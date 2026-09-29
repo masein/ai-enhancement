@@ -25,6 +25,7 @@ from pathlib import Path
 
 from . import config, db
 from . import served as _served
+from . import devicemark as _devicemark
 from .hfmeta import PreflightError, preflight
 
 LOCK = config.RESULTS_ROOT / ".run.lock"
@@ -446,6 +447,8 @@ def include_args_for(task: str) -> list[str]:
         return ["--include_path", str(config.SIMPLEQA_TASKS_DIR)]
     if task in config.MAB_TASKS:                    # 12o.3: mobileaibench.build_tasks writes them
         return ["--include_path", str(config.MAB_TASKS_DIR)]
+    if task in config.DM_TASKS:                     # 12q: devicemark.build_tasks writes them
+        return ["--include_path", str(config.DM_TASKS_DIR)]
     if task.startswith(("exam_", "fr_")):
         return ["--include_path", str(config.JUDGED_TASKS_DIR)]
     if config.EVAL_TASKS_DIR.is_dir() and any(config.EVAL_TASKS_DIR.glob("*.yaml")):
@@ -836,6 +839,9 @@ def run_submission(sub: dict) -> None:
     # 12o.3: MobileAIBench's HotpotQA and SQL, asked as SimpleQA is and scored
     # by MobileAIBench's own metrics, with no judge
     mobile = sub["suite"] == "mobile"
+    # 12q: DeviceMark's battery — a served setup asked over its server
+    # (service/devicemark.py), a Hugging Face model as three tasks on hf
+    devicemark = sub["suite"] == "devicemark"
     # 12f.0: a run that can't save doesn't start — in the status dot's words
     from . import disk
     why = disk.blocks_run()
@@ -878,6 +884,8 @@ def run_submission(sub: dict) -> None:
                 raise PreflightError(config.SAFETY_INSTRUCT_ONLY)
             if shared and meta["kind"] != "instruct":
                 raise PreflightError(config.SHARED_INSTRUCT_ONLY)
+            if devicemark and meta["kind"] != "instruct":
+                raise PreflightError(config.DM_INSTRUCT_ONLY)
     except PreflightError as e:
         db.update(sid, status="failed", error=str(e), finished_at=time.time())
         return
@@ -919,6 +927,13 @@ def run_submission(sub: dict) -> None:
     # of its own, "Qwen3.5-2B · thinking": its answers live apart, so nothing
     # ever averages them with the thinking-off ones
     th = gen_thinking(sub, meta) if generative or shared else None
+    if devicemark:
+        # 12q: thinking off unless asked, said out loud either way — a served
+        # setup's too, whatever it was registered with — and a thinking-on
+        # run a row of its own; the cap, thinking included, is the protocol's
+        th = {**({"mode": "switch", "on": bool(sub.get("thinking")),
+                  "separate": bool(sub.get("thinking")), "think_end": "</think>"}
+                 if rec else gen_thinking(sub, meta)), "budget": _devicemark.dm().CAP}
     row_safe = safe + "__thinking" if th and th["separate"] else safe
     config.LOGS_DIR.mkdir(parents=True, exist_ok=True)
     config.OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -941,7 +956,7 @@ def run_submission(sub: dict) -> None:
             {"model": sub["hf_id"] + " · thinking", "base_model": sub["hf_id"], "kind": kind,
              "params": meta["params"], "kind_reason": meta.get("kind_reason"),
              **(meta.get("archinfo") or {})}), encoding="utf-8")
-    backend, not_vllm = (gen_backend() if (generative or shared) and not rec else
+    backend, not_vllm = (gen_backend() if (generative or shared or devicemark) and not rec else
                          (_served.BACKEND, "") if generative or shared else ("hf", ""))
     fell_back = ""
     if everyday:
@@ -963,6 +978,15 @@ def run_submission(sub: dict) -> None:
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
         import mobileaibench as _mab
         _mab.build_tasks(mab_dir)
+    if devicemark and not rec:
+        # 12q: the battery's questions from the pinned datasets, as three tasks
+        try:
+            _devicemark.dm().build_tasks(config.DM_TASKS_DIR,
+                                         _devicemark.dm().load_items(config.DM_ITEMS))
+        except Exception as e:                          # noqa: BLE001 — said on the row
+            db.update(sid, status="failed", finished_at=time.time(),
+                      error=f"the battery's questions could not be read: {e}")
+            return
     if remote_code:      # the code that produced the scores is part of the record
         db.update(sid, progress=f"preflight ok · custom model code · batch={meta['batch']}")
     # 12h.1: a Hub model on the approved list runs its own code offline, as
@@ -1004,6 +1028,18 @@ def run_submission(sub: dict) -> None:
             pass
 
     try:
+        # 12q: a served setup's devicemark run — the battery, the pilot, the
+        # parity check or the speed test — asked over its server, in the lock
+        if devicemark and rec:
+            try:
+                status, line = _devicemark.run(sid, sub, rec, log_path)
+            except Exception as e:                      # noqa: BLE001 — said on the row
+                status, line = "failed", f"devicemark: {e}"
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n[service] devicemark: {e!r}\n")
+            db.update(sid, status=status, finished_at=time.time(), progress=line,
+                      error="" if status == "done" else line)
+            return
         # -- wait for VRAM, then run the missing tasks ----------------------------
         need_mib = int(meta["need_gb"] * 1024) + config.FREE_MARGIN_MIB
         t0 = time.time()
@@ -1066,7 +1102,8 @@ def run_submission(sub: dict) -> None:
             # 12n.2: a task asked as the generative three are — GPQA's chain of thought.
             # 12o.1: and in a thinking run, SimpleQA too: its answers are the
             # thinking row's, what follows the thinking
-            gen_task = generative or (shared and (task == config.GPQA_COT or th["separate"]))
+            gen_task = generative or devicemark or (
+                shared and (task == config.GPQA_COT or th["separate"]))
             shots = config.NFEWSHOT.get(task, 0)
             task_out = config.OUT_DIR / row_safe / f"{task}_{shots}shot"
             label = f"{i}/{len(tasks)} · {task} ({shots}-shot)"
@@ -1399,6 +1436,18 @@ def run_submission(sub: dict) -> None:
                 db.update(sid, error=f"reading the answers: {e}")
                 with open(log_path, "a") as lf:
                     lf.write(f"\n[service] the answers could not be read: {e!r}\n")
+        # 12q: DeviceMark's battery scored by its protocol — no judge, no GPU
+        if devicemark and not failed_tasks:
+            db.update(sid, status="running", progress="devicemark · scoring the answers")
+            try:
+                judge_note = _devicemark.mark_hf(sid, sub, meta, config.OUT_DIR / row_safe, th)
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n===== [{sid}] devicemark: {judge_note} =====\n")
+            except Exception as e:                      # noqa: BLE001 — the answers are on disk
+                failed_tasks.append("scoring")
+                db.update(sid, error=f"scoring: {e}")
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n[service] the devicemark answers could not be scored: {e!r}\n")
         if sub["suite"] == "judged" and not failed_tasks:
             db.update(sid, status="running", progress="submitting the answers to the judge")
             sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
@@ -1443,6 +1492,7 @@ def run_submission(sub: dict) -> None:
                     else f"{', '.join(t.replace('exam_', '') for t in tasks)}")
             db.update(sid, status="done", finished_at=time.time(),
                       progress=spent(judge_note if everyday or safety or shared or mobile
+                                     or devicemark
                                      else f"{what} done" + (f" · {note}" if note else "")
                                      + judge_note), error="")
     finally:

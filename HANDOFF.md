@@ -4290,6 +4290,67 @@ Not before the demo: a new hidden set changes every Everyday score.
   hidden. The tests' two answers are the stored ones, both on the practice
   half: a hidden question's answer never comes into the repo.
 
+### 12q — DeviceMark's protocol, run here (PR A: the suite, the runner, the scoring)
+
+- **The battery, `devicemark-replica-v1`** (`eval_tasks/devicemark/battery-v1.json`,
+  ids only; the questions are read on the server from the pinned datasets
+  into `BENCH_ROOT/devicemark/items-v1.jsonl`, never committed):
+  - IFEval: **DeviceMark's 300 keys**, from the `key` of their raw files
+    (huggingface.co/datasets/devicemark/results, `raw/full_*_ifeval.jsonl`):
+    the same 300 in all 12, whose 301st line is the run's `"record":
+    "summary"` line (no key);
+  - MMLU-Pro: 14 a category × 14 of the test split; MATH-500: 100 across its 7
+    subjects in proportion (largest remainder, exact, a tie to the larger
+    subject: 25/20/16/12/11/8/8). **Our draw of their design** — their keys
+    don't name dataset items — seeded by name from `source_ids.json`
+    (`python scripts/devicemark.py battery` draws it again and compares);
+  - the pilot's 30 (10 a bench) and the parity check's 50 (20/20/10), fixed.
+  The page must say: "IFEval: DeviceMark's items; MMLU-Pro and MATH: our draw
+  of the same design". If they publish their lists, swap them in and bump the
+  version.
+- **The protocol** (`scripts/devicemark.py`, `prompts.json`): 0-shot, the chat
+  template, one user message; greedy (temperature 0, seed 0); **a cap of 4,096
+  generated tokens, the thinking included** — checked on the server (the phone
+  build, 29 Sep: `max_tokens` 64 with thinking on stopped at 64, all of it
+  reasoning) and again by the pilot's cap check; thinking off unless asked,
+  said out loud either way, a thinking-on run its own row. No answer within
+  the cap is wrong and stays in: `acc` the headline, `acc_answered` beside it.
+- **The scorers**: IFEval by its official checkers, vendored from lm_eval
+  0.4.12 (`scripts/ifeval_official`, two marked changes; CI's image-deps job and
+  deploy step 3 compare it with the installed one), the mean of four, with
+  `random`, langdetect and `PYTHONHASHSEED` seeded (in a child) — items 1122
+  and 1129 draw a letter at random otherwise; MMLU-Pro, the letter in the last
+  `\boxed{}`, else "the answer is (X)" or "Answer: X" (recorded); MATH, the
+  last box, equal by math-verify (the board's MATH-500 check).
+- **A row** (`devicemark.json`): the composite (mean of the three) with a
+  2,000-resample item bootstrap, each bench with Wilson's interval (it gives
+  DeviceMark's own [0.3466, 0.4832] for 81/196), answered % and median
+  tokens, accuracy against budget at 128…4,096 (their `time_frontier`: pooled
+  over MMLU-Pro and MATH, as theirs; each bench beside), and the setup. Ranks:
+  1 + the rows wholly above; a shared rank is a tie, "=".
+- **Served setups** (`service/devicemark.py`): asked over llama-server
+  directly, each reply's usage, `timings`, finish reason and wall time kept;
+  its thinking counted with the server's `/tokenize` (llama-server's usage
+  doesn't split it), the answer the rest. Answers are appended as they land
+  (`devicemark_answers.jsonl`): a stopped run's next asks only the rest, and a
+  full run reuses the pilot's. Parts: `full`, `pilot`, `parity` (50 items on
+  the MTP setup and `pair`, identical outputs and same answers counted; 48 of
+  50 or more and the setup without MTP takes the MTP row's quality, marked
+  "quality from MTP run, parity x/50", until it has a full run of its own),
+  `speed` (`/tokenize` then `/completion`: 128 prompt tokens, 256 decoded past
+  any end, a warm-up and two trials; "server: RTX 5090 + CPU experts", never
+  a phone's speed).
+- **Hugging Face models** (calibration: `nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16`
+  and `Qwen/Qwen3.5-4B`, whose DeviceMark raw outputs match their board): the
+  three tasks `dm_ifeval`, `dm_mmlu_pro`, `dm_math` through lm_eval **on hf** —
+  there is no vLLM in this image (12h.1) — then scored the same way, each
+  answer's length counted again with the model's tokenizer. DeviceMark's raw
+  outputs for LFM2.5-1.2B, Granite-4.0-H-1B, Qwen3.5-0.8B/2B and Gemma 4 E2B
+  were generated at a 1,024-token cap and don't reproduce their board.
+- **A device's speed** (`PUT /api/devicemark/device`): a person's entry — tok/s,
+  device, source. Only it places a row on the chart's x-axis (PR B).
+- `GET /api/devicemark` lists the rows, resolved and ranked. PR B draws them.
+
 ### 12o.1 — every column's width and place, and what the live check of #103/#104 found
 
 - **Columns** (the Models table on every chip, the Knowledge exam's included,

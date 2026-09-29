@@ -1,0 +1,32 @@
+{
+ "_fixture": "12q: llama-server's reply to a request with enable_thinking=true and max_tokens=64, shaped as the one masein recorded on the phone build (port 8094, 29 Sep 2026): finish_reason length, usage.completion_tokens 64 and no completion_tokens_details, 215 characters of reasoning_content, empty content. The reasoning's words are invented here; its length is the recorded one.",
+ "choices": [
+  {
+   "finish_reason": "length",
+   "index": 0,
+   "message": {
+    "role": "assistant",
+    "content": "",
+    "reasoning_content": "Okay, the problem asks for the value of the expression. First I should simplify the fraction inside the brackets, then multiply both sides by the denominator and check whether the result is an integer or a fraction "
+   }
+  }
+ ],
+ "created": 1790000000,
+ "model": "Qwen3.6-35B-A3B-k4-LDA-UD-Q4_K_XL.gguf",
+ "system_fingerprint": "b6500-91428471f",
+ "object": "chat.completion",
+ "usage": {
+  "completion_tokens": 64,
+  "prompt_tokens": 71,
+  "total_tokens": 135
+ },
+ "id": "chatcmpl-recorded",
+ "timings": {
+  "prompt_n": 71,
+  "prompt_ms": 180.2,
+  "prompt_per_second": 394.0,
+  "predicted_n": 64,
+  "predicted_ms": 2105.3,
+  "predicted_per_second": 30.4
+ }
+}

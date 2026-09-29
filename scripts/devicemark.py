@@ -1,0 +1,754 @@
+#!/usr/bin/env python3
+"""12q: DeviceMark's protocol (devicemark.github.io), run here — the battery
+devicemark-replica-v1, its prompts, its scorers and each row's numbers.
+
+The battery (eval_tasks/devicemark/battery-v1.json, ids only):
+  IFEval    DeviceMark's own 300 keys — the same 300 in all 12 of their raw
+            files (huggingface.co/datasets/devicemark/results, raw/), whose
+            301st line is each run's summary record;
+  MMLU-Pro  14 a category × 14 categories of the test split, and
+  MATH-500  100 across its 7 subjects in proportion (largest remainder):
+            our draw of their design, seeded, from source_ids.json — their
+            keys ("mmlu-biology-0") don't name dataset items. The page says
+            so: IFEval, DeviceMark's items; MMLU-Pro and MATH, our draw.
+The questions are read on the server from the pinned datasets (load_items),
+never committed.
+
+The protocol: 0-shot, the chat template, one user message (prompts.json);
+greedy — temperature 0, seed 0; a cap of 4,096 generated tokens, thinking
+included; thinking off unless the run asks for it, a row of its own. No
+answer within the cap is wrong and stays in the denominator: `acc` is the
+headline, `acc_answered` beside it.
+
+The scorers: IFEval by its official checkers (scripts/ifeval_official, lm_eval
+v0.4.12's), the mean of prompt- and instruction-level, strict and loose, with
+random, langdetect and PYTHONHASHSEED seeded (items 1122 and 1129 draw a
+letter at random otherwise); MMLU-Pro, the letter in the last \\boxed{}, else
+one of a short list of unambiguous phrasings, which is recorded; MATH, the
+last \\boxed{}, equal as maths (math-verify on sympy: the board's MATH-500
+check, generative.math_equal).
+
+A row: the composite (the mean of the three) with an item bootstrap, each
+bench with Wilson's interval, answered % and median tokens, accuracy against
+budget (their time_frontier), and the setup. Ranks: above another only when
+its interval is wholly above the other's; overlapping is a tie, "=".
+
+    python scripts/devicemark.py battery                 draw it again and compare
+    python scripts/devicemark.py battery --write         …and write it
+    python scripts/devicemark.py mark results/full -m served/x   score one row again
+    python scripts/devicemark.py ifeval-score IN OUT     (the scorer's child)
+"""
+
+from __future__ import annotations
+
+import argparse
+import functools
+import json
+import math
+import os
+import random
+import re
+import statistics
+import subprocess
+import sys
+import time
+from fractions import Fraction
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+REPO = HERE.parent
+if str(HERE) not in sys.path:
+    sys.path.insert(0, str(HERE))
+
+VERSION = "devicemark-replica-v1"
+DATA_DIR = REPO / "eval_tasks" / "devicemark"
+SOURCE_IDS = DATA_DIR / "source_ids.json"
+BATTERY_PATH = DATA_DIR / "battery-v1.json"
+PROMPTS_PATH = DATA_DIR / "prompts.json"
+BENCHES = ("ifeval", "mmlu_pro", "math")
+LABEL = {"ifeval": "IFEval", "mmlu_pro": "MMLU-Pro", "math": "MATH"}
+# the tasks a Hugging Face model sits them as, through lm_eval (build_tasks)
+TASK = {"ifeval": "dm_ifeval", "mmlu_pro": "dm_mmlu_pro", "math": "dm_math"}
+BENCH_OF = {t: b for b, t in TASK.items()}
+DATASETS = {"ifeval": ("google/IFEval", "train"), "mmlu_pro": ("TIGER-Lab/MMLU-Pro", "test"),
+            "math": ("HuggingFaceH4/MATH-500", "test")}
+CAP = 4096
+SEED = 0
+BUDGETS = (128, 192, 256, 384, 512, 768, 1024, 1536, 2048, 3072, 4096)
+PER_CATEGORY, MATH_N = 14, 100
+PARTS = {"pilot": {"ifeval": 10, "mmlu_pro": 10, "math": 10},
+         "parity": {"ifeval": 20, "mmlu_pro": 20, "math": 10}}
+PARITY_NEED = 48
+BOOT_N, BOOT_SEED = 2000, 0
+Z = 1.959963984540054
+LETTERS = "ABCDEFGHIJ"
+WHOSE = "IFEval: DeviceMark's items; MMLU-Pro and MATH: our draw of the same design"
+SERVER_SPEED_LABEL = "server: RTX 5090 + CPU experts"
+OUT_NAME = "devicemark.json"
+ITEMS_NAME = "devicemark_items.jsonl"
+PILOT_NAME = "devicemark_pilot.json"
+PARITY_NAME = "devicemark_parity.json"
+SPEED_NAME = "devicemark_speed.json"
+DEVICE_NAME = "devicemark_device.json"
+
+
+# ---------------------------------------------------------------------------
+# the battery: ids only, drawn from source_ids.json with fixed seeds
+# ---------------------------------------------------------------------------
+
+def _rng(*parts) -> random.Random:
+    """a generator for one draw, seeded by its name: a string seed is hashed
+    with sha512, so it is the same on every machine and every PYTHONHASHSEED"""
+    return random.Random(":".join((VERSION, *map(str, parts))))
+
+
+def largest_remainder(counts: dict[str, int], n: int) -> dict[str, int]:
+    """n shared in proportion to counts: each its floor, then one more to the
+    largest remainders (exactly, as fractions) — a tie to the larger count,
+    then the name"""
+    total = sum(counts.values())
+    raw = {k: Fraction(n * v, total) for k, v in counts.items()}
+    take = {k: math.floor(x) for k, x in raw.items()}
+    for k in sorted(counts, key=lambda k: (-(raw[k] - take[k]), -counts[k], k))[
+            :n - sum(take.values())]:
+        take[k] += 1
+    return take
+
+
+def draw_mmlu(by_category: dict[str, list[int]], per: int = PER_CATEGORY) -> dict[str, list[int]]:
+    return {c: sorted(_rng("mmlu_pro", c).sample(sorted(ids), per))
+            for c, ids in sorted(by_category.items())}
+
+
+def draw_math(by_subject: dict[str, list[str]], n: int = MATH_N) -> dict[str, list[str]]:
+    take = largest_remainder({s: len(v) for s, v in by_subject.items()}, n)
+    return {s: sorted(_rng("math", s).sample(sorted(v), take[s]))
+            for s, v in sorted(by_subject.items())}
+
+
+def flat(bat: dict, bench: str) -> list[str]:
+    """one bench's keys, as strings, in the battery's order"""
+    v = bat[bench]
+    return [str(k) for k in (v if isinstance(v, list) else [x for ks in v.values() for x in ks])]
+
+
+def draw_part(bat: dict, name: str) -> dict[str, list[str]]:
+    """the pilot's or the parity check's fixed items, from the battery"""
+    out = {}
+    for b, n in PARTS[name].items():
+        keys = flat(bat, b)
+        got = set(_rng(name, b).sample(keys, n))
+        out[b] = [k for k in keys if k in got]
+    return out
+
+
+def make_battery(src: dict) -> dict:
+    """the battery, drawn from the ids"""
+    bat = {"version": VERSION,
+           "what": "DeviceMark's protocol, replicated: ids only (the questions are read on the "
+                   "server from the pinned datasets). " + WHOSE + ".",
+           "sources": {"ifeval": {"dataset": "google/IFEval", "license": "Apache-2.0",
+                                  "items": "DeviceMark's 300 keys: the key field of "
+                                           "huggingface.co/datasets/devicemark/results "
+                                           "raw/full_*_ifeval.jsonl — the same 300 in all 12 "
+                                           "files, whose 301st line is a summary record"},
+                       "mmlu_pro": {"dataset": "TIGER-Lab/MMLU-Pro", "split": "test",
+                                    "license": "MIT",
+                                    "items": f"{PER_CATEGORY} a category × 14, seeded: our draw"},
+                       "math": {"dataset": "HuggingFaceH4/MATH-500", "split": "test",
+                                "license": "MIT",
+                                "items": f"{MATH_N} across the 7 subjects in MATH-500's "
+                                         "proportions (largest remainder, a tie to the larger "
+                                         "subject), seeded: our draw"}},
+           "revisions": src["revisions"],
+           "seed": f"random.Random('{VERSION}:<bench>:<category or subject>')",
+           "ifeval": list(src["ifeval_devicemark_keys"]),
+           "mmlu_pro": draw_mmlu(src["mmlu_pro"]),
+           "math": draw_math(src["math500"])}
+    bat["pilot"] = draw_part(bat, "pilot")
+    bat["parity"] = draw_part(bat, "parity")
+    return bat
+
+
+@functools.lru_cache(maxsize=1)
+def battery() -> dict:
+    return json.loads(BATTERY_PATH.read_text(encoding="utf-8"))
+
+
+def keys_for(part: str = "full", bat: dict | None = None) -> list[tuple[str, str]]:
+    """(bench, key) of every item a run of this part asks, in order"""
+    bat = bat or battery()
+    if part in PARTS:
+        return [(b, k) for b in BENCHES for k in bat[part][b]]
+    return [(b, k) for b in BENCHES for k in flat(bat, b)]
+
+
+# ---------------------------------------------------------------------------
+# the prompts: one file, every row the same
+# ---------------------------------------------------------------------------
+
+@functools.lru_cache(maxsize=1)
+def prompts() -> dict:
+    return json.loads(PROMPTS_PATH.read_text(encoding="utf-8"))
+
+
+_FIELD = re.compile(r"\{(prompt|question|options|problem|letter|option)\}")
+
+
+def _fill(template: str, **values) -> str:
+    """the template's {fields} filled in one pass: a filled value is never
+    read again, and \\boxed{X} and \\boxed{} are not fields"""
+    return _FIELD.sub(lambda m: str(values[m.group(1)]), template)
+
+
+def prompt_for(item: dict) -> str:
+    p, b = prompts(), item["bench"]
+    if b == "ifeval":
+        return _fill(p["ifeval"], prompt=item["prompt"])
+    if b == "mmlu_pro":
+        opts = "\n".join(_fill(p["mmlu_pro_option"], letter=LETTERS[i], option=o)
+                         for i, o in enumerate(item["options"]))
+        return _fill(p["mmlu_pro"], question=item["question"], options=opts)
+    return _fill(p["math"], problem=item["problem"])
+
+
+def load_items(cache: Path, bat: dict | None = None) -> dict[tuple[str, str], dict]:
+    """every battery item's question and key, from the pinned datasets — on
+    the server, where they are fetched; kept in `cache` (beside BENCH_ROOT,
+    never in the repo) once read"""
+    bat = bat or battery()
+    if cache.exists():
+        rows = [json.loads(x) for x in cache.read_text(encoding="utf-8").splitlines() if x]
+        if rows and rows[0].get("version") == VERSION:
+            return {(r["bench"], r["key"]): r for r in rows[1:]}
+    from datasets import load_dataset
+    rev = bat["revisions"]
+    want = {b: set(flat(bat, b)) for b in BENCHES}
+    out: dict[tuple[str, str], dict] = {}
+    name, split = DATASETS["ifeval"]
+    for r in load_dataset(name, split=split, revision=rev[name]):
+        if str(r["key"]) in want["ifeval"]:
+            out[("ifeval", str(r["key"]))] = {
+                "bench": "ifeval", "key": str(r["key"]), "prompt": r["prompt"],
+                "instruction_id_list": list(r["instruction_id_list"]),
+                "kwargs": [dict(k) for k in r["kwargs"]]}
+    name, split = DATASETS["mmlu_pro"]
+    for r in load_dataset(name, split=split, revision=rev[name]):
+        if str(r["question_id"]) in want["mmlu_pro"]:
+            opts = [o for o in r["options"] if o is not None]
+            out[("mmlu_pro", str(r["question_id"]))] = {
+                "bench": "mmlu_pro", "key": str(r["question_id"]), "question": r["question"],
+                "options": opts, "answer": r["answer"], "category": r["category"]}
+    name, split = DATASETS["math"]
+    for r in load_dataset(name, split=split, revision=rev[name]):
+        if r["unique_id"] in want["math"]:
+            out[("math", r["unique_id"])] = {
+                "bench": "math", "key": r["unique_id"], "problem": r["problem"],
+                "answer": r["answer"], "subject": r["subject"]}
+    missing = [f"{b}:{k}" for b in BENCHES for k in want[b] if (b, k) not in out]
+    if missing:
+        raise ValueError(f"the pinned datasets lack {len(missing)} battery item(s): "
+                         f"{', '.join(sorted(missing)[:5])}")
+    for item in out.values():
+        item["text"] = prompt_for(item)
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    tmp = cache.with_suffix(".part")
+    tmp.write_text(json.dumps({"version": VERSION}) + "\n" + "".join(
+        json.dumps(out[k], ensure_ascii=False) + "\n" for k in keys_for("full", bat)),
+        encoding="utf-8")
+    tmp.replace(cache)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# reading an answer
+# ---------------------------------------------------------------------------
+
+def split_thinking(text: str) -> tuple[str, str]:
+    """(thinking, answer): the answer is what follows the last </think>; a
+    reply that opened its thinking and never closed it has no answer"""
+    t = text or ""
+    if "</think>" in t:
+        head, _, tail = t.rpartition("</think>")
+        return head.replace("<think>", "", 1).strip(), tail.strip()
+    if t.lstrip().startswith("<think>"):
+        return t.lstrip()[len("<think>"):].strip(), ""
+    return "", t.strip()
+
+
+def last_boxed(text: str) -> str | None:
+    """the last \\boxed{…}, braces matched (the board's, generative.last_boxed)"""
+    import generative
+    return generative.last_boxed(text or "")
+
+
+_WRAP = re.compile(r"\\(?:text|textbf|mathrm|mathbf|mbox|textrm)\s*\{([^{}]*)\}")
+_BOX_LETTER = re.compile(r"\(?([A-Ja-j])\)?(?:\s*[.:)]\s*.*)?", re.S)
+# the tested phrasings an MMLU-Pro answer may give instead of a box, each
+# unambiguous: a capital A–J after them, and not the start of a word
+FALLBACKS = (
+    ("answer is", re.compile(r"(?i:\b(?:the\s+)?(?:final\s+|correct\s+)?answer\s+is)\s*:?\s*"
+                             r"\**\s*\(?([A-J])\)?(?![A-Za-z])")),
+    ("Answer:", re.compile(r"(?:^|\n)[\s*#]*(?i:(?:final\s+)?answer)\s*\**\s*:\s*\**\s*"
+                           r"\(?([A-J])\)?(?![A-Za-z])")),
+)
+
+
+def box_letter(content: str) -> str | None:
+    """the one letter a box holds: C, \\text{C}, (C), C. or "C. the option" """
+    c = content or ""
+    for _ in range(3):
+        c = _WRAP.sub(r"\1", c)
+    c = c.strip().strip("$").strip()
+    m = _BOX_LETTER.fullmatch(c)
+    return m.group(1).upper() if m else None
+
+
+def mmlu_letter(answer: str) -> tuple[str | None, str]:
+    """(the letter, how it was read): the last box's; with no box, the last of
+    the tested phrasings. A letter in prose is never read"""
+    b = last_boxed(answer)
+    if b is not None:
+        got = box_letter(b)
+        return (got, "boxed") if got else (None, "")
+    for how, rx in FALLBACKS:
+        hits = rx.findall(answer or "")
+        if hits:
+            return hits[-1], how
+    return None, ""
+
+
+def math_answer(answer: str) -> str | None:
+    """the last box's contents, tidied as the board tidies them; no box, no
+    answer"""
+    import generative
+    b = last_boxed(answer)
+    return generative._tidy(b) if b else None
+
+
+def math_equal(pred: str | None, gold: str | None) -> bool:
+    import generative
+    return generative.math_equal(pred, gold)
+
+
+# ---------------------------------------------------------------------------
+# IFEval: the official checkers, seeded, in a child with PYTHONHASHSEED fixed
+# ---------------------------------------------------------------------------
+
+def _ifeval_here(rows: list[dict]) -> dict[str, dict]:
+    """each row {key, instruction_id_list, kwargs, prompt, response}: the four
+    verdicts, `random` and langdetect seeded before each item, so an item
+    whose kwargs leave a choice to chance (1122's letter "#", 1129's "!")
+    makes the same one every time"""
+    import langdetect
+
+    from ifeval_official import utils as U
+    out = {}
+    for r in rows:
+        inp = U.InputExample(key=r["key"], instruction_id_list=r["instruction_id_list"],
+                             prompt=r["prompt"], kwargs=r["kwargs"])
+        got = {}
+        for name, fn in (("strict", U.test_instruction_following_strict),
+                         ("loose", U.test_instruction_following_loose)):
+            random.seed(SEED)
+            langdetect.DetectorFactory.seed = SEED
+            o = fn(inp, r["response"])
+            got[name] = {"prompt": bool(o.follow_all_instructions),
+                         "inst": [bool(x) for x in o.follow_instruction_list]}
+        out[str(r["key"])] = got
+    return out
+
+
+def ifeval_verdicts(rows: list[dict]) -> dict[str, dict]:
+    """_ifeval_here in a child with PYTHONHASHSEED=0: the same answers score
+    the same in any process, any day"""
+    if not rows:
+        return {}
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        src, dst = Path(tmp) / "in.json", Path(tmp) / "out.json"
+        src.write_text(json.dumps(rows, ensure_ascii=False), encoding="utf-8")
+        env = {**os.environ, "PYTHONHASHSEED": str(SEED)}
+        env["PYTHONPATH"] = os.pathsep.join(
+            [str(HERE)] + [p for p in env.get("PYTHONPATH", "").split(os.pathsep) if p])
+        p = subprocess.run([sys.executable, str(HERE / "devicemark.py"), "ifeval-score",
+                            str(src), str(dst)], env=env, capture_output=True, text=True,
+                           timeout=1800)
+        if p.returncode != 0:
+            raise RuntimeError(f"the IFEval checker failed: {(p.stderr or p.stdout)[-600:]}")
+        return json.loads(dst.read_text(encoding="utf-8"))
+
+
+# ---------------------------------------------------------------------------
+# one item, scored
+# ---------------------------------------------------------------------------
+
+def score_items(records: list[dict], items: dict[tuple[str, str], dict]) -> list[dict]:
+    """each answer record {bench, key, text or answer/thinking, gen_tokens,
+    capped, …}, scored: answered, the parsed answer, correct — and for IFEval
+    the four verdicts. The record's own fields are kept"""
+    out, ife = [], []
+    for r in records:
+        item = items[(r["bench"], str(r["key"]))]
+        if "answer" in r:
+            answer = r["answer"] or ""
+        else:
+            _, answer = split_thinking(r.get("text") or "")
+        s = {**r, "key": str(r["key"])}
+        if r["bench"] == "mmlu_pro":
+            got, how = (None, "") if not answer else mmlu_letter(answer)
+            s.update(parsed=got, how=how, gold=item["answer"], answered=got is not None,
+                     correct=got is not None and got == item["answer"])
+        elif r["bench"] == "math":
+            got = math_answer(answer) if answer else None
+            s.update(parsed=got, how="boxed" if got else "", gold=item["answer"],
+                     answered=got is not None, correct=math_equal(got, item["answer"]))
+        else:
+            s.update(answered=bool(answer.strip()) and not r.get("capped"))
+            ife.append({"key": item["key"], "instruction_id_list": item["instruction_id_list"],
+                        "kwargs": item["kwargs"], "prompt": item["prompt"], "response": answer})
+        out.append(s)
+    verdicts = ifeval_verdicts(ife)
+    for s in out:
+        if s["bench"] == "ifeval":
+            v = verdicts[s["key"]]
+            s.update(ifeval=v, correct=v["strict"]["prompt"])
+    return out
+
+
+# ---------------------------------------------------------------------------
+# a row's numbers
+# ---------------------------------------------------------------------------
+
+def wilson(p: float, n: int) -> list[float]:
+    """Wilson's 95% interval for a proportion p of n"""
+    if n <= 0:
+        return [0.0, 0.0]
+    d = 1 + Z * Z / n
+    c = (p + Z * Z / (2 * n)) / d
+    h = Z * math.sqrt(p * (1 - p) / n + Z * Z / (4 * n * n)) / d
+    return [round(max(0.0, c - h), 4), round(min(1.0, c + h), 4)]
+
+
+def ifeval_mean4(scored: list[dict]) -> float:
+    """the mean of prompt-level strict, instruction-level strict, prompt-level
+    loose and instruction-level loose — instruction level over every
+    instruction of the items given"""
+    if not scored:
+        return 0.0
+    parts = []
+    for mode in ("strict", "loose"):
+        parts.append(sum(s["ifeval"][mode]["prompt"] for s in scored) / len(scored))
+        inst = [x for s in scored for x in s["ifeval"][mode]["inst"]]
+        parts.append(sum(inst) / len(inst) if inst else 0.0)
+    return sum(parts) / 4
+
+
+def bench_score(bench: str, scored: list[dict]) -> float:
+    if bench == "ifeval":
+        return ifeval_mean4(scored)
+    return sum(bool(s["correct"]) for s in scored) / len(scored) if scored else 0.0
+
+
+def composite_ci(by_bench: dict[str, list[dict]], n: int = BOOT_N,
+                 seed: int = BOOT_SEED) -> list[float]:
+    """the composite's 95% interval: items resampled with replacement within
+    each bench, each bench scored again, the three averaged, n times"""
+    rng = random.Random(seed)
+    vals = []
+    for _ in range(n):
+        vals.append(sum(bench_score(b, [rng.choice(v) for _ in v]) for b, v in
+                        by_bench.items()) / len(by_bench))
+    vals.sort()
+    return [round(vals[int(0.025 * (n - 1))], 4), round(vals[int(math.ceil(0.975 * (n - 1)))], 4)]
+
+
+def time_frontier(scored: list[dict], budgets=BUDGETS) -> dict:
+    """what the score would be at each cap, from each answer's own length: an
+    item counts at budget b when it is right and was written within b tokens.
+    As theirs, pooled over the MMLU-Pro and MATH items; each bench beside"""
+    def at(items):
+        return [round(sum(bool(s["correct"]) and (s.get("gen_tokens") or 0) <= b
+                          for s in items) / len(items), 4) if items else None for b in budgets]
+    pooled = [s for s in scored if s["bench"] in ("mmlu_pro", "math")]
+    return {"b": list(budgets), "acc": at(pooled),
+            "by_bench": {b: at([s for s in scored if s["bench"] == b])
+                         for b in ("mmlu_pro", "math")}}
+
+
+def _median(xs: list) -> float | None:
+    xs = [x for x in xs if isinstance(x, (int, float))]
+    return statistics.median(xs) if xs else None
+
+
+def summarize(scored: list[dict], setup: dict, part: str = "full") -> dict:
+    """a row: the composite and its interval, the three benches with theirs,
+    answered and median tokens per bench and overall, accuracy against budget,
+    and the setup it ran on"""
+    by = {b: [s for s in scored if s["bench"] == b] for b in BENCHES}
+    benches = {}
+    for b, items in by.items():
+        n = len(items)
+        acc = bench_score(b, items)
+        answered = [s for s in items if s["answered"]]
+        b_out = {"n": n, "acc": round(acc, 4), "ci": wilson(acc, n),
+                 "answered": len(answered),
+                 "answered_pct": round(len(answered) / n, 4) if n else None,
+                 "capped": sum(bool(s.get("capped")) for s in items),
+                 "median_tokens": _median([s.get("gen_tokens") for s in items])}
+        if b == "ifeval":
+            b_out["parts"] = {f"{lvl}_{mode}": round(
+                (sum(s["ifeval"][mode]["prompt"] for s in items) / n if lvl == "prompt" else
+                 (lambda xs: sum(xs) / len(xs) if xs else 0.0)(
+                     [x for s in items for x in s["ifeval"][mode]["inst"]])), 4)
+                for lvl in ("prompt", "inst") for mode in ("strict", "loose")} if n else {}
+        else:
+            b_out["acc_answered"] = (round(sum(bool(s["correct"]) for s in answered)
+                                           / len(answered), 4) if answered else None)
+            b_out["fallbacks"] = {h: sum(s.get("how") == h for s in items)
+                                  for h in sorted({s.get("how") for s in items} - {"", None})}
+        benches[b] = b_out
+    full = all(by[b] for b in BENCHES)
+    comp = round(sum(benches[b]["acc"] for b in BENCHES) / 3, 4) if full else None
+    return {
+        "version": VERSION, "part": part, "at": time.time(), "setup": setup,
+        "composite": {"value": comp, "ci": composite_ci(by) if full else None},
+        "benches": benches,
+        "answered_pct": round(sum(b["answered"] for b in benches.values())
+                              / max(1, len(scored)), 4),
+        "median_tokens": _median([s.get("gen_tokens") for s in scored]),
+        "time_frontier": time_frontier(scored),
+        "n": len(scored), "whose": WHOSE}
+
+
+def ranks(rows: list[dict]) -> list[str]:
+    """each row's rank by composite, theirs: 1 + the rows strictly better —
+    whose interval's lower end is above this one's upper end. A rank more
+    than one row shares is a tie, "=3" """
+    got = []
+    for r in rows:
+        lo_hi = r["ci"]
+        got.append(1 + sum(1 for o in rows if o is not r and o["ci"][0] > lo_hi[1]))
+    return [f"={g}" if got.count(g) > 1 else str(g) for g in got]
+
+
+# ---------------------------------------------------------------------------
+# MTP parity: the same items, with and without MTP, greedy both ways
+# ---------------------------------------------------------------------------
+
+def same_answer(a: dict, b: dict) -> bool:
+    if a["bench"] == "ifeval":
+        return a["ifeval"] == b["ifeval"]
+    if a["bench"] == "math":
+        return (a["parsed"] == b["parsed"]
+                or (a["parsed"] is not None and math_equal(a["parsed"], b["parsed"])))
+    return a["parsed"] == b["parsed"]
+
+
+def parity(mtp: list[dict], plain: list[dict]) -> dict:
+    """how many outputs are the same token for token (the same text: the one
+    model, the one tokenizer), and how many answers are the same; at least
+    PARITY_NEED of the 50 alike, and the setup without MTP takes its quality
+    from the MTP row"""
+    theirs = {(s["bench"], s["key"]): s for s in plain}
+    rows = []
+    for s in mtp:
+        o = theirs.get((s["bench"], s["key"]))
+        if o is None:
+            continue
+        rows.append({"bench": s["bench"], "key": s["key"],
+                     "identical": (s.get("text") or "") == (o.get("text") or ""),
+                     "same_answer": same_answer(s, o)})
+    same = sum(r["same_answer"] for r in rows)
+    return {"n": len(rows), "identical": sum(r["identical"] for r in rows), "same_answer": same,
+            "need": PARITY_NEED, "passes": len(rows) == sum(PARTS["parity"].values())
+            and same >= PARITY_NEED, "items": rows}
+
+
+def inherit(own: dict | None, mtp_row: dict | None, report: dict | None) -> dict | None:
+    """a setup without MTP's quality: its own full run when it has one (the
+    switch that runs it anyway); else the MTP row's, when the parity check
+    passed on the same thinking mode — marked so"""
+    if own and own.get("part") == "full":
+        return own
+    if not (mtp_row and report and report.get("passes")):
+        return own
+    if bool(report.get("thinking")) != bool((mtp_row.get("setup") or {}).get("thinking")):
+        return own
+    return {**mtp_row, "inherited": {"from": report["mtp"], "parity": report["same_answer"],
+                                     "of": report["n"],
+                                     "line": f"quality from MTP run, parity "
+                                             f"{report['same_answer']}/{report['n']}"}}
+
+
+# ---------------------------------------------------------------------------
+# a Hugging Face model: three lm_eval tasks, answered on hf
+# ---------------------------------------------------------------------------
+
+def build_tasks(dest: Path, items: dict[tuple[str, str], dict], part: str = "full") -> Path:
+    """the three tasks lm_eval asks a Hugging Face model: each item's prompt as
+    the one user message (the chat template applied), greedy, the cap of
+    4,096 generated tokens, nothing to stop on but the end of the turn"""
+    dest.mkdir(parents=True, exist_ok=True)
+    for b in BENCHES:
+        rows = [items[(bb, k)] for bb, k in keys_for(part) if bb == b]
+        (dest / f"{TASK[b]}.jsonl").write_text("".join(
+            json.dumps({"bench": b, "key": r["key"], "text": r["text"]}, ensure_ascii=False)
+            + "\n" for r in rows), encoding="utf-8")
+        (dest / f"{TASK[b]}.yaml").write_text(
+            f"task: {TASK[b]}\n"
+            "dataset_path: json\n"
+            f"dataset_kwargs:\n  data_files:\n    test: {dest / (TASK[b] + '.jsonl')}\n"
+            "test_split: test\n"
+            "output_type: generate_until\n"
+            "doc_to_text: '{{text}}'\n"
+            "doc_to_target: ''\n"
+            "generation_kwargs:\n"
+            "  until: []\n"
+            "  do_sample: false\n"
+            "  temperature: 0.0\n"
+            f"  max_gen_toks: {CAP}\n"
+            "metric_list:\n  - metric: bypass\n"
+            "metadata:\n  version: 1.0\n", encoding="utf-8")
+    return dest
+
+
+def stand_in_items(part: str = "full") -> dict[tuple[str, str], dict]:
+    """each battery key with "x" for its question: enough for build_tasks when
+    only the tasks' names are asked about (scripts/check_tasks.py)"""
+    return {(b, k): {"bench": b, "key": k, "text": "x"} for b, k in keys_for(part)}
+
+
+def records_from_samples(row_dir: Path, token_count=None) -> list[dict]:
+    """each answer a Hugging Face run logged, as a record: its length counted
+    again from the text with the model's tokenizer (`token_count`), and
+    capped when that reaches the cap"""
+    out = []
+    for b in BENCHES:
+        files = sorted((row_dir / f"{TASK[b]}_0shot").rglob(f"samples_{TASK[b]}_*.jsonl"))
+        if not files:
+            continue
+        for line in files[-1].read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            s = json.loads(line)
+            text = (s.get("resps") or [[""]])[0][0] or ""
+            n = token_count(text) if token_count else None
+            out.append({"bench": b, "key": str(s["doc"]["key"]), "text": text,
+                        "gen_tokens": n, "capped": bool(n is not None and n >= CAP - 2),
+                        "tokens_from": "the text, counted again with the model's tokenizer"})
+    return out
+
+
+# ---------------------------------------------------------------------------
+# on disk: a row's answers and its numbers
+# ---------------------------------------------------------------------------
+
+def read_items(row_dir: Path, name: str = ITEMS_NAME) -> list[dict]:
+    f = row_dir / name
+    if not f.exists():
+        return []
+    return [json.loads(x) for x in f.read_text(encoding="utf-8").splitlines() if x.strip()]
+
+
+def mark(row_dir: Path, items: dict[tuple[str, str], dict], setup: dict,
+         records: list[dict] | None = None, part: str = "full") -> dict:
+    """a row scored from its answers: the scored answers beside it
+    (devicemark_items.jsonl, the question browser's), its numbers in
+    devicemark.json (or the pilot's own file)"""
+    records = records if records is not None else read_items(row_dir)
+    order = {k: i for i, k in enumerate(keys_for(part))}
+    records = sorted((r for r in records if (r["bench"], str(r["key"])) in order),
+                     key=lambda r: order[(r["bench"], str(r["key"]))])
+    scored = score_items(records, items)
+    row = summarize(scored, setup, part)
+    row_dir.mkdir(parents=True, exist_ok=True)
+    if part == "full":
+        (row_dir / ITEMS_NAME).write_text("".join(json.dumps(s, ensure_ascii=False) + "\n"
+                                                  for s in scored), encoding="utf-8")
+    (row_dir / (OUT_NAME if part == "full" else PILOT_NAME)).write_text(
+        json.dumps(row if part == "full" else {**row, "items": scored}, indent=1,
+                   ensure_ascii=False), encoding="utf-8")
+    return row
+
+
+def rows(out_dir: Path) -> list[dict]:
+    """every row on the board that sat the battery: its numbers, its speeds
+    (the server's and a device's), a setup without MTP's quality from its
+    MTP partner when the parity check allows — and the ranks"""
+    got = {}
+    for d in sorted(p for p in out_dir.iterdir() if p.is_dir()) if out_dir.is_dir() else []:
+        f = d / OUT_NAME
+        row = json.loads(f.read_text(encoding="utf-8")) if f.exists() else None
+        rep = d / PARITY_NAME
+        report = json.loads(rep.read_text(encoding="utf-8")) if rep.exists() else None
+        if row is None and not (report and report.get("plain") == _model_of(d)):
+            continue
+        got[d.name] = {"dir": d.name, "row": row, "report": report}
+    out = []
+    for name, g in got.items():
+        row, report = g["row"], g["report"]
+        if report and report.get("plain") == _model_of(out_dir / name):
+            mtp = got.get(report["mtp"].replace("/", "__") + ("__thinking" if report.get(
+                "thinking") else ""), {}).get("row")
+            row = inherit(row, mtp, report)
+        if not row or row.get("composite", {}).get("value") is None:
+            continue
+        base = out_dir / name.removesuffix("__thinking")
+        speed = _json(base / SPEED_NAME)
+        device = _json(base / DEVICE_NAME)
+        thinks = name.endswith("__thinking")
+        mid = _model_of(out_dir / name)
+        out.append({"id": mid + (" · thinking" if thinks else ""), "model": mid,
+                    "thinking": thinks, "row": row,
+                    "server_tok_s": speed.get("decode_tok_s") if speed else None,
+                    "server_label": SERVER_SPEED_LABEL if speed else None,
+                    "device": device or None})
+    rk = ranks([{"ci": r["row"]["composite"]["ci"]} for r in out])
+    for r, k in zip(out, rk):
+        r["rank"] = k
+    return out
+
+
+def _json(f: Path) -> dict | None:
+    try:
+        return json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def _model_of(d: Path) -> str:
+    return d.name.removesuffix("__thinking").replace("__", "/", 1)
+
+
+# ---------------------------------------------------------------------------
+# the command line
+# ---------------------------------------------------------------------------
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    b = sub.add_parser("battery", help="draw the battery again from source_ids.json")
+    b.add_argument("--write", action="store_true")
+    s = sub.add_parser("ifeval-score")
+    s.add_argument("src", type=Path)
+    s.add_argument("dst", type=Path)
+    a = ap.parse_args(argv)
+    if a.cmd == "ifeval-score":
+        rows_in = json.loads(a.src.read_text(encoding="utf-8"))
+        a.dst.write_text(json.dumps(_ifeval_here(rows_in)), encoding="utf-8")
+        return 0
+    bat = make_battery(json.loads(SOURCE_IDS.read_text(encoding="utf-8")))
+    if a.write:
+        BATTERY_PATH.write_text(json.dumps(bat, indent=1) + "\n", encoding="utf-8")
+        print(f"wrote {BATTERY_PATH.relative_to(REPO)}: " + ", ".join(
+            f"{LABEL[k]} {len(flat(bat, k))}" for k in BENCHES))
+        return 0
+    same = BATTERY_PATH.exists() and json.loads(BATTERY_PATH.read_text(encoding="utf-8")) == bat
+    print("the committed battery is the draw" if same else "the committed battery differs")
+    return 0 if same else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

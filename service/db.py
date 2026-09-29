@@ -71,7 +71,9 @@ CREATE TABLE IF NOT EXISTS submissions (
   bank_version TEXT DEFAULT '',                  -- 12a.4: the Everyday wording this run answered (its hash)
   thinking    INTEGER NOT NULL DEFAULT 0,        -- 12h.1: "Think before answering" asked for
   subset      INTEGER NOT NULL DEFAULT 0,        -- 12h.1: MMLU-Pro items, a seeded subset; 0 = all
-  bbq_all     INTEGER NOT NULL DEFAULT 0         -- 12k.2: BBQ's 29,246, not the seeded 3,000
+  bbq_all     INTEGER NOT NULL DEFAULT 0,        -- 12k.2: BBQ's 29,246, not the seeded 3,000
+  part        TEXT DEFAULT '',                   -- 12q: devicemark's part: full, pilot, parity, speed
+  pair        TEXT DEFAULT ''                    -- 12q: the parity check's setup without MTP
 );
 CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions(status);
 -- find-the-gap: an LLM proposes a skill spec from diagnose-half failures, a
@@ -308,7 +310,8 @@ CREATE TABLE IF NOT EXISTS qb_drafts (
 _COLS = ["id", "hf_id", "kind", "suite", "submitter", "note", "status", "progress",
          "error", "params", "vocab", "batch", "need_gb", "created_at", "started_at",
          "finished_at", "gpu_seconds", "arch", "allow_remote_code", "load_missing",
-         "tasks", "judge_batch", "reuse_note", "bank_version", "thinking", "subset", "bbq_all"]
+         "tasks", "judge_batch", "reuse_note", "bank_version", "thinking", "subset", "bbq_all",
+         "part", "pair"]
 
 
 def _conn() -> sqlite3.Connection:
@@ -341,7 +344,11 @@ def init() -> None:
                      "ALTER TABLE submissions ADD COLUMN bank_version TEXT DEFAULT ''",
                      "ALTER TABLE submissions ADD COLUMN thinking INTEGER NOT NULL DEFAULT 0",
                      "ALTER TABLE submissions ADD COLUMN subset INTEGER NOT NULL DEFAULT 0",
-                     "ALTER TABLE submissions ADD COLUMN bbq_all INTEGER NOT NULL DEFAULT 0"):
+                     "ALTER TABLE submissions ADD COLUMN bbq_all INTEGER NOT NULL DEFAULT 0",
+                     # 12q: a devicemark run's part (full, pilot, parity, speed) and the
+                     # parity check's setup without MTP
+                     "ALTER TABLE submissions ADD COLUMN part TEXT DEFAULT ''",
+                     "ALTER TABLE submissions ADD COLUMN pair TEXT DEFAULT ''"):
             try:
                 c.execute(stmt)
             except sqlite3.OperationalError:
@@ -394,14 +401,16 @@ def _backfill_judge_batch(c: sqlite3.Connection) -> None:
 
 def add(hf_id: str, kind: str, suite: str, submitter: str, note: str,
         allow_remote_code: bool = False, tasks: list[str] | None = None,
-        thinking: bool = False, subset: int = 0, bbq_all: bool = False) -> int:
+        thinking: bool = False, subset: int = 0, bbq_all: bool = False,
+        part: str = "", pair: str = "") -> int:
     with closing(_conn()) as c:
         cur = c.execute(
             "INSERT INTO submissions (hf_id, kind, suite, submitter, note, created_at, "
-            "allow_remote_code, tasks, thinking, subset, bbq_all) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            "allow_remote_code, tasks, thinking, subset, bbq_all, part, pair) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (hf_id, kind, suite, submitter, note, time.time(), int(allow_remote_code),
              json.dumps(sorted(tasks or [])), int(bool(thinking)), int(subset or 0),
-             int(bool(bbq_all))))
+             int(bool(bbq_all)), part or "", pair or ""))
         c.commit()
         return int(cur.lastrowid)
 

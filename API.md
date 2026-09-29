@@ -208,6 +208,45 @@ other*, not to public leaderboards (different n-shot conventions).
 Returns `{"id": 12, "status": "queued"}` — or, if the model is already active,
 `{"id": 9, "status": "running", "note": "already in the queue — joining the existing run"}`.
 
+#### 12q: DeviceMark's protocol — `"suite": "devicemark"`
+
+DeviceMark's battery (`devicemark-replica-v1`: IFEval, their 300 items;
+MMLU-Pro and MATH, our draw of their design): greedy, capped at 4,096 generated
+tokens with the thinking counted, thinking off unless asked. A served setup is
+asked over its llama-server; a Hugging Face model sits it through lm_eval on
+hf. Two more fields:
+
+```json
+{"hf_id": "served/Qwen3.6-k4-LDA-MTP", "suite": "devicemark",
+ "part": "full",              // "full" (the 596 items, default) | "pilot" (30 of them, and a check
+                              //   that the cap counts the thinking) | "parity" (50 fixed items on
+                              //   this setup and `pair`) | "speed" (128 prompt tokens, 256 decoded,
+                              //   a warm-up and two trials) — all but full for a served setup only
+ "pair": "",                  // parity only: the same setup without MTP (hf_id is the one with it)
+ "thinking": false}           // true: thinking on, a row of its own (not for the speed test)
+```
+
+A served setup's thinking here is the request's (`chat_template_kwargs`),
+whatever it was registered with. A stopped run keeps its answers; the next
+asks only the rest.
+
+### GET /api/devicemark — each row that sat the battery
+
+`{"version", "whose", "cap", "server_speed_label", "rows": [...]}`: per row
+its numbers (`devicemark.json`: the composite with its bootstrap interval, the
+three benches with Wilson's, answered %, median tokens, accuracy against
+budget, the setup), its server speed from the speed test, its device speed if
+one was entered, and its rank (`"=3"` a tie). A setup without MTP whose parity
+check passed (48 of 50 or more) carries the MTP row's quality, marked
+`inherited`, until it has a full run of its own.
+
+### PUT /api/devicemark/device — a speed measured on a device
+
+`{"model": "served/…", "tok_s": 12.4, "device": "iPhone 17 Pro", "source":
+"measured by <name>, <date>"}` (X-Token as for submissions; `"tok_s": null`
+clears it). Only this places a row on the chart's x-axis — never the server's
+speed test.
+
 ### GET /api/submissions?limit=100 — the queue, newest first
 
 Each row:

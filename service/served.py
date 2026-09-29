@@ -54,7 +54,7 @@ LOGLIK_LINE = ("Multiple-choice benchmarks need the model loaded here; this one 
 CHANGED_LINE = ("The server now serves a different file than the one registered. Register it "
                 "again if that's intended.")
 KEPT_FOR_NEXT = " · the answers it gave are kept: the next run asks only the rest"
-SUITES = ("everyday", "judged", "generative", "safety", "shared", "mobile")
+SUITES = ("everyday", "judged", "generative", "safety", "shared", "mobile", "devicemark")
 THINKING = {"on": "on", "off": "off", "auto": "the model decides"}
 PINNED = ("file", "size", "ctx", "build")
 TS_FMT = "%Y-%m-%dT%H-%M-%S.000000"

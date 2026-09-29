@@ -107,6 +107,9 @@ def make_service(root: Path, monkeypatch, *, llm_provider: str = "fake", tree: b
                       # 12o.1: the run's SimpleQA task under the test's root, not the repo's
                       "SIMPLEQA_TASKS_DIR": root / "simpleqa" / "tasks",
                       "MAB_TASKS_DIR": root / "mobileaibench" / "tasks",
+                      # 12q: devicemark's tasks and its questions under the test's root
+                      "DM_TASKS_DIR": root / "devicemark" / "tasks",
+                      "DM_ITEMS": root / "devicemark" / "items-v1.jsonl",
                       # 12p.1: backups under the test's root; the fixture's exam is
                       # not the repo's, so its report half is checked by the tests
                       # that mean to

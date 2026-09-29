@@ -424,6 +424,12 @@ class SubmissionIn(BaseModel):
     # 12k.2, the full suite only: BBQ's 29,246 ambiguous questions instead of
     # the seeded 3,000
     bbq_all: bool = False
+    # 12q, the devicemark suite only: which part — the battery (full), its
+    # 30-item pilot, the MTP parity check, or the speed test (the last three
+    # for a served setup) — and, for the parity check, the setup without MTP
+    # (hf_id is the one with it)
+    part: str = ""
+    pair: str = ""
 
 
 ACTIVE = ("queued", "preflight", "waiting_gpu", "waiting_lock", "running")
@@ -451,12 +457,21 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
                                  "judged (free response + judge), everyday (Everyday tasks), "
                                  "generative (IFEval, MMLU-Pro, MATH-500), safety "
                                  "(Do-Not-Answer, XSTest), shared (GPQA Diamond, "
-                                 "SimpleQA Verified) or mobile (MobileAIBench's HotpotQA and "
-                                 "SQL)")
-    if s.suite not in ("generative", "shared") and s.thinking:
+                                 "SimpleQA Verified), mobile (MobileAIBench's HotpotQA and "
+                                 "SQL) or devicemark (DeviceMark's battery)")
+    if s.suite not in ("generative", "shared", "devicemark") and s.thinking:
         raise HTTPException(422, "thinking is for IFEval, MMLU-Pro and MATH-500 (suite "
-                                 "generative) and GPQA Diamond and SimpleQA Verified (suite "
-                                 "shared) only")
+                                 "generative), GPQA Diamond and SimpleQA Verified (suite "
+                                 "shared) and DeviceMark's battery (suite devicemark) only")
+    part = (s.part or "").strip().lower()
+    pair = (s.pair or "").strip()
+    if s.suite != "devicemark" and (part or pair):
+        raise HTTPException(422, "part and pair are for the devicemark suite only")
+    if s.suite == "devicemark":
+        why = _devicemark_check(s.hf_id.strip(), s.kind, part or "full", pair, s.thinking)
+        if why:
+            raise HTTPException(422, why + " Nothing was queued.")
+        part = part or "full"
     if s.suite != "generative" and s.subset:
         raise HTTPException(422, "subset is for MMLU-Pro (suite generative) only")
     if s.suite == "generative" and s.kind == "base":
@@ -503,7 +518,7 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
                                      f"A model served elsewhere. Nothing was queued.")
         if s.suite not in served.SUITES:
             raise HTTPException(422, served.LOGLIK_LINE + " Nothing was queued.")
-        if s.thinking:
+        if s.thinking and s.suite != "devicemark":
             raise HTTPException(422, "A served model thinks as it was registered: register it "
                                      "again to change that. Nothing was queued.")
         # 12m.3: a model from OpenRouter — a run that would pass this month's
@@ -570,14 +585,47 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
         # 12h.1: thinking on is another row, and a subset another run
         same = same and bool(row.get("thinking")) == s.thinking \
             and int(row.get("subset") or 0) == s.subset \
-            and bool(row.get("bbq_all")) == s.bbq_all
+            and bool(row.get("bbq_all")) == s.bbq_all \
+            and (row.get("part") or "") == part and (row.get("pair") or "") == pair
         if row["suite"] == s.suite and same:
             return {"id": row["id"], "status": row["status"],
                     "note": "already in the queue — joining the existing run"}
     sid = db.add(hf_id, s.kind, s.suite, s.submitter.strip()[:80], s.note.strip()[:200],
                  allow_remote_code=s.allow_remote_code, tasks=chosen,
-                 thinking=s.thinking, subset=s.subset, bbq_all=s.bbq_all)
-    return {"id": sid, "status": "queued", "tasks": sorted(chosen)}
+                 thinking=s.thinking, subset=s.subset, bbq_all=s.bbq_all,
+                 part=part, pair=pair)
+    return {"id": sid, "status": "queued", "tasks": sorted(chosen),
+            **({"part": part} if part else {}), **({"pair": pair} if pair else {})}
+
+
+def _devicemark_check(hf_id: str, kind: str, part: str, pair: str, thinking: bool) -> str:
+    """12q: '' when this devicemark run can be queued, else why not"""
+    if part not in config.DM_PARTS:
+        return f"part must be one of {', '.join(config.DM_PARTS)}."
+    if kind == "base":
+        return config.DM_INSTRUCT_ONLY + "."
+    srv = served.is_served(hf_id)
+    rec = served.get(hf_id) if srv else None
+    if rec and served.is_openrouter(rec):
+        return ("DeviceMark's battery here is for our own served setups and Hugging Face "
+                "models, not a model from OpenRouter.")
+    if not srv and part != "full":
+        return (f"The {part} is for a served setup: a Hugging Face model sits the whole "
+                "battery (part full).")
+    if part == "speed" and thinking:
+        return "The speed test decodes a fixed prompt: thinking doesn't apply to it."
+    if part == "parity":
+        if not pair:
+            return ("The parity check needs pair: the setup without MTP (hf_id is the one "
+                    "with it).")
+        other = served.get(pair)
+        if not served.is_served(pair) or not other or served.is_openrouter(other):
+            return f"pair {pair} is not one of our registered served setups."
+        if pair == hf_id:
+            return "pair is the same setup as hf_id: the parity check compares two."
+    elif pair:
+        return "pair is for the parity check only."
+    return ""
 
 
 @app.get("/api/submissions")
@@ -1243,6 +1291,58 @@ def artifact_delete(name: str, x_token: str = Header(default="")):
     import shutil
     shutil.rmtree(d)
     return {"deleted": name, "note": "its benchmark results stay on the leaderboard"}
+
+
+# ---------------------------------------------------------------------------
+# 12q: DeviceMark's protocol — each row that sat the battery, and a speed
+# measured on a device, entered by a person (only that places a row on the
+# chart's x-axis; the server's speed test never does)
+# ---------------------------------------------------------------------------
+
+def _dm():
+    from . import devicemark as _devicemark
+    return _devicemark.dm()
+
+
+@app.get("/api/devicemark")
+def devicemark_rows():
+    d = _dm()
+    return {"version": d.VERSION, "whose": d.WHOSE, "cap": d.CAP,
+            "server_speed_label": d.SERVER_SPEED_LABEL,
+            "rows": d.rows(config.OUT_DIR)}
+
+
+class DeviceSpeedIn(BaseModel):
+    model: str
+    tok_s: float | None = None          # None clears it
+    device: str = ""
+    source: str = ""                    # "measured by <colleague>, <date>"
+    by: str = ""
+
+
+@app.put("/api/devicemark/device")
+def devicemark_device(body: DeviceSpeedIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    d = _dm()
+    mid = body.model.strip()
+    if not _HF_ID_RE.match(mid):
+        raise HTTPException(422, "model must be a model id on the board, like served/<name>")
+    base = config.OUT_DIR / mid.replace("/", "__")
+    f = base / d.DEVICE_NAME
+    if body.tok_s is None:
+        f.unlink(missing_ok=True)
+        return {"model": mid, "device": None}
+    if not 0 < body.tok_s < 100000:
+        raise HTTPException(422, "tok_s is a decode speed in tokens a second, more than 0")
+    if not body.device.strip() or not body.source.strip():
+        raise HTTPException(422, "a device speed says the device and where it came from "
+                                 "(source: \"measured by <name>, <date>\")")
+    if not base.is_dir():
+        raise HTTPException(404, f"{mid} has no results on this board")
+    rec = {"tok_s": round(float(body.tok_s), 2), "device": body.device.strip()[:80],
+           "source": body.source.strip()[:200], "by": body.by.strip()[:80], "at": time.time()}
+    f.write_text(json.dumps(rec, indent=1), encoding="utf-8")
+    return {"model": mid, "device": rec}
 
 
 @app.get("/api/results")
