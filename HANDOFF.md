@@ -4450,6 +4450,75 @@ Not before the demo: a new hidden set changes every Everyday score.
   device, source. Only it places a row on the chart's x-axis (PR B).
 - `GET /api/devicemark` lists the rows, resolved and ranked. PR B draws them.
 
+### 12q.B — the On-device chart (PR B)
+
+- **Models ▸ On-device chart** (a chip beside Frontier, live only as Frontier
+  is; Frontier's card links to it): DeviceMark's board and our rows by their
+  protocol, on their axes — the composite with its 95% whisker up, decode tok/s
+  **on a device** across.
+  - Their rows: points on the iPhone; the two cloud APIs and the built-in
+    model, which have no device speed, dashed lines.
+  - Ours: a point, in the accent colour, named with its device, **only with a
+    speed measured on a device** (`PUT /api/devicemark/device`, or the table's
+    "enter"); otherwise a dotted line at its composite. **Never at the
+    server's speed.**
+- **DeviceMark's rows** come from `eval_tasks/devicemark/board-snapshot.json`:
+  their `board.json` as published (the date, and "DeviceMark
+  (devicemark.github.io), CC-BY-4.0"), their numbers never changed, read-only.
+  `python scripts/devicemark.py snapshot --fetch` refreshes it by hand;
+  nothing is fetched when a page loads. The snapshot keeps a note, beside
+  their rows, for the five whose raw outputs were generated at a 1,024-token
+  cap and don't reproduce their numbers (LFM2.5-1.2B, Granite-4.0-H-1B,
+  Qwen3.5-0.8B/2B, Gemma 4 E2B): shown in their tooltips, with "we show the
+  board as published".
+- **The table**: one row per model and setup, ours and theirs, ranked together
+  by their rule (`rank_all`): composite ± half its interval, IFEval, MMLU-Pro,
+  MATH, answered %, median tokens, device tok/s, server tok/s (ours; theirs
+  n/a), and **retention** — a phone build's score over the original's, per
+  bench, on the same battery, the same thinking mode, neither with lookahead,
+  only when both have run (`devicemark.retention`).
+- **Our runs of their open models, beside their rows** (`devicemark.pair`,
+  `THEIR_OPEN`: each of their nine on-device rows and the Hugging Face repo
+  it's published on). Our hf run of one (bf16, our battery) sits in their
+  row, not apart:
+  - the table's cells stack theirs over ours, the composite with both
+    intervals: "theirs (int8, iPhone): 61.4 ±3.6" over "ours (bf16, our
+    battery): …"; a thinking run is a third line;
+  - their point's hover gives ours too (composite, interval, the three
+    benches), with "calibration" on Nemotron-3-Nano-4B and Qwen3.5-4B;
+  - **ours is never plotted at their device speed**, which is their quantized
+    build's: no point and no line of its own. It isn't ranked apart
+    (`rank_all` null, `paired` names their row);
+  - ticking their row draws both in Accuracy against budget.
+  Only a run on hf pairs: a served build of the same model is a row of ours.
+- **What each needs to run here** (from each repo's own card and config, at
+  the head on 29 Sep 2026; transformers 5.5.3 has every architecture built
+  in, so no repo's own code runs):
+
+  | their row | repo | gated | licence | own code | bf16 weights |
+  |---|---|---|---|---|---|
+  | LFM2.5-1.2B | `LiquidAI/LFM2.5-1.2B-Instruct` | no | LFM Open License v1.0 | none | ~2.3 GB |
+  | Granite-4.0-H-1B | `ibm-granite/granite-4.0-h-1b` | no | Apache-2.0 | none (a Mamba2 hybrid: faster with the image's Mamba kernels) | ~2.9 GB |
+  | Qwen3.5-0.8B | `Qwen/Qwen3.5-0.8B` | no | Apache-2.0 | none | ~1.7 GB |
+  | Qwen3.5-2B | `Qwen/Qwen3.5-2B` | no | Apache-2.0 | none | ~4.5 GB |
+  | Qwen3.5-4B | `Qwen/Qwen3.5-4B` | no | Apache-2.0 | none | ~9.3 GB |
+  | Gemma 4 E2B | `google/gemma-4-E2B-it` | no | Apache-2.0 | none | ~10 GB |
+  | Nemotron-3-Nano-4B | `nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16` | no | NVIDIA Nemotron Open Model License | ships its own (`auto_map`); `nemotron_h` is built in and tried first; on the approved list at dfaf35de3e30, the repo's head | ~7.9 GB |
+  | Nanbeige4.1-3B | `Nanbeige/Nanbeige4.1-3B` | no | Apache-2.0 | none (a Llama) | ~7.9 GB |
+  | Youtu-LLM-2B | `tencent/Youtu-LLM-2B` | no | Youtu-LLM licence | none | ~3.9 GB |
+
+- **The caption** says what is comparable: the same protocol and the same 300
+  IFEval items; MMLU-Pro and MATH our draw of their design; our runs of their
+  open models beside their rows, never at their device speed.
+- **Accuracy against budget**, for the rows ticked in the table: their
+  `time_frontier`, ours worked out the same way (MMLU-Pro and MATH pooled).
+- **The question browser** lists the battery's three as "IFEval (DeviceMark
+  protocol)", "MMLU-Pro (DeviceMark protocol)" and "MATH (DeviceMark
+  protocol)": each answer with its pass or fail and its verdict in words (read
+  as X · the answer is Y · tokens, capped; IFEval's instructions followed,
+  strict and loose), a served setup's too. It lists what the board lists: the
+  diagnose half.
+
 ### 12o.1 — every column's width and place, and what the live check of #103/#104 found
 
 - **Columns** (the Models table on every chip, the Knowledge exam's included,

@@ -1306,10 +1306,11 @@ def _dm():
 
 @app.get("/api/devicemark")
 def devicemark_rows():
+    """ours, and (12q.B) DeviceMark's own rows from the committed snapshot —
+    ranked together, `rank_all`; nothing is fetched from DeviceMark here"""
     d = _dm()
     return {"version": d.VERSION, "whose": d.WHOSE, "cap": d.CAP,
-            "server_speed_label": d.SERVER_SPEED_LABEL,
-            "rows": d.rows(config.OUT_DIR)}
+            "server_speed_label": d.SERVER_SPEED_LABEL, **d.board(config.OUT_DIR)}
 
 
 class DeviceSpeedIn(BaseModel):

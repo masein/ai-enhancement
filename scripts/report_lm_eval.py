@@ -3384,6 +3384,9 @@ table.lb td.tcell { font-weight:400; }
 table.lb td .cellnote { display:block; font-family:var(--font-sans); font-size:10px;
   font-weight:400; line-height:1.2; color:var(--muted); white-space:nowrap; }
 table.lb td .cellnote.warn { color:var(--warning-text); }
+/* 12q.B: a row of DeviceMark's with our run of the model: theirs over ours */
+table.lb.dmtable td.dmpair > span { display:block; white-space:nowrap; }
+table.lb.dmtable td.dmpair > [data-dm-ours] { color:var(--accent); }
 /* a sparse model's active parameters under its total, small: "2.3B" then
    "908M act" — on one line they ran into the name beside them */
 table.lb td .act { display:block; font-size:10px; line-height:1.2; color:var(--muted); }
@@ -4646,7 +4649,8 @@ const state = {
   trMetricQ: '', trSecClosed: {}, trSecSig: '',            // metric panels filter / sections
   trXAxis: 'step',                     // benchmark-join chart: step | tokens | compute
   cmpSel: [], cmpColors: {}, cmpOpen: {},
-  rep: {},                                                 // 12m.2: api/reported, loaded once                               // radar: compared models (≤CMP_MAX)
+  rep: {},                                                 // 12m.2: api/reported, loaded once
+  dm: { sel: null, edit: null },                           // 12q.B: api/devicemark, the On-device chart                               // radar: compared models (≤CMP_MAX)
   accScale: 'raw',                     // task panels: 'raw' | 'chance' (diverging)
   cmpEvicted: '',                      // last model the compare FIFO dropped
   radarNorm: 'chance', radarAxes: 'tasks',                 // radar scaling / axis mode
@@ -9284,7 +9288,10 @@ const LB_CHIPS = [
   ['reasoning', 'Reasoning'], ['math', 'Math'], ['trust', 'Trust & safety'],
   ['instruction', 'Instruction & maths'], ['mobile', 'Mobile tasks'], ['lm', 'Language modelling'],
   // 12n.1: the home of reported scores (live: the frozen report carries none)
-  ['frontier', 'Frontier · reported']];
+  ['frontier', 'Frontier · reported'],
+  // 12q.B: DeviceMark's on-device chart, our phone builds on it (live, as Frontier)
+  ['ondevice', 'On-device chart']];
+const LIVE_CHIPS = ['frontier', 'ondevice'];
 // the four kinds of test, named the same and in the same order everywhere.
 // A kind with no data yet is not offered: On phone (12f.2) once a phone build
 // is registered
@@ -9514,7 +9521,10 @@ const BENCH_NAMES = { mmlu: 'MMLU', hellaswag: 'HellaSwag', piqa: 'PIQA', winogr
   bbq_3000: 'BBQ', bbq_all: 'BBQ (all 29,246)',
   gpqa_diamond_cot_zeroshot: 'GPQA Diamond (CoT)', gpqa_diamond_zeroshot: 'GPQA Diamond (4 options)',
   simpleqa_verified: 'SimpleQA Verified', mab_hotpotqa: 'HotpotQA (MobileAIBench)',
-  mab_sql: 'SQL from a question (MobileAIBench)' };
+  mab_sql: 'SQL from a question (MobileAIBench)',
+  // 12q.B: DeviceMark's battery, run by its protocol
+  dm_ifeval: 'IFEval (DeviceMark protocol)', dm_mmlu_pro: 'MMLU-Pro (DeviceMark protocol)',
+  dm_math: 'MATH (DeviceMark protocol)' };
 const benchName = t => isGgufKey(t) ? `${ggufLabel(t.slice(5))} (GGUF)`
   : BENCH_NAMES[t] || LB_SHORT[t] || t;
 // the mean of the chosen benchmarks, on the Scale pill's scale; each error
@@ -9846,7 +9856,8 @@ const LB_SHORT = { arc_challenge: 'ARC-C', arc_easy: 'ARC-E', truthfulqa_mc2: 'T
   ifeval: 'IFEval', mmlu_pro: 'MMLU-Pro', hendrycks_math500: 'MATH-500',
   do_not_answer: 'Do-Not-Answer', xstest: 'XSTest', bbq_3000: 'BBQ', bbq_all: 'BBQ, all',
   gpqa_diamond_cot_zeroshot: 'GPQA CoT', gpqa_diamond_zeroshot: 'GPQA 4 opts',
-  simpleqa_verified: 'SimpleQA', mab_hotpotqa: 'HotpotQA', mab_sql: 'SQL' };
+  simpleqa_verified: 'SimpleQA', mab_hotpotqa: 'HotpotQA', mab_sql: 'SQL',
+  dm_ifeval: 'IFEval (DM)', dm_mmlu_pro: 'MMLU-Pro (DM)', dm_math: 'MATH (DM)' };
 
 // A column's setup, in words — its tooltip, and its accessible name. The
 // header shows only the name; this is where the n-shot, the unit and the
@@ -10446,7 +10457,12 @@ const FR_CAL = 'Same questions, different prompt and settings. A large gap means
 function lbFrontier(ms) {
   const L = lbS(), F = state.fr = state.fr || { all: false, sort: null };
   const card = el('div', { class: 'card', 'data-lb-card': '1', 'data-frontier': '1' },
-    ...modelsHead(), lbToolbar(ms, lbColumns(ms), new Set(), 0));
+    ...modelsHead(), lbToolbar(ms, lbColumns(ms), new Set(), 0),
+    // 12q.B: DeviceMark's on-device board, our phone builds on it
+    el('p', { class: 'small', 'data-frontier-ondevice': '1' },
+      'On a phone: DeviceMark’s board and our phone builds, by their protocol — ',
+      el('a', { href: '#', 'data-frontier-ondevice-go': '1', text: 'On-device chart ▸',
+        onclick: e => { e.preventDefault(); lbSet({ chip: 'ondevice', cols: null }); } })));
   if (!state.rep.loaded) {
     card.append(el('p', { class: 'small se', 'data-frontier-loading': '1',
       text: 'Loading what others report…' }));
@@ -10594,6 +10610,312 @@ function lbFrontier(ms) {
       + 'own runs with each other, one outside source with itself, ours measured here with '
       + 'ours; the rest aren’t ranked against them. † a value the source took from elsewhere, '
       + 'named in its tooltip. Nothing here is averaged.' }));
+  return [card];
+}
+// ---- 12q.B: the On-device chart --------------------------------------------
+// DeviceMark's board (their snapshot, as published) and our rows run by their
+// protocol, on their axes: the composite up, decode tok/s on a device across.
+// Only a speed measured on a device places a row on the x-axis — never our
+// server's; a row without one is a dashed line at its composite. Their rows
+// are theirs: read-only, their numbers never changed, the credit on each.
+// Live only, as Frontier: api/devicemark, loaded when the chip is opened
+function dmLoad(force) {
+  const D = state.dm;
+  if (!LIVE || D.loading || (D.loaded && !force) || !netReady()) return;
+  D.loading = true;
+  api('api/devicemark').then(j => { D.data = j; D.msg = ''; })
+    .catch(e => { D.msg = String((e && e.message) || e); })
+    .finally(() => { D.loading = false; D.loaded = true; render(); });
+}
+// a row of ours as the page reads one; theirs come ready from the server
+function dmOurs(r) {
+  const su = r.row.setup || {};
+  const name = (su.runtime === 'llama-server' && su.name ? su.name : r.model)
+    + (r.thinking ? ' · thinking' : '');
+  return { id: r.id, name, external: false, kind: su.runtime === 'llama-server' ? 'served' : 'hf',
+    composite: r.row.composite, benches: r.row.benches, answered_pct: r.row.answered_pct,
+    median_tokens: r.row.median_tokens, time_frontier: r.row.time_frontier, device: r.device,
+    server_tok_s: r.server_tok_s, retention: r.retention, rank: r.rank_all, model: r.model,
+    inherited: r.row.inherited, setup: su };
+}
+function dmRows() {
+  const d = state.dm.data;
+  if (!d) return [];
+  // our runs of their open models sit in their rows (`ours`), never apart
+  return [...(d.rows || []).filter(r => !r.paired).map(dmOurs),
+    ...((d.external || {}).rows || []).map(r => ({ ...r, rank: r.rank_all }))]
+    .sort((a, b) => (b.composite.value || 0) - (a.composite.value || 0));
+}
+const dmCi = r => r.composite && r.composite.ci;
+const dmPct = v => v == null ? '—' : (100 * v).toFixed(1);
+const dmIv = r => dmCi(r) ? ` [${dmPct(dmCi(r)[0])}, ${dmPct(dmCi(r)[1])}]` : '';
+const dmBenchLine = r => `IFEval ${dmPct(r.benches.ifeval.acc)} · MMLU-Pro `
+  + `${dmPct(r.benches.mmlu_pro.acc)} · MATH ${dmPct(r.benches.math.acc)}`;
+// our runs of one of their models, as their row's hover and cells say them
+const dmOursLines = r => (r.ours || []).flatMap(o => [
+  `ours (${o.label}): composite ${dmPct(o.composite.value)}${dmIv(o)}`
+    + (o.calibration ? ' · calibration' : ''), `  ${dmBenchLine(o)}`]);
+function dmTip(r) {
+  const c = r.composite;
+  const ours = dmOursLines(r);
+  return [r.name, (ours.length ? `theirs (${r.label}): ` : '') + `composite ${dmPct(c.value)}`
+      + dmIv(r), (ours.length ? '  ' : '') + dmBenchLine(r),
+    ...ours,
+    ...(ours.length ? ['ours is never plotted at their device speed: that speed is their '
+      + 'quantized build’s'] : []),
+    r.device ? `${r.device.tok_s} tok/s decode on ${r.device.device} · ${r.device.source}`
+      : r.external ? `${r.kind === 'cloud' ? 'a cloud API' : 'the built-in model'}: no device `
+        + 'speed, drawn as a line' : 'no speed measured on a device yet: drawn as a line',
+    r.external ? r.credit : 'ours, by DeviceMark’s protocol'
+      + (r.inherited ? ` · ${r.inherited.line}` : ''),
+    ...(r.note ? [r.note] : [])];
+}
+// labels that don't sit on each other: a line's, spread down the right edge;
+// a point's, at the first of four places clear of the ones already placed
+const dmTextW = t => 6.1 * t.length;
+function dmSpread(ys, gap = 12) {
+  const order = ys.map((y, i) => [y, i]).sort((p, q) => p[0] - q[0]);
+  const out = [];
+  let last = -Infinity;
+  for (const [y, i] of order) { last = Math.max(y, last + gap); out[i] = last; }
+  return out;
+}
+function dmPlace(boxes, x, y, text) {
+  const w = dmTextW(text), h = 11;
+  const tries = [[8, -6, 'start'], [8, 14, 'start'], [-8, -6, 'end'], [-8, 14, 'end']];
+  const box = ([dx, dy, a]) => { const bx = a === 'start' ? x + dx : x + dx - w;
+    return { l: bx, r: bx + w, t: y + dy - h, b: y + dy }; };
+  const clear = bb => !boxes.some(o => bb.l < o.r && bb.r > o.l && bb.t < o.b && bb.b > o.t);
+  const pick = tries.find(t => clear(box(t))) || tries[0];
+  boxes.push(box(pick));
+  return { x: x + pick[0], y: y + pick[1], anchor: pick[2] };
+}
+function dmChart(rows) {
+  const W = 900, H = 440, x0 = 48, x1 = W - 200, y0 = H - 40, y1 = 16;
+  const pts = rows.filter(r => r.device && r.device.tok_s);
+  const lines = rows.filter(r => !(r.device && r.device.tok_s));
+  const xmax = Math.max(10, ...pts.map(r => r.device.tok_s)) * 1.12;
+  const X = v => x0 + (v / xmax) * (x1 - x0), Y = v => y0 - v * (y0 - y1);
+  const svg = el('svg:svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', class: 'dmchart',
+    style: `min-width:${W}px`, role: 'img', 'data-dm-chart': '1',
+    'aria-label': 'composite score against decode speed on a device' });
+  for (let k = 0; k <= 5; k++) {
+    const v = k / 5;
+    svg.append(el('svg:line', { x1: x0, x2: x1, y1: Y(v), y2: Y(v), stroke: 'var(--grid)' }),
+      el('svg:text', { x: x0 - 6, y: Y(v) + 4, 'text-anchor': 'end', 'font-size': 12,
+        fill: 'var(--muted)', text: Math.round(100 * v) + '%' }));
+  }
+  const step = xmax > 150 ? 50 : xmax > 60 ? 20 : 10;
+  for (let v = 0; v <= xmax; v += step)
+    svg.append(el('svg:text', { x: X(v), y: y0 + 16, 'text-anchor': 'middle', 'font-size': 12,
+      fill: 'var(--muted)', text: String(v) }));
+  svg.append(el('svg:text', { x: (x0 + x1) / 2, y: H - 6, 'text-anchor': 'middle',
+      'font-size': 12, fill: 'var(--muted)', text: 'decode tok/s on a device' }),
+    el('svg:text', { x: 12, y: y1 + (y0 - y1) / 2, 'font-size': 12, fill: 'var(--muted)',
+      'text-anchor': 'middle', transform: `rotate(-90 12 ${y1 + (y0 - y1) / 2})`,
+      text: 'composite' }));
+  // a row with no device speed: a dashed line at its composite, named at the right
+  const ly = dmSpread(lines.map(r => Y(r.composite.value) + 4));
+  lines.forEach((r, i) => {
+    const col = r.external ? 'var(--text-secondary)' : 'var(--accent)';
+    const y = Y(r.composite.value);
+    svg.append(el('svg:line', { x1: x0, x2: x1, y1: y, y2: y, stroke: col, 'stroke-width': 1.2,
+        'stroke-dasharray': r.external ? '6 4' : '2 3', 'data-dm-line': r.id,
+        'data-dm-external': r.external ? '1' : null, 'data-tip': JSON.stringify(dmTip(r)),
+        tabindex: 0 }),
+      el('svg:text', { x: x1 + 6, y: ly[i], 'font-size': 11, fill: col,
+        text: midTrunc(r.name, 30) }));
+  });
+  // a row with one: a point with its whisker, named beside it where there is room
+  const boxes = [];
+  for (const r of pts) {
+    const col = r.external ? 'var(--text-secondary)' : 'var(--accent)';
+    const cx = X(r.device.tok_s), cy = Y(r.composite.value), ci = dmCi(r);
+    if (ci) svg.append(el('svg:line', { x1: cx, x2: cx, y1: Y(ci[0]), y2: Y(ci[1]),
+      stroke: col, 'stroke-width': 1.2, 'data-dm-whisker': r.id }));
+    svg.append(el('svg:circle', { cx, cy, r: 5, fill: col,
+      stroke: 'var(--surface-1)', 'stroke-width': 1.2, tabindex: 0, 'data-dm-point': r.id,
+      'data-dm-external': r.external ? '1' : null, 'data-tip': JSON.stringify(dmTip(r)) }));
+    boxes.push({ l: cx - 5, r: cx + 5, t: cy - 5, b: cy + 5 });
+  }
+  for (const r of pts) {
+    const col = r.external ? 'var(--text-secondary)' : 'var(--accent)';
+    const text = midTrunc(r.external ? r.name : `${r.name} · ${r.device.device}`, 32);
+    const at = dmPlace(boxes, X(r.device.tok_s), Y(r.composite.value), text);
+    svg.append(el('svg:text', { x: at.x, y: at.y, 'text-anchor': at.anchor, 'font-size': 11,
+      fill: col, text }));
+  }
+  return svg;
+}
+// accuracy against budget, for the rows ticked in the table: their
+// time_frontier, and ours worked out the same way
+function dmBudgetChart(rows) {
+  const W = 680, H = 280, x0 = 48, x1 = W - 216, y0 = H - 36, y1 = 14;
+  const lo = 128, hi = 4096;
+  const X = v => logx(v, lo, hi, x0, x1), Y = v => y0 - v * (y0 - y1);
+  const COLS = ['var(--accent)', 'var(--good)', 'var(--critical)', 'var(--warning-text)',
+    'var(--text-secondary)', 'var(--live-text)'];
+  const svg = el('svg:svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', role: 'img',
+    style: `min-width:${W}px`, 'data-dm-budget': '1',
+    'aria-label': 'accuracy against the token budget' });
+  for (let k = 0; k <= 4; k++)
+    svg.append(el('svg:line', { x1: x0, x2: x1, y1: Y(k / 4), y2: Y(k / 4), stroke: 'var(--grid)' }),
+      el('svg:text', { x: x0 - 6, y: Y(k / 4) + 4, 'text-anchor': 'end', 'font-size': 12,
+        fill: 'var(--muted)', text: 25 * k + '%' }));
+  for (const b of [128, 256, 512, 1024, 2048, 4096])
+    svg.append(el('svg:text', { x: X(b), y: y0 + 16, 'text-anchor': 'middle', 'font-size': 12,
+      fill: 'var(--muted)', text: b >= 1024 ? `${b / 1024}k` : String(b) }));
+  const drawn = rows.map(r => {
+    const tf = r.time_frontier;
+    return tf && tf.b ? { r, pts: tf.b.map((b, j) => [b, tf.acc[j]]).filter(([, a]) => a != null) }
+      : null;
+  }).filter(x => x && x.pts.length);
+  const ly = dmSpread(drawn.map(x => Y(x.pts[x.pts.length - 1][1]) + 4));
+  drawn.forEach(({ r, pts }, i) => {
+    const col = COLS[i % COLS.length];
+    svg.append(el('svg:path', { d: 'M' + pts.map(([b, a]) => `${X(b).toFixed(1)},${Y(a).toFixed(1)}`)
+        .join('L'), fill: 'none', stroke: col, 'stroke-width': 1.8,
+        'stroke-dasharray': r.external ? '5 3' : null, 'data-dm-budget-line': r.id }),
+      el('svg:text', { x: x1 + 6, y: ly[i], 'font-size': 11, fill: col,
+        text: midTrunc(r.name, 34) }));
+  });
+  return svg;
+}
+function dmDeviceForm(r) {
+  const D = state.dm, f = D.form = D.form || {};
+  const note = el('span', { class: 'small se', 'data-dm-device-note': '1', text: D.formMsg || '' });
+  const input = (k, attrs) => el('input', { ...attrs, value: f[k] == null ? '' : f[k],
+    'data-dm-device': k, oninput: e => { f[k] = e.target.value; } });
+  const save = async body => {
+    try {
+      const res = await fetch('api/devicemark/device', { method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
+        body: JSON.stringify(body) });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof j.detail === 'string' ? j.detail : `HTTP ${res.status}`);
+      D.edit = null; D.form = {}; D.formMsg = '';
+      dmLoad(true);
+    } catch (e) { D.formMsg = String(e.message || e); render(); }
+  };
+  return el('div', { class: 'dmform', 'data-dm-device-form': r.id },
+    el('p', { class: 'small', text: `A speed measured on a device for ${r.name}. Only this `
+      + 'places it on the chart: the server’s own speed never does.' }),
+    el('label', { class: 'small' }, 'tok/s ', input('tok_s', { type: 'number', step: '0.1',
+      min: '0', style: 'width:6em' })), ' ',
+    el('label', { class: 'small' }, 'device ', input('device', { placeholder: 'iPhone 17 Pro' })),
+    ' ',
+    el('label', { class: 'small' }, 'source ', input('source', {
+      placeholder: 'measured by <name>, <date>', style: 'width:18em' })), ' ',
+    el('button', { class: 'btn', 'data-dm-device-save': '1', text: 'Save',
+      onclick: () => save({ model: r.model, tok_s: Number(f.tok_s), device: f.device || '',
+        source: f.source || '', by: whoName() }) }), ' ',
+    r.device ? el('button', { class: 'quiet', 'data-dm-device-clear': '1', text: 'Clear it',
+      onclick: () => save({ model: r.model, tok_s: null }) }) : '', ' ',
+    el('button', { class: 'quiet', text: 'Cancel',
+      onclick: () => { D.edit = null; D.formMsg = ''; render(); } }), ' ', note);
+}
+function dmTable(rows) {
+  const D = state.dm;
+  const sel = D.sel || new Set(rows.filter(r => !r.external).slice(0, 4).map(r => r.id));
+  const tick = r => el('input', { type: 'checkbox', checked: sel.has(r.id) ? '' : null,
+    'data-dm-sel': r.id, 'aria-label': `accuracy against budget: ${r.name}`,
+    onchange: e => { const s = new Set(sel); e.target.checked ? s.add(r.id) : s.delete(r.id);
+      D.sel = s; render(); } });
+  const ci = r => dmCi(r) ? ` ±${(50 * (dmCi(r)[1] - dmCi(r)[0])).toFixed(1)}` : '';
+  // a row with our run of it: theirs over ours — "theirs (int8, iPhone): X", "ours (bf16, …): Y"
+  const both = (r, f, whole) => !(r.ours || []).length ? f(r)
+    : [el('span', { 'data-dm-theirs': r.id, text: (whole ? `theirs (${r.label}): ` : '') + f(r) }),
+      ...r.ours.map(o => el('span', { 'data-dm-ours': o.id,
+        text: (whole ? `ours (${o.label}): ` : '') + f(o) }))];
+  const num = r => 'num' + ((r.ours || []).length ? ' dmpair' : '');
+  const pairTip = r => (r.ours || []).length ? JSON.stringify(['theirs · ' + r.ours.map(o =>
+    `ours (${o.label})`).join(' · ')]) : null;
+  const ret = r => !r.retention || r.external ? '—' : el('span', { 'data-dm-retention': r.id,
+    'data-tip': JSON.stringify([`${r.name} ÷ ${r.retention.of}`, 'the phone build’s score over '
+      + 'the original’s, per bench: the same items, the same thinking mode, no lookahead']) },
+    ['ifeval', 'mmlu_pro', 'math'].map(b => r.retention[b] == null ? '—'
+      : (100 * r.retention[b]).toFixed(0) + '%').join(' · '));
+  const head = ['#', 'Model / setup', 'Composite', 'IFEval', 'MMLU-Pro', 'MATH', 'Answered',
+    'Median tokens', 'Device tok/s', 'Server tok/s', 'Retention', 'Budget'];
+  return el('table', { class: 'lb norank dmtable', 'data-dm-table': '1' },
+    el('thead', {}, el('tr', {}, head.map(h => el('th', { class: /^(Model|#)/.test(h) ? '' : 'num',
+      scope: 'col', text: h })))),
+    el('tbody', {}, rows.map(r => el('tr', { 'data-dm-row': r.id,
+        'data-dm-external': r.external ? '1' : null },
+      el('td', { 'data-dm-rank': r.id, text: r.rank || '' }),
+      el('td', {}, el('span', { text: r.name }), ' ',
+        el('span', { class: 'badge', 'data-dm-whose': r.external ? 'theirs' : 'ours',
+          'data-tip': JSON.stringify(dmTip(r)),
+          text: r.external ? 'DeviceMark' + ((r.ours || []).length ? ' · and ours' : '') : 'ours' }),
+        r.inherited ? el('span', { class: 'small se', 'data-dm-inherited': r.id,
+          text: ` ${r.inherited.line}` }) : ''),
+      el('td', { class: num(r), 'data-dm-composite': r.id },
+        both(r, x => dmPct(x.composite.value) + ci(x), true)),
+      ...['ifeval', 'mmlu_pro', 'math'].map(b => el('td', { class: num(r), 'data-tip': pairTip(r) },
+        both(r, x => dmPct(x.benches[b].acc)))),
+      el('td', { class: num(r), 'data-tip': r.external ? JSON.stringify(
+        [`answered: ${r.answered_of}`, ...(pairTip(r) ? JSON.parse(pairTip(r)) : [])]) : null },
+        both(r, x => dmPct(x.answered_pct))),
+      el('td', { class: num(r), 'data-tip': pairTip(r) }, both(r, x => x.median_tokens == null
+        ? '—' : Math.round(x.median_tokens).toLocaleString())),
+      el('td', { class: 'num', 'data-dm-device-cell': r.id },
+        r.device ? `${r.device.tok_s}` : '—',
+        !r.external && LIVE ? el('button', { class: 'quiet', 'data-dm-device-edit': r.id,
+          text: r.device ? ' edit' : ' enter', onclick: () => {
+            D.edit = r.id; D.form = r.device ? { ...r.device } : {}; D.formMsg = ''; render(); } })
+          : ''),
+      el('td', { class: 'num', 'data-dm-server': r.id, 'data-tip': r.server_tok_s == null ? null
+        : JSON.stringify([state.dm.data.server_speed_label, 'the speed test: never on the chart']),
+        text: r.external ? 'n/a' : r.server_tok_s == null ? '—' : String(r.server_tok_s) }),
+      el('td', { class: 'num' }, ret(r)),
+      el('td', { class: 'num' }, tick(r))))));
+}
+function lbOnDevice(ms) {
+  const D = state.dm;
+  dmLoad();
+  const card = el('div', { class: 'card', 'data-lb-card': '1', 'data-ondevice': '1' },
+    ...modelsHead(), lbToolbar(ms, lbColumns(ms), new Set(), 0));
+  if (!D.loaded) {
+    card.append(el('p', { class: 'small se', 'data-ondevice-loading': '1',
+      text: D.msg || 'Loading the on-device rows…' }));
+    return [card];
+  }
+  const d = D.data || {}, ext = d.external || {};
+  const rows = dmRows();
+  const sel = D.sel || new Set(rows.filter(r => !r.external).slice(0, 4).map(r => r.id));
+  const editing = D.edit && rows.find(r => r.id === D.edit && !r.external);
+  card.append(
+    el('p', { class: 'small', 'data-ondevice-caption': '1', text: 'What is comparable: our rows '
+      + 'are run by DeviceMark’s protocol — 0-shot through the chat template, greedy, a cap of '
+      + `${(d.cap || 4096).toLocaleString()} generated tokens with the thinking counted, no `
+      + 'answer counted wrong — on the same 300 IFEval items; MMLU-Pro (196) and MATH (100) are '
+      + `our draw of the same design (${d.version || 'devicemark-replica-v1'}). Our runs of `
+      + 'their open models (hf, bf16, our battery) sit beside their rows — in the table and in '
+      + 'their point’s hover — and are never plotted at their device speed, which is their '
+      + 'quantized build’s. Only a speed measured on a device places a row on the x-axis — our '
+      + 'server’s speeds are in the table, never on the chart; a row without one is a dashed '
+      + 'line at its composite.' }),
+    el('p', { class: 'small se', 'data-ondevice-credit': '1',
+      text: `DeviceMark’s rows: their board as published (${ext.last_modified || ''}, fetched `
+        + `${ext.fetched || ''}), ${ext.credit || ''} — their numbers, never changed; speeds on `
+        + `${ext.device || 'their device'}.` }),
+    hfade('dmchart', el('div', { class: 'chartscroll', 'data-hkeep': 'dmchart' }, dmChart(rows))),
+    hfade('dmtable', el('div', { class: 'lb-wrap', 'data-hkeep': 'dmtable' }, dmTable(rows))),
+    editing ? dmDeviceForm(editing) : '',
+    el('p', { class: 'lbcap', text: 'Ranks: a row is above another only when its interval is '
+      + 'wholly above the other’s; a shared rank is a tie (=). Composite ± half its 95% interval '
+      + '(an item bootstrap); each bench with Wilson’s. Retention: a phone build’s score over the '
+      + 'original’s, per bench, on the same items with the same thinking mode and no lookahead — '
+      + 'shown when both have run.' }),
+    el('div', { class: 'ibox', 'data-dm-budget-box': '1' },
+      el('div', { class: 'ihead' }, el('div', { class: 'eyebrow', text: 'Accuracy against budget' }),
+        el('p', { class: 'small', text: 'What the score would be at each cap, from every '
+          + 'answer’s own length — MMLU-Pro and MATH pooled, as DeviceMark draws it. Tick rows '
+          + 'in the table to draw them.' })),
+      sel.size ? hfade('dmbudget', el('div', { class: 'chartscroll', 'data-hkeep': 'dmbudget' },
+        dmBudgetChart(rows.filter(r => sel.has(r.id)).flatMap(r => [r, ...(r.ours || []).map(o =>
+          ({ ...o, name: `${r.model} (ours, ${o.label.split(',')[0]})`, external: false }))]))))
+        : el('p', { class: 'small', text: 'No row ticked.' })));
   return [card];
 }
 // 12n.1: on every other chip, a line when chosen models are known only as reported
@@ -11275,6 +11597,7 @@ function vLeaderboard(ms) {
   }
   if (L.view === 'everyday') return lbEveryday(ms);
   if (L.view === 'standard' && L.chip === 'frontier' && !L.cols) return lbFrontier(ms);
+  if (L.view === 'standard' && L.chip === 'ondevice' && !L.cols) return lbOnDevice(ms);
   // the exam's scores are not ranked until a person has agreed with the judge:
   // one line says so, instead of an empty table
   if (L.view === 'exam' && !judgedCalibrated())
@@ -11805,7 +12128,7 @@ function lbToolbar(ms, cols, shown, nHidden) {
   const L = lbS();
   const calOk = judgedCalibrated();
   const chips = el('div', { class: 'chips', role: 'group', 'aria-label': 'task groups' },
-    LB_CHIPS.filter(([v]) => v !== 'frontier' || LIVE).map(([v, t]) => {
+    LB_CHIPS.filter(([v]) => !LIVE_CHIPS.includes(v) || LIVE).map(([v, t]) => {
       const off = v === 'judged' && !calOk;
       // 11e: an unavailable chip still takes the click (aria-disabled, not
       // disabled) — the click says why, in one line under the chips; the

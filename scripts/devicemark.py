@@ -37,6 +37,9 @@ its interval is wholly above the other's; overlapping is a tie, "=".
     python scripts/devicemark.py battery --write         …and write it
     python scripts/devicemark.py mark results/full -m served/x   score one row again
     python scripts/devicemark.py ifeval-score IN OUT     (the scorer's child)
+    python scripts/devicemark.py snapshot                what the committed snapshot holds
+    python scripts/devicemark.py snapshot --fetch        12q.B: DeviceMark's board.json again
+                                                         (by hand: nothing fetches it on a page)
 """
 
 from __future__ import annotations
@@ -65,6 +68,9 @@ DATA_DIR = REPO / "eval_tasks" / "devicemark"
 SOURCE_IDS = DATA_DIR / "source_ids.json"
 BATTERY_PATH = DATA_DIR / "battery-v1.json"
 PROMPTS_PATH = DATA_DIR / "prompts.json"
+# 12q.B: DeviceMark's board as published, their numbers never changed
+SNAPSHOT_PATH = DATA_DIR / "board-snapshot.json"
+BOARD_URL = "https://devicemark.github.io/data/leaderboard/board.json"
 BENCHES = ("ifeval", "mmlu_pro", "math")
 LABEL = {"ifeval": "IFEval", "mmlu_pro": "MMLU-Pro", "math": "MATH"}
 # the tasks a Hugging Face model sits them as, through lm_eval (build_tasks)
@@ -707,7 +713,163 @@ def rows(out_dir: Path) -> list[dict]:
     rk = ranks([{"ci": r["row"]["composite"]["ci"]} for r in out])
     for r, k in zip(out, rk):
         r["rank"] = k
+    for r in out:
+        r["retention"] = retention(r, out)
     return out
+
+
+def retention(r: dict, rows_: list[dict]) -> dict | None:
+    """12q.B: a phone build's scores over the original's, per bench — on the
+    same battery (so the same items), the same thinking mode, neither with
+    lookahead — and only when both have run"""
+    su = r["row"].get("setup") or {}
+    if not su.get("phone") or su.get("lookahead") or su.get("runtime") != "llama-server":
+        return None
+
+    def orig(o):
+        so = o["row"].get("setup") or {}
+        return (so.get("runtime") == "llama-server" and not so.get("phone")
+                and not so.get("lookahead") and bool(so.get("thinking")) == bool(su.get("thinking"))
+                and o["row"].get("version") == r["row"].get("version"))
+    cands = sorted((o for o in rows_ if o is not r and orig(o)),
+                   key=lambda o: (bool(o["row"].get("inherited")),
+                                  bool((o["row"].get("setup") or {}).get("mtp")), o["id"]))
+    if not cands:
+        return None
+    o = cands[0]
+    got = {}
+    for b in BENCHES:
+        mine, theirs = r["row"]["benches"][b]["acc"], o["row"]["benches"][b]["acc"]
+        got[b] = round(mine / theirs, 4) if theirs else None
+    return {"of": o["id"], **got}
+
+
+# ---------------------------------------------------------------------------
+# 12q.B: DeviceMark's own rows, from the committed snapshot
+# ---------------------------------------------------------------------------
+
+@functools.lru_cache(maxsize=1)
+def snapshot() -> dict:
+    return json.loads(SNAPSHOT_PATH.read_text(encoding="utf-8"))
+
+
+def external_rows(snap: dict | None = None) -> list[dict]:
+    """their rows, as the page reads a row — every number theirs, as
+    published, read-only; where each came from said on it"""
+    snap = snap or snapshot()
+    out = []
+    for r in snap["rows"]:
+        q = r["quality"]
+        kind = ("cloud" if r.get("format") == "api" else
+                "system" if r.get("format") == "system" else "device")
+        n = (q.get("mmlu_n") or 0) + (q.get("math_n") or 0)
+        answered = (q.get("mmlu_answered") or 0) + (q.get("math_answered") or 0)
+        out.append({
+            "id": r["artifact_id"], "external": True, "kind": kind,
+            "name": f"{r['model']} ({r['quant']})" if kind == "device" else r["model"],
+            "model": r["model"],
+            # what theirs is, beside ours: "int8, iPhone"
+            "label": (f"{QUANTS.get(r['quant'], r['quant'])}, "
+                      f"{(snap.get('device') or 'device').split()[0]}" if kind == "device"
+                      else r["model"]),
+            "vendor": r.get("vendor"), "params_b": r.get("params_b"),
+            "composite": {"value": r["composite"]["value"], "ci": r["composite"]["ci"]},
+            "benches": {
+                "ifeval": {"acc": q.get("ifeval_mean4"), "ci": q.get("ifeval_ci"),
+                           "n": q.get("ifeval_n")},
+                "mmlu_pro": {"acc": q.get("mmlu_acc"), "ci": q.get("mmlu_ci"),
+                             "n": q.get("mmlu_n"), "answered": q.get("mmlu_answered"),
+                             "acc_answered": q.get("mmlu_acc_answered")},
+                "math": {"acc": q.get("math_acc"), "ci": q.get("math_ci"), "n": q.get("math_n"),
+                         "answered": q.get("math_answered"),
+                         "acc_answered": q.get("math_acc_answered")}},
+            "answered_pct": round(answered / n, 4) if n else None,
+            "answered_of": "MMLU-Pro and MATH",
+            "median_tokens": q.get("gen_tokens_median"),
+            "time_frontier": q.get("time_frontier"),
+            "cap": q.get("cap_tokens"), "battery": q.get("battery_version"),
+            "device": ({"tok_s": r["iphone_tok_s"], "device": snap.get("device"),
+                        "source": "DeviceMark"} if r.get("iphone_tok_s") else None),
+            "retention": r.get("retention"), "note": (snap.get("notes") or {}).get(
+                r["artifact_id"]),
+            "credit": snap["credit"]})
+    return out
+
+
+# their open models, and the Hugging Face repo each is published on. Our run
+# of one on hf (bf16, our battery) sits beside their row — in the table and in
+# their point's hover — and is never a point of its own at their device's
+# speed, which is their quantized build's
+THEIR_OPEN = {
+    "lfm2.5-1.2b__int8hu__aimodel": "LiquidAI/LFM2.5-1.2B-Instruct",
+    "granite-4.0-h-1b__int8hu__aimodel": "ibm-granite/granite-4.0-h-1b",
+    "qwen3.5-0.8b__int8hu__aimodel": "Qwen/Qwen3.5-0.8B",
+    "qwen3.5-2b__int8hu__aimodel": "Qwen/Qwen3.5-2B",
+    "qwen3.5-4b__int8hu__aimodel": "Qwen/Qwen3.5-4B",
+    "gemma-4-e2b__int4__litertlm": "google/gemma-4-E2B-it",
+    "nemotron-4b__int8hu__aimodel": "nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16",
+    "nanbeige-3b__int8hu__aimodel": "Nanbeige/Nanbeige4.1-3B",
+    "youtu-2b__int8__aimodel": "tencent/Youtu-LLM-2B",
+}
+# 12q.A's calibration pair: how close our measurement comes to theirs
+CALIBRATION = ("nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16", "Qwen/Qwen3.5-4B")
+DTYPES = {"bfloat16": "bf16", "float16": "fp16", "float32": "fp32"}
+QUANTS = {"int8hu": "int8"}
+
+
+def _beside(r: dict) -> dict:
+    """a row of ours as it sits beside theirs: its numbers and how it ran"""
+    row, su = r["row"], r["row"].get("setup") or {}
+    return {"id": r["id"], "model": r["model"], "thinking": r["thinking"],
+            "label": f"{DTYPES.get(su.get('dtype'), su.get('dtype') or 'hf')}, our battery"
+                     + (", thinking" if r["thinking"] else ""),
+            "calibration": r["model"] in CALIBRATION,
+            **{k: row.get(k) for k in ("composite", "benches", "answered_pct", "median_tokens",
+                                       "time_frontier")}}
+
+
+def pair(ours: list[dict], theirs: list[dict]) -> None:
+    """each of our hf runs of one of their open models, beside their row
+    (`ours` on it, thinking off first) and out of our own rows (`paired`)"""
+    by_hf = {THEIR_OPEN[t["id"]]: t for t in theirs if t["id"] in THEIR_OPEN}
+    for r in sorted(ours, key=lambda r: r["thinking"]):
+        t = by_hf.get(r["model"])
+        if t and str((r["row"].get("setup") or {}).get("runtime", "")).startswith("hf"):
+            r["paired"] = t["id"]
+            t.setdefault("ours", []).append(_beside(r))
+
+
+def board(out_dir: Path) -> dict:
+    """ours and theirs, ranked together by their rule — our runs of their
+    models beside their rows, never ranked apart"""
+    ours, theirs = rows(out_dir), external_rows()
+    pair(ours, theirs)
+    solo = [r for r in ours if not r.get("paired")]
+    rk = ranks([{"ci": r["row"]["composite"]["ci"]} for r in solo]
+               + [{"ci": r["composite"]["ci"]} for r in theirs])
+    for r in ours:
+        r["rank_all"] = None
+    for r, k in zip(solo + theirs, rk):
+        r["rank_all"] = k
+    s = snapshot()
+    return {"rows": ours, "external": {"rows": theirs, **{k: s.get(k) for k in (
+        "source", "last_modified", "fetched", "credit", "licence", "device")}}}
+
+
+def fetch_snapshot() -> dict:
+    """DeviceMark's board.json again — by hand, never from a page; the notes
+    we keep beside their rows stay"""
+    import urllib.request
+    with urllib.request.urlopen(BOARD_URL, timeout=60) as r:
+        rows_ = json.loads(r.read())
+        modified = r.headers.get("last-modified")
+    old = snapshot() if SNAPSHOT_PATH.exists() else {}
+    snap = {**old, "source": BOARD_URL, "last_modified": modified,
+            "fetched": time.strftime("%Y-%m-%d"), "rows": rows_}
+    SNAPSHOT_PATH.write_text(json.dumps(snap, indent=1, ensure_ascii=False) + "\n",
+                             encoding="utf-8")
+    snapshot.cache_clear()
+    return snap
 
 
 def _json(f: Path) -> dict | None:
@@ -734,7 +896,16 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("ifeval-score")
     s.add_argument("src", type=Path)
     s.add_argument("dst", type=Path)
+    sn = sub.add_parser("snapshot", help="12q.B: DeviceMark's board, as committed")
+    sn.add_argument("--fetch", action="store_true", help="fetch board.json again and write it")
     a = ap.parse_args(argv)
+    if a.cmd == "snapshot":
+        snap = fetch_snapshot() if a.fetch else snapshot()
+        print(f"{len(snap['rows'])} rows from {snap['source']} (last modified "
+              f"{snap.get('last_modified')}, fetched {snap.get('fetched')}) · {snap['credit']}")
+        for r in external_rows(snap):
+            print(f"  {r['id']:40s} {r['composite']['value']:.4f} {r['composite']['ci']}")
+        return 0
     if a.cmd == "ifeval-score":
         rows_in = json.loads(a.src.read_text(encoding="utf-8"))
         a.dst.write_text(json.dumps(_ifeval_here(rows_in)), encoding="utf-8")

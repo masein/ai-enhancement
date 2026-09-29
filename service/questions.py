@@ -50,6 +50,10 @@ def _scripts() -> None:
 # ---------------------------------------------------------------------------
 
 GEN = ("ifeval", "mmlu_pro", "hendrycks_math500")
+# 12q.B: the devicemark battery's three, each answer beside its row
+# (devicemark_items.jsonl) — a served setup's have no lm_eval folder
+DM_TASKS = {"dm_ifeval": "ifeval", "dm_mmlu_pro": "mmlu_pro", "dm_math": "math"}
+DM_ITEMS = "devicemark_items.jsonl"
 
 
 def kind_of(task: str) -> str:
@@ -65,6 +69,8 @@ def kind_of(task: str) -> str:
         return "simpleqa"
     if task in ("mab_hotpotqa", "mab_sql"):
         return "mab"                        # 12o.3: MobileAIBench's, by its own metrics
+    if task in DM_TASKS:
+        return "dm"                         # 12q.B: DeviceMark's battery, by its protocol
     if task.startswith(GEN):
         return "gen"
     return "lm"
@@ -92,6 +98,9 @@ def model_dirs(task: str) -> dict[str, Path]:
         if task == "everyday":
             if (d / "everyday.json").exists():
                 out[_model_id(d)] = d
+        elif task in DM_TASKS:
+            if (d / DM_ITEMS).exists():
+                out[_dm_model_id(d)] = d
         elif _task_dirs(d, task):
             out[_model_id(d)] = d
     return out
@@ -110,7 +119,80 @@ def tasks() -> list[str]:
                     seen.add(m.group(1))
             if (d / "everyday.json").exists():
                 seen.add("everyday")
+            if d.is_dir() and (d / DM_ITEMS).exists():
+                seen.update(DM_TASKS)
     return sorted(seen)
+
+
+def _dm_model_id(d: Path) -> str:
+    """a devicemark row: its model, " · thinking" for a thinking-on row"""
+    base = d.name.removesuffix("__thinking")
+    mid = _model_id(d.parent / base) if (d.parent / base).is_dir() else base.replace("__", "/", 1)
+    return mid + (" · thinking" if d.name.endswith("__thinking") else "")
+
+
+_dm_q: dict = {}
+
+
+def _dm_questions() -> dict:
+    """the battery's questions as the server read them (DM_ITEMS), by key —
+    nothing is fetched for the browser"""
+    f = Path(config.DM_ITEMS)
+    try:
+        st = f.stat()
+    except OSError:
+        return {}
+    stamp = (st.st_mtime_ns, st.st_size)
+    if _dm_q.get("stamp") != stamp:
+        rows = {}
+        for line in f.read_text(encoding="utf-8").splitlines()[1:]:
+            if line.strip():
+                r = json.loads(line)
+                rows[(r["bench"], r["key"])] = r
+        _dm_q.update(stamp=stamp, rows=rows)
+    return _dm_q["rows"]
+
+
+def _dm_rows(task: str, d: Path) -> dict[str, dict]:
+    """a devicemark row's answers to one bench: each with its verdict in words"""
+    _scripts()
+    import devicemark as dm
+    bench, qs, out = DM_TASKS[task], _dm_questions(), {}
+    for i, it in enumerate(dm.read_items(d)):
+        if it.get("bench") != bench:
+            continue
+        q = qs.get((bench, it["key"])) or {}
+        think, answer = dm.split_thinking(it.get("text") or "")
+        if it.get("answer") is not None:
+            answer = it["answer"]
+        if bench == "ifeval":
+            v = it.get("ifeval") or {}
+            st, lo = (v.get("strict") or {}).get("inst") or [], (v.get("loose") or {}).get(
+                "inst") or []
+            verdict = (f"strict: {sum(st)} of {len(st)} instructions followed · loose: "
+                       f"{sum(lo)} of {len(lo)}")
+        elif not it.get("answered"):
+            verdict = ("no answer within the cap" if it.get("capped") else
+                       "no answer: no box" + (" or tested phrasing" if bench == "mmlu_pro"
+                                              else ""))
+        else:
+            how = it.get("how")
+            verdict = (f"read as {str(it.get('parsed'))[:60]}"
+                       + (f" (from \"{how}\")" if how and how != "boxed" else "")
+                       + f" · the answer is {str(it.get('gold'))[:60]}")
+        tok = it.get("gen_tokens")
+        if tok is not None:
+            verdict += f" · {tok:,} tokens" + (", capped" if it.get("capped") else "")
+        subj = q.get("category") or q.get("subject") or (
+            it["key"].split("/")[1] if bench == "math" and "/" in it["key"] else "")
+        out[it["key"]] = {
+            "q": q.get("prompt") or q.get("question") or q.get("problem") or "",
+            "options": q.get("options") or [] if bench == "mmlu_pro" else [],
+            "subject": subj, "reference": q.get("answer") if bench != "ifeval" else None,
+            "order": [bench, i],
+            "res": {"ok": bool(it.get("correct")), "answer": answer, "thinking": think,
+                    "verdict": verdict}}
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -232,6 +314,8 @@ def _rows_of(task: str, d: Path) -> dict[str, dict]:
     _scripts()
     import diagnose as dx
     kind, out = kind_of(task), {}
+    if kind == "dm":
+        return _dm_rows(task, d)
     if kind == "everyday":
         import everyday as ev
         e = ev.read(d) or {}
@@ -355,6 +439,7 @@ def _stamp(task: str, dirs: dict[str, Path]) -> tuple:
     out = []
     for mid, d in sorted(dirs.items()):
         files = ([d / "everyday.json"] if task == "everyday" else
+                 [d / DM_ITEMS, Path(config.DM_ITEMS)] if task in DM_TASKS else
                  [f for x in _task_dirs(d, task) for f in x.rglob("samples_*.jsonl")]
                  + [d / n for n in ("judge.json", "safety.json", "simpleqa.json",
                                     "generative.json", "mobileaibench.json")])
@@ -430,6 +515,16 @@ def meta(task: str) -> dict:
     if kind == "exam":
         return {"source": "the Knowledge exam, written for this board", "licence": None,
                 "revision": None, "url": None}
+    if kind == "dm":
+        import devicemark as dm
+        bench = DM_TASKS[task]
+        name, _ = dm.DATASETS[bench]
+        bat = dm.battery()
+        return {"source": f"{name}: DeviceMark's protocol, {bat['version']} — "
+                          + ("DeviceMark's 300 items" if bench == "ifeval" else
+                             "our draw of their design"),
+                "licence": bat["sources"][bench]["license"],
+                "revision": bat["revisions"][name], "url": f"https://huggingface.co/datasets/{name}"}
     if kind == "mab":
         import mobileaibench as mab
         c = mab.credits()
