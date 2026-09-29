@@ -4535,6 +4535,42 @@ Not before the demo: a new hidden set changes every Everyday score.
   strict and loose), a served setup's too. It lists what the board lists: the
   diagnose half.
 
+### 12q.C — a DeviceMark run on its model's page
+
+- "Open results" on a DeviceMark run landed on a model page with nothing about
+  DeviceMark. Each model's runs now come with the results
+  (`DATA.devicemark`, from `devicemark.model_runs`; the board refreshes when
+  any `devicemark*.json` changes), by thinking mode: its full row as the
+  board ranks it (and its row on the On-device chart — its own, or
+  DeviceMark's when it's our run of their model), its pilot, its MTP parity
+  check and its speed test.
+- **A "DeviceMark protocol" card on the model page**, one per thinking mode
+  (a tile and a block, as the other kinds): the composite ± half its
+  interval, the rank, the setup, a link to its row on the On-device chart
+  (scrolled to and marked), IFEval / MMLU-Pro / MATH with theirs, answered,
+  median tokens, device tok/s (with its device and source) and server tok/s;
+  a setup without MTP says its quality is its MTP partner's. In it:
+  - **the pilot**: its numbers and the cap-check line;
+  - **the MTP parity check**: identical x/50, same answer y/50, whether it
+    passes, and each pair that differs — what differs (the answer, or the
+    tokens only), what each setup answered (read without the gold) and their
+    tokens;
+  - **the speed test**: tok/s, and each trial (the warm-up not counted) with
+    its prompt and decoded tokens, decode and prefill tok/s.
+- **The setups of a file, side by side** have a DeviceMark column: each
+  setup's composite, thinking off, then on.
+- **"Open results" opens the run's own result**: a full run, its card; a
+  pilot, a parity check or a speed test, that part of the card, marked and
+  scrolled to below the bar. A model with no page (our hf run of one of
+  DeviceMark's models) opens its row on the On-device chart.
+- **The Answers tab has DeviceMark's items** — public benchmark items, all
+  of them (`GET /api/devicemark/answers`): no answer first, then wrong, then
+  right; a bench at a time or all, each with its counts; thinking off or on;
+  each with the question (MMLU-Pro's options lettered), the output with its
+  thinking folded, what was read from it and the answer (IFEval: its
+  instructions followed, strict and loose), its tokens and "ran out of
+  room"; fifty at a time.
+
 ### 12o.1 — every column's width and place, and what the live check of #103/#104 found
 
 - **Columns** (the Models table on every chip, the Knowledge exam's included,

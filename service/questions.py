@@ -191,7 +191,10 @@ def _dm_rows(task: str, d: Path) -> dict[str, dict]:
             "subject": subj, "reference": q.get("answer") if bench != "ifeval" else None,
             "order": [bench, i],
             "res": {"ok": bool(it.get("correct")), "answer": answer, "thinking": think,
-                    "verdict": verdict}}
+                    "verdict": verdict,
+                    # 12q.C: and what the model page's Answers tab shows beside it
+                    "parsed": it.get("parsed"), "answered": bool(it.get("answered")),
+                    "capped": bool(it.get("capped")), "tokens": tok}}
     return out
 
 

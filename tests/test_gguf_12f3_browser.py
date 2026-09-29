@@ -227,6 +227,8 @@ def test_served_setups_of_one_file_sit_side_by_side_with_mtps_acceptance(live, p
     assert mtp.locator(f"[data-served-draft='{MTP}']").inner_text() == "75.0%"
     assert table.locator(f"[data-served-draft='{PHONE}']").inner_text() == "not reported"
     cells = mtp.locator("td").all_inner_texts()
-    assert cells[0] == "LDA phone build, MTP 3" and " of " in cells[1] and " of " in cells[4]
+    # 12q.C: DeviceMark's column after the Knowledge exam's
+    assert cells[0] == "LDA phone build, MTP 3" and " of " in cells[1] and cells[3] == "—" \
+        and " of " in cells[5]
     shot(table, "served-setups-of-one-file.png")
     assert page.errors == []

@@ -251,6 +251,18 @@ ranked apart (`rank_all` null); their row carries it as `ours` — each run's
 median tokens and accuracy against budget — and their `label` ("int8,
 iPhone").
 
+### GET /api/devicemark/answers?model=…&thinking=false&bench=&offset=0&limit=50
+
+12q.C: a DeviceMark row's answers, for the model page's Answers tab — public
+benchmark items, all of them. `{"model", "thinking", "bench", "total",
+"offset", "counts": {bench: {n, no_answer, wrong, capped}}, "items": [...]}`;
+each item `{bench, key, q, options, subject, gold, parsed, answered, ok,
+capped, tokens, answer, thinking, verdict}`, no answer first, then wrong, then
+right. `bench` is `ifeval`, `mmlu_pro` or `math` (none: all); `limit` at most
+200. 422 for a model id or bench that isn't one; 404 when the row has no
+answers here. `GET /api/results` carries each model's runs as `devicemark`:
+`{model: {"off"|"on": {id, row, pilot, parity, speed}}}`.
+
 ### PUT /api/devicemark/device — a speed measured on a device
 
 `{"model": "served/…", "tok_s": 12.4, "device": "iPhone 17 Pro", "source":
