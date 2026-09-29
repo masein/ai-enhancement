@@ -8258,7 +8258,8 @@ function storeCard() {
     el('p', { class: 'sub', text: 'Everyday’s hidden set and the exam’s questions live on the data '
       + 'volume, not in the repo, which is public; the repo keeps what they should be. They are '
       + 'backed up once a day to another disk.' }),
-    !S.loaded ? skeleton(2) : !v ? el('p', { class: 'small', text: 'Not available.' })
+    !S.loaded ? skeleton(2) : !(v && v.hidden && v.exam && v.backup)
+      ? el('p', { class: 'small', text: 'Not available.' })
       : el('ul', { class: 'small' },
         line('hidden', 'Everyday’s hidden set', v.hidden),
         line('exam', 'The exam’s report half', v.exam),
