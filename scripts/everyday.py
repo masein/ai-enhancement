@@ -23,7 +23,9 @@ model has no such answer to — after a bank change, the new ones.
     python scripts/everyday.py results/full            re-mark every model (no GPU)
     python scripts/everyday.py results/full -m org/x   one model
     python scripts/everyday.py results/full --judge    12a.6: and send the judge what waits on it
-    python scripts/everyday.py results/full --compare  12a.6: before and after, model by model
+    python scripts/everyday.py results/full --compare  12a.6: before and after, model by model;
+                                                       12a.9: and what moved Summarise, change
+                                                       by change
     python scripts/everyday.py results/full --judge -q everyday-summarising-07
                                                        12a.8: the judge for one question's answers
 
@@ -1084,11 +1086,13 @@ def judge_prompt(item: dict, answer: str) -> str:
 RUBRIC_SCALE, RUBRIC_PASS = 4, 3
 _N = (r'(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twenty|thirty|forty|fifty|'
       r'a hundred)')
-STATED_LENGTH = re.compile(
-    r'\b(?:(?:in|under|within|below|at most|no more than|max(?:imum)?|less than|fewer than|'
-    r'about|around|to)\s+)?' + _N + r'\s+(?:words?|sentences?|lines?|bullets?(?:\s*points?)?|'
-    r'points?|paragraphs?)\b|\b(?:one|a|single)[\s-]+(?:line|liner|sentence|paragraph)\b', re.I)
-# 12a.9: "as 4 bullets" states a length as "in 4 bullet points" does
+_LENGTH = (r'\b(?:(?:in|under|within|below|at most|no more than|max(?:imum)?|less than|fewer than|'
+           r'about|around|to)\s+)?' + _N + r'\s+(?:words?|sentences?|lines?|{bullet}|'
+           r'points?|paragraphs?)\b|\b(?:one|a|single)[\s-]+(?:line|liner|sentence|paragraph)\b')
+# 12a.9: "as 4 bullets" states a length as "in 4 bullet points" does; 12a.8's
+# reading, which didn't, is kept for --compare to tell what that moved
+STATED_LENGTH = re.compile(_LENGTH.format(bullet=r'bullets?(?:\s*points?)?'), re.I)
+STATED_LENGTH_12A8 = re.compile(_LENGTH.format(bullet=r'bullet(?:\s*points?)?'), re.I)
 SHORTER = re.compile(r'\b(?:shorten|shorter|short|tl;?\s?dr|condense|brief(?:ly)?)\b', re.I)
 # 12a.7: 12a.6's rubric marked style as much as the summary — a lead-in and a
 # closing offer a point each, a bulleted summary "not one summary" — and ~50
@@ -1175,11 +1179,11 @@ def request_of(prompt: str) -> str:
     return re.split(r'["\u201c]', prompt, maxsplit=1)[0]
 
 
-def stated_length(prompt: str) -> str:
+def stated_length(prompt: str, pattern: re.Pattern = STATED_LENGTH) -> str:
     """the length the request states, in its own words; "shorter" when it
     only asks for it shorter; "" when it states none"""
     req = request_of(prompt)
-    m = STATED_LENGTH.search(req)
+    m = pattern.search(req)
     if m:
         return m.group(0).strip()
     return "shorter" if SHORTER.search(req) else ""
@@ -1257,8 +1261,12 @@ def summarise_checks(q: dict) -> list[dict]:
     text doesn't give, then the judge's rubric, 0 to 4, passing at 3. 12a.8:
     the judge reports findings on it, and the code scores them; 12a.9: a
     checklist of its key facts, which the code checks"""
+    facts, need = _facts_of(q)
     return [{"type": "numbers_from_source"},
             {"type": "judge", "scale": RUBRIC_SCALE, "pass_at": RUBRIC_PASS, "checklist": True,
+             # the question's own "at least n", which the rubric gives only where the
+             # request limits the length; --compare reads it
+             **({"at_least": need} if 0 < need < len(facts) else {}),
              "rubric": summarise_rubric(q)}]
 
 
@@ -1575,18 +1583,23 @@ def _checklist(obj) -> dict | None:
             **rest}
 
 
-def checklist_verdict(obj, q: dict, answer: str) -> dict | None:
+def checklist_verdict(obj, q: dict, answer: str, rules: dict | None = None) -> dict | None:
     """12a.9: the score from the judge's checklist — 4, less 1 a missing fact
     (2 at most), 2 for a fact wrong or anything invented, 1 for several
     versions and 1 for a length asked and not met; passing at 3. Every key
     fact counts unless the request limits the length (the rubric says which),
-    and the code has the last word on each, as said above"""
+    and the code has the last word on each, as said above. `rules` — the facts,
+    how many it needs and whether a length was asked — marks it as another
+    round would have (--compare)"""
     f = _checklist(obj)
     if f is None:
         return None
     c = judge_check(q) or {}
     scale, pass_at = int(c.get("scale") or RUBRIC_SCALE), int(c.get("pass_at") or RUBRIC_PASS)
     facts, need = _facts_in(c.get("rubric", ""))
+    asked = bool(stated_length(q.get("prompt", "")))
+    if rules:
+        facts, need, asked = rules["facts"], rules["need"], rules["asked"]
     named = names(q.get("prompt", ""))
     said, dropped = {}, []
     for row in f["checklist"]:
@@ -1629,7 +1642,6 @@ def checklist_verdict(obj, q: dict, answer: str) -> dict | None:
     missing = [r["fact"] for r in rows if r["status"] == "missing"]
     wrong = [r for r in rows if r["status"] == "wrong"]
     other = _invented(f["invented_or_wrong"], answer, dropped)
-    asked = bool(stated_length(q.get("prompt", "")))
     too_long = asked and f["length_ok"] == "no"
     kept = {"checklist": rows, "invented_or_wrong": other,
             "several_versions": f["several_versions"], "length_ok": f["length_ok"]}
@@ -2658,6 +2670,9 @@ def judge_failed(model_dir: Path, why: str) -> None:
 # marks, the judge adding points up; 12a.9's, 12a.8's marks, on findings
 BEFORE_NAME = "everyday_before_12a9.json"
 REMARK = "everyday-remark"
+# 12a.9: the facts a question gained this round; --compare counts what they
+# moved with "every fact where no length is set"
+GAINED_12A9 = {"everyday-summarising-long-01": ["9:30 / 9.30"]}
 
 
 def _counts(out: dict | None) -> dict:
@@ -2677,7 +2692,7 @@ def remark(results: Path, want: set[str] | None = None, judge: bool = False,
     snapshot for an edit's re-mark"""
     before_f = results / BEFORE_NAME
     before = json.loads(before_f.read_text(encoding="utf-8")) if before_f.exists() else None
-    snap, lines, todo, dirs = {}, {}, [], {}
+    snap, lines, todo, dirs, passes = {}, {}, [], {}, {}
     for d in sorted(p for p in results.iterdir() if p.is_dir()):
         if want and d.name not in want:
             continue
@@ -2687,6 +2702,10 @@ def remark(results: Path, want: set[str] | None = None, judge: bool = False,
             continue
         if prev:
             snap[prev.get("model") or out["model"]] = _counts(prev)
+            # 12a.9: and each Summarise answer's pass, both halves, for --compare's causes
+            passes[prev.get("model") or out["model"]] = {
+                it["id"]: it.get("pass") for it in prev.get("items") or []
+                if it.get("group") == "summarising"}
         write(d, out)
         dirs[d.name] = d
         lines[out["model"]] = summary(out) + (
@@ -2696,8 +2715,8 @@ def remark(results: Path, want: set[str] | None = None, judge: bool = False,
             todo += [(d.name, q, answers[q["id"]]) for q in _pending(out)
                      if only is None or q["id"] in only]
     if before is None and snap and snapshot:
-        before_f.write_text(json.dumps({"at": time.time(), "version": version(), "models": snap},
-                                       indent=1), encoding="utf-8")
+        before_f.write_text(json.dumps({"at": time.time(), "version": version(), "models": snap,
+                                        "summarise": passes}, indent=1), encoding="utf-8")
     res = {"models": lines, "batch_id": None, "sent": 0}
     if not todo:
         return res
@@ -2777,6 +2796,84 @@ def compare(results: Path) -> str:
                     + f"{now['passed']} of {now['total']} | {sb} | "
                     + (f"{ng['passed']} of {ng['total']}" if ng else "—")
                     + f" | {now.get('waiting') or 0} |")
+    causes = moved(results)
+    return "\n".join(rows) + ("\n\n" + causes if causes else "")
+
+
+def _steps(q: dict, it: dict) -> tuple | None:
+    """12a.9: an answer's pass after each of this round's changes in turn, on
+    the judge's one stored checklist — the checklist alone (12a.8's facts,
+    "at least n" and lengths), then the lengths "as 4 bullets" states, then
+    every fact counting where no length is set, with the facts a question
+    gained: its mark now. None while it waits on the judge"""
+    raw, c = it.get("judge_raw"), judge_check(q) or {}
+    if not (c.get("checklist") and isinstance(raw, dict) and "checklist" in raw
+            and isinstance(it.get("pass"), bool)):
+        return None
+    facts, _ = _facts_in(c["rubric"])
+    old = [f for f in facts if _show(f) not in GAINED_12A9.get(q["id"], ())]
+    need = min(int(c.get("at_least") or len(old)), len(old))
+    ans = it.get("answer_text") or ""
+    was = [checklist_verdict(raw, q, ans, {"facts": old, "need": need,
+                                          "asked": bool(stated_length(q["prompt"], pattern))})
+           for pattern in (STATED_LENGTH_12A8, STATED_LENGTH)]
+    return None if None in was else (was[0]["pass"], was[1]["pass"], it["pass"])
+
+
+def _reaches(q: dict) -> tuple[bool, bool]:
+    """whether 12a.9's reading of lengths, and its every-fact rule, reach a question"""
+    c = judge_check(q) or {}
+    length = bool(stated_length(q["prompt"])) != bool(stated_length(q["prompt"],
+                                                                     STATED_LENGTH_12A8))
+    every = not stated_length(q["prompt"]) and bool(c.get("at_least") or GAINED_12A9.get(q["id"]))
+    return length, every
+
+
+def moved(results: Path) -> str:
+    """12a.9: what moved Summarise, change by change — each column adds one of
+    this round's changes to the column before it. Both halves; a hidden
+    question is counted, never named"""
+    f = results / BEFORE_NAME
+    was = json.loads(f.read_text(encoding="utf-8")).get("summarise") if f.exists() else None
+    if not was:
+        return ""
+    bank = {q["id"]: q for q in load_bank() if q["group"] == "summarising"}
+    rows = ["Summarise, what moved it: each column adds one change to the column before",
+            "",
+            "| model | half | before | the checklist | + lengths “as 4 bullets” asks | "
+            "+ every fact where no length is set (now) | waiting |",
+            "|---|---|---|---|---|---|---|"]
+    for d in sorted(p for p in results.iterdir() if p.is_dir()):
+        now = read(d)
+        if not now or now.get("earlier"):
+            continue
+        before = was.get(now["model"]) or {}
+        for name, h in (("hidden", HIDDEN), ("practice", PRACTICE)):
+            n, waiting, cols = 0, 0, [0, 0, 0, 0]
+            for it in now["items"]:
+                q = bank.get(it["id"])
+                if q is None or half(q) != h or it["id"] not in before:
+                    continue
+                steps = _steps(q, it)
+                if steps is None:
+                    waiting += 1
+                    continue
+                n += 1
+                for i, ok in enumerate((before[it["id"]], *steps)):
+                    cols[i] += ok is True
+            if n or waiting:
+                rows.append(f"| {now['model']} | {name} | {cols[0]} of {n} | " + " | ".join(
+                    f"{c}" + (f" ({c - p:+d})".replace("-", "−") if c != p else "")
+                    for p, c in zip(cols, cols[1:])) + f" | {waiting} |")
+    reach = {q["id"]: (_reaches(q), half(q)) for q in bank.values()}
+
+    def which(k: int) -> str:
+        seen = [i for i, (r, h) in reach.items() if r[k] and h == PRACTICE]
+        hid = sum(1 for r, h in reach.values() if r[k] and h == HIDDEN)
+        return (", ".join(i.replace("everyday-summarising-", "") for i in sorted(seen))
+                or "none") + f" in the practice half; {hid} hidden"
+    rows += ["", f"Lengths “as 4 bullets” asks reach: {which(0)}.",
+             f"Every fact where no length is set reaches: {which(1)}."]
     return "\n".join(rows)
 
 
@@ -2788,7 +2885,8 @@ def main() -> int:
     ap.add_argument("--judge", action="store_true",
                     help="12a.6: also send the answers waiting on the judge (no model runs)")
     ap.add_argument("--compare", action="store_true",
-                    help="12a.6: before and after the re-mark, model by model")
+                    help="12a.6: before and after the re-mark, model by model; 12a.9: and "
+                         "what moved Summarise, change by change")
     ap.add_argument("-q", "--question", action="append", default=[],
                     help="12a.8: with --judge, send the judge only this question's answers "
                          "(a rubric or reference changed); every model is still marked")

@@ -4277,8 +4277,18 @@ Not before the demo: a new hidden set changes every Everyday score.
 - The 29 practice rubrics in the bank are the checklist form; a 12a.6, 12a.7
   or 12a.8 rubric generated from a question's facts (the builder's, **and the
   hidden set in the server's store**) is upgraded as it is read; one someone
-  wrote stays theirs and is marked as before. This round's before is
-  `everyday_before_12a9.json`.
+  wrote stays theirs and is marked as before. The check keeps the question's
+  own "at least n" (`at_least`) where the rubric no longer gives it.
+- **`--compare` says what moved Summarise, change by change** (`moved`): this
+  round's before (`everyday_before_12a9.json`) keeps each Summarise answer's
+  pass as well as the counts, and each answer's one stored checklist is
+  scored again with the changes added in turn — the checklist alone (12a.8's
+  facts, "at least n" and lengths), then the lengths "as 4 bullets" states,
+  then every fact where no length is set (with the facts a question gained,
+  `GAINED_12A9`: the email thread's 9:30). Per model and half; the questions
+  each change reaches are named on the practice half and counted on the
+  hidden. The tests' two answers are the stored ones, both on the practice
+  half: a hidden question's answer never comes into the repo.
 
 ### 12o.1 — every column's width and place, and what the live check of #103/#104 found
 

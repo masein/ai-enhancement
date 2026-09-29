@@ -13,9 +13,9 @@ correct, as 12a.8 dropped it. Scored as 12a.8: a missing fact −1 (2 at
 most), anything wrong −2, several versions −1, a length asked and not kept
 −1. Every listed fact counts where the request sets no length.
 
-The two answers are the brief's, built from the words it quotes, the rest in
-the text's own words. Nothing runs a model: the judge's replies are written
-here."""
+The two answers are the ones the server stored, both on the practice half
+(a hidden question's answer never comes into the repo), each judged 4 of 4 by
+12a.8. Nothing runs a model: the judge's replies are written here."""
 
 from __future__ import annotations
 
@@ -33,20 +33,28 @@ BANK = {q["id"]: q for q in ev.load_bank()}
 LEAVE, SCHOOL_RUN, EMAIL = ("everyday-summarising-15", "everyday-summarising-07",
                             "everyday-summarising-long-01")
 
-# gemma-3-270m-it, the school run plan: you pick Layla up, it's your mum, you
-# get the cake — three times the wrong person
-GEMMA_SCHOOL_RUN = ("She is planning to take Zain to football at 4 and will pick up Layla from "
-                    "her friend's house at 5:30. Her mum is coming at 7. She is also reminded to "
-                    "get the cake for Zain's birthday and to top up the transit card for Layla.")
+# gemma-3-270m-it, the school run plan, as stored: you pick Layla up, it's your
+# mum, you get the cake — the wrong person each time
+GEMMA_SCHOOL_RUN = (
+    "Here's a summary of the message from your wife:\nYour wife is planning a day with Zain and "
+    "Layla. She is planning to take Zain to a football game at 4 and will pick up Layla from her "
+    "friend's house at 5:30. They will then meet at home by 6:30 for dinner. Her mum is coming at "
+    "7. She is also reminded to get the cake for Zain's birthday. Additionally, she is planning to "
+    "top up the transit card for Layla, as she needs it for the metro tomorrow.")
 
-# Qwen3-0.6B, the email thread (work project): the overtime cap without its 10
-# hours, the daily call without its 9:30
-QWEN_EMAIL = ("The client wants the new site live on 6 October instead of 20 October. To make "
-              "that work, the mobile checkout redesign is cut and moved to phase 2 in November; "
-              "the product pages and search filters stay. The budget stays at $18,000 and "
-              "overtime is capped. Tomasz will finish the filters by 29 September, Aisha's "
-              "design review is on Wednesday 1 October at 2pm, and Mei needs the full build by "
-              "3 October for testing. There will be daily status calls until launch.")
+# Qwen3-0.6B, the email thread (work project), as stored: the overtime cap
+# without its 10 hours, no daily call at 9:30
+QWEN_EMAIL = (
+    "**Summary of Email Thread:**  \n\n- **Timeline Update:** The Northgate Outfitters website "
+    "will launch on **October 6** instead of **October 20**, reducing the timeline by two weeks.  "
+    "\n- **Mobile Checkout:** The mobile checkout redesign will be moved to **Phase 2 "
+    "(November)**, with product pages and search filters retained.  \n- **Budget:** The project "
+    "remains at **$18,000**.  \n- **Deadlines:**  \n  - **Tomasz:** Filters will be completed by "
+    "**29 September**.  \n  - **Aisha:** Design review will be moved to **Wednesday, October 1, "
+    "2:00 PM**.  \n  - **Mei:** Full build will be completed by **3 October**.  \n- **Team "
+    "Flexibility:** The team is flexible and agrees to the changes, with clear deadlines and a "
+    "capped overtime limit.  \n\n**Key Takeaway:** The timeline and tasks are adjusted, with "
+    "deadlines set for each contributor.")
 
 LEAVE_3 = """Option 1: Annual leave 3–10 November requested; the Hamilton file is with Mariam, and I'm reachable by mobile. Form attached.
 Option 2: Requesting leave from 3 to 10 November. Work done, Hamilton file handed to Mariam; call my mobile if urgent.
@@ -98,6 +106,7 @@ def test_the_school_run_plan_with_the_wrong_person_fails():
         "(−2)")
     assert [r["status"] for r in v["findings"]["checklist"]] == ["wrong", "wrong", "correct",
                                                                  "wrong"]
+    assert ev.half(BANK[SCHOOL_RUN]) == ev.PRACTICE
     # the judge's words cut short with "…", as the brief quotes it, still quote the answer
     reply = listed(SCHOOL_RUN, **{"5:30 / 5.30": ("wrong", "She is planning to take Zain … and "
                                                             "will pick up Layla")})
@@ -107,6 +116,7 @@ def test_the_school_run_plan_with_the_wrong_person_fails():
 
 def test_the_email_thread_without_its_numbers_fails_whatever_the_judge_says():
     assert facts(EMAIL)[-2:] == ["10 hours / overtime", "9:30 / 9.30"]
+    assert ev.half(BANK[EMAIL]) == ev.PRACTICE
     # the judge as the brief found it: every fact correct
     v = verdict(EMAIL, QWEN_EMAIL, listed(EMAIL))
     assert (v["pass"], v["score"]) == (False, 2)
@@ -117,8 +127,8 @@ def test_the_email_thread_without_its_numbers_fails_whatever_the_judge_says():
     assert {r["fact"]: r["by"] for r in v["findings"]["checklist"]
             if r["status"] == "missing"} == {"10 hours / overtime": "code", "9:30 / 9.30": "code"}
     # with its numbers, it has every fact
-    whole = QWEN_EMAIL.replace("overtime is capped", "overtime is capped at 10 hours").replace(
-        "daily status calls", "daily status calls at 9:30")
+    whole = QWEN_EMAIL.replace("a capped overtime limit", "overtime capped at 10 hours, and a "
+                               "daily status call at 9:30")
     v = verdict(EMAIL, whole, listed(EMAIL))
     assert (v["pass"], v["score"], v["reason"]) == (True, 4, "4 of 4: all key facts, one version")
 
@@ -178,10 +188,11 @@ def test_every_listed_fact_counts_unless_the_request_limits_the_length():
     q = BANK[EMAIL]
     assert ev.stated_length(q["prompt"]) == ""
     assert "It should keep all 9 of these:" in ev.judge_check(q)["rubric"]
-    no_checkout = QWEN_EMAIL.replace("the mobile checkout redesign", "the redesign")
+    no_checkout = QWEN_EMAIL.replace("**Mobile Checkout:** The mobile checkout redesign",
+                                     "The redesign")
     v = verdict(EMAIL, no_checkout, listed(EMAIL, **{"checkout": "missing"}))
     assert v["reason"] == ("2 of 4: missing: checkout; 10 hours / overtime; 9:30 / 9.30 (−2)")
-    one = QWEN_EMAIL.replace("overtime is capped", "overtime is capped at 10 hours")
+    one = QWEN_EMAIL.replace("a capped overtime limit", "overtime capped at 10 hours")
     assert verdict(EMAIL, one, listed(EMAIL))["reason"] == "3 of 4: missing: 9:30 / 9.30 (−1)"
     # "give me the main points as 4 bullets": the reference leaves out the boiler, still undecided
     four = BANK["everyday-summarising-long-14"]
@@ -228,6 +239,24 @@ def test_the_names_of_a_text():
     # a month is its name or its short form, and nothing that starts like one
     assert ev.key_words("Mariam's novel, 3rd November, Sept 29") >= {"mariam", "novel", "3",
                                                                       "nov", "sep", "29"}
+
+
+@pytest.mark.parametrize("answer,fact,has", [
+    # a word that starts like a month is not that month…
+    ("Mariam has it", ["3 mar", "3 march"], False),
+    ("Mariam 3", ["3 mar", "3 march"], False),
+    ("a novel, chapter 12", ["12 nov", "12 november"], False),
+    ("the novel's 12 chapters", ["november 12"], False),
+    # …and a month's name or its short form still is
+    ("Mar 3", ["3 mar", "3 march"], True),
+    ("3 March", ["3 mar", "3 march"], True),
+    ("Nov 12", ["12 nov", "12 november"], True),
+    ("12 November", ["november 12"], True),
+    ("Sept 29", ["29 september"], True),
+])
+def test_a_month_is_its_name_or_short_form_only(answer, fact, has):
+    assert ev.has_fact(answer, fact, ev.names("Mariam reads a novel from 3 March to 12 November."))\
+        is has
 
 
 @pytest.mark.parametrize("reply", ['{"missing_facts": [], "invented_or_wrong": []}',
@@ -328,3 +357,67 @@ def test_the_remark_asks_every_summarise_answer_again_as_a_checklist(svc):
     assert all(it["rubric"] == ev.rubric_key(BANK[i]) and it["findings"]["checklist"]
                for i, it in items.items())
     assert (items[EMAIL]["pass"], items[EMAIL]["score"]) == (False, 2)
+
+
+def test_compare_says_which_change_moved_which_scores(svc):
+    """the brief: split --compare by cause. On one stored checklist each, the
+    columns add 12a.9's changes in turn — the school run plan fails on the
+    checklist, a four-bullet answer too long on the length now read, the email
+    thread on every fact counting — and the marks before are each answer's"""
+    qs = [q for q in BANK.values() if q["group"] == "summarising"]
+    FOUR = "everyday-summarising-long-14"                          # "as 4 bullets"
+    special = {SCHOOL_RUN: GEMMA_SCHOOL_RUN, EMAIL: QWEN_EMAIL}
+    answer = lambda q: special.get(q["id"], q["reference"])  # noqa: E731
+    mdir = config.OUT_DIR / "org__m"
+    _asked(mdir, qs, answer=answer)
+    ev.write(mdir, {"model": "org/m", "items": [
+        {"id": q["id"], "group": "summarising", "pass": True, "score": 4,
+         "reason": "4 of 4: all key facts, one version", "answer_text": answer(q),
+         "rubric": ev.rubric_key({"checks": [{"type": "judge", "rubric": ev.summarise_rubric(
+             q, ev.RUBRIC_12A8)}]})} for q in qs]})
+    ev.remark(config.OUT_DIR, judge=True)
+    snap = json.loads((config.OUT_DIR / ev.BEFORE_NAME).read_text())["summarise"]["org/m"]
+    assert set(snap) == {q["id"] for q in qs} and all(snap.values())
+    sent = [r for r in llm.FakeBatches("fake-judge", config.BENCH_ROOT).recorded()
+            if r["custom_id"].startswith(ev.REMARK + ":org__m:")]
+    replies = {r["custom_id"]: llm.Result(text=ev.stub_reply(r["user"])) for r in sent}
+    by = {c.rsplit(":", 1)[1]: c for c in replies}
+    replies[by[SCHOOL_RUN]] = llm.Result(text=listed(SCHOOL_RUN, **{
+        "5:30 / 5.30": ("wrong", "will pick up Layla from her friend's house at 5:30"),
+        "mum / mother": ("wrong", "Her mum is coming at 7")}))
+    replies[by[EMAIL]] = llm.Result(text=listed(EMAIL))
+    replies[by[FOUR]] = llm.Result(text=listed(FOUR, several=True, length="no"))
+    ev.finish_remark(config.OUT_DIR, replies)
+    items = {it["id"]: it for it in ev.read(mdir)["items"]}
+    assert [items[i]["score"] for i in (SCHOOL_RUN, FOUR, EMAIL)] == [2, 2, 2]
+    out = ev.compare(config.OUT_DIR).splitlines()
+    k = out.index("Summarise, what moved it: each column adds one change to the column before")
+    assert out[k + 2] == ("| model | half | before | the checklist | + lengths “as 4 bullets” "
+                          "asks | + every fact where no length is set (now) | waiting |")
+    n = {h: sum(1 for q in qs if ev.half(q) == h) for h in (ev.HIDDEN, ev.PRACTICE)}
+    p = n[ev.PRACTICE]
+    assert f"| org/m | practice | {p} of {p} | {p - 1} (−1) | {p - 2} (−1) | {p - 3} (−1) | 0 |" \
+        in out
+    h = n[ev.HIDDEN]
+    assert f"| org/m | hidden | {h} of {h} | {h} | {h} | {h} | 0 |" in out
+    # which questions each change reaches: practice ones named, hidden ones counted
+    assert out[-2:] == [
+        "Lengths “as 4 bullets” asks reach: long-14, long-16, long-30, long-33, long-44 in the "
+        "practice half; 0 hidden.",
+        "Every fact where no length is set reaches: long-01, long-08, long-11, long-15, long-22, "
+        "long-28 in the practice half; 0 hidden."]
+
+
+def test_a_hidden_question_a_change_reaches_is_counted_never_named(tmp_path, monkeypatch):
+    x = {"id": "everyday-summarising-invented-x", "group": "summarising", "half": ev.HIDDEN,
+         "prompt": 'give me the main points as 3 bullets: "Fixture text, invented for the tests."',
+         "reference": "Fixture text."}
+    x["checks"] = ev.summarise_checks({**x, "checks": [
+        {"type": "facts", "values": [["fixture"], ["text"], ["invented"], ["tests"]], "n": 2}]})
+    real = ev.load_bank
+    monkeypatch.setattr(ev, "load_bank", lambda *a, **k: real(*a, **k) + [x])
+    (tmp_path / ev.BEFORE_NAME).write_text(json.dumps({"models": {}, "summarise": {"org/x": {}}}))
+    out = ev.moved(tmp_path)
+    assert "invented-x" not in out
+    assert "Lengths “as 4 bullets” asks reach: long-14, long-16, long-30, long-33, long-44 in the " \
+           "practice half; 1 hidden." in out
