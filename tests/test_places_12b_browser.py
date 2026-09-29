@@ -367,7 +367,8 @@ def test_models_is_one_table_and_a_row_opens_the_model_page(live, page):
         ["All tasks", "Knowledge", "Commonsense", "Reasoning", "Math", "Trust & safety",
          "Instruction & maths", "Mobile tasks",                # 12h.1, 12o.3: MobileAIBench's two
          "Language modelling",
-         "Frontier · reported"]                                # 12n.1: reported scores' home
+         "Frontier · reported",                                # 12n.1: reported scores' home
+         "On-device chart"]                                    # 12q.B: DeviceMark's axes
     # Kind, Size, Status, Columns and Scale are in Filters ▾; 12h.2: Benchmarks
     # and Models sit beside it
     assert page.locator(".lbbar > .pills").count() == 0

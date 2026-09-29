@@ -240,6 +240,17 @@ one was entered, and its rank (`"=3"` a tie). A setup without MTP whose parity
 check passed (48 of 50 or more) carries the MTP row's quality, marked
 `inherited`, until it has a full run of its own.
 
+12q.B: it also carries `external` — DeviceMark's own rows from the committed
+snapshot of their board (`rows`, each `"external": true` with their numbers as
+published, the `credit` and, for five rows, a `note`; `source`,
+`last_modified`, `fetched`) — and every row, ours and theirs, has `rank_all`,
+the rank among all of them. Nothing is fetched from DeviceMark on a request.
+Our hf run of one of their open models is `paired` (their row's id) and not
+ranked apart (`rank_all` null); their row carries it as `ours` — each run's
+`label` ("bf16, our battery"), `calibration`, composite, benches, answered %,
+median tokens and accuracy against budget — and their `label` ("int8,
+iPhone").
+
 ### PUT /api/devicemark/device — a speed measured on a device
 
 `{"model": "served/…", "tok_s": 12.4, "device": "iPhone 17 Pro", "source":

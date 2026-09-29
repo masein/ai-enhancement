@@ -84,6 +84,8 @@ REQUIRED_REPO_FILES = [
     "eval_tasks/devicemark/battery-v1.json",
     "eval_tasks/devicemark/source_ids.json",
     "eval_tasks/devicemark/prompts.json",
+    # 12q.B: DeviceMark's board as published, the On-device chart's
+    "eval_tasks/devicemark/board-snapshot.json",
     "FRIENDS.md",                           # served at /guide
     "clients/bench_client.py",              # served at /client
     *DELIVERED_TOPIC_FILES,

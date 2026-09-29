@@ -154,7 +154,8 @@ def live(tmp_path_factory):
         "BENCH_ROOT", "RESULTS_ROOT", "OUT_DIR", "DB_PATH", "ARTIFACTS_DIR", "LOGS_DIR",
         "DATASETS_DIR", "SUBMIT_TOKEN", "LLM_PROVIDER", "LLM_MODEL", "LLM_API_KEY", "LLM_POLL_S",
         "EXAM_DIR", "EXAM_PROVIDER", "EXAM_MODEL", "EXAM_API_KEY", "JUDGED_TASKS_DIR",
-        "EVERYDAY_TASKS_DIR", "TRUST_TASKS_DIR", "BACKUP_DIR", "EXAM_REPORT_MANIFEST")}
+        "EVERYDAY_TASKS_DIR", "TRUST_TASKS_DIR", "BACKUP_DIR", "EXAM_REPORT_MANIFEST",
+        "DM_TASKS_DIR", "DM_ITEMS")}
     for k, v in {"BENCH_ROOT": root, "RESULTS_ROOT": root / "results",
                  "OUT_DIR": root / "results" / "full", "DB_PATH": root / "service.sqlite3",
                  "ARTIFACTS_DIR": root / "artifacts", "LOGS_DIR": root / "logs",
@@ -167,6 +168,9 @@ def live(tmp_path_factory):
                  "TRUST_TASKS_DIR": root / "trust_safety" / "tasks",
                  "SIMPLEQA_TASKS_DIR": root / "simpleqa" / "tasks",
                  "MAB_TASKS_DIR": root / "mobileaibench" / "tasks",
+                 # 12q: devicemark's tasks and its questions under the live root
+                 "DM_TASKS_DIR": root / "devicemark" / "tasks",
+                 "DM_ITEMS": root / "devicemark" / "items-v1.jsonl",
                  "BACKUP_DIR": root / "backups",
                  "EXAM_REPORT_MANIFEST": root / "no-exam-report-manifest.json"}.items():
         setattr(config, k, v)
