@@ -242,7 +242,7 @@ def test_each_suite_option_says_what_it_gets_you(live, page):
         ["full", "quick", "control", "judged", "everyday", "generative",   # 12h.1
          "safety", "shared", "mobile"]                            # 12k.2, 12n.2, 12o.3
     # 12a: the Everyday option is its one short line (12a.2: the bank's), and 12c replaces the list
-    assert opts.nth(4).text_content() == "Everyday tasks — 340 questions, a few minutes"
+    assert opts.nth(4).text_content() == "Everyday tasks — 310 questions, a few minutes"
     for o in opts.all()[:4]:
         v = o.get_attribute("data-value")
         sub = o.locator(f"[data-opt-sub='{v}']").text_content()

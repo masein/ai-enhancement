@@ -126,7 +126,8 @@ def test_a_topic_of_worked_problems_gets_the_explainer_not_the_layperson(svc, tm
         assert EXPLAINER in line and "name the common mistake" in line
         assert "Prose, never question-and-answer pairs" in line
         assert "layperson" not in line and "members of the public" not in line
-    assert "styles: quantitative 15%, conceptual 14%, physical_explanation 13%" in lines["physics"]
+    # 12p.2: the styles of the repo's bank, its diagnose half
+    assert "styles: physical_explanation 15%, quantitative 15%, conceptual 13%" in lines["physics"]
     for name in ("medicine", "law"):
         line = lines[name]
         assert line.startswith("Audience: members of the public asking about their own situation")
@@ -231,7 +232,10 @@ def test_no_report_half_field_reaches_propose_or_generate_whatever_it_is_called(
     client, _, tree = svc
     import make_fixture
     from service import config, llm, llm_poller
-    eb.import_bank(config.EXAM_DIR, LAW, "Law", "masein", "law_v1")
+    # 12p.2: the delivered bank with its report half — invented, each item's intent a
+    # sentence of its own, as the delivered one's were; the repo holds the diagnose half
+    eb.import_bank(config.EXAM_DIR, make_fixture.exam_bank_whole(LAW, config.BENCH_ROOT),
+                   "Law", "masein", "law_v1")
     eb.build(tree["out_dir"], config.EXAM_DIR)
     # its questions changed, so the judged models sit it again (10b)
     make_fixture.sit_again(config.EXAM_DIR.parent, tree["out_dir"], ["exam_law"])
@@ -254,7 +258,8 @@ def test_no_report_half_field_reaches_propose_or_generate_whatever_it_is_called(
     for q in sent:
         body = q["system"] + "\n" + q["user"]
         assert "Audience: people learning or practising the subject" in body   # the channel is open
-        assert assert_no_report_half_text(body, rows) >= 3 * len(report)       # prompt, reference, intent
+        assert assert_no_report_half_text(body, rows) >= 3 * sum(
+            1 for r in report if r.get("source") == "law_v1")   # 12p.2: the import's own       # prompt, reference, intent
     # and the check is not vacuous: one report-half intent in a body fails it
     leak = "Audience: " + sentences[0]["meta"]["intent"]
     with pytest.raises(AssertionError, match="meta.intent"):

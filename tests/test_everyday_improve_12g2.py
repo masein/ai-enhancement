@@ -29,9 +29,10 @@ GROUP = "instructions"
 # Honesty's ten new questions took it from 19 hidden to 24. 12a.6: the short
 # summaries (same ids, same halves) are Summarise's again — fifteen kept, 48
 # retired — so Summarise is 31 hidden and 29 practice
-SPLIT = {"understanding": (27, 18), "writing": (24, 24), "summarising": (31, 29),
-         "transform": (25, 21), "quick_maths": (24, 21), "instructions": (24, 21),
-         "honesty": (24, 27)}
+# 12p.2: the tests' invented hidden half, and the repo's practice half
+SPLIT = {"understanding": (21, 18), "writing": (21, 24), "summarising": (22, 29),
+         "transform": (22, 21), "quick_maths": (21, 21), "instructions": (21, 21),
+         "honesty": (21, 27)}
 
 
 @pytest.fixture
@@ -81,10 +82,12 @@ def test_every_everyday_question_is_split_by_the_exams_function_and_salt():
     assert ev.SPLIT == dx.SPLIT_SALT
     for q in bank:
         assert ev.qid(q) == eb.qid_of(q["prompt"])
-        assert ev.half(q) == dx.split_of(eb.qid_of(q["prompt"])) in (ev.HIDDEN, ev.PRACTICE)
+        # 12p.2: the split's, unless the row says (the store's hidden rows do)
+        assert ev.half(q) == (q.get("half") or dx.split_of(eb.qid_of(q["prompt"]))) in \
+            (ev.HIDDEN, ev.PRACTICE)
     counts = ev.split_counts()
     assert {g: (c["hidden"], c["practice"]) for g, c in counts.items()} == SPLIT
-    assert sum(c["hidden"] for c in counts.values()) == 179            # 12a.6: was 200
+    assert sum(c["hidden"] for c in counts.values()) == 149            # 12p.2: the tests' own
     # 12a.5: no group is under the line now; Honesty was, by one
     assert [g for g, c in counts.items() if c["hidden"] < 20] == []
 
@@ -104,7 +107,7 @@ def test_no_hidden_question_reaches_the_page(tmp_path):
     assert leaks(json.dumps(e)) == []
     # the published score is the hidden half's
     m = e["models"]["org/m"]
-    assert m["total"] == 179 and {g: x["total"] for g, x in m["groups"].items()} == \
+    assert m["total"] == 149 and {g: x["total"] for g, x in m["groups"].items()} == \
         {g: h for g, (h, _) in SPLIT.items()}
     assert {g: x["total"] for g, x in m["practice"].items()} == \
         {g: p for g, (_, p) in SPLIT.items()}
@@ -132,15 +135,16 @@ def test_results_from_before_the_split_are_kept_labelled_and_never_mixed(tmp_pat
 
 def test_a_group_under_the_line_is_refused_and_says_how_many_more(svc, monkeypatch):
     client, _, _ = svc
-    # 12a.5: Honesty has 24 hidden questions now, so the line moves to find one
-    monkeypatch.setattr(config, "EVERYDAY_MIN_HIDDEN", 25)
+    # 12a.5: Honesty has 24 hidden questions now, so the line moves to find one;
+    # 12p.2: the tests' invented hidden half has 21
+    monkeypatch.setattr(config, "EVERYDAY_MIN_HIDDEN", 22)
     r = client.post("/api/proposals", json={"model": MODEL, "everyday": "honesty",
                                             "requested_by": "m"})
     assert r.status_code == 409
-    assert r.json()["detail"] == ("Honesty has 24 hidden questions and Improve takes a group at "
-                                  "25: it needs 1 more")
-    # the line is one setting: at 24, honesty is taken
-    monkeypatch.setattr(config, "EVERYDAY_MIN_HIDDEN", 24)
+    assert r.json()["detail"] == ("Honesty has 21 hidden questions and Improve takes a group at "
+                                  "22: it needs 1 more")
+    # the line is one setting: at 21, honesty is taken
+    monkeypatch.setattr(config, "EVERYDAY_MIN_HIDDEN", 21)
     r = client.post("/api/proposals", json={"model": MODEL, "everyday": "honesty",
                                             "requested_by": "m"})
     assert r.status_code == 200, r.text
@@ -198,7 +202,7 @@ def test_an_everyday_group_goes_propose_approve_generate_on_practice_only(svc):
         assert set(it) == {"user", "assistant", "checks"}
         assert all(ev.run_check(c, it["assistant"], it["user"])[0] is True for c in it["checks"])
     assert d["provenance"]["format"] == "chat"
-    assert d["provenance"]["gate"]["everyday_questions"] == 340       # 12a.6: was 388
+    assert d["provenance"]["gate"]["everyday_questions"] == 310       # 12p.2: the tests' bank
     # 12g.1's rule holds here too: no Standard benchmark in any of it
     fresh(appmod)
     names = standard_names(client.get("/api/results").json())
@@ -282,4 +286,4 @@ def test_the_gate_drops_an_example_copying_any_everyday_question_either_half(tmp
     assert [d["index"] for d in gate["dropped"]] == [0, 1, 2]
     assert all(d["source"] == "everyday" for d in gate["dropped"])
     assert [k["assistant"] for k in gate["kept"]] == ["Gary."]
-    assert gate["report"]["everyday_questions"] == 340               # 12a.6: was 388
+    assert gate["report"]["everyday_questions"] == 310               # 12p.2: the tests' bank

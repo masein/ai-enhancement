@@ -74,14 +74,12 @@ def test_the_brief_s_copies_are_the_prompts_the_builder_uses():
     docs = REPO / "docs" / "prompts" / "phase-12i"
     assert (docs / "knowledge-question-prompt.md").read_text(encoding="utf-8") == \
         builder.PROMPTS["knowledge"].read_text(encoding="utf-8")
-    # 12n.1: but for one example — the brief's quoted a question of the hidden
-    # half, word for word, and the writer was sent it with every batch
-    brief = (docs / "everyday-question-prompt.md").read_text(encoding="utf-8").splitlines()
-    ours = builder.PROMPTS["everyday"].read_text(encoding="utf-8").splitlines()
-    assert len(brief) == len(ours)
-    [(was, now)] = [(a, b) for a, b in zip(brief, ours) if a != b]
-    assert "cn u put thse in abc ordr pls: mango, banana, apple, kiwi" in was
-    assert json.loads(now)["skill"] == json.loads(was)["skill"] == "abbreviated sort"
+    # 12n.1: the brief's quoted a question of the hidden half, word for word, and
+    # the writer was sent it with every batch; 12p.2: the brief's copy no longer
+    # quotes it either — the two are the same, with the builder's own example
+    brief = (docs / "everyday-question-prompt.md").read_text(encoding="utf-8")
+    assert brief == builder.PROMPTS["everyday"].read_text(encoding="utf-8")
+    assert json.loads(brief.splitlines()[64])["skill"] == "abbreviated sort"
 
 
 def test_the_builder_loads_with_the_servers_data_shape(server):
@@ -94,7 +92,7 @@ def test_the_builder_loads_with_the_servers_data_shape(server):
     assert page["writer"]["label"] == "Local (gemma on this server)"
     assert page["writer"]["price_in"] == 0.0 and page["writer_blocked"] == ""
     assert sum(t["bank"] for t in page["topics"]) > 0
-    assert sum(g["bank"] for g in page["groups"]) == 340                # 12a.6: was 388
+    assert sum(g["bank"] for g in page["groups"]) == 310                # 12p.2: the tests' bank
     for kind in ("knowledge", "everyday"):
         p = page["prompts"][kind]
         assert p["editable"] and p["locked"].startswith("## Output")

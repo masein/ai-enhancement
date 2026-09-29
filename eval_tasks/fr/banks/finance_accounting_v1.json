@@ -1,15 +1,5 @@
 [
   {
-    "id": 1,
-    "prompt": "A company begins with assets of 500, liabilities of 200, and equity of 300. It then buys inventory for 80 cash and later sells half of that inventory for 70 cash. Ignoring tax, show the effects of both transactions on assets, liabilities, equity, revenue, expense, net income, and cash, and verify that the accounting equation remains balanced.",
-    "intent": "Trace linked inventory transactions through the accounting equation and income statement.",
-    "domain": "Financial Accounting",
-    "acuity": "routine",
-    "difficulty": 2,
-    "style": "transaction_analysis",
-    "jurisdiction_required": false
-  },
-  {
     "id": 2,
     "prompt": "A customer pays 12,000 on January 1 for twelve months of service delivered evenly through the year. Explain the accounting at receipt, the adjusting effect after three months, and why cash receipt and revenue recognition differ.",
     "intent": "Reason about deferred revenue and recognition timing.",
@@ -20,26 +10,6 @@
     "jurisdiction_required": false
   },
   {
-    "id": 3,
-    "prompt": "On October 1, a company pays 24,000 for a 12-month insurance policy and initially records a prepaid asset. What adjusting entry is needed at December 31, and how do the adjustment and original cash payment affect assets, expenses, net income, and cash?",
-    "intent": "Distinguish prepaid expense recognition from cash payment.",
-    "domain": "Financial Accounting",
-    "acuity": "routine",
-    "difficulty": 2,
-    "style": "journal_entry",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 4,
-    "prompt": "Employees have earned 18,000 of wages by year-end that will be paid next month. Explain the year-end entry and its effects on liabilities, expenses, net income, and cash in the current and following periods.",
-    "intent": "Apply accrued-expense accounting across periods.",
-    "domain": "Financial Accounting",
-    "acuity": "routine",
-    "difficulty": 2,
-    "style": "cross_statement_reasoning",
-    "jurisdiction_required": false
-  },
-  {
     "id": 5,
     "prompt": "A machine costs 120,000, has a 20,000 residual value, and a five-year useful life. Using straight-line depreciation, calculate annual depreciation and explain the first-year effects on the income statement, balance sheet, and cash-flow statement. Do not treat depreciation as a current-period cash payment.",
     "intent": "Calculate depreciation and distinguish noncash expense from cash investment.",
@@ -47,16 +17,6 @@
     "acuity": "routine",
     "difficulty": 2,
     "style": "quantitative",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 6,
-    "prompt": "A company has accounts receivable of 400,000 and an allowance for credit losses of 12,000 before adjustment. It estimates required ending allowance at 18,000. Later, a specific 5,000 receivable is written off. Explain the adjusting expense, the write-off, and the effect of each on net receivables, profit, and cash.",
-    "intent": "Distinguish allowance estimation from actual write-off.",
-    "domain": "Financial Accounting",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "accounting_interpretation",
     "jurisdiction_required": false
   },
   {
@@ -110,16 +70,6 @@
     "jurisdiction_required": false
   },
   {
-    "id": 12,
-    "prompt": "In one month, a company makes a 100,000 credit sale with 60,000 cost of goods sold, collects 70,000 from customers, purchases 50,000 of inventory on account, and pays 35,000 to suppliers. Compute the month-end changes in accounts receivable, inventory, accounts payable, gross profit, and cash from these transactions.",
-    "intent": "Integrate credit sales, inventory, collections, and payables.",
-    "domain": "Financial Accounting",
-    "acuity": "routine",
-    "difficulty": 4,
-    "style": "transaction_analysis",
-    "jurisdiction_required": false
-  },
-  {
     "id": 13,
     "prompt": "An acquired software license costs 60,000, has a six-year finite useful life, and no residual value. Explain annual straight-line amortization and distinguish amortization expense, carrying amount, and cash paid at acquisition. Then explain how the analysis would differ conceptually for an asset that is not amortized because its life is treated as indefinite.",
     "intent": "Reason about finite-life versus indefinite-life intangible assets.",
@@ -150,36 +100,6 @@
     "jurisdiction_required": false
   },
   {
-    "id": 16,
-    "prompt": "A company has cash of 40, receivables of 90, inventory of 170, current liabilities of 180, and long-term debt of 400 (all in millions). Calculate working capital, current ratio, and quick ratio, then explain what these measures do and do not say about liquidity and solvency.",
-    "intent": "Calculate and interpret liquidity measures in context.",
-    "domain": "Financial Reporting & Analysis",
-    "acuity": "routine",
-    "difficulty": 2,
-    "style": "ratio_analysis",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 17,
-    "prompt": "Net income is 120. Depreciation is 30, accounts receivable increase by 25, inventory decreases by 10, accounts payable decrease by 15, and deferred revenue increases by 8. Using the indirect approach, calculate operating cash flow and explain each adjustment sign.",
-    "intent": "Reconcile net income to operating cash flow.",
-    "domain": "Financial Reporting & Analysis",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "cash_flow_analysis",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 18,
-    "prompt": "A company reports 25% growth in net income, but receivables rise 45%, inventory rises 35%, payables are flat, and operating cash flow falls 10%. Give at least three plausible explanations, identify which patterns merit further investigation, and state what additional evidence is needed before concluding that earnings quality is poor.",
-    "intent": "Evaluate earnings quality without presuming misconduct.",
-    "domain": "Financial Reporting & Analysis",
-    "acuity": "routine",
-    "difficulty": 4,
-    "style": "case_analysis",
-    "jurisdiction_required": false
-  },
-  {
     "id": 19,
     "prompt": "A company pays 250,000 cash for equipment on the last day of the year. Explain the immediate effects on the income statement, balance sheet, and cash-flow statement, then explain what changes in the next year if straight-line depreciation of 50,000 is recorded.",
     "intent": "Trace capital expenditure and later depreciation across statements.",
@@ -200,16 +120,6 @@
     "jurisdiction_required": false
   },
   {
-    "id": 21,
-    "prompt": "A company pays 70,000 of accounts payable that arose from prior-period inventory purchases. Explain why the payment reduces cash and the liability but does not create a current-period expense, and describe the operating cash-flow effect.",
-    "intent": "Distinguish liability settlement from expense recognition.",
-    "domain": "Financial Reporting & Analysis",
-    "acuity": "routine",
-    "difficulty": 1,
-    "style": "accounting_interpretation",
-    "jurisdiction_required": false
-  },
-  {
     "id": 22,
     "prompt": "Sales are forecast to grow 20% next year. Receivable days rise from 30 to 42, inventory days rise from 50 to 65, and payable days remain 35. Explain qualitatively why growth may require external financing even if the forecast income statement shows higher profit.",
     "intent": "Connect growth, working capital, and financing need.",
@@ -220,16 +130,6 @@
     "jurisdiction_required": false
   },
   {
-    "id": 23,
-    "prompt": "Company A and Company B have the same operating income and assets, but A uses much more debt and therefore has much less equity. A reports the higher ROE. Explain how leverage can produce this result and which additional measures would help determine whether A actually has stronger operating performance.",
-    "intent": "Interpret ROE in light of leverage.",
-    "domain": "Financial Reporting & Analysis",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "ratio_analysis",
-    "jurisdiction_required": false
-  },
-  {
     "id": 24,
     "prompt": "A business has 55 inventory days, 38 receivable days, and 44 payable days. Calculate its cash conversion cycle. Then explain how a 10-day increase in receivable days, with all else unchanged, could affect cash needs even if reported sales are unchanged.",
     "intent": "Calculate and interpret the cash conversion cycle.",
@@ -237,16 +137,6 @@
     "acuity": "routine",
     "difficulty": 2,
     "style": "quantitative",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 25,
-    "prompt": "Define free cash flow for this question as operating cash flow minus capital expenditures. A company reports operating cash flow of 310 million and capital expenditures of 190 million. Calculate free cash flow, then explain why this number alone does not show whether the company is underinvesting or creating value.",
-    "intent": "Calculate a stated FCF convention and interpret limitations.",
-    "domain": "Financial Reporting & Analysis",
-    "acuity": "routine",
-    "difficulty": 2,
-    "style": "financial_statement_analysis",
     "jurisdiction_required": false
   },
   {
@@ -267,16 +157,6 @@
     "acuity": "routine",
     "difficulty": 4,
     "style": "financial_statement_analysis",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 28,
-    "prompt": "A mature manufacturer reports capital expenditure below depreciation for five consecutive years while operating margins rise. Explain why this may improve near-term free cash flow, why it can also create longer-term concerns, and what information would distinguish efficient asset use from underinvestment.",
-    "intent": "Evaluate low capex relative to depreciation without overclaiming.",
-    "domain": "Financial Reporting & Analysis",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "assumption_analysis",
     "jurisdiction_required": false
   },
   {
@@ -310,16 +190,6 @@
     "jurisdiction_required": false
   },
   {
-    "id": 32,
-    "prompt": "A plant has idle capacity. A one-time order would add revenue of 140,000 and variable production cost of 95,000, plus 12,000 of special setup cost. Allocated fixed overhead of 25,000 would not change. Should the allocated overhead affect the incremental-profit calculation? Compute the order's incremental operating effect and identify nonfinancial considerations.",
-    "intent": "Use relevant costs for a special-order decision.",
-    "domain": "Managerial Accounting",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "financial_decision",
-    "jurisdiction_required": false
-  },
-  {
     "id": 33,
     "prompt": "A component costs 32 per unit to make: 18 variable manufacturing cost, 6 avoidable fixed cost, and 8 allocated fixed cost that will remain if production stops. A supplier offers the component for 25. If 10,000 units are needed and no alternative use of capacity exists, calculate the relevant make-versus-buy cost difference and explain the role of unavoidable allocated cost.",
     "intent": "Analyze make-versus-buy using avoidable cost.",
@@ -327,26 +197,6 @@
     "acuity": "routine",
     "difficulty": 3,
     "style": "managerial_accounting",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 34,
-    "prompt": "A product line shows a reported loss of 90,000 after 160,000 of allocated common fixed costs. If the line is discontinued, 110,000 of contribution margin disappears and only 40,000 of direct fixed cost is avoided; the common fixed costs remain. Determine the profit effect of discontinuation and explain why the reported segment loss is misleading for this decision.",
-    "intent": "Distinguish allocated fixed costs from avoidable costs.",
-    "domain": "Managerial Accounting",
-    "acuity": "routine",
-    "difficulty": 4,
-    "style": "error_analysis",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 35,
-    "prompt": "Traditional costing allocates overhead using machine hours, but a low-volume customized product consumes many setups and inspections. Explain how activity-based costing could change the product's measured cost, what cost drivers would be relevant, and why a different allocation does not itself change total company cash cost.",
-    "intent": "Interpret activity-based costing and cost drivers.",
-    "domain": "Managerial Accounting",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "cost_accounting",
     "jurisdiction_required": false
   },
   {
@@ -376,36 +226,6 @@
     "domain": "Managerial Accounting",
     "acuity": "routine",
     "difficulty": 1,
-    "style": "conceptual",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 39,
-    "prompt": "What is the future value of 10,000 invested for three years at 5% annual compounding? Then explain why simply adding 15% to the principal is not exactly equivalent to compounding.",
-    "intent": "Apply and interpret compound future value.",
-    "domain": "Corporate Finance",
-    "acuity": "routine",
-    "difficulty": 1,
-    "style": "quantitative",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 40,
-    "prompt": "An investment pays 5,000 at the end of each of the next four years. Using an 8% annual discount rate, calculate the present value as an ordinary annuity. State the timing assumption clearly.",
-    "intent": "Calculate present value of an ordinary annuity.",
-    "domain": "Corporate Finance",
-    "acuity": "routine",
-    "difficulty": 2,
-    "style": "quantitative",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 41,
-    "prompt": "Two projects have identical certain cash flows except Project A pays most cash in years 1-2 and Project B pays most cash in years 7-8. Explain why an increase in the discount rate affects B's present value more strongly, all else equal.",
-    "intent": "Relate discount-rate sensitivity to cash-flow timing.",
-    "domain": "Corporate Finance",
-    "acuity": "routine",
-    "difficulty": 2,
     "style": "conceptual",
     "jurisdiction_required": false
   },
@@ -450,66 +270,6 @@
     "jurisdiction_required": false
   },
   {
-    "id": 46,
-    "prompt": "A stable utility company with an 8% corporate WACC is considering a highly speculative project with cash flows much riskier than its existing operations. Explain why automatically discounting the project at 8% can misvalue it and what kinds of evidence could support a project-specific required return.",
-    "intent": "Distinguish company-wide WACC from project-specific required return.",
-    "domain": "Corporate Finance",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "assumption_analysis",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 47,
-    "prompt": "A profitable company can fund a 300 million expansion with either new debt or new equity. Compare the effects on dilution, fixed obligations, financial flexibility, default risk, and potential shareholder returns. Explain why neither source is universally superior.",
-    "intent": "Evaluate debt-versus-equity financing trade-offs.",
-    "domain": "Corporate Finance",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "corporate_finance",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 48,
-    "prompt": "A company has 1,000 of operating assets financed entirely with equity and earns 120 before interest and tax. Compare this with a recapitalized case using 400 of debt at 6% interest and 600 of equity. Ignoring tax, calculate return on equity in both cases if operating income remains 120, then repeat if operating income falls to 40. Explain the upside and downside amplification from leverage.",
-    "intent": "Quantify how leverage affects equity returns across operating outcomes.",
-    "domain": "Corporate Finance",
-    "acuity": "routine",
-    "difficulty": 4,
-    "style": "quantitative",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 49,
-    "prompt": "A company generates 200 million of cash after necessary investment and has no near-term refinancing pressure. Management is considering dividends, share repurchases, debt reduction, or retaining the cash for future projects. Explain the financial trade-offs and what information is needed to evaluate the alternatives without assuming one is always best.",
-    "intent": "Assess payout and capital-allocation choices.",
-    "domain": "Corporate Finance",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "financial_decision",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 50,
-    "prompt": "A company is profitable and has positive equity, but most cash is tied up in receivables and inventory while a large debt maturity is due in 60 days. Explain how it can be solvent yet face a liquidity crisis, and identify potential financing or working-capital responses and their risks.",
-    "intent": "Distinguish liquidity from solvency in a financing scenario.",
-    "domain": "Corporate Finance",
-    "acuity": "routine",
-    "difficulty": 4,
-    "style": "case_analysis",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 51,
-    "prompt": "A firm has 10 million of capital available and two indivisible projects: Project A costs 10 million and has NPV 2.0 million; Project B costs 6 million and has NPV 1.5 million. A separate Project C costs 4 million and has NPV 0.8 million. Compare the feasible combinations and explain how a capital constraint changes the decision problem relative to ranking by IRR alone.",
-    "intent": "Apply capital rationing and NPV logic.",
-    "domain": "Corporate Finance",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "capital_budgeting",
-    "jurisdiction_required": false
-  },
-  {
     "id": 52,
     "prompt": "A company acquires a target for 800 million and funds 650 million with new debt. Expected annual cost synergies are 70 million, but integration costs are 120 million over two years. Explain how the deal could affect leverage, interest coverage, liquidity, and equity value even if the operating synergies are ultimately achieved.",
     "intent": "Connect acquisition financing and synergies to leverage and value.",
@@ -550,26 +310,6 @@
     "jurisdiction_required": false
   },
   {
-    "id": 56,
-    "prompt": "A perpetuity-growth terminal value uses next-year free cash flow of 105, WACC of 9%, and perpetual growth of 3%. Calculate terminal value at the valuation date using TV = FCF1/(WACC-g). Then explain why increasing growth to 4% or lowering WACC to 8% has a disproportionate effect, and why g must remain economically plausible.",
-    "intent": "Calculate and interpret perpetuity-growth terminal value sensitivity.",
-    "domain": "Valuation & Forecasting",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "sensitivity_analysis",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 57,
-    "prompt": "An analyst values a company by multiplying EBITDA by a P/E multiple. Explain why this mixes an enterprise-level operating measure with an equity-value multiple, and identify valuation pairings that are conceptually compatible instead.",
-    "intent": "Detect numerator-denominator mismatch in relative valuation.",
-    "domain": "Valuation & Forecasting",
-    "acuity": "routine",
-    "difficulty": 2,
-    "style": "error_analysis",
-    "jurisdiction_required": false
-  },
-  {
     "id": 58,
     "prompt": "Company A trades at 8x EV/EBITDA and Company B at 11x. B also has faster growth, higher margins, less capital intensity, and lower business risk. Explain why the multiple gap cannot by itself prove that A is undervalued, and identify normalization issues you would examine before comparing them.",
     "intent": "Interpret comparable-company multiples in context.",
@@ -577,16 +317,6 @@
     "acuity": "routine",
     "difficulty": 3,
     "style": "comparison",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 59,
-    "prompt": "A stock trades at 10x earnings while peers trade at 18x, but the company has slower expected growth, declining margins, and higher leverage. Explain why a low P/E does not by itself establish undervaluation and what further valuation evidence would be needed.",
-    "intent": "Critique a simplistic low-multiple claim.",
-    "domain": "Valuation & Forecasting",
-    "acuity": "routine",
-    "difficulty": 2,
-    "style": "financial_statement_analysis",
     "jurisdiction_required": false
   },
   {
@@ -610,36 +340,6 @@
     "jurisdiction_required": false
   },
   {
-    "id": 62,
-    "prompt": "A DCF base case assumes 6% revenue growth, 15% operating margin, and 9% WACC. An upside case assumes 8% growth and 17% margin, while a downside case assumes 2% growth, 11% margin, and 11% WACC. Explain how scenario analysis differs from changing one variable at a time, and why you should not attach probabilities unless they are justified.",
-    "intent": "Distinguish scenario analysis from one-variable sensitivity and probability weighting.",
-    "domain": "Valuation & Forecasting",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "sensitivity_analysis",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 63,
-    "prompt": "A valuation uses aggressive revenue growth, expanding margins, a low WACC, and a high perpetual-growth rate simultaneously. Explain how these assumptions can interact to create an optimistic DCF, which variables usually deserve sensitivity testing, and why a single point estimate may imply false precision.",
-    "intent": "Evaluate interacting DCF assumptions and false precision.",
-    "domain": "Valuation & Forecasting",
-    "acuity": "routine",
-    "difficulty": 4,
-    "style": "assumption_analysis",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 64,
-    "prompt": "A company has forecast unlevered free cash flow of 60, 75, 95, 115, and 130 over years 1-5. WACC is 9.5%. After year 5, cash flow is assumed to grow at 2.5% perpetually. Debt is 400, cash is 100, and there are 50 million shares. Build the DCF from enterprise value through implied equity value per share, and explain which assumptions drive the result most strongly.",
-    "intent": "Construct a full DCF and enterprise-to-equity bridge.",
-    "domain": "Valuation & Forecasting",
-    "acuity": "routine",
-    "difficulty": 5,
-    "style": "valuation",
-    "jurisdiction_required": false
-  },
-  {
     "id": 65,
     "prompt": "Enterprise value is estimated at 1.5 billion. The company has 500 million of debt, 120 million of excess cash, and 20 million shares. Calculate implied equity value and value per share, then explain how issuing additional debt solely to hold more cash would affect the simple net-debt bridge absent other changes.",
     "intent": "Translate enterprise value into per-share equity value.",
@@ -660,82 +360,12 @@
     "jurisdiction_required": false
   },
   {
-    "id": 67,
-    "prompt": "An acquisition is expected to increase the buyer's earnings per share next year because the target's earnings yield exceeds the buyer's after-tax borrowing cost. Explain why near-term EPS accretion does not by itself prove that the acquisition creates economic value, and identify at least four omitted value drivers.",
-    "intent": "Distinguish EPS accretion from value creation.",
-    "domain": "Valuation & Forecasting",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "financial_decision",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 68,
-    "prompt": "An analyst's intrinsic-value estimate is 40 per share while the market price is 34. Explain why this difference is not proof of mispricing. Discuss model risk, assumption uncertainty, market expectations, and the role of sensitivity analysis.",
-    "intent": "Separate analytical intrinsic value from observed market price.",
-    "domain": "Valuation & Forecasting",
-    "acuity": "routine",
-    "difficulty": 2,
-    "style": "evidence_and_uncertainty",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 69,
-    "prompt": "An investor buys a security for 100, receives 4 of cash income, and sells it one year later for 108. Calculate the holding-period return and separate the income return from the capital gain.",
-    "intent": "Calculate total holding-period return.",
-    "domain": "Investments & Markets",
-    "acuity": "routine",
-    "difficulty": 1,
-    "style": "investment_analysis",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 70,
-    "prompt": "An investment returns +20% in year 1 and -20% in year 2. Calculate the two-year compounded wealth change starting from 100 and explain why the arithmetic average return of 0% does not mean wealth is unchanged.",
-    "intent": "Distinguish arithmetic average returns from compounded wealth.",
-    "domain": "Investments & Markets",
-    "acuity": "routine",
-    "difficulty": 2,
-    "style": "quantitative",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 71,
-    "prompt": "A portfolio earns a nominal return of 7% while inflation over the same period is 3%. Calculate the approximate real return and the exact real return using (1.07/1.03)-1. Explain the difference between nominal and real purchasing-power growth.",
-    "intent": "Calculate and interpret real versus nominal return.",
-    "domain": "Investments & Markets",
-    "acuity": "routine",
-    "difficulty": 2,
-    "style": "quantitative",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 72,
-    "prompt": "An asset has a 60% chance of returning 12% and a 40% chance of returning -5% over the next period. Calculate expected return. Then explain why the expected return is not a guaranteed realized return and what additional information would be needed to assess risk.",
-    "intent": "Compute expected return and interpret uncertainty.",
-    "domain": "Investments & Markets",
-    "acuity": "routine",
-    "difficulty": 2,
-    "style": "investment_analysis",
-    "jurisdiction_required": false
-  },
-  {
     "id": 73,
     "prompt": "A portfolio is invested 50% in Asset A with expected return 8%, 30% in Asset B with expected return 5%, and 20% in cash with expected return 2%. Calculate the portfolio's expected return and explain why portfolio risk cannot be calculated from these returns alone.",
     "intent": "Calculate weighted portfolio return and identify missing risk inputs.",
     "domain": "Investments & Markets",
     "acuity": "routine",
     "difficulty": 2,
-    "style": "portfolio_analysis",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 74,
-    "prompt": "Two assets each have 15% volatility. Compare the diversification effect if their correlation is +0.9, 0, or -0.5. Explain why the number of holdings alone is an inadequate measure of diversification.",
-    "intent": "Reason about correlation and portfolio risk.",
-    "domain": "Investments & Markets",
-    "acuity": "routine",
-    "difficulty": 3,
     "style": "portfolio_analysis",
     "jurisdiction_required": false
   },
@@ -760,16 +390,6 @@
     "jurisdiction_required": false
   },
   {
-    "id": 77,
-    "prompt": "A three-year bond has face value 1,000, an annual 5% coupon paid once per year, and a required yield of 7%. Calculate its price by discounting coupons and principal, and explain why the price is below face value.",
-    "intent": "Price a coupon bond from promised cash flows and required yield.",
-    "domain": "Investments & Markets",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "fixed_income",
-    "jurisdiction_required": false
-  },
-  {
     "id": 78,
     "prompt": "A bond's required market yield rises from 4% to 6% while its promised coupon and principal remain unchanged. Explain why its price falls, and why the coupon rate should not be confused with the new required yield.",
     "intent": "Explain the inverse bond price-yield relationship.",
@@ -780,26 +400,6 @@
     "jurisdiction_required": false
   },
   {
-    "id": 79,
-    "prompt": "Bond A and Bond B have the same yield and maturity, but Bond A has a 2% coupon and Bond B an 8% coupon. Explain which is generally more price-sensitive to a small yield change and why, using duration intuition rather than a memorized formula.",
-    "intent": "Connect coupon structure to interest-rate sensitivity.",
-    "domain": "Investments & Markets",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "fixed_income",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 80,
-    "prompt": "The yield curve is strongly upward sloping. Give several possible interpretations involving expected future short rates, term premia, and uncertainty. Explain why one observed curve shape does not uniquely reveal market expectations.",
-    "intent": "Interpret the yield curve without overstating one theory.",
-    "domain": "Investments & Markets",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "conceptual",
-    "jurisdiction_required": false
-  },
-  {
     "id": 81,
     "prompt": "A lender has a 2% probability of default on a 10 million exposure. If default occurs, expected recovery is 40% of exposure. Calculate expected credit loss using PD × exposure × loss-given-default, and explain what this simple expected-loss measure omits.",
     "intent": "Calculate expected credit loss and interpret model limitations.",
@@ -807,26 +407,6 @@
     "acuity": "routine",
     "difficulty": 3,
     "style": "risk_analysis",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 82,
-    "prompt": "A company owns assets worth substantially more than its liabilities but cannot sell those assets quickly enough to meet payroll and debt payments due this week. Explain why this is a liquidity problem rather than necessarily an insolvency problem, and identify possible short-term funding responses and their risks.",
-    "intent": "Distinguish funding liquidity from solvency.",
-    "domain": "Financial Risk",
-    "acuity": "routine",
-    "difficulty": 2,
-    "style": "risk_analysis",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 83,
-    "prompt": "A European exporter expects to receive USD 5 million in three months and is concerned the dollar may weaken against the euro. Using the quote 1 EUR = 1.20 USD, explain conceptually how a forward contract could reduce transaction exposure. State clearly which currency the exporter would sell forward and why.",
-    "intent": "Apply an FX forward hedge with an unambiguous quotation.",
-    "domain": "Financial Risk",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "derivatives_reasoning",
     "jurisdiction_required": false
   },
   {
@@ -847,26 +427,6 @@
     "acuity": "routine",
     "difficulty": 3,
     "style": "derivatives_reasoning",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 86,
-    "prompt": "A company with floating-rate debt enters a swap intended to make its interest cost more fixed, but the debt resets off a different reference rate from the swap. Explain the risk reduction achieved, the mismatch that remains, and why hedging need not eliminate uncertainty.",
-    "intent": "Analyze an imperfect interest-rate hedge.",
-    "domain": "Financial Risk",
-    "acuity": "routine",
-    "difficulty": 4,
-    "style": "risk_analysis",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 87,
-    "prompt": "A company has positive annual EBITDA and positive book equity, but a large portion of its debt matures within six months and credit markets have tightened. Explain the mechanisms through which refinancing pressure can create financial distress even before accounting insolvency occurs.",
-    "intent": "Analyze maturity-driven distress and refinancing risk.",
-    "domain": "Financial Risk",
-    "acuity": "routine",
-    "difficulty": 4,
-    "style": "case_analysis",
     "jurisdiction_required": false
   },
   {
@@ -896,16 +456,6 @@
     "domain": "Audit & Reporting Judgment",
     "acuity": "routine",
     "difficulty": 3,
-    "style": "audit_analysis",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 91,
-    "prompt": "A misstatement equals only 0.3% of pretax income but causes a company to avoid violating a debt covenant. Explain why the item may still be material even if a simple percentage threshold appears small.",
-    "intent": "Apply qualitative materiality reasoning.",
-    "domain": "Audit & Reporting Judgment",
-    "acuity": "routine",
-    "difficulty": 2,
     "style": "audit_analysis",
     "jurisdiction_required": false
   },
@@ -987,16 +537,6 @@
     "acuity": "routine",
     "difficulty": 5,
     "style": "financial_decision",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 100,
-    "prompt": "A company books a large year-end credit sale based on a spreadsheet uploaded by a salesperson. The same salesperson can amend customer master data, and the finance manager reviews revenue but not subsequent cash collection. Receivables later become overdue. Identify the accounting, audit, and control issues; explain what evidence would test whether revenue was earned; describe the cash-flow and allowance implications; and propose control improvements without assuming fraud.",
-    "intent": "Integrate revenue recognition, receivables, audit evidence, and controls.",
-    "domain": "Cross-disciplinary",
-    "acuity": "routine",
-    "difficulty": 5,
-    "style": "case_analysis",
     "jurisdiction_required": false
   }
 ]

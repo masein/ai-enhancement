@@ -55,13 +55,12 @@ so nothing is lost.
 
 | id | group | prompt | check |
 |---|---|---|---|
-| 03 | summarising | `tldr pls: "Dear parents, on Thursday 1 October school will close early at 11:30 for staff training. Buses will leave at 11:15. If you are collecting your child yourself please come by 11:45 at the latest. Friday is a normal day. Thank you, Ms Rahman"` | `judge`, rubric below |
+| 03 | summarising | (a question of the hidden half: taken out in 12p.2) | `judge`, rubric below |
 | 05 | **instructions** (was behaviour) | unchanged | unchanged |
 
-Rubric for 03, passed to the judge with the question and the answer: *"Passes
-if the answer is at most two sentences and says school closes early at 11:30
-on Thursday, with buses at 11:15 or pickup by 11:45. Fails if it changes a
-time or adds anything the notice doesn't say."*
+Rubric for 03, passed to the judge with the question and the answer: (the
+rubric of a question of the hidden half, which says its facts: taken out in
+12p.2).
 
 The judge takes its rubric from the question; nothing is hard-coded to
 Arabic. The pilot page's short label for 03 is **TL;DR**. The pilot's groups

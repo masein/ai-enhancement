@@ -60,11 +60,11 @@ def test_the_everyday_page_shows_the_practice_half_and_counts_the_hidden(live, p
     page.set_viewport_size({"width": 1400, "height": 1000})
     page.goto(live["base"] + "/#tab=benchmarks&sub=everyday")
     page.wait_for_selector("[data-everyday-table]")
-    assert page.locator("[data-evd-bank-split]").get_attribute("data-evd-bank-split") == "179|161"
+    assert page.locator("[data-evd-bank-split]").get_attribute("data-evd-bank-split") == "149|161"   # 12p.2
     shown = {e.get_attribute("data-evd-bank-q") for e in page.locator("[data-evd-bank-q]").all()}
     assert len(shown) == 161 and not shown & hidden_ids()                       # 12a.6
     assert page.locator("[data-evd-group-split='honesty']").inner_text() == \
-        "24 hidden · 27 practice"                                       # 12a.5: was 19 · 22
+        "21 hidden · 27 practice"                   # 12a.5: was 19 · 22; 12p.2: the tests' 21
     # no hidden question's text anywhere in what the page holds
     held = page.evaluate("JSON.stringify(DATA.everyday)")
     for q in ev.load_bank():
@@ -72,8 +72,8 @@ def test_the_everyday_page_shows_the_practice_half_and_counts_the_hidden(live, p
             assert q["prompt"] not in held, q["id"]
     # a model's score is its hidden half's
     tot = page.evaluate(f"DATA.everyday.models[{json.dumps(GOOD)}].total")
-    assert tot == 179                                                          # 12a.6
-    assert page.locator(f"[data-evd-count='{GOOD}']").inner_text().endswith(" of 179")
+    assert tot == 149                                      # 12a.6; 12p.2: the tests' hidden half
+    assert page.locator(f"[data-evd-count='{GOOD}']").inner_text().endswith(" of 149")
     shot(page, "12g2-everyday-1400-light.png", full_page=True)
     assert page.errors == []
 
@@ -84,7 +84,7 @@ def test_a_groups_answers_are_its_practice_half_and_say_so(live, page):
     page.locator(f"[data-evd-cell='{GOOD}|honesty']").click()
     note = page.locator("[data-evd-split-note='honesty']")
     assert note.inner_text().startswith("Practice questions · ")
-    assert note.inner_text().endswith("The 24 hidden ones score it and are not shown.")
+    assert note.inner_text().endswith("The 21 hidden ones score it and are not shown.")
     rows = {r.get_attribute("data-evd-row") for r in page.locator("[data-evd-row]").all()}
     assert rows and not rows & hidden_ids()
     assert page.errors == []
@@ -170,7 +170,7 @@ def test_propose_on_a_group_makes_its_proposal_and_its_card_reads_practice(live,
     page.wait_for_selector("#reader[data-ready='1']")
     why = page.locator(f"[data-why-line='{pid}']").inner_text()
     assert "practice requests failed · Instructions" in why and why.endswith(
-        "of 24 (hidden questions)")
+        "of 21 (hidden questions)")                   # 12p.2: the tests'
     block = page.locator(f"[data-evd-read-block='{pid}']")
     block.locator("summary").click()
     read = {e.get_attribute("data-evd-read-q") for e in block.locator("[data-evd-read-q]").all()}
@@ -192,7 +192,7 @@ def _retest(case):
                 m["tainted"] = ["everyday:instructions"]
         base = e["models"][MODEL]
         ck = json.loads(json.dumps(base))
-        ck["groups"]["instructions"] = {"passed": 20, "total": 24}
+        ck["groups"]["instructions"] = {"passed": 20, "total": 21}
         if case == "same":
             e["models"][CK] = ck
         else:                                   # answered before the current version
@@ -206,7 +206,7 @@ def test_a_retest_shows_the_group_before_after_on_the_hidden_half(live, page):
     pipeline(page, live["base"])
     line = page.locator(f"[data-retest='{CK}'] [data-retest-group='instructions']")
     a = page.evaluate(f"DATA.everyday.models[{json.dumps(MODEL)}].groups.instructions")
-    assert line.inner_text() == f"Instructions {a['passed']} of 24 → 20 of 24"
+    assert line.inner_text() == f"Instructions {a['passed']} of 21 → 20 of 21"
     # and the Standard watch under it, as 12g.1 left it
     assert page.locator(f"[data-retest='{CK}'] [data-watch-line='{CK}']").count() == 1
     shot(page, "12g2-retest-1400-light.png")

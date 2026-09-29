@@ -19,8 +19,9 @@ ROUND3 = [q for q in BANK.values() if "-r3-" in q["id"]]
 
 
 def test_round3_is_176_of_the_bank():
-    """222, less its 46 short summaries — 12a.6 retired them"""
-    assert len(ROUND3) == 176 and all(q["written_by"] for q in ROUND3)
+    """222, less its 46 short summaries — 12a.6 retired them. 12p.2: the
+    practice half's 81 are in the repo; the other 95 are the server's"""
+    assert len(ROUND3) == 81 and all(q["written_by"] for q in ROUND3)
 
 
 def test_round3s_short_summaries_are_retired_each_with_why():
@@ -38,7 +39,7 @@ def test_round3s_short_summaries_are_retired_each_with_why():
 
 def test_repeating_the_request_back_fails_every_round3_writing_question():
     writing = [q for q in ROUND3 if q["group"] == "writing"]
-    assert len(writing) == 32
+    assert len(writing) == 16                  # 12p.2: the practice half's
     for q in writing:
         ok, why = ev.grade(q, q["prompt"])
         assert ok is False and why, q["id"]

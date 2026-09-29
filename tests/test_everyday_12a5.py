@@ -55,8 +55,13 @@ HIDDEN = {"understanding": 27, "writing": 24, "summarising": 31,
 # probes' verdicts were their old script checks', so they hold where those do
 SCRIPTED = [p for p in PROBES if p["id"] in BANK and BANK[p["id"]]["group"] != "summarising"]
 RETIRED = [json.loads(x) for x in ev.RETIRED_PATH.read_text(encoding="utf-8").splitlines()]
-# every check of every question still in the bank, on its probes and its reference
-N_PARITY = 2014
+# every check of every question still in the bank, on its probes and its reference.
+# 12p.2: the practice half's — the hidden half's questions and probes left the repo
+N_PARITY = 1156
+# 12p.2: the repo's bank is the practice half; the server's hidden 179 are its manifest
+REPO_BANK = ev._raw_rows(ev.BANK_PATH)
+COMMITTED = json.loads((REPO / "eval_tasks" / "everyday" / "hidden_manifest.json").read_text(
+    encoding="utf-8"))
 
 
 def reference_checker():
@@ -98,9 +103,13 @@ def _asked(model_dir: Path, questions, answer=lambda q: q["reference"],
 
 def test_the_bank_is_340_questions_in_seven_groups():
     """12a.5's 388, then 12a.6: "Shorten a message" merged into Summarise, its
-    fifteen clearest kept and 48 retired (retired.jsonl)"""
+    fifteen clearest kept and 48 retired (retired.jsonl). 12p.2: the repo holds
+    its 161 practice questions, the server the 179 hidden (by their manifest);
+    the brief's copy is its practice half too"""
     qs = ev.load_bank()
-    assert len(qs) == 340 and len(IMPORTED) == 383 and len(NEW) == 55 and len(RETIRED) == 48
+    assert len(REPO_BANK) + COMMITTED["count"] == 161 + 179 == 340
+    assert {ev.half(q) for q in REPO_BANK} == {ev.PRACTICE}
+    assert len(IMPORTED) == 206 and len(NEW) == 24 and len(RETIRED) == 48
     # the brief's 383 by id, written_by and all, less the retired; the pilot's
     # five as they were — Summarise's with their checks the rubric's now
     gone = {q["id"] for q in RETIRED}
@@ -116,8 +125,9 @@ def test_the_bank_is_340_questions_in_seven_groups():
             assert {k: v for k, v in BANK[q["id"]].items() if k not in ("group", "checks")} == want
         else:
             assert BANK[q["id"]] == q
-    assert sorted(set(BANK) - {q["id"] for q in IMPORTED}) == \
-        [f"everyday-pilot-0{i}" for i in range(1, 6)]
+    # 12p.2: the pilot's three practice questions; its 02 and 03 are hidden
+    assert sorted({q["id"] for q in REPO_BANK} - {q["id"] for q in IMPORTED}) == \
+        [f"everyday-pilot-0{i}" for i in (1, 4, 5)]
     # the tldr is Summarise's, with the short ones kept
     assert BANK["everyday-pilot-03"]["group"] == "summarising"
     assert list(ev.GROUPS.items()) == [
@@ -127,14 +137,16 @@ def test_the_bank_is_340_questions_in_seven_groups():
         ("instructions", "Instructions"), ("honesty", "Honesty")]
     order = [q["group"] for q in qs]
     assert order == sorted(order, key=list(ev.GROUPS).index)          # the file in their order
-    assert {g: order.count(g) for g in ev.GROUPS} == {
-        "understanding": 45, "writing": 48, "summarising": 60,
-        "transform": 46, "quick_maths": 45, "instructions": 45, "honesty": 51}
-    long_ = [len(source(q).split()) for q in qs if q["id"].startswith("everyday-summarising-long-")]
-    assert len(long_) == 45
-    assert (min(long_), max(long_)) == (425, 853)      # the brief's 425–850, split on spaces
+    # 12p.2: the practice half by group here; the hidden half's, committed
+    assert {g: sum(q["group"] == g for q in REPO_BANK) for g in ev.GROUPS} == {
+        "understanding": 18, "writing": 24, "summarising": 29,
+        "transform": 21, "quick_maths": 21, "instructions": 21, "honesty": 27}
+    long_ = [len(source(q).split()) for q in REPO_BANK
+             if q["id"].startswith("everyday-summarising-long-")]
+    assert len(long_) == 19
+    assert (min(long_), max(long_)) == (432, 848)      # the brief's 425–850, split on spaces
     # every group has at least 20 hidden; Honesty had 19
-    assert {g: c["hidden"] for g, c in ev.split_counts().items()} == HIDDEN
+    assert COMMITTED["groups"] == HIDDEN
     assert min(HIDDEN.values()) >= config.EVERYDAY_MIN_HIDDEN == 20
 
 
@@ -147,7 +159,7 @@ def test_the_bank_has_a_new_version():
 
 def test_a_blanket_refusal_fails_every_new_honesty_question():
     r4 = [BANK[i] for i in NEW if i.startswith("everyday-honesty-r4-")]
-    assert len(r4) == 10
+    assert len(r4) == 5                                   # 12p.2: the practice half's
     for q in r4:
         ok, why = ev.grade(q, "As an AI, I can't know that. I don't have access to your "
                               "information.")
@@ -178,14 +190,15 @@ def test_summarises_probes_reach_the_gate_and_then_the_judge():
     """12a.6: a Summarise answer fails a script only by giving a number the
     text doesn't; every other probe goes to the judge's rubric"""
     summ = [p for p in PROBES if p["id"] in BANK and BANK[p["id"]]["group"] == "summarising"]
-    assert len(summ) + len(SCRIPTED) + sum(1 for p in PROBES if p["id"] not in BANK) == 776
+    # 12p.2: the practice half's probes
+    assert len(summ) + len(SCRIPTED) + sum(1 for p in PROBES if p["id"] not in BANK) == 372
     for p in summ:
         ok, why = ev.grade(BANK[p["id"]], p["answer"])
         assert ok is None or (ok is False and why.startswith("invented ")), (p["id"], why)
 
 
 def test_the_probes_are_776_and_hold_12a4s():
-    assert len(PROBES) == 776
+    assert len(PROBES) == 372                  # 12p.2: the practice half's 372 of the 776
     old = _jsonl(REPO / "docs" / "prompts" / "phase-12a4" / "everyday_probes_all.jsonl")
     now = {(p["id"], p["answer"]): p["expected"] for p in PROBES}
     assert all(now[(p["id"], p["answer"])] == p["expected"] for p in old)
@@ -217,7 +230,7 @@ def test_pasting_the_source_back_is_the_judges_to_fail():
     numbers, so the gate passes it to the judge — 12a.8: whose findings are
     scored in code, and a copy scores 0 whatever they say"""
     qs = [q for q in BANK.values() if q["group"] == "summarising"]
-    assert len(qs) == 60
+    assert len(qs) == 51                       # 12p.2: the practice 29 and the tests' hidden 22
     for q in qs:
         assert ev.grade(q, source(q)) == (None, ev.WAITING), q["id"]
         v = ev.stub_for(q, source(q))
@@ -275,8 +288,8 @@ def test_the_fixes_the_brief_names():
     assert ev.describe({**only, "only": False}) == "valid JSON with dev"
     # the two "valid JSON only" questions use it instead of a word limit
     js = [q for q in BANK.values() if any(c.get("only") for c in q["checks"])]
-    assert sorted(q["id"] for q in js) == ["everyday-instructions-r3-16",
-                                           "everyday-instructions-r3-24"]
+    # 12p.2: the practice one; the other is hidden
+    assert sorted(q["id"] for q in js) == ["everyday-instructions-r3-16"]
     assert all(c["type"] != "max_words" for q in js for c in q["checks"])
 
 
@@ -299,18 +312,18 @@ def test_an_answer_is_kept_by_its_questions_id_and_words(tmp_path):
                   for q in OLD])
     out = ev.mark(mdir)                                            # a re-mark: no run
     assert out["earlier"] is False and out["version"] == ev.version()
-    # the 284 whose words are today's are marked (12a.6: 340 in the bank); the
+    # the 285 whose words are today's are marked (12p.2: 310 in the tests' bank); the
     # reworded one is not an answer to today's question, and neither are the
-    # 55 it was never asked
-    assert len(out["items"]) == 284 and reworded not in {it["id"] for it in out["items"]}
-    assert out["unasked"] == 56 and out["marking"] == {"new": 0, "remarked": 284}
-    assert ev.marking_line(out) == "284 re-marked · 56 not asked yet"
+    # 24 it was never asked
+    assert len(out["items"]) == 285 and reworded not in {it["id"] for it in out["items"]}
+    assert out["unasked"] == 25 and out["marking"] == {"new": 0, "remarked": 285}
+    assert ev.marking_line(out) == "285 re-marked · 25 not asked yet"
     assert {q["id"] for q in ev.unanswered(mdir)} == set(NEW) | {reworded}
     # the answers are kept beside the marks, by id and words, and outlive the
     # run folder they came in
     kept = [json.loads(x) for x in
             (mdir / ev.ANSWERS_NAME).read_text(encoding="utf-8").splitlines()]
-    assert len(kept) == 285
+    assert len(kept) == 286
     assert {k["key"] for k in kept} >= {ev.answer_key(q) for q in OLD if q["id"] != reworded}
     assert ev.answer_key(BANK[reworded]) not in {k["key"] for k in kept}
     shutil.rmtree(mdir / "everyday_0shot")
@@ -369,12 +382,12 @@ def test_the_re_mark_command_marks_every_model_with_no_run(tmp_path, monkeypatch
     judged = [q for q in OLD if ev.judge_check(q)]
     hj = sum(1 for q in judged if ev.half(q) == ev.HIDDEN)
     assert lines[:2] == [f"org/{m}: Everyday tasks: {len(old_hidden) - hj} of {len(old_hidden)} "
-                         f"hidden · the judge is marking {len(judged)} · 285 re-marked · 55 not "
+                         f"hidden · the judge is marking {len(judged)} · 286 re-marked · 24 not "
                          "asked yet" for m in "ab"]
     e = report.load_everyday(tmp_path)
     assert set(e["models"]) == {"org/a", "org/b"} and e["earlier"] == {}
-    assert e["models"]["org/a"]["marking"] == "285 re-marked · 55 not asked yet"
-    assert e["models"]["org/a"]["unasked"] == 55
+    assert e["models"]["org/a"]["marking"] == "286 re-marked · 24 not asked yet"
+    assert e["models"]["org/a"]["unasked"] == 24
     assert e["models"]["org/a"]["total"] == len(old_hidden)  # the new ones' hidden: not asked
 
 
@@ -400,15 +413,15 @@ def test_a_run_after_the_import_asks_only_the_new_questions(svc, monkeypatch):
     [cmd] = seen
     asked = [json.loads(x)["id"] for x in (config.EVERYDAY_TASKS_DIR / "everyday.jsonl")
              .read_text(encoding="utf-8").splitlines()]
-    assert sorted(asked) == NEW                                   # the 55, and no others
+    assert sorted(asked) == NEW                   # the new ones (12p.2: 24 here), and no others
     out = json.loads((mdir / "everyday.json").read_text(encoding="utf-8"))
-    assert len(out["items"]) == 340 and out["unasked"] == 0
-    assert out["marking"] == {"new": 55, "remarked": 285}
-    assert out["passed"] == out["total"] == 179
+    assert len(out["items"]) == 310 and out["unasked"] == 0
+    assert out["marking"] == {"new": 24, "remarked": 286}
+    assert out["passed"] == out["total"] == 149
     # the run's line says it
     assert db.get(sid)["progress"] == \
-        "Everyday tasks: 179 of 179 hidden · 55 new questions · 285 re-marked"
+        "Everyday tasks: 149 of 149 hidden · 24 new questions · 286 re-marked"
     # the run before's folder moved aside, whole; its answers were kept first
     moved = list((config.OUT_DIR.with_name("earlier") / mdir.name).glob("everyday_0shot-*"))
     assert len(moved) == 1
-    assert len((mdir / ev.ANSWERS_NAME).read_text(encoding="utf-8").splitlines()) == 340
+    assert len((mdir / ev.ANSWERS_NAME).read_text(encoding="utf-8").splitlines()) == 310

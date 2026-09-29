@@ -41,7 +41,9 @@ LOCAL = ["aed", "dirham", "dubai", "abu dhabi", "sharjah", "emirates", "uae", "n
 # 12g.2: the split is part of what a score means, so it is part of the version.
 # 12a.5: 55 new questions, the same day — a new hash. 12a.6: 48 short summaries
 # retired, "Shorten a message" merged into Summarise
-WORDING = {"date": "2026-09-27", "hash": "7489950e", "split": "evalboard-split-v1"}
+# 12p.2: the tests' bank — the repo's practice half and the invented hidden set;
+# the server's bank is still 7489950e (hidden_store move checked it unchanged)
+WORDING = {"date": "2026-09-27", "hash": "d8ffe0a2", "split": "evalboard-split-v1"}
 
 
 # ---------------------------------------------------------------------------
@@ -52,7 +54,7 @@ def test_the_neutral_wording_stands():
     """12a.5 fixed checks and moved the short summaries to a group of their
     own; the 328's words, and who wrote them, are still 12a.4's"""
     qs = ev.load_bank()
-    assert len(NEUTRAL) == 328
+    assert len(NEUTRAL) == 182                     # 12p.2: the brief's copy, practice half only
     # 12a.6: the ones still in the bank — the rest are the retired short summaries
     retired = {json.loads(x)["id"] for x in ev.RETIRED_PATH.read_text(encoding="utf-8").splitlines()}
     assert {q["id"] for q in NEUTRAL} - set(BANK) <= retired
@@ -64,11 +66,10 @@ def test_the_neutral_wording_stands():
         if q["id"] == SCHOOL_RUN:
             want["reference"] = FIXED
         assert {k: BANK[q["id"]][k] for k in ("prompt", "reference", "written_by")} == want, q["id"]
-    assert [q["id"] for q in qs].index("everyday-pilot-01") == 15
-    # the one pilot question that needed it: Toronto, not Dubai
-    p2 = BANK["everyday-pilot-02"]
-    assert "Toronto" in p2["prompt"] and '"city": "Toronto"' in p2["reference"]
-    assert ["toronto"] in p2["checks"][0]["required_values"]
+    # 12p.2: fourth of the repo's bank, its practice half
+    assert [q["id"] for q in qs].index("everyday-pilot-01") == 3
+    # 12p.2: the one pilot question that needed its words changed is hidden: the server's
+    assert "everyday-pilot-02" not in {q["id"] for q in ev._raw_rows(ev.BANK_PATH)}
     # the prompt for writing the next round sits beside the bank
     assert (ev.BANK_DIR / "everyday-question-prompt.md").read_text(encoding="utf-8") == \
         (BRIEF / "everyday-question-prompt.md").read_text(encoding="utf-8")
@@ -182,8 +183,9 @@ def test_a_run_on_this_wording_is_stamped_with_it(tmp_path):
     bank = ev.load_bank()
     judged = [q for q in bank if ev.judge_check(q)]
     hidden_judged = sum(1 for q in judged if ev.half(q) == ev.HIDDEN)
-    assert out["total"] == 179 and out["waiting"] == len(judged) == 70
-    assert out["passed"] == 179 - hidden_judged
+    # 12p.2: the tests' bank — its invented hidden 149, and 54 judged across both halves
+    assert out["total"] == 149 and out["waiting"] == len(judged) == 54
+    assert out["passed"] == 149 - hidden_judged
 
 
 def test_answers_to_an_earlier_wording_are_never_re_marked(tmp_path):
@@ -227,8 +229,9 @@ def test_answers_that_ran_out_of_room_are_counted(tmp_path):
     _asked(mdir, ev.load_bank(),
            answer=lambda q: thinking if q["group"] == "quick_maths" else q["reference"])
     out = ev.mark(mdir)
-    # 12g.2: beside the score, so the hidden half's: 24 of quick maths' 45
+    # 12g.2: beside the score, so the hidden half's: 21 of quick maths' 42 (12p.2:
+    # the tests' invented hidden half)
     hidden = ev.split_counts()["quick_maths"]["hidden"]
-    assert out["ran_out"] == hidden == 24
+    assert out["ran_out"] == hidden == 21
     ev.write(mdir, out)
     assert report.load_everyday(tmp_path)["models"]["org/m"]["ran_out"] == hidden

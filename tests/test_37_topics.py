@@ -8,6 +8,7 @@ two apart: by the topic string stored on each row, never by the slug."""
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -22,6 +23,18 @@ REPO = Path(__file__).resolve().parents[1]
 BANKS = REPO / "eval_tasks" / "fr" / "banks"
 RUBRICS = REPO / "eval_tasks" / "fr" / "rubrics"
 RETIRED = REPO / "eval_tasks" / "fr" / "retired"
+# 12p.2: the repo's banks hold each topic's diagnose half — its report half is the
+# server's, by qid in eval_tasks/fr/report_manifest.json
+IN_REPO = {b.name[:-len("_v1.json")]: len(json.loads(b.read_text(encoding="utf-8")))
+           for b in sorted(BANKS.glob("*_v1.json"))}
+REPORT = json.loads((REPO / "eval_tasks" / "fr" / "report_manifest.json").read_text(
+    encoding="utf-8"))["topics"]
+TOTAL = sum(IN_REPO.values())                     # 1,872 of the 3,700
+L = IN_REPO["law"]
+
+
+def n_of(topic: str) -> int:
+    return IN_REPO[categories.topic_slug(topic)]
 
 # the five topics and their delivered banks, as the box holds them today
 OLD = {"medicine & health": "medicine_v2.json", "law": "law_v2.json",
@@ -64,7 +77,9 @@ def test_37_topics_arrived_with_three_files_each():
         s = b[:-len("_v1.json")]
         assert (RUBRICS / f"{s}.criteria.json").is_file() and (RUBRICS / f"{s}.md").is_file()
         items = json.loads((BANKS / b).read_text(encoding="utf-8"))
-        assert isinstance(items, list) and len(items) == 100, b      # a bare array of 100
+        # a bare array of 100 — 12p.2: its diagnose half here, its report half the server's
+        assert isinstance(items, list) and len(items) + len(REPORT[s]) == 100, b
+        assert all(eb.half_of(eb.qid_of(it["prompt"])) == "diagnose" for it in items), b
     assert not (REPO / "docs" / "Knowledge Classification").exists()
     # the retired five, whole, outside every path the service reads
     assert sorted(p.name for p in RETIRED.glob("*.json")) == sorted(OLD.values())
@@ -76,7 +91,7 @@ def test_no_new_question_repeats_an_old_one():
     old = {eb.qid_of(it["prompt"]) for name in OLD.values()
            for it in eb.unwrap_items(json.loads((RETIRED / name).read_text("utf-8")))[0]}
     new = [eb.qid_of(it["prompt"]) for b in BANKS.glob("*.json")
-           for it in json.loads(b.read_text("utf-8"))]
+           for it in json.loads(b.read_text("utf-8"))] + [q for v in REPORT.values() for q in v]
     assert len(new) == len(set(new)) == 3700
     assert not old & set(new)
 
@@ -170,20 +185,22 @@ def test_acuity_reads_from_emergency_down_and_a_constant_one_is_still_a_sentence
 def test_import_dir_on_the_real_folder_is_37_topics_of_100(tmp_path):
     root = tmp_path / "exam"
     done = eb.import_dir(root, BANKS, "masein")
-    assert len(done) == 37 and all(r["imported"] == 100 for r in done)
+    assert len(done) == 37 and all(r["imported"] == n_of(r["topic"]) for r in done)
     bank = eb.load_bank(root)
-    assert {t: len(r) for t, r in bank.items()} == {t: 100 for t in eb.TOPICS}
+    assert {t: len(r) for t, r in bank.items()} == {t: n_of(t) for t in eb.TOPICS}
     for t, rows in bank.items():
         for r in rows:
             assert r["topic"] == t and r["accepted_by"] == "masein"
             assert r["source"] == f"{categories.topic_slug(t)}_v1"         # the file's stem
             assert "imported_by" not in r
-    # the halves come from the qid, as for every question: about 50/50
+    # the halves come from the qid, as for every question — 12p.2: the repo's are all
+    # diagnose; each topic's report half is 35 to 65 of its 100, on the server
     s = eb.summary(root)
-    assert all(35 <= s[t]["report"] <= 65 for t in eb.TOPICS)
+    assert all(s[t]["report"] == 0 for t in eb.TOPICS)
+    assert all(35 <= len(REPORT[categories.topic_slug(t)]) <= 65 for t in eb.TOPICS)
     # idempotent, like import
     again = eb.import_dir(root, BANKS, "masein")
-    assert sum(r["imported"] for r in again) == 0 and sum(r["skipped"] for r in again) == 3700
+    assert sum(r["imported"] for r in again) == 0 and sum(r["skipped"] for r in again) == TOTAL
 
 
 def test_import_dir_refuses_a_file_no_topic_owns_by_name_and_writes_nothing(tmp_path):
@@ -209,11 +226,11 @@ def test_the_cli_prints_a_line_per_topic_then_a_total(tmp_path):
                           "masein"], capture_output=True, text=True, cwd=REPO)
     assert out.returncode == 0, out.stderr
     lines = out.stdout.splitlines()
-    assert sum(1 for ln in lines if " imported 100 " in ln) == 37
+    assert sum(1 for ln in lines if re.search(r" imported +\d+ ", ln)) == 37
     assert any(ln.startswith("Medicine & Clinical Health ") and "source medicine_clinical_"
                "health_v1" in ln for ln in lines)
     total = next(ln for ln in lines if ln.startswith("total:"))
-    assert "37 topics, imported 3700" in total and "written by masein" in total
+    assert f"37 topics, imported {TOTAL}" in total and "written by masein" in total
 
 
 # ---------------------------------------------------------------------------
@@ -226,9 +243,9 @@ def test_the_old_rows_never_leak_into_the_topic_that_shares_their_slug(tmp_path)
     # before anything is retired: `law` is not `Law`, even in the same file
     assert eb.load_bank(root)["Law"] == []
     eb.import_bank(root, BANKS / "law_v1.json", "Law", "masein", "law_v1")
-    assert len(eb.load_bank(root)["Law"]) == 100
-    assert len(rows_on_disk(root, "law")) == 200                     # one file, two topics
-    assert eb.summary(root)["Law"]["accepted"] == 100
+    assert len(eb.load_bank(root)["Law"]) == L
+    assert len(rows_on_disk(root, "law")) == 100 + L                 # one file, two topics
+    assert eb.summary(root)["Law"]["accepted"] == L
 
 
 def test_retiring_law_leaves_Law_untouched(tmp_path):
@@ -239,13 +256,13 @@ def test_retiring_law_leaves_Law_untouched(tmp_path):
     r = eb.retire(root, "law", REASON)
     assert (r["rows"], r["changed"]) == (100, 100)
     rows = rows_on_disk(root, "law")
-    assert len(rows) == 200                                          # nothing deleted
+    assert len(rows) == 100 + L                                      # nothing deleted
     for row in rows:
         if row["topic"] == "law":
             assert row["retired_reason"] == REASON and row["retired_at"]
         else:
             assert row == before[row["qid"]]                         # not one byte moved
-    assert len(eb.load_bank(root)["Law"]) == 100
+    assert len(eb.load_bank(root)["Law"]) == L
     # retiring again changes nothing and says so
     assert eb.retire(root, "law", REASON)["changed"] == 0
 
@@ -255,7 +272,7 @@ def test_retiring_Law_leaves_law_untouched(tmp_path):
     seed_old_bank(root, {"law": "law_v2.json"})
     eb.import_bank(root, BANKS / "law_v1.json", "Law", "masein", "law_v1")
     old = {r["qid"]: r for r in rows_on_disk(root, "law") if r["topic"] == "law"}
-    assert eb.retire(root, "Law", "a test of the reverse")["changed"] == 100
+    assert eb.retire(root, "Law", "a test of the reverse")["changed"] == L
     for row in rows_on_disk(root, "law"):
         if row["topic"] == "law":
             assert row == old[row["qid"]]
@@ -283,12 +300,12 @@ def test_retired_rows_are_out_of_the_counts_the_imports_and_the_provenance(tmp_p
     old = json.loads((RETIRED / "law_v2.json").read_text(encoding="utf-8"))[:3]
     r = eb.import_bank(root, old, "Law", "masein", "law_again")
     assert (r["imported"], r["skipped"]) == (3, 0)
-    assert len(eb.load_bank(root)["Law"]) == 103
+    assert len(eb.load_bank(root)["Law"]) == L + 3
     assert len([x for x in rows_on_disk(root, "law") if x["qid"] == eb.qid_of(
         old[0]["prompt"])]) == 2                                     # history kept beside it
     # correcting the new topic's provenance never touches the retired rows
     p = eb.set_provenance(root, "Law", approver="someone else")
-    assert (p["rows"], p["changed"]) == (103, 103)
+    assert (p["rows"], p["changed"]) == (L + 3, L + 3)
     assert all(x["accepted_by"] == "masein" for x in rows_on_disk(root, "law")
                if x["topic"] == "law")
 
@@ -311,7 +328,7 @@ def test_the_deploy_steps_build_exactly_the_37_new_banks_and_the_control(tree, t
     exam = sorted(t for t in m["tasks"] if t != eb.CONTROL_TASK)
     assert exam == sorted(eb.topic_task(t) for t in eb.TOPICS)
     assert len(exam) == 37
-    assert all(m["tasks"][t]["items"] == 100 for t in exam)
+    assert all(m["tasks"][eb.topic_task(t)]["items"] == n_of(t) for t in eb.TOPICS)
     assert sorted(p.stem for p in tasks.glob("*.yaml")) == sorted(exam + [eb.CONTROL_TASK])
     assert m["removed"] == ["exam_medicine_health", "exam_other", "exam_physics_engineering"]
     # no retired question is in any built task
@@ -319,14 +336,14 @@ def test_the_deploy_steps_build_exactly_the_37_new_banks_and_the_control(tree, t
            for it in eb.unwrap_items(json.loads((RETIRED / name).read_text("utf-8")))[0]}
     built = {json.loads(ln)["qid"] for t in exam
              for ln in (tasks / f"{t}.jsonl").read_text("utf-8").splitlines()}
-    assert len(built) == 3700 and not built & old
+    assert len(built) == TOTAL and not built & old
     # the control set: only topics MMLU has subjects for, ten at most each
     ctl = m["tasks"][eb.CONTROL_TASK]
     assert set(ctl["per_category"]) <= set(categories.with_subjects())
     assert all(n <= eb.CONTROL_PER_CATEGORY for n in ctl["per_category"].values())
     # and the summary is the 37 topics, the old five nowhere
     s = eb.summary(root)
-    assert list(s) == eb.TOPICS and all(s[t]["accepted"] == 100 for t in eb.TOPICS)
+    assert list(s) == eb.TOPICS and all(s[t]["accepted"] == n_of(t) for t in eb.TOPICS)
     assert not set(OLD) & set(s)
 
 

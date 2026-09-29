@@ -194,6 +194,16 @@ MEDICINE = REPO / "eval_tasks" / "fr" / "banks" / "medicine_clinical_health_v1.j
 MEDICINE_TOPIC = "Medicine & Clinical Health"
 
 
+def medicine_whole(tmp: Path) -> Path:
+    """12p.2: the delivered bank as the demo imports it — its diagnose half as
+    the repo holds it, and an invented report half in its shape (55
+    questions, 19 of them emergencies, as the delivered one's), so the demo
+    imports a whole bank of 100 with 28 emergencies"""
+    import make_fixture
+    acuity = ["emergency"] * 19 + ["urgent"] * 24 + ["routine"] * 12
+    return make_fixture.exam_bank_whole(MEDICINE, tmp, lambda k: {"acuity": acuity[k]})
+
+
 def test_an_imported_bank_replaces_drafting_and_curation(tmp_path):
     """The medicine run: a human-written bank, its author as the approver,
     and no exam writer configured at all — nobody is drafting anything."""
@@ -209,7 +219,7 @@ def test_an_imported_bank_replaces_drafting_and_curation(tmp_path):
     (root / "demo" / "rubrics").mkdir(parents=True)
     (root / "demo" / "rubrics" / "medicine_clinical_health.md").write_text(
         f"{head} (version 1, DRAFT — awaiting sign-off)\n{rest}", encoding="utf-8")
-    r = run(root, "--keep", "--import", str(MEDICINE), "--approver", "masein",
+    r = run(root, "--keep", "--import", str(medicine_whole(tmp_path)), "--approver", "masein",
             "--topic", MEDICINE_TOPIC, EXAM_PROVIDER="", EXAM_MODEL="")
     assert r.returncode == 0, r.stdout + r.stderr
     out = r.stdout
@@ -440,12 +450,17 @@ def test_the_demo_doc_carries_every_delivered_bank():
     assert sorted(b.name for b in banks) == sorted(
         f"{topic_slug(t)}_v1.json" for t in eb.TOPICS)
     # "every bank clears it": the report half of each, split by qid as the
-    # import splits it, is at or above the floor
+    # import splits it, is at or above the floor — 12p.2: on the server; the
+    # repo's banks hold the diagnose half, and the committed manifest the rest
     assert "the 30-question floor.\nEvery bank clears it" in doc
+    assert "the repo's banks hold each topic's\ndiagnose half only" in doc
+    held = json.loads((REPO / "eval_tasks" / "fr" / "report_manifest.json").read_text(
+        encoding="utf-8"))["topics"]
     for b in banks:
         items = json.loads(b.read_text(encoding="utf-8"))
-        report_half = sum(1 for it in items if eb.half_of(eb.qid_of(it["prompt"])) == "report")
-        assert len(items) == 100 and report_half >= report.PROPOSE_MIN_N, b.name
+        assert all(eb.half_of(eb.qid_of(it["prompt"])) == "diagnose" for it in items), b.name
+        report_half = len(held[b.name[:-len("_v1.json")]])
+        assert len(items) + report_half == 100 and report_half >= report.PROPOSE_MIN_N, b.name
     # and what differs between them is the author's file, not our code
     assert "routine` on every item" in doc and "difficulty and domain" in doc
 

@@ -25,6 +25,26 @@ for p in (ROOT, ROOT / "scripts", ROOT / "clients", ROOT / "tests" / "fixtures")
 
 import make_fixture  # noqa: E402
 
+# 12p.2: the hidden half is not in the repo. Every test sits an invented one
+# (tests/fixtures/everyday_hidden_invented.jsonl, checked against its own
+# manifest), under whichever BENCH_ROOT it runs with — never the server's
+import tempfile  # noqa: E402
+
+from make_fixture import HIDDEN_FIXTURE, HIDDEN_FIXTURE_MANIFEST, sit_hidden  # noqa: E402,F401
+from service import config as _config  # noqa: E402
+
+
+def hidden_env(root: Path) -> dict:
+    """what a subprocess needs to read the same bank"""
+    sit_hidden(root)
+    return {"BENCH_ROOT": str(root), "HIDDEN_MANIFEST": str(HIDDEN_FIXTURE_MANIFEST)}
+
+
+_SESSION_ROOT = Path(tempfile.mkdtemp(prefix="evalboard-tests-"))
+sit_hidden(_SESSION_ROOT)
+_config.BENCH_ROOT = _SESSION_ROOT
+_config.HIDDEN_MANIFEST = HIDDEN_FIXTURE_MANIFEST
+
 
 @pytest.fixture(scope="session")
 def tree(tmp_path_factory) -> dict:
@@ -93,6 +113,7 @@ def make_service(root: Path, monkeypatch, *, llm_provider: str = "fake", tree: b
                       "BACKUP_DIR": root / "backups",
                       "EXAM_REPORT_MANIFEST": root / "no-exam-report-manifest.json"}.items():
         monkeypatch.setattr(config, name, val)
+    sit_hidden(root)
     monkeypatch.setattr(worker, "start", lambda: None)
     monkeypatch.setattr(llm_poller, "start", lambda: None)
     monkeypatch.setattr(llm.FakeBatches, "polls_to_done", 1)
@@ -146,6 +167,7 @@ def live(tmp_path_factory):
                  "BACKUP_DIR": root / "backups",
                  "EXAM_REPORT_MANIFEST": root / "no-exam-report-manifest.json"}.items():
         setattr(config, k, v)
+    sit_hidden(root)
     worker_start = worker.start
     worker.start = lambda: None
     llm.reset()

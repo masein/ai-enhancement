@@ -49,7 +49,7 @@ def test_the_page_has_seven_groups(live, page):
         page.locator("[data-everyday-bank]").inner_text()
     # each group's split beside it
     assert page.locator("[data-evd-group-split='summarising']").inner_text() == \
-        "31 hidden · 29 practice"
+        "22 hidden · 29 practice"                     # 12p.2: the tests' hidden half
     assert page.locator("[data-evd-group-split='shorten']").count() == 0
     shot(page, "12a5-everyday-1400-light.png", full_page=True)
     assert page.errors == []
@@ -60,7 +60,7 @@ def test_the_model_page_says_what_the_last_marking_was(live, page):
     page.goto(live["base"] + "/#model=" + GOOD.replace("/", "%2F"))
     open_kind(page, "everyday")
     # the fixture's answers were marked, not asked by a run
-    assert page.locator(f"[data-evd-marking='{GOOD}']").inner_text() == "340 re-marked"
+    assert page.locator(f"[data-evd-marking='{GOOD}']").inner_text() == "310 re-marked"
     assert page.errors == []
 
 
