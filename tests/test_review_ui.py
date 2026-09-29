@@ -14,6 +14,7 @@ from urllib.parse import quote
 import pytest
 
 from conftest import all_rows, choose, go_tab, open_diagnose, open_kind, set_name, open_submit
+import make_fixture  # noqa: E402
 
 
 pytestmark = pytest.mark.dashboard
@@ -302,7 +303,7 @@ REPO = Path(__file__).resolve().parents[1]
 # the files the first five topics were delivered as, kept byte-identical when
 # the 37-topic exam replaced them: these tests are about the import machinery
 # and its numbers (100 questions, wrapped or bare), not about today's banks
-RETIRED = REPO / "eval_tasks" / "fr" / "retired"
+RETIRED = make_fixture.retired_whole_dir()                        # 12p.4: whole
 MEDICINE = RETIRED / "medicine_v2.json"
 
 
