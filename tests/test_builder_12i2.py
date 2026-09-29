@@ -147,16 +147,20 @@ def test_an_everyday_question_whose_reference_fails_its_own_checks_is_set_aside(
     assert auto[0] == ""
     assert auto[1] == "its reference fails its own checks: didn't say 88"
     # 12a.6: written for Summarise, no script sets it aside — its checks become
-    # the gate and the judge's rubric, which scores a copy of the text 0
+    # the gate and the judge's rubric; 12a.8: of findings, a copy of the text
+    # scored 0 in code
     d2 = create(client, kind="everyday", group="summarising", count=10)
     it = d2["items"][2]
     assert it["auto"] == ""
     gate, rubric = it["q"]["checks"]
     assert gate == {"type": "numbers_from_source"}
-    assert (rubric["type"], rubric["scale"], rubric["pass_at"]) == ("judge", 4, 3)
+    assert (rubric["type"], rubric["scale"], rubric["pass_at"], rubric["findings"]) == \
+        ("judge", 4, 3, True)
     assert "- thursday" in rubric["rubric"] and '"Bins on Thursday."' in rubric["rubric"]
-    assert "The text itself, or most of it copied, is not a summary: score it 0." in rubric["rubric"]
     assert "The request asks for it shorter" in rubric["rubric"]            # "tldr"
+    import everyday as ev
+    q = it["q"]
+    assert ev.stub_for(q, q["prompt"])["score"] == 0             # the text given back
     # set aside before review: it cannot be reviewed, and is never published
     r = client.post(f"/api/builder/{d['id']}/review", json={"n": 2, "verdict": "accept", "by": BY})
     assert r.status_code == 422 and "set aside before review" in r.json()["detail"]

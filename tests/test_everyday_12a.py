@@ -52,12 +52,11 @@ def test_the_judges_questions_and_its_stand_in():
     rubric = next(c["rubric"] for c in q["checks"] if c["type"] == "judge")
     assert rubric in p and q["prompt"] in p and TLDR in p
     assert "arabic" not in p.lower()
-    assert ev.parse_verdict(ev.stub_reply(p)) == {
-        "pass": True, "reason": "closes 11:30 on Thursday, in two sentences or fewer"}
-    # read against the question's rubric, the stand-in's pass is the top score
-    assert ev.parse_verdict(ev.stub_reply(p), ev.judge_check(q)) == {
-        "pass": True, "score": 4, "scale": 4,
-        "reason": "4 of 4: closes 11:30 on Thursday, in two sentences or fewer"}
+    # 12a.8: Summarise's judge reports findings, no score — the stand-in finds none here
+    assert json.loads(ev.stub_reply(p))["missing_facts"] == []
+    v = ev.parse_verdict(ev.stub_reply(p), ev.judge_check(q), q, TLDR)
+    assert {k: v[k] for k in ("pass", "score", "scale", "reason")} == {
+        "pass": True, "score": 4, "scale": 4, "reason": "4 of 4: all key facts, one version"}
     assert ev.stub_verdict("School closes early on Thursday.")["pass"] is False
     assert ev.stub_verdict("Thursday: closes at 11:30. Buses at 11:15. Pickup by 11:45.") == {
         "pass": False, "reason": "more than two sentences"}
@@ -329,9 +328,9 @@ def test_the_judged_questions_wait_on_the_judge_and_the_row_says_so(svc, monkeyp
     out = json.loads((mdir / "everyday.json").read_text(encoding="utf-8"))
     assert out["passed"] == out["total"] == HIDDEN and out["waiting"] == 0   # 12g.2: hidden
     tldr = next(it for it in out["items"] if it["id"] == "everyday-pilot-03")
-    # 12a.6: on its rubric, scored
-    assert tldr["reason"] == "4 of 4: closes 11:30 on Thursday, in two sentences or fewer"
-    assert tldr["score"] == 4
+    # 12a.6: on its rubric, scored — 12a.8: from the judge's findings, in code
+    assert tldr["reason"] == "4 of 4: all key facts, one version"
+    assert tldr["score"] == 4 and tldr["findings"]["missing_facts"] == []
     row = next(r for r in client.get("/api/submissions").json() if r["id"] == sid)
     # the run's line stays the run's once the judge is in
     assert row["progress"] == f"Everyday tasks: {HIDDEN} of {HIDDEN} hidden · {N} new questions"

@@ -91,17 +91,17 @@ def test_a_length_counts_only_if_the_request_states_one(prompt, said):
 
 def test_the_rubric_says_what_scores_in_plain_words():
     tldr = ev.judge_check(BANK["everyday-pilot-03"])["rubric"]
-    # 12a.7: on what it says, not its style
-    assert tldr.startswith("Score the answer from 0 to 4 on what it says as a summary")
-    assert "It passes at 3 or more." in tldr
+    # 12a.7: on what it says, not its style — 12a.8: as findings, scored in code
+    assert tldr.startswith("Report what is wrong with the answer as a summary")
+    assert "Give no score" in tldr
     assert "several versions instead of one" in tldr and "lead-in" in tldr
     assert "judged by meaning and not by exact words" in tldr
     assert "It should keep all 2 of these:\n- 11:30\n- thursday" in tldr
-    assert "Take off 2 if it says anything invented or wrong" in tldr
+    assert "List anything the answer says that is invented or wrong" in tldr
     assert "The request asks for it shorter" in tldr
     # a request that states no length is never marked on it
     email = next(q for q in SUMMARISE if q["prompt"].startswith("can u summarise this email thread"))
-    assert "The request states no length: take nothing off for length." in \
+    assert 'The request states no length: length_ok is "not asked".' in \
         ev.judge_check(email)["rubric"]
     # a facts check with n: "at least n of these k"
     facts = next(c for c in ev._facts_of(json.loads(next(
@@ -110,9 +110,13 @@ def test_the_rubric_says_what_scores_in_plain_words():
     assert facts and "at least 5 of these" in ev.judge_check(email)["rubric"]
     # the page says what the rubric asks, not the whole of it
     assert ev.describe(ev.judge_check(email)) == (
-        # 12a.7: on what it says
-        "the judge, on a rubric (0 to 4, passing at 3): the key facts, nothing invented or "
-        "wrong, one version, and the length only if the request asks one — never the style")
+        # 12a.8: the judge's findings, scored in code
+        "the judge's findings, scored in code (0 to 4, passing at 3): a missing key fact −1 (2 "
+        "at most), anything invented or wrong −2, several versions −1, a length asked and not "
+        "kept −1 — never the style")
+    # 12a.7's scored rubric, where someone wrote one, still says so
+    assert ev.describe({**ev.judge_check(email), "findings": False}).startswith(
+        "the judge, on a rubric (0 to 4, passing at 3)")
 
 
 @pytest.mark.parametrize("reply,want", [
@@ -127,7 +131,10 @@ def test_the_rubric_says_what_scores_in_plain_words():
     ('{"score": 7}', None), ('{"score": true}', None), ("nothing", None),
 ])
 def test_the_judges_score_is_read_against_the_line(reply, want):
-    assert ev.parse_verdict(reply, ev.judge_check(BANK["everyday-summarising-02"])) == want
+    """a rubric that scores, written by someone (12a.8: a generated one asks
+    for findings, test_12a8_findings)"""
+    scored = {**ev.judge_check(BANK["everyday-summarising-02"]), "findings": False}
+    assert ev.parse_verdict(reply, scored) == want
 
 
 # ---------------------------------------------------------------------------
@@ -272,8 +279,12 @@ def test_a_re_mark_batch_that_fails_says_so_on_each_model(svc, monkeypatch):
 def test_the_judge_test_reads_a_rubrics_score(monkeypatch):
     from service import judge_test
     a = {"kind": "everyday", "task": "everyday-summarising-02", "answer": "x"}
-    assert judge_test.read_mark(a, '{"score": 3, "reason": "a lead-in"}') == 3
-    assert judge_test.read_mark(a, '{"pass": false, "reason": "no"}') == 1
+    # 12a.8: the score its findings give — here, several versions
+    assert judge_test.read_mark(a, json.dumps({
+        "missing_facts": [], "invented_or_wrong": [], "several_versions": True,
+        "length_ok": "not asked", "note": "two options"})) == 3
+    # a score alone is not findings: unread
+    assert judge_test.read_mark(a, '{"score": 3, "reason": "a lead-in"}') is None
 
 
 def test_the_re_mark_runs_as_the_server_runs_it(tmp_path):

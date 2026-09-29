@@ -32,51 +32,59 @@ SUMMARISE = [q for q in BANK.values() if q["group"] == "summarising"]
 GATE = {"type": "numbers_from_source"}
 
 
-def as_12a6(q: dict) -> dict:
+def as_12a6(q: dict, template: str | None = None) -> dict:
     """the question as 12a.6 wrote it: its rubric generated from the same facts,
-    request and reference with 12a.6's words"""
+    request and reference with 12a.6's words (12a.8: or 12a.7's)"""
     old = json.loads(json.dumps(q))
     j = ev.judge_check(old)
-    j["rubric"] = ev.summarise_rubric(q, ev.RUBRIC_12A6)
+    j["rubric"] = ev.summarise_rubric(q, template or ev.RUBRIC_12A6)
+    j.pop("findings", None)
     return old
 
 
 # ---------------------------------------------------------------------------
-# 1. the rubric scores content
+# 1. the rubric scores content — 12a.8: the judge reports findings on it, and
+# the code scores them (test_12a8_findings); what counts is as 12a.7 set it
 # ---------------------------------------------------------------------------
 
 def test_every_summarise_rubric_scores_content_not_style():
     assert len(SUMMARISE) == 60
     for q in SUMMARISE:
-        r = ev.judge_check(q)["rubric"]
-        assert r.startswith("Score the answer from 0 to 4 on what it says as a summary of the "
-                            "text in the question: its content, not its style."), q["id"]
-        assert "Take off 1 for each fact it is short of that, 2 at most, and name each missing " \
-               "fact in your reason." in r
-        assert "Take off 2 if it says anything invented or wrong: a wrong number, person, day, " \
-               "time or place" in r
-        assert 'Take off 1 if it gives several versions instead of one ("Option 1 / Option 2").' \
-            in r
-        assert ("Style costs nothing: a lead-in (\"Here's a concise summary:\"), a closing offer "
-                "(\"Let me know if you'd like it shorter\"), headings, bullets, bold and emoji "
-                "take nothing off. A summary in bullets is one summary.") in r
-        # the two worked examples
-        assert "Example 1 scores 4: every fact is there, and the lead-in, the bullets and the " \
-               "offer cost nothing." in r
+        c = ev.judge_check(q)
+        r = c["rubric"]
+        assert c["findings"] is True and (c["scale"], c["pass_at"]) == (4, 3), q["id"]
+        assert r.startswith("Report what is wrong with the answer as a summary of the text in "
+                            "the question: its content, not its style. Give no score"), q["id"]
+        assert "List each of these the answer does not have, quoted exactly as above." in r
+        assert "List anything the answer says that is invented or wrong: a wrong number, " \
+               "person, day, time or place" in r
+        assert 'Several versions: true if it gives several versions instead of one ' \
+               '("Option 1 / Option 2"). A summary in bullets is one summary.' in r
+        assert ("Style is never a finding: a lead-in (\"Here's a concise summary:\"), a closing "
+                "offer (\"Let me know if you'd like it shorter\"), headings, bullets, bold and "
+                "emoji.") in r
+        # the two worked examples, as findings
+        assert "Example 1 has no findings: every fact is there, and the lead-in, the bullets " \
+               "and the offer are style." in r
         assert "Here's a concise summary:\n    - Lunch moves to Friday" in r
-        assert "Example 2 scores 3" in r
+        assert 'Example 2 is the same answer without "- Bring £15 cash": one fact is missing.' \
+            in r and '"missing_facts": ["£15 cash"]' in r
         # 12a.6's style deductions are gone
         assert "wrapped in a lead-in" not in r and "not one summary" not in r
 
 
 def test_each_keeps_its_facts_length_and_reference():
     for q in SUMMARISE:
-        was = ev.judge_check(as_12a6(q))["rubric"]
         now = ev.judge_check(q)["rubric"]
-        # the round trip: 12a.6's rubric, read as the bank is read, is today's exactly
-        assert ev.judge_check(ev._valid(as_12a6(q), "12a.6"))["rubric"] == now, q["id"]
-        assert ev._facts_in(now) == ev._facts_in(was) and ev._facts_in(now)[0], q["id"]
-        assert was.split("4. Length. ", 1)[1].split("\nA good summary", 1)[0] in now, q["id"]
+        for template in (ev.RUBRIC_12A6, ev.RUBRIC_12A7):
+            was = as_12a6(q, template)
+            # the round trip: 12a.6's or 12a.7's rubric, read as the bank is read, is today's
+            assert ev.judge_check(ev._valid(was, "earlier"))["rubric"] == now, q["id"]
+            assert ev._facts_in(now) == ev._facts_in(ev.judge_check(was)["rubric"]), q["id"]
+        assert ev._facts_in(now)[0], q["id"]
+        length = ev.stated_length(q["prompt"])
+        if length and length != "shorter":
+            assert f'The request asks for "{length}"' in now, q["id"]
         assert f'A good summary, for reference: "{q["reference"]}"' in now
     # a length only when the request states one, as before
     assert 'The request asks for it shorter' in ev.judge_check(BANK["everyday-pilot-03"])["rubric"]
@@ -85,20 +93,25 @@ def test_each_keeps_its_facts_length_and_reference():
 def test_the_judge_is_asked_to_name_what_is_missing():
     q = BANK["everyday-summarising-09"]
     p = ev.judge_prompt(q, "Order 88291 is late.")
-    assert "what cost it points, naming each key fact it misses, or that it lost none" in p
+    # 12a.8: each missing fact quoted from the list, and no score
+    assert "each key fact from the rubric's list that the answer does not have, quoted " \
+           "exactly as the list gives it" in p
+    assert "Give no score" in p and '"score"' not in p
     assert "Two worked examples, on another text" in p
 
 
 def test_a_rubric_someone_wrote_stays_theirs_and_a_generated_one_is_replaced(tmp_path):
-    old = as_12a6(BANK["everyday-summarising-04"])
-    # one the question builder published with 12a.6's rubric: today's
-    q = ev._valid(json.loads(json.dumps(old)), "built")
-    assert ev.judge_check(q)["rubric"] == ev.judge_check(BANK["everyday-summarising-04"])["rubric"]
-    # one someone edited: theirs
-    mine = json.loads(json.dumps(old))
+    for template in (ev.RUBRIC_12A6, ev.RUBRIC_12A7):
+        old = as_12a6(BANK["everyday-summarising-04"], template)
+        # one the question builder published with 12a.6's or 12a.7's rubric: today's
+        q = ev._valid(json.loads(json.dumps(old)), "built")
+        assert ev.judge_check(q) == ev.judge_check(BANK["everyday-summarising-04"])
+    # one someone edited: theirs, and scored as it was
+    mine = as_12a6(BANK["everyday-summarising-04"])
     ev.judge_check(mine)["rubric"] += "\nAlso: the plumber's time must be there."
-    kept = ev.judge_check(ev._valid(mine, "edited"))["rubric"]
-    assert kept.endswith("the plumber's time must be there.") and "not its style" not in kept
+    kept = ev.judge_check(ev._valid(mine, "edited"))
+    assert kept["rubric"].endswith("the plumber's time must be there.")
+    assert "not its style" not in kept["rubric"] and not kept.get("findings")
 
 
 # ---------------------------------------------------------------------------
@@ -164,14 +177,15 @@ def test_the_re_mark_judges_on_the_new_rubric_and_compares_with_12a6s_marks(
     d = root / "org__a"
     _asked(d, list(BANK.values()))
     ev.write(d, ev.mark(d))
-    # 12a.6's snapshot is on the server already: this round keeps its own
+    # 12a.6's and 12a.7's snapshots are on the server already: this round keeps its own
     (root / "everyday_before_12a6.json").write_text(json.dumps({"models": {"org/a": {}}}))
+    (root / "everyday_before_12a7.json").write_text(json.dumps({"models": {"org/a": {}}}))
     ev.remark(root, judge=True)
     now = ev.read(d)
     rubric = {q["id"]: ev.rubric_key(q) for q in SUMMARISE}
     judged = [it for it in now["items"] if it["group"] == "summarising" and it.get("score")]
     assert judged and all(it["rubric"] == rubric[it["id"]] for it in judged)
-    assert (root / ev.BEFORE_NAME).exists() and ev.BEFORE_NAME == "everyday_before_12a7.json"
+    assert (root / ev.BEFORE_NAME).exists() and ev.BEFORE_NAME == "everyday_before_12a8.json"
     monkeypatch.setattr(sys, "argv", ["everyday.py", str(root), "--compare"])
     assert ev.main() == 0
     table = capsys.readouterr().out.strip().splitlines()

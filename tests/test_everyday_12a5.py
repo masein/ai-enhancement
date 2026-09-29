@@ -214,13 +214,17 @@ def test_every_reference_passes_its_own_script_checks():
 
 def test_pasting_the_source_back_is_the_judges_to_fail():
     """12a.6: a Summarise answer that is the text itself gives only the text's
-    numbers, so the gate passes it to the judge — whose rubric scores a copy 0"""
+    numbers, so the gate passes it to the judge — 12a.8: whose findings are
+    scored in code, and a copy scores 0 whatever they say"""
     qs = [q for q in BANK.values() if q["group"] == "summarising"]
     assert len(qs) == 60
     for q in qs:
         assert ev.grade(q, source(q)) == (None, ev.WAITING), q["id"]
-        assert "The text itself, or most of it copied, is not a summary: score it 0." in \
-            ev.judge_check(q)["rubric"]
+        v = ev.stub_for(q, source(q))
+        assert (v["pass"], v["score"]) == (False, 0), q["id"]
+        assert v["reason"] == "0 of 4: the text given back, not a summary"
+        # and a summary of it is not a copy
+        assert not ev.copied(q, q["reference"]), q["id"]
 
 
 def test_the_fixes_the_brief_names():

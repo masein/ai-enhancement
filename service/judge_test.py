@@ -432,7 +432,7 @@ def read_mark(a: dict, text: str) -> int | None:
     if a["kind"] == "everyday":
         import everyday as ev
         q = next((q for q in ev.load_bank() if q["id"] == a["task"]), {})
-        v = ev.parse_verdict(text, ev.judge_check(q))
+        v = ev.parse_verdict(text, ev.judge_check(q), q, a.get("answer") or "")
         # 12a.6: a rubric that scores gives its score; a pass or fail, the ends
         return None if v is None else v.get("score", 4 if v["pass"] else 0)
     import judge
