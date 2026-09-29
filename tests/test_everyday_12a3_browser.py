@@ -58,10 +58,10 @@ def test_the_new_checks_are_said_in_plain_words(live, page):
     # 12a.6: a Summarise question says its gate and what the judge's rubric asks
     page.locator("[data-evd-bank-group='summarising'] > summary").click()
     assert page.locator("[data-evd-checks='everyday-summarising-01']").inner_text() == (
-        # 12a.7: on what it says
-        "Passes if it: no number the question doesn’t give · the judge, on a rubric (0 to 4, "
-        "passing at 3): the key facts, nothing invented or wrong, one version, and the length "
-        "only if the request asks one — never the style")
+        # 12a.7: on what it says; 12a.8: the judge's findings, scored in code
+        "Passes if it: no number the question doesn’t give · the judge's findings, scored in "
+        "code (0 to 4, passing at 3): a missing key fact −1 (2 at most), anything invented or "
+        "wrong −2, several versions −1, a length asked and not kept −1 — never the style")
     # no check is said by its type
     text = page.locator("[data-everyday-bank]").inner_text()
     for word in ("first_mention", "facts:", "max_words", "in_order", "not_contains"):
