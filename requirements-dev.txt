@@ -11,3 +11,4 @@ fastapi
 uvicorn
 httpx            # fastapi.testclient
 pydantic
+pyrage==1.4.0    # 12p.1: the encrypted export's round trip is tested

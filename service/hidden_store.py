@@ -174,6 +174,10 @@ def export(src: Path, out: Path | None = None) -> Path:
     if not config.BACKUP_AGE_RECIPIENT:
         raise ValueError("no key to encrypt to: set EVALBOARD_BACKUP_AGE_RECIPIENT to an age public "
                          "key (age-keygen on your own machine; HANDOFF says how)")
+    if config.BACKUP_AGE_RECIPIENT.upper().startswith("AGE-SECRET-KEY"):
+        # never echoed: it is the key that opens every export
+        raise ValueError("EVALBOARD_BACKUP_AGE_RECIPIENT holds a private key: take it off this "
+                         "server and put only the public key (age1…) there")
     try:
         import pyrage
     except ImportError:

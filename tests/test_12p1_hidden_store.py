@@ -311,7 +311,15 @@ def test_the_worker_backs_up_when_idle(svc, monkeypatch):
 
 def test_an_export_needs_a_key_and_is_one_encrypted_file(svc, monkeypatch, capsys):
     assert run("backup", "--export") == 2
-    assert "EVALBOARD_BACKUP_AGE_RECIPIENT" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "EVALBOARD_BACKUP_AGE_RECIPIENT" in err and err.count("\n") == 1       # one line
+    # a private key put there by mistake: refused, and never said back
+    secret = "AGE-SECRET-KEY-1QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ"
+    monkeypatch.setattr(config, "BACKUP_AGE_RECIPIENT", secret)
+    assert run("backup", "--export") == 2
+    err = capsys.readouterr().err
+    assert "holds a private key" in err and secret not in err
+    monkeypatch.setattr(config, "BACKUP_AGE_RECIPIENT", "")
     pyrage = pytest.importorskip("pyrage")
     key = pyrage.x25519.Identity.generate()
     monkeypatch.setattr(config, "BACKUP_AGE_RECIPIENT", str(key.to_public()))

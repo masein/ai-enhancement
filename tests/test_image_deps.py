@@ -89,3 +89,16 @@ def test_trust_and_safety_tasks_load_in_the_installed_harness(tmp_path):
         assert t.doc_to_text(docs[0]) == docs[0]["prompt"]
         assert t.config.generation_kwargs["max_gen_toks"] == 512
     assert len(list(get_task_dict(["bbq_all"], task_manager=tm)["bbq_all"].test_docs())) == 29_246
+
+
+def test_the_encrypted_export_imports():
+    """12p.1b: `hidden_store backup --export` encrypts in-process with pyrage"""
+    try:
+        import pyrage
+    except ImportError:
+        if os.environ.get("EVALBOARD_IMAGE_DEPS") == "1":
+            raise
+        pytest.skip("pyrage isn't installed here: CI's image-deps job and deploy step 3 run this")
+    assert re.search(r"^pyrage==1\.4\.0", (ROOT / "requirements.txt").read_text(encoding="utf-8"),
+                     re.M)
+    assert md.version("pyrage") == "1.4.0" and pyrage.x25519.Identity.generate()
