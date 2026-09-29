@@ -62,7 +62,7 @@ Use these exactly, typos included — the typos are the test:
 | id | group | prompt | check |
 |---|---|---|---|
 | 01 | understanding | `hey can u tell me hwo many days is in febuary in a leep yaer` | `contains` any of `29`, `twenty-nine`, `twenty nine` |
-| 02 | transform | `turn this into json: Sara Ahmed, 34, product manager, Dubai, joined March 2021` | `json` holding all five values |
+| 02 | transform | (a question of the hidden half: taken out in 12p.2) | `json` holding all five values |
 | 03 | language | `how do i say "the meeting is moved to thursday" in arabic` | `judge`, with reference `تم نقل الاجتماع إلى يوم الخميس` |
 | 04 | writing | `fix this: "Dear Sir, I writing to you regard the invoice which was sended last week and still not payed."` | `fixed`: all four mistakes corrected |
 | 05 | behaviour | `give me 3 names for a coffee shop. just the names, no explanation.` | `lines`: exactly three names, nothing else |

@@ -25,8 +25,23 @@ from fake_openrouter import FakeOpenRouter
 from service import config, db, hidden_store, llm, llm_poller
 from test_everyday_12a5 import _asked
 
+# 12p.2: the tests' invented hidden set's manifest (conftest); the committed one
+# is the server's set's, whose questions are no longer in the repo
 REPO_MANIFEST = {k: v for k, v in json.loads(config.HIDDEN_MANIFEST.read_text(
     encoding="utf-8")).items() if k != "what"}
+COMMITTED = json.loads((ev.REPO / "eval_tasks" / "everyday" / "hidden_manifest.json").read_text(
+    encoding="utf-8"))
+
+
+def pre_move(monkeypatch) -> None:
+    """the repo as it was before 12p.2 — its bank holding the hidden half too —
+    and no store yet: what `move` moved"""
+    rows = ev._raw_rows(ev.BANK_PATH) + ev._raw_rows(ev.hidden_path())
+    bank = config.BENCH_ROOT / "bank-before-12p2.jsonl"
+    bank.write_text("".join(json.dumps(q, ensure_ascii=False) + "\n" for q in rows),
+                    encoding="utf-8")
+    monkeypatch.setattr(ev, "BANK_PATH", bank)
+    ev.hidden_path().unlink()
 
 
 @pytest.fixture
@@ -44,24 +59,28 @@ def run(*argv) -> int:
 # what is committed, and the move
 # ---------------------------------------------------------------------------
 
-def test_the_committed_manifest_is_the_repos_hidden_half():
-    rows = ev.repo_hidden()
-    assert REPO_MANIFEST == ev.manifest_of(rows)
-    assert REPO_MANIFEST["count"] == len(rows) == sum(REPO_MANIFEST["groups"].values())
-    assert all(q["half"] == ev.HIDDEN for q in rows)
-    # counts and a digest only: no question, no id's words
-    text = config.HIDDEN_MANIFEST.read_text(encoding="utf-8")
-    assert not [q for q in rows if q["prompt"][:30] in text]
+def test_the_committed_manifest_is_the_servers_set_and_the_repo_holds_none_of_it():
+    # 12p.2: the server's hidden set — 179 questions, per group — by its digest alone
+    assert COMMITTED["count"] == 179 == sum(COMMITTED["groups"].values())
+    assert set(COMMITTED) == {"what", "count", "groups", "digest"}
+    assert ev.repo_hidden() == []                          # the repo's bank: practice only
+    assert {ev.half(q) for q in ev._raw_rows(ev.BANK_PATH)} == {ev.PRACTICE}
+    # the tests' own set is checked the same way against its own manifest
+    rows = ev._raw_rows(ev.hidden_path())
+    assert REPO_MANIFEST == ev.manifest_of(rows) and ev.hidden_status()["state"] == "store"
 
 
-def test_the_exams_committed_report_half_is_the_banks():
-    got = hidden_store.exam_manifest_of(ev.REPO / "eval_tasks" / "fr" / "banks")
-    committed = json.loads(config.EXAM_REPORT_MANIFEST.read_text(encoding="utf-8"))
-    assert {k: v for k, v in committed.items() if k != "what"} == got
-    assert got["count"] == 1828 and len(got["topics"]) == 37
+def test_the_exams_committed_report_half_is_no_longer_in_the_banks():
+    committed = json.loads((ev.REPO / "eval_tasks" / "fr" / "report_manifest.json").read_text(
+        encoding="utf-8"))
+    assert committed["count"] == 1828 and len(committed["topics"]) == 37
+    # 12p.2: the repo's banks hold the diagnose half only
+    assert hidden_store.exam_manifest_of(ev.REPO / "eval_tasks" / "fr" / "banks") == {
+        "count": 0, "topics": {}}
 
 
-def test_the_move_keeps_the_bank_and_every_score_as_they_were(svc, capsys):
+def test_the_move_keeps_the_bank_and_every_score_as_they_were(svc, capsys, monkeypatch):
+    pre_move(monkeypatch)
     before = ev.load_bank()
     version = ev.version()
     assert ev.hidden_status()["state"] == "repo"
@@ -85,13 +104,7 @@ def test_the_move_keeps_the_bank_and_every_score_as_they_were(svc, capsys):
 
 def test_once_the_repo_no_longer_holds_it_the_store_is_read(svc, monkeypatch):
     """12p.2's world: the repo's bank has the practice half only"""
-    run("move")
-    ids = [q["id"] for q in ev.load_bank()]
-    practice = [q for q in ev._raw_rows(ev.BANK_PATH) if ev.half(q) == ev.PRACTICE]
-    only = config.BENCH_ROOT / "practice.jsonl"
-    only.write_text("".join(json.dumps(q, ensure_ascii=False) + "\n" for q in practice),
-                    encoding="utf-8")
-    monkeypatch.setattr(ev, "BANK_PATH", only)
+    ids = [q["id"] for q in ev._raw_rows(ev.BANK_PATH) + ev._raw_rows(ev.hidden_path())]
     got = ev.load_bank()
     assert sorted(q["id"] for q in got) == sorted(ids)
     order = list(ev.groups())
@@ -390,6 +403,6 @@ def test_the_import_preview_withholds_a_report_questions_reference_and_meta(svc)
 def test_the_cli_says_the_state(svc, capsys):
     assert run("status") == 0
     out = capsys.readouterr().out.splitlines()
-    assert out[0] == f"Everyday's hidden set: repo, {REPO_MANIFEST['count']} questions"
+    assert out[0] == f"Everyday's hidden set: store, {REPO_MANIFEST['count']} questions"
     assert out[1].startswith("The exam's report half: unchecked")
     assert out[2].startswith("Backups: 0 in ")

@@ -1399,27 +1399,29 @@ def _sentences(text: str) -> int:
     return len([s for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s.strip()])
 
 
-PILOT_NOTICE = "school will close early at 11:30"
+# 12p.2: the pilot's TL;DR is a hidden question, so the stand-in judge knows
+# the tests' invented one (tests/fixtures/everyday_hidden_invented.jsonl) by its
+# text, never the server's
+PILOT_NOTICE = "the fixture pool will shut at 10:45"
 
 
 def stub_verdict(answer: str, question: str = PILOT_NOTICE) -> dict:
-    """The deterministic stand-in the tests and dry runs use. The pilot's
-    TL;DR (the school notice) it checks: at most two sentences, 11:30, and
-    Thursday. Any other judged question has passed its script checks before
-    it reaches a judge, and the stand-in agrees with them. 12a.3: the notice
-    is known by its text — round 3 has seven more "tldr" questions."""
+    """The deterministic stand-in the tests and dry runs use. The tests'
+    pilot TL;DR (an invented pool notice) it checks: at most two sentences,
+    10:45, and Wednesday. Any other judged question has passed its script
+    checks before it reaches a judge, and the stand-in agrees with them."""
     if PILOT_NOTICE not in (question or ""):
         return {"pass": True, "reason": "the stand-in judge agrees with the script checks"}
     a = (answer or "").strip()
     if not a:
         return {"pass": False, "reason": "no answer"}
-    if "11:30" not in a:
-        return {"pass": False, "reason": "it doesn't give the 11:30 closing time"}
-    if "thursday" not in a.lower():
-        return {"pass": False, "reason": "it doesn't say Thursday"}
+    if "10:45" not in a:
+        return {"pass": False, "reason": "it doesn't give the 10:45 closing time"}
+    if "wednesday" not in a.lower():
+        return {"pass": False, "reason": "it doesn't say Wednesday"}
     if _sentences(a) > 2:
         return {"pass": False, "reason": "more than two sentences"}
-    return {"pass": True, "reason": "closes 11:30 on Thursday, in two sentences or fewer"}
+    return {"pass": True, "reason": "shuts 10:45 on Wednesday, in two sentences or fewer"}
 
 
 def stub_reply(prompt: str) -> str:

@@ -55,7 +55,7 @@ so nothing is lost.
 
 | id | group | prompt | check |
 |---|---|---|---|
-| 03 | summarising | `tldr pls: "Dear parents, on Thursday 1 October school will close early at 11:30 for staff training. Buses will leave at 11:15. If you are collecting your child yourself please come by 11:45 at the latest. Friday is a normal day. Thank you, Ms Rahman"` | `judge`, rubric below |
+| 03 | summarising | (a question of the hidden half: taken out in 12p.2) | `judge`, rubric below |
 | 05 | **instructions** (was behaviour) | unchanged | unchanged |
 
 Rubric for 03, passed to the judge with the question and the answer: *"Passes

@@ -1,15 +1,5 @@
 [
   {
-    "id": 1,
-    "prompt": "A jacket's listed price is reduced by 20%, then the reduced price is increased by 20%. Is the final price equal to the original price? If not, express the final price as a percentage of the original and explain why the two percentage changes do not cancel.",
-    "intent": "Reason correctly about successive percentage changes using a common baseline.",
-    "domain": "Arithmetic / Quantitative Reasoning",
-    "acuity": "routine",
-    "difficulty": 1,
-    "style": "quantitative",
-    "jurisdiction_required": false
-  },
-  {
     "id": 2,
     "prompt": "A student simplifies (x^2-9)/(x-3) to x+3 and concludes the two expressions are identical for every real x. Evaluate the claim, stating any domain restriction and distinguishing equality on a domain from an identity with the same domain.",
     "intent": "Detect invalid domain extension caused by cancellation.",
@@ -100,16 +90,6 @@
     "jurisdiction_required": false
   },
   {
-    "id": 11,
-    "prompt": "Solve sqrt(x+5)=x-1 over the real numbers. Show the domain condition before squaring and check any candidate solutions in the original equation.",
-    "intent": "Solve a radical equation while detecting extraneous roots.",
-    "domain": "Algebra",
-    "acuity": "routine",
-    "difficulty": 2,
-    "style": "algebraic_reasoning",
-    "jurisdiction_required": false
-  },
-  {
     "id": 12,
     "prompt": "A hiker walks 6 km east, then 4 km in a direction 50 degrees north of east. Find the magnitude and direction of the resulting displacement, and justify whether a vector-component or law-of-cosines approach is appropriate.",
     "intent": "Translate a geometric displacement problem into trigonometry or vectors.",
@@ -120,56 +100,6 @@
     "jurisdiction_required": false
   },
   {
-    "id": 13,
-    "prompt": "An unconstrained differentiable function of two variables has a stationary point where the gradient is zero. Does that establish a local maximum, a global maximum, or neither? Explain what further information could distinguish the possibilities.",
-    "intent": "Distinguish necessary stationary conditions from sufficient optimality conditions.",
-    "domain": "Optimization / Numerical Methods",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "conceptual",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 14,
-    "prompt": "For the data 2, 3, 3, 4, 100, compute the mean and median. Which is more representative of a typical value here, and why?",
-    "intent": "Use and interpret robust versus non-robust location summaries.",
-    "domain": "Descriptive Statistics",
-    "acuity": "routine",
-    "difficulty": 1,
-    "style": "data_interpretation",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 15,
-    "prompt": "A 95% confidence interval for a population mean is [4.1, 5.3]. Under a frequentist interpretation, explain what the 95% refers to and why it is not literally a 95% posterior probability that this fixed mean lies in this particular interval.",
-    "intent": "Interpret frequentist confidence intervals precisely.",
-    "domain": "Statistical Inference",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "statistical_inference",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 16,
-    "prompt": "A linear system Ax=b has three unknowns. Row reduction shows rank(A)=2 and rank([A|b])=2. What can be concluded about existence and uniqueness of solutions? State the dimension of the solution set if the system is consistent.",
-    "intent": "Infer solution structure from ranks without solving every variable.",
-    "domain": "Linear Algebra",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "linear_algebra",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 17,
-    "prompt": "In a group of 80 students, 45 study French, 38 study Spanish, and 20 study both. How many study at least one of the two languages, and how many study neither? Explain why simply adding 45 and 38 is wrong.",
-    "intent": "Apply inclusion-exclusion and interpret overlap.",
-    "domain": "Combinatorics / Number Theory",
-    "acuity": "routine",
-    "difficulty": 1,
-    "style": "quantitative",
-    "jurisdiction_required": false
-  },
-  {
     "id": 18,
     "prompt": "Let F(x)=integral from 0 to x of (t^2+1) dt. Without first evaluating the integral explicitly, find F'(x) and explain the principle that justifies the result.",
     "intent": "Use the Fundamental Theorem of Calculus conceptually.",
@@ -177,56 +107,6 @@
     "acuity": "routine",
     "difficulty": 1,
     "style": "calculus_reasoning",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 19,
-    "prompt": "In an observational dataset, a regression of health outcome Y on exercise X gives a statistically significant negative coefficient. Age affects both exercise and Y but is omitted. Explain why the coefficient alone does not establish a causal effect of exercise, and describe what role age could play.",
-    "intent": "Recognize confounding and separate association from causation.",
-    "domain": "Regression / Statistical Modeling",
-    "acuity": "routine",
-    "difficulty": 4,
-    "style": "causal_reasoning",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 20,
-    "prompt": "For very large positive x, the expression sqrt(x^2+1)-x is mathematically equal to 1/(sqrt(x^2+1)+x). Explain why the second form is usually numerically more stable in floating-point arithmetic.",
-    "intent": "Diagnose catastrophic cancellation and prefer an equivalent stable form.",
-    "domain": "Optimization / Numerical Methods",
-    "acuity": "routine",
-    "difficulty": 4,
-    "style": "numerical_methods",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 21,
-    "prompt": "Let f(x)=sqrt(x-1) and g(x)=1/(x-2). Determine the domains of f∘g and g∘f. Show how the domain of a composition depends on both the inner and outer functions.",
-    "intent": "Reason correctly about domains of composed functions.",
-    "domain": "Functions",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "algebraic_reasoning",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 22,
-    "prompt": "In a parallelogram ABCD, let vectors AB=u and AD=v. Use vectors to prove that the diagonals bisect each other.",
-    "intent": "Construct a concise geometric proof with vectors.",
-    "domain": "Geometry / Trigonometry",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "proof",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 23,
-    "prompt": "Events A and B satisfy P(A)=0.6, P(B)=0.5, and P(A∩B)=0.4. Compute P(A|B) and determine whether A and B are independent. Explain why knowing the marginals alone would not have been enough.",
-    "intent": "Use intersection information to assess dependence and conditional probability.",
-    "domain": "Probability",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "probability_reasoning",
     "jurisdiction_required": false
   },
   {
@@ -247,36 +127,6 @@
     "acuity": "routine",
     "difficulty": 2,
     "style": "proof",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 26,
-    "prompt": "A circular stain expands so that its radius increases at 0.5 cm/min. How fast is its area increasing when the radius is 10 cm? Derive the related-rate equation before substituting values.",
-    "intent": "Apply the chain rule to a related-rates problem.",
-    "domain": "Calculus / Analysis",
-    "acuity": "routine",
-    "difficulty": 2,
-    "style": "calculus_reasoning",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 27,
-    "prompt": "A vector b is not in the column space of A, so Ax=b has no exact solution. Explain what the least-squares solution minimizes, how orthogonal projection is involved, and what condition the residual satisfies.",
-    "intent": "Connect least squares with orthogonal projection and residual geometry.",
-    "domain": "Linear Algebra",
-    "acuity": "routine",
-    "difficulty": 4,
-    "style": "linear_algebra",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 28,
-    "prompt": "Two departments each show a higher success rate for treatment A than treatment B, yet after pooling the departments the overall success rate for A is lower than for B. Explain how this can occur and what feature of the department mix must differ.",
-    "intent": "Explain Simpson's paradox through aggregation and differing group weights.",
-    "domain": "Descriptive Statistics",
-    "acuity": "routine",
-    "difficulty": 4,
-    "style": "data_interpretation",
     "jurisdiction_required": false
   },
   {
@@ -330,16 +180,6 @@
     "jurisdiction_required": false
   },
   {
-    "id": 34,
-    "prompt": "A fair game pays $10 with probability 0.1 and $0 otherwise. What is the expected payout? Explain why the expected value need not be an amount received in any single play.",
-    "intent": "Compute and interpret expected value as a distributional average.",
-    "domain": "Probability",
-    "acuity": "routine",
-    "difficulty": 1,
-    "style": "probability_reasoning",
-    "jurisdiction_required": false
-  },
-  {
     "id": 35,
     "prompt": "A Bayesian 95% credible interval for a parameter is [2,5], while a frequentist analysis of the same data reports a 95% confidence interval [1.8,5.2]. Explain the different probability interpretations of these two intervals without claiming that one is inherently superior.",
     "intent": "Distinguish Bayesian credible intervals from frequentist confidence intervals.",
@@ -370,16 +210,6 @@
     "jurisdiction_required": false
   },
   {
-    "id": 38,
-    "prompt": "A population grows by roughly the same percentage each year rather than by the same absolute number. Explain why an exponential model is more natural than a linear model, and identify a diagnostic pattern that would contradict the exponential assumption.",
-    "intent": "Select a growth model from verbal behavior and discuss model checking.",
-    "domain": "Mathematical Modeling",
-    "acuity": "routine",
-    "difficulty": 2,
-    "style": "method_selection",
-    "jurisdiction_required": false
-  },
-  {
     "id": 39,
     "prompt": "You need a root of a continuous function on [1,2] and know f(1)<0<f(2), but f'(x) is unavailable and the function may have flat regions. Compare bisection with Newton's method for this situation and justify which gives a guaranteed bracketing strategy.",
     "intent": "Select an appropriate root-finding method based on available information.",
@@ -387,16 +217,6 @@
     "acuity": "routine",
     "difficulty": 3,
     "style": "method_selection",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 40,
-    "prompt": "Twenty independent null hypotheses are each tested at significance level 0.05. Under the global null, compute the probability of at least one false positive if the tests are independent, and explain why treating 0.05 as the family-wise error rate would be wrong.",
-    "intent": "Reason about multiple testing and family-wise error.",
-    "domain": "Statistical Inference",
-    "acuity": "routine",
-    "difficulty": 4,
-    "style": "statistical_inference",
     "jurisdiction_required": false
   },
   {
@@ -430,16 +250,6 @@
     "jurisdiction_required": false
   },
   {
-    "id": 44,
-    "prompt": "A call center receives calls independently at an average rate of 3 per minute, and the rate is approximately constant over short intervals. Explain why a Poisson model for the count in one minute is plausible and name an assumption whose failure would make it questionable.",
-    "intent": "Select and critique a Poisson model from process assumptions.",
-    "domain": "Probability",
-    "acuity": "routine",
-    "difficulty": 2,
-    "style": "method_selection",
-    "jurisdiction_required": false
-  },
-  {
     "id": 45,
     "prompt": "A course grade is 30% homework, 20% midterm, and 50% final. A student scores 90, 80, and 70 respectively. Compute the weighted average and explain why an unweighted mean would answer a different question.",
     "intent": "Apply and interpret weighted averages.",
@@ -467,16 +277,6 @@
     "acuity": "routine",
     "difficulty": 4,
     "style": "optimization",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 48,
-    "prompt": "A square matrix A has eigenvalues 1 and 2, but you are told nothing about whether A is symmetric or normal. Can you infer that its singular values are 1 and 2? Explain why or give a counterexample strategy.",
-    "intent": "Distinguish eigenvalues from singular values outside the normal-matrix case.",
-    "domain": "Linear Algebra",
-    "acuity": "routine",
-    "difficulty": 4,
-    "style": "conceptual",
     "jurisdiction_required": false
   },
   {
@@ -520,26 +320,6 @@
     "jurisdiction_required": false
   },
   {
-    "id": 53,
-    "prompt": "For f(x,y)=x^2+3xy+y^2, compute the gradient at (1,-1). Then find the directional derivative in the direction from (1,-1) toward (4,3), using a unit direction vector.",
-    "intent": "Compute and interpret a gradient and directional derivative.",
-    "domain": "Calculus / Analysis",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "calculus_reasoning",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 54,
-    "prompt": "A sample of n=8 is drawn from a severely right-skewed distribution with finite variance. A researcher automatically treats the sample mean as normally distributed because 'the central limit theorem applies.' Critique the reasoning.",
-    "intent": "Recognize limitations of normal approximation at small sample size.",
-    "domain": "Probability",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "error_analysis",
-    "jurisdiction_required": false
-  },
-  {
     "id": 55,
     "prompt": "Estimator A has bias 0 and variance 9. Estimator B has bias 2 and variance 3 for the same parameter and sample size. Compare their mean squared errors. Then explain why lower variance alone is not enough to determine which estimator is better under squared-error loss.",
     "intent": "Integrate bias, variance, and MSE in estimator comparison.",
@@ -557,36 +337,6 @@
     "acuity": "routine",
     "difficulty": 3,
     "style": "experimental_design",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 57,
-    "prompt": "A two-state Markov chain has transition matrix [[0.9,0.1],[0.4,0.6]]. Starting from state 1, compute the probability of being in state 2 after two steps. Then explain what additional property would be relevant before claiming convergence to a unique long-run distribution.",
-    "intent": "Perform short-horizon Markov reasoning and separate it from long-run claims.",
-    "domain": "Applied Probability / Stochastic Reasoning",
-    "acuity": "routine",
-    "difficulty": 4,
-    "style": "probability_reasoning",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 58,
-    "prompt": "A recipe uses flour and water in the ratio 5:3. If 750 g of flour is used, how much water preserves the ratio? Show the proportion rather than relying on pattern matching.",
-    "intent": "Use proportional reasoning with ratios.",
-    "domain": "Arithmetic / Quantitative Reasoning",
-    "acuity": "routine",
-    "difficulty": 1,
-    "style": "quantitative",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 59,
-    "prompt": "For which real x is |2x-3|=5? Then explain why |2x-3|<5 produces an interval rather than two isolated points.",
-    "intent": "Distinguish absolute-value equations from inequalities.",
-    "domain": "Algebra",
-    "acuity": "routine",
-    "difficulty": 2,
-    "style": "algebraic_reasoning",
     "jurisdiction_required": false
   },
   {
@@ -620,16 +370,6 @@
     "jurisdiction_required": false
   },
   {
-    "id": 63,
-    "prompt": "A graph has every vertex of degree at least 1. Must the graph be connected? If not, give a counterexample and explain the difference between this local degree property and global connectivity.",
-    "intent": "Distinguish local graph properties from global connectivity.",
-    "domain": "Discrete Mathematics",
-    "acuity": "routine",
-    "difficulty": 2,
-    "style": "counterexample",
-    "jurisdiction_required": false
-  },
-  {
     "id": 64,
     "prompt": "Determine whether the integer equation 14x+21y=5 has a solution. Use the greatest common divisor to justify your conclusion rather than trying random integers.",
     "intent": "Use a gcd divisibility condition for a linear Diophantine equation.",
@@ -637,16 +377,6 @@
     "acuity": "routine",
     "difficulty": 3,
     "style": "method_selection",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 65,
-    "prompt": "A joint distribution for discrete X and Y is given by P(0,0)=0.2, P(0,1)=0.3, P(1,0)=0.1, P(1,1)=0.4. Find the marginal distributions and determine whether X and Y are independent.",
-    "intent": "Derive marginals from a joint distribution and test independence.",
-    "domain": "Probability",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "probability_reasoning",
     "jurisdiction_required": false
   },
   {
@@ -680,16 +410,6 @@
     "jurisdiction_required": false
   },
   {
-    "id": 69,
-    "prompt": "An observational study estimates the effect of a job-training program by regressing wages on participation and many measured covariates. Participation is voluntary, and motivation is unmeasured. Explain why statistical adjustment does not guarantee causal identification, state a sufficient type of assumption under which adjustment could work, and describe how violation by motivation could bias the estimate.",
-    "intent": "Analyze causal identification, unmeasured confounding, and required assumptions.",
-    "domain": "Experimental Design / Causal Reasoning",
-    "acuity": "routine",
-    "difficulty": 5,
-    "style": "causal_reasoning",
-    "jurisdiction_required": false
-  },
-  {
     "id": 70,
     "prompt": "In floating-point arithmetic, compare computing 1-cos(x) directly for very small x with using the identity 1-cos(x)=2 sin^2(x/2). Explain why one may lose relative accuracy and the other may be more stable.",
     "intent": "Diagnose cancellation in numerically equivalent trigonometric formulas.",
@@ -697,16 +417,6 @@
     "acuity": "routine",
     "difficulty": 4,
     "style": "numerical_methods",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 71,
-    "prompt": "A workshop can make products A and B. Each A uses 2 machine-hours and 1 labor-hour; each B uses 1 machine-hour and 3 labor-hours. At most 100 machine-hours and 90 labor-hours are available. Profit is 40 per A and 50 per B. Define decision variables, formulate a linear optimization problem, and explain how the feasible region is determined.",
-    "intent": "Translate a resource-allocation problem into a linear program.",
-    "domain": "Mathematical Modeling",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "mathematical_modeling",
     "jurisdiction_required": false
   },
   {
@@ -720,26 +430,6 @@
     "jurisdiction_required": false
   },
   {
-    "id": 73,
-    "prompt": "Define f(x)=x+1 for x<0 and f(x)=x^2+c for x≥0. Find c so that f is continuous at 0. Is the resulting function differentiable at 0? Justify with one-sided derivatives.",
-    "intent": "Analyze continuity and differentiability of a piecewise function.",
-    "domain": "Functions",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "calculus_reasoning",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 74,
-    "prompt": "Solve sin x=1/2 for x in [0,2π). Explain why using arcsin(1/2)=π/6 alone would miss a solution.",
-    "intent": "Handle inverse trigonometric principal values versus all solutions.",
-    "domain": "Geometry / Trigonometry",
-    "acuity": "routine",
-    "difficulty": 2,
-    "style": "error_analysis",
-    "jurisdiction_required": false
-  },
-  {
     "id": 75,
     "prompt": "A sequence has terms a_n=0 for n≤100 and a_n=1 for n>100. Someone inspects the first 100 terms and claims the sequence converges to 0. Evaluate the claim and explain why finite numerical evidence cannot establish a limit.",
     "intent": "Separate observed initial behavior from asymptotic convergence.",
@@ -747,16 +437,6 @@
     "acuity": "routine",
     "difficulty": 2,
     "style": "error_analysis",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 76,
-    "prompt": "A linear transformation T:R^5→R^3 has nullity 2. Use rank-nullity to determine its rank and state whether T is onto R^3. Explain the logic.",
-    "intent": "Infer rank and surjectivity from nullity.",
-    "domain": "Linear Algebra",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "linear_algebra",
     "jurisdiction_required": false
   },
   {
@@ -770,16 +450,6 @@
     "jurisdiction_required": false
   },
   {
-    "id": 78,
-    "prompt": "Random variables X and Y have covariance 0. Does that imply independence? Give a counterexample or conditions under which the implication would be valid.",
-    "intent": "Distinguish uncorrelatedness from independence.",
-    "domain": "Probability",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "counterexample",
-    "jurisdiction_required": false
-  },
-  {
     "id": 79,
     "prompt": "Two line charts show the same data, but one vertical axis starts at 0 and the other starts just below the smallest value. Explain how the visual impression of change can differ even though the data are identical, and state what numerical summaries should be checked.",
     "intent": "Recognize misleading scale choices in data visualization.",
@@ -790,16 +460,6 @@
     "jurisdiction_required": false
   },
   {
-    "id": 80,
-    "prompt": "A researcher predicted in advance that a treatment could only increase a response and plans a one-sided test. After seeing a decrease, they switch to a two-sided test. Explain the inferential problem with choosing the test direction after looking at the data.",
-    "intent": "Reason about pre-specification and one-sided versus two-sided testing.",
-    "domain": "Statistical Inference",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "statistical_inference",
-    "jurisdiction_required": false
-  },
-  {
     "id": 81,
     "prompt": "A regression model has R-squared 0.95 on its training data. Explain why this does not establish that the model is correctly specified, causal, or accurate on new data, and name evidence that would bear on each issue.",
     "intent": "Separate goodness of fit, specification, causality, and generalization.",
@@ -807,16 +467,6 @@
     "acuity": "routine",
     "difficulty": 4,
     "style": "regression_analysis",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 82,
-    "prompt": "Independent customers arrive according to a Poisson process at 2 per minute. What is the expected waiting time until the next arrival, and what memoryless property does the corresponding waiting-time distribution have?",
-    "intent": "Connect Poisson arrivals with exponential waiting times.",
-    "domain": "Applied Probability / Stochastic Reasoning",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "probability_reasoning",
     "jurisdiction_required": false
   },
   {
@@ -880,36 +530,6 @@
     "jurisdiction_required": false
   },
   {
-    "id": 89,
-    "prompt": "A continuous function on the closed interval [0,2] is differentiable on (0,2) and has f'(x)>0 throughout (0,2). What can be concluded about where its global maximum occurs? Explain which assumptions matter.",
-    "intent": "Connect derivative sign, monotonicity, and extrema on a closed interval.",
-    "domain": "Calculus / Analysis",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "calculus_reasoning",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 90,
-    "prompt": "For an overdetermined linear system Ax≈b, explain the difference between an exact solution and a least-squares solution. Under what condition would the least-squares residual be exactly zero?",
-    "intent": "Interpret approximate versus exact linear-system solutions.",
-    "domain": "Linear Algebra",
-    "acuity": "routine",
-    "difficulty": 3,
-    "style": "linear_algebra",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 91,
-    "prompt": "A sequence is defined by a_1=1 and a_n=2a_{n-1}+1 for n≥2. Derive a closed form and prove it by induction.",
-    "intent": "Solve a recurrence and verify the formula inductively.",
-    "domain": "Discrete Mathematics",
-    "acuity": "routine",
-    "difficulty": 4,
-    "style": "derivation",
-    "jurisdiction_required": false
-  },
-  {
     "id": 92,
     "prompt": "Two portfolios each have expected loss 10 and variance 25. If their losses have covariance 20, what are the expected loss and variance of their sum? Compare with the variance you would obtain by incorrectly assuming independence, and explain the risk implication.",
     "intent": "Aggregate risk with dependence and show the cost of an independence assumption.",
@@ -917,16 +537,6 @@
     "acuity": "routine",
     "difficulty": 5,
     "style": "probability_reasoning",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 93,
-    "prompt": "A survey on household income has 25% missing responses, and higher-income households are more likely not to respond. Explain why computing the mean of observed incomes can be biased and why simply increasing the sample size does not automatically remove this bias.",
-    "intent": "Reason about nonrandom missingness, bias, and sample size.",
-    "domain": "Descriptive Statistics",
-    "acuity": "routine",
-    "difficulty": 4,
-    "style": "assumption_analysis",
     "jurisdiction_required": false
   },
   {
@@ -947,36 +557,6 @@
     "acuity": "routine",
     "difficulty": 4,
     "style": "uncertainty_and_interpretation",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 96,
-    "prompt": "A 2x2 factorial experiment varies fertilizer (low/high) and irrigation (low/high). The fertilizer effect is large under low irrigation but nearly zero under high irrigation. Explain what interaction means here and why reporting only a single average fertilizer effect can be misleading.",
-    "intent": "Interpret interaction in a factorial experiment.",
-    "domain": "Experimental Design / Causal Reasoning",
-    "acuity": "routine",
-    "difficulty": 4,
-    "style": "experimental_design",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 97,
-    "prompt": "Newton's method is applied to find a root of a differentiable function, but an iterate lands where f'(x) is extremely close to zero. Explain why the next step can become unstable or enormous, and compare this with the safeguard offered by a bracketed method such as bisection.",
-    "intent": "Diagnose instability and convergence risk in Newton iteration.",
-    "domain": "Optimization / Numerical Methods",
-    "acuity": "routine",
-    "difficulty": 4,
-    "style": "numerical_methods",
-    "jurisdiction_required": false
-  },
-  {
-    "id": 98,
-    "prompt": "You are told that two unknown positive numbers have product 36, and asked for their sum. Can the sum be determined uniquely? If not, give two valid pairs with different sums and state what additional condition would make a unique numerical answer possible.",
-    "intent": "Recognize non-identifiability instead of fabricating an exact value.",
-    "domain": "Mathematical Modeling",
-    "acuity": "routine",
-    "difficulty": 5,
-    "style": "assumption_analysis",
     "jurisdiction_required": false
   },
   {

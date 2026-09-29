@@ -1,0 +1,14 @@
+{
+ "what": "the tests' invented hidden set (tests/fixtures/everyday_hidden_invented.jsonl): never the server's",
+ "count": 149,
+ "groups": {
+  "transform": 22,
+  "summarising": 22,
+  "understanding": 21,
+  "writing": 21,
+  "quick_maths": 21,
+  "instructions": 21,
+  "honesty": 21
+ },
+ "digest": "2cb06473b130ed59a2aa89be8f7ec975de6679200ca3aee2d3f802f2187695d6"
+}

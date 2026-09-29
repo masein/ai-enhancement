@@ -820,19 +820,19 @@ EVERYDAY_ANSWERS = {
         _THINK.format("February has 28 days, and a leap year adds one.") + "A leap year February "
         "has 29 days.",
         _THINK.format("Five fields: name, age, role, city, start date.") + '```json\n{"name": '
-        '"Sara Ahmed", "age": 34, "role": "product manager", "city": "Toronto", "joined": '
-        '"March 2021"}\n```',
-        _THINK.format("Closing time, day, buses, pickup.") + "School closes early at 11:30 on "
-        "Thursday; buses leave at 11:15, or pick your child up by 11:45.",
+        '"Mara Quill", "age": 41, "role": "fixture librarian", "city": "Oslo", "joined": '
+        '"May 2019"}\n```',
+        _THINK.format("Closing time, day, lessons, lockers.") + "The fixture pool shuts at 10:45 "
+        "on Wednesday; lessons move to Friday, and lockers are emptied by 10:30.",
         _THINK.format("Four mistakes to fix.") + "Dear Sir, I am writing to you regarding the "
         "invoice which was sent last week and has still not been paid.",
         _THINK.format("Short and plain.") + "1. Bean There\n2. Daily Grind\n3. Brew Haven",
     ],
     "fx/below-135m-it": [
         "February has 28 days.",
-        'Here\'s your JSON:\n{"name": "Sara Ahmed", "age": "34", "job": "product manager", '
-        '"city": "Toronto", "start": "2021-03"}',
-        "School closes early on Thursday.",
+        'Here\'s your JSON:\n{"name": "Mara Quill", "age": "41", "job": "fixture librarian", '
+        '"city": "Oslo", "start": "2019-05"}',
+        "The fixture pool shuts on Wednesday.",
         "Dear Sir, I am writing to you regarding the invoice which was sended last week and "
         "still not payed.",
         "Here are three names:\n1. Bean There\n2. Daily Grind\n3. Brew Haven",
@@ -840,16 +840,16 @@ EVERYDAY_ANSWERS = {
     "fx/skewed-360m": [
         "<think>\nhmm, a leap year. february normally has 28 days and a leap year adds one, "
         "so the answer should be",
-        '{"name": "Sara Ahmed", "age": 34, "title": "product manager"}',
-        _THINK.format("Keep it short.") + "Thursday: school closes at 11:30. Buses leave at "
-        "11:15, pickup by 11:45.",
+        '{"name": "Mara Quill", "age": 41, "title": "fixture librarian"}',
+        _THINK.format("Keep it short.") + "Wednesday: the pool shuts at 10:45. Lessons move to "
+        "Friday, lockers by 10:30.",
         _THINK.format("Fix the verbs.") + "Dear Sir, I am writing to you about the invoice which "
         "was sent last week and is still not paid.",
         "1. **Bean There** – a cozy spot\n2. Daily Grind\n3. Brew Haven",
     ],
     "fx/chance-160m": [
         "Twenty-nine days, because it is a leap year.",
-        "name: Sara Ahmed, age: 34",
+        "name: Mara Quill, age: 41",
         "",
         "Dear Sir, I writing to you regard the invoice.",
         "Bean There\nDaily Grind\nBrew Haven\nCup of Joy",
