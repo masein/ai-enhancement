@@ -10679,9 +10679,13 @@ const dmIv = r => dmCi(r) ? ` [${dmPct(dmCi(r)[0])}, ${dmPct(dmCi(r)[1])}]` : ''
 const dmBenchLine = r => `IFEval ${dmPct(r.benches.ifeval.acc)} · MMLU-Pro `
   + `${dmPct(r.benches.mmlu_pro.acc)} · MATH ${dmPct(r.benches.math.acc)}`;
 // our runs of one of their models, as their row's hover and cells say them
+// 12q.E: and whether the pair agrees — or ran in different modes, which isn't calibration
 const dmOursLines = r => (r.ours || []).flatMap(o => [
   `ours (${o.label}): composite ${dmPct(o.composite.value)}${dmIv(o)}`
-    + (o.calibration ? ' · calibration' : ''), `  ${dmBenchLine(o)}`]);
+    + (o.calibration ? ' · calibration' : '')
+    + (o.within === true ? ' · the intervals overlap' : o.within === false
+      ? ' · the intervals don’t overlap' : ''), `  ${dmBenchLine(o)}`,
+  ...(o.mode_differs ? [o.mode_differs] : [])]);
 function dmTip(r) {
   const c = r.composite;
   const ours = dmOursLines(r);
@@ -10930,7 +10934,11 @@ function dmTable(rows) {
             text: `theirs (${r.label}): ${dmPct(r.composite.value)}${ci(r)}` }),
           el('span', { class: 'se', 'data-dm-cant': r.id, 'data-tip': JSON.stringify([r.cant_run]),
             text: 'ours: can’t run here' })]
-          : both(r, x => dmPct(x.composite.value) + ci(x), true)),
+          : [both(r, x => dmPct(x.composite.value) + ci(x), true),
+            // 12q.E: a pair in different modes says so, under its two scores
+            ...(r.ours || []).filter(o => o.mode_differs).map(o => el('span', { class: 'se',
+              'data-dm-mode-differs': o.id, 'data-tip': JSON.stringify([o.mode_differs]),
+              text: 'modes differ · not a calibration point' }))]),
       ...['ifeval', 'mmlu_pro', 'math'].map(b => el('td', { class: num(r), 'data-tip': pairTip(r) },
         both(r, x => dmPct(x.benches[b].acc)))),
       el('td', { class: num(r), 'data-tip': r.external ? JSON.stringify(
