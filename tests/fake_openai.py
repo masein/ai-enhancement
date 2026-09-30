@@ -43,7 +43,8 @@ LDA_FILE = "/home/masein/Qwen3.6-35B-A3B-k4-LDA-UD-Q4_K_XL.gguf"
 
 
 class FakeServer:
-    def __init__(self):
+    def __init__(self, port: int = 0):
+        # 12w: `port` takes up a closed server's address again — a server stopped and started
         self.model_path = LDA_FILE
         self.size = 22_900_000_000
         self.ctx = 16384
@@ -212,7 +213,8 @@ class FakeServer:
                     self.in_flight -= 1
 
         with socket.socket() as s:
-            s.bind(("127.0.0.1", 0))
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind(("127.0.0.1", port))
             self.port = s.getsockname()[1]
         self._server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=self.port,
                                                      log_level="warning"))

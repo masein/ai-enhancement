@@ -4691,6 +4691,26 @@ Not before the demo: a new hidden set changes every Everyday score.
   strict and loose), a served setup's too. It lists what the board lists: the
   diagnose half.
 
+### 12w — the MTP parity check with one llama-server on the card at a time
+
+- The parity check asks two setups: the one with MTP, then the one without.
+  Only one llama-server fits on the card beside gemma-vllm, and the run took
+  "nothing answers" on the second for a server that had stopped: two minutes
+  (`SERVED_RETRY_S`), then failed. A resubmit needed the first setup's server
+  up again just to pass preflight.
+- **A setup with items still to answer is waited for** (`devicemark.wait_for`,
+  `DM_SWAP_WAIT_S`, 30 minutes): the run's line reads "devicemark parity ·
+  start <setup>'s server now (the other can stop): waiting N min more", and
+  it goes on as soon as that server answers with the file registered. After
+  the wait it fails, keeping the answers so far.
+- **A setup whose 50 answers are kept needs no server**, and a parity run
+  passes preflight with either server up (`served.preflight`); each setup's
+  file is checked when its turn comes.
+- **A server up with another file than the one registered is not waited
+  for**: the run stops with that line.
+- Every other part (the battery, the pilot, the speed test) needs its own
+  server at the start, as before.
+
 ### 12v — the hybrid models' fast kernels, in the image
 
 - **What was wrong.** Granite-4.0-H-1B ran out of GPU memory on MMLU-Pro at a
