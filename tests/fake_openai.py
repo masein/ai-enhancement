@@ -18,7 +18,12 @@ OpenRouter itself.
 
 12q: a reply's finish reason (`finish`, "length" when a test says the cap cut
 it), and llama-server's own /tokenize and /completion, which the devicemark
-speed test asks: a word a token, and the decode speed a test sets."""
+speed test asks: a word a token, and the decode speed a test sets.
+
+12q.F: an error of one request's own, as llama-server gives it when its chat
+parser can't read what the model wrote (`chat_error`: a 500 with its words),
+and the raw way round it: /apply-template, which renders the prompt, and a
+/completion answer a test sets (`completion_reply`, `raw_error`)."""
 
 from __future__ import annotations
 
@@ -75,6 +80,11 @@ class FakeServer:
         self.decode_tok_s = 42.0                 # 12q: /completion's timings say this
         self.raw_reply = None                    # 12q: a recorded reply, sent as it is
         self.tokenized: list[str] = []           # 12q: every /tokenize content, as sent
+        # 12q.F: a function body -> None, or (status, message): this request's own error
+        self.chat_error = None
+        self.templated: list[dict] = []          # every /apply-template body, as sent
+        self.completion_reply = None             # a function: /completion's reply for a body
+        self.raw_error = None                    # a function body -> (status, message): its error
         self._lock = threading.Lock()
         app = FastAPI()
 
@@ -114,9 +124,24 @@ class FakeServer:
             self.tokenized.append(str(body.get("content") or ""))
             return {"tokens": list(range(len(str(body.get("content") or "").split())))}
 
+        @app.post("/apply-template")
+        def apply_template(body: dict):
+            # 12q.F: the prompt the server's own template makes of the messages;
+            # a template that thinks opens the thinking itself
+            self.templated.append(body)
+            text = (body.get("messages") or [{}])[-1].get("content") or ""
+            on = (body.get("chat_template_kwargs") or {}).get("enable_thinking")
+            return {"prompt": f"<|user|>\n{text}\n<|assistant|>\n" + ("<think>\n" if on else "")}
+
         @app.post("/completion")
         def completion(body: dict):
             self.completions.append(body)
+            if callable(self.raw_error) and self.raw_error(body):
+                st, msg = self.raw_error(body)
+                return JSONResponse({"error": {"code": st, "message": msg,
+                                               "type": "server_error"}}, status_code=st)
+            if callable(self.completion_reply):
+                return self.completion_reply(body)
             n = int(body.get("n_predict") or 0)
             return {"content": "x " * n, "tokens_predicted": n,
                     "timings": {"prompt_n": len(body.get("prompt") or []), "predicted_n": n,
@@ -139,6 +164,11 @@ class FakeServer:
                 if self.stop_after is not None and self.answered >= self.stop_after:
                     return JSONResponse({"error": {"message": "unavailable"}}, status_code=503)
                 self.requests.append(body)
+            if callable(self.chat_error) and self.chat_error(body):
+                st, msg = self.chat_error(body)
+                return JSONResponse({"error": {"code": st, "message": msg,
+                                               "type": "server_error"}}, status_code=st)
+            with self._lock:
                 self.in_flight += 1
                 self.max_in_flight = max(self.max_in_flight, self.in_flight)
             if self.on_request:

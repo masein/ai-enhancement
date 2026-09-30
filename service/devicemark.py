@@ -71,6 +71,46 @@ class _Retry(Exception):
     pass
 
 
+class ItemError(Exception):
+    """12q.F: the server answered this item with an error of its own — it is
+    up, and the next item may be fine. llama-server says 500 when its chat
+    parser can't read what the model wrote ("The model produced output that
+    does not match the expected peg-native format"), 400 when a request is
+    one it can't take"""
+
+
+# the statuses that are about one request, from a server that is answering
+ITEM_STATUSES = (400, 500)
+
+
+def _said(raw: bytes) -> str:
+    """what the server's error body says, in its own words"""
+    try:
+        e = json.loads(raw).get("error")
+        msg = e.get("message") if isinstance(e, dict) else e
+        if msg:
+            return str(msg)[:400]
+    except Exception:                                       # noqa: BLE001 — not JSON: as it is
+        pass
+    return raw[:400].decode("utf-8", "replace")
+
+
+def _post(url: str, key: str, body: dict) -> dict:
+    """a request to the server: its reply, _Retry when it isn't answering,
+    ItemError when it answers this request with an error of its own"""
+    try:
+        st, raw = _served._http("POST", url, key, body, timeout=config.SERVED_TIMEOUT_S)
+    except Exception as e:                                  # noqa: BLE001 — no answer: retried
+        raise _Retry(str(getattr(e, "reason", e))) from None
+    if st in ITEM_STATUSES:
+        raise ItemError(f"HTTP {st}: {_said(raw)}")
+    if st in (408, 429) or st >= 500:
+        raise _Retry(f"HTTP {st}")
+    if st != 200:
+        raise ValueError(f"HTTP {st}: {raw[:160].decode('utf-8', 'replace')}")
+    return json.loads(raw)
+
+
 def ask(rec: dict, text: str, s: dict) -> dict:
     """one item, one reply: the text (thinking the server split off put back
     in its tags), what it generated — thinking and answer apart where the
@@ -80,17 +120,8 @@ def ask(rec: dict, text: str, s: dict) -> dict:
             "messages": [{"role": "user", "content": text}], "stream": False, **s}
     base, key = _served._endpoint(rec)
     t0 = time.time()
-    try:
-        st, raw = _served._http("POST", base + "/chat/completions", key, body,
-                                timeout=config.SERVED_TIMEOUT_S)
-    except Exception as e:                                  # noqa: BLE001 — no answer: retried
-        raise _Retry(str(getattr(e, "reason", e))) from None
+    reply = _post(base + "/chat/completions", key, body)
     wall = time.time() - t0
-    if st in (408, 429) or st >= 500:
-        raise _Retry(f"HTTP {st}")
-    if st != 200:
-        raise ValueError(f"HTTP {st}: {raw[:160].decode('utf-8', 'replace')}")
-    reply = json.loads(raw)
     choice = (reply.get("choices") or [{}])[0]
     msg = choice.get("message") or {}
     content = msg.get("content") or ""
@@ -126,6 +157,74 @@ def ask(rec: dict, text: str, s: dict) -> dict:
     return out
 
 
+def ask_raw(rec: dict, text: str, s: dict) -> dict:
+    """12q.F: the same item without the server's chat parsing — the prompt the
+    server's own template makes of it (POST /apply-template), completed with
+    the same greedy settings, seed and cap (POST /completion), and the raw
+    text read here as any answer is: what follows the last </think>"""
+    d = dm()
+    root, key = _served.root_of(rec["base_url"]), rec.get("key", "")
+    t0 = time.time()
+    prompt = _post(root + "/apply-template", key, {
+        "messages": [{"role": "user", "content": text}],
+        "chat_template_kwargs": s["chat_template_kwargs"]}).get("prompt")
+    if not isinstance(prompt, str) or not prompt:
+        raise ItemError("/apply-template gave no prompt")
+    reply = _post(root + "/completion", key, {
+        "prompt": prompt, "n_predict": s["max_tokens"], "temperature": s["temperature"],
+        "seed": s["seed"], "cache_prompt": False, "stream": False})
+    wall = time.time() - t0
+    raw = reply.get("content") or ""
+    # a template that opens the thinking itself leaves the tag in the prompt:
+    # put back, so thinking the cap cut off is thinking, not an answer
+    full = ("<think>\n" + raw) if re.search(r"<think>\s*$", prompt) else raw
+    think, answer = d.split_thinking(full)
+    t = reply.get("timings") if isinstance(reply.get("timings"), dict) else {}
+    gen = _int(reply.get("tokens_predicted"))
+    gen = gen if gen is not None else _int(t.get("predicted_n"))
+    thought = count_tokens(rec, think) if think else (0 if gen is not None else None)
+    cut = reply.get("stop_type") == "limit" or bool(reply.get("stopped_limit"))
+    return {"text": full, "answer": answer, "thinking_chars": len(think),
+            "think_tokens_from": "/tokenize" if think and thought is not None else None,
+            "prompt_tokens": _int(reply.get("tokens_evaluated"))
+            if reply.get("tokens_evaluated") is not None else _int(t.get("prompt_n")),
+            "gen_tokens": gen, "think_tokens": thought if think else None,
+            "answer_tokens": gen - thought if gen is not None and thought is not None else None,
+            "finish": "length" if cut else "stop",
+            "capped": cut or bool(gen is not None and gen >= s["max_tokens"]),
+            "decode_tok_s": _float(t.get("predicted_per_second")), "wall_s": round(wall, 3)}
+
+
+def no_answer(chat_error: str, fallback_error: str) -> dict:
+    """12q.F: an item the server failed on twice, and again without its chat
+    parsing: no answer — counted wrong, as the protocol counts one — with what
+    the server said both ways"""
+    return {"text": "", "answer": "", "thinking_chars": 0, "think_tokens_from": None,
+            "prompt_tokens": None, "gen_tokens": None, "think_tokens": None,
+            "answer_tokens": None, "finish": "error", "capped": False, "decode_tok_s": None,
+            "wall_s": None, "error": {"chat": chat_error, "fallback": fallback_error}}
+
+
+def answer_item(rec: dict, text: str, s: dict) -> dict:
+    """12q.F: one item's record, whatever the server makes of it. Asked; on an
+    error of the item's own (a 500, a 400), once more; then without the
+    server's chat parsing, marked "raw fallback" with the server's words; and
+    if that fails too, no answer. A server that isn't answering at all is
+    another matter (_Retry, then ServerStopped): the row waits, then stops"""
+    try:
+        return _ask_patiently(rec, text, s)
+    except ItemError:
+        pass
+    try:
+        return _ask_patiently(rec, text, s)
+    except ItemError as e:
+        said = str(e)
+    try:
+        return {**_ask_patiently(rec, text, s, ask_raw), "raw_fallback": {"error": said}}
+    except ItemError as e:
+        return no_answer(said, str(e))
+
+
 def count_tokens(rec: dict, text: str) -> int | None:
     """how many tokens the server's own tokenizer makes of `text` — None when
     it can't say (the characters are kept either way, labelled as such)"""
@@ -146,12 +245,12 @@ def _float(v) -> float | None:
     return round(float(v), 3) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
 
 
-def _ask_patiently(rec: dict, text: str, s: dict) -> dict:
+def _ask_patiently(rec: dict, text: str, s: dict, how=None) -> dict:
     """a server that doesn't answer is asked again for SERVED_RETRY_S"""
     t0 = time.time()
     while True:
         try:
-            return ask(rec, text, s)
+            return (how or ask)(rec, text, s)
         except _Retry as e:
             if time.time() - t0 >= config.SERVED_RETRY_S:
                 raise _served.ServerStopped(0, 0, str(e)) from None
@@ -192,10 +291,10 @@ def answer_all(rec: dict, keys: list[tuple[str, str]], items: dict, s: dict, sto
         if halt or canceled():
             return
         try:
-            got = _ask_patiently(rec, items[k]["text"], s)
+            got = answer_item(rec, items[k]["text"], s)
         except (_served.ServerStopped, ValueError) as e:
             with lock:
-                halt.append(e)
+                halt.append(e.why if isinstance(e, _served.ServerStopped) else str(e))
             return
         r = {"bench": k[0], "key": k[1], "fp": fp, "at": time.time(), **got}
         with lock:
@@ -210,7 +309,14 @@ def answer_all(rec: dict, keys: list[tuple[str, str]], items: dict, s: dict, sto
 
     with ThreadPoolExecutor(max_workers=_served.concurrency(rec)) as pool:
         list(pool.map(one, todo))
-    return [have[k] for k in keys if k in have], (halt[0] if halt else None)
+    got = [have[k] for k in keys if k in have]
+    if not halt:
+        return got, None
+    # 12q.F: where it stopped, counted once every answer on its way has landed
+    # (it said "at 0 of 0")
+    return got, _served.ServerStopped(len(got), total, halt[0], refused=(
+        f"the server stopped answering after {len(got)} of {total}"
+        + (f" ({halt[0]})" if halt[0] else "")))
 
 
 # ---------------------------------------------------------------------------
@@ -309,9 +415,17 @@ def battery(sid: int, rec: dict, items: dict, thinking: bool, part: str,
     if db.cancel_requested(sid):
         return "canceled", f"canceled: the {len(got)} answered are kept for the next run"
     if stopped:
-        _log(log_path, f"[devicemark] stopped after {len(got)} of {len(keys)}: {stopped}")
-        return "failed", (f"{stopped} · the {len(got)} of {len(keys)} answered are kept: the "
-                          f"next run asks only the rest")
+        _log(log_path, f"[devicemark] {stopped}")
+        return "failed", (f"{stopped} · the answers it gave are kept: the next run asks only "
+                          f"the other {len(keys) - len(got)}")
+    # 12q.F: what the server failed on, said in the log as it is on the row
+    for r in got:
+        if r.get("raw_fallback") or r.get("error"):
+            _log(log_path, f"[devicemark] {r['bench']} {r['key']}: " + (
+                f"raw fallback — the server said: {r['raw_fallback']['error']}"
+                if r.get("raw_fallback") else
+                f"no answer — the server said: {r['error']['chat']}; without its chat "
+                f"parsing: {r['error']['fallback']}"))
     db.update(sid, status="running", progress="devicemark · scoring the answers")
     setup = setup_of(rec, thinking, _props(rec))
     row = d.mark(out, items, setup, got, part)
@@ -333,8 +447,12 @@ def summary_line(row: dict) -> str:
     head = (f"composite {c['value']:.3f} [{c['ci'][0]:.3f}, {c['ci'][1]:.3f}] · "
             if c.get("value") is not None else "")
     cc = row.get("cap_check")
+    odd = "".join(f" · {row[k]} {w}" for k, w in (
+        ("raw_fallback", "raw fallback"), ("errors", "no answer after a server error"))
+        if row.get(k))
     return (head + " · ".join(bits) + f" · answered {row['answered_pct']:.0%} · median "
-            f"{row['median_tokens']} tokens" + (f" · cap check: {cc['line']}" if cc else ""))
+            f"{row['median_tokens']} tokens" + odd
+            + (f" · cap check: {cc['line']}" if cc else ""))
 
 
 def cap_check(rec: dict, items: dict, pilot_keys: list[tuple[str, str]]) -> dict:
@@ -344,7 +462,7 @@ def cap_check(rec: dict, items: dict, pilot_keys: list[tuple[str, str]]) -> dict
     k = next(k for k in pilot_keys if k[0] == "math")
     try:
         r = _ask_patiently(rec, items[k]["text"], settings(True, CAP_CHECK_TOKENS))
-    except (_served.ServerStopped, ValueError) as e:
+    except (_served.ServerStopped, ValueError, ItemError) as e:
         return {"ok": None, "line": f"not checked: {e}"}
     within = r["gen_tokens"] is not None and r["gen_tokens"] <= CAP_CHECK_TOKENS
     ok = within and r["capped"] and r["thinking_chars"] > 0
@@ -509,7 +627,8 @@ def answers(model: str, thinking: bool, bench: str = "", offset: int = 0,
                          "subject": x["subject"], "gold": x["reference"], "parsed": r["parsed"],
                          "answered": r["answered"], "ok": r["ok"], "capped": r["capped"],
                          "tokens": r["tokens"], "answer": r["answer"], "thinking": r["thinking"],
-                         "verdict": r["verdict"], "_order": x["order"]})
+                         "verdict": r["verdict"], "fallback": r.get("fallback"),
+                         "error": r.get("error"), "_order": x["order"]})
     rows.sort(key=lambda x: (0 if not x["answered"] else 1 if not x["ok"] else 2,
                              d.BENCHES.index(x["bench"]), x["_order"][1]))
     for x in rows:

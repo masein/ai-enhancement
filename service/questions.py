@@ -171,6 +171,9 @@ def _dm_rows(task: str, d: Path) -> dict[str, dict]:
                 "inst") or []
             verdict = (f"strict: {sum(st)} of {len(st)} instructions followed · loose: "
                        f"{sum(lo)} of {len(lo)}")
+        elif it.get("error"):
+            # 12q.F: the server failed on it twice, and again without its chat parsing
+            verdict = "no answer: the server failed on this item"
         elif not it.get("answered"):
             verdict = ("no answer within the cap" if it.get("capped") else
                        "no answer: no box" + (" or tested phrasing" if bench == "mmlu_pro"
@@ -194,7 +197,11 @@ def _dm_rows(task: str, d: Path) -> dict[str, dict]:
                     "verdict": verdict,
                     # 12q.C: and what the model page's Answers tab shows beside it
                     "parsed": it.get("parsed"), "answered": bool(it.get("answered")),
-                    "capped": bool(it.get("capped")), "tokens": tok}}
+                    "capped": bool(it.get("capped")), "tokens": tok,
+                    # 12q.F: answered without the server's chat parsing (its error), or not
+                    # at all after that too (both errors)
+                    "fallback": (it.get("raw_fallback") or {}).get("error"),
+                    "error": it.get("error")}}
     return out
 
 

@@ -182,7 +182,10 @@ def test_a_stopped_battery_asks_only_the_rest_and_reuses_the_pilot(svc, fake):
     n0 = len(fake.requests)
     fake.stop_after = fake.answered + 100
     row = queue(mid)
-    assert row["status"] == "failed" and "the 130 of 596 answered are kept" in row["error"]
+    # 12q.F: where it stopped, counted — and how many the next run asks
+    assert row["status"] == "failed" and row["error"].endswith(
+        "the server stopped answering after 130 of 596 (HTTP 503) · the answers it gave are "
+        "kept: the next run asks only the other 466")
     assert len(fake.requests) - n0 == 100                     # the pilot's 30 were not asked
     fake.stop_after = None
     row = queue(mid)

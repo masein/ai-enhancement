@@ -524,6 +524,10 @@ def summarize(scored: list[dict], setup: dict, part: str = "full") -> dict:
                               / max(1, len(scored)), 4),
         "median_tokens": _median([s.get("gen_tokens") for s in scored]),
         "time_frontier": time_frontier(scored),
+        # 12q.F: the items the server failed on — answered without its chat
+        # parsing (scored as any), and those with no answer after that too
+        "raw_fallback": sum(bool(s.get("raw_fallback")) for s in scored),
+        "errors": sum(bool(s.get("error")) for s in scored),
         "n": len(scored), "whose": WHOSE}
 
 
@@ -1011,6 +1015,7 @@ def model_runs(out_dir: Path) -> dict[str, dict]:
                 "server_label": r.get("server_label"), "inherited": row.get("inherited"),
                 "paired": r.get("paired"), "chart_id": r.get("paired") or r["id"],
                 "items": (d / ITEMS_NAME).exists(), "at": row.get("at"),
+                "raw_fallback": row.get("raw_fallback") or 0, "errors": row.get("errors") or 0,
                 "version": row.get("version")}
         if pilot:
             cc = pilot.get("cap_check") or {}
