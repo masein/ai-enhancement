@@ -17,6 +17,9 @@ from pathlib import Path
 
 import pytest
 
+from test_12q_devicemark_runs import svc  # noqa: F401 — a fixture
+from test_step3_collects import IN_IMAGE
+
 ROOT = Path(__file__).resolve().parents[1]
 PIN = re.compile(r"^lm_eval\[([^\]]+)\]==([\d.]+)", re.M)
 # a distribution whose module is named otherwise
@@ -249,3 +252,51 @@ def test_lm_eval_takes_2048_for_a_limit_under_text_config_and_writes_what_it_use
     assert HFLM.max_length.fget(lm) == 32768
     assert '"max_length": getattr(lm, "max_length", None)' in inspect.getsource(
         logged.add_tokenizer_info)
+
+
+def test_the_image_has_what_the_tests_import_at_the_top():
+    """Step 3 collects every test module inside the image, and a module that
+    fails to import there stops the whole run. tests/test_step3_collects.py
+    sorts every distribution the dev and CI requirement files name into "the
+    image has it" or not, and collects the suite without the second kind.
+    This is the other half: the first kind imports, in the image"""
+    lm_eval()
+    for name in sorted(IN_IMAGE):
+        importlib.import_module(name)
+
+
+def test_an_hf_devicemark_run_in_a_test_fetches_no_tokenizer(svc, monkeypatch):  # noqa: F811
+    """A DeviceMark run on hf counts each answer with the model's tokenizer
+    (devicemark.mark_hf). Where transformers is installed that went to the Hub
+    for every model id a test names — in step 3, from the server. The tests'
+    shared fixture stands a refusal in for the loader; here, beside the real
+    transformers, a whole run asks for no host but this one"""
+    lm_eval()
+    import socket
+
+    import transformers
+
+    from service import db
+    from test_12q_g_hf_length_batch import PLAIN, QWEN, _run
+    asked = []
+    here = ("127.0.0.1", "localhost", "::1", None)
+    connect, lookup = socket.socket.connect, socket.getaddrinfo
+
+    def no_connect(self, address, *a, **k):
+        if not isinstance(address, tuple) or address[0] in here:
+            return connect(self, address, *a, **k)
+        asked.append(address[0])
+        raise OSError("no network in this test")
+
+    def no_lookup(host, *a, **k):
+        if host in here:
+            return lookup(host, *a, **k)
+        asked.append(host)
+        raise OSError("no network in this test")
+    monkeypatch.setattr(socket.socket, "connect", no_connect)
+    monkeypatch.setattr(socket, "getaddrinfo", no_lookup)
+    sid, cmds, _ = _run(monkeypatch, QWEN, PLAIN, params=4.2e9)
+    assert db.get(sid)["status"] == "done", db.get(sid)["error"]
+    assert len(cmds) == 3 and asked == []
+    with pytest.raises(OSError, match="no tokenizer is fetched in a test"):
+        transformers.AutoTokenizer.from_pretrained(QWEN)

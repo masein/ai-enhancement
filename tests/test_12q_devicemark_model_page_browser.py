@@ -13,7 +13,6 @@ import urllib.request
 from pathlib import Path
 
 import pytest
-from playwright.sync_api import Error as PlaywrightError
 
 import devicemark as dm
 from fake_openai import FakeServer
@@ -37,6 +36,9 @@ def api(live, path, body=None):
 
 def shot(part, name):
     """a screenshot, taken again when the page drew itself anew under it"""
+    # imported here, not at the top: deploy step 3 collects this module inside
+    # the image, which has no Playwright (tests/test_step3_collects.py)
+    from playwright.sync_api import Error as PlaywrightError
     SCREENS.mkdir(parents=True, exist_ok=True)
     for i in range(3):
         try:
