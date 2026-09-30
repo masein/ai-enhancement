@@ -123,9 +123,11 @@ def test_the_school_notice_with_three_options_a_lead_in_and_an_offer_scores_3_an
     assert (v["pass"], v["score"], v["reason"]) == (True, 3, "3 of 4: several versions (−1)")
     assert v["findings"]["invented_or_wrong"] == []
     assert kinds(v) == ["style"] * 3
+    # 12a.11: style by its shape — a heading, a lead-in, a closing offer
     assert v["dropped"][1]["text"] == (
-        "the judge counted “Option 2: Bulleted version” as invented or wrong; it states no "
-        "number, name, date, amount or place: style is never a finding")
+        "the judge counted “Option 2: Bulleted version” as invented or wrong; it is a lead-in "
+        "or heading: style is never a finding")
+    assert v["dropped"][2]["text"].endswith("it is a closing offer: style is never a finding")
     # the same claims as 12a.9's judge wrote them, bare quotes: dropped the same
     old = verdict(SCHOOL, SCHOOL_3, reply(SCHOOL, [c for c, _ in style], several=True,
                                           length="yes"))
@@ -138,10 +140,11 @@ def test_the_leave_request_with_tips_scores_3():
             ("Attach the leave form before you send it.", NOT_IN)]
     v = verdict(LEAVE, LEAVE_TIPS, reply(LEAVE, tips, several=True, length="yes"))
     assert (v["pass"], v["score"], v["reason"]) == (True, 3, "3 of 4: several versions (−1)")
-    # the tip names who the text addresses: the text gives it; the other states nothing
-    assert kinds(v) == ["given", "style"]
-    assert v["dropped"][0]["text"] == ("the judge said “Replace 'Sir' with your manager's actual "
-                                       "name” isn’t in the text; the text gives Sir")
+    # 12a.11: both are tips on using the answer — style, by their shape
+    assert kinds(v) == ["style", "style"]
+    assert v["dropped"][0]["text"] == ("the judge counted “Replace 'Sir' with your manager's "
+                                       "actual name” as invented or wrong; it is a tip on using "
+                                       "the answer: style is never a finding")
 
 
 def test_the_coffee_line_is_dropped():
@@ -157,7 +160,8 @@ def test_the_coffee_line_is_dropped():
     assert tom in BANK[SEND_OFF]["prompt"]
     v = verdict(SEND_OFF, SEND_OFF_3, reply(SEND_OFF, [(line, tom)], length="yes"))
     assert (v["score"], kinds(v)) == (4, ["unsupported"])
-    assert v["dropped"][0]["text"].endswith("they share no number, name, date, amount or place")
+    assert v["dropped"][0]["text"].endswith("they share no number, name, date, amount or place, "
+                                            "and at most one word")
 
 
 def test_kofis_birthday_is_dropped():
@@ -375,7 +379,7 @@ def test_the_remark_sends_the_schema_and_compare_says_what_was_dropped(svc):
          "rubric": ev.rubric_key({"checks": [{"type": "judge", "rubric": ev.summarise_rubric(
              q, ev.RUBRIC_12A9)}]}), "answer_text": answer(q)} for q in qs]})
     res = ev.remark(config.OUT_DIR, judge=True)
-    assert res["sent"] == len(qs) and ev.BEFORE_NAME == "everyday_before_12a10.json"
+    assert res["sent"] == len(qs) and ev.BEFORE_NAME == "everyday_before_12a11.json"
     sent = [r for r in llm.FakeBatches("fake-judge", config.BENCH_ROOT).recorded()
             if r["custom_id"].startswith(ev.REMARK + ":")]
     by_id = {r["custom_id"].rsplit(":", 1)[1]: r for r in sent}

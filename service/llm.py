@@ -91,6 +91,8 @@ class Request:
 class Result:
     text: str = ""
     error: str = ""
+    # 12a.11: why the reply ended, where the backend says ("length": the cap cut it)
+    finish: str = ""
 
 
 def prompt_sha(*parts: str) -> str:
@@ -929,7 +931,8 @@ class LocalOpenAI(Backend):
             self._ensure_worker(batch_id)
             raise LLMError(f"local batch {batch_id} is not finished: "
                            f"{sum(c in res for c in ids)}/{len(ids)} done")
-        return {c: Result(text=res[c].get("text") or "", error=res[c].get("error") or "")
+        return {c: Result(text=res[c].get("text") or "", error=res[c].get("error") or "",
+                          finish=res[c].get("finish_reason") or "")
                 for c in ids}
 
     # -- the worker ----------------------------------------------------------

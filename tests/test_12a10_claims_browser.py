@@ -48,8 +48,8 @@ def test_style_is_dropped_and_greyed_and_a_wrong_claim_stands(live, page, width)
         assert card.locator("[data-grp-decided]").inner_text() == \
             "the judge: 3 of 4: several versions (−1)"
         assert card.locator("[data-evd-dropped='style']").all_inner_texts() == [
-            f"the judge counted “{c}” as invented or wrong; it states no number, name, date, "
-            "amount or place: style is never a finding" for c, _ in STYLE]
+            f"the judge counted “{c}” as invented or wrong; it is a lead-in or heading: style is "
+            "never a finding" for c, _ in STYLE]
         grey = page.evaluate("getComputedStyle(document.querySelector('.evdropped')).color")
         body = page.evaluate("getComputedStyle(document.querySelector('.evans')).color")
         assert grey != body
