@@ -198,7 +198,7 @@ def test_the_re_mark_judges_on_the_new_rubric_and_compares_with_12a6s_marks(
     rubric = {q["id"]: ev.rubric_key(q) for q in SUMMARISE}
     judged = [it for it in now["items"] if it["group"] == "summarising" and it.get("score")]
     assert judged and all(it["rubric"] == rubric[it["id"]] for it in judged)
-    assert (root / ev.BEFORE_NAME).exists() and ev.BEFORE_NAME == "everyday_before_12a10.json"
+    assert (root / ev.BEFORE_NAME).exists() and ev.BEFORE_NAME == "everyday_before_12a11.json"
     monkeypatch.setattr(sys, "argv", ["everyday.py", str(root), "--compare"])
     assert ev.main() == 0
     table = capsys.readouterr().out.strip().splitlines()

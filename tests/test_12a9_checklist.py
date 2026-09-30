@@ -341,7 +341,7 @@ def test_the_remark_asks_every_summarise_answer_again_as_a_checklist(svc):
          "rubric": was[q["id"]], "answer_text": answer(q)} for q in qs]})
     res = ev.remark(config.OUT_DIR, judge=True)
     assert res["sent"] == len(qs) and (config.OUT_DIR / ev.BEFORE_NAME).exists()
-    assert ev.BEFORE_NAME == "everyday_before_12a10.json"          # 12a.10's round now
+    assert ev.BEFORE_NAME == "everyday_before_12a11.json"          # 12a.11's round now
     sent = [r for r in llm.FakeBatches("fake-judge", config.BENCH_ROOT).recorded()
             if r["custom_id"].startswith(ev.REMARK + ":")]
     assert {r["custom_id"].rsplit(":", 1)[1] for r in sent} == {q["id"] for q in qs}

@@ -23,6 +23,8 @@ model has no such answer to — after a bank change, the new ones.
     python scripts/everyday.py results/full            re-mark every model (no GPU)
     python scripts/everyday.py results/full -m org/x   one model
     python scripts/everyday.py results/full --judge    12a.6: and send the judge what waits on it
+    python scripts/everyday.py results/full --rescore  12a.11: Summarise scored again from the
+                                                       judge's stored checklists (no judge)
     python scripts/everyday.py results/full --compare  12a.6: before and after, model by model;
                                                        12a.10: and Summarise's claims, kept and
                                                        dropped by why
@@ -1365,6 +1367,10 @@ def _upgraded(q: dict) -> bool:
 
 UNREADABLE = "the judge's reply couldn't be read"
 ASKED_AGAIN = "asked the judge again: its reply couldn't be read"
+# 12a.11: a reply the token cap cut off is asked again with twice the room; a
+# request that failed says so — neither is "couldn't be read"
+CUT_OFF = "the judge's reply was cut off at its token cap"
+ASKED_AGAIN_CUT = "asked the judge again, with twice the room: its reply was cut off"
 LENGTHS = ("yes", "no", "not asked")
 # one word for one person, as the rubric says: "mum", "mom" and "mother" are one
 SAME_WORD = {"mom": "mum", "mother": "mum", "mam": "mum", "mummy": "mum", "mommy": "mum",
@@ -1611,15 +1617,80 @@ def _as_written(quote: str, keys: list[str]) -> list[str]:
     return [seen.get(k, k) for k in keys]
 
 
+# 12a.11: style is a shape, not the want of a number or a name. 12a.10's rule
+# (no number, name, date, amount or place: style) dropped most of the small
+# models' mistakes, which are plain prose — "The landlord is also responsible
+# for replacing light bulbs and smoke alarms", when the text says the tenants
+# are. Style is a lead-in or heading, a closing offer, a tip on using the
+# answer, or a line about the text itself
+STYLE_HEADING = re.compile(r"^(?:option|version|draft|variant|alternative|choice|summary)"
+                           r"\s*#?\d*\s*[:\-–—]", re.I)
+STYLE_TIP = re.compile(
+    r"^(?:tip:\s*|note:\s*)?(?:please\s+)?(?:replace|attach|add|insert|fill in|personali[sz]e|"
+    r"customi[sz]e|adjust|edit|proofread|double-check|check|review|read|identify|use|remember|"
+    r"make sure|consider|don't forget|do not forget)\b.*\b(?:name|names|placeholder|template|"
+    r"text|message|summary|email|e-mail|note|draft|version|details|carefully|key changes|"
+    r"before (?:you )?send|send it|your own|as needed|if needed|to fit|form)\b", re.I)
+STYLE_ABOUT = re.compile(
+    r"^(?:this|the)\s+(?:voice note|note|message|text|email|e-mail|thread|transcript|notice|"
+    r"letter|memo|chat|conversation|summary|update|post)\s+(?:is|was|describes|discusses|"
+    r"outlines|covers|contains|explains|gives|provides)\b", re.I)
+# the words a claim is about: not these, and none of two letters or fewer
+FUNCTION_WORDS = set("""about after again all also any back been before being both but can cannot
+could did does doing done down each even ever every few for from get gets getting got had has have
+having here how into its just let lets like made make many may might more most much must need not
+now off once one only other our ours out over own per quite rather really said same say see she
+should since some still such than that the their them then there these they thing this those
+though through too under until upon very was way well were what when where which while who whom
+why will with within without would yet you your yours going goes gone want him her his hers
+new""".split())
+
+
+def content_words(text: str) -> set[str]:
+    """12a.11: the words a claim is about — as key words, without the words
+    every sentence has"""
+    return {w for w in key_words(text) if len(w) > 2 and w not in FUNCTION_WORDS}
+
+
+def style_shape(claim: str, facts: set[str] = frozenset()) -> str:
+    """12a.11: which kind of style a claim is, or '' — a lead-in or heading, a
+    closing offer, a tip on using the answer, a line about the text itself
+    (one that states no fact), or no words to speak of"""
+    c = " ".join(str(claim).replace("\u2019", "'").split()).strip(" \"'*")
+    if not c:
+        return "empty"
+    if len(c.split()) <= 14 and SIGNOFF.match(c):
+        return "a closing offer"
+    if STYLE_HEADING.match(c) or (len(c.split()) <= 14 and LEAD_IN.match(c)):
+        return "a lead-in or heading"
+    if STYLE_TIP.match(c):
+        return "a tip on using the answer"
+    if not facts and STYLE_ABOUT.match(c):
+        return "a line about the text itself"
+    if not facts and not content_words(c):
+        return "no words to speak of"
+    return ""
+
+
+def _sentences_of(text: str) -> list[str]:
+    return [x.strip() for x in re.split(r"(?<=[.!?])\s+|\n+", str(text or "")) if x.strip()]
+
+
 def claims_kept(claims: list[dict], q: dict, answer: str, dropped: list[dict]) -> list[dict]:
     """12a.10: what of the judge's "invented or wrong" stands, checked against
-    the text in the question. A claim must quote the answer, and state a fact
-    (a number, name, date, amount or place) — else it is style. "Not in the
+    the text in the question. A claim must quote the answer. "Not in the
     source": kept only if none of its facts is anywhere in the text. A line of
     the text it contradicts: kept only if that line is the text's, word for
-    word, and shares a fact with the claim. Each one dropped is said"""
+    word, and shares a fact with the claim. Each one dropped is said.
+
+    12a.11: style is a shape (style_shape), never the want of a number or a
+    name. A claim that is the text's own words isn't invented or wrong. A
+    line of the text it contradicts also stands when it shares two words the
+    claim is about; a "not in the source" claim with no fact is dropped when a
+    sentence of the text holds most of its words"""
     src = q.get("prompt", "")
     named, have = names(src), key_words(src)
+    sents = [(x, content_words(x)) for x in _sentences_of(src)]
     kept = []
     for c in claims:
         quote, source = c["quote"], c.get("source") or ""
@@ -1629,27 +1700,40 @@ def claims_kept(claims: list[dict], q: dict, answer: str, dropped: list[dict]) -
                                     "doesn’t say that"})
             continue
         facts = claim_facts(quote, named)
-        if not facts or _style(quote):
+        words = content_words(quote)
+        shape = style_shape(quote, facts)
+        if shape:
             dropped.append({"kind": "style", "claim": quote,
-                            "text": f"the judge counted “{quote}” as invented or wrong; it states "
-                                    "no number, name, date, amount or place: style is never a "
-                                    "finding"})
+                            "text": f"the judge counted “{quote}” as invented or wrong; it is "
+                                    f"{shape}: style is never a finding"})
+        elif len(quote.split()) >= 6 and _quoted(quote, src):
+            dropped.append({"kind": "given", "claim": quote,
+                            "text": f"the judge said “{quote}” is invented or wrong; the text "
+                                    "says that itself"})
         elif source.strip(" .\"'").lower() in NOT_IN_SOURCE:
             given = sorted(facts & have)
+            most = max(sents, key=lambda s: len(words & s[1]), default=("", set()))
+            shared = len(words & most[1])
             if given:
                 dropped.append({"kind": "given", "claim": quote,
                                 "text": f"the judge said “{quote}” isn’t in the text; the text "
                                         f"gives {', '.join(_as_written(quote, given))}"})
+            elif not facts and shared >= 2 and 2 * shared > len(words):
+                line = most[0] if len(most[0]) <= 140 else most[0][:139] + "…"
+                dropped.append({"kind": "given", "claim": quote,
+                                "text": f"the judge said “{quote}” isn’t in the text; the text "
+                                        f"says most of it: “{line}”"})
             else:
                 kept.append({"quote": quote, "source": None})
         elif not _quoted(source, src):
             dropped.append({"kind": "unsupported", "claim": quote,
                             "text": f"the judge said “{quote}” contradicts the text, quoting "
                                     f"“{source}”; the text doesn’t say that"})
-        elif not facts & claim_facts(source, named):
+        elif not (facts & claim_facts(source, named)) and len(words & content_words(source)) < 2:
             dropped.append({"kind": "unsupported", "claim": quote,
                             "text": f"the judge said “{quote}” contradicts “{source}”; they "
-                                    "share no number, name, date, amount or place"})
+                                    "share no number, name, date, amount or place, and at most "
+                                    "one word"})
         else:
             kept.append({"quote": quote, "source": source})
     return kept
@@ -2734,7 +2818,7 @@ def finish(model_dir: Path, results: dict) -> dict | None:
     """The poller's half: the judge's replies in, everyday.json out. 12a.8: a
     reply that can't be read is asked once more; after that it is "the judge's
     reply couldn't be read" — neither a pass nor a fail, and waiting"""
-    verdicts, again = {}, []
+    verdicts, again, cut = {}, [], set()
     qs = {q["id"]: q for q in load_bank()}
     prev = read(model_dir) or {}
     answers = {it["id"]: it.get("answer_text") or "" for it in prev.get("items") or []}
@@ -2744,13 +2828,18 @@ def finish(model_dir: Path, results: dict) -> dict | None:
             continue
         qid, retried = parts[-1], len(parts) > 2 and parts[1] == "retry"
         q = qs.get(qid) or {}
-        v = None if getattr(res, "error", None) else parse_verdict(
+        err = str(getattr(res, "error", "") or "")
+        v = None if err else parse_verdict(
             getattr(res, "text", ""), judge_check(q), q, answers.get(qid, ""))
-        if v is None and not getattr(res, "error", None) and not retried and q \
-                and answers.get(qid):
+        # 12a.11: the cap cut it off — its JSON never closed
+        if v is None and getattr(res, "finish", "") == "length":
+            cut.add(qid)
+        if v is None and not err and not retried and q and answers.get(qid):
             again.append(q)
             continue
-        verdicts[qid] = v or {"pass": None, "reason": UNREADABLE}
+        verdicts[qid] = v or {"pass": None, "reason": (
+            f"the judge's request failed: {err[:200]}" if err
+            else CUT_OFF if qid in cut else UNREADABLE)}
     out = mark(model_dir, {k: v for k, v in verdicts.items() if v["pass"] is not None},
                judge=prev.get("judge"))
     if out is None:
@@ -2762,17 +2851,29 @@ def finish(model_dir: Path, results: dict) -> dict | None:
         if it["pass"] is None and v is not None:
             it["reason"] = v["reason"]
         elif it["pass"] is None and any(q["id"] == it["id"] for q in again):
-            it["reason"] = ASKED_AGAIN
+            it["reason"] = ASKED_AGAIN_CUT if it["id"] in cut else ASKED_AGAIN
     out["waiting"] = sum(1 for it in out["items"] if it["pass"] is None)
     write(model_dir, out)
     if again:
-        _ask_again(model_dir, again, answers)
+        # 12a.11: asking again failing leaves these waiting, saying why — the
+        # verdicts this batch brought stand, this model's and every other's
+        try:
+            _ask_again(model_dir, again, answers, cut)
+        except Exception as e:                      # noqa: BLE001 — said on each answer
+            why = f"asking the judge again failed: {type(e).__name__}: {e}"[:300]
+            for it in out["items"]:
+                if it["pass"] is None and it["reason"] in (ASKED_AGAIN, ASKED_AGAIN_CUT):
+                    it["reason"] = why
+            out["judge_error"] = why
+            write(model_dir, out)
     return out
 
 
-def _ask_again(model_dir: Path, qs: list[dict], answers: dict) -> str | None:
+def _ask_again(model_dir: Path, qs: list[dict], answers: dict,
+               cut: set[str] = frozenset()) -> str | None:
     """12a.8: the judge asked once more for the replies it couldn't be read on,
-    as a re-mark batch the poller lands as it lands any other"""
+    as a re-mark batch the poller lands as it lands any other. 12a.11: one the
+    token cap cut off, with twice the room"""
     if str(REPO) not in sys.path:
         sys.path.insert(0, str(REPO))
     from service import db, llm
@@ -2780,8 +2881,8 @@ def _ask_again(model_dir: Path, qs: list[dict], answers: dict) -> str | None:
         return None
     backend = llm.client("judge")
     reqs = [llm.Request(custom_id=f"{REMARK}:{model_dir.name}:retry:{q['id']}", system="",
-                        json=True, max_tokens=judge_tokens(q), schema=judge_schema(q),
-                        user=judge_prompt(q, answers[q["id"]]),
+                        json=True, max_tokens=judge_tokens(q) * (2 if q["id"] in cut else 1),
+                        schema=judge_schema(q), user=judge_prompt(q, answers[q["id"]]),
                         meta={"kind": "everyday", "id": q["id"]}) for q in qs]
     bid = backend.submit(reqs)
     db.batch_add(bid, "everyday_remark", 0, len(reqs), backend.name, backend.model)
@@ -2835,8 +2936,8 @@ def judge_failed(model_dir: Path, why: str) -> None:
 # 12a.7: each round of re-marking keeps its own — 12a.6's is the marks from
 # before 12a.6, 12a.7's the marks from before 12a.7; 12a.8's before is 12a.7's
 # marks, the judge adding points up; 12a.9's, 12a.8's marks, on findings;
-# 12a.10's, 12a.9's checklists
-BEFORE_NAME = "everyday_before_12a10.json"
+# 12a.10's, 12a.9's checklists; 12a.11's, 12a.10's claims rule
+BEFORE_NAME = "everyday_before_12a11.json"
 REMARK = "everyday-remark"
 
 
@@ -2855,8 +2956,6 @@ def remark(results: Path, want: set[str] | None = None, judge: bool = False,
     of these are kept in BEFORE_NAME, and never written over. 12n.1: `only`,
     the questions an edit changed — the only ones sent to the judge — and no
     snapshot for an edit's re-mark"""
-    before_f = results / BEFORE_NAME
-    before = json.loads(before_f.read_text(encoding="utf-8")) if before_f.exists() else None
     snap, lines, todo, dirs, passes = {}, {}, [], {}, {}
     for d in sorted(p for p in results.iterdir() if p.is_dir()):
         if want and d.name not in want:
@@ -2879,9 +2978,8 @@ def remark(results: Path, want: set[str] | None = None, judge: bool = False,
             answers = {it["id"]: it["answer_text"] for it in out["items"]}
             todo += [(d.name, q, answers[q["id"]]) for q in _pending(out)
                      if only is None or q["id"] in only]
-    if before is None and snap and snapshot:
-        before_f.write_text(json.dumps({"at": time.time(), "version": version(), "models": snap,
-                                        "summarise": passes}, indent=1), encoding="utf-8")
+    if snap and snapshot:
+        _keep_before(results, snap, passes)
     res = {"models": lines, "batch_id": None, "sent": 0}
     if not todo:
         return res
@@ -2921,6 +3019,57 @@ def remark(results: Path, want: set[str] | None = None, judge: bool = False,
     return res
 
 
+def _keep_before(results: Path, snap: dict, passes: dict) -> None:
+    """this round's marks from before it, for --compare: each model's the
+    first time it is marked this round — never written over (12a.11: a model
+    re-marked alone first leaves the others to be added later)"""
+    f = results / BEFORE_NAME
+    was = (json.loads(f.read_text(encoding="utf-8")) if f.exists()
+           else {"at": time.time(), "version": version(), "models": {}, "summarise": {}})
+    new = [m for m in snap if m not in was["models"]]
+    if not new:
+        return
+    was["models"].update({m: snap[m] for m in new})
+    was.setdefault("summarise", {}).update({m: passes[m] for m in new if m in passes})
+    f.write_text(json.dumps(was, indent=1), encoding="utf-8")
+
+
+def rescore(results: Path, want: set[str] | None = None) -> dict:
+    """12a.11: each Summarise answer scored again from the judge's own stored
+    checklist, by today's code — no judge asked, and no model. Only a verdict
+    on today's rubric; the marks before are kept (BEFORE_NAME) as a re-mark
+    keeps them. Returns {model: how many scored again}"""
+    bank = {q["id"]: q for q in load_bank() if q["group"] == "summarising"}
+    snap, passes, done = {}, {}, {}
+    for d in sorted(p for p in results.iterdir() if p.is_dir()):
+        if want and d.name not in want:
+            continue
+        prev = read(d)
+        if not prev or prev.get("earlier"):
+            continue
+        verdicts = {}
+        for it in prev.get("items") or []:
+            q, raw = bank.get(it["id"]), it.get("judge_raw")
+            if q is None or not isinstance(raw, dict) or "checklist" not in raw \
+                    or it.get("rubric") != rubric_key(q) or it.get("pass") is None:
+                continue
+            v = checklist_verdict(raw, q, it.get("answer_text") or "")
+            if v is not None:
+                verdicts[it["id"]] = v
+        if not verdicts:
+            continue
+        model = prev.get("model") or d.name
+        snap[model] = _counts(prev)
+        passes[model] = {it["id"]: it.get("pass") for it in prev.get("items") or []
+                         if it.get("group") == "summarising"}
+        _keep_before(results, snap, passes)
+        out = mark(d, verdicts, judge=prev.get("judge"))
+        if out is not None:
+            write(d, out)
+            done[model] = len(verdicts)
+    return done
+
+
 def finish_remark(results_dir: Path, results: dict) -> list[str]:
     """the poller's half of a re-mark: each model's verdicts into its marks"""
     by: dict[str, dict] = {}
@@ -2934,9 +3083,36 @@ def finish_remark(results_dir: Path, results: dict) -> list[str]:
     done = []
     for name, rs in by.items():
         d = results_dir / name
-        if d.is_dir() and finish(d, rs) is not None:
-            done.append(name)
+        if not d.is_dir():
+            continue
+        # 12a.11: one model's replies failing to land never fails the batch
+        # for the others (the poller would mark every model still waiting on
+        # it "the judge failed"); this one's answers wait, saying why
+        try:
+            if finish(d, rs) is not None:
+                done.append(name)
+        except HiddenMissing:
+            raise
+        except Exception as e:                      # noqa: BLE001 — said on its answers
+            import traceback
+            traceback.print_exc()
+            _landing_failed(d, f"{type(e).__name__}: {e}")
     return done
+
+
+def _landing_failed(model_dir: Path, err: str) -> None:
+    """12a.11: a model whose replies couldn't be taken in: its answers still
+    waiting say so, and a re-mark asks the judge for them again"""
+    out = read(model_dir)
+    if not out:
+        return
+    why = f"the judge's replies couldn't be taken in: {err}"[:300]
+    for it in out["items"]:
+        if it["pass"] is None:
+            it["reason"] = why
+    out["waiting"] = sum(1 for it in out["items"] if it["pass"] is None)
+    out["judge_error"] = why
+    write(model_dir, out)
 
 
 def compare(results: Path) -> str:
@@ -2957,13 +3133,30 @@ def compare(results: Path) -> str:
         sb = (f"{sum(x['passed'] for x in old_sum)} of {sum(x['total'] for x in old_sum)}"
               if old_sum else "—")
         ng = (now.get("groups") or {}).get("summarising")
+        # 12a.11: waiting is an answer with no verdict, as the second table counts it
         rows.append(f"| {now['model']} | "
                     + (f"{b['passed']} of {b['total']}" if b else "—") + " | "
                     + f"{now['passed']} of {now['total']} | {sb} | "
                     + (f"{ng['passed']} of {ng['total']}" if ng else "—")
-                    + f" | {now.get('waiting') or 0} |")
+                    + f" | {sum(1 for it in now['items'] if it.get('pass') is None)} |")
     causes = moved(results)
-    return "\n".join(rows) + ("\n\n" + causes if causes else "")
+    return "\n".join(rows) + ("\n\n" + causes if causes else "") + waiting_why(results)
+
+
+def waiting_why(results: Path) -> str:
+    """12a.11: each model's answers with no verdict, by why — the reasons are
+    the same few words for every question; none is named"""
+    lines = []
+    for d in sorted(p for p in results.iterdir() if p.is_dir()):
+        now = read(d)
+        if not now or now.get("earlier"):
+            continue
+        why = collections.Counter(it.get("reason") or WAITING for it in now["items"]
+                                  if it.get("pass") is None)
+        lines += [f"- {now['model']}: " + "; ".join(f"{n} {r}" for r, n in why.most_common())] \
+            if why else []
+    return ("\n\nWaiting, by why (every Everyday answer with no verdict yet):\n"
+            + "\n".join(lines)) if lines else ""
 
 
 def moved(results: Path) -> str:
@@ -2977,8 +3170,7 @@ def moved(results: Path) -> str:
     if not was:
         return ""
     bank = {q["id"]: q for q in load_bank() if q["group"] == "summarising"}
-    rows = ["Summarise, what 12a.10 changed: the judge's “invented or wrong”, checked against "
-            "the text",
+    rows = ["Summarise, this round: the judge's “invented or wrong”, checked against the text",
             "",
             "| model | half | before | now | claims kept | dropped: style | dropped: the text "
             "gives it | dropped: no line of the text behind it | dropped: not the answer's words "
@@ -3018,6 +3210,9 @@ def main() -> int:
     ap.add_argument("--compare", action="store_true",
                     help="12a.6: before and after the re-mark, model by model; 12a.10: and "
                          "Summarise's claims, kept and dropped by why")
+    ap.add_argument("--rescore", action="store_true",
+                    help="12a.11: score each Summarise answer again from the judge's stored "
+                         "checklist, by today's code (no judge, no model)")
     ap.add_argument("-q", "--question", action="append", default=[],
                     help="12a.8: with --judge, send the judge only this question's answers "
                          "(a rubric or reference changed); every model is still marked")
@@ -3031,6 +3226,12 @@ def main() -> int:
         return 2
     if a.compare:
         print(compare(a.results))
+        return 0
+    if a.rescore:
+        got = rescore(a.results, {m.replace("/", "__") for m in a.model} or None)
+        for model, n in got.items():
+            print(f"{model}: {n} Summarise answer(s) scored again from the judge's checklist")
+        print(f"scored again: {len(got)} model(s), no judge asked · then --compare")
         return 0
     want = {m.replace("/", "__") for m in a.model}
     # 12a.8: one question's answers — no new "before" for --compare

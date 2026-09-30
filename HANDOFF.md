@@ -4389,6 +4389,60 @@ Not before the demo: a new hidden set changes every Everyday score.
   tips (3); the coffee line and Kofi's birthday (dropped); the business cards
   listed as decided while still open (kept, −2).
 
+### 12a.11 — a re-mark's waiting answers, and why they wait
+
+- After 12a.10's re-mark, `served/Qwen3.6-k4-LDA-lookahead` had 28 Summarise
+  answers with no verdict (11 hidden, 17 practice) and lookahead-MTP 2, each
+  saying "the judge's reply couldn't be read". They weren't unreadable: the
+  judge's server (`gemma-vllm:8000`) stopped answering near the end of the
+  565-request batch — 24 requests got no response within 180 s, 2 were
+  disconnected, 4 refused — and the batch sends models in name order, the two
+  lookahead setups last. A failed request was said as an unreadable reply,
+  and never asked again.
+- **Each waiting answer says why**: the judge's request failed (and how:
+  "the judge's request failed: POST …: no response within 180s"), its reply
+  was cut off at the token cap (the backend's finish reason, now carried as
+  `Result.finish`; asked again with twice the room), or it couldn't be read
+  (asked again once). A failed request isn't asked again inside the batch —
+  the backend has already retried it — it waits; `--judge -m <model>` sends a
+  model's answers with no verdict, and only those.
+- **One model's failure stays that model's** (`finish_remark`): an error
+  taking in one model's replies, or asking the judge again, leaves that
+  model's answers waiting, saying so, and the batch's other verdicts stand.
+  Before, it failed the whole batch in the poller, and every model still
+  waiting on it read "not marked: the judge failed".
+- **`--compare` lists each model's waiting answers by why**, under the two
+  tables, counted, no question named; both tables count an answer with no
+  verdict.
+- **Style is a shape, not the want of a number or a name** (`style_shape`).
+  12a.10 dropped as style every claim with no number, name, date, amount or
+  place, and 14 of 20 practice-half claims it dropped for gemma-3-270m-it and
+  SmolLM2-135M-Instruct were wrong or invented prose ("The landlord is also
+  responsible for replacing light bulbs and smoke alarms", when the text says
+  the tenants now are) — gemma's hidden half rose from 5 to 9 on them. Style
+  is now a lead-in or heading, a closing offer, a tip on using the answer, or
+  a line about the text itself ("The voice note is a brief, informal
+  message…"). Then (rule B):
+  - **a line of the text it contradicts** stands when it is the text's, word
+    for word, and shares a number or name with the claim — or two of the words
+    the claim is about (`content_words`: its key words, less the ones every
+    sentence has);
+  - **a claim that is the text's own words** (six words or more) isn't
+    invented or wrong;
+  - **"not in the source", with no fact**: dropped when one sentence of the
+    text holds most of its words, else it counts.
+  - On those 20: the three that are style, and two of the three true lines,
+    are dropped; 12 of the 14 wrong count. What it can't tell apart: a claim
+    sharing one word with its line ("pet-free living"), a line that shares
+    nothing with the claim, and a true paraphrase the judge called wrong
+    ("They also mention needing groceries, milk, eggs, bread, and fruit").
+- **`--rescore`** scores each Summarise answer again from the judge's stored
+  checklist, by today's code — no judge asked, no model — on today's rubric
+  only. This round's before (`everyday_before_12a11.json`) takes each model
+  the first time it is marked or scored again, never written over, so a model
+  re-marked alone first leaves the others to be added.
+
+
 ### 12q — DeviceMark's protocol, run here (PR A: the suite, the runner, the scoring)
 
 - **The battery, `devicemark-replica-v1`** (`eval_tasks/devicemark/battery-v1.json`,
