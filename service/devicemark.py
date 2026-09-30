@@ -221,7 +221,7 @@ def answer_item(rec: dict, text: str, s: dict) -> dict:
         said = str(e)
     try:
         return {**_ask_patiently(rec, text, s, ask_raw), "raw_fallback": {"error": said}}
-    except ItemError as e:
+    except (ItemError, ValueError) as e:    # 12s: a server with no /apply-template says 404
         return no_answer(said, str(e))
 
 

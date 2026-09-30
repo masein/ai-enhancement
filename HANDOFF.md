@@ -4389,6 +4389,57 @@ Not before the demo: a new hidden set changes every Everyday score.
   tips (3); the coffee line and Kofi's birthday (dropped); the business cards
   listed as decided while still open (kept, −2).
 
+### 12s — a served model's run never stops for one question's error
+
+- llama-server answers a question with HTTP 500 when its chat parser can't
+  read what the model wrote ("The model produced output that does not match
+  the expected peg-native format"). 12q.F handled that on DeviceMark rows;
+  Everyday, the exam, Trust & safety, SimpleQA and MobileAIBench go through
+  `served.answer_task`, which still took every 5xx for a server that had
+  stopped answering: it waited `SERVED_RETRY_S` on the question, then failed
+  the run. (A 400 stopped it at once: "the server refused question …".)
+- **An error of the question's own** (`served.ItemError`: a 500 or a 400 from
+  a llama-server that is answering) is handled on the question
+  (`answer_one`), as 12q.F handles an item:
+  1. asked once more;
+  2. then **without the server's chat parsing** (`ask_raw`): the prompt from
+     `POST /apply-template` (the same messages, the system line included, and
+     the thinking switch), completed by `POST /completion` with the run's own
+     budget, temperature and stops. The raw text is read as any answer is;
+     where the template opens the thinking itself, the tag is put back, so
+     thinking the budget cut off is never an answer. The sample is marked
+     `raw_fallback`, with the server's words;
+  3. and if that fails too — a server with no `/apply-template` (404)
+     included — **no answer**: an empty one with both errors
+     (`server_error`), and the run goes on.
+- **No answer is counted as the run counts an empty one**, and says whose
+  failure it was (`judge.server_failed`): Everyday fails it with "no answer:
+  the server failed on this question twice (…), and again without its chat
+  parsing (…)", and never sends it to the judge; Trust & safety and SimpleQA
+  leave it unmarked with the same words instead of "the model wrote nothing";
+  the exam and MobileAIBench mark it as the empty answer it is. It is an
+  answer on file: the next run doesn't ask it again.
+- **Too many and the server isn't right**: more than three questions, or 2%
+  of the task (`item_error_limit`), with no answer either way stop the run —
+  "the server failed on 8 questions, asked its own way and without its chat
+  parsing (…): stopped" — and none of them is kept as an answer: the next run
+  asks them.
+- **A server that isn't answering** (no connection, a timeout, 408, 429, 502,
+  503) is still waited for and then stops the run, in the middle of a
+  fallback too. **A model from OpenRouter is asked as before**: it has no raw
+  way round, and its 500 is a provider to wait for.
+- **Where it shows**: the run's line ("· 1 raw fallback · 2 no answer after a
+  server error"); the log, a line a question with what the server said; an
+  Everyday answer on the model's Answers tab and in a question's reader ("No
+  answer: its server failed on this question." with both errors under it, or
+  a "raw fallback" badge with the server's words on hover), and the badge in a
+  group's side-by-side.
+- Not covered: the generative three, which a served model sits through
+  lm_eval's `local-chat-completions` (lm_eval's own retries).
+- 12q.F's DeviceMark path keeps its own copy of the three steps
+  (`devicemark.answer_item`); its fallback now also takes a 404 for a failed
+  fallback, as here.
+
 ### 12r — the judge's Docker network
 
 - **The judge's model, gemma-vllm, belongs to another compose project**

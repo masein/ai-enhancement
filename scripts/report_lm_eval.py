@@ -666,7 +666,9 @@ def load_results(path: Path) -> list[dict]:
 _EVERYDAY_ITEM = ("id", "group", "pass", "reason", "answer_text", "had_reasoning",
                   "reasoning_text", "reasoning_words", "no_answer", "failed",
                   # 12a.8: the judge's claims the answer disproves, and its own reply
-                  "dropped", "judge_raw")
+                  "dropped", "judge_raw",
+                  # 12s: a served model's question its server failed on
+                  "server_error", "raw_fallback")
 
 
 def _evd_label(q: dict) -> str:
@@ -7742,6 +7744,18 @@ function evdJudgeNotes(it, id = '') {
                                                    : 'the judge’s findings ▸' }),
       el('pre', { class: 'evthink-t', text: JSON.stringify(it.judge_raw, null, 1) })) : '');
 }
+// 12s: a served model's question its server failed on. No answer either way
+// is said in the answer's place, with what the server said both times; one
+// asked without the server's chat parsing is an answer like any other, with
+// a badge and what the server said
+const EVD_SERVER_FAILED = 'No answer: its server failed on this question.';
+const evdServerSaid = e => [`asked twice, the server said: ${e.chat}`,
+  `without its chat parsing: ${e.fallback}`];
+const evdRawBadge = (it, id) => it && it.raw_fallback
+  ? el('span', { class: 'badge warn', 'data-evd-raw': id,
+      'data-tip': JSON.stringify(['the server’s chat parsing failed on this question twice; '
+        + 'asked again through /apply-template and /completion, and the raw text marked',
+        `the server said: ${it.raw_fallback.error}`]), text: 'raw fallback' }) : '';
 function evdAnswer(q, it, attrs = {}, verdict = null) {
   return el('div', { class: 'evans-wrap', ...attrs },
     el('p', { class: 'evq-label', text: 'Question' }),
@@ -7754,8 +7768,12 @@ function evdAnswer(q, it, attrs = {}, verdict = null) {
     : it.no_answer
       ? el('p', { class: 'evans none', 'data-evd-answer': q.id, 'data-no-answer': '1',
           text: 'No answer: the model was still thinking when it ran out of room.' })
+      : it.server_error
+        ? el('p', { class: 'evans none', 'data-evd-answer': q.id, 'data-server-error': '1',
+            text: [EVD_SERVER_FAILED, ...evdServerSaid(it.server_error)].join('\n') })
       : el('div', { class: 'evans', 'data-evd-answer': q.id,
           text: (it && it.answer_text) || '(the model wrote nothing)' }),
+    evdRawBadge(it, q.id),
     it && it.had_reasoning ? el('details', { class: 'evthink', 'data-evd-thinking': q.id },
       el('summary', { text: `thinking ▸ ${(it.reasoning_words || 0).toLocaleString('en')} words` }),
       el('div', { class: 'evthink-t', text: it.reasoning_text || '' })) : '',
@@ -8085,8 +8103,12 @@ function evdSideCard(id, q, it, changed) {
         text: 'changed, not re-asked yet: its answer was to the old words, and doesn’t count' })
       : el('p', { class: 'small evside-why', 'data-grp-decided': id, text: evdDecided(it, q) }),
     changed ? '' : evdJudgeNotes(it, id),
-    changed || !it || it.no_answer ? '' : el('div', { class: 'evans', 'data-grp-text': id,
-      text: it.answer_text || '(the model wrote nothing)' }),
+    // 12s: no answer after its server's error, as one that ran out of room: the
+    // line above says why, and nothing stands in the answer's place
+    changed || !it || it.no_answer || it.server_error ? ''
+      : el('div', { class: 'evans', 'data-grp-text': id,
+          text: it.answer_text || '(the model wrote nothing)' }),
+    changed ? '' : evdRawBadge(it, id),
     !changed && it && it.had_reasoning ? el('details', { class: 'evthink' },
       el('summary', { text: `thinking ▸ ${(it.reasoning_words || String(it.reasoning_text || '')
         .split(/\s+/).filter(Boolean).length).toLocaleString('en')} words` }),
