@@ -300,3 +300,67 @@ def test_an_hf_devicemark_run_in_a_test_fetches_no_tokenizer(svc, monkeypatch): 
     assert len(cmds) == 3 and asked == []
     with pytest.raises(OSError, match="no tokenizer is fetched in a test"):
         transformers.AutoTokenizer.from_pretrained(QWEN)
+
+
+def _fast_kernels():
+    """scripts/fast_kernels.py, where this file's kernel checks can run: CI's
+    image-deps job (fla over a CPU torch) and the image. An image built with
+    WITH_FAST_KERNELS=0 has none, and says so"""
+    lm_eval()
+    import torch
+
+    import fast_kernels as fk
+    if torch.version.cuda is not None and not fk.DEST.exists():
+        pytest.skip("this image was built with WITH_FAST_KERNELS=0")
+    return fk, torch
+
+
+def test_the_three_fast_kernel_packages_import():
+    """12v: mamba_ssm, causal_conv1d and fla — what transformers looks for
+    before it takes a hybrid model's fast path. Granite-4.0-H-1B ran out of GPU
+    memory on the slow one (#132, #144, #147). In the image all three import,
+    from /opt/fast-kernels, every file as pinned, with the names transformers
+    takes from each. CI's image-deps job has a CPU torch, which can't load
+    the two CUDA builds: there it is fla, and the image's own build (the
+    docker-image job) imports the other two"""
+    fk, torch = _fast_kernels()
+    from packaging.version import Version
+    from transformers.utils.import_utils import _is_package_available
+
+    import fla
+    from fla.modules import FusedRMSNormGated  # noqa: F401 — what modeling_qwen3_5 imports
+    from fla.ops.gated_delta_rule import (  # noqa: F401
+        chunk_gated_delta_rule,
+        fused_recurrent_gated_delta_rule,
+    )
+    pin = re.search(r"^fla-core==([\d.]+)$",
+                    (ROOT / "requirements-kernels.txt").read_text(encoding="utf-8"), re.M).group(1)
+    assert md.version("fla-core") == pin == fla.__version__
+    # transformers finds it, at a version it accepts (0.2.2 or later)
+    found, version = _is_package_available("fla", return_version=True)
+    assert found and Version(version) >= Version("0.2.2")
+    # only the core: fla's own model classes aren't here to register themselves
+    assert importlib.util.find_spec("fla.models") is None
+    # what both kernels need beside torch, at the pins
+    assert re.search(rf"^einops=={re.escape(md.version('einops'))}$",
+                     (ROOT / "requirements.txt").read_text(encoding="utf-8"), re.M)
+    ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert f'"triton=={md.version("triton")}"' in ci, "CI's triton is the image's"
+    if torch.version.cuda is None:
+        return
+    assert fk.verify() == []
+    assert len(fk.check_imports()) == 3
+    import causal_conv1d
+    import mamba_ssm
+    assert Path(mamba_ssm.__file__).parent == fk.DEST / "mamba_ssm"
+    assert Path(causal_conv1d.__file__).parent == fk.DEST / "causal_conv1d"
+    assert Path(fla.__file__).parent == fk.DEST / "fla"
+
+
+def test_tritons_c_extension_builds_in_the_image():
+    """12v: every one of those kernels is a Triton kernel or sits beside one,
+    and Triton compiles a small C extension the first time each runs. Without
+    a C compiler and Python's headers the fast paths import and then fail at
+    their first call. Built here as Triton builds it"""
+    fk, _ = _fast_kernels()
+    assert fk.check_compiler() == "Triton's C extension builds and loads"

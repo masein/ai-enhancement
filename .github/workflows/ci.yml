@@ -19,9 +19,9 @@
 #   ci         green only when all three are: the one result to read
 #
 # The Docker image build is a separate job, and runs only when asked for
-# (build_image): the pytorch base image is multi-GB, and since 12a.5b the image
-# also pulls the ~14 GB devel image and compiles two CUDA kernels — more than
-# an hour, and more disk than a hosted runner has. A check is the jobs above.
+# (build_image): the pytorch base image is multi-GB, and since 12v the build
+# also fetches the hybrid models' two prebuilt CUDA kernels (718 MB). A check
+# is the jobs above; a PR that changes the image runs this too.
 name: ci
 
 on:
@@ -134,6 +134,10 @@ jobs:
         run: pip install "torch==2.11.*" --index-url https://download.pytorch.org/whl/cpu
       - name: the image's requirements
         run: pip install -r requirements.txt pytest httpx
+      - name: fla's core, and the triton the image's torch pins (12v)
+        # the two compiled kernels are CUDA builds, which a CPU torch can't
+        # load: the image's own build imports them (the docker-image job)
+        run: pip install "triton==3.6.0" -r requirements-kernels.txt
       - name: what lm_eval's api extra brought
         run: |
           python - <<'PY'

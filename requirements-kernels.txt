@@ -1,0 +1,10 @@
+# 12v: what the Dockerfile installs into /opt/fast-kernels, beside the two
+# prebuilt CUDA kernels (scripts/fast_kernels.py), not into site-packages: the
+# folder is on Python's path unless FAST_KERNELS=0.
+#
+# flash-linear-attention's core: the Triton kernels and modules transformers
+# 5.5.3 takes for Qwen3.5 (fla.modules, fla.ops; it wants 0.2.2 or later). Not
+# the `flash-linear-attention` distribution, which adds fla's own model
+# classes and registers them with transformers: nothing here uses them.
+# It needs torch, triton (torch's own pin) and einops (requirements.txt).
+fla-core==0.5.2
