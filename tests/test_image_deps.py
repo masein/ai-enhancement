@@ -165,3 +165,56 @@ def test_the_image_fetches_the_pinned_punkt_tab():
     assert "nltk.data.find('tokenizers/punkt_tab/english/')" in docker
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     assert 'python scripts/nltk_data.py --dest "$RUNNER_TEMP/nltk_data"' in ci
+
+
+def test_lm_eval_takes_the_length_a_devicemark_run_tells_it():
+    """12q.G: a DeviceMark run on hf passes lm_eval `max_length` (the prompt's
+    room and the cap), because lm_eval takes 2,048 for a model whose limit
+    isn't at the top of its config (Gemma 4's is under text_config: "requested
+    max tokens to generate (4096) must be less than model's maximum sequence
+    length (2048)", #148). And the runner reads lm_eval's own warning for a
+    prompt it cut. Both are the installed harness's"""
+    lm_eval()
+    import inspect
+
+    from lm_eval.models.huggingface import HFLM
+
+    from service import runner
+    assert "max_length" in inspect.signature(HFLM.__init__).parameters
+    assert HFLM._DEFAULT_MAX_LENGTH == 2048
+    src = inspect.getsource(sys.modules[HFLM.__module__])
+    assert '("n_positions", "max_position_embeddings", "n_ctx")' in src
+    assert "must be less than model's maximum sequence length" in src
+    warning = re.search(r'f"(Left truncation applied\. Original sequence length was )'
+                        r'\{\w+\}, "\s+f"(truncating to last )\{\w+\}( tokens)', src)
+    assert warning, "lm_eval's warning for a cut prompt has other words now"
+    said = warning.group(1) + "2301, " + warning.group(2) + "2048" + warning.group(3)
+    assert runner._CUT.findall(said) == [("2301", "2048")]
+
+
+def test_the_longest_prompt_is_counted_on_the_installed_transformers(tmp_path):
+    """12q.G: the battery's longest prompt is counted with the model's own
+    tokenizer, as lm_eval sends it: the chat template, the thinking switch. A
+    tokenizer made here, so nothing is fetched"""
+    lm_eval()
+    from tokenizers import Tokenizer, models, pre_tokenizers
+    from transformers import PreTrainedTokenizerFast
+
+    from service import devicemark as sdm
+    words = ["[UNK]", "<user>", "<assistant>", "<think>", "one", "two", "three", "four"]
+    inner = Tokenizer(models.WordLevel({w: i for i, w in enumerate(words)}, unk_token="[UNK]"))
+    inner.pre_tokenizer = pre_tokenizers.WhitespaceSplit()
+    tok = PreTrainedTokenizerFast(tokenizer_object=inner, unk_token="[UNK]")
+    tok.chat_template = ("{% for m in messages %}<user> {{ m['content'] }}{% endfor %}"
+                         "{% if add_generation_prompt %} <assistant>{% endif %}"
+                         "{% if enable_thinking %} <think>{% endif %}")
+    tok.save_pretrained(tmp_path / "tok")
+    texts = ["one two", "one two three four", "one"]
+    # the longest question's four words, and the template's two
+    assert sdm.prompt_tokens(str(tmp_path / "tok"), None, texts,
+                             {"mode": "switch", "on": False}) == (6, True)
+    # the switch reaches the template
+    assert sdm.prompt_tokens(str(tmp_path / "tok"), None, texts,
+                             {"mode": "switch", "on": True}) == (7, True)
+    # a tokenizer that isn't there is estimated, never an error
+    assert sdm.prompt_tokens(str(tmp_path / "none"), None, ["x" * 30], {}) == (10, False)

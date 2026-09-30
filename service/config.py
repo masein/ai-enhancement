@@ -485,6 +485,15 @@ DM_TASKS = ["dm_ifeval", "dm_mmlu_pro", "dm_math"]
 DM_TASKS_DIR = Path(os.environ.get("DM_TASKS_DIR", BENCH_ROOT / "devicemark" / "tasks"))
 DM_ITEMS = Path(os.environ.get("DM_ITEMS", BENCH_ROOT / "devicemark" / "items-v1.jsonl"))
 DM_PARTS = ("full", "pilot", "parity", "speed")
+# 12q.G: a Hugging Face model's run of it. lm_eval is told the length itself —
+# the prompt's room and the cap — since it takes 2,048 for a model whose limit
+# it can't find (Gemma 4 keeps max_position_embeddings under text_config, and
+# failed all three tasks at "must be less than … (2048)", #148). The room is
+# this, or the battery's longest prompt in the model's tokens where that is
+# longer. And its answers are written a few at a time at most: the batch comes
+# from what 4,096 generated tokens need (hfmeta.gen_estimate), never above this
+DM_PROMPT_TOKENS = int(os.environ.get("DM_PROMPT_TOKENS", "2048"))
+DM_HF_MAX_BATCH = int(os.environ.get("DM_HF_MAX_BATCH", "4"))
 DM_INSTRUCT_ONLY = ("DeviceMark's battery is asked through the chat template and scored on "
                     "what the model writes, so only an instruct model can sit it — this one "
                     "runs as a base model")
