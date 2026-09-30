@@ -157,7 +157,24 @@ def load_spec(hf_id: str, meta: dict) -> dict:
         pretrained = str((config.ARTIFACTS_DIR / pretrained[6:]).resolve())
     return {"pretrained": pretrained, "dtype": "bfloat16",
             "trust_remote_code": bool(meta.get("remote_code")),
-            "revision": meta.get("revision") or None}
+            "revision": meta.get("revision") or None,
+            # 12t: what lm_eval is told of a model whose limit it can't find
+            "max_length": nested_limit(meta)}
+
+
+def nested_limit(meta: dict) -> int | None:
+    """12t: the tokens a model reads, when its config keeps that under
+    text_config (Gemma 4) — None for every other model. lm_eval looks for a
+    model's limit at the top of its config only, and takes 2,048 when it finds
+    none: a prompt longer than that is cut from the left without a word, and a
+    generative task with 2,048 tokens or more to write fails outright. Such a
+    model's runs on hf are told its real limit; a model whose limit lm_eval
+    finds is told nothing, and is asked exactly as before"""
+    a = meta.get("archinfo") or {}
+    try:
+        return int(a["ctx"]) if a.get("ctx_nested") and a.get("ctx") else None
+    except (TypeError, ValueError):
+        return None
 
 
 def model_args(spec: dict) -> str:
@@ -167,6 +184,8 @@ def model_args(spec: dict) -> str:
         margs += ",trust_remote_code=True"
     if spec["revision"]:
         margs += f",revision={spec['revision']}"
+    if spec.get("max_length"):                  # 12t: nested_limit
+        margs += f",max_length={spec['max_length']}"
     return margs
 
 
@@ -1310,7 +1329,10 @@ def run_submission(sub: dict) -> None:
                                        revision=meta.get("revision"),
                                        gpu_util=gpu_util_for(gpu_free_mib(), gpu_total_mib())
                                        if be == "vllm" else None,
-                                       max_length=dm_plan and dm_plan["max_length"]),
+                                       # 12q.G: a DeviceMark run's own; 12t: else
+                                       # the limit lm_eval can't find, if any
+                                       max_length=dm_plan["max_length"] if dm_plan
+                                       else spec["max_length"]),
                         task, shots, batch or gen_batch or meta["batch"], task_out,
                         chat=True, max_gen_toks=th["budget"], backend=be, samples=samples)
                 cmd = gen_cmd(backend)
@@ -1339,6 +1361,10 @@ def run_submission(sub: dict) -> None:
                                 else "") + "\n")
                 if dm_plan and backend == "hf":
                     lf.write(_devicemark.hf_plan_lines(dm_plan, gen_batch))
+                elif spec["max_length"] and not rec and (not gen_task or backend == "hf"):
+                    lf.write(f"[service] lm_eval is told max_length={spec['max_length']}: the "
+                             f"model's limit is under text_config in its config, where lm_eval "
+                             f"doesn't look (it would take 2,048)\n")
                 if remote_code:
                     lf.write(f"[trust_remote_code] running as "
                              f"{config.EVAL_USER or 'root (EVAL_USER unset!)'}, "
