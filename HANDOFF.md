@@ -2474,8 +2474,9 @@ happens on the server, first with `scripts/trial_generative.py` (§ 5b).
   - The runner's vLLM path stays: it runs only when vLLM can be imported,
     which it can't here, so every run says "on hf". `GEN_BACKEND=hf` forces
     hf regardless.
-  - `mamba_ssm` and `causal-conv1d` are tried at build and never required
-    (`WITH_MAMBA=0` skips them).
+  - `mamba_ssm` and `causal-conv1d` were tried at build and never required
+    (`WITH_MAMBA=0` skipped them); they never built, since a runtime image
+    has no CUDA compiler. 12v fetches them prebuilt instead.
 - **A seeded MMLU-Pro subset** (the submit form's "MMLU-Pro subset") is off
   by default. It draws items from each subject in its share of the 12,032,
   with seed 1234, and the board marks the cell "subset". Only a full run is
@@ -4690,6 +4691,61 @@ Not before the demo: a new hidden set changes every Everyday score.
   strict and loose), a served setup's too. It lists what the board lists: the
   diagnose half.
 
+### 12v — the hybrid models' fast kernels, in the image
+
+- **What was wrong.** Granite-4.0-H-1B ran out of GPU memory on MMLU-Pro at a
+  batch of one (#132, #144, #147). Its log says "The fast path is not
+  available … Falling back to the naive implementation": the image had no
+  `mamba_ssm` and no `causal_conv1d`, so transformers ran its Mamba layers on
+  its own slow path (12q.G has the arithmetic). Qwen3.5's log says the same
+  for flash-linear-attention. 12h.1's build of the first two from source
+  never worked: a runtime image has no CUDA compiler.
+- **The three packages transformers looks for are in the image**, in
+  `/opt/fast-kernels` (`scripts/fast_kernels.py`):
+  - **`mamba_ssm` and `causal_conv1d`, prebuilt.** Hugging Face's
+    kernels-community publishes both built for this image's torch and CUDA
+    (`torch211-cxx11-cu128-x86_64-linux`, Blackwell among the architectures);
+    transformers 5.5.3 is written against those builds. Fetched at build,
+    every file pinned by its repo's commit, size and hash
+    (`scripts/fast_kernels.json`: mamba-ssm 768416ab, 611 MB, Apache-2.0;
+    causal-conv1d 6e9a5827, 107 MB, BSD-3-Clause). Other bytes fail the
+    build, and a dropped connection is taken up where it left off. Nothing
+    is compiled, and the `kernels` package isn't installed: with it,
+    transformers would ask the Hub for the newest build every time a model
+    loads.
+  - **`fla`, from `fla-core==0.5.2`** (`requirements-kernels.txt`; MIT):
+    flash-linear-attention's Triton kernels and modules, which is all
+    transformers takes for Qwen3.5. Not the `flash-linear-attention`
+    distribution, whose own model classes register themselves with
+    transformers.
+  - **`einops==0.8.2`** in `requirements.txt`: both need it.
+  - **Triton's C compiler is the base image's.** Triton compiles a small C
+    extension for each kernel the first time it runs; the base image has
+    `gcc` and `python3-dev` already, and triton 3.6.0 (torch's own pin).
+    Nothing is installed with apt.
+- **The build checks them** (`fast_kernels.py --check`): every file as
+  pinned, each package imports with the names transformers takes from it,
+  and Triton's C extension builds. A build where they don't fails.
+  `WITH_FAST_KERNELS=0` builds without them.
+- **`FAST_KERNELS=0` is the way back, with no rebuild.** The folder is on
+  every Python's path through one line in site-packages
+  (`evalboard_fast_kernels.pth`), unless that is in the environment. Set it
+  in `.env`, `docker compose up -d`, and every run is on the slow paths as
+  before. The memory estimate follows (`hfmeta.mamba_kernels`).
+- **This changes how Qwen3.5 is computed, too.** Its rows so far were
+  produced on transformers' slow path; from this deploy its runs use fla's
+  kernels and the compiled convolution. The arithmetic is the same and the
+  floating point isn't, so a greedy answer can differ here and there: a
+  re-run of a Qwen3.5 row may move by a few items. A run's log says which
+  path it was on: the "fast path is not available" warning is the slow one.
+- **Not tried on the card.** The build, the imports and the compiler are
+  checked in CI (the docker-image job) and at step 3; whether the kernels run
+  on the 5090 is known only from a run. The first Granite run's log should
+  say "The fast path for GraniteMoeHybrid will be used" and nothing about
+  falling back.
+- The image grows by about 0.7 GB. Supersedes the kernel build in #75 (open,
+  never merged), which compiled them in a devel image.
+
 ### 12t — a model whose limit is under text_config is told to lm_eval, on every hf run
 
 - 12q.G told a DeviceMark run its length. Every other run on hf of a model
@@ -4781,9 +4837,8 @@ Not before the demo: a new hidden set changes every Everyday score.
     the task started: the run grew, not the card." The others' share is read
     before each task loads (`others_mib`); 1 GiB more than then is "the card
     got busier". A retry's log line carries the same.
-  - **What would settle Granite** is the Mamba kernels in the image: with
-    them the slow path isn't taken. Whether they are there:
-    `docker compose exec bench python -c "import importlib.util as u; print(u.find_spec('mamba_ssm'), u.find_spec('causal_conv1d'))"`.
+  - **What settles Granite** is the Mamba kernels in the image: with them the
+    slow path isn't taken. 12v, below, puts them there.
 - `tests/test_image_deps.py` pins what this leans on in the installed
   packages: lm_eval's `max_length`, its 2,048 and its warning for a cut
   prompt; and the prompt count on the installed transformers.

@@ -27,9 +27,9 @@ services:
       args:
         # EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
         EVALBOARD_BUILD: ${EVALBOARD_BUILD:-}
-        # 12h.1: the Mamba kernels, tried at build and never required;
-        # WITH_MAMBA=0 builds without them
-        WITH_MAMBA: ${WITH_MAMBA:-1}
+        # 12v: the hybrid models' fast paths (mamba_ssm, causal_conv1d, fla),
+        # fetched prebuilt and pinned; WITH_FAST_KERNELS=0 builds without them
+        WITH_FAST_KERNELS: ${WITH_FAST_KERNELS:-1}
     image: aienh-bench
     pid: "host"
     # the box's loopback, reachable from inside the container: the `local`
@@ -50,6 +50,9 @@ services:
       # the 4,096 cap, and the most answers it writes at a time
       DM_PROMPT_TOKENS: ${DM_PROMPT_TOKENS:-2048}
       DM_HF_MAX_BATCH: ${DM_HF_MAX_BATCH:-4}
+      # 12v: 0 takes the fast kernels off every Python's path — the hybrid
+      # models run on transformers' slow paths again, with no rebuild
+      FAST_KERNELS: ${FAST_KERNELS:-1}
       SUBMIT_TOKEN: ${SUBMIT_TOKEN:-}
       ARTIFACT_MAX_GB: ${ARTIFACT_MAX_GB:-8}
       ARTIFACT_QUOTA_GB: ${ARTIFACT_QUOTA_GB:-150}

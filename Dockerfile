@@ -50,16 +50,37 @@ RUN python /tmp/nltk_data.py --dest /usr/share/nltk_data && rm /tmp/nltk_data.py
 # move FastAPI below 0.137, away from the version the check tests the service
 # on. If the trials say hf is too slow, vLLM gets a container of its own, in
 # its own brief — not this image.
-# 12h.1: the Mamba2 hybrids (Granite-4.0-H, Nemotron-3-Nano) are far faster
-# with these kernels, which may need a build this runtime image cannot do.
-# Tried, never required. WITH_MAMBA=0 skips it.
-ARG WITH_MAMBA=1
-RUN if [ "$WITH_MAMBA" = "1" ]; then \
-      timeout 900 python -m pip install --no-cache-dir --break-system-packages \
-        --no-build-isolation "causal-conv1d==1.7.0" "mamba-ssm==2.3.2.post1" \
-        && echo "Mamba kernels installed" \
-        || echo "Mamba kernels did not build: the Mamba2 hybrids run on the slower path"; \
-    fi
+# 12v: the hybrid models' fast paths. Without mamba_ssm, causal_conv1d and fla,
+# transformers runs Granite-4.0-H's Mamba layers and Qwen3.5's gated delta
+# rule on slow paths of its own; on Granite's, one tensor takes 1.5 GiB for
+# every 256 tokens read at once, and it ran out of GPU memory at a batch of
+# one (#132, #144, #147). 12h.1 tried to build the first two from source here
+# and couldn't: this is a runtime image, with no CUDA compiler.
+# - mamba_ssm and causal_conv1d are fetched already built for this image's
+#   torch and CUDA (torch 2.11, cu128, Blackwell among the architectures) from
+#   Hugging Face's kernels-community — the builds transformers 5.5.3 is
+#   written against — each file pinned by commit, size and hash
+#   (scripts/fast_kernels.json); any other bytes fail the build.
+# - fla is flash-linear-attention's core, pure Python over Triton, pinned in
+#   requirements-kernels.txt.
+# - Triton compiles a small C extension for each kernel the first time it
+#   runs. The base image has the C compiler and Python's headers that takes
+#   (gcc, python3-dev); the check below builds one as Triton does, so a base
+#   image without them fails here.
+# All three go into /opt/fast-kernels, on every Python's path unless
+# FAST_KERNELS=0 is in the environment (scripts/fast_kernels.py): the way back
+# to the slow paths with no rebuild. WITH_FAST_KERNELS=0 builds without them.
+ARG WITH_FAST_KERNELS=1
+COPY scripts/fast_kernels.py scripts/fast_kernels.json requirements-kernels.txt /tmp/fast-kernels/
+RUN if [ "$WITH_FAST_KERNELS" = "1" ]; then \
+      python -m pip install --no-cache-dir --break-system-packages --no-deps \
+           --target /opt/fast-kernels -r /tmp/fast-kernels/requirements-kernels.txt \
+      && python /tmp/fast-kernels/fast_kernels.py --dest /opt/fast-kernels \
+      && python /tmp/fast-kernels/fast_kernels.py --dest /opt/fast-kernels --check; \
+    else \
+      echo "built without the fast kernels: the hybrid models run on transformers' slow paths"; \
+    fi \
+    && rm -rf /tmp/fast-kernels
 
 # Fail the BUILD, not the first submission, if the env is incoherent (e.g. deps
 # landed in a different interpreter than torch).
@@ -71,7 +92,7 @@ import importlib.util as u; \
 print('image env OK — torch', torch.__version__, '| built for CUDA', torch.version.cuda, \
 '| lm_eval', lm_eval.__version__, '| transformers', transformers.__version__, \
 '| fastapi', fastapi.__version__, \
-'| Mamba kernels', 'yes' if u.find_spec('mamba_ssm') else 'no')"
+'| fast kernels', ', '.join(m for m in ('mamba_ssm', 'causal_conv1d', 'fla') if u.find_spec(m)) or 'none')"
 
 # An unprivileged account for evaluating uploads that carry their own model code
 # (EVAL_USER). The service itself still runs as root — it needs to write the

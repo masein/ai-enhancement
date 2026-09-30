@@ -34,3 +34,6 @@ tzdata                # zoneinfo data for TZ-aware timestamps in containers
 # 12p.1: `hidden_store backup --export` — one file encrypted to an age public
 # key, in-process; decrypted off the server with the standard `age` tool
 pyrage==1.4.0
+# 12v: the hybrid models' fast kernels import it (mamba_ssm and fla-core, which
+# the Dockerfile puts in /opt/fast-kernels: scripts/fast_kernels.py)
+einops==0.8.2

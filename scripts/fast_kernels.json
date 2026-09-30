@@ -1,0 +1,219 @@
+{
+ "variant": "torch211-cxx11-cu128-x86_64-linux",
+ "kernels": {
+  "mamba_ssm": {
+   "repo": "kernels-community/mamba-ssm",
+   "commit": "768416abf0ad7262a23d83c6efef10b9a4786489",
+   "license": "Apache-2.0",
+   "id": "_mamba_ssm_cuda_785446d",
+   "archs": [
+    "10.0",
+    "10.1",
+    "12.0+PTX",
+    "7.0",
+    "7.2",
+    "7.5",
+    "8.0",
+    "8.6",
+    "8.7",
+    "8.9",
+    "9.0"
+   ],
+   "needs": [
+    "einops"
+   ],
+   "files": {
+    "__init__.py": {
+     "size": 528,
+     "blob": "c209429f2f64022865f5ebea75a87a5eda2625cd"
+    },
+    "_mamba_ssm_cuda_785446d.abi3.so": {
+     "size": 610651160,
+     "sha256": "77999c94a9872de9a9010ef6f5e550983afe84f4362856444ec78cb47290a352"
+    },
+    "_ops.py": {
+     "size": 228,
+     "blob": "60c1d3e0fa1ce1ad9d4fcdc07d54ce6c50267589"
+    },
+    "distributed/__init__.py": {
+     "size": 0,
+     "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    "distributed/distributed_utils.py": {
+     "size": 5825,
+     "blob": "74c55279645cd0fd687584bc1b7374c8c3c73e56"
+    },
+    "distributed/tensor_parallel.py": {
+     "size": 11992,
+     "blob": "95216158aa3170db5f1166995b760634f9ba69d8"
+    },
+    "metadata.json": {
+     "size": 354,
+     "blob": "1e2130a69979d9178c76eb219e17f465039ecc86"
+    },
+    "models/__init__.py": {
+     "size": 85,
+     "blob": "c64f5ff98f8579a185159d3b2cc63ebb5ebca7b2"
+    },
+    "models/config_mamba.py": {
+     "size": 489,
+     "blob": "646c9e1e8ac94b2e82974cc0d5dab83fcfea900c"
+    },
+    "models/mixer_seq_simple.py": {
+     "size": 11587,
+     "blob": "80d1064033d5dbd31a56b7c80dea8d81ebe68d56"
+    },
+    "modules/__init__.py": {
+     "size": 100,
+     "blob": "ad51e45c79edd194726a6e515987377feea5f650"
+    },
+    "modules/block.py": {
+     "size": 3876,
+     "blob": "29d9770c602c0c6d6c13fad724d1bd2686b4a399"
+    },
+    "modules/mamba2.py": {
+     "size": 19162,
+     "blob": "9bdb84cb09977bb1b78fb3853da42b21bef70b1e"
+    },
+    "modules/mamba2_simple.py": {
+     "size": 8020,
+     "blob": "b02f394ffd0a7929645e2db137e66ba78fa37431"
+    },
+    "modules/mamba_simple.py": {
+     "size": 12298,
+     "blob": "6a383596d0f7695f6296ba5fc2314ffb264061d5"
+    },
+    "modules/mha.py": {
+     "size": 13392,
+     "blob": "978f3ea4d8f1c962303b5cb6d8388c2289c4f7db"
+    },
+    "modules/mlp.py": {
+     "size": 1130,
+     "blob": "33bab5c7cc21b96d5f5ccfe233e339cad12cfe2c"
+    },
+    "modules/ssd_minimal.py": {
+     "size": 4186,
+     "blob": "bce81cf19110542599c95e30ccfbee5955aedfd0"
+    },
+    "ops/__init__.py": {
+     "size": 103,
+     "blob": "1e994c1801667556fe746e2081fab2b082a4b2cd"
+    },
+    "ops/selective_scan_interface.py": {
+     "size": 20264,
+     "blob": "74f802c283acc64e6e735b19afdeca46660b92b8"
+    },
+    "ops/triton/__init__.py": {
+     "size": 144,
+     "blob": "b210bb0fb69b3592633f08c353f36fea4ec1dd74"
+    },
+    "ops/triton/k_activations.py": {
+     "size": 5169,
+     "blob": "79fa2cc672dd5ad839498e9150658ed7abce8736"
+    },
+    "ops/triton/layer_norm.py": {
+     "size": 35959,
+     "blob": "3014354dec55aa6e48003e6082da8c654d593bcb"
+    },
+    "ops/triton/layernorm_gated.py": {
+     "size": 17763,
+     "blob": "de4b2f4815f6fa9d80291491e3826251f50ff5ad"
+    },
+    "ops/triton/selective_state_update.py": {
+     "size": 11562,
+     "blob": "b04d5cf6ff43638004e0c12a4f62bb7266375132"
+    },
+    "ops/triton/softplus.py": {
+     "size": 328,
+     "blob": "5541655c6616032a484c1e567f94a65cd6e4c88b"
+    },
+    "ops/triton/ssd_bmm.py": {
+     "size": 13637,
+     "blob": "48fd4f063e7796ceea772c21956b7bbdcbf1d196"
+    },
+    "ops/triton/ssd_chunk_scan.py": {
+     "size": 105710,
+     "blob": "f4e65ad108fd713fe4fd6315281e8a57459baea0"
+    },
+    "ops/triton/ssd_chunk_state.py": {
+     "size": 56877,
+     "blob": "896eddc8d47aca39f81966108b87bd56eade94e5"
+    },
+    "ops/triton/ssd_combined.py": {
+     "size": 54420,
+     "blob": "d549cf1c7d87a8d8efa997eaaa26a86c7ffacf91"
+    },
+    "ops/triton/ssd_state_passing.py": {
+     "size": 16377,
+     "blob": "63863b8236e1c091741c9faeb6f4a41376fc5b42"
+    },
+    "utils/__init__.py": {
+     "size": 0,
+     "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    "utils/generation.py": {
+     "size": 15436,
+     "blob": "873210ce4b1db4fdde3dc3f794b4e86efc3e8741"
+    },
+    "utils/hf.py": {
+     "size": 966,
+     "blob": "0d7555acddbd260636d1d14d5bd6324f6af0056a"
+    },
+    "utils/torch.py": {
+     "size": 676,
+     "blob": "37df47c8e96cd730b9fbdbe152a55327b09d2f9d"
+    }
+   }
+  },
+  "causal_conv1d": {
+   "repo": "kernels-community/causal-conv1d",
+   "commit": "6e9a58272220a363dc50e59cba737abcedd7b59f",
+   "license": "BSD-3-Clause",
+   "id": "_causal_conv1d_cuda_63d1a23",
+   "archs": [
+    "10.0",
+    "10.1",
+    "12.0+PTX",
+    "7.0",
+    "7.2",
+    "7.5",
+    "8.0",
+    "8.6",
+    "8.7",
+    "8.9",
+    "9.0"
+   ],
+   "needs": [],
+   "files": {
+    "__init__.py": {
+     "size": 225,
+     "blob": "e00d508d004ebe3eafe214d2b1b2ec2a44090d5c"
+    },
+    "_causal_conv1d_cuda_63d1a23.abi3.so": {
+     "size": 107169936,
+     "sha256": "08e7e14121e2cee900a162bf548dc9c9be9546e9d9cabe6557524310690c04d4"
+    },
+    "_ops.py": {
+     "size": 240,
+     "blob": "7133c4475a7804517495c4e96a9a7b2825738dfb"
+    },
+    "causal_conv1d_interface.py": {
+     "size": 8837,
+     "blob": "d46d56c415e91e16a475a7261e01658b2259d377"
+    },
+    "causal_conv1d_varlen.py": {
+     "size": 3501,
+     "blob": "8005af233d5c21b0a58917a8a18045636c2351cb"
+    },
+    "cpp_functions.py": {
+     "size": 2558,
+     "blob": "1ddb9f83ceb4e9f72754fe39340738d47b6aea1b"
+    },
+    "metadata.json": {
+     "size": 348,
+     "blob": "fe1c5491b795cbf7062015f4086c9aa60acfd708"
+    }
+   }
+  }
+ }
+}
