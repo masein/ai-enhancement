@@ -841,6 +841,34 @@ def _beside(r: dict) -> dict:
                                        "time_frontier")}}
 
 
+# 12q.E: two runs of one model whose median answers differ by more than this
+# ran in different modes — one reasoned, the other didn't — and their scores
+# aren't a calibration point (Youtu-LLM-2B: ours 370 tokens, theirs 2,893)
+MODE_RATIO = 2.0
+
+
+def modes_differ(ours: dict, theirs: dict) -> str:
+    """'' unless the two runs' median tokens differ by more than MODE_RATIO;
+    then the sentence that says both"""
+    a, b = ours.get("median_tokens"), theirs.get("median_tokens")
+    if not a or not b or max(a, b) <= MODE_RATIO * min(a, b):
+        return ""
+
+    def pct(v):
+        return "—" if v is None else f"{round(100 * v)}%"
+    return (f"the modes differ: ours answered {pct(ours.get('answered_pct'))} at a median of "
+            f"{round(a):,} tokens, theirs {pct(theirs.get('answered_pct'))} at {round(b):,} — "
+            "not a calibration point")
+
+
+def intervals_overlap(a: dict | None, b: dict | None) -> bool | None:
+    """whether two composites' 95% intervals overlap; None where one has none"""
+    ca, cb = (a or {}).get("ci"), (b or {}).get("ci")
+    if not ca or not cb:
+        return None
+    return ca[0] <= cb[1] and cb[0] <= ca[1]
+
+
 def pair(ours: list[dict], theirs: list[dict]) -> None:
     """each of our hf runs of one of their open models, beside their row
     (`ours` on it, thinking off first) and out of our own rows (`paired`)"""
@@ -854,7 +882,14 @@ def pair(ours: list[dict], theirs: list[dict]) -> None:
         t = by_hf.get(r["model"])
         if t and str((r["row"].get("setup") or {}).get("runtime", "")).startswith("hf"):
             r["paired"] = t["id"]
-            t.setdefault("ours", []).append(_beside(r))
+            o = _beside(r)
+            # 12q.E: a pair in different modes is said so, and isn't calibration;
+            # any other says whether the two intervals overlap
+            o["mode_differs"] = modes_differ(o, t)
+            o["within"] = None if o["mode_differs"] else intervals_overlap(
+                o.get("composite"), t.get("composite"))
+            o["calibration"] = o["calibration"] and not o["mode_differs"]
+            t.setdefault("ours", []).append(o)
 
 
 # the build a served setup is: "k4-LDA" in a phone build's name or file, an

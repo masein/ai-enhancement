@@ -71,7 +71,9 @@ def test_the_chart_draws_rows_on_a_device_as_points_and_the_rest_as_lines(live, 
     assert nemo[3].startswith("ours (bf16, our battery): composite ") \
         and not nemo[3].endswith(" · calibration")
     assert not any("can't run here" in x for x in nemo)
-    assert "never plotted at their device speed" in nemo[5]
+    assert any("never plotted at their device speed" in x for x in nemo)
+    # 12q.E: this made-up run's answers are far shorter than theirs: another mode, said so
+    assert any(x.startswith("the modes differ: ours answered ") for x in nemo)
     assert chart.locator(f"[data-dm-whisker='{MTP}']").count() == 1
     tip = json.loads(chart.locator(f"[data-dm-point='{MTP}']").get_attribute("data-tip"))
     assert "14.2 tok/s decode on iPhone 17 Pro · measured by a colleague, 29 Sep 2026" in tip

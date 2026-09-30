@@ -959,6 +959,9 @@ def run_submission(sub: dict) -> None:
     backend, not_vllm = (gen_backend() if (generative or shared or devicemark) and not rec else
                          (_served.BACKEND, "") if generative or shared else ("hf", ""))
     fell_back = ""
+    # 12q.E: the batch a generative task runs at on hf, once one ran out of GPU
+    # memory and was tried again at half: the run's later tasks start there
+    gen_batch = None
     if everyday:
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
         import everyday as _everyday
@@ -1187,7 +1190,7 @@ def run_submission(sub: dict) -> None:
                               chat=kind == "instruct" or everyday, max_gen_toks=room,
                               system=_mab.SYSTEM[task] if task in config.MAB_TASKS else None)
             if gen_task:
-                def gen_cmd(be):
+                def gen_cmd(be, batch=None):
                     samples = None
                     if task == "mmlu_pro" and int(sub.get("subset") or 0) > 0:
                         samples = task_out / "subset.json"
@@ -1206,8 +1209,8 @@ def run_submission(sub: dict) -> None:
                                        revision=meta.get("revision"),
                                        gpu_util=gpu_util_for(gpu_free_mib(), gpu_total_mib())
                                        if be == "vllm" else None),
-                        task, shots, meta["batch"], task_out, chat=True,
-                        max_gen_toks=th["budget"], backend=be, samples=samples)
+                        task, shots, batch or gen_batch or meta["batch"], task_out,
+                        chat=True, max_gen_toks=th["budget"], backend=be, samples=samples)
                 cmd = gen_cmd(backend)
 
             t_task = time.time()
@@ -1265,6 +1268,26 @@ def run_submission(sub: dict) -> None:
                     lf.write(f"\n[service] {fell_back}\n")
                     lf.flush()
                     status = _run_task(sid, gen_cmd("hf"), lf, job_env, run_as,
+                                       cwd=lm_eval_cwd(task_out))
+                    if status == CANCELED:
+                        canceled = True
+                # 12q.E: a generative task that ran out of GPU memory on hf is tried
+                # again at half the batch, down to 1. The batch is sized for scoring
+                # short prompts (hfmeta.estimate); 4,096 generated tokens on MMLU-Pro's
+                # long ones need far more (Granite-4.0-H-1B, #132 and #144)
+                batch = gen_batch or meta.get("batch")
+                while (gen_task and not rec and backend == "hf" and isinstance(batch, int)
+                       and batch > 1 and status not in (0, CANCELED)
+                       and re.search(r"out of memory|OutOfMemoryError",
+                                     _read_from(log_path, mark), re.I)):
+                    batch = gen_batch = max(1, batch // 2)
+                    lf.write(f"\n[service] {task} ran out of GPU memory: again at batch "
+                             f"{batch}\n")
+                    lf.flush()
+                    mark = log_path.stat().st_size      # the next try's output starts here
+                    db.update(sid, status="running",
+                              progress=f"{label} · out of memory, again at batch {batch}")
+                    status = _run_task(sid, gen_cmd("hf", batch), lf, job_env, run_as,
                                        cwd=lm_eval_cwd(task_out))
                     if status == CANCELED:
                         canceled = True

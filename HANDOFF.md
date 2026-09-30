@@ -4619,6 +4619,30 @@ Not before the demo: a new hidden set changes every Everyday score.
   strict and loose), a served setup's too. It lists what the board lists: the
   diagnose half.
 
+### 12q.E — the hf DeviceMark runs of their models, as the server ran them
+
+- **A row is its newest scored run.** A resubmit's answers replace the
+  earlier run's (each task's newest samples file), and a later run that
+  fails before scoring leaves the row as it was. #140–#143 are the rows of
+  Qwen3.5-0.8B, LFM2.5-1.2B, Qwen3.5-2B and Youtu; #131, #133–#135 are
+  superseded.
+- **A pair in different modes says so** (`modes_differ`): when our run's and
+  theirs' median answers differ by more than 2× (`MODE_RATIO`), one reasoned
+  and the other didn't — Youtu-LLM-2B: ours answered 97% at a median of 370
+  tokens, theirs 65% at 2,893. Their row reads "modes differ · not a
+  calibration point" under the two scores, with both runs' answered % and
+  median tokens on hover, and the pair isn't calibration though the model is
+  on the list. Any other pair's hover says whether the two 95% intervals
+  overlap (Qwen3.5-0.8B 43.0 vs 41.9, Qwen3.5-2B 64.4 vs 62.1, Nanbeige 34.1
+  vs 31.7, LFM 65.5 vs 68.2 all do).
+- **A generative task that runs out of GPU memory on hf is tried again at
+  half the batch, down to 1**, and the run's later tasks start at the batch
+  that worked. The batch is sized for scoring short prompts
+  (`hfmeta.estimate`); 4,096 generated tokens on MMLU-Pro's long prompts need
+  far more — Granite-4.0-H-1B ran out twice (#132, #144). At a batch of one
+  it fails as before, in plain words.
+- Gemma 4 E2B has 5.1B parameters: `MAX_PARAMS_B=6` in `.env` lets it run.
+
 ### 12q.D — what the first hf DeviceMark runs found
 
 - **IFEval scoring needs NLTK's punkt_tab, and the image hadn't got it.** Five
