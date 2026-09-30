@@ -8,6 +8,7 @@ here). The questions are invented, in DM_ITEMS as the server keeps them."""
 
 from __future__ import annotations
 
+import importlib.util
 import json
 from pathlib import Path
 
@@ -82,6 +83,16 @@ def svc(tmp_path, monkeypatch):
     # tokenizer; no test fetches one (deploy step 3 runs these beside transformers)
     from service import devicemark as svc_dm
     monkeypatch.setattr(svc_dm, "prompt_tokens", lambda *a, **k: (900, True))
+    # …and counts each answer with it once lm_eval has answered (mark_hf). Where
+    # transformers is installed — the image, in step 3 — that went to the Hub
+    # for every model id a test names. No test does: the lengths stay uncounted,
+    # as they are where it isn't installed
+    if importlib.util.find_spec("transformers"):
+        import transformers
+
+        def no_tokenizer(*a, **k):
+            raise OSError("no tokenizer is fetched in a test")
+        monkeypatch.setattr(transformers.AutoTokenizer, "from_pretrained", no_tokenizer)
     write_items(config.DM_ITEMS)
     yield client
     client.__exit__(None, None, None)

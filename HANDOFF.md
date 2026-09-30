@@ -308,6 +308,23 @@ billing resets. `.github/workflows/ci.yml` runs only when started by hand
      (the Dockerfile, `.dockerignore`, `docker-compose.yml`, the docs), so
      step 3 streams the commit just deployed into `/tmp/check` inside the
      container with `git archive`.
+   - **The image has no Playwright, ruff or CI pytest plugins**, and
+     `-m "not dashboard"` deselects a browser test only once its module has
+     been imported. A test module that imports one of them at the top fails
+     collection, and pytest then runs nothing: after 12q.C,
+     `test_12q_devicemark_model_page_browser.py` did that and none of the
+     suite ran ("Interrupted: 1 error during collection"). A browser test
+     takes what it needs from the `page` fixture, or imports Playwright inside
+     the function that uses it. `tests/test_step3_collects.py` collects every
+     test module with those packages made unimportable, in CI and in the
+     local check, and sorts every dev and CI requirement into "the image has
+     it" or not; `tests/test_image_deps.py` imports the first kind in the
+     image.
+   - **No test goes to the Hub.** An hf DeviceMark run counts its answers
+     with the model's tokenizer; beside the image's transformers that fetched
+     one for every model id a test names. The tests' shared fixture refuses
+     the loader (`test_12q_devicemark_runs.svc`), and `tests/test_image_deps.py`
+     runs one such test with every host but this one cut off.
    - **It runs with an empty environment (`env -i`).** The container's
      environment holds the live `BENCH_ROOT`, the live database and the real
      API keys. `service/config.py` falls back to `BENCH_ROOT` for any path a
@@ -432,6 +449,9 @@ after 12a.5a, the 55 new ones — and the run's line says "55 new questions ·
 
 **Step 3's expected output:** the last line reads `N passed, M deselected
 in …s`, with no `failed` and no `error`.
+- `Interrupted: 1 error during collection` means a test module failed to
+  import and **nothing ran**: the lines above it name the module and the
+  import.
 - `test_matches_the_installed_harness` skips on a laptop, where lm_eval isn't
   installed. It runs here, because the image has lm_eval.
 - A test that fails here and passes in `scripts/check.sh` is a difference in
