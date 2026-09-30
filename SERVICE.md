@@ -99,6 +99,8 @@ it. If it fails part-way, the record is removed and the next start tries again.
 | `TITLE` | Team model benchmark | dashboard heading |
 | `MAX_PARAMS_B` | 4 | reject models bigger than this (bf16 weights ≈ 2 GB/B) |
 | `MAX_JOB_GB` | 10 | VRAM budget a job may plan for (drives batch choice) |
+| `DM_PROMPT_TOKENS` | 2048 | a DeviceMark run on hf: the tokens lm_eval leaves for the prompt, beside the 4,096 cap (more when the battery's longest prompt is longer) |
+| `DM_HF_MAX_BATCH` | 4 | a DeviceMark run on hf: the most answers written at a time (the batch is sized to fit `MAX_JOB_GB`, and halves when a task runs out of memory) |
 | `SUBMIT_TOKEN` | *(unset)* | if set, submits need it — friends use `http://…/?token=<value>` |
 | `TASK_TIMEOUT_S` | 10800 | kill a single task after this |
 | `ARTIFACT_MAX_GB` | 8 | per-upload cap for checkpoint artifacts |

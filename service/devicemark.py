@@ -29,7 +29,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from . import config, db
+from . import config, db, hfmeta
 from . import served as _served
 
 CANCELED = -15
@@ -565,6 +565,87 @@ def speed(sid: int, rec: dict, log_path: Path) -> tuple[str, str]:
             f"{d.SERVER_SPEED_LABEL}: not a phone's speed")
     _log(log_path, f"\n===== [{sid}] devicemark speed: {line} =====")
     return "done", line
+
+
+# ---------------------------------------------------------------------------
+# 12q.G: a Hugging Face model's battery, before lm_eval answers it
+# ---------------------------------------------------------------------------
+
+# counted on the battery's longest questions by their characters; the
+# template's own tokens and lm_eval's start token, over what is counted
+PROMPT_SAMPLE, PROMPT_SLACK = 25, 64
+
+
+def prompt_tokens(pretrained: str, revision: str | None, texts: list[str],
+                  thinking: dict) -> tuple[int, bool]:
+    """(the battery's longest prompt in this model's tokens, counted?): each
+    question as lm_eval sends it, the one user message with the chat template
+    and the thinking switch. A tokenizer that doesn't load here (its own code
+    is never run in the service) isn't counted: three characters a token, which
+    is on the long side"""
+    longest = sorted(texts, key=len, reverse=True)[:PROMPT_SAMPLE]
+    try:
+        from transformers import AutoTokenizer
+        tok = AutoTokenizer.from_pretrained(pretrained, revision=revision,
+                                            trust_remote_code=False)
+        kw = {"enable_thinking": bool(thinking.get("on"))} if thinking.get("mode") == "switch" else {}
+
+        def count(text):
+            said = tok.apply_chat_template([{"role": "user", "content": text}], tokenize=False,
+                                           add_generation_prompt=True, **kw)
+            return len(tok(said, add_special_tokens=False)["input_ids"])
+        return max(count(t) for t in longest), True
+    except Exception:                                       # noqa: BLE001 — estimated instead
+        return -(-len(longest[0]) // 3), False
+
+
+def hf_plan(sub: dict, meta: dict, thinking: dict, pretrained: str | None = None) -> dict:
+    """how a Hugging Face model sits the battery on lm_eval — {max_length,
+    room, longest, counted, ctx, batch, need_gb, why}:
+      max_length  what lm_eval is told: the prompt's room and the cap. The room
+                  is DM_PROMPT_TOKENS, or the battery's longest prompt where
+                  that is longer, so no question is ever cut
+      batch       how many answers are written at a time, and need_gb what that
+                  takes (hfmeta.gen_estimate): 4,096 tokens each, DM_HF_MAX_BATCH
+                  at most
+    A model that reads fewer tokens than max_length can't sit it: refused, in
+    PreflightError's words, before anything is loaded"""
+    d = dm()
+    arch = meta.get("archinfo") or {}
+    try:
+        texts = [r["text"] for r in d.load_items(config.DM_ITEMS).values()]
+    except Exception:                       # noqa: BLE001 — the run says so, building its tasks
+        texts = []
+    longest, counted = (prompt_tokens(pretrained or sub["hf_id"], meta.get("revision"), texts,
+                                      thinking) if texts else (config.DM_PROMPT_TOKENS // 2, False))
+    room = max(config.DM_PROMPT_TOKENS, longest + PROMPT_SLACK)
+    ctx = arch.get("ctx")
+    if ctx and ctx < room + d.CAP:
+        raise hfmeta.PreflightError(
+            f"{sub['hf_id']} reads {ctx:,} tokens at most (its config.json), and DeviceMark's "
+            f"protocol needs {room + d.CAP:,}: {room:,} for the prompt (the battery's longest "
+            f"is {'' if counted else 'about '}{longest:,} in its tokens) and the cap of "
+            f"{d.CAP:,} for the answer. It can't sit the battery as the other models do.")
+    return {"max_length": room + d.CAP, "room": room, "longest": longest, "counted": counted,
+            "ctx": ctx,
+            **hfmeta.gen_estimate(arch, meta.get("params"), meta["vocab"], prompt=longest,
+                                  new=d.CAP, max_batch=config.DM_HF_MAX_BATCH)}
+
+
+def hf_plan_lines(plan: dict, batch: int | None = None) -> str:
+    """the plan, for the run's log; `batch` is the one a task runs at, once an
+    earlier one ran out of memory at the planned"""
+    cap, planned = dm().CAP, plan["batch"]
+    some = lambda n: f"{n} answer{'s' if n != 1 else ''} written at a time"
+    return (f"[devicemark] lm_eval is told max_length={plan['max_length']}: {plan['room']:,} "
+            f"tokens for the prompt (the battery's longest is "
+            f"{'' if plan['counted'] else 'about '}{plan['longest']:,} in this model's tokens"
+            f"{'' if plan['counted'] else ', by its characters'}) and the cap of {cap:,} · "
+            + (f"the model reads up to {plan['ctx']:,}" if plan["ctx"] else
+               "the model's config gives no limit of its own") + "\n"
+            + (f"[devicemark] {some(batch)}: {planned} ran out of GPU memory\n"
+               if batch and batch != planned else
+               f"[devicemark] {some(planned)} · about {plan['need_gb']:g} GB: {plan['why']}\n"))
 
 
 # ---------------------------------------------------------------------------

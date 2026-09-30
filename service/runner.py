@@ -308,8 +308,10 @@ def release_lock() -> None:
 # ---------------------------------------------------------------------------
 
 _FRIENDLY = [
+    # 12q.G: PyTorch's own message says who held what (oom_line); these are the
+    # words for one that isn't PyTorch's
     (r"out of memory|OutOfMemoryError",
-     "ran out of GPU memory — the card was busier than when the run started. "
+     "ran out of GPU memory. "
      "Resubmit; the finished tasks are kept and only the missing ones re-run."),
     # 12n.2: GPQA's dataset is gated, not the model — said so, with where to accept it
     (r"(?s)Idavidrein/gpqa.{0,400}(?:gated|authenticat|401|403|GatedRepoError)"
@@ -334,6 +336,76 @@ _FRIENDLY = [
      "PyTorch/CUDA mismatch on the server (wrong wheel for this GPU) — operator "
      "issue, not your model."),
 ]
+
+
+# 12q.G: who held what when the card ran out, from PyTorch's own message. The
+# line above blamed the card every time; Granite-4.0-H-1B's own process had
+# grown to 15.9 GiB and asked for 6 more beside a 12.9 GiB neighbour that
+# hadn't moved (#147)
+_OOM = re.compile(r"out of memory|OutOfMemoryError", re.I)
+_SIZE = r"([\d.]+) ?(GiB|MiB|KiB|bytes)"
+_OOM_GREW_GIB = 1.0          # the others count as busier when they hold this much more
+# lm_eval's own warning when a prompt is longer than max_length less the answer
+_CUT = re.compile(r"Left truncation applied\. Original sequence length was (\d+), "
+                  r"truncating to last (\d+) tokens")
+
+
+def _gib(num: str, unit: str) -> float:
+    return float(num) / {"GiB": 1, "MiB": 1024, "KiB": 1024 ** 2, "bytes": 1024 ** 3}[unit]
+
+
+def oom_said(text: str) -> dict | None:
+    """{asked, own, others, total, spare} in GiB, from the last out-of-memory
+    message in `text`; None when it isn't PyTorch's. `own` is the run's own
+    process, `others` every other process on the card (what PyTorch lists, or
+    what is left of the card), `spare` what the run had reserved and not used"""
+    at = text.rfind("Tried to allocate")
+    if at < 0:
+        return None
+    said = text[at:at + 1500]
+    find = lambda pat: (lambda m: _gib(*m.groups()) if m else None)(re.search(pat, said))
+    asked = find(rf"Tried to allocate {_SIZE}")
+    total, free = find(rf"total capacity of {_SIZE}"), find(rf"of which {_SIZE} is free")
+    used, spare = find(rf"memory {_SIZE} is allocated by PyTorch"), find(rf"and {_SIZE} is reserved")
+    own = find(rf"this process has {_SIZE} memory in use")
+    if own is None and used is not None:
+        own = used + (spare or 0)
+    listed = [_gib(*m) for m in re.findall(rf"Process \d+ has {_SIZE} memory in use", said)]
+    others = (sum(listed) if listed else
+              max(0.0, total - free - own) if None not in (total, free, own) else None)
+    if asked is None or own is None:
+        return None
+    return {"asked": asked, "own": own, "others": others, "total": total, "spare": spare}
+
+
+def oom_line(o: dict, before_mib: int | None = None) -> str:
+    """"this run's own process held 15.9 GiB and asked for 6 GiB more; the
+    card's other processes held 12.9 GiB, as when the task started: the run
+    grew, not the card" — `before_mib` is what the others held then"""
+    g = lambda v: f"{v:.1f}".rstrip("0").rstrip(".") + " GiB"
+    line = (f"this run's own process held {g(o['own'])}"
+            + (f" ({g(o['spare'])} of it reserved and unused)"
+               if (o["spare"] or 0) >= _OOM_GREW_GIB else "")
+            + f" and asked for {g(o['asked'])} more")
+    if o["others"] is None:
+        return line
+    line += f"; the card's other processes held {g(o['others'])}"
+    if before_mib is None:
+        return line
+    before = before_mib / 1024
+    if o["others"] - before >= _OOM_GREW_GIB:
+        return line + f", up from {g(before)} when the task started: the card got busier"
+    return line + (", as when the task started" if abs(o["others"] - before) < 0.1 else
+                   f" ({g(before)} when the task started)") + ": the run grew, not the card"
+
+
+def others_mib() -> int | None:
+    """what the card's processes hold now, before a task's own is started"""
+    try:
+        total = gpu_total_mib()
+        return None if not total else max(0, total - gpu_free_mib())
+    except (OSError, ValueError, IndexError, subprocess.SubprocessError):
+        return None
 
 
 def classify(log_tail: str) -> str:
@@ -515,12 +587,14 @@ def gen_thinking(sub: dict, meta: dict) -> dict:
 
 
 def gen_model_args(pretrained: str, th: dict, *, backend: str, remote_code: bool = False,
-                   revision: str | None = None, gpu_util: float | None = None) -> str:
+                   revision: str | None = None, gpu_util: float | None = None,
+                   max_length: int | None = None) -> str:
     """The model_args of a generative run: the thinking switch said out loud
     (both ways — Qwen3 thinks unless told not to, Qwen3.5 only when told), the
     end of the thinking when it thinks (the harness scores what follows it),
     the approved commit of a model that runs its own code, and vLLM's share
-    of the card"""
+    of the card. 12q.G: `max_length`, on hf, is the length lm_eval is told
+    instead of looking for the model's (it takes 2,048 when it finds none)"""
     parts = [f"pretrained={pretrained}", "dtype=bfloat16"]
     if th["mode"] == "switch":
         parts.append(f"enable_thinking={th['on']}")
@@ -533,6 +607,8 @@ def gen_model_args(pretrained: str, th: dict, *, backend: str, remote_code: bool
     if backend == "vllm":
         parts += [f"gpu_memory_utilization={gpu_util or 0.8}",
                   f"max_model_len={th['budget'] + 6144}"]
+    elif max_length:
+        parts.append(f"max_length={max_length}")
     return ",".join(parts)
 
 
@@ -842,6 +918,7 @@ def run_submission(sub: dict) -> None:
     # 12q: DeviceMark's battery — a served setup asked over its server
     # (service/devicemark.py), a Hugging Face model as three tasks on hf
     devicemark = sub["suite"] == "devicemark"
+    dm_plan = None                       # 12q.G: a Hugging Face model's (hf_plan)
     # 12f.0: a run that can't save doesn't start — in the status dot's words
     from . import disk
     why = disk.blocks_run()
@@ -886,6 +963,13 @@ def run_submission(sub: dict) -> None:
                 raise PreflightError(config.SHARED_INSTRUCT_ONLY)
             if devicemark and meta["kind"] != "instruct":
                 raise PreflightError(config.DM_INSTRUCT_ONLY)
+            if devicemark:
+                # 12q.G: the length lm_eval is told, and the batch and memory
+                # of answers 4,096 tokens long — or a refusal, when the model
+                # reads fewer tokens than the protocol needs
+                dm_plan = _devicemark.hf_plan(sub, meta, gen_thinking(sub, meta),
+                                              load_spec(sub["hf_id"], meta)["pretrained"])
+                meta["batch"], meta["need_gb"] = dm_plan["batch"], dm_plan["need_gb"]
     except PreflightError as e:
         db.update(sid, status="failed", error=str(e), finished_at=time.time())
         return
@@ -1078,6 +1162,11 @@ def run_submission(sub: dict) -> None:
             return
         scratch = _job_scratch(sid, run_as) if remote_code else None
         job_env = _child_env(remote_code, scratch)
+        if dm_plan:
+            # 12q.G: PyTorch's own advice in its out-of-memory message, for a
+            # run whose big tensors come and go (Granite's, layer after layer):
+            # what it freed is given back in pieces the next one can use
+            job_env.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
         if remote_code:
             broken = _env_canary(job_env, run_as)
             if broken:
@@ -1208,7 +1297,8 @@ def run_submission(sub: dict) -> None:
                         gen_model_args(pretrained, th, backend=be, remote_code=remote_code,
                                        revision=meta.get("revision"),
                                        gpu_util=gpu_util_for(gpu_free_mib(), gpu_total_mib())
-                                       if be == "vllm" else None),
+                                       if be == "vllm" else None,
+                                       max_length=dm_plan and dm_plan["max_length"]),
                         task, shots, batch or gen_batch or meta["batch"], task_out,
                         chat=True, max_gen_toks=th["budget"], backend=be, samples=samples)
                 cmd = gen_cmd(backend)
@@ -1235,6 +1325,8 @@ def run_submission(sub: dict) -> None:
                              + (f" · MMLU-Pro subset of {sub['subset']}"
                                 if task == "mmlu_pro" and int(sub.get("subset") or 0) > 0
                                 else "") + "\n")
+                if dm_plan and backend == "hf":
+                    lf.write(_devicemark.hf_plan_lines(dm_plan, gen_batch))
                 if remote_code:
                     lf.write(f"[trust_remote_code] running as "
                              f"{config.EVAL_USER or 'root (EVAL_USER unset!)'}, "
@@ -1254,6 +1346,9 @@ def run_submission(sub: dict) -> None:
                 # OpenRouter's running total, and its stop at the AI limit
                 served_kw = ({"on_poll": lambda: _served_poll(sid, label, log_path, mark, meter)}
                              if rec else {})
+                # 12q.G: what the card's other processes hold before this task
+                # loads anything: an out-of-memory error is set against it
+                others_held = None if rec else others_mib()
                 status = _run_task(sid, cmd, lf,
                                    _served.job_env(job_env, rec) if rec else job_env, run_as,
                                    cwd=lm_eval_cwd(task_out), **served_kw)
@@ -1278,13 +1373,14 @@ def run_submission(sub: dict) -> None:
                 batch = gen_batch or meta.get("batch")
                 while (gen_task and not rec and backend == "hf" and isinstance(batch, int)
                        and batch > 1 and status not in (0, CANCELED)
-                       and re.search(r"out of memory|OutOfMemoryError",
-                                     _read_from(log_path, mark), re.I)):
+                       and _OOM.search(_read_from(log_path, mark))):
+                    oom = oom_said(_read_from(log_path, mark))
                     batch = gen_batch = max(1, batch // 2)
                     lf.write(f"\n[service] {task} ran out of GPU memory: again at batch "
-                             f"{batch}\n")
+                             f"{batch}" + (f" ({oom_line(oom, others_held)})" if oom else "") + "\n")
                     lf.flush()
                     mark = log_path.stat().st_size      # the next try's output starts here
+                    others_held = others_mib()
                     db.update(sid, status="running",
                               progress=f"{label} · out of memory, again at batch {batch}")
                     status = _run_task(sid, gen_cmd("hf", batch), lf, job_env, run_as,
@@ -1338,12 +1434,48 @@ def run_submission(sub: dict) -> None:
                 (task_out / ANSWERED_BY).write_text(json.dumps(
                     {"submission": sid, "at": time.time()}), encoding="utf-8")
 
+            # 12q.G: a prompt lm_eval cut isn't the protocol's question. The room
+            # is sized from the battery's longest, so this is a model whose
+            # tokenizer couldn't be counted with, and wrote more tokens than
+            # its characters said
+            cut = (_CUT.findall(_read_from(log_path, mark))
+                   if dm_plan and status == 0 else [])
+            if cut:
+                was, to = max(int(a) for a, _ in cut), int(cut[0][1])
+                shutil.rmtree(task_out, ignore_errors=True)
+                failed_tasks.append(task)
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n[service] discarded results for {task}: lm_eval cut "
+                             f"{len(cut)} prompt(s) to {to:,} tokens\n")
+                db.update(sid, error=f"{task}: a prompt of {was:,} tokens was cut to the "
+                                     f"{to:,} this run left for it, so its answers aren't the "
+                                     f"protocol's and none were kept. Set DM_PROMPT_TOKENS to "
+                                     f"{was:,} or more and resubmit.")
+                break                # the other tasks were given the same room
+
             if status != 0:
                 tail = _tail(log_path)
                 failed_tasks.append(task)
                 friendly = classify(tail)
+                # 12q.G: an out-of-memory error says who held what, and which grew
+                oom = (oom_said(_read_from(log_path, mark))
+                       if not rec and _OOM.search(tail) else None)
+                if oom:
+                    at = gen_batch or meta.get("batch") if gen_task else meta.get("batch")
+                    line = oom_line(oom, others_held)
+                    friendly = ("ran out of GPU memory"
+                                + (f" at batch {at}" if isinstance(at, int) and backend == "hf"
+                                   else "")
+                                + f": {line}. "
+                                + ("Resubmit when the card is quieter; the finished tasks are "
+                                   "kept and only the missing ones re-run."
+                                   if line.endswith("busier") else
+                                   "There is no smaller batch to try: the model needs more "
+                                   "than the card has free." if at == 1 and backend == "hf" else
+                                   "Resubmit; the finished tasks are kept and only the "
+                                   "missing ones re-run."))
                 db.update(sid, error=f"{task}: {friendly}")
-                if re.search(r"out of memory|OutOfMemoryError", tail, re.I):
+                if _OOM.search(tail):
                     break            # will OOM again for this model — stop here
                 if re.search(r"ModuleNotFoundError|ImportError", tail, re.I):
                     break            # environment — fails for every task

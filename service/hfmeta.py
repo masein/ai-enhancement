@@ -53,6 +53,73 @@ def estimate(vocab: int, params: int | None) -> tuple[int, float]:
     return 1, round(weights_gb + SEQ_LEN * vocab * LOGITS_FACTOR / 1e9 + OVERHEAD_GB, 2)
 
 
+# ---------------------------------------------------------------------------
+# 12q.G: what a run that WRITES its answers needs. estimate() above sizes
+# scoring: the logits over a 2,048-token prompt. Writing holds a cache that
+# grows with every token instead, and the prompt's logits once. A Mamba2
+# hybrid (Granite-4.0-H) without the Mamba kernels also reads its prompt on
+# transformers' slow path, where one tensor of each state-space layer is
+# chunk x chunk x heads x state in fp32 for every chunk of the prompt and
+# every answer written at a time: 1.5 GiB a chunk for Granite-4.0-H-1B
+# (256 x 256 x 48 x 128 x 4 bytes). Its batch of 2 on prompts of two chunks
+# asked for exactly 6 GiB (#132, #144, #147)
+# ---------------------------------------------------------------------------
+GEN_BATCHES = (8, 4, 2, 1)
+KV_BYTES = 2             # the cache's keys and values, in bf16
+GEN_LOGITS_BYTES = 4     # the prompt's logits in bf16, and a working copy
+# the slow path keeps that tensor while it builds one half its size
+MAMBA_SLOW_FACTOR = 1.5
+MAMBA_CHUNK = 256
+
+
+def mamba_kernels() -> bool:
+    """the Mamba kernels are in this image (the Dockerfile tries to build
+    them, and goes on without them when they don't build)"""
+    import importlib.util
+    return all(importlib.util.find_spec(m) is not None for m in ("mamba_ssm", "causal_conv1d"))
+
+
+def _mamba_from_config(cfg: dict) -> dict | None:
+    """a Mamba2 hybrid's state-space layers: how many, how many attention
+    layers beside them, and the sizes the slow path's memory goes by"""
+    heads = cfg.get("mamba_n_heads") or cfg.get("mamba_num_heads")
+    state = cfg.get("mamba_d_state") or cfg.get("ssm_state_size")
+    if not (heads and state):
+        return None
+    types = cfg.get("layer_types") or []
+    pattern = cfg.get("hybrid_override_pattern") or ""
+    return {"layers": types.count("mamba") if types else pattern.count("M"),
+            "attention": types.count("attention") if types else pattern.count("*"),
+            "heads": int(heads), "state": int(state),
+            "chunk": int(cfg.get("mamba_chunk_size") or cfg.get("chunk_size") or MAMBA_CHUNK)}
+
+
+def gen_estimate(arch: dict, params: int | None, vocab: int, *, prompt: int, new: int,
+                 max_batch: int = GEN_BATCHES[0], kernels: bool | None = None) -> dict:
+    """{batch, need_gb, why}: the largest batch up to `max_batch` whose
+    answers, each `new` tokens after a prompt of `prompt`, fit MAX_JOB_GB —
+    and 1 when none does. `why` is the sum in words, for the run's log"""
+    weights = (params * 2 / 1e9) if params else 1.0         # bf16; unknown -> assume small
+    mamba = arch.get("mamba")
+    attention = ((mamba.get("attention") if mamba else arch.get("layers")) or 0)
+    cache = attention * 2 * (arch.get("hidden") or 0) * (prompt + new) * KV_BYTES / 1e9
+    logits = prompt * vocab * GEN_LOGITS_BYTES / 1e9
+    slow, chunks = 0.0, 0
+    if mamba and not (mamba_kernels() if kernels is None else kernels):
+        chunks = -(-prompt // mamba["chunk"])
+        slow = (chunks * mamba["chunk"] ** 2 * mamba["heads"] * mamba["state"] * 4
+                * MAMBA_SLOW_FACTOR / 1e9)
+    each, fixed = cache + logits + slow, weights + OVERHEAD_GB
+    batch = next((b for b in GEN_BATCHES
+                  if b <= max_batch and fixed + b * each <= config.MAX_JOB_GB), 1)
+    why = (f"weights {weights:.1f} GB · each answer written at a time: {cache:.1f} GB of cache "
+           f"for {prompt:,} + {new:,} tokens, {logits:.1f} GB for the prompt's logits"
+           + (f", {slow:.1f} GB for its Mamba layers on the slow path ({chunks} x "
+              f"{mamba['chunk']} prompt tokens; this image has no Mamba kernels)" if slow else "")
+           + f" · {OVERHEAD_GB:g} GB besides")
+    return {"batch": batch, "need_gb": round(fixed + batch * each, 2), "why": why}
+
+
 LOCAL_PREFIX = "local/"
 
 
@@ -71,6 +138,8 @@ def _arch_from_config(cfg: dict) -> dict:
         "heads": pick("num_attention_heads", "n_head"),
         "ctx": pick("max_position_embeddings", "n_positions", "n_ctx"),
         "vocab": pick("vocab_size"),
+        # 12q.G: a Mamba2 hybrid's state-space layers (gen_estimate)
+        **({"mamba": m} if (m := _mamba_from_config({**tc, **cfg})) else {}),
     }
 
 

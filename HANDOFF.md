@@ -4619,6 +4619,74 @@ Not before the demo: a new hidden set changes every Everyday score.
   strict and loose), a served setup's too. It lists what the board lists: the
   diagnose half.
 
+### 12q.G — an hf DeviceMark run is told its length, and writes at a batch sized for writing
+
+- **Gemma 4 E2B (#148) failed all three tasks** at "requested max tokens to
+  generate (4096) must be less than model's maximum sequence length (2048)".
+  lm_eval looks for a model's limit at the top of its config and takes 2,048
+  when it finds none; Gemma 4 keeps `max_position_embeddings` under
+  `text_config`.
+  - **A DeviceMark run on hf tells lm_eval the length** (`max_length` in its
+    model_args, `devicemark.hf_plan`): the prompt's room and the 4,096 cap.
+    The room is `DM_PROMPT_TOKENS` (2,048), or the battery's longest prompt
+    in the model's own tokens and 64 more where that is longer — counted with
+    the model's tokenizer as lm_eval sends it (the chat template, the thinking
+    switch), or taken as three characters a token when the tokenizer doesn't
+    load in the service. So 6,144 for every model so far.
+  - **The model's own limit** is `archinfo.ctx`, read from `text_config` where
+    the top has none. A model that reads fewer tokens than the run needs is
+    **refused at preflight**: "… reads 4,096 tokens at most (its config.json),
+    and DeviceMark's protocol needs 6,144 …".
+  - **A prompt lm_eval cut isn't the protocol's question**: its warning in the
+    task's log fails the task, keeps none of its answers and says what to set
+    `DM_PROMPT_TOKENS` to. It can only happen for a tokenizer that couldn't be
+    counted with.
+  - Only DeviceMark runs are told a length. **The same model's other runs on
+    hf still get lm_eval's 2,048**: the generative three would fail the same
+    way, and a multiple-choice prompt longer than that is cut from the left
+    without a word. Not changed here.
+- **Granite-4.0-H-1B ran out of GPU memory on MMLU-Pro every time** (#132,
+  #144, #147): its own process at 15.9 GiB asking for 6 GiB more, beside a
+  neighbour that hadn't moved.
+  - **Why, from transformers' source (not from a run here):** Granite-4.0-H
+    is 36 Mamba2 layers and 4 of attention. Without the Mamba kernels
+    (`mamba-ssm`, `causal-conv1d`: the Dockerfile tries to build them and goes
+    on without), transformers reads the prompt on its slow path, where one
+    tensor of each Mamba layer is chunk × chunk × heads × state in fp32 for
+    every 256-token chunk of the prompt and every answer written at a time:
+    256 × 256 × 48 × 128 × 4 bytes = **1.5 GiB**. A batch of 2 on prompts of
+    two chunks, or 1 on a prompt of four, asks for exactly 6.00 GiB. It is the
+    prompt, not the 4,096-token answer: once the prompt is read, each new token
+    goes through the layers' cached state. The run's log says which path it is
+    on ("The fast path is not available…", transformers' own warning).
+  - **The batch is sized for writing** (`hfmeta.gen_estimate`, for DeviceMark
+    runs on hf): the weights, 1.5 GB besides, and for each answer written at a
+    time the cache of every attention layer over the prompt and 4,096 tokens,
+    the prompt's logits, and — for a Mamba2 hybrid in an image without the
+    kernels — the slow path's tensor and half again for every chunk of the
+    longest prompt. The largest of 4, 2, 1 (`DM_HF_MAX_BATCH`) that fits
+    `MAX_JOB_GB`, and 1 when none does. The row's "needs ~N GB", and the wait
+    for the card, go by it. The run's log has the sum.
+  - **12q.E's retry stays**: a task out of memory goes again at half, down
+    to 1.
+  - **The run asks PyTorch to hand back what it frees**
+    (`PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`, PyTorch's own advice
+    in its out-of-memory message; an operator's own setting is kept). Not
+    tried on the card.
+  - **An out-of-memory error says who held what, and which grew**
+    (`oom_said`, `oom_line`, every hf task): "ran out of GPU memory at batch
+    1: this run's own process held 15.9 GiB (2 GiB of it reserved and unused)
+    and asked for 6 GiB more; the card's other processes held 12.9 GiB, as when
+    the task started: the run grew, not the card." The others' share is read
+    before each task loads (`others_mib`); 1 GiB more than then is "the card
+    got busier". A retry's log line carries the same.
+  - **What would settle Granite** is the Mamba kernels in the image: with
+    them the slow path isn't taken. Whether they are there:
+    `docker compose exec bench python -c "import importlib.util as u; print(u.find_spec('mamba_ssm'), u.find_spec('causal_conv1d'))"`.
+- `tests/test_image_deps.py` pins what this leans on in the installed
+  packages: lm_eval's `max_length`, its 2,048 and its warning for a cut
+  prompt; and the prompt count on the installed transformers.
+
 ### 12q.F — a server's error on one item never stops the row
 
 - Run #146 (served lookahead + MTP) stopped at 584 of 596: llama-server
@@ -4673,7 +4741,9 @@ Not before the demo: a new hidden set changes every Everyday score.
   that worked. The batch is sized for scoring short prompts
   (`hfmeta.estimate`); 4,096 generated tokens on MMLU-Pro's long prompts need
   far more — Granite-4.0-H-1B ran out twice (#132, #144). At a batch of one
-  it fails as before, in plain words.
+  it fails as before, in plain words. (12q.G: the batch a DeviceMark run
+  starts at is sized for writing, and Granite's cause is the prompt on the
+  slow Mamba path.)
 - Gemma 4 E2B has 5.1B parameters: `MAX_PARAMS_B=6` in `.env` lets it run.
 
 ### 12q.D — what the first hf DeviceMark runs found

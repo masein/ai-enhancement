@@ -191,23 +191,25 @@ def _hf_run(monkeypatch, fits: dict):
 
 
 def test_a_task_out_of_memory_runs_again_at_half_the_batch(svc, monkeypatch):  # noqa: F811
-    sid, seen = _hf_run(monkeypatch, {"dm_mmlu_pro": 4})
+    sid, seen = _hf_run(monkeypatch, {"dm_mmlu_pro": 1})
     row = db.get(sid)
     assert row["status"] == "done", row["error"]
-    # MMLU-Pro at 16, 8, then 4 — and MATH starts at the batch that worked
-    assert seen == [("dm_ifeval", 16), ("dm_mmlu_pro", 16), ("dm_mmlu_pro", 8),
-                    ("dm_mmlu_pro", 4), ("dm_math", 4)]
+    # 12q.G: it starts at 4, the most a DeviceMark run writes at a time, whatever
+    # preflight sized for scoring (16). MMLU-Pro at 4, 2, then 1 — and MATH
+    # starts at the batch that worked
+    assert seen == [("dm_ifeval", 4), ("dm_mmlu_pro", 4), ("dm_mmlu_pro", 2),
+                    ("dm_mmlu_pro", 1), ("dm_math", 1)]
     [log_file] = config.LOGS_DIR.glob(f"service_{sid}_*.log")
     log = log_file.read_text()
-    assert "[service] dm_mmlu_pro ran out of GPU memory: again at batch 8" in log
-    assert "[service] dm_mmlu_pro ran out of GPU memory: again at batch 4" in log
+    assert "[service] dm_mmlu_pro ran out of GPU memory: again at batch 2" in log
+    assert "[service] dm_mmlu_pro ran out of GPU memory: again at batch 1" in log
     assert json.loads((row_dir(GRANITE) / dm.OUT_NAME).read_text())["n"] == 596
 
 
 def test_out_of_memory_at_a_batch_of_one_fails_in_plain_words(svc, monkeypatch):  # noqa: F811
     sid, seen = _hf_run(monkeypatch, {"dm_mmlu_pro": 0})
     row = db.get(sid)
-    assert [b for t, b in seen if t == "dm_mmlu_pro"] == [16, 8, 4, 2, 1]
+    assert [b for t, b in seen if t == "dm_mmlu_pro"] == [4, 2, 1]
     assert ("dm_math", 1) not in seen                       # it would run out again: stopped
     assert row["status"] == "failed" and "ran out of GPU memory" in row["error"]
     assert not (row_dir(GRANITE) / dm.OUT_NAME).exists()

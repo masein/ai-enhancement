@@ -78,6 +78,10 @@ def svc(tmp_path, monkeypatch):
     def no_vram():
         raise AssertionError("a served run waits for no VRAM here")
     monkeypatch.setattr(runner, "gpu_free_mib", no_vram)
+    # 12q.G: an hf run counts the battery's longest prompt with the model's
+    # tokenizer; no test fetches one (deploy step 3 runs these beside transformers)
+    from service import devicemark as svc_dm
+    monkeypatch.setattr(svc_dm, "prompt_tokens", lambda *a, **k: (900, True))
     write_items(config.DM_ITEMS)
     yield client
     client.__exit__(None, None, None)
