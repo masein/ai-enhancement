@@ -1,0 +1,25 @@
+# 12r: the judge's model (gemma-vllm) belongs to another compose project,
+# teraformer-chat, on that project's network, teraformer-chat_default. With this
+# file the board joins that network as well as its own, so a restart or a
+# recreate of the chat project can't cut the judge off: a connection made by
+# hand (`docker network connect`) is dropped whenever either container is
+# recreated, which is what left 30 Summarise answers waiting on 30 Sep 2026.
+#
+# Opt in from .env, so every `docker compose` command here uses both files:
+#
+#     COMPOSE_FILE=docker-compose.yml:docker-compose.judge.yml
+#
+# Compose refuses to start a service whose external network doesn't exist. If
+# teraformer-chat_default is ever gone, comment that line out: the board starts
+# on its own network alone, and the judge's health (GET /api/judge/health) says
+# what to run. Nothing here touches the chat project or gemma-vllm.
+services:
+  bench:
+    networks:
+      - default
+      - judge
+
+networks:
+  judge:
+    name: ${JUDGE_NETWORK:-teraformer-chat_default}
+    external: true

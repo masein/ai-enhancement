@@ -168,7 +168,9 @@ _JUDGE_HEALTH: dict = {"at": 0.0, "value": None}
 def judge_health(force: bool = False) -> dict:
     """{ok, checked, provider, url, why}: `why` is a plain sentence naming
     the URL that did not answer."""
+    import socket
     import urllib.error
+    import urllib.parse
     import urllib.request
     now = time.time()
     if not force and _JUDGE_HEALTH["value"] and now - _JUDGE_HEALTH["at"] < JUDGE_HEALTH_TTL:
@@ -188,9 +190,23 @@ def judge_health(force: bool = False) -> dict:
             why = "" if ok else f"the grading model at {url} answered {r.status}"
         except urllib.error.HTTPError as e:
             ok, why = False, f"the grading model at {url} answered {e.code}"
+            if e.code in (401, 403):
+                # 12r: its server wants a key the board doesn't send (or not this one)
+                why += (": it wants an API key. Set JUDGE_API_KEY in .env to the key its "
+                        "server was started with, then `sudo docker compose up -d`")
         except Exception as e:                          # noqa: BLE001 — down is down
             reason = getattr(e, "reason", None) or e
             ok, why = False, f"the grading model isn't answering at {url} ({reason})"
+            if isinstance(reason, socket.gaierror):
+                # 12r: its name doesn't resolve: the board isn't on its Docker network
+                host = urllib.parse.urlsplit(url).hostname or url
+                why = (f"the grading model's hostname {host} doesn't resolve from the board's "
+                       f"container ({reason.strerror or reason}): the board isn't on its Docker "
+                       f"network, {config.JUDGE_NETWORK}. To join it for good, put "
+                       "COMPOSE_FILE=docker-compose.yml:docker-compose.judge.yml in .env and "
+                       "run `sudo docker compose up -d`. Until then: `sudo docker network "
+                       f"connect {config.JUDGE_NETWORK} $(sudo docker compose ps -q bench)`. "
+                       "Neither touches the judge's own container")
         v = {"ok": ok, "checked": True, "provider": prov, "url": url, "why": why}
     _JUDGE_HEALTH.update(at=now, value=v)
     return v

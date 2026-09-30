@@ -274,6 +274,9 @@ def local_max_tokens(role: str = "llm") -> int:
            "exam": LOCAL_MAX_TOKENS_EXAM}.get(role, 0)
     return own or LOCAL_MAX_TOKENS or LOCAL_MAX_TOKENS_DEFAULTS.get(role, 1024)
 LOCAL_TIMEOUT_S = float(os.environ.get("LOCAL_TIMEOUT_S", "180"))
+# 12r: the Docker network the judge's container is on, when another compose
+# project owns it; the judge's health names it when its hostname doesn't resolve
+JUDGE_NETWORK = os.environ.get("JUDGE_NETWORK", "") or "teraformer-chat_default"
 
 # The exam writer (scripts/exam_build.py draft): a SEPARATE identity from the
 # generator and the judge, because a loop whose questions, grades and training

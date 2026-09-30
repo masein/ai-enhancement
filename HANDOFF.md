@@ -4389,6 +4389,35 @@ Not before the demo: a new hidden set changes every Everyday score.
   tips (3); the coffee line and Kofi's birthday (dropped); the business cards
   listed as decided while still open (kept, −2).
 
+### 12r — the judge's Docker network
+
+- **The judge's model, gemma-vllm, belongs to another compose project**
+  (teraformer-chat, network `teraformer-chat_default`), which other people
+  use. **Never restart or change gemma-vllm** for the board's sake. The board
+  (`aienh_default`) reached it by name only because gemma-vllm had been
+  connected to the board's network by hand; the chat project recreated it
+  (29 Sep 2026, 23:45), the connection went, and every judge request failed
+  at "Temporary failure in name resolution" — the 30 Summarise answers left
+  waiting by 12a.10's re-mark.
+- **The board joins the judge's network instead**, for good:
+  `docker-compose.judge.yml` adds `teraformer-chat_default` (external,
+  `JUDGE_NETWORK` names it) beside the board's own default. Opt in from
+  `.env`, so every `docker compose` command uses both files:
+
+      COMPOSE_FILE=docker-compose.yml:docker-compose.judge.yml
+
+  A recreate of either project then leaves the board on that network.
+- **Compose refuses to start a service whose external network doesn't
+  exist.** If `teraformer-chat_default` is ever gone, comment that line out:
+  the board starts on its own network alone. (While the board is attached,
+  the chat project's `down` can't remove the network.)
+- **The judge's health says what to run** (`GET /api/judge/health`, the
+  header's dot, and the refusal of a judged run): a hostname that doesn't
+  resolve names the network, the `.env` line and the one-off `docker network
+  connect <network> $(docker compose ps -q bench)`, which touches the board's
+  container only; a 401 says the judge wants a key (`JUDGE_API_KEY` in
+  `.env`).
+
 ### 12a.11 — a re-mark's waiting answers, and why they wait
 
 - After 12a.10's re-mark, `served/Qwen3.6-k4-LDA-lookahead` had 28 Summarise
