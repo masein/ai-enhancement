@@ -266,6 +266,48 @@ def fingerprint(rec: dict, s: dict) -> str:
                           .encode("utf-8")).hexdigest()[:16]
 
 
+def kept(rec: dict, keys: list[tuple[str, str]], s: dict, store: Path,
+         also: tuple[Path, ...] = ()) -> dict:
+    """the answers already in `store` (or `also`) to these items, on the same
+    server, settings and battery"""
+    fp, want, have = fingerprint(rec, s), set(keys), {}
+    for f in (*also, store):
+        if not f.exists():
+            continue
+        for line in f.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                r = json.loads(line)
+                if r.get("fp") == fp and (r["bench"], r["key"]) in want:
+                    have[(r["bench"], r["key"])] = r
+    return have
+
+
+def wait_for(sid: int, rec: dict, log_path: Path, what: str = "devicemark parity") -> str:
+    """12w: '' once this setup's server answers with the file registered, else
+    why the run stops. The parity check asks two setups, and only one
+    llama-server may fit on the card: the run says which to start and waits
+    DM_SWAP_WAIT_S for it, so the other can be stopped first. A server up with
+    another file is not waited for"""
+    t0, said = time.time(), False
+    while True:
+        why = _served.check_pin(rec)
+        if not why or why == _served.CHANGED_LINE:
+            return why
+        if db.cancel_requested(sid):
+            return "canceled"
+        left = config.DM_SWAP_WAIT_S - (time.time() - t0)
+        if left <= 0:
+            return (f"its server didn't answer in {max(1, round(config.DM_SWAP_WAIT_S / 60))} "
+                    f"min ({why})")
+        db.update(sid, status="running",
+                  progress=f"{what} · start {rec['name']}'s server now (the other can stop): "
+                           f"waiting {max(1, -(-int(left) // 60))} min more")
+        if not said:
+            _log(log_path, f"[devicemark] waiting for {rec['id']} at {rec['base_url']}: {why}")
+            said = True
+        time.sleep(min(5.0, max(0.05, config.DM_SWAP_WAIT_S / 24)))
+
+
 def answer_all(rec: dict, keys: list[tuple[str, str]], items: dict, s: dict, store: Path,
                on_progress=None, canceled=lambda: False,
                also: tuple[Path, ...] = ()) -> tuple[list[dict], Exception | None]:
@@ -273,15 +315,7 @@ def answer_all(rec: dict, keys: list[tuple[str, str]], items: dict, s: dict, sto
     pilot's — under these settings, each reply appended as it lands. (the
     answers, in `keys`' order, and why it stopped — None when every one is in)"""
     fp = fingerprint(rec, s)
-    have = {}
-    for f in (*also, store):
-        if not f.exists():
-            continue
-        for line in f.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                r = json.loads(line)
-                if r.get("fp") == fp and (r["bench"], r["key"]) in set(keys):
-                    have[(r["bench"], r["key"])] = r
+    have = kept(rec, keys, s, store, also)
     todo = [k for k in keys if k not in have]
     lock, halt = threading.Lock(), []
     total, t0, done = len(keys), time.time(), [len(keys) - len(todo)]
@@ -491,6 +525,14 @@ def parity(sid: int, mtp: dict, plain: dict, items: dict, thinking: bool,
     got = {}
     for tag, rec in (("mtp", mtp), ("plain", plain)):
         store = row_dir(rec["id"], thinking) / f"devicemark_parity_{tag}_answers.jsonl"
+        # 12w: a setup with items still to answer is waited for — only one
+        # server may fit on the card — and one whose 50 are kept needs no server
+        if len(kept(rec, keys, s, store)) < len(keys):
+            why = wait_for(sid, rec, log_path)
+            if why == "canceled":
+                return "canceled", "canceled: the answers so far are kept for the next run"
+            if why:
+                return "failed", f"{rec['name']}: {why} · the answers so far are kept"
         got[tag], stopped = answer_all(rec, keys, items, s, store,
                                        _progress(sid, f"devicemark parity · {rec['name']}"),
                                        lambda: db.cancel_requested(sid))

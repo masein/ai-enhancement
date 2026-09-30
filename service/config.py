@@ -494,6 +494,9 @@ DM_PARTS = ("full", "pilot", "parity", "speed")
 # from what 4,096 generated tokens need (hfmeta.gen_estimate), never above this
 DM_PROMPT_TOKENS = int(os.environ.get("DM_PROMPT_TOKENS", "2048"))
 DM_HF_MAX_BATCH = int(os.environ.get("DM_HF_MAX_BATCH", "4"))
+# 12w: the parity check asks two setups, and only one llama-server may fit on
+# the card: how long the run waits for the setup it needs next to be started
+DM_SWAP_WAIT_S = int(os.environ.get("DM_SWAP_WAIT_S", "1800"))
 DM_INSTRUCT_ONLY = ("DeviceMark's battery is asked through the chat template and scored on "
                     "what the model writes, so only an instruct model can sit it — this one "
                     "runs as a base model")

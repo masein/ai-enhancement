@@ -506,7 +506,11 @@ def preflight(sub: dict) -> dict:
                              f"A model served elsewhere")
     if sub["suite"] not in SUITES:
         raise PreflightError(LOGLIK_LINE)
-    why = check_pin(rec)
+    # 12w: the parity check asks two setups, one after the other, and waits
+    # for each one's server itself (devicemark.wait_for checks its file then):
+    # the run may start with either up
+    swaps = sub["suite"] == "devicemark" and (sub.get("part") or "") == "parity"
+    why = "" if swaps else check_pin(rec)
     if why:
         raise PreflightError(why)
     est = None
