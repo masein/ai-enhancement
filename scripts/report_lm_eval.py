@@ -10663,7 +10663,8 @@ function dmOurs(r) {
     composite: r.row.composite, benches: r.row.benches, answered_pct: r.row.answered_pct,
     median_tokens: r.row.median_tokens, time_frontier: r.row.time_frontier, device: r.device,
     server_tok_s: r.server_tok_s, retention: r.retention, rank: r.rank_all, model: r.model,
-    inherited: r.row.inherited, setup: su };
+    inherited: r.row.inherited, setup: su,
+    raw_fallback: r.row.raw_fallback || 0, errors: r.row.errors || 0 };
 }
 function dmRows() {
   const d = state.dm.data;
@@ -10673,6 +10674,13 @@ function dmRows() {
     ...((d.external || {}).rows || []).map(r => ({ ...r, rank: r.rank_all }))]
     .sort((a, b) => (b.composite.value || 0) - (a.composite.value || 0));
 }
+// 12q.F: the items the server failed on: answered without its chat parsing, or not at all
+const dmOdd = r => [r.raw_fallback ? `${r.raw_fallback} raw fallback` : '',
+  r.errors ? `${r.errors} no answer after a server error` : ''].filter(Boolean).join(' · ');
+const DM_ODD_TIP = ['raw fallback: the server’s chat parsing failed on the item twice, so it '
+  + 'was asked again through /apply-template and /completion and the raw text scored',
+  'no answer after a server error: that failed too; counted wrong, as the protocol counts '
+  + 'no answer'];
 const dmCi = r => r.composite && r.composite.ci;
 const dmPct = v => v == null ? '—' : (100 * v).toFixed(1);
 const dmIv = r => dmCi(r) ? ` [${dmPct(dmCi(r)[0])}, ${dmPct(dmCi(r)[1])}]` : '';
@@ -10702,6 +10710,7 @@ function dmTip(r) {
         + 'speed, drawn as a line' : 'no speed measured on a device yet: drawn as a line',
     r.external ? r.credit : 'ours, by DeviceMark’s protocol'
       + (r.inherited ? ` · ${r.inherited.line}` : ''),
+    ...(dmOdd(r) ? [dmOdd(r)] : []),
     ...(r.note ? [r.note] : [])];
 }
 // labels that don't sit on each other: a line's, spread down the right edge;
@@ -10926,7 +10935,9 @@ function dmTable(rows) {
           'data-tip': JSON.stringify(dmTip(r)),
           text: r.external ? 'DeviceMark' + ((r.ours || []).length ? ' · and ours' : '') : 'ours' }),
         r.inherited ? el('span', { class: 'small se', 'data-dm-inherited': r.id,
-          text: ` ${r.inherited.line}` }) : ''),
+          text: ` ${r.inherited.line}` }) : '',
+        dmOdd(r) ? el('span', { class: 'small se', 'data-dm-odd': r.id,
+          'data-tip': JSON.stringify(DM_ODD_TIP), text: ` ${dmOdd(r)}` }) : ''),
       el('td', { class: num(r) + (r.cant_run ? ' dmpair' : ''), 'data-dm-composite': r.id },
         // 12q.D: theirs, over "ours: can't run here" and why, on hover
         r.cant_run && !(r.ours || []).length ? [
@@ -11080,6 +11091,8 @@ function dmModelCard(m, mode) {
     r.inherited ? el('p', { class: 'small se', 'data-dm-card-inherited': mode,
       text: `${r.inherited.line}: this setup's quality is its MTP partner's (${r.inherited.from})` })
       : '',
+    dmOdd(r) ? el('p', { class: 'small se', 'data-dm-card-odd': mode,
+      'data-tip': JSON.stringify(DM_ODD_TIP), text: dmOdd(r) }) : '',
     el('div', { class: 'lb-wrap' }, el('table', { class: 'lb mtbl', 'data-dm-card-table': mode },
       th(['', 'IFEval', 'MMLU-Pro', 'MATH', 'Answered', 'Median tokens', 'Device tok/s',
         'Server tok/s']),
@@ -11204,7 +11217,12 @@ function dmAnswersList(m, modes) {
           + (x.subject ? ` · ${x.subject}` : '')
           + (x.tokens != null ? ` · ${x.tokens.toLocaleString('en')} tokens` : ''),
         x.capped ? el('span', { class: 'badge warn', 'data-dm-ans-capped': id,
-          text: 'ran out of room' }) : ''),
+          text: 'ran out of room' }) : '',
+        // 12q.F: answered without the server's chat parsing, and what the server said
+        x.fallback ? el('span', { class: 'badge warn', 'data-dm-ans-fallback': id,
+          'data-tip': JSON.stringify(['the server’s chat parsing failed on this item twice; '
+            + 'asked again through /apply-template and /completion, and the raw text scored',
+            `the server said: ${x.fallback}`]), text: 'raw fallback' }) : ''),
       el('p', { class: 'evq-label', text: 'Question' }),
       el('blockquote', { class: 'evq', 'data-dm-ans-q': id, text: x.q
         + ((x.options || []).length ? '\n\n' + x.options.map((o, i) =>
@@ -11213,8 +11231,10 @@ function dmAnswersList(m, modes) {
         : `read as: ${x.parsed ?? 'nothing (no answer)'} · the answer: ${x.gold ?? '—'}` }),
       el('p', { class: 'evq-label', text: 'Output' }),
       x.answer ? el('div', { class: 'evans', 'data-dm-ans-out': id, text: x.answer })
-        : el('p', { class: 'evans none', 'data-dm-ans-out': id, text: x.capped
-          ? 'No answer: it was still thinking when it ran out of room.'
+        : el('p', { class: 'evans none', 'data-dm-ans-out': id, text: x.error
+          ? `No answer: the server failed on this item twice (${x.error.chat}), and again `
+            + `without its chat parsing (${x.error.fallback}).`
+          : x.capped ? 'No answer: it was still thinking when it ran out of room.'
           : '(nothing after the thinking)' }),
       x.thinking ? el('details', { class: 'evthink', 'data-dm-ans-thinking': id },
         el('summary', { text: `thinking ▸ ${x.thinking.length.toLocaleString('en')} characters` }),

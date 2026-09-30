@@ -4619,6 +4619,39 @@ Not before the demo: a new hidden set changes every Everyday score.
   strict and loose), a served setup's too. It lists what the board lists: the
   diagnose half.
 
+### 12q.F — a server's error on one item never stops the row
+
+- Run #146 (served lookahead + MTP) stopped at 584 of 596: llama-server
+  answered one item with HTTP 500, "The model produced output that does not
+  match the expected peg-native format" (its chat parser couldn't read what
+  the model wrote), and the runner took every 5xx for a server that had
+  stopped answering — it waited `SERVED_RETRY_S` on the same item, then
+  failed the row, saying "at 0 of 0".
+- **An error of the item's own** (`ItemError`: a 500, or a 400, from a server
+  that is answering) is handled on the item (`answer_item`):
+  1. asked once more;
+  2. then **without the server's chat parsing** (`ask_raw`): the prompt from
+     `POST /apply-template` (the same message and thinking switch), completed
+     by `POST /completion` with the same greedy settings, seed and 4,096 cap.
+     The raw text is read as any answer is — what follows the last
+     `</think>`; where the template opens the thinking itself, the tag is put
+     back, so thinking the cap cut off is never an answer. The record is
+     marked `raw_fallback`, with the server's words;
+  3. and if that fails too, **no answer** — counted wrong, as the protocol
+     counts one — with both errors kept (`error`), and the row goes on.
+- **A server that isn't answering** (no connection, a timeout, 408, 429, 502,
+  503) is still waited for and then stops the row, in the middle of a
+  fallback too; the item isn't recorded, and the next run asks it.
+- **The stop says after how many**: "the server stopped answering after 584
+  of 596 (HTTP 503) · the answers it gave are kept: the next run asks only
+  the other 12".
+- **The counts are on the row** (`raw_fallback`, `errors` in
+  `devicemark.json`): in the run's line ("· 1 raw fallback"), the log (each
+  item, with what the server said), the On-device chart's row and its hover,
+  the model page's card, and the Answers tab — a "raw fallback" badge with the
+  server's words, and "No answer: the server failed on this item twice (…),
+  and again without its chat parsing (…)".
+
 ### 12q.E — the hf DeviceMark runs of their models, as the server ran them
 
 - **A row is its newest scored run.** A resubmit's answers replace the
