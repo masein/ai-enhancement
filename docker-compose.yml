@@ -90,6 +90,11 @@ services:
       LOCAL_CONCURRENCY: ${LOCAL_CONCURRENCY:-2}
       LOCAL_MAX_TOKENS: ${LOCAL_MAX_TOKENS:-1024}
       LOCAL_TIMEOUT_S: ${LOCAL_TIMEOUT_S:-180}
+      # 12r: the Docker network the judge's container is on, when it is another
+      # compose project's. docker-compose.judge.yml joins the board to it (opt in
+      # with COMPOSE_FILE in .env); here it is only the name the judge's health
+      # names when the judge's hostname doesn't resolve
+      JUDGE_NETWORK: ${JUDGE_NETWORK:-teraformer-chat_default}
       # 12p.1: backups of what lives only on the data volume (Everyday's hidden
       # set, the exam's questions), on the server's second disk; and the age
       # PUBLIC key an encrypted export is made for — the private key stays on
