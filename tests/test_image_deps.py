@@ -218,3 +218,34 @@ def test_the_longest_prompt_is_counted_on_the_installed_transformers(tmp_path):
                              {"mode": "switch", "on": True}) == (7, True)
     # a tokenizer that isn't there is estimated, never an error
     assert sdm.prompt_tokens(str(tmp_path / "none"), None, ["x" * 30], {}) == (10, False)
+
+
+def test_lm_eval_takes_2048_for_a_limit_under_text_config_and_writes_what_it_used():
+    """12t: lm_eval looks for a model's limit at the top of its config only. A
+    config that nests its text model has none there, so lm_eval takes 2,048 —
+    unless it is told (runner.nested_limit passes max_length). And it writes
+    the length it used into its results file, which scripts/asked_length.py
+    reads. Both are the installed harness's"""
+    lm_eval()
+    import inspect
+    import types
+
+    import lm_eval.loggers.utils as logged
+    from lm_eval.models import huggingface
+    from lm_eval.models.huggingface import HFLM
+
+    import asked_length
+    nested = types.SimpleNamespace(text_config=types.SimpleNamespace(max_position_embeddings=131072))
+    lm = types.SimpleNamespace(
+        _max_length=None, _DEFAULT_MAX_LENGTH=HFLM._DEFAULT_MAX_LENGTH,
+        model=types.SimpleNamespace(config=nested),
+        tokenizer=types.SimpleNamespace(model_max_length=huggingface.TOKENIZER_INFINITY))
+    assert HFLM.max_length.fget(lm) == asked_length.FALLBACK == 2048
+    lm._max_length = 131072
+    assert HFLM.max_length.fget(lm) == 131072
+    # a limit at the top is found without being told
+    lm._max_length = None
+    lm.model.config = types.SimpleNamespace(max_position_embeddings=32768)
+    assert HFLM.max_length.fget(lm) == 32768
+    assert '"max_length": getattr(lm, "max_length", None)' in inspect.getsource(
+        logged.add_tokenizer_info)

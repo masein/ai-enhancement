@@ -123,6 +123,11 @@ def gen_estimate(arch: dict, params: int | None, vocab: int, *, prompt: int, new
 LOCAL_PREFIX = "local/"
 
 
+# where a config says how many tokens the model reads — the three names lm_eval
+# looks for too, at the top of the config only
+CTX_KEYS = ("max_position_embeddings", "n_positions", "n_ctx")
+
+
 def _arch_from_config(cfg: dict) -> dict:
     """The model's shape, from its config.json — architecture name, hidden size,
     layer count, head count, context length, vocab. Handles the two naming eras
@@ -131,12 +136,17 @@ def _arch_from_config(cfg: dict) -> dict:
     tc = cfg.get("text_config") or {}
     pick = lambda *keys: next((v for src in (cfg, tc) for k in keys
                                if (v := src.get(k)) is not None), None)
+    ctx = pick(*CTX_KEYS)
     return {
         "arch": (cfg.get("architectures") or tc.get("architectures") or [None])[0],
         "hidden": pick("hidden_size", "n_embd", "d_model"),
         "layers": pick("num_hidden_layers", "n_layer", "num_layers"),
         "heads": pick("num_attention_heads", "n_head"),
-        "ctx": pick("max_position_embeddings", "n_positions", "n_ctx"),
+        "ctx": ctx,
+        # 12t: the limit is the text model's, under text_config — where lm_eval
+        # doesn't look (runner.nested_limit)
+        **({"ctx_nested": True} if ctx is not None
+           and all(cfg.get(k) is None for k in CTX_KEYS) else {}),
         "vocab": pick("vocab_size"),
         # 12q.G: a Mamba2 hybrid's state-space layers (gen_estimate)
         **({"mamba": m} if (m := _mamba_from_config({**tc, **cfg})) else {}),

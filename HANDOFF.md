@@ -4670,6 +4670,38 @@ Not before the demo: a new hidden set changes every Everyday score.
   strict and loose), a served setup's too. It lists what the board lists: the
   diagnose half.
 
+### 12t — a model whose limit is under text_config is told to lm_eval, on every hf run
+
+- 12q.G told a DeviceMark run its length. Every other run on hf of a model
+  whose config keeps its limit under `text_config` (Gemma 4) still got
+  lm_eval's 2,048: the generative three would fail at "requested max tokens
+  to generate … must be less than model's maximum sequence length (2048)",
+  and a multiple-choice or exam prompt longer than 2,048 tokens was cut from
+  the left without a word in the log.
+- **Such a model's runs on hf are passed `max_length=<its real limit>`**
+  (`runner.nested_limit`, through `load_spec` and `model_args`, and
+  `gen_model_args` for the generative tasks). Which models: `archinfo`'s
+  `ctx_nested`, set when the limit was read from `text_config` and none of
+  lm_eval's three names (`hfmeta.CTX_KEYS`) is at the top of the config. The
+  task's log says so: "lm_eval is told max_length=131072: the model's limit
+  is under text_config …".
+- **Every other model is asked exactly as before**: its commands carry no new
+  argument. vLLM keeps its own `max_model_len`, a served model has no loader
+  here, and a DeviceMark run keeps its own length (12q.G).
+- **A run that is now asked whole can need more memory**: the batch is still
+  sized for a 2,048-token prompt (`hfmeta.estimate`), and only a generative
+  task goes again at half the batch when it runs out.
+- **What is on disk already**: lm_eval writes the length it used into each
+  results file (`max_length`), and `model_meta.json` has what the model
+  reads. `python scripts/asked_length.py` lists every task whose newest
+  result was asked at 2,048 by a model that reads more. Those results stay
+  as they are, and the board doesn't mark them; a task sat again is asked
+  whole and may score differently.
+- Not covered: `scripts/run_benchmarks.sh`, the CLI, builds its own
+  model_args.
+- `tests/test_image_deps.py` pins both on the installed lm_eval: 2,048 for a
+  nested config unless told, and `max_length` in the results.
+
 ### 12q.G — an hf DeviceMark run is told its length, and writes at a batch sized for writing
 
 - **Gemma 4 E2B (#148) failed all three tasks** at "requested max tokens to
@@ -4692,10 +4724,8 @@ Not before the demo: a new hidden set changes every Everyday score.
     task's log fails the task, keeps none of its answers and says what to set
     `DM_PROMPT_TOKENS` to. It can only happen for a tokenizer that couldn't be
     counted with.
-  - Only DeviceMark runs are told a length. **The same model's other runs on
-    hf still get lm_eval's 2,048**: the generative three would fail the same
-    way, and a multiple-choice prompt longer than that is cut from the left
-    without a word. Not changed here.
+  - Only DeviceMark runs are told a length here. The same model's other runs
+    on hf got lm_eval's 2,048 until 12t, above.
 - **Granite-4.0-H-1B ran out of GPU memory on MMLU-Pro every time** (#132,
   #144, #147): its own process at 15.9 GiB asking for 6 GiB more, beside a
   neighbour that hadn't moved.
