@@ -12,6 +12,7 @@ import importlib
 import importlib.metadata as md
 import os
 import re
+import sys
 from pathlib import Path
 
 import pytest
@@ -123,3 +124,44 @@ def test_the_vendored_ifeval_checker_is_lm_evals():
                             "\ndownload_nltk_resources()\n")
         ours = ours.replace("    download_nltk_resources()  # 12q: here, not on import\n", "")
         assert ours == (theirs / name).read_text(encoding="utf-8"), name
+
+
+def test_ifeval_counts_sentences_with_no_network(monkeypatch):
+    """12q.D: IFEval's checkers split sentences with NLTK's punkt_tab, and the
+    image has it from its build (scripts/nltk_data.py): five DeviceMark runs on
+    hf failed at "Resource 'punkt_tab' not found" when the checker went to
+    download it. With the network cut off and a download made to fail, the
+    checker still counts sentences — in CI's image-deps job, which fetches it
+    as the image does, and in deploy step 3, inside the image"""
+    lm_eval()
+    import socket
+
+    import nltk
+
+    def no_network(*a, **k):
+        raise OSError("12q.D: no network in this test")
+    monkeypatch.setattr(socket, "create_connection", no_network)
+    monkeypatch.setattr(socket.socket, "connect", no_network)
+    monkeypatch.setattr(nltk, "download", lambda *a, **k: pytest.fail(
+        "the IFEval checker tried to download punkt_tab"))
+    nltk.data.find("tokenizers/punkt_tab/english/")
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from ifeval_official import instructions_registry, instructions_util
+    instructions_util._get_sentence_tokenizer.cache_clear()
+    text = "It rained all day. We stayed in! Did it ever stop?"
+    assert instructions_util.count_sentences(text) == 3
+    check = instructions_registry.INSTRUCTION_DICT["length_constraints:number_sentences"]("x")
+    check.build_description(num_sentences=3, relation="at least")
+    assert check.check_following(text) is True
+    check.build_description(num_sentences=4, relation="at least")
+    assert check.check_following(text) is False
+
+
+def test_the_image_fetches_the_pinned_punkt_tab():
+    """12q.D: the Dockerfile fetches it with the pinned script, and the build
+    fails when it isn't found; CI's image-deps job fetches it the same way"""
+    docker = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    assert "RUN python /tmp/nltk_data.py --dest /usr/share/nltk_data" in docker
+    assert "nltk.data.find('tokenizers/punkt_tab/english/')" in docker
+    ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert 'python scripts/nltk_data.py --dest "$RUNNER_TEMP/nltk_data"' in ci

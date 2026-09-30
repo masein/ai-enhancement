@@ -67,8 +67,10 @@ def test_the_chart_draws_rows_on_a_device_as_points_and_the_rest_as_lines(live, 
     assert chart.locator(f"[data-dm-line='{NEMO}'], [data-dm-point='{NEMO}']").count() == 0
     nemo = json.loads(chart.locator(f"[data-dm-point='{THEIR_NEMO}']").get_attribute("data-tip"))
     assert nemo[1] == "theirs (int8, iPhone): composite 61.4 [57.8, 65.1]"
+    # 12q.D: not calibration any more — it can't run here — though a run of ours still shows
     assert nemo[3].startswith("ours (bf16, our battery): composite ") \
-        and nemo[3].endswith(" · calibration")
+        and not nemo[3].endswith(" · calibration")
+    assert not any("can't run here" in x for x in nemo)
     assert "never plotted at their device speed" in nemo[5]
     assert chart.locator(f"[data-dm-whisker='{MTP}']").count() == 1
     tip = json.loads(chart.locator(f"[data-dm-point='{MTP}']").get_attribute("data-tip"))

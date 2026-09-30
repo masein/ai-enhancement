@@ -143,8 +143,12 @@ jobs:
                   d = re.split(r"[\s;<>=!~\[]", r, maxsplit=1)[0]
                   print(f"{d}=={md.version(d)}")
           PY
+      - name: NLTK's punkt_tab, as the image fetches it (12q.D)
+        run: python scripts/nltk_data.py --dest "$RUNNER_TEMP/nltk_data"
       - name: the imports a run needs
-        run: EVALBOARD_IMAGE_DEPS=1 pytest -q -p no:cacheprovider tests/test_image_deps.py
+        run: >-
+          EVALBOARD_IMAGE_DEPS=1 NLTK_DATA="$RUNNER_TEMP/nltk_data"
+          pytest -q -p no:cacheprovider tests/test_image_deps.py
 
   ci:
     needs: [lint-unit, browser, image-deps]

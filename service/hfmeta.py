@@ -438,6 +438,10 @@ def preflight(hf_id: str, requested_kind: str = "auto",
 def _preflight(hf_id: str, allow_remote_code: bool = False) -> dict:
     if hf_id.startswith(LOCAL_PREFIX):            # uploaded artifact — never touches the Hub
         return _preflight_local(hf_id[len(LOCAL_PREFIX):], allow_remote_code)
+    # 12q.D: a model this server can't run is refused before a run starts, saying why
+    why = catalog.cant_run_here(hf_id)
+    if why:
+        raise PreflightError(f"{hf_id} can't run on this server: {why}.")
     if os.environ.get("STUB_PREFLIGHT") == "1":   # offline tests
         batch, need = estimate(50304, 14_000_000)
         return {"params": 14_000_000, "vocab": 50304, "batch": batch,

@@ -459,6 +459,10 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
                                  "id, or local/<name> for an uploaded artifact")
     if s.kind not in ("auto", "base", "instruct"):
         raise HTTPException(422, "kind must be auto, base or instruct")
+    # 12q.D: a model this server can't run is refused here, saying why, never queued
+    why = hfmeta.catalog.cant_run_here(hf_id)
+    if why:
+        raise HTTPException(422, f"{hf_id} can't run on this server: {why}. Nothing was queued.")
     if s.suite not in config.SUITES:
         raise HTTPException(422, "suite must be quick, full, control (mmlu_perm only), "
                                  "judged (free response + judge), everyday (Everyday tasks), "
