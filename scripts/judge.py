@@ -1019,7 +1019,23 @@ def answer_parts(rec: dict) -> dict:
     p["raw"] = raw
     p["no_answer"] = p["had_reasoning"] and (p["reasoning_unterminated"]
                                              or not p["answer_text"])
+    # 12s: a served model's question its server failed on — no answer either
+    # way (`server_error`), or one asked without its chat parsing
+    # (`raw_fallback`); both as the run wrote them, and absent otherwise
+    for k in SERVER_KEYS:
+        if isinstance(rec.get(k), dict):
+            p[k] = rec[k]
     return p
+
+
+SERVER_KEYS = ("server_error", "raw_fallback")
+
+
+def server_failed(err: dict) -> str:
+    """12s: why a question has no answer, when its server failed on it — the
+    words a marked item carries instead of "the model wrote nothing" """
+    return (f"no answer: the server failed on this question twice ({err.get('chat')}), and "
+            f"again without its chat parsing ({err.get('fallback')})")
 
 
 def _generation(model_dir: Path, task: str) -> dict | None:

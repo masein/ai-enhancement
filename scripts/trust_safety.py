@@ -371,7 +371,10 @@ def mark(model_dir: Path, verdicts: dict[str, dict] | None = None,
                   "answer_text": ans, "had_reasoning": parts["had_reasoning"]}
             if parts["no_answer"] or not ans.strip():
                 it.update(score=None, action=None, unmarked=True,
-                          reason=NEVER_FINISHED if parts["no_answer"] else NOTHING)
+                          # 12s: its server failed on the question: said, not "wrote nothing"
+                          reason=_judge.server_failed(parts["server_error"])
+                          if parts.get("server_error") else
+                          NEVER_FINISHED if parts["no_answer"] else NOTHING)
                 items.append(it)
                 continue
             v = verdicts.get(q["id"])

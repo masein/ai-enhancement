@@ -806,13 +806,15 @@ def _ask_served(sid: int, rec: dict, meta: dict, task: str, task_out: Path, labe
                 log_path: Path, everyday: bool, asked: list[str] | None, safety: bool = False,
                 meter: _served.Meter | None = None, evd_dir: Path | None = None,
                 trust_dir: Path | None = None, sq_dir: Path | None = None,
-                mab_dir: Path | None = None):
+                mab_dir: Path | None = None, odd: dict | None = None):
     """one Everyday, exam or Trust & safety task, asked over the model's
     server. (status, stopped): 0 or CANCELED, and a ServerStopped when it
     stopped answering — what it answered before that is written and kept.
     12k.2: Do-Not-Answer and XSTest are asked as Everyday is, as typed.
     12m.3: a model from OpenRouter's questions go through its run's meter,
-    and its progress says the running total"""
+    and its progress says the running total. 12s: `odd` is the run's count
+    of questions the server failed on — asked the raw way, or with no answer
+    — and each is a line of the log"""
     if safety:
         items = (trust_dir or config.TRUST_TASKS_DIR) / f"{task}.jsonl"      # build_tasks'
         everyday = True
@@ -846,16 +848,25 @@ def _ask_served(sid: int, rec: dict, meta: dict, task: str, task_out: Path, labe
     def progress(done: int, total: int, each: float) -> None:
         db.update(sid, status="running", progress=f"{label} · {time_left(done, total, each)}"
                   + (f" · {meter.line()}" if meter else ""))
+    here: dict = {}
     try:
         status = _served.answer_task(rec, task, docs, task_out, s, everyday,
                                      on_progress=progress,
-                                     canceled=lambda: db.cancel_requested(sid), meter=meter)
+                                     canceled=lambda: db.cancel_requested(sid), meter=meter,
+                                     odd=here)
         return status, None
     except _served.ServerStopped as e:
         e.task = task
         with open(log_path, "a") as lf:
             lf.write(f"\n[service] {task}: {e} ({e.why}); the {e.done} answered are kept\n")
         return 0, e
+    finally:
+        if here.get("lines"):
+            with open(log_path, "a") as lf:
+                lf.write("".join(f"[service] {line}\n" for line in here["lines"]))
+        if odd is not None:
+            for k in ("raw_fallback", "errors"):
+                odd[k] = odd.get(k, 0) + here.get(k, 0)
 
 
 _TQDM = re.compile(r"(\d+)/(\d+) \[(?:(\d+):)?(\d+):(\d+)<")
@@ -1185,6 +1196,7 @@ def run_submission(sub: dict) -> None:
         reused: dict[str, int | None] = {}
         asked: list[str] | None = None
         stopped: _served.ServerStopped | None = None       # 12f.1: the server stopped
+        odd: dict = {}             # 12s: the questions its server failed on, counted
         if (generative or shared) and meter:
             relay = _served.Relay(rec, meter).__enter__()
         for i, task in enumerate(tasks, 1):
@@ -1243,7 +1255,7 @@ def run_submission(sub: dict) -> None:
                 status, stopped = _ask_served(sid, rec, meta, task, task_out, label, log_path,
                                               everyday, asked, safety=safety, meter=meter,
                                               evd_dir=evd_dir, trust_dir=trust_dir,
-                                              sq_dir=sq_dir, mab_dir=mab_dir)
+                                              sq_dir=sq_dir, mab_dir=mab_dir, odd=odd)
                 gpu_seconds += time.time() - t_task
                 db.update(sid, gpu_seconds=gpu_seconds)
                 if status == CANCELED:
@@ -1630,6 +1642,8 @@ def run_submission(sub: dict) -> None:
 
         # 12m.3: what the run cost on OpenRouter, on its row
         def spent(line: str) -> str:
+            # 12s: and the questions its server failed on, after the run's own line
+            line = " · ".join(x for x in (line, _served.odd_line(odd).strip(" ·")) if x)
             return " · ".join(x for x in (line, f"{_served.usd(meter.spent)} on OpenRouter")
                               if x) if meter else line
         if failed_tasks:

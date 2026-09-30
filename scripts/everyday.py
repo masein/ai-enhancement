@@ -2431,7 +2431,9 @@ def answers(model_dir: Path) -> dict[str, dict]:
                     continue
                 k = answer_key(doc)
                 out[k] = {"key": k, "id": doc["id"], "prompt_hash": prompt_hash(doc.get("prompt")),
-                          "raw": _judge._answer(rec), "at": at}
+                          "raw": _judge._answer(rec), "at": at,
+                          # 12s: what its server did on this question, kept with it
+                          **{s: rec[s] for s in _judge.SERVER_KEYS if isinstance(rec.get(s), dict)}}
     return out
 
 
@@ -2511,7 +2513,14 @@ def _item(q: dict, rec: dict, verdicts: dict, before: dict, memory: dict | None 
     if parts["had_reasoning"]:
         it.update(reasoning_text=parts["reasoning_text"],
                   reasoning_words=_judge.words(parts["reasoning_text"]))
-    if parts["no_answer"]:
+    if parts.get("raw_fallback"):
+        it["raw_fallback"] = parts["raw_fallback"]
+    if parts.get("server_error"):
+        # 12s: its server failed on the question, asked its own way and without
+        # its chat parsing: counted failed, and the reason says whose failure
+        it.update({"pass": False, "reason": _judge.server_failed(parts["server_error"]),
+                   "server_error": parts["server_error"]})
+    elif parts["no_answer"]:
         it.update({"pass": False, "reason": NEVER_FINISHED, "no_answer": True})
     elif not ans.strip():
         it.update({"pass": False, "reason": "the model wrote nothing"})
@@ -2567,7 +2576,8 @@ def mark(model_dir: Path, verdicts: dict[str, dict] | None = None,
     memory = verdict_memory(model_dir)
     current = [(q, got[answer_key(q)]) for q in bank if answer_key(q) in got]
     if current:
-        items = [_item(q, {"filtered_resps": [a["raw"]], "resps": [[a["raw"]]]},
+        items = [_item(q, {"filtered_resps": [a["raw"]], "resps": [[a["raw"]]],
+                           **{s: a[s] for s in _judge.SERVER_KEYS if a.get(s)}},
                        verdicts, before, memory) for q, a in current]
         new = len({q["id"] for q, _ in current} & set(asked or ()))
         # 12n.1: a question reworded since this model answered it — its answer

@@ -147,6 +147,21 @@ def test_a_double_failure_is_no_answer_and_the_row_goes_on(svc, fake):  # noqa: 
     assert queue(mid)["status"] == "done" and len(fake.requests) == n
 
 
+def test_a_server_without_the_raw_way_round_is_no_answer_too(svc, fake):  # noqa: F811
+    # 12s: an older llama-server has no /apply-template or /completion and says 404: the
+    # fallback failed, so the item has no answer and the row goes on — never "refused"
+    mid = register(fake, "Qwen3.6 lookahead MTP")
+    k = MATH[6]
+    fake.chat_error = fails_on(f"Fixture problem {k}.")
+    fake.raw_error = fails_on(f"Fixture problem {k}.", status=404, said="File Not Found")
+    row = queue(mid)
+    assert row["status"] == "done", row["error"]
+    it = item(mid, "math", k)
+    assert it["error"]["chat"] == f"HTTP 500: {PEG}"
+    assert it["error"]["fallback"].startswith("HTTP 404: ") and "File Not Found" in it["error"]["fallback"]
+    assert json.loads((row_dir(mid) / dm.OUT_NAME).read_text())["errors"] == 1
+
+
 def test_a_400_is_the_items_own_too(svc, fake):  # noqa: F811
     mid = register(fake, "Qwen3.6 lookahead MTP")
     k = MATH[2]

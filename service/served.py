@@ -88,6 +88,47 @@ class _Retry(Exception):
     """worth asking again: no answer, a timeout, a 5xx, 408 or 429"""
 
 
+class ItemError(Exception):
+    """12s: the server answered this question with an error of its own — it is
+    up, and the next question may be fine. llama-server says 500 when its chat
+    parser can't read what the model wrote ("The model produced output that
+    does not match the expected peg-native format"), 400 when a request is one
+    it can't take (a text longer than its context)"""
+
+
+# the statuses that are about one request, from a llama-server that is
+# answering. A model from OpenRouter has no raw way round them: asked as before
+ITEM_STATUSES = (400, 500)
+# 12s: more questions than this with no answer either way (its chat endpoint
+# twice, then without its chat parsing) and the server isn't right: the run
+# stops, and keeps none of them as answers — three, or 2% of the task
+ITEM_ERROR_SHARE = 0.02
+RAW_FALLBACK = "raw fallback"
+NO_ANSWER = "no answer after a server error"
+
+
+def item_error_limit(total: int) -> int:
+    return max(3, math.ceil(ITEM_ERROR_SHARE * total))
+
+
+def odd_line(odd: dict | None) -> str:
+    """12s: what a run's line says of the questions the server failed on"""
+    return "".join(f" · {odd[k]} {w}" for k, w in (("raw_fallback", RAW_FALLBACK),
+                                                  ("errors", NO_ANSWER)) if (odd or {}).get(k))
+
+
+def _said(raw: bytes) -> str:
+    """what the server's error body says, in its own words"""
+    try:
+        e = json.loads(raw).get("error")
+        msg = e.get("message") if isinstance(e, dict) else e
+        if msg:
+            return str(msg)[:400]
+    except Exception:                                       # noqa: BLE001 — not JSON: as it is
+        pass
+    return raw[:400].decode("utf-8", "replace")
+
+
 def is_served(model_id: str) -> bool:
     return (model_id or "").startswith(PREFIX)
 
@@ -521,6 +562,11 @@ class Answer(str):
     # the provider that answered
     usage: dict | None = None
     provider: str = ""
+    # 12s: asked without the server's chat parsing, after it failed on the
+    # question twice ({"error": what it said}); and, that failing too, no
+    # answer ({"chat": …, "fallback": …})
+    fallback: dict | None = None
+    error: dict | None = None
 
 
 def ask(rec: dict, text: str, s: dict) -> str:
@@ -533,16 +579,7 @@ def ask(rec: dict, text: str, s: dict) -> str:
     if is_openrouter(rec):
         body.update(_pinned_route(rec))
     base, key = _endpoint(rec)
-    try:
-        st, raw = _http("POST", base + "/chat/completions", key, body,
-                        timeout=config.SERVED_TIMEOUT_S)
-    except Exception as e:                                  # noqa: BLE001 — no answer: retried
-        raise _Retry(str(getattr(e, "reason", e))) from None
-    if st in (408, 429) or st >= 500:
-        raise _Retry(f"HTTP {st}")
-    if st != 200:
-        raise ValueError(f"HTTP {st}: {raw[:160].decode('utf-8', 'replace')}")
-    reply = json.loads(raw)
+    reply = _post(base + "/chat/completions", key, body, item=not is_openrouter(rec))
     msg = (reply.get("choices") or [{}])[0].get("message") or {}
     text = msg.get("content") or ""
     # llama-server says reasoning_content; OpenRouter says reasoning (12m.3)
@@ -558,12 +595,80 @@ def ask(rec: dict, text: str, s: dict) -> str:
     return out
 
 
-def _ask_patiently(rec: dict, text: str, s: dict) -> str:
+def _post(url: str, key: str, body: dict, item: bool = True) -> dict:
+    """a request to the server: its reply, _Retry when it isn't answering,
+    ItemError when it answers this request with an error of its own (`item`:
+    a llama-server's), ValueError when it refuses it"""
+    try:
+        st, raw = _http("POST", url, key, body, timeout=config.SERVED_TIMEOUT_S)
+    except Exception as e:                                  # noqa: BLE001 — no answer: retried
+        raise _Retry(str(getattr(e, "reason", e))) from None
+    if item and st in ITEM_STATUSES:
+        raise ItemError(f"HTTP {st}: {_said(raw)}")
+    if st in (408, 429) or st >= 500:
+        raise _Retry(f"HTTP {st}")
+    if st != 200:
+        raise ValueError(f"HTTP {st}: {raw[:160].decode('utf-8', 'replace')}")
+    return json.loads(raw)
+
+
+def ask_raw(rec: dict, text: str, s: dict) -> "Answer":
+    """12s: the same question without the server's chat parsing — the prompt
+    the server's own template makes of it (POST /apply-template), completed
+    with the same settings (POST /completion), and the raw text as the board
+    reads any answer: a template that opens the thinking itself leaves the
+    tag in the prompt, so it is put back"""
+    root, key = root_of(rec["base_url"]), rec.get("key", "")
+    system = [{"role": "system", "content": s["system"]}] if s.get("system") else []
+    prompt = _post(root + "/apply-template", key, {
+        "messages": [*system, {"role": "user", "content": text}],
+        **({"chat_template_kwargs": s["chat_template_kwargs"]}
+           if s.get("chat_template_kwargs") else {})}).get("prompt")
+    if not isinstance(prompt, str) or not prompt:
+        raise ItemError("/apply-template gave no prompt")
+    reply = _post(root + "/completion", key, {
+        "prompt": prompt, "n_predict": s["max_tokens"], "temperature": s["temperature"],
+        "stop": list(s.get("stop") or []), "cache_prompt": False, "stream": False})
+    raw = reply.get("content") or ""
+    out = Answer(("<think>\n" + raw) if re.search(r"<think>\s*$", prompt) else raw)
+    t = reply.get("timings") if isinstance(reply.get("timings"), dict) else {}
+    used = reply.get("tokens_predicted", t.get("predicted_n"))
+    out.tokens = int(used) if isinstance(used, (int, float)) and used >= 0 else None
+    if isinstance(t.get("draft_n"), (int, float)) and t["draft_n"] > 0:
+        out.draft = {"n": int(t["draft_n"]), "accepted": int(t.get("draft_n_accepted") or 0)}
+    return out
+
+
+def answer_one(rec: dict, text: str, s: dict) -> "Answer":
+    """12s: one question's answer, whatever the server makes of it. Asked; on
+    an error of the question's own (a 500, a 400), once more; then without
+    the server's chat parsing, marked with the server's words; and if that
+    fails too, no answer — an empty one, with both errors. A server that
+    isn't answering at all is another matter (_Retry, then ServerStopped)"""
+    try:
+        return _ask_patiently(rec, text, s)
+    except ItemError:
+        pass
+    try:
+        return _ask_patiently(rec, text, s)
+    except ItemError as e:
+        said = str(e)
+    try:
+        a = _ask_patiently(rec, text, s, ask_raw)
+        a.fallback = {"error": said}
+        return a
+    except (ItemError, ValueError) as e:    # a server with no /apply-template says 404
+        a = Answer("")
+        a.error = {"chat": said, "fallback": str(e)}
+        return a
+
+
+def _ask_patiently(rec: dict, text: str, s: dict, how=None) -> str:
     """a server that doesn't answer is asked again for SERVED_RETRY_S"""
     t0 = time.time()
     while True:
         try:
-            return ask(rec, text, s)
+            return (how or ask)(rec, text, s)
         except _Retry as e:
             if time.time() - t0 >= config.SERVED_RETRY_S:
                 raise ServerStopped(0, 0, str(e)) from None
@@ -579,17 +684,22 @@ def concurrency(rec: dict) -> int:
 
 def answer_task(rec: dict, task: str, docs: list[dict], task_out: Path, s: dict,
                 everyday: bool, on_progress=None, canceled=lambda: False,
-                meter: "Meter | None" = None) -> int:
+                meter: "Meter | None" = None, odd: dict | None = None) -> int:
     """ask every doc and write lm_eval's files: 0, or -15 when canceled — or
     ServerStopped after writing the answers before the first it didn't get.
     `on_progress(done, total, seconds an answer)`. 12m.3: with a `meter`,
     each question is held against the month's AI limit before it is asked
     and counted when answered; a question that could pass the limit stops
-    the run with LimitReached, and every answer already paid for is kept"""
+    the run with LimitReached, and every answer already paid for is kept.
+    12s: an error of one question's own never stops the run (answer_one);
+    `odd` takes what happened — how many were asked the raw way, how many
+    have no answer, and a line for each — unless too many have none: then the
+    server isn't right, the run stops, and none of those is kept as an answer"""
     total = len(docs)
     answers: dict[int, str] = {}
     lock = threading.Lock()
     halt: list[ServerStopped] = []
+    failed: list[int] = []
     t0 = time.time()
 
     def one(i: int) -> None:
@@ -602,7 +712,7 @@ def answer_task(rec: dict, task: str, docs: list[dict], task_out: Path, s: dict,
                 halt.append(LimitReached(0, total, meter))
             return
         try:
-            a = _ask_patiently(rec, text, s)
+            a = answer_one(rec, text, s)
         except ServerStopped as e:
             if meter:
                 meter.release(held)
@@ -619,6 +729,12 @@ def answer_task(rec: dict, task: str, docs: list[dict], task_out: Path, s: dict,
         if meter:
             meter.count(held, a.usage, a.provider)
         with lock:
+            if a.error:
+                failed.append(i)
+                if len(failed) > item_error_limit(total) and not halt:
+                    halt.append(ServerStopped(0, total, a.error["chat"], refused=(
+                        f"the server failed on {len(failed)} questions, asked its own way and "
+                        f"without its chat parsing ({a.error['chat']}): stopped")))
             answers[i] = a
             done = len(answers)
         if on_progress:
@@ -631,15 +747,30 @@ def answer_task(rec: dict, task: str, docs: list[dict], task_out: Path, s: dict,
     # what is finished is kept, in order: a stop keeps the answers before the
     # first gap. 12m.3: at the AI limit, every answer — each is paid for
     at_limit = any(isinstance(e, LimitReached) for e in halt)
+    if any(str(e).startswith("the server failed on") for e in halt):
+        for i in failed:                    # 12s: not answers: the next run asks them
+            answers.pop(i, None)
     gap = total if at_limit else next((i for i in range(total) if i not in answers), total)
     kept = {i: answers[i] for i in sorted(answers) if i < gap}
     if kept or not halt:
         _write(rec, task, docs, kept, task_out, s, total, everyday)
+    if odd is not None:
+        for i in sorted(kept):
+            a = kept[i]
+            if a.fallback or a.error:
+                k = "raw_fallback" if a.fallback else "errors"
+                odd[k] = odd.get(k, 0) + 1
+                odd.setdefault("lines", []).append(
+                    f"{task} question {i + 1} of {total}: " + (
+                        f"{RAW_FALLBACK} — the server said: {a.fallback['error']}" if a.fallback
+                        else f"no answer — the server said: {a.error['chat']}; without its chat "
+                             f"parsing: {a.error['fallback']}"))
     if canceled():
         return -15
     if halt:
         e = next((x for x in halt if isinstance(x, LimitReached)), halt[0])
-        if not isinstance(e, LimitReached) and not str(e).startswith("the server refused"):
+        if not isinstance(e, LimitReached) and not str(e).startswith(
+                ("the server refused", "the server failed on")):
             e = ServerStopped(len(kept), total, e.why)
         e.done, e.total = len(kept), total
         raise e
@@ -668,6 +799,10 @@ def _write(rec: dict, task: str, docs: list[dict], answers: dict[int, str], task
                 "tokens": getattr(raw, "tokens", None),
                 # 12f.3 addendum: MTP's drafted and accepted tokens, when reported
                 "draft": getattr(raw, "draft", None),
+                # 12s: asked without the server's chat parsing (what it said), or
+                # no answer either way (both errors)
+                **({"raw_fallback": raw.fallback} if getattr(raw, "fallback", None) else {}),
+                **({"server_error": raw.error} if getattr(raw, "error", None) else {}),
                 "metrics": ["bypass"], "bypass": 999, "doc_hash": _doc_hash(doc),
                 "prompt_hash": hashlib.sha256(text.encode("utf-8")).hexdigest(),
                 "target_hash": hashlib.sha256(str(doc.get("reference", "")).encode("utf-8"))
