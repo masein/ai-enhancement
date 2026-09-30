@@ -37,6 +37,14 @@ local_dir='/opt/models/bge-small-en-v1.5', allow_patterns=['config.json', 'model
 # because they read files the image leaves out (the Dockerfile, the docs).
 RUN python -m pip install --no-cache-dir --break-system-packages "pytest>=8" httpx
 
+# 12q.D: NLTK's punkt_tab, which IFEval's checkers split sentences with. A run
+# never downloads it: five DeviceMark runs on hf failed at "Resource
+# 'punkt_tab' not found" when the checker went to. Pinned as BGE is — the
+# nltk_data commit, the file's size and git blob hash (scripts/nltk_data.py) —
+# into /usr/share/nltk_data, on NLTK's own search path
+COPY scripts/nltk_data.py /tmp/nltk_data.py
+RUN python /tmp/nltk_data.py --dest /usr/share/nltk_data && rm /tmp/nltk_data.py
+
 # 12h.1: no vLLM in this image. IFEval, MMLU-Pro and MATH-500 run on hf. vLLM
 # 0.26.0 has no CUDA 12.8 build (this image's torch is cu128), and it would
 # move FastAPI below 0.137, away from the version the check tests the service
@@ -57,6 +65,7 @@ RUN if [ "$WITH_MAMBA" = "1" ]; then \
 # landed in a different interpreter than torch).
 RUN python -c "import torch, lm_eval, transformers, accelerate, datasets, fastapi, uvicorn, pytest, httpx; \
 import math_verify, langdetect, nltk, immutabledict; \
+nltk.data.find('tokenizers/punkt_tab/english/'); \
 import lm_eval.models.openai_completions, aiohttp, tenacity, tiktoken; \
 import importlib.util as u; \
 print('image env OK — torch', torch.__version__, '| built for CUDA', torch.version.cuda, \

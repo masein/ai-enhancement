@@ -27,6 +27,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 APPROVED_PATH = HERE / "approved_code.json"
+# 12q.D: the models that can't run here, and why — refused before a run starts
+CANT_RUN_PATH = HERE / "cant_run_here.json"
 
 # name, size, how it thinks, where its thinking ends, and what to watch when
 # it loads. Hugging Face names checked on 2026-09-25
@@ -98,6 +100,16 @@ def approved() -> dict[str, dict]:
     except (OSError, ValueError):
         return {}
     return {k: v for k, v in data.items() if isinstance(v, dict) and v.get("commit")}
+
+
+def cant_run_here(hf_id: str) -> str:
+    """12q.D: why a model can't run on this server ('' when it can), from
+    service/cant_run_here.json — a reviewed list, as the approved one is"""
+    try:
+        entry = json.loads(CANT_RUN_PATH.read_text(encoding="utf-8")).get(hf_id)
+    except (OSError, ValueError):
+        return ""
+    return str((entry or {}).get("why") or "")
 
 
 def approved_code(hf_id: str, revision: str | None = None) -> tuple[bool, str, str | None]:

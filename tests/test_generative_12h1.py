@@ -278,6 +278,9 @@ def hub(monkeypatch, tmp_path):
 
 
 def test_own_code_runs_only_from_the_approved_list(hub, monkeypatch):
+    # the approved list's own rules, apart from 12q.D's: Nemotron-3-Nano-4B, the list's one
+    # entry, can't run on this server's transformers (tests/test_12q_d_hf_runs.py)
+    monkeypatch.setattr(hfmeta.catalog, "cant_run_here", lambda hf_id: "")
     # built into transformers: its own class loads it, the repo's code never runs
     hub(NEMOTRON, "nemotron_h")
     monkeypatch.setattr(hfmeta, "native_architecture", lambda t: t == "nemotron_h")

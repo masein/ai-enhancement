@@ -10691,6 +10691,8 @@ function dmTip(r) {
     ...ours,
     ...(ours.length ? ['ours is never plotted at their device speed: that speed is their '
       + 'quantized build’s'] : []),
+    // 12q.D: a model of theirs this server can't run says so, and why
+    ...(r.cant_run && !ours.length ? [`ours: can't run here — ${r.cant_run}`] : []),
     r.device ? `${r.device.tok_s} tok/s decode on ${r.device.device} · ${r.device.source}`
       : r.external ? `${r.kind === 'cloud' ? 'a cloud API' : 'the built-in model'}: no device `
         + 'speed, drawn as a line' : 'no speed measured on a device yet: drawn as a line',
@@ -10921,8 +10923,14 @@ function dmTable(rows) {
           text: r.external ? 'DeviceMark' + ((r.ours || []).length ? ' · and ours' : '') : 'ours' }),
         r.inherited ? el('span', { class: 'small se', 'data-dm-inherited': r.id,
           text: ` ${r.inherited.line}` }) : ''),
-      el('td', { class: num(r), 'data-dm-composite': r.id },
-        both(r, x => dmPct(x.composite.value) + ci(x), true)),
+      el('td', { class: num(r) + (r.cant_run ? ' dmpair' : ''), 'data-dm-composite': r.id },
+        // 12q.D: theirs, over "ours: can't run here" and why, on hover
+        r.cant_run && !(r.ours || []).length ? [
+          el('span', { 'data-dm-theirs': r.id,
+            text: `theirs (${r.label}): ${dmPct(r.composite.value)}${ci(r)}` }),
+          el('span', { class: 'se', 'data-dm-cant': r.id, 'data-tip': JSON.stringify([r.cant_run]),
+            text: 'ours: can’t run here' })]
+          : both(r, x => dmPct(x.composite.value) + ci(x), true)),
       ...['ifeval', 'mmlu_pro', 'math'].map(b => el('td', { class: num(r), 'data-tip': pairTip(r) },
         both(r, x => dmPct(x.benches[b].acc)))),
       el('td', { class: num(r), 'data-tip': r.external ? JSON.stringify(

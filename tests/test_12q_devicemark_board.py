@@ -251,9 +251,10 @@ def test_our_run_of_their_model_sits_beside_their_row_never_ranked_apart(tmp_pat
         assert not ours["served/Nanbeige4.1-3B-Q8"].get("paired")
         # beside theirs: thinking off first, how each ran, the calibration pair said
         side = theirs["nemotron-4b__int8hu__aimodel"]["ours"]
+        # 12q.D: Nemotron-3-Nano-4B isn't calibration any more (it can't run here)
         assert [(o["id"], o["label"], o["calibration"]) for o in side] == [
-            (nemo, "bf16, our battery", True),
-            (f"{nemo} · thinking", "bf16, our battery, thinking", True)]
+            (nemo, "bf16, our battery", False),
+            (f"{nemo} · thinking", "bf16, our battery, thinking", False)]
         assert side[0]["composite"] == ours[nemo]["row"]["composite"]
         assert set(side[0]["benches"]) == {"ifeval", "mmlu_pro", "math"}
         assert theirs["lfm2.5-1.2b__int8hu__aimodel"]["ours"][0]["calibration"] is False

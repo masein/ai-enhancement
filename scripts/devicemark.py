@@ -812,8 +812,20 @@ THEIR_OPEN = {
     "nanbeige-3b__int8hu__aimodel": "Nanbeige/Nanbeige4.1-3B",
     "youtu-2b__int8__aimodel": "tencent/Youtu-LLM-2B",
 }
-# 12q.A's calibration pair: how close our measurement comes to theirs
-CALIBRATION = ("nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16", "Qwen/Qwen3.5-4B")
+# the calibration: how close our measurement comes to theirs, on the models
+# whose raw files match DeviceMark's board (12q.D: Nemotron-3-Nano-4B can't
+# run here — CANT_RUN_PATH)
+CALIBRATION = ("Qwen/Qwen3.5-4B", "Nanbeige/Nanbeige4.1-3B", "tencent/Youtu-LLM-2B")
+CANT_RUN_PATH = REPO / "service" / "cant_run_here.json"
+
+
+def cant_run_here() -> dict[str, str]:
+    """12q.D: hf id -> why this server can't run it (service/cant_run_here.json)"""
+    try:
+        return {k: str(v.get("why") or "") for k, v in json.loads(
+            CANT_RUN_PATH.read_text(encoding="utf-8")).items() if isinstance(v, dict)}
+    except (OSError, ValueError):
+        return {}
 DTYPES = {"bfloat16": "bf16", "float16": "fp16", "float32": "fp32"}
 QUANTS = {"int8hu": "int8"}
 
@@ -833,6 +845,11 @@ def pair(ours: list[dict], theirs: list[dict]) -> None:
     """each of our hf runs of one of their open models, beside their row
     (`ours` on it, thinking off first) and out of our own rows (`paired`)"""
     by_hf = {THEIR_OPEN[t["id"]]: t for t in theirs if t["id"] in THEIR_OPEN}
+    # 12q.D: a model of theirs this server can't run says so on their row
+    cant = cant_run_here()
+    for hf, t in by_hf.items():
+        if cant.get(hf):
+            t["cant_run"] = cant[hf]
     for r in sorted(ours, key=lambda r: r["thinking"]):
         t = by_hf.get(r["model"])
         if t and str((r["row"].get("setup") or {}).get("runtime", "")).startswith("hf"):

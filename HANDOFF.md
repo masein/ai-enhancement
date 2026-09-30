@@ -4485,7 +4485,8 @@ Not before the demo: a new hidden set changes every Everyday score.
     intervals: "theirs (int8, iPhone): 61.4 ±3.6" over "ours (bf16, our
     battery): …"; a thinking run is a third line;
   - their point's hover gives ours too (composite, interval, the three
-    benches), with "calibration" on Nemotron-3-Nano-4B and Qwen3.5-4B;
+    benches), with "calibration" on Qwen3.5-4B, Nanbeige4.1-3B and Youtu-LLM-2B
+    (12q.D: the three whose raw files match DeviceMark's board);
   - **ours is never plotted at their device speed**, which is their quantized
     build's: no point and no line of its own. It isn't ranked apart
     (`rank_all` null, `paired` names their row);
@@ -4503,7 +4504,7 @@ Not before the demo: a new hidden set changes every Everyday score.
   | Qwen3.5-2B | `Qwen/Qwen3.5-2B` | no | Apache-2.0 | none | ~4.5 GB |
   | Qwen3.5-4B | `Qwen/Qwen3.5-4B` | no | Apache-2.0 | none | ~9.3 GB |
   | Gemma 4 E2B | `google/gemma-4-E2B-it` | no | Apache-2.0 | none | ~10 GB |
-  | Nemotron-3-Nano-4B | `nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16` | no | NVIDIA Nemotron Open Model License | ships its own (`auto_map`); `nemotron_h` is built in and tried first; on the approved list at dfaf35de3e30, the repo's head | ~7.9 GB |
+  | Nemotron-3-Nano-4B | `nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16` | no | NVIDIA Nemotron Open Model License | **12q.D: can't run here** (below) | ~7.9 GB |
   | Nanbeige4.1-3B | `Nanbeige/Nanbeige4.1-3B` | no | Apache-2.0 | none (a Llama) | ~7.9 GB |
   | Youtu-LLM-2B | `tencent/Youtu-LLM-2B` | no | Youtu-LLM licence | none | ~3.9 GB |
 
@@ -4534,6 +4535,35 @@ Not before the demo: a new hidden set changes every Everyday score.
   as X · the answer is Y · tokens, capped; IFEval's instructions followed,
   strict and loose), a served setup's too. It lists what the board lists: the
   diagnose half.
+
+### 12q.D — what the first hf DeviceMark runs found
+
+- **IFEval scoring needs NLTK's punkt_tab, and the image hadn't got it.** Five
+  hf runs (Qwen3.5-0.8B, LFM2.5-1.2B, Qwen3.5-2B, Youtu-LLM-2B, Nanbeige)
+  failed at "scoring: the IFEval checker failed: Resource 'punkt_tab' not
+  found": the checker asks NLTK to download it the first time it counts a
+  sentence. The image now fetches it at build (`scripts/nltk_data.py`),
+  pinned as BGE is — nltk_data commit 4f15a3d8, 4,319,076 bytes, git blob
+  5e5ff613 — into `/usr/share/nltk_data`, on NLTK's own search path, and the
+  build fails if it isn't found. CI's image-deps job fetches it the same way
+  (`NLTK_DATA`), and `tests/test_image_deps.py` counts sentences with the
+  network cut off and a download made to fail — there and in deploy step 3.
+- **Nemotron-3-Nano-4B can't run here** (`service/cant_run_here.json`, a
+  reviewed list, as the approved one is). transformers 5.5.3's built-in
+  Nemotron-H has layers of three kinds — Mamba, attention, MoE — and this
+  model has plain MLP layers too (the "-" in its `hybrid_override_pattern`:
+  `KeyError: '-'` loading its config); 5.6.0 added them. The repo's own code
+  (approved at dfaf35de3e30) was written for transformers 4.53: it builds its
+  hybrid cache only when generation passes none, and 5.x's generation always
+  passes a standard one, which its Mamba layers can't use. So:
+  - a submission of it is refused, saying why, and never queued (any suite);
+    preflight refuses it too, before anything is fetched;
+  - their row on the On-device chart says "ours: can't run here", with why on
+    hover, and so does their point's hover;
+  - the calibration rests on Qwen3.5-4B, Nanbeige4.1-3B and Youtu-LLM-2B,
+    whose raw files match DeviceMark's board.
+  - It runs here once the image has transformers 5.6.0 or later: the
+    built-in class then maps "-" to an MLP layer. Take it off the list then.
 
 ### 12q.C — a DeviceMark run on its model's page
 

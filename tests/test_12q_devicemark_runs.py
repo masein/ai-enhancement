@@ -135,10 +135,11 @@ def test_what_the_queue_takes_and_refuses(svc, fake, monkeypatch):
         r = post(**kw)
         assert r.status_code == 422 and why in r.json()["detail"], (kw, r.text)
     monkeypatch.setattr("service.hfmeta.remote_code_check", lambda h: {"own_code": False})
-    r = post(hf_id="nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16", part="pilot")
+    # 12q.D: a model this server can run (Nemotron-3-Nano-4B can't, and says so first)
+    r = post(hf_id="Qwen/Qwen3.5-4B", part="pilot")
     assert r.status_code == 422 and "a Hugging Face model sits the whole battery" in \
         r.json()["detail"]
-    assert post(hf_id="nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16").status_code == 200
+    assert post(hf_id="Qwen/Qwen3.5-4B").status_code == 200
     r = client.post("/api/submissions", json={"hf_id": mtp, "suite": "everyday",
                                               "part": "pilot"})
     assert r.status_code == 422 and "devicemark suite only" in r.json()["detail"]

@@ -1,0 +1,6 @@
+{
+  "nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16": {
+    "why": "transformers 5.5.3's built-in Nemotron-H has no plain MLP layers (the '-' in this model's hybrid_override_pattern: they came in 5.6.0), and the repo's own code, written for transformers 4.53, builds its hybrid cache only when generation passes none, which 5.x's generation always does",
+    "added": "2026-09-30"
+  }
+}
