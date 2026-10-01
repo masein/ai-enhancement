@@ -484,6 +484,38 @@ def test_every_chosen_model_is_a_row_or_says_why_not(live, page):
     assert page.errors == []
 
 
+def test_the_empty_table_offers_every_set_that_covers_them(live, page):
+    """12x: not only llama.cpp's — DeviceMark's too, where a chosen model has a row"""
+    import service.app as appmod
+    from test_12q_devicemark_board import SERVED as DM_SETUP, _row
+    _row(config.OUT_DIR, SERVED_MTP, {"ifeval": 0.7, "mmlu_pro": 0.6, "math": 0.5},
+         {**DM_SETUP, "name": NAME + " · MTP"})
+    appmod._cache.update(key=None, payload=None, at=0.0)
+    try:
+        go(page, live, f"tab=models&cols={LOGLIK}&models={ids(SERVED, SERVED_MTP)}",
+           "[data-none-has]")
+        empty = page.locator("[data-none-has]")
+        assert empty.locator("p").inner_text() == (
+            "None of the 2 has any of these 6. 2 can’t be measured this way (served or GGUF) · "
+            "Show their llama.cpp columns · Show their DeviceMark columns")
+        assert empty.locator("[data-other-set]").evaluate_all(
+            "bs => bs.map(b => b.dataset.otherSet)") == ["gguf", "devicemark"]
+        shot(empty, "empty-offers.png")
+        empty.locator("[data-other-set='devicemark']").click()
+        page.wait_for_selector(f"tr[data-lb-row='{SERVED_MTP}'] [data-dm-cell='composite']")
+        # the GGUF entry joined to the plain setup has no DeviceMark row: under the line
+        assert page.locator(f"tr[data-lb-row='{SERVED}']").count() == 0
+        # llama.cpp's columns chosen, DeviceMark's is still offered for the one without
+        go(page, live, f"tab=models&cols=gguf:mmlu&models={ids(SERVED_MTP)}", "[data-lb-card]")
+        assert page.locator("[data-other-set='devicemark']").count() == 1
+        assert page.locator("[data-other-set='gguf']").count() == 0
+    finally:
+        for f in (config.OUT_DIR / SERVED_MTP.replace("/", "__")).glob("devicemark*"):
+            f.unlink()
+        appmod._cache.update(key=None, payload=None, at=0.0)
+    assert page.errors == []
+
+
 def test_labels_keep_what_tells_them_apart(live, page):
     go(page, live, "tab=benchmarks&sub=standard", "[data-bench-pick]")
     names = ["Qwen3.6-35B-A3B k4-LDA · lookahead 1", "Qwen3.6-35B-A3B original · lookahead 1",

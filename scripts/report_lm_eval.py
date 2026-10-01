@@ -8881,7 +8881,7 @@ function lbSortLabel(cols) {
   const cs = cols || [];
   const c = cs.find(x => x.key === state.sort.key) || cs.find(x => x.key === 'avg')
     || cs.find(x => x.key === 'cavg') || cs.find(x => x.key === 'javg')
-    || cs.find(x => x.key === 'name');
+    || cs.find(x => x.key === 'dm:composite') || cs.find(x => x.key === 'name');
   return `${c ? (c.label || c.key) : state.sort.key} ${state.sort.dir > 0 ? '▲' : '▼'}`;
 }
 
@@ -9338,8 +9338,10 @@ const LB_CHIPS = [
   // 12n.1: the home of reported scores (live: the frozen report carries none)
   ['frontier', 'Frontier · reported'],
   // 12q.B: DeviceMark's on-device chart, our phone builds on it (live, as Frontier)
-  ['ondevice', 'On-device chart']];
-const LIVE_CHIPS = ['frontier', 'ondevice'];
+  ['ondevice', 'On-device chart'],
+  // 12x: its rows as columns of the table, ours and the models it pairs
+  ['devicemark', 'DeviceMark']];
+const LIVE_CHIPS = ['frontier', 'ondevice', 'devicemark'];
 // the four kinds of test, named the same and in the same order everywhere.
 // A kind with no data yet is not offered: On phone (12f.2) once a phone build
 // is registered
@@ -9539,6 +9541,8 @@ function lbBenchGroups() {
   // 12f.3: measured on the GGUF — chosen only with each other for an Avg
   if (Object.keys(G().models || {}).length)
     out.push(['gguf', G().group, (G().order || []).map(b => 'gguf:' + b)]);
+  // 12x: DeviceMark's, while a model has a row
+  if (dmAny()) out.push(['devicemark', DM_GROUP, DM_KEYS]);
   return out;
 }
 const lbBenchAll = () => lbBenchGroups().flatMap(([, , ts]) => ts);
@@ -9548,7 +9552,7 @@ const lbBenchAll = () => lbBenchGroups().flatMap(([, , ts]) => ts);
 function lbBenchPicker() {
   const have = new Set(lbBenchAll());
   return CATS.map(([g, ts]) => [g, LB_GROUP[g], ts.map(t => [t, have.has(t)])])
-    .concat(lbBenchGroups().filter(([g]) => g === 'other' || g === 'gguf')
+    .concat(lbBenchGroups().filter(([g]) => g === 'other' || g === 'gguf' || g === 'devicemark')
       .map(([g, name, ts]) => [g, name, ts.map(t => [t, true])]));
 }
 // the chosen benchmarks in the checklist's order, the unknown ones dropped;
@@ -9574,6 +9578,7 @@ const BENCH_NAMES = { mmlu: 'MMLU', hellaswag: 'HellaSwag', piqa: 'PIQA', winogr
   dm_ifeval: 'IFEval (DeviceMark protocol)', dm_mmlu_pro: 'MMLU-Pro (DeviceMark protocol)',
   dm_math: 'MATH (DeviceMark protocol)' };
 const benchName = t => isGgufKey(t) ? `${ggufLabel(t.slice(5))} (GGUF)`
+  : isDmKey(t) ? dmField(t.slice(3)).name
   : BENCH_NAMES[t] || LB_SHORT[t] || t;
 // the mean of the chosen benchmarks, on the Scale pill's scale; each error
 // scales as its score does, and the errors add as variances (separate item
@@ -9604,6 +9609,64 @@ function ggufCol(b) {
     group: G().group || 'Measured on the GGUF', unit: '0-shot · %' };
 }
 const ggufCols = () => (G().order || []).map(ggufCol);
+// ---- 12x: DeviceMark's protocol, as columns of the table ----
+// From the runs (DATA.devicemark): each model's newest scored row by thinking
+// mode, as the On-device chart ranks them — a served setup's and a Hugging
+// Face model's alike. Thinking on is a row of its own, "· thinking". Never in
+// any average: the composite is DeviceMark's own, and answered and tokens are
+// not scores
+const DM_GROUP = 'DeviceMark protocol';
+const DM_FIELDS = [
+  { f: 'composite', short: 'DeviceMark', name: 'DeviceMark composite',
+    unit: 'composite · % · ± half its 95% interval' },
+  { f: 'ifeval', short: 'IFEval (DM)', name: 'IFEval (DeviceMark protocol)', unit: '% · ±' },
+  { f: 'mmlu_pro', short: 'MMLU-Pro (DM)', name: 'MMLU-Pro (DeviceMark protocol)', unit: '% · ±' },
+  { f: 'math', short: 'MATH (DM)', name: 'MATH (DeviceMark protocol)', unit: '% · ±' },
+  { f: 'answered', short: 'Answered', name: 'Answered (DeviceMark protocol)',
+    unit: '% of the battery with an answer', noLead: true },
+  { f: 'tokens', short: 'Tokens', name: 'Median tokens (DeviceMark protocol)',
+    unit: 'median per answer, thinking included', noLead: true }];
+const DM_KEYS = DM_FIELDS.map(x => 'dm:' + x.f);
+const isDmKey = t => String(t).startsWith('dm:');
+const dmField = f => DM_FIELDS.find(x => x.f === f) || { f, short: f, name: f, unit: '' };
+const DM_THINKING = ' · thinking';
+const dmBaseId = id => String(id).endsWith(DM_THINKING) ? String(id).slice(0, -DM_THINKING.length) : id;
+const dmRowById = id => (((((DATA || {}).devicemark || {})[dmBaseId(id)] || {})
+  [String(id).endsWith(DM_THINKING) ? 'on' : 'off']) || {}).row || null;
+function dmVal(id, f) {
+  const r = dmRowById(id);
+  if (!r) return null;
+  if (f === 'composite') return (r.composite || {}).value ?? null;
+  if (f === 'answered') return r.answered_pct ?? null;
+  if (f === 'tokens') return r.median_tokens ?? null;
+  return ((r.benches || {})[f] || {}).acc ?? null;
+}
+// the 95% interval's half, in points, of a score that has one
+function dmHalfOf(id, f) {
+  const r = dmRowById(id) || {};
+  const ci = f === 'composite' ? (r.composite || {}).ci : ((r.benches || {})[f] || {}).ci;
+  return ci && ci.length === 2 ? (50 * (ci[1] - ci[0])).toFixed(1) : null;
+}
+const dmAny = () => Object.values((DATA || {}).devicemark || {})
+  .some(x => (x.off || {}).row || (x.on || {}).row);
+function dmCol(f) {
+  const x = dmField(f);
+  return { key: 'dm:' + f, dm: f, label: x.name, short: x.short, num: true, group: DM_GROUP,
+    unit: x.unit, noLead: !!x.noLead };
+}
+const dmCols = () => DM_FIELDS.map(x => dmCol(x.f));
+// are DeviceMark's columns shown — chosen, or its chip
+const dmShown = L => L.view === 'standard' && (L.cols ? L.cols.some(isDmKey) : L.chip === 'devicemark');
+// a model's thinking-on DeviceMark row, where the board has no row of that
+// name (a served setup's never has: its thinking runs are DeviceMark's alone)
+function dmThinkingRows(ms) {
+  const have = new Set(DATA.models.map(m => m.id));
+  return ms.filter(m => !m.thinkingRow && dmRowById(m.id + DM_THINKING)
+      && !have.has(m.id + DM_THINKING))
+    .map(m => ({ ...m, id: m.id + DM_THINKING, name: m.name + DM_THINKING, thinkingRow: true,
+      dmHome: m.id, avg: null, avgRaw: null, judgedAvg: null, judge: null, duplicateOf: null,
+      tainted: [], provisional: false, gen: null, rowOf: m.rowOf || null }));
+}
 // 12f.2b: what was measured on the phone, as reported — its newest report
 const phoneRep = id => ((state.phone.byId || {})[id] || [])[0] || null;
 const REP_GROUP = 'On the phone · reported';
@@ -9648,12 +9711,14 @@ const gpqaForms = ts => (ts || []).filter(t => t === GPQA_COT || t === GPQA_LL |
 // 12o.1: the chosen benchmarks by how they are measured — lm_eval's, and
 // llama.cpp's on the GGUF — each averaged on its own: [[method, benchmarks]]
 function customMethods(ts) {
-  const lm = (ts || []).filter(t => !isGgufKey(t)), gg = (ts || []).filter(isGgufKey);
+  // 12x: DeviceMark's columns are in no average
+  const lm = (ts || []).filter(t => !isGgufKey(t) && !isDmKey(t)), gg = (ts || []).filter(isGgufKey);
   return [['lm_eval', lm], ['llama.cpp', gg]].filter(([, x]) => x.length);
 }
 const isCavg = c => c.key === 'cavg' || c.key.startsWith('cavg:');
 function customAvg(m, ts) {
-  if (!ts || !ts.length) return null;
+  ts = (ts || []).filter(t => !isDmKey(t));                // 12x: never averaged
+  if (!ts.length) return null;
   if (gpqaForms(ts).length > 1) return null;
   // 12f.3: GGUF columns average only with GGUF columns — the prompts differ
   if (ts.some(isGgufKey) && !ts.every(isGgufKey)) return null;
@@ -9853,11 +9918,13 @@ function lbColumns(ms) {
       unit: state.avgMode === 'raw' ? 'raw · %' : 'above chance · %' });
     // 12o.1: chosen across methods, one Avg a method — never one across them
     const byMethod = customMethods(L.cols);
+    // 12x: DeviceMark's alone have no average to show
     lead.splice(3, 1, ...(byMethod.length > 1
       ? byMethod.map(([what, ts], i) => avgOf(i ? 'cavg:' + what : 'cavg', ts, what))
-      : [avgOf('cavg', L.cols, '')]));
+      : byMethod.length ? [avgOf('cavg', byMethod[0][1], '')] : []));
     // 12n.1: only what was chosen — never a column nobody chose
-    return [...lead, ...L.cols.map(t => isGgufKey(t) ? ggufCol(t.slice(5)) : task(t)), ...tail];
+    return [...lead, ...L.cols.map(t => isGgufKey(t) ? ggufCol(t.slice(5))
+      : isDmKey(t) ? dmCol(t.slice(3)) : task(t)), ...tail];
   }
   let mid;
   if (L.chip === 'all') {
@@ -9876,6 +9943,11 @@ function lbColumns(ms) {
            ...areasHere.map(a => ({ key: 'area:' + a, label: a, num: true, area: a,
              group: 'MMLU by area', unit: 'hidden questions · %' })),
            ...cats];
+  } else if (L.chip === 'devicemark') {
+    // 12x: DeviceMark's own numbers, sorted by its composite — the Standard
+    // rank and average are Standard's
+    lead.splice(0, lead.length, ...lead.filter(c => c.key !== 'rank' && c.key !== 'avg'));
+    mid = dmCols();
   } else if (L.chip === 'judged') {
     // 12b: the Knowledge exam view stands on its own numbers — the Standard
     // rank and average are Standard's, and a model with no exam result is
@@ -10027,7 +10099,9 @@ function lbFilter(ms) {
         || (L.status === 'ranked' && officialAvg(m) != null)
         || (L.status === 'preliminary' && officialAvg(m) == null && !narrow(m))
         || (L.status === 'tainted' && (m.tainted || []).length))
-    && (!L.models || L.models.includes(m.id)));
+    && (!L.models || L.models.includes(m.id)
+      // 12x: and its thinking-on DeviceMark row with it, as the On-device chart has both
+      || (m.thinkingRow && dmShown(L) && L.models.includes(dmBaseId(m.id)) && !!dmRowById(m.id))));
 }
 
 // A "Label: Value ▾" pill with a single-choice menu on the shared popover
@@ -10046,15 +10120,17 @@ function pillMenu(key, label, opts, cur, pick, attrs = {}) {
 // cannot tell from it — over the whole board, so a filter never changes them.
 // They are bold, and (with Tint on) tinted; every other cell is plain. This
 // replaced five rank steps, which painted the top of a 14-model board one slab.
-function lbLeaders(cols, val) {
+function lbLeaders(cols, val, extra = []) {
   const out = {};
   for (const c of cols) {
     // 12f.2b: a reported number is shown, never ranked against the others
-    if (!c.num || c.key === 'params' || c.rep) continue;
+    if (!c.num || c.key === 'params' || c.rep || c.noLead) continue;
     // provisional scores are never tinted: a judged column is on the board
     // only once the judge is calibrated, and a model whose judge is not ok
     // has no judged cell to tint
-    const pool = DATA.models.filter(m => !m.duplicateOf
+    // 12x: and the thinking rows made for DeviceMark's columns
+    const all = [...DATA.models, ...extra];
+    const pool = all.filter(m => !m.duplicateOf
       && (c.key !== 'avg' || officialAvg(m) != null)
       && (!c.judged && !c.jarea || judgedOkM(m)))
       .map(m => ({ id: m.id, v: val(m, c) })).filter(x => x.v != null);
@@ -10065,7 +10141,7 @@ function lbLeaders(cols, val) {
     // 0.005) of the best is inside the noise, as the Perplexity tab says
     const band = Math.max(0.005, 0.01 * Math.abs(best.v));
     const lead = new Set(pool.filter(x => x.id === best.id || (c.lower ? x.v <= best.v + band
-      : tiedWithBest(c, DATA.models.find(m => m.id === x.id), best, val))).map(x => x.id));
+      : tiedWithBest(c, all.find(m => m.id === x.id), best, val))).map(x => x.id));
     out[c.key] = { best, lead };
   }
   return out;
@@ -10095,6 +10171,11 @@ function tiedWithBest(c, m, best, val) {
     const b = DATA.models.find(x => x.id === best.id);
     const x = areaMmlu(b, c.area), y = areaMmlu(m, c.area);
     return !!(x && y) && pair(x.se, y.se, x.v, y.v);
+  }
+  // 12x: a DeviceMark score's error from half its 95% interval
+  if (c.dm) {
+    const se = id => { const h = dmHalfOf(id, c.dm); return h == null ? null : Number(h) / 196; };
+    return pair(se(best.id), se(m.id), dmVal(best.id, c.dm), dmVal(m.id, c.dm));
   }
   return false;
 }
@@ -11963,6 +12044,9 @@ function vLeaderboard(ms) {
       lbToolbar(ms, lbColumns(ms), new Set(), 0), lbCustomLine(0, 0),
       el('p', { class: 'note', 'data-no-bench': '1', text: 'No benchmark chosen: tick one under '
         + 'Benchmarks ▾, or choose a group.' }))];
+  // 12x: a model's thinking-on DeviceMark row, beside it while those columns show
+  const dmMade = dmShown(L) ? dmThinkingRows(ms) : [];
+  ms = [...ms, ...dmMade];
   const cols = lbColumns(ms);
   const shown = lbShownFor(cols);
   const opt = cols.filter(c => c.optional);
@@ -11996,12 +12080,13 @@ function vLeaderboard(ms) {
     : c.area ? (areaMmlu(m, c.area) || {}).v
     : c.cat ? ((mmluCats(m) || {})[c.cat] || {}).score_report
     : c.gguf ? (ggufOf(m.id, c.gguf) || {}).v
+    : c.dm ? dmVal(m.id, c.dm)
     : c.rep ? repVal(m, c)
     : c.task ? (cell(c.task, m.id) || {}).v : null;
   const rowsIn = lbFilter(ms);
   const sortCol = cols.find(c => c.key === state.sort.key) || cols.find(c => c.key === 'avg')
     || cols.find(c => c.key === 'cavg') || cols.find(c => c.key === 'javg')
-    || cols.find(c => c.key === 'name');
+    || cols.find(c => c.key === 'dm:composite') || cols.find(c => c.key === 'name');
   const sorted = [...rowsIn].sort((a, b) => {
     const va = val(a, sortCol), vb = val(b, sortCol);
     if (va == null && vb == null) return 0;
@@ -12025,15 +12110,18 @@ function vLeaderboard(ms) {
   // them — one missing any is not averaged, and says what it is missing.
   // 12o.1: a row with any of them, its missing cells "—"; the Avg still needs
   // every one of its method's
-  const benchVal = (t, id) => ((isGgufKey(t) ? ggufOf(id, t.slice(5)) : cell(t, id)) || {}).v;
+  const benchVal = (t, id) => isDmKey(t) ? dmVal(id, t.slice(3))
+    : ((isGgufKey(t) ? ggufOf(id, t.slice(5)) : cell(t, id)) || {}).v;
   // 12f.2b: a model served elsewhere, a GGUF with no server, or a setup row
   // can have only some columns: the rest are left blank, and a chip with
   // none of them leaves it out. A harness task, an MMLU area or topic needs
   // the model loaded here — a generative task a server answers, and the
   // exam; the GGUF group needs the file
-  const measures = c => !!(c.task || c.area || c.cat || c.judged || c.jarea || c.gguf);
+  const measures = c => !!(c.task || c.area || c.cat || c.judged || c.jarea || c.gguf || c.dm);
   const hasFile = m => !!(G().registered || {})[m.rowOf || m.id];
-  const canHave = (m, c) => !narrow(m) || (c.gguf ? hasFile(m)
+  // 12x: DeviceMark asks a served setup as it asks a Hugging Face model; a
+  // GGUF file alone, or a setup's row, it never asks
+  const canHave = (m, c) => !narrow(m) || (c.dm ? !(m.rowOf || ggufOnly(m)) : c.gguf ? hasFile(m)
     : !(m.rowOf || ggufOnly(m)) && (c.task ? servedAsks(c.task) : !(c.area || c.cat)));
   // what the board measured decides the rows; a reported number never does
   // 12m.1: a GGUF measured only in a setup is still a row where GGUF columns
@@ -12054,7 +12142,8 @@ function vLeaderboard(ms) {
   const notTested = ordered.filter(m => !testedIn(m) && !(m.duplicateOf && dupsOf[m.duplicateOf])
     && (!!L.models || !(narrow(m) && !couldHave(m)) && !m.rowOf));
   // the columns asked of a model here: the chosen ones, or this chip's
-  const asked = custom ? L.cols.map(t => isGgufKey(t) ? { gguf: t.slice(5) } : { task: t })
+  const asked = custom ? L.cols.map(t => isGgufKey(t) ? { gguf: t.slice(5) }
+    : isDmKey(t) ? { dm: t.slice(3) } : { task: t })
     : dataCols.filter(measures);
   // can't be measured this way at all: a server or a GGUF, and none of these
   // (a server this chip can ask its written tasks is only not tested yet)
@@ -12064,7 +12153,7 @@ function vLeaderboard(ms) {
     state.src, state.avgMode, L.view, L.chip, L.kind, L.size, L.status, L.models, L.cols]));
   const rows = lbPg.rows.flatMap(m => [m, ...((state.lbDupOpen || {})[m.id] ? dupsOf[m.id] || [] : [])]);
   // the leaders are bold whatever the Tint switch says; Tint only adds the wash
-  const leaders = lbLeaders(visCols, val);
+  const leaders = lbLeaders(visCols, val, dmMade);
 
   // the chosen average stands in for Avg, arrow and all (12h.2)
   const sortedBy = c => state.sort.key === c.key || (custom && isCavg(c) && sortCol === c);
@@ -12139,7 +12228,7 @@ function vLeaderboard(ms) {
       onclick: e => {
         // links, buttons, checkboxes and badges with a job of their own keep it
         if (e.target.closest('a, button, input, select, label, .badge[title]')) return;
-        navigate({ model: m.rowOf || m.id, topic: null });
+        navigate({ model: m.rowOf || m.dmHome || m.id, topic: null });
       } },
       visCols.map(c => {
         if (c.key === 'rank') {
@@ -12180,11 +12269,11 @@ function vLeaderboard(ms) {
               onchange: e => { const t = new Set(L.ticks || []);
                 if (e.target.checked) t.add(m.id); else t.delete(m.id);
                 L.ticks = [...t]; render(); } }) : '',
-            mnameLink(m, lbShort, { href: '#model=' + encodeURIComponent(m.rowOf || m.id) }),
+            mnameLink(m, lbShort, { href: '#model=' + encodeURIComponent(m.rowOf || m.dmHome || m.id) }),
             ckBadge(m) || (m.kind === 'instruct'
               ? el('span', { class: 'badge instruct', text: 'instruct' })
               : el('span', { class: 'badge', text: 'base' })),
-            phoneTag(m) || servedTag(m.id),
+            phoneTag(m) || servedTag(m.dmHome || m.id),
             // 12h.1: a thinking row, or a model that cannot stop thinking
             m.thinkingRow || ((m.gen || {}).thinking || {}).mode === 'always'
               ? el('span', { class: 'badge instruct', 'data-thinking-badge': m.id,
@@ -12279,6 +12368,20 @@ function vLeaderboard(ms) {
           return one(c, m, g.score_report, null, pctn, { title: `${g.n_report} leaderboard-half items` });
         }
         if (c.rep) return repCell(m, c);
+        // 12x: DeviceMark's row: a score with half its 95% interval, the
+        // answered share, and the median tokens an answer
+        if (c.dm) {
+          const r = dmRowById(m.id), v = dmVal(m.id, c.dm);
+          if (v == null) return el('td', { class: 'num se', 'data-dm-cell': c.dm, text: '—',
+            title: r ? null : 'no DeviceMark run' + (m.thinkingRow ? ' with thinking on' : '') });
+          const from = [r.inherited ? r.inherited.line : '', r.paired ? 'beside DeviceMark’s own row'
+            : r.rank ? `rank ${r.rank} on the On-device chart` : ''].filter(Boolean).join(' · ');
+          if (c.dm === 'tokens') return el('td', { class: 'num tcell', 'data-dm-cell': 'tokens',
+            title: from || null, text: Math.round(v).toLocaleString('en') });
+          return one(c, m, v, c.dm === 'answered' ? null : dmHalfOf(m.id, c.dm), pctn,
+            { 'data-dm-cell': c.dm, title: [c.dm === 'answered' ? '' : 'the ± is half the 95% '
+              + 'interval', from].filter(Boolean).join(' · ') || null });
+        }
         if (c.gguf) {
           const g = ggufOf(m.id, c.gguf);
           // 12m.1: a GGUF's own row holds its "as built" results alone; a
@@ -12321,7 +12424,9 @@ function vLeaderboard(ms) {
     const text = 'no ' + miss.map(benchName).join(', ');
     // 12k.2: Do-Not-Answer and XSTest are the safety suite's, asked as IFEval is
     const asked = t => t === 'do_not_answer' || t === 'xstest' || isMab(t);
-    const harness = miss.filter(t => !isGen(t) && !asked(t));
+    // 12x: DeviceMark's are asked as its protocol asks, of a server too
+    if (miss.length && miss.every(isDmKey)) return { text, suite: 'devicemark' };
+    const harness = miss.filter(t => !isGen(t) && !asked(t) && !isDmKey(t));
     if (m.thinkingRow && harness.filter(t => t !== GPQA_COT && t !== SIMPLEQA).length)
       return { text: text + ' · a thinking row has only IFEval, MMLU-Pro, MATH-500, GPQA '
         + 'Diamond (CoT) and SimpleQA Verified' };
@@ -12338,6 +12443,23 @@ function vLeaderboard(ms) {
   const llama = llamaCounterparts(asked);
   const llamaVals = m => llama.map(b => [b, ggufOf(m.id, b)]).filter(([, g]) => g)
     .map(([b, g]) => `${ggufLabel(b)} ${(100 * g.v).toFixed(1)}`);
+  // 12x: the other column sets that hold numbers for these models, each a
+  // button that shows it: llama.cpp's on their GGUF — the chosen columns'
+  // counterparts where it has them, else every one it measured — and
+  // DeviceMark's
+  const otherSets = ms2 => {
+    const out = [];
+    const onFile = b => ms2.some(m => hasFile(m) && ggufOf(m.id, b));
+    const gg = llama.some(onFile) ? llama : (G().order || []).filter(onFile);
+    if (gg.length && !(custom && L.cols.every(isGgufKey)))
+      out.push(llamaSwitch(gg, { 'data-llama-switch': 'all', 'data-other-set': 'gguf' },
+        'Show their llama.cpp columns'));
+    if (ms2.some(m => dmRowById(m.id) || dmRowById(m.id + DM_THINKING)) && !dmShown(L))
+      out.push(el('button', { class: 'quiet', 'data-other-set': 'devicemark',
+        text: 'Show their DeviceMark columns',
+        onclick: () => lbSet({ view: 'standard', cols: DM_KEYS }) }));
+    return out;
+  };
   const notHere = m => {
     const srv = !!m.served && !m.rowOf && !ggufOnly(m);
     const vals = hasFile(m) ? llamaVals(m) : [];
@@ -12369,7 +12491,7 @@ function vLeaderboard(ms) {
       // 12i.0: a chosen model with no score in these columns is not "tested"
       // 12n.1: a number measured on its GGUF counts too
       lbCustomLine(lbAll.length, lbAll.filter(m => (L.cols || DATA.accTasks)
-        .some(t => benchVal(t, m.id) != null) || dataCols.some(c => c.gguf
+        .some(t => benchVal(t, m.id) != null) || dataCols.some(c => (c.gguf || c.dm)
           && val(m, c) != null)).length),
       statusLine(lbPg, 'models', [
         L.chip === 'judged' || custom ? null
@@ -12379,18 +12501,21 @@ function vLeaderboard(ms) {
       lbPg.pager,
       // the Models tab's empty state, kept: a sentence and the way back
       // 12n.1: what the empty table holds, counted truthfully
-      custom && !lbAll.length && rowsIn.length ? (() => {
+      !lbAll.length && rowsIn.length ? (() => {
         const nCan = notTested.filter(cannot).length, nMiss = notTested.length - nCan;
-        const text = `None of the ${rowsIn.length} has any of these ${L.cols.length}.`
+        // 12x: every other set of columns these models have numbers in — llama.cpp's
+        // on their GGUF, DeviceMark's — not only the one
+        const offers = otherSets(rowsIn);
+        if (!custom && !offers.length) return '';
+        const text = custom ? `None of the ${rowsIn.length} has any of these ${L.cols.length}.`
           + (nMiss ? ` ${nMiss} ${nMiss === 1 ? 'is' : 'are'} under the line with what `
             + `${nMiss === 1 ? 'it’s' : 'they’re'} missing` : '')
-          + (nCan ? `${nMiss ? ';' : ''} ${nCan} can’t be measured this way (served or GGUF)` : '');
-        const sw = nCan && notTested.some(m => cannot(m) && hasFile(m) && llamaVals(m).length);
+          + (nCan ? `${nMiss ? ';' : ''} ${nCan} can’t be measured this way (served or GGUF)` : '')
+          : `None of the ${rowsIn.length} has a number in these columns.`;
         return el('div', { class: 'empty', 'data-empty': '1', 'data-none-has': `${nMiss}|${nCan}` },
-          el('p', {}, text, sw ? [' · ', llamaSwitch(llama, { 'data-llama-switch': 'all' },
-            'Show their llama.cpp columns')] : ''),
-          el('button', { class: 'secondary', 'data-empty-action': '1', text: 'Reset',
-            onclick: () => lbSet({ cols: null, models: null }) }));
+          el('p', {}, text, offers.flatMap(o => [' · ', o])),
+          custom ? el('button', { class: 'secondary', 'data-empty-action': '1', text: 'Reset',
+            onclick: () => lbSet({ cols: null, models: null }) }) : '');
       })() : '',
       // 12i.0: Clear in Models ▾ applies at once, and leaves this
       L.models && !L.models.length ? empty('No model chosen: tick one under Models ▾.',
@@ -12477,7 +12602,9 @@ function lbToolbar(ms, cols, shown, nHidden) {
   const L = lbS();
   const calOk = judgedCalibrated();
   const chips = el('div', { class: 'chips', role: 'group', 'aria-label': 'task groups' },
-    LB_CHIPS.filter(([v]) => !LIVE_CHIPS.includes(v) || LIVE).map(([v, t]) => {
+    // 12x: DeviceMark's, while a model has a row
+    LB_CHIPS.filter(([v]) => (!LIVE_CHIPS.includes(v) || LIVE) && (v !== 'devicemark' || dmAny()))
+      .map(([v, t]) => {
       const off = v === 'judged' && !calOk;
       // 11e: an unavailable chip still takes the click (aria-disabled, not
       // disabled) — the click says why, in one line under the chips; the
@@ -12520,8 +12647,9 @@ function lbToolbar(ms, cols, shown, nHidden) {
     onclick: () => { state.lbFilters = !open; render(); } });
   // the benchmarks in view now, for the checklist: read when it is used, as
   // the panel outlives the render that built it
-  state.lbBenchNow = L.cols || cols.filter(c => c.task && !c.lower && !(DATA.tasks[c.task] || {})
-    .control && (!c.optional || shown.has(c.key))).map(c => c.task);
+  state.lbBenchNow = L.cols || (L.chip === 'devicemark' ? cols.filter(c => c.dm).map(c => c.key)
+    : cols.filter(c => c.task && !c.lower && !(DATA.tasks[c.task] || {})
+      .control && (!c.optional || shown.has(c.key))).map(c => c.task));
   return el('div', { class: 'lbbar narrow' },
     el('div', { class: 'chiprow' }, std ? chips : '',
       el('div', { class: 'pickers', 'data-pickers': '1' },
