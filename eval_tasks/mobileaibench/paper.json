@@ -1,0 +1,288 @@
+{
+ "source": {
+  "name": "MobileAIBench paper",
+  "url": "https://arxiv.org/abs/2406.10290",
+  "date": "2024-06-14",
+  "version": "arXiv:2406.10290v1",
+  "cite": "Murthy et al., MobileAIBench: Benchmarking LLMs and LMMs for On-Device Use Cases (2024)",
+  "tables": "Table 1 (standard NLP tasks) and Table 3 (MT-Bench), the 16-bit rows",
+  "judges": {
+   "mab_mtbench": "GPT-4"
+  }
+ },
+ "models": {
+  "Llama 2 7B": [
+   "meta-llama/Llama-2-7b-chat-hf",
+   "Meta"
+  ],
+  "Mistral 7B": [
+   "mistralai/Mistral-7B-Instruct-v0.2",
+   "Mistral AI"
+  ],
+  "Gemma 7B": [
+   "google/gemma-7b-it",
+   "Google"
+  ],
+  "Phi 2 3B": [
+   "microsoft/phi-2",
+   "Microsoft"
+  ],
+  "Gemma 2B": [
+   "google/gemma-2b-it",
+   "Google"
+  ],
+  "Zephyr 3B": [
+   "stabilityai/stablelm-zephyr-3b",
+   "Stability AI"
+  ],
+  "TinyLlama 1B": [
+   "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+   "TinyLlama"
+  ]
+ },
+ "benchmarks": {
+  "mab_dolly": [
+   "Dolly F1 (MobileAIBench)",
+   "share",
+   "their prompt, 16-bit"
+  ],
+  "mab_hotpotqa": [
+   "HotpotQA F1 (MobileAIBench)",
+   "share",
+   "their prompt, 16-bit"
+  ],
+  "mab_sql": [
+   "SQL SQLParser F1 (MobileAIBench)",
+   "share",
+   "their prompt, 16-bit"
+  ],
+  "mab_cnndm": [
+   "CNN/DailyMail ROUGE-L (MobileAIBench)",
+   "share",
+   "their prompt, 16-bit"
+  ],
+  "mab_xsum": [
+   "XSum ROUGE-L (MobileAIBench)",
+   "share",
+   "their prompt, 16-bit"
+  ],
+  "mab_mtbench": [
+   "MT-Bench (MobileAIBench)",
+   "points",
+   "FastChat's prompts, 16-bit, judge GPT-4"
+  ]
+ },
+ "rows": [
+  {
+   "model": "Llama 2 7B",
+   "task": "mab_dolly",
+   "value": 0.443
+  },
+  {
+   "model": "Llama 2 7B",
+   "task": "mab_hotpotqa",
+   "value": 0.21
+  },
+  {
+   "model": "Llama 2 7B",
+   "task": "mab_sql",
+   "value": 0.492
+  },
+  {
+   "model": "Llama 2 7B",
+   "task": "mab_cnndm",
+   "value": 0.204
+  },
+  {
+   "model": "Llama 2 7B",
+   "task": "mab_xsum",
+   "value": 0.118
+  },
+  {
+   "model": "Mistral 7B",
+   "task": "mab_dolly",
+   "value": 0.498
+  },
+  {
+   "model": "Mistral 7B",
+   "task": "mab_hotpotqa",
+   "value": 0.267
+  },
+  {
+   "model": "Mistral 7B",
+   "task": "mab_sql",
+   "value": 0.485
+  },
+  {
+   "model": "Mistral 7B",
+   "task": "mab_cnndm",
+   "value": 0.204
+  },
+  {
+   "model": "Mistral 7B",
+   "task": "mab_xsum",
+   "value": 0.114
+  },
+  {
+   "model": "Gemma 7B",
+   "task": "mab_dolly",
+   "value": 0.479
+  },
+  {
+   "model": "Gemma 7B",
+   "task": "mab_hotpotqa",
+   "value": 0.098
+  },
+  {
+   "model": "Gemma 7B",
+   "task": "mab_sql",
+   "value": 0.546
+  },
+  {
+   "model": "Gemma 7B",
+   "task": "mab_cnndm",
+   "value": 0.218
+  },
+  {
+   "model": "Gemma 7B",
+   "task": "mab_xsum",
+   "value": 0.127
+  },
+  {
+   "model": "Phi 2 3B",
+   "task": "mab_dolly",
+   "value": 0.472
+  },
+  {
+   "model": "Phi 2 3B",
+   "task": "mab_hotpotqa",
+   "value": 0.197
+  },
+  {
+   "model": "Phi 2 3B",
+   "task": "mab_sql",
+   "value": 0.489
+  },
+  {
+   "model": "Phi 2 3B",
+   "task": "mab_cnndm",
+   "value": 0.216
+  },
+  {
+   "model": "Phi 2 3B",
+   "task": "mab_xsum",
+   "value": 0.145
+  },
+  {
+   "model": "Gemma 2B",
+   "task": "mab_dolly",
+   "value": 0.401
+  },
+  {
+   "model": "Gemma 2B",
+   "task": "mab_hotpotqa",
+   "value": 0.046
+  },
+  {
+   "model": "Gemma 2B",
+   "task": "mab_sql",
+   "value": 0.519
+  },
+  {
+   "model": "Gemma 2B",
+   "task": "mab_cnndm",
+   "value": 0.241
+  },
+  {
+   "model": "Gemma 2B",
+   "task": "mab_xsum",
+   "value": 0.145
+  },
+  {
+   "model": "Zephyr 3B",
+   "task": "mab_dolly",
+   "value": 0.441
+  },
+  {
+   "model": "Zephyr 3B",
+   "task": "mab_hotpotqa",
+   "value": 0.109
+  },
+  {
+   "model": "Zephyr 3B",
+   "task": "mab_sql",
+   "value": 0.457
+  },
+  {
+   "model": "Zephyr 3B",
+   "task": "mab_cnndm",
+   "value": 0.203
+  },
+  {
+   "model": "Zephyr 3B",
+   "task": "mab_xsum",
+   "value": 0.112
+  },
+  {
+   "model": "TinyLlama 1B",
+   "task": "mab_dolly",
+   "value": 0.329
+  },
+  {
+   "model": "TinyLlama 1B",
+   "task": "mab_hotpotqa",
+   "value": 0.076
+  },
+  {
+   "model": "TinyLlama 1B",
+   "task": "mab_sql",
+   "value": 0.389
+  },
+  {
+   "model": "TinyLlama 1B",
+   "task": "mab_cnndm",
+   "value": 0.202
+  },
+  {
+   "model": "TinyLlama 1B",
+   "task": "mab_xsum",
+   "value": 0.113
+  },
+  {
+   "model": "Llama 2 7B",
+   "task": "mab_mtbench",
+   "value": 6.259
+  },
+  {
+   "model": "Mistral 7B",
+   "task": "mab_mtbench",
+   "value": 7.484
+  },
+  {
+   "model": "Gemma 7B",
+   "task": "mab_mtbench",
+   "value": 4.959
+  },
+  {
+   "model": "Phi 2 3B",
+   "task": "mab_mtbench",
+   "value": 5.318
+  },
+  {
+   "model": "Gemma 2B",
+   "task": "mab_mtbench",
+   "value": 5.187
+  },
+  {
+   "model": "Zephyr 3B",
+   "task": "mab_mtbench",
+   "value": 6.009
+  },
+  {
+   "model": "TinyLlama 1B",
+   "task": "mab_mtbench",
+   "value": 3.962
+  }
+ ],
+ "note": "Their numbers, as the paper prints them: never measured here, never ranked with ours. MT-Bench is a score out of 10; the others are shares (F1 and ROUGE-L from 0 to 1). Their AlpacaEval win rates are not carried: the set is not on this board."
+}

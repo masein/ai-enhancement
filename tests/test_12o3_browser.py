@@ -76,8 +76,9 @@ def test_the_model_page_line_and_compares_group(live, page):
         page.locator("[data-kind-block='standard'] > summary").first.click()
     line = page.locator(f"[data-mab-line='{GOOD}']")
     line.wait_for(state="attached")
-    assert line.inner_text() == "HotpotQA F1 1.00 · SQL 1.00 (MobileAIBench’s 1,000 each)" \
-        or line.inner_text().startswith("HotpotQA F1 1.00 · SQL 0.9")
+    # 14.1: and Dolly, CNN/DailyMail and XSum after them
+    assert line.inner_text().startswith(("HotpotQA F1 1.00 · SQL 1.00", "HotpotQA F1 1.00 · SQL 0.9"))
+    assert line.inner_text().endswith("XSum ROUGE-L 1.00 (MobileAIBench’s 1,000 each)")
     go(page, live, f"tab=models&view=compare&m={ids(GOOD, SKEWED)}", "[data-compare='2']")
     g = page.locator("[data-cmp-group='mobile']")
     assert g.inner_text().startswith("▾ Mobile tasks (MobileAIBench)")

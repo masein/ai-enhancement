@@ -134,7 +134,8 @@ def test_the_sql_is_taken_from_a_code_block_else_a_select_line(answer, sql, how)
 
 def test_the_suite_is_instruct_only(svc):
     client, _ = svc
-    assert config.tasks_for_suite("mobile") == ["mab_hotpotqa", "mab_sql"]
+    # 14.1: the suite's no-judge part is five sets now; MT-Bench is its judged part
+    assert config.tasks_for_suite("mobile") == list(mab.TASKS)
     r = client.post("/api/submissions", json={"hf_id": "org/base-1b", "suite": "mobile",
                                               "kind": "base"})
     assert r.status_code == 422 and r.json()["detail"] == \
@@ -175,7 +176,7 @@ def fake_gpu(monkeypatch):
     def run(sid, cmd, *a, **k):
         seen.append(cmd)
         model_dir = Path(cmd[cmd.index("--output_path") + 1]).parent
-        if cmd[cmd.index("--tasks") + 1] == mab.SQL:       # both written once both are asked
+        if cmd[cmd.index("--tasks") + 1] == mab.TASKS[-1]:   # all written once all are asked
             sit_mab(model_dir)
         return 0
     monkeypatch.setattr(runner, "_run_task", run)
@@ -188,7 +189,7 @@ def test_a_run_asks_both_with_their_system_line_and_scores_them(svc, monkeypatch
     sid = client.post("/api/submissions", json={"hf_id": "org/chat-1b", "suite": "mobile",
                                                 "kind": "instruct"}).json()["id"]
     runner.run_submission(db.get(sid))
-    assert [c[c.index("--tasks") + 1] for c in seen] == ["mab_hotpotqa", "mab_sql"]
+    assert [c[c.index("--tasks") + 1] for c in seen] == list(mab.TASKS)
     for cmd, t in zip(seen, mab.TASKS):
         assert cmd[cmd.index("--include_path") + 1] == str(config.MAB_TASKS_DIR)
         assert cmd[cmd.index("--system_instruction") + 1] == mab.SYSTEM[t]
@@ -225,9 +226,9 @@ def test_openrouters_estimate_counts_both(monkeypatch, tmp_path):
                    "provider": "openai", "version": "openai/gpt-6-luna-2026-09-01"}}
     monkeypatch.setattr(served, "model_dir", lambda r: tmp_path / "none")
     est = served.estimate(rec, "mobile")
-    # both sets' 1,000 prompts as the run sends them, each with its system line
+    # every set's 1,000 prompts as the run sends them, each with its system line (14.1: five)
     st = served.settings_for(rec, {"archinfo": served.archinfo(rec)}, True)
-    assert est["n"] == 2000 and est["tokens_out"] == 2000 * st["max_tokens"]
+    assert est["n"] == 5000 and est["tokens_out"] == 5000 * st["max_tokens"]
     assert est["tokens_in"] == sum(served.tokens_of(mab.SYSTEM[t]) + served.tokens_of(q["prompt"])
                                    for t in mab.TASKS for q in mab.load(t))
 
@@ -252,8 +253,8 @@ def test_the_cells_are_theirs_and_never_in_the_avg(svc):
     assert data["cells"]["mab_sql"]["fx/good-750m"]["v"] == got["mab_sql"]["sqlparser_f1"]
     assert data["tasks"]["mab_sql"]["metric"] == "sqlparser_f1"
     assert m["avg"] == before["avg"] and m["official"] == before["official"]
-    assert "mab_hotpotqa" not in data["required"] and data["mabTasks"] == ["mab_hotpotqa",
-                                                                          "mab_sql"]
+    assert "mab_hotpotqa" not in data["required"] and data["mabTasks"] == [
+        "mab_hotpotqa", "mab_sql", "mab_dolly", "mab_cnndm", "mab_xsum", "mab_mtbench"]
     assert m["mab"]["mab_sql"]["no_sql"] == 1000
     assert data["mab"]["credits"][0]["name"] == "MobileAIBench"
 

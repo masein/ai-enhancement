@@ -18,6 +18,11 @@ is the number the whole loop steers by.
 and reply are checked against the bank's requests and good answers, and a
 request that IS one of the bank's, however short, is a copy.
 
+14.1: and every pinned benchmark file the board asks from — MobileAIBench's
+samples, their questions, contexts and reference answers — indexed before any
+model has answered them (a run's own files hold the prompts, never the
+references).
+
 Both halves of both are indexed on purpose. The report half is never SHOWN to
 anyone or anything; it is still the thing the published score comes from, so
 a generated document that collides with it is exactly the leak this exists to
@@ -31,6 +36,9 @@ from pathlib import Path
 
 NGRAM = 13
 EVERYDAY_BANK = Path(__file__).resolve().parent.parent / "eval_tasks" / "everyday" / "bank.jsonl"
+# 14.1: MobileAIBench's pinned samples; not its judge's prompt templates
+MAB_DIR = Path(__file__).resolve().parent.parent / "eval_tasks" / "mobileaibench"
+NOT_ITEMS = {"mt_bench_judge_prompts"}
 MAX_DROP_SHARE = 0.02
 NEAR_DUP_SHINGLE = 5
 NEAR_DUP_JACCARD = 0.8
@@ -92,6 +100,7 @@ class BenchmarkIndex:
         self.n_files = 0
         self.n_exam = 0
         self.n_everyday = 0
+        self.n_pinned = 0
 
     def _bank_files(self) -> list[Path]:
         d = (self.exam_root / "bank") if self.exam_root else None
@@ -107,12 +116,42 @@ class BenchmarkIndex:
         d = config.BENCH_ROOT / "everyday"
         return [p for p in (EVERYDAY_BANK, d / "built.jsonl", d / "hidden.jsonl") if p.exists()]
 
+    @staticmethod
+    def pinned_files() -> list[Path]:
+        """14.1: the pinned benchmark files the board asks from — every row's
+        every string is a benchmark item (MobileAIBench's manifest)"""
+        import json
+        try:
+            m = json.loads((MAB_DIR / "manifest.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return []
+        return [MAB_DIR / f["file"] for k, f in sorted((m.get("files") or {}).items())
+                if k not in NOT_ITEMS and (MAB_DIR / f["file"]).exists()]
+
+    @staticmethod
+    def pinned_rows(path: Path):
+        """a pinned file's rows: a CSV's, or a JSON-lines file's"""
+        import csv
+        import io
+        import json
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if path.suffix == ".csv":
+            csv.field_size_limit(10 ** 9)
+            yield from csv.DictReader(io.StringIO(text))
+            return
+        for line in text.splitlines():
+            try:
+                yield json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
     def _key(self) -> tuple:
         files = list(self.root.rglob("samples_*.jsonl")) if self.root.is_dir() else []
         bank = self._bank_files()
         evd = tuple(p.stat().st_mtime for p in self._everyday_files())
+        pinned = tuple((str(p), p.stat().st_mtime, p.stat().st_size) for p in self.pinned_files())
         return (len(files), max((f.stat().st_mtime for f in files), default=0.0),
-                len(bank), max((f.stat().st_mtime for f in bank), default=0.0), evd)
+                len(bank), max((f.stat().st_mtime for f in bank), default=0.0), evd, pinned)
 
     def refresh(self) -> "BenchmarkIndex":
         import json
@@ -169,6 +208,15 @@ class BenchmarkIndex:
                 for s in (rec.get("prompt") or "", rec.get("reference") or ""):
                     for w in windows(normalize(s)):
                         evd.add(hash(w))
+        # 14.1: the pinned benchmark files, every string of every row
+        n_pinned = 0
+        for path in self.pinned_files():
+            for row in self.pinned_rows(path):
+                n_pinned += 1
+                for s in doc_strings(row):
+                    for w in windows(normalize(s)):
+                        grams.add(hash(w))
+        self.n_pinned = n_pinned
         self.key, self.grams, self.exam_grams = key, grams, exam
         self.everyday_grams, self.everyday_exact = evd, exact - {""}
         self.n_docs, self.n_files, self.n_exam, self.n_everyday = n_docs, n_files, n_exam, n_evd

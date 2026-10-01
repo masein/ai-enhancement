@@ -25,6 +25,7 @@ import everyday as _everyday  # noqa: E402
 import exam_build as _exam  # noqa: E402
 import judge as _judge  # noqa: E402
 import simpleqa as _sq  # noqa: E402
+import mobileaibench as _mab  # noqa: E402
 import trust_safety as _safety  # noqa: E402
 
 _stop = threading.Event()
@@ -211,6 +212,16 @@ def _finish_simpleqa(row: dict, results: dict[str, llm.Result]) -> None:
         db.update(sub["id"], progress=_sq.summary(out))
 
 
+def _finish_mab(row: dict, results: dict[str, llm.Result]) -> None:
+    """14.1: the judge's ratings of MT-Bench's turns, into each model's file —
+    a custom id names its folder, so a judging step with no run of its own
+    lands too; the run that asked says the score once it is in"""
+    done = _mab.finish(config.OUT_DIR, results)
+    db.batch_progress(row["batch_id"], f"{row['n_items']}/{row['n_items']} done")
+    if row.get("ref_id") and done:
+        db.update(row["ref_id"], progress=_mab.summary(_mab.read(done[0])))
+
+
 def judged_line(run: dict, at: float | None = None, note: str = "") -> str:
     """What a judged row says once its batch has landed — after, when the
     run answered nothing new, that it re-graded answers already on disk."""
@@ -370,6 +381,9 @@ def _mark_failed(r: dict, why: str) -> None:
         if d is not None:
             _sq.judge_failed(d, why)
             db.update(sub["id"], progress=_sq.summary(_sq.read(d)))
+    elif r["kind"] == "mab":
+        # 14.1: the answers wait again — a later judging step asks for them
+        _mab.judge_failed(config.OUT_DIR, r["batch_id"], why)
     elif r["kind"] == "everyday_remark":
         # 12a.6: each model this re-mark sent says so, instead of waiting
         for d in (p for p in config.OUT_DIR.iterdir() if p.is_dir()) if config.OUT_DIR.is_dir() else []:
@@ -393,7 +407,7 @@ def tick() -> int:
             backend = (judge_test.batch_backend(r["batch_id"]) if r["kind"] == "judge_test"
                        else builder.batch_backend(r["batch_id"]) if r["kind"] == "qb"
                        else llm.client("judge" if r["kind"] in ("judge", "everyday", "everyday_remark",
-                                                                "safety", "simpleqa")
+                                                                "safety", "simpleqa", "mab")
                                        else "llm"))
         except llm.LocalUnreachable as e:
             # vLLM restarting (or still loading after a reboot) is not a reason
@@ -436,6 +450,8 @@ def tick() -> int:
                 _finish_safety(r, results)
             elif r["kind"] == "simpleqa":
                 _finish_simpleqa(r, results)
+            elif r["kind"] == "mab":
+                _finish_mab(r, results)
             elif r["kind"] == "everyday_remark":
                 # 12a.6: a re-mark's verdicts, for every model it sent
                 _everyday.finish_remark(config.OUT_DIR, results)

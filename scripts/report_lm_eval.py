@@ -1238,13 +1238,25 @@ def parse_run(blob: dict, source: Path) -> dict:
                                                  "stderr": float(r.get("se") or 0.0),
                                                  "_filt_value": "board"}
     # 12o.3: MobileAIBench's HotpotQA and SQL, scored by its own metrics —
-    # HotpotQA's F1 and SQL's SQLParser F1 are the cells
+    # HotpotQA's F1 and SQL's SQLParser F1 are the cells. 14.1: Dolly's F1,
+    # CNN/DailyMail's and XSum's ROUGE-L, and MT-Bench — its two turns one
+    # column, the judge's mean rating over 10 (shown as itself, out of 10),
+    # once every answered turn is rated
     mab = _beside(source, "mobileaibench.json")
-    for t, key, metric in (("mab_hotpotqa", "f1", "mab_f1"),
-                           ("mab_sql", "sqlparser_f1", "sqlparser_f1")):
+    for turn in ("mab_mtbench_t1", "mab_mtbench_t2"):
+        if turn in tasks:
+            tasks.pop(turn)
+            tasks.setdefault("mab_mtbench", {"alias": "mab_mtbench"})
+    for t, key, metric, scale in (("mab_hotpotqa", "f1", "mab_f1", 1.0),
+                                  ("mab_sql", "sqlparser_f1", "sqlparser_f1", 1.0),
+                                  ("mab_dolly", "f1", "mab_f1", 1.0),
+                                  ("mab_cnndm", "rougeL", "rougeL", 1.0),
+                                  ("mab_xsum", "rougeL", "rougeL", 1.0),
+                                  ("mab_mtbench", "score", "mtbench", 10.0)):
         got = ((mab or {}).get("tasks") or {}).get(t) or {}
         if t in tasks and got.get(key) is not None:
-            tasks[t][metric] = {"value": float(got[key]), "stderr": float(got.get("se") or 0.0),
+            tasks[t][metric] = {"value": float(got[key]) / scale,
+                                "stderr": float(got.get("se") or 0.0) / scale,
                                 "_filt_value": "board"}
 
     n_samples = {k: (v.get("effective") if isinstance(v, dict) else v)
@@ -1357,7 +1369,7 @@ def primary_metric(entry: dict) -> tuple[str, float, float] | None:
     so nobody has to guess which number they are looking at.
     """
     for name in ("acc_norm", "acc", "exact_match", "prompt_level_strict_acc", "safe", "correct",
-                 "mab_f1", "sqlparser_f1", "pass@1",
+                 "mab_f1", "sqlparser_f1", "rougeL", "mtbench", "pass@1",
                  "f1", "em", "bits_per_byte", "byte_perplexity", "word_perplexity"):
         d = entry.get(name)
         if isinstance(d, dict) and "value" in d:
@@ -1419,7 +1431,7 @@ BBQ_TASKS = ("bbq_3000", "bbq_all")
 FRONTIER_TASKS = ("gpqa_diamond_zeroshot", "gpqa_diamond_cot_zeroshot", "simpleqa_verified")
 # 12o.3: MobileAIBench's HotpotQA and SQL — never in the Avg, never a training
 # target, never in Improve
-MAB_TASKS = ("mab_hotpotqa", "mab_sql")
+MAB_TASKS = ("mab_hotpotqa", "mab_sql", "mab_dolly", "mab_cnndm", "mab_xsum", "mab_mtbench")
 GPQA_URL = "https://huggingface.co/datasets/Idavidrein/gpqa"
 
 # Controls: tasks run to test how we POSE a benchmark, not what a model knows.
@@ -1538,6 +1550,32 @@ _TASK_META = {
                      "prompt; F1 over the answer's words, as MobileAIBench scores it (exact "
                      "match and BLEU beside it). Short answers score best: the reference is a "
                      "few words. Instruct models only; never in the average."),
+    # 14.1: and the rest of its text sets — AlpacaEval left out (CC BY-NC 4.0)
+    "mab_dolly": ("mobile tasks",
+                  "Dolly, from MobileAIBench (databricks-dolly-15k): follow an instruction, with "
+                  "its context when it has one. Their 1,000 and prompt; F1 over the answer's "
+                  "words, against one person's answer, as MobileAIBench scores it (exact match "
+                  "and BLEU beside it). Overlap with one human answer: a good answer in other "
+                  "words scores low. Instruct models only; never in the average."),
+    "mab_cnndm": ("mobile tasks",
+                  "CNN/DailyMail, from MobileAIBench: summarise a news article. Their 1,000 and "
+                  "prompt; ROUGE-L, as MobileAIBench scores it (ROUGE-1 beside it). Word "
+                  "overlap with one reference summary; a good summary in other words scores "
+                  "low — Everyday's Summarise is the measure of summarising. Instruct models "
+                  "only; never in the average."),
+    "mab_xsum": ("mobile tasks",
+                 "XSum, from MobileAIBench: summarise a BBC article in a sentence. Their 1,000 "
+                 "and prompt; ROUGE-L, as MobileAIBench scores it (ROUGE-1 beside it). Word "
+                 "overlap with one reference summary; a good summary in other words scores low "
+                 "— Everyday's Summarise is the measure of summarising. Instruct models only; "
+                 "never in the average."),
+    "mab_mtbench": ("mobile tasks",
+                    "MT-Bench, as MobileAIBench runs it (FastChat's 80 two-turn questions): each "
+                    "turn rated 1–10 by the board's judge with MT-Bench's own grading prompts "
+                    "(with GPT-4's reference answer for maths, reasoning and coding); the "
+                    "column is the mean, out of 10. It needs a judge: judged after the run, "
+                    "and \"awaiting judge\" until every turn is rated. Their paper's numbers were "
+                    "judged by GPT-4. Instruct models only; never in the average."),
     "mab_sql": ("mobile tasks",
                 "SQL from a question, from MobileAIBench (sql-create-context): write the SQL "
                 "for a plain question, given the table's CREATE statement. Their 1,000 and "
@@ -1649,15 +1687,29 @@ def mab_view(mab: dict | None) -> dict | None:
     if not t:
         return None
     keep = {"mab_hotpotqa": ("f1", "em", "bleu", "n", "of"),
-            "mab_sql": ("sqlparser_f1", "levenshtein", "exact", "no_sql", "n", "of")}
-    return {k: {x: t[k].get(x) for x in keep[k]} for k in keep if k in t}
+            "mab_sql": ("sqlparser_f1", "levenshtein", "exact", "no_sql", "n", "of"),
+            # 14.1
+            "mab_dolly": ("f1", "em", "bleu", "n", "of"),
+            "mab_cnndm": ("rougeL", "rouge1", "n", "of"),
+            "mab_xsum": ("rougeL", "rouge1", "n", "of"),
+            "mab_mtbench": ("score", "turn1", "turn2", "n", "of", "rated", "awaiting",
+                            "unreadable", "judge")}
+    out = {k: {x: t[k].get(x) for x in keep[k]} for k in keep if k in t}
+    if (mab or {}).get("note"):
+        out["note"] = mab["note"]
+    return out
 
 
 def mab_meta() -> dict | None:
     """12o.3: MobileAIBench's credit and the two datasets under it"""
     try:
         import mobileaibench as mab             # scripts/, beside this file
-        return {"credits": mab.credits(), "n": {t: len(mab.load(t)) for t in mab.TASKS}}
+        return {"credits": mab.credits(), "n": {t: len(mab.load(t)) for t in mab.TASKS},
+                # 14.1: MT-Bench's questions and turns; the suite's two parts
+                "mtbench": {"questions": len(mab.mt_bench()), "turns": 2 * len(mab.mt_bench())},
+                "parts": {(p or "none"): {"tasks": list(ts), **mab.part_counts(p)}
+                          for p, ts in mab.PARTS.items()},
+                "labels": {t: mab.LABEL[t] for t in (*mab.TASKS, mab.MTBENCH)}}
     except (ImportError, OSError, ValueError, KeyError):
         return None
 
@@ -1791,7 +1843,7 @@ PROPORTION = {"acc", "acc_norm", "exact_match", "pass@1", "f1", "em", "rubric_pa
               "prompt_level_strict_acc", "safe", "correct"}
 # 12o.3: scores from 0 to 1, higher better, that are means of per-question
 # scores rather than shares — a column like a proportion's, never its z-test
-MEAN_SCORES = {"mab_f1", "sqlparser_f1"}
+MEAN_SCORES = {"mab_f1", "sqlparser_f1", "rougeL", "mtbench"}
 
 _PARAM_RE = re.compile(r"(\d+(?:\.\d+)?)([mb])(?![a-z0-9])", re.I)
 
@@ -3013,6 +3065,12 @@ input[type=search]:focus { outline:2px solid var(--accent-soft); border-color:va
 .seg button[aria-pressed="true"] { background:var(--accent-soft); color:var(--text-primary); font-weight:600; }
 /* 12z C1: the Answers tab — a segmented switch above, filter chips under it,
    8px between chips, 12px between the rows and under the description */
+/* 14.1: the Mobile tasks suite's two parts, each with what it takes */
+.mabopts { margin:8px 0; }
+.mabopts > p { margin:0 0 4px; }
+.mabpart { margin:0 0 6px; }
+.mabpart label { display:block; }
+.mabpart .mabjudge { margin:2px 0 0 24px; }
 /* 12z C6: the device speed cell's control, spaced from its value */
 .dm-dev-edit { margin-left:4px; padding:1px 8px; min-height:0; font-size:var(--fs-1);
   border:1px solid var(--border); border-radius:999px; vertical-align:baseline; }
@@ -5459,9 +5517,12 @@ function barPanel(task, models, opts) {
     X = v => LBL + plotW * Math.max(0, Math.min(v, hi)) / hi;
     base = LBL;
     ticks = niceTicks(hi, 4);
-    tickFmt = v => lower ? num(v, 2) : Math.round(100 * v) + '%';
+    // 14.1: MT-Bench is a rating out of 10, drawn as one
+    tickFmt = v => lower ? num(v, 2) : task === MTBENCH ? (10 * v).toFixed(0)
+      : Math.round(100 * v) + '%';
   }
-  const fmt = lower ? (v => num(v, 3)) : (v => pct(v));
+  const fmt = lower ? (v => num(v, 3)) : task === MTBENCH ? (v => (10 * v).toFixed(2))
+    : (v => pct(v));
   const svg = el('svg:svg', { viewBox: `0 0 ${W} ${H}`, width: '100%',
                               role: 'img', 'aria-label': task });
   for (const t of ticks) {
@@ -5598,7 +5659,7 @@ function scoreBar(t, c) {
   const X = v => Math.max(0, Math.min(W, (v / hi) * W));
   const svg = el('svg:svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H,
     class: 'sbar', role: 'img',
-    'aria-label': `${t}: ${i.lower ? num(c.v, 3) : pct(c.v)}` });
+    'aria-label': `${t}: ${i.lower ? num(c.v, 3) : t === MTBENCH ? `${(10 * c.v).toFixed(2)} / 10` : pct(c.v)}` });
   svg.append(el('svg:rect', { x: 0, y: H / 2 - 3, width: W, height: 6, rx: 3,
     fill: 'var(--grid)' }));
   svg.append(el('svg:rect', { x: 0, y: H / 2 - 3, width: Math.max(2, X(c.v)),
@@ -6767,18 +6828,45 @@ function evdSuiteLabel(id) {
   const min = Math.max(1, Math.round(n * (measured ? each : SERVED_GUESS_S) / 60));
   return `Everyday tasks — ${n} questions, about ${min} min` + (measured ? '' : ', a rough guess');
 }
-// 12o.3: the Mobile tasks suite, its 2,000 answers — and, for a served model,
-// how long by its measured seconds an answer, as Everyday's says
+// 12o.3: the Mobile tasks suite. 14.1: two parts, each with what it takes —
+// asked of the server, before Start (/api/mobileaibench/estimate)
 function mabSuiteLabel(id) {
-  const n = ((DATA.mab || {}).n || {});
-  const k = (n.mab_hotpotqa || 1000) + (n.mab_sql || 1000);
-  const s = isServedId(id) ? servedOf(id) : null;
-  const head = 'Mobile tasks (MobileAIBench) — HotpotQA, SQL';
-  if (!s) return `${head}: ${k.toLocaleString('en')} answers`;
-  const each = (s.speed || {}).secs_each, measured = each != null && each > 0;
-  const min = Math.max(1, Math.round(k * (measured ? each : SERVED_GUESS_S) / 60));
-  return `${head}: ${k.toLocaleString('en')} answers, about ${min} min`
-    + (measured ? '' : ', a rough guess');
+  return 'Mobile tasks (MobileAIBench) — HotpotQA, SQL, Dolly, CNN/DailyMail, XSum; MT-Bench '
+    + 'judged';
+}
+function mabEstimate(id) {
+  const E = state.mabEst = state.mabEst || {};
+  if (!id || !LIVE) return null;
+  if (!(id in E) && netReady()) {
+    E[id] = null;
+    api('api/mobileaibench/estimate?model=' + encodeURIComponent(id))
+      .then(j => { E[id] = j.parts; if (state.testOpen) render(); })
+      .catch(() => { E[id] = { failed: true }; });
+  }
+  return E[id];
+}
+function mabPartOpts(sf) {
+  const id = sf.hf_id.trim(), est = mabEstimate(id) || {};
+  const parts = (DATA.mab || {}).parts || {};
+  const P = [['', 'no judge', (parts.none || {}).tasks || MAB.filter(t => t !== MTBENCH)],
+             ['judged', 'judged', ['MT-Bench']]];
+  const who = j => j.label && j.label !== 'none' ? j.label : j.id || 'none set up';
+  return el('div', { class: 'mabopts', 'data-mab-opts': '1' },
+    el('p', { class: 'small', text: 'Part:' }),
+    ...P.map(([v, words, ts]) => {
+      const e = est[v || 'none'];
+      return el('div', { class: 'mabpart', 'data-mab-part': v || 'none' },
+        el('label', { class: 'small' },
+          el('input', { type: 'radio', name: 'submit-mab-part', checked: (sf.part || '') === v ? ''
+            : null, onchange: () => { sf.part = v; render(); } }),
+          ` ${words} — ${ts.map(t => LB_SHORT[t] || t).join(', ')}`,
+          el('span', { class: 'se', 'data-mab-part-est': v || 'none',
+            text: e ? ` · ${e.line}` : est.failed ? '' : ' · working out how long…' })),
+        e && e.judge ? el('p', { class: 'small se mabjudge', 'data-mab-judge-est': '1',
+          text: `The judge (${who(e.judge)}): ${e.judge.line}`
+            + (e.judge.guess ? ', each answer guessed at '
+              + `${e.judge.answer_tokens.toLocaleString('en')} tokens` : '') }) : '');
+    }));
 }
 function servedCompare(m) {
   const s = servedOf(m.id), want = String((s || {}).based_on || '').toLowerCase();
@@ -7148,14 +7236,46 @@ function sharedLine(m) {
     na ? el('p', { class: 'small se', text: ((DATA.shared || {}).simpleqa || {}).honest || '' })
       : '');
 }
-// 12o.3: "HotpotQA F1 0.61 · SQL 0.78 (MobileAIBench's 1,000 each)"
+// 12o.3: "HotpotQA F1 0.61 · SQL 0.78 (MobileAIBench's 1,000 each)". 14.1:
+// every set it sat, MT-Bench out of 10 — or awaiting the judge, with the step
+// that asks it
+const MAB_WORDS = { mab_hotpotqa: 'HotpotQA F1', mab_sql: 'SQL', mab_dolly: 'Dolly F1',
+  mab_cnndm: 'CNN/DailyMail ROUGE-L', mab_xsum: 'XSum ROUGE-L' };
 function mabLine(m) {
-  const h = cell('mab_hotpotqa', m.id), q = cell('mab_sql', m.id);
-  if (!h && !q) return '';
-  return el('p', { class: 'small', 'data-mab-line': m.id, title: [...mabCredit('mab_hotpotqa'),
-      ...mabCredit('mab_sql').slice(0, 1)].join('\n'),
-    text: [h ? `HotpotQA F1 ${h.v.toFixed(2)}` : '', q ? `SQL ${q.v.toFixed(2)}` : '']
-      .filter(Boolean).join(' · ') + ' (MobileAIBench\u2019s 1,000 each)' });
+  const x = (m.mab || {})[MTBENCH];
+  const bits = Object.entries(MAB_WORDS).map(([t, w]) => { const c = cell(t, m.id);
+    return c ? `${w} ${c.v.toFixed(2)}` : ''; }).filter(Boolean);
+  const mt = cell(MTBENCH, m.id);
+  if (!bits.length && !x) return '';
+  return el('div', { class: 'small', 'data-mab-line': m.id },
+    el('p', { class: 'small', title: Object.keys(MAB_WORDS).filter(t => cell(t, m.id))
+        .flatMap(t => mabCredit(t).slice(0, 1)).join('\n'),
+      text: bits.join(' · ') + (bits.length ? ' (MobileAIBench\u2019s 1,000 each)' : '') }),
+    x ? el('p', { class: 'small', 'data-mab-mtbench-line': m.id, title: [mabJudgeLine(m),
+        ...mabCredit(MTBENCH)].join('\n') },
+      mt ? `MT-Bench ${(10 * mt.v).toFixed(2)} of 10 (turn 1 ${Number(x.turn1).toFixed(2)}, `
+        + `turn 2 ${Number(x.turn2).toFixed(2)}) · ${mabJudgeLine(m)}`
+        : `MT-Bench: ${x.awaiting} of ${x.n} turns awaiting judge`
+          + ((m.mab || {}).note ? ` · ${m.mab.note}` : ''),
+      !mt && LIVE ? [' · ', el('button', { class: 'quiet', 'data-mab-judge': m.id,
+        text: 'Judge now', disabled: judgeDown() ? '' : null,
+        title: judgeDown() ? judgeWhy() : 'send every MT-Bench turn that waits to the judge',
+        onclick: e => mabJudgeNow(e.currentTarget) })] : '') : '');
+}
+// 14.1: the later judging step — every model's turns that wait, to the judge now
+async function mabJudgeNow(btn) {
+  if (!whoName()) { askName(); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  try {
+    const j = await post('api/mobileaibench/judge', { by: whoName() });
+    const sent = (j.models || []).filter(x => x.batch_id).length;
+    const wait = (j.models || []).find(x => x.note);
+    toast(sent ? `MT-Bench: ${sent} model${sent === 1 ? '' : 's'} sent to the judge`
+      : wait ? `MT-Bench: ${wait.note}` : 'MT-Bench: nothing waits for the judge', { key: 'mab-judge' });
+    await refreshResults();
+  } catch (e) {
+    toast('Refused. ' + String((e && e.message) || e), { key: 'mab-judge' });
+  }
 }
 function trustLine(m) {
   const t = m.trust;
@@ -7199,7 +7319,7 @@ function resultsPart(m) {
         el('td', {}, el('span', { title: i.desc || '', class: 'tname',
           text: taskLabel(t) })),
         el('td', { class: 'num' + (atChance ? ' dimmed' : ''),
-          text: i.lower ? num(c.v, 3) : pct(c.v) },
+          text: i.lower ? num(c.v, 3) : t === MTBENCH ? `${(10 * c.v).toFixed(2)} / 10` : pct(c.v) },
           c.se ? el('span', { class: 'se', text: ` ±${(100 * c.se).toFixed(1)}` }) : ''),
         el('td', {}, scoreBar(t, c)),
         el('td', { class: 'num se', text: c.shots != null ? c.shots + '-shot' : '—' }),
@@ -9414,8 +9534,10 @@ const CATS = [
   // 12n.2: shared with the frontier — GPQA Diamond's two lm_eval forms and
   // SimpleQA Verified; never in Avg, never ranked with what others report
   ['shared',       ['gpqa_diamond_cot_zeroshot', 'gpqa_diamond_zeroshot', 'simpleqa_verified']],
-  // 12o.3: MobileAIBench's HotpotQA and SQL — never in Avg, never in Improve
-  ['mobile',       ['mab_hotpotqa', 'mab_sql']],
+  // 12o.3: MobileAIBench's HotpotQA and SQL — never in Avg, never in Improve.
+  // 14.1: and Dolly, CNN/DailyMail, XSum and MT-Bench
+  ['mobile',       ['mab_hotpotqa', 'mab_sql', 'mab_dolly', 'mab_cnndm', 'mab_xsum',
+                    'mab_mtbench']],
 ];
 function radarAxes() {
   if (state.radarAxes === 'tasks') return DATA.accTasks.map(t => ({ key: t, label: t, tasks: [t] }));
@@ -9565,19 +9687,40 @@ const FR_METHOD = { [GPQA_COT]: 'CoT, 0-shot', [GPQA_LL]: '4 options scored, 0-s
   'gguf:gpqa': 'llama.cpp, 0-shot', [SIMPLEQA]: 'graded by the judge, the dataset\u2019s grader' };
 // a task a server can be asked: the generative three, GPQA's chain of thought, SimpleQA
 const servedAsks = t => isGen(t) || t === GPQA_COT || t === SIMPLEQA || isMab(t);
-// 12o.3: MobileAIBench's HotpotQA and SQL, scored by its own metrics
-const MAB = ['mab_hotpotqa', 'mab_sql'];
+// 12o.3: MobileAIBench's HotpotQA and SQL, scored by its own metrics. 14.1:
+// and Dolly, CNN/DailyMail, XSum and MT-Bench (judged; out of 10)
+const MAB = ['mab_hotpotqa', 'mab_sql', 'mab_dolly', 'mab_cnndm', 'mab_xsum', 'mab_mtbench'];
 const isMab = t => MAB.includes(t);
-const MAB_METRIC = { mab_hotpotqa: 'F1', mab_sql: 'SQLParser F1' };
+const MTBENCH = 'mab_mtbench';
+const MAB_METRIC = { mab_hotpotqa: 'F1', mab_sql: 'SQLParser F1', mab_dolly: 'F1',
+  mab_cnndm: 'ROUGE-L', mab_xsum: 'ROUGE-L', mab_mtbench: 'score out of 10' };
+const MAB_SRC = { mab_hotpotqa: 'HotpotQA', mab_sql: 'sql-create-context',
+  mab_dolly: 'databricks-dolly-15k', mab_cnndm: 'CNN/DailyMail', mab_xsum: 'XSum',
+  mab_mtbench: 'MT-Bench' };
+// MT-Bench's number is the judge's mean rating: shown out of 10
+const mabShow = (t, v) => t === MTBENCH ? (10 * v).toFixed(2) : (100 * v).toFixed(1);
 // "HotpotQA: Yang et al. … · CC BY-SA 4.0", and MobileAIBench's own credit
 function mabCredit(t) {
   const c = ((DATA.mab || {}).credits || []), mab = c[0] || {};
-  const src = c.find(x => x.name === (t === 'mab_hotpotqa' ? 'HotpotQA' : 'sql-create-context'))
-    || {};
+  const src = c.find(x => x.name === MAB_SRC[t]) || {};
+  const fc = c.find(x => /FastChat/.test(x.name || '')) || {};
   return [src.name && `${src.name}: ${src.cite} · ${src.licence}`,
-    mab.name && `their 1,000, sampled by ${mab.name} (${mab.licence}): ${mab.cite}`]
-    .filter(Boolean);
+    mab.name && (t === MTBENCH ? `its 80 questions as ${mab.name} runs them (${mab.licence})`
+      : `their 1,000, sampled by ${mab.name} (${mab.licence}): ${mab.cite}`),
+    t === MTBENCH && fc.name && `judge prompts and GPT-4's reference answers: ${fc.name} `
+      + `(${fc.licence})`].filter(Boolean);
 }
+// 14.1: the judge of MT-Bench's ratings — its id, and "judge differs" from the
+// paper's GPT-4
+function mabJudgeLine(m) {
+  const x = ((m || {}).mab || {})[MTBENCH] || {};
+  const id = (x.judge || {}).id || ((DATA.judged || {}).current || {}).id || '';
+  return (id ? `judged by ${id}` : 'no judge set up yet') + ' · their paper\'s by GPT-4'
+    + (id && /^(openai\/)?gpt-4(-0613)?$/i.test(id) ? '' : ' — judge differs');
+}
+// 14.1: their paper's own numbers, reported, never ranked with ours
+const MAB_PAPER = 'their paper\u2019s numbers (16-bit) are under Frontier · reported (paper), '
+  + 'never ranked with ours';
 // asked through the chat template: an instruct model's
 const chatOnly = t => servedAsks(t) || t === 'do_not_answer' || t === 'xstest';
 // 12k.2: Do-Not-Answer, XSTest and BBQ — never in Avg, never in Improve
@@ -9754,7 +9897,9 @@ const BENCH_NAMES = { mmlu: 'MMLU', hellaswag: 'HellaSwag', piqa: 'PIQA', winogr
   bbq_3000: 'BBQ', bbq_all: 'BBQ (all 29,246)',
   gpqa_diamond_cot_zeroshot: 'GPQA Diamond (CoT)', gpqa_diamond_zeroshot: 'GPQA Diamond (4 options)',
   simpleqa_verified: 'SimpleQA Verified', mab_hotpotqa: 'HotpotQA (MobileAIBench)',
-  mab_sql: 'SQL from a question (MobileAIBench)',
+  mab_sql: 'SQL from a question (MobileAIBench)', mab_dolly: 'Dolly (MobileAIBench)',
+  mab_cnndm: 'CNN/DailyMail (MobileAIBench)', mab_xsum: 'XSum (MobileAIBench)',
+  mab_mtbench: 'MT-Bench (MobileAIBench)',
   // 12q.B: DeviceMark's battery, run by its protocol
   dm_ifeval: 'IFEval (DeviceMark protocol)', dm_mmlu_pro: 'MMLU-Pro (DeviceMark protocol)',
   dm_math: 'MATH (DeviceMark protocol)' };
@@ -10159,6 +10304,7 @@ const LB_SHORT = { arc_challenge: 'ARC-C', arc_easy: 'ARC-E', truthfulqa_mc2: 'T
   do_not_answer: 'Do-Not-Answer', xstest: 'XSTest', bbq_3000: 'BBQ', bbq_all: 'BBQ, all',
   gpqa_diamond_cot_zeroshot: 'GPQA CoT', gpqa_diamond_zeroshot: 'GPQA 4 opts',
   simpleqa_verified: 'SimpleQA', mab_hotpotqa: 'HotpotQA', mab_sql: 'SQL',
+  mab_dolly: 'Dolly', mab_cnndm: 'CNN/DM', mab_xsum: 'XSum', mab_mtbench: 'MT-Bench',
   dm_ifeval: 'IFEval (DM)', dm_mmlu_pro: 'MMLU-Pro (DM)', dm_math: 'MATH (DM)' };
 
 // A column's setup, in words — its tooltip, and its accessible name. The
@@ -10174,13 +10320,27 @@ function lbColTip(c) {
       `${Number(b.n || 0).toLocaleString('en')} questions, the lm_eval column's own`
         + (b.note ? ` · ${b.note}` : ''), 'never in any average with the lm_eval columns'];
   }
-  // 12o.3: MobileAIBench's metric, and its others under each cell
+  // 12o.3: MobileAIBench's metric, and its others under each cell. 14.1: each
+  // set's limits, said where its number is
   if (c.task && isMab(c.task)) return [`${benchName(c.task)} — ${MAB_METRIC[c.task]}, as `
-    + 'MobileAIBench scores it', c.task === 'mab_hotpotqa'
-      ? 'exact match and BLEU on each cell · short answers score best: the reference is a few '
-        + 'words' : 'the Levenshtein ratio and exact match (case, spacing, quotes) on each cell · '
+    + 'MobileAIBench scores it', {
+      mab_hotpotqa: 'exact match and BLEU on each cell · short answers score best: the '
+        + 'reference is a few words',
+      mab_sql: 'the Levenshtein ratio and exact match (case, spacing, quotes) on each cell · '
         + 'the SQL from a code block if the answer has one, else its first line starting with '
-        + 'SELECT', ...mabCredit(c.task), 'instruct models only · never in any average'];
+        + 'SELECT',
+      mab_dolly: 'exact match and BLEU on each cell · scored by overlap with one human answer: '
+        + 'a good answer in other words scores low',
+      mab_cnndm: 'word overlap with one reference summary; a good summary in other words '
+        + 'scores low · ROUGE-1 on each cell · Everyday\u2019s Summarise is the measure of '
+        + 'summarising',
+      mab_xsum: 'word overlap with one reference summary; a good summary in other words '
+        + 'scores low · ROUGE-1 on each cell · Everyday\u2019s Summarise is the measure of '
+        + 'summarising',
+      mab_mtbench: 'it needs a judge: each of 160 turns rated 1–10 with MT-Bench\u2019s own '
+        + 'grading prompts, after the run · \u201cawaiting judge\u201d until every turn is rated · '
+        + mabJudgeLine(null) }[c.task],
+    ...mabCredit(c.task), MAB_PAPER, 'instruct models only · never in any average'];
   if (c.key === 'rank' && (lbS().cols || lbS().models)) return ['# — this table\u2019s rows, '
     + 'in the order they are sorted'];
   if (c.key === 'rank') return ['# — rank among the ranked models on this board'];
@@ -11943,14 +12103,20 @@ function cmpGroups(ms) {
     // 12n.2: shared with the frontier — the phone build, the original,
     // Qwen3-1.7B and a frontier model on one line
     frCmpGroup(ms),
-    // 12o.3: MobileAIBench's two, each by its own metric
+    // 12o.3: MobileAIBench's sets, each by its own metric (14.1: MT-Bench out of 10)
     { key: 'mobile', name: 'Mobile tasks (MobileAIBench)', rows: MAB.map(t => ({ key: t,
-      label: `${LB_SHORT[t]} · ${MAB_METRIC[t]}`, get: m => {
+      label: `${LB_SHORT[t]} · ${MAB_METRIC[t]}`, fmt: t === MTBENCH ? 'n1' : undefined,
+      get: m => {
         const c = cell(t, m.id), x = ((m.mab || {})[t]) || {};
-        return c ? { v: c.v, se: c.se || null, tag: 'MobileAIBench\u2019s metric',
-          tip: t === 'mab_hotpotqa' ? `EM ${(100 * (x.em || 0)).toFixed(1)} · BLEU `
-            + `${(100 * (x.bleu || 0)).toFixed(1)}` : `Levenshtein ${(100 * (x.levenshtein
-            || 0)).toFixed(1)} · exact ${(100 * (x.exact || 0)).toFixed(1)}` } : null; } })) },
+        if (!c) return null;
+        const tip = t === 'mab_hotpotqa' || t === 'mab_dolly'
+          ? `EM ${(100 * (x.em || 0)).toFixed(1)} · BLEU ${(100 * (x.bleu || 0)).toFixed(1)}`
+          : t === 'mab_sql' ? `Levenshtein ${(100 * (x.levenshtein || 0)).toFixed(1)} · exact `
+            + `${(100 * (x.exact || 0)).toFixed(1)}`
+          : t === MTBENCH ? mabJudgeLine(m) : `ROUGE-1 ${(100 * (x.rouge1 || 0)).toFixed(1)}`;
+        return t === MTBENCH ? { v: 10 * c.v, se: c.se ? 10 * c.se : null,
+          tag: 'the judge\u2019s rating, out of 10', tip }
+          : { v: c.v, se: c.se || null, tag: 'MobileAIBench\u2019s metric', tip }; } })) },
     // 12m.2: what others report, a source a group, each credited
     ...repCmpGroups(ms),
     // 12f.2: what someone measured on the phone, as they reported it
@@ -12365,9 +12531,11 @@ function vLeaderboard(ms) {
   // are shown — beside its setup's row, its own cells "not measured yet"
   const ggufRow = m => !m.rowOf && ggufAny(m.id) && !ggufHas(m.id)
     && (custom ? L.cols.every(isGgufKey) : dataCols.some(c => c.gguf));
+  // 14.1: MT-Bench answered and awaiting the judge is tested — its cell says so
+  const mtWaits = m => dataCols.some(c => c.task === MTBENCH) && !!((m.mab || {})[MTBENCH] || {}).n;
   const testedIn = m => (custom ? L.cols.some(t => benchVal(t, m.id) != null)
     : dataCols.some(c => !c.rep && val(m, c) != null) || (L.view === 'exam' && judgedAny(m)))
-    || ggufRow(m);
+    || ggufRow(m) || mtWaits(m);
   // a server can be asked this chip's generative tasks before any model has a
   // column for one: then it is "not tested", not absent
   const chipAsks = L.chip === 'all' || [...genTasks(), GPQA_COT, SIMPLEQA, ...MAB].some(t =>
@@ -12644,6 +12812,13 @@ function vLeaderboard(ms) {
         }
         const cc = cell(c.task, m.id);
         const asked = c.task === 'do_not_answer' || c.task === 'xstest';
+        // 14.1: MT-Bench answered, the judge still to rate it
+        const mtw = c.task === MTBENCH && !cc && ((m.mab || {})[MTBENCH] || {}).n;
+        if (mtw) return el('td', { class: 'num se', 'data-mab-awaiting': m.id,
+          title: `${m.mab[MTBENCH].awaiting} of ${m.mab[MTBENCH].n} turns wait for the judge · `
+            + (m.mab.note || 'a judging step rates them'), text: 'awaiting judge' });
+        if (cc && c.task === MTBENCH) return one(c, m, cc.v, cc.se ? (10 * cc.se).toFixed(2) : null,
+          x => (10 * x).toFixed(2), { 'data-mab-mtbench': m.id, title: mabJudgeLine(m) });
         if (!cc) return el('td', { class: 'num se', text: '—',
           title: chatOnly(c.task) && m.kind === 'base'
             ? 'instruct only: asked through the chat template'
@@ -16229,11 +16404,11 @@ function vQueue(part = { form: true, list: true }) {
           + 'with the dataset\'s grader: beside what Epoch AI reports, never ranked with it. '
           + 'Instruct models only (a base model sits GPQA\'s four options in full); never in '
           + 'the average.' }],
-      // 12o.3: MobileAIBench's HotpotQA and SQL, scored by its own metrics
+      // 12o.3: MobileAIBench's sets, scored by its own metrics; 14.1: MT-Bench judged
       ['mobile', mabSuiteLabel(sf.hf_id.trim()),
-        { sub: 'Answer from ten given passages, and SQL from a plain question: MobileAIBench\'s '
-          + 'own 1,000 each and its prompt, scored by its metrics — no judge. Instruct models '
-          + 'only; never in the average.' }]]
+        { sub: 'MobileAIBench\'s own samples and prompts, scored by its metrics: five sets with '
+          + 'no judge, or MT-Bench rated by the judge after the run. Instruct models only; '
+          + 'never in the average.' }]]
       .map(o => srvId && !SERVED_SUITES.includes(o[0])
         ? [o[0], o[1], { ...(o[2] || {}), disabled: true, title: SERVED_LINE }] : o),
       sf.suite || 'full', v => { sf.suite = v; render(); }, { key: 'submit-suite' }),
@@ -16255,6 +16430,8 @@ function vQueue(part = { form: true, list: true }) {
   // 12o.1: GPQA as Epoch runs it, with reasoning — the shared suite thinks too
   const sharedOpts = sf.suite === 'shared' && canThink
     ? el('div', { class: 'genopts', 'data-shared-opts': '1' }, thinkBox) : '';
+  // 14.1: the Mobile tasks suite's two parts, each with what it takes
+  const mabOpts = sf.suite === 'mobile' ? mabPartOpts(sf) : '';
   const genOpts = sf.suite === 'generative' ? el('div', { class: 'genopts', 'data-gen-opts': '1' },
     thinkBox,
     el('label', { class: 'spread small' }, 'MMLU-Pro subset ',
@@ -16295,6 +16472,7 @@ function vQueue(part = { form: true, list: true }) {
       if (sf.subset) body.subset = sf.subset;
     }
     if (sf.suite === 'shared' && sf.thinking) body.thinking = true;
+    if (sf.suite === 'mobile' && sf.part) body.part = sf.part;
     if (sf.suite === 'full' && sf.bbqAll) body.bbq_all = true;
     if (sf.suite === 'judged') {
       body.tasks = [...(sf.tasks || []), ...(sf.control && J.control ? [J.control] : [])];
@@ -16323,7 +16501,7 @@ function vQueue(part = { form: true, list: true }) {
         // the form goes back to where it started: an empty model box and the
         // ticks it opens with, so the next submission is not the last one's
         sf.hf_id = ''; sf.note = ''; sf.allow = false;
-        sf.tasks = null; sf.control = false; sf.bbqAll = false; sf.subsetFor = null;
+        sf.tasks = null; sf.control = false; sf.bbqAll = false; sf.subsetFor = null; sf.part = '';
         state.testOpen = false;                       // 12b: the dialog's job is done
         toast(j.note ? `#${j.id}: ${j.note} —` : `Run #${j.id} queued —`,
               { key: 'submit', go: () => followRun(j.id), link: 'follow it →' });
@@ -16500,7 +16678,7 @@ function vQueue(part = { form: true, list: true }) {
           ? el('span', { class: 'propwhy', 'data-why': 'submit', text: judgeWhy() }) : '',
         ownWhy),
       ownCodeBox(info, sf.allow, v => { sf.allow = v; gateSubmit(); }, 'submit'),
-      topicBoxes, genOpts, sharedOpts, bbqOpts,
+      topicBoxes, genOpts, sharedOpts, mabOpts, bbqOpts,
       orId ? orEstimateLine(sf) : '',
       state.qmsg ? el('p', { class: 'warn', 'data-qmsg': '1', style: 'margin-top:8px',
         text: state.qmsg }) : '') : null,

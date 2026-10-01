@@ -484,16 +484,23 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
                                  "judged (free response + judge), everyday (Everyday tasks), "
                                  "generative (IFEval, MMLU-Pro, MATH-500), safety "
                                  "(Do-Not-Answer, XSTest), shared (GPQA Diamond, "
-                                 "SimpleQA Verified), mobile (MobileAIBench's HotpotQA and "
-                                 "SQL) or devicemark (DeviceMark's battery)")
+                                 "SimpleQA Verified), mobile (MobileAIBench's text sets; "
+                                 "part judged: MT-Bench) or devicemark (DeviceMark's battery)")
     if s.suite not in ("generative", "shared", "devicemark") and s.thinking:
         raise HTTPException(422, "thinking is for IFEval, MMLU-Pro and MATH-500 (suite "
                                  "generative), GPQA Diamond and SimpleQA Verified (suite "
                                  "shared) and DeviceMark's battery (suite devicemark) only")
     part = (s.part or "").strip().lower()
     pair = (s.pair or "").strip()
-    if s.suite != "devicemark" and (part or pair):
-        raise HTTPException(422, "part and pair are for the devicemark suite only")
+    # 14.1: the mobile suite's two parts — none (no judge), or judged (MT-Bench)
+    if s.suite == "mobile" and part not in config.MAB_PARTS:
+        raise HTTPException(422, "the mobile suite's part is judged (MT-Bench), or none for its "
+                                 "five sets with no judge")
+    if s.suite == "mobile" and pair:
+        raise HTTPException(422, "pair is for the devicemark suite only")
+    if s.suite not in ("devicemark", "mobile") and (part or pair):
+        raise HTTPException(422, "pair is for the devicemark suite only, and part for it and "
+                                 "the mobile suite")
     if s.suite == "devicemark":
         why = _devicemark_check(s.hf_id.strip(), s.kind, part or "full", pair, s.thinking)
         if why:
@@ -1046,6 +1053,7 @@ class EstimateIn(BaseModel):
     suite: str = "everyday"
     tasks: list[str] = []
     subset: int = 0
+    part: str = ""
 
 
 @app.post("/api/served/estimate")
@@ -1057,7 +1065,7 @@ def served_estimate(a: EstimateIn):
         raise HTTPException(422, f"{a.model} is not a model from OpenRouter")
     if a.suite not in served.SUITES:
         raise HTTPException(422, served.LOGLIK_LINE)
-    est = served.estimate(rec, a.suite, a.tasks, a.subset)
+    est = served.estimate(rec, a.suite, a.tasks, a.subset, part=a.part)
     cap, month = ai_models.limit(), db.spend_this_month()
     return {**est, "month": round(month, 4), "limit": cap, "left": round(max(0.0, cap - month), 4),
             "refused": served.over_limit_line(est)}
@@ -1354,6 +1362,73 @@ def artifact_delete(name: str, x_token: str = Header(default="")):
 # measured on a device, entered by a person (only that places a row on the
 # chart's x-axis; the server's speed test never does)
 # ---------------------------------------------------------------------------
+
+def _mab():
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import mobileaibench
+    return mobileaibench
+
+
+def _mab_judge() -> dict:
+    """14.1: the judge as an estimate needs it: its id and words, whether it
+    is this server's, and its prices when it is one from OpenRouter"""
+    import judge as _judge
+    c = ai_models.choice("judge") or {}
+    try:
+        ident = _judge.identity()
+    except Exception:                                   # noqa: BLE001 — no judge set up
+        ident = {"id": ""}
+    return {"id": ident.get("id", ""), "label": ai_models.label("judge"),
+            "local": ai_models.is_local("judge"),
+            "price_in": c.get("price_in") if c.get("kind") == "openrouter" else None,
+            "price_out": c.get("price_out") if c.get("kind") == "openrouter" else None}
+
+
+@app.get("/api/mobileaibench/estimate")
+def mab_estimate(model: str):
+    """14.1: what each part of a model's MobileAIBench run takes, before
+    Start: its answers and time — the model's own measured seconds an answer
+    when it has some, else the page's guess — and for the judged part the
+    judge's judgements, tokens and (an OpenRouter judge's) cost"""
+    if not _HF_ID_RE.match(model):
+        raise HTTPException(422, "model must be a model id on the board")
+    rec = served.get(model) if served.is_served(model) else None
+    each = ((rec or {}).get("speed") or {}).get("secs_each") if rec else _mab_hf_each()
+    return {"model": model, "parts": _mab().estimate(bool(rec), each, _mab_judge())}
+
+
+def _mab_hf_each() -> float | None:
+    """seconds an answer of this server's earlier MobileAIBench runs, on its
+    GPU: their GPU time over their answers"""
+    rows = [r for r in db.recent(500) if r.get("suite") == "mobile" and r.get("status") == "done"
+            and r.get("gpu_seconds") and not served.is_served(r.get("hf_id") or "")]
+    if not rows:
+        return None
+    m = _mab()
+    n = sum(m.part_counts(r.get("part") or "")["answers"] for r in rows)
+    return round(sum(float(r["gpu_seconds"]) for r in rows) / n, 3) if n else None
+
+
+class MabJudgeIn(BaseModel):
+    by: str = ""
+
+
+@app.post("/api/mobileaibench/judge")
+def mab_judge(a: MabJudgeIn, x_token: str = Header(default="")):
+    """14.1: the later judging step — every model's MT-Bench turns that wait
+    for the judge, sent now. A judge still offline leaves them waiting, and
+    says why"""
+    _check_token(x_token)
+    _name(a.by, "a judging step")
+    m = _mab()
+    out = []
+    for d in m.awaiting(config.OUT_DIR):
+        got = m.start_judge(d)
+        out.append({"model": d.name, "batch_id": got.get("batch_id"), "note": got.get("note", ""),
+                    "summary": m.summary(got)})
+    _cache.update(key=None, payload=None, at=0.0)
+    return {"models": out}
+
 
 def _dm():
     from . import devicemark as _devicemark
