@@ -42,8 +42,11 @@ import gguf_bench as gb  # noqa: E402
 
 PREFIX = "gguf/"
 HEARTBEAT_S = 60
-# seconds a task, before a run of this file has measured it: a rough guess
-GUESS_S = {"multiple-choice": 0.25, "hellaswag": 0.4, "winogrande": 0.1}
+# seconds a task, before any run on this server has measured one of its
+# kind: a rough guess. 12z A7: multiple-choice was 0.25, and said "about 17
+# min" for ARC-C, ARC-E and TruthfulQA on the phone build, which ran at about
+# 85 tasks a minute (#165): 0.7
+GUESS_S = {"multiple-choice": 0.7, "hellaswag": 0.4, "winogrande": 0.1}
 ACTIVE = ("queued", "waiting_lock", "running")
 DOWN = "The GGUF worker isn't running."
 # 12f.4: a job the worker was on when it went quiet this long is released — as
@@ -268,17 +271,37 @@ def setups_of(model_id: str, want: list[str] | None = None) -> list[dict]:
 
 
 def _seconds_each(model_id: str) -> dict[str, float]:
-    """seconds a task, by benchmark, from the newest run of this file that
-    measured it"""
+    """seconds a task, by benchmark, from the newest run that measured it:
+    12z A7: this file's first, then this file's on a benchmark of the same
+    kind, then any file's on this server, the same benchmark before the same
+    kind — a benchmark new to this file was guessed at 0.25 s a task"""
+    return {b: v for b, (v, _) in _seconds_each_from(model_id).items()}
+
+
+def _seconds_each_from(model_id: str) -> dict[str, tuple[float, str]]:
+    """(seconds a task, where it was measured: "this file" or "this server")"""
     sha = ((model(model_id) or {}).get("pin") or {}).get("sha256")
-    measured: dict[str, float] = {}
-    for res in results():
-        if sha and (res.get("file") or {}).get("sha256") != sha:
-            continue
+    own, own_kind, any_b, any_kind = {}, {}, {}, {}
+    for res in results():                                   # newest first
+        mine = bool(sha) and (res.get("file") or {}).get("sha256") == sha
         for b, v in (res.get("benchmarks") or {}).items():
-            if v.get("seconds") is not None and v.get("done"):
-                measured.setdefault(b, v["seconds"] / v["done"])
-    return measured
+            if b not in gb.BENCHMARKS or v.get("seconds") is None or not v.get("done"):
+                continue
+            each, kind = v["seconds"] / v["done"], gb.BENCHMARKS[b]["mode"]
+            if mine:
+                own.setdefault(b, each)
+                own_kind.setdefault(kind, each)
+            any_b.setdefault(b, each)
+            any_kind.setdefault(kind, each)
+    out = {}
+    for b, info in gb.BENCHMARKS.items():
+        kind = info["mode"]
+        got = (own.get(b), "this file") if b in own else (own_kind[kind], "this file") \
+            if kind in own_kind else (any_b[b], "this server") if b in any_b \
+            else (any_kind[kind], "this server") if kind in any_kind else None
+        if got:
+            out[b] = got
+    return out
 
 
 def estimate(model_id: str, benchmarks: list[str], subset: int = 0,
@@ -287,18 +310,21 @@ def estimate(model_id: str, benchmarks: list[str], subset: int = 0,
     of this file that measured it, else a rough guess"""
     k = len(setups_of(model_id, setups)) if model(model_id) else 1
     man = manifest()
-    measured = _seconds_each(model_id)
-    out, rough = {}, False
+    measured = _seconds_each_from(model_id)
+    out, rough, elsewhere = {}, False, False
     for b in benchmarks:
         n = subset or int((man.get(b) or {}).get("n") or gb.BENCHMARKS[b]["n"])
-        each = measured.get(b)
+        each, where = measured.get(b) or (None, "")
         if each is None:
             rough = True
             each = GUESS_S[gb.BENCHMARKS[b]["mode"]]
-        out[b] = {"n": n, "seconds": round(n * each * k)}
+        elsewhere = elsewhere or where == "this server"
+        out[b] = {"n": n, "seconds": round(n * each * k), "each": round(each, 3),
+                  "from": where or "a rough guess"}
     total = sum(v["seconds"] for v in out.values())
     return {"by": out, "seconds": total, "rough": rough, "line": _dur(total) + (
-        ", a rough guess" if rough else "")}
+        ", a rough guess" if rough else
+        ", at the pace of this server's runs of other files" if elsewhere else "")}
 
 
 def _dur(s: float) -> str:
@@ -544,7 +570,12 @@ def sync() -> None:
         if st == "waiting":
             db.update(row["id"], status="waiting_lock", progress=line)
         elif st == "running":
-            db.update(row["id"], status="running", progress=line,
+            # 12z A7: the line says the running benchmark's time; the whole
+            # run's goes after it while another is still to come
+            more = any(v.get("status") == "queued" for v in (res.get("benchmarks") or {}).values())
+            left = time_left(row["id"]) if more else None
+            db.update(row["id"], status="running",
+                      progress=line + (f" · {_dur(left)} left in all" if left else ""),
                       started_at=res.get("started_at"), arch=json.dumps(arch))
         else:
             if res.get("file", {}).get("sha256") and st in ("done", "stopped"):

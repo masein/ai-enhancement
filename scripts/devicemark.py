@@ -682,10 +682,13 @@ def mark(row_dir: Path, items: dict[tuple[str, str], dict], setup: dict,
     return row
 
 
-def rows(out_dir: Path) -> list[dict]:
+def rows(out_dir: Path, launch=None) -> list[dict]:
     """every row on the board that sat the battery: its numbers, its speeds
     (the server's and a device's), a setup without MTP's quality from its
-    MTP partner when the parity check allows — and the ranks"""
+    MTP partner when the parity check allows — and the ranks. 12z A1: a
+    served setup's lookahead and MTP are what its launch says now — `launch`,
+    model id -> {lookahead, mtp} (its registration, service side), else the
+    flags recorded with the row — never words in its description"""
     got = {}
     for d in sorted(p for p in out_dir.iterdir() if p.is_dir()) if out_dir.is_dir() else []:
         f = d / OUT_NAME
@@ -704,11 +707,22 @@ def rows(out_dir: Path) -> list[dict]:
             row = inherit(row, mtp, report)
         if not row or row.get("composite", {}).get("value") is None:
             continue
+        mid = _model_of(out_dir / name)
+        su = row.get("setup") or {}
+        if su.get("runtime") == "llama-server":
+            # its registration's launch; with none, the flags recorded with the
+            # row where they say anything, else what the row recorded
+            lk = launch(mid) if launch else None
+            if lk is None:
+                lk = launch_of(su.get("server_flags") or "")
+                if not lk["said"]:
+                    lk = {"lookahead": su.get("lookahead"), "mtp": su.get("mtp")}
+            row = {**row, "setup": {**su, "lookahead": bool(lk.get("lookahead")),
+                                    "mtp": bool(lk.get("mtp"))}}
         base = out_dir / name.removesuffix("__thinking")
         speed = _json(base / SPEED_NAME)
         device = _json(base / DEVICE_NAME)
         thinks = name.endswith("__thinking")
-        mid = _model_of(out_dir / name)
         out.append({"id": mid + (" · thinking" if thinks else ""), "model": mid,
                     "thinking": thinks, "row": row,
                     "label": setup_label(row.get("setup") or {}, thinks, mid),
@@ -773,9 +787,12 @@ def external_rows(snap: dict | None = None) -> list[dict]:
             "id": r["artifact_id"], "external": True, "kind": kind,
             "name": f"{r['model']} ({r['quant']})" if kind == "device" else r["model"],
             "model": r["model"],
-            # what theirs is, beside ours: "int8, iPhone"
-            "label": (f"{QUANTS.get(r['quant'], r['quant'])}, "
-                      f"{(snap.get('device') or 'device').split()[0]}" if kind == "device"
+            # what theirs is, beside ours — 12z A3: DeviceMark scores quality on
+            # a Mac (the bundle on Apple's engine, or LiteRT) and takes only the
+            # speed, and a short word-for-word check, from the phone: "int8,
+            # scored on a Mac; speed on iPhone 17 Pro"
+            "label": (f"{QUANTS.get(r['quant'], r['quant'])}, scored on {SCORED_ON}; "
+                      f"speed on {snap.get('device') or 'the device'}" if kind == "device"
                       else r["model"]),
             "vendor": r.get("vendor"), "params_b": r.get("params_b"),
             "composite": {"value": r["composite"]["value"], "ci": r["composite"]["ci"]},
@@ -830,7 +847,11 @@ def cant_run_here() -> dict[str, str]:
             CANT_RUN_PATH.read_text(encoding="utf-8")).items() if isinstance(v, dict)}
     except (OSError, ValueError):
         return {}
+
+
 DTYPES = {"bfloat16": "bf16", "float16": "fp16", "float32": "fp32"}
+# 12z A3: where DeviceMark scores a device row's quality (its methodology page)
+SCORED_ON = "a Mac"
 QUANTS = {"int8hu": "int8"}
 
 
@@ -896,6 +917,32 @@ def pair(ours: list[dict], theirs: list[dict]) -> None:
             t.setdefault("ours", []).append(o)
 
 
+# 12z A1: a setup's lookahead and MTP, from its launch flags and environment
+# — `--spec-type draft-mtp`, `LLAMA_MOE_ROUTE_MODE=lookahead` — read as flags
+# and VAR=value, never as words: "routing local (no lookahead)" is not
+# lookahead, and "MTP-GGUF" in a file's name is not MTP
+_ENV_TOKEN = re.compile(r"\b([A-Z][A-Z0-9_]*)=([A-Za-z0-9_.:/+-]+)")
+ROUTE_MODE, ROUTE_LOOKAHEAD = "LLAMA_MOE_ROUTE_MODE", "LLAMA_MOE_ROUTE_LOOKAHEAD"
+
+
+def launch_of(*texts: str) -> dict:
+    """{"lookahead", "mtp", "said"}: what these launch flags and environment
+    say — `said` when they say either at all"""
+    text = " ".join(t for t in texts if t)
+    env = dict(m.groups() for m in _ENV_TOKEN.finditer(text))
+    toks = [t for t in re.split(r"[\s,;()]+", text) if t]
+    spec = None
+    for i, t in enumerate(toks):
+        if t.startswith("--spec-type="):
+            spec = t.split("=", 1)[1]
+        elif t == "--spec-type" and i + 1 < len(toks):
+            spec = toks[i + 1]
+    mode = env.get(ROUTE_MODE, "").lower()
+    return {"lookahead": mode == "lookahead" and env.get(ROUTE_LOOKAHEAD, "1") != "0",
+            "mtp": bool(spec) and "mtp" in spec.lower(),
+            "said": spec is not None or ROUTE_MODE in env}
+
+
 # the build a served setup is: "k4-LDA" in a phone build's name or file, an
 # original's "k=8"
 _BUILD = re.compile(r"\bk\d+-[A-Za-z]+\b")
@@ -917,11 +964,11 @@ def setup_label(su: dict, thinking: bool, model: str = "") -> str:
         f"thinking {'on' if thinking else 'off'}") if x)
 
 
-def board(out_dir: Path) -> dict:
+def board(out_dir: Path, launch=None) -> dict:
     """ours and theirs, ranked together by their rule — our runs of their
     models beside their rows, never ranked apart. 12q.B2: the cloud APIs
     aren't ranked (their "☁" rows), as DeviceMark's board doesn't"""
-    ours, theirs = rows(out_dir), external_rows()
+    ours, theirs = rows(out_dir, launch), external_rows()
     pair(ours, theirs)
     solo = [r for r in ours if not r.get("paired")]
     ranked = [t for t in theirs if t["kind"] != "cloud"]
@@ -985,7 +1032,7 @@ def _parity_card(rep: dict, out_dir: Path, suffix: str) -> dict:
                                        "plain", "thinking", "at")}, "differ": differ}
 
 
-def model_runs(out_dir: Path) -> dict[str, dict]:
+def model_runs(out_dir: Path, launch=None) -> dict[str, dict]:
     """each model with a DeviceMark run, by thinking mode ("off", "on"): its
     full row as the board ranks it — and its row on the On-device chart, its
     own or DeviceMark's beside it — then its pilot, its parity check and its
@@ -993,7 +1040,9 @@ def model_runs(out_dir: Path) -> dict[str, dict]:
     opens"""
     if not out_dir.is_dir():
         return {}
-    full = {r["id"]: r for r in board(out_dir)["rows"]}
+    b = board(out_dir, launch)
+    full = {r["id"]: r for r in b["rows"]}
+    ext = {t["id"]: t for t in b["external"]["rows"]}
     out: dict[str, dict] = {}
     for d in sorted(p for p in out_dir.iterdir() if p.is_dir()):
         mode = "on" if d.name.endswith("__thinking") else "off"
@@ -1017,6 +1066,15 @@ def model_runs(out_dir: Path) -> dict[str, dict]:
                 "items": (d / ITEMS_NAME).exists(), "at": row.get("at"),
                 "raw_fallback": row.get("raw_fallback") or 0, "errors": row.get("errors") or 0,
                 "version": row.get("version")}
+            # 12z A5: DeviceMark's own row beside ours, as the chart's table has it:
+            # their number, and whether the two are a calibration point
+            t = ext.get(r.get("paired") or "")
+            if t:
+                o = next((x for x in t.get("ours") or [] if x.get("id") == rid), {})
+                card["row"]["theirs"] = {
+                    "id": t["id"], "name": t["name"], "label": t.get("label"),
+                    "composite": t.get("composite"), "mode_differs": o.get("mode_differs") or "",
+                    "within": o.get("within"), "calibration": bool(o.get("calibration"))}
         if pilot:
             cc = pilot.get("cap_check") or {}
             card["pilot"] = {"composite": pilot.get("composite"), "benches": _benches(pilot),

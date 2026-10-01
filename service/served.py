@@ -230,6 +230,15 @@ def probe(base: str, key: str = "") -> dict:
             out["answered"].append("health")
     except Exception:                                       # noqa: BLE001 — optional
         pass
+    # 12z A1: whether its slots draft tokens (MTP or a draft model), as it says
+    try:
+        st, raw = _http("GET", root + "/slots", key, timeout=5)
+        slots = json.loads(raw) if st == 200 else None
+        if isinstance(slots, list) and slots and all(isinstance(x, dict) for x in slots):
+            out["speculative"] = any(bool(x.get("speculative")) for x in slots)
+            out["answered"].append("slots")
+    except Exception:                                       # noqa: BLE001 — optional
+        pass
     out["file"] = out["file"] or out["model"].rsplit("/", 1)[-1]
     return out
 
@@ -310,7 +319,12 @@ def register(f: dict, by: str) -> dict:
            "gguf_flags": (f.get("gguf_flags") or "").strip(),
            # 12f.3 addendum: the setups its GGUF is measured in
            "gguf_setups": _gguf_setups(f.get("gguf_setups")),
-           "pin": pin_of(p), "answered": p["answered"], "by": by, "at": time.time()}
+           "pin": pin_of(p), "answered": p["answered"], "by": by, "at": time.time(),
+           # 12z A1: how it was launched — its flags and environment, as typed —
+           # and whether the server says its slots draft tokens
+           "flags": (f.get("flags") or "").strip() or old.get("flags", ""),
+           "env": (f.get("env") or "").strip() or old.get("env", ""),
+           "speculative": p.get("speculative")}
     if rec["gguf_path"] and old.get("gguf_path") == rec["gguf_path"] and old.get("gguf_pin"):
         rec["gguf_pin"] = old["gguf_pin"]
     # 12o.1: registered again, it keeps the file someone said it serves
@@ -319,6 +333,47 @@ def register(f: dict, by: str) -> dict:
     db.served_put(rec)
     write_meta(rec)
     return public(rec)
+
+
+def set_launch(served_id: str, flags: str, env: str) -> dict:
+    """12z A1: a served setup's launch flags and environment, as typed — kept
+    without asking its server (only one may be up at a time)"""
+    rec = get(served_id)
+    if not rec or is_openrouter(rec):
+        raise ValueError(f"no served llama-server {served_id}")
+    rec["flags"], rec["env"] = (flags or "").strip(), (env or "").strip()
+    db.served_put(rec)
+    write_meta(rec)
+    return public(rec)
+
+
+def launch(rec: dict | None) -> dict | None:
+    """12z A1: a served setup's lookahead and MTP — what its launch says: its
+    flags and environment (registered, or as flags in "How it's served"),
+    the GGUF setup it serves the same file as, and (MTP) the server saying
+    its slots draft tokens. Never words in its description: "routing local
+    (no lookahead)" is not lookahead, "MTP-GGUF" in a file's name is not MTP.
+    None for what has no launch (a model from OpenRouter)"""
+    if not rec or is_openrouter(rec):
+        return None
+    from .devicemark import dm
+    texts = [rec.get("flags") or "", rec.get("env") or "", rec.get("how") or ""]
+    sa = rec.get("same_as") or {}
+    if sa.get("gguf"):
+        g = db.gguf_get(sa["gguf"]) or {}
+        su = next((x for x in g.get("setups") or [] if x.get("id") == sa.get("setup")), None)
+        if su:
+            texts += [" ".join(f"{k}={v}" for k, v in (su.get("env") or {}).items()),
+                      " ".join(su.get("flags") or [])]
+    lk = dm().launch_of(*texts)
+    if rec.get("speculative") is True:
+        lk["mtp"] = True
+    lk["server_speculative"] = rec.get("speculative")
+    return lk
+
+
+def launch_of_id(model_id: str) -> dict | None:
+    return launch(get(model_id)) if is_served(model_id) else None
 
 
 def same_as_set(served_id: str, gguf_id: str, setup: str = "as-built") -> dict | None:

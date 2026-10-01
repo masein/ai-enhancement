@@ -364,7 +364,7 @@ def setup_of(rec: dict, thinking: bool, props: dict | None = None) -> dict:
     """model, lookahead, MTP, thinking, quant, the server's flags as far as
     it or its registration says them, port and battery"""
     d = dm()
-    name = f"{rec['name']} {rec.get('how') or ''}"
+    lk = _served.launch(rec) or {}
     file = rec["pin"].get("file") or ""
     m = re.search(r":(\d+)(?:/|$)", rec["base_url"])
     q = _QUANT.findall(file.rsplit(".", 1)[0])
@@ -372,8 +372,9 @@ def setup_of(rec: dict, thinking: bool, props: dict | None = None) -> dict:
             "base_url": rec["base_url"], "port": int(m.group(1)) if m else None,
             "file": file, "build": rec["pin"].get("build"), "ctx": rec["pin"].get("ctx"),
             "quant": q[-1] if q else None, "phone": _served.is_phone(rec),
-            "lookahead": bool(re.search(r"look-?ahead", name, re.I)),
-            "mtp": bool(re.search(r"\bmtp\b|draft|--spec|speculative", name, re.I)),
+            # 12z A1: from its launch, never words in its description
+            "lookahead": bool(lk.get("lookahead")), "mtp": bool(lk.get("mtp")),
+            "launch": {"flags": rec.get("flags") or "", "env": rec.get("env") or ""},
             "thinking": bool(thinking), "server_flags": rec.get("how") or "",
             "props": props or {}, "battery": d.VERSION, "cap": d.CAP, "seed": d.SEED}
 

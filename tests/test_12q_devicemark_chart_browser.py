@@ -66,7 +66,7 @@ def test_the_chart_draws_rows_on_a_device_as_points_and_the_rest_as_lines(live, 
     # our run of one of their models: never plotted — in their point's hover
     assert chart.locator(f"[data-dm-line='{NEMO}'], [data-dm-point='{NEMO}']").count() == 0
     nemo = json.loads(chart.locator(f"[data-dm-point='{THEIR_NEMO}']").get_attribute("data-tip"))
-    assert nemo[1] == "theirs (int8, iPhone): composite 61.4 [57.8, 65.1]"
+    assert nemo[1] == "theirs (int8, scored on a Mac; speed on iPhone 17 Pro): composite 61.4 [57.8, 65.1]"
     # 12q.D: not calibration any more — it can't run here — though a run of ours still shows
     assert nemo[3].startswith("ours (bf16, our battery): composite ") \
         and not nemo[3].endswith(" · calibration")
@@ -113,7 +113,7 @@ def test_the_table_ranks_everyone_theirs_read_only(live, page, ours):
     nemo = t.locator(f"[data-dm-row='{THEIR_NEMO}']")
     comp = nemo.locator(f"[data-dm-composite='{THEIR_NEMO}']")
     assert comp.locator(f"[data-dm-theirs='{THEIR_NEMO}']").inner_text() == \
-        "theirs (int8, iPhone): 61.4 ±3.6"
+        "theirs (int8, scored on a Mac; speed on iPhone 17 Pro): 61.4 ±3.6"
     assert comp.locator(f"[data-dm-ours='{NEMO}']").inner_text().startswith(
         "ours (bf16, our battery): ")
     assert nemo.locator(f"[data-dm-ours='{NEMO}']").count() == 6    # composite, 3 benches, 2 more

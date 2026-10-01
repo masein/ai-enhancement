@@ -525,11 +525,23 @@ def cancel_requested(sid: int) -> bool:
     return bool(row) and row[0] == "canceling"
 
 
-def recent(limit: int = 100) -> list[dict]:
+def recent(limit: int = 100, before: int | None = None) -> list[dict]:
+    """the newest `limit` runs — 12z A6: or the newest below run `before`, the
+    next page of older ones"""
     with closing(_conn()) as c:
-        rows = c.execute(f"SELECT {','.join(_COLS)} FROM submissions "
-                         "ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        if before is None:
+            rows = c.execute(f"SELECT {','.join(_COLS)} FROM submissions "
+                             "ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        else:
+            rows = c.execute(f"SELECT {','.join(_COLS)} FROM submissions WHERE id < ? "
+                             "ORDER BY id DESC LIMIT ?", (before, limit)).fetchall()
     return [dict(zip(_COLS, r)) for r in rows]
+
+
+def count_submissions() -> int:
+    """12z A6: every run there is, for the Runs list's count"""
+    with closing(_conn()) as c:
+        return int(c.execute("SELECT COUNT(*) FROM submissions").fetchone()[0])
 
 
 # ---------------------------------------------------------------------------

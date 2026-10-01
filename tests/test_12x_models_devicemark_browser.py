@@ -137,8 +137,8 @@ def test_the_chip_shows_each_models_rows_both_modes_sorted_by_the_composite(live
     tip = json.loads(page.locator(f"tr[data-lb-row='{SETUP}'] [data-dm-cell='composite']")
                      .get_attribute("data-tip"))
     assert tip[0] == f"{100 * off['composite']['value']:.1f} ± {half:.1f}"
-    assert tip[-1].startswith("the ± is half the 95% interval · rank ")
-    assert tip[-1].endswith(" on the On-device chart")
+    assert tip[-1].startswith("the ± is half the 95% interval · ")
+    assert tip[-1].endswith(" among ranked rows (cloud lines aren’t ranked)")
     # the served setup's thinking row is made beside it, badged, and opens the setup's page
     row = page.locator(f"tr[data-lb-row='{SETUP} · thinking']")
     assert row.locator("[data-thinking-badge]").count() == 1

@@ -4710,6 +4710,45 @@ Not before the demo: a new hidden set changes every Everyday score.
   strict and loose), a served setup's too. It lists what the board lists: the
   diagnose half.
 
+### 12z A — the QA walk's wrong data and labels (1 Oct)
+
+- **A1. A served setup's lookahead and MTP come from its launch**
+  (`served.launch`, `devicemark.launch_of`): `--spec-type draft-mtp` and
+  `LLAMA_MOE_ROUTE_MODE=lookahead` read as flags and VAR=value — in the new
+  "Launch flags" and "Environment" fields of the registration, as flags in
+  "How it's served", or from the GGUF setup it serves the same file as — and
+  MTP also when the server says its slots draft tokens (`/slots`,
+  `speculative`). Never words: "routing local (no lookahead)" isn't
+  lookahead, "MTP-GGUF" in a file's name isn't MTP. A row on disk is labelled
+  by its setup's launch as registered now (`rows(out_dir, launch)`), so a
+  corrected registration corrects the chart and the Scores tab at once.
+  `PUT /api/served/{id}/launch` sets the flags and environment without asking
+  the server (only one fits on the card at a time).
+- **A2. "Setups of this file"**: a row per setup and thinking mode ("… · MTP
+  · thinking"), each with its own DeviceMark number; a thinking row's folder
+  registers it too, and it isn't a second setup. The table keeps every cell
+  in its column (nowrap; the table scrolls).
+- **A3. Their device rows say where they were scored**: "theirs (int8,
+  scored on a Mac; speed on iPhone 17 Pro)" — DeviceMark scores quality on a
+  Mac and takes the speed, and a short word-for-word check, from the phone.
+- **A4. The plain phone build has its retention** over the original: it was
+  "—" because A1's guess called it lookahead.
+- **A5. Our hf run's DeviceMark card carries their row**: "DeviceMark's own
+  row (int8, …): 26.1 ±… · modes differ · not a calibration point", as the
+  chart's table says it (`model_runs` → `row.theirs`).
+- **A6. The Runs list pages back** past its newest 100: "100 of 166 · the
+  latest 100" and "Show 66 older runs" (`GET /api/submissions?before=N`,
+  `GET /api/submissions/count`).
+- **A7. A GGUF run's time**: at this server's measured pace — this file's,
+  else this file's on a benchmark of the same kind, else any file's on this
+  server — and the rough guess for multiple choice is 0.7 s a task (85 a
+  minute, #165), not 0.25. The running line adds the whole run's time left:
+  "· about 48 min left in all".
+- **A8.** An out-of-memory error says which process grew since 12q.G (#129);
+  #147's text predates it.
+- **A9. A rank says among what**: "=1 among ranked rows (cloud lines aren't
+  ranked)".
+
 ### 12x — DeviceMark's rows as columns on Models
 
 - Every model in a view of the phone builds and the calibration models had a
