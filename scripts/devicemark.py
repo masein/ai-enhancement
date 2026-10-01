@@ -629,6 +629,31 @@ def stand_in_items(part: str = "full") -> dict[tuple[str, str], dict]:
     return {(b, k): {"bench": b, "key": k, "text": "x"} for b, k in keys_for(part)}
 
 
+def task_keys(tasks_dir: Path, task: str) -> set[str]:
+    """the battery items a built task holds (build_tasks' file)"""
+    try:
+        text = (tasks_dir / f"{task}.jsonl").read_text(encoding="utf-8")
+    except OSError:
+        return set()
+    return {str(json.loads(x)["key"]) for x in text.splitlines() if x.strip()}
+
+
+def answered_keys(task_out: Path, task: str) -> set[str]:
+    """the battery items a run's saved answers to `task` cover: its newest
+    samples file, the one records_from_samples scores. lm_eval writes it
+    whole, once the task is answered; a line cut short is no answer"""
+    files = sorted(task_out.rglob(f"samples_{task}_*.jsonl"))
+    got: set[str] = set()
+    for line in files[-1].read_text(encoding="utf-8").splitlines() if files else []:
+        try:
+            key = (json.loads(line).get("doc") or {}).get("key")
+        except ValueError:
+            continue
+        if key is not None:
+            got.add(str(key))
+    return got
+
+
 def records_from_samples(row_dir: Path, token_count=None) -> list[dict]:
     """each answer a Hugging Face run logged, as a record: its length counted
     again from the text with the model's tokenizer (`token_count`), and
