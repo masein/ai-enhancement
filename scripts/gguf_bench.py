@@ -93,8 +93,18 @@ BENCHMARKS = {
     "gpqa": {"label": "GPQA Diamond", "mode": "multiple-choice", "data": "gpqa-diamond.bin",
              "lm_eval": "gpqa_diamond_zeroshot", "split": "train", "n": 198,
              "note": "gated on Hugging Face: accept its terms with this server's HF account"},
+    # 14.3: Mobile-MMLU-Pro, lettered as MMLU is, on our answer key's kept
+    # questions. Built apart (gguf_data.py --only mobile_mmlu_pro), once the
+    # key is: a new key is a new file, and a result on the old one is History's
+    "mobile_mmlu_pro": {"label": "Mobile-MMLU-Pro", "mode": "multiple-choice",
+                        "data": "mobile-mmlu-pro.bin", "lm_eval": "mobile_mmlu_pro",
+                        "split": "test", "n": 9497, "format": "lettered", "apart": True,
+                        "note": "on our answer key's kept questions; built once the key is"},
 }
 ORDER = list(BENCHMARKS)
+# 14.3: what a build covers when none is named — every benchmark but one
+# built apart (Mobile-MMLU-Pro, once its key is)
+DEFAULT = [b for b in ORDER if not BENCHMARKS[b].get("apart")]
 MODES = {
     "hellaswag": {"flag": "--hellaswag", "tasks": "--hellaswag-tasks", "file": "-f",
                   "chance": 0.25},

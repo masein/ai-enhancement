@@ -128,6 +128,10 @@ COPY eval_tasks/simpleqa/ eval_tasks/simpleqa/
 # 12o.3: MobileAIBench's HotpotQA and SQL samples (Apache-2.0; CC BY-SA 4.0 and
 # CC BY 4.0 under them), pinned — mobileaibench.build_tasks() writes their tasks
 COPY eval_tasks/mobileaibench/ eval_tasks/mobileaibench/
+# 14.3: Mobile-MMLU-Pro's manifest (its revision, hash, fields and the paper's
+# checks) and task template — never its questions: the data step fetches those
+# into the server's data folder, and mobile_mmlu.build_tasks() writes the task
+COPY eval_tasks/mobile_mmlu_pro/ eval_tasks/mobile_mmlu_pro/
 # 12q: DeviceMark's battery (ids only), its source ids and its prompts —
 # devicemark.load_items reads the questions for them from the pinned datasets
 COPY eval_tasks/devicemark/ eval_tasks/devicemark/

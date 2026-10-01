@@ -107,6 +107,10 @@ def make_service(root: Path, monkeypatch, *, llm_provider: str = "fake", tree: b
                       # 12o.1: the run's SimpleQA task under the test's root, not the repo's
                       "SIMPLEQA_TASKS_DIR": root / "simpleqa" / "tasks",
                       "MAB_TASKS_DIR": root / "mobileaibench" / "tasks",
+                      # 14.3: Mobile-MMLU-Pro's data folder and its run's task, under
+                      # the test's root: empty unless a test puts the invented rows there
+                      "MMP_DIR": root / "data" / "mobile_mmlu_pro",
+                      "MMP_TASKS_DIR": root / "mobile_mmlu_pro" / "tasks",
                       # 12q: devicemark's tasks and its questions under the test's root
                       "DM_TASKS_DIR": root / "devicemark" / "tasks",
                       "DM_ITEMS": root / "devicemark" / "items-v1.jsonl",
@@ -155,7 +159,7 @@ def live(tmp_path_factory):
         "DATASETS_DIR", "SUBMIT_TOKEN", "LLM_PROVIDER", "LLM_MODEL", "LLM_API_KEY", "LLM_POLL_S",
         "EXAM_DIR", "EXAM_PROVIDER", "EXAM_MODEL", "EXAM_API_KEY", "JUDGED_TASKS_DIR",
         "EVERYDAY_TASKS_DIR", "TRUST_TASKS_DIR", "BACKUP_DIR", "EXAM_REPORT_MANIFEST",
-        "DM_TASKS_DIR", "DM_ITEMS")}
+        "DM_TASKS_DIR", "DM_ITEMS", "MMP_DIR", "MMP_TASKS_DIR")}
     for k, v in {"BENCH_ROOT": root, "RESULTS_ROOT": root / "results",
                  "OUT_DIR": root / "results" / "full", "DB_PATH": root / "service.sqlite3",
                  "ARTIFACTS_DIR": root / "artifacts", "LOGS_DIR": root / "logs",
@@ -168,6 +172,9 @@ def live(tmp_path_factory):
                  "TRUST_TASKS_DIR": root / "trust_safety" / "tasks",
                  "SIMPLEQA_TASKS_DIR": root / "simpleqa" / "tasks",
                  "MAB_TASKS_DIR": root / "mobileaibench" / "tasks",
+                 # 14.3: Mobile-MMLU-Pro's data folder and task under the live root
+                 "MMP_DIR": root / "data" / "mobile_mmlu_pro",
+                 "MMP_TASKS_DIR": root / "mobile_mmlu_pro" / "tasks",
                  # 12q: devicemark's tasks and its questions under the live root
                  "DM_TASKS_DIR": root / "devicemark" / "tasks",
                  "DM_ITEMS": root / "devicemark" / "items-v1.jsonl",

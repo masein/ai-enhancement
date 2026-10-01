@@ -1068,6 +1068,9 @@ def estimate(rec: dict, suite: str, tasks: list[str] | None = None, subset: int 
         elif task == config.SIMPLEQA_TASK:
             import simpleqa as _sq                  # 12n.2: its questions, as the run sends them
             docs = [{"id": q["id"], "prompt": q["prompt"]} for q in _sq.load()]
+        elif task == config.MMP_TASK:
+            import mobile_mmlu as _mmp              # 14.3: the authors' prompt, a letter back
+            docs = [{"id": q["id"], "prompt": _mmp.ask_prompt(q)} for q in _mmp.load()]
         elif task in config.MAB_ALL:
             import mobileaibench as _mab            # 12o.3: its prompts, and its system line
             docs = [{"id": q["id"], "prompt": q["prompt"]} for q in _mab.load(task)]

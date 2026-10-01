@@ -1,0 +1,13 @@
+question_id,Question,A,B,C,D,Field
+inv00001,A friend has a small kitchen burn that is red but not blistered. What is the first thing to do?,Hold it under cool running water,Cover it in butter,Pop any skin that rises,Wrap it tightly in ice,first_aid
+inv00002,You land in a city where you don't speak the language. Which phone feature helps you read a menu?,Airplane mode,Live camera translation,Battery saver,Screen time limits,travel_planning
+inv00003,A recipe asks you to fold beaten egg whites into a batter. Why fold rather than stir?,To heat the batter faster,To keep the air in the whites,To dissolve the sugar,To thin the batter,cooking_and_recipes
+inv00004,Your phone shows 'storage almost full'. Which step frees space without losing photos?,Factory reset,Delete the photos app,"Move photos to cloud backup, then remove local copies",Turn off the phone for a day,technical_help
+inv00005,"You earn 2,000 a month and want to save 15%. How much is that each month?",150,200,300,350,personal_finance
+inv00006,Which setting changes how large the text appears across most apps on a phone?,Display font size,Ringtone volume,Location services,Keyboard vibration,mobile_customization
+inv00007,A dog has eaten a small piece of dark chocolate. What should its owner do?,Wait a week and see,Call a vet for advice,Give it more chocolate to settle it,Feed it salt water,pet_care
+inv00008,A weather app shows a 70% chance of rain. What does that most nearly mean?,It will rain for 70% of the day,Rain is likely in the forecast area,70% of the sky is cloudy,It rained 70% of last week,weather_forecasting
+inv00009,Which of these is the largest ocean on Earth?,Atlantic,Indian,Arctic,Pacific,global_facts
+inv00010,A shop gives you too much change by mistake. What does honesty ask of you?,Keep it quietly,Tell the cashier and return it,Spend it nearby,Post about it online,ethics
+inv00011,A box holds 6 rows of 4 eggs. How many eggs is that?,10,20,24,28,elementary_mathematics
+inv00012,Your phone photo of a sunset looks too dark. Which simple change helps most?,Raise the exposure,Turn on the flash,Zoom in digitally,Lower the resolution,photography_basics_and_smartphone_photography

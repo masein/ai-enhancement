@@ -18,7 +18,7 @@ import traceback
 import sys
 from pathlib import Path
 
-from . import builder, config, contamination, db, judge_test, llm, proposals
+from . import builder, config, contamination, db, judge_test, llm, mmp_key, proposals
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import everyday as _everyday  # noqa: E402
@@ -384,6 +384,9 @@ def _mark_failed(r: dict, why: str) -> None:
     elif r["kind"] == "mab":
         # 14.1: the answers wait again — a later judging step asks for them
         _mab.judge_failed(config.OUT_DIR, r["batch_id"], why)
+    elif r["kind"] == mmp_key.KIND:
+        # 14.3: what it landed is kept; the next Start asks the rest
+        mmp_key.failed(r["batch_id"], why)
     elif r["kind"] == "everyday_remark":
         # 12a.6: each model this re-mark sent says so, instead of waiting
         for d in (p for p in config.OUT_DIR.iterdir() if p.is_dir()) if config.OUT_DIR.is_dir() else []:
@@ -406,6 +409,8 @@ def tick() -> int:
             # 12i.2: a question builder batch to the job, as that draft chose it
             backend = (judge_test.batch_backend(r["batch_id"]) if r["kind"] == "judge_test"
                        else builder.batch_backend(r["batch_id"]) if r["kind"] == "qb"
+                       # 14.3: a key labeller's batch belongs to the labeller it pinned
+                       else mmp_key.batch_backend(r["batch_id"]) if r["kind"] == mmp_key.KIND
                        else llm.client("judge" if r["kind"] in ("judge", "everyday", "everyday_remark",
                                                                 "safety", "simpleqa", "mab")
                                        else "llm"))
@@ -459,6 +464,8 @@ def tick() -> int:
                 judge_test.finish(r["batch_id"], results)
             elif r["kind"] == "qb":
                 builder.finish(r["batch_id"], results)
+            elif r["kind"] == mmp_key.KIND:
+                mmp_key.finish(r["batch_id"], results)
             db.batch_finish(r["batch_id"], "done", "")
         except _everyday.HiddenMissing as e:
             # 12p.1: the judge's verdicts wait, pending, until the hidden set is back

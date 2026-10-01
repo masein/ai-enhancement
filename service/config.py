@@ -459,11 +459,18 @@ MAB_JUDGED_TASKS = [MAB_MTB1, MAB_MTB2]
 MAB_ADV, MAB_PRIVACY, MAB_SOCCHEM = "mab_adv", "mab_privacy", "mab_socchem"
 MAB_TRUST_TASKS = [MAB_ADV, MAB_PRIVACY, MAB_SOCCHEM]
 MAB_ALL = MAB_TASKS + MAB_JUDGED_TASKS + MAB_TRUST_TASKS
-MAB_PARTS = ("", "judged", "trust")
+# 14.3: and Mobile-MMLU-Pro (MBZUAI), on our own answer key: the "mmlu" part
+MMP_TASK = "mobile_mmlu_pro"
+MAB_PARTS = ("", "judged", "trust", "mmlu")
 # 14.2: what is never committed (Privacy Leakage: real people's names) — fetched
 # at deploy by scripts/fetch_data.py into the server's data folder
 MAB_PRIVATE_DIR = Path(os.environ.get("MAB_PRIVATE_DIR", BENCH_ROOT / "data" / "mobileaibench"))
 MAB_TASKS_DIR = Path(os.environ.get("MAB_TASKS_DIR", BENCH_ROOT / "mobileaibench" / "tasks"))
+# 14.3: Mobile-MMLU-Pro and our key are never committed either (CC BY-ND 4.0,
+# and the key is a derivative): the data step fetches the file here, and the
+# key is built beside it (service/mmp_key.py)
+MMP_DIR = Path(os.environ.get("MMP_DIR", BENCH_ROOT / "data" / "mobile_mmlu_pro"))
+MMP_TASKS_DIR = Path(os.environ.get("MMP_TASKS_DIR", BENCH_ROOT / "mobile_mmlu_pro" / "tasks"))
 MAB_INSTRUCT_ONLY = ("MobileAIBench's sets are asked through the chat template and scored on "
                      "what the model writes, so only an instruct model can sit them — this one "
                      "runs as a base model")
@@ -525,7 +532,8 @@ SUITES = ("quick", "full", "control", "judged", "everyday", "generative", "safet
 def tasks_for_suite(suite: str, bbq_all: bool = False, part: str = "") -> list[str]:
     """`bbq_all`: the full suite asks all 29,246 of BBQ's ambiguous questions
     instead of the seeded 3,000. 14.1: `part` — the mobile suite's "judged"
-    part is MT-Bench's two turns; with none, its five sets with no judge"""
+    part is MT-Bench's two turns; with none, its five sets with no judge.
+    14.2: "trust", its three trust sets; 14.3: "mmlu", Mobile-MMLU-Pro"""
     if suite == "control":
         return list(CONTROL_TASKS)
     if suite == "safety":
@@ -538,7 +546,7 @@ def tasks_for_suite(suite: str, bbq_all: bool = False, part: str = "") -> list[s
         return list(SHARED_TASKS)
     if suite == "mobile":
         return list(MAB_JUDGED_TASKS if part == "judged" else MAB_TRUST_TASKS if part == "trust"
-                    else MAB_TASKS)
+                    else [MMP_TASK] if part == "mmlu" else MAB_TASKS)
     if suite == "devicemark":
         return list(DM_TASKS)
     if suite == "judged":

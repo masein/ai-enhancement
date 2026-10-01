@@ -875,7 +875,13 @@ def load_gguf(results_root: Path | None, out_dir: Path | None = None,
                     pairs.append({"a": a, "b": b, "setup_a": seen_setup[a][su]["name"],
                                   "setup_b": seen_setup[b][su]["name"],
                                   "based_on": base_of[a], "by": by})
-    return {"group": gb.GROUP, "tip": gb.TIP, "order": gb.ORDER, "mtp_line": gb.MTP_LINE,
+    # 14.3: one built apart (Mobile-MMLU-Pro, once its key is) is a column once
+    # its dataset is built or a file was measured on it
+    measured = {k for b in models.values() for k in b} | {
+        k for rows in setups_out.values() for x in rows for k in (x.get("benches") or {})}
+    order = [k for k in gb.ORDER if not gb.BENCHMARKS[k].get("apart") or k in man
+             or k in measured]
+    return {"group": gb.GROUP, "tip": gb.TIP, "order": order, "mtp_line": gb.MTP_LINE,
             "benchmarks": {k: {"label": v["label"], "n": (man.get(k) or {}).get("n") or v["n"],
                                "note": v.get("note", "")} for k, v in gb.BENCHMARKS.items()},
             "models": models, "setups": setups_out, "history": history, "pairs": pairs,
@@ -1262,6 +1268,18 @@ def parse_run(blob: dict, source: Path) -> dict:
             tasks[t][metric] = {"value": float(got[key]) / scale,
                                 "stderr": float(got.get("se") or 0.0) / scale,
                                 "_filt_value": "board"}
+    # 14.3: Mobile-MMLU-Pro's cell is the model's accuracy on our key's kept
+    # questions, scored on the key as it stands now — never lm_eval's own acc,
+    # which is the share of A picks (the task's target is a stand-in)
+    preds = _beside(source, "mobile_mmlu_pro.json")
+    # answered, with no key yet: said so on the model page
+    mmp = mmp_score(preds) or ({"acc": None, "answered": preds.get("n"),
+                                "how": preds.get("how")} if preds else None)
+    if MMP_TASK in tasks:
+        tasks[MMP_TASK] = {"alias": MMP_TASK}
+        if mmp and mmp.get("acc") is not None:
+            tasks[MMP_TASK]["key_acc"] = {"value": mmp["acc"], "stderr": mmp.get("se") or 0.0,
+                                          "_filt_value": "board"}
 
     n_samples = {k: (v.get("effective") if isinstance(v, dict) else v)
                  for k, v in (blob.get("n-samples") or {}).items()}
@@ -1328,6 +1346,7 @@ def parse_run(blob: dict, source: Path) -> dict:
         "safety": saf,
         "simpleqa": sqa,
     "mab": mab,
+        "mmp": mmp,
         # 12f.1: a model served elsewhere — how, and what its server reported
         "served": blob.get("served"),
         "tasks": tasks,
@@ -1372,7 +1391,8 @@ def primary_metric(entry: dict) -> tuple[str, float, float] | None:
     code, bits_per_byte for perplexity corpora. The choice is recorded in the output
     so nobody has to guess which number they are looking at.
     """
-    for name in ("acc_norm", "acc", "exact_match", "prompt_level_strict_acc", "safe", "correct",
+    for name in ("key_acc", "acc_norm", "acc", "exact_match", "prompt_level_strict_acc", "safe",
+                 "correct",
                  "mab_f1", "sqlparser_f1", "rougeL", "mtbench", "judged_correct",
                  "kept_private", "agrees", "pass@1",
                  "f1", "em", "bits_per_byte", "byte_perplexity", "word_perplexity"):
@@ -1439,6 +1459,9 @@ FRONTIER_TASKS = ("gpqa_diamond_zeroshot", "gpqa_diamond_cot_zeroshot", "simpleq
 MAB_TASKS = ("mab_hotpotqa", "mab_sql", "mab_dolly", "mab_cnndm", "mab_xsum", "mab_mtbench",
              # 14.2: and its three trust sets, in Trust & safety's group
              "mab_adv", "mab_privacy", "mab_socchem")
+# 14.3: Mobile-MMLU-Pro (MBZUAI), on our own answer key — never in the Avg,
+# never a training target, never in Improve
+MMP_TASK = "mobile_mmlu_pro"
 GPQA_URL = "https://huggingface.co/datasets/Idavidrein/gpqa"
 
 # Controls: tasks run to test how we POSE a benchmark, not what a model knows.
@@ -1604,6 +1627,16 @@ _TASK_META = {
                     "everyday moral judgements: agreement with the majority label, not right or "
                     "wrong. Marked by the board's judge with MobileAIBench's exact-match prompt. "
                     "Instruct models only; never in the average."),
+    # 14.3: Mobile-MMLU-Pro, with our own answer key
+    "mobile_mmlu_pro": ("mobile tasks",
+                        "Mobile-MMLU-Pro (MBZUAI, DMLR 2026): 9,497 four-option questions about "
+                        "everyday phone topics in 80 fields, 0-shot, asked as MMLU is — scored by "
+                        "the letters' log-likelihood (HF and GGUF), or the letter a served model "
+                        "answers. The authors hold their answers back, so it is scored on our "
+                        "own key: what strong models of different makers agreed on, and the "
+                        "column is the accuracy on the questions it kept. \"Provisional key\" "
+                        "until three models of the paper land within 3 points of its numbers. "
+                        "CC BY-ND 4.0: used here, never published. Never in the average."),
     "mab_sql": ("mobile tasks",
                 "SQL from a question, from MobileAIBench (sql-create-context): write the SQL "
                 "for a plain question, given the table's CREATE statement. Their 1,000 and "
@@ -1748,6 +1781,57 @@ def mab_meta() -> dict | None:
         return None
 
 
+def mmp_score(preds: dict | None) -> dict | None:
+    """14.3: a model's picks scored on our key as it stands"""
+    if not preds:
+        return None
+    try:
+        import mobile_mmlu as mmp               # scripts/, beside this file
+        return mmp.score(preds)
+    except (ImportError, OSError, ValueError, KeyError):
+        return None
+
+
+def mmp_labellers() -> set[str]:
+    """the key's labellers' ids, when the service is here to say"""
+    try:
+        from service import mmp_key
+        return mmp_key.labelled_ids()
+    except Exception:                           # noqa: BLE001 — a frozen page has none
+        return set()
+
+
+def mmp_meta(by_model: dict, cells: dict, served: dict) -> dict | None:
+    """14.3: Mobile-MMLU-Pro's credit, our key (its version and counts) and
+    the paper's three models beside ours. A row whose model labelled the key
+    keeps its number here, out of the column: it is never ranked"""
+    try:
+        import mobile_mmlu as mmp               # scripts/, beside this file
+    except ImportError:
+        return None
+    try:
+        key = mmp.current_key()
+        ours = {m: (by_model.get(m) or {}).get("mmp") for m in mmp.manifest()["paper_checks"]["models"]}
+        checks = mmp.paper_checks(ours)
+        credit = mmp.credit()
+    except (OSError, ValueError, KeyError):
+        return None
+    labs = mmp_labellers()
+    labelled = {}
+    col = cells.get(MMP_TASK) or {}
+    for mid in list(col):
+        pin = (((served.get(mid) or {}).get("pin") or {}).get("model")
+               or (((by_model.get(mid) or {}).get("served") or {}).get("pin") or {}).get("model"))
+        if mid in labs or (pin and pin in labs):
+            labelled[mid] = col.pop(mid)
+    return {"credit": credit, "key": {"version": key.get("version") or "",
+                                      "counts": key.get("counts") or {},
+                                      "built_at": key.get("built_at")},
+            "decided": mmp.DECIDED, "categories": list(mmp.CATEGORIES),
+            "checks": checks, "provisional": checks["provisional"], "labelled": labelled,
+            "portal": mmp.portal_scores(), "missing": mmp.available()}
+
+
 def trust_meta() -> dict:
     """12k.2: each set's credit (its licence asks for it) and the BBQ subset"""
     try:
@@ -1842,7 +1926,7 @@ def required_tasks(acc_tasks: list[str]) -> tuple[list[str], list[str]]:
             else list(_REQUIRED_DEFAULT))
     # never, whatever the env says — 12k.2: nor Trust & safety's own three
     want = [t for t in want if t not in CONTROL_TASKS and t not in TRUST_TASKS
-            and t not in FRONTIER_TASKS and t not in MAB_TASKS]
+            and t not in FRONTIER_TASKS and t not in MAB_TASKS and t != MMP_TASK]
     return [t for t in want if t in acc_tasks], [t for t in want if t not in acc_tasks]
 
 
@@ -1874,7 +1958,9 @@ def above_chance(task: str, v: float) -> float:
 
 # Proportion metrics: the only ones the two-proportion z-test is valid for.
 PROPORTION = {"acc", "acc_norm", "exact_match", "pass@1", "f1", "em", "rubric_pass",
-              "prompt_level_strict_acc", "safe", "correct"}
+              "prompt_level_strict_acc", "safe", "correct",
+              # 14.3: Mobile-MMLU-Pro, accuracy on our key's kept questions
+              "key_acc"}
 # 12o.3: scores from 0 to 1, higher better, that are means of per-question
 # scores rather than shares — a column like a proportion's, never its z-test
 MEAN_SCORES = {"mab_f1", "sqlparser_f1", "rougeL", "mtbench", "judged_correct", "kept_private",
@@ -1921,6 +2007,7 @@ def merge_runs(runs: list[dict]) -> dict[str, dict]:
         m["judge_mtime"] = m.get("judge_mtime") or r.get("judge_mtime")
         m["generative"] = m.get("generative") or r.get("generative")
         m["safety"] = m.get("safety") or r.get("safety")
+        m["mmp"] = m.get("mmp") or r.get("mmp")                 # 14.3
         m["served"] = r.get("served") or m.get("served")        # the newest run's
     return by_model
 
@@ -2008,7 +2095,9 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             cells.setdefault(task, {})[mid] = {
                 "v": v, "se": s or 0.0,
                 "shots": run["n_shot"].get(task),
-                "n": run["n_samples"].get(task),
+                # 14.3: Mobile-MMLU-Pro's n is the kept questions it answered
+                "n": (run.get("mmp") or {}).get("n") if task == MMP_TASK
+                else run["n_samples"].get(task),
                 # 12k.2: BBQ's bias score, for the cell's tooltip alone
                 **({"bias": entry["bias_score"]["value"]}
                    if task in BBQ_TASKS and "value" in (entry.get("bias_score") or {}) else {}),
@@ -2052,7 +2141,7 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         have = [cells[t][mid]["v"] for t in acc_tasks
                 if mid in cells.get(t, {}) and t not in CONTROL_TASKS and t not in tainted_acc
                 and t not in GEN_TASKS and t not in TRUST_TASKS and t not in FRONTIER_TASKS
-                and t not in MAB_TASKS]
+                and t not in MAB_TASKS and t != MMP_TASK]
         got_req = [t for t in required if mid in cells.get(t, {}) and t not in tainted_acc]
         missing = [t for t in required if mid not in cells.get(t, {})]
         official = bool(required) and not missing and not (set(tainted_acc) & set(required))
@@ -2148,6 +2237,8 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             "simpleqa": simpleqa_view(r.get("simpleqa")),
             # 12o.3: MobileAIBench's two, and their other numbers
             "mab": mab_view(r.get("mab")),
+            # 14.3: Mobile-MMLU-Pro on our key — overall, and its 9 categories
+            "mmp": r.get("mmp"),
             # 12f.1: served elsewhere — how, and what its server reported. Its
             # own row: never averaged with the model it is based on
             "served": served.get(mid) or r.get("served") or None,
@@ -2551,6 +2642,7 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         "shared": shared_meta(),
         "mabTasks": list(MAB_TASKS),
         "mab": mab_meta(),
+        "mmp": mmp_meta(by_model, cells, served),
         "thinkingModes": _thinking_modes(),
         "published": {m: {t: {"v": v, "note": note} for t, (v, note) in ts.items()}
                       for m, ts in _PUBLISHED.items()},
@@ -3157,6 +3249,21 @@ tbody tr.open { background:var(--accent-soft); }
 /* 12h.1: Instruction & maths' two options, under the form */
 /* 12i.1: AI models and the judge test */
 table.aijobs { width:100%; border-collapse:collapse; margin-top:10px; }
+/* 14.3: Mobile-MMLU-Pro — its key's tables, its categories, its header's note */
+.mmpwrap { overflow-x:auto; max-width:100%; }
+table.mmptab { border-collapse:collapse; margin:6px 0; }
+table.mmptab th, table.mmptab td { text-align:left; padding:4px 12px 4px 0;
+  border-bottom:1px solid var(--border); font-size:var(--fs-1); }
+table.mmptab td.num, table.mmptab th:not(:first-child) { text-align:right; }
+/* on a phone, each labeller a block: its name, its model, its price, change ▾ */
+@media (max-width: 640px) {
+  table.mmplabs thead { display:none; }
+  table.mmplabs, table.mmplabs tbody { display:block; }
+  table.mmplabs tr { display:block; padding:8px 0; border-bottom:1px solid var(--border); }
+  table.mmplabs td { display:block; border:0; padding:2px 0; height:auto; }
+}
+.hkey { display:block; font-size:10px; font-weight:500; letter-spacing:0; text-transform:none;
+  color:var(--warning-text); }
 table.aijobs th, table.aijobs td { text-align:left; padding:8px 10px 8px 0; vertical-align:top;
   border-bottom:1px solid var(--border); }
 table.aijobs th { font-size:var(--fs-1); color:var(--text-secondary); font-weight:600; }
@@ -6867,7 +6974,7 @@ function evdSuiteLabel(id) {
 // asked of the server, before Start (/api/mobileaibench/estimate)
 function mabSuiteLabel(id) {
   return 'Mobile tasks (MobileAIBench) — HotpotQA, SQL, Dolly, CNN/DailyMail, XSum; MT-Bench '
-    + 'and three trust sets judged';
+    + 'and three trust sets judged; Mobile-MMLU-Pro';
 }
 function mabEstimate(id) {
   const E = state.mabEst = state.mabEst || {};
@@ -6886,21 +6993,24 @@ function mabPartOpts(sf) {
   const P = [['', 'no judge', (parts.none || {}).tasks || MAB.filter(t => t !== MTBENCH)],
              ['judged', 'judged', ['MT-Bench']],
              // 14.2: Privacy Leakage is fetched at deploy: without it, why
-             ['trust', 'trust & safety, judged', MAB_TRUST]];
+             ['trust', 'trust & safety, judged', MAB_TRUST],
+             // 14.3: Mobile-MMLU-Pro, fetched at deploy too
+             ['mmlu', 'multiple choice', [MMP]]];
   const missing = (DATA.mab || {}).privacyMissing || '';
+  const gone = v => v === 'trust' ? missing : v === 'mmlu' ? MMPD().missing || '' : '';
   const who = j => j.label && j.label !== 'none' ? j.label : j.id || 'none set up';
   return el('div', { class: 'mabopts', 'data-mab-opts': '1' },
     el('p', { class: 'small', text: 'Part:' }),
     ...P.map(([v, words, ts]) => {
       const e = est[v || 'none'];
       return el('div', { class: 'mabpart', 'data-mab-part': v || 'none' },
-        el('label', { class: 'small', title: v === 'trust' && missing ? missing : null },
+        el('label', { class: 'small', title: gone(v) || null },
           el('input', { type: 'radio', name: 'submit-mab-part', checked: (sf.part || '') === v ? ''
-            : null, disabled: v === 'trust' && missing ? '' : null,
+            : null, disabled: gone(v) ? '' : null,
             onchange: () => { sf.part = v; render(); } }),
           ` ${words} — ${ts.map(t => LB_SHORT[t] || t).join(', ')}`,
           el('span', { class: 'se', 'data-mab-part-est': v || 'none',
-            text: v === 'trust' && missing ? ` · ${missing}` : e ? ` · ${e.line}`
+            text: gone(v) ? ` · ${gone(v)}` : e ? ` · ${e.line}`
               : est.failed ? '' : ' · working out how long…' })),
         e && e.judge ? el('p', { class: 'small se mabjudge', 'data-mab-judge-est': '1',
           text: `The judge (${who(e.judge)}): ${e.judge.line}`
@@ -7228,6 +7338,7 @@ function kindParts(m, kind) {
       mabTrustLine(m),
       sharedLine(m),
       mabLine(m),
+      mmpLine(m),
       part(resultsPart(m), 'results'),
       // item analysis of the benchmark, not the improvement loop (12b §7)
       diag ? el('details', { class: 'kfold', 'data-cant-show': '1' },
@@ -7302,6 +7413,56 @@ function mabLine(m) {
         text: 'Judge now', disabled: judgeDown() ? '' : null,
         title: judgeDown() ? judgeWhy() : 'send every MT-Bench turn that waits to the judge',
         onclick: e => mabJudgeNow(e.currentTarget) })] : '') : '');
+}
+// 14.3: "Mobile-MMLU-Pro 58.2% on 9,012 kept questions · provisional key", its
+// 9 categories, and — a public model on Hugging Face — its picks in the
+// authors' portal format, with the portal's score typed in beside ours
+function mmpLine(m) {
+  const x = m.mmp;
+  if (!x) return '';
+  const lab = mmpLabelled(m.id);
+  const pc = v => `${(100 * v).toFixed(1)}%`;
+  const head = x.acc == null ? 'Mobile-MMLU-Pro: answered; scored once our answer key is built'
+    : `Mobile-MMLU-Pro ${pc(x.acc)} on ${x.n.toLocaleString('en')} kept questions`
+      + (lab ? ' · not ranked: it labelled the key' : '')
+      + (mmpProvisional() ? ' · provisional key' : '');
+  const cats = Object.entries(x.by_category || {});
+  return el('div', { class: 'small mmpline', 'data-mmp-line': m.id },
+    el('p', { class: 'small', title: [MMP_HOW, mmpKeyLine(), mmpChecksLine(), mmpCredit()]
+      .filter(Boolean).join('\n'), text: head }),
+    cats.length ? el('details', { class: 'mmpcats', 'data-mmp-cats': m.id },
+      el('summary', { class: 'small se', text: `its ${cats.length} categories ▸` }),
+      el('table', { class: 'mmptab' }, el('tbody', {}, cats.map(([c, v]) => el('tr',
+        { 'data-mmp-cat': c }, el('td', { text: c }),
+        el('td', { class: 'num', text: v.acc == null ? '—' : pc(v.acc) }),
+        el('td', { class: 'num se', text: `n ${v.n.toLocaleString('en')}` })))))) : '',
+    mmpPortal(m));
+}
+async function mmpPortalSave(m, inp) {
+  if (!whoName()) { askName(); return; }
+  try {
+    await post('api/mobile-mmlu/portal', { model: m.id, score: Number(inp.value), by: whoName() });
+    toast(`${m.name || m.id}: the portal’s score saved`, { key: 'mmp' });
+    await refreshResults();
+  } catch (e) { toast('Refused. ' + e.message, { key: 'mmp' }); }
+}
+function mmpPortal(m) {
+  if (!LIVE || !mmpPublic(m) || !m.mmp) return '';
+  const p = (MMPD().portal || {})[m.id];
+  const inp = el('input', { type: 'number', min: '0', max: '100', step: '0.1',
+    'aria-label': 'the portal’s score', 'data-mmp-portal-input': m.id, style: 'width:5.5em',
+    value: p ? String(p.score) : '' });
+  return el('p', { class: 'small', 'data-mmp-portal': m.id },
+    el('a', { href: 'api/mobile-mmlu/predictions?model=' + encodeURIComponent(m.id),
+      'data-mmp-download': m.id, download: '', text: 'Its picks for the authors’ portal' }),
+    ' (question_id, predicted_answer: never our key) · ',
+    el('a', { href: (MMPD().credit || {}).portal || '#', target: '_blank', rel: 'noopener',
+      text: 'the portal' }),
+    '’s score: ', inp, ' ',
+    el('button', { class: 'quiet', 'data-mmp-portal-save': m.id, text: 'Save',
+      onclick: () => mmpPortalSave(m, inp) }),
+    p ? el('span', { class: 'se', 'data-mmp-portal-score': m.id,
+      text: ` · ${Number(p.score).toFixed(1)}, typed by ${p.by}` }) : '');
 }
 // 14.2: "MobileAIBench: judged correct on reworded instructions 94% · keeps an
 // address private 100% · agrees with crowd judgements 63%" — or what waits
@@ -9600,7 +9761,9 @@ const CATS = [
   // 12o.3: MobileAIBench's HotpotQA and SQL — never in Avg, never in Improve.
   // 14.1: and Dolly, CNN/DailyMail, XSum and MT-Bench
   ['mobile',       ['mab_hotpotqa', 'mab_sql', 'mab_dolly', 'mab_cnndm', 'mab_xsum',
-                    'mab_mtbench']],
+                    'mab_mtbench',
+                    // 14.3: and Mobile-MMLU-Pro, on our own key
+                    'mobile_mmlu_pro']],
 ];
 function radarAxes() {
   if (state.radarAxes === 'tasks') return DATA.accTasks.map(t => ({ key: t, label: t, tasks: [t] }));
@@ -9795,6 +9958,39 @@ function mabJudgeLine(m) {
 // 14.1: their paper's own numbers, reported, never ranked with ours
 const MAB_PAPER = 'their paper\u2019s numbers (16-bit) are under Frontier · reported (paper), '
   + 'never ranked with ours';
+// 14.3: Mobile-MMLU-Pro, on our own answer key — "provisional key" until the
+// paper's three models land within 3 points of its numbers; a model that
+// labelled the key keeps its number off the column, never ranked
+const MMP = 'mobile_mmlu_pro';
+const MMPD = () => DATA.mmp || {};
+const mmpProvisional = () => MMPD().provisional !== false;
+const mmpLabelled = id => (MMPD().labelled || {})[id] || null;
+const MMP_HOW = 'asked as MMLU is, 0-shot: the letters’ log-likelihood (HF and GGUF, no chat '
+  + 'template, as the paper ran lm-evaluation-harness), or the letter a served model answers to '
+  + 'the authors’ own prompt';
+function mmpKeyLine() {
+  const k = MMPD().key || {}, c = (k.counts || {}).all;
+  if (!c || !c.questions) return 'our answer key isn’t built yet: AI models ▸ '
+    + 'Mobile-MMLU-Pro answer key';
+  return `our key ${k.version || ''}: ${c.kept.toLocaleString('en')} of `
+    + `${c.questions.toLocaleString('en')} questions kept, where strong models of different `
+    + 'makers agreed';
+}
+function mmpChecksLine() {
+  const ch = MMPD().checks;
+  if (!ch) return '';
+  return (ch.provisional ? 'Provisional key — ' : 'Key checked — ')
+    + ch.rows.map(r => `${r.model.split('/').pop()} ${r.ours == null ? 'not run' : r.ours
+      .toFixed(1)} (paper ${r.paper.toFixed(1)})`).join(' · ')
+    + ` · all three within ${ch.within} points takes “provisional” off`;
+}
+function mmpCredit() {
+  const c = MMPD().credit || {};
+  return c.name ? `${c.name}: ${c.by} · ${c.licence}, used here and never published` : '';
+}
+// a public model on Hugging Face, run here: the portal's predictions are offered
+const mmpPublic = m => !m.served && !ggufOnly(m) && !isCheckpoint(m)
+  && !/qwen[\s_-]*3[._-]?6/i.test(m.id) && /^[\w.-]+\/[\w.-]+$/.test(m.id);
 // asked through the chat template: an instruct model's
 const chatOnly = t => servedAsks(t) || t === 'do_not_answer' || t === 'xstest';
 // 12k.2: Do-Not-Answer, XSTest and BBQ — never in Avg, never in Improve
@@ -9975,6 +10171,7 @@ const BENCH_NAMES = { mmlu: 'MMLU', hellaswag: 'HellaSwag', piqa: 'PIQA', winogr
   mab_cnndm: 'CNN/DailyMail (MobileAIBench)', mab_xsum: 'XSum (MobileAIBench)',
   mab_mtbench: 'MT-Bench (MobileAIBench)', mab_adv: 'Adversarial Instruction (MobileAIBench)',
   mab_privacy: 'Privacy Leakage (MobileAIBench)', mab_socchem: 'Social Chemistry 101 (MobileAIBench)',
+  mobile_mmlu_pro: 'Mobile-MMLU-Pro (MBZUAI)',
   // 12q.B: DeviceMark's battery, run by its protocol
   dm_ifeval: 'IFEval (DeviceMark protocol)', dm_mmlu_pro: 'MMLU-Pro (DeviceMark protocol)',
   dm_math: 'MATH (DeviceMark protocol)' };
@@ -10383,6 +10580,7 @@ const LB_SHORT = { arc_challenge: 'ARC-C', arc_easy: 'ARC-E', truthfulqa_mc2: 'T
   simpleqa_verified: 'SimpleQA', mab_hotpotqa: 'HotpotQA', mab_sql: 'SQL',
   mab_dolly: 'Dolly', mab_cnndm: 'CNN/DM', mab_xsum: 'XSum', mab_mtbench: 'MT-Bench',
   mab_adv: 'Adv. instr.', mab_privacy: 'Privacy', mab_socchem: 'Agrees with crowd',
+  mobile_mmlu_pro: 'Mobile-MMLU-Pro',
   dm_ifeval: 'IFEval (DM)', dm_mmlu_pro: 'MMLU-Pro (DM)', dm_math: 'MATH (DM)' };
 
 // A column's setup, in words — its tooltip, and its accessible name. The
@@ -10412,6 +10610,13 @@ function lbColTip(c) {
     mabJudgeLine(null).replace('GPT-4', c.task === 'mab_adv' ? 'no judge (embeddings)' : 'GPT-4o'),
     '\u201cawaiting judge\u201d until every reply is marked', ...mabCredit(c.task), MAB_PAPER,
     'instruct models only · never in any average'];
+  // 14.3: what its number is, on whose key, and whether the key is checked
+  if (c.task === MMP) return [`${benchName(MMP)} — accuracy on our answer key’s kept `
+      + 'questions' + (mmpProvisional() ? ' · provisional key' : ''), MMP_HOW,
+    'the authors hold their answers back: our key is what strong models of different makers '
+      + 'agreed on', mmpKeyLine(), mmpChecksLine(), mmpCredit(),
+    'a model that labelled the key says so, and is never ranked',
+    'never in any average · never a training target'].filter(Boolean);
   // 12o.3: MobileAIBench's metric, and its others under each cell. 14.1: each
   // set's limits, said where its number is
   if (c.task && isMab(c.task)) return [`${benchName(c.task)} — ${MAB_METRIC[c.task]}, as `
@@ -12624,13 +12829,15 @@ function vLeaderboard(ms) {
   const ggufRow = m => !m.rowOf && ggufAny(m.id) && !ggufHas(m.id)
     && (custom ? L.cols.every(isGgufKey) : dataCols.some(c => c.gguf));
   // 14.1: MT-Bench answered and awaiting the judge is tested — its cell says so
-  const mtWaits = m => dataCols.some(c => mabJudged(c.task) && ((m.mab || {})[c.task] || {}).n);
+  const mtWaits = m => dataCols.some(c => mabJudged(c.task) && ((m.mab || {})[c.task] || {}).n)
+    // 14.3: and a model that labelled Mobile-MMLU-Pro's key: its cell says so
+    || (mmpLabelled(m.id) && dataCols.some(c => c.task === MMP));
   const testedIn = m => (custom ? L.cols.some(t => benchVal(t, m.id) != null)
     : dataCols.some(c => !c.rep && val(m, c) != null) || (L.view === 'exam' && judgedAny(m)))
     || ggufRow(m) || mtWaits(m);
   // a server can be asked this chip's generative tasks before any model has a
   // column for one: then it is "not tested", not absent
-  const chipAsks = L.chip === 'all' || [...genTasks(), GPQA_COT, SIMPLEQA, ...MAB].some(t =>
+  const chipAsks = L.chip === 'all' || [...genTasks(), GPQA_COT, SIMPLEQA, ...MAB, MMP].some(t =>
     ((CATS.find(([g]) => g === L.chip) || [])[1] || []).includes(t));
   const couldHave = m => cols.some(c => measures(c) && canHave(m, c))
     || (!!m.served && !custom && chipAsks);
@@ -12689,6 +12896,9 @@ function vLeaderboard(ms) {
           dir: state.sort.key === c.key ? -state.sort.dir : (c.key === 'name' ? 1 : c.lower ? 1 : -1) };
           render(); } },
         el('span', { class: 'hname', text: c.short || c.label }),
+        // 14.3: until the paper's three models land within 3 points
+        c.task === MMP && mmpProvisional() ? el('span', { class: 'hkey', 'data-mmp-provisional': '1',
+          text: 'provisional key' }) : '',
         sortedBy(c) ? el('span', { class: 'dir', text: state.sort.dir > 0 ? ' ▲' : ' ▼' }) : '',
         // 12o.1: its ⋯ and its width
         ...layoutBits(LK, c.key, c.label, { movable: !fixed,
@@ -12913,6 +13123,14 @@ function vLeaderboard(ms) {
             + (m.mab.note || 'a judging step marks them'), text: 'awaiting judge' });
         if (cc && c.task === MTBENCH) return one(c, m, cc.v, cc.se ? (10 * cc.se).toFixed(2) : null,
           x => (10 * x).toFixed(2), { 'data-mab-mtbench': m.id, title: mabJudgeLine(m) });
+        // 14.3: a model that labelled the key: its number, never ranked
+        if (c.task === MMP && mmpLabelled(m.id)) return el('td', { class: 'num se',
+          'data-mmp-labelled': m.id, text: 'labelled the key',
+          title: `${pctn(mmpLabelled(m.id).v)}% on the key it labelled: never ranked` });
+        if (cc && c.task === MMP) return one(c, m, cc.v, cc.se ? (100 * cc.se).toFixed(1) : null,
+          pctn, { 'data-mmp-cell': m.id, title: [`on ${(cc.n || 0).toLocaleString('en')} of `
+            + `${((m.mmp || {}).of || 0).toLocaleString('en')} kept questions`,
+          mmpProvisional() ? 'provisional key' : ''].filter(Boolean).join(' · ') });
         if (!cc) return el('td', { class: 'num se', text: '—',
           title: chatOnly(c.task) && m.kind === 'base'
             ? 'instruct only: asked through the chat template'
@@ -17601,8 +17819,12 @@ function qxResult(mid, r, row, kind) {
     : el('span', { class: r.ok ? 'qx-ok' : 'qx-no', text: r.ok ? '✓' : '✗',
         'aria-label': r.ok ? 'right' : 'wrong' });
   const state_ = r.ok == null ? 'open' : r.ok ? 'right' : 'wrong';
-  if (kind === 'lm') {
+  if (kind === 'lm' || kind === 'mmp') {
     const L = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    // 14.3: Mobile-MMLU-Pro: its pick beside our key, or why it isn't scored
+    if (kind === 'mmp') return el('div', { class: 'qx-res', 'data-qx-res': mid,
+        'data-qx-state': state_ }, mark, ' ', el('span', { class: 'qx-m', text: name }),
+      el('span', { class: 'se qx-verdict', text: ' · ' + (r.verdict || '') }));
     return el('div', { class: 'qx-res', 'data-qx-res': mid, 'data-qx-state': state_ },
       mark, ' ', el('span', { class: 'qx-m', text: name }),
       r.pick != null ? el('span', { class: 'qx-pick', 'data-qx-pick': String(r.pick),
@@ -17640,7 +17862,11 @@ function qxRow(row, d) {
         right.has(i) ? el('span', { class: 'qx-ok', text: ' ✓', 'aria-label': 'the right answer' })
           : ''))) : '',
     row.reference ? el('p', { class: 'small se', text: 'Reference: ' + row.reference }) : '',
-    el('div', { class: 'qx-results' + (d.kind === 'lm' ? '' : ' qx-results-gen') },
+    // 14.3: how our key's labellers decided it
+    row.agreement ? el('p', { class: 'small se', 'data-qx-key': row.id,
+      text: 'Our key: ' + row.agreement }) : '',
+    el('div', { class: 'qx-results' + (d.kind === 'lm' || d.kind === 'mmp' ? ''
+      : ' qx-results-gen') },
       models.map(m => qxResult(m, (row.results || {})[m], row, d.kind))),
     // 12o.2: the GGUF's, where llama.cpp's log says which question it was
     row.gguf ? el('div', { class: 'qx-results qx-gguf', 'data-qx-gguf-row': row.id },
@@ -20482,8 +20708,9 @@ function aiChange(j) {
       if (!whoName()) { popClose(); askName(); return; }
       popClose(true);
       try {
-        const r = await post(`api/ai/jobs/${j.job}`, { model: id, by: whoName() });
+        const r = await post(j.url || `api/ai/jobs/${j.job}`, { model: id, by: whoName() });
         A.page = r.page;
+        if (r.key) A.mmp = r.key;           // 14.3: a key labeller
         if (r.rejudge && r.rejudge.n) A.confirm = r.rejudge;
         toast(`${j.label}: ${aiName(r.saved)}`, { key: 'ai' });
       } catch (e) { toast('Refused. ' + e.message, { key: 'ai' }); }
@@ -20513,7 +20740,7 @@ function aiChange(j) {
           m.context ? ` · ${Math.round(m.context / 1000).toLocaleString('en')}k context` : ''),
         why || '');
       list.replaceChildren(
-        !q || 'local'.includes(q) ? item('local', `Local (${A.page.local.name} on this server)`,
+        j.noLocal ? '' : !q || 'local'.includes(q) ? item('local', `Local (${A.page.local.name} on this server)`,
           el('span', { class: 'small se aiitem-sub', text: 'free · no key needed' })) : '',
         // the reason sits inside the suggested row, under its price
         sug ? row(sug, el('span', { class: 'badge', 'data-ai-suggested': sug.id,
@@ -20623,7 +20850,142 @@ function vAiModels() {
         text: w.text })),
       A.confirm ? aiRejudgeBox() : '',
       aiJobsTable(P)),
-    judgeTestCard(), outsideCard()];
+    mmpKeyCard(), judgeTestCard(), outsideCard()];
+}
+
+// ---- 14.3: Mobile-MMLU-Pro's answer key ---------------------------------------
+async function loadMmpKey() {
+  const A = state.ai;
+  if (A.mmpAsked) return;
+  A.mmpAsked = true;
+  try { A.mmp = await api('api/mobile-mmlu/key'); A.mmpMsg = ''; }
+  catch (e) { A.mmpMsg = e.message; }
+  A.mmpAsked = false;
+  if (state.tab === 'ai') render();
+}
+async function mmpKeyAct(what) {
+  const A = state.ai;
+  if (!whoName()) { askName(); return; }
+  try {
+    const r = await post(`api/mobile-mmlu/key/${what}`, { by: whoName() });
+    A.mmp = r.page;
+    toast(what === 'stop' ? 'Labelling stopped: what is in flight lands, nothing more is sent'
+      : `Labelling: ${Object.values(r.sent || {}).reduce((a, x) => a + x.n, 0)
+        .toLocaleString('en')} questions sent`, { key: 'mmp' });
+  } catch (e) { toast('Refused. ' + e.message, { key: 'mmp' }); }
+  render();
+}
+function mmpKeyCard() {
+  const A = state.ai;
+  if (!A.mmp && !A.mmpMsg && netReady()) loadMmpKey();
+  const K = A.mmp;
+  const head = el('h2', { text: 'Mobile-MMLU-Pro answer key' });
+  if (!K) return el('div', { class: 'card', 'data-mmp-key': 'loading' }, head,
+    A.mmpMsg ? el('p', { class: 'warn', text: A.mmpMsg }) : skeleton(2));
+  const n = x => Number(x || 0).toLocaleString('en');
+  const labs = el('table', { class: 'aijobs mmplabs', 'data-mmp-labellers': '1' },
+    el('thead', {}, el('tr', {}, el('th', { text: 'Labeller' }), el('th', { text: 'Model' }),
+      el('th', { text: 'Price per million tokens' }), el('th', {}))),
+    el('tbody', {}, K.labellers.map(l => {
+      const now = l.now || {};
+      const j = { job: 'labeller-' + l.slot, label: l.label, suggested: l.suggested, why: l.why,
+        url: `api/ai/labellers/${l.slot}`, noLocal: true };
+      return el('tr', { 'data-mmp-labeller': l.slot },
+        el('td', {}, el('b', { text: l.label }), el('div', { class: 'small se', text: l.does })),
+        el('td', {}, el('span', { 'data-mmp-labeller-now': l.slot,
+            text: String(now.name || now.id || '—').split(': ').pop() }),
+          el('div', { class: 'small se', text: l.chosen ? `on ${now.provider_name || now.provider}`
+            + ` · ${now.version}` : 'the default: pinned when you press Start' }),
+          l.refused ? el('div', { class: 'small warntext', 'data-mmp-refused': l.slot,
+            text: l.refused }) : ''),
+        el('td', { class: 'mono small aiprice', text: now.price_in != null
+          ? `${usd(now.price_in)} in · ${usd(now.price_out)} out` : 'priced once pinned' }),
+        el('td', { class: 'aiact' }, LIVE && A.page ? aiChange(j) : ''));
+    })));
+  const E = K.estimate || {};
+  const est = el('div', { class: 'mmpwrap' }, el('table', { class: 'mmptab', 'data-mmp-estimate': '1' },
+    el('thead', {}, el('tr', {}, ['Labeller', 'Questions', 'Tokens in', 'Tokens out', 'Cost']
+      .map(h => el('th', { text: h })))),
+    el('tbody', {}, Object.entries(E.slots || {}).map(([s, x]) => el('tr', { 'data-mmp-est': s },
+      el('td', { text: String(x.name || x.id).split(': ').pop() + (x.guess ? ' *' : '') }),
+      el('td', { class: 'num', text: n(x.questions) }),
+      el('td', { class: 'num', text: n(x.tokens_in) }),
+      el('td', { class: 'num', text: n(x.tokens_out) }),
+      el('td', { class: 'num', text: x.usd == null ? 'once pinned' : usd(x.usd) }))))));
+  const c = ((K.key || {}).counts || {}).all;
+  const cats = ((K.key || {}).counts || {}).by_category || {};
+  const words = (K.key || {}).labels || {};
+  const order = ['agreed', 'settled', 'split', 'time', 'waiting'];
+  const ch = K.checks || { rows: [] };
+  const running = (K.running || []).length, stopped = !!K.stopped;
+  const why = K.available || (K.problems || [])[0] || E.over_limit || '';
+  const started = c && c.questions && (c.questions - c.waiting > 0 || running);
+  return el('div', { class: 'card', 'data-mmp-key': (K.key || {}).version || 'none' }, head,
+    el('p', { class: 'sub', text: 'The authors of Mobile-MMLU-Pro hold its answers back, so the '
+      + 'board scores it on a key of its own: two labellers from different makers answer every '
+      + 'question; where they agree, that is the key; where they differ, a third from a third '
+      + 'maker decides, two of three; a three-way split, or both saying the answer depends on '
+      + 'now (an app version, a price, a date), drops the question. No labeller may be local, '
+      + 'in-house, or a model scored on this set.' }),
+    el('p', { class: 'small se', 'data-mmp-credit': '1', text: mmpCreditOf(K.credit) }),
+    labs,
+    el('h3', { text: 'Before Start: a dry run' }),
+    el('p', { class: 'small se', text: 'Nothing is sent until you press Start. Tokens in are the '
+      + 'questions as each labeller is asked them (four characters a token); out is each '
+      + 'maker’s replies as the reasoning lab measured them, thinking included'
+      + (E.third_share ? `; * the third answers only where the first two differ — `
+        + `${Math.round(100 * E.third_share)}% is a guess until they have` : '') + '.' }),
+    est,
+    el('p', { class: 'small', 'data-mmp-total': String(E.usd == null ? '' : E.usd) },
+      'About ', el('b', { text: E.usd != null ? usd(E.usd) : `${usd(E.usd_known)} and the `
+        + 'unpriced' }), ` · this month ${usd(E.spent)} of ${usd(E.limit)} spent`),
+    LIVE ? el('div', { class: 'frm', 'data-mmp-run': running ? 'running' : stopped ? 'stopped'
+        : 'idle' },
+      el('button', { class: 'primary', 'data-mmp-start': '1', disabled: why ? '' : null,
+        title: why || null, text: started || stopped ? 'Carry on' : 'Start labelling',
+        onclick: () => mmpKeyAct('start') }),
+      running ? el('button', { class: 'quiet', 'data-mmp-stop': '1', text: 'Stop',
+        onclick: () => mmpKeyAct('stop') }) : '') : '',
+    why ? el('p', { class: 'small warntext', 'data-mmp-why': '1', text: why }) : '',
+    running ? el('p', { class: 'small', 'data-mmp-running': String(running) },
+      K.running.map(r => `${r.slot} labeller: ${r.progress || `${n(r.n)} sent`}`).join(' · ')
+      + (stopped ? ' · stopped: Carry on takes it up again' : '')) : '',
+    el('h3', { text: 'The key' }),
+    c && c.questions ? el('p', { class: 'small', 'data-mmp-counts': `${c.kept}|${c.questions}` },
+      `${n(c.kept)} of ${n(c.questions)} kept · ` + order.filter(k => c[k]).map(k =>
+        `${words[k] || k} ${n(c[k])}`).join(' · ')) : el('p', { class: 'small se',
+      'data-mmp-counts': '0|0', text: K.available ? 'No key: the file isn’t on this server.'
+        : 'No key yet: nothing has been labelled.' }),
+    Object.keys(cats).length ? el('details', { class: 'mmpcats', 'data-mmp-key-cats': '1' },
+      el('summary', { class: 'small se', text: 'per category ▸' }),
+      el('div', { class: 'mmpwrap' }, el('table', { class: 'mmptab' },
+        el('thead', {}, el('tr', {}, el('th', { text: 'Category' }), el('th', { text: 'Kept' }),
+          ...order.map(k => el('th', { text: words[k] || k })))),
+        el('tbody', {}, Object.entries(cats).map(([name, b]) => el('tr', { 'data-mmp-key-cat': name },
+          el('td', { text: name }), el('td', { class: 'num', text: `${n(b.kept)} of ${n(b.questions)}` }),
+          ...order.map(k => el('td', { class: 'num', text: n(b[k]) })))))))) : '',
+    el('h3', { text: ch.provisional ? 'Provisional key: checked against the paper'
+      : 'Key checked against the paper' }),
+    el('p', { class: 'small se', text: `The paper’s three models, run as it ran them (${ch.setting
+      || 'lm-evaluation-harness, 0-shot, accuracy'}), beside ours. Within ${ch.within || 3} `
+      + 'points on all three takes “provisional” off the column.' }),
+    el('div', { class: 'mmpwrap' }, el('table', { class: 'mmptab', 'data-mmp-checks': ch.provisional
+        ? 'provisional' : 'checked' },
+      el('thead', {}, el('tr', {}, ['Model', 'Paper', 'Ours', 'Difference', '']
+        .map(h => el('th', { text: h })))),
+      el('tbody', {}, ch.rows.map(r => el('tr', { 'data-mmp-check': r.model },
+        el('td', { text: r.model }), el('td', { class: 'num', text: r.paper.toFixed(1) }),
+        el('td', { class: 'num', text: r.ours == null ? 'not run' : r.ours.toFixed(1) }),
+        el('td', { class: 'num', text: r.diff == null ? '—' : (r.diff > 0 ? '+' : '')
+          + r.diff.toFixed(1) }),
+        el('td', { text: r.ok ? '✓ within' : r.ours == null ? '' : '✗ outside' })))))),
+    Object.keys(K.portal || {}).length ? el('p', { class: 'small', 'data-mmp-portal-scores': '1',
+      text: 'The authors’ portal: ' + Object.entries(K.portal).map(([m, p]) =>
+        `${m.split('/').pop()} ${Number(p.score).toFixed(1)}`).join(' · ') }) : '');
+}
+function mmpCreditOf(c) {
+  c = c || {};
+  return c.name ? `${c.name}: ${c.by} · ${c.licence} — ${c.note}` : '';
 }
 
 // ---- the judge test ----------------------------------------------------------

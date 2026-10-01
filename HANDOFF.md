@@ -4710,6 +4710,60 @@ Not before the demo: a new hidden set changes every Everyday score.
   strict and loose), a served setup's too. It lists what the board lists: the
   diagnose half.
 
+### 14.3 — Mobile-MMLU-Pro, with our own answer key (1 Oct)
+
+- **The set**: MBZUAI's Mobile-MMLU-Pro (arXiv 2503.20786, DMLR 2026), 9,497
+  four-option questions about everyday phone topics in 80 fields, grouped
+  into the paper's 9 categories (`scripts/mobile_mmlu.py`, `CATEGORIES`).
+  CC BY-ND 4.0: used here, never published. The full Mobile-MMLU is CC
+  BY-NC-ND 4.0 and isn't used.
+- **Never committed** (the mirror is public, and our key is a derivative):
+  `scripts/fetch_data.py` fetches `mobile-mmlu-pro.csv` from the Hub at
+  revision 44ed870 (pinned with its sha256 in
+  `eval_tasks/mobile_mmlu_pro/manifest.json`) into `MMP_DIR`
+  (`$BENCH_ROOT/data/mobile_mmlu_pro`). The key lives beside it in `key/`:
+  `labels.json` (each labeller's letter and "depends on now" flag, by
+  question id), `key.json` (each question's decision and reason, the counts
+  overall and per category, the key's version), `portal.json`. Tests use
+  invented rows (`tests/fixtures/mmp_invented.csv`).
+- **The key** (`service/mmp_key.py`; the rules are `mobile_mmlu.decide`): two
+  labellers from different makers answer every question; agreement is the
+  key; both flagging "depends on now" drops it; a split goes to a third from
+  a third maker, and two of three is the key, three different letters drop
+  it. Defaults: GPT-6 Sol and Gemini 3.1 Pro (pinned as the reasoning lab
+  pinned them), and Claude Sonnet 5.5 third — each changed on AI models
+  (`POST /api/ai/labellers/{slot}`). Refused as a labeller: local, a Qwen3.6
+  build or anything served here, a model with a Mobile-MMLU-Pro score, and a
+  maker another labeller has. A labeller scored later says "labelled the key"
+  on its row and isn't ranked.
+- **The run**: AI models ▸ Mobile-MMLU-Pro answer key shows the dry run (each
+  labeller's questions, tokens and cost; also `python scripts/mobile_mmlu.py
+  --dry-run`), and nothing is sent until **Start**. Batches are OpenRouter's,
+  worked on disk (kind `mmpk`, finished by the poller); **Stop** holds them,
+  Start carries on, and so does a restart. Spend counts as the "labeller"
+  job against the month's limit. The key is rebuilt as each batch lands; a
+  labeller changed later labels its slot again.
+- **Scoring** (the mobile suite's "mmlu" part): asked as MMLU is, 0-shot.
+  HF models by the letters' log-likelihood with lm_eval and no chat template
+  (as the paper ran lm-evaluation-harness; a base model may sit it), a GGUF
+  by llama-perplexity (`gguf_data.py --only mobile_mmlu_pro`, built from the
+  key's kept questions, again when the key moves), a served or OpenRouter
+  model by the letter it answers to the authors' own prompt. lm_eval's task
+  holds no key (its target is a stand-in, and its own acc is never shown):
+  every pick is kept (`mobile_mmlu_pro.json`) and scored on the key as it
+  stands — accuracy on the kept questions, with n, overall and per category.
+- **"Provisional key"** is on the column until Qwen2.5-3B-Instruct (60.6),
+  Llama-3.2-3B-Instruct (42.0) and gemma-2-2b-it (31.2), run here, all land
+  within 3 points of the paper's Table 2. The key's card shows ours beside
+  theirs.
+- **The portal**: a public HF model's page offers its picks in the authors'
+  format (`question_id,predicted_answer`; `GET /api/mobile-mmlu/predictions`,
+  refused for served, OpenRouter, GGUF, in-house or private models), and the
+  portal's score can be typed in beside ours. Our key is never a download.
+- Never in the Avg, never a training target (diagnose skips it), never in
+  Improve; every question and option is in the contamination index once
+  fetched. Step 4 checks it on a "mobile, mmlu" line.
+
 ### 14.2 — MobileAIBench's trust sets (1 Oct)
 
 - **Three judged sets, the mobile suite's "trust" part** (`part=trust`), in

@@ -62,6 +62,9 @@ MAB_MTBENCH = "mab_mtbench"
 # verdicts only, never its question or its reply
 MAB_TRUST = ("mab_adv", "mab_privacy", "mab_socchem")
 MAB_TURNS = ("mab_mtbench_t1", "mab_mtbench_t2")
+# 14.3: Mobile-MMLU-Pro — each model's pick beside our answer key, and how the
+# labellers came to it; the key itself is never offered as a file
+MMP = "mobile_mmlu_pro"
 
 
 def kind_of(task: str) -> str:
@@ -81,6 +84,8 @@ def kind_of(task: str) -> str:
         return "mabj"                       # 14.1: MT-Bench's two turns, rated by the judge
     if task in MAB_TRUST:
         return "mabt"                       # 14.2: a trust set, marked by the judge
+    if task == MMP:
+        return "mmp"                        # 14.3: picks scored on our own answer key
     if task in DM_TASKS:
         return "dm"                         # 12q.B: DeviceMark's battery, by its protocol
     if task.startswith(GEN):
@@ -115,6 +120,9 @@ def model_dirs(task: str) -> dict[str, Path]:
                 out[_dm_model_id(d)] = d
         elif task == MAB_MTBENCH:
             if any(_task_dirs(d, t) for t in MAB_TURNS):
+                out[_model_id(d)] = d
+        elif task == MMP:
+            if (d / "mobile_mmlu_pro.json").exists():
                 out[_model_id(d)] = d
         elif _task_dirs(d, task):
             out[_model_id(d)] = d
@@ -393,6 +401,34 @@ def _mtbench_rows(d: Path) -> dict[str, dict]:
     return out
 
 
+def _mmp_rows(d: Path) -> dict[str, dict]:
+    """14.3: the model's pick on each question it answered, beside our key —
+    right or wrong only where the key kept the question — and how the
+    labellers decided it"""
+    _scripts()
+    import mobile_mmlu as mmp
+    picks = (mmp.predictions(d) or {}).get("predictions") or {}
+    items = mmp.current_key().get("items") or {}
+    qs = mmp.by_id()
+    out = {}
+    for qid, pick in picks.items():
+        q = qs.get(qid)
+        if not q:
+            continue
+        it = items.get(qid) or {}
+        key = it.get("key") if it.get("decision") in mmp.KEPT else None
+        said = f"picked {pick}" if pick else "no letter in its answer"
+        out[qid] = {"q": q["question"], "options": [q[L] for L in mmp.LETTERS],
+                    "subject": q["category"], "order": [q["category"], qid],
+                    "answer_idx": mmp.LETTERS.index(key) if key else None,
+                    "agreement": mmp.agreement(it),
+                    "res": {"ok": None if not key else pick == key,
+                            "pick": mmp.LETTERS.index(pick) if pick else None,
+                            "verdict": said + (f" · our key {key}" if key else
+                                               " · not scored: " + mmp.agreement(it))}}
+    return out
+
+
 def _rows_of(task: str, d: Path) -> dict[str, dict]:
     """this model's results on the task, by question key, each with the
     question as its record carries it"""
@@ -405,6 +441,8 @@ def _rows_of(task: str, d: Path) -> dict[str, dict]:
         return _mtbench_rows(d)
     if kind == "mabt":
         return _trust_rows(task, d)
+    if kind == "mmp":
+        return _mmp_rows(d)
     if kind == "everyday":
         import everyday as ev
         e = ev.read(d) or {}
@@ -544,10 +582,19 @@ def _stamp(task: str, dirs: dict[str, Path]) -> tuple:
                  [f for t in (MAB_TURNS if task == MAB_MTBENCH else (task,))
                   for x in _task_dirs(d, t) for f in x.rglob("samples_*.jsonl")]
                  + [d / n for n in ("judge.json", "safety.json", "simpleqa.json",
-                                    "generative.json", "mobileaibench.json")])
+                                    "generative.json", "mobileaibench.json",
+                                    "mobile_mmlu_pro.json")]
+                 # 14.3: and our key, which scores every model's picks
+                 + ([_mmp_key_file()] if task == MMP else []))
         out.append((mid, tuple(sorted((str(f), f.stat().st_mtime_ns, f.stat().st_size)
                                       for f in files if f.exists()))))
     return tuple(out)
+
+
+def _mmp_key_file() -> Path:
+    _scripts()
+    import mobile_mmlu as mmp
+    return mmp.key_dir() / "key.json"
 
 
 def half_of(task: str, key: str, row: dict) -> str:
@@ -641,6 +688,13 @@ def meta(task: str) -> dict:
         return {"source": f"{src['name']} ({src['cite']}), MobileAIBench's {n:,}-row sample",
                 "licence": f"{src['licence']}; the sample {by['licence']}",
                 "revision": by["revision"], "url": by["url"]}
+    if kind == "mmp":
+        import mobile_mmlu as mmp
+        c = mmp.credit()
+        return {"source": f"{c['name']}, by {c['by']}; scored on our own answer key, as the "
+                          f"authors hold theirs back",
+                "licence": f"{c['licence']} — used here, never published",
+                "revision": c["revision"], "url": c["url"]}
     if kind == "simpleqa":
         import simpleqa as sq
         c = sq.credit()
@@ -728,6 +782,8 @@ def page(task: str, *, offset: int = 0, limit: int = PAGE, q: str = "", subject:
                          "answer_idx": r.get("answer_idx"), "subject": r.get("subject") or "",
                          "reference": r.get("reference") or None,
                          "context": r.get("context") or None,
+                         # 14.3: how our key's labellers decided it
+                         **({"agreement": r["agreement"]} if r.get("agreement") else {}),
                          "results": {m: r["results"].get(m) for m in shown},
                          # 12o.2: the GGUF's, where llama.cpp says which question it was
                          **({"gguf": {m: res.get(r.get("gkey")) for m, res in

@@ -496,7 +496,8 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
     if s.suite == "mobile" and part not in config.MAB_PARTS:
         raise HTTPException(422, "the mobile suite's part is judged (MT-Bench), trust "
                                  "(Adversarial Instruction, Privacy Leakage, Social Chemistry "
-                                 "101), or none for its five sets with no judge")
+                                 "101), mmlu (Mobile-MMLU-Pro), or none for its five sets with "
+                                 "no judge")
     if s.suite == "mobile" and pair:
         raise HTTPException(422, "pair is for the devicemark suite only")
     if s.suite == "mobile" and part == "trust":
@@ -504,6 +505,9 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
         why = next((_mab().available(t) for t in _mab().TRUST if _mab().available(t)), "")
         if why:
             raise HTTPException(422, why + ". Nothing was queued.")
+    if s.suite == "mobile" and part == "mmlu" and _mmp().available():
+        # 14.3: Mobile-MMLU-Pro is fetched at deploy too
+        raise HTTPException(422, _mmp().available() + ". Nothing was queued.")
     if s.suite not in ("devicemark", "mobile") and (part or pair):
         raise HTTPException(422, "pair is for the devicemark suite only, and part for it and "
                                  "the mobile suite")
@@ -523,7 +527,9 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
         raise HTTPException(422, config.SAFETY_INSTRUCT_ONLY + ". Nothing was queued.")
     if s.suite == "shared" and s.kind == "base":
         raise HTTPException(422, config.SHARED_INSTRUCT_ONLY + ". Nothing was queued.")
-    if s.suite == "mobile" and s.kind == "base":
+    # 14.3: Mobile-MMLU-Pro is scored on the letters' log-likelihoods, as the
+    # paper ran it: a base model can sit it
+    if s.suite == "mobile" and s.kind == "base" and part != "mmlu":
         raise HTTPException(422, config.MAB_INSTRUCT_ONLY + ". Nothing was queued.")
     total = sum(config.MMLU_PRO_SUBJECTS.values())
     if s.subset and not 0 < s.subset < total:
@@ -1258,8 +1264,11 @@ def gguf_page():
                 "flags": gguf.flags_of(r.get("gguf_flags")), "pin": r.get("gguf_pin") or {},
                 "setups": [gguf.gb.AS_BUILT] + (r.get("gguf_setups") or []),
                 "served": True} for r in db.served_all() if r.get("gguf_path")]
-    return {"worker": gguf.worker(), "benchmarks": gguf.gb.BENCHMARKS, "order": gguf.gb.ORDER,
-            "datasets": gguf.manifest(), "models": models,
+    man = gguf.manifest()
+    # 14.3: a benchmark built apart (Mobile-MMLU-Pro) is offered once its dataset is built
+    order = [b for b in gguf.gb.ORDER if not gguf.gb.BENCHMARKS[b].get("apart") or b in man]
+    return {"worker": gguf.worker(), "benchmarks": gguf.gb.BENCHMARKS, "order": order,
+            "datasets": man, "models": models,
             "default_flags": " ".join(gguf.gb.DEFAULT_FLAGS), "mtp_line": gguf.gb.MTP_LINE}
 
 
@@ -1277,7 +1286,10 @@ def gguf_register(f: GgufIn, x_token: str = Header(default="")):
 @app.post("/api/gguf/estimate")
 def gguf_estimate(a: GgufRunIn):
     try:
-        return gguf.estimate(a.model, a.benchmarks or gguf.gb.ORDER, a.subset, a.setups or None)
+        # 14.3: "all" is what a run of all asks: every benchmark with a dataset built
+        return gguf.estimate(a.model, a.benchmarks or [b for b in gguf.gb.ORDER
+                                                       if b in gguf.manifest()] or gguf.gb.DEFAULT,
+                             a.subset, a.setups or None)
     except ValueError as e:
         raise HTTPException(422, str(e)) from None
 
@@ -1400,14 +1412,18 @@ def mab_estimate(model: str):
         raise HTTPException(422, "model must be a model id on the board")
     rec = served.get(model) if served.is_served(model) else None
     each = ((rec or {}).get("speed") or {}).get("secs_each") if rec else _mab_hf_each()
-    return {"model": model, "parts": _mab().estimate(bool(rec), each, _mab_judge())}
+    parts = _mab().estimate(bool(rec), each, _mab_judge())
+    # 14.3: Mobile-MMLU-Pro — a letter a question, or four log-likelihoods
+    parts["mmlu"] = _mmp().run_estimate(bool(rec), each if rec else None)
+    return {"model": model, "parts": parts}
 
 
 def _mab_hf_each() -> float | None:
     """seconds an answer of this server's earlier MobileAIBench runs, on its
     GPU: their GPU time over their answers"""
     rows = [r for r in db.recent(500) if r.get("suite") == "mobile" and r.get("status") == "done"
-            and r.get("gpu_seconds") and not served.is_served(r.get("hf_id") or "")]
+            and r.get("gpu_seconds") and not served.is_served(r.get("hf_id") or "")
+            and (r.get("part") or "") != "mmlu"]
     if not rows:
         return None
     m = _mab()
@@ -1434,6 +1450,144 @@ def mab_judge(a: MabJudgeIn, x_token: str = Header(default="")):
                     "summary": m.summary(got)})
     _cache.update(key=None, payload=None, at=0.0)
     return {"models": out}
+
+
+# -- 14.3: Mobile-MMLU-Pro and our answer key -----------------------------------
+
+def _mmp():
+    from . import mmp_key
+    return mmp_key.mmp
+
+
+def _mmp_key_page() -> dict:
+    """the key's card on AI models: its labellers, the dry run, the run, the
+    key's counts, and the paper's three models beside ours"""
+    from . import mmp_key
+    st = mmp_key.status()
+    m = _mmp()
+    st["checks"] = m.paper_checks({mid: m.score(m.predictions(config.OUT_DIR / mid.replace("/", "__")))
+                                   for mid in m.manifest()["paper_checks"]["models"]})
+    st["portal"] = m.portal_scores()
+    st["credit"] = m.credit()
+    return st
+
+
+class MmpByIn(BaseModel):
+    by: str = ""
+
+
+class LabellerIn(BaseModel):
+    model: str
+    by: str
+
+
+@app.get("/api/mobile-mmlu/key")
+def mmp_key_status():
+    return _mmp_key_page()
+
+
+@app.post("/api/mobile-mmlu/key/start")
+def mmp_key_start(a: MmpByIn, x_token: str = Header(default="")):
+    """masein's Start, after the dry run: the labellers pinned, and what is
+    left to label sent. Started again after a stop, it carries on"""
+    from . import mmp_key
+    _check_token(x_token)
+    _name(a.by, "labelling the key")
+    try:
+        sent = mmp_key.start(a.by.strip()[:80])
+    except ValueError as e:
+        raise HTTPException(409, str(e)) from None
+    return {**sent, "page": _mmp_key_page()}
+
+
+@app.post("/api/mobile-mmlu/key/stop")
+def mmp_key_stop(a: MmpByIn, x_token: str = Header(default="")):
+    from . import mmp_key
+    _check_token(x_token)
+    _name(a.by, "stopping the labelling")
+    mmp_key.stop(a.by.strip()[:80])
+    return {"page": _mmp_key_page()}
+
+
+@app.post("/api/ai/labellers/{slot}")
+def mmp_labeller_set(slot: str, a: LabellerIn, x_token: str = Header(default="")):
+    """a key labeller, pinned on OpenRouter — never local, in-house, a model
+    scored on this set, or another labeller's maker"""
+    from . import mmp_key
+    _check_token(x_token)
+    if not a.by.strip():
+        raise HTTPException(422, "type your name first — it is recorded with the choice")
+    try:
+        saved = mmp_key.save(slot, a.model.strip(), a.by.strip()[:80])
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    _cache.update(key=None, payload=None, at=0.0)
+    return {"saved": saved, "page": _ai_page(), "key": _mmp_key_page()}
+
+
+class PortalIn(BaseModel):
+    model: str
+    score: float
+    by: str
+
+
+@app.post("/api/mobile-mmlu/portal")
+def mmp_portal_set(a: PortalIn, x_token: str = Header(default="")):
+    """the score the authors' portal gave a model's predictions, typed in"""
+    _check_token(x_token)
+    _name(a.by, "the portal's score")
+    if not _HF_ID_RE.match(a.model) or not 0 <= a.score <= 100:
+        raise HTTPException(422, "a model id on the board, and a score from 0 to 100")
+    _mmp().set_portal_score(a.model, round(float(a.score), 2), a.by.strip()[:80])
+    return _mmp_key_page()
+
+
+def _hub_public(hf_id: str) -> bool:
+    """the model is public on the Hub, asked without this server's token:
+    gated is public, private isn't"""
+    try:
+        from huggingface_hub import model_info
+        return not getattr(model_info(hf_id, token=False), "private", True)
+    except Exception:                               # noqa: BLE001 — unknown is not public
+        return False
+
+
+def mmp_download_refused(model_id: str, meta: dict | None) -> str:
+    """'' when the portal's predictions may be offered for this model: a
+    public model on Hugging Face, run here. Never one served elsewhere or
+    from OpenRouter, a GGUF, a checkpoint trained here, or an in-house build"""
+    from . import mmp_key
+    if served.is_served(model_id) or (meta or {}).get("served") or (meta or {}).get("gguf"):
+        return "only for a public model on Hugging Face: this one is served"
+    if mmp_key.IN_HOUSE.search(model_id) or (meta or {}).get("source") == "artifact" \
+            or (meta or {}).get("trained_from"):
+        return "never for an in-house model"
+    if not _HF_ID_RE.match(model_id):
+        return "only for a public model on Hugging Face"
+    return ""
+
+
+@app.get("/api/mobile-mmlu/predictions")
+def mmp_predictions(model: str):
+    """14.3: a public HF model's picks in the authors' portal format
+    (question_id,predicted_answer), for masein to submit — never our key,
+    never a served or in-house model's"""
+    d = config.OUT_DIR / model.replace("/", "__")
+    try:
+        meta = json.loads((d / "model_meta.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        meta = None
+    why = mmp_download_refused(model, meta)
+    if not why and not _hub_public(model):
+        why = "only for a model that is public on Hugging Face"
+    if why:
+        raise HTTPException(403, why)
+    preds = _mmp().predictions(d)
+    if not preds:
+        raise HTTPException(404, f"{model} has no Mobile-MMLU-Pro answers on file")
+    name = model.replace("/", "_") + "_predictions.csv"
+    return PlainTextResponse(_mmp().portal_csv(preds), media_type="text/csv",
+                             headers={"content-disposition": f'attachment; filename="{name}"'})
 
 
 def _dm():

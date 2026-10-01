@@ -4,7 +4,10 @@ data folder and checked against its pinned sha256 and size:
 
 - MobileAIBench's Privacy Leakage (real people's names, from the Enron
   corpus), from the commit eval_tasks/mobileaibench/manifest.json pins, into
-  MAB_PRIVATE_DIR.
+  MAB_PRIVATE_DIR;
+- 14.3: Mobile-MMLU-Pro (CC BY-ND 4.0: used here, never published, and our
+  key is a derivative), from the Hugging Face revision
+  eval_tasks/mobile_mmlu_pro/manifest.json pins, into MMP_DIR.
 
 A file already here with the pinned hash is left alone; one that isn't, or a
 download that doesn't match, is never kept (a .part is removed) and the step
@@ -32,10 +35,14 @@ def wanted() -> list[dict]:
     bytes, dest}"""
     sys.path.insert(0, str(HERE))
     import mobileaibench as mab
+    import mobile_mmlu as mmp
     m = mab.manifest()
+    f = mmp.manifest()["file"]
     return [{"name": f"MobileAIBench {k}", "url": f["url"], "sha256": f["sha256"],
              "bytes": f["bytes"], "dest": mab.private_dir() / f["file"]}
-            for k, f in m["files"].items() if not f.get("committed", True)]
+            for k, f in m["files"].items() if not f.get("committed", True)] + [
+        {"name": "Mobile-MMLU-Pro", "url": f["url"], "sha256": f["sha256"], "bytes": f["bytes"],
+         "dest": mmp.data_dir() / f["file"]}]
 
 
 def _sha(path: Path) -> str:
