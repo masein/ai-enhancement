@@ -126,6 +126,23 @@ def test_models_has_the_gguf_group_only_for_models_with_a_result(live, page, mea
     assert page.errors == []
 
 
+@pytest.mark.parametrize("width", [1400, 375])
+def test_the_gguf_group_goes_when_no_row_shown_has_a_number(live, page, measured, width):
+    """12z C10: with only base models shown — none has a GGUF — seven columns
+    of dashes said nothing"""
+    page.set_viewport_size({"width": width, "height": 900})
+    page.goto(live["base"] + "/#tab=models&kind=base")
+    page.wait_for_selector("table[data-lb-table] tr[data-lb-row]")
+    assert page.locator("th[data-col^='gguf:']").count() == 0
+    assert page.locator("[data-gguf-cell]").count() == 0
+    # and it is back with the rows that have one
+    page.goto(live["base"] + "/#tab=models")
+    page.wait_for_selector(f"tr[data-lb-row='{measured['gid']}'] td[data-gguf-cell='mmlu']")
+    assert page.locator("th[data-col^='gguf:']").count() == 7
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
+    assert page.errors == []
+
+
 def test_the_custom_table_averages_gguf_columns_only_with_each_other(live, page, measured):
     page.set_viewport_size({"width": 1400, "height": 900})
     page.goto(live["base"] + "/#tab=models&cols=mmlu,gguf:mmlu")
@@ -242,5 +259,15 @@ def test_served_setups_of_one_file_sit_side_by_side_with_mtps_acceptance(live, p
     # 12q.C: DeviceMark's column after the Knowledge exam's
     assert cells[0] == "LDA phone build, MTP 3" and " of " in cells[1] and cells[3] == "—" \
         and " of " in cells[5]
+    # 12z C3: which suite the answers' numbers are over, and out of what
+    heads = table.locator("thead th")
+    assert heads.nth(4).get_attribute("title").endswith(" on Everyday tasks, practice and hidden")
+    assert "of every answer it gave on Everyday tasks, practice and hidden. Ran out: " in \
+        heads.nth(5).get_attribute("title")
+    n = cells[5].split(" of ")[1]
+    note = page.locator("[data-served-setups-note]").inner_text()
+    assert note.startswith("Median tokens and Ran out: over every answer a setup gave on "
+                           f"Everyday tasks, practice and hidden ({n} answers).")
+    assert "drafts accepted" not in note                      # the MTP setup reported them
     shot(table, "served-setups-of-one-file.png")
     assert page.errors == []

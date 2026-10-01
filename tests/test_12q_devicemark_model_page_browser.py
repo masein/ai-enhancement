@@ -230,6 +230,45 @@ def test_open_results_on_a_model_with_no_page_opens_its_row_on_the_chart(live, p
 # 3. the Answers tab
 # ---------------------------------------------------------------------------
 
+
+# 12z C1: the mode a switch, the benches chips 8px apart, the rows 12px apart
+GAPS = """sel => { const xs = [...document.querySelectorAll(sel)].map(e => e.getBoundingClientRect());
+  const out = []; for (let i = 1; i < xs.length; i++)
+    if (Math.abs(xs[i].top - xs[i - 1].top) < 2) out.push(xs[i].left - xs[i - 1].right);
+  return out; }"""
+VGAP = """([a, b]) => document.querySelector(b).getBoundingClientRect().top
+  - document.querySelector(a).getBoundingClientRect().bottom"""
+
+
+@pytest.mark.parametrize("width", [1400, 375])
+def test_devicemarks_answers_have_a_mode_switch_and_spaced_chips(live, page, runs, width):
+    model_page(page, live, MTP, width=width)
+    page.locator("[data-mtab='answers']").click()
+    modes = page.locator("[data-dm-ans-modes]")
+    modes.wait_for()
+    assert "seg" in modes.get_attribute("class").split() and modes.locator(".chip-btn").count() == 0
+    page.wait_for_selector("[data-dm-ans-benches] .chip-btn")
+    gaps = page.evaluate(GAPS, "[data-dm-ans-benches] .chip-btn")
+    assert gaps and min(gaps) >= 7.5, gaps
+    assert page.evaluate(VGAP, ["[data-dm-ans-modes]", "[data-dm-ans-benches]"]) >= 11.5
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
+    shot(page.locator("[data-dm-ans-benches]"), f"answers-devicemark-chips-{width}.png")
+    assert page.errors == []
+
+
+@pytest.mark.parametrize("width", [1400, 375])
+def test_the_setups_table_has_no_drafts_column_until_one_is_reported(live, page, runs, width):
+    """12z C3: "not reported" on every row is a column of nothing"""
+    model_page(page, live, PLAIN, width=width)
+    table = page.locator("[data-served-setups]")
+    table.wait_for()
+    heads = table.locator("thead th").all_text_contents()
+    assert "MTP drafts accepted" not in heads and table.locator("[data-served-draft]").count() == 0
+    assert heads[-1] == "Ran out"
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
+    assert page.errors == []
+
+
 def test_the_answers_tab_has_every_item_no_answer_and_wrong_first(live, page, runs):
     model_page(page, live, MTP)
     page.locator("[data-mtab='answers']").click()

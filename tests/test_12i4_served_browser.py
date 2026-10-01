@@ -52,7 +52,8 @@ def test_a_served_models_answer_length_beside_its_bases(live, page, served_run):
     line.wait_for()
     txt = line.inner_text()
     # every answer, practice and hidden: "ran out 43 of 388"
-    out, of = txt.split("ran out ")[1].split(" of ")
+    out, of = txt.split("ran out ")[1].split(" (")[0].split(" of ")
+    assert txt.endswith(" (every answer, practice and hidden)")              # 12z C2
     assert txt.startswith("median 990 tokens · ran out ") and 0 < int(out) < int(of)
     assert "as the server counted them" in line.get_attribute("title")
     cmp = page.locator(f"[data-served-compare='{SID}']").inner_text()

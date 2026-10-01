@@ -6,6 +6,7 @@ score; and Home's Everyday badge as one short line with room around it."""
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -123,18 +124,19 @@ def test_answers_that_ran_out_of_room_are_said_beside_the_score(live, page):
     page.goto(live["base"] + "/#model=fx%2Fskewed-360m")
     page.wait_for_selector("[data-model-hero]")
     tile = page.locator("[data-kind-tile='everyday']")
-    assert tile.locator("[data-evd-ran-out]").inner_text() == "1 answer ran out of room"
+    # 12z C2: out of what it is scored over
+    assert re.fullmatch(r"1 of \d+ ran out of room", tile.locator("[data-evd-ran-out]").inner_text())
     open_kind(page, "everyday")
     assert page.locator("[data-everyday-block] [data-evd-ran-out='1']").count() == 1
     page.goto(live["base"] + "/#tab=benchmarks&sub=everyday")
     page.wait_for_selector("[data-everyday-table]")
     head = page.locator("[data-everyday-table] th[data-evd-model='fx/skewed-360m']")
-    assert head.locator("[data-evd-ran-out]").inner_text() == "1 answer ran out of room"
+    assert re.fullmatch(r"1 of \d+ ran out of room", head.locator("[data-evd-ran-out]").inner_text())
     assert page.locator("th[data-evd-model='fx/good-750m'] [data-evd-ran-out]").count() == 0
     page.goto(live["base"] + "/#tab=models&view=everyday")
     page.wait_for_selector("[data-lb-everyday]")
-    assert page.locator("tr[data-lb-row='fx/skewed-360m'] [data-evd-ran-out]").inner_text() == \
-        "1 answer ran out of room"
+    assert re.fullmatch(r"1 of \d+ ran out of room",
+                        page.locator("tr[data-lb-row='fx/skewed-360m'] [data-evd-ran-out]").inner_text())
     assert page.errors == []
 
 
@@ -168,7 +170,7 @@ def test_homes_everyday_badge_is_one_line_with_room(live, page, width):
     assert box["above"] >= 6 and abs(box["above"] - box["below"]) <= 2, box
     assert box["inside"], box
     # the eyebrow is the heading alone now
-    assert card.locator(".eyebrow").inner_text().lower() == "everyday tasks"
+    assert card.locator(".eyebrow").inner_text().lower() == "everyday tasks · most passed"  # 12z C8
     card.scroll_into_view_if_needed()
     shot(page, f"12a4-home-{width}-light.png")
     assert page.errors == []
