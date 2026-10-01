@@ -4130,6 +4130,14 @@ button:disabled, button:disabled:hover { opacity:.5; cursor:not-allowed; filter:
 .lbbar.narrow .chiprow { display:flex; gap:8px; align-items:center; }
 .lbbar.narrow .chips { flex:1; min-width:0; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; }
 .lbbar.narrow .chips::-webkit-scrollbar { display:none; }
+/* 12z B5: an edge with more chips past it fades out */
+.lbbar.narrow .chips[data-more="1"] { -webkit-mask-image:linear-gradient(to right, #000 calc(100% - 32px), transparent);
+  mask-image:linear-gradient(to right, #000 calc(100% - 32px), transparent); }
+.lbbar.narrow .chips[data-less="1"] { -webkit-mask-image:linear-gradient(to left, #000 calc(100% - 32px), transparent);
+  mask-image:linear-gradient(to left, #000 calc(100% - 32px), transparent); }
+.lbbar.narrow .chips[data-less="1"][data-more="1"] {
+  -webkit-mask-image:linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+  mask-image:linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent); }
 .lbbar.narrow .chips .chip-btn { flex:none; }
 .lbbar.narrow .chiprow > .pill { flex:none; }
 /* 12h.2: Benchmarks ▾, Models ▾ and Filters ▾ sit together beside the chips;
@@ -6489,8 +6497,13 @@ function vTaint(m) {
 function vModel() {
   const m = DATA.models.find(x => x.id === state.model);
   if (!m) return [note('No such model.')];
-  const back = el('a', { class: 'backlink', href: '#' + viewHash(state.tab), onclick: backTo(state.tab),
-    text: '← Back to ' + (TABS.find(([id]) => id === state.tab) || [, 'the board'])[1] });
+  // 12z B4: Back, when this page was reached from one here, and named for
+  // where that was; otherwise the view it sits under, named for what it is
+  const from = (history.state || {}).from, prev = from != null && from !== location.hash;
+  const back = el('a', { class: 'backlink', 'data-back-to': prev ? 'history' : 'view',
+    href: prev ? (from || '#tab=home') : '#' + viewHash(state.tab),
+    onclick: prev ? e => { e.preventDefault(); history.back(); } : null,
+    text: '← Back to ' + hashWords(prev ? from : viewHash(state.tab)) });
   // 12b: a header — the name, one line of facts, Test this model, and one
   // tile per kind of test — then four tabs, remembered per viewer. Improve
   // is a tab only when the Review lists hold something of this model's
@@ -6532,10 +6545,15 @@ function modelKinds(m) {
   if ((servedOf(m.id) || {}).phone && LIVE && !P.loaded && !P.loading && netReady()) loadPhone();
   const jt = Object.entries((m.judge || {}).tasks || {}).filter(([t]) => t.startsWith('exam_'));
   const ran = m.date ? Date.parse(String(m.date)) / 1000 : 0;
+  const std = [...DATA.accTasks, ...DATA.pplTasks].some(t => cell(t, m.id));
+  // 12z B1: its GGUF, measured by llama.cpp, is a kind of its own — a served
+  // model's page holds it, Measure included, whether or not it has been run
+  const gg = (G().registered || {})[m.id] || ggufAny(m.id);
   return [
-    { kind: 'standard', label: 'Standard',
-      taken: [...DATA.accTasks, ...DATA.pplTasks].some(t => cell(t, m.id)) || ggufAny(m.id),
-      at: ran || 0 },
+    // a GGUF with no server has nothing to sit the Standard suite with
+    std || !ggufOnly(m) ? { kind: 'standard', label: 'Standard', taken: std, at: ran || 0 } : null,
+    gg ? { kind: 'gguf', label: 'On its GGUF · llama.cpp', taken: ggufAny(m.id),
+      at: Math.max(0, ...((G().history || {})[m.id] || []).map(r => r.at || 0)) } : null,
     (J.exam || []).length ? { kind: 'exam', label: 'Knowledge exam',
       taken: jt.length > 0 || ((m.judge || {}).history || []).length > 0,
       at: Math.max(0, ...jt.map(([, v]) => v.judged_at || 0)) } : null,
@@ -6560,6 +6578,12 @@ function kindValue(m, kind) {
     const r = phoneReports(m.id)[0];
     if (!r) return ['—', 'nothing reported from the phone yet'];
     return [String(r.decode_median), `tok/s median on ${r.device} · reported by ${r.by}`];
+  }
+  if (kind === 'gguf') {
+    const sets = ((G().setups || {})[m.id] || []).filter(x => Object.keys(x.benches || {}).length);
+    const done = (G().order || []).filter(b => sets.some(x => (x.benches || {})[b]));
+    return [`${done.length} of ${(G().order || []).length}`, 'benchmarks measured'
+      + (sets.length > 1 ? ` · ${sets.length} setups` : '') + ' · never in any average'];
   }
   if (kind === 'standard' && m.served) {
     const n = genTasks().filter(t => cell(t, m.id)).length;
@@ -6870,6 +6894,9 @@ function kindTest(m, kind) {
   if (kind === 'everyday') return evdTestBtn(m, 'quiet ktest');
   if (kind === 'phone') return el('button', { class: 'quiet ktest', 'data-kind-test': 'phone',
     text: 'Add', onclick: () => openPhone(m.id) });
+  if (kind === 'gguf') return (G().registered || {})[m.id] ? el('button', { class: 'quiet ktest',
+    'data-kind-test': 'gguf', text: 'Measure', onclick: () => ggMeasureDialog(ggufIdOf(m.id),
+      '[data-kind-test="gguf"]') }) : '';
   return el('button', { class: 'quiet ktest', 'data-kind-test': 'standard', text: 'Test',
     onclick: () => { state.sub.suite = m.served ? 'generative' : 'full'; openTest(m.id); } });
 }
@@ -6913,7 +6940,8 @@ function modelScoresTab(m, kinds) {
     gg && LIVE ? ggufStartPanel(m.id) : '')];
   const newest = taken.reduce((a, b) => (b.at || 0) > (a.at || 0) ? b : a).kind;
   const mine = state.mblk[m.id] || {};
-  return taken.map(k => {
+  // 12z B1: the GGUF's block is there before its first number: Measure is in it
+  return kinds.filter(k => k.taken || k.kind === 'gguf').map(k => {
     const open = k.kind in mine ? mine[k.kind] : k.kind === newest;
     const [v, sub] = kindValue(m, k.kind);
     // a closed block is built when it opens: the judged tables are the
@@ -6960,12 +6988,12 @@ function kindParts(m, kind) {
       sharedLine(m),
       mabLine(m),
       part(resultsPart(m), 'results'),
-      // 12f.3: measured on the GGUF — under its own heading
-      ggufPart(m),
       // item analysis of the benchmark, not the improvement loop (12b §7)
       diag ? el('details', { class: 'kfold', 'data-cant-show': '1' },
         el('summary', { text: 'What the score can’t show ▸' }), diag) : ''].filter(Boolean);
   }
+  // 12f.3: measured on the GGUF; 12z B1: in its own block, not under Standard
+  if (kind === 'gguf') return [ggufPart(m)];
   if (kind === 'phone') return [phoneBody(servedOf(m.id), m.id)];
   if (DM_KINDS[kind]) return [dmModelCard(m, DM_KINDS[kind][0])];
   if (kind === 'exam') {
@@ -8559,7 +8587,15 @@ function routeFromHash() {
   const h = decodeURIComponent(rest);
   const m = /^model=(.+)$/.exec(h);
   if (m && DATA.models.some(x => x.id === canonId(m[1]))) {
-    state.model = canonId(m[1]); state.topic = null; return; }
+    state.model = canonId(m[1]); state.topic = null;
+    // 12z B1: a GGUF's own address lands on the page it is joined to, at its
+    // GGUF's block, open
+    if (state.model !== m[1] && /^gguf\//.test(m[1])) {
+      (state.mblk[state.model] = state.mblk[state.model] || {}).gguf = true;
+      state.mtab = 'scores';
+      state.after = { scroll: '[data-kind-block="gguf"]' };
+    }
+    return; }
   state.model = null;
   // a topic page is the loop for one topic — deep-linkable, because it is the
   // page a person is sent to when someone says "look at law". 12b: it sits
@@ -8605,6 +8641,8 @@ function navigate(patch) {
   delete patch.qxOpen;
   Object.assign(state, patch);
   const want = hashFor();
+  // 12z B3: Test a model belongs to the page it was opened on
+  if (location.hash.slice(1) !== want) state.testOpen = false;
   // push history, then paint. Painting here rather than leaving it to the
   // hashchange handler is deliberate: that handler ignores a hash which already
   // agrees with state (it is our own write echoing back), so relying on it to
@@ -8625,6 +8663,7 @@ window.addEventListener('hashchange', () => {
   // scroll they left that view at (11f)
   if (location.hash.slice(1) === hashFor()) return;
   if (!DATA) return;                  // routed by initData when the scores arrive
+  state.testOpen = false;             // 12z B3: Back or Forward leaves it too
   routeFromHash();
   _restore = { y: (history.state || {}).y || 0, until: Date.now() + 3000 };
   _navigated = true;
@@ -8671,22 +8710,35 @@ document.addEventListener('click', e => {
   const from = location.hash;
   clearTimeout(_saveT); saveScroll();
   history.pushState({ from, y: 0 }, '', h);
+  state.testOpen = false;                             // 12z B3
   routeFromHash();
   _navigated = true;
   render();
 });
 
-// "← Back to …" is Back when the entry before this one is the view it names
-function backTo(tab) {
-  return e => {
-    const from = (history.state || {}).from;
-    if (from == null || /[#&](model|topic)=/.test(from)) return;
-    // 12b: the address names a place and its part, not the view id
-    const was = new URLSearchParams(from.replace(/^#/, '')), want = new URLSearchParams(viewHash(tab));
-    if (was.get('tab') !== want.get('tab') || was.get('sub') !== want.get('sub')) return;
-    e.preventDefault();
-    history.back();
-  };
+// 12z B4: what an address shows, in words — "Models · DeviceMark",
+// "Benchmarks · Everyday tasks", a model's name — for "← Back to …"
+const SUB_WORDS = { model: 'By model', training: 'Training runs', standard: 'Standard',
+                    exam: 'Knowledge exam', everyday: 'Everyday tasks' };
+function hashWords(h) {
+  const [rest] = splitRead(h), s = decodeURIComponent(rest);
+  const mo = /^model=(.+)$/.exec(s);
+  if (mo) return (DATA.models.find(x => x.id === canonId(mo[1])) || {}).name || 'the model';
+  const tp = /^topic=(.+)$/.exec(s);
+  if (tp) return topicOfSlug(tp[1]) || 'the topic';
+  const p = new URLSearchParams(rest);
+  const tab = p.get('tab') || (PLACE_WORDS.includes(s) || s === 'everyday' ? s : 'home');
+  if (tab === 'models') {
+    const v = p.get('view') || p.get('sub'), c = LB_CHIPS.find(([k]) => k === p.get('chip'));
+    if (v === 'compare') return 'Compare';
+    return ['Models', MODELS_VIEWS[v] && v !== 'standard' ? MODELS_VIEWS[v] : '',
+      c && c[0] !== 'all' ? c[1] : ''].filter(Boolean).join(' · ');
+  }
+  if (tab === 'benchmarks') return 'Benchmarks · ' + (p.get('q') ? benchName(p.get('q'))
+    : SUB_WORDS[p.get('sub')] || 'Standard');
+  if (tab === 'improve') return 'Improve' + (SUB_WORDS[p.get('sub')] ? ' · ' + SUB_WORDS[p.get('sub')] : '');
+  const v = (Object.entries(PAGE_SLUG).find(([, slug]) => slug === tab) || [tab])[0];
+  return (TABS.find(([id]) => id === v) || [, 'Home'])[1];
 }
 
 // FLOP with a readable exponent — 6ND spans twenty orders of magnitude across a
@@ -9504,7 +9556,9 @@ function lbHash() {
 function lbFromHash(rest) {
   const L = lbS(), p = new URLSearchParams(rest || '');
   // an old link's "chip=judged" is the Knowledge exam view now (12b)
-  const view = p.get('chip') === 'judged' ? 'exam' : p.get('view');
+  // 12z B6: "sub=everyday" too, the way Benchmarks and Improve name their parts
+  const sv = { knowledge: 'exam', judged: 'exam' }[p.get('sub')] || p.get('sub');
+  const view = p.get('chip') === 'judged' ? 'exam' : p.get('view') || sv;
   // 12k.2: and "chip=truthfulness" is Trust & safety
   if (p.get('chip') === 'truthfulness') p.set('chip', 'trust');
   // 12f.2b: the old On phone view is Models with the phone builds chosen
@@ -12574,6 +12628,23 @@ function hfade(key, scroller) {
       btn(-1, '← scroll', 'Scroll the table left'), btn(1, 'scroll →', 'Scroll the table right')),
     scroller);
 }
+// 12z B5: the chip row scrolls sideways with no bar, so it fades at an edge
+// that has more chips past it, and the chip in use is brought into sight
+function chipsEdge(row) {
+  row.dataset.less = row.scrollLeft > 1 ? '1' : '0';
+  row.dataset.more = row.scrollLeft + row.clientWidth < row.scrollWidth - 1 ? '1' : '0';
+}
+function chipsInSight(root) {
+  for (const row of (root || document).querySelectorAll('[data-lb-chips]')) {
+    const on = row.querySelector('.chip-btn.on');
+    if (on && row.scrollWidth > row.clientWidth + 1) {
+      const r = row.getBoundingClientRect(), c = on.getBoundingClientRect();
+      if (c.left < r.left || c.right > r.right)
+        row.scrollLeft += c.left - r.left - Math.max(0, (r.width - c.width) / 2);
+    }
+    chipsEdge(row);
+  }
+}
 function hfadeUpdate(root) {
   // 11k: the Queue's table painted across its card at 1,512px — .stick left
   // the scroller with overflow:visible, so only the Leaderboard clipped. Now
@@ -12624,7 +12695,8 @@ function motionOff() { return matchMedia('(prefers-reduced-motion: reduce)').mat
 function lbToolbar(ms, cols, shown, nHidden) {
   const L = lbS();
   const calOk = judgedCalibrated();
-  const chips = el('div', { class: 'chips', role: 'group', 'aria-label': 'task groups' },
+  const chips = el('div', { class: 'chips', role: 'group', 'aria-label': 'task groups',
+      'data-lb-chips': '1', 'data-hkeep': 'lb-chips', onscroll: e => chipsEdge(e.currentTarget) },
     // 12x: DeviceMark's, while a model has a row
     LB_CHIPS.filter(([v]) => (!LIVE_CHIPS.includes(v) || LIVE) && (v !== 'devicemark' || dmAny()))
       .map(([v, t]) => {
@@ -12673,10 +12745,12 @@ function lbToolbar(ms, cols, shown, nHidden) {
   state.lbBenchNow = L.cols || (L.chip === 'devicemark' ? cols.filter(c => c.dm).map(c => c.key)
     : cols.filter(c => c.task && !c.lower && !(DATA.tasks[c.task] || {})
       .control && (!c.optional || shown.has(c.key))).map(c => c.task));
+  // 12z B5: the On-device chart and Frontier have no benchmark columns to pick
+  const picks = std && !['ondevice', 'frontier'].includes(L.chip);
   return el('div', { class: 'lbbar narrow' },
     el('div', { class: 'chiprow' }, std ? chips : '',
       el('div', { class: 'pickers', 'data-pickers': '1' },
-        std ? cmpGo() : '', std ? lbBenchPill() : '', std ? lbModelsPill(ms) : '', toggle)),
+        std ? cmpGo() : '', picks ? lbBenchPill() : '', std ? lbModelsPill(ms) : '', toggle)),
     note, std ? lbViewForm() : '',
     open ? el('div', { class: 'fsheet', id: 'filter-sheet', role: 'dialog', 'aria-label': 'filters',
         'data-filter-sheet': '1',
@@ -16338,33 +16412,45 @@ async function ggMeasureDialog(id, returnTo) {
   const oldFile = b => `the old file, ${((page.benchmarks || {})[b] || {}).old || 'asked another way'}`;
   const noData = b => stale(b) ? `${oldFile(b)}: build it again (HANDOFF § 5d)`
     : 'no dataset yet: run the converter once (HANDOFF § 5d)';
-  const S = { benches: new Set(order.filter(have)), setups: new Set(sets.map(x => x.id)),
-    subset: false, n: 2000, est: null, busy: false };
+  // 12z B2: what each setup already has, on the board — the dialog starts
+  // with what is missing, as built, never everything in every setup
+  const board = (G().setups || {})[canonId(id)] || (G().setups || {})[id] || [];
+  const done = (su, b) => !!((board.find(x => x.id === su) || {}).benches || {})[b];
+  const first = (sets[0] || {}).id || 'as-built';
+  const S = { benches: new Set(order.filter(b => have(b) && !done(first, b))),
+    setups: new Set([first]), subset: false, n: 2000, by: null, busy: false };
   const back = el('div', { class: 'dlg-back', 'data-dialog': 'gguf-measure' });
   const count = b => S.subset ? Math.min(S.n, (page.datasets[b] || {}).n || S.n)
     : ((page.datasets || {})[b] || {}).n || ((page.benchmarks || {})[b] || {}).n || 0;
-  const counts = {};
+  const counts = {}, times = {}, setTimes = {};
   const benches = el('div', { class: 'ggpick' }, order.map(b => el('label', { class: 'ggrow',
       'data-gg-bench-row': b, title: have(b) ? '' : noData(b) },
     el('input', { type: 'checkbox', 'data-gg-bench': b, checked: S.benches.has(b) ? '' : null,
       disabled: have(b) ? null : '', onchange: e => {
-        if (e.target.checked) S.benches.add(b); else S.benches.delete(b); sync(true); } }),
+        if (e.target.checked) S.benches.add(b); else S.benches.delete(b); sync(); } }),
     el('span', { text: ggufLabel(b) }),
     counts[b] = el('span', { class: 'small se mono', 'data-gg-count': b }),
+    have(b) ? times[b] = el('span', { class: 'small se', 'data-gg-time': b }) : '',
+    have(b) && sets.some(x => done(x.id, b)) ? el('span', { class: 'small se', 'data-gg-done': b,
+      text: 'measured: ' + sets.filter(x => done(x.id, b)).map(x => x.name).join(', ') }) : '',
     have(b) ? '' : el('span', { class: 'small se', 'data-gg-no-data': b,
       text: stale(b) ? oldFile(b) : 'no dataset yet' }))));
   const setups = el('div', { class: 'ggpick', 'data-gg-setups': id }, sets.map(x => el('label',
     { class: 'ggrow', title: setupWords(x) },
     el('input', { type: 'checkbox', 'data-gg-setup': x.id, checked: S.setups.has(x.id) ? '' : null,
-      onchange: e => { if (e.target.checked) S.setups.add(x.id); else S.setups.delete(x.id); sync(true); } }),
+      onchange: e => { if (e.target.checked) S.setups.add(x.id); else S.setups.delete(x.id); sync(); } }),
     el('span', { text: x.name }),
-    el('span', { class: 'small se', text: x.id === 'as-built' ? 'nothing added' : setupWords(x) }))));
+    el('span', { class: 'small se', text: (x.id === 'as-built' ? 'nothing added' : setupWords(x))
+      + ` · ${order.filter(b => done(x.id, b)).length} of ${order.length} measured` }),
+    setTimes[x.id] = el('span', { class: 'small se', 'data-gg-setup-time': x.id }))));
   const nBox = el('input', { type: 'number', min: '100', step: '100', value: String(S.n), style: 'width:6em',
     'data-gg-n': '1', disabled: '', 'aria-label': 'questions a benchmark',
     onchange: e => { S.n = Math.max(1, parseInt(e.target.value, 10) || 2000); sync(true); } });
   const radio = (v, ...kids) => el('label', { class: 'ggrow' }, el('input', { type: 'radio',
     name: 'gg-size', 'data-gg-size': v, checked: (v === 'subset') === S.subset ? '' : null,
     onchange: () => { S.subset = v === 'subset'; nBox.disabled = !S.subset; sync(true); } }), ...kids);
+  // the server's line, worked out here from its per-benchmark seconds
+  const dur = x => x >= 5400 ? `about ${(x / 3600).toFixed(1)} h` : `about ${Math.max(1, Math.round(x / 60))} min`;
   const est = el('p', { class: 'small', 'data-gg-estimate': '1' });
   const err = el('p', { class: 'warn small', 'data-gg-start-msg': '1', hidden: '' });
   const go = el('button', { class: 'primary', 'data-gg-start': id });
@@ -16395,15 +16481,32 @@ async function ggMeasureDialog(id, returnTo) {
     const runs = S.setups.size;
     go.textContent = S.busy ? 'Queueing…' : runs > 1 ? `Start ${runs} runs` : 'Start';
     go.disabled = S.busy || !S.benches.size || !runs;
-    if (!again) return;
-    if (!S.benches.size || !runs) { est.textContent = ''; return; }
-    const mine = ++ask;
-    est.textContent = 'Working out how long it takes…';
-    try {
-      const j = await post('api/gguf/estimate', { model: id, benchmarks: order.filter(b => S.benches.has(b)),
-        subset: S.subset ? S.n : 0, setups: sets.map(x => x.id).filter(x => S.setups.has(x)) });
-      if (mine === ask) est.textContent = `It takes ${j.line}` + (runs > 1 ? `, for the ${runs} setups.` : '.');
-    } catch (e) { if (mine === ask) est.textContent = ''; }
+    // 12z B2: one estimate of every benchmark in one setup; each choice its time
+    if (again) {
+      const mine = ++ask;
+      S.by = null;
+      est.textContent = 'Working out how long it takes…';
+      try {
+        const j = await post('api/gguf/estimate', { model: id, benchmarks: order.filter(have),
+          subset: S.subset ? S.n : 0, setups: [first] });
+        if (mine !== ask) return;
+        S.by = j.by || null;
+      } catch (e) { if (mine === ask) est.textContent = ''; return; }
+    }
+    if (!S.by) return;
+    const picked = order.filter(b => S.benches.has(b) && S.by[b]);
+    const one = picked.reduce((a, b) => a + S.by[b].seconds, 0);
+    for (const b of order) if (times[b] && S.by[b]) times[b].textContent = dur(S.by[b].seconds);
+    for (const x of sets) setTimes[x.id].textContent = S.setups.has(x.id) && picked.length
+      ? ' · ' + dur(one) : '';
+    const from = picked.map(b => S.by[b].from);
+    est.textContent = !picked.length || !runs
+      ? (sets.every(x => order.filter(have).every(b => done(x.id, b)))
+        ? 'Every benchmark is measured in every setup: tick what to measure again.'
+        : 'Tick a benchmark and a setup.')
+      : `It takes ${dur(one * runs)}` + (from.includes('a rough guess') ? ', a rough guess'
+        : from.includes('this server') ? ", at the pace of this server's runs of other files" : '')
+        + (runs > 1 ? `, for the ${runs} setups.` : '.');
   };
   const close = () => {
     back.remove();
@@ -21635,6 +21738,7 @@ function render() {
     if (e) e.scrollLeft = x;
   }
   hfadeUpdate(view);
+  chipsInSight(view);
   if (was) markChanged(view, was);
   if (nav) {
     view.classList.remove('view-enter');

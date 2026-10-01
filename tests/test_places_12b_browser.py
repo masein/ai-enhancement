@@ -386,9 +386,9 @@ def test_models_is_one_table_and_a_row_opens_the_model_page(live, page):
     table.locator(f"tr[data-lb-row='{MODEL}'] td.num").first.click()
     page.wait_for_selector("[data-model-hero]")
     assert page.evaluate("state.model") == MODEL
-    # ← Back to Models is Back: the same entry, the chip it was on
+    # ← Back to Models is Back: the same entry, the chip it was on (12z B4: named)
     back = page.locator(".backlink")
-    assert back.text_content() == "← Back to Models"
+    assert back.text_content() == "← Back to Models · Math"
     assert back.get_attribute("href") == "#tab=models&chip=math"
     n = page.evaluate("history.length")
     back.click()

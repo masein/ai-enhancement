@@ -66,8 +66,20 @@ def test_measure_from_test_a_model_is_a_dialog_that_queues(live, page, gid):
     assert dlg.locator("[data-gg-count='mmlu']").inner_text() == f"{n['mmlu']['n']:,}"
     assert dlg.locator("[data-gg-setup]").evaluate_all("xs => xs.map(x => x.dataset.ggSetup)") \
         == ["as-built", dlg.locator("[data-gg-setup]").nth(1).get_attribute("data-gg-setup")]
-    assert dlg.locator("[data-gg-start]").inner_text() == "Start 2 runs"
+    # 12z B2: as built only, every benchmark it has no number for, each with its time
+    assert dlg.locator("[data-gg-setup]:checked").evaluate_all(
+        "xs => xs.map(x => x.dataset.ggSetup)") == ["as-built"]
+    assert dlg.locator("[data-gg-bench]:checked").count() == dlg.locator(
+        "[data-gg-bench]:not([disabled])").count() > 0
+    assert dlg.locator("[data-gg-start]").inner_text() == "Start"
     page.wait_for_function("document.querySelector('[data-gg-estimate]').textContent.startsWith('It takes')")
+    assert dlg.locator("[data-gg-estimate]").inner_text().endswith("a rough guess.")
+    for t in dlg.locator("[data-gg-time]").all_inner_texts():
+        assert t.startswith("about ") and t.endswith((" min", " h")), t
+    one = dlg.locator("[data-gg-setup-time='as-built']").inner_text()
+    assert one.startswith(" · about ") or one.startswith("· about ")
+    dlg.locator("[data-gg-setup]").nth(1).check()
+    assert dlg.locator("[data-gg-start]").inner_text() == "Start 2 runs"
     assert dlg.locator("[data-gg-estimate]").inner_text().endswith("a rough guess, for the 2 setups.")
     assert "The GGUF worker isn't running." in dlg.locator("[data-gguf-worker-down]").inner_text()
     shot(dlg.locator(".dlg"), "measure-dialog-1280-light.png")

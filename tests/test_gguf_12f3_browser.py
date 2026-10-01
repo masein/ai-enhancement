@@ -150,9 +150,12 @@ def test_the_model_page_shows_its_gguf_scores_the_pairing_and_the_phone_card(liv
     page.goto(live["base"] + "/#tab=home")
     set_name(page, "masein")
     page.goto(live["base"] + "/#model=" + PHONE.replace("/", "%2F"))
-    page.locator("[data-kind-block='standard'] > summary").click()
-    part = page.locator(f"[data-gguf-part='{PHONE}']")
+    # 12z B1: its own block, not inside Standard
+    page.locator("[data-kind-tile='gguf']").click()
+    part = page.locator(f"[data-kind-block='gguf'][open] [data-gguf-part='{PHONE}']")
     part.wait_for()
+    assert page.locator("[data-kind-block='standard'] [data-gguf-part]").count() == 0
+    assert page.locator("[data-kind-tile='gguf'] [data-kind-value='gguf']").inner_text() == "7 of 7"
     assert part.locator("h3").inner_text() == "Measured on the GGUF · llama.cpp, 0-shot"
     assert part.locator("[data-gguf-row]").count() == 7                # 12n.2: GPQA Diamond too
     pairs = part.locator(f"[data-gguf-pair='{measured['gid']}']").all_inner_texts()
@@ -173,7 +176,14 @@ def test_the_model_page_shows_its_gguf_scores_the_pairing_and_the_phone_card(liv
     assert dlg.locator("[data-gg-mtp]").inner_text() == (
         "No MTP setups: llama-perplexity only scores the choices, so there is nothing for MTP "
         "to draft.")
-    page.wait_for_function("document.querySelector('[data-gg-estimate]').textContent.startsWith('It takes')")
+    # 12z B2: measured in both setups already, so nothing is ticked
+    page.wait_for_function("document.querySelector('[data-gg-time=\"mmlu\"]').textContent")
+    assert dlg.locator("[data-gg-bench]:checked").count() == 0
+    assert dlg.locator("[data-gg-start]").is_disabled()
+    assert dlg.locator("[data-gg-estimate]").inner_text() == (
+        "Every benchmark is measured in every setup: tick what to measure again.")
+    assert dlg.locator("[data-gg-done='mmlu']").inner_text() == "measured: as built, lookahead 1"
+    dlg.locator("[data-gg-bench='mmlu']").check()
     est = dlg.locator("[data-gg-estimate]").inner_text()
     assert est.startswith("It takes about ") and "rough guess" not in est
     assert "The GGUF worker isn't running." in dlg.locator("[data-gguf-worker-down]").inner_text()

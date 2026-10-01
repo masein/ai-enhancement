@@ -4710,6 +4710,32 @@ Not before the demo: a new hidden set changes every Everyday score.
   strict and loose), a served setup's too. It lists what the board lists: the
   diagnose half.
 
+### 12z B — the QA walk's navigation (1 Oct)
+
+- **B1. A model's GGUF is a kind of test of its own** on its page — tile
+  "On its GGUF · llama.cpp" ("5 of 7 · benchmarks measured") and block, with
+  the per-benchmark table and "Measure on the GGUF…" — whether or not it has
+  been measured. It was inside Standard, which a served model's page keeps
+  closed, and was not there at all before its first number. The GGUF's own
+  address (`#model=gguf/…`) lands on the served page at that block, open. A
+  GGUF with no server has no Standard tile: nothing there can sit it.
+- **B2. Measure on the GGUF opens on what is missing**: as built only, and
+  the benchmarks with no number as built (nothing, when all have one). Each
+  benchmark says its time and which setups have measured it; each setup what
+  it has measured and what it takes. One estimate call, every benchmark in
+  one setup; the page adds up the ticks.
+- **B3. Test a model closes when the page changes**: a navigation, Back or
+  Forward, a link, or an address typed in.
+- **B4. "← Back to …" is Back** whenever this page was reached from one here,
+  and is named for that page: "Models · Math", "Benchmarks · Everyday tasks",
+  a model's name (`hashWords`). A page opened from outside names the view it
+  links to.
+- **B5. The chip in use is in sight**: the row scrolls to it, and fades at
+  an edge with more chips past it. On-device chart and Frontier have no
+  "Benchmarks: N ▾": no benchmark columns to pick there.
+- **B6. `#tab=models&sub=everyday`** (and `sub=exam`, `sub=knowledge`,
+  `sub=standard`) opens that view; the address bar then shows `view=…`.
+
 ### 12z A — the QA walk's wrong data and labels (1 Oct)
 
 - **A1. A served setup's lookahead and MTP come from its launch**
