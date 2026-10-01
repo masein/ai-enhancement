@@ -4710,6 +4710,34 @@ Not before the demo: a new hidden set changes every Everyday score.
   strict and loose), a served setup's too. It lists what the board lists: the
   diagnose half.
 
+### 12x — DeviceMark's rows as columns on Models
+
+- Every model in a view of the phone builds and the calibration models had a
+  DeviceMark row, and Benchmarks ▾ had no DeviceMark columns: filtering to
+  them left an empty table.
+- **A "DeviceMark" chip** (live only, beside the On-device chart's) and a
+  **"DeviceMark protocol" group in Benchmarks ▾** (`dm:composite`,
+  `dm:ifeval`, `dm:mmlu_pro`, `dm:math`, `dm:answered`, `dm:tokens`): the
+  composite and the three benches each with half its 95% interval (on hover,
+  and beside the number with the ± switch), answered %, median tokens an
+  answer. From `DATA.devicemark` (`devicemark.model_runs`): each model's
+  newest scored row by thinking mode, as the On-device chart ranks them — a
+  served setup's and a Hugging Face model's alike.
+- **Thinking on is a row of its own, "· thinking".** A Hugging Face model's
+  has a row on the board already; a served setup's thinking runs are
+  DeviceMark's alone, so its row is made beside it (`dmThinkingRows`), tagged
+  as its setup is, and opens the setup's page. A chosen model brings its
+  thinking row with it while these columns show.
+- **Never in an average.** Chosen alone they have no Avg column; beside
+  lm_eval's columns the Avg is those alone. Sorted by the composite; answered
+  and tokens are never bold (not scores); a score is tied with the best by
+  its interval.
+- **The empty table offers every other set that covers its models**
+  (`otherSets`): llama.cpp's on their GGUF — the chosen columns'
+  counterparts where it has them, else every one it measured — and
+  DeviceMark's, each a button. Before, only llama.cpp's, and only with
+  columns chosen.
+
 ### 12w — the MTP parity check with one llama-server on the card at a time
 
 - The parity check asks two setups: the one with MTP, then the one without.
