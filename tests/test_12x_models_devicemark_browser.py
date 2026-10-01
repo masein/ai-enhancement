@@ -133,7 +133,7 @@ def test_the_chip_shows_each_models_rows_both_modes_sorted_by_the_composite(live
     assert cell(page, SETUP + " · thinking", "math").startswith(f"{100 * ON['math']:.1f}")
     assert cell(page, QWEN, "mmlu_pro").startswith(f"{100 * Q_OFF['mmlu_pro']:.1f}")
     assert cell(page, SETUP, "tokens") == f"{round(off['median_tokens']):,}"
-    assert cell(page, SETUP, "answered") == f"{100 * off['answered_pct']:.1f}"
+    assert cell(page, SETUP, "answered") == f"{100 * off['answered_pct']:.1f}%"          # 12z C7
     tip = json.loads(page.locator(f"tr[data-lb-row='{SETUP}'] [data-dm-cell='composite']")
                      .get_attribute("data-tip"))
     assert tip[0] == f"{100 * off['composite']['value']:.1f} ± {half:.1f}"
@@ -210,4 +210,33 @@ def test_at_400px(live, page, rows):
     assert "tested" not in line
     SCREENS.mkdir(parents=True, exist_ok=True)
     page.locator("[data-lb-card]").screenshot(path=SCREENS / "chip-400.png")
+    assert page.errors == []
+
+
+@pytest.mark.parametrize("width", [1400, 375])
+def test_the_devicemark_view_names_rows_whole_and_drops_standards_notions(live, page, rows, width):
+    """12z C7: names cut to "Qwen3.6-35B-…" couldn't tell the original from the
+    phone build; Params "—" for a served setup; "0 ranked" and "prelim 0/7"
+    are Standard's; answered is a share"""
+    go(page, live, "tab=models&chip=devicemark", "[data-lb-table]", width=width)
+    assert "dmview" in page.locator("[data-lb-table]").get_attribute("class").split()
+    # the whole name, in two lines at most, nothing cut, at 1400; a phone wraps it already
+    if width == 1400:
+        name = page.locator(f"tr[data-lb-row='{SETUP} · thinking'] .mname")
+        assert name.inner_text() == "DM k4-LDA phone build, MTP · thinking"
+        fit = name.evaluate("e => [e.scrollHeight, e.clientHeight, e.scrollWidth, e.clientWidth, "
+                            "e.getBoundingClientRect().width, e.closest('td').getBoundingClientRect().width]")
+        assert fit[0] <= fit[1] + 1 and fit[2] <= fit[3] + 1, fit
+    # Params from what it is based on: Qwen3.6-35B-A3B
+    params = page.locator(f"tr[data-lb-row='{SETUP}'] td[data-params-from]")
+    assert params.get_attribute("data-params-from") == "Qwen/Qwen3.6-35B-A3B"
+    assert params.inner_text().startswith("35B")
+    # none of Standard's: no prelim badge, no count of ranked models
+    assert page.locator("[data-lb-table] .badge.prelim").count() == 0
+    assert " ranked" not in page.locator("[data-statusline='models']").inner_text()
+    # answered, with its % sign
+    assert cell(page, QWEN, "answered").endswith("%")
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
+    SCREENS.mkdir(parents=True, exist_ok=True)
+    page.locator("[data-lb-card]").screenshot(path=SCREENS / f"dmview-{width}.png")
     assert page.errors == []

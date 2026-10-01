@@ -2911,7 +2911,10 @@ html.theme-fade, html.theme-fade *, html.theme-fade *::before, html.theme-fade *
 .evd-read li { margin:4px 0; }
 /* the checks: a popover from the status dot, as the run counter's */
 .checkspop { width:min(460px, calc(100vw - 32px)); max-height:min(60vh, 520px); overflow:auto;
-  padding:10px 14px; }
+  padding:10px 14px; color:var(--text-primary); font-size:var(--fs-2); }
+/* 12z C9: each check in the body's own ink; the reason under it too */
+.checkspop .check-short, .checkspop .check-more .warn { color:var(--text-primary); }
+.checkspop .checklist > li { margin:0 0 6px; }
 .checkspop .checklist { margin:0; padding-left:18px; }
 .checkspop .checklist li.checks-judged { list-style:none; color:var(--text-secondary);
   margin:0 0 6px; }
@@ -3008,6 +3011,16 @@ input[type=search]:focus { outline:2px solid var(--accent-soft); border-color:va
 .seg button { border:0; border-radius:0; background:var(--surface-1); padding:6px 12px; }
 .seg button + button { border-left:1px solid var(--border); }
 .seg button[aria-pressed="true"] { background:var(--accent-soft); color:var(--text-primary); font-weight:600; }
+/* 12z C1: the Answers tab — a segmented switch above, filter chips under it,
+   8px between chips, 12px between the rows and under the description */
+/* 12z C6: the device speed cell's control, spaced from its value */
+.dm-dev-edit { margin-left:4px; padding:1px 8px; min-height:0; font-size:var(--fs-1);
+  border:1px solid var(--border); border-radius:999px; vertical-align:baseline; }
+.ans-seg { display:flex; width:max-content; max-width:100%; margin:12px 0; flex-wrap:wrap; }
+.ans-seg button { min-height:36px; font-family:var(--font-sans); font-size:var(--fs-1); color:var(--text-secondary); }
+.ans-seg button.on { color:var(--text-primary); box-shadow:inset 0 -2px 0 var(--accent); }
+.chipset { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+[data-model-answers] > .sub { margin-bottom:12px; }
 .count-note { font-size:var(--fs-1); color:var(--muted); }
 .tabs { display:flex; gap:2px; margin:0; overflow-x:auto; scrollbar-width:none;
   align-self:stretch; align-items:stretch; flex:1 1 auto; min-width:0; }
@@ -3294,6 +3307,9 @@ button.ktile:hover { border-color:var(--axis); background:var(--accent-soft); }
   font-variant-numeric:tabular-nums; line-height:1.1; }
 .ktile-sub { font-size:var(--fs-1); color:var(--muted); display:flex; gap:6px; align-items:center;
   flex-wrap:wrap; }
+/* 12z C2: a badge on a tile sits at the tile's edge, on one line */
+.ktile-sub .badge { margin-left:0; white-space:nowrap; }
+.ktile-sub:empty { display:none; }
 .ktile.none { background:var(--plane); }
 .ktile-none { font-size:var(--fs-2); color:var(--muted); }
 button.ktest { padding:0 4px; min-height:0; font-size:var(--fs-2); }
@@ -3462,6 +3478,16 @@ table.lb tbody td.model { box-shadow:inset 3px 0 0 var(--fam, var(--axis)); }
 table.lb td.model .mname { display:inline-block; max-width:190px; overflow:hidden;
   text-overflow:ellipsis; vertical-align:bottom; }
 table.lb th.model { position:sticky; left:32px; z-index:3; }
+/* 12z C7: the DeviceMark view has few columns and few rows: a name is
+   whole, in two lines when it needs them — two setups of one file differ at
+   its end. On a phone every name already wraps */
+@media (min-width:601px) {
+  table.lb.dmview td.model { max-width:440px; }
+  table.lb.dmview .mcell { max-width:420px; white-space:normal; flex-wrap:wrap; row-gap:2px; }
+  table.lb.dmview td.model .mname { flex:0 0 auto; min-width:0; max-width:260px;
+    white-space:normal; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+    text-overflow:clip; }
+}
 /* 12o.1: every column as wide as someone dragged it, in the order they put
    it — a handle on each header's right edge, a header dragged within its
    group. Under 600px there are no handles, and a name wraps to two lines */
@@ -4760,18 +4786,47 @@ const pct  = (v, d = 1) => v == null ? '—' : (100 * v).toFixed(d) + '%';
 // "qwen35-d…-step945": the start and the end of a long name, never just the start
 const midTrunc = (s, n) => s.length <= n ? s
   : s.slice(0, Math.ceil((n - 1) * 0.45)) + '…' + s.slice(s.length - Math.floor((n - 1) * 0.55));
+// 12z C4: a name cut between words, never inside one: "Qwen3.6-35B-A3B …"
+function wordTrunc(s, n) {
+  s = String(s);
+  if (s.length <= n) return s;
+  const cut = s.slice(0, n - 1), at = Math.max(cut.lastIndexOf(' '), cut.lastIndexOf('·'));
+  return (at > n / 3 ? cut.slice(0, at) : cut).trimEnd() + '…';
+}
 // 12n.1: a label in at most two lines of n, broken between words; the end is
 // kept when it can't all fit
 function wrap2(text, n) {
   text = String(text);
   if (text.length <= n) return [text];
-  const w = text.match(/[^\s\-_·/]+[\s\-_·/]*|^[\s\-_·/]+/g) || [text];
+  const WORDS = /[^\s\-_·/]+[\s\-_·/]*|^[\s\-_·/]+/g;
+  const w = text.match(WORDS) || [text];
   let a = '';
   while (w.length && (a + w[0]).trimEnd().length <= n) a += w.shift();
   if (!a) return [text.slice(0, n), '…' + text.slice(Math.max(n, text.length - (n - 1)))];
   let b = w.join('').trim();
-  if (b.length > n) b = '…' + b.slice(b.length - (n - 1));
+  // 12z C5: a "·" that would end the first line starts the second
+  const sep = /\s*·\s*$/.exec(a);
+  if (sep && sep.index > 0) { a = a.slice(0, sep.index); b = '· ' + b; }
+  // 12z C5: what doesn't fit loses whole words from its front, never part of one
+  if (b.length > n) {
+    const bw = b.match(WORDS) || [b];
+    while (bw.length > 1 && bw.join('').trim().length > n - 1) bw.shift();
+    const t = bw.join('').trim();
+    b = '…' + (t.length > n - 1 ? t.slice(t.length - (n - 1)) : t);
+  }
   return [a.trimEnd(), b];
+}
+// 12z C5: a panel's names in two lines of n, whole when they can be: the
+// words all of a kind share go first, as far as it takes for every name to
+// fit its two lines uncut. Returns name -> lines
+function panelLines(names, n) {
+  const cut = ls => [...ls.values()].some(l => l.some(x => x.includes('…')));
+  let max = 2 * n, out;
+  do {
+    out = new Map([...shortNames(names, max)].map(([k, l]) => [k, wrap2(l, n)]));
+    max -= 4;
+  } while (cut(out) && max >= n);
+  return out;
 }
 // 12n.1: labels that keep what tells models apart. A name too long for its
 // place loses, first, the words it shares at the front with the others of
@@ -5371,8 +5426,7 @@ function barPanel(task, models, opts) {
   // 12n.1: a name wraps to two lines rather than being cut; one too long for
   // two keeps what tells it from the others, never its end (shortNames)
   const LINE = 24;
-  const labels = shortNames(shown.map(r => r.m.name), 2 * LINE);
-  const lines = new Map([...labels].map(([n, l]) => [n, wrap2(l, LINE)]));
+  const lines = panelLines(shown.map(r => r.m.name), LINE);
   const longest = Math.max(0, ...[...lines.values()].flat().map(x => x.length));
   const W = 460, LBL = Math.max(150, Math.min(190, 12 + 6.6 * longest)), PAD = 56, BH = 15, GAP = 7;
   const rowH = m => BH + GAP + ((lines.get(m.name) || []).length > 1 ? 11 : 0);
@@ -5478,7 +5532,8 @@ function barPanel(task, models, opts) {
       'font-size': 11.5, fill: dim ? 'var(--muted)' : 'var(--text-secondary)',
       'text-anchor': 'end', class: 'blab', 'data-model': m.id, 'data-full-name': m.name,
       'data-lines': String(ls.length) },
-      ...ls.map((t, i) => el('svg:tspan', { x: LBL - 8, dy: i ? 12.5 : 0, text: t })),
+      // 12z C5: a space between the lines, so the name reads whole as text
+      ...ls.flatMap((t, i) => [i ? ' ' : '', el('svg:tspan', { x: LBL - 8, dy: i ? 12.5 : 0, text: t })]),
       el('svg:title', { text: m.name === m.id ? m.id : `${m.name}\n${m.id}` })));
     svg.append(el('svg:path', { class: 'bar', 'data-model': m.id,
       'data-hl': hs >= 0 ? String(hs) : null,
@@ -6650,6 +6705,16 @@ const SERVED_SUITES = ['everyday', 'judged', 'generative', 'safety', 'shared', '
 const servedOf = id => (DATA.served || {})[id]
   || (DATA.models.find(x => x.id === id) || {}).served || null;
 const isServedId = id => /^served\//.test(String(id || ''));
+// 12z C7: a served model's parameters, from the model it is based on: that
+// model's own count when it is on the board, else its name's ("35B-A3B")
+function paramsOf(m) {
+  const s = servedOf(m.dmHome || m.id), b = s && s.based_on;
+  if (!b) return null;
+  const base = DATA.models.find(x => x.id === b && x.params);
+  if (base) return { v: base.params, act: (base.archinfo || {}).active_params || null, from: b };
+  const t = /(?:^|[-_ ])(\d+(?:\.\d+)?)B(?:[-_ ]A(\d+(?:\.\d+)?)B)?(?![a-z])/i.exec(String(b).split('/').pop());
+  return t ? { v: parseFloat(t[1]) * 1e9, act: t[2] ? parseFloat(t[2]) * 1e9 : null, from: b } : null;
+}
 // 12m.3: a model from OpenRouter is served too, and says where: "via OpenRouter"
 const isOpenRouter = s => !!s && s.via === 'openrouter';
 function servedTag(id) {
@@ -6677,14 +6742,18 @@ function pinLine(p) {
 // 12i.4: how long a model's answers are, thinking included, and how many ran
 // out while thinking — two small numbers under an Everyday or exam score
 const alOf = (m, kind) => ((m || {}).answerLength || {})[kind] || null;
+// 12z C2: "ran out" means one thing everywhere, and every count of it says
+// what it is out of
+const RAN_OUT_WHY = 'Ran out: the answer budget ended while it was still thinking, with no '
+  + 'answer written; such an answer counts as failed.';
 function answerLengthLine(m, kind) {
   const a = alOf(m, kind);
   if (!a) return '';
   return el('p', { class: 'mono small se', 'data-answer-length': kind,
       title: `the median over all ${a.n} answers, practice and hidden, thinking included; `
-        + `${a.words}. Ran out: the answer budget ended while it was still thinking, with no `
-        + 'answer written' },
-    `median ${a.median.toLocaleString('en')} tokens · ran out ${a.ran_out} of ${a.n}`);
+        + `${a.words}. ${RAN_OUT_WHY}` },
+    `median ${a.median.toLocaleString('en')} tokens · ran out ${a.ran_out} of ${a.n} `
+      + '(every answer, practice and hidden)');
 }
 // 12i.4: how long an Everyday run takes. A served model's own measured
 // seconds an answer, once a run has measured it; before that a rough guess.
@@ -6775,28 +6844,51 @@ function servedSetups(m) {
         ? [{ ...x, id: id + DM_THINKING, name: x.name + DM_THINKING, mode: 'on', page: id }] : [])]);
   if (same.filter(x => x.mode === 'off').length < 2) return '';
   const row = id => DATA.models.find(x => x.id === id) || {};
-  const al = id => alOf(row(id), 'everyday') || alOf(row(id), 'exam');
+  // 12z C3: the answers' median and ran-out are a suite's — Everyday's, else
+  // the Knowledge exam's — and the table says which, and out of what
+  const SUITE = { everyday: 'Everyday tasks', exam: 'Knowledge exam' };
+  const src = id => alOf(row(id), 'everyday') ? 'everyday' : alOf(row(id), 'exam') ? 'exam' : null;
+  const al = id => src(id) ? alOf(row(id), src(id)) : null;
+  const srcs = [...new Set(same.map(x => src(x.id)).filter(Boolean))];
+  const one = srcs.length === 1 ? srcs[0] : null;
+  const ns = [...new Set(same.map(x => (al(x.id) || {}).n).filter(Boolean))];
+  // MTP's acceptance, once any server has reported it
+  const drafts = same.some(x => (al(x.id) || {}).draft);
+  const heads = [['Setup'], ['Everyday'], ['Knowledge exam'], ['DeviceMark'],
+    ['Median tokens', 'the median answer, thinking included, over every answer it gave'
+      + (one ? ` on ${SUITE[one]}` : '') + ', practice and hidden'],
+    ['Ran out', 'of every answer it gave' + (one ? ` on ${SUITE[one]}` : '')
+      + `, practice and hidden. ${RAN_OUT_WHY}`],
+    ...(drafts ? [['MTP drafts accepted']] : [])];
   return el('div', { class: 'lb-wrap', 'data-served-setups': pin.file },
     el('p', { class: 'small', text: `Setups of this file (${pin.file}), side by side:` }),
     el('table', { class: 'lb mtbl setups' },
-      el('thead', {}, el('tr', {}, ['Setup', 'Everyday', 'Knowledge exam', 'DeviceMark',
-        'Median tokens', 'Ran out', 'MTP drafts accepted'].map((t, i) => el('th', {
-        class: i ? 'num' : '', text: t })))),
+      el('thead', {}, el('tr', {}, heads.map(([t, tip], i) => el('th', {
+        class: i ? 'num' : '', title: tip || null, text: t })))),
       el('tbody', {}, same.map(x => {
         const e = evdOf(x.id), a = al(x.id), d = (a || {}).draft, r = row(x.id);
+        const own = a && !one ? ` · ${src(x.id) === 'exam' ? 'exam' : 'Everyday'}` : '';
         return el('tr', { 'data-served-setup': x.id, class: x.id === m.id ? 'open' : null },
           el('td', { title: x.how }, x.id === m.id ? el('b', { text: x.name })
             : el('a', { href: '#model=' + encodeURIComponent(x.page), text: x.name })),
           el('td', { class: 'num', text: e ? `${e.passed} of ${e.total}` : '—' }),
           el('td', { class: 'num', text: r.judgedAvg != null ? num(r.judgedAvg, 2) : '—' }),
           dmSetupCell(x.page, x.mode),
-          el('td', { class: 'num', text: a ? a.median.toLocaleString('en') : '—' }),
-          el('td', { class: 'num', text: a ? `${a.ran_out} of ${a.n}` : '—' }),
-          el('td', { class: 'num', 'data-served-draft': x.id, title: d
+          el('td', { class: 'num', text: a ? a.median.toLocaleString('en') + own : '—' }),
+          el('td', { class: 'num', 'data-served-ran-out': x.id,
+            text: a ? `${a.ran_out} of ${a.n}` + own : '—' }),
+          drafts ? el('td', { class: 'num', 'data-served-draft': x.id, title: d
             ? `${d.accepted.toLocaleString('en')} of ${d.n.toLocaleString('en')} drafted tokens `
               + 'accepted (timings.draft_n_accepted / draft_n)' : 'the server reported no drafts',
-            text: d ? pct(d.rate) : 'not reported' }));
-      }))));
+            text: d ? pct(d.rate) : 'not reported' }) : '');
+      }))),
+    srcs.length ? el('p', { class: 'small se', 'data-served-setups-note': pin.file,
+      text: `Median tokens and Ran out: over every answer a setup gave on `
+        + (one ? SUITE[one] : 'Everyday tasks, else the Knowledge exam')
+        + ', practice and hidden'
+        + (ns.length === 1 ? ` (${ns[0].toLocaleString('en')} answers)` : '')
+        + '. Ran out: the budget ended while it was still thinking, with no answer written.'
+        + (drafts ? '' : ' MTP’s drafts accepted: no server has reported them yet.') }) : '');
 }
 function modelHead(m, kinds) {
   const facts = [m.params ? P(m.params) : null, m.source === 'artifact' ? 'checkpoint' : m.kind,
@@ -6880,7 +6972,7 @@ function kindTile(m, k) {
     el('span', { class: 'eyebrow ktile-k', text: k.label }),
     el('span', { class: 'ktile-v', 'data-kind-value': k.kind, text: v }),
     el('span', { class: 'ktile-sub' }, sub,
-      k.kind === 'everyday' ? evdBadge(evdOf(m.id).provisional) : '',
+      k.kind === 'everyday' ? evdBadge(evdOf(m.id).provisional, true) : '',
       // the provisional badge, once, on the tile it is about
       k.kind === 'exam' && !judgedOkM(m) ? provBadge(whyProvisional(m)) : ''),
     k.kind === 'everyday' ? evdRanOut(evdOf(m.id)) : '');
@@ -7135,8 +7227,10 @@ function modelAnswersTab(m, kinds) {
     return [card];
   }
   const kind = have.some(([k]) => k === state.mans) ? state.mans : have[0][0];
-  if (have.length > 1) card.append(el('div', { class: 'chiprow', 'data-answers-kinds': '1' },
-    have.map(([k, label]) => el('button', { class: 'chip-btn' + (k === kind ? ' on' : ''),
+  // 12z C1: which answers is a switch, not a filter: a segmented control
+  if (have.length > 1) card.append(el('div', { class: 'seg ans-seg', role: 'group',
+      'aria-label': 'which answers', 'data-answers-kinds': '1' },
+    have.map(([k, label]) => el('button', { type: 'button', class: k === kind ? 'on' : '',
       'data-answers-kind': k, 'aria-pressed': String(k === kind), text: label,
       onclick: () => { state.mans = k; render(); } }))));
   if (kind === 'exam' || kind === 'dm') card.append(!LIVE ? el('p', { class: 'small',
@@ -7153,7 +7247,7 @@ function evdAnswersList(m) {
   const g = groups.some(([k]) => k === state.mansGroup) ? state.mansGroup
     : (groups[0] || [''])[0];
   return el('div', { 'data-panel': 'everyday-answers' },
-    el('div', { class: 'chiprow' }, groups.map(([k, label]) =>
+    el('div', { class: 'chipset', 'data-answers-groups': '1' }, groups.map(([k, label]) =>
       el('button', { class: 'chip-btn' + (k === g ? ' on' : ''), 'data-answers-group': k,
         'aria-pressed': String(k === g), text: `${label} · ${evdGroupCount(e, k)}`,
         onclick: () => { state.mansGroup = k; render(); } }))),
@@ -7550,6 +7644,8 @@ function needsYou() {
 function openChecks() {
   const b = document.querySelector('#warnings [data-pop-anchor="checks"]');
   if (b && POP.key !== 'checks') b.click();
+  // 12z C9: under the line that was clicked, not at the dot across the page
+  if (POP.key === 'checks') { POP.at = '[data-needs="checks"] a'; popPlace(); }
 }
 
 // the run counter's list, full width
@@ -7608,7 +7704,8 @@ function bestByKind(ms) {
   const ev = Object.entries(E.models || {}).filter(([id]) => ms.some(m => m.id === id))
     .sort(([a, x], [b, y]) => (!!evdMissing(x) - !!evdMissing(y)) || (y.passed - x.passed)
       || evdName(a).localeCompare(evdName(b)))[0];
-  if (ev) cards.push(card('everyday', 'Everyday tasks', evdCount(ev[1]),
+  // 12z C8: never ranked, so not "best": the most passed, and the badge says why
+  if (ev) cards.push(card('everyday', 'Everyday tasks · most passed', evdCount(ev[1]),
     DATA.models.find(m => m.id === ev[0]), evdBadge(ev[1].provisional)));
   // the provisional-judge caveat, once, in the block's header
   const caveat = (exam && !(judgedCalibrated() && judgedOkM(exam))) || (weak && !judgedOkM(weak.m))
@@ -7716,8 +7813,8 @@ const evdEarlier = id => (evd().earlier || {})[id] || null;
 function evdRanOut(e) {
   const n = (e && e.ran_out) || 0;
   return n ? el('span', { class: 'small se evd-ranout', 'data-evd-ran-out': String(n),
-    title: 'the model was still thinking when it reached its answer budget; these answers '
-      + 'count as failed', text: `${n} answer${n === 1 ? '' : 's'} ran out of room` }) : '';
+    title: `of the ${e.total} hidden answers that score it. ${RAN_OUT_WHY}`,
+    text: `${n} of ${e.total} ran out of room` }) : '';
 }
 const evdName = id => (DATA.models.find(x => x.id === id) || {}).name || String(id).split('/').pop();
 const evdCount = e => `${e.passed} of ${e.total}`;
@@ -7749,13 +7846,14 @@ function evdTotal(e, id, attrs = {}) {
 const evdDay = d => { const [y, mo, da] = String(d || '').split('-').map(Number);
   return y ? `${da} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct',
     'Nov', 'Dec'][mo - 1]}` : String(d || ''); };
-function evdBadge(provisional) {
+function evdBadge(provisional, short = false) {
   return el('span', { class: 'badge prelim', 'data-pilot-badge': '1',
     title: `${evdHidden()} hidden questions score it and ${evdPractice()} practice ones are shown: `
       + 'a look at what the models say, not a ranking. Never ranked, never averaged into anything.'
       + (provisional
         ? ' Some answers were marked by a judge whose marks are not evidence yet.' : ''),
-    text: 'not ranked' + (provisional ? ' · provisional judge' : '') });
+    // 12z C2: on a tile, one line: "provisional" says it of the judge's marks
+    text: 'not ranked' + (provisional ? (short ? ' · provisional' : ' · provisional judge') : '') });
 }
 // ✓, ✗, or a question still with the judge
 function evdMark(it) {
@@ -9999,6 +10097,7 @@ function lbColumns(ms) {
     // 12b: the judged columns are Knowledge exam's, on the switch
     mid.push(...cats);
     // 12f.3: after the others, only while a model here has a GGUF result
+    // (12z C10: and only while a row in the table has one)
     if (ms.some(m => ggufHas(m.id))) mid.push(...ggufCols());
   } else if (L.chip === 'knowledge') {
     mid = [...(CATS.find(([g]) => g === 'knowledge')[1]).filter(t => DATA.accTasks.includes(t))
@@ -10820,11 +10919,21 @@ function dmLoad(force) {
     .finally(() => { D.loading = false; D.loaded = true; render(); });
 }
 // a row of ours as the page reads one; theirs come ready from the server
+// 12z C4: a line of ours by its setup alone — original / plain / MTP /
+// lookahead / lookahead + MTP, and "· thinking" — short and never alike; the
+// chart's key and the hover give the whole label
+function dmShort(su, thinking, model) {
+  if (su.runtime !== 'llama-server') return String(model).split('/').pop() + (thinking ? ' · thinking' : '');
+  const how = [su.lookahead ? 'lookahead' : '', su.mtp ? 'MTP' : ''].filter(Boolean).join(' + ');
+  return (su.phone ? how || 'plain' : 'original' + (how ? ` · ${how}` : ''))
+    + (thinking ? ' · thinking' : '');
+}
 function dmOurs(r) {
   const su = r.row.setup || {};
   const name = (su.runtime === 'llama-server' && su.name ? su.name : r.model)
     + (r.thinking ? ' · thinking' : '');
   return { id: r.id, name, label: r.label || name, external: false,
+    short: dmShort(su, r.thinking, r.model),
     kind: su.runtime === 'llama-server' ? 'served' : 'hf',
     composite: r.row.composite, benches: r.row.benches, answered_pct: r.row.answered_pct,
     median_tokens: r.row.median_tokens, time_frontier: r.row.time_frontier, device: r.device,
@@ -10882,11 +10991,14 @@ function dmTip(r) {
 // labels that don't sit on each other: a line's, spread down the right edge;
 // a point's, at the clearest of its places (12q.B2)
 const dmTextW = t => 6.1 * t.length;
-function dmSpread(ys, gap = 12) {
+function dmSpread(ys, gap = 12, lo = -Infinity, hi = Infinity) {
   const order = ys.map((y, i) => [y, i]).sort((p, q) => p[0] - q[0]);
   const out = [];
   let last = -Infinity;
-  for (const [y, i] of order) { last = Math.max(y, last + gap); out[i] = last; }
+  for (const [y, i] of order) { last = Math.max(y, last + gap, lo); out[i] = last; }
+  // 12z C4: none pushed past the bottom — moved back up, still gap apart
+  let next = Infinity;
+  for (const [, i] of [...order].reverse()) { out[i] = Math.min(out[i], hi, next - gap); next = out[i]; }
   return out;
 }
 // 12q.B2: a point's label goes where it covers least — the labels already
@@ -10949,7 +11061,9 @@ function dmChart(rows) {
   // a row with no device speed: a dashed line at its composite, named at the right
   // (ours by its setup: "phone build (k4-LDA) · MTP · thinking off")
   const obst = [];
-  const ly = dmSpread(lines.map(r => Y(r.composite.value) + 4));
+  // 12z C4: ours by their short names, theirs cut between words; 12px apart,
+  // inside the chart, with a leader to a line a label had to move from
+  const ly = dmSpread(lines.map(r => Y(r.composite.value) + 4), 12, y1 + 8, H - 4);
   lines.forEach((r, i) => {
     const col = r.external ? 'var(--text-secondary)' : 'var(--accent)';
     const y = Y(r.composite.value);
@@ -10957,8 +11071,11 @@ function dmChart(rows) {
         'stroke-dasharray': r.external ? '6 4' : '2 3', 'data-dm-line': r.id,
         'data-dm-external': r.external ? '1' : null, 'data-tip': JSON.stringify(dmTip(r)),
         tabindex: 0 }),
-      el('svg:text', { x: x1 + 6, y: ly[i], 'font-size': 11, fill: col,
-        'data-dm-line-label': r.id, text: midTrunc(r.external ? r.name : r.label, 42) }));
+      Math.abs(ly[i] - 4 - y) > 2 ? el('svg:polyline', { points: `${x1},${y} ${x1 + 6},${ly[i] - 4} `
+        + `${x1 + 9},${ly[i] - 4}`, fill: 'none', stroke: col, 'stroke-width': 0.8, opacity: 0.6,
+        'pointer-events': 'none', 'data-dm-line-leader': r.id }) : '',
+      el('svg:text', { x: x1 + 12, y: ly[i], 'font-size': 11, fill: col,
+        'data-dm-line-label': r.id, text: r.external ? wordTrunc(r.name, 40) : r.short || r.label }));
     obst.push({ l: x0, r: x1, t: y - 2, b: y + 2, wt: 1 });
   });
   // a row with one: a point with its whisker, named where it covers least
@@ -10978,7 +11095,7 @@ function dmChart(rows) {
   // the most crowded first, while there is most room
   const near = r => pts.filter(o => o !== r && Math.hypot(X(o.device.tok_s) - X(r.device.tok_s),
     Y(o.composite.value) - Y(r.composite.value)) < 90).length;
-  const said = r => midTrunc(r.external ? r.name : `${r.label} · ${r.device.device}`, 64);
+  const said = r => r.external ? wordTrunc(r.name, 64) : `${r.short || r.label} · ${r.device.device}`;
   for (const r of [...pts].sort((a, b) => near(b) - near(a) || said(b).length - said(a).length)) {
     const col = r.external ? 'var(--text-secondary)' : 'var(--accent)';
     const text = said(r);
@@ -10999,8 +11116,16 @@ function dmChart(rows) {
 }
 // accuracy against budget, for the rows ticked in the table: their
 // time_frontier, and ours worked out the same way
+// 12z C4: what the chart's short names stand for
+function dmKey(rows) {
+  const ours = rows.filter(r => !r.external && r.short && r.short !== r.label);
+  if (!ours.length) return '';
+  return el('p', { class: 'small se dmkey', 'data-dm-key': '1' }, 'Ours, by setup: ',
+    ...ours.flatMap((r, i) => [i ? ' · ' : '', el('b', { text: r.short }), ` = ${r.label}`]));
+}
 function dmBudgetChart(rows) {
-  const W = 680, H = 280, x0 = 48, x1 = W - 216, y0 = H - 36, y1 = 14;
+  // 12z C4: room for a whole name at the right
+  const W = 760, H = 280, x0 = 48, x1 = W - 276, y0 = H - 36, y1 = 14;
   const lo = 128, hi = 4096;
   const X = v => logx(v, lo, hi, x0, x1), Y = v => y0 - v * (y0 - y1);
   const COLS = ['var(--accent)', 'var(--good)', 'var(--critical)', 'var(--warning-text)',
@@ -11020,14 +11145,15 @@ function dmBudgetChart(rows) {
     return tf && tf.b ? { r, pts: tf.b.map((b, j) => [b, tf.acc[j]]).filter(([, a]) => a != null) }
       : null;
   }).filter(x => x && x.pts.length);
-  const ly = dmSpread(drawn.map(x => Y(x.pts[x.pts.length - 1][1]) + 4));
+  const ly = dmSpread(drawn.map(x => Y(x.pts[x.pts.length - 1][1]) + 4), 12, y1 + 8, H - 4);
   drawn.forEach(({ r, pts }, i) => {
     const col = COLS[i % COLS.length];
     svg.append(el('svg:path', { d: 'M' + pts.map(([b, a]) => `${X(b).toFixed(1)},${Y(a).toFixed(1)}`)
         .join('L'), fill: 'none', stroke: col, 'stroke-width': 1.8,
         'stroke-dasharray': r.external ? '5 3' : null, 'data-dm-budget-line': r.id }),
-      el('svg:text', { x: x1 + 6, y: ly[i], 'font-size': 11, fill: col,
-        text: midTrunc(r.name, 34) }));
+      el('svg:text', { x: x1 + 6, y: ly[i], 'font-size': 11, fill: col, 'data-dm-budget-label': r.id,
+        'data-tip': JSON.stringify([r.external ? r.name : r.label || r.name]),
+        text: r.external ? wordTrunc(r.name, 42) : r.short || wordTrunc(r.name, 42) }));
   });
   return svg;
 }
@@ -11125,8 +11251,11 @@ function dmTable(rows) {
         ? '—' : Math.round(x.median_tokens).toLocaleString())),
       el('td', { class: 'num', 'data-dm-device-cell': r.id },
         r.device ? `${r.device.tok_s}` : '—',
-        !r.external && LIVE ? el('button', { class: 'quiet', 'data-dm-device-edit': r.id,
-          text: r.device ? ' edit' : ' enter', onclick: () => {
+        // 12z C6: a small control, apart from the number or the dash
+        !r.external && LIVE ? ' ' : '',
+        !r.external && LIVE ? el('button', { class: 'ghost dm-dev-edit', 'data-dm-device-edit': r.id,
+          'aria-label': (r.device ? 'edit the device speed of ' : 'enter a device speed for ') + r.name,
+          text: r.device ? 'edit' : 'enter', onclick: () => {
             D.edit = r.id; D.form = r.device ? { ...r.device } : {}; D.formMsg = ''; render(); } })
           : ''),
       el('td', { class: 'num', 'data-dm-server': r.id, 'data-tip': r.server_tok_s == null ? null
@@ -11171,6 +11300,7 @@ function lbOnDevice(ms) {
         + `${ext.fetched || ''}), ${ext.credit || ''} — their numbers, never changed; speeds on `
         + `${ext.device || 'their device'}.` }),
     hfade('dmchart', el('div', { class: 'chartscroll', 'data-hkeep': 'dmchart' }, dmChart(rows))),
+    dmKey(rows),
     hfade('dmtable', el('div', { class: 'lb-wrap', 'data-hkeep': 'dmtable' }, dmTable(rows))),
     editing ? dmDeviceForm(editing) : '',
     el('p', { class: 'lbcap', text: 'Ranks: a row is above another only when its interval is '
@@ -11372,10 +11502,12 @@ function dmAnswersList(m, modes) {
     el('p', { class: 'small', text: 'DeviceMark’s protocol: public benchmark items, all of them. '
       + 'No answer first, then wrong, then right; each output with its thinking folded, what '
       + 'was read from it and the answer.' }),
-    modes.length > 1 ? el('div', { class: 'chiprow', 'data-dm-ans-modes': '1' },
-      modes.map(mo => chip(mo === A.mode, `thinking ${mo}`, { 'data-dm-ans-mode': mo },
-        () => { A.mode = mo; A.n = 50; }))) : '',
-    el('div', { class: 'chiprow', 'data-dm-ans-benches': '1' },
+    modes.length > 1 ? el('div', { class: 'seg ans-seg', role: 'group', 'aria-label': 'thinking',
+        'data-dm-ans-modes': '1' },
+      modes.map(mo => el('button', { type: 'button', class: mo === A.mode ? 'on' : '',
+        'aria-pressed': String(mo === A.mode), 'data-dm-ans-mode': mo, text: `thinking ${mo}`,
+        onclick: () => { A.mode = mo; A.n = 50; render(); } }))) : '',
+    el('div', { class: 'chipset', 'data-dm-ans-benches': '1' },
       chip(!A.bench, 'All', { 'data-dm-ans-bench': 'all' }, () => { A.bench = ''; A.n = 50; }),
       ['ifeval', 'mmlu_pro', 'math'].map(b => chip(A.bench === b, [DM_BENCH_WORDS[b], tally(b)],
         { 'data-dm-ans-bench': b }, () => { A.bench = b; A.n = 50; }))));
@@ -12135,7 +12267,7 @@ function vLeaderboard(ms) {
   const LK = lbLayoutKey(L);
   const grouped = L.chip === 'all';
   const lgroup = c => grouped ? c.group || '' : '';
-  const visCols = layoutOrder(LK, cols.filter(c => !c.optional || shown.has(c.key)),
+  let visCols = layoutOrder(LK, cols.filter(c => !c.optional || shown.has(c.key)),
     { keyOf: c => c.key, groupOf: lgroup, fixed: c => LB_FIXED.has(c.key) });
   const jval = (m, c) => c.judged === 'avg' ? m.judgedAvg
     : !judgedOkM(m) ? null
@@ -12226,6 +12358,10 @@ function vLeaderboard(ms) {
   // (a server this chip can ask its written tasks is only not tested yet)
   const cannot = m => narrow(m) && !couldHave(m);
   const lbAll = ordered.filter(m => !(m.duplicateOf && dupsOf[m.duplicateOf]) && testedIn(m));
+  // 12z C10: a group of llama.cpp columns no row here has a number in is not
+  // shown: seven columns of dashes said nothing. Chosen by name, it stays
+  if (!custom && !lbAll.some(m => visCols.some(c => c.gguf && val(m, c) != null)))
+    visCols = visCols.filter(c => !c.gguf);
   const lbPg = paged('leaderboard', lbAll, JSON.stringify([state.sort, state.q, state.kind,
     state.src, state.avgMode, L.view, L.chip, L.kind, L.size, L.status, L.models, L.cols]));
   const rows = lbPg.rows.flatMap(m => [m, ...((state.lbDupOpen || {})[m.id] ? dupsOf[m.id] || [] : [])]);
@@ -12295,6 +12431,9 @@ function vLeaderboard(ms) {
   };
   const pctn = v => (100 * v).toFixed(1);
   const ncols = visCols.length;
+  // 12z C7: the DeviceMark chip is its own view: names keep what tells two
+  // setups of one file apart, and Standard's ranks and "prelim" are not in it
+  const dmv = L.view === 'standard' && !L.cols && L.chip === 'devicemark';
   const lbShort = shortNames(rows.map(m => m.name), 26);
   const tbody = el('tbody', {});
   rows.forEach(m => {
@@ -12356,11 +12495,16 @@ function vLeaderboard(ms) {
               ? el('span', { class: 'badge instruct', 'data-thinking-badge': m.id,
                   title: genMode(m), text: 'thinking' }) : '',
             // a thinking row has only these three: Standard's "preliminary" is not its
-            m.thinkingRow || m.served || ggufOnly(m) ? ''
+            m.thinkingRow || m.served || ggufOnly(m) || dmv ? ''
               : warnBadge(m) || '', dupBadge(m) || '',
             dupsOf[m.id] ? dupToggle(m, dupsOf[m.id]) : ''));
         if (c.key === 'params') {
           const a = m.archinfo || {};
+          // 12z C7: a served model's, from what it is based on
+          const b = m.params == null ? paramsOf(m) : null;
+          if (b) return el('td', { class: 'num', 'data-params-from': b.from,
+              title: `from Based on: ${b.from}` + (b.act ? `\n${P(b.act)} active` : '') },
+            P(b.v), b.act ? el('span', { class: 'act', text: `${P(b.act)} act` }) : '');
           return el('td', { class: 'num', title: (m.paramsSrc ? 'from ' + (m.paramsSrc === 'config'
               ? 'harness config' : 'model name') : '') + (a.active_params
               ? `\n${P(a.active_params)} active · ${a.experts} experts, ${a.experts_per_tok} per token`
@@ -12455,7 +12599,9 @@ function vLeaderboard(ms) {
             : r.rank ? dmRankWords(r.rank) : ''].filter(Boolean).join(' · ');
           if (c.dm === 'tokens') return el('td', { class: 'num tcell', 'data-dm-cell': 'tokens',
             title: from || null, text: Math.round(v).toLocaleString('en') });
-          return one(c, m, v, c.dm === 'answered' ? null : dmHalfOf(m.id, c.dm), pctn,
+          // 12z C7: answered is a share: its % sign
+          return one(c, m, v, c.dm === 'answered' ? null : dmHalfOf(m.id, c.dm),
+            c.dm === 'answered' ? x => pctn(x) + '%' : pctn,
             { 'data-dm-cell': c.dm, title: [c.dm === 'answered' ? '' : 'the ± is half the 95% '
               + 'interval', from].filter(Boolean).join(' · ') || null });
         }
@@ -12556,7 +12702,8 @@ function vLeaderboard(ms) {
   state.lbTable = { cols: visCols, rows: lbAll, val, custom };
 
   const table = layoutApply(el('table', { class: 'lb' + (L.tint ? ' tinted' : '')
-      + (visCols.some(c => c.key === 'rank') ? '' : ' norank'), 'data-lb-table': '1',
+      + (visCols.some(c => c.key === 'rank') ? '' : ' norank') + (dmv ? ' dmview' : ''),
+      'data-lb-table': '1',
       ...layoutAttrs(LK) },
     thead, tbody));
   return [el('div', { class: 'card', 'data-lb-card': '1' },
@@ -12571,7 +12718,7 @@ function vLeaderboard(ms) {
         .some(t => benchVal(t, m.id) != null) || dataCols.some(c => (c.gguf || c.dm)
           && val(m, c) != null)).length),
       statusLine(lbPg, 'models', [
-        L.chip === 'judged' || custom ? null
+        L.chip === 'judged' || custom || dmv ? null
           : `${lbAll.filter(m => officialAvg(m) != null).length} ranked`,
         `sorted by ${lbSortLabel(cols)}`,
         L.chip !== 'all' && !custom ? (LB_CHIPS.find(([v]) => v === L.chip) || [])[1] : null]),
@@ -16440,9 +16587,10 @@ async function ggMeasureDialog(id, returnTo) {
     el('input', { type: 'checkbox', 'data-gg-setup': x.id, checked: S.setups.has(x.id) ? '' : null,
       onchange: e => { if (e.target.checked) S.setups.add(x.id); else S.setups.delete(x.id); sync(); } }),
     el('span', { text: x.name }),
-    el('span', { class: 'small se', text: (x.id === 'as-built' ? 'nothing added' : setupWords(x))
-      + ` · ${order.filter(b => done(x.id, b)).length} of ${order.length} measured` }),
-    setTimes[x.id] = el('span', { class: 'small se', 'data-gg-setup-time': x.id }))));
+    // 12z C: its time beside its name, as a benchmark's is; what it is after
+    setTimes[x.id] = el('span', { class: 'small se', 'data-gg-setup-time': x.id }),
+    el('span', { class: 'small se', text: `${order.filter(b => done(x.id, b)).length} of `
+      + `${order.length} measured · ` + (x.id === 'as-built' ? 'nothing added' : setupWords(x)) }))));
   const nBox = el('input', { type: 'number', min: '100', step: '100', value: String(S.n), style: 'width:6em',
     'data-gg-n': '1', disabled: '', 'aria-label': 'questions a benchmark',
     onchange: e => { S.n = Math.max(1, parseInt(e.target.value, 10) || 2000); sync(true); } });
@@ -16498,7 +16646,7 @@ async function ggMeasureDialog(id, returnTo) {
     const one = picked.reduce((a, b) => a + S.by[b].seconds, 0);
     for (const b of order) if (times[b] && S.by[b]) times[b].textContent = dur(S.by[b].seconds);
     for (const x of sets) setTimes[x.id].textContent = S.setups.has(x.id) && picked.length
-      ? ' · ' + dur(one) : '';
+      ? dur(one) : '';
     const from = picked.map(b => S.by[b].from);
     est.textContent = !picked.length || !runs
       ? (sets.every(x => order.filter(have).every(b => done(x.id, b)))
@@ -16951,12 +17099,19 @@ function runsNow() {
 }
 function runLine(r, attrs = {}) {
   const st = runStage(r);
-  const onBoard = DATA.models.some(m => m.id === r.hf_id);
+  // 12z C8: a GGUF's run links to the page its GGUF is on, at its block
+  const id = canonId(r.hf_id), onBoard = DATA.models.some(m => m.id === id);
   const name = runName(r);
   return el('div', { class: 'runline', 'data-run-line': String(r.id), ...attrs },
     el('span', { class: stClass(st.cls), text: st.text }),
     onBoard ? el('a', { href: '#model=' + encodeURIComponent(r.hf_id), class: 'runname', text: name,
-        onclick: e => { e.preventDefault(); popClose(); navigate({ model: r.hf_id, topic: null }); } })
+        'data-run-model': id,
+        onclick: e => { e.preventDefault(); popClose();
+          if (r.suite === 'gguf') {
+            (state.mblk[id] = state.mblk[id] || {}).gguf = true;
+            state.after = { scroll: '[data-kind-block="gguf"]' };
+          }
+          navigate({ model: id, topic: null, ...(r.suite === 'gguf' ? { mtab: 'scores' } : {}) }); } })
       : el('span', { class: 'runname', title: r.hf_id, text: name }),
     el('span', { class: 'small se runwhat', text: suiteWords(r) }),
     el('span', { class: 'small se runprog', title: r.progress || '',
@@ -19107,8 +19262,10 @@ function suiteWords(r) {
 // 12m.1: a run's model, and a GGUF run's setup with it:
 // "Qwen3.6-35B-A3B original k=8 · GGUF · lookahead 1"
 function runName(r) {
-  const name = (DATA.models.find(m => m.id === r.hf_id) || {}).name
-    || ((G().registered || {})[r.hf_id] || {}).name
+  // 12z C8: a GGUF joined to a served model is named as that model
+  const id = canonId(r.hf_id);
+  const name = (DATA.models.find(m => m.id === id) || {}).name
+    || ((G().registered || {})[id] || {}).name
     || ((DATA.served || {})[r.hf_id] || {}).name || r.hf_id.split('/').pop();
   if (r.suite !== 'gguf') return name;
   let su = '';
@@ -21823,7 +21980,7 @@ let _tabsBuilt = false;
 // its focus. Only the button is found again, by data-pop-anchor.
 // ---------------------------------------------------------------------------
 
-const POP = { key: null, panel: null, anchor: null, opts: null, build: null };
+const POP = { key: null, panel: null, anchor: null, opts: null, build: null, at: null };
 const POP_EDGE = 8;             // never closer than this to the window's edge
 
 function popItems() {
@@ -21832,7 +21989,10 @@ function popItems() {
 }
 
 function popPlace() {
-  const { panel, anchor, opts } = POP;
+  const { panel, opts } = POP;
+  // 12z C9: a panel opened from somewhere else than its button hangs from there
+  const at = POP.at && document.querySelector(POP.at);
+  const anchor = at || POP.anchor;
   if (!panel || !anchor || !anchor.isConnected) return;
   const r = anchor.getBoundingClientRect();
   // its button has scrolled out of the window: there is nothing to hang from
@@ -21850,7 +22010,7 @@ function popPlace() {
   const flip = pr.height > below && above > below;
   const room = Math.max(120, (flip ? above : below) - POP_EDGE);
   const top = flip ? Math.max(POP_EDGE, r.top - 4 - Math.min(pr.height, room)) : r.bottom + 4;
-  let left = (opts || {}).placement === 'bottom-end' ? r.right - pr.width : r.left;
+  let left = (opts || {}).placement === 'bottom-end' && !at ? r.right - pr.width : r.left;
   left = Math.min(Math.max(lo, left), Math.max(lo, hi - pr.width));
   panel.classList.toggle('flip', flip);        // it comes in from the side away from its button
   panel.style.top = `${Math.min(top, innerHeight - POP_EDGE - Math.min(pr.height, room))}px`;
@@ -21892,7 +22052,7 @@ function popClose(backToButton = false) {
     setTimeout(() => panel.remove(), 150);
   }
   if (anchor && anchor.isConnected) anchor.setAttribute('aria-expanded', 'false');
-  POP.key = POP.panel = POP.anchor = POP.opts = POP.build = null;
+  POP.key = POP.panel = POP.anchor = POP.opts = POP.build = POP.at = null;
   if (backToButton) refocus(anchor);
 }
 

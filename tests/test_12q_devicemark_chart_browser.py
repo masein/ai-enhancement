@@ -228,13 +228,97 @@ def test_no_label_sits_on_another_a_point_a_whisker_or_a_line(live, page, ours, 
 def test_our_rows_are_named_by_their_setup_on_the_chart(live, page, ours):
     open_chart(page, live)
     chart = page.locator("[data-dm-chart]")
-    assert chart.locator(f"[data-dm-line-label='{ORIG}']").text_content() == \
-        "original (k=8) · MTP · thinking off"
-    assert chart.locator(f"[data-dm-label='{MTP}']").text_content() == \
-        "phone build (k4-LDA) · MTP · thinking off · iPhone 17 Pro"
+    # 12z C4: by a short name the key spells out
+    assert chart.locator(f"[data-dm-line-label='{ORIG}']").text_content() == "original · MTP"
+    assert chart.locator(f"[data-dm-label='{MTP}']").text_content() == "MTP · iPhone 17 Pro"
+    key = page.locator("[data-dm-key]").inner_text()
+    assert "original · MTP = original (k=8) · MTP · thinking off" in key
+    assert "MTP = phone build (k4-LDA) · MTP · thinking off" in key
     # the row's name stays in the table
     assert page.locator(f"[data-dm-row='{ORIG}'] td").nth(1).inner_text().startswith(
         "Qwen3.6 original k=8")
     tip = json.loads(chart.locator(f"[data-dm-line='{ORIG}']").get_attribute("data-tip"))
     assert tip[:2] == ["Qwen3.6 original k=8", "original (k=8) · MTP · thinking off"]
+    assert page.errors == []
+
+
+# ---------------------------------------------------------------------------
+# 12z C4, C6: our lines by short names, 12px apart, inside the chart; the
+# device speed's control spaced from its value
+# ---------------------------------------------------------------------------
+
+CROWD = {"served/C-plain": ({"phone": True}, False), "served/C-la": ({"phone": True,
+         "lookahead": True}, False), "served/C-mtp": ({"phone": True, "mtp": True}, False),
+         "served/C-la-mtp": ({"phone": True, "lookahead": True, "mtp": True}, False),
+         "served/C-orig": ({"phone": False}, False)}
+
+
+@pytest.fixture
+def crowd(live):
+    """six lines of ours at one composite — the five setups and MTP thinking —
+    as the walk found five between 84 and 87"""
+    out = Path(live["root"]) / "results" / "full"
+    acc = {"ifeval": 0.85, "mmlu_pro": 0.85, "math": 0.9}
+    for mid, (su, _) in CROWD.items():
+        _row(out, mid, acc, {**SERVED, "mtp": False, "name": "Qwen3.6 " + mid.split("/")[1], **su})
+    _row(out, "served/C-mtp", acc, {**SERVED, "phone": True, "name": "Qwen3.6 C-mtp"}, thinking=True)
+    yield out
+    for mid in CROWD:
+        for d in out.glob(mid.replace("/", "__") + "*"):
+            shutil.rmtree(d, ignore_errors=True)
+
+
+LINE_LABELS = """() => {
+  const svg = document.querySelector('[data-dm-chart]'), [, , W, H] = svg.getAttribute('viewBox')
+    .split(' ').map(Number);
+  return { W, H, ls: [...svg.querySelectorAll('[data-dm-line-label]')].map(t => { const b = t.getBBox();
+    return { id: t.dataset.dmLineLabel, y: +t.getAttribute('y'), right: b.x + b.width, top: b.y,
+             t: t.textContent, ext: !!svg.querySelector(`[data-dm-line="${CSS.escape(t.dataset.dmLineLabel)}"][data-dm-external]`) }; }) }; }"""
+
+
+@pytest.mark.parametrize("width", [1400, 375])
+def test_our_crowded_lines_have_short_names_apart_and_inside(live, page, crowd, width):
+    open_chart(page, live, width=width)
+    got = page.evaluate(LINE_LABELS)
+    ys = sorted(x["y"] for x in got["ls"])
+    assert all(b - a >= 11.99 for a, b in zip(ys, ys[1:])), ys
+    assert all(x["top"] >= 0 and x["y"] <= got["H"] and x["right"] <= got["W"] for x in got["ls"])
+    mine = {x["id"]: x["t"] for x in got["ls"] if x["id"].startswith("served/C-")}
+    assert mine == {"served/C-plain": "plain", "served/C-la": "lookahead", "served/C-mtp": "MTP",
+                    "served/C-la-mtp": "lookahead + MTP", "served/C-orig": "original",
+                    "served/C-mtp · thinking": "MTP · thinking"}
+    # what each short name stands for, under the chart
+    key = page.locator("[data-dm-key]").inner_text()
+    assert "lookahead + MTP = phone build · MTP · lookahead · thinking off" in key
+    assert "MTP · thinking = phone build · MTP · thinking on" in key
+    # a label moved off its line has a leader back to it
+    assert page.locator("[data-dm-line-leader^='served/C-']").count() >= 4
+    page.locator("[data-dm-chart]").screenshot(path=SCREENS / f"chart-crowd-{width}.png")
+    # the budget chart's legend: whole names
+    labels = page.locator("[data-dm-budget-label]").evaluate_all(
+        "ts => ts.map(t => [t.textContent, t.getBBox().x + t.getBBox().width, "
+        "+t.closest('svg').getAttribute('viewBox').split(' ')[2]])")
+    assert labels and all("…" not in t and right <= w for t, right, w in labels), labels
+    page.locator("[data-dm-budget-box]").screenshot(path=SCREENS / f"budget-crowd-{width}.png")
+    assert page.errors == []
+
+
+DEVICE_CELL = """id => { const td = document.querySelector(`[data-dm-device-cell="${CSS.escape(id)}"]`);
+  const b = td.querySelector('[data-dm-device-edit]'), r = document.createRange();
+  r.selectNodeContents(td.firstChild);
+  const t = r.getBoundingClientRect(), x = b.getBoundingClientRect(), s = getComputedStyle(b);
+  return { gap: x.left - t.right, border: parseFloat(s.borderTopWidth), radius: s.borderRadius,
+           text: td.textContent }; }"""
+
+
+@pytest.mark.parametrize("width", [1400, 375])
+def test_the_device_speed_control_is_spaced_and_looks_like_one(live, page, ours, width):
+    page.goto(live["base"] + "/")
+    set_name(page, "masein")
+    open_chart(page, live, width=width)
+    got = page.evaluate(DEVICE_CELL, ORIG)
+    assert got["text"] == "— enter" and got["gap"] >= 6 and got["border"] >= 1, got
+    assert page.locator(f"[data-dm-device-edit='{ORIG}']").get_attribute("aria-label") == \
+        "enter a device speed for Qwen3.6 original k=8"
+    page.locator(f"[data-dm-device-cell='{ORIG}']").screenshot(path=SCREENS / f"device-cell-{width}.png")
     assert page.errors == []

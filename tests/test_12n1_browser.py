@@ -465,6 +465,34 @@ def test_the_ggufs_address_opens_its_block_with_measure(live, page, board, width
     assert page.errors == []
 
 
+@pytest.mark.parametrize("width", [1400, 375])
+def test_a_running_gguf_run_is_named_as_its_model_and_links_to_its_block(live, page, board, width):
+    """12z C8: Home's Running now showed "…-phone-build-GGUF · GGUF · as built"
+    and no link"""
+    def running(route):
+        r = route.fetch()
+        rows = r.json() if "count" not in route.request.url else None
+        if rows is None:
+            return route.fulfill(response=r)
+        rows.insert(0, {"id": 9001, "hf_id": board["gguf"], "kind": "instruct", "suite": "gguf",
+                        "status": "running", "submitter": "masein", "note": "setup: as built",
+                        "progress": "HellaSwag 120/400", "error": "", "part": "", "tasks": "[\"hellaswag\"]",
+                        "created_at": 1.8e9, "started_at": 1.8e9, "finished_at": None,
+                        "gpu_seconds": None})
+        route.fulfill(response=r, body=json.dumps(rows))
+    page.route("**/api/submissions?*", running)
+    go(page, live, "tab=home", "[data-running-now]", width=width)
+    line = page.locator("[data-running-now] [data-run-line='9001']")
+    line.wait_for()
+    link = line.locator("a.runname")
+    assert link.inner_text() == f"{NAME} · GGUF · as built"
+    assert link.get_attribute("data-run-model") == SERVED
+    link.click()
+    page.wait_for_selector(f"[data-kind-block='gguf'][open] [data-gguf-part='{SERVED}']")
+    assert page.evaluate("state.model") == SERVED
+    assert page.errors == []
+
+
 def test_compares_everyday_count_is_the_results(live, page):
     go(page, live, f"tab=models&view=compare&m={ids(GOOD, SKEWED)}", "[data-compare='2']")
     n = page.evaluate(f"evdOf({json.dumps(GOOD)}).total")
@@ -560,6 +588,34 @@ def test_labels_keep_what_tells_them_apart(live, page):
     assert "".join(lab.locator("tspan").all_text_contents()).replace(" ", "") == \
         (NAME + " · lookahead 1").replace(" ", "")
     assert lab.get_attribute("data-full-name") == NAME + " · lookahead 1"
+    assert page.errors == []
+
+
+@pytest.mark.parametrize("width", [1400, 375])
+def test_a_panels_names_keep_their_spaces_and_are_never_cut_inside_a_word(live, page, width):
+    """12z C5: "Q4(original, k=8)", "k4-LDA ·lookahead" and "Q4…nal, k=8)" on the
+    Benchmarks page's GGUF panels"""
+    go(page, live, f"tab=benchmarks&sub=standard&models={ids(SERVED, SERVED_LA)}",
+       "[data-panel='gguf:hellaswag']", width=width)
+    names = ["Qwen3.6-35B-A3B Q4 (original, k=8) · lookahead 1", "Qwen3.6-35B-A3B Q4 (original, k=8)",
+             "Qwen3.6-35B-A3B k4-LDA · lookahead 1", "Qwen3.6-35B-A3B k4-LDA"]
+    got = page.evaluate(f"Object.fromEntries(panelLines({json.dumps(names)}, 24))")
+    # the words they share at the front go first; what is left fits, whole
+    assert got == {names[0]: ["Q4 (original, k=8)", "· lookahead 1"],
+                   names[1]: ["Q4 (original, k=8)"], names[2]: ["k4-LDA · lookahead 1"],
+                   names[3]: ["k4-LDA"]}
+    # a line never ends on its separator, and what can't fit loses whole words
+    assert page.evaluate("wrap2('Qwen3.6-35B-A3B k4-LDA · lookahead 1 · MTP 3', 24)") == [
+        "Qwen3.6-35B-A3B k4-LDA", "· lookahead 1 · MTP 3"]
+    assert page.evaluate("wrap2('Qwen3.6-35B-A3B Q4 (original, k=8) · lookahead 1', 24)") == [
+        "Qwen3.6-35B-A3B Q4", "…k=8) · lookahead 1"]
+    # in the panel, the label reads as the name, spaces and all
+    lab = page.locator(f"[data-panel='gguf:hellaswag'] text.blab[data-full-name][data-model='{SERVED_LA}']")
+    said = lab.evaluate("t => [...t.childNodes].filter(n => n.nodeName !== 'title')"
+                        ".map(n => n.textContent).join('')")
+    assert said == NAME + " · lookahead 1"
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
+    shot(page.locator("[data-panel='gguf:hellaswag']"), f"gguf-panel-labels-{width}.png")
     assert page.errors == []
 
 

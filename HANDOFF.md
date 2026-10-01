@@ -4710,6 +4710,44 @@ Not before the demo: a new hidden set changes every Everyday score.
   strict and loose), a served setup's too. It lists what the board lists: the
   diagnose half.
 
+### 12z C — the QA walk's layout (1 Oct)
+
+- **C1. The Answers tab**: which answers (Knowledge exam · Everyday tasks ·
+  DeviceMark protocol) and DeviceMark's thinking off · on are segmented
+  switches (`.seg.ans-seg`); the groups and the benches are filter chips
+  (`.chipset`): 8px apart, 12px between the rows and under the description.
+- **C2. "Ran out"** has one definition (`RAN_OUT_WHY`) and every count says its
+  base: "2 of 169 ran out of room" beside a score (the hidden answers that
+  score it), "ran out 4 of 388 (every answer, practice and hidden)" beside
+  the answers' length. The tile's badge sits at the tile's edge on one line
+  ("not ranked · provisional").
+- **C3. "Setups of this file"** says, on each header and in a line under it,
+  which suite Median tokens and Ran out are over and how many answers; "MTP
+  drafts accepted" is a column only once a server has reported drafts.
+- **C4. The On-device chart** names our lines by setup alone (`dmShort`):
+  original / plain / MTP / lookahead / lookahead + MTP, "· thinking" — and a
+  key under the chart spells each out. Line labels are at least 12px apart,
+  inside the chart, with a leader to a line a label had to move from
+  (`dmSpread` with bounds). The budget chart's legend has room for a name and
+  cuts theirs between words (`wordTrunc`).
+- **C5. A panel's two-line names** (`panelLines`) drop the words all of a kind
+  share until every name fits uncut; a line never ends on "·"; what still
+  can't fit loses whole words; the two lines read with a space between.
+- **C6.** The device speed cell's "enter" / "edit" is a small bordered control,
+  spaced from the value.
+- **C7. Models ▸ DeviceMark**: names whole, in two lines when needed; Params
+  from "Based on" for a served model (`paramsOf`: the base's own count on the
+  board, else its name's "35B-A3B"); no "N ranked", no "prelim"; Answered
+  with its %.
+- **C8. Home**: the Everyday tile is "Everyday tasks · most passed" — never
+  ranked, so not "best". A GGUF run in Running now is named as the model it
+  is joined to and links to its GGUF block.
+- **C9. The checks popover** opens under the Home line that was clicked
+  (`POP.at`), in the body's own ink.
+- **C10.** A group of llama.cpp columns no row in the table has a number in
+  is not shown. (It was never remembered state: the group showed whenever
+  any model had a GGUF result.)
+
 ### 12z B — the QA walk's navigation (1 Oct)
 
 - **B1. A model's GGUF is a kind of test of its own** on its page — tile
