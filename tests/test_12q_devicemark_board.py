@@ -224,9 +224,9 @@ def test_their_nine_open_models_are_named_by_their_repos():
     assert set(dm.THEIR_OPEN) == {i for i, r in got.items() if r["kind"] == "device"}
     assert len(dm.THEIR_OPEN) == 9 and set(dm.CALIBRATION) <= set(dm.THEIR_OPEN.values())
     # what theirs is, beside ours
-    assert got["lfm2.5-1.2b__int8hu__aimodel"]["label"] == "int8, iPhone"
-    assert got["gemma-4-e2b__int4__litertlm"]["label"] == "int4, iPhone"
-    assert got["youtu-2b__int8__aimodel"]["label"] == "int8, iPhone"
+    assert got["lfm2.5-1.2b__int8hu__aimodel"]["label"] == "int8, scored on a Mac; speed on iPhone 17 Pro"
+    assert got["gemma-4-e2b__int4__litertlm"]["label"] == "int4, scored on a Mac; speed on iPhone 17 Pro"
+    assert got["youtu-2b__int8__aimodel"]["label"] == "int8, scored on a Mac; speed on iPhone 17 Pro"
 
 
 def test_our_run_of_their_model_sits_beside_their_row_never_ranked_apart(tmp_path, monkeypatch):

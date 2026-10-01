@@ -3616,6 +3616,9 @@ details.howto .about { margin-top:12px; }
 /* what "Open results" scrolls to lands below the bar, not under it */
 .dmcard .dmpart, table.lb.dmtable tr[data-dm-row], [data-kind-block^="dm"] {
   scroll-margin-top:calc(var(--bar-h) + 12px); }
+/* 12z A2: the setups table's cells keep to their columns: the table scrolls */
+table.setups { table-layout: auto; }
+table.setups td, table.setups th { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dmans { border-top:1px solid var(--border); }
 .dmans-head .badge { margin-left:6px; }
 /* 12q.B2: the On-device chart is drawn at its card's width */
@@ -4655,6 +4658,7 @@ const state = {
   runsSort: { idx: 0, dir: 1 },        // column sort for the metric query table
   ceSort: { key: 'task', dir: 1 },     // cross-entropy table
   queue: [], qmsg: '',
+  queueOlder: [], queueTotal: null,                     // 12z A6: runs before the newest 100
   qQ: '', qStatus: 'all', qSort: { key: 'id', dir: -1 },   // queue filter/sort
   trSel: [], trColors: {}, trSmooth: 0, trLog: false,      // Training tab
   trRuns: [], trSeries: {}, trFetching: false,
@@ -4706,7 +4710,7 @@ const state = {
   phone: { loaded: false, loading: false, byId: {}, readme: null, open: {}, f: {}, msg: {},
            busy: '' },
   srv: { open: false, f: { name: '', base_url: '', key: '', based_on: '', how: '', thinking: 'auto',
-         phone: false },
+         phone: false, flags: '', env: '' },
          msg: '', reported: null, saved: false, busy: '', list: null, loading: false },
   // 12m.3: Test a model ▸ A model from OpenRouter, and a run's estimate before Start
   orm: { open: false, q: '', models: null, hasKey: null, loading: false, busy: '', msg: '' },
@@ -6738,14 +6742,19 @@ function servedHead(m) {
 function servedSetups(m) {
   const s = servedOf(m.id), pin = (s || {}).pin || {};
   if (!pin.file) return '';
-  const same = Object.entries(DATA.served || {}).filter(([, x]) => (x.pin || {}).file === pin.file
-    && (x.pin || {}).size === pin.size).map(([id, x]) => ({ id, ...x }));
-  if (same.length < 2) return '';
+  // 12z A2: a thinking row's folder registers it too ("… · thinking"): it is
+  // its setup's row in thinking mode, never a second setup of the same name
+  const same = Object.entries(DATA.served || {}).filter(([id, x]) => (x.pin || {}).file === pin.file
+    && (x.pin || {}).size === pin.size && !id.endsWith(DM_THINKING))
+    .flatMap(([id, x]) => [{ id, ...x, mode: 'off', page: id },
+      ...((dmRunsOf(id) || {}).on || DATA.models.some(y => y.id === id + DM_THINKING)
+        ? [{ ...x, id: id + DM_THINKING, name: x.name + DM_THINKING, mode: 'on', page: id }] : [])]);
+  if (same.filter(x => x.mode === 'off').length < 2) return '';
   const row = id => DATA.models.find(x => x.id === id) || {};
   const al = id => alOf(row(id), 'everyday') || alOf(row(id), 'exam');
   return el('div', { class: 'lb-wrap', 'data-served-setups': pin.file },
     el('p', { class: 'small', text: `Setups of this file (${pin.file}), side by side:` }),
-    el('table', { class: 'lb mtbl' },
+    el('table', { class: 'lb mtbl setups' },
       el('thead', {}, el('tr', {}, ['Setup', 'Everyday', 'Knowledge exam', 'DeviceMark',
         'Median tokens', 'Ran out', 'MTP drafts accepted'].map((t, i) => el('th', {
         class: i ? 'num' : '', text: t })))),
@@ -6753,10 +6762,10 @@ function servedSetups(m) {
         const e = evdOf(x.id), a = al(x.id), d = (a || {}).draft, r = row(x.id);
         return el('tr', { 'data-served-setup': x.id, class: x.id === m.id ? 'open' : null },
           el('td', { title: x.how }, x.id === m.id ? el('b', { text: x.name })
-            : el('a', { href: '#model=' + encodeURIComponent(x.id), text: x.name })),
+            : el('a', { href: '#model=' + encodeURIComponent(x.page), text: x.name })),
           el('td', { class: 'num', text: e ? `${e.passed} of ${e.total}` : '—' }),
           el('td', { class: 'num', text: r.judgedAvg != null ? num(r.judgedAvg, 2) : '—' }),
-          dmSetupCell(x.id),
+          dmSetupCell(x.page, x.mode),
           el('td', { class: 'num', text: a ? a.median.toLocaleString('en') : '—' }),
           el('td', { class: 'num', text: a ? `${a.ran_out} of ${a.n}` : '—' }),
           el('td', { class: 'num', 'data-served-draft': x.id, title: d
@@ -11009,7 +11018,7 @@ function dmTable(rows) {
     onchange: e => { const s = new Set(sel); e.target.checked ? s.add(r.id) : s.delete(r.id);
       D.sel = s; render(); } });
   const ci = r => dmCi(r) ? ` ±${(50 * (dmCi(r)[1] - dmCi(r)[0])).toFixed(1)}` : '';
-  // a row with our run of it: theirs over ours — "theirs (int8, iPhone): X", "ours (bf16, …): Y"
+  // a row with our run of it: theirs over ours — "theirs (int8, scored on a Mac; speed on iPhone 17 Pro): X", "ours (bf16, …): Y"
   const both = (r, f, whole) => !(r.ours || []).length ? f(r)
     : [el('span', { 'data-dm-theirs': r.id, text: (whole ? `theirs (${r.label}): ` : '') + f(r) }),
       ...r.ours.map(o => el('span', { 'data-dm-ours': o.id,
@@ -11137,20 +11146,32 @@ const dmRunsOf = id => ((DATA.devicemark || {})[id]) || null;
 const dmHalf = c => c && c.ci ? ` ±${(50 * (c.ci[1] - c.ci[0])).toFixed(1)}` : '';
 const dmComp = c => c && c.value != null ? dmPct(c.value) + dmHalf(c) : '—';
 const dmTok = n => n == null ? '—' : Math.round(n).toLocaleString('en');
+// 12z A9: a rank says among what — "=1" read as first overall, and the
+// cloud lines are on the chart unranked
+const dmRankWords = k => `${k} among ranked rows (cloud lines aren’t ranked)`;
+// 12z A5: DeviceMark's own row beside ours: their number, and whether it's a
+// calibration point, as the chart's table says it
+function dmTheirsLine(t) {
+  if (!t) return '';
+  return `DeviceMark’s own row (${t.label}): ${dmComp(t.composite)}`
+    + (t.mode_differs ? ' · modes differ · not a calibration point'
+      : t.within === true ? ' · the two intervals overlap'
+      : t.within === false ? ' · the two intervals don’t overlap' : '');
+}
 function dmKindValue(m, mode) {
   const c = (dmRunsOf(m.id) || {})[mode] || {}, r = c.row;
   if (!r) return ['—', c.pilot ? 'the pilot only: no full run yet'
     : c.parity ? 'the MTP parity check only' : 'the speed test only'];
-  return [dmComp(r.composite), (r.rank ? `rank ${r.rank} on the On-device chart`
-    : r.paired ? 'beside DeviceMark’s own row' : 'composite') + (r.inherited ? ' · from MTP' : '')];
+  return [dmComp(r.composite), (r.rank ? dmRankWords(r.rank)
+    : r.paired ? `beside DeviceMark’s own row` + (r.theirs ? ` (${dmComp(r.theirs.composite)})` : '')
+    : 'composite') + (r.inherited ? ' · from MTP' : '')];
 }
 // the table's column: each setup's composite, thinking off, then on
-function dmSetupCell(id) {
-  const c = dmRunsOf(id) || {}, off = (c.off || {}).row, on = (c.on || {}).row;
-  return el('td', { class: 'num', 'data-served-dm': id,
-    title: off && off.inherited ? off.inherited.line : null,
-    text: !off && !on ? '—' : [off ? dmComp(off.composite) : null,
-      on ? `thinking ${dmComp(on.composite)}` : null].filter(Boolean).join(' · ') });
+// 12z A2: one mode's composite — the setups table has a row for each
+function dmSetupCell(id, mode = 'off') {
+  const r = (((dmRunsOf(id) || {})[mode]) || {}).row;
+  return el('td', { class: 'num', 'data-served-dm': `${id}|${mode}`,
+    title: r && r.inherited ? r.inherited.line : null, text: r ? dmComp(r.composite) : '—' });
 }
 // the On-device chart, scrolled to a row and marked
 function dmOpenRow(id) {
@@ -11187,10 +11208,12 @@ function dmModelCard(m, mode) {
   if (r) box.append(
     el('p', { class: 'mprose', 'data-dm-card-line': mode },
       el('b', { text: dmComp(r.composite) }), ' composite',
-      r.rank ? ` · rank ${r.rank}` : r.paired ? ' · beside DeviceMark’s own row' : '',
+      r.rank ? ` · ${dmRankWords(r.rank)}` : r.paired ? ' · beside DeviceMark’s own row' : '',
       r.label ? ` · ${r.label}` : '', ' · ',
       el('a', { href: '#', 'data-dm-card-chart': r.chart_id, text: 'its row on the On-device chart',
         onclick: e => { e.preventDefault(); dmOpenRow(r.chart_id); } })),
+    r.theirs ? el('p', { class: 'small', 'data-dm-card-theirs': mode,
+      title: r.theirs.mode_differs || null, text: dmTheirsLine(r.theirs) }) : '',
     r.inherited ? el('p', { class: 'small se', 'data-dm-card-inherited': mode,
       text: `${r.inherited.line}: this setup's quality is its MTP partner's (${r.inherited.from})` })
       : '',
@@ -12375,7 +12398,7 @@ function vLeaderboard(ms) {
           if (v == null) return el('td', { class: 'num se', 'data-dm-cell': c.dm, text: '—',
             title: r ? null : 'no DeviceMark run' + (m.thinkingRow ? ' with thinking on' : '') });
           const from = [r.inherited ? r.inherited.line : '', r.paired ? 'beside DeviceMark’s own row'
-            : r.rank ? `rank ${r.rank} on the On-device chart` : ''].filter(Boolean).join(' · ');
+            : r.rank ? dmRankWords(r.rank) : ''].filter(Boolean).join(' · ');
           if (c.dm === 'tokens') return el('td', { class: 'num tcell', 'data-dm-cell': 'tokens',
             title: from || null, text: Math.round(v).toLocaleString('en') });
           return one(c, m, v, c.dm === 'answered' ? null : dmHalfOf(m.id, c.dm), pctn,
@@ -16096,7 +16119,7 @@ function vQueue(part = { form: true, list: true }) {
   ];
   function qVisible() {
     const q = state.qQ.trim().toLowerCase();
-    const rows = state.queue.filter(r =>
+    const rows = allRuns().filter(r =>
       (state.qStatus === 'all'
         || (state.qStatus === 'active' ? ACTIVE_STATUS.has(r.status)
                                        : r.status === state.qStatus)) &&
@@ -16110,7 +16133,7 @@ function vQueue(part = { form: true, list: true }) {
       return state.qSort.dir * (c.num ? va - vb : natCmp(va, vb));
     });
   }
-  const qCount = el('span', { class: 'count-note' });
+  const qCount = el('span', { class: 'count-note', 'data-queue-count': '1' });
   const qToolbar = el('div', { class: 'toolbar', style: 'margin-top:2px' },
     el('input', { type: 'search', value: state.qQ, style: 'flex:1;min-width:160px',
       placeholder: 'filter: model, person, note…', 'aria-label': 'filter queue',
@@ -16123,6 +16146,7 @@ function vQueue(part = { form: true, list: true }) {
   const qThead = el('thead');
   const qTbody = el('tbody');
   const qPager = el('div');
+  const qOlder = el('div', { class: 'frm' });
   const qTableWrap = el('div', { class: 'lb-wrap stick' }, el('table', { 'data-queue-table': '1' },
     qThead, qTbody));
   const qEmpty = empty('Nothing has run yet. Test a model — it runs here, one '
@@ -16145,8 +16169,19 @@ function vQueue(part = { form: true, list: true }) {
           c.label + ' ', state.qSort.key === c.key
             ? el('span', { class: 'dir', text: state.qSort.dir > 0 ? '▲' : '▼' }) : '')
       : el('th', { text: c.label }))));
-    const rs = qVisible();
-    qCount.textContent = `${rs.length} of ${state.queue.length}`;
+    const rs = qVisible(), have = allRuns().length;
+    const total = Math.max(state.queueTotal || 0, have);
+    qCount.textContent = `${rs.length} of ${total}` + (have < total ? ` · the latest ${have}` : '');
+    // 12z A6: the older ones, a page at a time
+    qOlder.replaceChildren(have < total ? el('button', { class: 'secondary', 'data-queue-older': '1',
+      text: `Show ${Math.min(100, total - have)} older runs`, onclick: async e => {
+        e.target.disabled = true;
+        try {
+          const oldest = Math.min(...allRuns().map(r => r.id));
+          state.queueOlder = [...state.queueOlder,
+            ...await api(`api/submissions?limit=100&before=${oldest}`)];
+        } finally { rebuildQueue(); }
+      } }) : '');
     const pg = paged('queue', rs, JSON.stringify([state.qQ, state.qStatus, state.qSort]),
                      rebuildQueue, 25, true);
     if (pg.pager.parentNode !== qPager) qPager.replaceChildren(pg.pager);
@@ -16202,7 +16237,7 @@ function vQueue(part = { form: true, list: true }) {
     part.form ? ggufCard() : null,
     part.list ? el('div', { class: 'card', 'data-all-runs': '1' },
       el('h2', { text: 'All runs' }),
-      qToolbar, qPager, qTableWrap, qEmpty) : null].filter(Boolean);
+      qToolbar, qPager, qTableWrap, qOlder, qEmpty) : null].filter(Boolean);
 }
 
 // ---------------------------------------------------------------------------
@@ -16490,6 +16525,15 @@ function servedCard(sf) {
       el('textarea', { id: 'srv-how', 'data-srv': 'how', 'data-keep': 'srv-how', rows: '2',
         placeholder: 'llama.cpp build, quantisation, offload flags, routing',
         oninput: e => { F.how = e.target.value; } }, F.how || ''),
+      // 12z A1: lookahead and MTP are read from these, never from the words above
+      el('label', { for: 'srv-flags', text: 'Launch flags' }),
+      el('input', { id: 'srv-flags', 'data-srv': 'flags', 'data-keep': 'srv-flags',
+        placeholder: '-ngl 99 --n-cpu-moe 21 --spec-type draft-mtp', value: F.flags || '',
+        oninput: e => { F.flags = e.target.value; } }),
+      el('label', { for: 'srv-env', text: 'Environment' }),
+      el('input', { id: 'srv-env', 'data-srv': 'env', 'data-keep': 'srv-env',
+        placeholder: 'LLAMA_MOE_ROUTE_MODE=lookahead LLAMA_MOE_ROUTE_LOOKAHEAD=1',
+        value: F.env || '', oninput: e => { F.env = e.target.value; } }),
       el('label', { text: 'Thinking' }),
       el('div', {}, Select('thinking', [['on', 'on'], ['off', 'off'],
         ['auto', 'the model decides']], F.thinking || 'auto', v => { F.thinking = v; },
@@ -22204,6 +22248,11 @@ function markQueueRow(id) {
     if (state.tab === 'queue') (state.queueRedraw || render)(); } }, LANDED_MS);
 }
 
+// 12z A6: the newest 100, polled, and the older pages someone asked for
+function allRuns() {
+  const ids = new Set(state.queue.map(r => r.id));
+  return [...state.queue, ...state.queueOlder.filter(r => !ids.has(r.id))];
+}
 async function loadQueue() {
   try {
     const rows = await api('api/submissions?limit=100');
@@ -22231,6 +22280,8 @@ async function loadQueue() {
         || JSON.stringify(p.judge || null) !== JSON.stringify(r.judge || null);
     });
     state.queue = rows;
+    // 12z A6: how many there are in all — the list pages back from the newest 100
+    try { state.queueTotal = (await api('api/submissions/count')).total; } catch (e) { /* kept */ }
     // 12d.1: what the Playground has loaded, for the runs popover
     try {
       const ps = await api('api/playground/status');

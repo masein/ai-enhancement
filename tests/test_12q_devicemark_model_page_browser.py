@@ -59,7 +59,9 @@ def runs(live):
     fake = FakeServer()
     got = {}
     for name, extra in (("DM phone build", {"phone": True, "how": "llama.cpp fork, k=4 + LDA"}),
-                        ("DM phone build, MTP", {"how": "llama.cpp fork, k=4 + LDA, MTP 3"})):
+                        ("DM phone build, MTP", {"how": "llama.cpp fork, k=4 + LDA, MTP 3",
+                                                 # 12z A1: MTP from its launch, not its words
+                                                 "flags": "--spec-type draft-mtp"})):
         r = api(live, "/api/served", {"name": name, "base_url": fake.base, "thinking": "off",
                                       "based_on": "Qwen/Qwen3.6-35B-A3B", "by": "masein", **extra})
         got[name] = (r.get("model") or r)["id"]
@@ -133,8 +135,9 @@ def test_a_card_for_each_thinking_mode_with_its_row_and_its_runs(live, page, run
     assert page.locator("[data-kind-tile='dm_thinking']").count() == 1
     blk = open_block(page, "dm")
     line = blk.locator("[data-dm-card-line='off']").inner_text()
-    assert line.startswith(f"{comp} composite · rank ") and \
-        "phone build · MTP · thinking off · its row on the On-device chart" in line
+    assert line.startswith(f"{comp} composite · ") and (
+        " among ranked rows (cloud lines aren’t ranked) · phone build · MTP · thinking off · "
+        "its row on the On-device chart") in line
     t = blk.locator("[data-dm-card-table='off']")
     assert t.locator("[data-dm-card-bench='ifeval']").inner_text().startswith("70.0 ±")
     assert t.locator("[data-dm-card-device='off']").inner_text() == "14.2 · iPhone 17 Pro"
@@ -171,10 +174,14 @@ def test_the_setups_of_the_file_have_a_devicemark_column(live, page, runs):
     table = page.locator("[data-served-setups]")
     table.wait_for()
     assert "DeviceMark" in table.locator("thead").text_content()
-    mtp = table.locator(f"[data-served-dm='{MTP}']").inner_text()
-    assert " · thinking " in mtp and mtp.count("±") == 2
-    plain = table.locator(f"[data-served-dm='{PLAIN}']")
-    assert plain.inner_text() == mtp.split(" · ")[0]              # its MTP partner's, said so
+    # 12z A2: a row for each setup and thinking mode, each with its own number
+    mtp = table.locator(f"[data-served-dm='{MTP}|off']").inner_text()
+    on = table.locator(f"[data-served-dm='{MTP}|on']").inner_text()
+    assert mtp.count("±") == 1 and on.count("±") == 1 and mtp != on
+    names = table.locator("tbody tr td:first-child").all_inner_texts()
+    assert names.count("DM phone build, MTP") == 1 and names.count("DM phone build, MTP · thinking") == 1
+    plain = table.locator(f"[data-served-dm='{PLAIN}|off']")
+    assert plain.inner_text() == mtp                               # its MTP partner's, said so
     assert plain.get_attribute("title") == "quality from MTP run, parity 49/50"
     shot(table, "setups-devicemark-column.png")
     blk = open_block(page, "dm")

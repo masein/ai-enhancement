@@ -402,7 +402,7 @@ def results_payload() -> dict:
         payload["live"] = True
         # 12q.C: each model's DeviceMark runs, for its page and "Open results"
         try:
-            payload["devicemark"] = _dm().model_runs(config.OUT_DIR)
+            payload["devicemark"] = _dm().model_runs(config.OUT_DIR, served.launch_of_id)
         except Exception as e:                      # noqa: BLE001 — the board still loads
             payload["devicemark"] = {"_error": f"the DeviceMark runs couldn't be read: {e}"[:300]}
         # 12g.2: the hidden questions an Everyday group needs before Improve takes it
@@ -655,13 +655,21 @@ def _devicemark_check(hf_id: str, kind: str, part: str, pair: str, thinking: boo
     return ""
 
 
+@app.get("/api/submissions/count")
+def submissions_count():
+    """12z A6: how many runs there are — the Runs list shows the newest 100
+    and pages back from there"""
+    return {"total": db.count_submissions()}
+
+
 @app.get("/api/submissions")
-def submissions(limit: int = 100):
+def submissions(limit: int = 100, before: int | None = None):
     """The queue. A judged row carries the judge batch with it: the answers
     are on disk long before the grades are, and 'done' on the GPU half is not
-    done — the row should say which topics it sat and how far the judge is."""
+    done — the row should say which topics it sat and how far the judge is.
+    12z A6: `before` is the next page back — the runs older than that one"""
     gguf.sync()                           # 12f.3: the host worker's progress, into its rows
-    rows = db.recent(min(limit, 500))
+    rows = db.recent(max(1, min(limit, 500)), before)
     # 12f.5: what a finished GGUF run didn't finish, for Re-run failed benchmarks
     for r in rows:
         if r["suite"] == "gguf" and r["status"] in ("failed", "canceled"):
@@ -976,12 +984,33 @@ class ServedIn(BaseModel):
     key: str = ""
     based_on: str = ""
     how: str = ""
+    flags: str = ""                    # 12z A1: its launch flags, as typed
+    env: str = ""                      # 12z A1: its environment, KEY=VALUE
     thinking: str = "auto"
     phone: bool = False                # 12f.2: a phone build
     gguf_path: str = ""                # 12f.3: its GGUF file on the server
     gguf_flags: str = ""
     gguf_setups: str = ""              # 12f.3 addendum: "name: KEY=VALUE --flag", a line each
     by: str = ""
+
+
+class LaunchIn(BaseModel):
+    flags: str = ""
+    env: str = ""
+
+
+@app.put("/api/served/{model_id:path}/launch")
+def served_launch(model_id: str, f: LaunchIn, x_token: str = Header(default="")):
+    """12z A1: a served setup's launch flags and environment — what its
+    labels (lookahead, MTP) are read from — kept without asking its server"""
+    _check_token(x_token)
+    try:
+        out = {"model": served.set_launch(model_id, f.flags, f.env),
+               "launch": served.launch_of_id(model_id)}
+    except ValueError as e:
+        raise HTTPException(404, str(e)) from None
+    _cache.update(key=None, payload=None, at=0.0)
+    return out
 
 
 @app.get("/api/served")
@@ -1337,7 +1366,8 @@ def devicemark_rows():
     ranked together, `rank_all`; nothing is fetched from DeviceMark here"""
     d = _dm()
     return {"version": d.VERSION, "whose": d.WHOSE, "cap": d.CAP,
-            "server_speed_label": d.SERVER_SPEED_LABEL, **d.board(config.OUT_DIR)}
+            "server_speed_label": d.SERVER_SPEED_LABEL,
+            **d.board(config.OUT_DIR, served.launch_of_id)}
 
 
 @app.get("/api/devicemark/answers")
