@@ -364,3 +364,32 @@ def test_tritons_c_extension_builds_in_the_image():
     their first call. Built here as Triton builds it"""
     fk, _ = _fast_kernels()
     assert fk.check_compiler() == "Triton's C extension builds and loads"
+
+
+def test_the_gguf_arc_and_truthfulqa_prompts_are_lm_evals():
+    """12y: the GGUF columns ask ARC and TruthfulQA (MC1) with lm_eval's own
+    prompts — rendered here from the installed harness's task files, with its
+    own template function, for invented documents, and compared character for
+    character with what scripts/gguf_data.py writes. Nothing is fetched"""
+    lm_eval()
+    from pathlib import Path as P
+
+    from lm_eval.utils import apply_template
+    try:                                        # 0.4.12: the task loader's own reader
+        from lm_eval.tasks._yaml_loader import load_yaml
+    except ImportError:                         # before it
+        from lm_eval.utils import load_yaml_config as load_yaml
+
+    import gguf_data as gd
+    tasks = P(next(iter(importlib.util.find_spec("lm_eval").submodule_search_locations))) / "tasks"
+    arc = {"question": "Which gas do plants take in?", "answerKey": "B",
+           "choices": {"text": ["oxygen", "carbon dioxide"], "label": ["A", "B"]}}
+    for name in ("arc_easy", "arc_challenge"):
+        cfg = load_yaml(str(tasks / "arc" / f"{name}.yaml"))
+        assert apply_template(cfg["doc_to_text"], arc) == gd.arc_task(arc)["question"], name
+        assert cfg.get("target_delimiter", " ") == " "      # llama-perplexity's joint
+    tqa = {"question": "Can pigs fly?", "mc1_targets": {"choices": ["No.", "Yes."],
+                                                        "labels": [1, 0]}}
+    cfg = load_yaml(str(tasks / "truthfulqa" / "truthfulqa_mc1.yaml"))
+    assert apply_template(cfg["doc_to_text"], tqa) == gd.truthfulqa_task(tqa)["question"]
+    assert cfg.get("target_delimiter", " ") == " "

@@ -145,9 +145,10 @@ def test_measure_doesnt_offer_mmlu_on_the_cloze_file(live, page, run90):
         dlg = page.locator("[data-dialog='gguf-measure']")
         dlg.wait_for()
         assert dlg.locator("[data-gg-bench='mmlu']").is_disabled()
-        assert dlg.locator("[data-gg-no-data='mmlu']").inner_text() == "the old cloze file"
+        assert dlg.locator("[data-gg-no-data='mmlu']").inner_text() == \
+            "the old file, each option's text scored (cloze)"
         assert dlg.locator("[data-gg-bench-row='mmlu']").get_attribute("title") == \
-            "the old cloze file: build it again (HANDOFF § 5d)"
+            "the old file, each option's text scored (cloze): build it again (HANDOFF § 5d)"
         assert not dlg.locator("[data-gg-bench='arc_easy']").is_disabled()
         shot(dlg.locator(".dlg"), "measure-cloze-mmlu.png")
     finally:

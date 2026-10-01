@@ -16167,11 +16167,13 @@ async function ggMeasureDialog(id, returnTo) {
   const m = (page.models || []).find(x => x.id === id) || {};
   const sets = m.setups || (((G().registered || {})[id] || {}).setups) || [{ id: 'as-built', name: 'as built' }];
   const order = page.order || G().order || [];
-  // 12f.5: MMLU's cloze file is not offered: what it measured would go to History
+  // 12f.5: MMLU's cloze file is not offered: what it measured would go to History.
+  // 12y: nor ARC's or TruthfulQA's bare-question file
   const stale = b => { const f = ((page.benchmarks || {})[b] || {}).format;
     return !!f && !!(page.datasets || {})[b] && page.datasets[b].format !== f; };
   const have = b => !!(page.datasets || {})[b] && !stale(b);
-  const noData = b => stale(b) ? 'the old cloze file: build it again (HANDOFF § 5d)'
+  const oldFile = b => `the old file, ${((page.benchmarks || {})[b] || {}).old || 'asked another way'}`;
+  const noData = b => stale(b) ? `${oldFile(b)}: build it again (HANDOFF § 5d)`
     : 'no dataset yet: run the converter once (HANDOFF § 5d)';
   const S = { benches: new Set(order.filter(have)), setups: new Set(sets.map(x => x.id)),
     subset: false, n: 2000, est: null, busy: false };
@@ -16187,7 +16189,7 @@ async function ggMeasureDialog(id, returnTo) {
     el('span', { text: ggufLabel(b) }),
     counts[b] = el('span', { class: 'small se mono', 'data-gg-count': b }),
     have(b) ? '' : el('span', { class: 'small se', 'data-gg-no-data': b,
-      text: stale(b) ? 'the old cloze file' : 'no dataset yet' }))));
+      text: stale(b) ? oldFile(b) : 'no dataset yet' }))));
   const setups = el('div', { class: 'ggpick', 'data-gg-setups': id }, sets.map(x => el('label',
     { class: 'ggrow', title: setupWords(x) },
     el('input', { type: 'checkbox', 'data-gg-setup': x.id, checked: S.setups.has(x.id) ? '' : null,
