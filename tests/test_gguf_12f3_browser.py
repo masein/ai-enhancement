@@ -28,8 +28,10 @@ PHONE = "served/LDA-phone-build"
 MTP = "served/LDA-phone-build-MTP-3"
 LOOK = "lookahead 1: LLAMA_MOE_ROUTE_MODE=lookahead LLAMA_MOE_ROUTE_LOOKAHEAD=1"
 BASE = "Qwen/Qwen3.6-35B-A3B"
-TIP = ("Scored by llama.cpp's llama-perplexity on the quantised file. Not comparable with the "
-       "lm_eval columns to its left: different prompts and no examples.")
+# 12y: lm_eval's own prompts now; what differs still is said
+TIP = ("Scored by llama.cpp's llama-perplexity on the quantised file, with lm_eval's own prompts "
+       "but no examples (0-shot), each answer by its mean log-probability a token (lm_eval's "
+       "acc_norm divides by characters). Not comparable with the lm_eval columns to its left.")
 
 
 def shot(part, name, **kw):

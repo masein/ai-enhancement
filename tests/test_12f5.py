@@ -113,7 +113,8 @@ def test_np_and_c_come_from_the_datasets_biggest_task(box):
     man = json.loads((box["res"] / "gguf_data" / "manifest.json").read_text())["benchmarks"]
     # the manifest carries each multiple-choice file's shape
     assert [man[b]["max_answers"] for b in ("mmlu", "arc_challenge", "truthfulqa")] == [4, 5, 13]
-    assert man["mmlu"]["format"] == "lettered" and man["arc_easy"]["format"] == "text"
+    # 12y: ARC after lm_eval's own prompt
+    assert man["mmlu"]["format"] == "lettered" and man["arc_easy"]["format"] == "prompted"
     assert "max_answers" not in man["hellaswag"]
     w = gw.Worker(box["res"], box["bin"], poll=0.05)
     request(box)
@@ -188,9 +189,9 @@ def test_mmlu_is_asked_as_lm_evals_mmlu_asks_it(tmp_path):
     assert (man["mmlu"]["n"], man["mmlu"]["skipped"], man["mmlu"]["format"]) == (1, 0, "lettered")
     back = gd.read_mc_binary((tmp_path / "mmlu-test.bin").read_bytes())
     assert back[0]["question"] == t["question"] and back[0]["answers"] == ["A", "B", "C", "D"]
-    # ARC and TruthfulQA stay each option's text after the bare question
+    # ARC and TruthfulQA stay each option's text — 12y: after lm_eval's own prompt
     arc = gd.arc_task(ARC5)
-    assert arc["question"] == "Which is a mammal?" and arc["answers"][0] == "cat"
+    assert arc["question"] == "Question: Which is a mammal?\nAnswer:" and arc["answers"][0] == "cat"
 
 
 def svc_box(tmp_path, monkeypatch, docs_fn=None):

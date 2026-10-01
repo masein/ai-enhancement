@@ -572,6 +572,18 @@ worker isn't running" while `results/gguf_worker.json` is older than a minute.
   question, A. to D., "Answer:", scored on the letter. MMLU measured before
   (each option's text, cloze) is in History, "cloze, not comparable", and a
   run on the old file is refused until it is built again (below).
+- **12y: ARC and TruthfulQA after lm_eval's own prompt.** They were each
+  option's text after the bare question; lm_eval asks "Question: …\nAnswer:"
+  (ARC) and puts six questions and answers before "Q: …\nA:" (TruthfulQA
+  MC1). Bare, Qwen3.6-35B-A3B scored 43.8 on ARC-Challenge and 61.7 on
+  ARC-Easy, both builds. Now the prompt is lm_eval's, character for character
+  (`tests/test_image_deps.py` renders the installed harness's own templates);
+  what stays llama.cpp's is no examples (0-shot) and each answer's mean
+  log-probability a token, where lm_eval's acc_norm divides by characters.
+  A run on the bare file is in History, "the bare question, not comparable",
+  and one is refused until the file is built again (below). Each file's
+  format is read from the file (`gguf_bench.mc_shape`: lettered, prompted,
+  text).
 - **At start, the worker clears up after one that stopped mid-job:** that
   job fails, "The GGUF worker restarted during this run.", its finished
   benchmarks kept, and the dead worker's lock goes. The board does the same
@@ -587,6 +599,13 @@ manifest gets every file's shape):
 
 ```
 sudo docker compose exec -T bench python scripts/gguf_data.py --out /home/masein/benchmarks/results/gguf_data --only mmlu
+```
+
+Once, after deploying 12y, ARC and TruthfulQA again, then measure them again
+(Measure this model, or Re-run on each GGUF):
+
+```
+sudo docker compose exec -T bench python scripts/gguf_data.py --out /home/masein/benchmarks/results/gguf_data --only arc_challenge,arc_easy,truthfulqa
 ```
 
 **Setups:** a GGUF is measured "as built", and in each setup registered with

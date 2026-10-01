@@ -365,12 +365,14 @@ def _queue_one(model_id: str, benchmarks: list[str], subset: int, by: str,
     if missing:
         raise ValueError(f"No dataset yet for {', '.join(missing)}: run the converter once "
                          "(HANDOFF § 5d)")
-    # 12f.5: hours measuring MMLU's cloze file would land in History, not the column
+    # 12f.5: hours measuring MMLU's cloze file would land in History, not the
+    # column — 12y: and ARC's or TruthfulQA's bare-question file
     for b in want:
         form = gb.BENCHMARKS[b].get("format")
         if form and man[b].get("format") != form:
             raise ValueError(OLD_DATASET.format(label=gb.BENCHMARKS[b]["label"],
-                                                what="each option's text scored (cloze)"))
+                                                what=gb.BENCHMARKS[b].get("old") or "asked "
+                                                "another way"))
     subset = int(subset or 0)
     if subset < 0:
         raise ValueError("a subset is a number of tasks; 0 is every one")

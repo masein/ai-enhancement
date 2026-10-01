@@ -29,6 +29,14 @@ perplexity.cpp and common/arg.cpp (teraformer/lda-2026-09-22, 91428471f):
   35B at 42.5 where its author reports about 82. ARC, HellaSwag, Winogrande
   and TruthfulQA stay as they are: lm_eval scores those on the option's text
   too.
+- **12y: ARC and TruthfulQA after lm_eval's own prompt.** They were the
+  option's text after the bare question, where lm_eval asks "Question:
+  …\nAnswer:" (ARC) and puts six questions and answers before "Q: …\nA:"
+  (TruthfulQA MC1): Qwen3.6-35B-A3B scored 43.8 on ARC-Challenge and 61.7 on
+  ARC-Easy. Now the same prompt, character for character; still no examples
+  (0-shot, where the board's lm_eval ARC is 5-shot), and still llama.cpp's
+  scoring: the mean log-probability a token, where lm_eval's acc_norm
+  divides by characters. A result on the bare file is History's.
 - **12f.5: -np and -c.** `--multiple-choice` puts each of a task's answers
   in a sequence of its own and refuses a task with more answers than
   `-np|--parallel` ("task N requires a higher -np|--parallel value (at least
@@ -45,8 +53,12 @@ import re
 import struct
 
 GROUP = "Measured on the GGUF · llama.cpp, 0-shot"
-TIP = ("Scored by llama.cpp's llama-perplexity on the quantised file. Not comparable with the "
-       "lm_eval columns to its left: different prompts and no examples.")
+TIP = ("Scored by llama.cpp's llama-perplexity on the quantised file, with lm_eval's own prompts "
+       "but no examples (0-shot), each answer by its mean log-probability a token (lm_eval's "
+       "acc_norm divides by characters). Not comparable with the lm_eval columns to its left.")
+# 12y: a multiple-choice file asked another way than the board now asks it —
+# a run on it goes to History, and none is queued on it
+BARE = "the bare question, not comparable"
 
 # key -> label, llama-perplexity's mode, the dataset file under gguf_data/, the
 # lm_eval task (and split) whose questions it holds, and how many that is
@@ -54,20 +66,27 @@ BENCHMARKS = {
     # 12f.5: lettered, as lm_eval asks it; a result on the cloze file is History's
     "mmlu": {"label": "MMLU", "mode": "multiple-choice", "data": "mmlu-test.bin",
              "lm_eval": "mmlu", "split": "test", "n": 14042, "format": "lettered",
-             "earlier": "cloze, not comparable"},
+             "earlier": "cloze, not comparable", "old": "each option's text scored (cloze)"},
     "hellaswag": {"label": "HellaSwag", "mode": "hellaswag", "data": "hellaswag-validation.txt",
                   "lm_eval": "hellaswag", "split": "validation", "n": 10042},
     "winogrande": {"label": "Winogrande", "mode": "winogrande",
                    "data": "winogrande-validation.csv", "lm_eval": "winogrande",
                    "split": "validation", "n": 1267},
+    # 12y: after lm_eval's own prompt; a result on the bare question is History's
     "arc_challenge": {"label": "ARC-C", "mode": "multiple-choice", "data": "arc-challenge-test.bin",
-                      "lm_eval": "arc_challenge", "split": "test", "n": 1172},
+                      "lm_eval": "arc_challenge", "split": "test", "n": 1172,
+                      "format": "prompted", "earlier": BARE,
+                      "old": "each option's text after the bare question"},
     "arc_easy": {"label": "ARC-E", "mode": "multiple-choice", "data": "arc-easy-test.bin",
-                 "lm_eval": "arc_easy", "split": "test", "n": 2376},
+                 "lm_eval": "arc_easy", "split": "test", "n": 2376,
+                 "format": "prompted", "earlier": BARE,
+                 "old": "each option's text after the bare question"},
     "truthfulqa": {"label": "TruthfulQA", "mode": "multiple-choice",
                    "data": "truthfulqa-mc1-validation.bin", "lm_eval": "truthfulqa_mc1",
                    "split": "validation", "n": 817,
-                   "note": "MC1, one right answer: llama-perplexity scores no MC2"},
+                   "note": "MC1, one right answer: llama-perplexity scores no MC2",
+                   "format": "prompted", "earlier": BARE,
+                   "old": "each option's text after the bare question"},
     # 12n.2: shared with the frontier — as lm_eval's gpqa_diamond_zeroshot asks it,
     # its four options scored. Gated: gguf_data.py builds it on the server with
     # its HF token, and its questions are never committed or shown
@@ -171,17 +190,25 @@ def task_tokens(question: str, answers: list[str]) -> int:
     return len(question.encode("utf-8")) + 2 + sum(len(a.encode("utf-8")) + 3 for a in answers)
 
 
+# 12y: how lm_eval's prompts end, before the answer
+PROMPT_ENDS = ("\nAnswer:", "\nA:")
+
+
 def mc_shape(data: bytes) -> dict:
     """what -np and -c are sized from: the most answers any task has, and
-    the biggest task's tokens (task_tokens); and whether its answers are
-    letters (lm_eval's lettered MMLU) or each option's text"""
+    the biggest task's tokens (task_tokens); and how it asks: its answers
+    letters (lm_eval's lettered MMLU), each option's text after a prompt that
+    asks for an answer (12y: lm_eval's ARC and TruthfulQA, "…\nAnswer:" and
+    "…\nA:"), or each option's text after the bare question"""
     tasks = read_mc(data)
     lettered = bool(tasks) and all(t["answers"] == list(LETTERS[:len(t["answers"])])
                                    for t in tasks)
+    prompted = bool(tasks) and all(t["question"].endswith(PROMPT_ENDS) for t in tasks)
     return {"max_answers": max((len(t["answers"]) for t in tasks), default=0),
             "max_task_tokens": max((task_tokens(t["question"], t["answers"]) for t in tasks),
                                    default=0),
-            "format": "lettered" if lettered else "text"}
+            "format": "lettered" if lettered else "prompted" if prompted else "text"}
+
 
 
 def mc_flags(shape: dict) -> list[str]:
