@@ -762,9 +762,19 @@ def answers_fingerprint(task_out: Path, task: str) -> str | None:
     return judge.answered_fingerprint(task_out.parent, task)
 
 
+def _dm_answered(task_out: Path, task: str) -> bool:
+    """A DeviceMark task whose saved answers cover every item the built task
+    holds: done, as a task with lm_eval's results file is. Its scoring reads
+    those answers alone (devicemark.records_from_samples), so a run the
+    service restarted under (#167, at the 12z deploy) resumes at the task it
+    was on instead of asking the battery again from its first item"""
+    want = _devicemark.dm().task_keys(config.DM_TASKS_DIR, task)
+    return bool(want) and want <= _devicemark.dm().answered_keys(task_out, task)
+
+
 def _task_done(task_out: Path, task: str | None = None) -> bool:
     if not _has_results(task_out):
-        return False
+        return bool(task in config.DM_TASKS and _dm_answered(task_out, task))
     want = current_fingerprint(task) if task else None
     return want is None or answers_fingerprint(task_out, task) == want
 
@@ -1337,6 +1347,9 @@ def run_submission(sub: dict) -> None:
             if _task_done(task_out, task):
                 if current_fingerprint(task):
                     reused[task] = _answered_by(task_out)
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n[service] {task}: answered already ({task_out.name}); not "
+                             f"asked again\n")
                 db.update(sid, status="running", progress=f"{label} — already done")
                 continue
             if _has_results(task_out):

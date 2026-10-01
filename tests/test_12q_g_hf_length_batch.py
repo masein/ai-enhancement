@@ -18,6 +18,7 @@ No model runs: lm_eval is a stand-in, as in test_12q_e_hf_pairs.py."""
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 import types
 from pathlib import Path
@@ -91,6 +92,10 @@ def _run(monkeypatch, hf_id: str, cfg: dict, *, params: float, kernels: bool = T
                                          "resps": [["\\boxed{A}"]]}) + "\n")
         return 0
     monkeypatch.setattr(runner, "_run_task", run_task)
+    # each run here starts with no answers on disk: a task answered already
+    # is not asked again (#167's resume), and these tests look at the asking
+    for d in row_dir(hf_id).glob("dm_*_0shot"):
+        shutil.rmtree(d)
     sid = db.add(hf_id, "instruct", "devicemark", ME, "", part="full")
     runner.run_submission(db.get(sid))
     return sid, cmds, envs
