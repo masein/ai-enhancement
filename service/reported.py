@@ -45,7 +45,12 @@ SOURCES = {
            "url": "https://artificialanalysis.ai"},
     "card": {"name": "model card", "credit": "as the model card or paper reports it",
              "licence": "", "url": ""},
+    # 14.1: a benchmark's own paper, its numbers as printed — from a file in the
+    # repo (eval_tasks/mobileaibench/paper.json), never fetched
+    "paper": {"name": "MobileAIBench paper", "credit": "as the MobileAIBench paper reports it "
+              "(arXiv:2406.10290)", "licence": "", "url": "https://arxiv.org/abs/2406.10290"},
 }
+PAPER_FILE = Path(__file__).resolve().parent.parent / "eval_tasks" / "mobileaibench" / "paper.json"
 NO_AA_KEY = ("Artificial Analysis: no key yet — add ARTIFICIAL_ANALYSIS_API_KEY to the "
              "server's .env, then Import now")
 
@@ -305,6 +310,28 @@ def import_epoch(fetch=None, board: list[str] | None = None) -> dict:
     return _store("epoch", sha, keep(kept, board=board))
 
 
+def import_paper(fetch=None, board: list[str] | None = None) -> dict:
+    """14.1: MobileAIBench's own numbers, from its paper's tables — reported
+    (paper), never ranked against ours. `fetch` is never used: the numbers
+    are in the repo, imported again only when the file changes"""
+    blob = PAPER_FILE.read_bytes()
+    sha, same = _begin("paper", blob)
+    if same:
+        db.reported_import_checked(same["id"])
+        return {"source": "paper", "status": "unchanged", "line": _line("paper", same)}
+    p = json.loads(blob)
+    src = p["source"]
+    rows = []
+    for r in p["rows"]:
+        hf, mk = p["models"][r["model"]]
+        name, unit, setting = p["benchmarks"][r["task"]]
+        rows.append({"key": key(hf), "name": hf, "maker": mk, "benchmark": name, "unit": unit,
+                     "value": float(r["value"]), "setting": setting, "url": src["url"],
+                     "date": src["date"], "by": src["name"], "task": r["task"],
+                     "as": r["model"]})
+    return _store("paper", sha, rows)
+
+
 def _store(source: str, sha: str, rows: list[dict]) -> dict:
     iid = db.reported_import_add(source, sha, rows)
     rec = db.reported_import_last(source)
@@ -315,7 +342,7 @@ def run_all(fetch=None, board: list[str] | None = None) -> list[dict]:
     """every source that imports, once: its line each (an error is a line too)"""
     board = board_ids() if board is None else board
     out = []
-    for name, fn in (("epoch", import_epoch), ("aa", import_aa)):
+    for name, fn in (("epoch", import_epoch), ("aa", import_aa), ("paper", import_paper)):
         try:
             out.append(fn(fetch=fetch, board=board))
         except Exception as e:                      # noqa: BLE001 — one source's error is its line

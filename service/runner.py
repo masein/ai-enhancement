@@ -522,6 +522,23 @@ def _read_from(path: Path, offset: int) -> str:
 # the run
 # ---------------------------------------------------------------------------
 
+def _chat_renderer(hf_id: str, meta: dict):
+    """14.1: a conversation in the model's own chat template, as text — MT-Bench's
+    second turn, asked by lm_eval as it stands (no chat template of its own on
+    top). A Gemma model's BOS is left to lm_eval, which adds one to every Gemma
+    prompt; any other keeps the template's"""
+    from transformers import AutoTokenizer
+    tok = AutoTokenizer.from_pretrained(hf_id, revision=meta.get("revision"),
+                                        trust_remote_code=bool(meta.get("remote_code")))
+    bos = tok.bos_token or ""
+    gemma = "gemma" in str((meta.get("archinfo") or {}).get("arch") or hf_id).lower()
+
+    def render(messages: list[dict]) -> str:
+        text = tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        return text[len(bos):] if gemma and bos and text.startswith(bos) else text
+    return render
+
+
 def include_args_for(task: str) -> list[str]:
     """--include_path for a task the harness does not ship. The perplexity
     slices live under BENCH_ROOT/eval_tasks; the permutation control ships with
@@ -536,7 +553,9 @@ def include_args_for(task: str) -> list[str]:
         return ["--include_path", str(config.TRUST_TASKS_DIR)]
     if task == config.SIMPLEQA_TASK:                # 12n.2: simpleqa.build_tasks writes it
         return ["--include_path", str(config.SIMPLEQA_TASKS_DIR)]
-    if task in config.MAB_TASKS:                    # 12o.3: mobileaibench.build_tasks writes them
+    if task in config.MAB_ALL:
+        # 12o.3, 14.1: mobileaibench.build_tasks writes them; MT-Bench's second
+        # turn is the model's own (lm_eval_cmd's include_dir)
         return ["--include_path", str(config.MAB_TASKS_DIR)]
     if task in config.DM_TASKS:                     # 12q: devicemark.build_tasks writes them
         return ["--include_path", str(config.DM_TASKS_DIR)]
@@ -550,7 +569,8 @@ def include_args_for(task: str) -> list[str]:
 def lm_eval_cmd(model_args: str, task: str, shots: int, batch, task_out: Path, *,
                 chat: bool, max_gen_toks: int | None = None, backend: str = "hf",
                 samples: Path | None = None, limit: int | None = None,
-                cache: Path | None = None, system: str | None = None) -> list[str]:
+                cache: Path | None = None, system: str | None = None,
+                include_dir: Path | None = None) -> list[str]:
     """The lm_eval command for one task. Built here only, so that
     scripts/check_tasks.py (deploy step 4) hands the installed harness exactly
     what a run hands it. 12h.1: `backend` is "hf" or "vllm" (vLLM sizes its
@@ -569,7 +589,7 @@ def lm_eval_cmd(model_args: str, task: str, shots: int, batch, task_out: Path, *
            "--output_path", str(task_out),
            "--log_samples",
            *([] if backend in ("vllm", _served.BACKEND) else ["--device", "cuda:0"]),
-           *include_args_for(task)]
+           *(["--include_path", str(include_dir)] if include_dir else include_args_for(task))]
     if chat:
         cmd.append("--apply_chat_template")
     if max_gen_toks:
@@ -841,9 +861,11 @@ def _ask_served(sid: int, rec: dict, meta: dict, task: str, task_out: Path, labe
         # 12n.2: asked as typed, with the Everyday settings, as Trust & safety is
         items = (sq_dir or config.SIMPLEQA_TASKS_DIR) / f"{task}.jsonl"      # build_tasks'
         everyday, safety = True, True
-    elif task in config.MAB_TASKS:
+    elif task in config.MAB_ALL:
         # 12o.3: MobileAIBench's prompt as typed, its system line as the system
-        # message, with the Everyday settings
+        # message, with the Everyday settings. 14.1: MT-Bench's second turn
+        # from the model's own folder (build_turn2), its conversation so far
+        # asked as messages
         items = (mab_dir or config.MAB_TASKS_DIR) / f"{task}.jsonl"        # build_tasks'
         everyday, safety = True, True
     elif everyday:
@@ -855,10 +877,13 @@ def _ask_served(sid: int, rec: dict, meta: dict, task: str, task_out: Path, labe
     if everyday and not safety and asked is not None:
         docs = [d for d in docs if d.get("id") in set(asked)]
     s = _served.settings_for(rec, meta, everyday)
-    if task in config.MAB_TASKS:
+    if task in config.MAB_ALL:
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
         import mobileaibench as _mab
         s["system"] = _mab.SYSTEM[task]
+        if task in config.MAB_JUDGED_TASKS:
+            # 14.1: MT-Bench's answers get FastChat's room, 1,024 tokens
+            s["max_tokens"] = max(int(s["max_tokens"]), _mab.MTB_MAX_GEN_TOKS)
     with open(log_path, "a") as lf:
         lf.write(f"\n===== [{sid}] {task} · served: {rec['name']} at {rec['base_url']} · "
                  f"{rec['pin'].get('version') or rec['pin'].get('file')} · {len(docs)} "
@@ -1027,7 +1052,8 @@ def run_submission(sub: dict) -> None:
                        f"{est.get('line', '')}" if meter else
                        f"preflight ok · served elsewhere: {rec['pin'].get('file') or rec['name']}")
 
-    tasks = config.tasks_for_suite(sub["suite"], bbq_all=bool(sub.get("bbq_all")))
+    tasks = config.tasks_for_suite(sub["suite"], bbq_all=bool(sub.get("bbq_all")),
+                                   part=sub.get("part") or "")
     judged = set(config.judged_tasks())
     # a judged run narrowed to one topic: the same suite, fewer tasks. The
     # judge below grades only these, so a person can sit one topic in minutes
@@ -1090,8 +1116,9 @@ def run_submission(sub: dict) -> None:
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
         import simpleqa as _sq
         _sq.build_tasks(sq_dir)
-    if set(tasks) & set(config.MAB_TASKS):
-        # 12o.3: MobileAIBench's two samples, from the pinned files
+    if set(tasks) & set(config.MAB_ALL):
+        # 12o.3: MobileAIBench's samples, from the pinned files (14.1: and
+        # MT-Bench's first turn; its second is built from the model's answers)
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
         import mobileaibench as _mab
         _mab.build_tasks(mab_dir)
@@ -1230,6 +1257,21 @@ def run_submission(sub: dict) -> None:
             shots = config.NFEWSHOT.get(task, 0)
             task_out = config.OUT_DIR / row_safe / f"{task}_{shots}shot"
             label = f"{i}/{len(tasks)} · {task} ({shots}-shot)"
+            turn2_dir = None
+            if task == config.MAB_MTB2:
+                # 14.1: the second turn after the model's own first answer — as
+                # messages to a server, or in the model's own chat template as
+                # text for lm_eval, in a folder of this model's
+                turn2_dir = config.BENCH_ROOT / "mobileaibench" / "turn2" / row_safe
+                try:
+                    _mab.build_turn2(turn2_dir, config.OUT_DIR / row_safe,
+                                     None if rec else _chat_renderer(sub["hf_id"], meta))
+                except Exception as e:                  # noqa: BLE001 — said on the row
+                    failed_tasks.append(task)
+                    with open(log_path, "a") as lf:
+                        lf.write(f"\n[service] {task}: the second turns could not be built: "
+                                 f"{e!r}\n")
+                    continue
             if everyday:
                 # 12a.5: the model is asked only what it has no answer to on
                 # today's words; the answers it gave before are kept (beside
@@ -1274,7 +1316,8 @@ def run_submission(sub: dict) -> None:
                 status, stopped = _ask_served(sid, rec, meta, task, task_out, label, log_path,
                                               everyday, asked, safety=safety, meter=meter,
                                               evd_dir=evd_dir, trust_dir=trust_dir,
-                                              sq_dir=sq_dir, mab_dir=mab_dir, odd=odd)
+                                              sq_dir=sq_dir, mab_dir=turn2_dir or mab_dir,
+                                              odd=odd)
                 gpu_seconds += time.time() - t_task
                 db.update(sid, gpu_seconds=gpu_seconds)
                 if status == CANCELED:
@@ -1298,7 +1341,7 @@ def run_submission(sub: dict) -> None:
             # ran out inside the thinking on every question of run #60. Only
             # its judged answers get more room, and only when its template is
             # the one that thinks; lm_eval records the override in its results
-            sq = task == config.SIMPLEQA_TASK or task in config.MAB_TASKS
+            sq = task == config.SIMPLEQA_TASK or task in config.MAB_ALL
             thinks = ((kind == "instruct" and task in judged or everyday or safety or sq)
                       and (meta.get("archinfo") or {}).get("reasoning_template"))
             # 12a.4: its everyday answers get more room still — 12d.1: said
@@ -1306,9 +1349,13 @@ def run_submission(sub: dict) -> None:
             # 12k.2: Trust & safety is asked with the Everyday settings
             room = (_everyday_settings(meta)["max_gen_toks"] if everyday or safety or sq
                     else _exam_settings(meta)["max_gen_toks"]) if thinks else None
+            # 14.1: MT-Bench's second turn is the conversation already in the
+            # model's chat template: asked as it stands
             cmd = lm_eval_cmd(margs, task, shots, meta["batch"], task_out,
-                              chat=kind == "instruct" or everyday, max_gen_toks=room,
-                              system=_mab.SYSTEM[task] if task in config.MAB_TASKS else None)
+                              chat=(kind == "instruct" or everyday) and task != config.MAB_MTB2,
+                              max_gen_toks=room, include_dir=turn2_dir,
+                              system=(_mab.SYSTEM.get(task) or None) if task in config.MAB_ALL
+                              else None)
             if gen_task:
                 def gen_cmd(be, batch=None):
                     samples = None
@@ -1588,14 +1635,20 @@ def run_submission(sub: dict) -> None:
                 db.update(sid, error=f"grading: {e}")
                 with open(log_path, "a") as lf:
                     lf.write(f"\n[service] SimpleQA Verified could not be graded: {e!r}\n")
-        # 12o.3: MobileAIBench's two, scored by its own metrics — no judge, no GPU
+        # 12o.3: MobileAIBench's sets, scored by its own metrics — no judge, no
+        # GPU. 14.1: the judged part's answers go to the judge as a step of its
+        # own: an offline judge leaves them "awaiting judge", and the run is done
         if mobile and not failed_tasks:
             db.update(sid, status="running", progress="scoring the answers")
             try:
-                out = _mab.mark(config.OUT_DIR / row_safe)
-                if out:
-                    _mab.write(config.OUT_DIR / row_safe, out)
-                judge_note = _mab.summary(out)
+                if (sub.get("part") or "") == "judged":
+                    out = _mab.start_judge(config.OUT_DIR / row_safe, sid)
+                else:
+                    out = _mab.mark(config.OUT_DIR / row_safe)
+                    if out:
+                        _mab.write(config.OUT_DIR / row_safe, out)
+                judge_note = _mab.summary(out) + (f" · {out['note']}" if (out or {}).get("note")
+                                                  else "")
                 with open(log_path, "a") as lf:
                     lf.write(f"\n===== [{sid}] MobileAIBench: {judge_note} =====\n")
             except Exception as e:                      # noqa: BLE001 — the answers are on disk

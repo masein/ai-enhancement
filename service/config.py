@@ -447,11 +447,20 @@ SHARED_INSTRUCT_ONLY = ("GPQA Diamond's chain of thought and SimpleQA Verified a
 # eval_tasks/mobileaibench. The "mobile" suite. Standard benchmarks: never in
 # the Avg, never a training target, never in Improve
 MAB_HOTPOT, MAB_SQL = "mab_hotpotqa", "mab_sql"
-MAB_TASKS = [MAB_HOTPOT, MAB_SQL]
+# 14.1: and Dolly, CNN/DailyMail and XSum, scored the same way — the "no
+# judge" part, 5,000 answers — and MT-Bench, asked in two turns (the second
+# after the model's own first answer) and rated by the board's judge in a step
+# of its own: the "judged" part. AlpacaEval is left out (CC BY-NC 4.0)
+MAB_DOLLY, MAB_CNNDM, MAB_XSUM = "mab_dolly", "mab_cnndm", "mab_xsum"
+MAB_MTB1, MAB_MTB2 = "mab_mtbench_t1", "mab_mtbench_t2"
+MAB_TASKS = [MAB_HOTPOT, MAB_SQL, MAB_DOLLY, MAB_CNNDM, MAB_XSUM]
+MAB_JUDGED_TASKS = [MAB_MTB1, MAB_MTB2]
+MAB_ALL = MAB_TASKS + MAB_JUDGED_TASKS
+MAB_PARTS = ("", "judged")
 MAB_TASKS_DIR = Path(os.environ.get("MAB_TASKS_DIR", BENCH_ROOT / "mobileaibench" / "tasks"))
-MAB_INSTRUCT_ONLY = ("MobileAIBench's HotpotQA and SQL are asked through the chat template and "
-                     "scored on what the model writes, so only an instruct model can sit them — "
-                     "this one runs as a base model")
+MAB_INSTRUCT_ONLY = ("MobileAIBench's sets are asked through the chat template and scored on "
+                     "what the model writes, so only an instruct model can sit them — this one "
+                     "runs as a base model")
 
 # alone is 12,032 chain-of-thought answers, hours where the Standard tasks
 # take minutes — and never in the official average: a base model cannot be
@@ -507,9 +516,10 @@ SUITES = ("quick", "full", "control", "judged", "everyday", "generative", "safet
           "mobile", "devicemark")
 
 
-def tasks_for_suite(suite: str, bbq_all: bool = False) -> list[str]:
+def tasks_for_suite(suite: str, bbq_all: bool = False, part: str = "") -> list[str]:
     """`bbq_all`: the full suite asks all 29,246 of BBQ's ambiguous questions
-    instead of the seeded 3,000"""
+    instead of the seeded 3,000. 14.1: `part` — the mobile suite's "judged"
+    part is MT-Bench's two turns; with none, its five sets with no judge"""
     if suite == "control":
         return list(CONTROL_TASKS)
     if suite == "safety":
@@ -521,7 +531,7 @@ def tasks_for_suite(suite: str, bbq_all: bool = False) -> list[str]:
     if suite == "shared":
         return list(SHARED_TASKS)
     if suite == "mobile":
-        return list(MAB_TASKS)
+        return list(MAB_JUDGED_TASKS if part == "judged" else MAB_TASKS)
     if suite == "devicemark":
         return list(DM_TASKS)
     if suite == "judged":

@@ -54,6 +54,11 @@ GEN = ("ifeval", "mmlu_pro", "hendrycks_math500")
 # (devicemark_items.jsonl) — a served setup's have no lm_eval folder
 DM_TASKS = {"dm_ifeval": "ifeval", "dm_mmlu_pro": "mmlu_pro", "dm_math": "math"}
 DM_ITEMS = "devicemark_items.jsonl"
+# 12o.3, 14.1: MobileAIBench's sets scored with no judge, and MT-Bench (its two
+# turns' answers under mab_mtbench_t1 and _t2)
+MAB_SCORED = ("mab_hotpotqa", "mab_sql", "mab_dolly", "mab_cnndm", "mab_xsum")
+MAB_MTBENCH = "mab_mtbench"
+MAB_TURNS = ("mab_mtbench_t1", "mab_mtbench_t2")
 
 
 def kind_of(task: str) -> str:
@@ -67,8 +72,10 @@ def kind_of(task: str) -> str:
         return "safety"
     if task == "simpleqa_verified":
         return "simpleqa"
-    if task in ("mab_hotpotqa", "mab_sql"):
+    if task in MAB_SCORED:
         return "mab"                        # 12o.3: MobileAIBench's, by its own metrics
+    if task == MAB_MTBENCH:
+        return "mabj"                       # 14.1: MT-Bench's two turns, rated by the judge
     if task in DM_TASKS:
         return "dm"                         # 12q.B: DeviceMark's battery, by its protocol
     if task.startswith(GEN):
@@ -101,6 +108,9 @@ def model_dirs(task: str) -> dict[str, Path]:
         elif task in DM_TASKS:
             if (d / DM_ITEMS).exists():
                 out[_dm_model_id(d)] = d
+        elif task == MAB_MTBENCH:
+            if any(_task_dirs(d, t) for t in MAB_TURNS):
+                out[_model_id(d)] = d
         elif _task_dirs(d, task):
             out[_model_id(d)] = d
     return out
@@ -121,6 +131,9 @@ def tasks() -> list[str]:
                 seen.add("everyday")
             if d.is_dir() and (d / DM_ITEMS).exists():
                 seen.update(DM_TASKS)
+    # 14.1: MT-Bench's two turns are one benchmark
+    if seen & set(MAB_TURNS):
+        seen = (seen - set(MAB_TURNS)) | {MAB_MTBENCH}
     return sorted(seen)
 
 
@@ -318,6 +331,34 @@ def _answer(rec: dict) -> dict:
             "no_answer": bool(p["no_answer"])}
 
 
+def _mtbench_rows(d: Path) -> dict[str, dict]:
+    """14.1: MT-Bench, a row a turn: the turn's question (the second with the
+    first beside it), the answer, and the judge's rating — or "awaiting
+    judge"; GPT-4's reference for maths, reasoning and coding"""
+    import mobileaibench as mab
+    qs = {q["id"]: q for q in mab.load(mab.MTB1)}
+    items = (((mab.read(d) or {}).get("tasks") or {}).get(mab.MTBENCH) or {}).get("items") or []
+    out = {}
+    for it in items:
+        q = qs.get(it["id"])
+        if not q:
+            continue
+        t = it["turn"]
+        s = it.get("score")
+        ref = q.get("reference") or []
+        out[f"{it['id']}:{t}"] = {
+            "q": q["turns"][t - 1], "options": [], "subject": f"{q['category']} · turn {t}",
+            "context": q["turns"][0] if t == 2 else None,
+            "reference": ref[t - 1] if len(ref) >= t else None,
+            "order": [q["category"], q["question_id"] * 2 + t],
+            "res": {"ok": None if s is None or s == -1 else s >= 6,
+                    "answer": it.get("answer_text") or "", "thinking": "",
+                    "verdict": (mab.AWAITING if s is None else "the judge's reply had no rating"
+                                if s == -1 else f"rated {s:g} of 10"
+                                + (f" by {it['judge']}" if it.get("judge") else ""))}}
+    return out
+
+
 def _rows_of(task: str, d: Path) -> dict[str, dict]:
     """this model's results on the task, by question key, each with the
     question as its record carries it"""
@@ -326,6 +367,8 @@ def _rows_of(task: str, d: Path) -> dict[str, dict]:
     kind, out = kind_of(task), {}
     if kind == "dm":
         return _dm_rows(task, d)
+    if kind == "mabj":
+        return _mtbench_rows(d)
     if kind == "everyday":
         import everyday as ev
         e = ev.read(d) or {}
@@ -404,11 +447,23 @@ def _rows_of(task: str, d: Path) -> dict[str, dict]:
                 row["context"] = q.get("context") if task == "mab_sql" else doc.get(
                     "prompt", "").split("\nquestion: ", 1)[0].removeprefix("context: ")
                 row["reference"] = q.get("answer")
+                if task in ("mab_cnndm", "mab_xsum"):
+                    # the article: folded on the page; the question is the ask
+                    row["q"] = "Summarise the article."
+                    row["context"] = doc.get("prompt", "").removeprefix(
+                        "Create a short summary of the following article: ")
+                elif task == "mab_dolly":
+                    row["context"] = doc.get("prompt", "").split("\nquestion: ", 1)[0] \
+                        .removeprefix("context: ") if doc.get("prompt", "").startswith(
+                            "context: ") else None
                 if not m:
                     ok, verdict = None, "not scored yet"
-                elif task == "mab_hotpotqa":
+                elif task in ("mab_hotpotqa", "mab_dolly"):
                     ok = m["f1"] >= 0.5
                     verdict = f"F1 {m['f1']:.2f} · EM {m['em']} · BLEU {m['bleu']:.2f}"
+                elif task in ("mab_cnndm", "mab_xsum"):
+                    ok = None                       # overlap with one reference is no verdict
+                    verdict = f"ROUGE-L {m['rougeL']:.2f} · ROUGE-1 {m['rouge1']:.2f}"
                 else:
                     ok = m["sqlparser"] >= 0.5
                     verdict = (f"SQLParser F1 {m['sqlparser']:.2f} · Levenshtein "
@@ -450,7 +505,8 @@ def _stamp(task: str, dirs: dict[str, Path]) -> tuple:
     for mid, d in sorted(dirs.items()):
         files = ([d / "everyday.json"] if task == "everyday" else
                  [d / DM_ITEMS, Path(config.DM_ITEMS)] if task in DM_TASKS else
-                 [f for x in _task_dirs(d, task) for f in x.rglob("samples_*.jsonl")]
+                 [f for t in (MAB_TURNS if task == MAB_MTBENCH else (task,))
+                  for x in _task_dirs(d, t) for f in x.rglob("samples_*.jsonl")]
                  + [d / n for n in ("judge.json", "safety.json", "simpleqa.json",
                                     "generative.json", "mobileaibench.json")])
         out.append((mid, tuple(sorted((str(f), f.stat().st_mtime_ns, f.stat().st_size)
@@ -535,13 +591,19 @@ def meta(task: str) -> dict:
                              "our draw of their design"),
                 "licence": bat["sources"][bench]["license"],
                 "revision": bat["revisions"][name], "url": f"https://huggingface.co/datasets/{name}"}
-    if kind == "mab":
+    if kind in ("mab", "mabj"):
         import mobileaibench as mab
-        c = mab.credits()
-        src = c[1] if task == "mab_hotpotqa" else c[2]
+        m = mab.manifest()
+        src, by = m["sources"][mab.SOURCE[task]], m["sampled_by"]
+        if kind == "mabj":
+            fc = m["fastchat"]
+            return {"source": f"{src['name']} ({src['cite']}), as MobileAIBench runs it; judge "
+                              f"prompts and GPT-4's reference answers from {fc['name']}",
+                    "licence": f"{src['licence']}; MobileAIBench {by['licence']}",
+                    "revision": fc["revision"], "url": fc["url"]}
         return {"source": f"{src['name']} ({src['cite']}), MobileAIBench's 1,000-row sample",
-                "licence": f"{src['licence']}; the sample {c[0]['licence']}",
-                "revision": c[0]["revision"], "url": c[0]["url"]}
+                "licence": f"{src['licence']}; the sample {by['licence']}",
+                "revision": by["revision"], "url": by["url"]}
     if kind == "simpleqa":
         import simpleqa as sq
         c = sq.credit()

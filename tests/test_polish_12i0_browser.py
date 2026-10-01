@@ -31,7 +31,10 @@ NAMES = {"mmlu": "MMLU", "hellaswag": "HellaSwag", "piqa": "PIQA", "winogrande":
          "simpleqa_verified": "SimpleQA Verified",
          # 12o.3: MobileAIBench's two
          "mab_hotpotqa": "HotpotQA (MobileAIBench)",
-         "mab_sql": "SQL from a question (MobileAIBench)"}
+         "mab_sql": "SQL from a question (MobileAIBench)",
+         # 14.1: MobileAIBench's other text sets
+         "mab_dolly": "Dolly (MobileAIBench)", "mab_cnndm": "CNN/DailyMail (MobileAIBench)",
+         "mab_xsum": "XSum (MobileAIBench)", "mab_mtbench": "MT-Bench (MobileAIBench)"}
 
 
 def shot(page_or_part, name, **kw):

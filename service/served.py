@@ -670,9 +670,10 @@ def ask(rec: dict, text: str, s: dict) -> str:
     """one chat message, one reply — thinking the server split off put back in
     its tags, as a local run's text has it, so the board reads it the same"""
     system = [{"role": "system", "content": s["system"]}] if s.get("system") else []
+    # 14.1: MT-Bench's second turn — the conversation so far before the question
     body = {"model": rec["pin"].get("model") or rec["name"],
-            "messages": [*system, {"role": "user", "content": text}],
-            **{k: v for k, v in s.items() if k != "system"}}
+            "messages": [*system, *(s.get("history") or []), {"role": "user", "content": text}],
+            **{k: v for k, v in s.items() if k not in ("system", "history")}}
     if is_openrouter(rec):
         body.update(_pinned_route(rec))
     base, key = _endpoint(rec)
@@ -718,7 +719,7 @@ def ask_raw(rec: dict, text: str, s: dict) -> "Answer":
     root, key = root_of(rec["base_url"]), rec.get("key", "")
     system = [{"role": "system", "content": s["system"]}] if s.get("system") else []
     prompt = _post(root + "/apply-template", key, {
-        "messages": [*system, {"role": "user", "content": text}],
+        "messages": [*system, *(s.get("history") or []), {"role": "user", "content": text}],
         **({"chat_template_kwargs": s["chat_template_kwargs"]}
            if s.get("chat_template_kwargs") else {})}).get("prompt")
     if not isinstance(prompt, str) or not prompt:
@@ -803,13 +804,15 @@ def answer_task(rec: dict, task: str, docs: list[dict], task_out: Path, s: dict,
         if halt or canceled():
             return
         text = prompt_of(docs[i], everyday)
-        held = meter.worst([s.get("system") or "", text], s["max_tokens"]) if meter else 0.0
+        hist = docs[i].get("history") or []
+        held = meter.worst([s.get("system") or "", *(h["content"] for h in hist), text],
+                           s["max_tokens"]) if meter else 0.0
         if meter and not meter.room(held):
             with lock:
                 halt.append(LimitReached(0, total, meter))
             return
         try:
-            a = answer_one(rec, text, s)
+            a = answer_one(rec, text, {**s, "history": hist} if hist else s)
         except ServerStopped as e:
             if meter:
                 meter.release(held)
@@ -1011,17 +1014,18 @@ def about(v: float) -> str:
     return "under $0.01" if 0 < v < 0.005 else f"about {usd(v)}"
 
 
-def _run_tasks(rec: dict, suite: str, tasks: list[str] | None) -> list[str]:
+def _run_tasks(rec: dict, suite: str, tasks: list[str] | None, part: str = "") -> list[str]:
     """the tasks a run of `suite` asks: the chosen ones, less those answered
     already (the run skips them too)"""
     from . import runner
-    todo = config.tasks_for_suite(suite)
+    todo = config.tasks_for_suite(suite, part=part)
     chosen = [t for t in (tasks or []) if t in todo]
     return [t for t in chosen or todo if suite == "everyday" or not runner._task_done(
         model_dir(rec) / f"{t}_{config.NFEWSHOT.get(t, 0)}shot", t)]
 
 
-def estimate(rec: dict, suite: str, tasks: list[str] | None = None, subset: int = 0) -> dict:
+def estimate(rec: dict, suite: str, tasks: list[str] | None = None, subset: int = 0,
+             part: str = "") -> dict:
     """What a run of `suite` would cost, about. The rule, said once:
 
     - each question's prompt as the run sends it, at one token for every four
@@ -1041,7 +1045,7 @@ def estimate(rec: dict, suite: str, tasks: list[str] | None = None, subset: int 
     runner._scripts()
     meta = {"archinfo": archinfo(rec)}
     n = tin = tout = 0
-    for task in _run_tasks(rec, suite, tasks):
+    for task in _run_tasks(rec, suite, tasks, part):
         # 12n.2: GPQA's chain of thought is asked as the generative three are
         if suite == "generative" or task == config.GPQA_COT:
             k = (min(subset, sum(config.MMLU_PRO_SUBJECTS.values())) if task == "mmlu_pro"
@@ -1061,15 +1065,22 @@ def estimate(rec: dict, suite: str, tasks: list[str] | None = None, subset: int 
         elif task == config.SIMPLEQA_TASK:
             import simpleqa as _sq                  # 12n.2: its questions, as the run sends them
             docs = [{"id": q["id"], "prompt": q["prompt"]} for q in _sq.load()]
-        elif task in config.MAB_TASKS:
+        elif task in config.MAB_ALL:
             import mobileaibench as _mab            # 12o.3: its prompts, and its system line
             docs = [{"id": q["id"], "prompt": q["prompt"]} for q in _mab.load(task)]
             tin += len(docs) * tokens_of(_mab.SYSTEM[task])
+            if task == config.MAB_MTB2:
+                # 14.1: the second turn carries the first question and its answer
+                tin += sum(tokens_of(q["turns"][0]) for q in _mab.load(task)) \
+                    + len(docs) * _mab.MTB_MAX_GEN_TOKS
         else:
             path = config.JUDGED_TASKS_DIR / f"{task}.jsonl"
             docs = [json.loads(x) for x in path.read_text(encoding="utf-8").splitlines()
                     if x.strip()] if path.exists() else []
         st = settings_for(rec, meta, everyday)
+        if task in config.MAB_JUDGED_TASKS:
+            import mobileaibench as _mab
+            st = {**st, "max_tokens": max(int(st["max_tokens"]), _mab.MTB_MAX_GEN_TOKS)}
         n += len(docs)
         tin += sum(tokens_of(st.get("system") or "") + tokens_of(prompt_of(d, everyday))
                    for d in docs)

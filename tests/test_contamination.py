@@ -44,7 +44,9 @@ def test_the_exam_is_indexed_in_both_halves(tree, tmp_path_factory):
     assert ix.exam_grams and not ct.BenchmarkIndex(tree['out_dir']).refresh().exam_grams
     halves = {eb.half_of(b["qid"]) for b in bank}
     assert halves == {"report", "diagnose"}
-    assert empty.n_exam == ix.n_exam and not empty.grams
+    # 14.1: with no run on file, the benchmark grams are the pinned files' alone
+    pinned = ct.BenchmarkIndex(tmp_path_factory.mktemp("noresults2")).refresh()
+    assert empty.n_exam == ix.n_exam and empty.grams == pinned.grams and pinned.n_pinned
     for half in ("report", "diagnose"):
         q = next(b["prompt"] for b in sorted(bank, key=lambda b: b["qid"])
                  if eb.half_of(b["qid"]) == half)

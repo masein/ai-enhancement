@@ -1,5 +1,5 @@
 {
- "built": "2026-09-28",
+ "built": "2026-10-01",
  "sampled_by": {
   "name": "MobileAIBench",
   "licence": "Apache-2.0",
@@ -21,9 +21,37 @@
    "url": "https://huggingface.co/datasets/b-mc2/sql-create-context",
    "revision": null,
    "cite": "b-mc2, sql-create-context (2023), built from WikiSQL and Spider"
+  },
+  "databricks_dolly_15k": {
+   "name": "databricks-dolly-15k",
+   "licence": "CC BY-SA 3.0",
+   "url": "https://huggingface.co/datasets/databricks/databricks-dolly-15k",
+   "revision": null,
+   "cite": "Conover et al., Free Dolly: Introducing the World's First Truly Open Instruction-Tuned LLM (Databricks, 2023)"
+  },
+  "cnn_dailymail": {
+   "name": "CNN/DailyMail",
+   "licence": "Apache-2.0",
+   "url": "https://huggingface.co/datasets/abisee/cnn_dailymail",
+   "revision": null,
+   "cite": "Hermann et al., Teaching Machines to Read and Comprehend (NeurIPS 2015); See et al., Get To The Point (ACL 2017)"
+  },
+  "edinburghNLP_xsum": {
+   "name": "XSum",
+   "licence": "not stated (BBC articles)",
+   "url": "https://huggingface.co/datasets/EdinburghNLP/xsum",
+   "revision": null,
+   "cite": "Narayan et al., Don't Give Me the Details, Just the Summary! (EMNLP 2018)"
+  },
+  "mt_bench": {
+   "name": "MT-Bench",
+   "licence": "Apache-2.0 (FastChat)",
+   "url": "https://github.com/lm-sys/FastChat/tree/main/fastchat/llm_judge",
+   "revision": null,
+   "cite": "Zheng et al., Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena (NeurIPS 2023)"
   }
  },
- "note": "MobileAIBench's own 1,000-row samples, as its repository holds them at the revision above; the underlying datasets' revisions are not recorded there",
+ "note": "MobileAIBench's own samples, as its repository holds them at the revision above; MT-Bench's judge prompts and GPT-4 reference answers from FastChat at the commit MobileAIBench's submodule pins. The underlying datasets' revisions are not recorded there. AlpacaEval is left out: tatsu-lab/alpaca_eval is CC BY-NC 4.0",
  "files": {
   "hotpot_qa": {
    "file": "hotpot_qa.csv",
@@ -38,6 +66,57 @@
    "sha256": "45e63fcc8c9d2dd5b36c915f7186d1bb2a6e1dcd4afe859a38576bed23c82818",
    "bytes": 221593,
    "n": 1000
+  },
+  "databricks_dolly_15k": {
+   "file": "databricks_dolly_15k.csv",
+   "from": "data/databricks_dolly_15k.csv",
+   "sha256": "587b3bbc755f416786afae82378271228b065ed7a49fdff5e1994051e736cc8f",
+   "bytes": 1181419,
+   "n": 1000
+  },
+  "cnn_dailymail": {
+   "file": "cnn_dailymail.csv",
+   "from": "data/cnn_dailymail.csv",
+   "sha256": "793fa21cdbda97a9f8de6e06a497bf2fb95b33110e1c7bede8a614f5b9e70459",
+   "bytes": 3141402,
+   "n": 1000
+  },
+  "edinburghNLP_xsum": {
+   "file": "edinburghNLP_xsum.csv",
+   "from": "data/edinburghNLP_xsum.csv",
+   "sha256": "4ea324a8f5567597a1dbbde46fb6f4063d4e298b4e0f17755c8769882d56bf31",
+   "bytes": 1908930,
+   "n": 1000
+  },
+  "mt_bench": {
+   "file": "mt_bench_question.jsonl",
+   "from": "data/mt_bench_question.jsonl",
+   "sha256": "ba960ff0a2d80e4bb7d949e250536db7714dfc752564e25849c812e801c15081",
+   "bytes": 48928,
+   "n": 80
+  },
+  "mt_bench_judge_prompts": {
+   "file": "mt_bench_judge_prompts.jsonl",
+   "from": "fastchat/llm_judge/data/judge_prompts.jsonl",
+   "sha256": "fd283293406d024f44c174b094ef48031d0687a4682fd3a56b29b138f80281b6",
+   "bytes": 10449,
+   "n": 8,
+   "repo": "fastchat"
+  },
+  "mt_bench_reference": {
+   "file": "mt_bench_reference_gpt-4.jsonl",
+   "from": "fastchat/llm_judge/data/mt_bench/reference_answer/gpt-4.jsonl",
+   "sha256": "f957a5bc977badb66885ec970e6cd08527845780313f0995764260e5777b9b3f",
+   "bytes": 51109,
+   "n": 30,
+   "repo": "fastchat"
   }
+ },
+ "fastchat": {
+  "name": "FastChat (MT-Bench)",
+  "licence": "Apache-2.0",
+  "url": "https://github.com/lm-sys/FastChat",
+  "revision": "a37078fc772a3abac082b7af474709d41b5a242b",
+  "cite": "Zheng et al., Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena (NeurIPS 2023)"
  }
 }

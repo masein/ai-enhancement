@@ -203,7 +203,8 @@ def main() -> int:
         # 12n.2: SimpleQA Verified, from the pinned file
         import simpleqa
         config.SIMPLEQA_TASKS_DIR = simpleqa.build_tasks(Path(tmp) / "simpleqa-task")
-        # 12o.3: MobileAIBench's HotpotQA and SQL, from the pinned files
+        # 12o.3: MobileAIBench's sets, from the pinned files (14.1: Dolly,
+        # CNN/DailyMail, XSum and MT-Bench's two turns too)
         import mobileaibench
         config.MAB_TASKS_DIR = mobileaibench.build_tasks(Path(tmp) / "mobileaibench-tasks")
         # 12q: DeviceMark's three, with a stand-in for each question: only whether
@@ -213,7 +214,10 @@ def main() -> int:
                                                      devicemark.stand_in_items())
         seen: dict[str, tuple[bool, str, str]] = {}
         # the full suite's second choice, all of BBQ, is checked as its own line
+        # the mobile suite's judged part (14.1) and the full suite's second choice,
+        # all of BBQ, are checked as lines of their own
         for suite, tasks in [(s, config.tasks_for_suite(s)) for s in config.SUITES] + [
+                ("mobile, judged", config.tasks_for_suite("mobile", part="judged")),
                 ("full, all of BBQ", [config.BBQ_ALL_TASK])]:
             if not tasks:
                 note = (" — the exam has not been built (scripts/exam_build.py)"
@@ -232,7 +236,9 @@ def main() -> int:
                     tail = [ln for ln in text.strip().splitlines() if ln.strip()][-8:]
                     for ln in tail:
                         print(f"    | {ln}")
-            print(f"{suite:<9} {ok} of {len(tasks)} found")
+            # 14.1: MobileAIBench's lines name their sets
+            print(f"{suite:<9} {ok} of {len(tasks)} found"
+                  + (f" ({', '.join(tasks)})" if suite.startswith("mobile") else ""))
         found = sum(1 for good, _, _ in seen.values() if good)
         total = len(seen)
     # 12n.2: GPQA's dataset is gated — finding its tasks says nothing of whether

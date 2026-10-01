@@ -4710,6 +4710,42 @@ Not before the demo: a new hidden set changes every Everyday score.
   strict and loose), a served setup's too. It lists what the board lists: the
   diagnose half.
 
+### 14.1 — MobileAIBench's other text sets (1 Oct)
+
+- **Five sets with no judge, the "mobile" suite as before**: HotpotQA and
+  SQL (12o.3), and now Dolly (F1), CNN/DailyMail and XSum (ROUGE-L) —
+  MobileAIBench's own 1,000-row samples, committed and pinned by commit and
+  sha256 in `eval_tasks/mobileaibench/manifest.json`, their prompts word for
+  word, their metrics ported (`scripts/mobileaibench.py`; ROUGE as
+  `rouge_score` computes it, with NLTK's Porter stemmer: no new package).
+- **MT-Bench, the suite's "judged" part** (`part=judged`): FastChat's 80
+  questions in two turns — the second asked after the model's own first
+  answer (as messages to a server; in the model's own chat template as text
+  for lm_eval, `runner._chat_renderer`, its folder under
+  `BENCH_ROOT/mobileaibench/turn2/<model>`) — each turn rated 1–10 by the
+  board's judge with FastChat's single-answer prompts (GPT-4's reference for
+  maths, reasoning and coding), read as FastChat reads "[[rating]]". The
+  answers get FastChat's 1,024 tokens (thinking models the Everyday room).
+- **Answers first, judging second**: the run writes its answers and is done.
+  `start_judge` sends what waits as one batch (kind `mab`; a custom id names
+  the model's folder); a judge that is offline, not set up or unreachable
+  leaves the turns "awaiting judge" — the column says so — and **Judge now**
+  on the model page (`POST /api/mobileaibench/judge`, or
+  `python scripts/mobileaibench.py --judge <results>/<model>`) sends them
+  later. A rating counts only with the judge that gave it (12i.1).
+- **AlpacaEval is left out**: tatsu-lab/alpaca_eval is CC BY-NC 4.0.
+- **Before Start**, Test a model shows each part's answers and time (the
+  model's measured pace, else a guess) and, for the judged part, the judge's
+  judgements, tokens and an OpenRouter judge's cost
+  (`GET /api/mobileaibench/estimate`).
+- **Their paper's numbers** (Tables 1 and 3, 16-bit) come in as a reported
+  source of their own, "MobileAIBench paper", from
+  `eval_tasks/mobileaibench/paper.json` — never fetched, never ranked; MT-Bench
+  says "judge differs" (theirs GPT-4).
+- **Never a training target**: every row of every pinned file (questions,
+  contexts, references) is in the contamination index before any run.
+- Step 4 names the mobile sets, and checks the judged part on a line of its own.
+
 ### 12z D — the QA walk's state and content (1 Oct)
 
 - **D1. Improve with the judge offline**: the AI line says "judge offline"
