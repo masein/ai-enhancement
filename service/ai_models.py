@@ -317,6 +317,15 @@ def label(job: str) -> str:
     return f"{p} {m}".strip() if p else "none"
 
 
+def is_local(job: str) -> bool:
+    """12z D1: the job runs on the local server — the one the judge's health
+    probe asks, so when that is down this job can't be done either"""
+    c = choice(job)
+    if c:
+        return c.get("kind") == LOCAL
+    return _env(job)[0] == LOCAL
+
+
 def pin(model_id: str) -> dict:
     """An OpenRouter model, pinned: the id, its dated version and its first
     provider, with that provider's prices — or ValueError, in one line. The

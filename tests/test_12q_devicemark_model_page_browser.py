@@ -330,3 +330,37 @@ def test_at_400px(live, page, runs, scheme):
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
     shot(page.locator("[data-dm-ans]").first, f"answer-400-{scheme}.png")
     assert page.errors == []
+
+
+@pytest.mark.parametrize("width", [1400, 375])
+def test_devicemarks_answers_reach_past_200_fifty_at_a_time(live, page, runs, width):
+    """12z D4: "50 of 596 shown" — the page asked for a longer first page each
+    time, and the server gives at most 200: past that, Show more did nothing"""
+    total, asked = 596, []
+
+    def handle(route):
+        from urllib.parse import parse_qs, urlparse
+        q = {k: v[0] for k, v in parse_qs(urlparse(route.request.url).query).items()}
+        asked.append(q)
+        off, lim = int(q.get("offset", 0)), min(int(q.get("limit", 50)), 200)
+        items = [{"bench": "mmlu_pro", "key": f"p{i}", "q": f"item {i}", "options": [], "subject": "",
+                  "gold": "A", "parsed": "A", "answered": True, "ok": True, "capped": False,
+                  "tokens": 10, "answer": "A", "thinking": "", "verdict": "", "fallback": None,
+                  "error": None} for i in range(off, min(total, off + lim))]
+        route.fulfill(json={"model": MTP, "thinking": False, "bench": None, "total": total,
+                            "offset": off, "counts": {}, "items": items})
+    page.route("**/api/devicemark/answers*", handle)
+    model_page(page, live, MTP, width=width)
+    page.locator("[data-mtab='answers']").click()
+    shown = "document.querySelector('[data-dm-ans-shown]')?.dataset.dmAnsShown"
+    page.wait_for_function(f"{shown} === '50'")
+    for n in (100, 150, 200, 250):
+        page.locator("[data-dm-ans-more]").click()
+        page.wait_for_function(f"{shown} === '{n}'")
+    assert page.locator("[data-dm-ans-shown]").inner_text() == "250 of 596 shown"
+    # each next page from where the list stops, never a longer first page
+    assert [(q.get("offset"), q.get("limit")) for q in asked][-5:] == [
+        ("0", "50"), ("50", "50"), ("100", "50"), ("150", "50"), ("200", "50")]
+    assert page.locator("[data-dm-ans]").count() == 250
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
+    assert page.errors == []

@@ -4710,6 +4710,36 @@ Not before the demo: a new hidden set changes every Everyday score.
   strict and loose), a served setup's too. It lists what the board lists: the
   diagnose half.
 
+### 12z D — the QA walk's state and content (1 Oct)
+
+- **D1. Improve with the judge offline**: the AI line says "judge offline"
+  beside the judge's name, and while the training-data writer runs on the
+  same local server (`/api/llm` → `ai_local`, from `ai_models.is_local`),
+  every Propose — Improve's, each weak spot's, the topic page's — is
+  disabled with the reason in words. A writer on OpenRouter keeps Propose.
+  A change in the judge's health redraws Improve.
+- **D2. A served page's launch** (`served.launch_check`, in its `view` as
+  `launch`): the flags and environment registered, whether its server's
+  slots draft tokens, and each disagreement in amber — a long flag in "How
+  it's served" the registered flags don't have (`--cpu-moe` beside
+  `--n-cpu-moe 21`), a context the text or the flags give that the server
+  doesn't report, MTP registered with no drafting or drafting with no MTP.
+  llama-server doesn't report its command line; its context, build and file
+  are the line above.
+- **D3. Confirmed, not changed**: the Playground's suggestions are drawn from
+  `/api/playground/practice`, which lists Everyday's practice half and the
+  exam's diagnose half only. A test now checks no id the hidden store holds
+  is ever offered (`tests/test_12z_d.py`), and across twelve new chats on
+  the page.
+- **D4. DeviceMark's answers page by offset**, fifty at a time from where the
+  list stops; asking for a longer first page stopped at the server's 200.
+- **D5. Runs**: a failed or stopped run that a later run of the same model,
+  suite, part and thinking mode (and, for the exam, topics) finished says
+  "superseded by #N", which follows that run; Resubmit is in its ⋯ menu. An
+  error is said once (a failed run's progress is often its error). Resubmit
+  keeps the run's thinking mode, subset, BBQ set, and a DeviceMark run's
+  part and pair — it used to drop them.
+
 ### 12z C — the QA walk's layout (1 Oct)
 
 - **C1. The Answers tab**: which answers (Knowledge exam · Everyday tasks ·

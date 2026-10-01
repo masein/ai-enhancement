@@ -6826,8 +6826,28 @@ function servedHead(m) {
     el('p', { class: 'small se', 'data-served-pin': m.id, text: isOpenRouter(s)
       ? `Pinned to ${pinLine(s.pin)}, with no fallbacks. Every run checks it still is.`
       : 'Its server reported ' + pinLine(s.pin) + '. Every run checks it still does.' }),
+    servedLaunch(m),
     el('p', { class: 'small', 'data-served-loglik': m.id, text: SERVED_LINE }),
     servedCompare(m), servedSetups(m));
+}
+// 12z D2: beside "How it's served" (free text, which goes stale): the launch
+// as registered, whether its server's slots draft tokens, and each place the
+// two disagree. llama-server doesn't report its command line; its context,
+// build and file are on the line above
+function servedLaunch(m) {
+  const L = (servedOf(m.id) || {}).launch;
+  if (!L) return '';
+  const reg = [L.flags, L.env].filter(Boolean).join(' · ');
+  return el('div', { 'data-served-launch': m.id },
+    el('p', { class: 'small' }, el('span', { class: 'se', text: 'Launch, as registered: ' }),
+      reg ? el('span', { class: 'mono', 'data-served-launch-reg': m.id, text: reg })
+        : el('span', { class: 'se', 'data-served-launch-reg': '', text: 'none registered — its '
+          + 'lookahead and MTP are read from the line above until it is' }),
+      L.speculative == null ? '' : el('span', { class: 'se', 'data-served-drafts': String(L.speculative),
+        text: ` · its server ${L.speculative ? 'drafts tokens (MTP or a draft model)'
+          : 'drafts nothing'}` })),
+    ...(L.mismatch || []).map(x => el('p', { class: 'warn small', 'data-served-mismatch': m.id,
+      text: x })));
 }
 // 12f.3 addendum: served entries whose servers report the same file are setups
 // of it — side by side: the score, the answers' median length, how many ran
@@ -11477,20 +11497,26 @@ function dmModelCard(m, mode) {
 const dmAnswerModes = id => ['off', 'on'].filter(mo => (((dmRunsOf(id) || {})[mo] || {}).row || {})
   .items);
 const DM_BENCH_WORDS = { ifeval: 'IFEval', mmlu_pro: 'MMLU-Pro', math: 'MATH' };
+const DM_ANS_PAGE = 50;
 function dmAnswersList(m, modes) {
   const A = state.dmAns;
   if (A.model !== m.id) Object.assign(A, { model: m.id, mode: modes[0], bench: '', n: 50,
     data: null, key: null, msg: '' });
   if (!modes.includes(A.mode)) A.mode = modes[0];
-  const key = `${A.model}|${A.mode}|${A.bench}|${A.n}`;
-  if (A.key !== key && !A.loading) {
+  // 12z D4: fifty at a time, each next fifty from where the list stops — the
+  // server pages by offset and gives at most 200 at once, so asking for a
+  // longer first page stopped at 200 of 596
+  const key = `${A.model}|${A.mode}|${A.bench}`;
+  const ask = (offset, keep) => {
     A.loading = true;
     api(`api/devicemark/answers?model=${encodeURIComponent(A.model)}&thinking=${A.mode === 'on'}`
-      + `&bench=${A.bench}&limit=${A.n}`)
-      .then(j => { A.data = j; A.msg = ''; })
+      + `&bench=${A.bench}&offset=${offset}&limit=${DM_ANS_PAGE}`)
+      .then(j => { A.data = keep ? { ...j, items: [...keep, ...j.items] } : j; A.msg = ''; })
       .catch(e => { A.msg = String((e && e.message) || e); })
-      .finally(() => { A.loading = false; A.key = key; render(); });
-  }
+      .finally(() => { A.loading = false; A.key = key; A.n = (A.data || {}).items
+        ? A.data.items.length : A.n; render(); });
+  };
+  if (A.key !== key && !A.loading) ask(0, null);
   const d = A.key === key ? A.data : null, counts = (d || A.data || {}).counts || {};
   const chip = (on, label, attrs, go) => el('button', { class: 'chip-btn' + (on ? ' on' : ''),
     'aria-pressed': String(on), ...attrs, onclick: () => { go(); render(); } }, label);
@@ -11553,8 +11579,10 @@ function dmAnswersList(m, modes) {
         el('div', { class: 'evthink-t', text: x.thinking })) : ''));
   }
   if (d.total > d.items.length) wrap.append(el('button', { class: 'quiet', 'data-dm-ans-more': '1',
-    text: `Show ${Math.min(50, d.total - d.items.length)} more`,
-    onclick: () => { A.n += 50; render(); } }));
+    disabled: A.loading ? '' : null,
+    text: A.loading ? 'Loading…' : `Show ${Math.min(DM_ANS_PAGE, d.total - d.items.length)} more`,
+    onclick: e => { e.currentTarget.disabled = true; e.currentTarget.textContent = 'Loading…';
+      ask(d.items.length, d.items); } }));
   return wrap;
 }
 // 12n.1: on every other chip, a line when chosen models are known only as reported
@@ -15938,9 +15966,13 @@ async function queueResubmit(r, regrade = false, extra = {}) {
   try { tasks = JSON.parse(r.tasks || '[]'); } catch (e) { /* older row */ }
   state.qRc = null;
   try {
+    // 12z D5: the run as it was — its thinking mode, subset, BBQ set, and a
+    // DeviceMark run's part and pair, which a resubmit used to drop
     const j = await post('api/submissions', { hf_id: r.hf_id, kind: r.kind || 'auto',
       suite: r.suite, note: r.note || '', submitter: whoName() || r.submitter || '',
-      ...(tasks.length ? { tasks } : {}), ...extra });
+      ...(tasks.length ? { tasks } : {}), ...(r.thinking ? { thinking: true } : {}),
+      ...(r.subset ? { subset: r.subset } : {}), ...(r.bbq_all ? { bbq_all: true } : {}),
+      ...(r.part ? { part: r.part } : {}), ...(r.pair ? { pair: r.pair } : {}), ...extra });
     rememberQueued(j.id);
     markQueueRow(j.id);
     toast(j.note ? `#${j.id}: ${j.note}`
@@ -16051,6 +16083,16 @@ function runStage(r) {
   return { key: r.status, cls: r.status, text: r.status };
 }
 
+// 12z D5: a failed or stopped run that a later run of the same model, suite,
+// part and thinking mode (and, for the exam, the same topics) finished
+function supersededBy(r) {
+  if (!['failed', 'canceled'].includes(r.status)) return null;
+  const same = x => x.id > r.id && x.status === 'done' && x.hf_id === r.hf_id
+    && x.suite === r.suite && (x.part || '') === (r.part || '') && !!x.thinking === !!r.thinking
+    && (r.suite !== 'judged' || (x.tasks || '[]') === (r.tasks || '[]'));
+  const later = allRuns().filter(same).sort((a, b) => a.id - b.id)[0];
+  return later ? later.id : null;
+}
 function queueActions(r) {
   const id = String(r.id);
   // 11g: the log opens in the reader; the raw text is one item further down
@@ -16103,6 +16145,12 @@ function queueActions(r) {
   }
   if (r.suite === 'gguf' && (r.status === 'failed' || r.status === 'canceled'))
     return cell(ggufRerunButton(r.id, r.gguf_left || [], true));
+  // 12z D5: replaced by a later run: that run, and Resubmit in the menu
+  const by = supersededBy(r);
+  if (by && (r.status === 'failed' || r.status === 'canceled'))
+    return cell(el('a', { href: '#tab=runs', class: 'small', 'data-row-superseded': String(by),
+      title: `#${by} ran the same model, suite and part, and finished`, text: `superseded by #${by}`,
+      onclick: e => { e.preventDefault(); followRun(by); } }), resubmit);
   if (r.status === 'failed' || r.status === 'canceled')
     return cell(ghost('data-row-resubmit', 'Resubmit', () => queueResubmit(r),
       { title: `the same model, suite${r.suite === 'judged' ? ' and topics' : ''}, queued again` }));
@@ -16306,7 +16354,10 @@ function vQueue(part = { form: true, list: true }) {
     el('td', { text: r.submitter || '—' }),
     el('td', { 'data-watch': `q|${r.id}|status` }, (() => { const st = runStage(r);
       return el('span', { class: stClass(st.cls), 'data-stage': st.key, text: st.text }); })()),
-    el('td', { class: 'small', text: r.progress || '', 'data-watch': `q|${r.id}|progress` },
+    // 12z D5: a failed run's progress is often its error: said once, as the error
+    el('td', { class: 'small', 'data-watch': `q|${r.id}|progress`,
+      text: r.error && r.progress && (r.error.includes(r.progress.trim())
+        || r.progress.includes(r.error.trim())) ? '' : r.progress || '' },
       // the GPU half finishing is not the job finishing: the judge batch is
       // still out, and the row says how far it is
       r.judge && !r.judge_failed && r.suite !== 'everyday' ? el('div', { class: 'se',
@@ -17603,7 +17654,8 @@ function docLine(d) {
 function aiLine(llm, writer = 'data') {
   const ai = llm.ai || {};
   return el('span', { 'data-ai-line': writer },
-    `AI: judge ${ai.judge || 'none'} · writer ${ai[writer] || 'none'}`,
+    `AI: judge ${ai.judge || 'none'}`, judgeDown() ? [' ', judgeChip()] : '',
+    ` · writer ${ai[writer] || 'none'}`,
     llm.ai_waiting ? ` · ${llm.ai_waiting}` : '',
     LIVE ? [' · ', el('a', { href: '#tab=ai', 'data-ai-change': '1', text: 'change',
       onclick: e => { e.preventDefault(); navigate({ tab: 'ai', model: null, topic: null }); } })]
@@ -18343,15 +18395,18 @@ function vPipeline() {
   const head = el('div', { class: 'card imphead', 'data-pipeline': m.id },
     el('div', { class: 'rvbar' },
       el('h2', { class: 'imp-title' }, 'Improving: ', picker),
-      el('button', { class: 'primary', 'data-imp-propose': '1', text: 'Propose',
-        title: first ? `opens on ${frName(first.task)}, the weakest topic a proposal can be `
-          + 'made from' : 'no weak spot a proposal can be made from yet',
+      el('button', proposeGate({ class: 'primary', 'data-imp-propose': '1', text: 'Propose',
         onclick: () => npDialog({ model: m.id, topic: first ? frName(first.task) : '',
-          returnTo: '[data-imp-propose]' }) })),
+          returnTo: '[data-imp-propose]' }) }, first ? `opens on ${frName(first.task)}, the `
+          + 'weakest topic a proposal can be made from'
+          : 'no weak spot a proposal can be made from yet'))),
     el('p', { class: 'sub', text: 'What the Knowledge exam and Everyday tasks say this model is '
       + 'missing, the data made for it, and what training changed. The Standard benchmarks are only watched here, '
       + 'never trained toward.' }),
     !llm.configured && llm.reason ? el('p', { class: 'warn', text: llm.reason }) : '',
+    // 12z D1: why Propose waits, in words, where the buttons are
+    proposeDown() ? el('p', { class: 'warn', 'data-propose-down-why': '1' }, judgeChip(), ' ',
+      proposeDownWhy()) : '',
     // 12i.3: the way to AI models, set up or not — a job without a model is
     // exactly when it is needed
     llm.ai ? el('p', { class: 'small se', 'data-imp-ai': '1' }, aiLine(llm)) : '',
@@ -18377,17 +18432,17 @@ function impStagesCard(m) {
       [tag('exam'), ' ', frName(w.task), ' ',
        el('span', { class: 'mono', text: `${num(w.v, 2)}/4` })],
       w.why ? el('span', { 'data-weak-why': w.task, text: w.why }) : '',
-      w.why ? '' : el('button', { class: 'ghost', 'data-weak-propose': w.task, text: 'Propose',
-        onclick: () => npDialog({ model: m.id, topic: frName(w.task),
-          returnTo: `[data-weak-propose="${CSS.escape(w.task)}"]` }) }))
+      w.why ? '' : el('button', proposeGate({ class: 'ghost', 'data-weak-propose': w.task,
+        text: 'Propose', onclick: () => npDialog({ model: m.id, topic: frName(w.task),
+          returnTo: `[data-weak-propose="${CSS.escape(w.task)}"]` }) }, null)))
     : impItem({ 'data-weak': w.task, 'data-weak-kind': 'everyday' },
       [tag('everyday'), ' ', w.label],
       // the score on the line under the name: "8 of 24 hidden questions"
       [el('span', { class: 'mono', 'data-weak-score': w.task,
         text: `${w.x.passed} of ${w.x.total}` }), ' hidden questions',
        w.why ? el('span', { 'data-weak-why': w.task, text: ' · ' + w.why }) : ''],
-      w.why ? '' : el('button', { class: 'ghost', 'data-weak-propose': w.task, text: 'Propose',
-        onclick: e => impProposeEveryday(m, w.g, e.currentTarget) }))),
+      w.why ? '' : el('button', proposeGate({ class: 'ghost', 'data-weak-propose': w.task,
+        text: 'Propose', onclick: e => impProposeEveryday(m, w.g, e.currentTarget) }, null)))),
     ...evw.under.map(w => impItem({ 'data-weak': w.task, 'data-weak-kind': 'everyday',
         'data-weak-need': String(w.need), class: 'stageitem greyed' },
       [tag('everyday'), ` ${w.label} · needs ${w.need} more hidden question`
@@ -18616,7 +18671,9 @@ function setJudgeHealth(h) {
   if (sig === _judgeSig) return;
   _judgeSig = sig;
   renderFresh();
-  if ((state.tab === 'queue' || state.topic) && !state.model) render();
+  // 12z D1: and Improve, whose Propose waits on it
+  if ((state.tab === 'queue' || state.topic || placeOf(state.tab) === 'improve') && !state.model) render();
+  else if (state.model && state.mtab === 'improve') render();
   else if (state.model && state.msitRedraw) state.msitRedraw();
 }
 async function loadJudgeHealth() {
@@ -18635,6 +18692,20 @@ function judgeOfflineLine() {
   if (!judgeDown()) return '';
   return el('p', { class: 'warn', 'data-judge-offline-why': '1' }, judgeChip(), ' ', judgeWhy());
 }
+// 12z D1: Propose is written by the training-data writer. When that runs on
+// the local server and the judge's probe finds the server down, Propose
+// waits, and says why — the buttons stayed live while the header said
+// "judge offline"
+const proposeDown = () => judgeDown() && (((state.rv.llm || {}).ai_local || {}).data !== false);
+function proposeDownWhy() {
+  const w = (state.judgeHealth || {}).why || 'the local AI server is not answering';
+  return w[0].toUpperCase() + w.slice(1) + '. The judge and the training-data writer both run '
+    + 'there: start it, then Propose.';
+}
+// the attributes a Propose button takes while it waits
+const proposeGate = (attrs, title) => proposeDown()
+  ? { ...attrs, disabled: '', 'aria-disabled': 'true', 'data-propose-down': '1', title: proposeDownWhy() }
+  : { ...attrs, title };
 
 function loopRowOf(slug) {
   return (state.loop.rows || []).find(r => r.slug === slug) || null;
@@ -18727,6 +18798,12 @@ function proposeControl(r) {
         e.preventDefault();
         openReader({ kind: 'proposal', id: String(open.id) },
           `[data-review-link="${open.id}"]`); } }), actNote(slot));
+  // 12z D1: the server that writes it is down: it waits, and says why
+  if (proposeDown() && (gate.ok || gate.overridable))
+    return el('div', {}, el('button', proposeGate({ ...attrs, class: 'primary', 'data-gate': 'down',
+        text: 'Propose' }, null)),
+      el('div', { class: 'propwhy', 'data-why': 'propose', text: 'judge offline — start it, then Propose' }),
+      actNote(slot));
   // 11k: one dialog, here too — it opens over this page and does not leave it
   if (gate.ok)
     return el('div', {}, el('button', { ...attrs, class: 'primary', 'data-gate': 'ok',
