@@ -1489,6 +1489,8 @@ def _llm_status() -> dict:
             # 12i.1: each job's model in words, for the one line on Improve and
             # the Knowledge exam ("AI: judge DeepSeek V4.1 Flash · writer GLM 5.3")
             "ai": {j: ai_models.label(j) for j in ai_models.JOBS},
+            # 12z D1: which jobs are on the local server, whose health the page polls
+            "ai_local": {j: ai_models.is_local(j) for j in ai_models.JOBS},
             "ai_waiting": ai_models.over_limit(),
             "note": "the tailnet is the auth boundary: approvals record a typed name, "
                     "nothing more"}

@@ -372,6 +372,42 @@ def launch(rec: dict | None) -> dict | None:
     return lk
 
 
+_LONG_FLAG = re.compile(r"(?<![\w-])(--[a-z][a-z0-9-]*)")
+_CTX = re.compile(r"(?:^|\s)(?:-c|--ctx-size)[ =](\d+)")
+
+
+def launch_check(rec: dict | None) -> dict | None:
+    """12z D2: the launch as registered beside what its server reports, and
+    where they disagree — "How it's served" is free text, and goes stale (it
+    said --cpu-moe while the server ran --n-cpu-moe 21). llama-server doesn't
+    report its command line: what it reports is its context, build and file,
+    and whether its slots draft tokens"""
+    if not rec or is_openrouter(rec):
+        return None
+    from .devicemark import dm
+    flags, env, how = rec.get("flags") or "", rec.get("env") or "", rec.get("how") or ""
+    pin, spec = rec.get("pin") or {}, rec.get("speculative")
+    lk = dm().launch_of(flags, env)
+    out = []
+    if flags:
+        have = set(_LONG_FLAG.findall(flags))
+        extra = [f for f in dict.fromkeys(_LONG_FLAG.findall(how)) if f not in have]
+        if extra:
+            out.append(f"“How it’s served” says {', '.join(extra)}; the launch flags registered "
+                       "don’t")
+    for where, text in (("“How it’s served”", how), ("The launch flags", flags)):
+        m = _CTX.search(text)
+        if m and pin.get("ctx") and int(m.group(1)) != int(pin["ctx"]):
+            out.append(f"{where} say{'s' if where[0] == '“' else ''} a context of "
+                       f"{int(m.group(1)):,}; its server reports {int(pin['ctx']):,}")
+    if spec is False and lk["mtp"]:
+        out.append("The launch registered has MTP, but its server’s slots draft nothing")
+    if spec is True and not lk["mtp"]:
+        out.append("Its server’s slots draft tokens, but the launch registered has no --spec-type")
+    return {"flags": flags, "env": env, "ctx": pin.get("ctx"), "build": pin.get("build") or "",
+            "speculative": spec, "mismatch": out}
+
+
 def launch_of_id(model_id: str) -> dict | None:
     return launch(get(model_id)) if is_served(model_id) else None
 
@@ -471,6 +507,8 @@ def view(rec: dict) -> dict:
             "same_as": rec.get("same_as"),
             # 12i.4: measured by its last run — Test a model's time estimate
             "speed": rec.get("speed"),
+            # 12z D2: its launch as registered, what its server reports, and where they differ
+            "launch": launch_check(rec),
             # 12m.3: a model from OpenRouter, its maker, and the MMLU-Pro
             # subset it sits unless a person clears it
             **({"via": OPENROUTER, "maker": rec.get("maker") or "",
