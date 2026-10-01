@@ -441,6 +441,30 @@ def test_a_served_model_and_its_gguf_are_one_model(live, page, board):
     assert page.errors == []
 
 
+@pytest.mark.parametrize("width", [1400, 375])
+def test_the_ggufs_address_opens_its_block_with_measure(live, page, board, width):
+    """12z B1: the GGUF's own address lands on the served page at its GGUF's
+    block, open, Measure in it — the numbers were inside a closed Standard"""
+    go(page, live, "model=" + quote(board["gguf"], safe=""), "[data-model-hero]", width=width)
+    blk = page.locator("[data-kind-block='gguf']")
+    blk.wait_for()
+    assert blk.get_attribute("open") is not None
+    assert blk.locator(f"[data-gguf-part='{SERVED}'] [data-gguf-row]").count() > 0
+    assert blk.locator(f"[data-gg-measure='{SERVED}']").is_visible()
+    assert page.locator("[data-kind-block='standard'] [data-gguf-part]").count() == 0
+    # the tile says how many, and opens it
+    tile = page.locator("[data-kind-tile='gguf']")
+    assert tile.locator(".ktile-k").inner_text().lower() == "on its gguf · llama.cpp"
+    assert re.fullmatch(r"\d+ of \d+", tile.locator("[data-kind-value='gguf']").inner_text())
+    # Measure opens the dialog for the GGUF, from here
+    blk.locator(f"[data-gg-measure='{SERVED}']").click()
+    page.locator(f"[data-gg-measure-dialog='{board['gguf']}']").wait_for()
+    page.keyboard.press("Escape")
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
+    shot(blk, f"gguf-block-{width}.png")
+    assert page.errors == []
+
+
 def test_compares_everyday_count_is_the_results(live, page):
     go(page, live, f"tab=models&view=compare&m={ids(GOOD, SKEWED)}", "[data-compare='2']")
     n = page.evaluate(f"evdOf({json.dumps(GOOD)}).total")
