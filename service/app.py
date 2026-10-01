@@ -494,10 +494,16 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
     pair = (s.pair or "").strip()
     # 14.1: the mobile suite's two parts — none (no judge), or judged (MT-Bench)
     if s.suite == "mobile" and part not in config.MAB_PARTS:
-        raise HTTPException(422, "the mobile suite's part is judged (MT-Bench), or none for its "
-                                 "five sets with no judge")
+        raise HTTPException(422, "the mobile suite's part is judged (MT-Bench), trust "
+                                 "(Adversarial Instruction, Privacy Leakage, Social Chemistry "
+                                 "101), or none for its five sets with no judge")
     if s.suite == "mobile" and pair:
         raise HTTPException(422, "pair is for the devicemark suite only")
+    if s.suite == "mobile" and part == "trust":
+        # 14.2: Privacy Leakage is fetched at deploy (scripts/fetch_data.py)
+        why = next((_mab().available(t) for t in _mab().TRUST if _mab().available(t)), "")
+        if why:
+            raise HTTPException(422, why + ". Nothing was queued.")
     if s.suite not in ("devicemark", "mobile") and (part or pair):
         raise HTTPException(422, "pair is for the devicemark suite only, and part for it and "
                                  "the mobile suite")

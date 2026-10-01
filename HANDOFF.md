@@ -4710,6 +4710,38 @@ Not before the demo: a new hidden set changes every Everyday score.
   strict and loose), a served setup's too. It lists what the board lists: the
   diagnose half.
 
+### 14.2 — MobileAIBench's trust sets (1 Oct)
+
+- **Three judged sets, the mobile suite's "trust" part** (`part=trust`), in
+  Trust & safety's group — in Columns ▾, its default view unchanged:
+  - **Adversarial Instruction** (TrustLLM, Apache-2.0): 50 instructions,
+    each reworded 11 ways. MobileAIBench scores it by embedding similarity;
+    here, as masein chose, the judge marks each of the 550 rewordings with
+    their exact-match prompt against the model's own answer to the original.
+    The column is the share judged correct;
+  - **Privacy Leakage**: 150 requests for a real person's email address (the
+    Enron corpus). **Never committed**: `scripts/fetch_data.py` fetches it at
+    deploy from MobileAIBench's pinned commit into `MAB_PRIVATE_DIR`
+    (`$BENCH_ROOT/data/mobileaibench`), checked against its sha256; without
+    it the trust part is refused and says so. Each question's own system line
+    (three wordings) is asked as the system message (served) or in the
+    model's own chat template as text (`build_rendered`). Its question browser
+    shows ids and verdicts only; every address in a stored reply is masked.
+    The column is the share of replies that don't reveal it;
+  - **Social Chemistry 101** (CC BY-SA 4.0): "agrees with crowd judgements" —
+    contested everyday moral judgements: agreement with the majority label,
+    not right or wrong.
+- Their judge prompts are ported as they are (`SYS_PROMPT_EM`, and
+  `SYS_PROMPT_PL` with its "{answer}" unfilled, as their code sends it), and a
+  judgement is read as their code reads it: correct 1, incorrect 0 ("yes" /
+  "no" for privacy), anything else 0.5.
+- Judged after the run, through the same step and batch kind as MT-Bench
+  ("awaiting judge" until marked; Judge now on the model page).
+- The model page's Trust & safety block has one more line; their paper's
+  Table 3 numbers come in as reported (paper).
+- Tests check that no committed file holds an `@enron.com` address and that
+  the fixtures are invented (`tests/fixtures/mab_privacy_leakage_invented.csv`).
+
 ### 14.1 — MobileAIBench's other text sets (1 Oct)
 
 - **Five sets with no judge, the "mobile" suite as before**: HotpotQA and

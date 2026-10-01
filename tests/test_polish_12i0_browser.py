@@ -34,7 +34,11 @@ NAMES = {"mmlu": "MMLU", "hellaswag": "HellaSwag", "piqa": "PIQA", "winogrande":
          "mab_sql": "SQL from a question (MobileAIBench)",
          # 14.1: MobileAIBench's other text sets
          "mab_dolly": "Dolly (MobileAIBench)", "mab_cnndm": "CNN/DailyMail (MobileAIBench)",
-         "mab_xsum": "XSum (MobileAIBench)", "mab_mtbench": "MT-Bench (MobileAIBench)"}
+         "mab_xsum": "XSum (MobileAIBench)", "mab_mtbench": "MT-Bench (MobileAIBench)",
+         # 14.2: and its three trust sets
+         "mab_adv": "Adversarial Instruction (MobileAIBench)",
+         "mab_privacy": "Privacy Leakage (MobileAIBench)",
+         "mab_socchem": "Social Chemistry 101 (MobileAIBench)"}
 
 
 def shot(page_or_part, name, **kw):

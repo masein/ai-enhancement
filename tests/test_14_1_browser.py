@@ -149,7 +149,7 @@ def test_test_a_model_offers_two_parts_each_with_what_it_takes(live, page, width
         "· 5,000 answers, about 83 min, a rough guess"
     assert page.locator("[data-mab-part-est='judged']").inner_text().strip().startswith(
         "· 160 answers")
-    j = page.locator("[data-mab-judge-est]").inner_text()
+    j = page.locator("[data-mab-part='judged'] [data-mab-judge-est]").inner_text()
     assert j.startswith("The judge (") and "160 judgements · about " in j and "judge tokens" in j
     assert j.endswith("each answer guessed at 400 tokens")
     no_sideways(page)

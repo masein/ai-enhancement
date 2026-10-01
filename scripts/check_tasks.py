@@ -218,6 +218,7 @@ def main() -> int:
         # all of BBQ, are checked as lines of their own
         for suite, tasks in [(s, config.tasks_for_suite(s)) for s in config.SUITES] + [
                 ("mobile, judged", config.tasks_for_suite("mobile", part="judged")),
+                ("mobile, trust", config.tasks_for_suite("mobile", part="trust")),
                 ("full, all of BBQ", [config.BBQ_ALL_TASK])]:
             if not tasks:
                 note = (" — the exam has not been built (scripts/exam_build.py)"

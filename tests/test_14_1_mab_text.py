@@ -39,6 +39,8 @@ def test_the_manifest_pins_every_file_and_its_rows():
     assert m["sampled_by"]["revision"] == "cff7b48f3b1e0c3e2549c2ae211ce14a4ceba8d1"
     assert m["fastchat"]["revision"] == "a37078fc772a3abac082b7af474709d41b5a242b"
     for name, f in m["files"].items():
+        if not f.get("committed", True):
+            continue                          # 14.2: Privacy Leakage, never in the repo
         raw = (mab.DATA_DIR / f["file"]).read_bytes()
         assert hashlib.sha256(raw).hexdigest() == f["sha256"], name
         assert len(raw) == f["bytes"], name
@@ -373,7 +375,10 @@ def test_openrouters_estimate_counts_the_judged_part(monkeypatch, tmp_path):
 
 def test_every_new_item_is_in_the_contamination_index_before_any_run(tmp_path):
     ix = contamination.BenchmarkIndex(tmp_path / "nothing-run").refresh()
-    assert ix.n_pinned == 1000 * 5 + 80 + 30
+    # every committed row (14.2: the trust sets' 600 and 500 too)
+    assert ix.n_pinned == sum(f["n"] for k, f in mab.manifest()["files"].items()
+                              if f.get("committed", True) and k != "mt_bench_judge_prompts")
+    assert ix.n_pinned >= 1000 * 5 + 80 + 30
     for t in (mab.DOLLY, mab.CNNDM, mab.XSUM):
         words = contamination.normalize(mab.load(t)[3]["answer"])
         if len(words) >= contamination.NGRAM:
@@ -394,7 +399,9 @@ def test_their_papers_numbers_come_in_reported_and_never_ranked(svc):
     assert mt["value"] == pytest.approx(5.187) and mt["unit"] == "points"
     assert "judge GPT-4" in mt["setting"]
     assert v["sources"]["paper"]["credit"].startswith("as the MobileAIBench paper reports it")
-    assert len(rows) == 42
+    # 14.1's sets' rows (14.2 adds the trust sets')
+    assert len([s for s in rows if not s["benchmark"].startswith(
+        ("Social Chemistry", "Adversarial", "Privacy"))]) == 42
 
 
 def test_none_of_them_is_a_training_target(tmp_path):

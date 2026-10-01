@@ -58,6 +58,9 @@ DM_ITEMS = "devicemark_items.jsonl"
 # turns' answers under mab_mtbench_t1 and _t2)
 MAB_SCORED = ("mab_hotpotqa", "mab_sql", "mab_dolly", "mab_cnndm", "mab_xsum")
 MAB_MTBENCH = "mab_mtbench"
+# 14.2: the trust sets, marked by the judge; Privacy Leakage shown as ids and
+# verdicts only, never its question or its reply
+MAB_TRUST = ("mab_adv", "mab_privacy", "mab_socchem")
 MAB_TURNS = ("mab_mtbench_t1", "mab_mtbench_t2")
 
 
@@ -76,6 +79,8 @@ def kind_of(task: str) -> str:
         return "mab"                        # 12o.3: MobileAIBench's, by its own metrics
     if task == MAB_MTBENCH:
         return "mabj"                       # 14.1: MT-Bench's two turns, rated by the judge
+    if task in MAB_TRUST:
+        return "mabt"                       # 14.2: a trust set, marked by the judge
     if task in DM_TASKS:
         return "dm"                         # 12q.B: DeviceMark's battery, by its protocol
     if task.startswith(GEN):
@@ -331,6 +336,35 @@ def _answer(rec: dict) -> dict:
             "no_answer": bool(p["no_answer"])}
 
 
+def _trust_rows(task: str, d: Path) -> dict[str, dict]:
+    """14.2: a trust set's replies, marked — "judged correct", "kept it private"
+    or "agrees with the crowd", or awaiting judge. Privacy Leakage: the id and
+    the verdict only — never the person's name, never the reply"""
+    import mobileaibench as mab
+    private = task == mab.PRIVACY
+    qs = {q["id"]: q for q in mab.load(task)} if not mab.available(task) else {}
+    items = (((mab.read(d) or {}).get("tasks") or {}).get(task) or {}).get("items") or []
+    words = {mab.ADV: ("judged correct", "judged incorrect"),
+             mab.PRIVACY: ("kept it private", "revealed it"),
+             mab.SOCCHEM: ("agrees with the crowd", "disagrees with the crowd")}[task]
+    out = {}
+    for i, it in enumerate(items):
+        q = qs.get(it["id"]) or {}
+        s = it.get("score")
+        verdict = ("the answer to the original: what its rewordings are marked against"
+                   if it.get("original") else mab.AWAITING if s is None else words[0] if s == 1
+                   else words[1] if s == 0 else "the judge's reply was neither")
+        out[it["id"]] = {
+            "q": it["id"] if private else q.get("prompt") or it["id"], "options": [],
+            "subject": "" if private else q.get("topic") or q.get("answer") or "",
+            "context": None, "reference": None if private else q.get("answer") if task == mab.SOCCHEM
+            else None, "order": [task, i], "private": private,
+            "res": {"ok": None if s is None or s == 0.5 else s == 1,
+                    "answer": "" if private else it.get("answer_text") or "", "thinking": "",
+                    "verdict": verdict}}
+    return out
+
+
 def _mtbench_rows(d: Path) -> dict[str, dict]:
     """14.1: MT-Bench, a row a turn: the turn's question (the second with the
     first beside it), the answer, and the judge's rating — or "awaiting
@@ -369,6 +403,8 @@ def _rows_of(task: str, d: Path) -> dict[str, dict]:
         return _dm_rows(task, d)
     if kind == "mabj":
         return _mtbench_rows(d)
+    if kind == "mabt":
+        return _trust_rows(task, d)
     if kind == "everyday":
         import everyday as ev
         e = ev.read(d) or {}
@@ -591,7 +627,7 @@ def meta(task: str) -> dict:
                              "our draw of their design"),
                 "licence": bat["sources"][bench]["license"],
                 "revision": bat["revisions"][name], "url": f"https://huggingface.co/datasets/{name}"}
-    if kind in ("mab", "mabj"):
+    if kind in ("mab", "mabj", "mabt"):
         import mobileaibench as mab
         m = mab.manifest()
         src, by = m["sources"][mab.SOURCE[task]], m["sampled_by"]
@@ -601,7 +637,8 @@ def meta(task: str) -> dict:
                               f"prompts and GPT-4's reference answers from {fc['name']}",
                     "licence": f"{src['licence']}; MobileAIBench {by['licence']}",
                     "revision": fc["revision"], "url": fc["url"]}
-        return {"source": f"{src['name']} ({src['cite']}), MobileAIBench's 1,000-row sample",
+        n = m["files"][mab.SOURCE[task]]["n"]
+        return {"source": f"{src['name']} ({src['cite']}), MobileAIBench's {n:,}-row sample",
                 "licence": f"{src['licence']}; the sample {by['licence']}",
                 "revision": by["revision"], "url": by["url"]}
     if kind == "simpleqa":
