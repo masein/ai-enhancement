@@ -88,7 +88,8 @@ def box(tmp_path, monkeypatch):
 
 def request(box, rid="1", benchmarks=None, **over):
     man = json.loads((box["res"] / "gguf_data" / "manifest.json").read_text())["benchmarks"]
-    want = benchmarks or gb.ORDER
+    # 14.3: every benchmark built by default (Mobile-MMLU-Pro is built apart)
+    want = benchmarks or gb.DEFAULT
     req = {"id": rid, "sid": int(rid), "model": "gguf/test", "name": "test",
            "path": str(box["model"]), "flags": ["-ngl", "99", "--cpu-moe"], "benchmarks": want,
            "subset": 0, "pin": {}, "datasets": {b: {"sha256": man[b]["sha256"], "n": man[b]["n"]}
@@ -349,7 +350,7 @@ def test_a_gguf_is_registered_measured_and_shown_in_its_own_columns(svc, monkeyp
     appmod._cache.update(key=None, payload=None, at=0.0)
     j = client.get("/api/results").json()
     g = j["gguf"]["models"][gid]
-    assert set(g) == set(gb.ORDER) and g["mmlu"]["full"] and abs(g["mmlu"]["v"] - 5 / 6) < 1e-6
+    assert set(g) == set(gb.DEFAULT) and g["mmlu"]["full"] and abs(g["mmlu"]["v"] - 5 / 6) < 1e-6
     assert j["gguf"]["group"] == "Measured on the GGUF · llama.cpp, 0-shot"
     assert j["cells"] == before["cells"]
     for m in before["models"]:

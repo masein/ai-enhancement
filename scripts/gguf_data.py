@@ -36,6 +36,9 @@ and -c. A build fills those in for the files it didn't rebuild too, so
 version, as for the Everyday bank: results record the sha256 they were
 measured on.
 
+14.3: Mobile-MMLU-Pro is built apart, once our answer key is (and again
+when the key moves): `--only mobile_mmlu_pro`.
+
 12f.5, once after deploying: MMLU again, lettered (the others' files don't
 change, so their results stay current):
 
@@ -197,7 +200,9 @@ def gpqa_task(doc: dict) -> dict | None:
 
 
 MC = {"mmlu": mmlu_task, "arc_challenge": arc_task, "arc_easy": arc_task,
-      "truthfulqa": truthfulqa_task, "gpqa": gpqa_task}
+      "truthfulqa": truthfulqa_task, "gpqa": gpqa_task,
+      # 14.3: asked as MMLU is, its field the subject (mobile_mmlu.gguf_docs)
+      "mobile_mmlu_pro": mmlu_task}
 # 12n.2: GPQA's dataset is gated — said in one line, as the board's runs say it
 GPQA_GATED = ("GPQA is gated: accept its terms at https://huggingface.co/datasets/Idavidrein/gpqa "
               "with this server's HF account")
@@ -269,6 +274,11 @@ def read_winogrande(text: str) -> list[dict]:
 def lm_eval_docs(task_name: str) -> list[dict]:
     """the documents lm_eval evaluates for a task (a group's subtasks in
     order), after its process_docs"""
+    if task_name == "mobile_mmlu_pro":
+        # 14.3: not lm_eval's: the kept questions of our answer key, from the
+        # file the data step fetched — never committed
+        import mobile_mmlu
+        return mobile_mmlu.gguf_docs()
     from lm_eval.tasks import TaskManager, get_task_dict
 
     def flat(d):
@@ -301,7 +311,8 @@ def build(out: Path, only: list[str] | None = None, docs_of=lm_eval_docs) -> dic
         version = getattr(lm_eval, "__version__", "")
     except ImportError:
         version = ""
-    for key in only or gb.ORDER:
+    # 14.3: a benchmark built apart (Mobile-MMLU-Pro, once its key is) only when named
+    for key in only or gb.DEFAULT:
         info = gb.BENCHMARKS[key]
         if key == "gpqa":
             # lm_eval's process_docs shuffles GPQA's choices with Python's own
@@ -330,6 +341,12 @@ def build(out: Path, only: list[str] | None = None, docs_of=lm_eval_docs) -> dic
             "skipped": skipped, "of": len(docs),
             "source": f"lm_eval {version} {info['lm_eval']} ({info['split']})".strip(),
             "made_at": time.time()}
+        if key == "mobile_mmlu_pro":
+            import mobile_mmlu
+            manifest["benchmarks"][key].update(
+                source=f"our answer key {mobile_mmlu.current_key().get('version')}, its kept "
+                       f"questions of Mobile-MMLU-Pro {mobile_mmlu.manifest()['revision'][:7]}",
+                key=mobile_mmlu.current_key().get("version"))
         print(f"{info['label']}: {n} of {len(docs)} questions"
               + (f" ({skipped} left out: the format can't hold them exactly)" if skipped else "")
               + f" -> {out / info['data']}")

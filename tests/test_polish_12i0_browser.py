@@ -38,7 +38,9 @@ NAMES = {"mmlu": "MMLU", "hellaswag": "HellaSwag", "piqa": "PIQA", "winogrande":
          # 14.2: and its three trust sets
          "mab_adv": "Adversarial Instruction (MobileAIBench)",
          "mab_privacy": "Privacy Leakage (MobileAIBench)",
-         "mab_socchem": "Social Chemistry 101 (MobileAIBench)"}
+         "mab_socchem": "Social Chemistry 101 (MobileAIBench)",
+         # 14.3: Mobile-MMLU-Pro, on our own answer key
+         "mobile_mmlu_pro": "Mobile-MMLU-Pro (MBZUAI)"}
 
 
 def shot(page_or_part, name, **kw):

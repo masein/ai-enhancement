@@ -39,6 +39,8 @@ EVERYDAY_BANK = Path(__file__).resolve().parent.parent / "eval_tasks" / "everyda
 # 14.1: MobileAIBench's pinned samples; not its judge's prompt templates
 MAB_DIR = Path(__file__).resolve().parent.parent / "eval_tasks" / "mobileaibench"
 NOT_ITEMS = {"mt_bench_judge_prompts"}
+# 14.3: Mobile-MMLU-Pro's manifest; its file lives only in the server's data folder
+MMP_DIR = Path(__file__).resolve().parent.parent / "eval_tasks" / "mobile_mmlu_pro"
 MAX_DROP_SHARE = 0.02
 NEAR_DUP_SHINGLE = 5
 NEAR_DUP_JACCARD = 0.8
@@ -130,8 +132,17 @@ class BenchmarkIndex:
         # 14.2: and what lives only on the server (Privacy Leakage), once fetched
         where = lambda f: (MAB_DIR if f.get("committed", True)  # noqa: E731
                            else Path(config.MAB_PRIVATE_DIR)) / f["file"]
-        return [where(f) for k, f in sorted((m.get("files") or {}).items())
-                if k not in NOT_ITEMS and where(f).exists()]
+        out = [where(f) for k, f in sorted((m.get("files") or {}).items())
+               if k not in NOT_ITEMS and where(f).exists()]
+        # 14.3: Mobile-MMLU-Pro's questions and options, once the data step fetched it
+        try:
+            mm = json.loads((MMP_DIR / "manifest.json").read_text(encoding="utf-8"))
+            p = Path(config.MMP_DIR) / mm["file"]["file"]
+            if p.exists():
+                out.append(p)
+        except (OSError, ValueError, KeyError):
+            pass
+        return out
 
     @staticmethod
     def pinned_rows(path: Path):

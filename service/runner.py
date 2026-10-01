@@ -557,6 +557,8 @@ def include_args_for(task: str) -> list[str]:
         # 12o.3, 14.1: mobileaibench.build_tasks writes them; MT-Bench's second
         # turn is the model's own (lm_eval_cmd's include_dir)
         return ["--include_path", str(config.MAB_TASKS_DIR)]
+    if task == config.MMP_TASK:                     # 14.3: mobile_mmlu.build_tasks writes it
+        return ["--include_path", str(config.MMP_TASKS_DIR)]
     if task in config.DM_TASKS:                     # 12q: devicemark.build_tasks writes them
         return ["--include_path", str(config.DM_TASKS_DIR)]
     if task.startswith(("exam_", "fr_")):
@@ -861,6 +863,10 @@ def _ask_served(sid: int, rec: dict, meta: dict, task: str, task_out: Path, labe
         # 12n.2: asked as typed, with the Everyday settings, as Trust & safety is
         items = (sq_dir or config.SIMPLEQA_TASKS_DIR) / f"{task}.jsonl"      # build_tasks'
         everyday, safety = True, True
+    elif task == config.MMP_TASK:
+        # 14.3: Mobile-MMLU-Pro, asked the authors' way — a letter, as typed
+        items = config.MMP_TASKS_DIR / f"{task}_ask.jsonl"                # build_tasks'
+        everyday, safety = True, True
     elif task in config.MAB_ALL:
         # 12o.3: MobileAIBench's prompt as typed, its system line as the system
         # message, with the Everyday settings. 14.1: MT-Bench's second turn
@@ -1128,6 +1134,21 @@ def run_submission(sub: dict) -> None:
             db.update(sid, status="failed", finished_at=time.time(),
                       error=_mab.available(missing[0]) + ". Nothing was asked.")
             return
+    if config.MMP_TASK in tasks:
+        # 14.3: Mobile-MMLU-Pro, from the file the data step fetched — every
+        # question, never our key
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+        import mobile_mmlu as _mmp
+        try:
+            why = _mmp.available()
+            if not why:
+                _mmp.build_tasks(config.MMP_TASKS_DIR)
+        except (OSError, ValueError) as e:
+            why = str(e)
+        if why:
+            db.update(sid, status="failed", finished_at=time.time(),
+                      error=why + ". Nothing was asked.")
+            return
     if devicemark and not rec:
         # 12q: the battery's questions from the pinned datasets, as three tasks
         try:
@@ -1368,9 +1389,12 @@ def run_submission(sub: dict) -> None:
                     else _exam_settings(meta)["max_gen_toks"]) if thinks else None
             # 14.1: MT-Bench's second turn is the conversation already in the
             # model's chat template: asked as it stands
+            # 14.3: Mobile-MMLU-Pro as the paper ran lm-evaluation-harness, with no
+            # chat template
             cmd = lm_eval_cmd(margs, task, shots, meta["batch"], task_out,
                               chat=(kind == "instruct" or everyday)
-                              and not (task == config.MAB_MTB2 or turn2_dir is not None),
+                              and not (task == config.MAB_MTB2 or turn2_dir is not None)
+                              and task != config.MMP_TASK,
                               max_gen_toks=room, include_dir=turn2_dir,
                               system=(_mab.SYSTEM.get(task) or None) if task in config.MAB_ALL
                               else None)
@@ -1656,7 +1680,17 @@ def run_submission(sub: dict) -> None:
         # 12o.3: MobileAIBench's sets, scored by its own metrics — no judge, no
         # GPU. 14.1: the judged part's answers go to the judge as a step of its
         # own: an offline judge leaves them "awaiting judge", and the run is done
-        if mobile and not failed_tasks:
+        if mobile and not failed_tasks and (sub.get("part") or "") == "mmlu":
+            # 14.3: every pick kept, and scored against the key as it stands
+            try:
+                got = _mmp.collect(config.OUT_DIR / row_safe)
+                judge_note = _mmp.summary(_mmp.score(got))
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n===== [{sid}] {judge_note} =====\n")
+            except Exception as e:                      # noqa: BLE001 — the answers are on disk
+                failed_tasks.append("reading")
+                db.update(sid, error=f"reading the answers: {e}")
+        elif mobile and not failed_tasks:
             db.update(sid, status="running", progress="scoring the answers")
             try:
                 if (sub.get("part") or "") in ("judged", "trust"):

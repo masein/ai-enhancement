@@ -72,7 +72,8 @@ def box(tmp_path, monkeypatch):
 
 def request(box, rid="1", benchmarks=None):
     man = json.loads((box["res"] / "gguf_data" / "manifest.json").read_text())["benchmarks"]
-    want = benchmarks or gb.ORDER
+    # 14.3: every benchmark built by default (Mobile-MMLU-Pro is built apart)
+    want = benchmarks or gb.DEFAULT
     req = {"id": rid, "sid": int(rid), "model": "gguf/test", "name": "test",
            "path": str(box["model"]), "flags": ["-ngl", "99", "--cpu-moe"], "benchmarks": want,
            "subset": 0, "pin": {}, "at": time.time(),
@@ -312,7 +313,7 @@ def test_rerun_queues_only_the_failed_benchmarks(svc):
     assert set(result(config.RESULTS_ROOT, new)["benchmarks"]) == {"arc_challenge", "arc_easy",
                                                                     "truthfulqa"}
     g = results(client, appmod)["gguf"]
-    assert set(g["models"][gid]) == set(gb.ORDER)
+    assert set(g["models"][gid]) == set(gb.DEFAULT)
     assert g["models"][gid]["mmlu"]["sid"] == sid and g["models"][gid]["arc_easy"]["sid"] == new
     # nothing left to re-run, and a run still going can't be
     r = client.post(f"/api/gguf/runs/{new}/rerun", json={"by": "masein"})

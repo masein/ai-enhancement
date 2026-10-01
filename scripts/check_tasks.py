@@ -207,6 +207,10 @@ def main() -> int:
         # CNN/DailyMail, XSum and MT-Bench's two turns too)
         import mobileaibench
         config.MAB_TASKS_DIR = mobileaibench.build_tasks(Path(tmp) / "mobileaibench-tasks")
+        # 14.3: Mobile-MMLU-Pro, from the fetched file — a stand-in with no
+        # questions before the data step has fetched it
+        import mobile_mmlu
+        config.MMP_TASKS_DIR = mobile_mmlu.build_tasks(Path(tmp) / "mobile-mmlu-tasks")
         # 12q: DeviceMark's three, with a stand-in for each question: only whether
         # lm_eval finds the task is asked, and no dataset is fetched for that
         import devicemark
@@ -219,6 +223,7 @@ def main() -> int:
         for suite, tasks in [(s, config.tasks_for_suite(s)) for s in config.SUITES] + [
                 ("mobile, judged", config.tasks_for_suite("mobile", part="judged")),
                 ("mobile, trust", config.tasks_for_suite("mobile", part="trust")),
+                ("mobile, mmlu", config.tasks_for_suite("mobile", part="mmlu")),
                 ("full, all of BBQ", [config.BBQ_ALL_TASK])]:
             if not tasks:
                 note = (" — the exam has not been built (scripts/exam_build.py)"
