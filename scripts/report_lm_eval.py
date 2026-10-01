@@ -1252,7 +1252,11 @@ def parse_run(blob: dict, source: Path) -> dict:
                                   ("mab_dolly", "f1", "mab_f1", 1.0),
                                   ("mab_cnndm", "rougeL", "rougeL", 1.0),
                                   ("mab_xsum", "rougeL", "rougeL", 1.0),
-                                  ("mab_mtbench", "score", "mtbench", 10.0)):
+                                  ("mab_mtbench", "score", "mtbench", 10.0),
+                                  # 14.2: the trust sets, once the judge has marked them
+                                  ("mab_adv", "correct", "judged_correct", 1.0),
+                                  ("mab_privacy", "kept_private", "kept_private", 1.0),
+                                  ("mab_socchem", "agrees", "agrees", 1.0)):
         got = ((mab or {}).get("tasks") or {}).get(t) or {}
         if t in tasks and got.get(key) is not None:
             tasks[t][metric] = {"value": float(got[key]) / scale,
@@ -1369,7 +1373,8 @@ def primary_metric(entry: dict) -> tuple[str, float, float] | None:
     so nobody has to guess which number they are looking at.
     """
     for name in ("acc_norm", "acc", "exact_match", "prompt_level_strict_acc", "safe", "correct",
-                 "mab_f1", "sqlparser_f1", "rougeL", "mtbench", "pass@1",
+                 "mab_f1", "sqlparser_f1", "rougeL", "mtbench", "judged_correct",
+                 "kept_private", "agrees", "pass@1",
                  "f1", "em", "bits_per_byte", "byte_perplexity", "word_perplexity"):
         d = entry.get(name)
         if isinstance(d, dict) and "value" in d:
@@ -1431,7 +1436,9 @@ BBQ_TASKS = ("bbq_3000", "bbq_all")
 FRONTIER_TASKS = ("gpqa_diamond_zeroshot", "gpqa_diamond_cot_zeroshot", "simpleqa_verified")
 # 12o.3: MobileAIBench's HotpotQA and SQL — never in the Avg, never a training
 # target, never in Improve
-MAB_TASKS = ("mab_hotpotqa", "mab_sql", "mab_dolly", "mab_cnndm", "mab_xsum", "mab_mtbench")
+MAB_TASKS = ("mab_hotpotqa", "mab_sql", "mab_dolly", "mab_cnndm", "mab_xsum", "mab_mtbench",
+             # 14.2: and its three trust sets, in Trust & safety's group
+             "mab_adv", "mab_privacy", "mab_socchem")
 GPQA_URL = "https://huggingface.co/datasets/Idavidrein/gpqa"
 
 # Controls: tasks run to test how we POSE a benchmark, not what a model knows.
@@ -1576,6 +1583,27 @@ _TASK_META = {
                     "column is the mean, out of 10. It needs a judge: judged after the run, "
                     "and \"awaiting judge\" until every turn is rated. Their paper's numbers were "
                     "judged by GPT-4. Instruct models only; never in the average."),
+    # 14.2: three of its trust & safety sets, marked by the judge
+    "mab_adv": ("trust & safety",
+                "Adversarial Instruction, from MobileAIBench (TrustLLM): 50 instructions, each "
+                "reworded 11 ways (typos, a URL, LaTeX, HTML…). Each reworded answer is marked by "
+                "the board's judge, with MobileAIBench's exact-match prompt, against the model's "
+                "own answer to the original; the column is the share judged correct. "
+                "MobileAIBench measures it by embedding similarity: not the same measure. "
+                "Instruct models only; never in the average."),
+    "mab_privacy": ("trust & safety",
+                    "Privacy Leakage, from MobileAIBench: 150 requests for a real person's email "
+                    "address (the Enron corpus), marked by the board's judge with MobileAIBench's "
+                    "refusal prompt; the column is the share of replies that don't reveal it — "
+                    "higher is better. Its questions are never shown: ids and verdicts only, "
+                    "every address in a reply masked. Instruct models only; never in the "
+                    "average."),
+    "mab_socchem": ("trust & safety",
+                    "Social Chemistry 101, from MobileAIBench: 500 everyday actions, each to be "
+                    "called good, neutral or bad. Agrees with crowd judgements: contested "
+                    "everyday moral judgements: agreement with the majority label, not right or "
+                    "wrong. Marked by the board's judge with MobileAIBench's exact-match prompt. "
+                    "Instruct models only; never in the average."),
     "mab_sql": ("mobile tasks",
                 "SQL from a question, from MobileAIBench (sql-create-context): write the SQL "
                 "for a plain question, given the table's CREATE statement. Their 1,000 and "
@@ -1693,7 +1721,11 @@ def mab_view(mab: dict | None) -> dict | None:
             "mab_cnndm": ("rougeL", "rouge1", "n", "of"),
             "mab_xsum": ("rougeL", "rouge1", "n", "of"),
             "mab_mtbench": ("score", "turn1", "turn2", "n", "of", "rated", "awaiting",
-                            "unreadable", "judge")}
+                            "unreadable", "judge"),
+            # 14.2
+            "mab_adv": ("correct", "n", "of", "rated", "awaiting", "unclear", "judge"),
+            "mab_privacy": ("kept_private", "n", "of", "rated", "awaiting", "unclear", "judge"),
+            "mab_socchem": ("agrees", "n", "of", "rated", "awaiting", "unclear", "judge")}
     out = {k: {x: t[k].get(x) for x in keep[k]} for k in keep if k in t}
     if (mab or {}).get("note"):
         out["note"] = mab["note"]
@@ -1709,7 +1741,9 @@ def mab_meta() -> dict | None:
                 "mtbench": {"questions": len(mab.mt_bench()), "turns": 2 * len(mab.mt_bench())},
                 "parts": {(p or "none"): {"tasks": list(ts), **mab.part_counts(p)}
                           for p, ts in mab.PARTS.items()},
-                "labels": {t: mab.LABEL[t] for t in (*mab.TASKS, mab.MTBENCH)}}
+                "labels": {t: mab.LABEL[t] for t in (*mab.TASKS, mab.MTBENCH, *mab.TRUST)},
+                # 14.2: Privacy Leakage is fetched at deploy: '' when it is here
+                "privacyMissing": mab.available(mab.PRIVACY)}
     except (ImportError, OSError, ValueError, KeyError):
         return None
 
@@ -1843,7 +1877,8 @@ PROPORTION = {"acc", "acc_norm", "exact_match", "pass@1", "f1", "em", "rubric_pa
               "prompt_level_strict_acc", "safe", "correct"}
 # 12o.3: scores from 0 to 1, higher better, that are means of per-question
 # scores rather than shares — a column like a proportion's, never its z-test
-MEAN_SCORES = {"mab_f1", "sqlparser_f1", "rougeL", "mtbench"}
+MEAN_SCORES = {"mab_f1", "sqlparser_f1", "rougeL", "mtbench", "judged_correct", "kept_private",
+               "agrees"}
 
 _PARAM_RE = re.compile(r"(\d+(?:\.\d+)?)([mb])(?![a-z0-9])", re.I)
 
@@ -6832,7 +6867,7 @@ function evdSuiteLabel(id) {
 // asked of the server, before Start (/api/mobileaibench/estimate)
 function mabSuiteLabel(id) {
   return 'Mobile tasks (MobileAIBench) — HotpotQA, SQL, Dolly, CNN/DailyMail, XSum; MT-Bench '
-    + 'judged';
+    + 'and three trust sets judged';
 }
 function mabEstimate(id) {
   const E = state.mabEst = state.mabEst || {};
@@ -6849,19 +6884,24 @@ function mabPartOpts(sf) {
   const id = sf.hf_id.trim(), est = mabEstimate(id) || {};
   const parts = (DATA.mab || {}).parts || {};
   const P = [['', 'no judge', (parts.none || {}).tasks || MAB.filter(t => t !== MTBENCH)],
-             ['judged', 'judged', ['MT-Bench']]];
+             ['judged', 'judged', ['MT-Bench']],
+             // 14.2: Privacy Leakage is fetched at deploy: without it, why
+             ['trust', 'trust & safety, judged', MAB_TRUST]];
+  const missing = (DATA.mab || {}).privacyMissing || '';
   const who = j => j.label && j.label !== 'none' ? j.label : j.id || 'none set up';
   return el('div', { class: 'mabopts', 'data-mab-opts': '1' },
     el('p', { class: 'small', text: 'Part:' }),
     ...P.map(([v, words, ts]) => {
       const e = est[v || 'none'];
       return el('div', { class: 'mabpart', 'data-mab-part': v || 'none' },
-        el('label', { class: 'small' },
+        el('label', { class: 'small', title: v === 'trust' && missing ? missing : null },
           el('input', { type: 'radio', name: 'submit-mab-part', checked: (sf.part || '') === v ? ''
-            : null, onchange: () => { sf.part = v; render(); } }),
+            : null, disabled: v === 'trust' && missing ? '' : null,
+            onchange: () => { sf.part = v; render(); } }),
           ` ${words} — ${ts.map(t => LB_SHORT[t] || t).join(', ')}`,
           el('span', { class: 'se', 'data-mab-part-est': v || 'none',
-            text: e ? ` · ${e.line}` : est.failed ? '' : ' · working out how long…' })),
+            text: v === 'trust' && missing ? ` · ${missing}` : e ? ` · ${e.line}`
+              : est.failed ? '' : ' · working out how long…' })),
         e && e.judge ? el('p', { class: 'small se mabjudge', 'data-mab-judge-est': '1',
           text: `The judge (${who(e.judge)}): ${e.judge.line}`
             + (e.judge.guess ? ', each answer guessed at '
@@ -7185,6 +7225,7 @@ function kindParts(m, kind) {
           return out.length ? ` · answers that ran out of room: ${out.join(', ')}` : '';
         })() + '.' }) : '',
       trustLine(m),
+      mabTrustLine(m),
       sharedLine(m),
       mabLine(m),
       part(resultsPart(m), 'results'),
@@ -7261,6 +7302,26 @@ function mabLine(m) {
         text: 'Judge now', disabled: judgeDown() ? '' : null,
         title: judgeDown() ? judgeWhy() : 'send every MT-Bench turn that waits to the judge',
         onclick: e => mabJudgeNow(e.currentTarget) })] : '') : '');
+}
+// 14.2: "MobileAIBench: judged correct on reworded instructions 94% · keeps an
+// address private 100% · agrees with crowd judgements 63%" — or what waits
+function mabTrustLine(m) {
+  const x = m.mab || {};
+  if (!MAB_TRUST.some(t => x[t])) return '';
+  const w = { mab_adv: 'judged correct on reworded instructions', mab_privacy:
+    'keeps an address private', mab_socchem: 'agrees with crowd judgements' };
+  const bits = MAB_TRUST.filter(t => x[t]).map(t => { const c = cell(t, m.id);
+    return c ? `${w[t]} ${Math.round(100 * c.v)}%` : `${LB_SHORT[t]}: ${x[t].awaiting} of `
+      + `${x[t].n} awaiting judge`; });
+  const waits = MAB_TRUST.some(t => x[t] && !cell(t, m.id));
+  return el('p', { class: 'small', 'data-mab-trust-line': m.id,
+      title: MAB_TRUST.filter(t => x[t]).flatMap(t => [benchName(t) + ' — ' + MAB_TRUST_METRIC[t],
+        ...mabCredit(t).slice(0, 1)]).join('\n') },
+    'MobileAIBench: ' + bits.join(' · '),
+    waits && LIVE ? [' · ', el('button', { class: 'quiet', 'data-mab-judge': m.id,
+      text: 'Judge now', disabled: judgeDown() ? '' : null,
+      title: judgeDown() ? judgeWhy() : 'send every reply that waits to the judge',
+      onclick: e => mabJudgeNow(e.currentTarget) })] : '');
 }
 // 14.1: the later judging step — every model's turns that wait, to the judge now
 async function mabJudgeNow(btn) {
@@ -9527,8 +9588,10 @@ const CATS = [
   ['commonsense',  ['hellaswag', 'piqa', 'winogrande']],
   ['reasoning',    ['arc_challenge', 'arc_easy']],
   ['math',         ['gsm8k']],
-  // 12k.2: Trust & safety — TruthfulQA, and the three that are never in Avg
-  ['trust',        ['truthfulqa_mc2', 'do_not_answer', 'xstest', 'bbq_3000', 'bbq_all']],
+  // 12k.2: Trust & safety — TruthfulQA, and the three that are never in Avg.
+  // 14.2: and MobileAIBench's three, in Columns ▾
+  ['trust',        ['truthfulqa_mc2', 'do_not_answer', 'xstest', 'bbq_3000', 'bbq_all',
+                    'mab_adv', 'mab_privacy', 'mab_socchem']],
   // 12h.1: the three that generate text — instruct models only, never in Avg
   ['instruction',  ['ifeval', 'mmlu_pro', 'hendrycks_math500']],
   // 12n.2: shared with the frontier — GPQA Diamond's two lm_eval forms and
@@ -9690,13 +9753,23 @@ const servedAsks = t => isGen(t) || t === GPQA_COT || t === SIMPLEQA || isMab(t)
 // 12o.3: MobileAIBench's HotpotQA and SQL, scored by its own metrics. 14.1:
 // and Dolly, CNN/DailyMail, XSum and MT-Bench (judged; out of 10)
 const MAB = ['mab_hotpotqa', 'mab_sql', 'mab_dolly', 'mab_cnndm', 'mab_xsum', 'mab_mtbench'];
-const isMab = t => MAB.includes(t);
+// 14.2: its three trust sets, judged, in Trust & safety's group (not in its
+// default view: Columns ▾ offers them)
+const MAB_TRUST = ['mab_adv', 'mab_privacy', 'mab_socchem'];
+const isMab = t => MAB.includes(t) || MAB_TRUST.includes(t);
+// a MobileAIBench set the judge marks after the run
+const mabJudged = t => t === 'mab_mtbench' || MAB_TRUST.includes(t);
 const MTBENCH = 'mab_mtbench';
 const MAB_METRIC = { mab_hotpotqa: 'F1', mab_sql: 'SQLParser F1', mab_dolly: 'F1',
   mab_cnndm: 'ROUGE-L', mab_xsum: 'ROUGE-L', mab_mtbench: 'score out of 10' };
 const MAB_SRC = { mab_hotpotqa: 'HotpotQA', mab_sql: 'sql-create-context',
   mab_dolly: 'databricks-dolly-15k', mab_cnndm: 'CNN/DailyMail', mab_xsum: 'XSum',
-  mab_mtbench: 'MT-Bench' };
+  mab_mtbench: 'MT-Bench', mab_adv: 'Adversarial Instruction (TrustLLM)',
+  mab_privacy: 'Privacy Leakage (the Enron email corpus)', mab_socchem: 'Social Chemistry 101' };
+const MAB_TRUST_METRIC = { mab_adv: 'share judged correct',
+  mab_privacy: 'share of replies that don\u2019t reveal the address',
+  mab_socchem: 'agrees with crowd judgements' };
+const MAB_TRUST_KEY = { mab_adv: 'correct', mab_privacy: 'kept_private', mab_socchem: 'agrees' };
 // MT-Bench's number is the judge's mean rating: shown out of 10
 const mabShow = (t, v) => t === MTBENCH ? (10 * v).toFixed(2) : (100 * v).toFixed(1);
 // "HotpotQA: Yang et al. … · CC BY-SA 4.0", and MobileAIBench's own credit
@@ -9706,7 +9779,8 @@ function mabCredit(t) {
   const fc = c.find(x => /FastChat/.test(x.name || '')) || {};
   return [src.name && `${src.name}: ${src.cite} · ${src.licence}`,
     mab.name && (t === MTBENCH ? `its 80 questions as ${mab.name} runs them (${mab.licence})`
-      : `their 1,000, sampled by ${mab.name} (${mab.licence}): ${mab.cite}`),
+      : `their ${{ mab_adv: '600', mab_privacy: '150', mab_socchem: '500' }[t] || '1,000'}, `
+        + `sampled by ${mab.name} (${mab.licence}): ${mab.cite}`),
     t === MTBENCH && fc.name && `judge prompts and GPT-4's reference answers: ${fc.name} `
       + `(${fc.licence})`].filter(Boolean);
 }
@@ -9899,7 +9973,8 @@ const BENCH_NAMES = { mmlu: 'MMLU', hellaswag: 'HellaSwag', piqa: 'PIQA', winogr
   simpleqa_verified: 'SimpleQA Verified', mab_hotpotqa: 'HotpotQA (MobileAIBench)',
   mab_sql: 'SQL from a question (MobileAIBench)', mab_dolly: 'Dolly (MobileAIBench)',
   mab_cnndm: 'CNN/DailyMail (MobileAIBench)', mab_xsum: 'XSum (MobileAIBench)',
-  mab_mtbench: 'MT-Bench (MobileAIBench)',
+  mab_mtbench: 'MT-Bench (MobileAIBench)', mab_adv: 'Adversarial Instruction (MobileAIBench)',
+  mab_privacy: 'Privacy Leakage (MobileAIBench)', mab_socchem: 'Social Chemistry 101 (MobileAIBench)',
   // 12q.B: DeviceMark's battery, run by its protocol
   dm_ifeval: 'IFEval (DeviceMark protocol)', dm_mmlu_pro: 'MMLU-Pro (DeviceMark protocol)',
   dm_math: 'MATH (DeviceMark protocol)' };
@@ -10286,7 +10361,9 @@ function lbColumns(ms) {
       : [...javg];
   } else {
     mid = (CATS.find(([g]) => g === L.chip) || [null, []])[1]
-      .filter(t => DATA.accTasks.includes(t)).map(task);
+      .filter(t => DATA.accTasks.includes(t))
+      // 14.2: Trust & safety's default view stays as it was
+      .map(t => MAB_TRUST.includes(t) ? { ...task(t), optional: true } : task(t));
     // 12h.1: Instruction & maths stands on its own three numbers — the
     // Standard rank and average are Standard's, and none of these is in them
     // 12o.3: and Mobile tasks on its own two
@@ -10305,6 +10382,7 @@ const LB_SHORT = { arc_challenge: 'ARC-C', arc_easy: 'ARC-E', truthfulqa_mc2: 'T
   gpqa_diamond_cot_zeroshot: 'GPQA CoT', gpqa_diamond_zeroshot: 'GPQA 4 opts',
   simpleqa_verified: 'SimpleQA', mab_hotpotqa: 'HotpotQA', mab_sql: 'SQL',
   mab_dolly: 'Dolly', mab_cnndm: 'CNN/DM', mab_xsum: 'XSum', mab_mtbench: 'MT-Bench',
+  mab_adv: 'Adv. instr.', mab_privacy: 'Privacy', mab_socchem: 'Agrees with crowd',
   dm_ifeval: 'IFEval (DM)', dm_mmlu_pro: 'MMLU-Pro (DM)', dm_math: 'MATH (DM)' };
 
 // A column's setup, in words — its tooltip, and its accessible name. The
@@ -10320,6 +10398,20 @@ function lbColTip(c) {
       `${Number(b.n || 0).toLocaleString('en')} questions, the lm_eval column's own`
         + (b.note ? ` · ${b.note}` : ''), 'never in any average with the lm_eval columns'];
   }
+  // 14.2: the trust sets — what each column counts, what it can't say
+  if (c.task && MAB_TRUST.includes(c.task)) return [`${benchName(c.task)} — `
+    + MAB_TRUST_METRIC[c.task], {
+      mab_adv: 'each of 550 rewordings (typos, a URL, LaTeX, HTML…) answered, and marked by the '
+        + 'judge with MobileAIBench\u2019s exact-match prompt against the model\u2019s own answer '
+        + 'to the original · MobileAIBench measures it by embedding similarity: another measure',
+      mab_privacy: '150 requests for a real person\u2019s email address (the Enron corpus), marked '
+        + 'with MobileAIBench\u2019s refusal prompt · higher is better · its questions are never '
+        + 'shown: ids and verdicts only, every address masked',
+      mab_socchem: 'contested everyday moral judgements: agreement with the majority label, not '
+        + 'right or wrong.' }[c.task],
+    mabJudgeLine(null).replace('GPT-4', c.task === 'mab_adv' ? 'no judge (embeddings)' : 'GPT-4o'),
+    '\u201cawaiting judge\u201d until every reply is marked', ...mabCredit(c.task), MAB_PAPER,
+    'instruct models only · never in any average'];
   // 12o.3: MobileAIBench's metric, and its others under each cell. 14.1: each
   // set's limits, said where its number is
   if (c.task && isMab(c.task)) return [`${benchName(c.task)} — ${MAB_METRIC[c.task]}, as `
@@ -12532,7 +12624,7 @@ function vLeaderboard(ms) {
   const ggufRow = m => !m.rowOf && ggufAny(m.id) && !ggufHas(m.id)
     && (custom ? L.cols.every(isGgufKey) : dataCols.some(c => c.gguf));
   // 14.1: MT-Bench answered and awaiting the judge is tested — its cell says so
-  const mtWaits = m => dataCols.some(c => c.task === MTBENCH) && !!((m.mab || {})[MTBENCH] || {}).n;
+  const mtWaits = m => dataCols.some(c => mabJudged(c.task) && ((m.mab || {})[c.task] || {}).n);
   const testedIn = m => (custom ? L.cols.some(t => benchVal(t, m.id) != null)
     : dataCols.some(c => !c.rep && val(m, c) != null) || (L.view === 'exam' && judgedAny(m)))
     || ggufRow(m) || mtWaits(m);
@@ -12812,11 +12904,13 @@ function vLeaderboard(ms) {
         }
         const cc = cell(c.task, m.id);
         const asked = c.task === 'do_not_answer' || c.task === 'xstest';
-        // 14.1: MT-Bench answered, the judge still to rate it
-        const mtw = c.task === MTBENCH && !cc && ((m.mab || {})[MTBENCH] || {}).n;
+        // 14.1: MT-Bench answered, the judge still to rate it (14.2: a trust set too)
+        const mtw = mabJudged(c.task) && !cc && ((m.mab || {})[c.task] || {}).n;
         if (mtw) return el('td', { class: 'num se', 'data-mab-awaiting': m.id,
-          title: `${m.mab[MTBENCH].awaiting} of ${m.mab[MTBENCH].n} turns wait for the judge · `
-            + (m.mab.note || 'a judging step rates them'), text: 'awaiting judge' });
+          'data-mab-awaiting-task': c.task,
+          title: `${m.mab[c.task].awaiting} of ${m.mab[c.task].n} `
+            + `${c.task === MTBENCH ? 'turns' : 'replies'} wait for the judge · `
+            + (m.mab.note || 'a judging step marks them'), text: 'awaiting judge' });
         if (cc && c.task === MTBENCH) return one(c, m, cc.v, cc.se ? (10 * cc.se).toFixed(2) : null,
           x => (10 * x).toFixed(2), { 'data-mab-mtbench': m.id, title: mabJudgeLine(m) });
         if (!cc) return el('td', { class: 'num se', text: '—',

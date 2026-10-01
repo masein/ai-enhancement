@@ -5,9 +5,12 @@
   "date": "2024-06-14",
   "version": "arXiv:2406.10290v1",
   "cite": "Murthy et al., MobileAIBench: Benchmarking LLMs and LMMs for On-Device Use Cases (2024)",
-  "tables": "Table 1 (standard NLP tasks) and Table 3 (MT-Bench), the 16-bit rows",
+  "tables": "Table 1 (standard NLP tasks) and Table 3 (MT-Bench; Social Chemistry 101, Adversarial Instruction, Privacy Leakage), the 16-bit rows",
   "judges": {
-   "mab_mtbench": "GPT-4"
+   "mab_mtbench": "GPT-4",
+   "mab_socchem": "GPT-4o",
+   "mab_privacy": "GPT-4o",
+   "mab_adv": "none: embedding similarity"
   }
  },
  "models": {
@@ -70,6 +73,21 @@
    "MT-Bench (MobileAIBench)",
    "points",
    "FastChat's prompts, 16-bit, judge GPT-4"
+  ],
+  "mab_socchem": [
+   "Social Chemistry 101 (MobileAIBench)",
+   "share",
+   "16-bit, judge GPT-4o"
+  ],
+  "mab_adv": [
+   "Adversarial Instruction (MobileAIBench)",
+   "share",
+   "16-bit, by embedding similarity (OpenAI text-embedding-3-small) — not a judge"
+  ],
+  "mab_privacy": [
+   "Privacy Leakage (MobileAIBench)",
+   "share",
+   "16-bit, judge GPT-4o"
   ]
  },
  "rows": [
@@ -282,6 +300,111 @@
    "model": "TinyLlama 1B",
    "task": "mab_mtbench",
    "value": 3.962
+  },
+  {
+   "model": "Llama 2 7B",
+   "task": "mab_socchem",
+   "value": 0.626
+  },
+  {
+   "model": "Llama 2 7B",
+   "task": "mab_adv",
+   "value": 0.943
+  },
+  {
+   "model": "Llama 2 7B",
+   "task": "mab_privacy",
+   "value": 1.0
+  },
+  {
+   "model": "Mistral 7B",
+   "task": "mab_socchem",
+   "value": 0.706
+  },
+  {
+   "model": "Mistral 7B",
+   "task": "mab_adv",
+   "value": 0.925
+  },
+  {
+   "model": "Mistral 7B",
+   "task": "mab_privacy",
+   "value": 0.993
+  },
+  {
+   "model": "Gemma 7B",
+   "task": "mab_socchem",
+   "value": 0.736
+  },
+  {
+   "model": "Gemma 7B",
+   "task": "mab_adv",
+   "value": 0.892
+  },
+  {
+   "model": "Gemma 7B",
+   "task": "mab_privacy",
+   "value": 1.0
+  },
+  {
+   "model": "Phi 2 3B",
+   "task": "mab_socchem",
+   "value": 0.676
+  },
+  {
+   "model": "Phi 2 3B",
+   "task": "mab_adv",
+   "value": 0.849
+  },
+  {
+   "model": "Phi 2 3B",
+   "task": "mab_privacy",
+   "value": 0.02
+  },
+  {
+   "model": "Gemma 2B",
+   "task": "mab_socchem",
+   "value": 0.594
+  },
+  {
+   "model": "Gemma 2B",
+   "task": "mab_adv",
+   "value": 0.916
+  },
+  {
+   "model": "Gemma 2B",
+   "task": "mab_privacy",
+   "value": 1.0
+  },
+  {
+   "model": "Zephyr 3B",
+   "task": "mab_socchem",
+   "value": 0.716
+  },
+  {
+   "model": "Zephyr 3B",
+   "task": "mab_adv",
+   "value": 0.86
+  },
+  {
+   "model": "Zephyr 3B",
+   "task": "mab_privacy",
+   "value": 1.0
+  },
+  {
+   "model": "TinyLlama 1B",
+   "task": "mab_socchem",
+   "value": 0.628
+  },
+  {
+   "model": "TinyLlama 1B",
+   "task": "mab_adv",
+   "value": 0.879
+  },
+  {
+   "model": "TinyLlama 1B",
+   "task": "mab_privacy",
+   "value": 0.53
   }
  ],
  "note": "Their numbers, as the paper prints them: never measured here, never ranked with ours. MT-Bench is a score out of 10; the others are shares (F1 and ROUGE-L from 0 to 1). Their AlpacaEval win rates are not carried: the set is not on this board."

@@ -1122,6 +1122,12 @@ def run_submission(sub: dict) -> None:
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
         import mobileaibench as _mab
         _mab.build_tasks(mab_dir)
+        # 14.2: Privacy Leakage is fetched at deploy: without it the trust part waits
+        missing = [t for t in tasks if t in _mab.TRUST and _mab.available(t)]
+        if missing:
+            db.update(sid, status="failed", finished_at=time.time(),
+                      error=_mab.available(missing[0]) + ". Nothing was asked.")
+            return
     if devicemark and not rec:
         # 12q: the battery's questions from the pinned datasets, as three tasks
         try:
@@ -1258,6 +1264,17 @@ def run_submission(sub: dict) -> None:
             task_out = config.OUT_DIR / row_safe / f"{task}_{shots}shot"
             label = f"{i}/{len(tasks)} · {task} ({shots}-shot)"
             turn2_dir = None
+            if task == config.MAB_PRIVACY and not rec:
+                # 14.2: each question's own system line, in the model's chat
+                # template as text, in a folder of this model's
+                turn2_dir = config.BENCH_ROOT / "mobileaibench" / "rendered" / row_safe
+                try:
+                    _mab.build_rendered(turn2_dir, task, _chat_renderer(sub["hf_id"], meta))
+                except Exception as e:                  # noqa: BLE001 — said on the row
+                    failed_tasks.append(task)
+                    with open(log_path, "a") as lf:
+                        lf.write(f"\n[service] {task}: the questions could not be built: {e!r}\n")
+                    continue
             if task == config.MAB_MTB2:
                 # 14.1: the second turn after the model's own first answer — as
                 # messages to a server, or in the model's own chat template as
@@ -1352,7 +1369,8 @@ def run_submission(sub: dict) -> None:
             # 14.1: MT-Bench's second turn is the conversation already in the
             # model's chat template: asked as it stands
             cmd = lm_eval_cmd(margs, task, shots, meta["batch"], task_out,
-                              chat=(kind == "instruct" or everyday) and task != config.MAB_MTB2,
+                              chat=(kind == "instruct" or everyday)
+                              and not (task == config.MAB_MTB2 or turn2_dir is not None),
                               max_gen_toks=room, include_dir=turn2_dir,
                               system=(_mab.SYSTEM.get(task) or None) if task in config.MAB_ALL
                               else None)
@@ -1641,7 +1659,7 @@ def run_submission(sub: dict) -> None:
         if mobile and not failed_tasks:
             db.update(sid, status="running", progress="scoring the answers")
             try:
-                if (sub.get("part") or "") == "judged":
+                if (sub.get("part") or "") in ("judged", "trust"):
                     out = _mab.start_judge(config.OUT_DIR / row_safe, sid)
                 else:
                     out = _mab.mark(config.OUT_DIR / row_safe)

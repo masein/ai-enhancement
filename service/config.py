@@ -455,8 +455,14 @@ MAB_DOLLY, MAB_CNNDM, MAB_XSUM = "mab_dolly", "mab_cnndm", "mab_xsum"
 MAB_MTB1, MAB_MTB2 = "mab_mtbench_t1", "mab_mtbench_t2"
 MAB_TASKS = [MAB_HOTPOT, MAB_SQL, MAB_DOLLY, MAB_CNNDM, MAB_XSUM]
 MAB_JUDGED_TASKS = [MAB_MTB1, MAB_MTB2]
-MAB_ALL = MAB_TASKS + MAB_JUDGED_TASKS
-MAB_PARTS = ("", "judged")
+# 14.2: three of its trust & safety sets, judged: the suite's "trust" part
+MAB_ADV, MAB_PRIVACY, MAB_SOCCHEM = "mab_adv", "mab_privacy", "mab_socchem"
+MAB_TRUST_TASKS = [MAB_ADV, MAB_PRIVACY, MAB_SOCCHEM]
+MAB_ALL = MAB_TASKS + MAB_JUDGED_TASKS + MAB_TRUST_TASKS
+MAB_PARTS = ("", "judged", "trust")
+# 14.2: what is never committed (Privacy Leakage: real people's names) — fetched
+# at deploy by scripts/fetch_data.py into the server's data folder
+MAB_PRIVATE_DIR = Path(os.environ.get("MAB_PRIVATE_DIR", BENCH_ROOT / "data" / "mobileaibench"))
 MAB_TASKS_DIR = Path(os.environ.get("MAB_TASKS_DIR", BENCH_ROOT / "mobileaibench" / "tasks"))
 MAB_INSTRUCT_ONLY = ("MobileAIBench's sets are asked through the chat template and scored on "
                      "what the model writes, so only an instruct model can sit them — this one "
@@ -531,7 +537,8 @@ def tasks_for_suite(suite: str, bbq_all: bool = False, part: str = "") -> list[s
     if suite == "shared":
         return list(SHARED_TASKS)
     if suite == "mobile":
-        return list(MAB_JUDGED_TASKS if part == "judged" else MAB_TASKS)
+        return list(MAB_JUDGED_TASKS if part == "judged" else MAB_TRUST_TASKS if part == "trust"
+                    else MAB_TASKS)
     if suite == "devicemark":
         return list(DM_TASKS)
     if suite == "judged":

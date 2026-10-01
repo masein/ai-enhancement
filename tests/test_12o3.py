@@ -39,6 +39,8 @@ def test_the_manifest_pins_both_files_and_credits_every_licence():
     assert m["sources"]["hotpot_qa"]["licence"] == "CC BY-SA 4.0"
     assert m["sources"]["sql_create_context"]["licence"] == "CC BY 4.0"
     for key, f in m["files"].items():
+        if not f.get("committed", True):
+            continue                          # 14.2: Privacy Leakage, never in the repo
         data = (mab.DATA_DIR / f["file"]).read_bytes()
         assert hashlib.sha256(data).hexdigest() == f["sha256"] and len(data) == f["bytes"], key
     for t in mab.TASKS:
@@ -254,7 +256,9 @@ def test_the_cells_are_theirs_and_never_in_the_avg(svc):
     assert data["tasks"]["mab_sql"]["metric"] == "sqlparser_f1"
     assert m["avg"] == before["avg"] and m["official"] == before["official"]
     assert "mab_hotpotqa" not in data["required"] and data["mabTasks"] == [
-        "mab_hotpotqa", "mab_sql", "mab_dolly", "mab_cnndm", "mab_xsum", "mab_mtbench"]
+        "mab_hotpotqa", "mab_sql", "mab_dolly", "mab_cnndm", "mab_xsum", "mab_mtbench",
+        # 14.2: and its three trust sets
+        "mab_adv", "mab_privacy", "mab_socchem"]
     assert m["mab"]["mab_sql"]["no_sql"] == 1000
     assert data["mab"]["credits"][0]["name"] == "MobileAIBench"
 

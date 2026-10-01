@@ -121,12 +121,17 @@ class BenchmarkIndex:
         """14.1: the pinned benchmark files the board asks from — every row's
         every string is a benchmark item (MobileAIBench's manifest)"""
         import json
+
+        from . import config
         try:
             m = json.loads((MAB_DIR / "manifest.json").read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return []
-        return [MAB_DIR / f["file"] for k, f in sorted((m.get("files") or {}).items())
-                if k not in NOT_ITEMS and (MAB_DIR / f["file"]).exists()]
+        # 14.2: and what lives only on the server (Privacy Leakage), once fetched
+        where = lambda f: (MAB_DIR if f.get("committed", True)  # noqa: E731
+                           else Path(config.MAB_PRIVATE_DIR)) / f["file"]
+        return [where(f) for k, f in sorted((m.get("files") or {}).items())
+                if k not in NOT_ITEMS and where(f).exists()]
 
     @staticmethod
     def pinned_rows(path: Path):

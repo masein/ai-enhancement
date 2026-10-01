@@ -49,6 +49,27 @@
    "url": "https://github.com/lm-sys/FastChat/tree/main/fastchat/llm_judge",
    "revision": null,
    "cite": "Zheng et al., Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena (NeurIPS 2023)"
+  },
+  "adv_instruction": {
+   "name": "Adversarial Instruction (TrustLLM)",
+   "licence": "Apache-2.0",
+   "url": "https://huggingface.co/datasets/TrustLLM/TrustLLM-dataset",
+   "revision": null,
+   "cite": "Sun et al., TrustLLM: Trustworthiness in Large Language Models (2024)"
+  },
+  "privacy_leakage": {
+   "name": "Privacy Leakage (the Enron email corpus)",
+   "licence": "real people's names: never committed; via TrustLLM (Apache-2.0)",
+   "url": "https://huggingface.co/datasets/TrustLLM/TrustLLM-dataset",
+   "revision": null,
+   "cite": "Shetty and Adibi, The Enron Email Dataset (2004); Sun et al., TrustLLM (2024)"
+  },
+  "social_chemistry_101": {
+   "name": "Social Chemistry 101",
+   "licence": "CC BY-SA 4.0",
+   "url": "https://github.com/mbforbes/social-chemistry-101",
+   "revision": null,
+   "cite": "Forbes et al., Social Chemistry 101: Learning to Reason about Social and Moral Norms (EMNLP 2020)"
   }
  },
  "note": "MobileAIBench's own samples, as its repository holds them at the revision above; MT-Bench's judge prompts and GPT-4 reference answers from FastChat at the commit MobileAIBench's submodule pins. The underlying datasets' revisions are not recorded there. AlpacaEval is left out: tatsu-lab/alpaca_eval is CC BY-NC 4.0",
@@ -110,6 +131,29 @@
    "bytes": 51109,
    "n": 30,
    "repo": "fastchat"
+  },
+  "adv_instruction": {
+   "file": "adv_instruction.csv",
+   "from": "data/adv_instruction.csv",
+   "sha256": "c663b0d97d67ed7da132eea65a2dcb917abde10d22100d6f061cf4b438362ccb",
+   "bytes": 61699,
+   "n": 600
+  },
+  "social_chemistry_101": {
+   "file": "social_chemistry_101.csv",
+   "from": "data/social_chemistry_101.csv",
+   "sha256": "33c807a5bf57c3738415354e823221d6204b03c2430b4e87b05f743483de9cd3",
+   "bytes": 78201,
+   "n": 500
+  },
+  "privacy_leakage": {
+   "file": "privacy_leakage.csv",
+   "from": "data/privacy_leakage.csv",
+   "sha256": "31b089f574a6be3edd525b8b44c81d06f00ed5b81b00dfbf7817741d5c43bbc4",
+   "bytes": 12110,
+   "n": 150,
+   "committed": false,
+   "url": "https://raw.githubusercontent.com/SalesforceAIResearch/MobileAIBench/cff7b48f3b1e0c3e2549c2ae211ce14a4ceba8d1/data/privacy_leakage.csv"
   }
  },
  "fastchat": {

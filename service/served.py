@@ -805,14 +805,17 @@ def answer_task(rec: dict, task: str, docs: list[dict], task_out: Path, s: dict,
             return
         text = prompt_of(docs[i], everyday)
         hist = docs[i].get("history") or []
-        held = meter.worst([s.get("system") or "", *(h["content"] for h in hist), text],
+        # 14.1: a conversation so far; 14.2: a doc's own system line (Privacy Leakage's)
+        si = {**s, **({"history": hist} if hist else {}),
+              **({"system": docs[i]["system"]} if docs[i].get("system") else {})}
+        held = meter.worst([si.get("system") or "", *(h["content"] for h in hist), text],
                            s["max_tokens"]) if meter else 0.0
         if meter and not meter.room(held):
             with lock:
                 halt.append(LimitReached(0, total, meter))
             return
         try:
-            a = answer_one(rec, text, {**s, "history": hist} if hist else s)
+            a = answer_one(rec, text, si)
         except ServerStopped as e:
             if meter:
                 meter.release(held)
