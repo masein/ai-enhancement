@@ -712,8 +712,47 @@ def mark_hf(sid: int, sub: dict, meta: dict, row: Path, thinking: dict) -> str:
     setup = {"model": sub["hf_id"], "runtime": "hf transformers (lm_eval)", "dtype": "bfloat16",
              "thinking": bool(thinking.get("on")), "thinking_mode": thinking.get("mode"),
              "lookahead": False, "mtp": False, "quant": "bf16", "battery": d.VERSION,
-             "cap": d.CAP, "seed": d.SEED, "revision": meta.get("revision")}
+             "cap": d.CAP, "seed": d.SEED, "revision": meta.get("revision"),
+             # 15.2: the tasks answered on a rented GPU, imported (where_of)
+             **where_of(row)}
     return summary_line(d.mark(row, items, setup, records, "full"))
+
+
+# ---------------------------------------------------------------------------
+# 15.2: a row answered, whole or in part, on a rented GPU
+# ---------------------------------------------------------------------------
+
+REMOTE_NAME = "remote_imports.json"
+TASK_WORDS = {"dm_ifeval": "IFEval", "dm_mmlu_pro": "MMLU-Pro", "dm_math": "MATH"}
+
+
+def _and(xs: list[str]) -> str:
+    return xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " and " + xs[-1]
+
+
+def where_of(row: Path) -> dict:
+    """which of the row's tasks have the answers a bundle brought
+    (scripts/import_remote.py keeps the record): {where, remote} — "run on a
+    rented GPU (NVIDIA GeForce RTX 4090)", or, for a row answered in part
+    here, which tasks were which. {} for a row answered here alone"""
+    try:
+        reg = json.loads((row / REMOTE_NAME).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    remote = {t: x for t, x in (reg.get("tasks") or {}).items()
+              if x.get("samples") and all((row / rel).exists() for rel in x["samples"])}
+    if not remote:
+        return {}
+    gpus = ", ".join(sorted({x.get("gpu") or "a GPU" for x in remote.values()}))
+    here = [t for t in config.DM_TASKS if t not in remote and (row / f"{t}_0shot").is_dir()]
+    if here:
+        line = (f"{_and([TASK_WORDS[t] for t in config.DM_TASKS if t in remote])} run on a "
+                f"rented GPU ({gpus}); {_and([TASK_WORDS[t] for t in here])} on this server")
+    else:
+        line = f"run on a rented GPU ({gpus})"
+    return {"where": line, "remote": {t: {"gpu": x.get("gpu"), "bundle": x.get("bundle"),
+                                          "sha256": (x.get("sha256") or "")[:16]}
+                                      for t, x in sorted(remote.items())}}
 
 
 # ---------------------------------------------------------------------------

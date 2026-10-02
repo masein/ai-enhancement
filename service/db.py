@@ -402,15 +402,17 @@ def _backfill_judge_batch(c: sqlite3.Connection) -> None:
 def add(hf_id: str, kind: str, suite: str, submitter: str, note: str,
         allow_remote_code: bool = False, tasks: list[str] | None = None,
         thinking: bool = False, subset: int = 0, bbq_all: bool = False,
-        part: str = "", pair: str = "") -> int:
+        part: str = "", pair: str = "", status: str = "queued") -> int:
+    """a run on the queue — 15.2: or `status` "done", a record of one that
+    ran elsewhere (an import), which the worker never picks up"""
     with closing(_conn()) as c:
         cur = c.execute(
             "INSERT INTO submissions (hf_id, kind, suite, submitter, note, created_at, "
-            "allow_remote_code, tasks, thinking, subset, bbq_all, part, pair) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "allow_remote_code, tasks, thinking, subset, bbq_all, part, pair, status) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (hf_id, kind, suite, submitter, note, time.time(), int(allow_remote_code),
              json.dumps(sorted(tasks or [])), int(bool(thinking)), int(subset or 0),
-             int(bool(bbq_all)), part or "", pair or ""))
+             int(bool(bbq_all)), part or "", pair or "", status))
         c.commit()
         return int(cur.lastrowid)
 

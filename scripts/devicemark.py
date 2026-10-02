@@ -1104,7 +1104,9 @@ def model_runs(out_dir: Path, launch=None) -> dict[str, dict]:
                 "paired": r.get("paired"), "chart_id": r.get("paired") or r["id"],
                 "items": (d / ITEMS_NAME).exists(), "at": row.get("at"),
                 "raw_fallback": row.get("raw_fallback") or 0, "errors": row.get("errors") or 0,
-                "version": row.get("version")}
+                "version": row.get("version"),
+                # 15.2: run on a rented GPU, whole or in part
+                "where": (row.get("setup") or {}).get("where")}
             # 12z A5: DeviceMark's own row beside ours, as the chart's table has it:
             # their number, and whether the two are a calibration point
             t = ext.get(r.get("paired") or "")

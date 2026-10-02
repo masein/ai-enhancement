@@ -4710,6 +4710,30 @@ Not before the demo: a new hidden set changes every Everyday score.
   strict and loose), a served setup's too. It lists what the board lists: the
   diagnose half.
 
+### 15.2 — a rented GPU's bundle, into the board (2 Oct)
+
+- **`scripts/import_remote.py <bundle> --by <name>`**, inside the container.
+  It refuses the bundle, saying which check failed, when the battery hashes
+  (ids, prompts, every item), the protocol (version, cap, seed) or the pinned
+  libraries (torch and its CUDA, transformers, lm_eval, fla-core, the
+  prebuilt kernels) differ from the server's, or a task's answers don't cover
+  its items. `--battery` prints the server's hashes, for
+  `remote_run.py --battery`.
+- **The merge**: each task the bundle holds replaces that task's answers for
+  the same model and mode (the earlier ones moved to `results/earlier/`); the
+  rest stay. The row is scored by `service/devicemark.mark_hf` from what is on
+  disk then, and its setup gets `where` — "run on a rented GPU (<GPU>)", or
+  which tasks ran where (`devicemark.where_of`, from the row's
+  `remote_imports.json`) — shown on the model page's DeviceMark card.
+- **The Runs list** gets an entry (`db.add(..., status="done")`: never queued),
+  its log the bundle's with the import's lines after it.
+- **Idempotent**: a bundle's sha256 in `remote_imports.json` means it's
+  imported already; nothing is touched.
+- **`docs/REMOTE-RUNS.md`**: the vast.ai steps — push the runner image, the
+  template (private registry login, SSH launch mode, the on-start line, 60
+  GB), the runs under tmux, `scp` from the server, the import, destroy — and
+  the two waiting runs' times from #167's pace.
+
 ### 15.1 — a DeviceMark row on a rented GPU (2 Oct)
 
 - **`scripts/remote_run.py`** runs one Hugging Face model's battery, in one
