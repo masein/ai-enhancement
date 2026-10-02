@@ -268,6 +268,10 @@ def make_bundle(out: Path, model: str, thinking: bool, tasks: list[str], hashes:
                 files[f"results/{row.name}/{rel.as_posix()}"] = f.read_bytes()
     if (row / "model_meta.json").exists():
         files[f"results/{row.name}/model_meta.json"] = (row / "model_meta.json").read_bytes()
+    # a thinking row's model, as the runner writes it beside the row
+    base = config.OUT_DIR / model.replace("/", "__")
+    if base != row and (base / "model_meta.json").exists():
+        files[f"results/{base.name}/model_meta.json"] = (base / "model_meta.json").read_bytes()
     logs = sorted(config.LOGS_DIR.glob(f"service_*_{model.replace('/', '__')}.log"),
                   key=lambda p: int(p.name.split("_")[1]))
     log = "".join(p.read_text(encoding="utf-8", errors="replace") for p in logs)

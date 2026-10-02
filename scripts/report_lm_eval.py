@@ -11875,6 +11875,9 @@ function dmModelCard(m, mode) {
         onclick: e => { e.preventDefault(); dmOpenRow(r.chart_id); } })),
     r.theirs ? el('p', { class: 'small', 'data-dm-card-theirs': mode,
       title: r.theirs.mode_differs || null, text: dmTheirsLine(r.theirs) }) : '',
+    // 15.2: answered on a rented GPU, whole or in part, and imported
+    r.where ? el('p', { class: 'small se', 'data-dm-card-where': mode,
+      text: r.where.charAt(0).toUpperCase() + r.where.slice(1) }) : '',
     r.inherited ? el('p', { class: 'small se', 'data-dm-card-inherited': mode,
       text: `${r.inherited.line}: this setup's quality is its MTP partner's (${r.inherited.from})` })
       : '',
