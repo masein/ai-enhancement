@@ -194,10 +194,18 @@ def merge_shards(row: Path, t: str, n: int, stamp: str) -> int:
                 got[str(s["doc"]["key"])] = s
     if set(got) != set(every):
         raise ValueError(f"{t}: the shards hold {len(got)} of its {len(every)} items")
+    # 15.7: the form the replies were saved in, the same in every shard
+    forms = {dm.reply_form(shards_dir(row.name) / t / f"{j}-of-{n}") for j in range(1, n + 1)}
+    if len(forms) > 1:
+        raise ValueError(f"{t}: its shards' replies were saved in different forms ({forms})")
     dest = row / f"{t}_0shot" / sub
     dest.mkdir(parents=True, exist_ok=True)
     (dest / f"samples_{t}_{stamp}.jsonl").write_text(
         "".join(json.dumps(got[k], ensure_ascii=False) + "\n" for k in every), encoding="utf-8")
+    form = forms.pop()
+    if form:
+        (row / f"{t}_0shot" / dm.FORM_NAME).write_text(json.dumps({"form": form}),
+                                                       encoding="utf-8")
     return len(every)
 
 
@@ -298,6 +306,21 @@ def import_bundle(path: Path, by: str, say=print) -> int:
             reg["shards"][t] = sh
             lines.append(f"{t}: shard {i} of {n}, {bundle['tasks'][t]} answers from a rented "
                          f"GPU ({gpu})")
+            # 15.7: a shard here saved in another form than this one (cut, before
+            # 15.7, under a new run's whole replies) is set aside: its new run
+            # replaces it, and the task waits for it
+            form = dm.reply_form(slot)
+            for j in sorted((x for x in sh["have"] if x != str(i)), key=int):
+                other = shards_dir(row_name) / t / f"{j}-of-{n}"
+                if dm.reply_form(other) == form:
+                    continue
+                aside = earlier / f"{t}_0shot-shard-{j}-of-{n}-other-form-{stamp}"
+                aside.parent.mkdir(parents=True, exist_ok=True)
+                if other.exists():
+                    shutil.move(str(other), str(aside))
+                del sh["have"][j]
+                lines.append(f"{t}: shard {j} of {n} here was saved in another form; it's kept "
+                             f"at {aside}, and its new run replaces it")
             missing = [j for j in range(1, n + 1) if str(j) not in sh["have"]]
             if missing:
                 waiting[t] = missing

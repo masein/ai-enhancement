@@ -573,20 +573,25 @@ def include_args_for(task: str) -> list[str]:
     return []
 
 
+WHOLE_SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "lm_eval_whole.py"
+
+
 def lm_eval_cmd(model_args: str, task: str, shots: int, batch, task_out: Path, *,
                 chat: bool, max_gen_toks: int | None = None, backend: str = "hf",
                 samples: Path | None = None, limit: int | None = None,
                 cache: Path | None = None, system: str | None = None,
-                include_dir: Path | None = None) -> list[str]:
+                include_dir: Path | None = None, whole: bool = False) -> list[str]:
     """The lm_eval command for one task. Built here only, so that
     scripts/check_tasks.py (deploy step 4) hands the installed harness exactly
     what a run hands it. 12h.1: `backend` is "hf" or "vllm" (vLLM sizes its
     own batches and picks its own device), and `samples` a seeded subset.
     12f.1: "local-chat-completions" asks a model served elsewhere — no device
     here, one request a message, and `cache`, the answers it has, so a run
-    the server stopped asks only the rest next time."""
-    cmd = ["lm_eval",
-           "--model", backend,
+    the server stopped asks only the rest next time. 15.7: `whole`, hf's
+    replies kept whole — every token, special ones too, nothing cut at the end
+    of the thinking (scripts/lm_eval_whole.py's hf-whole)"""
+    cmd = [*([sys.executable, str(WHOLE_SCRIPT)] if whole else ["lm_eval"]),
+           "--model", "hf-whole" if whole else backend,
            "--model_args", model_args,
            "--tasks", task,
            "--num_fewshot", str(shots),
@@ -729,6 +734,22 @@ def dm_cache(task_out: Path) -> Path:
     stopped — asks only the rest when it runs again. Inside the task's folder,
     so whatever sets the folder aside or discards it takes its cache too"""
     return task_out / "lm-cache" / "answers"
+
+
+def keep_whole(task_out: Path) -> None:
+    """15.7: a DeviceMark task with the thinking on saves its replies whole
+    (lm_eval_whole.py), and says so beside them (devicemark.reply_form) —
+    before it starts, so answers kept part-way are known for what they are.
+    Answers an earlier run kept in lm_eval's cut form are set aside, not
+    mixed in: the task asks them again"""
+    d = _devicemark.dm()
+    cache = task_out / "lm-cache"
+    if cache.is_dir() and d.reply_form(task_out) != "whole" and any(cache.glob("*.db")):
+        shutil.move(str(cache), str(task_out / f"lm-cache-cut-{int(time.time())}"))
+    task_out.mkdir(parents=True, exist_ok=True)
+    (task_out / d.FORM_NAME).write_text(json.dumps(
+        {"form": "whole", "by": "scripts/lm_eval_whole.py (hf-whole)",
+         "scoring": d.SCORING}), encoding="utf-8")
 
 
 def _has_results(task_out: Path) -> bool:
@@ -1565,8 +1586,12 @@ def run_submission(sub: dict) -> None:
                         chat=True, max_gen_toks=th["budget"], backend=be, samples=samples,
                         # 15.1: a DeviceMark task resumes per answer; 15.3: any
                         # task that writes its answers here
-                        cache=dm_cache(task_out))
+                        cache=dm_cache(task_out),
+                        # 15.7: a DeviceMark reply with the thinking on, kept whole
+                        whole=bool(devicemark and be == "hf" and th.get("on")))
                 cmd = gen_cmd(backend)
+                if devicemark and not rec and backend == "hf" and th.get("on"):
+                    keep_whole(task_out)
 
             t_task = time.time()
             # the dropped-privilege child cannot create its own output dir under

@@ -176,15 +176,17 @@ def test_the_nine_and_their_thinking_switches():
                    "google/gemma-4-E2B-it", NEMOTRON, "tencent/Youtu-LLM-2B",
                    "Nanbeige/Nanbeige4.1-3B"]
     modes = {m["id"]: catalog.thinking_of(m["id"], None) for m in catalog.MODELS}
+    # 15.7: and its template opens the thinking itself (<think>\n after the turn)
     assert modes["Qwen/Qwen3.5-2B"] == {"mode": "switch", "default_on": False,
-                                        "think_end": "</think>"}
+                                        "think_end": "</think>", "opens": True}
     assert modes[NEMOTRON]["default_on"] is True               # turn it off
     assert modes["Nanbeige/Nanbeige4.1-3B"]["mode"] == "always"
     assert modes["LiquidAI/LFM2.5-1.2B-Instruct"]["mode"] == "never"
     assert modes["google/gemma-4-E2B-it"]["think_end"] == "<channel|>"
     # any other model: its template decides
     qwen3 = "{%- if enable_thinking is defined and enable_thinking is false %}<think>\n\n</think>"
-    assert catalog.thinking_of("Qwen/Qwen3-1.7B", qwen3) == \
+    got = catalog.thinking_of("Qwen/Qwen3-1.7B", qwen3)
+    assert {k: got[k] for k in ("mode", "default_on", "think_end")} == \
         {"mode": "switch", "default_on": True, "think_end": "</think>"}
     qwen35 = "{%- if enable_thinking is defined and enable_thinking is true %}<think>\n"
     assert catalog.thinking_of("org/other", qwen35)["default_on"] is False

@@ -4710,6 +4710,47 @@ Not before the demo: a new hidden set changes every Everyday score.
   strict and loose), a served setup's too. It lists what the board lists: the
   diagnose half.
 
+### 15.7 — thinking split from the answer as DeviceMark splits it (2 Oct)
+
+- **Why**: thinking-on Hugging Face rows were scored on thinking. lm_eval's hf
+  decodes with skip_special_tokens=True and cuts at think_end_token, keeping
+  what follows: Gemma 4's `<|channel>`/`<channel|>` are special tokens
+  (soc_token/eoc_token), so its replies ("thought\n…" then the answer) were
+  never cut; Qwen3.5's template opens `<think>\n` itself, so a reply capped
+  inside its thinking had no marker and was kept whole as the answer.
+- **DeviceMark's rule, from their raw outputs and artifacts** (their scorer
+  isn't published): with the thinking split off (Youtu, Nanbeige:
+  thinking_chars on every item, the text not published), only `answer` is
+  scored — MATH "answered" is exactly the answers holding a \boxed{} (59 of
+  59, 65 of 65), Nanbeige's IFEval is 1.3% with 295 answers empty, a reply
+  capped inside the thinking has an empty answer. With the thinking off
+  (their whole battery, for models with a switch) the whole visible reply is
+  scored: Qwen3.5-4B's "Thinking Process:" preamble and literal `</think>`
+  included (IFEval 32.7 scoring it whole by our checker against their 31.5;
+  47.6 if split; MATH answered 54 = replies with a box anywhere).
+- **Scoring v2** (`devicemark.SCORING`, `split_reply`, `read_reply`): thinking
+  on — the answer after the closed thinking; capped inside it, no answer, on
+  all three tests; thinking off — the whole reply. Recorded per item
+  (`scored_answer`, `closed`, `cap_in`), per row (`setup.scoring`,
+  `setup.reading`: on, marks, whether the template opens the thinking) and
+  shown on the model page's card; `capped_in_thinking` per test.
+- **Replies kept whole**: a DeviceMark task on hf with the thinking on runs
+  `scripts/lm_eval_whole.py` (`hf-whole`: every token decoded, special ones
+  too, nothing cut — think_end_token is given, as enable_thinking needs, and
+  ignored), with `reply_form.json` beside the answers; an earlier cut-form
+  cache is set aside (`runner.keep_whole`). Shard merges carry the form.
+- **Which templates open the thinking**: the catalogue (`opens`: Qwen3.5,
+  Nemotron) or, for another model, its template rendered with jinja2
+  (`catalog.opens_thinking`, archinfo `think_opens`).
+- **Re-scoring**: `scripts/rescore_devicemark.py [--dry-run]` scores every row
+  again from its saved answers and prints before and after. Replies saved
+  before 15.7 are read as cut: a template-opens model's capped reply is all
+  thinking; Gemma 4's can't be split, so its row keeps its numbers, marked
+  provisional "needs a new run". Until re-scored, a row is provisional
+  (`devicemark.provisional_why`), badged in the On-device table.
+- **Thinking off changes too**: v1 split a thinking-off reply at a literal
+  `</think>`; v2 scores it whole, as DeviceMark does.
+
 ### 15.6 — the battery's items hash, whatever stored them (2 Oct)
 
 - **Why**: the first rented run (image 673cfba) refused to start — items

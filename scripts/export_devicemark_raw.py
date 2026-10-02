@@ -205,9 +205,13 @@ def log_of(row: Path, runs: list[dict]) -> str:
     return "\n".join(out) or "(no log on this server for this row)\n"
 
 
-def item_record(s: dict, item: dict | None) -> dict:
-    """one scored item, in DeviceMark's raw field names where ours mean the same"""
-    if "answer" in s and s.get("text") is None:
+def item_record(s: dict, item: dict | None, reading: dict | None = None) -> dict:
+    """one scored item, in DeviceMark's raw field names where ours mean the same.
+    15.7: split as it was scored (the row's reading), where the cap fell"""
+    if reading is not None and "scored_answer" in s:
+        got = dm.read_reply(s, reading)
+        thinking, answer = got["thinking"] or "", s["scored_answer"] or ""
+    elif "answer" in s and s.get("text") is None:
         thinking, answer = s.get("thinking") or "", s.get("answer") or ""
     else:
         thinking, answer = dm.split_thinking(s.get("text") or s.get("answer") or "")
@@ -216,6 +220,8 @@ def item_record(s: dict, item: dict | None) -> dict:
            "prompt_chars": len(prompt), "thinking": thinking, "thinking_chars": len(thinking),
            "answer": answer, "content_chars": len(answer),
            "generated_tokens": s.get("gen_tokens"), "capped": bool(s.get("capped")),
+           # 15.7: where the cap fell, and whether the thinking closed
+           "cap_in": s.get("cap_in"), "thinking_closed": s.get("closed"),
            "answered": bool(s.get("answered")), "correct": bool(s.get("correct"))}
     for k in ("prompt_tokens", "decode_tok_s", "wall_s"):
         if s.get(k) is not None:
@@ -420,7 +426,8 @@ def export_row(row: Path, out: Path, public: bool | None = None, runs: list[dict
     except Exception:                               # noqa: BLE001 — prompts left out, said
         items_src = {}
     model, thinking = model_of(row), row.name.endswith("__thinking")
-    items = [item_record(s, items_src.get((s["bench"], str(s["key"])))) for s in scored]
+    items = [item_record(s, items_src.get((s["bench"], str(s["key"]))), setup.get("reading"))
+             for s in scored]
     scores = scores_of(data, items)
     pub = public_by_default(row, setup) if public is None else public
     dest = out / ("public" if pub else "private") / row.name

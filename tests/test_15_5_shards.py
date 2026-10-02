@@ -242,3 +242,24 @@ def test_the_docs_commands_for_the_two_waiting_runs():
     fetched = [x.split(":", 1)[1].split()[0] for x in doc.splitlines() if x.startswith("scp ")]
     assert fetched == [f"{out}/{rb.bundle_name('devicemark', m, True, dm.parse_shard(s))}"
                        for (m, s), (_, out, _) in got.items()]
+
+
+def test_a_new_run_in_shards_replaces_shards_saved_in_the_cut_form(board, tmp_path):  # noqa: F811
+    """15.7: the Gemma 4 case — its three shards imported before 15.7, saved
+    cut (no reply_form.json beside them); its new run's first shard sets the
+    other two aside, to wait for their new runs, rather than merge whole
+    replies with cut ones"""
+    for i in (1, 2, 3):
+        assert imported(remote(tmp_path / f"old{i}", GEMMA, "dm_math", shard=f"{i}/3"))[0] == 0
+    row = row_of(GEMMA)
+    for i in (1, 2, 3):
+        (ir.shards_dir(row.name) / "dm_math" / f"{i}-of-3" / dm.FORM_NAME).unlink()
+    before = rb.task_answers(row / "dm_math_0shot", "dm_math")
+    new = remote(tmp_path / "new1", GEMMA, "dm_math", shard="1/3")
+    assert any(n.endswith("dm_math_0shot/" + dm.FORM_NAME) for n in rb.read(new)["files"])
+    code, said = imported(new)
+    assert code == 0
+    assert sum("here was saved in another form" in x for x in said) == 2
+    assert "dm_math: shards 2 and 3 of 3 missing — dm_math is scored once they are imported" \
+        in said
+    assert rb.task_answers(row / "dm_math_0shot", "dm_math") == before   # the old merge stands

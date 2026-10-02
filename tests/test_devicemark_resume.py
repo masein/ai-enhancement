@@ -56,6 +56,9 @@ def lm_eval(monkeypatch, restart_on: str = "", results: bool = False,
         b = dm.BENCH_OF[task]
         ans = {"ifeval": "a note without any commas", "mmlu_pro": "\\boxed{A}",
                "math": "\\boxed{1/2}"}[b]
+        # 15.7: a thinking-on reply is saved whole, its thinking with it (hf-whole)
+        if cmd[cmd.index("--model") + 1] == "hf-whole":
+            ans = "Thinking it over.\n</think>\n\n" + ans
         with open(out / f"samples_{task}_{stamp}.jsonl", "w") as fh:
             for k in keys:
                 fh.write(json.dumps({"doc": {"bench": b, "key": k}, "resps": [[ans]]}) + "\n")

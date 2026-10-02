@@ -354,7 +354,7 @@ def _thinking(hf_id: str, tmpl: str | None) -> dict:
     the page: its mode, which way it defaults, where its thinking ends"""
     t = catalog.thinking_of(hf_id, tmpl)
     return {"thinking": t["mode"], "thinking_default_on": t["default_on"],
-            "think_end": t["think_end"]}
+            "think_end": t["think_end"], "think_opens": t["opens"]}
 
 
 def reasoning_template(text: str | None) -> bool:
