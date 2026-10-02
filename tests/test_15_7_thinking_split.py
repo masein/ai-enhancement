@@ -277,3 +277,4 @@ def test_the_catalogue_knows_which_templates_open_the_thinking():
         "Nanbeige/Nanbeige4.1-3B": False}
     assert sdm.reading_of("google/gemma-4-E2B-it", True) == {
         "on": True, "marks": list(dm.CHANNEL), "opens": False}
+
