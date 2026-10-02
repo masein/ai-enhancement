@@ -13,8 +13,19 @@ FROM ${BASE_IMAGE} AS deps
 # these images use Ubuntu's system Python 3.12, which is PEP 668 "externally
 # managed" and rejects bare pip installs — inside a single-purpose container that
 # protection protects nothing, and it's how the base image got torch in there too.
-COPY requirements.txt /tmp/requirements.txt
+#
+# 15.6: and with constraints.txt — every package's version as the board's image
+# holds it (scripts/image_packages.py), the ones requirements.txt doesn't name
+# included (tokenizers, starlette, …) — so the board's image, built here at
+# deploy, and the runner image, built by the mirror's Actions, install the same
+# version of each: datasets drifted between them while it was unpinned. It
+# stays in the image for the board stage's own install. USE_CONSTRAINTS=0
+# builds without it, to make it again after a requirement changes
+ARG USE_CONSTRAINTS=1
+COPY requirements.txt constraints.txt /tmp/
 RUN python -m pip install --no-cache-dir --break-system-packages -r /tmp/requirements.txt \
+        $(if [ "$USE_CONSTRAINTS" = "1" ]; then echo "-c /tmp/constraints.txt"; fi) \
+    && mkdir -p /opt/evalboard && mv /tmp/constraints.txt /opt/evalboard/constraints.txt \
     && rm /tmp/requirements.txt
 
 # 12q.D: NLTK's punkt_tab, which IFEval's checkers split sentences with. A run
@@ -113,7 +124,10 @@ local_dir='/opt/models/bge-small-en-v1.5', allow_patterns=['config.json', 'model
 # and httpx for FastAPI's test client, and nothing else: the tests are not in
 # the image — the deploy step streams the commit in with `git archive`,
 # because they read files the image leaves out (the Dockerfile, the docs).
-RUN python -m pip install --no-cache-dir --break-system-packages "pytest>=8" httpx
+# 15.6: with the same constraints.txt as the deps stage
+ARG USE_CONSTRAINTS=1
+RUN python -m pip install --no-cache-dir --break-system-packages "pytest>=8" httpx \
+        $(if [ "$USE_CONSTRAINTS" = "1" ]; then echo "-c /opt/evalboard/constraints.txt"; fi)
 
 # Fail the BUILD, not the first submission, if the env is incoherent (e.g. deps
 # landed in a different interpreter than torch).

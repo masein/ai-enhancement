@@ -124,25 +124,37 @@ class Out:
 def hours(s: float | None) -> str:
     if s is None:
         return "—"
+    if s <= 0:
+        return "0 min"                      # 15.6: a task done has nothing left, not a minute
     return f"{s / 3600:.1f} h" if s >= 3600 else f"{max(1, round(s / 60))} min"
 
 
 class Watch(threading.Thread):
     """a line an answer, read from lm_eval's cache as each lands, and the
-    runner's own lines as they change"""
+    runner's own lines as they change.
+
+    15.6: each task's pace is its own. Its clock starts when the task before
+    it ended — the last answer another task gave — or, for the first task of
+    the session, when the session began; it was the session's start for every
+    task, so a third task's pace counted the first two's hours (gemma-1:
+    "dm_math 4/34 · 1255.1 s an answer" 84 minutes in). The time left on the
+    run is each task's answers left at that task's pace, and at the latest
+    measured pace for a task not begun"""
 
     def __init__(self, sid: int, tasks: list[str], say, every: float = 2.0):
         super().__init__(daemon=True)
         self.sid, self.tasks, self.say, self.every = sid, tasks, say, every
         self.done_ev = threading.Event()
+        self.started = time.time()
         self.last: dict[str, int] = {}
-        self.first: dict[str, tuple[int, float]] = {}
+        self.clock: dict[str, tuple[int, float]] = {}   # (answers, time) its clock started at
+        self.seen: dict[str, float] = {}                 # when its latest answer was seen
+        self.paces: dict[str, float] = {}
+        self.latest: float | None = None                 # the pace measured last, any task
         self.totals: dict[str, int] = {}
         self.prog = ""
-        self.pace: float | None = None
         for t in tasks:                     # what this session starts from: a line a new answer
-            n = self._answered(t)
-            self.first[t], self.last[t] = (n, time.time()), n
+            self.last[t] = self._answered(t)
 
     def run(self) -> None:
         while not self.done_ev.wait(self.every):
@@ -168,26 +180,34 @@ class Watch(threading.Thread):
         whole = max((len(rb.task_answers(o, task)) for o in outs), default=0)
         return max(n, whole)
 
-    def tick(self) -> None:
+    def pace_of(self, task: str) -> float | None:
+        return self.paces.get(task) or self.latest
+
+    def tick(self, now: float | None = None) -> None:
         from service import db
         row = db.get(self.sid) or {}
         prog = row.get("progress") or ""
         if prog and prog != self.prog:
             self.prog = prog
             self.say(f"· {prog}")
+        now = now if now is not None else time.time()
+        seen = dict(self.seen)              # before this tick: when the task before ended
         for t in self.tasks:
             total, n = self._total(t), self._answered(t)
+            if n > self.last[t] and t not in self.clock:
+                ended = [s for x, s in seen.items() if x != t]
+                self.clock[t] = (self.last[t], max(ended) if ended else self.started)
             while self.last[t] < n:
                 self.last[t] += 1
-                n0, t0 = self.first[t]
-                if self.last[t] > n0:
-                    self.pace = (time.time() - t0) / (self.last[t] - n0)
-                left_task = (total - self.last[t]) * self.pace if self.pace else None
-                left_run = (sum(max(0, self._total(x) - self.last.get(x, 0)) for x in self.tasks)
-                            * self.pace if self.pace else None)
-                self.say(f"{t}  {self.last[t]}/{total or '?'}"
-                         + (f" · {self.pace:.1f} s an answer · {hours(left_task)} left on this "
-                            f"task · {hours(left_run)} on the run" if self.pace else ""))
+                n0, t0 = self.clock[t]
+                self.paces[t] = self.latest = (now - t0) / (self.last[t] - n0)
+                pace = self.paces[t]
+                left_task = (total - self.last[t]) * pace
+                left_run = sum(max(0, self._total(x) - self.last.get(x, 0)) * (self.pace_of(x) or 0)
+                               for x in self.tasks)
+                self.seen[t] = now
+                self.say(f"{t}  {self.last[t]}/{total or '?'} · {pace:.1f} s an answer · "
+                         f"{hours(left_task)} left on this task · {hours(left_run)} on the run")
 
 
 def model_revision(model: str) -> str | None:
@@ -318,7 +338,8 @@ def main(argv: list[str] | None = None) -> int:
                          "every shard of it is in")
     ap.add_argument("--battery", default="",
                     help="the server's items sha256 (import_remote.py --battery): refuse "
-                         "another battery before starting")
+                         "another battery before starting. 15.6: the repo's own "
+                         "(items-v1.sha256.json) is checked without it")
     ap.add_argument("--suite", default=SUITE, choices=tuple(rb.SUITES))
     ap.add_argument("--by", default="remote", help="who ran it, for the run's record")
     a = ap.parse_args(argv)
@@ -362,6 +383,11 @@ def main(argv: list[str] | None = None) -> int:
     items = dm.load_items(config.DM_ITEMS)
     hashes = dm.battery_hashes(items)
     say(f"battery {dm.VERSION}: {len(items)} items · items sha256 {hashes['items'][:16]}")
+    # 15.6: the repo's hash, committed beside the battery's ids — and the
+    # server's, when --battery gives it
+    why = dm.items_differ(items, config.DM_ITEMS_SHA256)
+    if why:
+        raise SystemExit(f"{why}: the server would refuse the bundle. Nothing was run.")
     if a.battery and a.battery != hashes["items"]:
         raise SystemExit(f"this battery's items hash is {hashes['items'][:16]}, the server's "
                          f"{a.battery[:16]}: the server would refuse the bundle. Nothing was run.")
@@ -375,7 +401,8 @@ def main(argv: list[str] | None = None) -> int:
     gpu, libs = rb.gpu_info(), rb.library_versions()
     say(f"GPU {gpu.get('name') or 'unknown'} (driver {gpu.get('driver') or '?'}) · torch "
         f"{libs.get('torch_build')} · transformers {libs.get('transformers')} · lm_eval "
-        f"{libs.get('lm_eval')} · fast kernels {libs.get('fast_kernels') or 'none'} · "
+        f"{libs.get('lm_eval')} · datasets {libs.get('datasets')} · pyarrow {libs.get('pyarrow')} · "
+        f"fast kernels {libs.get('fast_kernels') or 'none'} · "
         f"model revision {(state.get('revision') or 'unknown')[:12]}")
 
     sid = db.add(a.model, "instruct", "devicemark", a.by, "run on a rented GPU (remote_run.py)",

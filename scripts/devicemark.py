@@ -70,6 +70,8 @@ BATTERY_PATH = DATA_DIR / "battery-v1.json"
 PROMPTS_PATH = DATA_DIR / "prompts.json"
 # 12q.B: DeviceMark's board as published, their numbers never changed
 SNAPSHOT_PATH = DATA_DIR / "board-snapshot.json"
+# 15.6: the items hash every machine's battery must come to (battery_hashes)
+ITEMS_HASH_PATH = DATA_DIR / "items-v1.sha256.json"
 BOARD_URL = "https://devicemark.github.io/data/leaderboard/board.json"
 BENCHES = ("ifeval", "mmlu_pro", "math")
 LABEL = {"ifeval": "IFEval", "mmlu_pro": "MMLU-Pro", "math": "MATH"}
@@ -295,18 +297,58 @@ def load_items(cache: Path, bat: dict | None = None) -> dict[tuple[str, str], di
     return out
 
 
+def normal_item(item: dict) -> dict:
+    """15.6: an item as its hash reads it — IFEval's kwargs without the keys
+    whose value is null. datasets 4.6.1 and earlier load google/IFEval's
+    kwargs as one struct, every key in every dict and null where it's unset
+    (the server's items-v1.jsonl of 29 Sep); 4.7.0 and later keep each dict as
+    written. The two ask the same and score the same (the IFEval checker drops
+    unset keys), and so they hash the same"""
+    if item.get("bench") != "ifeval" or not item.get("kwargs"):
+        return item
+    return {**item, "kwargs": [{k: v for k, v in (d or {}).items() if v is not None}
+                               for d in item["kwargs"]]}
+
+
 def battery_hashes(items: dict[tuple[str, str], dict]) -> dict[str, str]:
     """15.1: what a run's battery was — the ids (battery-v1.json), the prompt
     templates (prompts.json), and every item as load_items built it from the
     pinned datasets (its question, key and prompt), each a sha256. A row run
-    elsewhere is imported only when all three are the board's"""
+    elsewhere is imported only when all three are the board's. 15.6: the items
+    as normal_item reads them, so the form the datasets library stored them
+    in doesn't count"""
     import hashlib
 
     def sha(b: bytes) -> str:
         return hashlib.sha256(b).hexdigest()
-    rows = [items[k] for k in keys_for("full") if k in items]
+    rows = [normal_item(items[k]) for k in keys_for("full") if k in items]
     return {"battery": sha(BATTERY_PATH.read_bytes()), "prompts": sha(PROMPTS_PATH.read_bytes()),
             "items": sha(json.dumps(rows, sort_keys=True, ensure_ascii=False).encode("utf-8"))}
+
+
+def expected_items_hash() -> str:
+    """15.6: the items hash the repo expects (items-v1.sha256.json)"""
+    return json.loads(ITEMS_HASH_PATH.read_text(encoding="utf-8"))["items"]
+
+
+def items_differ(items: dict[tuple[str, str], dict], expected: str) -> str | None:
+    """15.6: None when the items hash to `expected` (the repo's, as config
+    holds it; "" checks nothing), else what differs, in words"""
+    if not expected:
+        return None
+    got = battery_hashes(items)["items"]
+    if got == expected:
+        return None
+    import importlib.metadata as md
+
+    def v(name: str) -> str:
+        try:
+            return md.version(name)
+        except md.PackageNotFoundError:
+            return "none"
+    return (f"the battery's items hash to {got[:16]}, and the repo expects {expected[:16]} "
+            f"({ITEMS_HASH_PATH.name}): they were read differently here (datasets {v('datasets')}, "
+            f"pyarrow {v('pyarrow')}) — nothing was asked")
 
 
 # ---------------------------------------------------------------------------

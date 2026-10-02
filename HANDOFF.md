@@ -4710,6 +4710,60 @@ Not before the demo: a new hidden set changes every Everyday score.
   strict and loose), a served setup's too. It lists what the board lists: the
   diagnose half.
 
+### 15.6 — the battery's items hash, whatever stored them (2 Oct)
+
+- **Why**: the first rented run (image 673cfba) refused to start — items
+  fe5fe34ffa0968a5 on the box, fd239fd498d8e7a6 on the server. Only IFEval's
+  `kwargs` differed: datasets 4.6.1 and earlier load google/IFEval's list of
+  dicts as one struct, every key in every dict, null where unset (the server's
+  items-v1.jsonl of 29 Sep); 4.7.0 (9 Mar 2026) and later load it as their
+  `Json` type, each dict as written. Reproduced on 2 Oct from the pinned files:
+  4.6.1 builds the server's file exactly, 5.0.1 the box's. Both ask and score
+  the same: the IFEval checker drops unset keys.
+- **`devicemark.normal_item`**: the hash reads IFEval's kwargs without their
+  null-valued keys, so both forms come to fe5fe34f…66323. Nothing on the server
+  is rewritten, and no row changes: rows don't hold the hash.
+- **Committed**: `eval_tasks/devicemark/items-v1.sha256.json` (in the runner
+  image too); `config.DM_ITEMS_SHA256` reads it ("" checks nothing — the tests'
+  invented battery; conftest sets it). `devicemark.items_differ` is checked by
+  a board run (hf and served: failed, nothing asked), by `remote_run.py`
+  before anything runs (`--battery` is now optional), and by the import (this
+  server's items must be the repo's).
+- **Pinned**: every direct requirement — `datasets==5.0.1`, `pyarrow==25.0.1`,
+  and accelerate, sentencepiece, huggingface_hub, fastapi, uvicorn and tzdata
+  at what CI's image build resolved on 2 Oct (run 36993529597). The board's
+  image is built at deploy and the runner image at merge, so an unpinned one
+  drifts between them. The deps layer rebuilds once. datasets, pyarrow,
+  accelerate and huggingface_hub are in `rb.library_versions()`: recorded in a
+  bundle's setup, not required to match (the items hash is the check).
+- **`constraints.txt`**: every Python package in the board's image at its
+  version (`scripts/image_packages.py constraints <board image>`, from CI's
+  build of 2 Oct), the ones requirements.txt doesn't name included (tokenizers,
+  starlette, pydantic, …) and the base image's. The deps stage installs with
+  `-c` and keeps it at /opt/evalboard/constraints.txt for the board stage's
+  pytest install, so the board's image (built at deploy) and the runner image
+  (built at merge) resolve the same versions. `USE_CONSTRAINTS=0` builds
+  without it. **After a requirement changes**: build the board image with
+  `--build-arg USE_CONSTRAINTS=0` and make the file again from it (CI's
+  `image-packages` artifact holds both images' lists).
+- **The checks**: ci.yml's image job (`image_packages.py compare`) fails when
+  the board and runner images' package lists differ, but for what only the
+  board stage installs (`BOARD_ONLY`: pytest, iniconfig, pluggy), or when
+  either isn't constraints.txt; runner-image.yml (`check`) holds the runner
+  image to it before the push. tokenizers is in the setup record too.
+- **docs/REMOTE-RUNS.md**: times scaled by 1.6 — the first rented RTX 5090 ran
+  Qwen3.5-4B thinking-on at about 74 s a full-length answer, the board's 47 s
+  (#167) — and rented hosts vary.
+- **`remote_run.py`'s progress lines**: each task's pace is its own (`Watch`).
+  A task's clock starts when the task before it ended (the last answer another
+  task gave), or at the session's start for the first; it was the session's
+  start for every task, so gemma-1's dm_math showed "4/34 · 1255.1 s an
+  answer · 10.5 h left" 84 minutes in. The time left on the run is each task's
+  answers left at its own pace, at the latest measured pace for one not begun.
+  A finished task has "0 min" left.
+- Bundles made before this carry the old hash (fd239fd4… from the server's
+  copied cache) and are refused after it: import them first.
+
 ### 15.5 — the runner image from Actions, and shards (2 Oct)
 
 - **`.github/workflows/runner-image.yml`** (the mirror only): on each push to

@@ -1280,13 +1280,19 @@ def run_submission(sub: dict) -> None:
     if devicemark and not rec:
         # 12q: the battery's questions from the pinned datasets, as three tasks
         try:
-            # 15.5: on a rented GPU run as a shard, its share of each task alone
-            _devicemark.dm().build_tasks(config.DM_TASKS_DIR,
-                                         _devicemark.dm().load_items(config.DM_ITEMS),
-                                         shard=_devicemark.dm().parse_shard(config.DM_SHARD))
+            items = _devicemark.dm().load_items(config.DM_ITEMS)
+            # 15.6: the battery the repo expects, or nothing is asked
+            why = _devicemark.dm().items_differ(items, config.DM_ITEMS_SHA256)
+            if not why:
+                # 15.5: on a rented GPU run as a shard, its share of each task alone
+                _devicemark.dm().build_tasks(config.DM_TASKS_DIR, items,
+                                             shard=_devicemark.dm().parse_shard(config.DM_SHARD))
         except Exception as e:                          # noqa: BLE001 — said on the row
             db.update(sid, status="failed", finished_at=time.time(),
                       error=f"the battery's questions could not be read: {e}")
+            return
+        if why:
+            db.update(sid, status="failed", finished_at=time.time(), error=why)
             return
     if remote_code:      # the code that produced the scores is part of the record
         db.update(sid, progress=f"preflight ok · custom model code · batch={meta['batch']}")

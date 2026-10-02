@@ -38,12 +38,13 @@ cat ~/.ssh/vast_ed25519.pub
 Paste the printed line into vast.ai → Account → SSH Keys. vast.ai puts it on
 every instance you rent, so the server can `scp` from them.
 
-**Make the image public.** GitHub creates the package private on its first
-push, and Actions can't change that. Once, at
+**The image is public.** GitHub made the package public on its first push
+from the public mirror (2 Oct), so vast.ai pulls it with no login. Actions
+can't change a package's visibility; if it ever reads private, it's at
 <https://github.com/users/masein/packages/container/evalboard-runner/settings>:
-Danger Zone → Change visibility → Public. Every later push stays public.
+Danger Zone → Change visibility → Public.
 
-## 1. After a deploy: the image's tag and the battery
+## 1. After a deploy: the image's tag
 
 On the server. The image's tag is the commit the server runs, the same value
 as its `EVALBOARD_BUILD`. The mirror's Actions push it within the hour after
@@ -56,14 +57,17 @@ echo $TAG
 sudo docker manifest inspect ghcr.io/masein/evalboard-runner:$TAG > /dev/null && echo "the image is there"
 ```
 
-Then print the server's battery hash. Each run in step 3 checks it before it
-starts, so a battery the server would refuse never costs GPU hours:
+**The battery.** Its expected items hash is committed beside its ids
+(`eval_tasks/devicemark/items-v1.sha256.json`). Each run in step 3 checks its
+battery against it before it starts, so a battery the server would refuse
+never costs GPU hours; a run here and the import check it too. To see the
+server's:
 
 ```bash
 sudo docker compose exec -T bench python scripts/import_remote.py --battery
 ```
 
-Its first line is `items <hash>`.
+It ends `the repo's items fe5fe34f… (the same)`.
 
 ## 2. What to rent
 
@@ -111,9 +115,9 @@ MMLU-Pro and MATH on the server), in 2 shards:
 
 ```bash
 # instance 1
-python scripts/remote_run.py --model Qwen/Qwen3.5-4B --thinking on --only dm_ifeval --shard 1/2 --out /workspace/qwen-1 --battery <hash from step 1>
+python scripts/remote_run.py --model Qwen/Qwen3.5-4B --thinking on --only dm_ifeval --shard 1/2 --out /workspace/qwen-1
 # instance 2
-python scripts/remote_run.py --model Qwen/Qwen3.5-4B --thinking on --only dm_ifeval --shard 2/2 --out /workspace/qwen-2 --battery <hash from step 1>
+python scripts/remote_run.py --model Qwen/Qwen3.5-4B --thinking on --only dm_ifeval --shard 2/2 --out /workspace/qwen-2
 ```
 
 **Gemma 4 E2B**, the whole battery, in 3 shards. It's gated: type a token
@@ -122,11 +126,11 @@ that has accepted Gemma's licence on Hugging Face first, on each of the three:
 ```bash
 read -rs HF_TOKEN && export HF_TOKEN
 # instance 3
-python scripts/remote_run.py --model google/gemma-4-E2B-it --thinking on --shard 1/3 --out /workspace/gemma-1 --battery <hash from step 1>
+python scripts/remote_run.py --model google/gemma-4-E2B-it --thinking on --shard 1/3 --out /workspace/gemma-1
 # instance 4
-python scripts/remote_run.py --model google/gemma-4-E2B-it --thinking on --shard 2/3 --out /workspace/gemma-2 --battery <hash from step 1>
+python scripts/remote_run.py --model google/gemma-4-E2B-it --thinking on --shard 2/3 --out /workspace/gemma-2
 # instance 5
-python scripts/remote_run.py --model google/gemma-4-E2B-it --thinking on --shard 3/3 --out /workspace/gemma-3 --battery <hash from step 1>
+python scripts/remote_run.py --model google/gemma-4-E2B-it --thinking on --shard 3/3 --out /workspace/gemma-3
 ```
 
 `read -rs` takes the token without showing it or keeping it in the shell's
@@ -213,14 +217,24 @@ The pace comes from #167, Qwen3.5-4B with thinking on, run on the board's RTX 50
 
 On DeviceMark's board, Qwen3.5-4B's answers average about 3,600 tokens, which comes to about 85 tokens a second here.
 
-**Qwen3.5-4B, IFEval in 2 shards:** 150 answers each at 41.6 s is **about 1.75 hours** on an RTX 5090, both at once.
+**A rented RTX 5090 is slower than the board's.** The first one (2 Oct) ran
+Qwen3.5-4B with thinking on at about 74 s a full-length answer, against about
+47 s on the board's (#167's log): about **1.6 times** as long. The times below
+are the server's pace times 1.6.
+
+**Rented hosts vary.** The same card can be power-limited, or sit in a host
+with a slower CPU or PCIe link, or share the machine. One may be faster or
+slower than this: the pace in `remote_run.py`'s lines after the first dozen
+answers tells you which.
+
+**Qwen3.5-4B, IFEval in 2 shards:** 150 answers each, **about 2.8 hours** a shard, both at once.
 
 **Gemma 4 E2B, the full battery in 3 shards** (200, 198 and 198 answers):
 - It depends on how long its answers run.
-- On DeviceMark's board, Gemma 4 E2B's answers average about 390 tokens on IFEval and 800 on MMLU-Pro and MATH. At #167's 85 tokens a second, that is **about half an hour** a shard.
-- If its answers run as long as Qwen3.5-4B's, it is **about 2.5 hours** a shard. Plan for the longer.
+- On DeviceMark's board, Gemma 4 E2B's answers average about 390 tokens on IFEval and 800 on MMLU-Pro and MATH. That is **about 50 minutes** a shard.
+- If its answers run as long as Qwen3.5-4B's, it is **about 4 hours** a shard. Plan for the longer.
 
-**On a slower GPU:** on an RTX 4090, allow about a third more time.
+**On a slower GPU:** on an RTX 4090, allow about a third more again.
 
 **Before the first answer:** each instance pulls the image (5.0 GB) and the
 model, and builds the battery: allow 10 to 20 minutes.

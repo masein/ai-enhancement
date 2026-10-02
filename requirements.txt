@@ -24,13 +24,24 @@ tiktoken==0.14.0
 transformers==5.5.3
 # MATH-500's answers compared as maths, not strings (scripts/generative.py)
 math-verify[antlr4_11_0]==0.9.0
-accelerate
-sentencepiece
-datasets
-huggingface_hub
-fastapi
-uvicorn[standard]
-tzdata                # zoneinfo data for TZ-aware timestamps in containers
+# 15.6: every direct requirement pinned. The board's image is built on the
+# server at deploy and the runner image by the mirror's Actions at merge: an
+# unpinned package resolves to whatever is newest at each build, and the two
+# drift apart (as datasets did). The versions CI's image build and image-deps
+# job both resolved on 2026-10-02 (run 36993529597). constraints.txt pins the
+# rest — what these bring in — and the Dockerfile installs with both
+accelerate==1.15.0
+sentencepiece==0.2.2
+# they read the battery's datasets, and the form they keep a record in can
+# change between releases: 4.7.0 keeps IFEval's kwargs as written where 4.6.1
+# and earlier null-fill every key (the items hash reads both alike since
+# 15.6). The versions on the server and in the runner image on 2026-10-02
+datasets==5.0.1
+pyarrow==25.0.1
+huggingface_hub==1.33.0
+fastapi==0.142.2
+uvicorn[standard]==0.54.0
+tzdata==2026.4        # zoneinfo data for TZ-aware timestamps in containers
 # 12p.1: `hidden_store backup --export` — one file encrypted to an age public
 # key, in-process; decrypted off the server with the standard `age` tool
 pyrage==1.4.0

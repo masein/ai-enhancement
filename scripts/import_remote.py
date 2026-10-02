@@ -103,6 +103,11 @@ def checks(b: dict) -> list[str]:
         if theirs.get(k) != ours[k]:
             out.append(f"the battery's {words}: the bundle's hash {str(theirs.get(k))[:16]}, "
                        f"this server's {ours[k][:16]}")
+    # 15.6: and this server's items are the repo's (items-v1.sha256.json)
+    from service import config
+    if config.DM_ITEMS_SHA256 and ours["items"] != config.DM_ITEMS_SHA256:
+        out.append(f"this server's battery: its items hash to {ours['items'][:16]}, and the repo "
+                   f"expects {config.DM_ITEMS_SHA256[:16]}")
     out += [f"a pinned library — {d}" for d in
             rb.pin_differences(setup.get("libraries") or {}, rb.library_versions())]
     model, row = bundle.get("model") or "", bundle.get("row") or ""
@@ -400,8 +405,12 @@ def main(argv: list[str] | None = None) -> int:
     from service import db
     db.init()
     if a.battery:
+        from service import config
         h = server_battery()
         print(f"items {h['items']}\nbattery {h['battery']}\nprompts {h['prompts']}")
+        if config.DM_ITEMS_SHA256:                  # 15.6: and whether they're the repo's
+            print("the repo's items " + config.DM_ITEMS_SHA256 + (
+                " (the same)" if h["items"] == config.DM_ITEMS_SHA256 else " (they differ)"))
         return 0
     if not a.bundle:
         ap.error("a bundle, or --battery")
