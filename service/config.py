@@ -32,6 +32,13 @@ DISK_RED_GB = float(os.environ.get("DISK_RED_GB", "3"))
 GPU_POLL_S = int(os.environ.get("GPU_POLL_S", "60"))
 GPU_WAIT_MAX_S = int(os.environ.get("GPU_WAIT_MAX_S", str(6 * 3600)))
 TASK_TIMEOUT_S = int(os.environ.get("TASK_TIMEOUT_S", str(3 * 3600)))
+# 15.3: a task that writes its answers (DeviceMark's, the generative three) is
+# given a limit sized for it — its answers still to write, each at the cap, at
+# the model's measured pace (tokens a second, pace.json), with LIMIT_HEADROOM
+# — never under TASK_TIMEOUT_S. Before any run has measured the model,
+# PACE_GUESS_TOK_S. TASK_TIMEOUT_S=0 is no limit at all (a rented GPU's run)
+PACE_GUESS_TOK_S = float(os.environ.get("PACE_GUESS_TOK_S", "20"))
+LIMIT_HEADROOM = float(os.environ.get("LIMIT_HEADROOM", "1.5"))
 
 # Submission guardrails.
 MAX_PARAMS_B = float(os.environ.get("MAX_PARAMS_B", "4"))  # reject >4B params (bf16 ≈ 8 GB weights)

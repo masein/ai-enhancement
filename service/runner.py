@@ -225,6 +225,11 @@ def _exam_settings(meta: dict) -> dict:
             "max_gen_toks": config.REASONING_MAX_GEN_TOKS if thinks else EXAM_MAX_GEN_TOKS}
 
 
+def hours_words(s: float) -> str:
+    """"5.6 h", "41 min" """
+    return f"{s / 3600:.1f} h" if s >= 3600 else f"{max(1, round(s / 60))} min"
+
+
 def time_left(done: int, total: int, secs_each: float) -> str:
     """"140 of 200 · 4.1 s an answer · about 4 min left": a slow run's
     progress, from the seconds each answer has taken so far"""
@@ -717,7 +722,8 @@ def lm_eval_cwd(task_out: Path) -> Path:
 
 
 def dm_cache(task_out: Path) -> Path:
-    """15.1: a DeviceMark task's answers as they are written, one by one —
+    """15.1: a DeviceMark task's answers as they are written, one by one (15.3:
+    any task that writes its answers here, the generative three too) —
     lm_eval's own cache (--use_cache; it adds "_rank0.db"), committed after
     each answer. A task stopped part-way — a restart, a timeout, a rented box
     stopped — asks only the rest when it runs again. Inside the task's folder,
@@ -823,6 +829,101 @@ def reuse_note(reused: dict[str, int | None], tasks: list[str]) -> str:
 
 
 CANCELED = -15
+TIMED_OUT = -3                # 15.3: the task ran past its limit
+# 15.3: each run's limit for the task in hand, (seconds, why) — set by the run
+# before it starts lm_eval and read by _run_task, so the many tests that stand
+# in for _run_task keep their own signature
+_TASK_LIMIT: dict[int, tuple[float, str]] = {}
+PACE_NAME = "pace.json"
+
+
+def model_pace(hf_id: str) -> dict | None:
+    """15.3: the model's measured generation pace, {tok_s, sid, task, …} — its
+    last task that wrote its answers in one go here (record_pace)"""
+    try:
+        p = json.loads((config.OUT_DIR / hf_id.replace("/", "__") / PACE_NAME)
+                       .read_text(encoding="utf-8"))
+        return p if float(p.get("tok_s") or 0) > 0 else None
+    except (OSError, ValueError, TypeError):
+        return None
+
+
+def task_limit(n_left: int, cap: int, pace: dict | None) -> tuple[float, str] | None:
+    """15.3: the limit a task that writes its answers is given — (seconds,
+    why): the answers still to write, each at the cap, at the model's
+    measured pace (else PACE_GUESS_TOK_S), with LIMIT_HEADROOM, never under
+    TASK_TIMEOUT_S. None when TASK_TIMEOUT_S is 0: no limit"""
+    if config.TASK_TIMEOUT_S <= 0:
+        return None
+    tok_s = float(pace["tok_s"]) if pace else config.PACE_GUESS_TOK_S
+    src = (f"measured on #{pace['sid']}, {pace.get('task')}" if pace else
+           "a guess: no run here has measured this model yet")
+    sized = config.LIMIT_HEADROOM * max(0, n_left) * cap / tok_s
+    why = (f"{max(0, n_left):,} answers at the {cap:,}-token cap at {tok_s:.0f} tokens a second "
+           f"({src}), with {config.LIMIT_HEADROOM:g}× headroom")
+    if sized < config.TASK_TIMEOUT_S:
+        return float(config.TASK_TIMEOUT_S), why + f", and never under {hours_words(config.TASK_TIMEOUT_S)}"
+    return sized, why
+
+
+def _items_of(task: str, sub: dict) -> int:
+    """15.3: how many answers a task that writes them asks: DeviceMark's from
+    its built task, the generative three's from the board's counts"""
+    if task in config.DM_TASKS:
+        return len(_devicemark.dm().task_keys(config.DM_TASKS_DIR, task))
+    if task == "mmlu_pro":
+        n = sum(config.MMLU_PRO_SUBJECTS.values())
+        return min(int(sub.get("subset") or 0), n) or n
+    return _served.GEN_ITEMS.get(task, 0)
+
+
+def cached_answers(task_out: Path) -> int:
+    """the answers a task's cache holds (dm_cache): what a stopped task keeps"""
+    import sqlite3
+    n = 0
+    for f in task_out.glob("lm-cache/*.db"):
+        try:
+            with sqlite3.connect(f"file:{f}?mode=ro", uri=True, timeout=5) as c:
+                n += c.execute("SELECT COUNT(*) FROM unnamed").fetchone()[0]
+        except sqlite3.Error:
+            continue
+    return n
+
+
+def _answer_tokens(hf_id: str, revision: str | None, texts: list[str]) -> tuple[int, bool]:
+    """the answers' tokens, counted with the model's tokenizer — or, when it
+    can't be loaded, at four characters a token: (tokens, counted)"""
+    try:
+        from transformers import AutoTokenizer
+        tok = AutoTokenizer.from_pretrained(hf_id, revision=revision)
+        return sum(len(tok(t, add_special_tokens=False)["input_ids"]) for t in texts), True
+    except Exception:                                   # noqa: BLE001 — characters, then
+        return sum(len(t) for t in texts) // 4, False
+
+
+def record_pace(sid: int, hf_id: str, revision: str | None, task: str, task_out: Path,
+                text: str) -> dict | None:
+    """15.3: the model's pace from a task it answered in one go: its answers'
+    tokens over the seconds lm_eval's bar took"""
+    bar = _tqdm_last(text)
+    files = sorted(task_out.rglob(f"samples_{task}_*.jsonl"))
+    if not bar or not bar[0] or bar[0] != bar[1] or not bar[2] or not files:
+        return None
+    texts = []
+    for line in files[-1].read_text(encoding="utf-8").splitlines():
+        try:
+            texts.append(((json.loads(line).get("resps") or [[""]])[0] or [""])[0] or "")
+        except ValueError:
+            continue
+    if len(texts) != bar[0]:
+        return None
+    tokens, counted = _answer_tokens(hf_id, revision, texts)
+    out = {"tok_s": round(tokens / bar[2], 2), "sid": sid, "task": task, "tokens": tokens,
+           "seconds": bar[2], "answers": bar[0], "counted": counted, "at": time.time()}
+    p = config.OUT_DIR / hf_id.replace("/", "__") / PACE_NAME
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(out), encoding="utf-8")
+    return out
 
 
 def _run_task(sid: int, cmd: list[str], lf, env: dict, run_as, cwd: Path,
@@ -838,16 +939,22 @@ def _run_task(sid: int, cmd: list[str], lf, env: dict, run_as, cwd: Path,
                             env=env, **({"user": run_as[0], "group": run_as[1]}
                                         if run_as else {}))
     t0 = time.time()
+    # 15.3: the limit the run sized for this task, else TASK_TIMEOUT_S; none
+    # at 0 (15.1: a rented GPU has nothing else queued)
+    limit = _TASK_LIMIT.get(sid)
+    limit_s = limit[0] if limit else (config.TASK_TIMEOUT_S if config.TASK_TIMEOUT_S > 0 else 0)
     while True:
         try:
             return proc.wait(timeout=2)
         except subprocess.TimeoutExpired:
             pass
         stop = (on_poll() or "") if on_poll else ""
-        # 15.1: 0 is no limit — a rented GPU has nothing else queued
+        took = time.time() - t0
+        timed = bool(limit_s) and took > limit_s
         why = ("canceled by request" if db.cancel_requested(sid)
-               else stop or (f"killed after {config.TASK_TIMEOUT_S}s timeout"
-                             if 0 < config.TASK_TIMEOUT_S < time.time() - t0 else ""))
+               else stop or (f"timed out after {hours_words(took)}: its limit, "
+                             f"{hours_words(limit_s)}, was "
+                             + (limit[1] if limit else "TASK_TIMEOUT_S") if timed else ""))
         if why:
             proc.terminate()
             try:
@@ -856,7 +963,8 @@ def _run_task(sid: int, cmd: list[str], lf, env: dict, run_as, cwd: Path,
                 proc.kill()
                 proc.wait()
             lf.write(f"\n[service] {why}\n")
-            return CANCELED if why.startswith("canceled") else -1
+            return (CANCELED if why.startswith("canceled") else TIMED_OUT if timed and not stop
+                    else -1)
 
 
 # ---------------------------------------------------------------------------
@@ -1447,8 +1555,9 @@ def run_submission(sub: dict) -> None:
                                        else spec["max_length"]),
                         task, shots, batch or gen_batch or meta["batch"], task_out,
                         chat=True, max_gen_toks=th["budget"], backend=be, samples=samples,
-                        # 15.1: a DeviceMark task resumes per answer
-                        cache=dm_cache(task_out) if devicemark else None)
+                        # 15.1: a DeviceMark task resumes per answer; 15.3: any
+                        # task that writes its answers here
+                        cache=dm_cache(task_out))
                 cmd = gen_cmd(backend)
 
             t_task = time.time()
@@ -1501,6 +1610,20 @@ def run_submission(sub: dict) -> None:
                 # 12q.G: what the card's other processes hold before this task
                 # loads anything: an out-of-memory error is set against it
                 others_held = None if rec else others_mib()
+                # 15.3: a task that writes its answers here gets a limit sized for
+                # it — the answers still to write, at the cap, at the model's pace
+                n_task = _items_of(task, sub) if gen_task and not rec else 0
+                kept_at_start = cached_answers(task_out) if n_task else 0
+                limit = (task_limit(n_task - kept_at_start, th["budget"], model_pace(sub["hf_id"]))
+                         if n_task else None)
+                if limit:
+                    _TASK_LIMIT[sid] = limit
+                    lf.write(f"[service] {task}: its limit is {hours_words(limit[0])} — "
+                             f"{limit[1]}\n")
+                    lf.flush()
+                    mark = log_path.stat().st_size
+                else:
+                    _TASK_LIMIT.pop(sid, None)
                 status = _run_task(sid, cmd, lf,
                                    _served.job_env(job_env, rec) if rec else job_env, run_as,
                                    cwd=lm_eval_cwd(task_out), **served_kw)
@@ -1579,6 +1702,14 @@ def run_submission(sub: dict) -> None:
                     db.update(sid, error=f"{task}: {got}" + _served.KEPT_FOR_NEXT)
                     break
 
+            # 15.3: the model's pace, from a task it answered in one go here
+            if status == 0 and gen_task and not rec and n_task and not kept_at_start:
+                try:
+                    record_pace(sid, sub["hf_id"], meta.get("revision"), task, task_out,
+                                _read_from(log_path, mark))
+                except Exception as e:                  # noqa: BLE001 — a limit, not a result
+                    with open(log_path, "a") as lf:
+                        lf.write(f"\n[service] the pace couldn't be recorded: {e!r}\n")
             if status == 0 and current_fingerprint(task):
                 # which questions these answers answer, and which row asked
                 (task_out / BANK_FILE).write_text(current_fingerprint(task) + "\n",
@@ -1605,6 +1736,19 @@ def run_submission(sub: dict) -> None:
                                      f"{was:,} or more and resubmit.")
                 break                # the other tasks were given the same room
 
+            if status == TIMED_OUT:
+                # 15.3: it says it timed out, what its limit was and why, and what it kept
+                failed_tasks.append(task)
+                kept = cached_answers(task_out)
+                db.update(sid, error=f"{task} timed out: its limit was "
+                                     f"{hours_words(limit[0]) if limit else 'TASK_TIMEOUT_S'}"
+                                     + (f" — {limit[1]}" if limit else "") + ". "
+                                     + (f"The {kept:,} answers it wrote are kept: resubmit and it "
+                                        f"asks only the other {max(0, n_task - kept):,}."
+                                        if kept else "Nothing it wrote was kept."))
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n[service] {task}: {kept:,} of {n_task:,} answers kept\n")
+                continue
             if status != 0:
                 tail = _tail(log_path)
                 failed_tasks.append(task)
@@ -1824,6 +1968,7 @@ def run_submission(sub: dict) -> None:
                                      else f"{what} done" + (f" · {note}" if note else "")
                                      + judge_note), error="")
     finally:
+        _TASK_LIMIT.pop(sid, None)
         if relay is not None:
             relay.__exit__(None, None, None)
         if held:                   # 12m.3: never a GPU run's lock, taken while a remote one ran
