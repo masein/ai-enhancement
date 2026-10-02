@@ -4736,11 +4736,31 @@ Not before the demo: a new hidden set changes every Everyday score.
   drifts between them. The deps layer rebuilds once. datasets, pyarrow,
   accelerate and huggingface_hub are in `rb.library_versions()`: recorded in a
   bundle's setup, not required to match (the items hash is the check).
-  Transitive packages (starlette, pydantic, tokenizers, …) are still resolved
-  at each build.
+- **`constraints.txt`**: every Python package in the board's image at its
+  version (`scripts/image_packages.py constraints <board image>`, from CI's
+  build of 2 Oct), the ones requirements.txt doesn't name included (tokenizers,
+  starlette, pydantic, …) and the base image's. The deps stage installs with
+  `-c` and keeps it at /opt/evalboard/constraints.txt for the board stage's
+  pytest install, so the board's image (built at deploy) and the runner image
+  (built at merge) resolve the same versions. `USE_CONSTRAINTS=0` builds
+  without it. **After a requirement changes**: build the board image with
+  `--build-arg USE_CONSTRAINTS=0` and make the file again from it (CI's
+  `image-packages` artifact holds both images' lists).
+- **The checks**: ci.yml's image job (`image_packages.py compare`) fails when
+  the board and runner images' package lists differ, but for what only the
+  board stage installs (`BOARD_ONLY`: pytest, iniconfig, pluggy), or when
+  either isn't constraints.txt; runner-image.yml (`check`) holds the runner
+  image to it before the push. tokenizers is in the setup record too.
 - **docs/REMOTE-RUNS.md**: times scaled by 1.6 — the first rented RTX 5090 ran
   Qwen3.5-4B thinking-on at about 74 s a full-length answer, the board's 47 s
   (#167) — and rented hosts vary.
+- **`remote_run.py`'s progress lines**: each task's pace is its own (`Watch`).
+  A task's clock starts when the task before it ended (the last answer another
+  task gave), or at the session's start for the first; it was the session's
+  start for every task, so gemma-1's dm_math showed "4/34 · 1255.1 s an
+  answer · 10.5 h left" 84 minutes in. The time left on the run is each task's
+  answers left at its own pace, at the latest measured pace for one not begun.
+  A finished task has "0 min" left.
 - Bundles made before this carry the old hash (fd239fd4… from the server's
   copied cache) and are refused after it: import them first.
 

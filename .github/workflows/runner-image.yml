@@ -54,6 +54,9 @@ jobs:
           -t "$IMAGE:${{ steps.tag.outputs.short }}" -t "$IMAGE:latest" .
       - name: nothing that stays on the server is in it
         run: python3 scripts/check_runner_image.py "$IMAGE:${{ steps.tag.outputs.short }}"
+      # 15.6: and each package at constraints.txt's version, as the board's image
+      - name: its packages are constraints.txt's
+        run: python3 scripts/image_packages.py check "$IMAGE:${{ steps.tag.outputs.short }}"
       - name: its size
         run: |
           docker image ls --format '{{.Repository}}:{{.Tag}} {{.Size}}' "$IMAGE"

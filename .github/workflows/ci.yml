@@ -184,6 +184,21 @@ jobs:
       # 15.5: what runner-image.yml checks before it pushes the public image
       - name: nothing that stays on the server is in the runner image
         run: python3 scripts/check_runner_image.py aienh-runner:ci
+      # 15.6: the two images hold the same packages, at constraints.txt's
+      # versions, but for what only the board stage installs; the lists are
+      # kept, to make constraints.txt again from (scripts/image_packages.py)
+      - name: the board and runner images' packages are the same, and constraints.txt
+        run: |
+          mkdir -p image-packages
+          python3 scripts/image_packages.py list aienh-bench:ci > image-packages/board.txt
+          python3 scripts/image_packages.py list aienh-runner:ci > image-packages/runner.txt
+          python3 scripts/image_packages.py compare aienh-bench:ci aienh-runner:ci
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: image-packages
+          path: image-packages/
+          if-no-files-found: ignore
       - name: the two images' sizes
         run: |
           docker image ls --format '{{.Repository}}:{{.Tag}} {{.Size}}' | grep -E 'aienh-(bench|runner)'

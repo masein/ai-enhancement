@@ -93,7 +93,7 @@ def library_versions() -> dict:
     """the versions a row depends on, as this Python has them: torch (its
     release and its CUDA), transformers, lm_eval, and the fast kernels — the
     pinned variant of the two prebuilt ones when both import, and fla-core.
-    15.6: datasets, pyarrow, accelerate and huggingface_hub too"""
+    15.6: datasets, pyarrow, accelerate, huggingface_hub and tokenizers too"""
     out: dict = {"python": platform.python_version()}
     try:
         import torch
@@ -110,6 +110,7 @@ def library_versions() -> dict:
     out["pyarrow"] = _dist("pyarrow")
     out["accelerate"] = _dist("accelerate")
     out["huggingface_hub"] = _dist("huggingface_hub") or _dist("huggingface-hub")
+    out["tokenizers"] = _dist("tokenizers")
     on = os.environ.get("FAST_KERNELS", "1").strip().lower() not in ("0", "off", "no", "false")
     both = on and all(importlib.util.find_spec(m) for m in ("mamba_ssm", "causal_conv1d"))
     out["fast_kernels"] = (json.loads((HERE / "fast_kernels.json").read_text(encoding="utf-8"))
