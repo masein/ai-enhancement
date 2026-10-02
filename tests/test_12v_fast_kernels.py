@@ -252,8 +252,12 @@ def test_the_image_fetches_installs_and_checks_them_at_build():
     assert ("COPY scripts/fast_kernels.py scripts/fast_kernels.json requirements-kernels.txt "
             "/tmp/fast-kernels/") in DOCKER
     # fla beside the kernels, with no dependency pulled in; and nothing installed with apt
-    # (the base image has Triton's compiler: the check builds with it)
-    assert "apt-get" not in DOCKER
+    # (the base image has Triton's compiler: the check builds with it). 15.1: the
+    # runner stage alone installs tmux and an SSH server, for a rented GPU's session
+    stages = re.split(r"(?m)^(?=FROM )", DOCKER)
+    assert not [p for p in stages if "apt-get" in p and not p.startswith("FROM deps AS runner")]
+    runner = next(p for p in stages if p.startswith("FROM deps AS runner"))
+    assert re.search(r"apt-get install -y --no-install-recommends tmux openssh-server", runner)
     assert re.search(r"pip install --no-cache-dir --break-system-packages --no-deps \\\n\s+"
                      r"--target /opt/fast-kernels -r /tmp/fast-kernels/requirements-kernels\.txt",
                      DOCKER)

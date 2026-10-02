@@ -4,7 +4,7 @@
 # (sm_120) and needs cu128+ kernels; torch 2.11.0 matches the version already
 # validated on the target server. (Tag existence verified against Docker Hub.)
 ARG BASE_IMAGE=pytorch/pytorch:2.11.0-cuda12.8-cudnn9-runtime
-FROM ${BASE_IMAGE}
+FROM ${BASE_IMAGE} AS deps
 
 # lm-eval + service deps; torch comes from the base image.
 #
@@ -16,26 +16,6 @@ FROM ${BASE_IMAGE}
 COPY requirements.txt /tmp/requirements.txt
 RUN python -m pip install --no-cache-dir --break-system-packages -r /tmp/requirements.txt \
     && rm /tmp/requirements.txt
-
-# 12o.1: the question builder's duplicate check embeds on this server's CPU —
-# BAAI/bge-small-en-v1.5 (MIT, 133 MB), pinned to one commit and its weights'
-# sha256 — so no question, the hidden half included, leaves the server to be
-# embedded (service/embed_local.py holds the same pins)
-ARG BGE_REVISION=5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
-ARG BGE_SHA256=3c9f31665447c8911517620762200d2245a2518d6e7208acc78cd9db317e21ad
-RUN python -c "from huggingface_hub import snapshot_download; \
-snapshot_download('BAAI/bge-small-en-v1.5', revision='${BGE_REVISION}', \
-local_dir='/opt/models/bge-small-en-v1.5', allow_patterns=['config.json', 'model.safetensors', \
-'tokenizer.json', 'tokenizer_config.json', 'special_tokens_map.json', 'vocab.txt'])" \
-    && rm -rf /opt/models/bge-small-en-v1.5/.cache \
-    && echo "${BGE_SHA256}  /opt/models/bge-small-en-v1.5/model.safetensors" | sha256sum -c -
-
-# The unit suite also runs inside the running container, on this image's
-# Python and packages (HANDOFF.md § Checks, deploy step 3). That needs pytest,
-# and httpx for FastAPI's test client, and nothing else: the tests are not in
-# the image — the deploy step streams the commit in with `git archive`,
-# because they read files the image leaves out (the Dockerfile, the docs).
-RUN python -m pip install --no-cache-dir --break-system-packages "pytest>=8" httpx
 
 # 12q.D: NLTK's punkt_tab, which IFEval's checkers split sentences with. A run
 # never downloads it: five DeviceMark runs on hf failed at "Resource
@@ -81,6 +61,59 @@ RUN if [ "$WITH_FAST_KERNELS" = "1" ]; then \
       echo "built without the fast kernels: the hybrid models run on transformers' slow paths"; \
     fi \
     && rm -rf /tmp/fast-kernels
+
+# 15.1: the image a rented GPU runs a DeviceMark row in (scripts/remote_run.py),
+# built from the same stage and pins as the board's: the same torch, lm_eval,
+# transformers, fast kernels and punkt_tab, so a row run there imports here.
+# Slim on purpose: the board's code and DeviceMark's battery (ids, prompts),
+# nothing else — none of the board's question banks, rubrics or data, whatever
+# else the server's checkout holds. It never starts the board: no database, no
+# judge, no queue. vast.ai's SSH launch mode replaces the start command and
+# logs in over SSH; tmux keeps a run going when the session drops.
+#     docker build --target runner -t evalboard-runner .
+FROM deps AS runner
+RUN apt-get update && apt-get install -y --no-install-recommends tmux openssh-server \
+    && rm -rf /var/lib/apt/lists/*
+RUN python -c "import torch, lm_eval, transformers, accelerate, datasets; \
+import math_verify, langdetect, nltk, immutabledict; \
+nltk.data.find('tokenizers/punkt_tab/english/'); \
+import importlib.util as u; \
+print('runner env OK — torch', torch.__version__, '| lm_eval', lm_eval.__version__, \
+'| transformers', transformers.__version__, \
+'| fast kernels', ', '.join(m for m in ('mamba_ssm', 'causal_conv1d', 'fla') if u.find_spec(m)) or 'none')"
+WORKDIR /app
+COPY scripts/ scripts/
+COPY service/ service/
+COPY eval_tasks/devicemark/ eval_tasks/devicemark/
+ENV PYTHONPATH=/app \
+    PYTHONUNBUFFERED=1
+ARG EVALBOARD_BUILD=""
+ENV EVALBOARD_BUILD=${EVALBOARD_BUILD}
+CMD ["python", "scripts/remote_run.py", "--help"]
+
+# the board: the service, its data and its start command — the default target,
+# what `docker compose up --build` builds
+FROM deps AS board
+
+# 12o.1: the question builder's duplicate check embeds on this server's CPU —
+# BAAI/bge-small-en-v1.5 (MIT, 133 MB), pinned to one commit and its weights'
+# sha256 — so no question, the hidden half included, leaves the server to be
+# embedded (service/embed_local.py holds the same pins)
+ARG BGE_REVISION=5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+ARG BGE_SHA256=3c9f31665447c8911517620762200d2245a2518d6e7208acc78cd9db317e21ad
+RUN python -c "from huggingface_hub import snapshot_download; \
+snapshot_download('BAAI/bge-small-en-v1.5', revision='${BGE_REVISION}', \
+local_dir='/opt/models/bge-small-en-v1.5', allow_patterns=['config.json', 'model.safetensors', \
+'tokenizer.json', 'tokenizer_config.json', 'special_tokens_map.json', 'vocab.txt'])" \
+    && rm -rf /opt/models/bge-small-en-v1.5/.cache \
+    && echo "${BGE_SHA256}  /opt/models/bge-small-en-v1.5/model.safetensors" | sha256sum -c -
+
+# The unit suite also runs inside the running container, on this image's
+# Python and packages (HANDOFF.md § Checks, deploy step 3). That needs pytest,
+# and httpx for FastAPI's test client, and nothing else: the tests are not in
+# the image — the deploy step streams the commit in with `git archive`,
+# because they read files the image leaves out (the Dockerfile, the docs).
+RUN python -m pip install --no-cache-dir --break-system-packages "pytest>=8" httpx
 
 # Fail the BUILD, not the first submission, if the env is incoherent (e.g. deps
 # landed in a different interpreter than torch).

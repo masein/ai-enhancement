@@ -716,6 +716,15 @@ def lm_eval_cwd(task_out: Path) -> Path:
     return task_out
 
 
+def dm_cache(task_out: Path) -> Path:
+    """15.1: a DeviceMark task's answers as they are written, one by one —
+    lm_eval's own cache (--use_cache; it adds "_rank0.db"), committed after
+    each answer. A task stopped part-way — a restart, a timeout, a rented box
+    stopped — asks only the rest when it runs again. Inside the task's folder,
+    so whatever sets the folder aside or discards it takes its cache too"""
+    return task_out / "lm-cache" / "answers"
+
+
 def _has_results(task_out: Path) -> bool:
     return any(task_out.glob("*/results*.json")) or any(task_out.glob("results*.json"))
 
@@ -835,9 +844,10 @@ def _run_task(sid: int, cmd: list[str], lf, env: dict, run_as, cwd: Path,
         except subprocess.TimeoutExpired:
             pass
         stop = (on_poll() or "") if on_poll else ""
+        # 15.1: 0 is no limit — a rented GPU has nothing else queued
         why = ("canceled by request" if db.cancel_requested(sid)
                else stop or (f"killed after {config.TASK_TIMEOUT_S}s timeout"
-                             if time.time() - t0 > config.TASK_TIMEOUT_S else ""))
+                             if 0 < config.TASK_TIMEOUT_S < time.time() - t0 else ""))
         if why:
             proc.terminate()
             try:
@@ -1436,7 +1446,9 @@ def run_submission(sub: dict) -> None:
                                        max_length=dm_plan["max_length"] if dm_plan
                                        else spec["max_length"]),
                         task, shots, batch or gen_batch or meta["batch"], task_out,
-                        chat=True, max_gen_toks=th["budget"], backend=be, samples=samples)
+                        chat=True, max_gen_toks=th["budget"], backend=be, samples=samples,
+                        # 15.1: a DeviceMark task resumes per answer
+                        cache=dm_cache(task_out) if devicemark else None)
                 cmd = gen_cmd(backend)
 
             t_task = time.time()
@@ -1748,7 +1760,10 @@ def run_submission(sub: dict) -> None:
                 with open(log_path, "a") as lf:
                     lf.write(f"\n[service] the answers could not be read: {e!r}\n")
         # 12q: DeviceMark's battery scored by its protocol — no judge, no GPU
-        if devicemark and not failed_tasks:
+        if devicemark and not failed_tasks and not config.DM_SCORE_AFTER_RUN:
+            # 15.1: on a rented GPU — scored on the server, from the bundle
+            judge_note = "answered: scored where the bundle is imported"
+        elif devicemark and not failed_tasks:
             db.update(sid, status="running", progress="devicemark · scoring the answers")
             try:
                 judge_note = _devicemark.mark_hf(sid, sub, meta, config.OUT_DIR / row_safe, th)

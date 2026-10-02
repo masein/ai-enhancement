@@ -266,6 +266,20 @@ def load_items(cache: Path, bat: dict | None = None) -> dict[tuple[str, str], di
     return out
 
 
+def battery_hashes(items: dict[tuple[str, str], dict]) -> dict[str, str]:
+    """15.1: what a run's battery was — the ids (battery-v1.json), the prompt
+    templates (prompts.json), and every item as load_items built it from the
+    pinned datasets (its question, key and prompt), each a sha256. A row run
+    elsewhere is imported only when all three are the board's"""
+    import hashlib
+
+    def sha(b: bytes) -> str:
+        return hashlib.sha256(b).hexdigest()
+    rows = [items[k] for k in keys_for("full") if k in items]
+    return {"battery": sha(BATTERY_PATH.read_bytes()), "prompts": sha(PROMPTS_PATH.read_bytes()),
+            "items": sha(json.dumps(rows, sort_keys=True, ensure_ascii=False).encode("utf-8"))}
+
+
 # ---------------------------------------------------------------------------
 # reading an answer
 # ---------------------------------------------------------------------------
