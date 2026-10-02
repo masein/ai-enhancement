@@ -91,6 +91,8 @@ LETTERS = "ABCDEFGHIJ"
 WHOSE = "IFEval: DeviceMark's items; MMLU-Pro and MATH: our draw of the same design"
 SERVER_SPEED_LABEL = "server: RTX 5090 + CPU experts"
 OUT_NAME = "devicemark.json"
+# 15.4: a row's published raw run (scripts/export_devicemark_raw.py --link)
+RAW_NAME = "devicemark_raw.json"
 ITEMS_NAME = "devicemark_items.jsonl"
 PILOT_NAME = "devicemark_pilot.json"
 PARITY_NAME = "devicemark_parity.json"
@@ -767,7 +769,9 @@ def rows(out_dir: Path, launch=None) -> list[dict]:
                     "label": setup_label(row.get("setup") or {}, thinks, mid),
                     "server_tok_s": speed.get("decode_tok_s") if speed else None,
                     "server_label": SERVER_SPEED_LABEL if speed else None,
-                    "device": device or None})
+                    "device": device or None,
+                    # 15.4: its raw per-item run, where it was published
+                    "raw_url": (_json(out_dir / name / RAW_NAME) or {}).get("url")})
     rk = ranks([{"ci": r["row"]["composite"]["ci"]} for r in out])
     for r, k in zip(out, rk):
         r["rank"] = k
@@ -1106,7 +1110,9 @@ def model_runs(out_dir: Path, launch=None) -> dict[str, dict]:
                 "raw_fallback": row.get("raw_fallback") or 0, "errors": row.get("errors") or 0,
                 "version": row.get("version"),
                 # 15.2: run on a rented GPU, whole or in part
-                "where": (row.get("setup") or {}).get("where")}
+                "where": (row.get("setup") or {}).get("where"),
+                # 15.4: its raw per-item run, where it was published
+                "raw_url": r.get("raw_url")}
             # 12z A5: DeviceMark's own row beside ours, as the chart's table has it:
             # their number, and whether the two are a calibration point
             t = ext.get(r.get("paired") or "")
