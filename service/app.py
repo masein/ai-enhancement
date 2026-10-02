@@ -1655,6 +1655,38 @@ def devicemark_device(body: DeviceSpeedIn, x_token: str = Header(default="")):
     return {"model": mid, "device": rec}
 
 
+class DmRawIn(BaseModel):
+    model: str
+    thinking: bool = False
+    url: str = ""
+    by: str = ""
+
+
+@app.put("/api/devicemark/raw")
+def devicemark_raw(body: DmRawIn, x_token: str = Header(default="")):
+    """15.4: a DeviceMark row's published raw run — the board's "raw" link on
+    it (scripts/export_devicemark_raw.py --link sets the same); an empty url
+    takes it off"""
+    _check_token(x_token)
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import export_devicemark_raw as ex
+    mid = body.model.strip()
+    if not _HF_ID_RE.match(mid):
+        raise HTTPException(422, "model must be a model id on the board")
+    rows = ex.row_dirs(mid, body.thinking)
+    if not rows:
+        raise HTTPException(404, f"{mid} has no DeviceMark row "
+                                 f"{'with thinking on ' if body.thinking else ''}on this board")
+    if body.url.strip() and not body.by.strip():
+        raise HTTPException(422, "type your name first — it is recorded with the link")
+    try:
+        got = ex.set_link(rows[0], body.url.strip() or None, body.by.strip()[:80])
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    _cache.update(key=None, payload=None, at=0.0)
+    return {"model": mid, "thinking": body.thinking, "raw": got}
+
+
 @app.get("/api/results")
 def results():
     payload = results_payload()

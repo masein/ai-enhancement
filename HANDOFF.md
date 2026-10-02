@@ -4710,6 +4710,28 @@ Not before the demo: a new hidden set changes every Everyday score.
   strict and loose), a served setup's too. It lists what the board lists: the
   diagnose half.
 
+### 15.4 — DeviceMark's raw runs, to publish (2 Oct)
+
+- **`scripts/export_devicemark_raw.py --run <id>` / `--all`**: one folder a
+  DeviceMark row — `items.jsonl` (a line an item: test, key, the prompt as sent,
+  the reply and its thinking, the parsed answer and the dataset's, correct,
+  IFEval's rules strict and loose, the tokens, capped; DeviceMark's raw field
+  names where ours mean the same), `setup.json`, `scores.json` (each test with
+  its interval, the composite, and their summary's counts), `log.txt`,
+  `recompute.py` (scores.json again from items.jsonl, the board's arithmetic,
+  standard library; a test checks they agree) and `README.md` (the protocol,
+  the battery's sources and licences, the fields).
+- **Scrubbed** (`scrub`): keys and tokens (by value and shape), home paths,
+  this machine's and SCRUB_HOSTS' names and the tailnet's, private and tailnet
+  addresses. **DeviceMark rows only**: another suite's run is refused.
+- **public/ or private/**: public for a public HF model, private for a Qwen3.6
+  build, a served setup or a checkpoint; `--public`/`--private` override.
+  Upload is masein's (`docs/REMOTE-RUNS.md` § Publishing the raw runs): two
+  dataset repos, since Hugging Face sets privacy per repo.
+- **The "raw" link**: `--link <run id> <url> --by <name>` or the model page
+  card's form (`PUT /api/devicemark/raw`) writes the row's
+  `devicemark_raw.json`; the card and the On-device chart's table link it.
+
 ### 15.3 — the time limit on the board (2 Oct)
 
 - **Why**: #167's IFEval (Qwen3.5-4B, thinking on) was stopped twice by the

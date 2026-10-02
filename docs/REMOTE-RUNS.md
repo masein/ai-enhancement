@@ -186,3 +186,63 @@ On DeviceMark's board, Qwen3.5-4B's answers average about 3,600 tokens, which co
 - the run's answers and cache: a few MB.
 
 60 GB leaves room to spare.
+
+## Publishing the raw runs
+
+DeviceMark links every row of its board to its raw per-item file on Hugging Face
+([devicemark/results](https://huggingface.co/datasets/devicemark/results), `raw/`).
+Ours get the same link.
+
+**Export.** Inside the container:
+
+```bash
+cd ~/benchmarks/aienh
+sudo docker compose exec -T -e SCRUB_HOSTS="$(hostname)" bench python scripts/export_devicemark_raw.py --all
+sudo docker compose exec -T -e SCRUB_HOSTS="$(hostname)" bench python scripts/export_devicemark_raw.py --run <run id>
+```
+
+`SCRUB_HOSTS` gives the export the server's host name to remove: inside the
+container, the host name is the container's.
+
+**What it writes.** One folder a row, under `~/benchmarks/raw-export/public/` or `…/private/`:
+- `items.jsonl`, `setup.json`, `scores.json` and `log.txt`;
+- `recompute.py`, which recomputes `scores.json` from `items.jsonl`;
+- a `README.md` with the protocol and the battery's sources and licences.
+
+**Public or private, by default.**
+- Public: a public Hugging Face model, DeviceMark's calibration models among them.
+- Private: a Qwen3.6 build, a setup served here, or a checkpoint.
+- `--public` or `--private` decides instead.
+
+**DeviceMark rows only.** Any other run is refused.
+
+**The scrub.** Every file is scrubbed before it is written:
+- keys and tokens, by value and by shape;
+- home paths;
+- this machine's host name and the tailnet's;
+- private and tailnet addresses.
+
+**Upload: your step.** Hugging Face sets privacy per repository, so the public and private rows go to two repositories. Once:
+
+```bash
+hf auth login
+hf repos create <you>/evalboard-devicemark-raw --repo-type dataset
+hf repos create <you>/evalboard-devicemark-raw-private --repo-type dataset --private
+```
+
+Each time:
+
+```bash
+hf upload <you>/evalboard-devicemark-raw ~/benchmarks/raw-export/public . --repo-type dataset
+hf upload <you>/evalboard-devicemark-raw-private ~/benchmarks/raw-export/private . --repo-type dataset
+```
+
+**The link.** Give the row its link, either:
+- on the model page's DeviceMark card (add its raw run's link); or
+- with
+
+  ```bash
+  sudo docker compose exec -T bench python scripts/export_devicemark_raw.py --link <run id> https://huggingface.co/datasets/<you>/evalboard-devicemark-raw/tree/main/<folder> --by masein
+  ```
+
+The board then shows a "raw" link on the row's card and beside the row in the On-device chart's table.

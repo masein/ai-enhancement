@@ -11416,7 +11416,9 @@ function dmOurs(r) {
     median_tokens: r.row.median_tokens, time_frontier: r.row.time_frontier, device: r.device,
     server_tok_s: r.server_tok_s, retention: r.retention, rank: r.rank_all, model: r.model,
     inherited: r.row.inherited, setup: su,
-    raw_fallback: r.row.raw_fallback || 0, errors: r.row.errors || 0 };
+    raw_fallback: r.row.raw_fallback || 0, errors: r.row.errors || 0,
+    // 15.4: its raw per-item run, where it was published
+    raw_url: r.raw_url || null };
 }
 function dmRows() {
   const d = state.dm.data;
@@ -11705,6 +11707,9 @@ function dmTable(rows) {
           text: r.external ? 'DeviceMark' + ((r.ours || []).length ? ' · and ours' : '') : 'ours' }),
         r.inherited ? el('span', { class: 'small se', 'data-dm-inherited': r.id,
           text: ` ${r.inherited.line}` }) : '',
+        // 15.4: ours links its raw run, as theirs on DeviceMark's board do
+        r.raw_url ? [' ', el('a', { href: r.raw_url, target: '_blank', rel: 'noopener',
+          class: 'small', 'data-dm-raw': r.id, text: 'raw' })] : '',
         dmOdd(r) ? el('span', { class: 'small se', 'data-dm-odd': r.id,
           'data-tip': JSON.stringify(DM_ODD_TIP), text: ` ${dmOdd(r)}` }) : ''),
       el('td', { class: num(r) + (r.cant_run ? ' dmpair' : ''), 'data-dm-composite': r.id },
@@ -11860,6 +11865,42 @@ function dmOpenRun(r) {
 const dmBenchCells = b => ['ifeval', 'mmlu_pro', 'math'].map(x => el('td', { class: 'num',
   'data-dm-card-bench': x, text: b && b[x] && b[x].acc != null ? dmPct(b[x].acc) + dmHalf(b[x])
     : '—' }));
+// 15.4: a row's raw per-item run, published on Hugging Face — its link, and
+// live, where to set it (scripts/export_devicemark_raw.py --link does the same)
+function dmRawLine(m, mode, r) {
+  const R = state.dmRaw = state.dmRaw || {}, key = `${m.id}|${mode}`;
+  const link = r.raw_url ? el('a', { href: r.raw_url, target: '_blank', rel: 'noopener',
+    'data-dm-card-raw': mode, text: 'raw' }) : '';
+  if (!LIVE) return link ? el('p', { class: 'small', 'data-dm-raw-line': mode }, 'Its run, item by '
+    + 'item: ', link) : '';
+  const save = async url => {
+    if (!whoName()) { askName(); return; }
+    try {
+      const res = await fetch('api/devicemark/raw', { method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
+        body: JSON.stringify({ model: m.id, thinking: mode === 'on', url, by: whoName() }) });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof j.detail === 'string' ? j.detail : `HTTP ${res.status}`);
+      R[key] = false;
+      toast(url ? 'raw link saved' : 'raw link taken off', { key: 'dmraw' });
+      await refreshResults();
+    } catch (e) { toast('Refused. ' + e.message, { key: 'dmraw' }); }
+  };
+  if (!R[key]) return el('p', { class: 'small', 'data-dm-raw-line': mode },
+    link ? ['Its run, item by item: ', link, ' · '] : '',
+    el('button', { class: 'quiet', 'data-dm-raw-edit': mode,
+      text: link ? 'change the link' : 'add its raw run’s link',
+      onclick: () => { R[key] = true; render(); } }));
+  const inp = el('input', { type: 'url', placeholder: 'https://huggingface.co/datasets/…',
+    value: r.raw_url || '', 'data-dm-raw-input': mode, 'aria-label': 'the raw run’s link',
+    style: 'width:min(100%, 30em)' });
+  return el('p', { class: 'small dmrawform', 'data-dm-raw-line': mode }, inp, ' ',
+    el('button', { class: 'quiet', 'data-dm-raw-save': mode, text: 'Save',
+      onclick: () => save(inp.value.trim()) }),
+    r.raw_url ? [' · ', el('button', { class: 'quiet', 'data-dm-raw-clear': mode,
+      text: 'take it off', onclick: () => save('') })] : '', ' · ',
+    el('button', { class: 'quiet', text: 'cancel', onclick: () => { R[key] = false; render(); } }));
+}
 function dmModelCard(m, mode) {
   const c = (dmRunsOf(m.id) || {})[mode] || {}, r = c.row, P = state.dmPart || {};
   const here = part => P.model === m.id && P.mode === mode && P.part === part ? ' dmfocus' : '';
@@ -11878,6 +11919,7 @@ function dmModelCard(m, mode) {
     // 15.2: answered on a rented GPU, whole or in part, and imported
     r.where ? el('p', { class: 'small se', 'data-dm-card-where': mode,
       text: r.where.charAt(0).toUpperCase() + r.where.slice(1) }) : '',
+    dmRawLine(m, mode, r),
     r.inherited ? el('p', { class: 'small se', 'data-dm-card-inherited': mode,
       text: `${r.inherited.line}: this setup's quality is its MTP partner's (${r.inherited.from})` })
       : '',
