@@ -318,7 +318,8 @@ def main(argv: list[str] | None = None) -> int:
                          "every shard of it is in")
     ap.add_argument("--battery", default="",
                     help="the server's items sha256 (import_remote.py --battery): refuse "
-                         "another battery before starting")
+                         "another battery before starting. 15.6: the repo's own "
+                         "(items-v1.sha256.json) is checked without it")
     ap.add_argument("--suite", default=SUITE, choices=tuple(rb.SUITES))
     ap.add_argument("--by", default="remote", help="who ran it, for the run's record")
     a = ap.parse_args(argv)
@@ -362,6 +363,11 @@ def main(argv: list[str] | None = None) -> int:
     items = dm.load_items(config.DM_ITEMS)
     hashes = dm.battery_hashes(items)
     say(f"battery {dm.VERSION}: {len(items)} items · items sha256 {hashes['items'][:16]}")
+    # 15.6: the repo's hash, committed beside the battery's ids — and the
+    # server's, when --battery gives it
+    why = dm.items_differ(items, config.DM_ITEMS_SHA256)
+    if why:
+        raise SystemExit(f"{why}: the server would refuse the bundle. Nothing was run.")
     if a.battery and a.battery != hashes["items"]:
         raise SystemExit(f"this battery's items hash is {hashes['items'][:16]}, the server's "
                          f"{a.battery[:16]}: the server would refuse the bundle. Nothing was run.")
@@ -375,7 +381,8 @@ def main(argv: list[str] | None = None) -> int:
     gpu, libs = rb.gpu_info(), rb.library_versions()
     say(f"GPU {gpu.get('name') or 'unknown'} (driver {gpu.get('driver') or '?'}) · torch "
         f"{libs.get('torch_build')} · transformers {libs.get('transformers')} · lm_eval "
-        f"{libs.get('lm_eval')} · fast kernels {libs.get('fast_kernels') or 'none'} · "
+        f"{libs.get('lm_eval')} · datasets {libs.get('datasets')} · pyarrow {libs.get('pyarrow')} · "
+        f"fast kernels {libs.get('fast_kernels') or 'none'} · "
         f"model revision {(state.get('revision') or 'unknown')[:12]}")
 
     sid = db.add(a.model, "instruct", "devicemark", a.by, "run on a rented GPU (remote_run.py)",

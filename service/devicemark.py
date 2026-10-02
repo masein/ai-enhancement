@@ -411,6 +411,9 @@ def run(sid: int, sub: dict, rec: dict, log_path: Path) -> tuple[str, str]:
     d = dm()
     db.update(sid, status="running", progress="devicemark · reading the battery's questions")
     items = d.load_items(config.DM_ITEMS)
+    why = d.items_differ(items, config.DM_ITEMS_SHA256)      # 15.6: the repo's battery
+    if why:
+        return "failed", why
     if part == "parity":
         pair = _served.get(sub.get("pair") or "")
         if not pair:

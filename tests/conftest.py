@@ -44,6 +44,11 @@ _SESSION_ROOT = Path(tempfile.mkdtemp(prefix="evalboard-tests-"))
 sit_hidden(_SESSION_ROOT)
 _config.BENCH_ROOT = _SESSION_ROOT
 _config.HIDDEN_MANIFEST = HIDDEN_FIXTURE_MANIFEST
+# 15.6: the tests' DeviceMark battery is invented (test_12q_devicemark_runs.
+# write_items), so the check that a battery hashes to the repo's committed one
+# is off here — and on in its own tests (test_15_6_items_hash.py)
+_config.DM_ITEMS_SHA256 = ""
+os.environ["DM_ITEMS_SHA256"] = ""
 
 
 @pytest.fixture(scope="session")

@@ -7,6 +7,7 @@ that if you launch it from elsewhere.
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -514,6 +515,20 @@ DM_TASKS = ["dm_ifeval", "dm_mmlu_pro", "dm_math"]
 DM_TASKS_DIR = Path(os.environ.get("DM_TASKS_DIR", BENCH_ROOT / "devicemark" / "tasks"))
 DM_ITEMS = Path(os.environ.get("DM_ITEMS", BENCH_ROOT / "devicemark" / "items-v1.jsonl"))
 DM_PARTS = ("full", "pilot", "parity", "speed")
+# 15.6: the items hash the battery must come to, committed beside its ids
+# (eval_tasks/devicemark/items-v1.sha256.json): a run here, a rented GPU's and
+# an import each check it. "" checks nothing (the tests' invented battery)
+
+
+def _items_sha256() -> str:
+    try:
+        return json.loads((Path(__file__).resolve().parents[1] / "eval_tasks" / "devicemark"
+                           / "items-v1.sha256.json").read_text(encoding="utf-8"))["items"]
+    except (OSError, ValueError, KeyError):
+        return ""
+
+
+DM_ITEMS_SHA256 = os.environ.get("DM_ITEMS_SHA256", _items_sha256()).strip()
 # 12q.G: a Hugging Face model's run of it. lm_eval is told the length itself —
 # the prompt's room and the cap — since it takes 2,048 for a model whose limit
 # it can't find (Gemma 4 keeps max_position_embeddings under text_config, and

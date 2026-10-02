@@ -1,0 +1,6 @@
+{
+ "battery": "devicemark-replica-v1",
+ "items": "fe5fe34ffa0968a51aa45887431af619804082e01e5edd2d7d3c5e7bacf66323",
+ "of": "every battery item as devicemark.load_items builds it from the pinned datasets, IFEval's kwargs without their null-valued keys (devicemark.battery_hashes, normal_item)",
+ "checked": "2026-10-02: datasets 4.6.1, which null-fills IFEval's kwargs (the server's items-v1.jsonl of 29 Sep: fd239fd498d8e7a6 as stored), and datasets 5.0.1, which keeps them as written (a fresh build on a rented GPU: fe5fe34ffa0968a5 as stored), both come to it"
+}

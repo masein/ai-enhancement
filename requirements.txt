@@ -26,7 +26,13 @@ transformers==5.5.3
 math-verify[antlr4_11_0]==0.9.0
 accelerate
 sentencepiece
-datasets
+# 15.6: pinned — they read the battery's datasets, and the form they keep a
+# record in can change between releases: 4.7.0 keeps IFEval's kwargs as
+# written where 4.6.1 and earlier null-fill every key (the items hash reads
+# both alike since 15.6). The versions on the server and in the runner image
+# on 2026-10-02; both are in a rented GPU's setup record
+datasets==5.0.1
+pyarrow==25.0.1
 huggingface_hub
 fastapi
 uvicorn[standard]
