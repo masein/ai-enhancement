@@ -48,8 +48,9 @@ def board(svc, monkeypatch):  # noqa: F811
     return svc
 
 
-def remote(out: Path, model: str, *only: str) -> Path:
-    """a rented GPU's run and its bundle — the server's config put back after"""
+def remote(out: Path, model: str, *only: str, shard: str = "") -> Path:
+    """a rented GPU's run and its bundle — the server's config put back after.
+    15.5: `shard`, "i/n", one shard of it"""
     keep = {k: getattr(config, k) for k in [*rr.ENV, "OUT_DIR"]}
     lock, env = runner.LOCK, {v: os.environ.get(v) for v in [*rr.ENV.values(), "PATH"]}
     try:
@@ -57,6 +58,8 @@ def remote(out: Path, model: str, *only: str) -> Path:
         args = ["--model", model, "--thinking", "on", "--out", str(out)]
         for t in only:
             args += ["--only", t]
+        if shard:
+            args += ["--shard", shard]
         assert rr.main(args) == 0
     finally:
         for k, v in keep.items():
@@ -67,7 +70,7 @@ def remote(out: Path, model: str, *only: str) -> Path:
                 os.environ.pop(k, None)
             else:
                 os.environ[k] = v
-    return out / rb.bundle_name("devicemark", model, True)
+    return out / rb.bundle_name("devicemark", model, True, dm.parse_shard(shard))
 
 
 def local(model: str, *only: str) -> dict:

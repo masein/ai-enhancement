@@ -743,15 +743,20 @@ def where_of(row: Path) -> dict:
               if x.get("samples") and all((row / rel).exists() for rel in x["samples"])}
     if not remote:
         return {}
-    gpus = ", ".join(sorted({x.get("gpu") or "a GPU" for x in remote.values()}))
+    # 15.5: a task answered in shards ran on as many rented GPUs
+    names = sorted({g for x in remote.values() for g in (x.get("gpus") or [x.get("gpu") or "a GPU"])})
+    gpus = f"a rented GPU ({names[0]})" if len(names) == 1 else f"rented GPUs ({_and(names)})"
+    ns = {int(x.get("shards") or 1) for x in remote.values()}
+    split = ("" if max(ns) == 1 else f", in {max(ns)} shards" if len(ns) == 1 else ", in shards")
     here = [t for t in config.DM_TASKS if t not in remote and (row / f"{t}_0shot").is_dir()]
     if here:
-        line = (f"{_and([TASK_WORDS[t] for t in config.DM_TASKS if t in remote])} run on a "
-                f"rented GPU ({gpus}); {_and([TASK_WORDS[t] for t in here])} on this server")
+        line = (f"{_and([TASK_WORDS[t] for t in config.DM_TASKS if t in remote])} run on "
+                f"{gpus}{split}; {_and([TASK_WORDS[t] for t in here])} on this server")
     else:
-        line = f"run on a rented GPU ({gpus})"
+        line = f"run on {gpus}{split}"
     return {"where": line, "remote": {t: {"gpu": x.get("gpu"), "bundle": x.get("bundle"),
-                                          "sha256": (x.get("sha256") or "")[:16]}
+                                          "sha256": (x.get("sha256") or "")[:16],
+                                          **({"shards": x["shards"]} if x.get("shards") else {})}
                                       for t, x in sorted(remote.items())}}
 
 

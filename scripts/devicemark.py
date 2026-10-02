@@ -191,6 +191,33 @@ def keys_for(part: str = "full", bat: dict | None = None) -> list[tuple[str, str
     return [(b, k) for b in BENCHES for k in flat(bat, b)]
 
 
+_SHARD = re.compile(r"^\s*(\d+)\s*/\s*(\d+)\s*$")
+MAX_SHARDS = 64
+
+
+def parse_shard(text: str | None) -> tuple[int, int] | None:
+    """15.5: "2/3" is (2, 3), shard 2 of 3 — None for none ("" or "1/1")"""
+    if not (text or "").strip():
+        return None
+    m = _SHARD.match(text)
+    if not m:
+        raise ValueError(f"a shard is i/n, such as 1/2: not {text!r}")
+    i, n = int(m[1]), int(m[2])
+    if not 1 <= i <= n <= MAX_SHARDS:
+        raise ValueError(f"shard {i} of {n}: i runs from 1 to n, and n to {MAX_SHARDS}")
+    return None if n == 1 else (i, n)
+
+
+def shard_of(keys: list, shard: tuple[int, int] | None) -> list:
+    """15.5: shard i of n of a task's items — every n-th from the i-th, in the
+    battery's order. The same on every machine, the n shards together are
+    every item once, and no two differ in size by more than one"""
+    if not shard:
+        return list(keys)
+    i, n = shard
+    return list(keys)[i - 1::n]
+
+
 # ---------------------------------------------------------------------------
 # the prompts: one file, every row the same
 # ---------------------------------------------------------------------------
@@ -611,13 +638,15 @@ def inherit(own: dict | None, mtp_row: dict | None, report: dict | None) -> dict
 # a Hugging Face model: three lm_eval tasks, answered on hf
 # ---------------------------------------------------------------------------
 
-def build_tasks(dest: Path, items: dict[tuple[str, str], dict], part: str = "full") -> Path:
+def build_tasks(dest: Path, items: dict[tuple[str, str], dict], part: str = "full",
+                shard: tuple[int, int] | None = None) -> Path:
     """the three tasks lm_eval asks a Hugging Face model: each item's prompt as
     the one user message (the chat template applied), greedy, the cap of
-    4,096 generated tokens, nothing to stop on but the end of the turn"""
+    4,096 generated tokens, nothing to stop on but the end of the turn. 15.5:
+    `shard`, a rented GPU's share of each task (shard_of)"""
     dest.mkdir(parents=True, exist_ok=True)
     for b in BENCHES:
-        rows = [items[(bb, k)] for bb, k in keys_for(part) if bb == b]
+        rows = shard_of([items[(bb, k)] for bb, k in keys_for(part) if bb == b], shard)
         (dest / f"{TASK[b]}.jsonl").write_text("".join(
             json.dumps({"bench": b, "key": r["key"], "text": r["text"]}, ensure_ascii=False)
             + "\n" for r in rows), encoding="utf-8")

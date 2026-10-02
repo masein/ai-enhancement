@@ -1,0 +1,78 @@
+# 15.5: the rented GPU's image — the Dockerfile's `runner` stage, the board's
+# pins and code and DeviceMark's battery ids, nothing else — built here on the
+# public mirror and pushed to ghcr.io/masein/evalboard-runner, on every push to
+# main and by hand (Actions ▸ runner-image ▸ Run workflow). Two tags: the
+# commit's short sha, the same value the server's deploy sets as
+# EVALBOARD_BUILD, and "latest". The package is public, so vast.ai pulls it
+# with no registry login (docs/REMOTE-RUNS.md).
+#
+# It is checked before it is pushed: an image that holds the exam or Everyday
+# banks, the trust sets, the judge's rubrics or an .env file is never pushed
+# (scripts/check_runner_image.py, every file in the image).
+#
+# The mirror only: on the canonical repository the job is skipped, and its
+# token pushes nowhere. The token is this run's own GITHUB_TOKEN: no secret is
+# stored for it.
+name: runner-image
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+# one at a time, in order, so "latest" is the newest main
+concurrency:
+  group: runner-image
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/masein/evalboard-runner
+
+jobs:
+  runner-image:
+    if: github.repository == 'masein/ai-enhancement'
+    runs-on: ubuntu-latest
+    # the deps stage's base image and kernels are most of it: 15.1's image
+    # job built both images in under an hour
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: the tag — the commit's short sha, as the deploy's EVALBOARD_BUILD
+        id: tag
+        run: echo "short=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+      - name: build the runner image
+        run: >-
+          docker build --target runner
+          --build-arg EVALBOARD_BUILD=${{ steps.tag.outputs.short }}
+          --label org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          --label org.opencontainers.image.revision=${{ github.sha }}
+          --label "org.opencontainers.image.description=evalboard's DeviceMark runner for a rented GPU"
+          -t "$IMAGE:${{ steps.tag.outputs.short }}" -t "$IMAGE:latest" .
+      - name: nothing that stays on the server is in it
+        run: python3 scripts/check_runner_image.py "$IMAGE:${{ steps.tag.outputs.short }}"
+      - name: its size
+        run: |
+          docker image ls --format '{{.Repository}}:{{.Tag}} {{.Size}}' "$IMAGE"
+          docker run --rm "$IMAGE:${{ steps.tag.outputs.short }}" | head -3
+      - name: log in to ghcr.io with this run's token
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: push both tags
+        run: |
+          docker push "$IMAGE:${{ steps.tag.outputs.short }}"
+          docker push "$IMAGE:latest"
+          echo "pushed $IMAGE:${{ steps.tag.outputs.short }} and $IMAGE:latest"
+      # Actions can't set a package's visibility (GitHub has no API for it):
+      # this says whether it is public yet, and where to make it so
+      - name: public?
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          v=$(gh api /users/masein/packages/container/evalboard-runner --jq .visibility 2>/dev/null || echo "not readable with this run's token")
+          echo "ghcr.io/masein/evalboard-runner: $v"
+          if [ "$v" != public ]; then
+            echo "::warning::Make it public once: https://github.com/users/masein/packages/container/evalboard-runner/settings → Danger Zone → Change visibility → Public"
+          fi

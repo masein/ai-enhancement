@@ -6,9 +6,11 @@ judge" part and Mobile-MMLU-Pro for Hugging Face models are the next
 candidates; each needs only its entry in SUITES, its tasks' check and its
 scoring on import.
 
-A bundle, devicemark-<model>-thinking-<on|off>.tar.gz, holds:
+A bundle, devicemark-<model>-thinking-<on|off>.tar.gz (15.5: a shard's,
+devicemark-<model>-thinking-<on|off>-shard-<i>-of-<n>.tar.gz), holds:
   bundle.json    what it is: the suite, the model and its mode, the row's folder,
-                 each task's answers, a digest of every answer, each file's sha256
+                 each task's answers, a digest of every answer, each file's
+                 sha256, and the shard it holds when it is one
   setup.json     where it ran: the GPU and its driver, Python, torch and its
                  CUDA, transformers, lm_eval and the fast kernels, the model's
                  revision, the battery's hashes, the protocol's version, what
@@ -52,10 +54,28 @@ SECRETS = ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN", "OPENROUTER_API_KEY", "LLM_API_
 MAX_BYTES = 2 * 1024 ** 3                  # a bundle is answers and a log: far less
 
 
-def bundle_name(suite: str, model: str, thinking: bool) -> str:
-    """"devicemark-Qwen__Qwen3.5-4B-thinking-on.tar.gz" """
+def bundle_name(suite: str, model: str, thinking: bool,
+                shard: tuple[int, int] | None = None) -> str:
+    """"devicemark-Qwen__Qwen3.5-4B-thinking-on.tar.gz", and 15.5's shards
+    "devicemark-Qwen__Qwen3.5-4B-thinking-on-shard-1-of-2.tar.gz" """
     return (f"{SUITES[suite]['prefix']}-{model.replace('/', '__')}-thinking-"
-            f"{'on' if thinking else 'off'}.tar.gz")
+            f"{'on' if thinking else 'off'}"
+            + (f"-shard-{shard[0]}-of-{shard[1]}" if shard else "") + ".tar.gz")
+
+
+def shard_of_bundle(bundle: dict) -> tuple[int, int] | None:
+    """15.5: the shard a bundle holds, (i, n) — None for a whole run. A value
+    that isn't one raises ValueError"""
+    s = bundle.get("shard")
+    if not s:
+        return None
+    try:
+        i, n = int(s["i"]), int(s["n"])
+    except (KeyError, TypeError, ValueError):
+        raise ValueError(f"its shard {s!r} isn't i of n") from None
+    if not 1 <= i <= n or n < 2:
+        raise ValueError(f"its shard {i} of {n} isn't one")
+    return i, n
 
 
 # ---------------------------------------------------------------------------

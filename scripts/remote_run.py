@@ -5,7 +5,8 @@ board as one file (scripts/import_remote.py takes it in).
 It runs inside the board's own runner image (the Dockerfile's `runner` stage:
 the same torch, lm_eval, transformers and fast kernels as the board, the
 board's code and DeviceMark's battery and nothing else), which vast.ai starts
-from a private registry; docs/REMOTE-RUNS.md has the commands.
+from ghcr.io/masein/evalboard-runner (15.5: built and pushed by the mirror's
+Actions); docs/REMOTE-RUNS.md has the commands.
 
 It runs the board's own runner (service/runner.py, run_submission), not a copy
 of it: the same task files (devicemark.build_tasks), prompts, generation
@@ -32,6 +33,12 @@ later session on another revision refuses to mix the two.
 
 A line an answer — the task, how many of how many, the pace, the time left on
 the task and on the run — to watch under tmux.
+
+15.5: --shard i/n runs this instance's share of each task — every n-th item
+from the i-th, in the battery's order (devicemark.shard_of), the same split on
+every machine — so n instances answer a battery together, one bundle each
+(…-shard-<i>-of-<n>.tar.gz). The server takes the n bundles in any order and
+scores a task once every shard of it is in. Per-answer resume is the same.
 
 Gated models: HF_TOKEN from the environment, never printed, never in the
 bundle.
@@ -68,23 +75,24 @@ ENV = {"BENCH_ROOT": "BENCH_ROOT", "RESULTS_ROOT": "OUT_ROOT", "LOGS_DIR": "LOGS
        "DB_PATH": "SERVICE_DB", "DM_ITEMS": "DM_ITEMS", "DM_TASKS_DIR": "DM_TASKS_DIR",
        "TASK_TIMEOUT_S": "TASK_TIMEOUT_S", "DM_HF_MAX_BATCH": "DM_HF_MAX_BATCH",
        "DM_SCORE_AFTER_RUN": "DM_SCORE_AFTER_RUN", "MAX_PARAMS_B": "MAX_PARAMS_B",
-       "GPU_POLL_S": "GPU_POLL_S"}
+       "GPU_POLL_S": "GPU_POLL_S", "DM_SHARD": "DM_SHARD"}
 
 
-def settings(out: Path) -> dict:
+def settings(out: Path, shard: tuple[int, int] | None = None) -> dict:
     bench = out / "bench"
     return {"BENCH_ROOT": bench, "RESULTS_ROOT": bench / "results",
             "LOGS_DIR": bench / "logs", "DB_PATH": bench / "service.sqlite3",
             "DM_ITEMS": bench / "devicemark" / "items-v1.jsonl",
             "DM_TASKS_DIR": bench / "devicemark" / "tasks", "TASK_TIMEOUT_S": 0,
             "DM_HF_MAX_BATCH": 1, "DM_SCORE_AFTER_RUN": False,
-            "MAX_PARAMS_B": float(os.environ.get("MAX_PARAMS_B") or 1000), "GPU_POLL_S": 10}
+            "MAX_PARAMS_B": float(os.environ.get("MAX_PARAMS_B") or 1000), "GPU_POLL_S": 10,
+            "DM_SHARD": f"{shard[0]}/{shard[1]}" if shard else ""}
 
 
-def configure(out: Path) -> dict:
+def configure(out: Path, shard: tuple[int, int] | None = None) -> dict:
     """the board's config, pointed at --out: set in the environment before
     the service is imported, and on config itself when it already was"""
-    vals = settings(out)
+    vals = settings(out, shard)
     for k, v in vals.items():
         os.environ[ENV[k]] = "0" if v is False else str(v)
     # lm_eval, the runner's child, beside this Python
@@ -218,7 +226,8 @@ _BATCH = re.compile(r"\[devicemark\] (\d+) answers? written at a time")
 
 
 def setup_record(model: str, thinking: bool, tasks: list[str], hashes: dict, state: dict,
-                 log: str, answers: dict, incomplete: dict) -> dict:
+                 log: str, answers: dict, incomplete: dict,
+                 shard: tuple[int, int] | None = None) -> dict:
     import devicemark as dm
     mode = _MODE.findall(log)
     ml, batch = _LEN.findall(log), _BATCH.findall(log)
@@ -234,14 +243,17 @@ def setup_record(model: str, thinking: bool, tasks: list[str], hashes: dict, sta
             "gpu": rb.gpu_info(), "libraries": rb.library_versions(),
             "where": "a rented GPU", "runner": "service/runner.py, called directly",
             "board_commit": board_commit(), "sessions": state.get("sessions", 1),
+            "shard": {"i": shard[0], "n": shard[1]} if shard else None,
             "started_at": state.get("started_at"),
             "finished_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
 
 
 def make_bundle(out: Path, model: str, thinking: bool, tasks: list[str], hashes: dict,
-                state: dict) -> tuple[Path | None, dict, dict]:
-    """the bundle of every task answered whole: its path (None when none is),
-    the tasks in it and those not finished"""
+                state: dict, shard: tuple[int, int] | None = None
+                ) -> tuple[Path | None, dict, dict]:
+    """the bundle of every task answered whole — 15.5: its shard's share of
+    it, as the run built it — its path (None when none is), the tasks in it
+    and those not finished"""
     import hashlib
 
     import devicemark as dm
@@ -278,15 +290,17 @@ def make_bundle(out: Path, model: str, thinking: bool, tasks: list[str], hashes:
     own = out / OWN_LOG
     log = rb.scrub(log + ("\n===== remote_run =====\n" + own.read_text(encoding="utf-8")
                           if own.exists() else ""))
-    setup = setup_record(model, thinking, tasks, hashes, state, log, answers, incomplete)
+    setup = setup_record(model, thinking, tasks, hashes, state, log, answers, incomplete, shard)
     files["run.log"] = log.encode("utf-8")
     files["setup.json"] = rb.scrub(json.dumps(setup, indent=1, sort_keys=True)).encode("utf-8")
     bundle = {"format": rb.FORMAT, "suite": SUITE, "model": model, "thinking": thinking,
               "row": row.name, "tasks": {t: len(a) for t, a in answers.items()},
               "incomplete": incomplete, "answers_sha256": rb.answers_digest(answers),
               "files": {n: hashlib.sha256(b).hexdigest() for n, b in files.items()}}
+    if shard:
+        bundle["shard"] = {"i": shard[0], "n": shard[1]}
     files["bundle.json"] = json.dumps(bundle, indent=1, sort_keys=True).encode("utf-8")
-    path = rb.write(out / rb.bundle_name(SUITE, model, thinking), files)
+    path = rb.write(out / rb.bundle_name(SUITE, model, thinking, shard), files)
     return path, answers, incomplete
 
 
@@ -298,28 +312,41 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--only", action="append", choices=TASKS,
                     help="one task (repeatable); every task when none is given")
     ap.add_argument("--out", default="remote-run", help="where the run and its bundle go")
+    ap.add_argument("--shard", default="",
+                    help="i/n: this instance's share of each task, every n-th item from the "
+                         "i-th — n instances, one bundle each; the server scores a task once "
+                         "every shard of it is in")
     ap.add_argument("--battery", default="",
                     help="the server's items sha256 (import_remote.py --battery): refuse "
                          "another battery before starting")
     ap.add_argument("--suite", default=SUITE, choices=tuple(rb.SUITES))
     ap.add_argument("--by", default="remote", help="who ran it, for the run's record")
     a = ap.parse_args(argv)
+    import devicemark as dm
+    try:
+        shard = dm.parse_shard(a.shard)
+    except ValueError as e:
+        ap.error(f"--shard: {e}")
     out = Path(a.out).resolve()
     thinking = a.thinking == "on"
     tasks = [t for t in TASKS if t in (a.only or TASKS)]
-    configure(out)
+    configure(out, shard)
     say = Out(out / OWN_LOG)
-    import devicemark as dm
     from service import config, db, runner
     db.init()
-    say(f"{a.model} · thinking {a.thinking} · {', '.join(tasks)} · in {out}")
+    words = f"shard {shard[0]} of {shard[1]}" if shard else ""
+    say(f"{a.model} · thinking {a.thinking} · {', '.join(tasks)}"
+        + (f" · {words}" if shard else "") + f" · in {out}")
 
-    # the run this folder holds: one model, one mode, one revision
+    # the run this folder holds: one model, one mode, one revision, one shard
     sp = out / STATE
     state = json.loads(sp.read_text(encoding="utf-8")) if sp.exists() else {}
     if state and (state.get("model"), state.get("thinking")) != (a.model, thinking):
         raise SystemExit(f"{out} holds a run of {state.get('model')} (thinking "
                          f"{'on' if state.get('thinking') else 'off'}): give this one another --out")
+    if state and (state.get("shard") or "") != (a.shard.strip() if shard else ""):
+        raise SystemExit(f"{out} holds {('shard ' + state['shard']) if state.get('shard') else 'a whole run'}"
+                         f" of {a.model}: give {words or 'a whole run'} another --out")
     rev = model_revision(a.model)
     if state.get("revision") and rev and rev != state["revision"]:
         raise SystemExit(f"{a.model} changed on the Hub since this run began ({state['revision'][:12]} "
@@ -327,7 +354,8 @@ def main(argv: list[str] | None = None) -> int:
     state = {"model": a.model, "thinking": thinking, "revision": state.get("revision") or rev,
              "started_at": state.get("started_at")
              or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-             "sessions": int(state.get("sessions", 0)) + 1}
+             "sessions": int(state.get("sessions", 0)) + 1,
+             "shard": f"{shard[0]}/{shard[1]}" if shard else None}
     sp.write_text(json.dumps(state, indent=1), encoding="utf-8")
 
     # the battery, from its pinned sources, as the board builds it
@@ -337,6 +365,13 @@ def main(argv: list[str] | None = None) -> int:
     if a.battery and a.battery != hashes["items"]:
         raise SystemExit(f"this battery's items hash is {hashes['items'][:16]}, the server's "
                          f"{a.battery[:16]}: the server would refuse the bundle. Nothing was run.")
+    if shard:
+        share = []
+        for t in tasks:
+            every = [k for b, k in dm.keys_for("full") if dm.TASK[b] == t]
+            share.append(f"{t} {len(dm.shard_of(every, shard))} of {len(every)}")
+        i, n = shard
+        say(f"{words}: items {i}, {i + n}, {i + 2 * n}, … of each task · " + ", ".join(share))
     gpu, libs = rb.gpu_info(), rb.library_versions()
     say(f"GPU {gpu.get('name') or 'unknown'} (driver {gpu.get('driver') or '?'}) · torch "
         f"{libs.get('torch_build')} · transformers {libs.get('transformers')} · lm_eval "
@@ -356,7 +391,7 @@ def main(argv: list[str] | None = None) -> int:
     row = db.get(sid) or {}
     say(f"the run: {row.get('status')} · {row.get('progress') or ''}"
         + (f" · {row['error']}" if row.get("error") else ""))
-    path, answers, incomplete = make_bundle(out, a.model, thinking, tasks, hashes, state)
+    path, answers, incomplete = make_bundle(out, a.model, thinking, tasks, hashes, state, shard)
     for t, x in incomplete.items():
         say(f"{t}: {x['answers']} of {x['of']} answered — run the same command again to carry on")
     if not path:
