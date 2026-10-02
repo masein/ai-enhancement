@@ -466,7 +466,8 @@ def battery(sid: int, rec: dict, items: dict, thinking: bool, part: str,
                 f"parsing: {r['error']['fallback']}"))
     db.update(sid, status="running", progress="devicemark · scoring the answers")
     setup = setup_of(rec, thinking, _props(rec))
-    row = d.mark(out, items, setup, got, part)
+    # 15.7: the server splits the thinking off (its reasoning_content); read as v2
+    row = d.mark(out, items, setup, got, part, reading={"on": bool(thinking)})
     if part == "pilot":
         row["cap_check"] = cap_check(rec, items, d.keys_for("pilot"))
         (out / d.PILOT_NAME).write_text(json.dumps({**json.loads(
@@ -698,9 +699,34 @@ def hf_plan_lines(plan: dict, batch: int | None = None) -> str:
 # a Hugging Face model's battery, after lm_eval has answered it
 # ---------------------------------------------------------------------------
 
+def reading_of(hf_id: str, on: bool, meta: dict | None = None, row: Path | None = None) -> dict:
+    """15.7: how a Hugging Face row's replies are read (devicemark.split_reply):
+    its thinking markers, and whether its chat template opens the thinking
+    itself — the catalogue's word for a model it knows, else what preflight
+    read from the template (archinfo), given or in the model's model_meta.json"""
+    from . import catalog
+    a = dict((meta or {}).get("archinfo") or {})
+    if not a and row is not None:
+        base = row.with_name(row.name.removesuffix("__thinking"))
+        for f in (row / "model_meta.json", base / "model_meta.json"):
+            try:
+                m = json.loads(f.read_text(encoding="utf-8"))
+                a = m.get("archinfo") or m           # the runner writes it flat
+            except (OSError, ValueError, AttributeError):
+                continue
+            if a:
+                break
+    k = catalog.known(hf_id) or {}
+    think_end = k.get("think_end") or a.get("think_end") or "</think>"
+    opens = bool(k["opens"]) if "opens" in k else bool(a.get("think_opens"))
+    return {"on": bool(on), "marks": list(dm().marks_of(think_end)), "opens": opens}
+
+
 def mark_hf(sid: int, sub: dict, meta: dict, row: Path, thinking: dict) -> str:
     """the three tasks' answers, each counted again with the model's own
-    tokenizer, scored as a served row's are"""
+    tokenizer, scored as a served row's are. 15.7: read by the row's reading
+    (reading_of), each task in the form it was saved in (whole from 15.7, cut
+    by lm_eval before)"""
     d = dm()
     items = d.load_items(config.DM_ITEMS)
     try:
@@ -718,7 +744,58 @@ def mark_hf(sid: int, sub: dict, meta: dict, row: Path, thinking: dict) -> str:
              "cap": d.CAP, "seed": d.SEED, "revision": meta.get("revision"),
              # 15.2: the tasks answered on a rented GPU, imported (where_of)
              **where_of(row)}
-    return summary_line(d.mark(row, items, setup, records, "full"))
+    return summary_line(d.mark(row, items, setup, records, "full",
+                               reading=reading_of(sub["hf_id"], bool(thinking.get("on")), meta,
+                                                  row)))
+
+
+# ---------------------------------------------------------------------------
+# 15.7: a row scored again by today's reading
+# ---------------------------------------------------------------------------
+
+def _nums(row: dict) -> dict:
+    b = row.get("benches") or {}
+    return {"composite": (row.get("composite") or {}).get("value"),
+            **{k: (b.get(k) or {}).get("acc") for k in ("ifeval", "mmlu_pro", "math")}}
+
+
+def rescore(row_dir: Path, write: bool = True) -> dict:
+    """15.7: a DeviceMark row scored again from its saved answers by today's
+    reading (devicemark.SCORING): {row, model, thinking, status, before,
+    after, why, caps}. A row whose answers can't be read apart from their
+    thinking (Gemma 4 thinking on, before 15.7) keeps its numbers and is
+    marked provisional, with why: it needs a new run. Nothing is asked"""
+    d = dm()
+    try:
+        row = json.loads((row_dir / d.OUT_NAME).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"row": row_dir.name, "status": "no row"}
+    setup = dict(row.get("setup") or {})
+    out = {"row": row_dir.name, "model": setup.get("model"), "thinking": bool(setup.get("thinking")),
+           "before": _nums(row)}
+    if setup.get("scoring") == d.SCORING:
+        return {**out, "status": f"{d.SCORING} already", "after": out["before"]}
+    on = bool(setup.get("thinking"))
+    hf = str(setup.get("runtime") or "").startswith("hf ")
+    reading = reading_of(setup.get("model") or "", on, row=row_dir) if hf else {"on": on}
+    records = d.read_items(row_dir)
+    items = d.load_items(config.DM_ITEMS)
+    base = {k: v for k, v in setup.items() if k not in ("scoring", "reading", "provisional")}
+    new = d.mark(row_dir, items, base, records, "full", reading=reading, write=False)
+    caps = {b: {k: (new["benches"].get(b) or {}).get(k) for k in ("capped", "capped_in_thinking")}
+            for b in d.BENCHES}
+    if new.get("unreadable"):
+        why = (f"needs a new run: {new['unreadable']} of its answers can't be told from its "
+               f"thinking — the run before 15.7 kept neither its thinking markers nor where "
+               f"the thinking ended")
+        if write:
+            row["setup"] = {**setup, "provisional": why}
+            (row_dir / d.OUT_NAME).write_text(json.dumps(row, indent=1, ensure_ascii=False),
+                                              encoding="utf-8")
+        return {**out, "status": "needs a new run", "why": why, "after": None, "caps": caps}
+    if write:
+        d.mark(row_dir, items, base, records, "full", reading=reading)
+    return {**out, "status": "re-scored", "after": _nums(new), "caps": caps}
 
 
 # ---------------------------------------------------------------------------

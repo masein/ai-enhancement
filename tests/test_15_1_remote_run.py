@@ -79,6 +79,9 @@ def lm_eval(monkeypatch, die_after: int | None = None) -> list[tuple[str, str]]:
 
     def run_task(sid, cmd, lf, env, run_as, cwd, on_poll=None):
         task = cmd[cmd.index("--tasks") + 1]
+        # 15.7: a thinking-on DeviceMark task saves each reply whole, its
+        # thinking and </think> included (lm_eval_whole.py's hf-whole)
+        whole = cmd[cmd.index("--model") + 1] == "hf-whole"
         out = Path(cmd[cmd.index("--output_path") + 1])
         cache = cmd[cmd.index("--use_cache") + 1]
         assert cache == str(runner.dm_cache(out))           # resumable per answer
@@ -96,7 +99,7 @@ def lm_eval(monkeypatch, die_after: int | None = None) -> list[tuple[str, str]]:
                     continue
                 if die_after is not None and len(made) >= die_after:
                     raise Killed
-                have[k] = answer(b, k)
+                have[k] = ("Thinking it over.\n</think>\n\n" if whole else "") + answer(b, k)
                 c.execute("INSERT INTO unnamed VALUES (?, ?)", (k, have[k]))
                 c.commit()
                 made.append((task, k))

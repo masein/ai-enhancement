@@ -31,14 +31,21 @@ APPROVED_PATH = HERE / "approved_code.json"
 CANT_RUN_PATH = HERE / "cant_run_here.json"
 
 # name, size, how it thinks, where its thinking ends, and what to watch when
-# it loads. Hugging Face names checked on 2026-09-25
+# it loads. Hugging Face names checked on 2026-09-25. 15.7: "opens" — its chat
+# template opens the thinking itself when it's on ('<think>\n' after the
+# assistant's turn: Qwen3.5 and Nemotron, read on 2 Oct), so a reply carries
+# no opening marker; Youtu and Nanbeige write <think> themselves, Gemma 4 its
+# <|channel>
 MODELS = [
     {"id": "Qwen/Qwen3.5-0.8B", "params": 0.8e9, "thinking": "switch", "default_on": False,
+     "opens": True,
      "watch": "the card loads it as multimodal (Qwen3_5ForConditionalGeneration); needs "
               "transformers 5.5+"},
     {"id": "Qwen/Qwen3.5-2B", "params": 2e9, "thinking": "switch", "default_on": False,
+     "opens": True,
      "watch": "multimodal on the card; needs transformers 5.5+"},
     {"id": "Qwen/Qwen3.5-4B", "params": 4e9, "thinking": "switch", "default_on": False,
+     "opens": True,
      "watch": "multimodal on the card; needs transformers 5.5+"},
     {"id": "LiquidAI/LFM2.5-1.2B-Instruct", "params": 1.2e9, "thinking": "never",
      "watch": "convolution + attention hybrid (lfm2); LFM 1.0 licence"},
@@ -49,7 +56,7 @@ MODELS = [
      "watch": "multimodal (Gemma4ForConditionalGeneration); needs transformers 5.5+; thinks "
               "inside <|channel>…<channel|>"},
     {"id": "nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16", "params": 4e9, "thinking": "switch",
-     "default_on": True,
+     "default_on": True, "opens": True,
      "watch": "Mamba2 hybrid; the repo ships its own code, and transformers 5.5.3 has "
               "nemotron_h built in, so it loads without it; thinks unless told not to"},
     {"id": "tencent/Youtu-LLM-2B", "params": 2e9, "thinking": "switch", "default_on": True,
@@ -78,7 +85,7 @@ def thinking_of(hf_id: str, template: str | None) -> dict:
     if k:
         mode = k["thinking"]
         return {"mode": mode, "default_on": mode == "always" or bool(k.get("default_on")),
-                "think_end": k.get("think_end", "</think>")}
+                "think_end": k.get("think_end", "</think>"), "opens": bool(k.get("opens"))}
     t = template or ""
     if "enable_thinking" in t:
         # Qwen3 and Youtu: `enable_thinking is defined and enable_thinking is
@@ -87,8 +94,31 @@ def thinking_of(hf_id: str, template: str | None) -> dict:
         on = ("enable_thinking is false" in t.replace("  ", " ")
               or "else True" in t)
         return {"mode": "switch", "default_on": on,
-                "think_end": "<channel|>" if "<|channel>" in t else "</think>"}
-    return {"mode": "never", "default_on": False, "think_end": "</think>"}
+                "think_end": "<channel|>" if "<|channel>" in t else "</think>",
+                "opens": opens_thinking(t)}
+    return {"mode": "never", "default_on": False, "think_end": "</think>", "opens": False}
+
+
+def opens_thinking(template: str | None) -> bool:
+    """15.7: does this chat template open the thinking itself when it's on —
+    the prompt it makes ending in <think> — so the reply carries no opening
+    marker? Rendered as transformers renders it (jinja2, sandboxed); False
+    where it can't be"""
+    if not template:
+        return False
+    try:
+        from jinja2.sandbox import ImmutableSandboxedEnvironment
+        env = ImmutableSandboxedEnvironment(trim_blocks=True, lstrip_blocks=True)
+
+        def fail(msg):
+            raise ValueError(msg)
+        env.globals["raise_exception"] = fail
+        prompt = env.from_string(template).render(
+            messages=[{"role": "user", "content": "x"}], add_generation_prompt=True,
+            enable_thinking=True, bos_token="", eos_token="", tools=None)
+    except Exception:                               # noqa: BLE001 — unknown: read as not
+        return False
+    return prompt.rstrip().endswith("<think>")
 
 
 def approved() -> dict[str, dict]:

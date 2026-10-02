@@ -393,3 +393,57 @@ def test_the_gguf_arc_and_truthfulqa_prompts_are_lm_evals():
     cfg = load_yaml(str(tasks / "truthfulqa" / "truthfulqa_mc1.yaml"))
     assert apply_template(cfg["doc_to_text"], tqa) == gd.truthfulqa_task(tqa)["question"]
     assert cfg.get("target_delimiter", " ") == " "
+
+
+def test_hf_whole_keeps_every_token_and_cuts_nothing(monkeypatch):
+    """15.7: a DeviceMark reply with the thinking on is saved whole
+    (scripts/lm_eval_whole.py): lm_eval's hf decodes with
+    skip_special_tokens=True — Gemma 4's <|channel>…<channel|> went — and cuts
+    at think_end_token, which enable_thinking needs given. hf-whole is the
+    installed harness's hf with neither"""
+    lm_eval()
+    import inspect
+
+    from lm_eval.api.registry import get_model
+    from lm_eval.models.huggingface import HFLM
+
+    import lm_eval_whole as w
+    assert get_model("hf-whole") is w.WholeHFLM and issubclass(w.WholeHFLM, HFLM)
+    # where hf decodes and cuts a reply: the two things hf-whole turns off
+    src = inspect.getsource(HFLM.generate_until)
+    assert "s = self.tok_decode(cont_toks)" in src and "self.think_end_token" in src
+
+    class Tok:
+        def decode(self, tokens, skip_special_tokens=True):
+            return f"{tokens} kept={not skip_special_tokens}"
+
+    def init(self, *a, **k):
+        self.think_end_token = k.get("think_end_token")
+    monkeypatch.setattr(HFLM, "__init__", init)
+    m = w.WholeHFLM(think_end_token="<channel|>")
+    m.tokenizer = Tok()
+    assert m.think_end_token is None
+    assert m.tok_decode([1, 2]) == "[1, 2] kept=True"
+
+
+def test_a_rendered_template_says_whether_it_opens_the_thinking():
+    """15.7: the generation prompt each family's template makes with the
+    thinking on (read on 2 Oct): Qwen3.5 and Nemotron end it in <think>, so a
+    reply carries no opening marker; Youtu (unless forced) and Gemma 4 don't"""
+    lm_eval()
+    from service import catalog
+    head = "{%- for m in messages %}{{ m['content'] }}{%- endfor %}"
+    qwen = head + ("{%- if add_generation_prompt %}{{- '<|im_start|>assistant\\n' }}"
+                   "{%- if enable_thinking is defined and enable_thinking is false %}"
+                   "{{- '<think>\\n\\n</think>\\n\\n' }}{%- else %}{{- '<think>\\n' }}"
+                   "{%- endif %}{%- endif %}")
+    nemotron = head + ("{%- if add_generation_prompt %}{%- if enable_thinking %}"
+                       "{{- '<|im_start|>assistant\\n<think>\\n' }}{%- else %}"
+                       "{{- '<|im_start|>assistant\\n<think></think>' }}{%- endif %}{%- endif %}")
+    youtu = head + ("{% if add_generation_prompt %}{{ '<|Assistant|>' }}{% if enable_thinking "
+                    "is defined and enable_thinking is false %}{{ '<think>\\n\\n</think>\\n\\n' }}"
+                    "{% elif forced_thinking is defined and forced_thinking is true %}"
+                    "{{ '<think>\\n' }}{% endif %}{% endif %}")
+    gemma = head + "{%- if add_generation_prompt -%}{{- '<|turn>model\\n' -}}{%- endif -%}"
+    assert [catalog.opens_thinking(t) for t in (qwen, nemotron, youtu, gemma)] == [
+        True, True, False, False]

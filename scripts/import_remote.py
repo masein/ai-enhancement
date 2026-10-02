@@ -194,10 +194,18 @@ def merge_shards(row: Path, t: str, n: int, stamp: str) -> int:
                 got[str(s["doc"]["key"])] = s
     if set(got) != set(every):
         raise ValueError(f"{t}: the shards hold {len(got)} of its {len(every)} items")
+    # 15.7: the form the replies were saved in, the same in every shard
+    forms = {dm.reply_form(shards_dir(row.name) / t / f"{j}-of-{n}") for j in range(1, n + 1)}
+    if len(forms) > 1:
+        raise ValueError(f"{t}: its shards' replies were saved in different forms ({forms})")
     dest = row / f"{t}_0shot" / sub
     dest.mkdir(parents=True, exist_ok=True)
     (dest / f"samples_{t}_{stamp}.jsonl").write_text(
         "".join(json.dumps(got[k], ensure_ascii=False) + "\n" for k in every), encoding="utf-8")
+    form = forms.pop()
+    if form:
+        (row / f"{t}_0shot" / dm.FORM_NAME).write_text(json.dumps({"form": form}),
+                                                       encoding="utf-8")
     return len(every)
 
 

@@ -355,9 +355,106 @@ def items_differ(items: dict[tuple[str, str], dict], expected: str) -> str | Non
 # reading an answer
 # ---------------------------------------------------------------------------
 
+# 15.7: how a reply is read, and so scored. v1 (to 2 Oct) took the answer as
+# what follows the last </think> in what lm_eval saved, whatever the mode —
+# and lm_eval had already cut at the end of the thinking, so a Qwen3.5 reply
+# capped inside its thinking (its template opens <think>, leaving no marker)
+# was scored as its answer, and Gemma 4's <|channel>…<channel|>, special
+# tokens the decode drops, was never split at all. v2 is DeviceMark's rule, as
+# its raw outputs show it: with thinking on, only the answer after the closed
+# thinking is scored — a reply capped inside its thinking has no answer, on all
+# three tests (their Youtu and Nanbeige rows: "answered" is the answers that
+# hold a \boxed{}, the thinking is never read); with thinking off, the whole
+# visible reply is the answer, a "Thinking Process:" preamble or a literal
+# </think> in it included (their Qwen3.5 rows)
+SCORING = "v2"
+SCORING_WORDS = {"v1": "the answer after the last </think> in what lm_eval kept",
+                 "v2": "DeviceMark's: thinking on, the answer after the closed thinking (capped "
+                       "inside it, no answer); thinking off, the whole reply"}
+THINK = ("<think>", "</think>")
+CHANNEL = ("<|channel>", "<channel|>")              # Gemma 4: <|channel>thought\n…<channel|>
+# what a decode that keeps special tokens leaves after the reply: end of turn, end of text, padding
+_END_TOKENS = re.compile(r"(?:\s*(?:<\|im_end\|>|<\|endoftext\|>|<turn\|>|<end_of_turn>|<eos>|</s>|"
+                         r"<\|eot_id\|>|<\|end\|>|<pad>))+\s*$")
+_EMPTY_THINKING = re.compile(r"^\s*(?:<think>\s*</think>|<\|channel>(?:thought)?\s*<channel\|>)\s*")
+
+
+def marks_of(think_end: str | None) -> tuple[str, str]:
+    """a model's thinking markers, from where its thinking ends"""
+    return CHANNEL if think_end == CHANNEL[1] else THINK
+
+
+def split_reply(text: str, on: bool, marks: tuple[str, str] = THINK, opens: bool = False,
+                form: str = "whole", capped: bool = False) -> dict:
+    """15.7, v2: a reply read as DeviceMark reads one — {thinking, answer,
+    closed, readable}. `on`: the row thinks. `marks`: where its thinking
+    opens and closes. `opens`: its chat template opens the thinking itself
+    (Qwen3.5, Nemotron), so the reply carries no opening marker. `form`:
+    "whole", every token generated (lm_eval_whole.py, from 15.7), or "cut",
+    what lm_eval kept after cutting at the end of the thinking (the runs
+    before 15.7, thinking on). closed: True, False (capped or ended inside
+    its thinking) or None (no thinking). readable: False when the thinking
+    can't be told from the answer (Gemma 4, cut: its markers were dropped)"""
+    t = _END_TOKENS.sub("", text or "")
+    start, end = marks
+    if not on:
+        t = _EMPTY_THINKING.sub("", t)
+        if t.lstrip().startswith(THINK[0]):         # a served reply the server split, put back
+            t = t.lstrip()[len(THINK[0]):]
+        return {"thinking": "", "answer": t.strip(), "closed": None, "readable": True}
+    if end in t:
+        head, _, tail = t.partition(end)             # the thinking closes once
+        think = head.strip()
+        if think.startswith(start):
+            think = think[len(start):]
+        if start == CHANNEL[0]:
+            think = re.sub(r"^\s*thought\b", "", think)   # the channel's name
+        return {"thinking": think.strip(), "answer": tail.strip(), "closed": True,
+                "readable": True}
+    began = t.lstrip().startswith(start)
+    if form == "cut" and not began:
+        if start == CHANNEL[0]:
+            return {"thinking": "", "answer": "", "closed": None, "readable": False}
+        if opens and capped:                         # whole, and never closed
+            return {"thinking": t.strip(), "answer": "", "closed": False, "readable": True}
+        return {"thinking": "", "answer": t.strip(), "closed": True, "readable": True}
+    if began or opens:
+        body = t.lstrip()[len(start):] if began else t
+        if start == CHANNEL[0]:
+            body = re.sub(r"^\s*thought\b", "", body)
+        return {"thinking": body.strip(), "answer": "", "closed": False, "readable": True}
+    return {"thinking": "", "answer": t.strip(), "closed": None, "readable": True}
+
+
+def read_reply(r: dict, reading: dict | None) -> dict:
+    """15.7: one answer record read by its row's `reading` ({on, marks,
+    opens}): what split_reply says, and where the cap fell. A served reply
+    keeps the server's own split (its `answer`); with no reading (a record
+    from before 15.7 scored alone), v1's split"""
+    capped = bool(r.get("capped"))
+    if reading is None:
+        think, answer = split_thinking(r.get("text") or "")
+        got = {"thinking": think, "answer": answer, "closed": None, "readable": True}
+    elif "answer" in r and reading.get("on"):        # the server split it
+        answer = (r.get("answer") or "").strip()
+        think = split_thinking(r.get("text") or "")[0] if r.get("thinking_chars") else ""
+        got = {"thinking": think, "answer": answer,
+               "closed": (None if not think else not (capped and not answer)), "readable": True}
+    else:
+        on = bool(reading.get("on"))
+        form = r.get("form") or ("cut" if on else "whole")
+        got = split_reply(r.get("text") or r.get("answer") or "", on,
+                          tuple(reading.get("marks") or THINK), bool(reading.get("opens")),
+                          form, capped)
+    got["cap_in"] = (None if not capped else "thinking" if got["closed"] is False else "answer")
+    return got
+
+
 def split_thinking(text: str) -> tuple[str, str]:
     """(thinking, answer): the answer is what follows the last </think>; a
-    reply that opened its thinking and never closed it has no answer"""
+    reply that opened its thinking and never closed it has no answer. v1's
+    reading (15.7: split_reply is v2's); the served path still parses a
+    server's reply with it"""
     t = text or ""
     if "</think>" in t:
         head, _, tail = t.rpartition("</think>")
@@ -474,18 +571,30 @@ def ifeval_verdicts(rows: list[dict]) -> dict[str, dict]:
 # one item, scored
 # ---------------------------------------------------------------------------
 
-def score_items(records: list[dict], items: dict[tuple[str, str], dict]) -> list[dict]:
+SCORED = ("parsed", "how", "gold", "answered", "correct", "ifeval", "scored_answer", "closed",
+          "cap_in", "readable", "thinking_chars_read")
+
+
+def score_items(records: list[dict], items: dict[tuple[str, str], dict],
+                reading: dict | None = None) -> list[dict]:
     """each answer record {bench, key, text or answer/thinking, gen_tokens,
     capped, …}, scored: answered, the parsed answer, correct — and for IFEval
-    the four verdicts. The record's own fields are kept"""
+    the four verdicts. The record's own fields are kept. 15.7: read by the
+    row's `reading` (read_reply), the answer scored kept with where the cap
+    fell; without one, v1's reading"""
     out, ife = [], []
     for r in records:
         item = items[(r["bench"], str(r["key"]))]
-        if "answer" in r:
-            answer = r["answer"] or ""
+        if reading is None and "answer" in r:
+            got = {"answer": r["answer"] or "", "closed": None, "readable": True, "thinking": "",
+                   "cap_in": None}
         else:
-            _, answer = split_thinking(r.get("text") or "")
-        s = {**r, "key": str(r["key"])}
+            got = read_reply(r, reading)
+        answer = got["answer"] or ""
+        s = {**{k: v for k, v in r.items() if k not in SCORED}, "key": str(r["key"])}
+        if reading is not None:
+            s.update(scored_answer=answer, closed=got["closed"], cap_in=got["cap_in"],
+                     readable=got["readable"], thinking_chars_read=len(got["thinking"] or ""))
         if r["bench"] == "mmlu_pro":
             got, how = (None, "") if not answer else mmlu_letter(answer)
             s.update(parsed=got, how=how, gold=item["answer"], answered=got is not None,
@@ -586,6 +695,8 @@ def summarize(scored: list[dict], setup: dict, part: str = "full") -> dict:
                  "answered": len(answered),
                  "answered_pct": round(len(answered) / n, 4) if n else None,
                  "capped": sum(bool(s.get("capped")) for s in items),
+                 # 15.7: of which the cap fell inside the thinking (no answer)
+                 "capped_in_thinking": sum(s.get("cap_in") == "thinking" for s in items),
                  "median_tokens": _median([s.get("gen_tokens") for s in items])}
         if b == "ifeval":
             b_out["parts"] = {f"{lvl}_{mode}": round(
@@ -612,6 +723,8 @@ def summarize(scored: list[dict], setup: dict, part: str = "full") -> dict:
         # 12q.F: the items the server failed on — answered without its chat
         # parsing (scored as any), and those with no answer after that too
         "raw_fallback": sum(bool(s.get("raw_fallback")) for s in scored),
+        # 15.7: answers whose thinking can't be told from them (a new run reads them)
+        "unreadable": sum(s.get("readable") is False for s in scored),
         "errors": sum(bool(s.get("error")) for s in scored),
         "n": len(scored), "whose": WHOSE}
 
@@ -750,6 +863,7 @@ def records_from_samples(row_dir: Path, token_count=None) -> list[dict]:
         files = sorted((row_dir / f"{TASK[b]}_0shot").rglob(f"samples_{TASK[b]}_*.jsonl"))
         if not files:
             continue
+        form = reply_form(row_dir / f"{TASK[b]}_0shot")
         for line in files[-1].read_text(encoding="utf-8").splitlines():
             if not line.strip():
                 continue
@@ -758,8 +872,22 @@ def records_from_samples(row_dir: Path, token_count=None) -> list[dict]:
             n = token_count(text) if token_count else None
             out.append({"bench": b, "key": str(s["doc"]["key"]), "text": text,
                         "gen_tokens": n, "capped": bool(n is not None and n >= CAP - 2),
-                        "tokens_from": "the text, counted again with the model's tokenizer"})
+                        "tokens_from": "the text, counted again with the model's tokenizer",
+                        **({"form": form} if form else {})})
     return out
+
+
+FORM_NAME = "reply_form.json"
+
+
+def reply_form(task_out: Path) -> str | None:
+    """15.7: the form a task's replies were saved in — "whole" (every token,
+    lm_eval_whole.py) where the runner says so beside them; None before 15.7
+    (lm_eval's own: cut at the end of the thinking when it was on)"""
+    try:
+        return json.loads((task_out / FORM_NAME).read_text(encoding="utf-8")).get("form")
+    except (OSError, ValueError, AttributeError):
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -774,16 +902,25 @@ def read_items(row_dir: Path, name: str = ITEMS_NAME) -> list[dict]:
 
 
 def mark(row_dir: Path, items: dict[tuple[str, str], dict], setup: dict,
-         records: list[dict] | None = None, part: str = "full") -> dict:
+         records: list[dict] | None = None, part: str = "full",
+         reading: dict | None = None, write: bool = True) -> dict:
     """a row scored from its answers: the scored answers beside it
     (devicemark_items.jsonl, the question browser's), its numbers in
-    devicemark.json (or the pilot's own file)"""
+    devicemark.json (or the pilot's own file). 15.7: read by `reading`
+    ({on, marks, opens}), and the scoring's version in its setup"""
     records = records if records is not None else read_items(row_dir)
     order = {k: i for i, k in enumerate(keys_for(part))}
     records = sorted((r for r in records if (r["bench"], str(r["key"])) in order),
                      key=lambda r: order[(r["bench"], str(r["key"]))])
-    scored = score_items(records, items)
+    scored = score_items(records, items, reading)
+    setup = {**setup, "scoring": SCORING if reading is not None else "v1"}
+    if reading is not None:
+        setup["reading"] = {"on": bool(reading.get("on")),
+                            "marks": list(reading.get("marks") or THINK),
+                            "opens": bool(reading.get("opens"))}
     row = summarize(scored, setup, part)
+    if not write:                                   # 15.7: what it would come to
+        return row
     row_dir.mkdir(parents=True, exist_ok=True)
     if part == "full":
         (row_dir / ITEMS_NAME).write_text("".join(json.dumps(s, ensure_ascii=False) + "\n"
@@ -842,13 +979,27 @@ def rows(out_dir: Path, launch=None) -> list[dict]:
                     "server_label": SERVER_SPEED_LABEL if speed else None,
                     "device": device or None,
                     # 15.4: its raw per-item run, where it was published
-                    "raw_url": (_json(out_dir / name / RAW_NAME) or {}).get("url")})
+                    "raw_url": (_json(out_dir / name / RAW_NAME) or {}).get("url"),
+                    # 15.7: the reading it was scored by, and why it's provisional
+                    "scoring": (row.get("setup") or {}).get("scoring") or "v1",
+                    "provisional": provisional_why(row.get("setup") or {})})
     rk = ranks([{"ci": r["row"]["composite"]["ci"]} for r in out])
     for r, k in zip(out, rk):
         r["rank"] = k
     for r in out:
         r["retention"] = retention(r, out)
     return out
+
+
+def provisional_why(setup: dict) -> str | None:
+    """15.7: why a row's numbers are provisional, in one line — scored by the
+    reading before 15.7, or past re-scoring (it needs a new run) — or None"""
+    if setup.get("provisional"):
+        return setup["provisional"]
+    if setup.get("scoring") != SCORING:
+        return ("scored by the reading before 15.7, which could take a reply capped inside "
+                "its thinking for its answer; scored again by scripts/rescore_devicemark.py")
+    return None
 
 
 def retention(r: dict, rows_: list[dict]) -> dict | None:
@@ -1182,6 +1333,7 @@ def model_runs(out_dir: Path, launch=None) -> dict[str, dict]:
                 "version": row.get("version"),
                 # 15.2: run on a rented GPU, whole or in part
                 "where": (row.get("setup") or {}).get("where"),
+                "scoring": r.get("scoring"), "provisional": r.get("provisional"),
                 # 15.4: its raw per-item run, where it was published
                 "raw_url": r.get("raw_url")}
             # 12z A5: DeviceMark's own row beside ours, as the chart's table has it:

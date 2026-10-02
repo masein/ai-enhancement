@@ -191,15 +191,24 @@ def _dm_rows(task: str, d: Path) -> dict[str, dict]:
         think, answer = dm.split_thinking(it.get("text") or "")
         if it.get("answer") is not None:
             answer = it["answer"]
+        if it.get("scored_answer") is not None:      # 15.7: what was scored, as it was read
+            answer = it["scored_answer"]
+            text = it.get("text") or ""
+            think = (text[:len(text) - len(answer)] if answer and text.endswith(answer)
+                     else think if answer else text)
         if bench == "ifeval":
             v = it.get("ifeval") or {}
             st, lo = (v.get("strict") or {}).get("inst") or [], (v.get("loose") or {}).get(
                 "inst") or []
             verdict = (f"strict: {sum(st)} of {len(st)} instructions followed · loose: "
                        f"{sum(lo)} of {len(lo)}")
+            if it.get("cap_in") == "thinking":           # 15.7
+                verdict = "no answer: the cap fell inside its thinking · " + verdict
         elif it.get("error"):
             # 12q.F: the server failed on it twice, and again without its chat parsing
             verdict = "no answer: the server failed on this item"
+        elif it.get("cap_in") == "thinking":
+            verdict = "no answer: the cap fell inside its thinking"
         elif not it.get("answered"):
             verdict = ("no answer within the cap" if it.get("capped") else
                        "no answer: no box" + (" or tested phrasing" if bench == "mmlu_pro"

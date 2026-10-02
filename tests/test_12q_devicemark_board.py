@@ -115,8 +115,9 @@ def _row(out_dir: Path, mid: str, acc: dict, setup: dict, thinking=False, device
             scored.append(s)
     d = out_dir / (mid.replace("/", "__") + ("__thinking" if thinking else ""))
     d.mkdir(parents=True, exist_ok=True)
-    (d / dm.OUT_NAME).write_text(json.dumps(dm.summarize(scored, {**setup,
-                                                                  "thinking": thinking})))
+    # 15.7: as a run writes one today — scored by today's reading
+    (d / dm.OUT_NAME).write_text(json.dumps(dm.summarize(scored, {
+        "scoring": dm.SCORING, **setup, "thinking": thinking})))
     (d / dm.ITEMS_NAME).write_text("".join(json.dumps(s) + "\n" for s in scored))
     base = out_dir / mid.replace("/", "__")
     if device:

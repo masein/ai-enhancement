@@ -11418,7 +11418,9 @@ function dmOurs(r) {
     inherited: r.row.inherited, setup: su,
     raw_fallback: r.row.raw_fallback || 0, errors: r.row.errors || 0,
     // 15.4: its raw per-item run, where it was published
-    raw_url: r.raw_url || null };
+    raw_url: r.raw_url || null,
+    // 15.7: the reading it was scored by, and why its numbers are provisional
+    scoring: r.scoring || null, provisional: r.provisional || null };
 }
 function dmRows() {
   const d = state.dm.data;
@@ -11710,6 +11712,9 @@ function dmTable(rows) {
         // 15.4: ours links its raw run, as theirs on DeviceMark's board do
         r.raw_url ? [' ', el('a', { href: r.raw_url, target: '_blank', rel: 'noopener',
           class: 'small', 'data-dm-raw': r.id, text: 'raw' })] : '',
+        // 15.7: numbers that may change, and why on hover
+        r.provisional ? [' ', el('span', { class: 'badge prelim', 'data-dm-provisional': r.id,
+          'data-tip': JSON.stringify([r.provisional]), text: 'provisional' })] : '',
         dmOdd(r) ? el('span', { class: 'small se', 'data-dm-odd': r.id,
           'data-tip': JSON.stringify(DM_ODD_TIP), text: ` ${dmOdd(r)}` }) : ''),
       el('td', { class: num(r) + (r.cant_run ? ' dmpair' : ''), 'data-dm-composite': r.id },
@@ -11919,6 +11924,13 @@ function dmModelCard(m, mode) {
     // 15.2: answered on a rented GPU, whole or in part, and imported
     r.where ? el('p', { class: 'small se', 'data-dm-card-where': mode,
       text: r.where.charAt(0).toUpperCase() + r.where.slice(1) }) : '',
+    // 15.7: the reading its replies were scored by; provisional, and why
+    r.provisional ? el('p', { class: 'warn', 'data-dm-card-provisional': mode,
+      text: `Provisional: ${r.provisional}` }) : '',
+    r.scoring ? el('p', { class: 'small se', 'data-dm-card-scoring': mode,
+      text: `Scoring ${r.scoring}` + (r.scoring === 'v2' ? ': thinking on, the answer after the '
+        + 'closed thinking (capped inside it, no answer); thinking off, the whole reply, as '
+        + 'DeviceMark scores' : '') }) : '',
     dmRawLine(m, mode, r),
     r.inherited ? el('p', { class: 'small se', 'data-dm-card-inherited': mode,
       text: `${r.inherited.line}: this setup's quality is its MTP partner's (${r.inherited.from})` })
