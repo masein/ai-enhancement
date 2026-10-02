@@ -4710,6 +4710,48 @@ Not before the demo: a new hidden set changes every Everyday score.
   strict and loose), a served setup's too. It lists what the board lists: the
   diagnose half.
 
+### 15.1 — a DeviceMark row on a rented GPU (2 Oct)
+
+- **`scripts/remote_run.py`** runs one Hugging Face model's battery, in one
+  thinking mode, through the board's own runner (`runner.run_submission`,
+  called directly): the same task files, prompts, generation settings, max
+  length and answer layout. On the rented box its folders are under `--out`;
+  there is no per-task time limit (`TASK_TIMEOUT_S=0`), one answer is written
+  at a time (`DM_HF_MAX_BATCH=1`), there is no parameter cap, and nothing is
+  scored there (`DM_SCORE_AFTER_RUN=0`): the server scores the answers when
+  the bundle is imported (15.2). Options: `--model`, `--thinking on|off`,
+  `--only dm_ifeval|dm_mmlu_pro|dm_math` (repeatable), `--out`, and
+  `--battery <the server's items sha256>`, which refuses to start on another.
+- **The battery** is built as the board builds it (`devicemark.load_items`, the
+  pinned dataset revisions) and hashed (`devicemark.battery_hashes`: the ids,
+  the prompt templates, every item).
+- **Resumable per answer, on the board too**: a DeviceMark task on hf runs with
+  lm_eval's own cache (`--use_cache`, `runner.dm_cache`: inside the task's
+  folder), which commits each answer as it lands. A task stopped part-way asks
+  only the rest next time; a finished one is skipped. On the box, the same
+  command carries on; the model's revision is recorded at the start and a
+  later session on another refuses to mix them.
+- **A line an answer**, read from that cache: the task, n of N, the pace, the
+  time left on the task and on the run (`tmux`).
+- **The bundle**, `devicemark-<model>-thinking-<on|off>.tar.gz`
+  (`scripts/remote_bundle.py`): `bundle.json` (each task answered whole, a
+  digest of every answer, each file's sha256), `setup.json` (GPU and driver,
+  Python, torch and its CUDA, transformers, lm_eval, the fast kernels, the
+  model's revision, the battery hashes, the protocol version, what lm_eval was
+  told), `run.log` (every session) and the answers in the layout the board
+  reads. The same files make the same bytes. `HF_TOKEN` is read from the
+  environment and every secret's value is scrubbed from the log and setup.
+- **The runner image** (the Dockerfile's `runner` stage, 2 Oct, replacing a
+  venv script): vast.ai starts it from a private registry. It shares the
+  `deps` stage with the board — the base image's torch, `requirements.txt`, the
+  pinned fast kernels, punkt_tab — so its pins are the board's, and carries
+  only `scripts/`, `service/` and `eval_tasks/devicemark/`: none of the
+  board's banks, rubrics or data, nor whatever else the server's checkout
+  holds. tmux and an SSH server; its start command prints remote_run's help
+  and never starts the board. `docker build --target runner .`; the board is
+  still the last stage, what compose builds. CI's image job (dispatched with
+  `build_image`) builds both and prints their sizes.
+
 ### 14.3 — Mobile-MMLU-Pro, with our own answer key (1 Oct)
 
 - **The set**: MBZUAI's Mobile-MMLU-Pro (arXiv 2503.20786, DMLR 2026), 9,497

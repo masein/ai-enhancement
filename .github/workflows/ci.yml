@@ -174,3 +174,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: build the service image (not pushed)
         run: docker build -t aienh-bench:ci .
+      # 15.1: the rented GPU's image, from the same stages and pins
+      - name: build the runner image (not pushed)
+        run: |
+          docker build --target runner -t aienh-runner:ci .
+          docker run --rm aienh-runner:ci | head -5
+      - name: the two images' sizes
+        run: |
+          docker image ls --format '{{.Repository}}:{{.Tag}} {{.Size}}' | grep -E 'aienh-(bench|runner)'
+          docker save aienh-runner:ci | gzip -1 | wc -c | awk '{printf "runner, gzipped as a registry holds it: %.1f GB\n", $1 / 1e9}'

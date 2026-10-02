@@ -516,6 +516,9 @@ DM_PARTS = ("full", "pilot", "parity", "speed")
 # from what 4,096 generated tokens need (hfmeta.gen_estimate), never above this
 DM_PROMPT_TOKENS = int(os.environ.get("DM_PROMPT_TOKENS", "2048"))
 DM_HF_MAX_BATCH = int(os.environ.get("DM_HF_MAX_BATCH", "4"))
+# 15.1: a run on a rented GPU (scripts/remote_run.py) leaves its answers to be
+# scored where they are imported: 0 skips the scoring step after the run
+DM_SCORE_AFTER_RUN = os.environ.get("DM_SCORE_AFTER_RUN", "1").strip() not in ("0", "no", "off")
 # 12w: the parity check asks two setups, and only one llama-server may fit on
 # the card: how long the run waits for the setup it needs next to be started
 DM_SWAP_WAIT_S = int(os.environ.get("DM_SWAP_WAIT_S", "1800"))
