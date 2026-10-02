@@ -4710,6 +4710,38 @@ Not before the demo: a new hidden set changes every Everyday score.
   strict and loose), a served setup's too. It lists what the board lists: the
   diagnose half.
 
+### 15.5 — the runner image from Actions, and shards (2 Oct)
+
+- **`.github/workflows/runner-image.yml`** (the mirror only): on each push to
+  main and by hand, builds the Dockerfile's `runner` stage with
+  `EVALBOARD_BUILD` = the commit's 7-character sha, checks it, and pushes
+  `ghcr.io/masein/evalboard-runner:<sha>` and `:latest` with the run's own
+  `GITHUB_TOKEN`. Actions can't set a package's visibility: masein made it
+  public once in the package's settings (docs/REMOTE-RUNS.md § 0). The
+  server no longer builds or pushes the runner image.
+- **`scripts/check_runner_image.py <image>`**: every file in the image (find,
+  inside it) and its config. It fails on the exam banks or rubrics
+  (eval_tasks/fr), the Everyday bank, the trust sets, any other
+  eval_tasks/ folder but devicemark/, anything in /app outside scripts/,
+  service/ and eval_tasks/devicemark/, a data file there named like a bank, a
+  rubric or a hidden half, any .env file, a secret's name in the image's
+  environment, or the board's start command or port. Run before the push and
+  in ci.yml's docker-image job.
+- **`remote_run.py --shard i/n`**: `config.DM_SHARD` tells the runner's
+  `devicemark.build_tasks` to build shard i of each task
+  (`devicemark.shard_of`: every n-th item from the i-th, in the battery's
+  order), so everything downstream (resume, progress, the bundle) is the
+  shard's. One bundle a shard, `…-shard-<i>-of-<n>.tar.gz`, its `shard` in
+  bundle.json and setup.json; another shard in the same `--out` is refused.
+- **`import_remote.py`**: a shard is checked for exactly its items, then waits
+  under `results/shards/<row>/<task>/<i>-of-<n>/` (`remote_imports.json`'s
+  `shards`) and the import says which are missing. With all n in,
+  `merge_shards` writes one samples file in the battery's order (doc_id its
+  place in the whole task), and the row is scored as before. A shard of
+  another n is refused while a set waits; a newer bundle of a shard replaces
+  it (the earlier under results/earlier/). `where_of` names each card and the
+  shards: "run on a rented GPU (…), in 3 shards".
+
 ### 15.4 — DeviceMark's raw runs, to publish (2 Oct)
 
 - **`scripts/export_devicemark_raw.py --run <id>` / `--all`**: one folder a

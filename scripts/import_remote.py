@@ -25,6 +25,16 @@ from the answers on disk, and its setup says which tasks ran on a rented GPU
 the import, its log the bundle's.
 
 A bundle already imported — by its sha256 — changes nothing.
+
+15.5: shards. A bundle from `remote_run.py --shard i/n` holds shard i of n of
+each task (devicemark.shard_of: every n-th item from the i-th) and is checked
+for exactly those items. It waits under results/shards/<row>/<task>/<i>-of-<n>/
+until all n shards of the task are in — the import says which are missing —
+and then the shards are merged into the task's answers, in the battery's
+order, as one run would have written them, and the row is scored as above.
+The shards come in any order; a shard imported twice changes nothing; a newer
+bundle of the same shard replaces it, the earlier one kept under
+results/earlier/. Every shard of a task has the same n.
 """
 
 from __future__ import annotations
@@ -78,6 +88,10 @@ def checks(b: dict) -> list[str]:
         return [f"its format: the bundle's {bundle.get('format')}, this board reads {rb.FORMAT}"]
     if bundle.get("suite") not in rb.SUITES:
         return [f"its suite: {bundle.get('suite')!r}, which this board doesn't import"]
+    try:
+        shard = rb.shard_of_bundle(bundle)
+    except ValueError as e:
+        return [str(e)]
     out = []
     if (setup.get("protocol"), setup.get("cap"), setup.get("seed")) != (dm.VERSION, dm.CAP,
                                                                          dm.SEED):
@@ -102,10 +116,15 @@ def checks(b: dict) -> list[str]:
         if t not in rb.SUITES[bundle["suite"]]["tasks"]:
             out.append(f"{t}: not a task of {bundle['suite']}")
             continue
-        want = {k for bb, k in dm.keys_for("full") if dm.TASK[bb] == t}
+        # 15.5: a shard's are its share of the task's items, and no others
+        want = set(dm.shard_of([k for bb, k in dm.keys_for("full") if dm.TASK[bb] == t], shard))
         got = set(_bundle_answers(b, row, t))
+        of = f" (shard {shard[0]} of {shard[1]})" if shard else ""
         if not want <= got:
-            out.append(f"{t}: {len(want & got)} of {len(want)} items answered")
+            out.append(f"{t}: {len(want & got)} of {len(want)} items answered{of}")
+        elif shard and got - want:
+            out.append(f"{t}: {len(got - want)} answers to items outside shard {shard[0]} of "
+                       f"{shard[1]}")
     if not bundle.get("tasks"):
         out.append("it holds no task answered whole")
     return out
@@ -117,6 +136,64 @@ def registry(row: Path) -> dict:
         return json.loads((row / sdm.REMOTE_NAME).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {"imports": [], "tasks": {}}
+
+
+def shards_dir(row_name: str) -> Path:
+    """15.5: where a task's shards wait until every one of them is in"""
+    from service import config
+    return config.OUT_DIR.with_name("shards") / row_name
+
+
+def _and(xs: list) -> str:
+    xs = [str(x) for x in xs]
+    return xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " and " + xs[-1]
+
+
+def _shards(js: list[int], n: int) -> str:
+    """"shard 2 of 3", "shards 1 and 2 of 3" """
+    return f"shard{'s' if len(js) > 1 else ''} {_and(js)} of {n}"
+
+
+def shard_conflicts(reg: dict, tasks: list[str], shard: tuple[int, int]) -> list[str]:
+    """15.5: a task whose shards here, still waiting for the rest, are of
+    another n than this bundle's"""
+    i, n = shard
+    out = []
+    for t in tasks:
+        sh = (reg.get("shards") or {}).get(t) or {}
+        m, have = sh.get("n"), sorted(int(j) for j in sh.get("have") or {})
+        if m and m != n and len(have) < m:
+            out.append(f"{t}: {_shards(have, m)} {'is' if len(have) == 1 else 'are'} here, "
+                       f"waiting for the rest, and this bundle is shard {i} of {n} — every "
+                       f"shard of a task is one of the same n")
+    return out
+
+
+def merge_shards(row: Path, t: str, n: int, stamp: str) -> int:
+    """15.5: a task's n shards as one run's answers: their samples in one
+    file, in the battery's order, each line's doc_id its place in the whole
+    task (as lm_eval numbers a whole run's) — the row's task folder"""
+    import devicemark as dm
+    every = [k for bb, k in dm.keys_for("full") if dm.TASK[bb] == t]
+    place = {k: p for p, k in enumerate(every)}
+    got: dict[str, dict] = {}
+    sub = None
+    for j in range(1, n + 1):
+        slot = shards_dir(row.name) / t / f"{j}-of-{n}"
+        newest = rb.samples_files(slot, t)[-1]
+        sub = sub or newest.parent.relative_to(slot)
+        for line in newest.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                s = json.loads(line)
+                s["doc_id"] = place[str(s["doc"]["key"])]
+                got[str(s["doc"]["key"])] = s
+    if set(got) != set(every):
+        raise ValueError(f"{t}: the shards hold {len(got)} of its {len(every)} items")
+    dest = row / f"{t}_0shot" / sub
+    dest.mkdir(parents=True, exist_ok=True)
+    (dest / f"samples_{t}_{stamp}.jsonl").write_text(
+        "".join(json.dumps(got[k], ensure_ascii=False) + "\n" for k in every), encoding="utf-8")
+    return len(every)
 
 
 def _write_registry(row: Path, reg: dict) -> None:
@@ -139,8 +216,13 @@ def import_bundle(path: Path, by: str, say=print) -> int:
     bundle, setup = b["bundle"], b["setup"]
     model, thinking = bundle.get("model") or "", bool(bundle.get("thinking"))
     row_name = bundle.get("row") or ""
+    try:
+        shard = rb.shard_of_bundle(bundle)
+    except ValueError:
+        shard = None                                  # refused by checks, below
     say(f"{path.name} · sha256 {b['sha256'][:16]} · {model} · thinking "
-        f"{'on' if thinking else 'off'} · {', '.join(bundle.get('tasks') or {}) or 'no task'}")
+        f"{'on' if thinking else 'off'} · {', '.join(bundle.get('tasks') or {}) or 'no task'}"
+        + (f" · shard {shard[0]} of {shard[1]}" if shard else ""))
     row = config.OUT_DIR / row_name if row_name else None
     reg = registry(row) if row else {"imports": [], "tasks": {}}
     was = next((x for x in reg.get("imports") or [] if x.get("sha256") == b["sha256"]), None)
@@ -148,6 +230,9 @@ def import_bundle(path: Path, by: str, say=print) -> int:
         say(f"imported already, as Runs #{was['sid']} on {was['at']}: nothing changed")
         return 0
     bad = checks(b)
+    if not bad and shard:
+        bad = shard_conflicts(reg, [t for t in rb.SUITES[bundle["suite"]]["tasks"]
+                                    if t in bundle["tasks"]], shard)
     if bad:
         for line in bad:
             say(f"refused — {line}")
@@ -160,19 +245,79 @@ def import_bundle(path: Path, by: str, say=print) -> int:
         f"transformers {libs.get('transformers')}, lm_eval {libs.get('lm_eval')}, the fast "
         f"kernels")
 
-    # the merge: each task the bundle holds replaces this server's, kept aside
     stamp = time.strftime("%Y-%m-%dT%H-%M-%S")
-    tasks = list(bundle["tasks"])
+    tasks = [t for t in rb.SUITES[bundle["suite"]]["tasks"] if t in bundle["tasks"]]
     base = config.OUT_DIR / model.replace("/", "__")
-    lines = []
-    for t in tasks:
+    earlier = config.OUT_DIR.with_name("earlier") / row_name
+    lines: list[str] = []
+    # 15.5: a shard waits for the task's others; the tasks every shard of which
+    # is in now go into the row, merged — a whole bundle's tasks go in as they are
+    waiting: dict[str, list[int]] = {}
+    into_row = [] if shard else tasks
+
+    def set_aside(t: str) -> None:
         dest = row / f"{t}_0shot"
         if dest.exists():
-            aside = config.OUT_DIR.with_name("earlier") / row_name / f"{t}_0shot-before-import-{stamp}"
+            aside = earlier / f"{t}_0shot-before-import-{stamp}"
             aside.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(dest), str(aside))
             lines.append(f"{t}: the answers here before are kept at {aside}")
-    for name, data in sorted(b["files"].items()):
+
+    if shard:
+        i, n = shard
+        for t in tasks:
+            sh = (reg.setdefault("shards", {}).get(t) or {})
+            if sh.get("n") and sh["n"] != n:          # a whole set of another n: kept aside
+                for j in sorted(sh.get("have") or {}, key=int):
+                    old = shards_dir(row_name) / t / f"{j}-of-{sh['n']}"
+                    if old.exists():
+                        aside = earlier / f"{t}_0shot-shard-{j}-of-{sh['n']}-before-import-{stamp}"
+                        aside.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.move(str(old), str(aside))
+                sh = {}
+            sh = {"n": n, "have": dict(sh.get("have") or {})}
+            slot = shards_dir(row_name) / t / f"{i}-of-{n}"
+            if slot.exists():
+                aside = earlier / f"{t}_0shot-shard-{i}-of-{n}-before-import-{stamp}"
+                aside.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(slot), str(aside))
+                lines.append(f"{t}: shard {i} of {n} as it was here before is kept at {aside}")
+            prefix = f"results/{row_name}/{t}_0shot/"
+            for name, data in sorted(b["files"].items()):
+                if name.startswith(prefix):
+                    target = slot / name[len(prefix):]
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes(data)
+            sh["have"][str(i)] = {"gpu": gpu, "sha256": b["sha256"], "bundle": path.name,
+                                  "at": stamp, "answers": bundle["tasks"][t]}
+            reg["shards"][t] = sh
+            lines.append(f"{t}: shard {i} of {n}, {bundle['tasks'][t]} answers from a rented "
+                         f"GPU ({gpu})")
+            missing = [j for j in range(1, n + 1) if str(j) not in sh["have"]]
+            if missing:
+                waiting[t] = missing
+                lines.append(f"{t}: {_shards(missing, n)} missing — {t} is scored once "
+                             f"{'it is' if len(missing) == 1 else 'they are'} imported")
+                continue
+            set_aside(t)
+            count = merge_shards(row, t, n, stamp)
+            parts = [sh["have"][str(j)] for j in range(1, n + 1)]
+            gpus = sorted({x["gpu"] for x in parts})
+            reg.setdefault("tasks", {})[t] = {
+                "gpu": _and(gpus), "gpus": gpus, "shards": n, "sha256": b["sha256"],
+                "bundle": path.name, "at": stamp,
+                "shard_bundles": [{"shard": j, **{k: x[k] for k in ("gpu", "sha256", "bundle")}}
+                                  for j, x in enumerate(parts, 1)],
+                "samples": [str(q.relative_to(row)) for q in
+                            sorted((row / f"{t}_0shot").rglob(f"samples_{t}_*.jsonl"))]}
+            lines.append(f"{t}: every shard is in ({n} of {n}) · {count} answers, merged in the "
+                         f"battery's order")
+            into_row.append(t)
+    else:
+        for t in tasks:
+            set_aside(t)
+    # the answers' files, and the model's record where the server has none
+    for name, data in sorted(b["files"].items()) if into_row else []:
         if not name.startswith("results/"):
             continue
         rel = Path(name).relative_to("results")
@@ -182,17 +327,17 @@ def import_bundle(path: Path, by: str, say=print) -> int:
         if rel.name == "model_meta.json" and len(rel.parts) == 2:
             if target.exists():
                 continue                      # the server's own record of the model stands
-        elif not (rel.parts[0] == row_name and len(rel.parts) > 2
-                  and rel.parts[1] in {f"{t}_0shot" for t in tasks}):
-            continue
+        elif shard or not (rel.parts[0] == row_name and len(rel.parts) > 2
+                           and rel.parts[1] in {f"{t}_0shot" for t in tasks}):
+            continue                          # a shard's answers went in merged, above
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
-    for t in tasks:
-        n = bundle["tasks"][t]
-        lines.append(f"{t}: {n} answers from a rented GPU ({gpu})")
+    for t in [] if shard else tasks:
+        n_ = bundle["tasks"][t]
+        lines.append(f"{t}: {n_} answers from a rented GPU ({gpu})")
         reg.setdefault("tasks", {})[t] = {
             "gpu": gpu, "sha256": b["sha256"], "bundle": path.name, "at": stamp,
-            "samples": [str(p.relative_to(row)) for p in
+            "samples": [str(q.relative_to(row)) for q in
                         sorted((row / f"{t}_0shot").rglob(f"samples_{t}_*.jsonl"))]}
     _write_registry(row, reg)
 
@@ -202,7 +347,15 @@ def import_bundle(path: Path, by: str, say=print) -> int:
     missing = [t for t in rb.SUITES[bundle["suite"]]["tasks"] if t not in have]
     status, error = "done", ""
     if missing:
-        line = f"answers imported; the row is scored once {', '.join(missing)} is here too"
+        by_gap: dict[tuple, list[str]] = {}
+        for t, js in waiting.items():
+            by_gap.setdefault(tuple(js), []).append(t)
+        waits = [f"{_and(ts)} {'waits' if len(ts) == 1 else 'wait'} for "
+                 f"{_shards(list(js), shard[1])}" for js, ts in by_gap.items()]
+        rest = [t for t in missing if t not in waiting]
+        line = "; ".join(
+            ([f"shard {shard[0]} of {shard[1]} imported"] if shard else ["answers imported"])
+            + waits + ([f"the row is scored once {', '.join(rest)} is here too"] if rest else []))
     else:
         try:
             line = sdm.mark_hf(0, {"hf_id": model}, {"revision": setup.get("revision")}, row,
@@ -212,24 +365,26 @@ def import_bundle(path: Path, by: str, say=print) -> int:
     where = sdm.where_of(row).get("where") or f"run on a rented GPU ({gpu})"
 
     # the Runs list: an entry for the import, with the bundle's log
+    of = f" · shard {shard[0]} of {shard[1]}" if shard else ""
     sid = db.add(model, "instruct", bundle["suite"], by,
-                 f"imported from a rented GPU ({gpu}) · {path.name}", thinking=thinking,
+                 f"imported from a rented GPU ({gpu}){of} · {path.name}", thinking=thinking,
                  part="full", tasks=tasks if len(tasks) < len(rb.SUITES[bundle["suite"]]["tasks"])
                  else None, status=status)
     db.update(sid, finished_at=time.time(), progress=line, error=error)
     log = config.LOGS_DIR / f"service_{sid}_{model.replace('/', '__')}.log"
     log.parent.mkdir(parents=True, exist_ok=True)
     log.write_text(f"===== [{sid}] imported {path.name} (sha256 {b['sha256'][:16]}) by {by}: "
-                   f"{', '.join(tasks)} {where} =====\n" + b["log"]
+                   f"{', '.join(tasks)}{of} {where} =====\n" + b["log"]
                    + "".join(f"\n[import] {x}" for x in lines) + f"\n[import] {line}\n",
                    encoding="utf-8")
     reg.setdefault("imports", []).append({"sha256": b["sha256"], "sid": sid, "tasks": tasks,
-                                          "gpu": gpu, "by": by, "at": stamp, "bundle": path.name})
+                                          "gpu": gpu, "by": by, "at": stamp, "bundle": path.name,
+                                          **({"shard": list(shard)} if shard else {})})
     _write_registry(row, reg)
     for x in lines:
         say(x)
-    say(f"the row {model}{' · thinking' if row_name.endswith('__thinking') else ''}: {line} · "
-        f"{where}")
+    say(f"the row {model}{' · thinking' if row_name.endswith('__thinking') else ''}: {line}"
+        + (f" · {where}" if into_row else ""))
     say(f"Runs #{sid}, its log the bundle's")
     return 0 if status == "done" else 1
 

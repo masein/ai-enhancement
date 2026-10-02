@@ -21,7 +21,9 @@
 # The Docker image build is a separate job, and runs only when asked for
 # (build_image): the pytorch base image is multi-GB, and since 12v the build
 # also fetches the hybrid models' two prebuilt CUDA kernels (718 MB). A check
-# is the jobs above; a PR that changes the image runs this too.
+# is the jobs above; a PR that changes the image runs this too. 15.5: it also
+# checks the runner image holds nothing that stays on the server, as
+# runner-image.yml does before it pushes ghcr.io/masein/evalboard-runner.
 name: ci
 
 on:
@@ -179,6 +181,9 @@ jobs:
         run: |
           docker build --target runner -t aienh-runner:ci .
           docker run --rm aienh-runner:ci | head -5
+      # 15.5: what runner-image.yml checks before it pushes the public image
+      - name: nothing that stays on the server is in the runner image
+        run: python3 scripts/check_runner_image.py aienh-runner:ci
       - name: the two images' sizes
         run: |
           docker image ls --format '{{.Repository}}:{{.Tag}} {{.Size}}' | grep -E 'aienh-(bench|runner)'
