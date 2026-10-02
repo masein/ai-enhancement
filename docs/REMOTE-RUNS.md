@@ -217,14 +217,24 @@ The pace comes from #167, Qwen3.5-4B with thinking on, run on the board's RTX 50
 
 On DeviceMark's board, Qwen3.5-4B's answers average about 3,600 tokens, which comes to about 85 tokens a second here.
 
-**Qwen3.5-4B, IFEval in 2 shards:** 150 answers each at 41.6 s is **about 1.75 hours** on an RTX 5090, both at once.
+**A rented RTX 5090 is slower than the board's.** The first one (2 Oct) ran
+Qwen3.5-4B with thinking on at about 74 s a full-length answer, against about
+47 s on the board's (#167's log): about **1.6 times** as long. The times below
+are the server's pace times 1.6.
+
+**Rented hosts vary.** The same card can be power-limited, or sit in a host
+with a slower CPU or PCIe link, or share the machine. One may be faster or
+slower than this: the pace in `remote_run.py`'s lines after the first dozen
+answers tells you which.
+
+**Qwen3.5-4B, IFEval in 2 shards:** 150 answers each, **about 2.8 hours** a shard, both at once.
 
 **Gemma 4 E2B, the full battery in 3 shards** (200, 198 and 198 answers):
 - It depends on how long its answers run.
-- On DeviceMark's board, Gemma 4 E2B's answers average about 390 tokens on IFEval and 800 on MMLU-Pro and MATH. At #167's 85 tokens a second, that is **about half an hour** a shard.
-- If its answers run as long as Qwen3.5-4B's, it is **about 2.5 hours** a shard. Plan for the longer.
+- On DeviceMark's board, Gemma 4 E2B's answers average about 390 tokens on IFEval and 800 on MMLU-Pro and MATH. That is **about 50 minutes** a shard.
+- If its answers run as long as Qwen3.5-4B's, it is **about 4 hours** a shard. Plan for the longer.
 
-**On a slower GPU:** on an RTX 4090, allow about a third more time.
+**On a slower GPU:** on an RTX 4090, allow about a third more again.
 
 **Before the first answer:** each instance pulls the image (5.0 GB) and the
 model, and builds the battery: allow 10 to 20 minutes.

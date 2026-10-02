@@ -165,9 +165,15 @@ def test_an_import_onto_a_server_whose_battery_isnt_the_repos_is_refused(board, 
                x.endswith("and the repo expects 2222222222222222") for x in said)
 
 
-def test_datasets_and_pyarrow_are_pinned_and_recorded():
-    req = (REPO / "requirements.txt").read_text()
-    assert re.search(r"^datasets==\d+\.\d+\.\d+$", req, re.M)
-    assert re.search(r"^pyarrow==\d+\.\d+\.\d+$", req, re.M)
+def test_every_requirement_is_pinned_and_the_setup_records_them():
+    # the board's image is built at deploy, the runner image at merge: an
+    # unpinned package drifts between the two, as datasets did
+    lines = [x.split("#")[0].strip() for x in (REPO / "requirements.txt").read_text().splitlines()]
+    reqs = [x for x in lines if x]
+    assert reqs and all(re.fullmatch(r"[A-Za-z0-9_.\-]+(\[[a-z0-9_,]+\])?==[0-9][\w.]*", x)
+                        for x in reqs), [x for x in reqs if "==" not in x]
+    pins = {x.split("[")[0].split("==")[0].lower().replace("-", "_"): x.split("==")[1] for x in reqs}
+    assert {"datasets", "pyarrow", "accelerate", "sentencepiece", "huggingface_hub", "fastapi",
+            "uvicorn", "tzdata"} <= set(pins)
     libs = rb.library_versions()
-    assert {"datasets", "pyarrow"} <= set(libs)
+    assert {"datasets", "pyarrow", "accelerate", "huggingface_hub"} <= set(libs)

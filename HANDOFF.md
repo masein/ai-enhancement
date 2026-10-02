@@ -4729,9 +4729,18 @@ Not before the demo: a new hidden set changes every Everyday score.
   a board run (hf and served: failed, nothing asked), by `remote_run.py`
   before anything runs (`--battery` is now optional), and by the import (this
   server's items must be the repo's).
-- **Pinned**: `datasets==5.0.1`, `pyarrow==25.0.1` in requirements.txt (the
-  image's deps layer rebuilds); both in `rb.library_versions()` — recorded in a
+- **Pinned**: every direct requirement — `datasets==5.0.1`, `pyarrow==25.0.1`,
+  and accelerate, sentencepiece, huggingface_hub, fastapi, uvicorn and tzdata
+  at what CI's image build resolved on 2 Oct (run 36993529597). The board's
+  image is built at deploy and the runner image at merge, so an unpinned one
+  drifts between them. The deps layer rebuilds once. datasets, pyarrow,
+  accelerate and huggingface_hub are in `rb.library_versions()`: recorded in a
   bundle's setup, not required to match (the items hash is the check).
+  Transitive packages (starlette, pydantic, tokenizers, …) are still resolved
+  at each build.
+- **docs/REMOTE-RUNS.md**: times scaled by 1.6 — the first rented RTX 5090 ran
+  Qwen3.5-4B thinking-on at about 74 s a full-length answer, the board's 47 s
+  (#167) — and rented hosts vary.
 - Bundles made before this carry the old hash (fd239fd4… from the server's
   copied cache) and are refused after it: import them first.
 
