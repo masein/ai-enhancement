@@ -4710,6 +4710,27 @@ Not before the demo: a new hidden set changes every Everyday score.
   strict and loose), a served setup's too. It lists what the board lists: the
   diagnose half.
 
+### 15.3 — the time limit on the board (2 Oct)
+
+- **Why**: #167's IFEval (Qwen3.5-4B, thinking on) was stopped twice by the
+  fixed 3-hour limit, at 259 and 260 of 300 (41.6 s an answer), and asked
+  again from its first item each time.
+- **A task that writes its answers on this server** (DeviceMark's on hf, the
+  generative three) gets a limit sized for it (`runner.task_limit`): the
+  answers still to write, each at the cap, at the model's measured pace, with
+  `LIMIT_HEADROOM` (1.5×), never under `TASK_TIMEOUT_S` (3 h). The run's log
+  says it before the task starts: "dm_ifeval: its limit is 6.0 h — 300
+  answers at the 4,096-token cap at 85 tokens a second (measured on #N,
+  dm_math), with 1.5× headroom". Before any run has measured the model,
+  `PACE_GUESS_TOK_S` (20). `TASK_TIMEOUT_S=0` is no limit (a rented GPU).
+- **The pace** (`pace.json` in the model's folder, `runner.record_pace`): a
+  task answered in one go — its answers' tokens (the model's tokenizer, else
+  four characters a token) over the seconds lm_eval's bar took.
+- **A stopped task resumes per answer**: every task that writes its answers
+  here now runs with lm_eval's per-answer cache (15.1's `dm_cache`).
+- **A timeout says so**: "dm_ifeval timed out: its limit was 6.0 h — … The
+  260 answers it wrote are kept: resubmit and it asks only the other 40."
+
 ### 15.2 — a rented GPU's bundle, into the board (2 Oct)
 
 - **`scripts/import_remote.py <bundle> --by <name>`**, inside the container.
