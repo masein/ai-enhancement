@@ -4750,6 +4750,13 @@ Not before the demo: a new hidden set changes every Everyday score.
   (`devicemark.provisional_why`), badged in the On-device table.
 - **Thinking off changes too**: v1 split a thinking-off reply at a literal
   `</think>`; v2 scores it whole, as DeviceMark does.
+- **15.7a — resubmitting a row saved cut asks it again**: a thinking-on
+  DeviceMark task on hf whose answers on disk are in the cut form (no
+  `reply_form.json`: saved before 15.7 — the rows `rescore_devicemark.py`
+  marks "needs a new run" among them) is set aside under
+  `results/earlier/<row>/<task>-cut-<time>` (`runner.saved_cut`,
+  `set_aside_cut`) before the "answered already" check, and asked again
+  whole. Gemma 4 E2B thinking on had been moved aside by hand on 3 Oct.
 
 ### 15.6 — the battery's items hash, whatever stored them (2 Oct)
 
