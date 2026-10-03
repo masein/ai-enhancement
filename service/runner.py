@@ -752,6 +752,25 @@ def keep_whole(task_out: Path) -> None:
          "scoring": d.SCORING}), encoding="utf-8")
 
 
+def saved_cut(task_out: Path, task: str) -> bool:
+    """15.7a: a DeviceMark task holding answers — whole or part-way — saved in
+    lm_eval's cut form: anything but what keep_whole marks whole"""
+    if not task_out.is_dir() or _devicemark.dm().reply_form(task_out) == "whole":
+        return False
+    return (any(task_out.rglob(f"samples_{task}_*.jsonl"))
+            or any(task_out.glob("lm-cache/*.db")))
+
+
+def set_aside_cut(task_out: Path) -> Path:
+    """15.7a: a task's cut-form answers moved beside the tree, whole —
+    results/earlier/<row>/<task>-cut-<time> — never read as its answers again"""
+    dest = (config.OUT_DIR.with_name("earlier") / task_out.parent.name
+            / f"{task_out.name}-cut-{int(time.time())}")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(task_out), str(dest))
+    return dest
+
+
 def _has_results(task_out: Path) -> bool:
     return any(task_out.glob("*/results*.json")) or any(task_out.glob("results*.json"))
 
@@ -1491,6 +1510,16 @@ def run_submission(sub: dict) -> None:
                     with open(log_path, "a") as lf:
                         lf.write(f"\n[service] {task}: the last run's folder is kept at "
                                  f"{moved}\n")
+            if (devicemark and not rec and backend == "hf" and th and th.get("on")
+                    and saved_cut(task_out, task)):
+                # 15.7a: answers saved before 15.7, cut by lm_eval at the end of
+                # the thinking (or with their markers dropped), are no answers
+                # to keep: set aside, and asked again, whole
+                moved = set_aside_cut(task_out)
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n[service] {task}: its replies were saved before 15.7, cut at "
+                             f"the end of the thinking — kept at {moved}, asking again with "
+                             f"each reply whole\n")
             if _task_done(task_out, task):
                 if current_fingerprint(task):
                     reused[task] = _answered_by(task_out)
