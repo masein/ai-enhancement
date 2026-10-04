@@ -1025,6 +1025,21 @@ async def artifact_upload(name: str, request: Request, x_token: str = Header(def
         tmp.unlink(missing_ok=True)
 
 
+@app.get("/api/served/up")
+def served_up(id: str = ""):
+    """16.8: whether a served model's server answers — the Playground's own
+    check, asked in the background at most every 30 s: true, false, or null
+    before its first answer. Test a model holds Start until it is true"""
+    rec = served.get(id)
+    if not rec:
+        raise HTTPException(404, f"{id} is not registered")
+    if served.is_openrouter(rec):
+        return {"id": id, "up": True, "why": ""}
+    up = chat.served_up(id)
+    return {"id": id, "up": up, "why": "" if up else chat.NOT_RUNNING + "."
+            if up is False else chat.CHECKING + "."}
+
+
 @app.get("/api/models/suggest")
 def models_suggest(q: str = ""):
     """What the model-id boxes offer as you type: the models this board knows
@@ -3875,12 +3890,16 @@ def _qtask(task: str) -> None:
     from . import questions
     if questions.GPQA.match(task):
         raise HTTPException(403, questions.NOT_LISTED)
-    if task == questions.MMF:
-        raise HTTPException(403, questions.MMF_NOT_LISTED)        # 14.4.4
     if questions.kind_of(task) == "exam" and not config.KNOWLEDGE_EXAM:
         raise HTTPException(409, config.EXAM_OFF + ".")             # 16.5
     if task not in questions.tasks():
-        raise HTTPException(404, f"No questions on file for {task}: no model has answered it yet")
+        if task == questions.MMF:                                     # 14.4.5: off, or not here
+            sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+            import mobile_mmlu
+            raise HTTPException(403 if not mobile_mmlu.full_on() else 404,
+                                mobile_mmlu.full_available() + ".")
+        raise HTTPException(404, f"No questions on file for {task}: "
+                                 + questions.NOT_YET[0].lower() + questions.NOT_YET[1:] + ".")
 
 
 def _qmodels(models: str | list[str] | None) -> list[str] | None:
@@ -3891,8 +3910,13 @@ def _qmodels(models: str | list[str] | None) -> list[str] | None:
 
 @app.get("/api/questions")
 def questions_list():
+    """every benchmark whose questions can be read — 16.8: from a run's answers
+    or from its own file — and why the others can't"""
     from . import questions
-    return {"tasks": [{"task": t, "kind": questions.kind_of(t)} for t in questions.tasks()]}
+    ff = questions.from_file()
+    return {"tasks": [{"task": t, "kind": questions.kind_of(t), "from_file": t in ff}
+                      for t in questions.tasks()],
+            "why": {"gpqa": questions.NOT_LISTED, "not_yet": questions.NOT_YET}}
 
 
 @app.get("/api/questions/{task}")

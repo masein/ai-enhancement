@@ -12,6 +12,13 @@ What may be listed is exactly what may be listed today:
 - GPQA is never listed, by its authors' request;
 - the owner's audit (app.py) opens a report or hidden half, logged.
 
+16.8: a benchmark no model has answered lists its questions from its own file
+on the server — Mobile-MMLU-Pro, MobileAIBench's parts, DeviceMark's battery,
+and the full Mobile-MMLU (always from its file: Non-commercial, and no right
+answer) — keyed as a run's answers are, so each question falls in the half a
+run would put it in. An lm_eval benchmark's questions are in a run's samples
+alone: until one runs, its card says so.
+
 Nothing here writes anything a writer, Improve, the Playground or chat reads:
 it reads the results tree and keeps its tables in this process's memory."""
 
@@ -42,6 +49,9 @@ NOT_LISTED = "GPQA Diamond's questions are never shown, as its authors ask"
 MMF = "mobile_mmlu_full"
 MMF_NOT_LISTED = ("The full Mobile-MMLU's questions aren't shown here: it is non-commercial and "
                   "kept apart. Its scores are in its own table under Models ▸ Mobile tasks")
+# 16.8: why a benchmark's questions can't be read, where they can't
+NOT_YET = ("Its questions are listed once a model has answered it: lm_eval keeps them in a "
+           "run's samples")
 GGUF_TOTAL = "llama.cpp records only the total"
 
 
@@ -156,7 +166,125 @@ def tasks() -> list[str]:
     # 16.5: and the Knowledge exam's are listed only while it is switched on
     if not config.KNOWLEDGE_EXAM:
         seen = {t for t in seen if kind_of(t) != "exam"}
-    return sorted(seen)
+    # 16.8: and every benchmark whose questions are in a file on this server
+    seen.discard(MMF)
+    return sorted(seen | from_file())
+
+
+_ff: dict = {}
+
+
+def from_file() -> set[str]:
+    """the benchmarks whose questions this server has in a file of their own,
+    read with no model's answers: asked again a minute later at most (a check
+    may hash a file)"""
+    import time
+    if _ff.get("at", 0) > time.time() - 60:
+        return _ff["tasks"]
+    _scripts()
+    out: set[str] = set()
+    try:
+        import mobile_mmlu as mm
+        if not mm.available():
+            out.add(MMP)
+        if not mm.full_available():
+            out.add(MMF)
+    except Exception:                                       # noqa: BLE001 — not on this server
+        pass
+    try:
+        import mobileaibench as mab
+        for t in (*MAB_SCORED, *MAB_TRUST):
+            if not mab.available(t):
+                out.add(t)
+        if not mab.available(mab.MTB1):
+            out.add(MAB_MTBENCH)
+    except Exception:                                       # noqa: BLE001
+        pass
+    if Path(config.DM_ITEMS).is_file():
+        out.update(DM_TASKS)
+    _ff.update(at=time.time(), tasks=out)
+    return out
+
+
+def _doc_hash(doc: dict) -> str:
+    """lm_eval's own key for a question (evaluator: the sha256 of its doc as
+    json.dumps(doc, indent=2, ensure_ascii=False)) — so a question read from
+    the file falls in the half its run's answer would"""
+    return hashlib.sha256(json.dumps(doc, indent=2, ensure_ascii=False).encode("utf-8")) \
+        .hexdigest()
+
+
+def file_rows(task: str) -> dict[str, dict]:
+    """16.8: a benchmark's questions from its own file, keyed as its run's
+    answers are: the question, its options, its category, and the right answer
+    only where the file has one we show (our key's, where the labellers kept the
+    question; the full Mobile-MMLU's never). No model's result"""
+    _scripts()
+    kind, out = kind_of(task), {}
+    if task in (MMP, MMF):
+        import mobile_mmlu as mm
+        # our key answers Pro alone: the full set's answers are held back
+        items = (mm.current_key().get("items") or {}) if task == MMP else {}
+        for i, q in enumerate(mm.load() if task == MMP else mm.load_full()):
+            it = items.get(q["id"]) or {}
+            key = it.get("key") if it.get("decision") in mm.KEPT else None
+            out[q["id"] if task == MMP else mm.lid(q)] = {
+                "q": q["question"], "options": [q[L] for L in mm.LETTERS],
+                "subject": q["category"], "order": [q["category"], i],
+                "answer_idx": mm.LETTERS.index(key) if key else None,
+                **({"agreement": mm.agreement(it)} if task == MMP else {})}
+        return out
+    if kind == "mab":
+        import mobileaibench as mab
+        for i, q in enumerate(mab.load(task)):
+            # the item a run asks — build_tasks writes {id, prompt} — is its key
+            key = _doc_hash({"id": q["id"], "prompt": q["prompt"]})
+            row = {"q": q.get("question") or "Summarise the article.", "options": [],
+                   "subject": q.get("category") or q.get("type") or "", "order": [task, i],
+                   "reference": q.get("answer")}
+            if task == "mab_sql":
+                row["context"] = q.get("context")
+            elif task in ("mab_cnndm", "mab_xsum"):
+                row["context"] = q["prompt"].removeprefix(
+                    "Create a short summary of the following article: ")
+            elif q["prompt"].startswith("context: "):
+                row["context"] = q["prompt"].split("\nquestion: ", 1)[0].removeprefix(
+                    "context: ")
+            out[key] = row
+        return out
+    if kind == "mabj":
+        import mobileaibench as mab
+        for q in mab.load(mab.MTB1):
+            ref = q.get("reference") or []
+            for t in (1, 2):
+                out[f"{q['id']}:{t}"] = {
+                    "q": q["turns"][t - 1], "options": [], "subject": f"{q['category']} · turn {t}",
+                    "context": q["turns"][0] if t == 2 else None,
+                    "reference": ref[t - 1] if len(ref) >= t else None,
+                    "order": [q["category"], q["question_id"] * 2 + t]}
+        return out
+    if kind == "mabt":
+        import mobileaibench as mab
+        private = task == mab.PRIVACY
+        for i, q in enumerate(mab.load(task)):
+            out[q["id"]] = {"q": q["id"] if private else q["prompt"], "options": [],
+                            "subject": "" if private else q.get("topic") or q.get("answer") or "",
+                            "reference": q.get("answer") if task == mab.SOCCHEM else None,
+                            "order": [task, i], "private": private}
+        return out
+    if kind == "dm":
+        bench = DM_TASKS[task]
+        for i, ((b, key), q) in enumerate(sorted(_dm_questions().items())):
+            if b != bench:
+                continue
+            out[key] = {"q": q.get("prompt") or q.get("question") or q.get("problem") or "",
+                        "options": q.get("options") or [] if bench == "mmlu_pro" else [],
+                        "subject": q.get("category") or q.get("subject") or (
+                            key.split("/")[1] if bench == "math" and "/" in key else ""),
+                        "reference": q.get("answer") if bench != "ifeval" else None,
+                        "order": [bench, i]}
+        return out
+    return out
 
 
 def _dm_model_id(d: Path) -> str:
@@ -635,9 +763,9 @@ def table(task: str) -> dict:
     """{models: [ids], rows: {key: row with results by model and its half}}"""
     if GPQA.match(task):
         raise PermissionError(NOT_LISTED)
-    if task == MMF:
-        raise PermissionError(MMF_NOT_LISTED)
-    dirs = model_dirs(task)
+    # 16.8: the full Mobile-MMLU from its file alone — a run's samples carry a
+    # stand-in "right answer"
+    dirs = {} if task == MMF else model_dirs(task)
     stamp = (task, _stamp(task, dirs))
     with _lock:
         if stamp in _cache:
@@ -650,6 +778,8 @@ def table(task: str) -> dict:
             rows[q["id"]] = {"q": q["prompt"], "options": [], "subject": ev.groups().get(
                 q["group"], q["group"]), "reference": q.get("reference") or "",
                              "half": ev.half(q), "results": {}, "order": [q["group"], q["id"]]}
+    if not dirs and task != "everyday" and task in from_file():
+        rows = {k: {**r, "results": {}} for k, r in file_rows(task).items()}
     for mid, d in dirs.items():
         for key, r in _rows_of(task, d).items():
             row = rows.setdefault(key, {k: v for k, v in r.items() if k != "res"})
@@ -708,6 +838,13 @@ def meta(task: str) -> dict:
         return {"source": f"{src['name']} ({src['cite']}), MobileAIBench's {n:,}-row sample",
                 "licence": f"{src['licence']}; the sample {by['licence']}",
                 "revision": by["revision"], "url": by["url"]}
+    if task == MMF:
+        import mobile_mmlu as mmp
+        m = mmp.full_manifest()
+        return {"source": f"{m['name']}, by {m['by']}; its answers held back by the authors, so "
+                          "none is shown", "licence": f"{m['licence']} — Non-commercial: "
+                          "internal research evaluation only",
+                "revision": m["revision"], "url": m["source"]}
     if kind == "mmp":
         import mobile_mmlu as mmp
         c = mmp.credit()
@@ -813,6 +950,9 @@ def page(task: str, *, offset: int = 0, limit: int = PAGE, q: str = "", subject:
             "hidden_why": HIDDEN_WHY["everyday" if task == "everyday" else "exam"
                                      if kind_of(task) == "exam" else "lm"],
             "subjects": subjects, "models": t["models"], "shown": sorted(shown),
+            # 16.8: read from its own file — no model has answered it, or (the
+            # full Mobile-MMLU) never from a run — and its use, where it has one
+            "from_file": task == MMF or (not t["models"] and task in from_file()),
             "rows": out_rows, "meta": meta(task),
             "gguf": ({"benchmark": gg["benchmark"], "line": gg["line"],
                       "models": sorted(gg["models"])} if gg else None)}

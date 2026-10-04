@@ -11473,7 +11473,10 @@ function lbColTipOf(c) {
       + 'across methods'] : []), state.avgMode === 'raw'
     ? 'the mean of the chosen benchmarks\u2019 raw scores; the Scale pill switches it'
     : '0 = guessing, 100 = perfect, so a 25% guess on a 4-option test counts as 0'];
-  if (c.key === 'name') return ['Model — sort by name'];
+  if (c.key === 'name') return ['Model — sort by name',
+    // 16.8: what the boxes before the names are for
+    ...(lbS().view === 'standard' ? ['The box before a name: tick two to eight models, then '
+      + 'Compare ▸ lays them side by side'] : [])];
   if (c.key === 'params') return ['Params — parameter count, from the harness config or the name'];
   if (c.key === 'date') return ['Tested — when the model’s latest finished run was, any kind: '
     + 'the standard tests, a judged, Everyday, DeviceMark, served or GGUF run'];
@@ -14062,6 +14065,7 @@ function vLeaderboard(ms) {
             // 12m.1: tick two to eight rows, then Compare ▸
             L.view === 'standard' ? el('input', { type: 'checkbox', class: 'cmptick',
               'data-cmp-tick': m.id, 'aria-label': 'compare ' + m.name,
+              title: 'Tick two to eight models to compare them',
               checked: (L.ticks || []).includes(m.id) ? '' : null,
               onchange: e => { const t = new Set(L.ticks || []);
                 if (e.target.checked) t.add(m.id); else t.delete(m.id);
@@ -14727,6 +14731,9 @@ function lbTestedHidden(ms) {
 // 12m.1: "Compare 3 ▸" while two to eight rows are ticked
 function cmpGo() {
   const n = (lbS().ticks || []).length;
+  // 16.8: one tick changed nothing in view: it says what comes next, where the button will be
+  if (n === 1) return el('span', { class: 'small se cmpone', 'data-cmp-one': '1',
+    text: 'Tick one more to compare' });
   if (n < 2) return '';
   return el('button', { class: 'pill on', 'data-cmp-go': String(n), disabled: n > CMP_TOP ? '' : null,
     title: n > CMP_TOP ? `a comparison holds ${CMP_TOP}: untick ${n - CMP_TOP}` : null,
@@ -15850,7 +15857,9 @@ function radarBlock(ms) {
     : radarSvg(axes, ids.map(id => ({ m: DATA.models.find(x => x.id === id),
         color: trColor(state.cmpColors[id] ?? ids.indexOf(id)) })));
   return el('div', { class: 'ibox', 'data-radar': '1' }, head, chips, src, body,
-    calOk ? '' : el('p', { class: 'small se', text: 'Judged by area: ' + judgedOffWhy() + '.' }));
+    // 16.8: and nothing about it while the exam is switched off
+    calOk || !examOn() ? '' : el('p', { class: 'small se', 'data-radar-judged-why': '1',
+      text: 'Judged by area: ' + judgedOffWhy() + '.' }));
 }
 
 function radarSvg(axes, series) {
@@ -17961,6 +17970,24 @@ function gpuNeedBit(sf) {
   if (!j.line) return '';
   return el('p', { class: 'small', 'data-gpu-need': j.when || '1', text: j.line });
 }
+// 16.8: whether a served model's server answers (GET api/served/up), asked
+// again every 2 s while Test a model waits on it; a change redraws the dialog
+function srvUp(id, again = false) {
+  const U = state.srvUp = state.srvUp || {};
+  const s = U[id];
+  if (!s || again || (s.up !== true && !s.busy && Date.now() - s.at > 2000)) {
+    if (s && s.busy) return s.up;
+    U[id] = { up: s ? s.up : null, at: Date.now(), busy: true };
+    api('api/served/up?id=' + encodeURIComponent(id)).then(j => {
+      const was = s ? s.up : undefined;
+      U[id] = { up: j.up, at: Date.now(), busy: false };
+      if (j.up !== was) render();
+      if (j.up !== true) setTimeout(() => {
+        if (state.testOpen && state.sub.hf_id.trim() === id) srvUp(id, true); }, 2000);
+    }).catch(() => { U[id] = { up: s ? s.up : null, at: Date.now(), busy: false }; });
+  }
+  return (U[id] || {}).up;
+}
 function gpuNeedPaint() {
   const slot = document.querySelector('[data-gpu-need-slot]');
   if (slot && state.sub) slot.replaceChildren(gpuNeedBit(state.sub));
@@ -18066,6 +18093,11 @@ function vQueue(part = { form: true, list: true }) {
   // person clears it, and its run's cost shows before Start
   const orRec = srvId ? servedOf(sf.hf_id.trim()) : null;
   const orId = isOpenRouter(orRec);
+  // 16.8: a served model's server answers, or Start waits for it — the
+  // Playground picker's own check. A run that met a dead server failed in seconds
+  const upOf = srvId && !orId ? srvUp(sf.hf_id.trim()) : true;
+  const srvWhy = upOf === true ? '' : upOf === false ? 'Its server isn\u2019t running.'
+    : 'Checking that its server answers\u2026';
   if (orId && sf.suite === 'generative' && sf.subsetFor !== sf.hf_id.trim()) {
     sf.subset = orRec.subset || 0;
     sf.subsetFor = sf.hf_id.trim();
@@ -18366,7 +18398,7 @@ function vQueue(part = { form: true, list: true }) {
   function gateSubmit() {
     const code = info ? ownCodeWhy(info, !!sf.allow) : '';
     const w = judgedOff() ? (cannotRun(sf.hf_id) ? noWeightsWhy(sf.hf_id.trim()) : judgeWhy())
-      : code || (orId ? orGate(sf) : '') || (sf.suite === 'judged' && built.length
+      : code || (orId ? orGate(sf) : '') || srvWhy || (sf.suite === 'judged' && built.length
                  && !(sf.tasks || []).length && !sf.control ? 'Tick at least one topic.' : '');
     btn.disabled = !!w;
     btn.title = w;
@@ -18381,6 +18413,9 @@ function vQueue(part = { form: true, list: true }) {
       el('p', { class: 'sub', 'data-suite-help': '1', text: 'Pick a model and what to test. '
         + 'One test runs at a time; results appear on Models.' }),
       el('div', { class: 'frm' }, f.hf_id, srvId ? '' : f.kind, f.suite, f.note, btn,
+        // 16.8: beside Start, while it waits for the server
+        srvWhy ? el('span', { class: 'warn small', 'data-why': 'server-down',
+          'data-srv-up': String(upOf), text: srvWhy }) : '',
         srvId ? el('span', { class: 'propwhy', 'data-why': 'served' },
           orId ? servedTag(sf.hf_id.trim()) : el('span', { class: 'badge served',
             title: (servedOf(sf.hf_id.trim()) || {}).how || '', text: 'served' }),
@@ -18392,6 +18427,13 @@ function vQueue(part = { form: true, list: true }) {
           ? el('span', { class: 'propwhy', 'data-why': 'submit', text: judgeWhy() }) : '',
         ownWhy),
       ownCodeBox(info, sf.allow, v => { sf.allow = v; gateSubmit(); }, 'submit'),
+      // 16.8: a part the judge marks, while the judge isn't answering: said before Start
+      judgeDown() && ((sf.suite === 'mobile' && ['judged', 'trust'].includes(sf.part || ''))
+        || ['safety', 'shared'].includes(sf.suite))
+        ? el('p', { class: 'warn small', 'data-judge-needed': sf.suite, text: 'The judge marks '
+          + 'these answers, and it isn\u2019t answering now: '
+          + ((state.judgeHealth || {}).why || 'the grading model is not answering')
+          + '. The run can start; its marks wait until the judge answers.' }) : '',
       topicBoxes, genOpts, sharedOpts, mabOpts, bbqOpts,
       orId ? orEstimateLine(sf) : '',
       // 16.2: what it needs of the GPU, what is free, and when it starts
@@ -19296,7 +19338,10 @@ function catCard(c) {
   const nm = c.models != null ? c.models : c.tasks ? catModels(c.tasks) : null;
   const r = c.restriction || (c.tasks ? c.tasks.map(restrictOf).find(Boolean) : null);
   // a suite's questions are read from its parts
+  if (LIVE && !state.qxList) qxListLoad();
   const read = LIVE && !c.parts ? (c.tasks || []).filter(canBrowse) : [];
+  // 16.8: where they can't be, why — in the link's place
+  const whyNot = LIVE && !c.parts && !read.length ? (c.tasks || []).map(qxWhyNot).find(Boolean) : '';
   return el('article', { class: 'catcard' + (c.parts ? ' suite' : ''), 'data-cat-card': c.key,
       id: 'cat-' + c.key },
     el('h3', {}, c.name, rBadge(r, { 'data-cat-restriction': c.key })),
@@ -19321,6 +19366,7 @@ function catCard(c) {
         onclick: () => catSee(...c.see) }) : '',
       ...read.map(t => qxLink(t, { text: read.length > 1 ? `Read ${benchName(t)} ▸`
         : 'Read the questions ▸', 'data-cat-read': t })),
+      whyNot ? el('span', { class: 'small se', 'data-cat-noread': c.key, text: whyNot + '.' }) : '',
       c.manage ? el('button', { class: 'quiet', 'data-cat-manage': c.key, text: 'Manage questions ▸',
         onclick: c.manage }) : ''));
 }
@@ -19454,8 +19500,29 @@ function vCatalog() {
 // owner's audit, logged. GPQA is never listed
 // ===========================================================================
 // 14.4.4: never the full Mobile-MMLU's (non-commercial, kept apart)
-const canBrowse = t => !!LIVE && !!t && !/^gpqa/i.test(t) && t !== 'mobile_mmlu_full'
-  && !(DATA.pplTasks || []).includes(t);
+// 16.8: what the server says can be read — from a run's answers, or from the
+// benchmark's own file before any model has answered it. Until it says, the
+// old rule; a benchmark it doesn't list leads to no dead end
+const canBrowse = t => !!LIVE && !!t && !/^gpqa/i.test(t) && !(DATA.pplTasks || []).includes(t)
+  && (state.qxList ? state.qxList.has(t) : t !== 'mobile_mmlu_full');
+async function qxListLoad() {
+  if (state.qxListBusy || !LIVE || !netReady()) return;
+  state.qxListBusy = true;
+  try {
+    const j = await api('api/questions');
+    state.qxList = new Set((j.tasks || []).map(x => x.task));
+    state.qxWhy = j.why || {};
+  } catch (e) { /* the old rule meanwhile */ }
+  state.qxListBusy = false;
+  if (state.qxList) render();
+}
+// why a benchmark's questions can't be read, in the place of the link
+function qxWhyNot(t) {
+  const w = state.qxWhy || {};
+  if (/^gpqa/i.test(t)) return w.gpqa || '';
+  if ((DATA.pplTasks || []).includes(t)) return '';
+  return state.qxList && !state.qxList.has(t) ? (w.not_yet || '') : '';
+}
 function openQuestions(task, from) {
   Object.assign(state.qx, { task, offset: 0, q: '', subject: '', f: '', data: null, key: '',
     audit: false });
@@ -19613,6 +19680,14 @@ function vQuestions(ms) {
       + String(meta.revision).slice(0, 12) : ''].filter(Boolean).join(' · ') },
       meta.url ? [' · ', el('a', { href: meta.url, target: '_blank', rel: 'noopener',
         text: 'its card' })] : ''),
+    // 16.8: read from its file, before any model has answered it
+    d && d.from_file ? el('p', { class: 'small se', 'data-qx-from-file': task,
+      text: task === 'mobile_mmlu_full'
+        ? 'Read from its file on this server. The authors hold its answers back, so none is '
+          + 'shown, and no model\u2019s answer is beside them: its scores are on its own table.'
+        : 'Read from its file on this server: no model has answered it yet, so no result is '
+          + 'beside them.' + (d.rows.some(r => r.answer_idx != null || r.reference) ? ''
+            : ' Its file has no right answer to show.') }) : '',
     d ? el('p', { class: 'small', 'data-qx-counts': `${d.listed}|${d.other}` },
       X.audit ? `${d.listed.toLocaleString('en')} questions in this half, never listed — `
         + 'this opening is logged under Data & sources.'

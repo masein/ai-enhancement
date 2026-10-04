@@ -251,3 +251,120 @@ def test_a_served_model_being_checked_holds_send_until_it_answers(live, page, se
     page.wait_for_selector("[data-pg-send]:not([disabled])", timeout=20000)
     assert page.locator(f"[data-pg-checking='{mid}']").count() == 0
     assert page.errors == []
+
+
+# ---------------------------------------------------------------------------
+# Read the questions: never a dead end
+# ---------------------------------------------------------------------------
+
+def test_read_the_questions_is_offered_where_they_can_be_read_and_says_why_where_not(live, page):
+    from service import questions
+    questions._ff.clear()
+    page.set_viewport_size({"width": 1400, "height": 1000})
+    page.goto(live["base"] + "/#tab=benchmarks")
+    page.wait_for_selector("[data-catalog]")
+    page.wait_for_function("state.qxList instanceof Set")
+    listable = set(page.evaluate("[...state.qxList]"))
+    # every link the catalogue offers leads to questions — none to a 404
+    offered = page.locator("[data-cat-read]").evaluate_all("xs => xs.map(x => x.dataset.catRead)")
+    assert offered and set(offered) <= listable
+    # MobileAIBench's parts: read from their files though no model has answered
+    assert "mab_hotpotqa" in listable and "mab_mtbench" in listable
+    # where they can't be, the card says why in the link's place
+    whys = page.locator("[data-cat-noread]").all_text_contents()     # some in folded suites
+    assert whys and all(w in (questions.NOT_YET + ".", questions.NOT_LISTED + ".") for w in whys)
+    assert questions.NOT_LISTED + "." in whys                       # GPQA, never
+    # a part no model has run: its questions, from its file, said so
+    page.goto(live["base"] + "/#tab=benchmarks&q=mab_xsum")
+    page.wait_for_selector("[data-qx-counts]")
+    if page.locator("[data-qx-from-file]").count():
+        assert page.locator("[data-qx-from-file]").inner_text().startswith(
+            "Read from its file on this server: no model has answered it yet")
+    assert page.locator("[data-qx-error]").count() == 0
+    assert page.errors == []
+
+
+# ---------------------------------------------------------------------------
+# Models: the row boxes say what they are for
+# ---------------------------------------------------------------------------
+
+def test_the_compare_boxes_say_what_they_are_for_and_one_tick_says_what_next(live, page):
+    page.set_viewport_size({"width": 1400, "height": 1000})
+    page.goto(live["base"] + "/#tab=models")
+    page.wait_for_selector("[data-lb-table]")
+    tip = page.locator("[data-lb-table] th[data-col='name']").get_attribute("data-tip")
+    assert "tick two to eight models, then Compare ▸ lays them side by side" in tip
+    boxes = page.locator("[data-cmp-tick]")
+    assert boxes.first.get_attribute("title") == "Tick two to eight models to compare them"
+    boxes.nth(0).check()
+    one = page.locator("[data-cmp-one]")
+    one.wait_for()
+    assert one.inner_text() == "Tick one more to compare"
+    boxes.nth(1).check()
+    page.wait_for_selector("[data-cmp-go='2']")
+    assert page.locator("[data-cmp-one]").count() == 0
+    boxes.nth(0).uncheck()
+    boxes.nth(1).uncheck()
+    assert page.errors == []
+
+
+def test_insights_compare_shapes_says_nothing_of_the_exam_while_it_is_off(live, page,
+                                                                         monkeypatch):
+    import service.app as appmod
+    from service import config as cfg
+    monkeypatch.setattr(cfg, "KNOWLEDGE_EXAM", False)
+    appmod._cache.update(key=None, payload=None, at=0.0)
+    try:
+        page.set_viewport_size({"width": 1400, "height": 1000})
+        page.goto(live["base"] + "/#tab=models")
+        page.wait_for_selector("[data-radar]")
+        assert page.locator("[data-radar-judged-why]").count() == 0
+        assert "Judged by area" not in page.locator("[data-radar]").inner_text()
+    finally:
+        appmod._cache.update(key=None, payload=None, at=0.0)
+    assert page.errors == []
+
+
+# ---------------------------------------------------------------------------
+# Test a model: a served model's server, and the judge, before Start
+# ---------------------------------------------------------------------------
+
+def test_start_waits_for_a_served_models_server_and_an_offline_judge_is_said(live, page,
+                                                                            setups,
+                                                                            monkeypatch):
+    from conftest import set_name
+    from service import chat
+    mid = setups[0]
+    up = {"v": False}
+    real = chat.served_up
+    monkeypatch.setattr(chat, "served_up", lambda m: up["v"] if m == mid else real(m))
+    page.set_viewport_size({"width": 1400, "height": 1000})
+    page.goto(live["base"] + "/#tab=home")
+    set_name(page, "masein")
+    page.goto(live["base"] + "/#model=" + mid.replace("/", "%2F"))
+    page.wait_for_selector(f"[data-test-model][data-test-this='{mid}']")
+    page.locator("[data-test-model]").click()
+    dlg = page.locator("[data-dialog='test']")
+    why = dlg.locator("[data-why='server-down']")
+    why.wait_for()
+    page.wait_for_function("document.querySelector(\"[data-why='server-down']\")"
+                           ".dataset.srvUp === 'false'")
+    assert why.inner_text() == "Its server isn’t running."
+    start = dlg.locator("[data-submit-form] button.primary")
+    assert start.is_disabled()
+    SCREENS.mkdir(parents=True, exist_ok=True)
+    steady_shot(dlg.locator("[data-submit-form]"), SCREENS / "server-down-1400.png")
+    # its server starts: Start comes back on its own
+    up["v"] = True
+    page.wait_for_selector("[data-dialog='test'] [data-why='server-down']", state="detached",
+                           timeout=15000)
+    assert not start.is_disabled()
+    # the judge offline, and a part it marks: said before Start
+    page.evaluate("setJudgeHealth({ok: false, why: 'the grading model is not answering'})")
+    page.evaluate("state.sub.suite = 'mobile'; state.sub.part = 'judged'; render()")
+    line = dlg.locator("[data-judge-needed]")
+    line.wait_for()
+    assert line.inner_text() == ("The judge marks these answers, and it isn’t answering now: the "
+                                 "grading model is not answering. The run can start; its marks "
+                                 "wait until the judge answers.")
+    assert page.errors == []

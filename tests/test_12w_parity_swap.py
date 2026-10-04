@@ -128,7 +128,10 @@ def test_every_other_part_still_needs_its_server_at_the_start(svc, monkeypatch):
         a.close()
         for part in ("full", "pilot", "speed"):
             row = queue(mtp, part)
-            assert row["status"] == "failed" and row["error"].startswith("Nothing answered at ")
+            # 16.8: in plain words; where it asked, and what came back, in its log
+            assert row["status"] == "failed" and row["error"] == served.DOWN_RUN
+            log = next(config.LOGS_DIR.glob(f"service_{row['id']}_*.log")).read_text()
+            assert "preflight: Nothing answered at " in log
     finally:
         b.close()
 

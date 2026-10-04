@@ -5002,7 +5002,35 @@ Not before the demo: a new hidden set changes every Everyday score.
   - A served model before its server's first answer is "checking" ("Checking
     its server"), never "ready": Send waits, with "checking that its server
     answers. Send waits for the answer." under the box, and comes back when
-    the answer is in.
+    the answer is in. The page asks again a second later while one is.
+- **Read the questions is never a dead end** (16.4): a benchmark whose
+  questions are in a file on the server lists them from it before any model
+  has answered — Mobile-MMLU-Pro (our key's answer where the labellers kept
+  the question), MobileAIBench's parts, DeviceMark's battery
+  (`questions.file_rows`, `from_file`). Keyed as a run's answers are, so
+  each question falls in the half a run would put it in: MobileAIBench's by
+  lm_eval 0.4.12's own key, the sha256 of `json.dumps(doc, indent=2,
+  ensure_ascii=False)` of the item `build_tasks` writes. An lm_eval benchmark's
+  questions are in a run's samples alone: until one runs, its card says so in
+  the link's place, as GPQA's says it never shows them. `GET /api/questions`
+  lists what can be read and why the rest can't.
+  - **The full Mobile-MMLU** is listed from its file, always (a run's samples
+    carry a stand-in "right answer"): Non-commercial badge and banner, no
+    right answer (the authors hold theirs back), no model's result, the
+    halves as everywhere. Nothing else stopped it: masein's recorded decision
+    is internal research use, labelled wherever the set appears. Switched off
+    (MOBILE_MMLU_FULL=0), it is refused.
+- **Models' row boxes:** the Model column's tip says what they are for, and
+  one tick says "Tick one more to compare" where Compare ▸ will be. Insights ▸
+  Compare shapes says nothing of "Judged by area" while the exam is off.
+- **A served model's server, before Start:** Test a model asks `GET
+  /api/served/up` (the Playground's own background check) and holds Start,
+  with "Its server isn't running." beside it, until the server answers. A
+  run that still meets one fails with "Its server isn't running. Start it,
+  then press Resubmit."; the address and the error go in its log
+  (`preflight: Nothing answered at …`). A part the judge marks (Mobile's
+  judged and trust parts, Trust & safety, Frontier) says so before Start
+  while the judge isn't answering.
 
 ### 16.7 — words (4 Oct)
 

@@ -9,6 +9,12 @@
 - **/api/gpu names a host's process by nvidia-smi's own name for it** (16.2
   missed it): the container can't read a host process's /proc, so the judge's
   vLLM read as "other". The lines below are the server's.
+- **Read the questions before any model has answered** (16.4): a benchmark
+  whose questions are in a file on the server lists them from it — keyed as a
+  run's answers are, so each falls in the half a run would put it in.
+- **A served model whose server is down** (16.2): Test a model holds Start
+  until it answers (GET /api/served/up), and a run that still meets it fails
+  in plain words, the address and the error in its log.
 
 No model runs; a fake server."""
 
@@ -190,3 +196,101 @@ def test_a_served_model_is_checking_until_its_server_first_answers(svc, monkeypa
             break
         time.sleep(0.02)
     assert state() == {"state": "ready", "why": ""}
+
+
+# ---------------------------------------------------------------------------
+# Read the questions: from the benchmark's own file, before any model answered
+# ---------------------------------------------------------------------------
+
+def test_mobile_mmlu_pro_is_read_from_its_file_before_any_model_answered(svc, tmp_path,
+                                                                          monkeypatch):
+    from test_14_3_mobile_mmlu import RIGHT, a_key, put_invented
+    from service import questions
+    client, _ = svc
+    put_invented(monkeypatch, tmp_path / "data" / "mobile_mmlu_pro")
+    a_key()                                       # two questions dropped by the labellers
+    questions._ff.clear()
+    got = client.get("/api/questions/mobile_mmlu_pro", params={"limit": 50}).json()
+    assert got["from_file"] is True and got["models"] == [] and got["kind"] == "mmp"
+    rows = {r["id"]: r for r in got["rows"]}
+    # the halves, as everywhere: keyed by its id, as a run's picks are
+    assert rows and got["listed"] + got["other"] == len(RIGHT)
+    for qid, r in rows.items():
+        assert len(r["options"]) == 4 and r["subject"] and r["results"] == {}
+        # our key's answer where the labellers kept it; none where they didn't
+        want = None if qid in ("inv00007", "inv00008") else "ABCD".index(RIGHT[qid])
+        assert r["answer_idx"] == want, qid
+    listed = {x["task"]: x for x in client.get("/api/questions").json()["tasks"]}
+    assert listed["mobile_mmlu_pro"]["from_file"] is True
+
+
+def test_mobileaibench_is_read_from_its_files_keyed_as_lm_eval_keys_its_answers(svc, tmp_path):
+    """lm_eval keys a question by the sha256 of its doc, json.dumps(doc,
+    indent=2, ensure_ascii=False) (0.4.12's evaluator); the doc is the item
+    build_tasks writes. A question read from the file has that key, so it
+    falls in the half its run's answer would"""
+    import hashlib
+    import mobileaibench as mab
+    from service import questions
+    client, _ = svc
+    questions._ff.clear()
+    built = mab.build_tasks(tmp_path / "mab_tasks")
+    for task in ("mab_hotpotqa", "mab_cnndm"):
+        docs = [json.loads(x) for x in (built / f"{task}.jsonl").read_text().splitlines()[:5]]
+        keys = set(questions.file_rows(task))
+        for doc in docs:
+            h = hashlib.sha256(json.dumps(doc, indent=2, ensure_ascii=False).encode()).hexdigest()
+            assert h in keys, (task, doc["id"])
+    got = client.get("/api/questions/mab_hotpotqa", params={"limit": 3}).json()
+    assert got["from_file"] is True and got["total"] > 0
+    r = got["rows"][0]
+    assert r["q"] and r["context"] and r["reference"] and r["results"] == {}
+    # MT-Bench a row a turn, the second with the first beside it
+    got = client.get("/api/questions/mab_mtbench", params={"limit": 200}).json()
+    assert got["from_file"] and any(r["subject"].endswith("turn 2") and r["context"]
+                                     for r in got["rows"])
+
+
+def test_an_lm_eval_benchmark_no_model_ran_says_why_and_gpqa_never(svc):
+    from service import questions
+    client, _ = svc
+    r = client.get("/api/questions/arc_challenge_never_run")
+    assert r.status_code == 404 and questions.NOT_YET.split(":")[0].lower() in \
+        r.json()["detail"].lower()
+    j = client.get("/api/questions").json()
+    assert j["why"]["not_yet"] == questions.NOT_YET
+    assert not any(x["task"].startswith("gpqa") for x in j["tasks"])
+
+
+# ---------------------------------------------------------------------------
+# a served model whose server is down
+# ---------------------------------------------------------------------------
+
+def test_a_dead_server_holds_start_and_a_run_that_meets_one_fails_in_plain_words(svc,
+                                                                               monkeypatch):
+    import time as _time
+    from service import chat, db, runner
+    client, _ = svc
+    rec = {"id": "served/down", "name": "down one", "base_url": "http://127.0.0.1:9/v1",
+           "how": "k4", "based_on": "", "thinking": "off", "pin": {"model": "x"}}
+    db.served_put(rec)
+    served.write_meta(rec)
+    monkeypatch.setattr(chat, "_health", {})
+    monkeypatch.setattr(chat, "ping", lambda r: False)
+    first = client.get("/api/served/up", params={"id": "served/down"}).json()
+    assert first == {"id": "served/down", "up": None,
+                     "why": "Checking that its server answers."}
+    for _ in range(100):
+        if chat._health.get("served/down", {}).get("ok") is False:
+            break
+        _time.sleep(0.02)
+    assert client.get("/api/served/up", params={"id": "served/down"}).json()["why"] == \
+        "Its server isn't running."
+    # queued anyway (from the API): it fails at once, in plain words
+    sid = db.add("served/down", "instruct", "mobile", ME, "")
+    runner.run_submission(db.get(sid))
+    row = db.get(sid)
+    assert (row["status"], row["error"]) == ("failed", served.DOWN_RUN)
+    assert served.DOWN_RUN == "Its server isn't running. Start it, then press Resubmit."
+    log = next(config.LOGS_DIR.glob(f"service_{sid}_*.log")).read_text()
+    assert "preflight: Nothing answered at http://127.0.0.1:9/v1" in log
