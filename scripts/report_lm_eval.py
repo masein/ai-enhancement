@@ -4288,7 +4288,9 @@ td.evdtotal .evd-ranout { display:block; white-space:normal; text-align:right; }
 .upprog { margin:8px 0; }
 .upbar { height:8px; border-radius:999px; background:var(--surface-2, var(--border)); overflow:hidden;
   margin:0 0 6px; }
-.upfill { height:100%; width:0; background:var(--accent); transition:width .2s; }
+/* the bar moves by transform alone, as every transition here does */
+.upfill { height:100%; width:100%; background:var(--accent); transform:scaleX(0);
+  transform-origin:left; transition:transform .2s; }
 .upstore { margin-top:12px; border-top:1px solid var(--border); padding-top:8px; }
 .uplist { margin:4px 0; padding-left:18px; font-size:var(--fs-1); }
 .uptable { width:100%; font-size:var(--fs-1); }
@@ -18434,10 +18436,8 @@ function vQueue(part = { form: true, list: true }) {
     where === 'hf' ? el('div', { class: 'card', 'data-submit-form': '1' },
       addState().note ? el('p', { class: 'small', 'data-add-note': '1', text: addState().note }) : '',
       // 12i.0: one line, no system words
-      el('p', { class: 'sub', 'data-suite-help': '1', text: addState().mode === 'test'
-        ? 'What to test. One test runs at a time; results appear on Models.'
-        : 'A model on Hugging Face, or one already on the board: its id, and what to test. '
-          + 'One test runs at a time; results appear on Models.' }),
+      el('p', { class: 'sub', 'data-suite-help': '1', text: 'Pick a model and what to test. '
+        + 'One test runs at a time; results appear on Models.' }),
       el('div', { class: 'frm' }, f.hf_id, srvId ? '' : f.kind, f.suite, f.note, btn,
         // 16.8: beside Start, while it waits for the server
         srvWhy ? el('span', { class: 'warn small', 'data-why': 'server-down',
@@ -18943,7 +18943,7 @@ function upPaint() {
   const size = U.file.size, sent = Math.min(U.sent || 0, size);
   const secs = (Date.now() - U.t0) / 1000, rate = secs > 1 ? ((sent - U.from) / secs) : 0;
   const left = rate > 0 ? (size - sent) / rate : null;
-  bar.querySelector('.upfill').style.width = `${(100 * sent / size).toFixed(1)}%`;
+  bar.querySelector('.upfill').style.transform = `scaleX(${(sent / size).toFixed(4)})`;
   bar.querySelector('[data-up-words]').textContent = `${GBW(sent)} of ${GBW(size)}`
     + (rate > 0 ? ` · ${(rate / 1e6).toFixed(1)} MB/s` : '')
     + (left != null ? ` · about ${left < 90 ? Math.max(1, Math.round(left)) + ' s'
@@ -19471,7 +19471,8 @@ function renderTestAct() {
   if (state.model) btn.dataset.testThis = state.model;
   else delete btn.dataset.testThis;
   btn.querySelector('.t-full').textContent = words;
-  btn.querySelector('.t-short').textContent = gg ? 'Measure' : state.model ? 'Test' : 'Add';
+  // a phone's bar has room for one short word: Test on a model's page (Measure too), else Add
+  btn.querySelector('.t-short').textContent = state.model ? 'Test' : 'Add';
 }
 
 // ● n running: a pulsing dot while anything runs, "Runs" when nothing does.

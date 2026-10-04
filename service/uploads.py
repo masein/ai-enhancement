@@ -358,19 +358,22 @@ def _check(uid: str) -> None:
             path.unlink(missing_ok=True)           # the folder is what is kept
         rec.update(state="ready", error="")
     except Refused as e:
-        _remove(uid)
-        rec.update(state="failed", error=str(e))
-        _save(rec)                                 # said once, then swept
-        data_path(uid).unlink(missing_ok=True)
+        _failed(uid, rec, str(e))
         return
     except Exception as e:                         # noqa: BLE001 — a disk error, said
-        _remove(uid)
-        rec.update(state="failed", error=f"Couldn't check {rec['filename']}: {e}. Nothing was "
-                                          "kept.")
-        _save(rec)
+        _failed(uid, rec, f"Couldn't check {rec['filename']}: {e}. Nothing was kept.")
         return
     rec["touched"] = time.time()
     _save(rec)
+
+
+def _failed(uid: str, rec: dict, why: str) -> None:
+    """said first — the record replaced in one step, so the page never asks
+    between — then its bytes and its folder removed; the record is swept"""
+    rec.update(state="failed", error=why, touched=time.time())
+    _save(rec)
+    data_path(uid).unlink(missing_ok=True)
+    shutil.rmtree(_dir_path(uid), ignore_errors=True)
 
 
 def unpack_zip(src: Path, dest: Path, cap: int) -> list[dict]:
