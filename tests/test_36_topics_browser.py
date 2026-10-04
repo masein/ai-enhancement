@@ -57,6 +57,7 @@ def test_the_model_page_picks_a_judged_topic_from_a_searchable_list(live, page):
     same component, and the one left on the model page."""
     page.goto(live["base"] + "/#model=fx%2Fgood-750m")
     model_tab(page, "answers")                          # 12b.2: the Answers tab
+    page.locator("[data-answers-kind='exam']").click()   # 16.7: Everyday opens first
     box = page.locator("[data-combobox='answers topic']")
     box.wait_for()
     box.click()

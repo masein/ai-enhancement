@@ -81,7 +81,7 @@ def test_the_model_page_line_and_compares_group(live, page):
     assert line.inner_text().endswith("XSum ROUGE-L 1.00 (MobileAIBench’s 1,000 each)")
     go(page, live, f"tab=models&view=compare&m={ids(GOOD, SKEWED)}", "[data-compare='2']")
     g = page.locator("[data-cmp-group='mobile']")
-    assert g.inner_text().startswith("▾ Mobile tasks (MobileAIBench)")
+    assert g.inner_text().startswith("▾ Mobile · MobileAIBench")          # 16.7
     row = page.locator("[data-cmp-row='mab_hotpotqa']")
     assert row.locator(f"[data-cmp-cell='{GOOD}']").get_attribute("data-best") == "1"
     # never under lm_eval's group
@@ -116,7 +116,7 @@ def test_test_a_model_offers_the_suite(live, page):
     page.locator("[data-dialog='test'] [data-select='suite']").click()
     opt = page.locator("[role='option'][data-value='mobile']")
     opt.wait_for()
-    assert opt.inner_text().startswith("Mobile tasks (MobileAIBench) — HotpotQA, SQL")
+    assert opt.inner_text().startswith("Mobile — MobileAIBench: HotpotQA, SQL")   # 16.7
     assert page.errors == []
 
 

@@ -305,13 +305,13 @@ def test_leaderboard_knowledge_shows_mmlu_by_area_and_by_topic(surface, diag):
 
 def test_the_model_page_scores_are_a_block_per_kind_in_the_kinds_order(surface):
     """12b.2: Scores is one block per kind of test the model has taken —
-    Standard, Knowledge exam, Everyday tasks, the order they have everywhere.
+    Standard, Everyday, Knowledge exam, the order they have everywhere (16.7).
     Standard holds Results, and Diagnose under "What the score can't show":
     the second opinion, free."""
     pg = surface.open(model_link("fx/good-750m"))
     assert pg.locator("[data-model-hero] h1").text_content() == "good-750m"
     kinds = [b.get_attribute("data-kind-block") for b in pg.locator("[data-kind-block]").all()]
-    assert kinds == ["standard", "exam", "everyday"]
+    assert kinds == ["standard", "everyday", "exam"]
     dx = diagnose_card(pg)
     assert pg.locator("[data-kind-block='standard'] #sec-results").count() == 1
     assert "The second opinion, free" in dx.text_content()

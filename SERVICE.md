@@ -358,7 +358,7 @@ root-run stock jobs keep working while every dropped-privilege job fails with
 answers what it found: `{own_code, files: [{file, sha}], user, why}`. The
 dashboard asks it in the model search, the model page's Sit the exam panel and
 the Queue form. When the server runs such code it shows an unticked box — "Run
-this checkpoint's own model code (`modeling_*.py`, sha `ab12…`) — as the
+this model's own model code (`modeling_*.py`, sha `ab12…`) — as the
 unprivileged `benchjob` user" — and sends `allow_remote_code: true` only when it
 is ticked. When the server does not, Queue this run is disabled with the reason.
 `POST /api/submissions` refuses with **422** before queueing, in the same words:

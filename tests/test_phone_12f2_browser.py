@@ -154,7 +154,7 @@ def test_the_model_page_has_it_as_its_fourth_kind_and_nowhere_else(live, page, f
     tile = page.locator("[data-kind-tile='phone']")
     tile.wait_for()
     assert page.locator("[data-kind-tile]").evaluate_all("xs => xs.map(x => x.dataset.kindTile)") \
-        == ["standard", "exam", "everyday", "phone"]
+        == ["standard", "phone", "everyday", "exam"]               # 16.7: Models' order
     assert tile.locator("[data-kind-value='phone']").inner_text() == "13.5"
     assert "tok/s median on OnePlus 15 · reported by Sam" in tile.inner_text()
     tile.click()

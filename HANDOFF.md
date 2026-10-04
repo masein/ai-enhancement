@@ -4953,6 +4953,43 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 16.7 — words (4 Oct)
+
+- **"checkpoint" on screen is "uploaded here"** where it names where a model
+  came from. That covers the model sentence, the badge (`ckpt` became
+  `uploaded`), the facts line, Compare's kind, the Models menu's group, the
+  search's suggestions and the chart's "hollow bars". The API keeps
+  `source: "artifact"` and `kind=checkpoint`.
+- **The own-code check is any model's,** so "this checkpoint ships its own
+  model code" is "this model…". The box is "Run this model's own model code",
+  and the 422 that names it says the same (SERVICE.md too).
+- **A training run's checkpoints keep the word:** a step's saved model is a
+  checkpoint.
+- **"VRAM" and MiB** were gone from the screen with 16.2. What's left in the
+  code is test fakes and the out-of-memory parser.
+- **The kinds of test, the same names in the same order everywhere:**
+  Standard · Mobile · Everyday · Frontier, then the Knowledge exam while it
+  is on.
+  - Test a model: the suites in that order, each label starting with its
+    kind.
+  - A model's page: its kinds sorted by `KIND_ORDER`, with "Standard · on its
+    GGUF (llama.cpp)", "Mobile · DeviceMark" and "Mobile · on the phone,
+    reported".
+  - "How it was graded", Home's cards, Compare's groups.
+  - The Runs list's suite names (`SUITE_NAMES`, "Standard · on the GGUF"
+    among them) and the back-link words.
+  - A model's Answers: Mobile · DeviceMark, Everyday, Knowledge exam, and the
+    first of them opens (it was the exam).
+  - "Everyday tasks" stays as the benchmark's own name in sentences and on its
+    catalogue card.
+- **Other jargon changed:**
+  - "(local artifact)" → "uploaded to this board, not from Hugging Face";
+  - "resubmit with suite=full" → "Test them on every Standard task";
+  - "re-run suite=judged for this topic" → "test this topic again" (a
+    rubric's warning, and the line after it is replaced);
+  - "submit it with suite=judged first" → "test it on the Knowledge exam
+    first" (Improve's 404 when a model has no judged answers).
+
 ### 16.6 — dates and times in the Playground, one way through the board (4 Oct)
 
 - **One way to say when** (beside `rel`): the viewer's own time zone, 24-hour.

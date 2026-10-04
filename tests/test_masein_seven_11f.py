@@ -487,6 +487,7 @@ def test_the_topic_combobox_narrows_as_you_type_and_is_grouped_by_area(live, pag
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto(live["base"] + "/#model=fx%2Fgood-750m")
     model_tab(page, "answers")                          # 12b.2: the Answers tab
+    page.locator("[data-answers-kind='exam']").click()   # 16.7: Everyday opens first
     box = page.locator(TOPIC_BOX)
     box.wait_for()
     box.click()
@@ -518,6 +519,7 @@ def test_the_topic_combobox_narrows_as_you_type_and_is_grouped_by_area(live, pag
 def test_a_chosen_value_survives_a_poll_while_the_list_is_open(live, page):
     page.goto(live["base"] + "/#model=fx%2Fgood-750m")
     model_tab(page, "answers")
+    page.locator("[data-answers-kind='exam']").click()
     box = page.locator(TOPIC_BOX)
     box.wait_for()
     box.click()

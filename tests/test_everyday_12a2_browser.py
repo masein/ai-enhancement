@@ -155,7 +155,7 @@ def test_run_everyday_tasks_and_the_suite_say_340(live, page):
     page.locator("header [data-test-model]").click()
     page.get_by_label("suite").click()
     opt = page.locator("#pop-sel-submit-suite [role=option][data-value='everyday']")
-    assert opt.inner_text() == "Everyday tasks — 310 questions, a few minutes"
+    assert opt.inner_text() == "Everyday — 310 questions, a few minutes"      # 16.7
     page.keyboard.press("Escape")
     assert page.errors == []
 

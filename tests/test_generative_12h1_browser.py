@@ -141,7 +141,8 @@ def test_the_form_offers_the_three_a_thinking_switch_and_a_subset(live, page):
     dlg.wait_for()
     page.get_by_label("suite").click()
     opt = page.locator("#pop-sel-submit-suite [role=option][data-value='generative']")
-    assert opt.inner_text().startswith("Instruction & maths — IFEval, MMLU-Pro, MATH-500, hours")
+    assert opt.inner_text().startswith("Standard · Instruction & maths — IFEval, MMLU-Pro, MATH-500, "
+                                       "hours")
     opt.click()
     # a model with a switch: the switch; one without: none
     page.evaluate("state.sub.hf_id = 'Qwen/Qwen3.5-2B'; render()")

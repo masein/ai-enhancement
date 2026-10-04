@@ -177,7 +177,7 @@ def test_the_model_page_has_its_everyday_block_after_the_exam(live, page):
     page.set_viewport_size({"width": 1400, "height": 1000})
     open_model(page, live["base"], "fx/good-750m")
     kinds = [b.get_attribute("data-kind-block") for b in page.locator("[data-kind-block]").all()]
-    assert kinds.index("exam") < kinds.index("everyday")
+    assert kinds.index("everyday") < kinds.index("exam")         # 16.7: Models' order
     open_kind(page, "everyday")
     block = page.locator("[data-everyday-block='fx/good-750m']")
     block.wait_for()
@@ -226,7 +226,7 @@ def test_a_model_that_has_not_sat_the_pilot_shows_one_line_and_test_queues_it(li
     # 12b.2: the one line is the Everyday tile's, in the header
     line = page.locator(f"[data-everyday-none='{UNTESTED}']")
     line.wait_for()
-    assert " ".join(line.inner_text().split()) == "EVERYDAY TASKS Not tested · Test"
+    assert " ".join(line.inner_text().split()) == "EVERYDAY Not tested · Test"
     assert page.locator("[data-everyday-block], [data-kind-block='everyday']").count() == 0
     line.scroll_into_view_if_needed()
     shot(page, "12a-4-not-tested-1400-light.png")
@@ -284,7 +284,7 @@ def test_run_everyday_tasks_queues_one_run_per_ticked_model(live, page):
         toast.locator("[data-toast-link]").click()
         page.wait_for_selector("[data-queue-row]")
         assert page.locator(f"tr[data-queue-row='{rows[0]['id']}'] [data-suite-cell]") \
-            .first.text_content() == "Everyday tasks"              # 12m.1: the board's name
+            .first.text_content() == "Everyday"                    # 16.7: the kind's name
     finally:
         cancel_pilot_rows(live["base"])
     assert page.errors == []
@@ -305,7 +305,7 @@ def test_it_is_reached_from_benchmarks_and_test_a_model_offers_it(live, page):
     page.wait_for_selector("[data-dialog='test'] [data-suite-help]")
     page.get_by_label("suite").click()
     opt = page.locator("#pop-sel-submit-suite [role=option][data-value='everyday']")
-    assert opt.text_content() == "Everyday tasks — 310 questions, a few minutes"   # 12a.6
+    assert opt.text_content() == "Everyday — 310 questions, a few minutes"   # 12a.6; 16.7
     page.keyboard.press("Escape")
     assert page.errors == []
 

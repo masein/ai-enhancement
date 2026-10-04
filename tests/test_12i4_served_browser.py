@@ -89,7 +89,7 @@ def test_the_estimate_uses_the_measured_seconds_an_answer(live, page, served_run
         suite = page.locator("[data-dialog='test'] [data-select='suite']")
         suite.wait_for()
         words = suite.locator('.sel-v').inner_text()
-        assert words.startswith("Everyday tasks — ") and " min" in words, words
+        assert words.startswith("Everyday — ") and " min" in words, words
         assert words.endswith(", a rough guess") is rough, words
     assert page.errors == []
 

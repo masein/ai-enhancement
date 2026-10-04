@@ -188,7 +188,7 @@ def test_test_a_model_offers_the_suite(live, page):
     page.locator("[data-dialog='test'] [data-select='suite']").click()
     opt = page.locator("[role='option'][data-value='shared']")
     opt.wait_for()
-    assert opt.inner_text().startswith("Shared with the frontier — GPQA Diamond (CoT), SimpleQA")
+    assert opt.inner_text().startswith("Frontier — GPQA Diamond (CoT), SimpleQA")   # 16.7
     assert page.errors == []
 
 

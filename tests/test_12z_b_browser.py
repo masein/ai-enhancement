@@ -109,7 +109,7 @@ def test_back_names_each_kind_of_address(live, page):
         'tab=models&view=frontier'].map(hashWords)""")
     # 16.3: Row 1's names, and the group after them
     assert words == ["Models · Mobile · DeviceMark", "Models · Everyday", "Models · Knowledge exam",
-                     "Benchmarks · Everyday tasks", "Improve · By model", "All runs", "Home",
+                     "Benchmarks · Everyday", "Improve · By model", "All runs", "Home",
                      "Compare", "Models · Mobile · Mobile-MMLU", "Models · Trust & safety",
                      "Models · Frontier"]
     assert page.errors == []

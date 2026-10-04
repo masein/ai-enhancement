@@ -128,7 +128,7 @@ def test_homes_everyday_tile_says_most_passed_not_best(live, page, width):
     page.goto(live["base"] + "/#tab=home")
     card = page.locator("[data-best='everyday']")
     card.wait_for()
-    assert card.locator(".eyebrow").inner_text().lower() == "everyday tasks · most passed"
+    assert card.locator(".eyebrow").inner_text().lower() == "everyday · most passed"   # 16.7
     assert card.locator("[data-pilot-badge]").inner_text().startswith("not ranked")
     no_sideways(page)
     assert page.errors == []

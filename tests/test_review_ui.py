@@ -438,7 +438,7 @@ def test_a_rubric_is_replaced_from_the_page_and_says_what_that_costs(live, page,
         up.locator("button[data-commit='rubric']").click()
         page.wait_for_selector("[data-action-ok='exrubric']", timeout=30000)
         said = page.locator("[data-action-ok='exrubric']").text_content()
-        assert "Written to" in said and "re-run suite=judged" in said
+        assert "Written to" in said and "test this topic again" in said      # 16.7: plain words
         # written outside the checkout, read by the judge, and on the record
         written = store / f"{slug}.md"
         assert written.read_text(encoding="utf-8") == signed
