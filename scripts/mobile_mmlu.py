@@ -178,6 +178,22 @@ FULL_NAME = "Mobile-MMLU (full)"
 FULL_PRED_FILE = "mobile_mmlu_full.json"
 FULL_MISSING = ("Mobile-MMLU (full) isn't on this server: fetch it with the data step "
                 "(scripts/fetch_data.py)")
+# 14.4.5: MOBILE_MMLU_FULL=0 in .env hides the full set everywhere and refuses
+# new runs of it; its files, picks and labels stay on disk
+FULL_OFF = "Mobile-MMLU (full) is switched off on this server (MOBILE_MMLU_FULL=0 in .env)"
+
+
+def full_on() -> bool:
+    """the switch: on unless MOBILE_MMLU_FULL is 0 (the service's config, or
+    the environment where there is none)"""
+    try:
+        from service import config
+        return bool(config.MOBILE_MMLU_FULL)
+    except ImportError:
+        return os.environ.get("MOBILE_MMLU_FULL", "1").strip().lower() not in OFF_WORDS
+
+
+OFF_WORDS = ("0", "no", "off", "false")
 
 
 def full_manifest() -> dict:
@@ -202,7 +218,12 @@ def full_files() -> list[tuple[dict, Path]]:
 
 def full_available() -> str:
     """'' when every pinned file of the full set is on this server; else why
-    not, in one line"""
+    not, in one line. 14.4.5: switched off, it isn't: everything that asks
+    this hides the set or refuses it"""
+    return FULL_OFF if not full_on() else _full_missing()
+
+
+def _full_missing() -> str:
     ok = all(p.is_file() and p.stat().st_size == f["bytes"] for f, p in full_files())
     return "" if ok else FULL_MISSING
 
@@ -213,8 +234,14 @@ _full_rows: dict = {}
 def load_full() -> list[dict]:
     """every question of the full set — {id, question, A–D, field, category},
     its field from its file's name — once each file's sha256 is the pinned
-    one; [] when the set isn't here"""
-    if full_available():
+    one; [] when the set isn't here (14.4.5: or is switched off)"""
+    return _read_full() if full_on() else []
+
+
+def _read_full() -> list[dict]:
+    """the full set's rows whether or not it is switched off: the one key
+    keeps its labels either way (pool), so switching it back shows them"""
+    if _full_missing():
         return []
     files = full_files()
     k = tuple((str(p), p.stat().st_mtime_ns, p.stat().st_size) for _, p in files)
@@ -419,7 +446,7 @@ def pool(pro: list[dict] | None = None, full: list[dict] | None = None) -> list[
     its order, then the full set's that Pro hasn't (its own, and the one
     worded apart) — each with its "lid" and the sets it's in"""
     pro = load() if pro is None else pro
-    full = load_full() if full is None else full
+    full = _read_full() if full is None else full
     out: dict[str, dict] = {}
     for name, rows in (("pro", pro), ("full", full)):
         for q in rows:

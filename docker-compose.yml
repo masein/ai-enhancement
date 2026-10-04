@@ -108,6 +108,9 @@ services:
       # your own machine
       BACKUP_DIR: ${BACKUP_DIR:-/data-03/evalboard-backups}
       EVALBOARD_BACKUP_AGE_RECIPIENT: ${EVALBOARD_BACKUP_AGE_RECIPIENT:-}
+      # 14.4.5: 0 hides the full Mobile-MMLU everywhere and refuses new runs of
+      # it (its files, picks and labels stay on disk); on by default
+      MOBILE_MMLU_FULL: ${MOBILE_MMLU_FULL:-1}
     volumes:
       - ${BENCH_ROOT}:${BENCH_ROOT}
       - ${HF_HOME}:${HF_HOME}

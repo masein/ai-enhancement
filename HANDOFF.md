@@ -4953,6 +4953,29 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 14.4.5 — the full Mobile-MMLU's switch (4 Oct)
+
+- **`MOBILE_MMLU_FULL=0`** in `.env` (passed through docker-compose; on by
+  default; `config._switch` reads 0, no, off or false as off) hides the full
+  set everywhere and refuses new runs of it. Its files, picks, labels and key
+  stay on disk; set it back to 1 and everything shows again from them.
+- **How:** `mobile_mmlu.full_on()`; switched off, `full_available()` says so
+  (`FULL_OFF`), so everything that asks it hides the set or refuses it.
+  `load_full()` is empty, but `pool()` keeps the full set's rows
+  (`_read_full`), so the one key keeps every label. The manifest names its
+  switch (`"switch": "MOBILE_MMLU_FULL"`), and `restrictions.sets()` leaves a
+  switched-off set out: it isn't badged either.
+- **Off means:**
+  - no `mmf` in `/api/results` or the single-file report, and no GGUF cells;
+  - no part in Test a model or its estimate;
+  - Pro alone on the key's card and in its dry run, and labelling sends Pro's
+    questions alone (`mmp_key._rows`);
+  - nothing offered in GGUF's Measure;
+  - refused: a submission (422), a GGUF run naming it, and a run queued
+    before the switch (failed: "Nothing was asked").
+- **And in 14.4, kept apart either way:** a GGUF run of all never asks the
+  full set (`kept_apart`); it is measured only when named.
+
 ### 14.4.4 — what a restricted set may be used for, everywhere (4 Oct)
 
 - **One rule, from the manifests** (`scripts/restrictions.py`): a manifest under
