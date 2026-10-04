@@ -308,6 +308,14 @@ CREATE TABLE IF NOT EXISTS gguf_models (
   data        TEXT NOT NULL,
   updated_at  REAL NOT NULL
 );
+-- 16b.1: a model added from a browser — a GGUF file or a model folder — and
+-- its file: where it is, its size and sha256, who added it and when, and
+-- whether others may download it
+CREATE TABLE IF NOT EXISTS uploads (
+  model       TEXT PRIMARY KEY,
+  data        TEXT NOT NULL,
+  updated_at  REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS qb_drafts (
   id          TEXT PRIMARY KEY,
   kind        TEXT NOT NULL,                      -- 'knowledge' | 'everyday'
@@ -1400,6 +1408,32 @@ def gguf_all() -> list[dict]:
     with closing(_conn()) as c:
         rows = c.execute("SELECT data FROM gguf_models ORDER BY updated_at DESC").fetchall()
     return [json.loads(r[0]) for r in rows]
+
+
+def upload_put(rec: dict) -> None:
+    with closing(_conn()) as c:
+        c.execute("INSERT INTO uploads (model, data, updated_at) VALUES (?,?,?) "
+                  "ON CONFLICT(model) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at",
+                  (rec["model"], json.dumps(rec), time.time()))
+        c.commit()
+
+
+def upload_get(model_id: str) -> dict | None:
+    with closing(_conn()) as c:
+        row = c.execute("SELECT data FROM uploads WHERE model=?", (model_id,)).fetchone()
+    return json.loads(row[0]) if row else None
+
+
+def uploads_all() -> list[dict]:
+    with closing(_conn()) as c:
+        rows = c.execute("SELECT data FROM uploads ORDER BY updated_at DESC").fetchall()
+    return [json.loads(r[0]) for r in rows]
+
+
+def upload_del(model_id: str) -> None:
+    with closing(_conn()) as c:
+        c.execute("DELETE FROM uploads WHERE model=?", (model_id,))
+        c.commit()
 
 
 def served_all() -> list[dict]:

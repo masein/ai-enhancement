@@ -17,7 +17,7 @@ from urllib.parse import quote
 import pytest
 
 import simpleqa as sq
-from conftest import set_name
+from conftest import open_add, set_name
 from test_12n1_browser import (GOOD, NAME, SERVED, SERVED_LA, SERVED_MTP, SKEWED,  # noqa: F401
                                board)
 from test_12n2 import sit_simpleqa, twenty
@@ -142,8 +142,7 @@ def test_models_picker_is_by_model_and_setup_with_what_each_has(live, page):
 def test_same_file_as_from_either_side_joins_or_parts_them(live, page):
     go(page, live, "model=" + quote(GOOD, safe=""), "[data-model-hero]")
     set_name(page, "masein")
-    page.locator("[data-test-model]").click()
-    page.locator("[data-served-card] > summary").click()
+    open_add(page, live["base"], "server")
     page.wait_for_selector(f"[data-srv-row='{SERVED_LA}'] [data-same-as]")
     # the GGUF entries it can be, loaded
     page.wait_for_function("state.gg.page && !state.gg.loading")
@@ -162,8 +161,7 @@ def test_same_file_as_from_either_side_joins_or_parts_them(live, page):
     assert len(json.loads(box.get_attribute("data-ids"))) == 2
     # from the GGUF entry's side: its lookahead 1 is that served entry again
     go(page, live, "model=" + quote(GOOD, safe=""), "[data-model-hero]")
-    page.locator("[data-test-model]").click()
-    page.locator("[data-gguf-card] > summary").click()
+    open_add(page, live["base"], "here")
     page.wait_for_selector("[data-same-as-gguf] [data-same-as-setup]")
     page.wait_for_function("state.srv.list && !state.srv.loading")
     look = page.locator("[data-same-as-gguf] [data-same-as-setup]", has_text="lookahead 1")

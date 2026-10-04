@@ -105,11 +105,38 @@ curl -X POST --data-binary @ckpt.zip -H 'Content-Type: application/zip' \
   and tells you before wasting the upload.
 - **safetensors only** — pickle `.bin` weights execute code on load and are
   refused. Anything modern `save_pretrained()` writes passes by default.
-- **Caps**: per-upload `ARTIFACT_MAX_GB` (default 8), shared total quota
-  `ARTIFACT_QUOTA_GB` (default 150) — `GET /api/artifacts` shows usage, delete
-  what you no longer need.
+- **Caps**: per-upload `ARTIFACT_MAX_GB` (default 30), shared total quota
+  `ARTIFACT_QUOTA_GB` (default 150, the browser's uploads included) — `GET
+  /api/artifacts` shows usage, delete what you no longer need.
 - Preflight (params cap, architecture capture, `trust_remote_code` refusal)
   applies to uploads exactly as it does to Hub models.
+
+### From a browser, in pieces that resume (16b.1)
+
+Add a model ▸ On my computer sends a `.gguf` file, or a model folder as a
+`.zip`, in pieces. The same endpoints serve any client:
+
+- `POST /api/uploads` `{filename, size, mtime, name, by}` — refused before a
+  byte is sent when the file is over `UPLOAD_MAX_GB` (30), uploads would pass
+  `ARTIFACT_QUOTA_GB` (150), or the disk would keep under `UPLOAD_FREE_GB`
+  (50) free: 413 or 507, with the numbers. The same file (name, size, date)
+  started again resumes: `{"id", "offset", "resumed": true}`.
+- `PUT /api/uploads/{id}?offset=N` — the raw bytes from N, at most 64 MB a
+  piece. A piece at the wrong offset is 409 with the server's; a cut one keeps
+  what arrived.
+- `POST /api/uploads/{id}/finish` — the server works out its sha256 and
+  reads what it is: a GGUF's header (one that isn't a GGUF is refused, nothing
+  kept), a zip with the rules above. `GET /api/uploads/{id}` says
+  `checking`, `ready` (with `sha256`, `header` or `files`) or `failed`.
+- `POST /api/uploads/{id}/add` `{name, based_on, how, total, active,
+  download, by}` — a GGUF is registered as the path form registers one (its
+  sha256 pinned), a folder as `local/<name>`.
+- `DELETE /api/uploads/{id}` cancels; an upload untouched for a day is
+  removed. `GET /api/uploads` lists what is kept and what is under way;
+  `DELETE /api/uploads/file/{model_id}` deletes a kept one (409 while a run
+  uses it; its results stay).
+
+Nothing in an upload is ever run.
 
 ---
 

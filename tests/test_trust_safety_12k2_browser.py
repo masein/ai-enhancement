@@ -85,7 +85,7 @@ def test_trust_and_safety_is_a_chip_with_the_four_and_says_whose_they_are(live, 
     b = tip(page.locator(f"{LB} thead th[data-task='bbq_3000']"))
     assert b[0] == "BBQ — 0-shot, % accuracy on ambiguous questions"
     assert "a seeded 3,000 of the 29,246 (seed “bbq-ambig-3000”); all of them is the second " \
-           "choice under Test a model" in b
+           "choice when you test a model" in b
     assert any(t.startswith("BBQ: Parrish et al.") and t.endswith("· CC BY 4.0") for t in b)
     assert "never part of the board’s Avg, and never a training target" in b
     # the cells: the share of safe replies, and BBQ's bias score in its tooltip

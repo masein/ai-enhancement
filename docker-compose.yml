@@ -54,8 +54,11 @@ services:
       # models run on transformers' slow paths again, with no rebuild
       FAST_KERNELS: ${FAST_KERNELS:-1}
       SUBMIT_TOKEN: ${SUBMIT_TOKEN:-}
-      ARTIFACT_MAX_GB: ${ARTIFACT_MAX_GB:-8}
+      ARTIFACT_MAX_GB: ${ARTIFACT_MAX_GB:-30}
       ARTIFACT_QUOTA_GB: ${ARTIFACT_QUOTA_GB:-150}
+      # 16b.1: a browser's upload — one file at most, and the disk it leaves free
+      UPLOAD_MAX_GB: ${UPLOAD_MAX_GB:-30}
+      UPLOAD_FREE_GB: ${UPLOAD_FREE_GB:-50}
       # custom model code (trust_remote_code) — off unless all three line up;
       # see SERVICE.md § custom model code before turning this on
       ALLOW_REMOTE_CODE: ${ALLOW_REMOTE_CODE:-0}

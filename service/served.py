@@ -276,7 +276,7 @@ def _not_openrouter(base: str) -> None:
     host = re.sub(r"^https?://", "", (base or "").strip().lower()).split("/")[0]
     if host == "openrouter.ai" or host.endswith(".openrouter.ai") or (
             base or "").strip().rstrip("/") == config.OPENROUTER_BASE_URL:
-        raise ValueError("That is OpenRouter: add its models under Test a model ▸ A model from "
+        raise ValueError("That is OpenRouter: add its models under Add a model ▸ On "
                          "OpenRouter, where what they cost is counted")
 
 
@@ -290,7 +290,22 @@ def check(f: dict) -> dict:
 
 def _gguf_setups(text) -> list[dict]:
     from . import gguf
-    return gguf.parse_setups(text)
+    setups = gguf.parse_setups(text)
+    for s in setups:
+        gguf.check_flags(s["flags"], s["name"])            # 16b.1
+    return setups
+
+
+def _gguf_file(f: dict) -> tuple[str, str]:
+    """16b.1: its GGUF file's path and flags, checked as the GGUF form checks them"""
+    from . import gguf
+    path = (f.get("gguf_path") or "").strip()
+    flags = (f.get("gguf_flags") or "").strip()
+    if path:
+        gguf._check_path(path)
+    if flags:
+        gguf.check_flags(gguf.flags_of(flags), "Its GGUF's flags")
+    return path, flags
 
 
 def register(f: dict, by: str) -> dict:
@@ -310,13 +325,13 @@ def register(f: dict, by: str) -> dict:
     key = (f.get("key") or "").strip() or old.get("key", "")
     base = (f.get("base_url") or "").strip().rstrip("/")
     _not_openrouter(base)
+    gpath, gflags = _gguf_file(f)
     p = probe(base, key)
     rec = {"id": mid, "name": name, "base_url": base, "key": key,
            "based_on": (f.get("based_on") or "").strip(), "how": how, "thinking": thinking,
            "phone": bool(f.get("phone")),
            # 12f.3: its GGUF file on the server, for llama-perplexity's benchmarks
-           "gguf_path": (f.get("gguf_path") or "").strip(),
-           "gguf_flags": (f.get("gguf_flags") or "").strip(),
+           "gguf_path": gpath, "gguf_flags": gflags,
            # 12f.3 addendum: the setups its GGUF is measured in
            "gguf_setups": _gguf_setups(f.get("gguf_setups")),
            "pin": pin_of(p), "answered": p["answered"], "by": by, "at": time.time(),
@@ -559,7 +574,7 @@ def check_pin(rec: dict) -> str:
 # 16.8: a run that meets a server that doesn't answer
 DOWN_RUN = "Its server isn't running. Start it, then press Resubmit."
 
-AGAIN = "add it again under Test a model ▸ A model from OpenRouter if that's intended"
+AGAIN = "add it again under Add a model ▸ On OpenRouter if that's intended"
 
 
 def check_openrouter(rec: dict) -> str:
@@ -598,8 +613,8 @@ def preflight(sub: dict) -> dict:
     from .hfmeta import PreflightError
     rec = get(sub["hf_id"])
     if not rec:
-        raise PreflightError(f"{sub['hf_id']} is not registered: add it under Test a model ▸ "
-                             f"A model served elsewhere")
+        raise PreflightError(f"{sub['hf_id']} is not registered: add it under Add a model ▸ "
+                             f"Running on a server")
     if sub["suite"] not in SUITES:
         raise PreflightError(LOGLIK_LINE)
     # 12w: the parity check asks two setups, one after the other, and waits

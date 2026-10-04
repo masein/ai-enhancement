@@ -4273,6 +4273,28 @@ table.lb td.tcell div.rep-by, td div.rep-by { display:block; font-weight:400;
 td.na { background:transparent; }
 td.evdtotal .evd-ranout { display:block; white-space:normal; text-align:right; }
 .srvsum::-webkit-details-marker { display:none; }
+/* 16b.1: Add a model — where is the model, then that part alone. The part
+   chosen is open, so its own fold line goes */
+.dlg-title { margin:0 0 8px; }
+.addwhere { margin:0 0 12px; }
+.addq { font-weight:600; margin:0 0 6px; }
+.addchoices { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.addmore { display:inline-flex; gap:6px; align-items:center; }
+.addmore > summary { cursor:pointer; color:var(--text-secondary); font-size:var(--fs-1); padding:0 4px; }
+.addmore[open] { display:inline-flex; }
+.testdlg details.card > summary.srvsum { display:none; }
+.upfile { display:inline-flex; align-items:center; cursor:pointer; padding:6px 12px;
+  border:1px solid var(--border); border-radius:var(--r-1); }
+.upprog { margin:8px 0; }
+.upbar { height:8px; border-radius:999px; background:var(--surface-2, var(--border)); overflow:hidden;
+  margin:0 0 6px; }
+/* the bar moves by transform alone, as every transition here does */
+.upfill { height:100%; width:100%; background:var(--accent); transform:scaleX(0);
+  transform-origin:left; transition:transform .2s; }
+.upstore { margin-top:12px; border-top:1px solid var(--border); padding-top:8px; }
+.uplist { margin:4px 0; padding-left:18px; font-size:var(--fs-1); }
+.uptable { width:100%; font-size:var(--fs-1); }
+.uptable td { overflow-wrap:anywhere; }
 /* 12f.2: On phone — reported beside measured, stacked on a phone */
 .phone-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px; }
 @media (max-width:720px) { .phone-grid { grid-template-columns:minmax(0, 1fr); } }
@@ -8429,7 +8451,7 @@ function runningNow() {
   const card = el('div', { class: 'card', 'data-running-now': String(running.length + queued.length) },
     el('h2', { text: 'Running now' }));
   if (!running.length && !queued.length) card.append(el('p', { class: 'small', 'data-running-none': '1' },
-    'Nothing running · ', el('a', { href: '#', 'data-running-test': '1', text: 'Test a model',
+    'Nothing running · ', el('a', { href: '#', 'data-running-test': '1', text: 'Add a model',
       onclick: e => { e.preventDefault(); openTest(); } })));
   else card.append(el('div', { class: 'runsfull' }, runsList()));
   return card;
@@ -10660,7 +10682,7 @@ function mmfCard() {
     rows.length ? el('div', { class: 'mmpwrap lb-wrap' }, el('table', { class: 'mmptab',
         'data-mmf-table': '1' }, el('thead', {}, head), el('tbody', {}, body)))
       : el('p', { class: 'small', 'data-mmf-none': '1', text: 'No model has sat the full set yet: '
-        + 'Test a model ▸ Mobile tasks ▸ multiple choice, the full set.' }),
+        + 'Add a model ▸ On Hugging Face ▸ Mobile ▸ multiple choice, the full set.' }),
     el('p', { class: 'small se', 'data-mmf-checks': '1', text: [mmfKeyLine(), mmfChecksLine()]
       .filter(Boolean).join(' · ') }),
     el('p', { class: 'small se', 'data-mmf-credit': '1', text: `${D.name}: MBZUAI, ${D.source} `
@@ -11501,7 +11523,7 @@ function lbColTipOf(c) {
         bbq_all: `BBQ, all — ${c.shot || '0-shot'}, % accuracy on ambiguous questions` }[c.task],
       ...[info.domain, info.desc].filter(Boolean),
       ...(c.task === 'bbq_3000' && sub ? [`a seeded ${n(sub.n)} of the ${n(sub.of)} (seed `
-        + `\u201c${sub.seed}\u201d); all of them is the second choice under Test a model`] : []),
+        + `\u201c${sub.seed}\u201d); all of them is the second choice when you test a model`] : []),
       ...(isBbq(c.task) ? ['each cell\u2019s tooltip has its bias score'] : []),
       trustCredit(c.task), 'never part of the board\u2019s Avg, and never a training target']
       .filter(Boolean);
@@ -18406,9 +18428,13 @@ function vQueue(part = { form: true, list: true }) {
     ownWhy.hidden = !ownWhy.textContent;
   }
   gateSubmit();
+  // 16b.1: Add a model asks where the model is, and shows that part alone;
+  // a model's page opens it to test that model: the form alone
+  const where = part.form ? (addState().mode === 'test' ? 'hf' : addState().where) : '';
   return [
-    part.form ? el('div', { class: 'card', 'data-submit-form': '1' },
-      el('h2', { id: 'test-title', text: 'Test a model' }),
+    part.form ? addHead() : null,
+    where === 'hf' ? el('div', { class: 'card', 'data-submit-form': '1' },
+      addState().note ? el('p', { class: 'small', 'data-add-note': '1', text: addState().note }) : '',
       // 12i.0: one line, no system words
       el('p', { class: 'sub', 'data-suite-help': '1', text: 'Pick a model and what to test. '
         + 'One test runs at a time; results appear on Models.' }),
@@ -18440,9 +18466,10 @@ function vQueue(part = { form: true, list: true }) {
       gpuNeedLine(sf),
       state.qmsg ? el('p', { class: 'warn', 'data-qmsg': '1', style: 'margin-top:8px',
         text: state.qmsg }) : '') : null,
-    part.form ? servedCard(sf) : null,
-    part.form ? openrouterCard(sf) : null,
-    part.form ? ggufCard() : null,
+    where === 'computer' ? uploadCard() : null,
+    where === 'server' ? (state.srv.open = true, servedCard(sf)) : null,
+    where === 'openrouter' ? (state.orm.open = true, openrouterCard(sf)) : null,
+    where === 'here' ? (state.gg.open = true, ggufCard()) : null,
     part.list ? el('div', { class: 'card', 'data-all-runs': '1' },
       el('h2', { text: 'All runs' }),
       qToolbar, qPager, qTableWrap, qOlder, qEmpty) : null].filter(Boolean);
@@ -18752,6 +18779,8 @@ async function srvDo(what) {
       S.list = null;
       Object.assign(state.sub, { hf_id: m.id, kind: 'instruct', note: '' });
       if (!SERVED_SUITES.includes(state.sub.suite)) state.sub.suite = 'everyday';
+      toTestForm(`Saved ${m.name}, pinned to what the server reports: ${pinLine(m.pin)}. `
+        + 'Choose what to test it on, then Start test — or close: it is on the board.');
       await refreshResults();
     }
   } catch (e) {
@@ -18760,6 +18789,326 @@ async function srvDo(what) {
   }
   S.busy = '';
   render();
+}
+// ---------------------------------------------------------------------------
+// 16b.1: Add a model — where is the model? On Hugging Face (as before), on my
+// computer (an upload: a .gguf, or a model folder as a .zip), running on a
+// server, on OpenRouter; under More, already on this server (its path, for
+// people with SSH). A model's page opens the same dialog to test that model
+// ---------------------------------------------------------------------------
+const ADD_WHERE = [['hf', 'On Hugging Face'], ['computer', 'On my computer'],
+  ['server', 'Running on a server'], ['openrouter', 'On OpenRouter']];
+const ADD_MORE = [['here', 'Already on this server']];
+const addState = () => (state.add = state.add || { where: 'hf', mode: 'add' });
+function setAddWhere(w) {
+  addState().where = w;
+  addState().note = '';
+  // the part chosen opens, and loads what it lists, as unfolding it did
+  if (w === 'server') { state.srv.open = true; if (state.srv.list == null && netReady()) loadServed(); }
+  if (w === 'openrouter') { state.orm.open = true; if (state.orm.models == null && netReady()) loadOrModels(); }
+  if (w === 'here') { state.gg.open = true; if (!state.gg.page && netReady()) loadGg(); }
+  if (w === 'computer') loadUploads();
+  render();
+}
+// a model added (or picked) under one of the other places: its tests next, in
+// the test form, with a line on what just happened
+function toTestForm(note) {
+  const A = addState();
+  A.where = 'hf'; A.note = note || '';
+}
+function addHead() {
+  const A = addState(), w = A.where;
+  if (A.mode === 'test') return el('h2', { id: 'test-title', class: 'dlg-title', text: 'Test this model' });
+  const btn = ([k, label]) => el('button', { type: 'button', class: 'chip-btn' + (k === w ? ' on' : ''),
+    'data-add-where': k, 'aria-pressed': String(k === w), text: label, onclick: () => setAddWhere(k) });
+  return el('div', { class: 'addhead' },
+    el('h2', { id: 'test-title', class: 'dlg-title', text: 'Add a model' }),
+    el('div', { class: 'addwhere', role: 'group', 'aria-label': 'where is the model',
+        'data-add-chooser': '1' },
+      el('p', { class: 'addq', text: 'Where is the model?' }),
+      el('div', { class: 'addchoices' }, ADD_WHERE.map(btn),
+        // opened, it stays open across the 5 s poll's redraw
+        el('details', { class: 'addmore', open: A.more || ADD_MORE.some(([k]) => k === w) ? ''
+            : null, ontoggle: e => { A.more = e.target.open; } },
+          el('summary', { text: 'More' }), ADD_MORE.map(btn)))));
+}
+
+// ---- On my computer: the upload, its two steps, and what is kept ----
+const GBW = n => n == null ? '—' : `${(n / 1e9).toFixed(1)} GB`;
+const UP_HINTS = { gguf: 'a GGUF file: measured by llama.cpp on the host, and served by llama-server',
+  zip: 'a model folder as a .zip: the folder save_pretrained() made, safetensors only' };
+const upState = () => (state.up = state.up || { phase: 'pick', f: { download: true } });
+async function loadUploads() {
+  const U = upState();
+  if (U.loading || !netReady()) return;
+  U.loading = true;
+  try { U.store = await api('api/uploads'); } catch (e) { U.store = U.store || null; }
+  U.loading = false;
+  render();
+}
+function upErr(e) { return String((e && e.message) || e); }
+function upPick(file) {
+  const U = upState();
+  U.file = file; U.msg = ''; U.phase = 'pick';
+  U.name = file.name.replace(/\.(gguf|zip)$/i, '');
+  render();
+}
+// one piece, with its progress as it goes
+function upPut(uid, off, blob, onSent) {
+  return new Promise((ok, bad) => {
+    const x = new XMLHttpRequest();
+    state.up.xhr = x;
+    x.open('PUT', `api/uploads/${uid}?offset=${off}`);
+    x.setRequestHeader('X-Token', TOKEN);
+    x.setRequestHeader('Content-Type', 'application/octet-stream');
+    x.upload.onprogress = e => onSent(e.loaded);
+    x.onload = () => {
+      let j = {};
+      try { j = JSON.parse(x.responseText || '{}'); } catch (e) { /* not JSON */ }
+      if (x.status >= 200 && x.status < 300) ok(j);
+      else bad(Object.assign(new Error(typeof j.detail === 'string' ? j.detail
+        : `the server answered HTTP ${x.status}`), { status: x.status }));
+    };
+    x.onerror = () => bad(new Error('the connection dropped'));
+    x.onabort = () => bad(Object.assign(new Error('cancelled'), { cancelled: true }));
+    x.send(blob);
+  });
+}
+async function upStart() {
+  const U = upState(), file = U.file;
+  if (!file) return;
+  if (!whoName()) { askName(); return; }
+  U.msg = '';
+  try {
+    U.rec = await post('api/uploads', { filename: file.name, size: file.size,
+      mtime: file.lastModified / 1000, name: (U.name || '').trim(), by: whoName() });
+  } catch (e) { U.msg = upErr(e); render(); return; }
+  U.phase = 'sending'; U.cancel = false;
+  U.t0 = Date.now(); U.from = U.rec.offset; U.sent = U.rec.offset;
+  render();
+  upSend();
+}
+async function upSend() {
+  const U = upState(), f = U.file, piece = (U.store || {}).piece || 64 * 1024 * 1024;
+  let off = U.rec.offset, tries = 0;
+  while (off < f.size && !U.cancel) {
+    const end = Math.min(f.size, off + piece);
+    try {
+      const r = await upPut(U.rec.id, off, f.slice(off, end), n => { U.sent = off + n; upPaint(); });
+      off = r.offset; tries = 0;
+    } catch (e) {
+      if (U.cancel || e.cancelled) return;
+      // refused: said, and the upload waits — the disk, a name, a gone upload
+      if (e.status && e.status !== 409) { U.phase = 'paused'; U.msg = upErr(e); render(); return; }
+      // the connection dropped: ask where the server is, and go on from there
+      if (++tries > 6) {
+        U.phase = 'paused';
+        U.msg = `The connection dropped (${upErr(e)}). Resume upload goes on from ${GBW(off)}.`;
+        render(); return;
+      }
+      await new Promise(r => setTimeout(r, 1500 * tries));
+      try { off = (await api('api/uploads/' + U.rec.id)).offset; } catch (e2) { /* asked again */ }
+    }
+    U.rec.offset = U.sent = off;
+    upPaint();
+  }
+  if (U.cancel) return;
+  U.phase = 'checking'; render();
+  try { await post(`api/uploads/${U.rec.id}/finish`, {}); } catch (e) {
+    U.phase = 'paused'; U.msg = upErr(e); render(); return; }
+  upWait();
+}
+// the server works out its sha256 and reads what it is: asked until it says
+async function upWait() {
+  const U = upState();
+  try {
+    const r = await api('api/uploads/' + U.rec.id);
+    U.rec = r;
+    if (r.state === 'checking') { setTimeout(upWait, 1500); return; }
+    if (r.state === 'failed') { U.phase = 'pick'; U.msg = r.error; U.file = null; loadUploads(); return; }
+    upDetails(r);
+  } catch (e) { setTimeout(upWait, 3000); }
+}
+// what the header says fills the details; the person confirms them
+function upDetails(rec) {
+  const U = upState(), h = rec.header || {};
+  const P = n => !n ? '' : n >= 1e9 ? `${+(n / 1e9).toFixed(1)}B` : n >= 1e6
+    ? `${Math.round(n / 1e6)}M` : `${Math.max(1, Math.round(n / 1e3))}K`;
+  U.rec = rec; U.phase = 'details'; U.msg = '';
+  U.f = { name: rec.name, based_on: '', how: '', size: P(h.params),
+    active: h.active_params && h.active_params < h.params ? P(h.active_params) : '', download: true };
+  render();
+}
+function upPaint() {
+  const U = upState(), bar = document.querySelector('[data-up-progress]');
+  if (!bar || !U.file) return;
+  const size = U.file.size, sent = Math.min(U.sent || 0, size);
+  const secs = (Date.now() - U.t0) / 1000, rate = secs > 1 ? ((sent - U.from) / secs) : 0;
+  const left = rate > 0 ? (size - sent) / rate : null;
+  bar.querySelector('.upfill').style.transform = `scaleX(${(sent / size).toFixed(4)})`;
+  bar.querySelector('[data-up-words]').textContent = `${GBW(sent)} of ${GBW(size)}`
+    + (rate > 0 ? ` · ${(rate / 1e6).toFixed(1)} MB/s` : '')
+    + (left != null ? ` · about ${left < 90 ? Math.max(1, Math.round(left)) + ' s'
+      : Math.round(left / 60) + ' min'} left` : '');
+}
+async function upCancel(uid) {
+  const U = upState();
+  if (U.rec && U.rec.id === uid) { U.cancel = true; if (U.xhr) U.xhr.abort(); }
+  try { await fetch(`api/uploads/${uid}`, { method: 'DELETE', headers: { 'X-Token': TOKEN } }); }
+  catch (e) { /* removed after a day untouched */ }
+  if (U.rec && U.rec.id === uid) Object.assign(U, { phase: 'pick', rec: null, file: null, msg: 'Cancelled: its parts are removed.' });
+  loadUploads();
+}
+async function upAdd() {
+  const U = upState(), F = U.f;
+  if (!whoName()) { askName(); return; }
+  U.busy = true; U.msg = ''; render();
+  try {
+    U.added = await post(`api/uploads/${U.rec.id}/add`, { name: F.name, based_on: F.based_on,
+      how: F.how, total: F.size || null, active: F.active || null, download: !!F.download,
+      by: whoName() });
+    U.phase = 'tests';
+    await refreshResults();
+  } catch (e) { U.msg = upErr(e); }
+  U.busy = false; loadUploads(); render();
+}
+function upDone(test) {
+  const U = upState(), a = U.added || {};
+  Object.assign(U, { phase: 'pick', rec: null, file: null, added: null, msg: '' });
+  if (!test) { closeTest(); if (a.id) navigate({ model: a.id, topic: null }); return; }
+  if (a.kind === 'gguf') { closeTest(); ggMeasureDialog(a.id, '[data-test-model]'); return; }
+  // a folder: the test form, with its tests and what each needs of the GPU
+  Object.assign(state.sub, { hf_id: a.id, allow: false });
+  toTestForm(`Added: ${(a.model || {}).name || a.id}. Choose its tests.`); render();
+}
+async function upDelete(mid) {
+  const U = upState();
+  try {
+    const r = await fetch(`api/uploads/file/${mid}`, { method: 'DELETE', headers: { 'X-Token': TOKEN } });
+    const j = await r.json().catch(() => ({}));
+    U.msg = r.ok ? `Deleted ${j.deleted}: ${GBW(j.bytes)} freed. ${j.note || ''}` : (j.detail || `HTTP ${r.status}`);
+  } catch (e) { U.msg = upErr(e); }
+  U.del = null; await refreshResults(); loadUploads();
+}
+function uploadCard() {
+  const U = upState(), S = U.store;
+  if (!S && !U.loading && netReady()) loadUploads();
+  const kind = U.file ? (/\.gguf$/i.test(U.file.name) ? 'gguf' : /\.zip$/i.test(U.file.name) ? 'zip' : '') : '';
+  const body = [];
+  if (U.phase === 'pick' || U.phase === 'paused') {
+    const resuming = U.phase === 'paused' && U.rec;
+    body.push(el('div', { class: 'frm', 'data-up-pick': '1' },
+      el('label', { class: 'secondary upfile' }, resuming ? 'Pick the same file' : 'Choose a file…',
+        el('input', { type: 'file', accept: '.gguf,.zip', 'data-up-file': '1', hidden: '',
+          onchange: e => { const f = e.target.files[0]; if (f) { upPick(f); if (resuming) upStart(); } } })),
+      U.file ? el('span', { class: 'small', 'data-up-chosen': '1',
+        text: `${U.file.name} · ${GBW(U.file.size)}` + (kind ? ` · ${UP_HINTS[kind].split(':')[0]}` : '') }) : ''),
+      U.file && !resuming ? el('div', { class: 'srvform' },
+        el('label', { for: 'up-name', text: 'Name' }),
+        el('input', { type: 'text', id: 'up-name', 'data-up-name': '1', 'data-keep': 'up-name',
+          value: U.name || '', autocomplete: 'off', spellcheck: 'false',
+          oninput: e => { U.name = e.target.value; } }),
+        el('span'), el('div', { class: 'frm' },
+          el('button', { class: 'primary', 'data-up-start': '1', text: 'Upload',
+            disabled: kind ? null : '', onclick: upStart }),
+          kind ? '' : el('span', { class: 'warn small', text: 'A .gguf file, or a model folder as a .zip.' }))) : '',
+      resuming ? el('div', { class: 'frm' },
+        el('button', { class: 'primary', 'data-up-resume': '1', text: 'Resume upload',
+          disabled: U.file ? null : '', onclick: () => { U.phase = 'sending'; U.t0 = Date.now();
+            U.from = U.sent = U.rec.offset; render(); upSend(); } }),
+        el('button', { class: 'ghost', text: 'Cancel', onclick: () => upCancel(U.rec.id) })) : '');
+  }
+  if (U.phase === 'sending') body.push(el('div', { class: 'upprog', 'data-up-progress': '1' },
+      el('div', { class: 'upbar' }, el('div', { class: 'upfill' })),
+      el('div', { class: 'frm' }, el('span', { class: 'small mono', 'data-up-words': '1' }),
+        el('button', { class: 'ghost', 'data-up-cancel': '1', text: 'Cancel',
+          onclick: () => upCancel(U.rec.id) }))));
+  if (U.phase === 'checking') body.push(el('p', { class: 'small', 'data-up-checking': '1',
+    text: `All ${GBW(U.rec.size)} are here. Checking it: its sha256, and `
+      + (U.rec.kind === 'gguf' ? 'its header…' : 'the folder in the zip…') }));
+  if (U.phase === 'details') body.push(upDetailsForm());
+  if (U.phase === 'tests') {
+    const a = U.added || {};
+    body.push(el('div', { 'data-up-tests': a.id || '' },
+      el('p', { class: 'small', text: `Added: ${(a.model || {}).name || a.id} · sha256 ${a.sha256} · ${GBW(a.bytes)}.` }),
+      el('p', { class: 'addq', text: 'Tests' }),
+      el('p', { class: 'small se', text: a.kind === 'gguf'
+        ? 'Measured by llama.cpp on the host: MMLU, HellaSwag, Winogrande, ARC and TruthfulQA, each with its time. Its GPU memory is llama.cpp’s on the host, not this card’s.'
+        : 'Its tests, each with the time and GPU memory it needs.' }),
+      el('div', { class: 'frm' },
+        el('button', { class: 'primary', 'data-up-test': '1', text: a.kind === 'gguf' ? 'Choose what to measure ▸' : 'Choose its tests ▸',
+          onclick: () => upDone(true) }),
+        el('button', { class: 'secondary', 'data-up-skip': '1', text: 'Add without testing',
+          onclick: () => upDone(false) }))));
+  }
+  return el('div', { class: 'card', 'data-upload-card': '1' },
+    el('p', { class: 'sub', text: 'A .gguf file, or a model folder as a .zip, from this computer. '
+      + 'It resumes after a dropped connection or a reload; nothing in it is ever run.' }),
+    ...body,
+    U.msg ? el('p', { class: 'warn small', 'data-up-msg': '1', text: U.msg }) : '',
+    upStorage(S));
+}
+function upDetailsForm() {
+  const U = upState(), F = U.f, rec = U.rec, h = rec.header || {};
+  const inp = (key, attrs = {}) => el('input', { type: 'text', id: 'up-' + key, 'data-up': key,
+    'data-keep': 'up-' + key, value: F[key] || '', autocomplete: 'off', spellcheck: 'false',
+    oninput: e => { F[key] = e.target.value; }, ...attrs });
+  const n = h.params, nW = !n ? '' : n >= 995e6 ? P(n) : n >= 1e6 ? `${Math.round(n / 1e6)}M`
+    : `${Math.max(1, Math.round(n / 1e3))}K`;
+  const facts = rec.kind === 'gguf' ? [h.arch, h.file_type, nW ? nW + ' parameters' : '',
+    h.context_length ? `context ${Number(h.context_length).toLocaleString('en')}` : '',
+    h.chat_template ? 'has a chat template' : 'no chat template'].filter(Boolean)
+    : [`${(rec.files || []).length} files`];
+  return el('div', { 'data-up-details': rec.id },
+    el('p', { class: 'small', 'data-up-checked': '1', text: `Checked: ${rec.filename} · ${GBW(rec.size)} · sha256 ${rec.sha256}` }),
+    el('p', { class: 'small se', 'data-up-facts': '1', text: facts.join(' · ') }),
+    el('p', { class: 'addq', text: 'Details' }),
+    el('datalist', { id: 'up-bases' }, DATA.models.filter(m => !m.served).map(m => el('option', { value: m.id }))),
+    el('div', { class: 'srvform' },
+      el('label', { for: 'up-name', text: 'Name' }), inp('name'),
+      el('label', { for: 'up-based_on', text: 'Based on' }), inp('based_on', { list: 'up-bases', placeholder: 'Qwen/Qwen3.6-35B-A3B' }),
+      el('label', { for: 'up-how', text: rec.kind === 'gguf' ? 'How it’s built' : 'How it’s made' }),
+      el('textarea', { id: 'up-how', 'data-up': 'how', 'data-keep': 'up-how', rows: '2',
+        placeholder: rec.kind === 'gguf' ? 'the llama.cpp build, the quantisation, what changed' : 'optional',
+        oninput: e => { F.how = e.target.value; } }, F.how || ''),
+      el('label', { for: 'up-size', text: 'Size' }), sizeFields(F, inp, 'up'),
+      el('span'), el('label', { class: 'small' }, el('input', { type: 'checkbox', 'data-up-download': '1',
+        checked: F.download ? '' : null, onchange: e => { F.download = e.target.checked; } }),
+        ' Others can download it')),
+    el('div', { class: 'frm' },
+      el('button', { class: 'primary', 'data-up-add': '1', text: U.busy ? 'Adding…' : 'Add',
+        disabled: U.busy ? '' : null, onclick: upAdd }),
+      el('button', { class: 'ghost', text: 'Cancel', onclick: () => upCancel(rec.id) })));
+}
+function upStorage(S) {
+  const U = upState();
+  if (!S) return el('p', { class: 'small se', text: 'Loading what is kept…' });
+  const pending = (S.pending || []).filter(p => !U.rec || p.id !== U.rec.id);
+  return el('div', { class: 'upstore', 'data-up-storage': '1' },
+    el('p', { class: 'small', 'data-up-line': '1', title: `One file at most ${GBW(S.max)}; the disk keeps ${GBW(S.floor)} free (${GBW(S.free)} free now)`,
+      text: S.line }),
+    pending.length ? el('ul', { class: 'uplist' }, pending.map(p => el('li', { 'data-up-pending': p.id },
+      `${p.filename} · ${p.state === 'receiving' ? `${GBW(p.offset)} of ${GBW(p.size)}` : p.state} · ${p.by} · `,
+      p.state === 'receiving' ? el('button', { class: 'quiet', text: 'Resume', onclick: () => {
+        Object.assign(U, { rec: p, phase: 'paused', msg: `Pick ${p.filename} again: it goes on from ${GBW(p.offset)}.` }); render(); } })
+        : p.state === 'ready' ? el('button', { class: 'quiet', text: 'Add it', onclick: async () => {
+          upDetails(await api('api/uploads/' + p.id)); } }) : '',
+      ' · ', el('button', { class: 'quiet', text: 'Cancel', onclick: () => upCancel(p.id) })))) : '',
+    (S.files || []).length ? el('table', { class: 'mini uptable', 'data-up-files': '1' },
+      el('thead', {}, el('tr', {}, ['Model', 'File', 'Size', 'Added', 'By', ''].map(h => el('th', { text: h })))),
+      el('tbody', {}, S.files.map(r => el('tr', { 'data-up-file-row': r.model },
+        el('td', {}, el('a', { href: '#model=' + encodeURIComponent(r.model), text: r.name })),
+        el('td', { class: 'small mono', text: r.filename }),
+        el('td', { class: 'num', text: GBW(r.bytes) }),
+        el('td', {}, whenEl(r.at)),
+        el('td', { text: r.by }),
+        el('td', {}, U.del === r.model
+          ? el('span', { class: 'small', 'data-up-confirm': r.model }, `Delete ${r.name}? Its results stay. `,
+              el('button', { class: 'quiet', 'data-up-delete-yes': r.model, text: 'Delete it', onclick: () => upDelete(r.model) }), ' · ',
+              el('button', { class: 'quiet', text: 'Keep', onclick: () => { U.del = null; render(); } }))
+          : el('button', { class: 'quiet', 'data-up-delete': r.model, text: 'Delete',
+              disabled: r.busy ? '' : null, title: r.busy ? `Not now: ${r.busy}` : null,
+              onclick: () => { U.del = r.model; render(); } })))))) : '');
 }
 function servedCard(sf) {
   const S = state.srv, F = S.f;
@@ -18848,6 +19197,7 @@ function servedCard(sf) {
             Object.assign(sf, { hf_id: r.id, kind: 'instruct' });
             if (!SERVED_SUITES.includes(sf.suite)) sf.suite = 'everyday';
             state.qmsg = '';
+            toTestForm('');
             render();
           } }),
         r.gguf_path || isOpenRouter(r) ? '' : sameAsServed(r)))) : '');
@@ -18973,13 +19323,15 @@ async function orAdd(id, sf) {
   O.busy = id; O.msg = ''; render();
   try {
     const m = (await post('api/served/openrouter', { model: id, by: whoName() })).model;
-    O.msg = `Added ${m.name}: pinned to ${m.pin.version} on ${m.pin.provider_name}, with no `
-      + 'fallbacks. Pick what to test it on above — what it would cost shows before Start.';
+    O.msg = '';
     state.srv.list = null;
     await refreshResults();
     Object.assign(sf, { hf_id: m.id, kind: 'instruct', note: '' });
     if (!SERVED_SUITES.includes(sf.suite)) sf.suite = 'everyday';
     state.qmsg = '';
+    // 16b.1: the test form is next, with what happened on top of it
+    toTestForm(`Added ${m.name}: pinned to ${m.pin.version} on ${m.pin.provider_name}, with no `
+      + 'fallbacks. Choose what to test it on — what it would cost shows before Start.');
   } catch (e) { O.msg = String((e && e.message) || e); }
   O.busy = ''; render();
 }
@@ -19009,7 +19361,7 @@ function orRows(sf) {
       sid ? el('button', { class: 'quiet', 'data-or-test': sid, text: 'Test it', onclick: () => {
         Object.assign(sf, { hf_id: sid, kind: 'instruct' });
         if (!SERVED_SUITES.includes(sf.suite)) sf.suite = 'everyday';
-        state.qmsg = ''; render(); } }) : '',
+        state.qmsg = ''; toTestForm(''); render(); } }) : '',
       el('button', { class: sid ? 'quiet' : 'secondary', 'data-or-add': m.id,
         disabled: O.busy ? '' : null, text: O.busy === m.id ? 'Pinning…' : sid ? 'Pin again' : 'Add',
         title: sid ? 'pin it again, to the version and provider OpenRouter lists now' : '',
@@ -19070,7 +19422,12 @@ function openTest(prefill) {
   }
   state.testOpen = true;
   state.qmsg = '';
-  state.after = { focus: '[data-dialog="test"] [data-ms="submit"] input' };
+  // 16b.1: a model's page tests that model; the header adds one
+  const A = addState();
+  A.mode = id ? 'test' : 'add';
+  if (id) A.where = 'hf';
+  state.after = { focus: A.where === 'hf' ? '[data-dialog="test"] [data-ms="submit"] input'
+    : `[data-dialog="test"] [data-add-where="${A.where}"]` };
   render();
 }
 function closeTest() {
@@ -19110,12 +19467,14 @@ function renderTestAct() {
       el('span', { class: 't-short', text: 'Test' })));
   // 12b.3: on a model page it is that model's — the dialog opens with it
   // filled in (openTest takes state.model) — and it says so
-  const words = gg ? 'Measure this model' : state.model ? 'Test this model' : 'Test a model';
+  const words = gg ? 'Measure this model' : state.model ? 'Test this model' : 'Add a model';
   const btn = box.firstChild;
   btn.title = words;
   if (state.model) btn.dataset.testThis = state.model;
   else delete btn.dataset.testThis;
   btn.querySelector('.t-full').textContent = words;
+  // a phone's bar has room for one short word: Test on a model's page (Measure too), else Add
+  btn.querySelector('.t-short').textContent = state.model ? 'Test' : 'Add';
 }
 
 // ● n running: a pulsing dot while anything runs, "Runs" when nothing does.

@@ -239,7 +239,7 @@ def test_the_header_holds_four_places_and_no_more_menu(live, page):
     assert page.locator("#moreBtn, [data-tab='more'], #barMore, #themeBtn").count() == 0
     bar = page.locator("#bar")
     assert bar.locator("button.primary").count() == 1
-    assert bar.locator("button.primary").inner_text() == "Test a model"
+    assert bar.locator("button.primary").inner_text() == "Add a model"   # 16b.1
     assert "checks" not in bar.text_content()
     assert page.locator("#liveBadge").is_visible()
     shot(page, "12b-header-1512-light.png", clip={"x": 0, "y": 0, "width": 1512, "height": 60})
@@ -323,7 +323,7 @@ def test_test_a_model_opens_the_form_and_from_a_model_page_fills_it_in(live, pag
     page.locator("[data-test-model]").click()
     dlg = page.locator("[data-dialog='test']")
     dlg.wait_for()
-    assert dlg.locator("h2").text_content() == "Test a model"
+    assert dlg.locator("h2").first.text_content() == "Add a model"         # 16b.1
     assert dlg.locator("[data-suite-help]").count() == 1         # today's form, unchanged
     shot(page, "12b-test-a-model-1512-light.png")
     page.keyboard.press("Escape")

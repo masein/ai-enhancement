@@ -123,7 +123,7 @@ def test_nothing_needs_you_and_nothing_running_say_so(browser, payload):
         pg = s.open()
         pg.wait_for_selector("[data-needs-none]")
         assert pg.locator("[data-needs-none]").inner_text() == "Nothing needs you."
-        assert pg.locator("[data-running-none]").inner_text() == "Nothing running · Test a model"
+        assert pg.locator("[data-running-none]").inner_text() == "Nothing running · Add a model"
         pg.locator("[data-running-test]").click()
         pg.wait_for_selector("[data-dialog='test'] [data-submit-form]")
         assert s.errors == []

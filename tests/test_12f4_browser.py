@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 import gguf_data as gd
-from conftest import set_name
+from conftest import open_add, set_name
 from service import config
 from test_gguf_12f3 import docs_of
 
@@ -52,8 +52,7 @@ def home(page, live, width=1280):
 
 def test_measure_from_test_a_model_is_a_dialog_that_queues(live, page, gid):
     home(page, live)
-    page.locator("[data-test-model]").click()
-    page.locator("[data-gguf-card] > summary").click()
+    open_add(page, live["base"], "here")
     page.locator(f"[data-gg-open='{gid}']").click()
     dlg = page.locator("[data-dialog='gguf-measure']")
     dlg.wait_for()

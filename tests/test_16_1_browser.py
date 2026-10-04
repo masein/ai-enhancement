@@ -14,7 +14,7 @@ from urllib.parse import quote
 
 import pytest
 
-from conftest import open_filters, set_name
+from conftest import choose_where, open_filters, set_name
 from fake_openai import FakeServer
 from test_14_3_browser import go, no_sideways, steady_shot
 
@@ -130,7 +130,7 @@ def test_the_registration_form_suggests_a_size_from_the_name_behind_a_button(liv
     page.goto(live["base"] + "/#tab=home")
     set_name(page, ME)
     page.locator("[data-test-model]").click()
-    page.locator("[data-dialog='test'] summary", has_text="A model served elsewhere").click()
+    choose_where(page, "server")
     page.locator("#srv-name").fill("Qwen3.6-35B-A3B k4-LDA (phone build)")
     page.locator("#srv-based_on").fill("Qwen/Qwen3.6-35B-A3B")
     page.locator("#srv-name").press("Tab")

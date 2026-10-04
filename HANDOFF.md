@@ -4953,6 +4953,53 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 16b.1 — Add a model, with an upload from the browser (4 Oct)
+
+Brief: `docs/prompts/phase-16b-model-handover.md`, stage 1. masein's decisions
+(4 Oct): 30 GB a file, 150 GB in all, and no upload may leave less than 50 GB
+free on the disk (`/home` also holds `HF_HOME`).
+
+- **Add a model** (the header's button; "Test a model" before) asks where the
+  model is: On Hugging Face (today's form) · On my computer (new) · Running on
+  a server · On OpenRouter; under More, Already on this server (the path form,
+  for people with SSH). Each shows its part alone (`state.add.where`). A
+  model's page opens the same dialog as **Test this model**: its model, the
+  form alone (`mode: 'test'`). Adding a served or OpenRouter model goes on to
+  the test form, with what happened on top (`toTestForm`).
+- **The upload** (`service/uploads.py`, `GET/POST /api/uploads`, `PUT
+  /api/uploads/{id}?offset=N`, `…/finish`, `…/add`, `DELETE`):
+  - pieces of 64 MB of the raw file — never a form upload, which spools
+    through `/tmp` on the container's root disk — written off the main loop,
+    each at the offset the server has; a cut one keeps what arrived;
+  - resumable: the same file (name, size, date) started again resumes; after
+    a reload the page lists it with Resume, and the person picks the file again
+    (a browser can't reopen one by itself);
+  - refused before it starts, with the numbers: over `UPLOAD_MAX_GB` (30),
+    uploads and model folders over `ARTIFACT_QUOTA_GB` (150), or a disk that
+    would keep under `UPLOAD_FREE_GB` (50); a disk that fills meanwhile stops
+    the next piece;
+  - checked after: its sha256; a GGUF's header (`gguf_header.read`: arch,
+    quantisation, parameters, context, chat template — a file that isn't one is
+    refused, nothing kept); a zip with today's checks (`unpack_zip`, which `POST
+    /api/artifacts` uses too, now off the main loop);
+  - added under its details: a GGUF registered as the path form registers one,
+    its sha256 pinned from the upload, under `$BENCH_ROOT/uploads/gguf/` (the
+    host worker sees the same path); a folder as `local/<name>`. Its size,
+    filled from the header, is entered as the person confirms it. "Others can
+    download it" is kept for stage 2 (`uploads` table);
+  - its tests next: a GGUF's Measure, a folder's test form with what each
+    needs of the GPU, or Add without testing;
+  - an upload untouched for a day, finished or not, is removed.
+- **Storage, in view:** "Uploads: 62 of 150 GB", each kept file with its
+  size, date and who added it, and Delete that asks first, is refused while a
+  run uses the file (or a served model names it), and leaves the results.
+- **Nothing in an upload is ever run**, and two forms got stricter (new and
+  re-saved registrations only): the path form's file ends in `.gguf` with no
+  `..`, and no llama-perplexity flag names a file (`gguf.FILE_FLAGS`: `-o`,
+  `--log-file`, `--logits-file`, `-m`…) or is a path — the worker runs them as
+  masein on the host. The same for a served model's GGUF path and flags.
+- `ARTIFACT_MAX_GB` is 30 by default (it was 8), as decision 1 says.
+
 ### 16.8 — what the deployed board showed after phase 16 (4 Oct)
 
 - **A served model's thinking row takes its model's size** (16.1): sizes are

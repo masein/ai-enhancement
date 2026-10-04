@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import set_name
+from conftest import choose_where, open_add, set_name
 from fake_openai import FakeServer, nothing_listening
 from service import config, db, runner
 
@@ -146,8 +146,7 @@ def open_card(page, live, width=1400):
     page.set_viewport_size({"width": width, "height": 900})
     page.goto(live["base"] + "/#tab=home")
     set_name(page, "masein")
-    page.locator("[data-test-model]").click()
-    page.locator("[data-served-card] > summary").click()
+    open_add(page, live["base"], "server")
     page.wait_for_selector("[data-srv='name']")
 
 
@@ -163,8 +162,11 @@ def test_test_a_model_checks_a_server_and_saves_it(live, page, srv):
     assert rep.inner_text() == f"The server reports: {PIN}"
     assert "served/LDA-test-build" not in [m["id"] for m in get(live, "/api/served")["models"]]
     page.locator("[data-srv-save]").click()
-    page.wait_for_function("() => (document.querySelector('[data-srv-reported]') || {})"
-                           ".textContent?.startsWith('Saved')")
+    # 16b.1: the test form is next, with what happened on top of it
+    note = page.locator("[data-dialog='test'] [data-add-note]")
+    note.wait_for()
+    assert note.inner_text().startswith(f"Saved LDA test build, pinned to what the server "
+                                        f"reports: {PIN}.")
     assert "served/LDA-test-build" in [m["id"] for m in get(live, "/api/served")["models"]]
     # picked for the test, with what it can sit and the one line
     assert page.locator("[data-ms='submit'] input").input_value() == "served/LDA-test-build"
@@ -180,9 +182,11 @@ def test_test_a_model_checks_a_server_and_saves_it(live, page, srv):
     # judged is greyed only when there's no judge, as for any model: not for this
     assert page.locator("[role=option][data-value='judged']").get_attribute("title") != LINE
     page.keyboard.press("Escape")
-    # the key field is empty again: it is never shown
-    assert page.locator("[data-srv='key']").input_value() == ""
     shot(page.locator("[data-dialog='test'] .dlg"), "test-a-model-served.png")
+    # the key field is empty again: it is never shown
+    choose_where(page, "server")
+    page.wait_for_function("state.srv.list && !state.srv.loading")
+    assert page.locator("[data-srv='key']").input_value() == ""
     assert page.errors == []
 
 

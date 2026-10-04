@@ -17,7 +17,7 @@ import pytest
 
 import gguf_data as gd
 import gguf_worker as gw
-from conftest import set_name
+from conftest import open_add, set_name
 from fake_openai import FakeServer
 from service import config
 from test_gguf_12f3 import docs_of, fake_binary
@@ -226,8 +226,7 @@ def test_test_a_model_has_a_gguf_file_and_says_the_worker_is_down(live, page, me
     page.set_viewport_size({"width": 1400, "height": 1000})
     page.goto(live["base"] + "/#tab=home")
     set_name(page, "masein")
-    page.locator("[data-test-model]").click()
-    page.locator("[data-gguf-card] > summary").click()
+    open_add(page, live["base"], "here")
     down = page.locator("[data-gguf-card] [data-gguf-worker-down]")
     down.wait_for()
     assert down.inner_text().startswith("The GGUF worker isn't running.")
@@ -236,8 +235,7 @@ def test_test_a_model_has_a_gguf_file_and_says_the_worker_is_down(live, page, me
     (config.RESULTS_ROOT / "gguf_worker.json").write_text(json.dumps({"at": time.time()}))
     page.goto("about:blank")
     page.goto(live["base"] + "/#tab=home")
-    page.locator("[data-test-model]").click()
-    page.locator("[data-gguf-card] > summary").click()
+    open_add(page, live["base"], "here")
     page.wait_for_selector("[data-gg-list]")
     assert page.locator("[data-gguf-card] [data-gguf-worker-down]").count() == 0
     assert page.locator(f"[data-gg-row='{measured['gid']}']").count() == 1

@@ -49,8 +49,16 @@ SUBMIT_TOKEN = os.environ.get("SUBMIT_TOKEN", "")          # empty = no token re
 # Hub. They are ordinary model directories under ARTIFACTS_DIR and get evaluated
 # as `local/<name>`. Quotas exist because friends iterate and disks do not.
 ARTIFACTS_DIR = Path(os.environ.get("ARTIFACTS_DIR", BENCH_ROOT / "artifacts"))
-ARTIFACT_MAX_GB = float(os.environ.get("ARTIFACT_MAX_GB", "8"))     # per upload
+ARTIFACT_MAX_GB = float(os.environ.get("ARTIFACT_MAX_GB", "30"))    # per upload (16b: was 8)
 ARTIFACT_QUOTA_GB = float(os.environ.get("ARTIFACT_QUOTA_GB", "150"))  # total dir
+# 16b.1: a model added from a browser — a .gguf, or a folder as a .zip — kept
+# under BENCH_ROOT, so the host's GGUF worker sees the same path. One file at
+# most UPLOAD_MAX_GB; uploads and model folders together at most
+# ARTIFACT_QUOTA_GB (16b decision 1: 30 and 150); and none may leave less than
+# UPLOAD_FREE_GB free on the disk (masein, 4 Oct: /home also holds HF_HOME)
+UPLOADS_DIR = Path(os.environ.get("UPLOADS_DIR", BENCH_ROOT / "uploads"))
+UPLOAD_MAX_GB = float(os.environ.get("UPLOAD_MAX_GB", "30"))
+UPLOAD_FREE_GB = float(os.environ.get("UPLOAD_FREE_GB", "50"))
 
 # ---------------------------------------------------------------------------
 # Custom model code (transformers' trust_remote_code).

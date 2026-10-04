@@ -34,7 +34,7 @@ from pydantic import BaseModel
 from . import (ai_models, builder, chat, config, db, disk, hfmeta, judge_test, llm, llm_poller,
                startup, suggest, worker)
 from . import playground
-from . import gguf, gpu, phone, reported, served, sizes
+from . import gguf, gpu, phone, reported, served, sizes, uploads
 from . import proposals as prop
 from . import reader
 
@@ -610,8 +610,8 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
     srv = served.is_served(hf_id)
     if srv:
         if not served.get(hf_id):
-            raise HTTPException(422, f"{hf_id} is not registered: add it under Test a model ▸ "
-                                     f"A model served elsewhere. Nothing was queued.")
+            raise HTTPException(422, f"{hf_id} is not registered: add it under Add a model ▸ "
+                                     f"Running on a server. Nothing was queued.")
         if s.suite not in served.SUITES:
             raise HTTPException(422, served.LOGLIK_LINE + " Nothing was queued.")
         if s.thinking and s.suite != "devicemark":
@@ -952,7 +952,7 @@ async def artifact_upload(name: str, request: Request, x_token: str = Header(def
     dest = config.ARTIFACTS_DIR / name
     cap = int(config.ARTIFACT_MAX_GB * 1e9)
     quota = int(config.ARTIFACT_QUOTA_GB * 1e9)
-    used = _dir_bytes(config.ARTIFACTS_DIR)
+    used = uploads.used()                        # 16b.1: the browser's uploads count too
     # Refusing BEFORE the body is read makes a mid-send client see a bare
     # connection reset instead of the reason. The client declares Content-Length,
     # so size/quota can be judged up front; for a duplicate name, drain the body
@@ -984,34 +984,12 @@ async def artifact_upload(name: str, request: Request, x_token: str = Header(def
                     raise HTTPException(507, "artifact storage quota reached — delete "
                                              "old artifacts (GET /api/artifacts to list)")
                 fh.write(chunk)
-        import zipfile
-        with zipfile.ZipFile(tmp) as z:
-            infos = [i for i in z.infolist() if not i.is_dir()]
-            if sum(i.file_size for i in infos) > cap * 3:
-                raise HTTPException(413, "zip expands past three times the upload cap")
-            # strip a single shared top-level directory if the zip has one
-            roots = {i.filename.split("/", 1)[0] for i in infos}
-            strip = (roots.pop() + "/") if len(roots) == 1 and all(
-                "/" in i.filename for i in infos) else ""
-            dest.mkdir(parents=True)
-            for i in infos:
-                rel = i.filename[len(strip):] if i.filename.startswith(strip) else i.filename
-                target = (dest / rel).resolve()
-                if not str(target).startswith(str(dest.resolve()) + "/"):
-                    raise HTTPException(422, f"zip member escapes the artifact dir: {i.filename}")
-                target.parent.mkdir(parents=True, exist_ok=True)
-                with z.open(i) as src, open(target, "wb") as out:
-                    while True:
-                        buf = src.read(1 << 20)
-                        if not buf:
-                            break
-                        out.write(buf)
-        if not (dest / "config.json").exists():
-            raise HTTPException(422, "no config.json at the checkpoint root — zip the "
-                                     "directory save_pretrained() produced")
-        if list(dest.glob("*.bin")):
-            raise HTTPException(422, "pickle-format weights (*.bin) execute code on load "
-                                     "and are refused — re-save with safetensors")
+        # 16b.1: unpacked with the browser upload's checks, off the main loop —
+        # it stalled every request, chat streams included
+        try:
+            await asyncio.to_thread(uploads.unpack_zip, tmp, dest, cap)
+        except uploads.Refused as e:
+            raise HTTPException(e.code, str(e)) from e
         return {"model_id": f"local/{name}", "bytes": _dir_bytes(dest)}
     except HTTPException:
         import shutil
@@ -1038,6 +1016,133 @@ def served_up(id: str = ""):
     up = chat.served_up(id)
     return {"id": id, "up": up, "why": "" if up else chat.NOT_RUNNING + "."
             if up is False else chat.CHECKING + "."}
+
+
+# ---------------------------------------------------------------------------
+# 16b.1: Add a model ▸ On my computer — a .gguf file, or a model folder as a
+# .zip, in pieces that resume (service/uploads.py)
+# ---------------------------------------------------------------------------
+
+class UploadIn(BaseModel):
+    filename: str
+    size: int
+    mtime: float = 0
+    name: str = ""
+    by: str = ""
+
+
+class UploadAddIn(BaseModel):
+    name: str = ""
+    based_on: str = ""
+    how: str = ""
+    total: str | float | None = None
+    active: str | float | None = None
+    download: bool = True
+    by: str = ""
+
+
+def _refused(e: "uploads.Refused"):
+    return HTTPException(e.code, str(e))
+
+
+@app.get("/api/uploads")
+def uploads_index():
+    return uploads.storage()
+
+
+@app.post("/api/uploads")
+def upload_start(f: UploadIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    try:
+        return uploads.start(f.model_dump(), f.by)
+    except uploads.Refused as e:
+        raise _refused(e) from e
+
+
+_PIECE_LOCKS: dict[str, asyncio.Lock] = {}
+
+
+@app.put("/api/uploads/{uid}")
+async def upload_piece(uid: str, request: Request, offset: int = 0,
+                       x_token: str = Header(default="")):
+    """one piece at the offset the server has; a cut one keeps what arrived,
+    and the next starts there"""
+    _check_token(x_token)
+    lock = _PIECE_LOCKS.setdefault(uid, asyncio.Lock())
+    if lock.locked():
+        raise HTTPException(409, "A piece of this upload is being written: wait for it.")
+    async with lock:
+        try:
+            rec = uploads.at_offset(uid, offset)
+        except uploads.Refused as e:
+            raise _refused(e) from e
+        room = min(uploads.PIECE, rec["size"] - offset)
+        got, buf = 0, bytearray()
+        fh = await asyncio.to_thread(open, uploads.data_path(uid), "ab")
+        try:
+            async for chunk in request.stream():
+                got += len(chunk)
+                if got > room:
+                    raise HTTPException(413, f"A piece is at most {room} bytes here.")
+                buf += chunk
+                if len(buf) >= 4 << 20:
+                    await asyncio.to_thread(fh.write, bytes(buf))
+                    buf.clear()
+            if buf:
+                await asyncio.to_thread(fh.write, bytes(buf))
+        finally:
+            await asyncio.to_thread(fh.close)
+            uploads.touch(uid)
+    return {"id": uid, "offset": uploads.offset(uid), "size": rec["size"]}
+
+
+@app.get("/api/uploads/{uid}")
+def upload_get(uid: str):
+    try:
+        return uploads.get(uid)
+    except uploads.Refused as e:
+        raise _refused(e) from e
+
+
+@app.post("/api/uploads/{uid}/finish")
+def upload_finish(uid: str, x_token: str = Header(default="")):
+    _check_token(x_token)
+    try:
+        return uploads.finish(uid)
+    except uploads.Refused as e:
+        raise _refused(e) from e
+
+
+@app.post("/api/uploads/{uid}/add")
+def upload_add(uid: str, f: UploadAddIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    try:
+        got = uploads.register(uid, f.model_dump(), f.by)
+    except uploads.Refused as e:
+        raise _refused(e) from e
+    _cache.update(key=None, payload=None, at=0.0)
+    return got
+
+
+@app.delete("/api/uploads/{uid}")
+def upload_cancel(uid: str, x_token: str = Header(default="")):
+    _check_token(x_token)
+    try:
+        return uploads.cancel(uid)
+    except uploads.Refused as e:
+        raise _refused(e) from e
+
+
+@app.delete("/api/uploads/file/{model_id:path}")
+def upload_delete(model_id: str, x_token: str = Header(default="")):
+    """a kept upload's file — refused while a run uses it; its results stay"""
+    _check_token(x_token)
+    try:
+        got = uploads.delete(model_id)
+    except uploads.Refused as e:
+        raise _refused(e) from e
+    _cache.update(key=None, payload=None, at=0.0)
+    return got
 
 
 @app.get("/api/models/suggest")
