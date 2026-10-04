@@ -2145,6 +2145,16 @@ def size_of(mid: str, r: dict, served: dict, entered: dict, files: dict,
     if e and e.get("total"):
         return {"total": e["total"], "active": e.get("active"), "src": "entered", "by": e.get("by")}
     arch = (r or {}).get("archinfo") or {}
+    # 16.8: a thinking row is its model in thinking mode: its model's size, the
+    # row its folder names (base_model) or its id without " · thinking". Sizes
+    # are entered for the model, never for its thinking row
+    if mid.endswith(" · thinking"):
+        own = str(arch.get("base_model") or "").strip() or mid.removesuffix(" · thinking")
+        if own != mid and own not in _seen:
+            got = size_of(own, (by_model or {}).get(own) or {}, served, entered, files, by_model,
+                          gguf_reg, _seen + (mid,))
+            if got.get("total"):
+                return {**got, "of": own}
     if (r or {}).get("num_params"):
         return {"total": r["num_params"], "active": arch.get("active_params"), "src": "config"}
     sv = (served or {}).get(mid) or {}
@@ -2160,7 +2170,8 @@ def size_of(mid: str, r: dict, served: dict, entered: dict, files: dict,
                           _seen + (mid,))
             if got.get("total"):
                 return {**got, "src": "base", "base": base}
-    if mid in (served or {}) or mid.startswith("gguf/") or reg:
+    # a served row's name is never read, in the served lookup or not (16.8)
+    if mid in (served or {}) or mid.startswith(("gguf/", "served/")) or reg:
         return {"total": None, "active": None, "src": None}
     total, active = sizes_from_name(mid)
     return {"total": total, "active": active if total else None, "src": "name" if total else None}
@@ -2476,6 +2487,8 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             # 16.1: "35B · 3B active"; who entered it, or the base it came from
             "activeParams": size.get("active"), "paramsBy": size.get("by"),
             "paramsBase": size.get("base"),
+            # 16.8: a thinking row's size is its model's row's
+            "paramsOf": size.get("of"),
             "backend": r["backend"], "dtype": r["dtype"],
             "batch": r["batch_size"], "chat": r["chat_template"],
             "seed": r["seed"], "limit": r["limit"],
@@ -3850,14 +3863,14 @@ table.lb td.tcell .se { font-family:var(--font-mono); display:inline; }
 table.lb td.model { position:sticky; left:32px; background:var(--surface-1); z-index:1;
   padding-left:12px; max-width:280px; }
 table.lb td.model .badge { margin-left:0; padding:0 4px; }
-table.lb .mcell { display:flex; align-items:center; gap:4px; max-width:260px; overflow:hidden;
-  white-space:nowrap; }
+table.lb .mcell { display:flex; align-items:center; gap:4px; max-width:var(--namew, 260px);
+  overflow:hidden; white-space:nowrap; }
 table.lb .mcell .mname { flex:0 3 auto; min-width:40px; max-width:none; overflow:hidden;
   text-overflow:ellipsis; }
 /* 12f.2b: a phone build's row carries a setup in its name, "k4-LDA · lookahead 1" */
 /* 12m.1: 22px more for the Compare tick before the name */
 table.lb td.model:has([data-phone-tag]) { max-width:362px; }
-table.lb td.model:has([data-phone-tag]) .mcell { max-width:342px; }
+table.lb td.model:has([data-phone-tag]) .mcell { max-width:var(--namew, 342px); }
 /* a long badge ("duplicate of <name>") gives way too, after the name: every
    child stays inside the cell. The short ones (base, prelim) keep their word */
 table.lb .mcell .badge { flex:none; white-space:nowrap; }
@@ -3909,6 +3922,14 @@ table.lb tr.detail table.mini { width:100%; }
 table.lb tbody td.model { box-shadow:inset 3px 0 0 var(--fam, var(--axis)); }
 table.lb td.model .mname { display:inline-block; max-width:190px; overflow:hidden;
   text-overflow:ellipsis; vertical-align:bottom; }
+/* 16.8: inside its block a name has the column's width (fitNames sets
+   --namew from the column the widest row made), less its badges; one still
+   cut shows its short form, which keeps the end where two setups differ */
+table.lb td.model .mcell .mname { max-width:none; }
+@media (min-width:601px) {
+  .mname[data-cut] .mn-full { display:none; }
+  .mname[data-cut] .mn-short { display:inline; }
+}
 table.lb th.model { position:sticky; left:32px; z-index:3; }
 /* 12z C7: the DeviceMark view has few columns and few rows: a name is
    whole, in two lines when it needs them — two setups of one file differ at
@@ -4688,11 +4709,13 @@ sup.fr-mark { color:var(--text-secondary); margin-left:1px; }
 @media (min-width:721px) {
   .fsheet { position:static; max-height:none; border:1px solid var(--border);
     border-radius:var(--r-2); box-shadow:none; margin:8px 0 4px; padding:12px 14px; }
-  .fsheet .pills { flex-direction:row; flex-wrap:wrap; align-items:center; }
-  .fsheet .pills .pill { width:auto; }
 }
-.fsheet .pills { display:flex; flex-direction:column; align-items:stretch; gap:8px; margin:0; }
-.fsheet .pills .pill { width:100%; text-align:left; justify-content:space-between; }
+/* 16.8: one row of compact menus that wraps, at every width. The column
+   rule came after the wide screen's row, so it won everywhere: six full-width
+   rows stacked */
+.fsheet .pills { display:flex; flex-direction:row; flex-wrap:wrap; align-items:center; gap:8px;
+  margin:0; }
+.fsheet .pills .pill { width:auto; }
 /* 16.3: Models' three rows — which tests and Table or Chart; the menus; what is on */
 .lbrow1 { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center;
   gap:6px 12px; margin:8px 0 0; }
@@ -5380,9 +5403,11 @@ const num  = (v, d = 3) => v == null ? '—'
 const activeOf = m => m.activeParams || (m.archinfo || {}).active_params || null;
 const sizeText = m => m.params ? P(m.params) + (activeOf(m) ? ` · ${P(activeOf(m))} active` : '') : '';
 function sizeTip(m) {
-  return { entered: `entered by ${m.paramsBy || 'someone'}`, config: 'from the harness config',
+  const w = { entered: `entered by ${m.paramsBy || 'someone'}`, config: 'from the harness config',
     file: 'from the file', base: `from its base model, ${m.paramsBase || ''}`,
     name: 'from the model name' }[m.paramsSrc] || '';
+  // 16.8: a thinking row is its model in thinking mode, of its model's size
+  return w && m.paramsOf ? `its model's size (thinking off), ${w}` : w;
 }
 // "908M active · 64 experts, 8 per token": a mixture of experts' line
 function activeTip(m) {
@@ -9820,10 +9845,15 @@ function lbSortLabel(cols) {
 // 11b: one mono line above a big table — what is on screen, out of what, and
 // how it is sorted. "Showing 1–25 of 32 models · 15 ranked · sorted by Avg ▼".
 function statusLine(pg, noun, extra) {
-  const bits = [`Showing ${pg.from}–${pg.to} of ${pg.total} ${noun}`];
+  // 16.8: Models' count is in its toolbar: its line says the rows only when
+  // there is more than one page of them
+  const one = noun === 'models' && pg.from <= 1 && pg.to >= pg.total;
+  const bits = one ? [] : [noun === 'models' ? `Rows ${pg.from}–${pg.to} of ${pg.total} in the table`
+    : `Showing ${pg.from}–${pg.to} of ${pg.total} ${noun}`];
   for (const x of [].concat(extra || [])) if (x) bits.push(x);
   const line = el('p', { class: 'statusline', 'data-statusline': noun }, bits.join(' · '));
-  if (LIVE && DATA) line.append(' · ', el('span', { class: 'dot ok' }), `live ${checkedAt()}`);
+  if (LIVE && DATA) line.append(bits.length ? ' · ' : '', el('span', { class: 'dot ok' }),
+    `live ${checkedAt()}`);
   return line;
 }
 
@@ -11443,7 +11473,10 @@ function lbColTipOf(c) {
       + 'across methods'] : []), state.avgMode === 'raw'
     ? 'the mean of the chosen benchmarks\u2019 raw scores; the Scale pill switches it'
     : '0 = guessing, 100 = perfect, so a 25% guess on a 4-option test counts as 0'];
-  if (c.key === 'name') return ['Model — sort by name'];
+  if (c.key === 'name') return ['Model — sort by name',
+    // 16.8: what the boxes before the names are for
+    ...(lbS().view === 'standard' ? ['The box before a name: tick two to eight models, then '
+      + 'Compare ▸ lays them side by side'] : [])];
   if (c.key === 'params') return ['Params — parameter count, from the harness config or the name'];
   if (c.key === 'date') return ['Tested — when the model’s latest finished run was, any kind: '
     + 'the standard tests, a judged, Everyday, DeviceMark, served or GGUF run'];
@@ -13250,8 +13283,9 @@ function lbEveryday(ms) {
           onclick: ev => { if (ev.target.closest('a, button')) return;
             navigate({ model: m.id, topic: null }); } },
         el('td', { class: 'model pin', 'data-model': m.id },
-          mnameLink(m, evShort, { href: '#model=' + encodeURIComponent(m.id) }),
-          phoneTag(m) || servedTag(m.id)),
+          el('div', { class: 'mcell' },
+            mnameLink(m, evShort, { href: '#model=' + encodeURIComponent(m.id) }),
+            phoneTag(m) || servedTag(m.id))),
         groups.map(([g, label]) => {
           const n = evdGroupCount(e, g);
           return el('td', { class: 'num' + (n && !evdMissing(e) ? '' : ' se'), 'data-evd-g': g,
@@ -13877,6 +13911,13 @@ function vLeaderboard(ms) {
   // (a server this chip can ask its written tasks is only not tested yet)
   const cannot = m => narrow(m) && !couldHave(m);
   const lbAll = ordered.filter(m => !(m.duplicateOf && dupsOf[m.duplicateOf]) && testedIn(m));
+  // 16.8: where each model that matches the filters is — they add up
+  const folded = m => !!(m.duplicateOf && dupsOf[m.duplicateOf]);
+  const unlisted = ordered.filter(m => !folded(m) && !testedIn(m) && !L.models
+    && (cannot(m) || m.rowOf));
+  const lbCounts = { table: lbAll.length, not: notTested.length,
+    dup: ordered.filter(folded).length, cannot: unlisted.filter(cannot).length,
+    setup: unlisted.filter(m => !cannot(m)).length };
   // 12z C10: a group of llama.cpp columns no row here has a number in is not
   // shown: seven columns of dashes said nothing. Chosen by name, it stays
   if (!custom && !lbAll.some(m => visCols.some(c => c.gguf && val(m, c) != null)))
@@ -14024,6 +14065,7 @@ function vLeaderboard(ms) {
             // 12m.1: tick two to eight rows, then Compare ▸
             L.view === 'standard' ? el('input', { type: 'checkbox', class: 'cmptick',
               'data-cmp-tick': m.id, 'aria-label': 'compare ' + m.name,
+              title: 'Tick two to eight models to compare them',
               checked: (L.ticks || []).includes(m.id) ? '' : null,
               onchange: e => { const t = new Set(L.ticks || []);
                 if (e.target.checked) t.add(m.id); else t.delete(m.id);
@@ -14037,8 +14079,9 @@ function vLeaderboard(ms) {
             m.thinkingRow || ((m.gen || {}).thinking || {}).mode === 'always'
               ? el('span', { class: 'badge instruct', 'data-thinking-badge': m.id,
                   title: genMode(m), text: 'thinking' }) : '',
-            // a thinking row has only these three: Standard's "preliminary" is not its
-            m.thinkingRow || m.served || ggufOnly(m) || dmv ? ''
+            // a thinking row has only these three: Standard's "preliminary" is not its.
+            // 16.8: "prelim 0/7" counts Standard's required benchmarks: Standard's alone
+            m.thinkingRow || m.served || ggufOnly(m) || dmv || lbTest(L) !== 'standard' ? ''
               : warnBadge(m) || '', dupBadge(m) || '',
             dupsOf[m.id] ? dupToggle(m, dupsOf[m.id]) : ''));
         if (c.key === 'params') {
@@ -14261,7 +14304,7 @@ function vLeaderboard(ms) {
     thead, tbody));
   return [el('div', { class: 'card', 'data-lb-card': '1' },
       ...modelsHead(L.view === 'exam' ? judgeChecked() : ''),
-      lbToolbar(ms, cols, shown, nHidden),
+      lbToolbar(ms, cols, shown, nHidden, lbCounts),
       L.chip === 'knowledge' && staleSentence(ms) && !custom
         ? el('p', { class: 'warn', 'data-stale-diag': '1', text: staleSentence(ms) }) : '',
       repHiddenLine(),
@@ -14270,6 +14313,7 @@ function vLeaderboard(ms) {
       lbCustomLine(lbAll.length, lbAll.filter(m => (L.cols || DATA.accTasks)
         .some(t => benchVal(t, m.id) != null) || dataCols.some(c => (c.gguf || c.dm)
           && val(m, c) != null)).length),
+      // 16.8: the toolbar has the count; "Showing" only says which page
       statusLine(lbPg, 'models', [
         // 16.3: "ranked" where the board's Avg ranks — not on Mobile's views
         !cols.some(c => c.key === 'avg') || custom || dmv ? null
@@ -14290,7 +14334,8 @@ function vLeaderboard(ms) {
           + (nMiss ? ` ${nMiss} ${nMiss === 1 ? 'is' : 'are'} under the line with what `
             + `${nMiss === 1 ? 'it’s' : 'they’re'} missing` : '')
           + (nCan ? `${nMiss ? ';' : ''} ${nCan} can’t be measured this way (served or GGUF)` : '')
-          : `None of the ${rowsIn.length} has a number in these columns.`;
+          // 16.8: the toolbar counts them, and says where each is
+          : 'No model that matches the filters has a number in these columns.';
         return el('div', { class: 'empty', 'data-empty': '1', 'data-none-has': `${nMiss}|${nCan}` },
           el('p', {}, text, offers.flatMap(o => [' · ', o])),
           custom ? el('button', { class: 'secondary', 'data-empty-action': '1', text: 'Reset',
@@ -14349,6 +14394,74 @@ function chipsInSight(root) {
     chipsEdge(row);
   }
 }
+// 16.8: a name in a table's Model column takes the width its column has. The
+// widest row makes the column (its block capped, 260px, or 342px for a phone
+// build's), and every other row's block may then use all of it: before, each
+// was capped on its own, and a name was cut beside empty room. A name still
+// cut shows its short form (shortNames: the words it shares at the front
+// with the others give way, never its end), so two rows on screen never read
+// the same; the whole name is on hover. On a phone the short forms are
+// always shown, in two lines. All reads, then all writes: one layout
+let _fitCtx = null;
+function textWidth(s, font) {
+  _fitCtx = _fitCtx || document.createElement('canvas').getContext('2d');
+  _fitCtx.font = font;
+  return _fitCtx.measureText(s).width;
+}
+// a cut name as "front…end", in w: its end in whole words — at least what
+// shortNames kept, where it differs from the others, and up to about half the
+// room — then as much of its front as fits. `scale` turns the canvas's width
+// into the page's (the name's own, measured whole)
+function fitLabel(full, short, w, font, scale) {
+  const tail = short.replace(/^…/, '');
+  if (!full.endsWith(tail) || tail === full) return short;
+  const wd = s => textWidth(s, font) * scale;
+  const words = full.match(/[^\s\-_·/]+[\s\-_·/]*|^[\s\-_·/]+/g) || [full];
+  let end = tail;
+  for (let i = words.length - 1; i > 0; i--) {
+    const more = words.slice(i).join('');
+    if (more.length <= end.length) continue;
+    if (wd(more) > 0.45 * w) break;
+    end = more;
+  }
+  const head = full.slice(0, full.length - end.length);
+  const at = k => head.slice(0, k).replace(/[\s\-_·/]+$/, '') + '…' + end;
+  let lo = 0, hi = head.length;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (wd(at(mid)) <= w) lo = mid; else hi = mid - 1;
+  }
+  if (lo > 0 && head.slice(0, lo).trim()) return at(lo);
+  // no room for any front: the end alone, losing its own front first
+  let e = end;
+  while (e.length > tail.length && wd('…' + e) > w) e = e.slice(1);
+  return '…' + e.replace(/^[\s\-_·/]+/, '');
+}
+function fitNames(root) {
+  if (!matchMedia('(min-width:601px)').matches) return;
+  const tables = [...(root || document).querySelectorAll('table.lb')]
+    .filter(t => t.querySelector('tbody td.model .mcell'));
+  for (const t of tables) {
+    t.style.removeProperty('--namew');
+    t.querySelectorAll('.mname[data-cut]').forEach(n => n.removeAttribute('data-cut'));
+  }
+  const widths = tables.map(t => {
+    const td = t.querySelector('tbody td.model'), cs = getComputedStyle(td);
+    return Math.floor(td.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
+  });
+  tables.forEach((t, i) => t.style.setProperty('--namew', widths[i] + 'px'));
+  const cut = tables.flatMap(t => [...t.querySelectorAll('tbody td.model .mname')]
+    .filter(n => n.querySelector('.mn-short') && n.scrollWidth > n.clientWidth + 1))
+    .map(n => {
+      const full = n.getAttribute('title') || '', font = getComputedStyle(n).font;
+      return [n, fitLabel(full, n.querySelector('.mn-short').textContent, n.clientWidth - 1, font,
+        n.scrollWidth / Math.max(1, textWidth(full, font)))];
+    });
+  for (const [n, label] of cut) {
+    n.querySelector('.mn-short').textContent = label;
+    n.dataset.cut = '1';
+  }
+}
 function hfadeUpdate(root) {
   // 11k: the Queue's table painted across its card at 1,512px — .stick left
   // the scroller with overflow:visible, so only the Leaderboard clipped. Now
@@ -14378,7 +14491,7 @@ function hfadeUpdate(root) {
     upd();
   });
 }
-window.addEventListener('resize', () => hfadeUpdate());
+window.addEventListener('resize', () => { fitNames(); hfadeUpdate(); });
 
 // "1 duplicate ▸": on the row, and in the opened row where a phone can reach it
 function dupToggle(m, dups) {
@@ -14398,7 +14511,7 @@ function motionOff() { return matchMedia('(prefers-reduced-motion: reduce)').mat
 // ---- the toolbar: one row ---------------------------------------------------
 // 16.3: Row 2 — Group ▾, Models ▾, Filters ▾, Columns ▾ — the saved views,
 // and Row 3: a chip for each filter on, Clear all, and how many models
-function lbToolbar(ms, cols, shown, nHidden) {
+function lbToolbar(ms, cols, shown, nHidden, counts = null) {
   const L = lbS(), test = lbTest(L);
   // the benchmarks in view now, for Columns ▾ and the Chart: read when used,
   // as the panel outlives the render that built it
@@ -14428,7 +14541,8 @@ function lbToolbar(ms, cols, shown, nHidden) {
         'data-lb-chips': '1', 'data-hkeep': 'lb-chips', onscroll: e => chipsEdge(e.currentTarget) },
       el('span', { class: 'small se', text: 'Saved views' }), ...state.views.map(viewChip)) : '';
   // Row 3 while a filter is on; else its count ends Row 2, not a line of its own
-  const active = lbActiveRow(ms), count = active.dataset.lbActive === '0' ? active.lastChild : null;
+  const active = lbActiveRow(ms, counts), count = active.dataset.lbActive === '0' ? active.lastChild
+    : null;
   return el('div', { class: 'lbbar narrow' },
     el('div', { class: 'chiprow', 'data-lb-row2': '1' },
       el('div', { class: 'pickers', 'data-pickers': '1' },
@@ -14456,7 +14570,23 @@ function lbFiltersOn() {
 }
 // 16.3: Row 3 — a chip for each filter on (and the models chosen), Clear all,
 // and the count: "9 of 56 models"
-function lbActiveRow(ms) {
+// 16.8: one count, read at a glance — how many models match the filters, and
+// of those how many are in the table, how many are under "Not tested on this",
+// and what the rest are. Before, "56 of 56 models" counted the filters' and
+// "Showing 1–20 of 20 models" the table's, side by side
+function lbCountWords(n, all, c) {
+  const s = k => k === 1 ? '' : 's';
+  const head = n === all ? `${all} model${s(all)}` : `${n} of ${all} models match the filters`;
+  if (!c) return head;
+  const bits = [`${c.table} in the table`,
+    c.not ? `${c.not} not tested on this` : '',
+    c.dup ? `${c.dup} duplicate${s(c.dup)} under ${c.dup === 1 ? 'its' : 'their'} original` : '',
+    c.setup ? `${c.setup} setup${s(c.setup)} measured with ${c.setup === 1 ? 'its' : 'their'} file`
+      : '',
+    c.cannot ? `${c.cannot} can't be tested this way` : ''].filter(Boolean);
+  return `${head}: ${bits.join(' · ')}`;
+}
+function lbActiveRow(ms, counts = null) {
   const L = lbS(), on = [];
   const lc = w => w.charAt(0).toLowerCase() + w.slice(1);
   const sizes = sizeSel(L.size);
@@ -14481,7 +14611,12 @@ function lbActiveRow(ms) {
       on.length > 1 || (on.length && on[0][0] !== 'models') ? el('button', { class: 'quiet',
         'data-clear-all': '1', text: 'Clear all', onclick: lbClearAll }) : ''),
     el('span', { class: 'small se lbcount', 'data-lb-count': `${n}|${ms.length}`,
-      text: `${n} of ${ms.length} model${ms.length === 1 ? '' : 's'}` }));
+      'data-lb-counts': counts ? [counts.table, counts.not, counts.dup, counts.setup, counts.cannot]
+        .join('|') : null,
+      title: counts && (counts.cannot || counts.setup) ? 'Can’t be tested this way: a model '
+        + 'served elsewhere or a GGUF file, which these columns can’t be measured on. A setup '
+        + 'is measured with its file, on the file’s row.' : null,
+      text: lbCountWords(n, ms.length, counts) }));
 }
 function lbClearAll() {
   state.avgMode = 'chance';
@@ -14596,6 +14731,9 @@ function lbTestedHidden(ms) {
 // 12m.1: "Compare 3 ▸" while two to eight rows are ticked
 function cmpGo() {
   const n = (lbS().ticks || []).length;
+  // 16.8: one tick changed nothing in view: it says what comes next, where the button will be
+  if (n === 1) return el('span', { class: 'small se cmpone', 'data-cmp-one': '1',
+    text: 'Tick one more to compare' });
   if (n < 2) return '';
   return el('button', { class: 'pill on', 'data-cmp-go': String(n), disabled: n > CMP_TOP ? '' : null,
     title: n > CMP_TOP ? `a comparison holds ${CMP_TOP}: untick ${n - CMP_TOP}` : null,
@@ -15719,7 +15857,9 @@ function radarBlock(ms) {
     : radarSvg(axes, ids.map(id => ({ m: DATA.models.find(x => x.id === id),
         color: trColor(state.cmpColors[id] ?? ids.indexOf(id)) })));
   return el('div', { class: 'ibox', 'data-radar': '1' }, head, chips, src, body,
-    calOk ? '' : el('p', { class: 'small se', text: 'Judged by area: ' + judgedOffWhy() + '.' }));
+    // 16.8: and nothing about it while the exam is switched off
+    calOk || !examOn() ? '' : el('p', { class: 'small se', 'data-radar-judged-why': '1',
+      text: 'Judged by area: ' + judgedOffWhy() + '.' }));
 }
 
 function radarSvg(axes, series) {
@@ -17830,6 +17970,24 @@ function gpuNeedBit(sf) {
   if (!j.line) return '';
   return el('p', { class: 'small', 'data-gpu-need': j.when || '1', text: j.line });
 }
+// 16.8: whether a served model's server answers (GET api/served/up), asked
+// again every 2 s while Test a model waits on it; a change redraws the dialog
+function srvUp(id, again = false) {
+  const U = state.srvUp = state.srvUp || {};
+  const s = U[id];
+  if (!s || again || (s.up !== true && !s.busy && Date.now() - s.at > 2000)) {
+    if (s && s.busy) return s.up;
+    U[id] = { up: s ? s.up : null, at: Date.now(), busy: true };
+    api('api/served/up?id=' + encodeURIComponent(id)).then(j => {
+      const was = s ? s.up : undefined;
+      U[id] = { up: j.up, at: Date.now(), busy: false };
+      if (j.up !== was) render();
+      if (j.up !== true) setTimeout(() => {
+        if (state.testOpen && state.sub.hf_id.trim() === id) srvUp(id, true); }, 2000);
+    }).catch(() => { U[id] = { up: s ? s.up : null, at: Date.now(), busy: false }; });
+  }
+  return (U[id] || {}).up;
+}
 function gpuNeedPaint() {
   const slot = document.querySelector('[data-gpu-need-slot]');
   if (slot && state.sub) slot.replaceChildren(gpuNeedBit(state.sub));
@@ -17935,6 +18093,11 @@ function vQueue(part = { form: true, list: true }) {
   // person clears it, and its run's cost shows before Start
   const orRec = srvId ? servedOf(sf.hf_id.trim()) : null;
   const orId = isOpenRouter(orRec);
+  // 16.8: a served model's server answers, or Start waits for it — the
+  // Playground picker's own check. A run that met a dead server failed in seconds
+  const upOf = srvId && !orId ? srvUp(sf.hf_id.trim()) : true;
+  const srvWhy = upOf === true ? '' : upOf === false ? 'Its server isn\u2019t running.'
+    : 'Checking that its server answers\u2026';
   if (orId && sf.suite === 'generative' && sf.subsetFor !== sf.hf_id.trim()) {
     sf.subset = orRec.subset || 0;
     sf.subsetFor = sf.hf_id.trim();
@@ -18235,7 +18398,7 @@ function vQueue(part = { form: true, list: true }) {
   function gateSubmit() {
     const code = info ? ownCodeWhy(info, !!sf.allow) : '';
     const w = judgedOff() ? (cannotRun(sf.hf_id) ? noWeightsWhy(sf.hf_id.trim()) : judgeWhy())
-      : code || (orId ? orGate(sf) : '') || (sf.suite === 'judged' && built.length
+      : code || (orId ? orGate(sf) : '') || srvWhy || (sf.suite === 'judged' && built.length
                  && !(sf.tasks || []).length && !sf.control ? 'Tick at least one topic.' : '');
     btn.disabled = !!w;
     btn.title = w;
@@ -18250,6 +18413,9 @@ function vQueue(part = { form: true, list: true }) {
       el('p', { class: 'sub', 'data-suite-help': '1', text: 'Pick a model and what to test. '
         + 'One test runs at a time; results appear on Models.' }),
       el('div', { class: 'frm' }, f.hf_id, srvId ? '' : f.kind, f.suite, f.note, btn,
+        // 16.8: beside Start, while it waits for the server
+        srvWhy ? el('span', { class: 'warn small', 'data-why': 'server-down',
+          'data-srv-up': String(upOf), text: srvWhy }) : '',
         srvId ? el('span', { class: 'propwhy', 'data-why': 'served' },
           orId ? servedTag(sf.hf_id.trim()) : el('span', { class: 'badge served',
             title: (servedOf(sf.hf_id.trim()) || {}).how || '', text: 'served' }),
@@ -18261,6 +18427,13 @@ function vQueue(part = { form: true, list: true }) {
           ? el('span', { class: 'propwhy', 'data-why': 'submit', text: judgeWhy() }) : '',
         ownWhy),
       ownCodeBox(info, sf.allow, v => { sf.allow = v; gateSubmit(); }, 'submit'),
+      // 16.8: a part the judge marks, while the judge isn't answering: said before Start
+      judgeDown() && ((sf.suite === 'mobile' && ['judged', 'trust'].includes(sf.part || ''))
+        || ['safety', 'shared'].includes(sf.suite))
+        ? el('p', { class: 'warn small', 'data-judge-needed': sf.suite, text: 'The judge marks '
+          + 'these answers, and it isn\u2019t answering now: '
+          + ((state.judgeHealth || {}).why || 'the grading model is not answering')
+          + '. The run can start; its marks wait until the judge answers.' }) : '',
       topicBoxes, genOpts, sharedOpts, mabOpts, bbqOpts,
       orId ? orEstimateLine(sf) : '',
       // 16.2: what it needs of the GPU, what is free, and when it starts
@@ -19165,7 +19338,10 @@ function catCard(c) {
   const nm = c.models != null ? c.models : c.tasks ? catModels(c.tasks) : null;
   const r = c.restriction || (c.tasks ? c.tasks.map(restrictOf).find(Boolean) : null);
   // a suite's questions are read from its parts
+  if (LIVE && !state.qxList) qxListLoad();
   const read = LIVE && !c.parts ? (c.tasks || []).filter(canBrowse) : [];
+  // 16.8: where they can't be, why — in the link's place
+  const whyNot = LIVE && !c.parts && !read.length ? (c.tasks || []).map(qxWhyNot).find(Boolean) : '';
   return el('article', { class: 'catcard' + (c.parts ? ' suite' : ''), 'data-cat-card': c.key,
       id: 'cat-' + c.key },
     el('h3', {}, c.name, rBadge(r, { 'data-cat-restriction': c.key })),
@@ -19190,6 +19366,7 @@ function catCard(c) {
         onclick: () => catSee(...c.see) }) : '',
       ...read.map(t => qxLink(t, { text: read.length > 1 ? `Read ${benchName(t)} ▸`
         : 'Read the questions ▸', 'data-cat-read': t })),
+      whyNot ? el('span', { class: 'small se', 'data-cat-noread': c.key, text: whyNot + '.' }) : '',
       c.manage ? el('button', { class: 'quiet', 'data-cat-manage': c.key, text: 'Manage questions ▸',
         onclick: c.manage }) : ''));
 }
@@ -19323,8 +19500,29 @@ function vCatalog() {
 // owner's audit, logged. GPQA is never listed
 // ===========================================================================
 // 14.4.4: never the full Mobile-MMLU's (non-commercial, kept apart)
-const canBrowse = t => !!LIVE && !!t && !/^gpqa/i.test(t) && t !== 'mobile_mmlu_full'
-  && !(DATA.pplTasks || []).includes(t);
+// 16.8: what the server says can be read — from a run's answers, or from the
+// benchmark's own file before any model has answered it. Until it says, the
+// old rule; a benchmark it doesn't list leads to no dead end
+const canBrowse = t => !!LIVE && !!t && !/^gpqa/i.test(t) && !(DATA.pplTasks || []).includes(t)
+  && (state.qxList ? state.qxList.has(t) : t !== 'mobile_mmlu_full');
+async function qxListLoad() {
+  if (state.qxListBusy || !LIVE || !netReady()) return;
+  state.qxListBusy = true;
+  try {
+    const j = await api('api/questions');
+    state.qxList = new Set((j.tasks || []).map(x => x.task));
+    state.qxWhy = j.why || {};
+  } catch (e) { /* the old rule meanwhile */ }
+  state.qxListBusy = false;
+  if (state.qxList) render();
+}
+// why a benchmark's questions can't be read, in the place of the link
+function qxWhyNot(t) {
+  const w = state.qxWhy || {};
+  if (/^gpqa/i.test(t)) return w.gpqa || '';
+  if ((DATA.pplTasks || []).includes(t)) return '';
+  return state.qxList && !state.qxList.has(t) ? (w.not_yet || '') : '';
+}
 function openQuestions(task, from) {
   Object.assign(state.qx, { task, offset: 0, q: '', subject: '', f: '', data: null, key: '',
     audit: false });
@@ -19482,6 +19680,14 @@ function vQuestions(ms) {
       + String(meta.revision).slice(0, 12) : ''].filter(Boolean).join(' · ') },
       meta.url ? [' · ', el('a', { href: meta.url, target: '_blank', rel: 'noopener',
         text: 'its card' })] : ''),
+    // 16.8: read from its file, before any model has answered it
+    d && d.from_file ? el('p', { class: 'small se', 'data-qx-from-file': task,
+      text: task === 'mobile_mmlu_full'
+        ? 'Read from its file on this server. The authors hold its answers back, so none is '
+          + 'shown, and no model\u2019s answer is beside them: its scores are on its own table.'
+        : 'Read from its file on this server: no model has answered it yet, so no result is '
+          + 'beside them.' + (d.rows.some(r => r.answer_idx != null || r.reference) ? ''
+            : ' Its file has no right answer to show.') }) : '',
     d ? el('p', { class: 'small', 'data-qx-counts': `${d.listed}|${d.other}` },
       X.audit ? `${d.listed.toLocaleString('en')} questions in this half, never listed — `
         + 'this opening is logged under Data & sources.'
@@ -23609,7 +23815,10 @@ function pgScore(m) {
 // 16.2: whether a model can answer now — worked out on the server
 // (chat.Engine.state) and asked again every few seconds — and the GPU's line
 const PG_STATE_WORDS = { ready: 'Ready', loads: 'Loads on the first message',
-  cpu: 'On the CPU, slower', not_now: 'Not now' };
+  cpu: 'On the CPU, slower', not_now: 'Not now',
+  // 16.8: a served model before its server's first answer: never "ready"
+  checking: 'Checking its server' };
+const PG_HOLDS = ['not_now', 'checking'];
 function pgStateOf(id) {
   const s = (state.pg.states || {})[id] || pgModel(id) || {};
   return { state: s.state || '', why: s.why || '' };
@@ -23632,6 +23841,12 @@ async function loadPgStates() {
     if (JSON.stringify([P.states, P.gpu]) !== before && pgActive()) render();
   } catch (e) { /* the next tick asks again */ }
   P.statesBusy = false;
+  // 16.8: a server being checked answers in a moment: asked again in a
+  // second, not at the next 5 s tick, so Send isn't held longer than it must be
+  if (pgActive() && Object.values(P.states || {}).some(s => s.state === 'checking')) {
+    clearTimeout(P.checkAgain);
+    P.checkAgain = setTimeout(loadPgStates, 1000);
+  }
 }
 function pgGpuLine() {
   const g = state.pg.gpu;
@@ -23642,7 +23857,7 @@ function pgGpuLine() {
 // the picked models that can't answer now: Send waits for them, the reason beside it
 function pgNotNow(P, c) {
   const ids = c ? [c.model, c.model2] : [P.pick, P.pick2];
-  return ids.filter(Boolean).map(id => [id, pgStateOf(id)]).filter(([, x]) => x.state === 'not_now');
+  return ids.filter(Boolean).map(id => [id, pgStateOf(id)]).filter(([, x]) => PG_HOLDS.includes(x.state));
 }
 // the models chatted with lately come first, each in its group
 function pgRecency() {
@@ -24004,8 +24219,11 @@ function pgInput(P, c, m, changed) {
       el('p', { class: 'warn', 'data-pg-long': '1', hidden: long ? null : '',
         text: `Too long for this model: about ${fits.toLocaleString('en')} words fits.` }),
       // its reason names it already, or it is named first (two models: which one)
-      notNow.map(([id, x]) => el('p', { class: 'warn small', 'data-pg-notnow': id,
-        text: x.why.startsWith(pgName(id)) ? `Not now: ${x.why}` : `${pgName(id)}: not now. ${x.why}` })),
+      notNow.map(([id, x]) => x.state === 'checking'
+        ? el('p', { class: 'small se', 'data-pg-checking': id,
+            text: `${pgName(id)}: checking that its server answers. Send waits for the answer.` })
+        : el('p', { class: 'warn small', 'data-pg-notnow': id,
+            text: x.why.startsWith(pgName(id)) ? `Not now: ${x.why}` : `${pgName(id)}: not now. ${x.why}` })),
       el('div', { class: 'pgbox' }, box,
         live ? el('button', { class: 'primary', 'data-pg-stop': '1', text: 'Stop', onclick: pgStop })
           : el('button', { class: 'primary', 'data-pg-send': '1', text: 'Send',
@@ -24173,7 +24391,8 @@ function pgRetryWhenFree(n, col) {
     if (!pgActive() || P.id !== chatId || !L || !L.refused) return;
     await loadPgStates();
     const st = pgStateOf(mid);
-    if (st.state && st.state !== 'not_now') { const c = P.chat; P.live = null; pgAgain(c, n, col); return; }
+    if (st.state && !PG_HOLDS.includes(st.state)) {
+      const c = P.chat; P.live = null; pgAgain(c, n, col); return; }
     if (st.why && L.refused !== st.why) { L.refused = st.why; render(); }
     P.retry = setTimeout(tick, 5000);
   }, 5000);
@@ -24349,6 +24568,7 @@ function render() {
   } else if (_settle) {
     requestAnimationFrame(settleAgain);
   }
+  fitNames(view);                        // 16.8: before the scrollers are measured
   hfadeUpdate(view);                     // decides which boxes scroll…
   for (const [k, x] of hkeep) {          // …so the old sideways scroll can come back
     const e = view.querySelector(`[data-hkeep="${k}"]`);

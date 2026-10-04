@@ -556,6 +556,9 @@ def check_pin(rec: dict) -> str:
     return CHANGED_LINE if any(now.get(k) != rec["pin"].get(k) for k in PINNED) else ""
 
 
+# 16.8: a run that meets a server that doesn't answer
+DOWN_RUN = "Its server isn't running. Start it, then press Resubmit."
+
 AGAIN = "add it again under Test a model ▸ A model from OpenRouter if that's intended"
 
 
@@ -605,6 +608,12 @@ def preflight(sub: dict) -> dict:
     swaps = sub["suite"] == "devicemark" and (sub.get("part") or "") == "parity"
     why = "" if swaps else check_pin(rec)
     if why:
+        # 16.8: a server that doesn't answer, in plain words; its address and
+        # the error go in the run's log (runner), not its line
+        if why.startswith(("Nothing answered at", "Nothing usable answered at")):
+            e = PreflightError(DOWN_RUN)
+            e.detail = why
+            raise e
         raise PreflightError(why)
     est = None
     if is_openrouter(rec):

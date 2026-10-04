@@ -236,10 +236,23 @@ def test_never_a_source_of_questions(svc, monkeypatch):
     assert b["verdict"] is None and not b["flags"]
 
 
-def test_its_questions_are_never_browsed(svc):
+def test_its_questions_are_read_from_its_file_never_a_runs_answers(svc, monkeypatch):
+    """16.8: listed from its own file — Non-commercial, with no right answer
+    (the authors hold theirs back) and no model's result (a run's lm_eval
+    target is a stand-in) — and refused while it is switched off"""
     client, _ = svc
     sat("org/m")
-    r = client.get("/api/questions/mobile_mmlu_full")
-    assert r.status_code == 403 and "non-commercial and kept apart" in r.json()["detail"]
     from service import questions
+    questions._ff.clear()
+    got = client.get("/api/questions/mobile_mmlu_full", params={"limit": 200}).json()
+    assert got["from_file"] is True and got["models"] == []
+    assert got["rows"] and all(r["answer_idx"] is None and r["results"] == {}
+                               for r in got["rows"])
+    assert got["meta"]["licence"].startswith("CC BY-NC-ND 4.0 — Non-commercial")
+    # the halves, as everywhere: part of the set is listed
+    assert got["listed"] + got["other"] == len(mmp.load_full()) and got["other"] > 0
+    monkeypatch.setattr(config, "MOBILE_MMLU_FULL", False)
+    questions._ff.clear()
+    r = client.get("/api/questions/mobile_mmlu_full")
+    assert r.status_code == 403 and "switched off" in r.json()["detail"]
     assert "mobile_mmlu_full" not in questions.tasks()

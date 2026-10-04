@@ -1223,6 +1223,13 @@ def run_submission(sub: dict) -> None:
                                               load_spec(sub["hf_id"], meta)["pretrained"])
                 meta["batch"], meta["need_gb"] = dm_plan["batch"], dm_plan["need_gb"]
     except PreflightError as e:
+        # 16.8: what a person needn't read in the run's line — an address, an
+        # error code — goes in its log
+        if getattr(e, "detail", ""):
+            config.LOGS_DIR.mkdir(parents=True, exist_ok=True)
+            with open(config.LOGS_DIR / f"service_{sid}_{sub['hf_id'].replace('/', '__')}.log",
+                      "a", encoding="utf-8") as lf:
+                lf.write(f"preflight: {e.detail}\n")
         db.update(sid, status="failed", error=str(e), finished_at=time.time())
         return
     rec = meta.get("served")
