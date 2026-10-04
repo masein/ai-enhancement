@@ -57,6 +57,7 @@ OOM_LOAD = ("Ran out of GPU memory while loading {name} (it needed about {need};
 OOM_REPLY = ("Ran out of GPU memory while {name} was answering; it was unloaded to give the "
              "memory back. Your message is kept.")
 NOT_RUNNING = "Its server isn't running"
+CHECKING = "Checking that its server answers"
 SUITE_WORDS = {"full": "Standard tests", "quick": "quick tests", "control": "control tests",
                "judged": "Knowledge exam", "everyday": "Everyday tasks",
                "generative": "instruction and maths tests", "safety": "Trust & safety tests"}
@@ -600,7 +601,8 @@ class Engine:
     # -- 16.2: each model's state, for the picker ----------------------------
     def state(self, row: dict) -> dict:
         """{state, why}: "ready" (loaded, or served and answering), "loads" (it
-        fits now: it loads on the first message), "cpu" (on the CPU, slower) or
+        fits now: it loads on the first message), "cpu" (on the CPU, slower),
+        "checking" (served, before its server's first answer: 16.8) or
         "not_now", with the reason in words. Worked out without loading
         anything; a served model's server is asked in the background
         (served_up), never on this call"""
@@ -612,7 +614,10 @@ class Engine:
             up = served_up(row["id"])
             if up is False:
                 return {"state": "not_now", "why": NOT_RUNNING + "."}
-            return {"state": "ready", "why": "" if up else "its server is being checked"}
+            # 16.8: never "ready" before its server has answered once
+            if up is None:
+                return {"state": "checking", "why": CHECKING + "."}
+            return {"state": "ready", "why": ""}
         if held and held.device == "cuda" and not runner.LOCK.exists():
             return {"state": "ready", "why": "loaded"}
         device, why = self.place(row)

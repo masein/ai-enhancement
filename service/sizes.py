@@ -7,7 +7,9 @@ for a Hub model alone — its name (report_lm_eval.size_of). A served model's
 or a GGUF file's name is never read: it is the person's words, suggested in
 the form and confirmed there.
 
-On the server, for rows that have none (the deploy step of 16.1):
+`list` prints the served and GGUF models registered — not their thinking
+rows, which take their model's size (16.8). On the server, for rows that have
+none (the deploy step of 16.1):
 
     sudo docker compose exec -T bench python -m service.sizes list
     sudo docker compose exec -T bench python -m service.sizes set \\

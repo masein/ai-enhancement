@@ -4953,6 +4953,57 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 16.8 — what the deployed board showed after phase 16 (4 Oct)
+
+- **A served model's thinking row takes its model's size** (16.1): sizes are
+  entered for "served/X"; its thinking row, "served/X · thinking", looked for
+  one of its own and found none. `size_of` now gives a thinking row, right
+  after a size entered for itself, its model's row's size: the row its
+  folder's `model_meta.json` names (`base_model`, as the runner writes it), or
+  its id without " · thinking". The payload says so (`paramsOf`), and the
+  hover reads "its model's size (thinking off), entered by masein". A served
+  row's name is never read now, in the served lookup or not: one outside it
+  read 35B from its name, which 12f.1 forbids.
+  - **`sizes list`** prints the served and GGUF models registered (7 on the
+    server), not their thinking rows: those take their model's size. 16.1's PR
+    said 9.
+- **`/api/gpu` names a host's process by nvidia-smi's name for it** (16.2):
+  on the server the container reads no host process's `/proc/<pid>/cmdline`
+  (it comes back empty, `pid: "host"` or not), so the judge was "other".
+  `processes()` asks for `process_name` too, and a process is named by its
+  command line or else that name: `VLLM::EngineCore` is the judge;
+  `llama-server` and `llama-perplexity` by theirs. A llama-server's port isn't
+  in its name: it is the registered served model answering, when exactly one
+  server is (the Playground's own check, `chat.served_up`; setups on one
+  server are one), else "llama-server". The parser reads past a header line
+  and "MiB", as `--format=csv` writes them.
+- **A name uses the width its column has** (16.3): each row's name block was
+  capped on its own (a name at 190px, a phone build's block at 342px), so a
+  name was cut beside empty room. `fitNames`, after each render and on resize,
+  sets `--namew` on each table from the column the widest row made, and every
+  row's block may use it. A name still cut shows a label that keeps its end
+  whole, at least what `shortNames` kept (where it differs from the others),
+  and as much of its front as fits ("Qwen3.6-35B-A…original-k-8"): two rows on
+  screen never read the same. The whole name is on hover. Everyday's name cell
+  is a block like the others'. On a phone, the short forms in two lines, as
+  before.
+- **One count** (16.3): the toolbar says where each model that matches the
+  filters is, and they add up: "56 models: 20 in the table · 33 not tested on
+  this · 3 can't be tested this way" (also duplicates under their original,
+  and setups measured with their file). Before, "56 of 56 models" counted the
+  filters' and "Showing 1–20 of 20 models" the table's. The status line says
+  "Rows 26–40 of 40 in the table" only when there is more than one page, and
+  the empty table's line has no number of its own.
+- **Smaller:**
+  - "prelim 0/7" counts Standard's required benchmarks: it is on Standard's
+    table alone.
+  - The Filters panel is one row of compact menus that wraps, at every width.
+    Its column rule came after the wide screen's row rule and won everywhere.
+  - A served model before its server's first answer is "checking" ("Checking
+    its server"), never "ready": Send waits, with "checking that its server
+    answers. Send waits for the answer." under the box, and comes back when
+    the answer is in.
+
 ### 16.7 — words (4 Oct)
 
 - **"checkpoint" on screen is "uploaded here"** where it names where a model

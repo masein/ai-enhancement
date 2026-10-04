@@ -118,7 +118,8 @@ def test_row_1_says_which_tests_and_row_2_holds_the_menus(live, page, width):
     for pill in ("#pill-group", "#pill-models", "[data-filters]", "#pill-columns"):
         assert picks.locator(pill).count() == 1, pill
     n = page.evaluate("DATA.models.length")
-    assert page.locator("[data-lb-count]").inner_text() == f"{n} of {n} models"
+    # 16.8: one count, where each model is
+    assert page.locator("[data-lb-count]").inner_text().startswith(f"{n} models: ")
     assert page.locator("[data-lb-active]").count() == 0
     # Group ▾: one choice, each with how many benchmarks it holds
     page.locator("#pill-group").click()
@@ -295,7 +296,7 @@ def test_source_type_and_row_3(live, page):
     kept = page.evaluate("lbFilter(DATA.models).map(m => m.id)")
     assert kept and all(k.startswith("local/") for k in kept)
     count = page.locator("[data-lb-count]")
-    assert count.inner_text() == f"{len(kept)} of {n} models"
+    assert count.inner_text().startswith(f"{len(kept)} of {n} models match the filters: ")
     # Type with it: an uploaded instruct model — none here: said, and Clear all
     page.locator("#pill-type").click()
     page.locator("#pop-type [data-choice='instruct']").click()
@@ -309,7 +310,7 @@ def test_source_type_and_row_3(live, page):
     assert page.locator(f"{LB} tbody tr").count() >= 1
     page.locator("[data-clear-all]").click()
     page.wait_for_selector("[data-on]", state="detached")
-    assert page.locator("[data-lb-count]").inner_text() == f"{n} of {n} models"
+    assert page.locator("[data-lb-count]").inner_text().startswith(f"{n} models: ")
     assert page.evaluate("location.hash") == "#tab=models"
     assert page.errors == []
 

@@ -9,7 +9,11 @@ knows for certain:
 - each process's memory, when nvidia-smi can give it, named by what it runs:
   the judge (vLLM), a served model (llama-server, by its port), a GGUF run
   (llama-perplexity), a board run (a child of this service), the Playground
-  (this service's own process);
+  (this service's own process). What it runs is its command line, or — when
+  the container can't read a host process's /proc, as on the server —
+  nvidia-smi's own name for it ("VLLM::EngineCore"): a llama-server's port
+  isn't in that, so it is the one served model answering, else "llama-server"
+  (16.8);
 - what it can't name is "other". When nvidia-smi can't give memory for each
   process, the Playground's own (torch's count, in this process) is the one
   number besides the card's, and the rest is "other: N GB" — never a guess
@@ -76,22 +80,26 @@ def card() -> dict | None:
     return {"total": total * MIB, "used": used * MIB, "free": free * MIB}
 
 
-def processes() -> list[tuple[int, float]] | None:
-    """[(pid, bytes)] for each process on the card, or None when nvidia-smi
-    can't give memory for each (a container often sees "[N/A]")"""
+def processes() -> list[tuple[int, float, str]] | None:
+    """[(pid, bytes, name)] for each process on the card — name is
+    nvidia-smi's own ("VLLM::EngineCore") — or None when nvidia-smi can't give
+    memory for each (a container often sees "[N/A]"). A header line and "MiB"
+    after a number are read past, as `--format=csv` writes them"""
     try:
-        text = _smi(["--query-compute-apps=pid,used_memory", "--format=csv,noheader,nounits"])
+        text = _smi(["--query-compute-apps=pid,used_memory,process_name",
+                     "--format=csv,noheader,nounits"])
     except (OSError, subprocess.SubprocessError):
         return None
     out = []
     for line in text.splitlines():
-        parts = [x.strip() for x in line.split(",")]
-        if len(parts) != 2:
-            continue
+        parts = [x.strip() for x in line.split(",", 2)]
+        if len(parts) < 2 or not parts[0].isdigit():
+            continue                          # a header, or a blank line
         try:
-            out.append((int(parts[0]), float(parts[1]) * MIB))
+            n = float(re.sub(r"\s*MiB$", "", parts[1])) * MIB
         except ValueError:
             return None                       # "[N/A]": no memory for each process
+        out.append((int(parts[0]), n, parts[2] if len(parts) > 2 else ""))
     return out
 
 
@@ -176,6 +184,21 @@ def _served_ports() -> dict[int, str]:
     return out
 
 
+def _served_answering() -> str:
+    """16.8: a llama-server whose port the board can't see: the registered
+    served model answering, when exactly one server is — by the Playground's
+    own background check (chat.served_up), never asked here. Setups on one
+    server are one server. '' when none answers, or more than one does"""
+    from . import chat, db, served
+    up: dict[str, list[str]] = {}
+    for rec in db.served_all():
+        if served.is_openrouter(rec) or chat.served_up(rec["id"]) is not True:
+            continue
+        up.setdefault(str(rec.get("base_url") or "").rstrip("/"), []).append(
+            rec.get("name") or rec["id"])
+    return " / ".join(sorted(next(iter(up.values())))) if len(up) == 1 else ""
+
+
 def holders(c: dict, procs: list[tuple[int, float]] | None) -> list[dict]:
     """[{kind, name, bytes}] — bytes None where the board can't say. Kinds:
     judge, run, gguf, chat, served, other"""
@@ -193,18 +216,21 @@ def holders(c: dict, procs: list[tuple[int, float]] | None) -> list[dict]:
 
     if procs is not None:
         ports = _served_ports()
-        for pid, n in procs:
-            cmd = _cmdline(pid)
+        for pid, n, *smi in procs:
+            # 16.8: its command line, else nvidia-smi's name for it — the
+            # container can't read a host process's /proc
+            cmd = _cmdline(pid) or (smi[0] if smi else "")
+            low = cmd.lower()
             if pid == me:
                 add("chat", "the Playground" + (f": {', '.join(loaded)}" if loaded else ""), n)
-            elif "vllm" in cmd:
+            elif "vllm" in low:
                 add("judge", "the judge", n)
-            elif "llama-server" in cmd:
+            elif "llama-server" in low:
                 port = _PORT.search(cmd)
-                name = ports.get(int(port.group(1))) if port else None
+                name = ports.get(int(port.group(1))) if port else _served_answering()
                 add("served", name or ("llama-server" + (f" on port {port.group(1)}" if port
                                                           else "")), n)
-            elif "llama-perplexity" in cmd:
+            elif "llama-perplexity" in low:
                 add("gguf", "a GGUF run (llama.cpp)", n)
             elif _descends(pid, me) or (run and "lm_eval" in cmd):
                 add("run", run_words(run) if run else "a board run", n)
