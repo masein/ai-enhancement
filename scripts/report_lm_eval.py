@@ -18827,7 +18827,9 @@ function addHead() {
         'data-add-chooser': '1' },
       el('p', { class: 'addq', text: 'Where is the model?' }),
       el('div', { class: 'addchoices' }, ADD_WHERE.map(btn),
-        el('details', { class: 'addmore', open: ADD_MORE.some(([k]) => k === w) ? '' : null },
+        // opened, it stays open across the 5 s poll's redraw
+        el('details', { class: 'addmore', open: A.more || ADD_MORE.some(([k]) => k === w) ? ''
+            : null, ontoggle: e => { A.more = e.target.open; } },
           el('summary', { text: 'More' }), ADD_MORE.map(btn)))));
 }
 
