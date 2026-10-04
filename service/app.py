@@ -34,7 +34,7 @@ from pydantic import BaseModel
 from . import (ai_models, builder, chat, config, db, disk, hfmeta, judge_test, llm, llm_poller,
                startup, suggest, worker)
 from . import playground
-from . import gguf, gpu, phone, reported, served, sizes, uploads
+from . import downloads, gguf, gpu, phone, reported, served, sizes, uploads
 from . import proposals as prop
 from . import reader
 
@@ -1143,6 +1143,91 @@ def upload_delete(model_id: str, x_token: str = Header(default="")):
         raise _refused(e) from e
     _cache.update(key=None, payload=None, at=0.0)
     return got
+
+
+# ---------------------------------------------------------------------------
+# 16b.2: Download — a model file on this server, streamed with HTTP Range so
+# a download resumes; the board's token; each download logged
+# (service/downloads.py)
+# ---------------------------------------------------------------------------
+
+class DownloadAllowIn(BaseModel):
+    model: str
+    allowed: bool
+    by: str = ""
+
+
+class DownloadLinkIn(BaseModel):
+    model: str
+    by: str = ""
+
+
+def _dl_refused(e: "downloads.Refused"):
+    return HTTPException(e.code, str(e))
+
+
+@app.get("/api/models/file")
+def model_file(id: str = ""):
+    """what the model page says: its file's name, size and sha256, whether
+    it may be downloaded and by whose word, or why there is no file"""
+    got = downloads.info(id)
+    return {**got, "log": downloads.log_rows(id, 10)}
+
+
+@app.post("/api/models/file/allow")
+def model_file_allow(f: DownloadAllowIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    try:
+        return downloads.set_allowed(f.model, f.allowed, f.by)
+    except downloads.Refused as e:
+        raise _dl_refused(e) from e
+
+
+@app.post("/api/models/file/link")
+def model_file_link(f: DownloadLinkIn, x_token: str = Header(default="")):
+    """a link for one download from a browser, kept a day — no token in it"""
+    _check_token(x_token)
+    try:
+        return downloads.link(f.model, f.by)
+    except downloads.Refused as e:
+        raise _dl_refused(e) from e
+
+
+def _range_start(request: Request) -> int:
+    m = re.match(r"bytes=(\d+)-", request.headers.get("range") or "")
+    return int(m.group(1)) if m else 0
+
+
+def _send_file(path: Path, name: str) -> FileResponse:
+    # identity: GZip would break a range; the file is streamed from disk
+    return FileResponse(path, filename=name, media_type="application/octet-stream",
+                        headers={"Content-Encoding": "identity", "Accept-Ranges": "bytes",
+                                 "Cache-Control": "no-store"})
+
+
+@app.get("/api/dl/{tid}/{name}")
+def model_file_by_link(tid: str, name: str, request: Request):
+    try:
+        got = downloads.by_link(tid)
+        path, fname = downloads.file_for(got["model"])
+    except downloads.Refused as e:
+        raise _dl_refused(e) from e
+    downloads.logged(got["model"], got["who"], "link", _range_start(request))
+    return _send_file(path, fname)
+
+
+@app.get("/api/download")
+def model_file_download(request: Request, model: str = "", x_token: str = Header(default=""),
+                        x_who: str = Header(default="")):
+    """the same file with the token in a header — curl -C - resumes it. The
+    page's command reads the token from $BOARD_TOKEN, never writes it"""
+    _check_token(x_token)
+    try:
+        path, fname = downloads.file_for(model)
+    except downloads.Refused as e:
+        raise _dl_refused(e) from e
+    downloads.logged(model, x_who, "token", _range_start(request))
+    return _send_file(path, fname)
 
 
 @app.get("/api/models/suggest")

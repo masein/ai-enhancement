@@ -138,6 +138,35 @@ Add a model ▸ On my computer sends a `.gguf` file, or a model folder as a
 
 Nothing in an upload is ever run.
 
+### Download a model's file (16b.2)
+
+A model file on this server — an uploaded or registered GGUF, or a model
+folder (one uncompressed zip, made on its first download and kept a day) —
+when the person who added it allows it. Streamed from disk with HTTP Range,
+so a download resumes; never gzipped.
+
+```bash
+export BOARD_TOKEN=…        # the board's write token: never in the command
+curl -C - -fL -H "X-Token: $BOARD_TOKEN" -H "X-Who: you" \
+     -o model.gguf "http://<board>:8899/api/download?model=gguf%2Fmy-build"
+```
+
+- `GET /api/models/file?id=…` — `{kind: gguf|folder|hub|served|none, name,
+  bytes, sha256, allowed, decided_by, adder, downloads, log}`. A Hugging Face
+  model is fetched from Hugging Face (`hubSha` on its row: the commit our
+  runs loaded); a model served elsewhere has no file here.
+- `GET /api/download?model=…` — the file, with `X-Token`; `X-Who` names who
+  downloads it, logged with the time (a resumed one with where it went on).
+- `POST /api/models/file/link` `{model, by}` — for a browser: a link made for
+  this one download, kept a day, with no token in it.
+- `POST /api/models/file/allow` `{model, allowed, by}` — the person who added
+  it, or the board's owner. A GGUF registered by its path starts off; an
+  upload as its form said.
+
+Only model files: a GGUF is served only when its header reads as one, a
+folder only from `ARTIFACTS_DIR`. No question bank, answer key or hidden set
+is reachable.
+
 ---
 
 ## Semantics you should design around

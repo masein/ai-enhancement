@@ -4953,6 +4953,34 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 16b.2 — Download (4 Oct)
+
+- **A model's page** has one row of actions: Test this model (Measure for a
+  GGUF) · Chat · Download, and Compare with… beside them.
+- **Download** (`service/downloads.py`):
+  - offered for a model file on this server — an uploaded or registered GGUF
+    whose header reads as one, or a folder under `ARTIFACTS_DIR` — when the
+    person who added it allows it (`download_allowed`; with no row, the
+    upload's word; a GGUF registered by its path, the Qwen3.6 phone builds,
+    starts off — decision 2). Its adder or the owner switches it;
+  - its name, size and sha256 (the upload's, or the worker's pin);
+  - from a browser: a link made for that one download (`POST
+    /api/models/file/link`, kept a day, no token in it — a browser can't send
+    a header on a link); from a terminal: `curl -C - … -H "X-Token:
+    $BOARD_TOKEN"`, the token from the environment, never in the command;
+  - streamed from disk with HTTP Range (Starlette's `FileResponse`), so both
+    resume; `Content-Encoding: identity`, so the gzip middleware leaves it
+    whole; never a whole file in memory;
+  - a folder: one uncompressed zip, made on its first download in the
+    background (202 meanwhile), kept a day under `uploads/.downloads`,
+    refused when it would leave the disk under `UPLOAD_FREE_GB`;
+  - each download logged with who and when (`download_log`; a resume with the
+    byte it went on from).
+- **A Hugging Face model:** "Get it on Hugging Face ↗" at the commit our runs
+  loaded (`hubSha`, lm_eval's `model_sha` in its results' config), or its
+  newest when no run recorded one. **A served model** with no file here says
+  so in one line.
+
 ### 16b.1 — Add a model, with an upload from the browser (4 Oct)
 
 Brief: `docs/prompts/phase-16b-model-handover.md`, stage 1. masein's decisions
