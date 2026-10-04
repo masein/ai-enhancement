@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import open_filters
+from conftest import choose_chip, open_filters
 
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase11"
@@ -62,21 +62,20 @@ def uncalibrated(page):
 ])
 def test_a_chip_shows_exactly_its_groups_columns(live, page, chip, want):
     open_lb(page, live["base"])
-    page.locator(f"[data-chip='{chip}']").click()
-    page.wait_for_selector(f"[data-chip='{chip}'][aria-pressed='true']")
+    choose_chip(page, chip)                                  # 16.3: Group ▾
     tasks = page.evaluate(f"""() => [...document.querySelectorAll('{LB} thead th[data-task]')]
       .map(t => t.dataset.task)""")
     have = page.evaluate("DATA.accTasks")
     assert tasks == [t for t in want if t in have]
-    # 11f: a chip is one group, so it has no group row — that row is All tasks'
+    # 11f: a group is one group, so it has no group row — that row is All's
     assert page.locator(f"{LB} thead tr.grp").count() == 0
-    assert f"chip={chip}" in page.evaluate("location.hash")
+    assert f"group={chip}" in page.evaluate("location.hash")
     assert page.errors == []
 
 
 def test_knowledge_shows_mmlu_and_mmlu_by_area(live, page):
     open_lb(page, live["base"])
-    page.locator("[data-chip='knowledge']").click()
+    choose_chip(page, "knowledge")
     page.wait_for_selector(f"{LB} thead th[data-area]")
     areas = page.evaluate(f"""() => [...document.querySelectorAll('{LB} thead th[data-area]')]
       .map(t => t.dataset.area)""")
@@ -185,8 +184,7 @@ def test_no_provisional_cell_is_ever_tinted(live, page):
     uncalibrated(page)
     open_lb(page, live["base"])
     for chip in ("all", "knowledge"):
-        page.locator(f"[data-chip='{chip}']").click()
-        page.wait_for_selector(f"[data-chip='{chip}'][aria-pressed='true']")
+        choose_chip(page, chip)                                  # 16.3: Group ▾
         tinted = page.evaluate(f"""() => [...document.querySelectorAll(
           '{LB} tbody td[data-judged-avg], {LB} tbody td[data-jarea-cell]')]
           .filter(td => td.dataset.lead || (td.getAttribute('style') || '').includes('--heat')).length""")
@@ -229,7 +227,7 @@ def test_a_row_opens_the_model_page_from_the_keyboard(live, page):
 
 @pytest.mark.parametrize("pill,panel", [("#pill-columns", "#pop-columns"),
                                         ("#pill-models", "#pop-models"),
-                                        ("#pill-kind", "#pop-kind")])
+                                        ("#pill-type", "#pop-type")])
 def test_a_popover_stays_open_across_a_poll(live, page, pill, panel):
     open_lb(page, live["base"])
     open_filters(page)                                     # 12b: the pills are in Filters ▾

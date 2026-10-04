@@ -18,7 +18,7 @@ import time
 
 import pytest
 
-from conftest import choose, go_tab, make_service, open_filters, open_kind, open_submit, set_name
+from conftest import choose, go_tab, make_service, open_kind, open_submit, set_name
 from test_page_recovery import Live
 import make_fixture  # noqa: E402
 
@@ -381,15 +381,16 @@ def test_the_leaderboard_shows_six_task_columns_and_says_how_many_are_hidden(bro
         assert task_cols <= 6
         # every task-like column (benchmarks, perplexity, judged topics) is in
         # the Columns popover; what is not shown is counted out loud on the pill
-        open_filters(pg)                                  # 12b: in Filters ▾
+        # 16.3: in Columns ▾, on Row 2 — its Benchmarks section; Model details are apart
         pg.locator("[data-columns-menu]").click()
         pg.wait_for_selector("#pop-columns")
-        n_cols = pg.locator("#pop-columns input[data-column]").count()
-        n_shown = pg.locator("#pop-columns input[data-column]:checked").count()
+        bench = pg.locator("#pop-columns [data-columns-section='benchmarks']")
+        n_cols = bench.locator("input[data-column]").count()
+        n_shown = bench.locator("input[data-column]:checked").count()
         assert n_shown <= 6 and n_cols > n_shown
         hidden = pg.locator("[data-hidden-tasks]")
         assert hidden.get_attribute("data-hidden-tasks") == str(n_cols - n_shown)
-        assert "hidden" in hidden.text_content()
+        assert bench.locator("[data-columns-shown]").text_content() == f"{n_shown} of {n_cols} shown"
         pg.keyboard.press("Escape")
         # the rank comes first, then the model, which stays put; there is no
         # compare column any more — the radar's model chips are the comparison
@@ -409,7 +410,9 @@ def test_the_leaderboard_shows_six_task_columns_and_says_how_many_are_hidden(bro
         pg.locator("[data-columns-menu]").click()
         pg.locator("#pop-columns [data-show-all]").click()
         pg.wait_for_function("!document.querySelector('[data-hidden-tasks]')")
-        assert pg.locator("#pop-columns input[data-column]:not(:checked)").count() == 0
+        # every benchmark; Show all leaves the model details as they were (16.3)
+        assert pg.locator("#pop-columns [data-columns-section='benchmarks'] "
+                          "input[data-column]:not(:checked)").count() == 0
         assert s.errors == []
     finally:
         ctx.close()
@@ -444,9 +447,13 @@ def test_the_model_page_leads_with_numbers(live, page):
         assert card.locator("[data-topic-switch], [data-criteria-table]").count() == 0
         # no "Training compute: Unknown" — the hero's cards (11d) say it only when known
         assert "Training compute" not in page.locator("[data-model-hero]").text_content()
-        # last evaluated counts the judged run — the model's sentence, on Standard
+        # last evaluated counts the judged run — the model's sentence, on Standard.
+        # 16.3: and the latest finished run of any kind, which a test before this
+        # one may have finished later than the judging
         open_kind(page, "standard")
-        assert "Last evaluated 2026-09-21" in page.locator("#view").text_content()
+        day = page.evaluate(f"String(lastEval(DATA.models.find(m => m.id === {MODEL!r}))).slice(0, 10)")
+        assert day >= "2026-09-21"
+        assert f"Last evaluated {day}" in page.locator("#view").text_content()
         assert page.errors == []
     finally:
         jf.write_bytes(kept)

@@ -22,6 +22,8 @@ from urllib.parse import quote
 
 import pytest
 
+from conftest import open_benchmarks
+
 from fake_openai import FakeServer
 from service import config
 from test_12q_devicemark_board import HF, SERVED, _row
@@ -106,17 +108,22 @@ def cell(page, model, f) -> str:
     return page.locator(f"tr[data-lb-row='{model}'] [data-dm-cell='{f}']").inner_text().strip()
 
 
-def test_the_chip_is_offered_only_while_a_model_has_a_row(live, page):
-    # first in this file: before its rows are written there is no DeviceMark row, and no chip
-    go(page, live, "tab=models", "[data-lb-table]")
+def test_devicemark_is_offered_before_a_model_has_a_row(live, page):
+    # first in this file: before its rows are written there is no DeviceMark
+    # row. 16.3: Mobile ▸ DeviceMark is offered all the same — its Chart is
+    # DeviceMark's own board (the On-device chart was a chip of its own)
+    go(page, live, "tab=models&view=mobile", "#pill-group")
     assert page.evaluate("dmAny()") is False
-    assert page.locator("[data-chip='devicemark']").count() == 0
-    assert page.locator("[data-chip='ondevice']").count() == 1
+    page.locator("#pill-group").click()
+    assert page.locator("#pop-group [data-choice='devicemark']").count() == 1
+    page.keyboard.press("Escape")
+    # and Mobile ▸ All has no DeviceMark column while no model has a row
+    assert page.locator("th[data-col='dm:composite']").count() == 0
 
 
 def test_the_chip_shows_each_models_rows_both_modes_sorted_by_the_composite(live, page, rows):
     go(page, live, "tab=models&chip=devicemark", "[data-lb-table]")
-    assert page.locator("[data-chip='devicemark'][aria-pressed='true']").count() == 1
+    assert page.locator("#pill-group[data-value='devicemark']").count() == 1    # 16.3
     assert headers(page)[-6:] == DM_COLS and "Avg" not in headers(page)
     shown = page.locator("tr[data-lb-row]").evaluate_all("rs => rs.map(r => r.dataset.lbRow)")
     want = {SETUP, SETUP + " · thinking", QWEN, QWEN + " · thinking"}
@@ -169,7 +176,7 @@ def test_the_picker_has_the_group_and_chosen_models_bring_their_thinking_rows(li
     # DeviceMark's alone: no Avg column, and nothing averaged
     assert not any(h.startswith("Avg") for h in headers(page))
     assert headers(page)[-6:] == DM_COLS
-    page.locator("#pill-benchmarks").click()
+    open_benchmarks(page)
     group = page.locator("[data-bench-group='devicemark']")
     group.wait_for()
     assert group.locator("[data-bench-row]").evaluate_all("rs => rs.map(r => r.dataset.benchRow)") \

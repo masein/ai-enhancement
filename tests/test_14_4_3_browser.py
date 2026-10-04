@@ -92,7 +92,7 @@ def shot_clear(page, part, name):
 
 @pytest.mark.parametrize("width", WIDTHS)
 def test_mobile_tasks_has_the_full_sets_own_table_and_no_column_of_it(live, page, width):
-    go(page, live, "tab=models&chip=mobile", "[data-mmf-card]", width)
+    go(page, live, "tab=models&view=mobile&group=mmlu", "[data-mmf-card]", width)
     # never a column of the table above, and nothing ranks or averages it
     assert page.locator("th[data-col='mobile_mmlu_full']").count() == 0
     assert page.locator("th[data-col='mobile_mmlu_pro']").count() == 1

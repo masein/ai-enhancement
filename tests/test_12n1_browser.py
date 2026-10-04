@@ -23,6 +23,8 @@ from urllib.parse import quote
 
 import pytest
 
+from conftest import open_benchmarks
+
 import gguf_data as gd
 import gguf_worker as gw
 from fake_openai import FakeServer
@@ -185,14 +187,14 @@ def test_every_picker_group_has_all_none_and_a_three_state_box(live, page):
     page.keyboard.press("Escape")
     chosen = page.evaluate("lbS().models")
     # Benchmarks ▾'s groups
-    page.locator("#pill-benchmarks").click()
-    gb = page.locator("#pop-benchmarks [data-bench-group-box='commonsense']")
+    open_benchmarks(page)
+    gb = page.locator("#pop-columns [data-bench-group-box='commonsense']")
     gb.wait_for()
-    page.locator("#pop-benchmarks [data-bench-group-none='commonsense']").click()
-    page.wait_for_selector("#pop-benchmarks [data-bench-group-box='commonsense']"
+    page.locator("#pop-columns [data-bench-group-none='commonsense']").click()
+    page.wait_for_selector("#pop-columns [data-bench-group-box='commonsense']"
                            "[data-group-state='none']")
-    page.locator("#pop-benchmarks [data-bench-group-box='commonsense']").click()
-    page.wait_for_selector("#pop-benchmarks [data-bench-group-box='commonsense']"
+    page.locator("#pop-columns [data-bench-group-box='commonsense']").click()
+    page.wait_for_selector("#pop-columns [data-bench-group-box='commonsense']"
                            "[data-group-state='all']")
     page.keyboard.press("Escape")
     # the choice is the address's, shared with Benchmarks
@@ -236,7 +238,7 @@ def test_the_frontier_view_follows_the_coverage_rule_and_credits_once(live, page
     for s in view["scores"]:
         have.setdefault(frkey(s["benchmark"]), set()).add(s["model"])
     go(page, live, "tab=models&chip=frontier", "[data-frontier-table]")
-    assert page.locator("[data-chip='frontier']").get_attribute("aria-pressed") == "true"
+    assert page.locator("[data-models-view='frontier']").get_attribute("aria-selected") == "true"
     cols = page.locator("[data-fr-col]").evaluate_all("xs => xs.map(x => x.dataset.frCol)")
     wide = {k for k, ms in have.items() if 2 * len(ms) >= n}
     assert wide <= set(cols)

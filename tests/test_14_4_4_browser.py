@@ -55,7 +55,7 @@ def badge(loc) -> str:
 
 @pytest.mark.parametrize("width", WIDTHS)
 def test_the_results_table_and_the_sets_own_section(live, page, width):
-    go(page, live, "tab=models&chip=mobile", "[data-mmf-card]", width)
+    go(page, live, "tab=models&view=mobile&group=mmlu", "[data-mmf-card]", width)
     # Pro's column: its badge beside its name, in the header a screenshot takes
     th = page.locator("th[data-col='mobile_mmlu_pro']")
     assert badge(th.locator("[data-col-restriction='mobile_mmlu_pro']")) == "Internal use"
@@ -77,7 +77,7 @@ def test_the_results_table_and_the_sets_own_section(live, page, width):
 
 
 def test_copy_as_csv_carries_each_restricted_columns_licence_and_restriction(live, page):
-    go(page, live, f"tab=models&chip=mobile&models={ids(GOOD, CHANCE)}",
+    go(page, live, f"tab=models&view=mobile&group=mmlu&models={ids(GOOD, CHANCE)}",
        "th[data-col='mobile_mmlu_pro']")
     got = list(csv.reader(io.StringIO(page.evaluate("lbCsv()"))))
     head = got[0]

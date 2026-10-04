@@ -18,7 +18,7 @@ from urllib.parse import quote
 
 import pytest
 
-from conftest import go_tab, model_tab, open_filters, open_kind, show_all_columns
+from conftest import choose_chip, go_tab, model_tab, open_filters, open_kind, show_all_columns
 import make_fixture  # noqa: E402
 
 pytestmark = pytest.mark.dashboard
@@ -28,7 +28,7 @@ pytestmark = pytest.mark.dashboard
 FROZEN_TABS = {"Overview": ("Home", "#tab=home"), "Models": ("Models", "#tab=models"),
                "Leaderboard": ("Models", "#tab=models"),
                "Tasks": ("Benchmarks", "#tab=benchmarks&sub=standard"),
-               "Perplexity & Loss": ("Models", "#tab=models&chip=lm"),
+               "Perplexity & Loss": ("Models", "#tab=models&group=lm"),
                "Provenance": ("", "#tab=data")}
 SCREENS = Path(__file__).resolve().parent / "_screens"
 
@@ -98,7 +98,7 @@ def test_old_hashes_still_land_where_they_used_to(surface):
     the reader on Overview."""
     pg = surface.page
     for old_hash, place, want in (("evals", "", "#tab=data"), ("provenance", "", "#tab=data"),
-                                  ("ppl", "Models", "#tab=models&chip=lm"),
+                                  ("ppl", "Models", "#tab=models&group=lm"),
                                   ("leaderboard", "Models", "#tab=models"),
                                   ("tasks", "Benchmarks", "#tab=benchmarks&sub=standard")):
         surface.open("#tab=" + old_hash)
@@ -273,7 +273,7 @@ def test_leaderboard_knowledge_shows_mmlu_by_area_and_by_topic(surface, diag):
     """11c: the Knowledge chip replaced the "MMLU by category" view — MMLU, its
     eight areas, and the per-topic columns one tick away under Columns."""
     pg = surface.open("#tab=leaderboard")
-    pg.locator("[data-chip='knowledge']").click()
+    choose_chip(pg, "knowledge")
     pg.wait_for_selector("table.lb thead th[data-area]")
     # 11e: the areas some model here has a number for (the fixture's MMLU
     # subjects reach five of the eight)
@@ -282,8 +282,7 @@ def test_leaderboard_knowledge_shows_mmlu_by_area_and_by_topic(surface, diag):
     assert pg.locator("table.lb thead th[data-area]").count() >= 1
     assert pg.locator("table.lb thead th[data-task='mmlu']").count() == 1
     # the per-topic columns, one tick away: a topic under 30 items is greyed
-    open_filters(pg)                                      # 12b: in Filters ▾
-    pg.locator("[data-columns-menu]").click()
+    pg.locator("[data-columns-menu]").click()               # 16.3: Columns ▾, on Row 2
     pg.locator("#pop-columns [data-column-group-all='cats']").click()
     pg.wait_for_selector("table.lb thead th[data-col='cat:Economics']")
     pg.keyboard.press("Escape")
@@ -295,7 +294,7 @@ def test_leaderboard_knowledge_shows_mmlu_by_area_and_by_topic(surface, diag):
     pg.locator("[data-not-tested-toggle]").click()
     pg.wait_for_selector("tr[data-not-tested-row='local/nodiag-step400']")
     # the control column carries its warning in All tasks
-    pg.locator("[data-chip='all']").click()
+    choose_chip(pg, "all")
     show_all_columns(pg)                             # six task columns by default (9c)
     th = pg.locator("table.lb thead th[data-task='mmlu_perm']")
     assert "CONTROL" in th.get_attribute("data-tip")          # 11f: the name's tooltip
@@ -614,7 +613,7 @@ def test_screenshots_for_the_pr(surface):
             dx.locator("details.dxcat > summary").first.click()
             pg.screenshot(path=SCREENS / f"model-skewed-{scheme}-{width}.png", full_page=True)
             surface.open("#tab=leaderboard")
-            pg.locator("[data-chip='knowledge']").click()
+            choose_chip(pg, "knowledge")
             pg.wait_for_selector("table.lb thead th[data-area]")
             pg.screenshot(path=SCREENS / f"leaderboard-knowledge-{scheme}-{width}.png",
                           full_page=True)
@@ -639,15 +638,16 @@ def test_the_models_table_lists_every_model_and_filters_it(surface):
     # the old floating filters are gone from the shell
     assert pg.locator("#kindSeg").count() == 0 and pg.locator("#srcSeg").count() == 0
     open_filters(pg)
-    pg.locator("#pill-kind").click()
-    pg.locator("#pop-kind [data-choice='instruct']").click()
+    # 16.3: Type, where Kind mixed type with where a model came from
+    pg.locator("#pill-type").click()
+    pg.locator("#pop-type [data-choice='instruct']").click()
     pg.wait_for_function("n => document.querySelectorAll('table.lb tbody tr[data-lb-row]')"
                          ".length < n", arg=n)
     instruct = rows.count()
     assert 0 < instruct < n
     assert all("instruct" in rows.nth(i).text_content() for i in range(instruct))
-    pg.locator("#pill-kind").click()
-    pg.locator("#pop-kind [data-choice='all']").click()
+    pg.locator("#pill-type").click()
+    pg.locator("#pop-type [data-choice='all']").click()
     pg.wait_for_function("n => document.querySelectorAll('table.lb tbody tr[data-lb-row]')"
                          ".length === n", arg=n)
     # the old tab's search: the Models picker finds by name, id or family

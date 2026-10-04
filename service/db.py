@@ -551,6 +551,16 @@ def recent(limit: int = 100, before: int | None = None) -> list[dict]:
     return [dict(zip(_COLS, r)) for r in rows]
 
 
+def last_done() -> dict[str, float]:
+    """16.3: each model's latest finished run, of any kind — the standard
+    tests, judged, Everyday, DeviceMark, served and GGUF runs, and imports —
+    {hf_id: finished_at}, for Models' Tested"""
+    with closing(_conn()) as c:
+        rows = c.execute("SELECT hf_id, MAX(COALESCE(finished_at, created_at)) FROM submissions "
+                         "WHERE status = 'done' GROUP BY hf_id").fetchall()
+    return {h: float(t) for h, t in rows if h and t}
+
+
 def count_submissions() -> int:
     """12z A6: every run there is, for the Runs list's count"""
     with closing(_conn()) as c:

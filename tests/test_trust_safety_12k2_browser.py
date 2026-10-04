@@ -64,8 +64,9 @@ def tip(loc) -> list[str]:
 
 def test_trust_and_safety_is_a_chip_with_the_four_and_says_whose_they_are(live, page):
     trust_chip(page, live)
-    assert page.locator("[data-chip='trust']").inner_text() == "Trust & safety"
-    assert page.locator("[data-chip='trust']").get_attribute("aria-pressed") == "true"
+    # 16.3: Standard ▸ Group ▾ ▸ Trust & safety
+    assert page.locator("#pill-group").inner_text() == "Group: Trust & safety ▾"
+    assert page.locator("#pill-group").get_attribute("data-value") == "trust"
     heads = page.locator(f"{LB} thead th[data-task]")
     assert heads.evaluate_all("hs => hs.map(h => h.dataset.task)") == [
         "truthfulqa_mc2", "do_not_answer", "xstest", "bbq_3000"]
@@ -110,8 +111,8 @@ def test_the_screens(live, page, width, scheme):
 
 def test_an_old_truthfulness_link_opens_trust_and_safety(live, page):
     page.goto(live["base"] + "/#tab=models&chip=truthfulness")
-    page.wait_for_selector("[data-chip='trust'][aria-pressed='true']")
-    assert "chip=trust" in page.evaluate("location.hash")
+    page.wait_for_selector("#pill-group[data-value='trust']")
+    assert "group=trust" in page.evaluate("location.hash")
     assert page.errors == []
 
 

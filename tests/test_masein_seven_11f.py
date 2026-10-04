@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import choice, model_tab, open_filters, open_submit
+from conftest import choice, choose_chip, model_tab, open_filters, open_submit
 
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase11f"
@@ -102,8 +102,7 @@ def test_the_header_is_one_line_of_names_under_a_quiet_group_row(live, page):
       d.style.color = 'var(--muted)'; document.body.append(d);
       const c = getComputedStyle(d).color; d.remove(); return c; }""")
     assert grp.evaluate("e => getComputedStyle(e).color") == muted
-    page.locator("[data-chip='commonsense']").click()
-    page.wait_for_selector("[data-chip='commonsense'][aria-pressed='true']")
+    choose_chip(page, "commonsense")                       # 16.3: Group ▾
     assert page.locator(f"{LB} thead tr.grp").count() == 0
     # the caption says what bold means, once, under the table
     cap = page.locator("[data-lb-caption]")

@@ -16,6 +16,8 @@ from urllib.parse import quote
 
 import pytest
 
+from conftest import open_benchmarks
+
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase12i0"
 NAMES = {"mmlu": "MMLU", "hellaswag": "HellaSwag", "piqa": "PIQA", "winogrande": "WinoGrande",
@@ -70,8 +72,8 @@ def test_the_average_says_it_is_above_chance(live, page):
 
 def test_the_picker_names_each_benchmark_and_lists_the_ones_not_run_yet(live, page):
     models_tab(page, live["base"])
-    page.locator("#pill-benchmarks").click()
-    menu = page.locator("#pop-benchmarks")
+    open_benchmarks(page)
+    menu = page.locator("#pop-columns")
     menu.wait_for()
     labels = {r.get_attribute("data-bench-row"): r for r in menu.locator("[data-bench-row]").all()}
     # every one the board knows, by its own name and nothing else — 14.4.4: and a
@@ -101,7 +103,8 @@ def test_the_picker_names_each_benchmark_and_lists_the_ones_not_run_yet(live, pa
 def test_both_pickers_stay_inside_the_page_card(live, page, width):
     models_tab(page, live["base"], width=width)
     card = page.locator("[data-lb-card]").bounding_box()
-    for pill, pop in (("#pill-benchmarks", "#pop-benchmarks"), ("#pill-models", "#pop-models")):
+    # 16.3: Columns ▾ holds Benchmarks ▾'s job
+    for pill, pop in (("#pill-columns", "#pop-columns"), ("#pill-models", "#pop-models")):
         page.locator(pill).click()
         box = page.locator(pop).bounding_box()
         assert box["x"] >= card["x"] - 0.5, (pop, box, card)
