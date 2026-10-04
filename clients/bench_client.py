@@ -2,10 +2,17 @@
 """Zero-dependency client for the benchmark service — stdlib only, so you can
 vendor this single file into any training repo without touching its environment.
 
+Where the board is: --base (or Bench(base)), else BENCH_URL in your environment,
+else the board this file was downloaded from (GET /client fills that in). Its
+address is the board's on the tailnet — `tailscale ip -4` on the server, or ask
+whoever runs it; it is never written into this repo:
+
+    export BENCH_URL=http://<board>:8899
+
 Library — benchmark a model straight from your disk (no Hugging Face needed):
 
     from bench_client import Bench
-    bench = Bench("http://100.74.89.105:8899")          # token="..." if the server wants one
+    bench = Bench()                              # BENCH_URL; token="..." if the server wants one
 
     mid = bench.upload_artifact("run7-step4000", "ckpt_dir/")   # -> "local/run7-step4000"
     sid = bench.submit(mid, suite="quick", submitter="masein")  # returns immediately
@@ -17,7 +24,7 @@ Library — benchmark a model straight from your disk (no Hugging Face needed):
 
 CLI (same verbs from a shell):
 
-    python bench_client.py --base http://100.74.89.105:8899 upload run7-step4000 ckpt_dir/ --submit --wait
+    python bench_client.py upload run7-step4000 ckpt_dir/ --submit --wait      # BENCH_URL, or --base
     python bench_client.py --base ... submit myorg/model --suite quick --wait
     python bench_client.py --base ... artifacts        # what's in storage, vs quota
     python bench_client.py --base ... queue
@@ -33,6 +40,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 import urllib.error
@@ -43,9 +51,24 @@ class BenchError(RuntimeError):
     pass
 
 
+# the board this file was downloaded from: GET /client fills it in as it serves
+# the file. Never an address in the repo
+DEFAULT_BASE = ""
+NO_BASE = ("Where is the board? Pass --base http://<board>:8899 (or Bench(base)), or set "
+           "BENCH_URL — the board's tailnet address: `tailscale ip -4` on the server")
+
+
+def base_url(base: str | None = None) -> str:
+    """the board's address: given, else BENCH_URL, else the board it came from"""
+    got = (base or os.environ.get("BENCH_URL") or DEFAULT_BASE or "").strip()
+    if not got:
+        raise BenchError(NO_BASE)
+    return got.rstrip("/")
+
+
 class Bench:
-    def __init__(self, base: str, token: str = "", timeout: float = 30.0):
-        self.base = base.rstrip("/")
+    def __init__(self, base: str | None = None, token: str = "", timeout: float = 30.0):
+        self.base = base_url(base)
         self.token = token
         self.timeout = timeout
 
@@ -342,7 +365,9 @@ class Run:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--base", required=True, help="e.g. http://100.74.89.105:8899")
+    ap.add_argument("--base", default=None,
+                    help="the board, http://<board>:8899 — else BENCH_URL, else the board "
+                         "this file came from")
     ap.add_argument("--token", default="", help="only if the server sets SUBMIT_TOKEN")
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("submit", help="queue a model — a Hub id or local/<name>")
@@ -378,7 +403,11 @@ def main() -> int:
     pl.add_argument("dataset_id", type=int); pl.add_argument("dest")
     a = ap.parse_args()
 
-    b = Bench(a.base, a.token)
+    try:
+        b = Bench(a.base, a.token)
+    except BenchError as e:
+        print(e, file=sys.stderr)
+        return 2
     try:
         if a.cmd == "submit":
             sid = b.submit(a.hf_id, a.suite, a.kind, a.submitter, a.note,

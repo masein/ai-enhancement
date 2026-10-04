@@ -3,8 +3,10 @@
 One place for the whole loop: **benchmark any model, track your training runs,
 store your checkpoints** — on our shared GPU, on the tailnet.
 
-Dashboard: **http://100.74.89.105:8899/** (you need to be on the tailnet —
-ask Masein for an invite). This guide lives at `/guide` on the same host.
+Dashboard: **http://<board>:8899/** (you need to be on the tailnet —
+ask Masein for an invite). `<board>` is the board's tailnet address: ask Masein
+for it too. It isn't written here, because this repo has a public mirror. This
+guide lives at `/guide` on the same host.
 
 ---
 
@@ -40,7 +42,7 @@ First grab the client (one stdlib-only file, no pip installs) straight from
 the service — no GitHub access needed:
 
 ```bash
-curl -o bench_client.py http://100.74.89.105:8899/client
+curl -o bench_client.py http://<board>:8899/client
 ```
 
 (It's also `clients/bench_client.py` in the repo.)
@@ -48,7 +50,7 @@ curl -o bench_client.py http://100.74.89.105:8899/client
 Then one shell line uploads **and** benchmarks:
 
 ```bash
-python bench_client.py --base http://100.74.89.105:8899 \
+python bench_client.py --base http://<board>:8899 \
     upload my-model-v1 ./my_checkpoint_dir --submit --suite quick --submitter yourname
 ```
 
@@ -56,7 +58,7 @@ Or, from Python:
 
 ```python
 from bench_client import Bench
-bench = Bench("http://100.74.89.105:8899")
+bench = Bench("http://<board>:8899")
 mid = bench.upload_artifact("my-model-v1", "./my_checkpoint_dir")   # -> "local/my-model-v1"
 bench.submit(mid, suite="quick", submitter="yourname")
 print(bench.scores(mid))     # once it's done — or just watch the dashboard
@@ -82,7 +84,7 @@ With the same `bench_client.py` from §2, in your training code:
 
 ```python
 from bench_client import Bench
-bench = Bench("http://100.74.89.105:8899")
+bench = Bench("http://<board>:8899")
 
 run = bench.init("my-run7", submitter="yourname",
                  config={"lr": 3e-4, "batch": 32})     # config shows + diffs in the UI
@@ -123,8 +125,8 @@ trains a tiny model and does all of the above:
 
 ```bash
 git clone https://github.com/Teraformer-LIMITED/evalboard && cd evalboard
-python examples/train_and_benchmark.py --bench http://100.74.89.105:8899 --dry-run   # 1-minute check
-python examples/train_and_benchmark.py --bench http://100.74.89.105:8899 --steps 200 --checkpoint-every 100
+python examples/train_and_benchmark.py --bench http://<board>:8899 --dry-run   # 1-minute check
+python examples/train_and_benchmark.py --bench http://<board>:8899 --steps 200 --checkpoint-every 100
 ```
 
 ## The loop

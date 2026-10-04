@@ -78,8 +78,10 @@ tail -f service.log        # Ctrl-C stops the tail, not the service
 curl -s "http://$(tailscale ip -4):8899/healthz"
 ```
 
-Friends open `http://100.74.89.105:8899/` (tailnet hostname works from any
-device on the tailnet). To stop the service: `pkill -f "uvicorn service.app"` —
+Friends open `http://<board>:8899/`, where `<board>` is the server's tailnet
+address (`tailscale ip -4` on the server) or its tailnet hostname, from any
+device on the tailnet. Neither is written into the repo: it has a public mirror.
+To stop the service: `pkill -f "uvicorn service.app"` —
 a run in flight is killed with it; on restart the interrupted submission is
 re-queued automatically and per-task resume repeats only the interrupted task.
 
