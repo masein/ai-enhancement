@@ -111,9 +111,9 @@ def test_the_models_column_menu_and_compares_row_open_it_too(live, page):
     go(page, live, f"tab=models&view=compare&m={ids(GOOD, CHANCE)}", "[data-compare='2']")
     page.locator("[data-cmp-row='arc_easy'] [data-q-open='arc_easy']").click()
     page.wait_for_selector("[data-qx-head='arc_easy']")
-    # back to Benchmarks
+    # back to Benchmarks — 16.4: its catalogue
     page.locator("[data-qx-back]").click()
-    page.wait_for_selector("[data-panel]")
+    page.wait_for_selector("[data-catalog]")
     assert "q=" not in page.evaluate("location.hash")
     assert page.errors == []
 

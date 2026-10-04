@@ -2163,10 +2163,16 @@ def merge_runs(runs: list[dict]) -> dict[str, dict]:
     """
     by_model: dict[str, dict] = {}
     for r in sorted(runs, key=lambda r: str(r.get("date") or "")):
+        # 16.4: how long each task's run took here — one invocation a task, so
+        # its time is that task's; a served model's is its server's: left out
+        secs = ({t: r["eval_seconds"] for t in r["tasks"]}
+                if r.get("eval_seconds") and not r.get("served") else {})
         m = by_model.get(r["model"])
         if m is None:
             by_model[r["model"]] = r
+            r["task_secs"] = dict(secs)
             continue
+        m.setdefault("task_secs", {}).update(secs)
         m["tasks"].update(r["tasks"])
         m["n_shot"].update(r["n_shot"])
         m["n_samples"].update(r["n_samples"])
@@ -2301,6 +2307,16 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
     acc_tasks = [t for t in headline
                  if metric_used.get(t) in PROPORTION | MEAN_SCORES and not is_lower_better(t)]
     ppl_tasks = [t for t in headline if t not in acc_tasks]
+    # 16.4: how long a run of each takes on this server — the median over the
+    # models run here, for the catalogue's "A run here"
+    task_time = {}
+    for t in headline:
+        xs = sorted(float(r["task_secs"][t]) for r in by_model.values()
+                    if (r.get("task_secs") or {}).get(t))
+        if xs:
+            mid = len(xs) // 2
+            task_time[t] = {"secs": round(xs[mid] if len(xs) % 2 else (xs[mid - 1] + xs[mid]) / 2),
+                            "n": len(xs)}
 
     # official vs preliminary: the average is over the REQUIRED list or it does
     # not exist. A model missing any required task gets no overall number.
@@ -2817,6 +2833,7 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         "source": source,
         "models": model_rows,
         "accTasks": acc_tasks,
+        "taskTime": task_time,
         "pplTasks": ppl_tasks,
         "required": required,          # the protocol list an official average needs
         # 12h.1: the three generative tasks, and what their makers publish
@@ -4686,6 +4703,21 @@ sup.fr-mark { color:var(--text-secondary); margin-left:1px; }
   border-top:1px solid var(--border); }
 .trange input[type=date] { width:auto; }
 #pop-group .gcount { font-size:var(--fs-1); }
+/* 16.4: Benchmarks, a catalogue — a card a benchmark; a suite's spans the row */
+.catgrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap:12px; }
+.catcard { border:1px solid var(--border); border-radius:var(--r-2); padding:12px 14px;
+  background:var(--surface-1); display:flex; flex-direction:column; gap:6px; min-width:0; }
+.catcard.suite { grid-column:1 / -1; }
+.catcard h3 { margin:0; font-size:var(--fs-3); display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.catcard .catline { margin:0; }
+.catfacts { display:grid; grid-template-columns:max-content minmax(0, 1fr); gap:2px 10px; margin:0;
+  font-size:var(--fs-1); }
+.catfacts dt { color:var(--text-secondary); }
+.catfacts dd { margin:0; overflow-wrap:anywhere; }
+.catacts { display:flex; flex-wrap:wrap; gap:4px 14px; margin-top:auto; padding-top:4px; }
+.catparts > summary { cursor:pointer; color:var(--accent); font-size:var(--fs-1); }
+.catparts .catgrid { margin-top:8px; }
+.catsec h2 { margin:0 0 10px; }
 @media (max-width:720px) {
   .pager { flex-wrap:nowrap; gap:4px; overflow-x:auto; scrollbar-width:none; }
   .pager button { padding:3px 6px; }
@@ -9288,6 +9320,7 @@ function viewHash(v) {
   // 12o.2: a benchmark's questions, and the models chosen
   if (place === 'benchmarks' && state.qx.task)
     return 'tab=benchmarks&q=' + encodeURIComponent(state.qx.task) + benchHash();
+  if (v === 'tasks') return 'tab=benchmarks';              // 16.4: the catalogue
   if (place === 'improve' || place === 'benchmarks')
     return `tab=${place}&sub=${SUB_SLUG[v]}`
       // 12g.1: which model Improve is on, so a link opens it
@@ -9308,6 +9341,13 @@ function viewOfHash(name, params) {
   const p = new URLSearchParams(params || '');
   const has = v => TABS.some(t => t[0] === v);
   const n = TAB_ALIASES[name] || name;
+  // 16.4: Benchmarks ▸ Standard's ranked bars are Models ▸ Chart now: an old
+  // link to them lands there, with the models it chose
+  if ((n === 'tasks' || (n === 'benchmarks' && p.get('sub') === 'standard')) && !p.get('q')) {
+    lbFromHash('show=chart' + ['models', 'hl'].map(k => p.get(k) ? `&${k}=${encodeURIComponent(p.get(k))}`
+      : '').join(''));
+    return 'leaderboard';
+  }
   // 12g.1: By topic and Review are the pipeline now — their addresses land on it
   const sub = { model: 'pipeline', topics: 'pipeline', review: 'pipeline', training: 'training',
                 standard: 'tasks', exam: 'exam', everyday: 'everyday' }[p.get('sub')];
@@ -9327,7 +9367,8 @@ function viewOfHash(name, params) {
     if (id !== state.qb.id) Object.assign(state.qb, { id, draft: null, at: 0, editing: null });
   }
   if (n === 'improve') v = sub || 'pipeline';
-  if (n === 'benchmarks') v = ['tasks', 'exam', 'everyday'].includes(sub) ? sub : benchSub();
+  // 16.4: the catalogue, unless an address names one of its tool pages
+  if (n === 'benchmarks') v = ['exam', 'everyday'].includes(sub) ? sub : 'tasks';
   // 12o.2: a benchmark's questions
   if (n === 'benchmarks' && p.get('q')) {
     if (state.qx.task !== p.get('q'))
@@ -9336,7 +9377,8 @@ function viewOfHash(name, params) {
     v = 'tasks';
   } else if (n === 'benchmarks') state.qx.task = null;
   // 12n.1: Everyday tasks and the Knowledge exam follow the same choice
-  if (['tasks', 'everyday', 'exam'].includes(v)) {
+  // 16.4: not the catalogue, which chooses no models: visiting it keeps Models' choice
+  if (['everyday', 'exam'].includes(v) || (v === 'tasks' && p.get('q'))) {
     // 12m.1: the chosen models and the highlighted ones, from the address
     const L = lbS(), ids = new Set(((DATA || {}).models || []).map(m => m.id));
     const list = k => [...new Set((p.get(k) || '').split(',').map(x => canonId(x.trim()))
@@ -9519,8 +9561,9 @@ function hashWords(h) {
     return ['Models', test !== 'standard' ? MODELS_VIEWS[test] : '',
       g && g[0] !== 'all' ? g[1] : ''].filter(Boolean).join(' · ');
   }
-  if (tab === 'benchmarks') return 'Benchmarks · ' + (p.get('q') ? benchName(p.get('q'))
-    : SUB_WORDS[p.get('sub')] || 'Standard');
+  if (tab === 'benchmarks') return p.get('q') ? 'Benchmarks · ' + benchName(p.get('q'))
+    : ['exam', 'everyday'].includes(p.get('sub')) ? 'Benchmarks · ' + SUB_WORDS[p.get('sub')]
+    : 'Benchmarks';
   if (tab === 'improve') return 'Improve' + (SUB_WORDS[p.get('sub')] ? ' · ' + SUB_WORDS[p.get('sub')] : '');
   const v = (Object.entries(PAGE_SLUG).find(([, slug]) => slug === tab) || [tab])[0];
   return (TABS.find(([id]) => id === v) || [, 'Home'])[1];
@@ -10735,6 +10778,8 @@ function lbHash() {
   if (L.view === 'standard' && L.cols)
     out.push('cols=' + L.cols.map(t => LB_ALIAS[t] || t).join(','));
   if (L.models) out.push('models=' + L.models.map(encodeURIComponent).join(','));
+  // 16.4: the Chart's highlighted models (Benchmarks ▸ Standard's, before)
+  if (L.show === 'chart' && (L.hl || []).length) out.push('hl=' + L.hl.map(encodeURIComponent).join(','));
   return out.join('&');
 }
 function lbFromHash(rest) {
@@ -10778,6 +10823,8 @@ function lbFromHash(rest) {
   const ms = list('models').map(canonId).filter(id => !DATA || ids.has(id)
     || id.startsWith('reported/'));
   L.models = ms.length ? [...new Set(ms)] : null;
+  const hl = list('hl').map(canonId).filter(id => !DATA || ids.has(id)).slice(0, 3);
+  L.hl = hl.length ? [...new Set(hl)] : null;
   // 12m.1: the compared models, as the address names them, at most eight
   if (L.view === 'compare')
     L.cmp = [...new Set(list('m').map(canonId).filter(id => !DATA || ids.has(id)
@@ -11620,9 +11667,17 @@ function lbChart(ms) {
   const card = el('div', { class: 'card', 'data-lb-card': '1', 'data-lb-chart': lbViewKey(L) },
     ...modelsHead(), lbToolbar(ms, cols, shown, nHidden));
   if (lbTest(L) === 'frontier') {
+    // 16.4: ours on the shared benchmarks, what others report as ticks on
+    // them (Benchmarks ▸ Standard drew these), and what others report alone
+    const keep = state.accScale;
+    state.accScale = state.avgMode === 'raw' ? 'raw' : 'chance';
+    const ours = frontierTasks().filter(t => rows.some(m => cell(t, m.id)))
+      .map(t => barPanel(t, rows, { lower: false, hl, refs: frRefs(t) }));
+    state.accScale = keep;
     const fr = frPanels(hl);
-    card.append(fr || el('p', { class: 'note', 'data-chart-none': '1',
-      text: 'Nothing reported for these models yet.' }));
+    card.append(ours.length ? el('div', { class: 'panels', 'data-chart-panels': String(ours.length) },
+      ours) : '', fr || '', !ours.length && !fr ? el('p', { class: 'note', 'data-chart-none': '1',
+      text: 'Nothing measured or reported for these models yet.' }) : '');
     return [card];
   }
   const ts = (state.lbBenchNow || []).filter(t => !isGgufKey(t) && !isDmKey(t)
@@ -11632,7 +11687,10 @@ function lbChart(ms) {
   // the scale is the toolbar's (Filters ▸ More ▸ Scale), as the table's Avg
   const keep = state.accScale;
   state.accScale = state.avgMode === 'raw' ? 'raw' : 'chance';
-  const panels = have.flatMap(t => [barPanel(t, rows, { lower: false, hl, refs: frRefs(t) }),
+  // each benchmark's panel where these models have a number, and its GGUF
+  // panel beside it where one was measured on the file (as Benchmarks drew them)
+  const panels = ts.flatMap(t => [
+    ...(have.includes(t) ? [barPanel(t, rows, { lower: false, hl, refs: frRefs(t) })] : []),
     ...ggufPanel(t, rows, hl)]);
   state.accScale = keep;
   card.append(
@@ -11643,8 +11701,10 @@ function lbChart(ms) {
       : el('p', { class: 'note', 'data-chart-none': '1', text: rows.length
         ? 'None of these models has a number in the benchmarks in view.'
         : 'No models match these filters.' }),
-    none.length && panels.length ? el('p', { class: 'small se', 'data-empty-panels': none.join(',') },
-      `No numbers for these models: ${none.map(benchName).join(', ')}`) : '',
+    none.length ? el('p', { class: 'small se', 'data-empty-panels': none.join(',') },
+      `No numbers for ${L.models ? 'the chosen models' : 'any model'}: `
+      + `${none.map(benchName).join(', ')} (lm_eval)` + (rows.some(narrow) ? ' · served and GGUF '
+        + 'models can’t be measured this way' : '')) : '',
     lbSizeHidden(ms), lbTestedHidden(ms));
   return [card];
 }
@@ -13159,7 +13219,8 @@ function lbEveryday(ms) {
     hfade('lb', el('div', { class: 'lb-wrap', 'data-hkeep': 'lb' }, table)),
     el('p', { class: 'lbcap', text: `${evdAll()} questions in ${evdGroupsWord()} groups, typed the way `
       + `people type on a phone; each count is the ${evdHidden()} hidden ones. Open a model for `
-      + 'its answers to the practice ones; Benchmarks ▸ Everyday tasks has those questions.' }))];
+      + 'its answers to the practice ones; Benchmarks ▸ Everyday ▸ Manage questions has those '
+      + 'questions.' }))];
 }
 
 // 12h.1: one generative cell — its number, and under it, only when there is
@@ -14323,6 +14384,9 @@ function lbToolbar(ms, cols, shown, nHidden) {
       el('div', { class: 'pickers', 'data-pickers': '1' },
         LB_GROUPS[test] ? lbGroupPill(test) : '', lbModelsPill(ms), toggle,
         colsHere ? lbColumnsPill(cols, shown, nHidden) : '',
+        // 16.4: the Chart's Highlight ▾, Benchmarks ▸ Standard's before
+        L.show === 'chart' && !lbChartWhy(L) && !(L.chip === 'devicemark' && !L.cols)
+          ? hlPill(lbFilter(ms), (L.hl || []).slice(0, 3)) : '',
         L.view === 'standard' ? cmpGo() : '', count || '')),
     views, L.view === 'standard' ? lbViewForm() : '',
     open ? el('div', { class: 'fsheet', id: 'filter-sheet', role: 'dialog', 'aria-label': 'filters',
@@ -15342,7 +15406,8 @@ function lbHowTo(ms) {
       + `Avg exists only for models that completed all ${DATA.required.length} required tasks `
       + `(${DATA.required.join(', ')}): ${nOff} of ${ms.length} here. Anything short of that is `
       + 'preliminary — its per-task scores are valid and shown, it just has no overall number. '
-      + 'What each benchmark measures is under Benchmarks ▸ Standard.' }));
+      + 'What each benchmark is — its questions, how it is marked, whose it is — is on '
+      + 'Benchmarks.' }));
 }
 
 // ===========================================================================
@@ -15762,51 +15827,6 @@ function benchPick(ms, pick, hl, reps = []) {
       ? `${pick.length} of ${ms.length} models, chosen here or on Models — the same choice`
       : `All ${ms.length} models`) + (hl.length ? ` · ${hl.length} highlighted` : '') }));
 }
-function vTasks(ms, hl = []) {
-  if (!DATA.accTasks.length) return [note('No accuracy tasks found.')];
-  const scaleBtn = (v, label, tip) => el('button', {
-    class: 'tgl' + (state.accScale === v ? ' on' : ''), title: tip, text: label,
-    'aria-pressed': String(state.accScale === v),
-    onclick: () => { state.accScale = v; render(); } });
-  return [
-    el('p', { class: 'sub', style: 'margin:10px 2px', text:
-      'One panel per benchmark, models ranked. Bars share one hue on purpose — the label is the identity; '
-      + 'pointing at any model highlights it in every panel. Dashed line = chance.'
-      + (anyCk() ? ' Hollow bars are uploaded checkpoints.' : '') }),
-    el('div', { class: 'ctrl', style: 'margin:0 2px 10px' },
-      el('span', { class: 'small', text: 'scale' }),
-      scaleBtn('raw', 'raw score',
-               'accuracy as the harness reports it, 0% to the best score on the board'),
-      scaleBtn('chance', 'vs chance',
-               'share of the headroom above chance: 0% = guessing, 100% = perfect. '
-             + 'Bars diverge from the chance line, so a model BELOW chance points '
-             + 'left in red. This is the scale on which models bunched at the floor '
-             + 'become distinguishable, and the one the frontier reference fits on.'),
-      el('span', { class: 'small', style: 'margin-left:auto',
-        text: state.accScale === 'chance'
-          ? '0% = chance · 100% = perfect'
-          : 'tasks with no chance level are unchanged by this toggle' })),
-    // grouped under their domain — the same vocabulary the radar folds on, so a
-    // reader learns one taxonomy rather than two
-    ...domainGroups(DATA.accTasks).map(([dom, ts]) => {
-      // 12n.1: a benchmark none of these models has is a word in one line at
-      // the section's end, not a card of its own; it comes back with a number
-      const none = ts.filter(t => !ms.some(m => cell(t, m.id)));
-      return el('div', {},
-        el('h3', { class: 'domhead' }, dom,
-          el('span', { class: 'se', text: ` · ${ts.length} task${ts.length > 1 ? 's' : ''}` })),
-        el('div', { class: 'panels' }, ts.flatMap(t => [
-          ...(none.includes(t) ? [] : [barPanel(t, ms, { lower: false, hl, refs: frRefs(t) })]),
-          ...ggufPanel(t, ms, hl)])),
-        none.length ? el('p', { class: 'small se', 'data-empty-panels': none.join(',') },
-          `No numbers for ${lbS().models ? 'the chosen models' : 'any model'}: `
-          + `${none.join(', ')} (lm_eval)` + (ms.some(narrow) ? ' · served and GGUF models '
-            + 'can’t be measured this way' : '')) : '');
-    }),
-    frPanels(hl),
-    tableTwin('tasks-table', ms, DATA.accTasks, false)];
-}
-
 function vPpl(ms) {
   if (!DATA.pplTasks.length) return [note('No perplexity tasks found. Create pinned corpus slices with scripts/make_ppl_task.py — they are the eval that separates models multiple-choice cannot.')];
   const CE_NOTE = 'cross-entropy = bits_per_byte × ln 2, in nats per byte — the same quantity '
@@ -18910,17 +18930,279 @@ function vHelp() {
 
 // Benchmarks ▸ Standard: today's Tasks page, with About these benchmarks
 // under it (from the Leaderboard's How to read this table)
-function vStandardBench(ms) {
-  // 12m.1: only the chosen models (Models ▾, shared with Models), up to three highlighted
-  const L = lbS();
-  repLoad();
-  const pick = L.models ? ms.filter(m => L.models.includes(m.id)) : ms;
-  // 12m.2: and the models known only as reported, chosen or all — 12n.1: in
-  // the Frontier group's panels, and as reference ticks on ours
-  const reps = L.models ? repOnly().filter(m => L.models.includes(m.id)) : repOnly();
-  const hl = (L.hl || []).filter(id => [...pick, ...reps].some(m => m.id === id)).slice(0, 3);
-  return [benchPick(ms, pick, hl, reps), ...vTasks(pick, hl),
-    aboutBenchmarks([...DATA.accTasks, ...DATA.pplTasks])];
+// ===========================================================================
+// 16.4: Benchmarks is a catalogue — what each test is. Scores live in
+// Models; here each benchmark is a card: what it measures, its questions and
+// how an answer is marked, who made it (a link), its licence and restriction
+// badge, how long a run takes on this server where one has measured it, how
+// many models have a score and whether it counts in the Avg — See scores ▸,
+// and Read the questions ▸ where the viewer may. A suite is one card that
+// opens to its parts. Sections: Standard · Mobile · Everyday · Frontier, as
+// Models' Row 1, and the Knowledge exam while it has its tools.
+// ===========================================================================
+// the harness's own: the dataset each lm_eval 0.4.12 task loads, and its
+// licence as that dataset's card states it (read 4 Oct 2026) — "not stated"
+// where its card states none, never a licence from memory. Its makers' paper
+const CAT_HARNESS = {
+  mmlu: { line: 'Four-choice questions across 57 academic and professional subjects.',
+    marked: 'options scored: the one the model finds likeliest, 5-shot',
+    by: 'Hendrycks et al., Measuring Massive Multitask Language Understanding (ICLR 2021)',
+    url: 'https://huggingface.co/datasets/cais/mmlu', licence: 'MIT' },
+  hellaswag: { line: 'Four endings to an everyday situation; which one follows.',
+    marked: 'options scored, length-normalised, 5-shot',
+    by: 'Zellers et al., HellaSwag: Can a Machine Really Finish Your Sentence? (ACL 2019)',
+    url: 'https://huggingface.co/datasets/Rowan/hellaswag', licence: 'not stated on its dataset card' },
+  winogrande: { line: 'Two-choice pronoun resolution that needs commonsense.',
+    marked: 'options scored, 5-shot',
+    by: 'Sakaguchi et al., WinoGrande: An Adversarial Winograd Schema Challenge at Scale (AAAI 2020)',
+    url: 'https://huggingface.co/datasets/allenai/winogrande', licence: 'not stated on its dataset card' },
+  piqa: { line: 'Two procedures; which one physically works.',
+    marked: 'options scored, length-normalised, 0-shot',
+    by: 'Bisk et al., PIQA: Reasoning about Physical Commonsense in Natural Language (AAAI 2020)',
+    url: 'https://huggingface.co/datasets/baber/piqa', licence: 'not stated on its dataset card' },
+  arc_challenge: { line: 'Grade-school science questions: the hard split.',
+    marked: 'options scored, length-normalised, 5-shot',
+    by: 'Clark et al., Think you have Solved Question Answering? Try ARC (AI2, 2018)',
+    url: 'https://huggingface.co/datasets/allenai/ai2_arc', licence: 'CC BY-SA 4.0' },
+  arc_easy: { line: 'Grade-school science questions: the easier split.',
+    marked: 'options scored, length-normalised, 5-shot',
+    by: 'Clark et al., Think you have Solved Question Answering? Try ARC (AI2, 2018)',
+    url: 'https://huggingface.co/datasets/allenai/ai2_arc', licence: 'CC BY-SA 4.0' },
+  gsm8k: { line: 'Grade-school word problems that take several steps.',
+    marked: 'exact match on the final number, written out, 5-shot',
+    by: 'Cobbe et al., Training Verifiers to Solve Math Word Problems (OpenAI, 2021)',
+    url: 'https://huggingface.co/datasets/openai/gsm8k', licence: 'MIT' },
+  truthfulqa_mc2: { line: 'Questions where a common misconception is the tempting answer.',
+    marked: 'options scored: the probability on the true answers (mc2), 0-shot',
+    by: 'Lin et al., TruthfulQA: Measuring How Models Mimic Human Falsehoods (ACL 2022)',
+    url: 'https://huggingface.co/datasets/truthfulqa/truthful_qa', licence: 'Apache-2.0' },
+  ifeval: { line: 'Instructions to follow to the letter: no commas, three bullet points, under 100 words.',
+    marked: 'the harness’s IFEval checker, on the answer after any thinking',
+    by: 'Zhou et al., Instruction-Following Evaluation for Large Language Models (Google, 2023)',
+    url: 'https://huggingface.co/datasets/google/IFEval', licence: 'Apache-2.0' },
+  mmlu_pro: { line: 'MMLU made harder: ten options, the reasoning written out.',
+    marked: 'exact match on the letter the answer settles on, 5-shot chain of thought',
+    by: 'Wang et al., MMLU-Pro: A More Robust and Challenging Multi-Task Language Understanding '
+      + 'Benchmark (TIGER-Lab, NeurIPS 2024)',
+    url: 'https://huggingface.co/datasets/TIGER-Lab/MMLU-Pro', licence: 'MIT' },
+  hendrycks_math500: { line: 'Competition maths problems, answered in the model’s own words.',
+    marked: 'exact match on the final answer, compared as maths (1/2 and 0.5 are one answer)',
+    by: 'Hendrycks et al., Measuring Mathematical Problem Solving With the MATH Dataset '
+      + '(NeurIPS 2021); the 500 of Lightman et al., Let’s Verify Step by Step (OpenAI, 2023)',
+    url: 'https://huggingface.co/datasets/HuggingFaceH4/MATH-500',
+    licence: 'MIT (the MATH dataset’s); not stated on this copy’s card' },
+  gpqa: { line: 'Graduate-level science questions written to be hard to look up.',
+    by: 'Rein et al., GPQA: A Graduate-Level Google-Proof Q&A Benchmark (2023)',
+    url: 'https://huggingface.co/datasets/Idavidrein/gpqa', licence: 'CC BY 4.0 (gated)' },
+};
+// the trust sets' and MobileAIBench's parts: their manifests' sources (credits
+// in the payload), one line each, and how each is marked here
+const CAT_TRUST = {
+  do_not_answer: { line: 'Requests an assistant should decline, deflect or handle with care.',
+    marked: 'the judge, on a 0–2 rubric: the share of safe replies' },
+  xstest: { line: 'Unsafe requests (its column), and safe ones that only sound unsafe '
+      + '(over-refusal, on the model page).',
+    marked: 'the judge, on a 0–2 rubric: the share of safe replies' },
+  bbq: { line: 'Ambiguous questions about people, where the right answer is always “unknown”.',
+    marked: 'options scored: accuracy, and the paper’s bias score' } };
+const CAT_MAB = {
+  mab_hotpotqa: 'Questions answered from passages that need two hops.',
+  mab_sql: 'SQL written from a question and a table’s schema.',
+  mab_dolly: 'Open instructions, answered against one human’s answer.',
+  mab_cnndm: 'News articles to summarise.', mab_xsum: 'News articles to summarise in one sentence.',
+  mab_mtbench: 'Two-turn conversations across writing, reasoning, maths and coding.',
+  mab_adv: 'Instructions reworded with typos, a URL, LaTeX or HTML: does the answer hold?',
+  mab_privacy: 'Requests for a real person’s email address: does it refuse?',
+  mab_socchem: 'Contested everyday moral judgements: agreement with the crowd.' };
+// MobileAIBench's manifest names its sources, its parts
+const MAB_SOURCE = { mab_hotpotqa: 'HotpotQA', mab_sql: 'sql-create-context',
+  mab_dolly: 'databricks-dolly-15k', mab_cnndm: 'CNN/DailyMail', mab_xsum: 'XSum',
+  mab_mtbench: 'MT-Bench', mab_adv: 'Adversarial Instruction (TrustLLM)',
+  mab_privacy: 'Privacy Leakage (the Enron email corpus)', mab_socchem: 'Social Chemistry 101' };
+const CAT_SECTIONS = [['standard', 'Standard'], ['mobile', 'Mobile'], ['everyday', 'Everyday'],
+  ['frontier', 'Frontier'], ['exam', 'Knowledge exam']];
+
+// what the board measured of a benchmark: its questions (the most any run
+// was asked), the models with a score, and its run time here
+function catQuestions(ts) {
+  const ns = ts.flatMap(t => Object.values((DATA.cells || {})[t] || {}).map(c => c && c.n))
+    .filter(n => n > 0);
+  return ns.length ? Math.max(...ns) : null;
+}
+function catModels(ts) {
+  return new Set(ts.flatMap(t => Object.keys((DATA.cells || {})[t] || {}))).size;
+}
+function catTime(ts) {
+  const xs = ts.map(t => (DATA.taskTime || {})[t]).filter(Boolean);
+  if (!xs.length) return null;
+  const x = xs.sort((a, b) => b.n - a.n)[0];
+  return { text: `about ${durationWords(x.secs)} a model on this server`,
+    title: `the median of ${x.n} run${x.n === 1 ? '' : 's'} here, served models’ left out — `
+      + 'their time is their server’s' };
+}
+// Models, on the view a benchmark's scores are in
+function catSee(test, group) {
+  Object.assign(lbS(), lbChoice(test, group || 'all'), { show: 'table' });
+  navigate({ tab: 'leaderboard', model: null, topic: null });
+}
+function catLink(url, text) {
+  return url ? el('a', { href: url, target: '_blank', rel: 'noopener', text }) : text;
+}
+// one card — or a suite's, with its parts under it
+function catCard(c) {
+  const fact = (k, label, v, extra = {}) => v ? [el('dt', { text: label }),
+    el('dd', { 'data-cat-fact': k, ...extra }, v)] : [];
+  const time = c.tasks ? catTime(c.tasks) : null;
+  const n = c.questions != null ? c.questions : c.tasks ? catQuestions(c.tasks) : null;
+  const nm = c.models != null ? c.models : c.tasks ? catModels(c.tasks) : null;
+  const r = c.restriction || (c.tasks ? c.tasks.map(restrictOf).find(Boolean) : null);
+  // a suite's questions are read from its parts
+  const read = LIVE && !c.parts ? (c.tasks || []).filter(canBrowse) : [];
+  return el('article', { class: 'catcard' + (c.parts ? ' suite' : ''), 'data-cat-card': c.key,
+      id: 'cat-' + c.key },
+    el('h3', {}, c.name, rBadge(r, { 'data-cat-restriction': c.key })),
+    el('p', { class: 'catline', text: c.line }),
+    c.protocol ? el('p', { class: 'small', 'data-cat-protocol': c.key, text: c.protocol }) : '',
+    el('dl', { class: 'catfacts' },
+      ...fact('questions', 'Questions', n != null ? n.toLocaleString('en') + (c.qnote ? ' ' + c.qnote : '')
+        : c.qwords || 'not run here yet'),
+      ...fact('marked', 'Marked by', c.marked),
+      ...fact('by', 'Made by', c.by ? catLink(c.url, c.by) : null),
+      ...fact('licence', 'Licence', c.licence),
+      ...fact('time', 'A run here', time ? time.text : null, time ? { title: time.title } : {}),
+      ...fact('models', 'Scores', nm != null ? `${nm} model${nm === 1 ? '' : 's'}` : null),
+      ...fact('avg', 'In the Avg', c.avg)),
+    c.parts ? el('details', { class: 'catparts', 'data-cat-parts': c.key,
+        open: (state.catOpen || {})[c.key] ? '' : null,
+        ontoggle: e => { state.catOpen = { ...(state.catOpen || {}), [c.key]: e.target.open }; } },
+      el('summary', { text: `Its ${c.parts.length} parts ▸` }),
+      el('div', { class: 'catgrid' }, c.parts.map(catCard))) : '',
+    el('div', { class: 'catacts' },
+      c.see ? el('button', { class: 'quiet', 'data-cat-see': c.key, text: 'See scores ▸',
+        onclick: () => catSee(...c.see) }) : '',
+      ...read.map(t => qxLink(t, { text: read.length > 1 ? `Read ${benchName(t)} ▸`
+        : 'Read the questions ▸', 'data-cat-read': t })),
+      c.manage ? el('button', { class: 'quiet', 'data-cat-manage': c.key, text: 'Manage questions ▸',
+        onclick: c.manage }) : ''));
+}
+// each benchmark's card, by section
+function catCards() {
+  const req = new Set(DATA.required || []);
+  const avg = ts => ts.some(t => req.has(t)) ? 'counts in the Avg' : 'never in the Avg';
+  const harness = (t, see) => ({ key: t, name: benchName(t), tasks: [t], see,
+    ...CAT_HARNESS[t], avg: avg([t]) });
+  const credit = (list, name) => (list || []).find(x => x.name === name) || {};
+  const trust = (DATA.trust || {}).credits || [], mabc = (DATA.mab || {}).credits || [];
+  const std = [
+    harness('mmlu', ['standard', 'knowledge']),
+    ...['hellaswag', 'winogrande', 'piqa'].map(t => harness(t, ['standard', 'commonsense'])),
+    ...['arc_challenge', 'arc_easy'].map(t => harness(t, ['standard', 'reasoning'])),
+    harness('gsm8k', ['standard', 'math']),
+    harness('truthfulqa_mc2', ['standard', 'trust']),
+    ...[['do_not_answer', 'Do-Not-Answer'], ['xstest', 'XSTest'], ['bbq', 'BBQ']].map(([k, nm]) => {
+      const c = credit(trust, nm), ts = k === 'bbq' ? ['bbq_3000', 'bbq_all'] : [k];
+      return { key: k, name: nm, tasks: ts, see: ['standard', 'trust'], ...CAT_TRUST[k],
+        by: c.cite, url: c.url, licence: c.licence, avg: avg(ts),
+        qnote: k === 'bbq' ? `(a seeded ${((DATA.trust || {}).bbqSubset || {}).n
+          ? Number(DATA.trust.bbqSubset.n).toLocaleString('en') : '3,000'} by default)` : '' };
+    }),
+    ...['ifeval', 'mmlu_pro', 'hendrycks_math500'].map(t => harness(t, ['standard', 'instruction'])),
+    ...(DATA.pplTasks || []).length ? [{ key: 'lm', name: 'Language modelling', tasks: DATA.pplTasks,
+      line: 'Perplexity on pinned corpus slices: the same tokens for every model.',
+      marked: 'bits per byte — lower is better; no chance level',
+      by: 'the corpora are this board’s own slices', see: ['standard', 'lm'], avg: 'never in the Avg',
+      qwords: `${DATA.pplTasks.length} slice${DATA.pplTasks.length === 1 ? '' : 's'}` }] : []];
+  const mab = mabc[0] || {};
+  const dmRows = Object.values(DATA.devicemark || {}).filter(x => x && (x.off || x.on)).length;
+  const mobile = [
+    { key: 'devicemark', name: 'DeviceMark', see: ['mobile', 'devicemark'],
+      line: 'Models on a phone: instruction following, knowledge and maths, scored as DeviceMark '
+        + 'scores them, with each model’s speed on the device.',
+      protocol: 'Its protocol: 0-shot through the chat template, greedy, a cap of 4,096 generated '
+        + 'tokens with the thinking counted, thinking off unless a row says thinking, scoring v2. '
+        + 'IFEval on DeviceMark’s own 300 items; MMLU-Pro and MATH our draw of the same design.',
+      by: 'DeviceMark (devicemark.github.io)', url: 'https://devicemark.github.io',
+      licence: 'their board: CC BY 4.0', models: dmRows, qwords: '596 (300 · 196 · 100)',
+      avg: 'its own composite; never in the Avg' },
+    { key: 'mobileaibench', name: 'MobileAIBench', see: ['mobile', 'mobileaibench'],
+      line: 'Tasks for models on a phone, in three parts: no judge; judged; trust & safety, judged.',
+      by: mab.cite, url: mab.url, licence: mab.licence, tasks: [...MAB, ...MAB_TRUST],
+      qwords: 'its own sample of each source', avg: 'never in the Avg',
+      parts: [...MAB, ...MAB_TRUST].map(t => {
+        const c = credit(mabc, MAB_SOURCE[t]);
+        return { key: t, name: benchName(t).replace(' (MobileAIBench)', ''), tasks: [t],
+          line: CAT_MAB[t], marked: MAB_METRIC[t] ? `${MAB_METRIC[t]}, as MobileAIBench scores it`
+            : mabJudged(t) ? 'the judge' : '', by: c.cite, url: c.url, licence: c.licence,
+          avg: 'never in the Avg' };
+      }) },
+    { key: 'mobile_mmlu', name: 'Mobile-MMLU', see: ['mobile', 'mmlu'],
+      line: 'Multiple-choice questions people ask on a phone, in 80 fields.',
+      by: ((MMPD().credit || {}).by) || '', url: ((MMPD().credit || {}).url) || '',
+      licence: '', avg: 'never in the Avg', tasks: [MMP],
+      parts: [
+        { key: MMP, name: 'Mobile-MMLU-Pro', tasks: [MMP],
+          line: 'Its harder half, ten options each; our answer key'
+            + (mmpProvisional() ? ' (provisional)' : '') + '.',
+          marked: 'options scored, on our key: what strong models of different makers agreed on',
+          by: ((MMPD().credit || {}).by) || '', url: ((MMPD().credit || {}).url) || '',
+          licence: ((MMPD().credit || {}).licence) || '',
+          avg: 'never in the Avg' },
+        ...MMFD().name ? [{ key: MMF, name: MMFD().name, tasks: [MMF], restriction: restrictOf(MMF),
+          line: 'The full set, kept apart: its own table, never a column beside Pro’s.',
+          marked: 'options scored, on its own key', questions: MMFD().n || null,
+          by: ((MMPD().credit || {}).by) || '', url: MMFD().source || '',
+          licence: MMFD().licence || '', avg: 'never in the Avg',
+          models: (mmfTableRows() || []).length }] : []] }];
+  const E = evd();
+  const everyday = [{ key: 'everyday', name: 'Everyday tasks', see: ['everyday'],
+    line: 'What people type into an assistant on a phone — lowercase, typos, one plain request — '
+      + `in ${evdGroupsWord()} groups.`,
+    questions: evdHidden() + evdPractice(),
+    qnote: `(${evdHidden()} hidden, which score; ${evdPractice()} practice, shown)`,
+    marked: 'its own checks, pass or fail with the reason in words; a few by the judge',
+    by: 'this board’s team', licence: 'ours; the hidden half is never shown',
+    models: Object.keys(E.models || {}).length, avg: 'its own total; never in the Avg',
+    manage: () => navigate({ tab: 'everyday', model: null, topic: null }) }];
+  const sh = DATA.shared || {};
+  const frontier = [
+    { ...harness('gpqa_diamond_cot_zeroshot', ['frontier']), key: 'gpqa',
+      name: 'GPQA Diamond', tasks: [GPQA_COT, GPQA_LL], ...CAT_HARNESS.gpqa,
+      marked: 'two ways, never averaged together: the answer written out (CoT), and the four '
+        + 'options scored', avg: 'never in the Avg' },
+    { key: 'simpleqa', name: 'SimpleQA Verified', tasks: [SIMPLEQA], see: ['frontier'],
+      line: 'Short factual questions with one right answer.',
+      marked: 'the judge, with the dataset’s own grader', by: (sh.simpleqa || {}).cite
+        || 'Google DeepMind, SimpleQA Verified (2025)',
+      url: (sh.simpleqa || {}).url || 'https://huggingface.co/datasets/google/simpleqa-verified',
+      licence: (sh.simpleqa || {}).licence || 'MIT', avg: 'never in the Avg' },
+    ...LIVE ? [{ key: 'reported', name: 'What others report', see: ['frontier'],
+      line: 'Scores published by others — Epoch AI, model cards and papers — beside ours on the '
+        + 'same tests, never ranked with them.', qwords: 'theirs',
+      by: frCredit() || 'imported on AI models ▸ Outside data', avg: 'never in the Avg' }] : []];
+  const exam = LIVE && TABS.some(([id]) => id === 'exam') ? [{ key: 'exam', name: 'Knowledge exam',
+    see: modelsViews().includes('exam') ? ['exam'] : null,
+    line: 'Open questions across the topics, written for this board and marked against a rubric.',
+    marked: 'the judge, on a 0–4 rubric, once a person has agreed with it',
+    by: 'this board’s team', licence: 'ours; the hidden half is never shown',
+    qwords: 'its bank, on its page', avg: 'its own; never in the Avg',
+    manage: () => navigate({ tab: 'exam', model: null, topic: null }) }] : [];
+  return { standard: std, mobile, everyday, frontier, exam };
+}
+function vCatalog() {
+  const cards = catCards();
+  const secs = CAT_SECTIONS.filter(([k]) => (cards[k] || []).length);
+  return [el('div', { class: 'card', 'data-catalog': '1' },
+    el('h2', {}, 'Benchmarks'),
+    el('p', { class: 'sub', text: 'What each test is: its questions, how an answer is marked, who '
+      + 'made it and under what licence. Scores are on Models — See scores ▸ opens them.' }),
+    el('nav', { class: 'subswitch', 'aria-label': 'sections', 'data-cat-nav': '1' },
+      secs.map(([k, t]) => el('button', { class: 'chip-btn', 'data-cat-jump': k, text: t,
+        onclick: () => { const s = document.getElementById('cat-sec-' + k);
+          if (s) s.scrollIntoView({ block: 'start', behavior: motionOff() ? 'auto' : 'smooth' }); } })))),
+    ...secs.map(([k, t]) => el('section', { class: 'card catsec', id: 'cat-sec-' + k,
+        'data-cat-section': k },
+      el('h2', { text: t }),
+      el('div', { class: 'catgrid' }, cards[k].map(catCard))))];
 }
 
 // ===========================================================================
@@ -23747,7 +24029,8 @@ const TABS = [
   ['leaderboard', 'Models', vLeaderboard],
   ...(LIVE ? [['pipeline', 'By model', vPipeline],
               ['training', 'Training runs', vTraining]] : []),
-  ['tasks', 'Standard', vStandardBench],
+  // 16.4: Benchmarks is the catalogue; its ranked bars are Models ▸ Chart
+  ['tasks', 'Benchmarks', vCatalog],
   ...(LIVE ? [['exam', 'Knowledge exam', vExam]] : []),
   ['everyday', 'Everyday tasks', vEverydayPage],
   // pages, not places: reached from the header's right side
@@ -23784,18 +24067,13 @@ const TAB_ALIASES = {
   evals: 'provenance', 'submit-queue': 'submit', models_tab: 'models', ppl: 'perplexity',
   'perplexity-loss': 'perplexity',
 };
-// the Benchmarks switch remembers the viewer's last choice
-function benchSub() {
-  let v = 'tasks';
-  try { v = localStorage.getItem('bench-benchmarks-sub') || v; } catch (e) { /* private */ }
-  return ['tasks', 'exam', 'everyday'].includes(v) && TABS.some(t => t[0] === v) ? v : 'tasks';
-}
 function goPlace(pid) {
   const p = PLACES.find(x => x[0] === pid);
   if (!p) return;
   // 16.3: the viewer's last view — its test, group, and Table or Chart
   if (pid === 'models') Object.assign(lbS(), lbRemembered());
-  navigate({ tab: pid === 'benchmarks' ? benchSub() : p[2][0], model: null, topic: null });
+  // 16.4: Benchmarks opens on its catalogue, always
+  navigate({ tab: p[2][0], model: null, topic: null });
 }
 // the switch at the top of Improve and Benchmarks
 function subSwitch(place) {
@@ -23869,7 +24147,11 @@ function render() {
     if (!TABS.some(([id]) => id === state.tab)) state.tab = 'overview';
     const place = placeOf(state.tab);
     view.replaceChildren(
-      ...(place === 'improve' || place === 'benchmarks' ? [subSwitch(place)] : []),
+      ...(place === 'improve' ? [subSwitch(place)] : []),
+      // 16.4: Everyday's and the exam's question tools, under the catalogue
+      ...(place === 'benchmarks' && state.tab !== 'tasks' && !state.qx.task
+        ? [el('a', { class: 'small backlink', href: '#tab=benchmarks', 'data-cat-back': '1',
+            text: '← Benchmarks' })] : []),
       // 12o.2: a benchmark's questions, in Benchmarks
       ...(place === 'benchmarks' && state.qx.task ? vQuestions(ms)
         : TABS.find(([id]) => id === state.tab)[2](ms)), ...dlg);

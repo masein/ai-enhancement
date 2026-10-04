@@ -316,7 +316,8 @@ def test_the_insights_radar_has_the_method_sources(live, page, board):
 
 
 # ---------------------------------------------------------------------------
-# Benchmarks ▸ Standard: the chosen models, and the highlighted ones
+# Benchmarks ▸ Standard: the chosen models, and the highlighted ones —
+# 16.4: Models ▸ Chart now, where an old address lands
 # ---------------------------------------------------------------------------
 
 def test_benchmarks_follow_the_models_choice_and_a_highlight(live, page, board):
@@ -325,7 +326,8 @@ def test_benchmarks_follow_the_models_choice_and_a_highlight(live, page, board):
     page.goto(live["base"] + "/#tab=benchmarks&sub=standard&models="
               + ",".join(quote(m, safe="") for m in (GOOD, SMALL, SKEWED))
               + "&hl=" + quote(SMALL, safe=""))
-    page.wait_for_selector("[data-bench-pick='3']")
+    page.wait_for_selector("[data-lb-chart] [data-on='models']")
+    assert page.locator("[data-on='models']").inner_text().startswith("Models: 3 chosen")
     for p in page.locator("[data-panel]").all():
         assert int(p.get_attribute("data-panel-models")) <= 3
     head = page.locator("[data-panel-method='mmlu']").inner_text()
@@ -337,23 +339,23 @@ def test_benchmarks_follow_the_models_choice_and_a_highlight(live, page, board):
         "opacity") == "0.35"
     # the choice is Models' own: going there, the address carries it
     page.locator("#tabs [role=tab][data-tab='models']").click()
-    page.wait_for_selector("[data-lb-table]")
+    page.wait_for_selector("#pill-models")              # its last view: the Chart (16.3)
     assert page.locator("#pill-models").inner_text() == "Models: 3 ▾"
     # a change here is in the address, and every panel follows
     page.goto(live["base"] + "/#tab=benchmarks&sub=standard")
-    page.wait_for_selector("[data-bench-pick]")
+    page.wait_for_selector("[data-lb-chart]")
     page.locator("#pill-models").click()
     page.locator("[data-models-clear]").click()
     for mid in (GOOD, SKEWED):
         page.locator(f"#pop-models [data-model-pick='{mid}']").check()
     page.keyboard.press("Escape")
-    page.wait_for_selector("[data-bench-pick='2']")
+    page.wait_for_function("lbS().models && lbS().models.length === 2")
     assert "models=" + quote(GOOD, safe="") in page.evaluate("location.hash")
     page.locator("#pill-highlight").click()
     page.locator(f"#pop-highlight [data-hl-pick='{GOOD}']").check()
     page.wait_for_function("location.hash.includes('&hl=')")
     page.reload()
-    page.wait_for_selector("[data-bench-pick='2']")
+    page.wait_for_selector("[data-lb-chart] [data-panel='mmlu']")
     assert page.locator(f"[data-panel='mmlu'] path.bar[data-model='{GOOD}']").get_attribute(
         "data-hl") == "0"
     assert page.errors == []
@@ -379,7 +381,7 @@ def test_benchmarks_screens(live, page, board, width, scheme):
     page.set_viewport_size({"width": width, "height": 1000})
     page.goto("about:blank")
     page.goto(live["base"] + f"/#tab=benchmarks&sub=standard&hl={quote(GOOD, safe='')}")
-    page.wait_for_selector("[data-bench-pick]")
+    page.wait_for_selector("[data-lb-chart]")
     assert page.evaluate("document.scrollingElement.scrollWidth <= innerWidth + 1")
     shot(page, f"benchmarks-{width}-{scheme}.png")
     assert page.errors == []

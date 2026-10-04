@@ -4953,6 +4953,50 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 16.4 — Benchmarks is a catalogue (4 Oct)
+
+- **One page, "what is this test?"** (`vCatalog`, still the `tasks` view, at
+  `#tab=benchmarks`).
+  - Sections: Standard · Mobile · Everyday · Frontier, and the Knowledge exam
+    while its tools exist.
+  - A card a benchmark (`catCard`):
+    - its line; its questions (the most any run here was asked);
+    - how an answer is marked; who made it, as a link; its licence; the
+      restriction badge;
+    - "A run here": `DATA.taskTime`, the median of the models' own runs of
+      that task, served models' left out;
+    - how many models have a score, and whether it counts in the Avg;
+    - See scores ▸ (Models on its group, `catSee`); Read the questions ▸
+      where `canBrowse` allows (never GPQA, never the full Mobile-MMLU).
+  - A suite (DeviceMark, MobileAIBench, Mobile-MMLU) is one card with its
+    parts folded under it. DeviceMark's states its protocol (`devicemark.py`'s
+    `CAP` and `SCORING`).
+- **Where the facts come from.**
+  - **The harness's tasks:** `CAT_HARNESS`. Each one's dataset is the one its
+    lm_eval 0.4.12 task loads (its yaml's `dataset_path`). Its licence is the
+    one that dataset's Hub card states, read 4 Oct. HellaSwag, PIQA,
+    WinoGrande and MATH-500's copy state none, and their cards say so.
+    MATH-500 adds the MATH dataset's MIT, which `devicemark.py` already
+    records.
+  - **Everything else:** the manifests, through the payload's credits
+    (`DATA.trust`, `DATA.mab`, `DATA.mmp`, `DATA.mmf`, `DATA.shared`).
+  - Nothing is written from memory.
+- **The ranked bars are Models ▸ Chart.**
+  - `#tab=tasks` and `#tab=benchmarks&sub=standard` land on
+    `#tab=models&show=chart`, keeping `models=` and `hl=`.
+  - The Chart has Benchmarks' Highlight ▾ (`hlPill`; `hl=` in Models'
+    address while charting).
+  - Frontier's Chart draws ours on GPQA and SimpleQA with others' ticks, then
+    `frPanels`.
+  - `vStandardBench` and `vTasks` are gone.
+- **The tools.**
+  - Everyday's and the exam's pages are reached from their cards' Manage
+    questions ▸, and lead back with "← Benchmarks" (`data-cat-back`).
+  - Their addresses (`sub=everyday`, `sub=exam`) are unchanged.
+  - Benchmarks in the header always opens the catalogue (no `benchSub`).
+  - Visiting the catalogue keeps the models chosen on Models; only the tools
+    and the question browser read `models=` from their address.
+
 ### 16.3 — the Models toolbar (4 Oct)
 
 - **Three rows.**

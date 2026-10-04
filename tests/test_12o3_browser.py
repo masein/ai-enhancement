@@ -91,7 +91,8 @@ def test_the_model_page_line_and_compares_group(live, page):
 
 
 def test_benchmarks_panels_and_their_questions(live, page):
-    go(page, live, f"tab=benchmarks&sub=standard&models={ids(GOOD, SKEWED)}",
+    # 16.4: the ranked bars are Models ▸ Chart: Mobile ▸ MobileAIBench's
+    go(page, live, f"tab=models&view=mobile&group=mobileaibench&show=chart&models={ids(GOOD, SKEWED)}",
        "[data-panel='mab_hotpotqa'] [data-q-open='mab_hotpotqa']")
     assert page.locator("[data-panel='mab_sql']").count() == 1
     page.locator("[data-panel='mab_hotpotqa'] [data-q-open='mab_hotpotqa']").click()

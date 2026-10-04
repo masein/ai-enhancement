@@ -82,7 +82,7 @@ def test_the_header_is_drawn_before_the_scores_arrive(live, browser):
         for route in list(held):                               # now let them through
             route.fulfill(response=route.fetch())
         pg.unroute("**/api/results*")
-        pg.wait_for_selector("[data-subswitch='benchmarks']", timeout=10000)
+        pg.wait_for_selector("[data-catalog]", timeout=10000)          # 16.4: its catalogue
         assert pg.errors == []
     finally:
         ctx.close()
@@ -91,7 +91,7 @@ def test_the_header_is_drawn_before_the_scores_arrive(live, browser):
 @pytest.mark.parametrize("typed, place, arrived", [
     ("#home", "Home", "[data-needs-you]"),
     ("#models", "Models", "[data-lb-table]"),
-    ("#benchmarks", "Benchmarks", "[data-subswitch='benchmarks']"),
+    ("#benchmarks", "Benchmarks", "[data-catalog]"),
 ])
 def test_a_bare_place_name_lands_on_its_place(live, browser, typed, place, arrived):
     ctx, pg = fresh_page(browser)
