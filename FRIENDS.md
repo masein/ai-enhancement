@@ -12,8 +12,9 @@ guide lives at `/guide` on the same host.
 
 ## 1 · Benchmark a model in 30 seconds (no code)
 
-Open the dashboard → **Queue** → start typing a model id (it searches this board
-and the Hub) → Submit.
+Open the dashboard → **Add a model** (top right) → **On Hugging Face** → start
+typing a model id (it searches this board and the Hub) → Start test. On a
+model's page the same button is **Test this model**, with that model filled in.
 
 - Any public Hugging Face id works: `HuggingFaceTB/SmolLM2-135M`
 - `suite`: **quick** = hellaswag + arc-easy + perplexity, minutes — use while
@@ -37,6 +38,18 @@ This is the main path for most of us. The service has its **own checkpoint
 storage**: upload any `save_pretrained()` directory under a name you pick, and
 it becomes `local/<name>` — a first-class model on the leaderboard, no Hugging
 Face account anywhere.
+
+**From the browser** (16b): **Add a model** → **On my computer** → pick a
+`.gguf` file (a phone build, say) or the folder zipped as a `.zip` → **Upload**.
+It shows its progress, speed and time left; a dropped connection carries on by
+itself, and after a reload you pick the same file again and it goes on from
+where it stopped. The board then works out its sha256 and reads what the file
+is, and asks for its details (a name, what it's based on, how it was built,
+its size, and whether others may download it) and its tests: a GGUF is
+measured by llama.cpp on the host, a folder gets the usual tests. One file is
+at most 30 GB; what is kept is listed under it, with Delete.
+
+**From a script:**
 
 First grab the client (one stdlib-only file, no pip installs) straight from
 the service — no GitHub access needed:

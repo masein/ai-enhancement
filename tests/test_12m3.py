@@ -208,7 +208,7 @@ def test_every_question_carries_the_pin_and_a_changed_pin_stops_the_next_run(svc
     assert row["status"] == "failed" and fake.requests == []
     assert row["error"] == ("openai/gpt-6-luna now points to openai/gpt-6-luna-20261001, not the "
                             "openai/gpt-6-luna-20260922 it was added with — add it again under "
-                            "Test a model ▸ A model from OpenRouter if that's intended")
+                            "Add a model ▸ On OpenRouter if that's intended")
     # added again, it is pinned to what OpenRouter lists now
     assert add(client)["pin"]["version"] == "openai/gpt-6-luna-20261001"
     # the pinned provider no longer runs it: no fallbacks, so the run stops
@@ -216,8 +216,8 @@ def test_every_question_carries_the_pin_and_a_changed_pin_stops_the_next_run(svc
     row = run(queue("judged", [task2]))
     assert row["status"] == "failed" and fake.requests == []
     assert row["error"] == ("OpenAI doesn't run openai/gpt-6-luna on OpenRouter now, and it is "
-                            "pinned there with no fallbacks — add it again under Test a model ▸ "
-                            "A model from OpenRouter if that's intended")
+                            "pinned there with no fallbacks — add it again under Add a model ▸ "
+                            "On OpenRouter if that's intended")
     fake.endpoints = [dict(e) for e in ENDPOINTS]
     row = run(queue("judged", [task2]))
     assert row["status"] == "done", row["error"]
@@ -533,7 +533,7 @@ def test_it_sits_what_a_served_model_sits_and_not_the_playground(svc, fake):
         r = client.post(path, json={"name": "GPT by hand", "base_url": OR, "key": KEY,
                                     "how": "OpenRouter", "by": ME})
         assert r.status_code == 422 and r.json()["detail"] == (
-            "That is OpenRouter: add its models under Test a model ▸ A model from OpenRouter, "
+            "That is OpenRouter: add its models under Add a model ▸ On OpenRouter, "
             "where what they cost is counted")
     assert len(fake.auth) == n and served.get("served/GPT-by-hand") is None
 

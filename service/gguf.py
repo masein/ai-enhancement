@@ -3,7 +3,7 @@ on the host (scripts/gguf_worker.py).
 
 The board can't run the fork's llama-perplexity in its container, so it:
 - **registers** a GGUF: a served model's "GGUF file on the server", or a file
-  with no server (Test a model ▸ A GGUF file) — a host path, what it's based
+  with no server (Add a model ▸ Already on this server) — a host path, what it's based
   on, how it's built, and llama-perplexity's flags for it;
 - **queues** a job as a run row (suite "gguf") and a request file in
   results/gguf_requests/, which the worker picks up under the same run lock
@@ -183,7 +183,36 @@ def _check_path(path: str) -> str:
     if not path.startswith(("/", "~/")):
         raise ValueError("The GGUF file is an absolute path on the server, like "
                          "/home/masein/Qwen3.6-35B-A3B-k4-LDA-UD-Q4_K_XL.gguf")
+    # 16b.1: the worker reads and hashes it as masein on the host: a .gguf, and
+    # never a path that climbs out of where it says
+    if not path.lower().endswith(".gguf") or "/../" in path + "/" or "\0" in path:
+        raise ValueError("The GGUF file's path ends in .gguf, with no .. in it: "
+                         f"{path!r} isn't one")
     return path
+
+
+# 16b.1: llama-perplexity's flags as a person types them, which the worker
+# runs as masein on the host: none that names a file to read or write (the
+# worker sets the model and its own files), and no value that is a path.
+# Checked when a model is registered or registered again; one kept from
+# before is run as it was
+FILE_FLAGS = {"-o", "--output", "-m", "--model", "-mu", "--model-url", "-hf", "-hfr",
+              "--hf-repo", "-hff", "--hf-file", "-hft", "--hf-token", "-f", "--file", "-bf",
+              "--binary-file", "-lf", "--logits-file", "--kl-divergence-base", "--log-file",
+              "--lora", "--lora-scaled", "--control-vector", "--control-vector-scaled",
+              "--grammar-file", "-jf", "--json-schema-file", "--prompt-cache",
+              "--slot-save-path", "-md", "--model-draft", "--mmproj", "--chat-template-file",
+              "--rpc", "--path", "--ssl-key-file", "--ssl-cert-file", "--api-key-file"}
+
+
+def check_flags(flags: list[str], what: str = "Flags") -> list[str]:
+    for tok in flags:
+        flag = tok.split("=", 1)[0]
+        if flag in FILE_FLAGS:
+            raise ValueError(f"{what}: {flag} names a file, and only the worker sets those")
+        if "/" in tok or "\\" in tok or tok.startswith("~"):
+            raise ValueError(f"{what}: {tok!r} is a path; these flags take numbers and words")
+    return flags
 
 
 def view(rec: dict) -> dict:
@@ -202,21 +231,30 @@ def write_meta(rec: dict) -> None:
         encoding="utf-8")
 
 
-def register(f: dict, by: str) -> dict:
-    """Test a model ▸ A GGUF file: kept, the path checked by the worker when
-    its first job starts (the board can't see the host's files)"""
+def register(f: dict, by: str, *, check_only: bool = False, pin: dict | None = None) -> dict:
+    """Add a model ▸ Already on this server: kept, the path checked by the
+    worker when its first job starts (the board can't see the host's files).
+    16b.1: an upload's file is registered the same way, its sha256 pinned from
+    the upload (`pin`); `check_only` says whether it would be, keeping nothing"""
     name, how = (f.get("name") or "").strip(), (f.get("how") or "").strip()
     if not slug(name)[len(PREFIX):]:
         raise ValueError("A name: it is shown everywhere")
     if not how:
         raise ValueError("How it's built: the llama.cpp build, the quantisation, what changed. "
                          "It is the record of what was measured")
+    setups = parse_setups(f.get("setups"))
+    for s in setups:
+        check_flags(s["flags"], s["name"])
     rec = {"id": slug(name), "name": name, "path": _check_path(f.get("path")),
            "based_on": (f.get("based_on") or "").strip(), "how": how,
-           "flags": flags_of(f.get("flags")), "setups": parse_setups(f.get("setups")),
+           "flags": check_flags(flags_of(f.get("flags"))), "setups": setups,
            "by": by, "at": time.time()}
+    if check_only:
+        return rec
     old = db.gguf_get(rec["id"]) or {}
-    if old.get("path") == rec["path"] and old.get("pin"):
+    if pin:
+        rec["pin"] = pin
+    elif old.get("path") == rec["path"] and old.get("pin"):
         rec["pin"] = old["pin"]
     db.gguf_put(rec)
     write_meta(rec)

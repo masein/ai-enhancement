@@ -304,10 +304,10 @@ def test_one_filled_button_and_it_is_the_headers(live, page):
     dlg.wait_for()
     assert dlg.locator("[data-ms='submit'] input").input_value() == MODEL
     page.keyboard.press("Escape")
-    # everywhere else it is Test a model
+    # everywhere else it is Add a model (16b.1)
     page.goto(live["base"] + "/#tab=models")
     page.wait_for_selector("[data-lb-table]")
-    assert btn.inner_text() == "Test a model" and btn.get_attribute("data-test-this") is None
+    assert btn.inner_text() == "Add a model" and btn.get_attribute("data-test-this") is None
     assert page.errors == []
 
 

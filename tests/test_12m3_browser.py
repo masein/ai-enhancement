@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import set_name
+from conftest import open_add, set_name
 from fake_openai import FakeServer
 from service import config, db, runner
 from test_12m3 import CATALOG, ENDPOINTS, KEY, LUNA, LUNA_V, OR, SID
@@ -92,8 +92,7 @@ def open_card(page, live, width=1400):
     page.set_viewport_size({"width": width, "height": 1000})
     page.goto(live["base"] + "/#tab=home")
     set_name(page, "masein")
-    page.locator("[data-test-model]").click()
-    page.locator("[data-openrouter-card] > summary").click()
+    open_add(page, live["base"], "openrouter")
     page.wait_for_selector(f"[data-or-row='{GEM}']")
 
 
@@ -113,10 +112,11 @@ def test_a_model_from_openrouter_is_added_and_its_cost_shows_before_start(live, 
     card.locator("[data-or-search]").fill("gemini")
     assert card.locator("[data-or-row]").count() == 1
     card.locator(f"[data-or-add='{GEM}']").click()
-    msg = card.locator("[data-or-msg]")
+    # 16b.1: the test form is next, with what happened on top of it
+    msg = page.locator("[data-dialog='test'] [data-add-note]")
     msg.wait_for()
     assert msg.inner_text() == ("Added Gemini 4 Flash: pinned to google/gemini-4-flash-20260901 on "
-                                "OpenAI, with no fallbacks. Pick what to test it on above — what it "
+                                "OpenAI, with no fallbacks. Choose what to test it on — what it "
                                 "would cost shows before Start.")
     # picked for the test, tagged, with what the run would cost — before Start
     assert page.locator("[data-ms='submit'] input").input_value() == GEM_SID

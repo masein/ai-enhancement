@@ -411,6 +411,25 @@ def open_submit(page, base: str, name: str | None = None) -> None:
     page.wait_for_selector("[data-dialog='test'] [data-submit-form]")
 
 
+def choose_where(page, where: str) -> None:
+    """16b.1: Add a model's first step, where the model is — hf, computer,
+    server, openrouter, or here (under More) — and the part it opens"""
+    if where == "here":
+        more = page.locator("[data-dialog='test'] .addmore")
+        if more.get_attribute("open") is None:
+            more.locator("summary").click()
+    page.locator(f"[data-dialog='test'] [data-add-where='{where}']").click()
+    page.wait_for_selector(f"[data-dialog='test'] [data-add-where='{where}'][aria-pressed='true']")
+
+
+def open_add(page, base: str, where: str) -> None:
+    """16b.1: Add a model from the header (a model's page tests its own
+    model), and where the model is"""
+    page.goto(base + "/#tab=home")
+    page.locator("[data-test-model]").click()
+    choose_where(page, where)
+
+
 def bar_reveal(page, sel: str) -> bool:
     """11e hid the checks, the name and the theme behind ⋯ at 400 px; 12b
     keeps the right side on the bar at every width. Nothing to reveal."""
