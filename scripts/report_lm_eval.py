@@ -20936,7 +20936,7 @@ function mmpKeyCard() {
   const A = state.ai;
   if (!A.mmp && !A.mmpMsg && netReady()) loadMmpKey();
   const K = A.mmp;
-  const head = el('h2', { text: 'Mobile-MMLU-Pro answer key' });
+  const head = el('h2', { text: 'Mobile-MMLU answer key' });
   if (!K) return el('div', { class: 'card', 'data-mmp-key': 'loading' }, head,
     A.mmpMsg ? el('p', { class: 'warn', text: A.mmpMsg }) : skeleton(2));
   const n = x => Number(x || 0).toLocaleString('en');
@@ -20960,17 +20960,37 @@ function mmpKeyCard() {
         el('td', { class: 'aiact' }, LIVE && A.page ? aiChange(j) : ''));
     })));
   const E = K.estimate || {};
-  const est = el('div', { class: 'mmpwrap' }, el('table', { class: 'mmptab', 'data-mmp-estimate': '1' },
+  // 14.4: a dry run for each set — Pro alone, the full set — and what Start sends
+  const estOf = (X, pre) => el('div', { class: 'mmpwrap' }, el('table', { class: 'mmptab',
+      [`data-mmp-${pre}estimate`]: '1' },
     el('thead', {}, el('tr', {}, ['Labeller', 'Questions', 'Tokens in', 'Tokens out', 'Cost']
       .map(h => el('th', { text: h })))),
-    el('tbody', {}, Object.entries(E.slots || {}).map(([s, x]) => el('tr', { 'data-mmp-est': s },
+    el('tbody', {}, Object.entries(X.slots || {}).map(([s, x]) => el('tr', { [`data-mmp-${pre}est`]: s },
       el('td', { text: String(x.name || x.id).split(': ').pop() + (x.guess ? ' *' : '') }),
       el('td', { class: 'num', text: n(x.questions) }),
       el('td', { class: 'num', text: n(x.tokens_in) }),
       el('td', { class: 'num', text: n(x.tokens_out) }),
       el('td', { class: 'num', text: x.usd == null ? 'once pinned' : usd(x.usd) }))))));
+  const totalOf = X => X.usd != null ? usd(X.usd) : `${usd(X.usd_known)} and the unpriced`;
+  const S = E.sets || { pro: E };
+  const est = el('div', {},
+    el('h4', { text: 'Mobile-MMLU-Pro alone' }), estOf(S.pro || E, ''),
+    el('p', { class: 'small', 'data-mmp-set-total': 'pro' }, 'About ',
+      el('b', { text: totalOf(S.pro || E) })),
+    S.full ? [el('h4', {}, 'The full Mobile-MMLU ', el('span', { class: 'badge prelim',
+        'data-mmp-nc': 'estimate', text: 'Non-commercial' })),
+      S.full.missing ? el('p', { class: 'small se', 'data-mmp-full-missing': '1',
+        text: `${S.full.missing}: from the published lengths until then.` }) : '',
+      estOf(S.full, 'full-'),
+      el('p', { class: 'small', 'data-mmp-set-total': 'full' }, 'About ',
+        el('b', { text: totalOf(S.full) }))] : '',
+    S.all && S.full ? el('p', { class: 'small se', 'data-mmp-start-sends': '1',
+      text: `Start sends both, once each — a question the two sets word alike is labelled once — `
+        + `Pro’s questions first, so Pro’s key is whole before the rest: ${n(S.all.questions)} `
+        + 'questions in all.' }) : '');
   const c = ((K.key || {}).counts || {}).all;
   const cats = ((K.key || {}).counts || {}).by_category || {};
+  const cf = (((K.sets || {}).full || {}).counts || {}).all;
   const words = (K.key || {}).labels || {};
   const order = ['agreed', 'settled', 'split', 'time', 'waiting'];
   const ch = K.checks || { rows: [] };
@@ -20978,12 +20998,13 @@ function mmpKeyCard() {
   const why = K.available || (K.problems || [])[0] || E.over_limit || '';
   const started = c && c.questions && (c.questions - c.waiting > 0 || running);
   return el('div', { class: 'card', 'data-mmp-key': (K.key || {}).version || 'none' }, head,
-    el('p', { class: 'sub', text: 'The authors of Mobile-MMLU-Pro hold its answers back, so the '
-      + 'board scores it on a key of its own: two labellers from different makers answer every '
+    el('p', { class: 'sub', text: 'The authors of Mobile-MMLU hold its answers back, so the '
+      + 'board scores Mobile-MMLU-Pro and the full set on one key of its own — a question the two '
+      + 'sets word alike is labelled once: two labellers from different makers answer every '
       + 'question; where they agree, that is the key; where they differ, a third from a third '
       + 'maker decides, two of three; a three-way split, or both saying the answer depends on '
       + 'now (an app version, a price, a date), drops the question. No labeller may be local, '
-      + 'in-house, or a model scored on this set.' }),
+      + 'in-house, or a model scored on either set.' }),
     el('p', { class: 'small se', 'data-mmp-credit': '1', text: mmpCreditOf(K.credit) }),
     labs,
     el('h3', { text: 'Before Start: a dry run' }),
@@ -20994,7 +21015,7 @@ function mmpKeyCard() {
         + `${Math.round(100 * E.third_share)}% is a guess until they have` : '') + '.' }),
     est,
     el('p', { class: 'small', 'data-mmp-total': String(E.usd == null ? '' : E.usd) },
-      'About ', el('b', { text: E.usd != null ? usd(E.usd) : `${usd(E.usd_known)} and the `
+      'Start: about ', el('b', { text: E.usd != null ? usd(E.usd) : `${usd(E.usd_known)} and the `
         + 'unpriced' }), ` · this month ${usd(E.spent)} of ${usd(E.limit)} spent`),
     LIVE ? el('div', { class: 'frm', 'data-mmp-run': running ? 'running' : stopped ? 'stopped'
         : 'idle' },
@@ -21013,6 +21034,12 @@ function mmpKeyCard() {
         `${words[k] || k} ${n(c[k])}`).join(' · ')) : el('p', { class: 'small se',
       'data-mmp-counts': '0|0', text: K.available ? 'No key: the file isn’t on this server.'
         : 'No key yet: nothing has been labelled.' }),
+    // 14.4: the full set's view of the same key
+    el('p', { class: 'small', 'data-mmp-full-counts': cf && cf.questions ? `${cf.kept}|${cf.questions}`
+        : '0|0' }, 'The full Mobile-MMLU ', el('span', { class: 'badge prelim', 'data-mmp-nc': 'key',
+        text: 'Non-commercial' }), ': ', cf && cf.questions ? `${n(cf.kept)} of ${n(cf.questions)} `
+        + 'kept · ' + order.filter(k => cf[k]).map(k => `${words[k] || k} ${n(cf[k])}`).join(' · ')
+        : K.full_available ? 'its files aren’t on this server.' : 'nothing labelled yet.'),
     Object.keys(cats).length ? el('details', { class: 'mmpcats', 'data-mmp-key-cats': '1' },
       el('summary', { class: 'small se', text: 'per category ▸' }),
       el('div', { class: 'mmpwrap' }, el('table', { class: 'mmptab' },
@@ -21026,19 +21053,28 @@ function mmpKeyCard() {
     el('p', { class: 'small se', text: `The paper’s three models, run as it ran them (${ch.setting
       || 'lm-evaluation-harness, 0-shot, accuracy'}), beside ours. Within ${ch.within || 3} `
       + 'points on all three takes “provisional” off the column.' }),
-    el('div', { class: 'mmpwrap' }, el('table', { class: 'mmptab', 'data-mmp-checks': ch.provisional
-        ? 'provisional' : 'checked' },
-      el('thead', {}, el('tr', {}, ['Model', 'Paper', 'Ours', 'Difference', '']
-        .map(h => el('th', { text: h })))),
-      el('tbody', {}, ch.rows.map(r => el('tr', { 'data-mmp-check': r.model },
-        el('td', { text: r.model }), el('td', { class: 'num', text: r.paper.toFixed(1) }),
-        el('td', { class: 'num', text: r.ours == null ? 'not run' : r.ours.toFixed(1) }),
-        el('td', { class: 'num', text: r.diff == null ? '—' : (r.diff > 0 ? '+' : '')
-          + r.diff.toFixed(1) }),
-        el('td', { text: r.ok ? '✓ within' : r.ours == null ? '' : '✗ outside' })))))),
+    checksTable(ch, ''),
+    // 14.4: the full set's own check: Table 2's Mobile-MMLU column, on its view of the key
+    K.checks_full ? [el('h4', {}, (K.checks_full.provisional ? 'The full Mobile-MMLU: '
+        + 'provisional key ' : 'The full Mobile-MMLU: key checked '), el('span', {
+        class: 'badge prelim', 'data-mmp-nc': 'checks', text: 'Non-commercial' })),
+      el('p', { class: 'small se', text: `${K.checks_full.setting || ''}` }),
+      checksTable(K.checks_full, 'full-')] : '',
     Object.keys(K.portal || {}).length ? el('p', { class: 'small', 'data-mmp-portal-scores': '1',
       text: 'The authors’ portal: ' + Object.entries(K.portal).map(([m, p]) =>
         `${m.split('/').pop()} ${Number(p.score).toFixed(1)}`).join(' · ') }) : '');
+}
+function checksTable(ch, pre) {
+  return el('div', { class: 'mmpwrap' }, el('table', { class: 'mmptab',
+      [`data-mmp-${pre}checks`]: ch.provisional ? 'provisional' : 'checked' },
+    el('thead', {}, el('tr', {}, ['Model', 'Paper', 'Ours', 'Difference', '']
+      .map(h => el('th', { text: h })))),
+    el('tbody', {}, (ch.rows || []).map(r => el('tr', { [`data-mmp-${pre}check`]: r.model },
+      el('td', { text: r.model }), el('td', { class: 'num', text: r.paper.toFixed(1) }),
+      el('td', { class: 'num', text: r.ours == null ? 'not run' : r.ours.toFixed(1) }),
+      el('td', { class: 'num', text: r.diff == null ? '—' : (r.diff > 0 ? '+' : '')
+        + r.diff.toFixed(1) }),
+      el('td', { text: r.ok ? '✓ within' : r.ours == null ? '' : '✗ outside' }))))));
 }
 function mmpCreditOf(c) {
   c = c || {};

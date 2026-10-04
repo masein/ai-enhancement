@@ -1,5 +1,8 @@
 """14.3: Mobile-MMLU-Pro's answer key — who labels it, and the labelling run.
-The rules and the file are scripts/mobile_mmlu.py's.
+The rules and the file are scripts/mobile_mmlu.py's. 14.4: one pool of labels
+for Mobile-MMLU-Pro and the full Mobile-MMLU — a question both sets word alike
+is labelled once — and Pro's questions go first, so Pro's key is whole before
+the full set's own are sent.
 
 **The labellers.** Three slots, each a model on OpenRouter pinned as the
 judge is (ai_models.pin: its dated version, its first provider, no
@@ -83,11 +86,12 @@ def _cached(model_id: str) -> dict | None:
 
 
 def scored_ids() -> set[str]:
-    """every model with a Mobile-MMLU-Pro score on the board, by its own id
-    and (a model from OpenRouter) the id OpenRouter knows it by"""
+    """every model with a Mobile-MMLU-Pro or (14.4) full Mobile-MMLU score on
+    the board, by its own id and (a model from OpenRouter) the id OpenRouter
+    knows it by"""
     out: set[str] = set()
     for d in config.OUT_DIR.iterdir() if config.OUT_DIR.is_dir() else []:
-        if not (d / mmp.PRED_FILE).exists():
+        if not ((d / mmp.PRED_FILE).exists() or (d / mmp.FULL_PRED_FILE).exists()):
             continue
         try:
             meta = json.loads((d / "model_meta.json").read_text(encoding="utf-8"))
@@ -110,7 +114,7 @@ def refused(slot: str, model_id: str, others: dict | None = None) -> str:
         return ("a labeller can't be an in-house model (a Qwen3.6 build, or a model served "
                 "here): choose a model on OpenRouter from another maker")
     if mid in scored_ids():
-        return (f"{mid} has a Mobile-MMLU-Pro score on the board: a model can't label the key "
+        return (f"{mid} has a Mobile-MMLU score on the board: a model can't label the key "
                 "it is scored on")
     others = labellers() if others is None else others
     mk = ai_models.maker(mid)
@@ -185,52 +189,105 @@ def current() -> dict:
 
 
 def rebuild() -> dict:
-    """the key from every label kept, with the labellers set now"""
-    rows = mmp.load()
-    k = mmp.build_key(rows, mmp.read_labels(), current())
+    """the key from every label kept, with the labellers set now — the pool's,
+    and each set's view of it"""
+    k = mmp.build_key(mmp.pool(), mmp.read_labels(), current())
     mmp.write_key(k)
     return k
 
 
-def left(rows: list[dict] | None = None) -> dict:
-    """each slot's questions still to label: {slot: [ids]} — none already out
-    in a batch"""
-    rows = mmp.load() if rows is None else rows
-    labels, cur = mmp.read_labels(), current()
-    out_now = {}
+def _out_now() -> dict[str, set]:
+    out: dict[str, set] = {}
     for p in pending():
-        out_now.setdefault(p["slot"], set()).update(p.get("ids") or [])
+        out.setdefault(p["slot"], set()).update(p.get("ids") or [])
+    return out
 
-    def has(slot: str, qid: str) -> bool:
-        x = (labels.get(slot) or {}).get(qid)
+
+def left(rows: list[dict] | None = None) -> dict:
+    """each slot's questions still to label, by label id: {slot: [lids]}, in
+    the pool's order (Pro's first) — none already out in a batch"""
+    rows = mmp.pool() if rows is None else rows
+    labels, cur = mmp.read_labels(), current()
+    out_now = _out_now()
+
+    def has(slot: str, k: str) -> bool:
+        x = (labels.get(slot) or {}).get(k)
         return bool(x) and x.get("version") == cur[slot]["version"]
     todo = {s: [] for s in mmp.SLOTS}
     for q in rows:
-        qid = q["id"]
+        k = q["lid"]
         for s in ("first", "second"):
-            if not has(s, qid) and qid not in out_now.get(s, set()):
-                todo[s].append(qid)
-        if has("first", qid) and has("second", qid) and not has("third", qid) \
-                and qid not in out_now.get("third", set()):
-            d = mmp.decide(labels["first"][qid], labels["second"][qid])
+            if not has(s, k) and k not in out_now.get(s, set()):
+                todo[s].append(k)
+        if has("first", k) and has("second", k) and not has("third", k) \
+                and k not in out_now.get("third", set()):
+            d = mmp.decide(labels["first"][k], labels["second"][k])
             if d["decision"] == "waiting":
-                todo["third"].append(qid)
+                todo["third"].append(k)
     return todo
+
+
+def pro_open(rows: list[dict] | None = None, todo: dict | None = None) -> bool:
+    """14.4: Pro's key isn't whole yet: one of Pro's questions is still to
+    label, or out in a batch, in any slot"""
+    rows = mmp.pool() if rows is None else rows
+    pro = {q["lid"] for q in rows if "pro" in q["sets"]}
+    todo = left(rows) if todo is None else todo
+    labels, cur = mmp.read_labels(), current()
+
+    def landed(slot: str, k: str) -> bool:
+        # a batch still on the books as it lands: its labels are kept already
+        x = (labels.get(slot) or {}).get(k)
+        return bool(x) and x.get("version") == cur[slot]["version"]
+    out_now = {s: [k for k in v if not landed(s, k)] for s, v in _out_now().items()}
+    return any(k in pro for s in mmp.SLOTS for k in [*todo[s], *out_now.get(s, ())])
+
+
+def due(rows: list[dict] | None = None) -> dict:
+    """14.4: what is sent now, per slot — Pro's questions while Pro's key isn't
+    whole, then every question left"""
+    rows = mmp.pool() if rows is None else rows
+    todo = left(rows)
+    if not pro_open(rows, todo):
+        return todo
+    pro = {q["lid"] for q in rows if "pro" in q["sets"]}
+    return {s: [k for k in v if k in pro] for s, v in todo.items()}
+
+
+def _set_left(rows: list[dict], todo: dict, name: str) -> dict:
+    """a set's questions still to label, per slot, as counts"""
+    mine = {q["lid"] for q in rows if name in q["sets"]}
+    return {s: sum(1 for k in v if k in mine) for s, v in todo.items()}
 
 
 def estimate(stats: bool = False) -> dict:
     """the dry run: each labeller's questions, tokens and cost — what is still
     to label, the third's a share of the first two's until they have answered.
-    Nothing is sent"""
+    Nothing is sent. 14.4: for Pro alone, for the full set, and for both (what
+    Start sends, Pro's first): {pro, full, all} — and the top level is "all",
+    as 14.3's one estimate was"""
     labs = labellers()
-    rows = [] if stats else mmp.load()
-    if rows:
-        n_left = {s: len(v) for s, v in left(rows).items()}
-        # the third's share is a guess while the first two have questions left
-        est = mmp.label_estimate(labs, n_left, rows,
-                                 guess_third=bool(n_left["first"] or n_left["second"]))
-    else:
-        est = mmp.label_estimate(labs)
+    pro_rows = [] if stats else mmp.load()
+    full_rows = [] if stats or not pro_rows else mmp.load_full()
+    out: dict = {}
+    if pro_rows:
+        rows = mmp.pool(pro_rows, full_rows)
+        todo = left(rows)
+        for name, mine in (("pro", pro_rows), ("full", full_rows), ("all", rows)):
+            if not mine:
+                continue
+            n_left = (_set_left(rows, todo, name) if name != "all"
+                      else {s: len(v) for s, v in todo.items()})
+            # the third's share is a guess while the first two have questions left
+            out[name] = mmp.label_estimate(labs, n_left, mine,
+                                           guess_third=bool(n_left["first"] or n_left["second"]))
+    if "full" not in out:                           # the set's published lengths, without its files
+        out.setdefault("pro", mmp.label_estimate(labs))
+        out["full"] = {**mmp.label_estimate(labs, which="full"),
+                       "missing": mmp.full_available()}
+        if "all" not in out:
+            out["all"] = mmp.label_estimate(labs, which="all")
+    est = {**out["all"], "sets": out}
     try:
         est.update(over_limit=ai_models.over_limit(), limit=ai_models.limit(),
                    spent=round(db.spend_this_month(), 2))
@@ -272,11 +329,12 @@ def batch_backend(batch_id: str) -> llm.Backend:
 
 
 def _submit(slot: str, pin: dict, ids: list[str], by: str) -> str:
-    qs = mmp.by_id()
-    reqs = [llm.Request(f"mmpk:{slot}:{qid}", "", mmp.label_prompt(qs[qid]),
+    """a batch of questions, by label id (14.4: each asked in its own wording)"""
+    qs = {q["lid"]: q for q in mmp.pool()}
+    reqs = [llm.Request(f"mmpk:{slot}:{k}", "", mmp.label_prompt(qs[k]),
                         max_tokens=min(mmp.LABEL_MAX_TOKENS, config.OPENROUTER_MAX_TOKENS),
                         json=True, meta={"kind": KIND})
-            for qid in ids if qid in qs]
+            for k in ids if k in qs]
     if not reqs:
         return ""
     be = _backend(pin)
@@ -318,13 +376,18 @@ def start(by: str) -> dict:
     if bad:
         raise ValueError(bad[0])
     (mmp.key_dir() / "stopped.json").unlink(missing_ok=True)
-    mmp._write(mmp.key_dir() / "run.json", {"by": by, "at": time.time()})
+    rows = mmp.pool()
+    now = due(rows)
+    # 14.4: Pro's questions first; the rest once Pro's key is whole — sent then
+    # by advance(), once a Start
+    first_round_is_all = not pro_open(rows)
+    mmp._write(mmp.key_dir() / "run.json", {"by": by, "at": time.time(),
+                                             "rest_sent": first_round_is_all})
     sent = {}
     for slot in ("first", "second"):
         _pinned(slot, by)
-    todo = left()
     for slot in ("first", "second"):
-        ids = todo[slot]
+        ids = now[slot]
         if ids:
             sent[slot] = {"batch_id": _submit(slot, chosen(slot), ids, by), "n": len(ids)}
     third = advance(by)
@@ -340,14 +403,30 @@ def start(by: str) -> dict:
 
 def advance(by: str = "") -> dict | None:
     """the third labeller's turn: the questions the first two split on that it
-    hasn't been asked — never while the run is stopped"""
+    hasn't been asked — Pro's first (14.4) — never while the run is stopped.
+    And once Pro's key is whole, the full set's own questions to the first
+    two, once a Start (a failed one waits for the next, as 14.3's do)"""
     if stopped() or mmp.available():
         return None
-    ids = left()["third"]
-    if not ids:
-        return None
-    pin = _pinned("third", by or (mmp._read(mmp.key_dir() / "run.json", {}) or {}).get("by", ""))
-    return {"batch_id": _submit("third", pin, ids, by), "n": len(ids)}
+    run = mmp._read(mmp.key_dir() / "run.json", {}) or {}
+    by = by or run.get("by", "")
+    rows = mmp.pool()
+    now = due(rows)
+    out = None
+    if now["third"]:
+        pin = _pinned("third", by)
+        out = {"batch_id": _submit("third", pin, now["third"], by), "n": len(now["third"])}
+    if not run.get("rest_sent") and not pro_open(rows):
+        rest = {}
+        for slot in ("first", "second"):
+            ids = left(rows)[slot]
+            if ids:
+                rest[slot] = {"batch_id": _submit(slot, _pinned(slot, by), ids, by),
+                              "n": len(ids)}
+        mmp._write(mmp.key_dir() / "run.json", {**run, "rest_sent": True})
+        if rest:
+            out = {**(out or {}), "rest": rest}
+    return out
 
 
 def stop(by: str) -> dict:
@@ -363,12 +442,12 @@ def finish(batch_id: str, results: dict) -> int:
     pin = meta["pin"]
     got = {}
     for cid, res in results.items():
-        qid = cid.split(":", 2)[2]
+        k = cid.split(":", 2)[2]                # 14.4: the question's label id
         if res.error:
             continue                          # asked again by the next Start
         lab = mmp.parse_label(res.text)
-        got[qid] = {**lab, "model": pin["id"], "version": pin.get("version") or pin["id"],
-                    "at": time.time()}
+        got[k] = {**lab, "model": pin["id"], "version": pin.get("version") or pin["id"],
+                  "at": time.time()}
     mmp.add_labels(meta["slot"], got)
     rebuild()
     try:
@@ -389,7 +468,12 @@ def status() -> dict:
     labs = labellers()
     k = mmp.current_key()
     out_now = pending()
-    return {"available": mmp.available(),
+    f = mmp.full_key()
+    return {"available": mmp.available(), "full_available": mmp.full_available(),
+            # 14.4: each set's view of the one key
+            "sets": {"pro": {"version": k.get("version") or "", "counts": k.get("counts") or {}},
+                     "full": {"version": f.get("version") or "",
+                              "counts": f.get("counts") or {}}},
             "labellers": [{"slot": s, "label": SLOT_LABEL[s], "does": SLOT_DOES[s],
                            "why": SLOT_WHY[s], "suggested": mmp.DEFAULT_LABELLERS[s]["id"],
                            "chosen": chosen(s), "now": labs[s],

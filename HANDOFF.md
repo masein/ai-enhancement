@@ -4953,6 +4953,29 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 14.4.2 — one answer key for both sets (4 Oct)
+
+- **One pool of labels, by question**: a label id is the question's id and the
+  first 8 hex of its wording's sha256 (`mobile_mmlu.lid`, `pool`). A question
+  the two sets word alike is labelled once; `9933ec55` twice, once in each
+  wording. `labels.json` is kept by label id; labels kept by id alone (14.3)
+  are moved to Pro's wording's ids on first read. `key.json` is the pool's
+  (`items` by label id, each with its `sets`); `current_key()` is still
+  Pro's view by question id (its version as 14.3's), `full_key()` the full
+  set's (`set_view`).
+- **The same rule and labellers** as 14.3; a model with a score on either set
+  can't label. **Pro first**: while any of Pro's questions is to label or out
+  in a batch, in any slot, only Pro's are sent (`mmp_key.due`, `pro_open`);
+  once Pro's key is whole, `advance()` sends the full set's own to the first
+  two, once a Start (`run.json` `rest_sent`): a failed one waits for the next
+  Start, as 14.3's do.
+- **The dry run** (`estimate()`, `--dry-run`): Pro alone, the full set, and
+  what Start sends (both, once each); without the files, each set's
+  published or measured lengths. The AI models card shows the three, the
+  key's counts per set, and both paper checks — the full set's on its own key
+  against Table 2's Mobile-MMLU column (Qwen2.5-3B 68.1, Llama-3.2-3B 50.2,
+  gemma-2-2b 38.9), "provisional" until all three land within 3 points.
+
 ### 14.4.1 — the full Mobile-MMLU's data (4 Oct)
 
 - **The decision**: masein, 4 Oct 2026 — the full Mobile-MMLU (16,186

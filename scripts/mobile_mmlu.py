@@ -404,24 +404,73 @@ def decide(a: dict | None, b: dict | None, c: dict | None = None) -> dict:
             "reason": f"all three differ ({said}, then {lc or 'no letter'})"}
 
 
+# 14.4: one pool of labels for both sets, by question — its id and a hash of
+# its wording, so a question the two sets word alike (all but one) is labelled
+# once, and the one worded apart (9933ec55) twice, once in each wording
+
+def lid(q: dict) -> str:
+    """a question's label id: "9933ec55#a556794a" — its id and the first 8 hex
+    of its question's sha256"""
+    return f"{q['id']}#{hashlib.sha256(q['question'].encode('utf-8')).hexdigest()[:8]}"
+
+
+def pool(pro: list[dict] | None = None, full: list[dict] | None = None) -> list[dict]:
+    """every question either set needs labelled, once each: Pro's first, in
+    its order, then the full set's that Pro hasn't (its own, and the one
+    worded apart) — each with its "lid" and the sets it's in"""
+    pro = load() if pro is None else pro
+    full = load_full() if full is None else full
+    out: dict[str, dict] = {}
+    for name, rows in (("pro", pro), ("full", full)):
+        for q in rows:
+            k = lid(q)
+            if k in out:
+                out[k]["sets"].append(name)
+            else:
+                out[k] = {**q, "lid": k, "sets": [name]}
+    return list(out.values())
+
+
 def build_key(rows: list[dict], labels: dict, current: dict) -> dict:
-    """the key from every label: {items: {id: {key, decision, reason, category,
-    labels}}, counts, version, labellers}. `current` is each slot's labeller
-    now ({slot: {id, version}}): only its labels count, so a labeller changed
-    on AI models labels its slot again"""
-    def lab(slot: str, qid: str) -> dict | None:
-        x = (labels.get(slot) or {}).get(qid)
+    """the key from every label: {items: {lid: {id, key, decision, reason,
+    category, sets, labels}}, sets: {pro, full: {counts, version}}, labellers}.
+    `rows` is the pool (each with its lid; a row without one is Pro's, as 14.3
+    built it). `current` is each slot's labeller now ({slot: {id, version}}):
+    only its labels count, so a labeller changed on AI models labels its slot
+    again"""
+    def lab(slot: str, k: str) -> dict | None:
+        x = (labels.get(slot) or {}).get(k)
         cur = current.get(slot) or {}
         return x if x and cur.get("version") and x.get("version") == cur["version"] else None
     items = {}
     for q in rows:
-        got = {s: lab(s, q["id"]) for s in SLOTS}
-        items[q["id"]] = {**decide(got["first"], got["second"], got["third"]),
-                          "category": q["category"],
-                          "labels": {s: {"letter": x["letter"], "now": x["now"]}
-                                     for s, x in got.items() if x}}
+        k = q.get("lid") or lid(q)
+        got = {s: lab(s, k) for s in SLOTS}
+        items[k] = {**decide(got["first"], got["second"], got["third"]), "id": q["id"],
+                    "category": q["category"], "sets": list(q.get("sets") or ["pro"]),
+                    "labels": {s: {"letter": x["letter"], "now": x["now"]}
+                               for s, x in got.items() if x}}
+    out = {"items": items, "pool": True, "labellers": current, "built_at": time.time()}
+    out["sets"] = {name: {"counts": v["counts"], "version": v["version"]}
+                   for name, v in ((n, set_view(out, n)) for n in SETS)}
+    return out
+
+
+SETS = ("pro", "full")
+
+
+def set_view(pooled: dict, name: str) -> dict:
+    """one set's key, from the pool: {items: {id: item}, counts, version,
+    labellers, built_at} — as 14.3's key was, by question id. A key built
+    before the pool (items by id, no "pool") is Pro's, as it stands"""
+    if not pooled:
+        return {}
+    if not pooled.get("pool"):
+        return pooled if name == "pro" else {}
+    items = {it["id"]: it for it in (pooled.get("items") or {}).values()
+             if name in (it.get("sets") or [])}
     return {"items": items, "counts": counts(items), "version": key_version(items),
-            "labellers": current, "built_at": time.time()}
+            "labellers": pooled.get("labellers") or {}, "built_at": pooled.get("built_at")}
 
 
 def counts(items: dict) -> dict:
@@ -474,7 +523,17 @@ def _write(p: Path, obj) -> None:
 
 
 def read_labels() -> dict:
-    return _read(key_dir() / "labels.json", {})
+    """every label kept, {slot: {lid: label}}. 14.4: labels kept by question
+    id alone (before the pool) are Pro's, labelled in Pro's wording: moved to
+    their label ids once, when Pro's file is here"""
+    lab = _read(key_dir() / "labels.json", {})
+    old = any("#" not in k for got in lab.values() for k in got)
+    if old and not available():
+        ids = {q["id"]: lid(q) for q in load()}
+        lab = {slot: {(ids.get(k, k) if "#" not in k else k): v for k, v in got.items()}
+               for slot, got in lab.items()}
+        _write(key_dir() / "labels.json", lab)
+    return lab
 
 
 def add_labels(slot: str, got: dict[str, dict]) -> None:
@@ -495,8 +554,8 @@ def write_key(k: dict) -> None:
 _keyc: dict = {}
 
 
-def current_key() -> dict:
-    """the key as last built, read once per change: {} before any label"""
+def pooled_key() -> dict:
+    """the pool's key as last built, read once per change: {} before any label"""
     p = key_dir() / "key.json"
     try:
         st = p.stat()
@@ -504,8 +563,22 @@ def current_key() -> dict:
         return {}
     k = (st.st_mtime_ns, st.st_size)
     if _keyc.get("k") != k:
-        _keyc.update(k=k, key=read_key())
+        pooled = read_key()
+        _keyc.update(k=k, key=pooled, views={n: set_view(pooled, n) for n in SETS})
     return _keyc["key"]
+
+
+def current_key() -> dict:
+    """Mobile-MMLU-Pro's key, by question id (14.4: its view of the pool)"""
+    pooled_key()
+    return (_keyc.get("views") or {}).get("pro") or {}
+
+
+def full_key() -> dict:
+    """14.4: the full Mobile-MMLU's key, by question id — the pool's labels of
+    its own wording"""
+    pooled_key()
+    return (_keyc.get("views") or {}).get("full") or {}
 
 
 def gguf_docs() -> list[dict]:
@@ -595,6 +668,11 @@ def predictions(model_dir: Path) -> dict | None:
     return _read(Path(model_dir) / PRED_FILE, None)
 
 
+def full_predictions(model_dir: Path) -> dict | None:
+    """14.4: the model's picks on the full set's wording"""
+    return _read(Path(model_dir) / FULL_PRED_FILE, None)
+
+
 def score(preds: dict | None, key: dict | None = None) -> dict | None:
     """the model's accuracy on the kept questions it answered, with n, overall
     and per category, on the key as it stands — None before any key or pick"""
@@ -630,11 +708,12 @@ def summary(s: dict | None) -> str:
 # checking the key against the paper, and the portal's file
 # ---------------------------------------------------------------------------
 
-def paper_checks(ours: dict[str, dict | None]) -> dict:
+def paper_checks(ours: dict[str, dict | None], which: str = "pro") -> dict:
     """ours beside the paper's for its three models: {rows: [{model, paper,
     ours, n, diff, ok}], provisional, within, setting}. The key stays
-    provisional until all three land within 3 points"""
-    pc = manifest()["paper_checks"]
+    provisional until all three land within 3 points. 14.4: `which` set —
+    the full set's checks are Table 2's Mobile-MMLU column"""
+    pc = (manifest() if which == "pro" else full_manifest())["paper_checks"]
     rows = []
     for model, paper in pc["models"].items():
         s = ours.get(model)
@@ -643,7 +722,7 @@ def paper_checks(ours: dict[str, dict | None]) -> dict:
         rows.append({"model": model, "paper": paper, "ours": v, "n": (s or {}).get("n"),
                      "diff": diff, "ok": diff is not None and abs(diff) <= pc["within"]})
     return {"rows": rows, "provisional": not all(r["ok"] for r in rows),
-            "within": pc["within"], "setting": pc["setting"]}
+            "within": pc["within"], "setting": pc["setting"], "table": pc.get("table")}
 
 
 def portal_scores() -> dict:
@@ -680,9 +759,10 @@ OUT_DEFAULT = 400
 THIRD_SHARE = 0.10
 
 
-def _stats_rows() -> list[dict]:
-    """a question of the published mean lengths, for an estimate with no file"""
-    mc = manifest()["mean_chars"]
+def _stats_rows(which: str = "pro") -> list[dict]:
+    """a question of the published mean lengths, for an estimate with no file
+    (14.4: Pro's, or the full set's for "full" and "all")"""
+    mc = (manifest() if which == "pro" else full_manifest())["mean_chars"]
     return [{"id": "", "question": "x" * round(mc["Question"]),
              **{L: "x" * round(mc[L]) for L in LETTERS}, "field": "global_facts"}]
 
@@ -698,16 +778,25 @@ def out_guess(model_id: str) -> int:
     return OUT_GUESS.get((model_id or "").split("/")[0].lower(), OUT_DEFAULT)
 
 
+def _stats_n(which: str) -> int:
+    """how many questions a set asks to label, without its files: Pro's; the
+    full set's; or both, once each — the full set and Pro's wording apart"""
+    if which == "pro":
+        return manifest()["file"]["n"]
+    fm = full_manifest()
+    return fm["n"] + (len(fm["overlap"]["worded_apart"]) if which == "all" else 0)
+
+
 def label_estimate(labellers: dict, left: dict | None = None, rows: list[dict] | None = None,
-                   guess_third: bool | None = None) -> dict:
+                   guess_third: bool | None = None, which: str = "pro") -> dict:
     """the dry run: each labeller's questions, tokens in and out, and cost —
     {slots: {slot: {id, name, questions, tokens_in, tokens_out, usd, …}}, usd}.
     `labellers`: {slot: {id, name, price_in, price_out}}; `left`: each slot's
     questions still to label (every one, with none given). The third answers
     only where the first two split: while they have questions left, its count
     is THIRD_SHARE of theirs, a guess"""
-    n = len(rows) if rows else manifest()["file"]["n"]
-    each_in = tokens_in(label_prompt, rows)
+    n = len(rows) if rows else _stats_n(which)
+    each_in = tokens_in(label_prompt, rows or _stats_rows(which))
     left = dict(left or {"first": n, "second": n, "third": 0})
     guess_third = True if guess_third is None else guess_third
     if guess_third:
@@ -728,7 +817,8 @@ def label_estimate(labellers: dict, left: dict | None = None, rows: list[dict] |
                      "price_in": pin, "price_out": pout, "out_each": oe,
                      "in_each": round(each_in), "guess": slot == "third" and guess_third}
     return {"slots": out, "usd": round(total, 2) if known else None,
-            "usd_known": round(total, 2), "third_share": THIRD_SHARE if guess_third else None}
+            "usd_known": round(total, 2), "third_share": THIRD_SHARE if guess_third else None,
+            "questions": n, "which": which}
 
 
 SERVED_GUESS_S = 5.0     # as MobileAIBench's estimate guesses a served answer
@@ -758,8 +848,23 @@ def run_estimate(served: bool, secs_each: float | None = None) -> dict:
 # the command line, on the server
 # ---------------------------------------------------------------------------
 
+SET_WORDS = {"pro": "Mobile-MMLU-Pro alone",
+             "full": "the full Mobile-MMLU (Non-commercial: internal research only)",
+             "all": "both, once each — what Start sends, Pro's questions first"}
+
+
 def dry_run_lines(est: dict, source: str) -> list[str]:
-    out = [f"Labelling Mobile-MMLU-Pro's key — a dry run, nothing is sent ({source}):"]
+    """the dry run, each set apart (14.4: Pro alone, the full set, and both)"""
+    sets = est.get("sets") or {"pro": est}
+    out = [f"Labelling the Mobile-MMLU answer key — a dry run, nothing is sent ({source}):"]
+    for name in ("pro", "full", "all"):
+        if name in sets:
+            out += [f"{SET_WORDS[name]}:"] + ["  " + x for x in _est_lines(sets[name])]
+    return out
+
+
+def _est_lines(est: dict) -> list[str]:
+    out = []
     for slot, s in est["slots"].items():
         cost = f"${s['usd']:,.2f}" if s["usd"] is not None else "price known once it is pinned"
         price = (f" at ${s['price_in']:g} in / ${s['price_out']:g} out per million"
@@ -807,9 +912,13 @@ def main(argv: list[str]) -> int:
             from_defaults = {s: {"id": d["id"], "name": d["name"], "price_in": d.get("price_in"),
                                  "price_out": d.get("price_out")}
                              for s, d in DEFAULT_LABELLERS.items()}
-            est = label_estimate(from_defaults)
+            est = {"sets": {w: label_estimate(from_defaults, which=w) for w in ("pro", "full",
+                                                                                 "all")}}
         src = ("the published mean lengths" if a.stats or available()
-               else f"{len(load()):,} questions in {csv_path()}")
+               else f"{len(load()):,} questions in {csv_path()}"
+               + ("" if full_available() else "; the full set's published lengths")
+               + ("" if full_available() else "" if not load_full() else
+                  f", {len(load_full()):,} in {full_dir()}"))
         print("\n".join(dry_run_lines(est, src)))
         return 0
     if a.key:

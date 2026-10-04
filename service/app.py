@@ -1467,6 +1467,10 @@ def _mmp_key_page() -> dict:
     m = _mmp()
     st["checks"] = m.paper_checks({mid: m.score(m.predictions(config.OUT_DIR / mid.replace("/", "__")))
                                    for mid in m.manifest()["paper_checks"]["models"]})
+    # 14.4: the full set's, on its own key and Table 2's Mobile-MMLU column
+    st["checks_full"] = m.paper_checks(
+        {mid: m.score(m.full_predictions(config.OUT_DIR / mid.replace("/", "__")), m.full_key())
+         for mid in m.full_manifest()["paper_checks"]["models"]}, "full")
     st["portal"] = m.portal_scores()
     st["credit"] = m.credit()
     return st
