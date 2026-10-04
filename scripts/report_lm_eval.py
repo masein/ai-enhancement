@@ -4725,6 +4725,15 @@ sup.fr-mark { color:var(--text-secondary); margin-left:1px; }
   border-top:1px solid var(--border); }
 .trange input[type=date] { width:auto; }
 #pop-group .gcount { font-size:var(--fs-1); }
+/* 16.6: when — a chat's last use beside its model, a line between a
+   conversation's days, a message's time beside its tokens */
+.pgnames { display:flex; gap:8px; justify-content:space-between; align-items:baseline; min-width:0; }
+.pgnames .pgnm { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pgnames .pgwhen { flex:none; }
+.pgday { text-align:center; margin:14px 0 6px; display:flex; align-items:center; gap:10px;
+  max-width:none; width:100%; }
+.pgday::before, .pgday::after { content:''; flex:1; border-top:1px solid var(--border); }
+.pgat { display:block; text-align:right; margin-top:2px; }
 /* 16.4: Benchmarks, a catalogue — a card a benchmark; a suite's spans the row */
 .catgrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap:12px; }
 .catcard { border:1px solid var(--border); border-radius:var(--r-2); padding:12px 14px;
@@ -8134,7 +8143,7 @@ function ggufHistoryCard(m) {
     el('h2', { text: 'Measured on the GGUF' }),
     el('ul', { class: 'small' }, runs.map(r => el('li', { 'data-gguf-run': String(r.sid) },
       el('b', { text: `#${r.sid} ${r.status}` }),
-      ` · ${r.at ? new Date(r.at * 1000).toISOString().slice(0, 16).replace('T', ' ') : ''}`,
+      r.at ? [' · ', whenEl(r.at)] : '',
       r.file ? ` · ${r.file.name} (${String(r.file.sha256 || '').slice(0, 12)})` : '',
       r.build ? ` · ${r.build}` : '', (r.flags || []).length ? ` · ${r.flags.join(' ')}` : '',
       r.subset ? ` · subset of ${r.subset}` : '',
@@ -8179,7 +8188,7 @@ async function ggufRerun(sid, btn) {
 function judgedEarlierCard(m) {
   const x = m.judgedEarlier;
   if (!x) return null;
-  const when = x.at ? new Date(x.at * 1000).toISOString().slice(0, 10) : '';
+  const when = x.at ? dateShort(x.at) : '';                            // 16.6
   return el('div', { class: 'card', 'data-judged-earlier': m.id },
     el('div', { class: 'sechead' }, el('h2', { text: 'Knowledge exam' }),
       el('span', { class: 'badge', 'data-judged-by': x.by, text: 'judged by ' + x.by })),
@@ -8193,7 +8202,7 @@ function judgedEarlierCard(m) {
 function evdEarlierCard(m) {
   const x = evdEarlier(m.id);
   if (!x) return null;
-  const when = x.marked_at ? new Date(x.marked_at * 1000).toISOString().slice(0, 10) : '';
+  const when = x.marked_at ? dateShort(x.marked_at) : '';               // 16.6
   // 12g.2: marked on every question, before the bank was split — kept, and
   // never beside a hidden-half score
   const split = x.label === 'all questions, before the split';
@@ -14033,14 +14042,11 @@ function vLeaderboard(ms) {
               ? el('span', { class: 'act', text: `${P(activeOf(m))} act` }) : '');
         }
         if (c.key === 'date') {
-          const d = String(lastEval(m) || '');
-          const [y, mo, da] = d.slice(0, 10).split('-');
-          // 11f: "15 Sep"; the year only when it is not this one
-          const short = da ? `${+da} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug',
-            'Sep', 'Oct', 'Nov', 'Dec'][+mo - 1]}`
-            + (+y !== new Date().getFullYear() ? ` ${y}` : '') : '—';
-          return el('td', { class: 'num small nowrap', 'data-date': d.slice(0, 10),
-            title: d.replace('T', ' '), text: short });
+          // 11f: "15 Sep"; the year only when it is not this one — 16.6: the
+          // viewer's own day, and in full on hover
+          const ms = testedMs(m);
+          return el('td', { class: 'num small nowrap', 'data-date': testedDay(m) || '',
+            title: ms ? whenFull(ms / 1000) : '', text: ms ? dateShort(ms / 1000) : '—' });
         }
         if (isCavg(c)) {
           const ts = c.ts || L.cols, a = customAvg(m, ts);
@@ -16280,7 +16286,58 @@ const rel = ts => {
   return s < 90 ? `${Math.round(s)}s` : s < 5400 ? `${Math.round(s / 60)}m`
        : s < 129600 ? `${Math.round(s / 3600)}h` : `${Math.round(s / 86400)}d`;
 };
-const absT = ts => ts ? new Date(ts * 1000).toLocaleString() : '—';   // viewer's zone
+// 16.6: one way to say when, through the whole board — the viewer's own time
+// zone, 24-hour: "14:32" today, "Yesterday", a weekday within the week, then
+// "28 Sep" ("28 Sep 2025" in another year), and in full on hover, "Sat 3 Oct
+// 2026, 14:32". Times are seconds since the epoch; none stored, none said
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
+  'September', 'October', 'November', 'December'];
+const pad2 = n => String(n).padStart(2, '0');
+const dayAt0 = ms => { const d = new Date(ms); d.setHours(0, 0, 0, 0); return d.getTime(); };
+const thisYear = d => d.getFullYear() === new Date().getFullYear();
+// whole days between a time's day and today's, as the viewer's calendar counts them
+const daysAgo = ts => Math.round((dayAt0(Date.now()) - dayAt0(ts * 1000)) / 864e5);
+function clockOf(ts) {
+  const d = new Date(ts * 1000);
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+function dateShort(ts) {
+  const d = new Date(ts * 1000);
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}` + (thisYear(d) ? '' : ` ${d.getFullYear()}`);
+}
+function whenShort(ts) {
+  if (!ts) return '';
+  const n = daysAgo(ts);
+  return n <= 0 ? clockOf(ts) : n === 1 ? 'Yesterday'
+    : n < 7 ? WEEKDAYS[new Date(ts * 1000).getDay()] : dateShort(ts);
+}
+function whenFull(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts * 1000);
+  return `${WEEKDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}, `
+    + clockOf(ts);
+}
+// a conversation's line between its days: "Sat 3 Oct"
+function dayLine(ts) {
+  const d = new Date(ts * 1000);
+  return `${WEEKDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`
+    + (thisYear(d) ? '' : ` ${d.getFullYear()}`);
+}
+// a list's group: Today · Yesterday · Earlier this week (from Monday) · then by month
+function whenGroup(ts) {
+  const n = daysAgo(ts);
+  if (n <= 0) return 'Today';
+  if (n === 1) return 'Yesterday';
+  const now = new Date(), monday = dayAt0(Date.now()) - ((now.getDay() + 6) % 7) * 864e5;
+  if (ts * 1000 >= monday) return 'Earlier this week';
+  const d = new Date(ts * 1000);
+  return MONTH_NAMES[d.getMonth()] + (thisYear(d) ? '' : ` ${d.getFullYear()}`);
+}
+// a time on the page: its short words, in full on hover
+const whenEl = (ts, attrs = {}) => ts ? el('time', { datetime: new Date(ts * 1000).toISOString(),
+  title: whenFull(ts), text: whenShort(ts), ...attrs }) : '';
+const absT = ts => ts ? whenFull(ts) : '—';                            // 16.6: in full
 const fmtv = v => !isFinite(v) ? '—' : Math.abs(v) >= 100 ? Math.round(v).toLocaleString()
               : Math.abs(v) >= 1 ? v.toFixed(3).replace(/0+$/, '').replace(/\.$/, '')
               : v.toPrecision(3);
@@ -16471,7 +16528,7 @@ function vTraining() {
     return el('div', { class: 'runrow' + (sel ? ' sel' : ''), onclick: () => toggleRun(r.id),
       role: 'button', tabindex: 0,
       title: `${r.name}\nproject: ${r.project} · started ${rel(r.created_at)} ago`
-        + (r.updated_at ? ` · last update ${new Date(r.updated_at * 1000).toLocaleString()}` : '')
+        + (r.updated_at ? ` · last update ${whenFull(r.updated_at)}` : '')
         + (idle ? `\nno update for ${rel(r.updated_at)}`
              + (r.cadence_s ? ` — this run normally reports every ${rel(Date.now() / 1000 - r.cadence_s)}` : '')
              + `. Still "running" because run.finish() was never called (crash or Ctrl-C?); `
@@ -17493,7 +17550,7 @@ function provTree(v, key, depth) {
     : isHash(x) ? el('span', { class: 'rd-hash' }, el('span', { class: 'mono', title: x, text: shortSha(x) }),
         el('button', { class: 'quiet', 'aria-label': 'copy ' + key, text: 'copy',
           onclick: () => copyText(x, 'the hash') }))
-    : isTime(key, x) ? el('span', { title: String(x), text: new Date(x * 1000).toLocaleString() })
+    : isTime(key, x) ? el('span', { title: String(x), text: whenFull(x) })      // 16.6
     : typeof x === 'boolean' ? el('span', { class: 'mono', text: x ? 'yes' : 'no' })
     : el('span', { class: typeof x === 'number' ? 'mono' : '', text: String(x) });
   if (v && typeof v === 'object') {
@@ -23464,15 +23521,16 @@ function vPlayground() {
 const pgName = id => (pgModel(id) || {}).name || String(id || '').split('/').pop();
 function pgChatItems() {
   const P = state.pg;
-  const d0 = new Date(); d0.setHours(0, 0, 0, 0);
-  const today = d0.getTime() / 1000, yesterday = today - 86400;
   const chats = P.chats || [];
   const item = c => el('li', { class: 'pgitem' + (c.id === P.id ? ' on' : ''), 'data-pg-chat': c.id },
     el('a', { href: '#tab=playground&chat=' + c.id, title: c.title,
         onclick: e => { e.preventDefault(); popClose(); pgOpen(c.id); } },
       // two lines of its title, then the model, small and grey (12d.2: both)
       el('span', { class: 'pgtitle', text: c.title }),
-      el('span', { class: 'small se pgnames', 'data-pg-names': '1', text: c.names || pgName(c.model) })),
+      // 16.6: and when it was last used, beside the model
+      el('span', { class: 'small se pgnames', 'data-pg-names': '1' },
+        el('span', { class: 'pgnm', text: c.names || pgName(c.model) }),
+        whenEl(c.updated_at, { class: 'pgwhen', 'data-pg-when': c.id }))),
     P.confirm === c.id
       ? el('span', { class: 'pgconfirm small' },
           el('button', { class: 'quiet danger', 'data-pg-delete-yes': c.id, text: 'Delete?',
@@ -23481,9 +23539,13 @@ function pgChatItems() {
       // shown on hover and focus (always on a touch screen), never in the way
       : el('button', { class: 'quiet pgdel', 'data-pg-delete': c.id, 'aria-label': `delete “${c.title}”`,
           title: 'Delete this chat', text: '⋯', onclick: () => { P.confirm = c.id; render(); } }));
-  const groups = [['Today', chats.filter(c => c.updated_at >= today)],
-    ['Yesterday', chats.filter(c => c.updated_at >= yesterday && c.updated_at < today)],
-    ['Earlier', chats.filter(c => c.updated_at < yesterday)]];
+  // 16.6: Today · Yesterday · Earlier this week · then by month, newest first
+  const groups = [];
+  for (const c of [...chats].sort((a, b) => (b.updated_at || 0) - (a.updated_at || 0))) {
+    const g = c.updated_at ? whenGroup(c.updated_at) : 'Earlier';
+    const last = groups[groups.length - 1];
+    if (last && last[0] === g) last[1].push(c); else groups.push([g, [c]]);
+  }
   return groups.filter(([, xs]) => xs.length).map(([h, xs]) =>
     el('div', { class: 'pggroup', 'data-pg-group': h },
       el('p', { class: 'pghead small se', text: h }), el('ul', {}, xs.map(item))));
@@ -23756,10 +23818,13 @@ function pgMain(narrow) {
     el('div', { class: 'pgcol' + (compare ? ' two' : '') },
       compare ? pgColHeads(P, c, cur, cur2) : '',
       !msgs.length && !P.live ? pgEmpty(P)
-        : msgs.map((x, i) => x.role === 'user' ? pgUser(x)
+        : pgDays(msgs).map(([x, i, day]) => [
+          // 16.6: a line where the day changes: "Sat 3 Oct"
+          day ? el('p', { class: 'pgday small se', 'data-pg-day': day.key, text: day.text }) : '',
+          x.role === 'user' ? pgUser(x)
           : x.b ? el('div', { class: 'pgpair', 'data-pg-pair': String(i) },
               pgReply(c, m, x, i, 'a'), pgReply(c, m2, x.b, i, 'b'))
-          : pgReply(c, m, x, i, 'a'))));
+          : pgReply(c, m, x, i, 'a')])));
   return el('div', { class: 'card pgmain' + (P.fixed ? ' pgembed' : ''), 'data-pg-main': c ? c.id : 'new' },
     bar, conv, pgInput(P, c, m, changed), P.panel && m ? pgPanel(P, c, m) : '');
 }
@@ -23790,7 +23855,24 @@ function pgEmpty(P) {
 }
 function pgUser(x) {
   return el('div', { class: 'pgmsg you', 'data-pg-you': '1' },
-    el('span', { class: 'sr-only', text: 'you:' }), el('div', { class: 'pgtext', text: x.text }));
+    el('span', { class: 'sr-only', text: 'you:' }), el('div', { class: 'pgtext', text: x.text }),
+    // 16.6: its time, in full on hover; none stored, none said
+    x.at ? el('span', { class: 'small se pgat', 'data-pg-at': 'you' },
+      el('time', { datetime: new Date(x.at * 1000).toISOString(), title: whenFull(x.at),
+        text: clockOf(x.at) })) : '');
+}
+// 16.6: each message with the day's line before it where the day changes —
+// on the messages that say when they were sent
+function pgDays(msgs) {
+  let last = null;
+  return msgs.map((x, i) => {
+    const at = x.role === 'user' ? x.at : null;
+    if (!at) return [x, i, null];
+    const key = dayAt0(at * 1000);
+    if (key === last) return [x, i, null];
+    last = key;
+    return [x, i, { key: String(key), text: dayLine(at) }];
+  });
 }
 // what a reply cost: a local one in words a second; a served one in the
 // server's own tokens, and MTP's drafts when it reports them — its speed is
@@ -23838,7 +23920,11 @@ function pgReply(c, m, x, i, col = 'a') {
     r.cut ? el('p', { class: 'small se', 'data-pg-cut': r.cut,
       text: r.cut === 'stopped' ? 'stopped' : `cut short: ${r.cut}` }) : '',
     pgMark(r.mark),
-    el('p', { class: 'small se mono pgstats', 'data-pg-stats': '1' }, ...[].concat(pgStats(r)), ' · ',
+    el('p', { class: 'small se mono pgstats', 'data-pg-stats': '1' },
+      // 16.6: when it answered, beside its tokens and seconds
+      ...(r.at ? [el('time', { 'data-pg-at': 'reply', datetime: new Date(r.at * 1000).toISOString(),
+        title: whenFull(r.at), text: clockOf(r.at) }), ' · '] : []),
+      ...[].concat(pgStats(r)), ' · ',
       el('button', { class: 'quiet', 'data-pg-copy': '1', text: 'copy', onclick: () => {
         try { navigator.clipboard.writeText(r.text); toast('Copied', { key: 'pg' }); }
         catch (e) { toast('Copy failed', { key: 'pg' }); } } }), ' · ',

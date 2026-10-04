@@ -84,7 +84,8 @@ def test_a_chat_streams_with_its_stats_copy_and_again(live, page):
     assert page.locator("[data-pg-reply='1'] [data-pg-text]").inner_text().startswith(
         "You asked: can u make this shorter pls")
     import re
-    assert re.match(r"\d+ words · [\d.]+s · [\d.]+ w/s · copy · again", stats.inner_text())
+    assert re.match(r"\d\d:\d\d · \d+ words · [\d.]+s · [\d.]+ w/s · copy · again",
+                    stats.inner_text())                         # 16.6: when, first
     did = page.evaluate("state.pg.id")
     assert page.evaluate("location.hash") == f"#tab=playground&chat={did}"
     assert page.locator(f"[data-pg-chat='{did}'] .pgtitle").inner_text() == "can u make this shorter pls"

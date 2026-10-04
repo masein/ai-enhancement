@@ -4953,6 +4953,29 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 16.6 — dates and times in the Playground, one way through the board (4 Oct)
+
+- **One way to say when** (beside `rel`): the viewer's own time zone, 24-hour.
+  - `whenShort`: "14:32" today, "Yesterday", a weekday within the week, then
+    "28 Sep" ("28 Sep 2025" in another year).
+  - `whenFull`: "Sat 3 Oct 2026, 14:32", on hover.
+  - `dayLine`: "Sat 3 Oct", between a conversation's days.
+  - `whenGroup`: Today · Yesterday · Earlier this week (from Monday) · then by
+    month.
+  - `whenEl`: a `<time>` with the short words and the full ones on hover.
+  - `absT` is `whenFull`.
+- **The Playground** (its page and a model page's Chat tab):
+  - each chat says when it was last used, beside its model, under its group;
+  - a line between days;
+  - the time on each message: under the person's, first on a reply's stats
+    line. A message with no `at` stored says none.
+- **The same words elsewhere:**
+  - Runs: the submitted, started and finished tooltips;
+  - a model's History: the GGUF runs list, earlier exam and Everyday cards;
+  - Models' Tested column, now the viewer's own day where it was UTC's;
+  - proposals, training runs, the record reader.
+  - The store card still says its backups in UTC, as it says it does.
+
 ### 16.5 — the Knowledge exam is switched off (4 Oct)
 
 - **`KNOWLEDGE_EXAM`, default 0** (`config.KNOWLEDGE_EXAM`, passed through
