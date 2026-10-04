@@ -80,7 +80,7 @@ def test_compare_two_models_side_by_side(live, page, width):
     shot(page, f"12d2-compare-{width}-light.png", full_page=width < 720)
     if width > 720:
         did = page.evaluate("state.pg.id")
-        item = page.locator(f"[data-pg-chat='{did}'] [data-pg-names]")
+        item = page.locator(f"[data-pg-chat='{did}'] [data-pg-names] .pgnm")   # 16.6: its time beside
         assert item.inner_text() == "below-135m-it vs chat-1.7b-it"
     assert page.errors == []
 

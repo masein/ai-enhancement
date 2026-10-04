@@ -109,7 +109,9 @@ def test_a_served_model_streams_its_thinking_folded_and_mtp_under_it(live, page,
     assert "timetable lists" in fold.inner_text()
     import re
     txt = stats.inner_text()
-    assert re.fullmatch(r"\d+ tokens · [\d.]+ s · MTP: 135 of 165 drafts kept · copy · again", txt), txt
+    # 16.6: when it answered, first
+    assert re.fullmatch(r"\d\d:\d\d · \d+ tokens · [\d.]+ s · MTP: 135 of 165 drafts kept · copy · "
+                        r"again", txt), txt
     assert "w/s" not in txt                     # its server's speed is not the phone's
     body = lda.requests[n]
     assert body["stream"] is True and body["chat_template_kwargs"] == {"enable_thinking": True}
@@ -203,7 +205,10 @@ def test_enter_sends_shift_enter_is_a_new_line_and_stop_cancels(live, page, serv
     stop.wait_for()
     assert box.input_value() == ""                                         # sent, so gone
     assert page.locator("[data-pg-send]").count() == 0                     # Send is Stop
-    assert page.locator("[data-pg-you]").inner_text() == "you:\nline one\nline two"
+    assert page.locator("[data-pg-you] .pgtext").inner_text() == "line one\nline two"
+    # 16.6: and its time under it
+    import re as _re
+    assert _re.fullmatch(r"\d\d:\d\d", page.locator("[data-pg-you] [data-pg-at]").inner_text())
     stop.click()
     cut = page.locator("[data-pg-reply='1'] [data-pg-cut]")
     cut.wait_for()
@@ -299,7 +304,12 @@ def test_the_chat_list_groups_by_day_wraps_titles_and_hides_delete(live, page):
             cn.commit()
     pg(page, live["base"])
     groups = page.locator("[data-pg-group]").evaluate_all("xs => xs.map(x => x.dataset.pgGroup)")
-    assert groups == ["Today", "Yesterday", "Earlier"]
+    # 16.6: then by month — nine days ago is always before this week's Monday
+    import datetime as dt
+    month = dt.datetime.fromtimestamp(now - 9 * 86400).strftime("%B")
+    if dt.datetime.fromtimestamp(now - 9 * 86400).year != dt.datetime.now().year:
+        month += dt.datetime.fromtimestamp(now - 9 * 86400).strftime(" %Y")
+    assert groups == ["Today", "Yesterday", month]
     long = page.locator("[data-pg-list] .pgtitle", has_text="Train arrival").first
     lines = long.evaluate("e => Math.round(e.getBoundingClientRect().height / parseFloat(getComputedStyle(e).lineHeight))")
     assert lines == 2
