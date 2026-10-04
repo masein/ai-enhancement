@@ -484,6 +484,14 @@ MMP_TASKS_DIR = Path(os.environ.get("MMP_TASKS_DIR", BENCH_ROOT / "mobile_mmlu_p
 MMF_TASK = "mobile_mmlu_full"
 MMF_DIR = Path(os.environ.get("MMF_DIR", BENCH_ROOT / "data" / "mobile_mmlu"))
 MMF_TASKS_DIR = Path(os.environ.get("MMF_TASKS_DIR", BENCH_ROOT / "mobile_mmlu_full" / "tasks"))
+# 14.4.5: MOBILE_MMLU_FULL=0 hides it everywhere and refuses new runs; its files,
+# picks and labels stay on disk, and setting it back shows them again. On by default
+def _switch(name: str, default: str = "1") -> bool:
+    """an on/off setting from .env: off for 0, no, off or false"""
+    return os.environ.get(name, default).strip().lower() not in ("0", "no", "off", "false")
+
+
+MOBILE_MMLU_FULL = _switch("MOBILE_MMLU_FULL")
 MAB_INSTRUCT_ONLY = ("MobileAIBench's sets are asked through the chat template and scored on "
                      "what the model writes, so only an instruct model can sit them — this one "
                      "runs as a base model")

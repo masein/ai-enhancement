@@ -65,17 +65,26 @@ def sets() -> dict[str, dict]:
     that is switched off on this server (14.4.5)"""
     out = {}
     for m in _manifests():
+        if switched_off(m):
+            continue
         for key in m.get("covers") or []:
-            if hidden(key):
-                continue
             out[key] = entry(key, m.get("board_name") or m.get("name") or key,
                              m.get("licence") or "", m["restriction"])
     return out
 
 
-def hidden(key: str) -> bool:
-    """14.4.5: a set switched off on this server is nowhere, not even badged"""
-    return False
+def switched_off(m: dict) -> bool:
+    """14.4.5: a set whose manifest names a switch (`switch`: an .env setting,
+    MOBILE_MMLU_FULL) that is off on this server is nowhere, not even badged"""
+    name = m.get("switch")
+    if not name:
+        return False
+    try:
+        from service import config
+        return not getattr(config, name, True)
+    except ImportError:
+        import os
+        return os.environ.get(name, "1").strip().lower() in ("0", "no", "off", "false")
 
 
 def of(key: str) -> dict | None:

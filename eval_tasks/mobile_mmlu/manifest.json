@@ -6,6 +6,7 @@
  "licence": "CC BY-NC-ND 4.0",
  "restriction": "non-commercial",
  "board_name": "Mobile-MMLU (full)",
+ "switch": "MOBILE_MMLU_FULL",
  "covers": [
   "mobile_mmlu_full"
  ],

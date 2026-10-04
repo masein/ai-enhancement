@@ -770,6 +770,9 @@ def load_gguf(results_root: Path | None, out_dir: Path | None = None,
                          .read_text(encoding="utf-8")).get("benchmarks") or {}
     except (OSError, ValueError):
         man = {}
+    # 14.4.5: the full Mobile-MMLU, switched off, is nowhere in it
+    hidden = set() if mmf_on() else {"mobile_mmlu_full"}
+    man = {k: v for k, v in man.items() if k not in hidden}
     registered = {}
     for f in sorted(Path(out_dir).glob("gguf__*/model_meta.json")) if out_dir and \
             Path(out_dir).is_dir() else []:
@@ -798,6 +801,8 @@ def load_gguf(results_root: Path | None, out_dir: Path | None = None,
         seen_setup.setdefault(mid, {}).setdefault(su, setup)
         benches = {}
         for b, v in (r.get("benchmarks") or {}).items():
+            if b in hidden:
+                continue                # 14.4.5: the full Mobile-MMLU, switched off
             dsi = (r.get("datasets") or {}).get(b) or {}
             ds = dsi.get("sha256") or ""
             benches[b] = {k: v.get(k) for k in ("status", "acc", "se", "n", "done", "total",
@@ -885,7 +890,8 @@ def load_gguf(results_root: Path | None, out_dir: Path | None = None,
                                      or k in measured) and not gb.BENCHMARKS[k].get("kept_apart")]
     return {"group": gb.GROUP, "tip": gb.TIP, "order": order, "mtp_line": gb.MTP_LINE,
             "benchmarks": {k: {"label": v["label"], "n": (man.get(k) or {}).get("n") or v["n"],
-                               "note": v.get("note", "")} for k, v in gb.BENCHMARKS.items()},
+                               "note": v.get("note", "")} for k, v in gb.BENCHMARKS.items()
+                           if k not in hidden},
             "models": models, "setups": setups_out, "history": history, "pairs": pairs,
             "registered": registered}
 
@@ -1287,7 +1293,7 @@ def parse_run(blob: dict, source: Path) -> dict:
     # 14.4: the full Mobile-MMLU is never a column: its own table (DATA.mmf),
     # no composite, rank or "overall". Non-commercial: internal research only
     tasks.pop(MMF_TASK, None)
-    fpreds = _beside(source, "mobile_mmlu_full.json")
+    fpreds = _beside(source, "mobile_mmlu_full.json") if mmf_on() else None   # 14.4.5
     mmf = mmf_score(fpreds) or ({"acc": None, "answered": fpreds.get("n"),
                                  "how": fpreds.get("how")} if fpreds else None)
 
@@ -1804,6 +1810,16 @@ def mmp_score(preds: dict | None) -> dict | None:
         return None
 
 
+def mmf_on() -> bool:
+    """14.4.5: the full Mobile-MMLU is shown unless MOBILE_MMLU_FULL=0 switches it
+    off — then it is nowhere in the page's data; its files stay on disk"""
+    try:
+        import mobile_mmlu as mmp               # scripts/, beside this file
+        return mmp.full_on()
+    except ImportError:
+        return True
+
+
 def mmf_score(preds: dict | None) -> dict | None:
     """14.4: a model's picks on the full set's wording, scored on its key"""
     if not preds:
@@ -1910,6 +1926,8 @@ def mmf_meta(by_model: dict, served: dict) -> dict | None:
     manifest's), our key's version and counts, its paper check (Table 2's
     Mobile-MMLU column), the 9 categories and 80 fields, and the models that
     labelled the key (each kept out of the ranking, as for Pro)"""
+    if not mmf_on():
+        return None
     try:
         import mobile_mmlu as mmp               # scripts/, beside this file
     except ImportError:
@@ -21392,9 +21410,10 @@ function mmpKeyCard() {
         `${words[k] || k} ${n(c[k])}`).join(' · ')) : el('p', { class: 'small se',
       'data-mmp-counts': '0|0', text: K.available ? 'No key: the file isn’t on this server.'
         : 'No key yet: nothing has been labelled.' }),
-    // 14.4: the full set's view of the same key
-    el('p', { class: 'small', 'data-mmp-full-counts': cf && cf.questions ? `${cf.kept}|${cf.questions}`
-        : '0|0' }, 'The full Mobile-MMLU', rBadge(restrictOf(MMF), { 'data-mmp-nc': 'key' }),
+    // 14.4: the full set's view of the same key (14.4.5: none while switched off)
+    K.full_on === false ? '' : el('p', { class: 'small', 'data-mmp-full-counts': cf && cf.questions
+        ? `${cf.kept}|${cf.questions}` : '0|0' }, 'The full Mobile-MMLU',
+        rBadge(restrictOf(MMF), { 'data-mmp-nc': 'key' }),
         ': ', cf && cf.questions ? `${n(cf.kept)} of ${n(cf.questions)} `
         + 'kept · ' + order.filter(k => cf[k]).map(k => `${words[k] || k} ${n(cf[k])}`).join(' · ')
         : K.full_available ? 'its files aren’t on this server.' : 'nothing labelled yet.'),

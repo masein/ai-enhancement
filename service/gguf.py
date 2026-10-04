@@ -366,6 +366,17 @@ def waiting_line(sid: int) -> str:
     return f"waiting for GGUF run #{sid}" + (f" ({_dur(left)} left)" if left else "")
 
 
+def hidden() -> set[str]:
+    """14.4.5: the benchmarks switched off on this server — the full
+    Mobile-MMLU, with MOBILE_MMLU_FULL=0: never offered, never queued"""
+    return set() if config.MOBILE_MMLU_FULL else {"mobile_mmlu_full"}
+
+
+def _mmlu_full_off() -> str:
+    import mobile_mmlu                      # scripts/, on the path above
+    return mobile_mmlu.FULL_OFF + ". Nothing was queued."
+
+
 def queue(model_id: str, benchmarks: list[str], subset: int, by: str,
           time_limit_h: float = 24.0, setups: list[str] | None = None) -> list[int]:
     """a run for each setup chosen (every one when none is)"""
@@ -384,9 +395,14 @@ def _queue_one(model_id: str, benchmarks: list[str], subset: int, by: str,
         raise ValueError("benchmarks are " + ", ".join(gb.ORDER))
     man = manifest()
     # 12n.2: "all" is every benchmark with a dataset built — GPQA's is built
-    # apart (gguf_data.py --only gpqa), and until then a run of all asks the rest
+    # apart (gguf_data.py --only gpqa), and until then a run of all asks the rest.
+    # 14.4: the full Mobile-MMLU is kept apart: measured only when named
     if not benchmarks:
-        want = [b for b in want if b in man] or want
+        want = [b for b in want if b in man and not gb.BENCHMARKS[b].get("kept_apart")] or [
+            b for b in want if not gb.BENCHMARKS[b].get("kept_apart")]
+    off = [b for b in want if b in hidden()]
+    if off:
+        raise ValueError(_mmlu_full_off())
     missing = [gb.BENCHMARKS[b]["label"] for b in want if b not in man]
     if missing:
         raise ValueError(f"No dataset yet for {', '.join(missing)}: run the converter once "

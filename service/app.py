@@ -1276,10 +1276,15 @@ def gguf_page():
                 "setups": [gguf.gb.AS_BUILT] + (r.get("gguf_setups") or []),
                 "served": True} for r in db.served_all() if r.get("gguf_path")]
     man = gguf.manifest()
-    # 14.3: a benchmark built apart (Mobile-MMLU-Pro) is offered once its dataset is built
-    order = [b for b in gguf.gb.ORDER if not gguf.gb.BENCHMARKS[b].get("apart") or b in man]
-    return {"worker": gguf.worker(), "benchmarks": gguf.gb.BENCHMARKS, "order": order,
-            "datasets": man, "models": models,
+    # 14.3: a benchmark built apart (Mobile-MMLU-Pro) is offered once its dataset is built.
+    # 14.4.5: the full Mobile-MMLU, switched off, isn't offered or shown
+    hidden = gguf.hidden()
+    order = [b for b in gguf.gb.ORDER if (not gguf.gb.BENCHMARKS[b].get("apart") or b in man)
+             and b not in hidden]
+    return {"worker": gguf.worker(),
+            "benchmarks": {k: v for k, v in gguf.gb.BENCHMARKS.items() if k not in hidden},
+            "order": order, "datasets": {k: v for k, v in man.items() if k not in hidden},
+            "models": models,
             # 14.4.4: each restricted benchmark's badge and sentence
             "restrictions": _restrictions().sets(),
             "default_flags": " ".join(gguf.gb.DEFAULT_FLAGS), "mtp_line": gguf.gb.MTP_LINE}
@@ -1300,8 +1305,11 @@ def gguf_register(f: GgufIn, x_token: str = Header(default="")):
 def gguf_estimate(a: GgufRunIn):
     try:
         # 14.3: "all" is what a run of all asks: every benchmark with a dataset built
+        # (14.4: but the full Mobile-MMLU, measured only when named)
         return gguf.estimate(a.model, a.benchmarks or [b for b in gguf.gb.ORDER
-                                                       if b in gguf.manifest()] or gguf.gb.DEFAULT,
+                                                       if b in gguf.manifest()
+                                                       and not gguf.gb.BENCHMARKS[b].get(
+                                                           "kept_apart")] or gguf.gb.DEFAULT,
                              a.subset, a.setups or None)
     except ValueError as e:
         raise HTTPException(422, str(e)) from None
@@ -1430,7 +1438,8 @@ def mab_estimate(model: str):
     # 14.4: each counts only what this model has no pick for, by either set's run
     mdir = config.OUT_DIR / model.replace("/", "__")
     parts["mmlu"] = _mmp().run_estimate(bool(rec), each if rec else None, "pro", mdir)
-    parts["mmlu_full"] = _mmp().run_estimate(bool(rec), each if rec else None, "full", mdir)
+    if _mmp().full_on():                    # 14.4.5: switched off, it isn't offered
+        parts["mmlu_full"] = _mmp().run_estimate(bool(rec), each if rec else None, "full", mdir)
     # 14.4.4: and what each set's questions and scores may be used for
     for p, t in (("mmlu", config.MMP_TASK), ("mmlu_full", config.MMF_TASK)):
         rx = _restrictions().of(t)
@@ -1496,7 +1505,8 @@ def _mmp_key_page() -> dict:
     st["checks"] = m.paper_checks({mid: m.score(m.predictions(config.OUT_DIR / mid.replace("/", "__")))
                                    for mid in m.manifest()["paper_checks"]["models"]})
     # 14.4: the full set's, on its own key and Table 2's Mobile-MMLU column
-    st["checks_full"] = m.paper_checks(
+    # (14.4.5: none while it is switched off)
+    st["checks_full"] = None if not m.full_on() else m.paper_checks(
         {mid: m.score(m.full_predictions(config.OUT_DIR / mid.replace("/", "__")), m.full_key())
          for mid in m.full_manifest()["paper_checks"]["models"]}, "full")
     st["portal"] = m.portal_scores()

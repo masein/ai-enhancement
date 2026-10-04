@@ -203,10 +203,17 @@ def _out_now() -> dict[str, set]:
     return out
 
 
+def _rows() -> list[dict]:
+    """the questions labelling may send: the pool — Pro's alone while the full
+    set is switched off (14.4.5). The key keeps every label either way"""
+    rows = mmp.pool()
+    return rows if mmp.full_on() else [q for q in rows if "pro" in q["sets"]]
+
+
 def left(rows: list[dict] | None = None) -> dict:
     """each slot's questions still to label, by label id: {slot: [lids]}, in
     the pool's order (Pro's first) — none already out in a batch"""
-    rows = mmp.pool() if rows is None else rows
+    rows = _rows() if rows is None else rows
     labels, cur = mmp.read_labels(), current()
     out_now = _out_now()
 
@@ -230,7 +237,7 @@ def left(rows: list[dict] | None = None) -> dict:
 def pro_open(rows: list[dict] | None = None, todo: dict | None = None) -> bool:
     """14.4: Pro's key isn't whole yet: one of Pro's questions is still to
     label, or out in a batch, in any slot"""
-    rows = mmp.pool() if rows is None else rows
+    rows = _rows() if rows is None else rows
     pro = {q["lid"] for q in rows if "pro" in q["sets"]}
     todo = left(rows) if todo is None else todo
     labels, cur = mmp.read_labels(), current()
@@ -246,7 +253,7 @@ def pro_open(rows: list[dict] | None = None, todo: dict | None = None) -> bool:
 def due(rows: list[dict] | None = None) -> dict:
     """14.4: what is sent now, per slot — Pro's questions while Pro's key isn't
     whole, then every question left"""
-    rows = mmp.pool() if rows is None else rows
+    rows = _rows() if rows is None else rows
     todo = left(rows)
     if not pro_open(rows, todo):
         return todo
@@ -281,7 +288,10 @@ def estimate(stats: bool = False) -> dict:
             # the third's share is a guess while the first two have questions left
             out[name] = mmp.label_estimate(labs, n_left, mine,
                                            guess_third=bool(n_left["first"] or n_left["second"]))
-    if "full" not in out:                           # the set's published lengths, without its files
+    if not mmp.full_on():                           # 14.4.5: switched off: Pro alone
+        out = {"pro": out.get("pro") or mmp.label_estimate(labs)}
+        out["all"] = out["pro"]
+    if "full" not in out and mmp.full_on():         # the set's published lengths, without its files
         out.setdefault("pro", mmp.label_estimate(labs))
         out["full"] = {**mmp.label_estimate(labs, which="full"),
                        "missing": mmp.full_available()}
@@ -376,7 +386,7 @@ def start(by: str) -> dict:
     if bad:
         raise ValueError(bad[0])
     (mmp.key_dir() / "stopped.json").unlink(missing_ok=True)
-    rows = mmp.pool()
+    rows = _rows()
     now = due(rows)
     # 14.4: Pro's questions first; the rest once Pro's key is whole — sent then
     # by advance(), once a Start
@@ -410,7 +420,7 @@ def advance(by: str = "") -> dict | None:
         return None
     run = mmp._read(mmp.key_dir() / "run.json", {}) or {}
     by = by or run.get("by", "")
-    rows = mmp.pool()
+    rows = _rows()
     now = due(rows)
     out = None
     if now["third"]:
@@ -470,10 +480,12 @@ def status() -> dict:
     out_now = pending()
     f = mmp.full_key()
     return {"available": mmp.available(), "full_available": mmp.full_available(),
+            # 14.4.5: switched off, the card shows Pro alone
+            "full_on": mmp.full_on(),
             # 14.4: each set's view of the one key
             "sets": {"pro": {"version": k.get("version") or "", "counts": k.get("counts") or {}},
-                     "full": {"version": f.get("version") or "",
-                              "counts": f.get("counts") or {}}},
+                     **({"full": {"version": f.get("version") or "",
+                                  "counts": f.get("counts") or {}}} if mmp.full_on() else {})},
             "labellers": [{"slot": s, "label": SLOT_LABEL[s], "does": SLOT_DOES[s],
                            "why": SLOT_WHY[s], "suggested": mmp.DEFAULT_LABELLERS[s]["id"],
                            "chosen": chosen(s), "now": labs[s],
