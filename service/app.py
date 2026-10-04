@@ -34,7 +34,7 @@ from pydantic import BaseModel
 from . import (ai_models, builder, chat, config, db, disk, hfmeta, judge_test, llm, llm_poller,
                startup, suggest, worker)
 from . import playground
-from . import downloads, gguf, gpu, phone, reported, served, sizes, uploads
+from . import api_v1, downloads, gguf, gpu, phone, reported, served, sizes, uploads
 from . import proposals as prop
 from . import reader
 
@@ -1228,6 +1228,87 @@ def model_file_download(request: Request, model: str = "", x_token: str = Header
         raise _dl_refused(e) from e
     downloads.logged(model, x_who, "token", _range_start(request))
     return _send_file(path, fname)
+
+
+# ---------------------------------------------------------------------------
+# 16b.3: Use as an API — OpenAI-compatible, behind each person's own key
+# (service/api_v1.py). The shared write token makes a key; it is never one
+# ---------------------------------------------------------------------------
+
+class ApiKeyIn(BaseModel):
+    by: str = ""
+
+
+def _api_error(e: "api_v1.ApiError") -> JSONResponse:
+    return JSONResponse(e.body(), status_code=e.status,
+                        headers={"Retry-After": str(e.retry_after)} if e.retry_after else None)
+
+
+@app.post("/api/keys")
+def api_key_make(f: ApiKeyIn, x_token: str = Header(default="")):
+    """a key for one person, shown once: the board keeps only its sha256"""
+    _check_token(x_token)
+    try:
+        return api_v1.make_key(f.by)
+    except api_v1.ApiError as e:
+        return _api_error(e)
+
+
+@app.get("/api/keys")
+def api_keys_list(who: str = ""):
+    """each key's who, first characters, counts and last use — never a key"""
+    return {"keys": db.apikeys(who), "address": "/v1",
+            "max_tokens": config.API_MAX_TOKENS, "wait_s": config.API_WAIT_S}
+
+
+@app.post("/api/keys/{kid}/revoke")
+def api_key_revoke(kid: int, f: ApiKeyIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    try:
+        return api_v1.revoke(kid, f.by)
+    except api_v1.ApiError as e:
+        return _api_error(e)
+
+
+@app.get("/api/models/api")
+def model_api(id: str = ""):
+    """the model page's Use as an API: whether it is offered, and its state"""
+    why = api_v1.why_not(id)
+    row = chat.model_row(id)
+    return {"model": id, "offered": not why, "why": why,
+            **({"state": chat.ENGINE.state(row)} if row and not why else {})}
+
+
+@app.get("/v1/models")
+def v1_models(authorization: str = Header(default="")):
+    try:
+        api_v1.auth(authorization)
+    except api_v1.ApiError as e:
+        return _api_error(e)
+    return api_v1.models_list()
+
+
+@app.post("/v1/chat/completions")
+async def v1_chat(request: Request, authorization: str = Header(default="")):
+    try:
+        key = api_v1.auth(authorization)
+        try:
+            body = await request.json()
+        except ValueError:
+            raise api_v1.ApiError(400, "The body is a JSON object, OpenAI's chat request") \
+                from None
+        st, ctx, lock = await asyncio.to_thread(api_v1.begin, body, key)
+    except api_v1.ApiError as e:
+        return _api_error(e)
+    if body.get("stream"):
+        # identity: the gzip middleware would hold the events back
+        return StreamingResponse(api_v1.stream(st, ctx, key, lock), media_type="text/event-stream",
+                                 headers={"Cache-Control": "no-store",
+                                          "Content-Encoding": "identity"})
+    try:
+        return await asyncio.to_thread(api_v1.complete, st, ctx, key, lock)
+    except api_v1.ApiError as e:
+        return _api_error(e)
 
 
 @app.get("/api/models/suggest")

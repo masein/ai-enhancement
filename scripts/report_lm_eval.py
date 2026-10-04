@@ -4298,6 +4298,10 @@ td.evdtotal .evd-ranout { display:block; white-space:normal; text-align:right; }
 .upfill { height:100%; width:100%; background:var(--accent); transform:scaleX(0);
   transform-origin:left; transition:transform .2s; }
 .upstore { margin-top:12px; border-top:1px solid var(--border); padding-top:8px; }
+/* 16b.3: Use as an API's facts and keys */
+.apifacts { display:grid; grid-template-columns:max-content minmax(0, 1fr); gap:2px 10px; margin:6px 0; }
+.apifacts dd { margin:0; overflow-wrap:anywhere; }
+.apikeys { margin-top:10px; border-top:1px solid var(--border); padding-top:8px; }
 /* 16b.2: a model page's actions, and Download's command */
 .mact { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:6px 0 0; }
 [data-dl-panel] [data-dl-facts], [data-dl-panel] [data-dl-sha] { overflow-wrap:anywhere;
@@ -7192,7 +7196,8 @@ function vModel() {
     : cur === 'improve' ? modelImproveTab(m)
     : cur === 'history' ? modelHistoryTab(m)
     : modelScoresTab(m, kinds);
-  return [back, modelHead(m, kinds), modelDownloadPanel(m), modelSitPanel(m), strip,
+  return [back, modelHead(m, kinds), modelDownloadPanel(m), modelApiPanel(m), modelSitPanel(m),
+    strip,
     el('div', { id: 'mpanel', role: 'tabpanel', 'aria-labelledby': 'mtab-' + cur,
       'data-mtab-panel': cur }, body)].filter(Boolean);
 }
@@ -7577,6 +7582,11 @@ function modelActions(m) {
       'aria-expanded': String(D.open === id), text: 'Download',
       onclick: () => { D.open = D.open === id ? null : id; D.msg = '';
         if (D.open) dlLoad(id); render(); } }),
+    // 16b.3: Use as an API
+    el('button', { class: 'secondary' + (apiState().open === id ? ' on' : ''), 'data-act-api': id,
+      'aria-expanded': String(apiState().open === id), text: 'Use as an API',
+      onclick: () => { const A = apiState(); A.open = A.open === id ? null : id; A.msg = '';
+        if (A.open) apiLoad(id); render(); } }),
     el('button', { class: 'quiet', 'data-compare-with': m.id, text: 'Compare with…',
       onclick: () => openCompare([m.rowOf || m.id]) }));
 }
@@ -7652,6 +7662,96 @@ function modelDownloadPanel(m) {
   return el('div', { class: 'card', 'data-dl-panel': id },
     el('h3', { text: 'Download' }), ...body,
     D.msg ? el('p', { class: 'small', 'data-dl-msg': id, text: D.msg }) : '');
+}
+// ---------------------------------------------------------------------------
+// 16b.3: Use as an API — its state, the address, the model's name, a curl and
+// a Python example, and the viewer's own keys: Create my key (shown once),
+// each one's use, Revoke. For trying a model: runs come first
+// ---------------------------------------------------------------------------
+const apiState = () => (state.apiP = state.apiP || { info: {}, keys: null, open: null, made: null,
+  msg: '' });
+async function apiLoad(id) {
+  const A = apiState();
+  try { A.info[id] = await api('api/models/api?id=' + encodeURIComponent(id)); }
+  catch (e) { A.info[id] = { offered: false, why: 'it couldn’t be looked up' }; }
+  try { A.keys = await api('api/keys?who=' + encodeURIComponent(whoName() || '')); }
+  catch (e) { A.keys = null; }
+  render();
+}
+const API_STATE_WORDS = { ready: 'Ready', loads: 'Starts on the first request',
+  cpu: 'Starts on the first request, on the CPU (slower)', checking: 'Checking its server',
+  not_now: 'Not available now' };
+function apiExamples(id) {
+  const base = new URL('v1', location.href).href.replace(/\/$/, '');
+  return {
+    base,
+    curl: `curl ${base}/chat/completions \\\n  -H "Authorization: Bearer $BOARD_API_KEY" \\\n`
+      + `  -H "Content-Type: application/json" \\\n  -d '${JSON.stringify({ model: id,
+        messages: [{ role: 'user', content: 'Hello' }] })}'`,
+    python: 'import os\nfrom openai import OpenAI\n\n'
+      + `client = OpenAI(base_url="${base}", api_key=os.environ["BOARD_API_KEY"])\n`
+      + `r = client.chat.completions.create(\n    model=${JSON.stringify(id)},\n`
+      + '    messages=[{"role": "user", "content": "Hello"}])\nprint(r.choices[0].message.content)' };
+}
+async function apiMakeKey(id) {
+  const A = apiState();
+  if (!whoName()) { askName(); return; }
+  try { A.made = await post('api/keys', { by: whoName() }); A.msg = ''; }
+  catch (e) { A.msg = String((e && e.message) || e); }
+  apiLoad(id);
+}
+async function apiRevoke(id, kid) {
+  const A = apiState();
+  try { await post(`api/keys/${kid}/revoke`, { by: whoName() }); A.msg = 'Revoked: it answers '
+    + 'nothing from now on.'; if (A.made && A.made.id === kid) A.made = null; }
+  catch (e) { A.msg = String((e && e.message) || e); }
+  apiLoad(id);
+}
+function modelApiPanel(m) {
+  const A = apiState(), id = m.rowOf || m.id;
+  if (!LIVE || A.open !== id) return '';
+  const i = A.info[id], body = [];
+  if (!i) body.push(el('p', { class: 'small se', text: 'Looking it up…' }));
+  else if (!i.offered) body.push(el('p', { class: 'small', 'data-api-not': id,
+    text: `Not offered through the API: ${i.why}.` }));
+  else {
+    const s = i.state || {}, ex = apiExamples(id);
+    body.push(el('p', { class: 'small', 'data-api-state': s.state || '' }, el('b', {
+        text: API_STATE_WORDS[s.state] || s.state || '' }),
+        s.state === 'not_now' && s.why ? ` — ${s.why}` : ''),
+      el('dl', { class: 'apifacts' },
+        el('dt', { text: 'Address' }), el('dd', { class: 'mono small', 'data-api-base': id, text: ex.base }),
+        el('dt', { text: 'Model' }), el('dd', { class: 'mono small', 'data-api-model': id, text: id })),
+      el('p', { class: 'small se', text: 'OpenAI-compatible: POST /chat/completions (streamed or '
+        + 'not) and GET /models. For trying a model: benchmark runs come first, one request at a '
+        + `time for each model, a reply at most ${((A.keys || {}).max_tokens || 2048).toLocaleString('en')} tokens. `
+        + 'Your key goes in BOARD_API_KEY; the board keeps counts, never your prompts.' }),
+      el('pre', { class: 'mono small dlcmd', 'data-api-curl': id, text: ex.curl }),
+      el('pre', { class: 'mono small dlcmd', 'data-api-python': id, text: ex.python }));
+  }
+  // the viewer's keys: made here with the board's token, shown once
+  const mine = ((A.keys || {}).keys || []);
+  body.push(el('div', { class: 'apikeys', 'data-api-keys': '1' },
+    el('h4', { text: 'My keys' }),
+    A.made ? el('div', { class: 'warn small', 'data-api-made': A.made.id },
+      el('p', { text: A.made.line }), el('pre', { class: 'mono small dlcmd', 'data-api-key': '1',
+        text: A.made.key })) : '',
+    mine.length ? el('table', { class: 'mini uptable' },
+      el('thead', {}, el('tr', {}, ['Key', 'Made', 'Last used', 'Requests', 'Tokens', '']
+        .map(h => el('th', { text: h })))),
+      el('tbody', {}, mine.map(k => el('tr', { 'data-api-key-row': String(k.id) },
+        el('td', { class: 'mono small', text: k.prefix + '…' }),
+        el('td', {}, whenEl(k.created_at)),
+        el('td', {}, k.last_used ? whenEl(k.last_used) : el('span', { class: 'se', text: 'never' })),
+        el('td', { class: 'num', text: String(k.requests) }),
+        el('td', { class: 'num', text: k.tokens.toLocaleString('en') }),
+        el('td', {}, k.revoked_at ? el('span', { class: 'se small', text: 'revoked' })
+          : el('button', { class: 'quiet', 'data-api-revoke': String(k.id), text: 'Revoke',
+              onclick: () => apiRevoke(id, k.id) })))))) : '',
+    el('button', { class: 'secondary', 'data-api-make': '1', text: 'Create my key',
+      onclick: () => apiMakeKey(id) })));
+  return el('div', { class: 'card', 'data-api-panel': id }, el('h3', { text: 'Use as an API' }),
+    ...body, A.msg ? el('p', { class: 'small', 'data-api-msg': '1', text: A.msg }) : '');
 }
 function modelHead(m, kinds) {
   const facts = [m.source === 'artifact' ? 'uploaded here' : m.kind, famOf(m)].filter(Boolean)

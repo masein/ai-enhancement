@@ -138,6 +138,35 @@ Add a model ▸ On my computer sends a `.gguf` file, or a model folder as a
 
 Nothing in an upload is ever run.
 
+### Use a model as an API (16b.3)
+
+An OpenAI-compatible address, for trying a model from your own code. It is a
+shared 32 GB card and benchmark runs come first: not for serving an app.
+
+```python
+import os
+from openai import OpenAI
+client = OpenAI(base_url="http://<board>:8899/v1", api_key=os.environ["BOARD_API_KEY"])
+r = client.chat.completions.create(model="fx/below-135m-it",
+                                   messages=[{"role": "user", "content": "Hello"}])
+```
+
+- **Your key:** a model's page ▸ Use as an API ▸ Create my key (or `POST
+  /api/keys {by}` with the board's write token). Shown once; the board keeps
+  its sha256, your requests, tokens and last use, and never a prompt or a
+  reply. Revoke it there (`POST /api/keys/{id}/revoke`). The write token is
+  not an API key.
+- `GET /v1/models`; `POST /v1/chat/completions`, streamed (`"stream": true`,
+  thinking as `reasoning_content`) or not. `model` is the board's model id.
+- **Taking turns:** a model that would load while a run holds the GPU is 503
+  with `Retry-After` and one line (a small one answers on the CPU; a served
+  model answers unless the run is testing it); one request at a time for
+  each model — another waits `API_WAIT_S` (10 s), then 429; a reply at most
+  `API_MAX_TOKENS` (2048); a conversation at most what the model reads (400,
+  `context_length_exceeded`).
+- **Not offered:** a base model, a GGUF file with no server, a model from
+  OpenRouter, a thinking row; `GET /api/models/api?id=` says why.
+
 ### Download a model's file (16b.2)
 
 A model file on this server — an uploaded or registered GGUF, or a model

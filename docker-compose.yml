@@ -59,6 +59,9 @@ services:
       # 16b.1: a browser's upload — one file at most, and the disk it leaves free
       UPLOAD_MAX_GB: ${UPLOAD_MAX_GB:-30}
       UPLOAD_FREE_GB: ${UPLOAD_FREE_GB:-50}
+      # 16b.3: Use as an API — the longest reply, and how long a second request waits
+      API_MAX_TOKENS: ${API_MAX_TOKENS:-2048}
+      API_WAIT_S: ${API_WAIT_S:-10}
       # custom model code (trust_remote_code) — off unless all three line up;
       # see SERVICE.md § custom model code before turning this on
       ALLOW_REMOTE_CODE: ${ALLOW_REMOTE_CODE:-0}
