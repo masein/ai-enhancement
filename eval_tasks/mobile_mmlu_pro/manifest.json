@@ -5,7 +5,7 @@
  "revision": "44ed870be9def0f6326d77bd2ac9a18dcf514e41",
  "licence": "CC BY-ND 4.0",
  "licence_note": "used internally; nothing derived from it (our answer key, its questions) is published: the file lives only in the server's data folder, never in this repo or its public mirror",
- "not_used": "MBZUAI-LLM/Mobile-MMLU, the full set of 16,186 questions, is CC BY-NC-ND 4.0: a company can't use it",
+ "full_set": "MBZUAI-LLM/Mobile-MMLU, the full set of 16,186 questions (every Pro question among them), is CC BY-NC-ND 4.0. Since 4 Oct 2026 it's on the board too, for internal research evaluation only, labelled Non-commercial: masein's decision, recorded in eval_tasks/mobile_mmlu/manifest.json. Pro stays the default: its licence lets its scores be used",
  "answers": "held back by the authors, who score through their portal",
  "portal": "https://huggingface.co/spaces/SondosMB/Mobile-MMLU",
  "portal_format": "question_id,predicted_answer (A, B, C or D) — the authors' README, VILA-Lab/Mobile-MMLU 3da2ba2",

@@ -1,0 +1,3 @@
+question_id,Question,A,B,C,D
+inv00004,Your handset shows 'storage almost full'. Which step frees space without losing photos?,Factory reset,Delete the photos app,"Move photos to cloud backup, then remove local copies",Turn off the phone for a day
+inv00015,Your phone storage is full. What frees the most space first?,Clearing old video files,Deleting one text,Changing the wallpaper,Turning off Bluetooth

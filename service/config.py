@@ -479,6 +479,11 @@ MAB_TASKS_DIR = Path(os.environ.get("MAB_TASKS_DIR", BENCH_ROOT / "mobileaibench
 # key is built beside it (service/mmp_key.py)
 MMP_DIR = Path(os.environ.get("MMP_DIR", BENCH_ROOT / "data" / "mobile_mmlu_pro"))
 MMP_TASKS_DIR = Path(os.environ.get("MMP_TASKS_DIR", BENCH_ROOT / "mobile_mmlu_pro" / "tasks"))
+# 14.4: the full Mobile-MMLU (CC BY-NC-ND 4.0, for internal research evaluation
+# only — eval_tasks/mobile_mmlu/manifest.json), fetched by the same data step
+MMF_TASK = "mobile_mmlu_full"
+MMF_DIR = Path(os.environ.get("MMF_DIR", BENCH_ROOT / "data" / "mobile_mmlu"))
+MMF_TASKS_DIR = Path(os.environ.get("MMF_TASKS_DIR", BENCH_ROOT / "mobile_mmlu_full" / "tasks"))
 MAB_INSTRUCT_ONLY = ("MobileAIBench's sets are asked through the chat template and scored on "
                      "what the model writes, so only an instruct model can sit them — this one "
                      "runs as a base model")

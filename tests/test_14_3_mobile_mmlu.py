@@ -101,7 +101,7 @@ def test_the_file_is_pinned_by_revision_and_hash_and_never_committed():
     assert f["committed"] is False and len(f["sha256"]) == 64 and f["bytes"] == 16_899_380
     assert m["revision"] in f["url"] and f["url"].startswith(
         "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU-Pro/resolve/")
-    assert m["licence"] == "CC BY-ND 4.0" and "CC BY-NC-ND 4.0" in m["not_used"]
+    assert m["licence"] == "CC BY-ND 4.0" and "CC BY-NC-ND 4.0" in m["full_set"]
 
 
 def test_no_mobile_mmlu_pro_text_is_in_the_repo_outside_the_invented_rows():

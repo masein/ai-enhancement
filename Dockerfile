@@ -179,6 +179,10 @@ COPY eval_tasks/mobileaibench/ eval_tasks/mobileaibench/
 # checks) and task template — never its questions: the data step fetches those
 # into the server's data folder, and mobile_mmlu.build_tasks() writes the task
 COPY eval_tasks/mobile_mmlu_pro/ eval_tasks/mobile_mmlu_pro/
+# 14.4: the full Mobile-MMLU's manifest (its revision, every file's hash, the
+# licence and masein's decision) — never its questions, which the data step
+# fetches into the server's data folder
+COPY eval_tasks/mobile_mmlu/ eval_tasks/mobile_mmlu/
 # 12q: DeviceMark's battery (ids only), its source ids and its prompts —
 # devicemark.load_items reads the questions for them from the pinned datasets
 COPY eval_tasks/devicemark/ eval_tasks/devicemark/

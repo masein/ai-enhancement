@@ -7,7 +7,10 @@ data folder and checked against its pinned sha256 and size:
   MAB_PRIVATE_DIR;
 - 14.3: Mobile-MMLU-Pro (CC BY-ND 4.0: used here, never published, and our
   key is a derivative), from the Hugging Face revision
-  eval_tasks/mobile_mmlu_pro/manifest.json pins, into MMP_DIR.
+  eval_tasks/mobile_mmlu_pro/manifest.json pins, into MMP_DIR;
+- 14.4: the full Mobile-MMLU (CC BY-NC-ND 4.0: internal research evaluation
+  only, never anything commercial, never published), its 80 files from the
+  revision eval_tasks/mobile_mmlu/manifest.json pins, each checked, into MMF_DIR.
 
 A file already here with the pinned hash is left alone; one that isn't, or a
 download that doesn't match, is never kept (a .part is removed) and the step
@@ -42,7 +45,10 @@ def wanted() -> list[dict]:
              "bytes": f["bytes"], "dest": mab.private_dir() / f["file"]}
             for k, f in m["files"].items() if not f.get("committed", True)] + [
         {"name": "Mobile-MMLU-Pro", "url": f["url"], "sha256": f["sha256"], "bytes": f["bytes"],
-         "dest": mmp.data_dir() / f["file"]}]
+         "dest": mmp.data_dir() / f["file"]}] + [
+        {"name": f"Mobile-MMLU (full) {Path(g['file']).stem}", "url": g["url"],
+         "sha256": g["sha256"], "bytes": g["bytes"], "dest": dest}
+        for g, dest in mmp.full_files()]
 
 
 def _sha(path: Path) -> str:
