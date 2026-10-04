@@ -253,9 +253,20 @@ def test_the_key_rules(a, b, c, key, decision):
 def test_the_key_keeps_each_questions_labels_and_counts_them_per_category(invented):
     rows = mmp.load()
     cur = {s: {"id": s, "version": f"{s}-v1"} for s in mmp.SLOTS}
-    lab = {"first": {q: {"letter": RIGHT[q], "now": False, "version": "first-v1"} for q in RIGHT},
-           "second": {q: {"letter": RIGHT[q], "now": False, "version": "second-v1"} for q in RIGHT},
-           "third": {}}
+    # 14.4: labels are kept by label id — the question's id and its wording's hash
+    lid = {q["id"]: mmp.lid(q) for q in rows}
+
+    class ByLid(dict):
+        def __setitem__(self, q, v):
+            super().__setitem__(lid.get(q, q), v)
+
+        def __getitem__(self, q):
+            return super().__getitem__(lid.get(q, q))
+    lab = {"first": ByLid({lid[q]: {"letter": RIGHT[q], "now": False, "version": "first-v1"}
+                           for q in RIGHT}),
+           "second": ByLid({lid[q]: {"letter": RIGHT[q], "now": False, "version": "second-v1"}
+                            for q in RIGHT}),
+           "third": ByLid()}
     lab["first"]["inv00003"]["letter"] = "C"                   # settled by the third
     lab["third"]["inv00003"] = {"letter": "B", "now": False, "version": "third-v1"}
     lab["first"]["inv00007"]["letter"] = "C"                   # three-way split
@@ -264,7 +275,7 @@ def test_the_key_keeps_each_questions_labels_and_counts_them_per_category(invent
     for s in ("first", "second"):                              # time-sensitive
         lab[s]["inv00008"]["now"] = True
     lab["second"]["inv00009"]["version"] = "second-v0"         # another labeller's: waits
-    k = mmp.build_key(rows, lab, cur)
+    k = mmp.set_view(mmp.build_key(rows, lab, cur), "pro")
     c = k["counts"]["all"]
     assert (c["agreed"], c["settled"], c["split"], c["time"], c["waiting"]) == (8, 1, 1, 1, 1)
     assert c["kept"] == 9 and c["questions"] == 12
@@ -299,7 +310,7 @@ def test_a_model_scored_on_this_set_cant_label_it(svc):
     (d / "model_meta.json").write_text(json.dumps({"model": "served/openrouter-x-ai-grok-5",
                                                    "served": {"pin": {"model": "x-ai/grok-5"}}}))
     (d / mmp.PRED_FILE).write_text(json.dumps({"predictions": {}}))
-    assert "has a Mobile-MMLU-Pro score on the board" in mmp_key.refused("third", "x-ai/grok-5")
+    assert "has a Mobile-MMLU score on the board" in mmp_key.refused("third", "x-ai/grok-5")
     assert not mmp_key.refused("third", "x-ai/grok-6")
 
 
@@ -346,7 +357,7 @@ def test_labelling_sends_nothing_before_start_and_carries_on_after_a_stop(svc, m
              ("anthropic", "inv00007"): "A"}
 
     def complete(self, row):
-        qid = row["custom_id"].split(":", 2)[2]
+        qid = row["custom_id"].split(":", 2)[2].split("#")[0]      # 14.4: by label id
         org = self.model.split("/")[0]
         asked.append((org, qid))
         reply = {"answer": wrong.get((org, qid), RIGHT[qid]), "depends_on_now": qid == "inv00008"}
@@ -361,7 +372,8 @@ def test_labelling_sends_nothing_before_start_and_carries_on_after_a_stop(svc, m
     # held: a batch out while the run is stopped sends nothing
     mmp_key.stop("masein")
     db.ai_set("labeller:first", fake_pin("openai/gpt-6-sol"), "masein")
-    held = mmp_key._submit("first", mmp_key.chosen("first"), ["inv00001", "inv00002"], "masein")
+    held = mmp_key._submit("first", mmp_key.chosen("first"),
+                           [mmp.lid(mmp.by_id()[q]) for q in ("inv00001", "inv00002")], "masein")
     time.sleep(0.3)
     assert not asked and mmp_key.pending()[0]["batch_id"] == held
     # Start: the stop lifted, the held batch carries on, and the rest is sent once

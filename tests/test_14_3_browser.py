@@ -50,9 +50,24 @@ def board(live):
     appmod._cache.update(key=None, payload=None, at=0.0)
 
 
-def shot(part, name):
-    SCREENS.mkdir(parents=True, exist_ok=True)
-    part.screenshot(path=SCREENS / name)
+def shot(part, name, screens=None):
+    (screens or SCREENS).mkdir(parents=True, exist_ok=True)
+    steady_shot(part, (screens or SCREENS) / name)
+
+
+def steady_shot(part, path):
+    """a part's screenshot. The page renders again when its 5-second poll
+    lands, and a tall part (AI models' key card at 375 px) can take longer to
+    shoot than is left before it: a part replaced mid-shot is taken again,
+    straight after the render that replaced it"""
+    from playwright.sync_api import Error
+    for attempt in range(4):
+        try:
+            part.screenshot(path=path)
+            return
+        except Error as e:
+            if "not attached" not in str(e) or attempt == 3:
+                raise
 
 
 def ids(*ms):
@@ -212,7 +227,7 @@ def test_ai_models_has_the_keys_card(live, page, width):
     assert card.locator("[data-mmp-labeller-now='first']").inner_text() == "GPT-6 Sol"
     assert card.locator("[data-mmp-labeller-now='second']").inner_text() == "Gemini 3.1 Pro"
     # a labeller scored on this set is refused, and says why
-    assert "has a Mobile-MMLU-Pro score on the board" in card.locator(
+    assert "has a Mobile-MMLU score on the board" in card.locator(
         "[data-mmp-refused='third']").inner_text()
     est = card.locator("[data-mmp-est='first']").inner_text().split("\t")
     assert est[0].strip() == "GPT-6 Sol" and est[1].strip() == "12"
@@ -221,7 +236,7 @@ def test_ai_models_has_the_keys_card(live, page, width):
     assert card.locator("[data-mmp-check]").count() == 3
     start_btn = card.locator("[data-mmp-start]")
     assert start_btn.is_disabled()                       # the third labeller can't label it
-    assert "has a Mobile-MMLU-Pro score" in card.locator("[data-mmp-why]").inner_text()
+    assert "has a Mobile-MMLU score" in card.locator("[data-mmp-why]").inner_text()
     no_sideways(page)
     shot(card, f"key-card-{width}.png")
     assert page.errors == []
