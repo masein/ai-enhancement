@@ -143,7 +143,7 @@ def test_api_enforces_the_same_gate(gap):
     assert r.status_code == 404 and "no judged answers on file" in r.json()["detail"]
     assert _propose(client, "nobody/nothing").status_code == 404
     r = _propose(client, tree["nodiag"])
-    assert r.status_code == 404 and "suite=judged" in r.json()["detail"]
+    assert r.status_code == 404 and "on the Knowledge exam first" in r.json()["detail"]
     assert client.get("/api/proposals").json() == []          # nothing was recorded
 
 

@@ -99,7 +99,7 @@ def test_own_code_on_a_server_that_runs_it_needs_the_box(svc, monkeypatch):
     assert code["own_code"] and code["why"] == "" and code["files"][0]["sha"] == sha
     assert code["user"] == getpass.getuser()
     r = client.post("/api/submissions", json={"hf_id": f"local/{UPLOAD}", "suite": "quick"})
-    assert r.status_code == 422 and "Run this checkpoint's own model code" in r.json()["detail"]
+    assert r.status_code == 422 and "Run this model's own model code" in r.json()["detail"]   # 16.7
     assert sha in r.json()["detail"]
     r = client.post("/api/submissions", json={"hf_id": f"local/{UPLOAD}", "suite": "quick",
                                               "allow_remote_code": True})
@@ -438,7 +438,7 @@ def test_own_code_the_server_runs_needs_the_box_and_sends_it(live, page, upload,
     box = page.locator("[data-own-code-box='submit']")
     box.wait_for()
     label = page.locator("[data-own-code='submit']").text_content()
-    assert label.startswith("Run this checkpoint's own model code (modeling_custom.py, sha "
+    assert label.startswith("Run this model's own model code (modeling_custom.py, sha "
                             + upload[:4] + "…)")
     assert label.endswith(f"as the unprivileged {getpass.getuser()} user")
     assert not box.is_checked()

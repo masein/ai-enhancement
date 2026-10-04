@@ -640,7 +640,7 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
             names = ", ".join(f"{f['file']} (sha {f['sha']})" for f in code["files"])
             raise HTTPException(422, f"{hf_id} ships its own model code ({names}). Running "
                                      f"it runs that Python, as the unprivileged "
-                                     f"{code['user']} user: tick \"Run this checkpoint's own "
+                                     f"{code['user']} user: tick \"Run this model's own "
                                      f"model code\" (allow_remote_code=true) to queue it. "
                                      f"Nothing was queued.")
     if s.allow_remote_code:
@@ -2987,7 +2987,7 @@ def _rubric_check(body: RubricIn) -> dict:
             fromfile=str(current) if current else "(none)", tofile="uploaded", lineterm=""))[:400],
         "warning": ("Committing changes this file's sha256, which is recorded in every "
                     "judge.json. Scores judged before and after it are from different "
-                    "instruments and are not comparable; re-run suite=judged for this topic."),
+                    "instruments and are not comparable; test this topic again."),
     }
 
 
@@ -3308,8 +3308,8 @@ def answers(model: str, topic: str, limit: int = 200):
     task = exam_build.topic_task(topic)
     model_dir = config.OUT_DIR / model.replace("/", "__")
     if not (model_dir / "judge.json").exists():
-        raise HTTPException(404, f"{model} has no judged run on file — submit it with "
-                                 f"suite=judged first")
+        raise HTTPException(404, f"{model} has no judged run on file — test it on the "
+                                 f"Knowledge exam first")
     # only answers to the questions the topic holds now: a retired answer
     # shown against a new topic's question would be an answer to another one
     j, earlier = judge_now(model)
@@ -3546,7 +3546,7 @@ def proposal_create(p: ProposalIn, x_token: str = Header(default="")):
     t = (judge.get("tasks") or {}).get(task)
     if not t:
         raise HTTPException(404, f"{p.model} has no judged answers on file for {p.topic!r} — "
-                                 f"submit it with suite=judged first")
+                                 f"test it on the Knowledge exam first")
     if t.get("propose") is None:
         raise HTTPException(422, f"{p.topic!r} is not an exam topic")
     # recomputed on every request: the page's copy is a courtesy, this is the rule

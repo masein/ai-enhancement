@@ -457,7 +457,7 @@ def test_the_ggufs_address_opens_its_block_with_measure(live, page, board, width
     assert page.locator("[data-kind-block='standard'] [data-gguf-part]").count() == 0
     # the tile says how many, and opens it
     tile = page.locator("[data-kind-tile='gguf']")
-    assert tile.locator(".ktile-k").inner_text().lower() == "on its gguf · llama.cpp"
+    assert tile.locator(".ktile-k").inner_text().lower() == "standard · on its gguf (llama.cpp)"   # 16.7
     assert re.fullmatch(r"\d+ of \d+", tile.locator("[data-kind-value='gguf']").inner_text())
     # Measure opens the dialog for the GGUF, from here
     blk.locator(f"[data-gg-measure='{SERVED}']").click()

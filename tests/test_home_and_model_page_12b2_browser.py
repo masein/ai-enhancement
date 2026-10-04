@@ -150,7 +150,7 @@ def test_running_now_is_the_run_counters_list(live, page, tidy):
 def test_best_in_each_kind_is_one_card_per_kind_with_data(live, page):
     home(page, live["base"])
     cards = page.locator("[data-best]")
-    assert [c.get_attribute("data-best") for c in cards.all()] == ["standard", "exam", "everyday"]
+    assert [c.get_attribute("data-best") for c in cards.all()] == ["standard", "everyday", "exam"]
     want = page.evaluate("""() => {
       const std = DATA.models.filter(m => officialAvg(m) != null && !m.duplicateOf)
         .sort((a, b) => officialAvg(b) - officialAvg(a))[0];
@@ -242,7 +242,7 @@ def test_the_header_is_the_name_the_facts_one_action_and_a_tile_per_kind(live, p
     assert page.locator("header [data-test-model]").inner_text() == "Test this model"
     tiles = hero.locator("[data-kind-tile]")
     assert [t.get_attribute("data-kind-tile") for t in tiles.all()] == \
-        ["standard", "exam", "everyday"]
+        ["standard", "everyday", "exam"]                                  # 16.7: Models' order
     avg, jav, r = page.evaluate(f"""() => {{ const m = DATA.models.find(x => x.id === '{MODEL}');
       return [(100 * officialAvg(m)).toFixed(1), num(m.judgedAvg, 2), rankOf(m)]; }}""")
     assert hero.locator("[data-kind-value='standard']").inner_text() == avg
@@ -264,7 +264,7 @@ def test_a_kind_not_taken_is_a_not_tested_tile_and_no_block(live, page):
     for kind in ("exam", "everyday"):
         tile = page.locator(f"[data-kind-tile='{kind}']")
         assert " ".join(tile.inner_text().split()) == \
-            ("KNOWLEDGE EXAM" if kind == "exam" else "EVERYDAY TASKS") + " Not tested · Test"
+            ("KNOWLEDGE EXAM" if kind == "exam" else "EVERYDAY") + " Not tested · Test"
     assert [b.get_attribute("data-kind-block") for b in page.locator("[data-kind-block]").all()] \
         == ["standard"]
     # the exam's Test is its own topic picker, on this page
@@ -279,7 +279,7 @@ def test_scores_opens_the_newest_kind_and_folds_the_others(live, page):
       .filter(k => k.taken); return ks.reduce((a, b) => (b.at || 0) > (a.at || 0) ? b : a).kind; }}""")
     blocks = page.locator("[data-kind-block]")
     assert [b.get_attribute("data-kind-block") for b in blocks.all()] == \
-        ["standard", "exam", "everyday"]
+        ["standard", "everyday", "exam"]                                  # 16.7
     for b in blocks.all():
         k = b.get_attribute("data-kind-block")
         is_open = b.get_attribute("open") is not None
@@ -357,7 +357,10 @@ def test_answers_are_by_kind_then_topic_or_group(live, page):
     open_model(page, live["base"])
     page.locator("[data-mtab='answers']").click()
     kinds = page.locator("[data-answers-kind]")
-    assert kinds.all_inner_texts() == ["Knowledge exam", "Everyday tasks"]
+    assert kinds.all_inner_texts() == ["Everyday", "Knowledge exam"]
+    # 16.7: the first in the board's order opens: Everyday, then the exam
+    assert page.locator("[data-answers-kind='everyday']").get_attribute("aria-pressed") == "true"
+    page.locator("[data-answers-kind='exam']").click()
     page.wait_for_selector("[data-panel='model-answers'] .anscard")
     page.locator("[data-answers-kind='everyday']").click()
     # 12a.2: one group at a time, the first to begin with. 12g.2: its practice
@@ -386,7 +389,7 @@ def test_history_holds_the_runs_run_provenance_and_how_it_was_graded(live, page)
     facts = dict(zip(prov.locator("dt").all_inner_texts(), prov.locator("dd").all_inner_texts()))
     assert facts["hub id"] == MODEL and facts["harness"] and facts["limit"] == "full"
     graded = page.locator(f"[data-model-graded='{MODEL}']")
-    assert graded.locator("dt").all_inner_texts() == ["Standard", "Knowledge exam", "Everyday tasks"]
+    assert graded.locator("dt").all_inner_texts() == ["Standard", "Everyday", "Knowledge exam"]
     assert "Judge stub/overlap-v1" in graded.inner_text()
     graded.locator("[data-how-graded]").click()
     page.wait_for_selector("#reader[data-ready='1']")

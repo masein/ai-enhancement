@@ -418,18 +418,19 @@ def test_run_lists_name_a_gguf_runs_setup_and_suites_by_the_boards_names(live, p
     name = page.locator(f"tr[data-queue-row='{look['id']}'] td").nth(2).inner_text()
     assert name.startswith("Qwen3.6 k=8 · GGUF · lookahead 1")
     suite = page.locator(f"tr[data-queue-row='{look['id']}'] [data-suite-cell]").inner_text()
-    assert suite.startswith("Measured on the GGUF · ") and "MMLU" in suite
+    assert suite.startswith("Standard · on the GGUF · ") and "MMLU" in suite
     built = next(r for r in rows if r["suite"] == "gguf" and r["hf_id"] == PHONE
                  and "as built" in r["note"])
     assert page.evaluate(f"runName({json.dumps(built)})") == "k4-LDA · GGUF · as built"
     # never an id: gguf, generative, safety
     words = page.evaluate("['gguf', 'generative', 'safety', 'everyday', 'full', 'judged']"
                           ".map(s => suiteWords({suite: s}))")
-    assert words == ["Measured on the GGUF", "Instruction & maths", "Trust & safety",
-                     "Everyday tasks", "Standard", "Knowledge exam"]
+    # 16.7: each named by its kind first, as Models names them
+    assert words == ["Standard · on the GGUF", "Standard · Instruction & maths",
+                     "Standard · Trust & safety", "Everyday", "Standard", "Knowledge exam"]
     # and the run line (Home ▸ Running now, the Runs menu) uses the same
     ev = next(r for r in rows if r["suite"] == "everyday" and r["hf_id"] == PHONE)
     line = page.evaluate(f"runLine({json.dumps(ev)}).textContent")
-    assert "k4-LDA" in line and "Everyday tasks" in line and "everyday" not in line.replace(
+    assert "k4-LDA" in line and "Everyday" in line and "everyday" not in line.replace(
         "Everyday", "")
     assert page.errors == []

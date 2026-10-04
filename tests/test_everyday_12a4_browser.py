@@ -170,7 +170,7 @@ def test_homes_everyday_badge_is_one_line_with_room(live, page, width):
     assert box["above"] >= 6 and abs(box["above"] - box["below"]) <= 2, box
     assert box["inside"], box
     # the eyebrow is the heading alone now
-    assert card.locator(".eyebrow").inner_text().lower() == "everyday tasks · most passed"  # 12z C8
+    assert card.locator(".eyebrow").inner_text().lower() == "everyday · most passed"  # 12z C8, 16.7
     # found and scrolled in one step too: a redraw between the two detached the
     # card ("Element is not attached to the DOM", twice in CI on 2 Oct)
     page.evaluate("() => document.querySelector(\"[data-best='everyday']\")"

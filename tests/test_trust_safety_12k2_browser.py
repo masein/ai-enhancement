@@ -157,7 +157,7 @@ def test_test_a_model_offers_the_safety_suite_and_all_of_bbq(live, page):
     shot(dlg.locator(".dlg"), "test-a-model-bbq-1280-light.png")
     page.get_by_label("suite").click()
     opt = page.locator("#pop-sel-submit-suite [role=option][data-value='safety']")
-    assert opt.inner_text().startswith("Trust & safety — Do-Not-Answer, XSTest")
+    assert opt.inner_text().startswith("Standard · Trust & safety — Do-Not-Answer, XSTest")
     opt.click()
     assert dlg.locator("[data-bbq-opts]").count() == 0          # BBQ is Full's
     page.get_by_label("suite").click()
@@ -171,7 +171,7 @@ def test_test_a_model_offers_the_safety_suite_and_all_of_bbq(live, page):
     assert (row["hf_id"], row["suite"], row["bbq_all"]) == (GOOD, "full", 1)
     # the queue says what each run asks
     assert page.evaluate(f"suiteWords({json.dumps(row)})") == "Standard · all of BBQ"   # 12m.1
-    assert page.evaluate("suiteWords({suite: 'safety'})") == "Trust & safety"
+    assert page.evaluate("suiteWords({suite: 'safety'})") == "Standard · Trust & safety"  # 16.7
     assert page.evaluate("stillGrading({suite: 'safety', judge: {status: 'submitted'}})")
     assert page.errors == []
 

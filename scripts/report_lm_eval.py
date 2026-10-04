@@ -5710,7 +5710,7 @@ function rankOf(m) {
 // fact that several of them are indistinguishable from guessing.
 function modelSentence(m) {
   const out = [];
-  out.push(`${m.name} is ${m.source === 'artifact' ? 'an uploaded checkpoint'
+  out.push(`${m.name} is ${m.source === 'artifact' ? 'a model uploaded here'
                                                    : 'a Hub model'}`
     + `, evaluated as ${m.kind === 'instruct' ? 'instruct-tuned (chat template applied)'
                                               : 'base (no chat template)'}`
@@ -5811,8 +5811,8 @@ const warnBadge = m => {
   return t || p;
 };
 const ckBadge = m => m.source === 'artifact'
-  ? el('span', { class: 'badge ckpt', title: 'uploaded checkpoint (local artifact)',
-                 text: 'ckpt' }) : null;
+  ? el('span', { class: 'badge ckpt', title: 'uploaded to this board, not from Hugging Face',
+                 text: 'uploaded' }) : null;
 
 // ---------- tooltip: one element, filled with textContent, follows pointer ----------
 const tip = document.getElementById('tip');
@@ -5918,7 +5918,7 @@ function barPanel(task, models, opts) {
     ? 'missing: ' + missing.slice(0, 12).map(m => m.name).join(', ')
       + (missing.length > 12 ? ` +${missing.length - 12} more` : '')
       + (missing.every(m => m.source === 'artifact')
-         ? ' — checkpoints ran the quick suite; resubmit with suite=full to fill this panel'
+         ? ' — models uploaded here ran the quick test; Test them on every Standard task to fill this panel'
          : '')
     : null;
   const panel = el('div', { class: 'panel', 'data-panel': opts.key || task,
@@ -6116,7 +6116,7 @@ function barPanel(task, models, opts) {
       m.id + (m.params ? ` · ${sizeText(m)} params` : '')];
     if (dim) tipRows.splice(1, 0, '≈ chance — not statistically above it');
     if (opts.credit) tipRows.push(opts.credit);
-    if (isCk) tipRows.push('uploaded checkpoint (local artifact)');
+    if (isCk) tipRows.push('uploaded here, not from Hugging Face');
     if (lower && info.metric === 'bits_per_byte')
       tipRows.splice(1, 0, `cross-entropy ${num(c.v * Math.LN2, 3)} nats/byte`);
     svg.append(el('svg:rect', { class: 'hit', x: 0, y: y0 - GAP / 2, width: W,
@@ -7141,6 +7141,7 @@ function vModel() {
 // the kinds of test, named the same and in the same order everywhere (12b).
 // A kind the board has no test for is not shown at all; one this model has
 // not taken is a tile that says so, with the button that fills it
+const KIND_ORDER = ['standard', 'gguf', 'dm', 'dm_thinking', 'phone', 'everyday', 'exam'];
 function modelKinds(m) {
   const J = DATA.judged || {}, E = evd(), e = evdOf(m.id);
   const P = state.phone;
@@ -7154,15 +7155,15 @@ function modelKinds(m) {
   return [
     // a GGUF with no server has nothing to sit the Standard suite with
     std || !ggufOnly(m) ? { kind: 'standard', label: 'Standard', taken: std, at: ran || 0 } : null,
-    gg ? { kind: 'gguf', label: 'On its GGUF · llama.cpp', taken: ggufAny(m.id),
+    gg ? { kind: 'gguf', label: 'Standard · on its GGUF (llama.cpp)', taken: ggufAny(m.id),
       at: Math.max(0, ...((G().history || {})[m.id] || []).map(r => r.at || 0)) } : null,
     (J.exam || []).length ? { kind: 'exam', label: 'Knowledge exam',
       taken: jt.length > 0 || ((m.judge || {}).history || []).length > 0,
       at: Math.max(0, ...jt.map(([, v]) => v.judged_at || 0)) } : null,
-    (E.questions || []).length ? { kind: 'everyday', label: 'Everyday tasks', taken: !!e,
+    (E.questions || []).length ? { kind: 'everyday', label: 'Everyday', taken: !!e,
       at: e ? e.marked_at || 0 : 0 } : null,
     // 12f.2: a phone build's fourth — the numbers reported from the phone
-    (servedOf(m.id) || {}).phone ? { kind: 'phone', label: 'On the phone · reported',
+    (servedOf(m.id) || {}).phone ? { kind: 'phone', label: 'Mobile · on the phone, reported',
       taken: phoneReports(m.id).length > 0 || !!state.phone.open[m.id],
       at: (phoneReports(m.id)[0] || {}).at || 0 } : null,
     // 12q.C: DeviceMark's protocol, a card for each thinking mode it ran
@@ -7171,7 +7172,9 @@ function modelKinds(m) {
       return c ? { kind, label, taken: true, at: Math.max(0, ...[c.row, c.pilot, c.parity, c.speed]
         .map(x => (x || {}).at || 0)) } : null;
     }),
-  ].filter(Boolean);
+  ].filter(Boolean)
+    // 16.7: in Models' order — Standard (its GGUF beside it), Mobile, Everyday, the exam
+    .sort((x, y) => KIND_ORDER.indexOf(x.kind) - KIND_ORDER.indexOf(y.kind));
 }
 // a kind's one number, and the line under it
 function kindValue(m, kind) {
@@ -7299,15 +7302,15 @@ const SERVED_GUESS_S = 5;
 function evdSuiteLabel(id) {
   const e = evdOf(id), n = e && e.unasked ? e.unasked : evdAll() || 111;
   const s = isServedId(id) ? servedOf(id) : null;
-  if (!s) return `Everyday tasks — ${n} questions, a few minutes`;
+  if (!s) return `Everyday — ${n} questions, a few minutes`;
   const each = (s.speed || {}).secs_each, measured = each != null && each > 0;
   const min = Math.max(1, Math.round(n * (measured ? each : SERVED_GUESS_S) / 60));
-  return `Everyday tasks — ${n} questions, about ${min} min` + (measured ? '' : ', a rough guess');
+  return `Everyday — ${n} questions, about ${min} min` + (measured ? '' : ', a rough guess');
 }
 // 12o.3: the Mobile tasks suite. 14.1: two parts, each with what it takes —
 // asked of the server, before Start (/api/mobileaibench/estimate)
 function mabSuiteLabel(id) {
-  return 'Mobile tasks (MobileAIBench) — HotpotQA, SQL, Dolly, CNN/DailyMail, XSum; MT-Bench '
+  return 'Mobile — MobileAIBench: HotpotQA, SQL, Dolly, CNN/DailyMail, XSum; MT-Bench '
     + 'and three trust sets judged; Mobile-MMLU-Pro' + (MMFD().name ? ', or the full Mobile-MMLU'
       : '');
 }
@@ -7491,7 +7494,7 @@ function servedSetups(m) {
         + (drafts ? '' : ' MTP’s drafts accepted: no server has reported them yet.') }) : '');
 }
 function modelHead(m, kinds) {
-  const facts = [m.source === 'artifact' ? 'checkpoint' : m.kind, famOf(m)].filter(Boolean)
+  const facts = [m.source === 'artifact' ? 'uploaded here' : m.kind, famOf(m)].filter(Boolean)
     .join(' · ');
   return el('div', { class: 'card mhero', 'data-model-hero': '1' },
     el('div', { class: 'mtop' },
@@ -7958,18 +7961,20 @@ function modelAnswersTab(m, kinds) {
   const cats = Object.keys(tasks).filter(t => (J.exam || []).includes(t))
     .sort((a, b) => (pubScore(tasks[a]) ?? 9) - (pubScore(tasks[b]) ?? 9));
   const dmModes = dmAnswerModes(m.id);
-  const have = [cats.length ? ['exam', 'Knowledge exam'] : null,
-    evdOf(m.id) ? ['everyday', 'Everyday tasks'] : null,
+  // 16.7: in the board's order, Mobile · Everyday · then the exam
+  const have = [
     // 12q.C: DeviceMark's items are public benchmark items: all of them are shown
-    dmModes.length ? ['dm', 'DeviceMark protocol'] : null].filter(Boolean);
+    dmModes.length ? ['dm', 'Mobile · DeviceMark'] : null,
+    evdOf(m.id) ? ['everyday', 'Everyday'] : null,
+    cats.length ? ['exam', 'Knowledge exam'] : null].filter(Boolean);
   const card = el('div', { class: 'card', 'data-model-answers': m.id },
     el('h2', { text: 'Answers' }),
     el('p', { class: 'sub', text: 'What the model wrote, on the questions anyone may read. '
       + 'The hidden questions stay hidden: their score is all you see of them.' }));
   if (!have.length) {
     card.append(el('p', { class: 'small', 'data-answers-none': '1', text: 'No written answers '
-      + 'yet: this model has not sat the Knowledge exam, the Everyday tasks or DeviceMark’s '
-      + 'protocol.' }));
+      + 'yet: this model has not been asked DeviceMark’s protocol or the Everyday tasks'
+      + (examOn() ? ', or sat the Knowledge exam.' : '.') }));
     return [card];
   }
   const kind = have.some(([k]) => k === state.mans) ? state.mans : have[0][0];
@@ -8260,14 +8265,15 @@ function gradedCard(m) {
   if ([...DATA.accTasks, ...DATA.pplTasks].some(t => cell(t, m.id)))
     rows.push(['Standard', 'lm-evaluation-harness'
       + (m.hash ? ` ${m.hash}` : '') + ': each task’s own metric, at the shots its row says.']);
+  // 16.7: the kinds in Models' order, by their names
+  const e = evdOf(m.id);
+  if (e) rows.push(['Everyday', 'Four answers are checked by a script; the TL;DR is '
+    + 'marked by the judge, against its rubric'
+    + (e.provisional ? ', and its marks are not evidence yet.' : '.')]);
   const j = m.judge;
   if (j && j.judge) rows.push(['Knowledge exam', judgeIdLine(m),
     LIVE ? el('span', { 'data-how-graded': m.id },
       readLink({ kind: 'provenance', id: 'judge:' + m.id }, 'How this was graded ▸')) : '']);
-  const e = evdOf(m.id);
-  if (e) rows.push(['Everyday tasks', 'Four answers are checked by a script; the TL;DR is '
-    + 'marked by the judge, against its rubric'
-    + (e.provisional ? ', and its marks are not evidence yet.' : '.')]);
   if (!rows.length) return null;
   return el('div', { class: 'card', 'data-model-graded': m.id },
     el('h2', { text: 'How it was graded' }),
@@ -8449,13 +8455,16 @@ function bestByKind(ms) {
     .sort(([a, x], [b, y]) => (!!evdMissing(x) - !!evdMissing(y)) || (y.passed - x.passed)
       || evdName(a).localeCompare(evdName(b)))[0];
   // 12z C8: never ranked, so not "best": the most passed, and the badge says why
-  if (ev) cards.push(card('everyday', 'Everyday tasks · most passed', evdCount(ev[1]),
+  if (ev) cards.push(card('everyday', 'Everyday · most passed', evdCount(ev[1]),
     DATA.models.find(m => m.id === ev[0]), evdBadge(ev[1].provisional)));
   // the provisional-judge caveat, once, in the block's header
   const caveat = (exam && !(judgedCalibrated() && judgedOkM(exam))) || (weak && !judgedOkM(weak.m))
     ? el('span', { class: 'badge prelim', 'data-best-caveat': '1',
         title: judgedCalibrated() ? whyProvisional(exam || weak.m) : judgedOffWhy(),
         text: 'Knowledge exam: provisional judge' }) : exam ? judgeChecked() : '';
+  // 16.7: in Models' order — Standard, Everyday, then the exam
+  const rank = k => ['standard', 'everyday', 'exam'].indexOf(k);
+  cards.sort((x, y) => rank(x.dataset.best) - rank(y.dataset.best));
   return el('div', { class: 'card', 'data-best-by-kind': String(cards.length) },
     el('div', { class: 'sechead' }, el('h2', { text: 'Best in each kind of test' }), caveat),
     cards.length ? el('div', { class: 'hlgrid' }, cards)
@@ -9574,7 +9583,7 @@ document.addEventListener('click', e => {
 // 12z B4: what an address shows, in words — "Models · DeviceMark",
 // "Benchmarks · Everyday tasks", a model's name — for "← Back to …"
 const SUB_WORDS = { model: 'By model', training: 'Training runs', standard: 'Standard',
-                    exam: 'Knowledge exam', everyday: 'Everyday tasks' };
+                    exam: 'Knowledge exam', everyday: 'Everyday' };
 function hashWords(h) {
   const [rest] = splitRead(h), s = decodeURIComponent(rest);
   const mo = /^model=(.+)$/.exec(s);
@@ -10025,7 +10034,7 @@ function msItem(key, it, i, active) {
   if (it.on_board) bits.push('on the board');
   if (it.judged) bits.push(`judged on ${it.judged} topic${it.judged > 1 ? 's' : ''}`);
   if (it.queued) bits.push('in the queue');
-  if (it.artifact) bits.push('uploaded checkpoint');
+  if (it.artifact) bits.push('uploaded here');
   if (it.over_cap) bits.push('over the size cap');
   // 11i: said in the list, before it is picked
   if (it.own_code) bits.push(it.own_code.runs ? 'ships its own model code'
@@ -12740,8 +12749,8 @@ function lbOnDevice(ms) {
 // its page's cards (one per thinking mode: the full row, the pilot, the parity
 // check, the speed test), the setups table's column, "Open results", and its
 // answers. The runs come with the results (DATA.devicemark), by model and mode
-const DM_KINDS = { dm: ['off', 'DeviceMark protocol'],
-                   dm_thinking: ['on', 'DeviceMark protocol · thinking'] };
+const DM_KINDS = { dm: ['off', 'Mobile · DeviceMark'],
+                   dm_thinking: ['on', 'Mobile · DeviceMark, thinking'] };
 const dmRunsOf = id => ((DATA.devicemark || {})[id]) || null;
 const dmHalf = c => c && c.ci ? ` ±${(50 * (c.ci[1] - c.ci[0])).toFixed(1)}` : '';
 const dmComp = c => c && c.value != null ? dmPct(c.value) + dmHalf(c) : '—';
@@ -13314,7 +13323,7 @@ function cmpKind(m) {
   if (isPhoneRow(m)) return 'phone build';
   if (m.rowOf || ggufOnly(m)) return 'GGUF';
   if (m.served) return 'served';
-  if (m.source === 'artifact') return 'checkpoint';
+  if (m.source === 'artifact') return 'uploaded here';
   return m.kind === 'instruct' ? 'instruct' : 'base';
 }
 // and its setup, when it has one: a GGUF setup's settings, how a served model is served
@@ -13375,7 +13384,7 @@ function cmpGroups(ms) {
           + (sub ? ` · subset of ${Number(sub.n).toLocaleString('en')}` : '')
           + (m.thinkingRow ? ' · thinking' : '') };
       } })) },
-    { key: 'everyday', name: 'Everyday tasks', rows: [
+    { key: 'everyday', name: 'Everyday', rows: [
       { key: 'evd', label: 'All groups', get: m => cmpEvd(m.id, null) },
       ...evdGroups().map(([g, label]) => ({ key: 'evd:' + g, label, get: m => cmpEvd(m.id, g) }))] },
     // 16.5: only while the Knowledge exam is switched on
@@ -13395,7 +13404,7 @@ function cmpGroups(ms) {
     // Qwen3-1.7B and a frontier model on one line
     frCmpGroup(ms),
     // 12o.3: MobileAIBench's sets, each by its own metric (14.1: MT-Bench out of 10)
-    { key: 'mobile', name: 'Mobile tasks (MobileAIBench)', rows: MAB.map(t => ({ key: t,
+    { key: 'mobile', name: 'Mobile · MobileAIBench', rows: MAB.map(t => ({ key: t,
       label: `${LB_SHORT[t]} · ${MAB_METRIC[t]}`, fmt: t === MTBENCH ? 'n1' : undefined,
       get: m => {
         const c = cell(t, m.id), x = ((m.mab || {})[t]) || {};
@@ -15084,7 +15093,8 @@ function lbModelsPill(ms) {
     // 12n.1: one Google — and the whole of it folded until opened
     const repMakers = [...new Set([...((REP().settings || {}).makers || []),
       ...reps.map(m => m.maker || 'other')])].map(mk => 'reported · ' + mk);
-    const gname = g => g.startsWith('reported · ') ? g.slice(11) : g;
+    const gname = g => g.startsWith('reported · ') ? g.slice(11)
+      : g === 'checkpoints' ? 'uploaded here' : g;                       // 16.7
     // 12n.1: a group's box and its all · none; "only these" chooses it alone
     const setGroup = (ids, on) => { ids.forEach(id => on ? pick.add(id) : pick.delete(id));
       say(); apply(); fill(state.lbModelsQ || ''); };
@@ -15934,7 +15944,7 @@ function vPpl(ms) {
       + 'call a small lead a win: ≈ marks values within 1% (floor 0.005) of the best, '
       + 'which is a stated placeholder until per-shard bootstrap intervals exist. Two '
       + 'models 0.001 apart are tied, not ranked.'
-      + (anyCk() ? ' Hollow bars are uploaded checkpoints.' : '') }),
+      + (anyCk() ? ' Hollow bars are models uploaded here.' : '') }),
     el('div', { class: 'panels' }, DATA.pplTasks.map(t => barPanel(t, ms, { lower: true }))),
     el('div', { class: 'card' },
       el('h2', { text: 'Cross-entropy loss' }),
@@ -17686,18 +17696,18 @@ function ownCodeResubmit(r) {
   const keep = el('button', { class: 'ghost', 'data-own-code-keep': String(r.id), text: 'Keep it',
     onclick: () => { state.qRc = null; redraw(); } });
   if (info === null) return el('div', { class: 'owncode-row' },
-    el('span', { class: 'small se', text: 'Checking the checkpoint…' }), keep);
+    el('span', { class: 'small se', text: 'Checking the model…' }), keep);
   const why = ownCodeWhy(info, true);
   if (why || !info || !info.own_code) return el('div', { class: 'owncode-row' },
     el('span', { class: 'small', 'data-own-code-why': String(r.id),
-      text: why || 'This checkpoint no longer ships its own model code.' }),
+      text: why || 'This model no longer ships its own model code.' }),
     why ? '' : el('button', { class: 'ghost', text: 'Resubmit', onclick: () => queueResubmit(r) }),
     keep);
   const go = el('button', { class: 'primary', 'data-own-code-go': String(r.id), text: 'Resubmit',
     disabled: state.qRcAllow ? null : '',
     onclick: () => queueResubmit(r, false, { allow_remote_code: true }) });
   return el('div', { class: 'owncode-row' },
-    el('span', { class: 'small', text: `#${r.id} stopped because this checkpoint ships its `
+    el('span', { class: 'small', text: `#${r.id} stopped because this model ships its `
       + 'own model code. Resubmit it with leave to run that code:' }),
     ownCodeBox(info, state.qRcAllow, v => { state.qRcAllow = v; go.disabled = !v; }, 'q' + r.id),
     go, keep);
@@ -17881,7 +17891,7 @@ function queueActions(r) {
       state.qRc = state.qRc === r.id ? null : r.id; state.qRcAllow = false;
       delete state.codeInfo[r.hf_id];
       (state.queueRedraw || render)(); },
-      { title: 'this checkpoint ships its own model code — resubmitting asks first',
+      { title: 'this model ships its own model code — resubmitting asks first',
         'aria-expanded': String(state.qRc === r.id) }));
   }
   if (r.suite === 'gguf' && (r.status === 'failed' || r.status === 'canceled'))
@@ -17946,38 +17956,39 @@ function vQueue(part = { form: true, list: true }) {
     // 11m: masein read the drop-down as `judged` and nothing else, and took
     // `full` for removed. Each option says what it gets you.
     suite: Select('suite', [
-      ['full', 'full — every task', { sub: 'The benchmark tasks: the model\'s average and its '
+      ['full', 'Standard — every task', { sub: 'The benchmark tasks: the model\'s average and its '
         + 'place on the leaderboard.' }],
-      ['quick', 'quick — three tasks, minutes', { sub: 'hellaswag, arc_easy and perplexity: a '
+      ['quick', 'Standard · quick — three tasks, minutes', { sub: 'hellaswag, arc_easy and perplexity: a '
         + 'first look. A full run later adds only the tasks still missing.' }],
-      ['control', 'control — MMLU, options rotated', { sub: 'The position-bias experiment: '
+      ['control', 'Standard · control — MMLU, options rotated', { sub: 'The position-bias experiment: '
         + 'MMLU with the options moved round. About a fifth of a full MMLU.' }],
-      // 16.5: only while the Knowledge exam is switched on
-      ...examOn() ? [['judged', 'judged — the written exam' + (state.loop.blocked ? ' (unavailable)' : ''),
-        { disabled: !!state.loop.blocked, title: state.loop.blocked || '',
-          sub: 'The exam topics, answered in writing and graded by the judge: the model\'s '
-            + 'judged score per topic.' }]] : [],
-      // 12a: the pilot. 12c replaces this drop-down with cards
-      ['everyday', evdSuiteLabel(sf.hf_id.trim())],
       // 12h.1: instruct models only; MMLU-Pro alone is hours
-      ['generative', 'Instruction & maths — IFEval, MMLU-Pro, MATH-500, hours',
+      ['generative', 'Standard · Instruction & maths — IFEval, MMLU-Pro, MATH-500, hours',
         { sub: 'Asked through the chat template and scored on what the model writes. '
           + 'Instruct models only; never in the average.' }],
       // 12k.2: BBQ is in full; these two are asked and marked by the judge
-      ['safety', 'Trust & safety — Do-Not-Answer, XSTest',
+      ['safety', 'Standard · Trust & safety — Do-Not-Answer, XSTest',
         { sub: 'Requests it should decline, and safe ones it shouldn\'t, asked through the chat '
           + 'template and marked by the judge. Instruct models only; never in the average.' }],
-      // 12n.2: the questions frontier labs are measured on, measured here
-      ['shared', 'Shared with the frontier — GPQA Diamond (CoT), SimpleQA Verified',
-        { sub: 'GPQA Diamond thinking step by step, and 1,000 short facts graded by the judge '
-          + 'with the dataset\'s grader: beside what Epoch AI reports, never ranked with it. '
-          + 'Instruct models only (a base model sits GPQA\'s four options in full); never in '
-          + 'the average.' }],
       // 12o.3: MobileAIBench's sets, scored by its own metrics; 14.1: MT-Bench judged
       ['mobile', mabSuiteLabel(sf.hf_id.trim()),
         { sub: 'MobileAIBench\'s own samples and prompts, scored by its metrics: five sets with '
           + 'no judge, or MT-Bench rated by the judge after the run. Instruct models only; '
-          + 'never in the average.' }]]
+          + 'never in the average.' }],
+      // 16.7: the kinds of test in Models' order — Standard's, Mobile, Everyday, Frontier
+      // 12a: the pilot. 12c replaces this drop-down with cards
+      ['everyday', evdSuiteLabel(sf.hf_id.trim())],
+      // 12n.2: the questions frontier labs are measured on, measured here
+      ['shared', 'Frontier — GPQA Diamond (CoT), SimpleQA Verified',
+        { sub: 'GPQA Diamond thinking step by step, and 1,000 short facts graded by the judge '
+          + 'with the dataset\'s grader: beside what Epoch AI reports, never ranked with it. '
+          + 'Instruct models only (a base model sits GPQA\'s four options in full); never in '
+          + 'the average.' }],
+      // 16.5: only while the Knowledge exam is switched on
+      ...examOn() ? [['judged', 'Knowledge exam — written, graded by the judge' + (state.loop.blocked ? ' (unavailable)' : ''),
+        { disabled: !!state.loop.blocked, title: state.loop.blocked || '',
+          sub: 'The exam topics, answered in writing and graded by the judge: the model\'s '
+            + 'judged score per topic.' }]] : []]
       .map(o => srvId && !SERVED_SUITES.includes(o[0])
         ? [o[0], o[1], { ...(o[2] || {}), disabled: true, title: SERVED_LINE }] : o),
       sf.suite || 'full', v => { sf.suite = v; render(); }, { key: 'submit-suite' }),
@@ -21301,7 +21312,7 @@ function ownCodeBox(info, checked, onToggle, key) {
   return el('label', { class: 'owncode', 'data-own-code': key },
     el('input', { type: 'checkbox', 'data-own-code-box': key, checked: checked ? '' : null,
       onchange: e => onToggle(e.target.checked) }),
-    el('span', {}, 'Run this checkpoint\'s own model code (',
+    el('span', {}, 'Run this model\'s own model code (',
       el('code', { text: f.map(x => x.file).join(', ') }), ', sha ',
       el('code', { title: f.map(x => `${x.file} ${x.sha}`).join('\n'),
         text: f.map(x => x.sha.slice(0, 4) + '…').join(', ') }),
@@ -21309,10 +21320,10 @@ function ownCodeBox(info, checked, onToggle, key) {
 }
 // why this run cannot be queued yet, or '' — the reason goes beside the button
 function ownCodeWhy(info, allowed) {
-  if (info === null) return 'Checking the checkpoint…';
+  if (info === null) return 'Checking the model…';
   if (!info || !info.own_code) return '';
   if (info.why) return info.why;
-  return allowed ? '' : 'This checkpoint ships its own model code — tick the box to run it.';
+  return allowed ? '' : 'This model ships its own model code — tick the box to run it.';
 }
 
 // ---------------------------------------------------------------------------
@@ -21341,7 +21352,7 @@ function sitWhy(m, s, info) {
   if (state.loop.blocked) return state.loop.blocked;
   if (judgeDown()) return judgeWhy();
   const code = ownCodeWhy(info, s.allow);
-  if (code === 'Checking the checkpoint…') return code;
+  if (code === 'Checking the model…') return code;
   if (cannotRun(m.id)) return noWeightsWhy(m.id);
   if (code) return code;
   if (!s.tasks.length && !s.control) return 'Tick at least one topic.';
@@ -21410,11 +21421,12 @@ function modelSitPanel(m) {
 // grouped by area. #56's row listed 37 names and stood 650px tall.
 state.suiteOpen = new Set();
 // 12m.1: a run's suite by the board's own names, never its id
-const SUITE_NAMES = { full: 'Standard', quick: 'Standard · quick', control: 'MMLU control',
-  judged: 'Knowledge exam', everyday: 'Everyday tasks', generative: 'Instruction & maths',
-  safety: 'Trust & safety', gguf: 'Measured on the GGUF',
-  shared: 'Shared with the frontier', mobile: 'Mobile tasks (MobileAIBench)',
-  devicemark: 'DeviceMark protocol' };
+// 16.7: each run's suite under the kind of test it is, in Models' words
+const SUITE_NAMES = { full: 'Standard', quick: 'Standard · quick', control: 'Standard · MMLU control',
+  judged: 'Knowledge exam', everyday: 'Everyday', generative: 'Standard · Instruction & maths',
+  safety: 'Standard · Trust & safety', gguf: 'Standard · on the GGUF',
+  shared: 'Frontier', mobile: 'Mobile · MobileAIBench',
+  devicemark: 'Mobile · DeviceMark' };
 // 12q: a devicemark run says its part: the battery, the pilot, the parity
 // check against the setup without MTP, or the speed test
 const DM_PARTS = { pilot: 'pilot (30 items)', parity: 'MTP parity', speed: 'speed test' };
@@ -22193,7 +22205,7 @@ function exRubricUpload(st) {
         const j = await post('api/exam/rubrics', send);
         st.content = ''; st.file = ''; st.rows = null; loadRubrics();
         return `Written to ${j.written}. Its sha is recorded in every judge.json from now `
-          + 'on — re-run suite=judged for this topic.';
+          + 'on — test this topic again.';
       }, { 'data-commit': 'rubric' }) : ''),
     st.file ? el('p', { class: 'small se', 'data-rubric-file': '1', text: `file: ${st.file}` }) : '',
     actNote(slot),

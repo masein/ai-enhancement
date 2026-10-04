@@ -238,11 +238,12 @@ def test_each_suite_option_says_what_it_gets_you(live, page):
     page.get_by_label("suite").click()
     page.wait_for_selector("[role=listbox][aria-label='suite']")
     opts = page.locator("#pop-sel-submit-suite [role=option]")
+    # 16.7: Standard's, then Mobile, Everyday, Frontier, and the exam — Models' order
     assert [o.get_attribute("data-value") for o in opts.all()] == \
-        ["full", "quick", "control", "judged", "everyday", "generative",   # 12h.1
-         "safety", "shared", "mobile"]                            # 12k.2, 12n.2, 12o.3
+        ["full", "quick", "control", "generative", "safety", "mobile", "everyday", "shared",
+         "judged"]
     # 12a: the Everyday option is its one short line (12a.2: the bank's), and 12c replaces the list
-    assert opts.nth(4).text_content() == "Everyday tasks — 310 questions, a few minutes"
+    assert opts.nth(6).text_content() == "Everyday — 310 questions, a few minutes"
     for o in opts.all()[:4]:
         v = o.get_attribute("data-value")
         sub = o.locator(f"[data-opt-sub='{v}']").text_content()
@@ -252,7 +253,9 @@ def test_each_suite_option_says_what_it_gets_you(live, page):
     shot(page, "11m-6-suite-options-1400-light.png")
     # the picked one still reads as a name, not a paragraph
     page.locator("#pop-sel-submit-suite [data-value='quick']").click()
-    assert page.get_by_label("suite").text_content().startswith("quick — three tasks, minutes")
+    # 16.7: its kind first
+    assert page.get_by_label("suite").text_content().startswith(
+        "Standard · quick — three tasks, minutes")
     assert page.errors == []
 
 
