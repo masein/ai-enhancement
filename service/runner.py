@@ -1171,6 +1171,12 @@ def run_submission(sub: dict) -> None:
     if why:
         db.update(sid, status="failed", finished_at=time.time(), error=why)
         return
+    # 16.5: a judged run queued before the Knowledge exam was switched off: its
+    # tasks are all the exam's, so it skips them all and says so
+    if sub.get("suite") == "judged" and not config.KNOWLEDGE_EXAM:
+        db.update(sid, status="failed", finished_at=time.time(),
+                  error=config.EXAM_OFF + ". Its exam tasks were skipped: nothing was run.")
+        return
     # 12p.1: nor an Everyday run without its hidden set — in the red banner's words
     if everyday:
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))

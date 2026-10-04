@@ -49,6 +49,10 @@ _config.HIDDEN_MANIFEST = HIDDEN_FIXTURE_MANIFEST
 # is off here — and on in its own tests (test_15_6_items_hash.py)
 _config.DM_ITEMS_SHA256 = ""
 os.environ["DM_ITEMS_SHA256"] = ""
+# 16.5: the Knowledge exam is off by default; its own tests (most of the 11s
+# and 12s) run with it on, as the board was, and 16.5's switch it off
+_config.KNOWLEDGE_EXAM = True
+os.environ["KNOWLEDGE_EXAM"] = "1"
 
 
 @pytest.fixture(scope="session")

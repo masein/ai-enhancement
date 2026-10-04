@@ -492,6 +492,13 @@ def _switch(name: str, default: str = "1") -> bool:
 
 
 MOBILE_MMLU_FULL = _switch("MOBILE_MMLU_FULL")
+# 16.5: the Knowledge exam, switched off (masein, 4 Oct: "lets remove the knowledge
+# exams for now completely"). Off, it appears nowhere and nothing about it is
+# run, asked or generated; its banks, rubrics, answers and judged scores stay on
+# disk and in the database, and KNOWLEDGE_EXAM=1 brings everything back as it was
+KNOWLEDGE_EXAM = _switch("KNOWLEDGE_EXAM", "0")
+EXAM_OFF = ("The Knowledge exam is switched off on this server (KNOWLEDGE_EXAM=0 in .env): "
+            "nothing about it is run, asked or shown. Its banks, answers and scores are kept")
 MAB_INSTRUCT_ONLY = ("MobileAIBench's sets are asked through the chat template and scored on "
                      "what the model writes, so only an instruct model can sit them — this one "
                      "runs as a base model")

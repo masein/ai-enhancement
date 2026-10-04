@@ -131,6 +131,9 @@ python examples/train_and_benchmark.py --bench http://<board>:8899 --steps 200 -
 
 ## The loop
 
+> The Knowledge exam is switched off on this board for now (`KNOWLEDGE_EXAM=0`):
+> the loop below works from Everyday tasks' weak groups until it is back.
+
 Most of this guide is about benchmarking a model. The **Loop** tab is the
 other job: improving one. It runs on one topic at a time, and every step has
 an owner.

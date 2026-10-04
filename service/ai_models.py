@@ -50,6 +50,16 @@ JOBS = {
                 "why": "another family from the writer, so it doesn't share its blind spots"},
 }
 ROLE_JOB = {j["role"]: k for k, j in JOBS.items()}
+# 16.5: what each does while the Knowledge exam is switched off
+DOES_NO_EXAM = {"judge": "marks the Everyday questions with a judge check, 0–4",
+                "writer": "writes new questions for Everyday tasks"}
+
+
+def does(job: str) -> str:
+    """a job's line, in what the board runs now"""
+    if not config.KNOWLEDGE_EXAM and job in DOES_NO_EXAM:
+        return DOES_NO_EXAM[job]
+    return JOBS[job]["does"]
 LOCAL = "local"
 # the model families whose terms restrict training on their output: easy to
 # edit. Open-weight families (GLM, DeepSeek, Qwen) avoid the question

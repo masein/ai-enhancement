@@ -25,7 +25,7 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse, PlainTextResponse,
                                StreamingResponse)
@@ -375,6 +375,38 @@ def trained_from_for(model_ids) -> dict[str, dict]:
     return out
 
 
+def exam_gate() -> None:
+    """16.5: the Knowledge exam's own endpoints answer, while KNOWLEDGE_EXAM=0,
+    that it is switched off — nothing is read, run or written"""
+    if not config.KNOWLEDGE_EXAM:
+        raise HTTPException(409, config.EXAM_OFF + ".")
+
+
+EXAM_ONLY = [Depends(exam_gate)]
+
+
+def exam_task(task: str | None) -> bool:
+    """16.5: a proposal's or a dataset's target is a Knowledge exam topic"""
+    return str(task or "").startswith(("exam_", "fr_"))
+
+
+def exam_hidden(task: str | None) -> bool:
+    """…and the exam is switched off: kept, and neither shown nor carried on"""
+    return exam_task(task) and not config.KNOWLEDGE_EXAM
+
+
+def _exam_prop_gate(r: dict) -> None:
+    if exam_hidden(r.get("task")):
+        raise HTTPException(409, config.EXAM_OFF + ".")
+
+
+def _exam_dataset_gate(did: int) -> None:
+    """16.5: a dataset built from an exam topic's proposal, while it is off"""
+    d = db.dataset_get(did)
+    if d and not config.KNOWLEDGE_EXAM:
+        _exam_prop_gate(db.proposal_get(d["proposal_id"]) or {})
+
+
 def results_payload() -> dict:
     now = time.time()
     if _cache["payload"] is not None and now - _cache["at"] < 5:
@@ -423,7 +455,7 @@ def results_payload() -> dict:
         _cache.update(key=key, payload=payload)
     # 16.3: each model's latest finished run of any kind, for Models' Tested —
     # from the runs table, so a run whose files didn't move the tree counts too
-    done = db.last_done()
+    done = db.last_done(judged=config.KNOWLEDGE_EXAM)
     for m in _cache["payload"]["models"]:
         if done.get(m["id"]):
             m["testedAt"] = done[m["id"]]
@@ -551,6 +583,9 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
         raise HTTPException(422, f"subset is a number of MMLU-Pro items, from 1 to {total - 1}; "
                                  f"0 runs all {total}")
     chosen: list[str] = []
+    # 16.5: the Knowledge exam switched off: nothing about it is queued
+    if s.suite == "judged" and not config.KNOWLEDGE_EXAM:
+        raise HTTPException(422, config.EXAM_OFF + ". Nothing was queued.")
     if s.suite == "judged":
         # before a GPU second is spent on answers nobody could grade
         h = judge_health()
@@ -1789,6 +1824,13 @@ def results():
     # on every request, never cached with the scores
     from . import hidden_store
     payload = {**payload, "alarms": hidden_store.alarms()}
+    # 16.5: what the exam switched off hides on Improve, counted, never deleted
+    if not config.KNOWLEDGE_EXAM:
+        props = db.proposal_list(None, 500)
+        exam_ids = {p["id"] for p in props if exam_task(p.get("task"))}
+        payload = {**payload, "examHidden": {
+            "proposals": len(exam_ids),
+            "datasets": sum(1 for d in db.dataset_list(500) if d["proposal_id"] in exam_ids)}}
     return JSONResponse(payload)
 
 
@@ -1875,7 +1917,7 @@ def _ai_page() -> dict:
     for k, j in ai_models.JOBS.items():
         c = ai_models.choice(k)
         p, m, _ = llm.identity(j["role"])
-        jobs.append({"job": k, "label": j["label"], "does": j["does"],
+        jobs.append({"job": k, "label": j["label"], "does": ai_models.does(k),
                      "suggested": j["suggested"], "why": j["why"],
                      "chosen": c, "from": "page" if c else ("environment" if p else None),
                      "provider": p, "model": m, "now": ai_models.label(k),
@@ -1965,7 +2007,8 @@ def ai_job_set(job: str, a: AiJobIn, x_token: str = Header(default="")):
         raise HTTPException(422, str(e)) from None
     llm.reset()
     out = {"saved": saved, "page": _ai_page()}
-    if job == "judge" and _judge.version()["key"] != before:
+    # 16.5: re-judging is the Knowledge exam's, and asks nothing while it is off
+    if job == "judge" and config.KNOWLEDGE_EXAM and _judge.version()["key"] != before:
         out["rejudge"] = _rejudge_estimate()
     return out
 
@@ -1986,7 +2029,7 @@ def ai_limit_set(a: AiLimitIn, x_token: str = Header(default="")):
     return _ai_page()
 
 
-@app.get("/api/ai/rejudge")
+@app.get("/api/ai/rejudge", dependencies=EXAM_ONLY)
 def ai_rejudge_estimate():
     return _rejudge_estimate()
 
@@ -1995,7 +2038,7 @@ class ByIn(BaseModel):
     by: str
 
 
-@app.post("/api/ai/rejudge")
+@app.post("/api/ai/rejudge", dependencies=EXAM_ONLY)
 def ai_rejudge(a: ByIn, x_token: str = Header(default="")):
     """Re-judge every answer on file another judge marked, with the judge now:
     a judged run per model whose exam answers are on disk (it only grades
@@ -2027,10 +2070,13 @@ def ai_rejudge(a: ByIn, x_token: str = Header(default="")):
 def judge_test_page():
     """the answers to mark, as masein sees them — never a judge's mark — his
     marks so far, and where he got to"""
-    shown = [judge_test.shown(x) for x in judge_test.answers()]
+    every = judge_test.answers()
+    shown = [judge_test.shown(x) for x in judge_test.in_use(every)]
     hist = judge_test.history()
     prog = judge_test.progress()
     return {"answers": shown, "marks": db.jt_marks(judge_test.person()), "progress": prog,
+            # 16.5: the Knowledge exam's answers in the sample, kept while it is off
+            "exam_hidden": len(every) - len(shown),
             "kappa_min": config.JUDGE_KAPPA_MIN, "n_min": config.JUDGE_TEST_MIN,
             # 12f.0: a new sample is a new version; the earlier ones, marks and
             # all, are History — and until the new one has a mark, it says so
@@ -2345,11 +2391,14 @@ def builder_page():
     """what step 1 offers: kinds, topics with suggested subtopics, groups, the
     default writing instructions (their output section locked), each job's
     model, and the drafts so far"""
-    return {"topics": builder.topics(), "groups": builder.everyday_groups(),
+    exam = config.KNOWLEDGE_EXAM                         # 16.5: Everyday alone while off
+    kinds = list(builder.KINDS) if exam else [k for k in builder.KINDS if k != "knowledge"]
+    return {"kinds": kinds, "topics": builder.topics() if exam else [],
+            "groups": builder.everyday_groups(),
             "levels": list(builder.LEVELS), "reasons": list(builder.REASONS),
             "try_n": builder.TRY_N, "min_reviewed": builder.MIN_REVIEWED,
             "suggest_min": builder.SUGGEST_MIN,
-            "prompts": {k: builder.default_prompt(k) for k in builder.KINDS},
+            "prompts": {k: builder.default_prompt(k) for k in kinds},
             "writer": builder.who("writer"), "checker": builder.who("checker"),
             "writer_blocked": builder.blocked("writer"),
             "checker_blocked": builder.blocked("checker"),
@@ -2364,7 +2413,8 @@ def builder_page():
                                "created_at": d.get("created_at"),
                                "writer": (d.get("writer") or {}).get("label", ""),
                                "updated_at": d.get("updated_at"), "published": d.get("published"),
-                               "progress": builder.progress(d)} for d in db.qb_list()],
+                               "progress": builder.progress(d)} for d in db.qb_list()
+                              if exam or d["kind"] != "knowledge"],
                              key=lambda x: -(x["created_at"] or 0))}
 
 
@@ -2383,6 +2433,8 @@ def builder_estimate(a: BuildEstimateIn):
         c = builder.who("checker", builder._override(a.checker))
     except ValueError as e:
         raise HTTPException(422, str(e)) from None
+    if a.kind == "knowledge" and not config.KNOWLEDGE_EXAM:
+        raise HTTPException(409, config.EXAM_OFF + ".")             # 16.5
     return builder.estimate(a.kind, a.count, w, c, a.group)
 
 
@@ -2407,6 +2459,9 @@ class BuildIn(BaseModel):
 def builder_create(a: BuildIn, x_token: str = Header(default="")):
     """step 1 done: a draft, and its first ten being written"""
     _check_token(x_token)
+    # 16.5: the Knowledge exam's path, while it is switched off
+    if a.kind == "knowledge" and not config.KNOWLEDGE_EXAM:
+        raise HTTPException(409, config.EXAM_OFF + ". Nothing was written.")
     by = _name(a.by, "a batch of questions")
     try:
         d = builder.create(a.model_dump(), by)
@@ -2417,9 +2472,13 @@ def builder_create(a: BuildIn, x_token: str = Header(default="")):
 
 def _draft(draft_id: str) -> dict:
     try:
-        return builder.get(draft_id)
+        d = builder.get(draft_id)
     except KeyError:
         raise HTTPException(404, f"no draft {draft_id}") from None
+    # 16.5: a Knowledge exam draft is kept, and neither shown nor carried on
+    if d.get("kind") == "knowledge" and not config.KNOWLEDGE_EXAM:
+        raise HTTPException(409, config.EXAM_OFF + ".")
+    return d
 
 
 def _draft_for(draft_id: str, by: str) -> dict:
@@ -2615,7 +2674,7 @@ def _rebuild_if_idle() -> dict:
     return {"built": True, "tasks": len(m["tasks"])}
 
 
-@app.get("/api/exam")
+@app.get("/api/exam", dependencies=EXAM_ONLY)
 def exam_status():
     why = llm.blocked("exam")
     return {"configured": not why, "reason": why,
@@ -2630,13 +2689,13 @@ def exam_status():
                     "diagnose half is ever shown here or placed in a request"}
 
 
-@app.get("/api/exam/candidates")
+@app.get("/api/exam/candidates", dependencies=EXAM_ONLY)
 def exam_candidates(topic: str | None = None, status: str = "candidate"):
     return exam_build.load_candidates(config.EXAM_DIR, topic or None,
                                       None if status == "all" else status)
 
 
-@app.get("/api/exam/bank")
+@app.get("/api/exam/bank", dependencies=EXAM_ONLY)
 def exam_bank(topic: str | None = None, half: str | None = None):
     """The bank with report-half text withheld — see exam_build.public_bank.
     11g: half=diagnose is what the Reader asks for — one topic's practice
@@ -2651,7 +2710,7 @@ def exam_bank(topic: str | None = None, half: str | None = None):
     return exam_build.public_bank(config.EXAM_DIR, topic or None)
 
 
-@app.post("/api/exam/candidates/{cid}/accept")
+@app.post("/api/exam/candidates/{cid}/accept", dependencies=EXAM_ONLY)
 def exam_accept(cid: str, a: CandidateAccept, x_token: str = Header(default="")):
     _check_token(x_token)
     who = _name(a.approver, "accepting a question")
@@ -2667,7 +2726,7 @@ def exam_accept(cid: str, a: CandidateAccept, x_token: str = Header(default=""))
             "build": _rebuild_if_idle()}
 
 
-@app.post("/api/exam/candidates/{cid}/reject")
+@app.post("/api/exam/candidates/{cid}/reject", dependencies=EXAM_ONLY)
 def exam_reject(cid: str, a: CandidateReject, x_token: str = Header(default="")):
     _check_token(x_token)
     who = _name(a.approver, "rejecting a question")
@@ -2753,7 +2812,7 @@ def _import_preview(plan: dict) -> dict:
             | {"items": shown})
 
 
-@app.post("/api/exam/import/preview")
+@app.post("/api/exam/import/preview", dependencies=EXAM_ONLY)
 def exam_import_preview(body: ImportIn, x_token: str = Header(default="")):
     _check_token(x_token)
     who = _name(body.approver, "importing a bank")
@@ -2766,7 +2825,7 @@ def exam_import_preview(body: ImportIn, x_token: str = Header(default="")):
     return _import_preview(plan)
 
 
-@app.post("/api/exam/import")
+@app.post("/api/exam/import", dependencies=EXAM_ONLY)
 def exam_import(body: ImportIn, x_token: str = Header(default="")):
     _check_token(x_token)
     who = _name(body.approver, "importing a bank")
@@ -2826,7 +2885,7 @@ def _rubric_store() -> tuple[Path, bool]:
     return Path(config.BENCH_ROOT) / "rubrics", False
 
 
-@app.get("/api/exam/rubrics")
+@app.get("/api/exam/rubrics", dependencies=EXAM_ONLY)
 def exam_rubrics():
     store, in_repo = _rubric_store()
     # the bank beside the instrument: a rubric and a criteria file ship in the
@@ -2844,7 +2903,7 @@ def exam_rubrics():
             "changes": db.rubric_changes(20)}
 
 
-@app.get("/api/exam/rubrics/{name}")
+@app.get("/api/exam/rubrics/{name}", dependencies=EXAM_ONLY)
 def exam_rubric_file(name: str, kind: str = "rubric"):
     import judge as _judge
     if not re.fullmatch(r"[a-z0-9_]+", name):
@@ -2857,7 +2916,7 @@ def exam_rubric_file(name: str, kind: str = "rubric"):
                              else "application/json")
 
 
-@app.get("/api/exam/rubrics/{name}/read")
+@app.get("/api/exam/rubrics/{name}/read", dependencies=EXAM_ONLY)
 def exam_rubric_read(name: str, kind: str = "rubric"):
     """11g: a rubric or a criteria file shaped for the Reader — the criteria
     through the judge's own normalise_criteria()."""
@@ -2932,14 +2991,14 @@ def _rubric_check(body: RubricIn) -> dict:
     }
 
 
-@app.post("/api/exam/rubrics/preview")
+@app.post("/api/exam/rubrics/preview", dependencies=EXAM_ONLY)
 def exam_rubric_preview(body: RubricIn, x_token: str = Header(default="")):
     _check_token(x_token)
     _name(body.approver, "changing a rubric")
     return _rubric_check(body)
 
 
-@app.post("/api/exam/rubrics")
+@app.post("/api/exam/rubrics", dependencies=EXAM_ONLY)
 def exam_rubric_commit(body: RubricIn, x_token: str = Header(default="")):
     _check_token(x_token)
     who = _name(body.approver, "changing a rubric")
@@ -2957,7 +3016,7 @@ def exam_rubric_commit(body: RubricIn, x_token: str = Header(default="")):
     return {**check, "written": str(dest), "approver": who}
 
 
-@app.post("/api/exam/build")
+@app.post("/api/exam/build", dependencies=EXAM_ONLY)
 def exam_build_tasks(x_token: str = Header(default="")):
     """Write the harness tasks from the bank (+ the MMLU control set). No GPU;
     a curator does this after a round of accepting so suite=judged runs the
@@ -2977,7 +3036,7 @@ def exam_build_tasks(x_token: str = Header(default="")):
             "tasks_dir": str(exam_build.tasks_dir(config.EXAM_DIR))}
 
 
-@app.get("/api/judge/justifications")
+@app.get("/api/judge/justifications", dependencies=EXAM_ONLY)
 def judge_justifications(model: str, topic: str, limit: int = 8):
     """What the judge wrote about one model's answers on one topic —
     DIAGNOSIS half only, with any exam question text the judge quoted already
@@ -3216,7 +3275,7 @@ def built_items() -> dict[str, int]:
             if isinstance(v, dict)}
 
 
-@app.get("/api/loop")
+@app.get("/api/loop", dependencies=EXAM_ONLY)
 def loop_board(model: str = ""):
     """One row per topic: the bank, the rubric, where `model`'s judged run
     left it (default: the model with the most judged topics), and the one
@@ -3238,7 +3297,7 @@ def loop_board(model: str = ""):
             "gap_dataset_flag": "--gap-dataset"}
 
 
-@app.get("/api/answers")
+@app.get("/api/answers", dependencies=EXAM_ONLY)
 def answers(model: str, topic: str, limit: int = 200):
     """One model's DIAGNOSE-half answers on one topic, with what the judge
     made of each. The report half is here as one aggregate line and nothing
@@ -3311,7 +3370,7 @@ def answers(model: str, topic: str, limit: int = 200):
     }
 
 
-@app.get("/api/judge")
+@app.get("/api/judge", dependencies=EXAM_ONLY)
 def judge_status():
     """What the judged suite would run with: the pinned judge, its family,
     the tasks built, and the calibration on file."""
@@ -3466,6 +3525,9 @@ def proposal_create(p: ProposalIn, x_token: str = Header(default="")):
     or a model that wrote nothing is refused with the same words the page
     shows."""
     _check_token(x_token)
+    # 16.5: an exam topic, while the Knowledge exam is switched off
+    if p.topic and not p.everyday and not config.KNOWLEDGE_EXAM:
+        raise HTTPException(409, config.EXAM_OFF + ". Nothing was proposed.")
     # 14.4.4: a restricted set is never a training target
     why = _restrictions().never_trained([p.topic, p.everyday])
     if why:
@@ -3616,7 +3678,8 @@ def _proposal_view(r: dict, datasets: list[dict] | None = None) -> dict:
 @app.get("/api/proposals")
 def proposal_index(status: str | None = None, limit: int = 200):
     ds = db.dataset_list(500)
-    return [_proposal_view(r, ds) for r in db.proposal_list(status, min(limit, 500))]
+    return [_proposal_view(r, ds) for r in db.proposal_list(status, min(limit, 500))
+            if not exam_hidden(r.get("task"))]                       # 16.5
 
 
 @app.get("/api/proposals/{pid}")
@@ -3624,6 +3687,7 @@ def proposal_detail(pid: int):
     r = db.proposal_get(pid)
     if not r:
         raise HTTPException(404, "no such proposal")
+    _exam_prop_gate(r)                                       # 16.5
     return _proposal_view(r, db.dataset_list(500))
 
 
@@ -3813,6 +3877,8 @@ def _qtask(task: str) -> None:
         raise HTTPException(403, questions.NOT_LISTED)
     if task == questions.MMF:
         raise HTTPException(403, questions.MMF_NOT_LISTED)        # 14.4.4
+    if questions.kind_of(task) == "exam" and not config.KNOWLEDGE_EXAM:
+        raise HTTPException(409, config.EXAM_OFF + ".")             # 16.5
     if task not in questions.tasks():
         raise HTTPException(404, f"No questions on file for {task}: no model has answered it yet")
 
@@ -3891,6 +3957,7 @@ def proposal_answers(pid: int):
     r = db.proposal_get(pid)
     if not r:
         raise HTTPException(404, "no such proposal")
+    _exam_prop_gate(r)                                       # 16.5
     try:
         ev = json.loads(r.get("evidence") or "{}")
     except (ValueError, TypeError):
@@ -3939,6 +4006,7 @@ def proposal_approve(pid: int, a: ApproveIn, x_token: str = Header(default="")):
     r = db.proposal_get(pid)
     if not r:
         raise HTTPException(404, "no such proposal")
+    _exam_prop_gate(r)                                       # 16.5
     if r["status"] != "proposed":
         raise HTTPException(409, f"proposal #{pid} is {r['status']}, not awaiting review")
     who = _name(a.approver, "approving")
@@ -3983,6 +4051,7 @@ def proposal_reject(pid: int, a: RejectIn, x_token: str = Header(default="")):
     r = db.proposal_get(pid)
     if not r:
         raise HTTPException(404, "no such proposal")
+    _exam_prop_gate(r)                                       # 16.5
     if r["status"] not in ("proposed", "approved"):
         raise HTTPException(409, f"proposal #{pid} is {r['status']} and cannot be rejected")
     who = _name(a.approver, "rejecting")
@@ -4001,6 +4070,7 @@ def proposal_generate(pid: int, g: GenerateIn, x_token: str = Header(default="")
     r = db.proposal_get(pid)
     if not r:
         raise HTTPException(404, "no such proposal")
+    _exam_prop_gate(r)                                       # 16.5
     if r["status"] != "approved":
         raise HTTPException(409, f"proposal #{pid} is {r['status']}; only an approved spec "
                                  f"reaches the generator")
@@ -4096,7 +4166,8 @@ def _dataset_view(d: dict, props: dict[int, dict]) -> dict:
 @app.get("/api/datasets")
 def dataset_index(limit: int = 200):
     props = {p["id"]: p for p in db.proposal_list(None, 500)}
-    return [_dataset_view(d, props) for d in db.dataset_list(min(limit, 500))]
+    return [_dataset_view(d, props) for d in db.dataset_list(min(limit, 500))
+            if not exam_hidden((props.get(d["proposal_id"]) or {}).get("task"))]   # 16.5
 
 
 @app.get("/api/datasets/{did}")
@@ -4104,6 +4175,7 @@ def dataset_detail(did: int):
     d = db.dataset_get(did)
     if not d:
         raise HTTPException(404, "no such dataset")
+    _exam_prop_gate(db.proposal_get(d["proposal_id"]) or {})             # 16.5
     return _dataset_view(d, {p["id"]: p for p in db.proposal_list(None, 500)})
 
 
@@ -4112,6 +4184,7 @@ def dataset_items_read(did: int, offset: int = 0, limit: int = reader.PAGE, q: s
     """11g: the documents, for the Reader — numbered, each with its focus
     label and word count, the missing ones in their place with their reason.
     The items.jsonl download below is unchanged."""
+    _exam_dataset_gate(did)                                   # 16.5
     try:
         return reader.dataset_page(did, offset, limit, q)
     except KeyError:
@@ -4120,6 +4193,7 @@ def dataset_items_read(did: int, offset: int = 0, limit: int = reader.PAGE, q: s
 
 @app.get("/api/datasets/{did}/items.jsonl")
 def dataset_items(did: int):
+    _exam_dataset_gate(did)                                   # 16.5
     d = db.dataset_get(did)
     if not d:
         raise HTTPException(404, "no such dataset")
@@ -4135,6 +4209,7 @@ def dataset_items(did: int):
 
 @app.delete("/api/datasets/{did}")
 def dataset_delete(did: int, x_token: str = Header(default="")):
+    _exam_dataset_gate(did)                                   # 16.5: hidden, so kept
     _check_token(x_token)
     d = db.dataset_get(did)
     if not d:
@@ -4334,7 +4409,7 @@ def run_lines(sid: int, tail: int = 200):
         raise HTTPException(404, "no such submission") from None
 
 
-@app.get("/api/judge/provenance")
+@app.get("/api/judge/provenance", dependencies=EXAM_ONLY)
 def judge_provenance(model: str):
     """11g: how a model was graded, for the Reader — its judge runs (never a
     run's plan) and the head of its judge.json (never an item or a qid)."""

@@ -551,13 +551,15 @@ def recent(limit: int = 100, before: int | None = None) -> list[dict]:
     return [dict(zip(_COLS, r)) for r in rows]
 
 
-def last_done() -> dict[str, float]:
+def last_done(judged: bool = True) -> dict[str, float]:
     """16.3: each model's latest finished run, of any kind — the standard
     tests, judged, Everyday, DeviceMark, served and GGUF runs, and imports —
-    {hf_id: finished_at}, for Models' Tested"""
+    {hf_id: finished_at}, for Models' Tested. 16.5: `judged` False leaves the
+    Knowledge exam's runs out, while it is switched off"""
     with closing(_conn()) as c:
         rows = c.execute("SELECT hf_id, MAX(COALESCE(finished_at, created_at)) FROM submissions "
-                         "WHERE status = 'done' GROUP BY hf_id").fetchall()
+                         "WHERE status = 'done'" + ("" if judged else " AND suite != 'judged'")
+                         + " GROUP BY hf_id").fetchall()
     return {h: float(t) for h, t in rows if h and t}
 
 

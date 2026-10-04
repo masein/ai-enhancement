@@ -153,6 +153,9 @@ def tasks() -> list[str]:
     # 14.1: MT-Bench's two turns are one benchmark
     if seen & set(MAB_TURNS):
         seen = (seen - set(MAB_TURNS)) | {MAB_MTBENCH}
+    # 16.5: and the Knowledge exam's are listed only while it is switched on
+    if not config.KNOWLEDGE_EXAM:
+        seen = {t for t in seen if kind_of(t) != "exam"}
     return sorted(seen)
 
 

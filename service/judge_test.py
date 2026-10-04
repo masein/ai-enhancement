@@ -234,15 +234,25 @@ def answers(n: int | None = None, rebuild: bool = False) -> list[dict]:
         _archive(got)
     instruct, room = _instruct(), [int(n * DEGENERATE_SHARE)]
     evd = _everyday_rows()
-    n_evd = min(len(evd), n // 7)
+    # 16.5: with the Knowledge exam switched off, a new sample is Everyday's alone
+    exam = config.KNOWLEDGE_EXAM
+    n_evd = min(len(evd), n // 7 if exam else n)
     picked = _draw(evd, n_evd, instruct, room)
-    picked += _draw(_exam_rows(), n - len(picked), instruct, room)
+    if exam:
+        picked += _draw(_exam_rows(), n - len(picked), instruct, room)
     ver = "v" + hashlib.sha256("|".join(a["key"] for a in picked).encode()).hexdigest()[:8]
     p = _sample_path()
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps({"n": n, "at": time.time(), "answers": picked, "builder": BUILDER,
                              "version": ver}), encoding="utf-8")
     return picked
+
+
+def in_use(rows: list[dict]) -> list[dict]:
+    """16.5: the sample's answers that are shown and asked of a candidate judge:
+    with the Knowledge exam switched off, its exam answers are neither (kept,
+    with their marks, and the result as it stands)"""
+    return rows if config.KNOWLEDGE_EXAM else [a for a in rows if a.get("kind") != "exam"]
 
 
 def _archive(sample: dict) -> None:
@@ -472,7 +482,11 @@ def run(model_ids: list[str], by: str) -> list[dict]:
     why = ai_models.over_limit()
     if why:
         raise ValueError(why)
-    todo = answers()
+    todo = in_use(answers())
+    if not todo:
+        raise ValueError("no answers in the sample to judge"
+                         + ("" if config.KNOWLEDGE_EXAM else ": the Knowledge exam's are "
+                            "switched off, and there are no Everyday ones yet"))
     out = []
     for mid in model_ids:
         c = candidate(mid)
