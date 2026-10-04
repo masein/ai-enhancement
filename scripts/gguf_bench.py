@@ -100,10 +100,18 @@ BENCHMARKS = {
                         "data": "mobile-mmlu-pro.bin", "lm_eval": "mobile_mmlu_pro",
                         "split": "test", "n": 9497, "format": "lettered", "apart": True,
                         "note": "on our answer key's kept questions; built once the key is"},
+    # 14.4: the full Mobile-MMLU, likewise on its own key's kept questions
+    # (gguf_data.py --only mobile_mmlu_full). Non-commercial: internal research only
+    "mobile_mmlu_full": {"label": "Mobile-MMLU (full)", "mode": "multiple-choice",
+                         "data": "mobile-mmlu-full.bin", "lm_eval": "mobile_mmlu_full",
+                         "split": "test", "n": 16186, "format": "lettered", "apart": True,
+                         # never a column of the GGUF table: the full set's own table
+                         "kept_apart": True, "restriction": "non-commercial",
+                         "note": "on our answer key's kept questions; built once the key is"},
 }
 ORDER = list(BENCHMARKS)
-# 14.3: what a build covers when none is named — every benchmark but one
-# built apart (Mobile-MMLU-Pro, once its key is)
+# 14.3: what a build covers when none is named — every benchmark but those
+# built apart (Mobile-MMLU-Pro and, 14.4, the full set, once their keys are)
 DEFAULT = [b for b in ORDER if not BENCHMARKS[b].get("apart")]
 MODES = {
     "hellaswag": {"flag": "--hellaswag", "tasks": "--hellaswag-tasks", "file": "-f",

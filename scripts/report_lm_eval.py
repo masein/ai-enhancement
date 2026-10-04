@@ -847,6 +847,8 @@ def load_gguf(results_root: Path | None, out_dir: Path | None = None,
     def compare(x_cells, y_cells):
         by = {}
         for k in gb.ORDER:
+            if gb.BENCHMARKS[k].get("kept_apart"):
+                continue                # 14.4: the full Mobile-MMLU: its own table only
             x, y = x_cells.get(k), y_cells.get(k)
             if not x or not y or x["full"] != y["full"] or (not x["full"] and x["n"] != y["n"]):
                 continue
@@ -879,8 +881,8 @@ def load_gguf(results_root: Path | None, out_dir: Path | None = None,
     # its dataset is built or a file was measured on it
     measured = {k for b in models.values() for k in b} | {
         k for rows in setups_out.values() for x in rows for k in (x.get("benches") or {})}
-    order = [k for k in gb.ORDER if not gb.BENCHMARKS[k].get("apart") or k in man
-             or k in measured]
+    order = [k for k in gb.ORDER if (not gb.BENCHMARKS[k].get("apart") or k in man
+                                     or k in measured) and not gb.BENCHMARKS[k].get("kept_apart")]
     return {"group": gb.GROUP, "tip": gb.TIP, "order": order, "mtp_line": gb.MTP_LINE,
             "benchmarks": {k: {"label": v["label"], "n": (man.get(k) or {}).get("n") or v["n"],
                                "note": v.get("note", "")} for k, v in gb.BENCHMARKS.items()},
@@ -1275,11 +1277,19 @@ def parse_run(blob: dict, source: Path) -> dict:
     # answered, with no key yet: said so on the model page
     mmp = mmp_score(preds) or ({"acc": None, "answered": preds.get("n"),
                                 "how": preds.get("how")} if preds else None)
-    if MMP_TASK in tasks:
+    # 14.4: one run, two scores — a full run's picks are Pro's too, so its
+    # results give the Pro cell as a Pro run's do
+    if MMP_TASK in tasks or (MMF_TASK in tasks and mmp):
         tasks[MMP_TASK] = {"alias": MMP_TASK}
         if mmp and mmp.get("acc") is not None:
             tasks[MMP_TASK]["key_acc"] = {"value": mmp["acc"], "stderr": mmp.get("se") or 0.0,
                                           "_filt_value": "board"}
+    # 14.4: the full Mobile-MMLU is never a column: its own table (DATA.mmf),
+    # no composite, rank or "overall". Non-commercial: internal research only
+    tasks.pop(MMF_TASK, None)
+    fpreds = _beside(source, "mobile_mmlu_full.json")
+    mmf = mmf_score(fpreds) or ({"acc": None, "answered": fpreds.get("n"),
+                                 "how": fpreds.get("how")} if fpreds else None)
 
     n_samples = {k: (v.get("effective") if isinstance(v, dict) else v)
                  for k, v in (blob.get("n-samples") or {}).items()}
@@ -1347,6 +1357,7 @@ def parse_run(blob: dict, source: Path) -> dict:
         "simpleqa": sqa,
     "mab": mab,
         "mmp": mmp,
+        "mmf": mmf,                                 # 14.4: kept apart
         # 12f.1: a model served elsewhere — how, and what its server reported
         "served": blob.get("served"),
         "tasks": tasks,
@@ -1462,6 +1473,7 @@ MAB_TASKS = ("mab_hotpotqa", "mab_sql", "mab_dolly", "mab_cnndm", "mab_xsum", "m
 # 14.3: Mobile-MMLU-Pro (MBZUAI), on our own answer key — never in the Avg,
 # never a training target, never in Improve
 MMP_TASK = "mobile_mmlu_pro"
+MMF_TASK = "mobile_mmlu_full"          # 14.4: kept apart — never a column
 GPQA_URL = "https://huggingface.co/datasets/Idavidrein/gpqa"
 
 # Controls: tasks run to test how we POSE a benchmark, not what a model knows.
@@ -1792,6 +1804,17 @@ def mmp_score(preds: dict | None) -> dict | None:
         return None
 
 
+def mmf_score(preds: dict | None) -> dict | None:
+    """14.4: a model's picks on the full set's wording, scored on its key"""
+    if not preds:
+        return None
+    try:
+        import mobile_mmlu as mmp               # scripts/, beside this file
+        return mmp.score(preds, mmp.full_key())
+    except (ImportError, OSError, ValueError, KeyError):
+        return None
+
+
 def mmp_labellers() -> set[str]:
     """the key's labellers' ids, when the service is here to say"""
     try:
@@ -1830,6 +1853,38 @@ def mmp_meta(by_model: dict, cells: dict, served: dict) -> dict | None:
             "decided": mmp.DECIDED, "categories": list(mmp.CATEGORIES),
             "checks": checks, "provisional": checks["provisional"], "labelled": labelled,
             "portal": mmp.portal_scores(), "missing": mmp.available()}
+
+
+def mmf_meta(by_model: dict, served: dict) -> dict | None:
+    """14.4: the full Mobile-MMLU — its licence and restriction (the
+    manifest's), our key's version and counts, its paper check (Table 2's
+    Mobile-MMLU column), the 9 categories and 80 fields, and the models that
+    labelled the key (each kept out of the ranking, as for Pro)"""
+    try:
+        import mobile_mmlu as mmp               # scripts/, beside this file
+    except ImportError:
+        return None
+    try:
+        fm = mmp.full_manifest()
+        key = mmp.full_key()
+        ours = {m: (by_model.get(m) or {}).get("mmf") for m in fm["paper_checks"]["models"]}
+        checks = mmp.paper_checks(ours, "full")
+    except (OSError, ValueError, KeyError):
+        return None
+    labs = mmp_labellers()
+    labelled = []
+    for mid, m in by_model.items():
+        pin = (((served.get(mid) or {}).get("pin") or {}).get("model")
+               or ((m.get("served") or {}).get("pin") or {}).get("model"))
+        if (m.get("mmf") or {}).get("acc") is not None and (mid in labs or (pin and pin in labs)):
+            labelled.append(mid)
+    return {"name": mmp.FULL_NAME, "licence": fm["licence"], "restriction": fm["restriction"],
+            "source": fm["source"], "revision": fm["revision"], "n": fm["n"],
+            "key": {"version": key.get("version") or "", "counts": key.get("counts") or {},
+                    "built_at": key.get("built_at")},
+            "categories": list(mmp.CATEGORIES), "fields": sorted(fm["fields"]),
+            "checks": checks, "provisional": checks["provisional"], "labelled": labelled,
+            "missing": mmp.available() or mmp.full_available()}
 
 
 def trust_meta() -> dict:
@@ -2008,6 +2063,7 @@ def merge_runs(runs: list[dict]) -> dict[str, dict]:
         m["generative"] = m.get("generative") or r.get("generative")
         m["safety"] = m.get("safety") or r.get("safety")
         m["mmp"] = m.get("mmp") or r.get("mmp")                 # 14.3
+        m["mmf"] = m.get("mmf") or r.get("mmf")                 # 14.4
         m["served"] = r.get("served") or m.get("served")        # the newest run's
     return by_model
 
@@ -2239,6 +2295,9 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             "mab": mab_view(r.get("mab")),
             # 14.3: Mobile-MMLU-Pro on our key — overall, and its 9 categories
             "mmp": r.get("mmp"),
+            # 14.4: the full Mobile-MMLU on its own key — overall, its 9
+            # categories and 80 fields. Never a column, never averaged
+            "mmf": r.get("mmf"),
             # 12f.1: served elsewhere — how, and what its server reported. Its
             # own row: never averaged with the model it is based on
             "served": served.get(mid) or r.get("served") or None,
@@ -2643,6 +2702,7 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         "mabTasks": list(MAB_TASKS),
         "mab": mab_meta(),
         "mmp": mmp_meta(by_model, cells, served),
+        "mmf": mmf_meta(by_model, served),
         "thinkingModes": _thinking_modes(),
         "published": {m: {t: {"v": v, "note": note} for t, (v, note) in ts.items()}
                       for m, ts in _PUBLISHED.items()},
@@ -3255,6 +3315,7 @@ table.mmptab { border-collapse:collapse; margin:6px 0; }
 table.mmptab th, table.mmptab td { text-align:left; padding:4px 12px 4px 0;
   border-bottom:1px solid var(--border); font-size:var(--fs-1); }
 table.mmptab td.num, table.mmptab th:not(:first-child) { text-align:right; }
+table.mmptab td.num { white-space:nowrap; }
 /* on a phone, each labeller a block: its name, its model, its price, change ▾ */
 @media (max-width: 640px) {
   table.mmplabs thead { display:none; }
@@ -6974,7 +7035,8 @@ function evdSuiteLabel(id) {
 // asked of the server, before Start (/api/mobileaibench/estimate)
 function mabSuiteLabel(id) {
   return 'Mobile tasks (MobileAIBench) — HotpotQA, SQL, Dolly, CNN/DailyMail, XSum; MT-Bench '
-    + 'and three trust sets judged; Mobile-MMLU-Pro';
+    + 'and three trust sets judged; Mobile-MMLU-Pro' + (MMFD().name ? ', or the full Mobile-MMLU'
+      : '');
 }
 function mabEstimate(id) {
   const E = state.mabEst = state.mabEst || {};
@@ -6995,9 +7057,12 @@ function mabPartOpts(sf) {
              // 14.2: Privacy Leakage is fetched at deploy: without it, why
              ['trust', 'trust & safety, judged', MAB_TRUST],
              // 14.3: Mobile-MMLU-Pro, fetched at deploy too
-             ['mmlu', 'multiple choice', [MMP]]];
+             ['mmlu', 'multiple choice', [MMP]],
+             // 14.4: the full Mobile-MMLU — asks only what Pro's run hasn't
+             ...(MMFD().name ? [['mmlu_full', 'multiple choice, the full set', [MMF]]] : [])];
   const missing = (DATA.mab || {}).privacyMissing || '';
-  const gone = v => v === 'trust' ? missing : v === 'mmlu' ? MMPD().missing || '' : '';
+  const gone = v => v === 'trust' ? missing : v === 'mmlu' ? MMPD().missing || ''
+    : v === 'mmlu_full' ? MMFD().missing || '' : '';
   const who = j => j.label && j.label !== 'none' ? j.label : j.id || 'none set up';
   return el('div', { class: 'mabopts', 'data-mab-opts': '1' },
     el('p', { class: 'small', text: 'Part:' }),
@@ -7339,13 +7404,15 @@ function kindParts(m, kind) {
       sharedLine(m),
       mabLine(m),
       mmpLine(m),
+      mmfLine(m),                                     // 14.4: kept apart
       part(resultsPart(m), 'results'),
       // item analysis of the benchmark, not the improvement loop (12b §7)
       diag ? el('details', { class: 'kfold', 'data-cant-show': '1' },
         el('summary', { text: 'What the score can’t show ▸' }), diag) : ''].filter(Boolean);
   }
   // 12f.3: measured on the GGUF; 12z B1: in its own block, not under Standard
-  if (kind === 'gguf') return [ggufPart(m)];
+  // 14.4: and the full Mobile-MMLU's, kept apart from its table
+  if (kind === 'gguf') return [ggufPart(m), ggufOf(m.id, MMF) ? mmfLine(m) : ''].filter(Boolean);
   if (kind === 'phone') return [phoneBody(servedOf(m.id), m.id)];
   if (DM_KINDS[kind]) return [dmModelCard(m, DM_KINDS[kind][0])];
   if (kind === 'exam') {
@@ -9988,6 +10055,135 @@ function mmpCredit() {
   const c = MMPD().credit || {};
   return c.name ? `${c.name}: ${c.by} · ${c.licence}, used here and never published` : '';
 }
+// 14.4: the full Mobile-MMLU, on its own key (the pool's labels of its own
+// wording) — kept apart: its own table on Mobile tasks, a line on the model
+// page, a group of Compare. Never a column, never in any average, rank or
+// "overall"; Pro stays the default
+const MMF = 'mobile_mmlu_full';
+const MMFD = () => DATA.mmf || {};
+const mmfProvisional = () => MMFD().provisional !== false;
+const mmfLabelled = id => (MMFD().labelled || []).includes(id);
+const mmfPc = v => `${(100 * v).toFixed(1)}%`;
+const mmfField = f => f.replace(/_/g, ' ');
+function mmfKeyLine() {
+  const k = MMFD().key || {}, c = (k.counts || {}).all;
+  if (!c || !c.questions) return 'its answer key isn’t built yet: AI models ▸ Mobile-MMLU answer key';
+  return `our key ${k.version || ''}: ${c.kept.toLocaleString('en')} of `
+    + `${c.questions.toLocaleString('en')} questions kept, where strong models of different `
+    + 'makers agreed';
+}
+function mmfChecksLine() {
+  const ch = MMFD().checks;
+  if (!ch) return '';
+  return (ch.provisional ? 'Provisional key — ' : 'Key checked — ')
+    + ch.rows.map(r => `${r.model.split('/').pop()} ${r.ours == null ? 'not run' : r.ours
+      .toFixed(1)} (paper ${r.paper.toFixed(1)})`).join(' · ')
+    + ` · ${ch.table || 'the paper'} · all three within ${ch.within} points takes “provisional” off`;
+}
+// a model's full-set results: its run here (HF or served), and llama.cpp's on its GGUF
+function mmfResults(id) {
+  const m = anyModel(id) || { id }, x = m.mmf, g = ggufOf(id, MMF), out = [];
+  if (x && x.acc != null) out.push({ src: x.how === 'log-likelihood' ? 'log-likelihood'
+    : 'the letter it answers', acc: x.acc, se: x.se, n: x.n, x });
+  if (g) out.push({ src: 'llama.cpp on the GGUF', acc: g.v, se: g.se, n: g.n, gguf: true });
+  return out;
+}
+function mmfLine(m) {
+  const x = m.mmf, rs = mmfResults(m.id);
+  if (!x && !rs.length) return '';
+  const lab = mmfLabelled(m.id);
+  const heads = rs.map(r => `${MMFD().name || 'Mobile-MMLU (full)'} ${mmfPc(r.acc)} on `
+    + `${(r.n || 0).toLocaleString('en')} kept questions · ${r.src}`
+    + (lab && !r.gguf ? ' · not ranked: it labelled the key' : ''));
+  if (x && x.acc == null) heads.push('Mobile-MMLU (full): answered; scored once its answer key '
+    + 'is built');
+  const cats = Object.entries((x || {}).by_category || {});
+  const fields = Object.entries((x || {}).by_field || {});
+  const tab = (rows, attr) => el('table', { class: 'mmptab' },
+    el('tbody', {}, rows.map(([c, v]) => el('tr', { [attr]: c }, el('td', { text: mmfField(c) }),
+      el('td', { class: 'num', text: v.acc == null ? '—' : mmfPc(v.acc) }),
+      el('td', { class: 'num se', text: `n ${v.n.toLocaleString('en')}` })))));
+  return el('div', { class: 'small mmpline', 'data-mmf-line': m.id },
+    heads.map(h => el('p', { class: 'small', title: [MMP_HOW, mmfKeyLine(), mmfChecksLine(),
+      'kept apart: never in any average, rank or overall'].filter(Boolean).join('\n'),
+      text: h + (mmfProvisional() ? ' · provisional key' : '') })),
+    cats.length ? el('details', { class: 'mmpcats', 'data-mmf-cats': m.id },
+      el('summary', { class: 'small se', text: `its ${cats.length} categories ▸` }),
+      tab(cats, 'data-mmf-cat')) : '',
+    fields.length ? el('details', { class: 'mmpcats', 'data-mmf-fields': m.id },
+      el('summary', { class: 'small se', text: `its ${fields.length} fields ▸` }),
+      tab(fields, 'data-mmf-field')) : '');
+}
+// its own table: every model with a full-set score — run here, or on its GGUF
+// — highest first, with no rank, no average and no "overall"
+function mmfTableRows() {
+  const ids = new Set([...DATA.models.filter(m => m.mmf).map(m => m.id),
+    ...Object.keys(G().models || {}).filter(id => ggufOf(id, MMF))]);
+  const rows = [];
+  for (const id of ids) for (const r of mmfResults(id))
+    rows.push({ id, name: (anyModel(id) || {}).name || id, lab: !r.gguf && mmfLabelled(id), ...r });
+  return rows.sort((a, b) => (a.lab - b.lab) || b.acc - a.acc || a.name.localeCompare(b.name));
+}
+function mmfCard() {
+  const D = MMFD();
+  if (!D.name) return '';
+  const rows = mmfTableRows(), cats = D.categories || [];
+  const c = ((D.key || {}).counts || {}).all || {};
+  const head = el('tr', {}, el('th', { scope: 'col', text: 'Model' }),
+    el('th', { scope: 'col', class: 'num', text: 'Accuracy' }),
+    el('th', { scope: 'col', class: 'num', text: '±' }),
+    el('th', { scope: 'col', class: 'num', text: 'Questions' }),
+    el('th', { scope: 'col', text: 'How' }),
+    ...cats.map(k => el('th', { scope: 'col', class: 'num', 'data-mmf-cat-head': k, text: k })));
+  const body = rows.map(r => el('tr', { 'data-mmf-row': r.id, 'data-mmf-src': r.gguf ? 'gguf' : 'run' },
+    el('td', {}, el('a', { href: '#model=' + encodeURIComponent(r.id), text: r.name })),
+    r.lab ? el('td', { class: 'num se', 'data-mmf-labelled': r.id, text: 'labelled the key',
+      title: `${mmfPc(r.acc)} on the key it labelled: never ranked` })
+      : el('td', { class: 'num', 'data-mmf-cell': r.id, text: mmfPc(r.acc) }),
+    el('td', { class: 'num se', text: r.se ? (100 * r.se).toFixed(1) : '—' }),
+    el('td', { class: 'num se', text: (r.n || 0).toLocaleString('en') }),
+    el('td', { class: 'small se', text: r.src }),
+    ...cats.map(k => { const v = ((r.x || {}).by_category || {})[k];
+      return el('td', { class: 'num' + (v ? '' : ' se'), text: v && v.acc != null ? mmfPc(v.acc)
+        : '—' }); })));
+  return el('div', { class: 'card', 'data-mmf-card': '1' },
+    el('h2', { text: D.name }),
+    el('p', { class: 'small', 'data-mmf-about': '1', text: `${(D.n || 0).toLocaleString('en')} `
+      + 'four-option questions about everyday phone topics in 80 fields and the paper’s 9 '
+      + 'categories, 0-shot, asked as Mobile-MMLU-Pro is and scored on our own key '
+      + (c.questions ? `(${c.kept.toLocaleString('en')} of ${c.questions.toLocaleString('en')} kept)`
+        : '(not built yet)') + (mmfProvisional() ? ' · provisional key' : '') + '. Kept apart: '
+      + 'never a column of the table above, never in any average, rank or overall. A full run '
+      + 'scores Mobile-MMLU-Pro too, each on its own wording.' }),
+    D.missing ? el('p', { class: 'warn small', 'data-mmf-missing': '1', text: D.missing }) : '',
+    rows.length ? el('div', { class: 'mmpwrap lb-wrap' }, el('table', { class: 'mmptab',
+        'data-mmf-table': '1' }, el('thead', {}, head), el('tbody', {}, body)))
+      : el('p', { class: 'small', 'data-mmf-none': '1', text: 'No model has sat the full set yet: '
+        + 'Test a model ▸ Mobile tasks ▸ multiple choice, the full set.' }),
+    el('p', { class: 'small se', 'data-mmf-checks': '1', text: [mmfKeyLine(), mmfChecksLine()]
+      .filter(Boolean).join(' · ') }),
+    el('p', { class: 'small se', 'data-mmf-credit': '1', text: `${D.name}: MBZUAI, ${D.source} `
+      + `at ${String(D.revision || '').slice(0, 7)} · ${D.licence}` }));
+}
+// Compare: a group of its own, never with Pro's or any other
+function mmfCmpGroup() {
+  const D = MMFD();
+  if (!D.name) return null;
+  const prov = mmfProvisional() ? ' · provisional key' : '';
+  const run = (m, k) => {
+    const x = m.mmf;
+    if (!x || x.acc == null || mmfLabelled(m.rowOf || m.id)) return null;
+    const v = k ? (x.by_category || {})[k] : x;
+    return v && v.acc != null ? { v: v.acc, se: v.se || null, tag: 'our key' + prov,
+      tip: `on ${v.n.toLocaleString('en')} kept questions` } : null;
+  };
+  return { key: 'mmf', name: D.name, credit: `${D.licence} · kept apart: never averaged`, rows: [
+    { key: 'mmf', label: 'Accuracy · kept questions', get: m => run(m, null) },
+    { key: 'mmf:gguf', label: 'Accuracy · llama.cpp on the GGUF', get: m => {
+      const g = ggufOf(m.rowOf || m.id, MMF);
+      return g ? { v: g.v, se: g.se || null, tag: 'llama.cpp, 0-shot' + prov } : null; } },
+    ...(D.categories || []).map(k => ({ key: 'mmf:' + k, label: k, get: m => run(m, k) }))] };
+}
 // a public model on Hugging Face, run here: the portal's predictions are offered
 const mmpPublic = m => !m.served && !ggufOnly(m) && !isCheckpoint(m)
   && !/qwen[\s_-]*3[._-]?6/i.test(m.id) && /^[\w.-]+\/[\w.-]+$/.test(m.id);
@@ -10580,7 +10776,7 @@ const LB_SHORT = { arc_challenge: 'ARC-C', arc_easy: 'ARC-E', truthfulqa_mc2: 'T
   simpleqa_verified: 'SimpleQA', mab_hotpotqa: 'HotpotQA', mab_sql: 'SQL',
   mab_dolly: 'Dolly', mab_cnndm: 'CNN/DM', mab_xsum: 'XSum', mab_mtbench: 'MT-Bench',
   mab_adv: 'Adv. instr.', mab_privacy: 'Privacy', mab_socchem: 'Agrees with crowd',
-  mobile_mmlu_pro: 'Mobile-MMLU-Pro',
+  mobile_mmlu_pro: 'Mobile-MMLU-Pro', mobile_mmlu_full: 'Mobile-MMLU (full)',
   dm_ifeval: 'IFEval (DM)', dm_mmlu_pro: 'MMLU-Pro (DM)', dm_math: 'MATH (DM)' };
 
 // A column's setup, in words — its tooltip, and its accessible name. The
@@ -12471,6 +12667,8 @@ function cmpGroups(ms) {
         return t === MTBENCH ? { v: 10 * c.v, se: c.se ? 10 * c.se : null,
           tag: 'the judge\u2019s rating, out of 10', tip }
           : { v: c.v, se: c.se || null, tag: 'MobileAIBench\u2019s metric', tip }; } })) },
+    // 14.4: the full Mobile-MMLU, a group of its own
+    ...(MMFD().name ? [mmfCmpGroup()] : []),
     // 12m.2: what others report, a source a group, each credited
     ...repCmpGroups(ms),
     // 12f.2: what someone measured on the phone, as they reported it
@@ -13324,7 +13522,9 @@ function vLeaderboard(ms) {
         + 'within its noise · hover a score for its ± error · hover a column name for its setup · '
         + 'click a row for the model' }),
       lbHowTo(ms)),
-    insightsCard(ms)];
+    // 14.4: the full Mobile-MMLU's own table, under Mobile tasks'
+    L.view === 'standard' && L.chip === 'mobile' && !custom ? mmfCard() : '',
+    insightsCard(ms)].filter(Boolean);
 }
 
 // A box that scrolls sideways, with a fade on its right edge (11e) and, above
@@ -17488,13 +17688,15 @@ function sameAsGguf(g) {
 // ---------------------------------------------------------------------------
 const orKey = sf => JSON.stringify([sf.hf_id.trim(), sf.suite,
   sf.suite === 'judged' ? [...(sf.tasks || []), ...(sf.control && (DATA.judged || {}).control
-    ? [DATA.judged.control] : [])] : [], sf.suite === 'generative' ? sf.subset || 0 : 0]);
+    ? [DATA.judged.control] : [])] : [], sf.suite === 'generative' ? sf.subset || 0 : 0,
+  // 14.4: a Mobile tasks part is what it costs (the full Mobile-MMLU's, say)
+  sf.suite === 'mobile' ? sf.part || '' : '']);
 async function loadOrEst(key) {
   const E = state.orEst;
   E.key = key; E.est = null;
-  const [model, suite, tasks, subset] = JSON.parse(key);
+  const [model, suite, tasks, subset, part] = JSON.parse(key);
   let est;
-  try { est = await post('api/served/estimate', { model, suite, tasks, subset }); }
+  try { est = await post('api/served/estimate', { model, suite, tasks, subset, part }); }
   catch (e) { est = { error: String((e && e.message) || e) }; }
   if (E.key !== key) return;                     // a later choice asked again
   E.est = est;

@@ -211,6 +211,8 @@ def main() -> int:
         # questions before the data step has fetched it
         import mobile_mmlu
         config.MMP_TASKS_DIR = mobile_mmlu.build_tasks(Path(tmp) / "mobile-mmlu-tasks")
+        # 14.4: and the full Mobile-MMLU's, likewise
+        config.MMF_TASKS_DIR = mobile_mmlu.build_full_tasks(Path(tmp) / "mobile-mmlu-full-tasks")
         # 12q: DeviceMark's three, with a stand-in for each question: only whether
         # lm_eval finds the task is asked, and no dataset is fetched for that
         import devicemark
@@ -224,6 +226,7 @@ def main() -> int:
                 ("mobile, judged", config.tasks_for_suite("mobile", part="judged")),
                 ("mobile, trust", config.tasks_for_suite("mobile", part="trust")),
                 ("mobile, mmlu", config.tasks_for_suite("mobile", part="mmlu")),
+                ("mobile, mmlu_full", config.tasks_for_suite("mobile", part="mmlu_full")),
                 ("full, all of BBQ", [config.BBQ_ALL_TASK])]:
             if not tasks:
                 note = (" — the exam has not been built (scripts/exam_build.py)"

@@ -564,6 +564,8 @@ def include_args_for(task: str) -> list[str]:
         return ["--include_path", str(config.MAB_TASKS_DIR)]
     if task == config.MMP_TASK:                     # 14.3: mobile_mmlu.build_tasks writes it
         return ["--include_path", str(config.MMP_TASKS_DIR)]
+    if task == config.MMF_TASK:                     # 14.4: and build_full_tasks the full set's
+        return ["--include_path", str(config.MMF_TASKS_DIR)]
     if task in config.DM_TASKS:                     # 12q: devicemark.build_tasks writes them
         return ["--include_path", str(config.DM_TASKS_DIR)]
     if task.startswith(("exam_", "fr_")):
@@ -1031,9 +1033,11 @@ def _ask_served(sid: int, rec: dict, meta: dict, task: str, task_out: Path, labe
         # 12n.2: asked as typed, with the Everyday settings, as Trust & safety is
         items = (sq_dir or config.SIMPLEQA_TASKS_DIR) / f"{task}.jsonl"      # build_tasks'
         everyday, safety = True, True
-    elif task == config.MMP_TASK:
-        # 14.3: Mobile-MMLU-Pro, asked the authors' way — a letter, as typed
-        items = config.MMP_TASKS_DIR / f"{task}_ask.jsonl"                # build_tasks'
+    elif task in (config.MMP_TASK, config.MMF_TASK):
+        # 14.3: Mobile-MMLU-Pro, asked the authors' way — a letter, as typed.
+        # 14.4: and the full Mobile-MMLU, from build_full_tasks'
+        items = (config.MMP_TASKS_DIR if task == config.MMP_TASK
+                 else config.MMF_TASKS_DIR) / f"{task}_ask.jsonl"
         everyday, safety = True, True
     elif task in config.MAB_ALL:
         # 12o.3: MobileAIBench's prompt as typed, its system line as the system
@@ -1050,6 +1054,10 @@ def _ask_served(sid: int, rec: dict, meta: dict, task: str, task_out: Path, labe
             if line.strip()]
     if everyday and not safety and asked is not None:
         docs = [d for d in docs if d.get("id") in set(asked)]
+    if task in (config.MMP_TASK, config.MMF_TASK):
+        # 14.4: only the questions the model has no pick for (one run, two scores)
+        import mobile_mmlu as _mmp
+        docs = [docs[i] for i in _mmp.to_ask(task_out.parent, task) if i < len(docs)]
     s = _served.settings_for(rec, meta, everyday)
     if task in config.MAB_ALL:
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
@@ -1302,15 +1310,20 @@ def run_submission(sub: dict) -> None:
             db.update(sid, status="failed", finished_at=time.time(),
                       error=_mab.available(missing[0]) + ". Nothing was asked.")
             return
-    if config.MMP_TASK in tasks:
+    if config.MMP_TASK in tasks or config.MMF_TASK in tasks:
         # 14.3: Mobile-MMLU-Pro, from the file the data step fetched — every
-        # question, never our key
+        # question, never our key. 14.4: the full Mobile-MMLU from its 80, and
+        # Pro's wording of the question the two word apart
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
         import mobile_mmlu as _mmp
         try:
             why = _mmp.available()
+            if not why and config.MMF_TASK in tasks:
+                why = _mmp.full_available()
             if not why:
                 _mmp.build_tasks(config.MMP_TASKS_DIR)
+                if config.MMF_TASK in tasks:
+                    _mmp.build_full_tasks(config.MMF_TASKS_DIR)
         except (OSError, ValueError) as e:
             why = str(e)
         if why:
@@ -1520,7 +1533,20 @@ def run_submission(sub: dict) -> None:
                     lf.write(f"\n[service] {task}: its replies were saved before 15.7, cut at "
                              f"the end of the thinking — kept at {moved}, asking again with "
                              f"each reply whole\n")
-            if _task_done(task_out, task):
+            mm_left = None
+            if task in (config.MMP_TASK, config.MMF_TASK):
+                # 14.4: one run, two scores — a Mobile-MMLU task asks only the
+                # questions the model has no pick for, by its runs of either set
+                mm_left = _mmp.to_ask(config.OUT_DIR / row_safe, task)
+                if not mm_left:
+                    with open(log_path, "a") as lf:
+                        lf.write(f"\n[service] {task}: every question answered already, by "
+                                 f"this model's Mobile-MMLU runs; not asked again\n")
+                    db.update(sid, status="running", progress=f"{label} — already done")
+                    continue
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n[service] {task}: {len(mm_left):,} question(s) to ask\n")
+            if mm_left is None and _task_done(task_out, task):
                 if current_fingerprint(task):
                     reused[task] = _answered_by(task_out)
                 with open(log_path, "a") as lf:
@@ -1528,7 +1554,7 @@ def run_submission(sub: dict) -> None:
                              f"asked again\n")
                 db.update(sid, status="running", progress=f"{label} — already done")
                 continue
-            if _has_results(task_out):
+            if mm_left is None and _has_results(task_out):
                 # answers on disk, to a question set the task no longer holds
                 moved = _set_aside(task_out, task)
                 with open(log_path, "a") as lf:
@@ -1579,12 +1605,14 @@ def run_submission(sub: dict) -> None:
             # 14.1: MT-Bench's second turn is the conversation already in the
             # model's chat template: asked as it stands
             # 14.3: Mobile-MMLU-Pro as the paper ran lm-evaluation-harness, with no
-            # chat template
+            # chat template; 14.4: the full set too, and only what's left to ask
             cmd = lm_eval_cmd(margs, task, shots, meta["batch"], task_out,
                               chat=(kind == "instruct" or everyday)
                               and not (task == config.MAB_MTB2 or turn2_dir is not None)
-                              and task != config.MMP_TASK,
+                              and task not in (config.MMP_TASK, config.MMF_TASK),
                               max_gen_toks=room, include_dir=turn2_dir,
+                              samples=_mmp.samples_file(task_out, task, mm_left)
+                              if mm_left else None,
                               system=(_mab.SYSTEM.get(task) or None) if task in config.MAB_ALL
                               else None)
             if gen_task:
@@ -1911,11 +1939,17 @@ def run_submission(sub: dict) -> None:
         # 12o.3: MobileAIBench's sets, scored by its own metrics — no judge, no
         # GPU. 14.1: the judged part's answers go to the judge as a step of its
         # own: an offline judge leaves them "awaiting judge", and the run is done
-        if mobile and not failed_tasks and (sub.get("part") or "") == "mmlu":
-            # 14.3: every pick kept, and scored against the key as it stands
+        if mobile and not failed_tasks and (sub.get("part") or "") in ("mmlu", "mmlu_full"):
+            # 14.3: every pick kept, and scored against the key as it stands.
+            # 14.4: one run, two scores — a full run's picks give Pro's score
+            # too, each set scored on its own wording
             try:
                 got = _mmp.collect(config.OUT_DIR / row_safe)
                 judge_note = _mmp.summary(_mmp.score(got))
+                if sub.get("part") == "mmlu_full":
+                    full = _mmp.full_predictions(config.OUT_DIR / row_safe)
+                    judge_note = (_mmp.summary(_mmp.score(full, _mmp.full_key()), _mmp.FULL_NAME)
+                                  + " · " + judge_note)
                 with open(log_path, "a") as lf:
                     lf.write(f"\n===== [{sid}] {judge_note} =====\n")
             except Exception as e:                      # noqa: BLE001 — the answers are on disk

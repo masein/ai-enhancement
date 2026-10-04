@@ -581,20 +581,24 @@ def full_key() -> dict:
     return (_keyc.get("views") or {}).get("full") or {}
 
 
-def gguf_docs() -> list[dict]:
+def gguf_docs(which: str = "pro") -> list[dict]:
     """the kept questions as lm_eval's mmlu docs — {question, choices,
     subject, answer} — for gguf_data.py: a GGUF is scored on the key as it
-    stands when its dataset is built (its sha256 moves with the key)"""
-    key = current_key()
+    stands when its dataset is built (its sha256 moves with the key). 14.4:
+    `which` "full", the full set's, in its own wording, on its own key"""
+    full = which == "full"
+    key = full_key() if full else current_key()
     items = key.get("items") or {}
+    name = FULL_NAME if full else NAME
     if not kept(items):
-        raise ValueError("Mobile-MMLU-Pro has no answer key yet: build it on AI models first")
-    if available():
-        raise ValueError(MISSING)
+        raise ValueError(f"{name} has no answer key yet: build it on AI models first")
+    why = available() or (full_available() if full else "")
+    if why:
+        raise ValueError(why)
     k = kept(items)
     return [{"id": q["id"], "question": q["question"], "choices": [q[L] for L in LETTERS],
              "subject": subject(q["field"]), "answer": LETTERS.index(k[q["id"]])}
-            for q in load() if q["id"] in k]
+            for q in (load_full() if full else load()) if q["id"] in k]
 
 
 # ---------------------------------------------------------------------------
@@ -625,6 +629,61 @@ def build_tasks(dest: Path) -> Path:
     return dest
 
 
+def build_full_tasks(dest: Path) -> Path:
+    """14.4: the full run's task, under `dest` — every question the full set
+    or Pro asks, once each (the pool: the full set's wording, and Pro's of a
+    question worded apart, so that one run scores both sets on their own),
+    never a key — and the authors' prompts a served model is asked. A
+    model's run asks only what it hasn't answered (full_left). Returns the
+    directory for --include_path"""
+    dest.mkdir(parents=True, exist_ok=True)
+    rows = pool()
+    items, ask = dest / f"{FULL_TASK}.jsonl", dest / f"{FULL_TASK}_ask.jsonl"
+    stamp = dest / f"{FULL_TASK}.sha256"
+    want = full_sha() if load_full() else "none"
+    if not (items.exists() and ask.exists() and stamp.exists()
+            and stamp.read_text(encoding="utf-8").strip() == want):
+        for path, how in ((items, mc_prompt), (ask, ask_prompt)):
+            tmp = path.with_name(path.name + ".tmp")
+            tmp.write_text("".join(json.dumps({"id": q["id"], "lid": q["lid"], "field": q["field"],
+                                               "prompt": how(q)}, ensure_ascii=False) + "\n"
+                                   for q in rows), encoding="utf-8")
+            tmp.replace(path)
+        stamp.write_text(want + "\n", encoding="utf-8")
+    (dest / f"{FULL_TASK}.yaml").write_text(
+        f"task: {FULL_TASK}\n" + TEMPLATE.read_text(encoding="utf-8")
+        .replace("__ITEMS_PATH__", str(items.resolve())), encoding="utf-8")
+    return dest
+
+
+def full_left(model_dir: Path | None) -> list[int]:
+    """14.4: the full run's questions this model hasn't answered, as indices
+    into the task's rows (the pool's order) — every one for a model with no
+    picks; a Pro run's count, so a later full run asks only the rest"""
+    return to_ask(model_dir, FULL_TASK)
+
+
+def to_ask(model_dir: Path | None, task: str = TASK) -> list[int]:
+    """14.4: the questions a run of `task` would ask this model — those it
+    has no pick for, as indices into the task's rows (Pro's or the pool's
+    order). One run, two scores: a full run's picks are Pro's too, so a Pro
+    run after it asks none, and a full run after a Pro run only the rest"""
+    rows = pool() if task == FULL_TASK else [{**q, "lid": lid(q)} for q in load()]
+    have = picks(model_dir)[0] if model_dir and Path(model_dir).is_dir() else {}
+    return [i for i, q in enumerate(rows) if q["lid"] not in have]
+
+
+def samples_file(task_out: Path, task: str, todo: list[int]) -> Path | None:
+    """lm_eval's --samples for a run that asks only some of `task`'s
+    questions: {task: indices}, beside its answers; None when it asks all"""
+    if len(todo) == len(pool() if task == FULL_TASK else load()):
+        return None
+    task_out.mkdir(parents=True, exist_ok=True)
+    path = task_out / "left.json"
+    path.write_text(json.dumps({task: todo}), encoding="utf-8")
+    return path
+
+
 def _pick(rec: dict) -> tuple[str | None, str]:
     """(letter, how): the highest log-likelihood of four, or a reply's letter"""
     fr = rec.get("filtered_resps")
@@ -636,32 +695,77 @@ def _pick(rec: dict) -> tuple[str | None, str]:
     return letter_of(text), "letter"
 
 
-def collect(model_dir: Path) -> dict | None:
-    """every pick of the model's run, from the samples its run wrote (lm_eval's
-    or a served model's, later ones over earlier), into mobile_mmlu_pro.json:
-    {how, predictions: {id: letter or None}, n, unreadable, data_sha256, at}"""
+def _samples(model_dir: Path, task: str) -> list[Path]:
+    return sorted(Path(model_dir).glob(f"{task}_*shot/**/samples_{task}_*.jsonl"),
+                  key=lambda p: p.stat().st_mtime)
+
+
+def picks(model_dir: Path) -> tuple[dict[str, str | None], set[str]]:
+    """14.4: every pick the model has made, by label id — from its two pick
+    files, then the samples its runs wrote (later over earlier): a Pro run's
+    by question id (Pro's wording), a full run's by label id — and how they
+    were picked"""
     model_dir = Path(model_dir)
-    files = sorted(model_dir.glob(f"{TASK}_*shot/**/samples_{TASK}_*.jsonl"),
-                   key=lambda p: p.stat().st_mtime)
-    if not files:
+    pro_lid = {q["id"]: lid(q) for q in load()}
+    full_lid = {q["id"]: lid(q) for q in load_full()}
+    got: dict[str, str | None] = {}
+    hows: set[str] = set()
+    for f, ids in ((PRED_FILE, pro_lid), (FULL_PRED_FILE, full_lid)):
+        old = _read(model_dir / f, None) or {}
+        for qid, v in (old.get("predictions") or {}).items():
+            if qid in ids:
+                got[ids[qid]] = v
+        if old.get("how"):
+            hows.add(old["how"])
+    for task in (TASK, FULL_TASK):
+        for f in _samples(model_dir, task):
+            for line in f.read_text(encoding="utf-8").splitlines():
+                try:
+                    rec = json.loads(line)
+                except ValueError:
+                    continue
+                doc = rec.get("doc") or {}
+                k = doc.get("lid") or pro_lid.get(doc.get("id"))
+                if k:
+                    got[k], how = _pick(rec)
+                    hows.add(how)
+    return got, hows
+
+
+def _pred_file(rows: list[dict], got: dict, hows: set[str], sha: str) -> dict:
+    preds = {q["id"]: got[lid(q)] for q in rows if lid(q) in got}
+    return {"how": "log-likelihood" if hows == {"log-likelihood"} else "letter",
+            "predictions": preds, "n": len(preds),
+            "unreadable": sum(1 for v in preds.values() if v is None),
+            "data_sha256": sha, "at": time.time()}
+
+
+def full_sha() -> str:
+    """one hash of the full set as pinned: its 80 files' and Pro's"""
+    return hashlib.sha256(json.dumps([manifest()["file"]["sha256"]]
+                                     + [f["sha256"] for f in full_manifest()["files"]])
+                          .encode()).hexdigest()
+
+
+def collect(model_dir: Path) -> dict | None:
+    """every pick of the model's runs, from the samples they wrote (lm_eval's
+    or a served model's, later ones over earlier), into mobile_mmlu_pro.json:
+    {how, predictions: {id: letter or None}, n, unreadable, data_sha256, at}.
+    14.4: one run, two scores — the picks are kept by question and wording, so
+    a full run's picks give Pro's score too (each set on its own wording), and
+    a Pro run's count towards a later full run. Once the model has sat the
+    full set, mobile_mmlu_full.json too. Returns Pro's"""
+    model_dir = Path(model_dir)
+    if not (_samples(model_dir, TASK) or _samples(model_dir, FULL_TASK)):
         return None
-    preds, hows = {}, set()
-    for f in files:
-        for line in f.read_text(encoding="utf-8").splitlines():
-            try:
-                rec = json.loads(line)
-            except ValueError:
-                continue
-            qid = (rec.get("doc") or {}).get("id")
-            if qid:
-                preds[qid], how = _pick(rec)
-                hows.add(how)
-    out = {"how": "log-likelihood" if hows == {"log-likelihood"} else "letter",
-           "predictions": preds, "n": len(preds),
-           "unreadable": sum(1 for v in preds.values() if v is None),
-           "data_sha256": manifest()["file"]["sha256"], "at": time.time()}
-    _write(model_dir / PRED_FILE, out)
-    return out
+    got, hows = picks(model_dir)
+    pro = _pred_file(load(), got, hows, manifest()["file"]["sha256"])
+    if pro["n"]:
+        _write(model_dir / PRED_FILE, pro)
+    full = load_full()
+    if full and (_samples(model_dir, FULL_TASK) or (model_dir / FULL_PRED_FILE).exists()):
+        _write(model_dir / FULL_PRED_FILE, _pred_file(full, got, hows, full_sha()))
+    return pro if pro["n"] else None
 
 
 def predictions(model_dir: Path) -> dict | None:
@@ -693,15 +797,33 @@ def score(preds: dict | None, key: dict | None = None) -> dict | None:
     cats: dict[str, list[str]] = {}
     for q in got:
         cats.setdefault(items[q].get("category") or OTHER, []).append(q)
+    # 14.4: and its 80 fields
+    fields: dict[str, list[str]] = {}
+    field_of = {q: f for f, qs in _fields_of(items).items() for q in qs}
+    for q in got:
+        fields.setdefault(field_of.get(q) or OTHER, []).append(q)
     return {**part(list(got)), "of": len(k), "unreadable": sum(1 for v in got.values() if v is None),
             "how": (preds or {}).get("how"), "key": key.get("version") or "",
-            "by_category": {c: part(cats[c]) for c in CATEGORIES if c in cats}}
+            "by_category": {c: part(cats[c]) for c in CATEGORIES if c in cats},
+            "by_field": {f: part(fields[f]) for f in sorted(fields)}}
 
 
-def summary(s: dict | None) -> str:
+def _fields_of(items: dict) -> dict[str, list[str]]:
+    """each field's questions, as the sets' rows say (a key's items carry
+    only their category)"""
+    out: dict[str, list[str]] = {}
+    for q in (*load(), *load_full()):
+        if q["id"] in items:
+            ids = out.setdefault(q["field"], [])
+            if q["id"] not in ids:
+                ids.append(q["id"])
+    return out
+
+
+def summary(s: dict | None, name: str = NAME) -> str:
     if not s:
-        return f"{NAME}: answered; scored once the answer key is built"
-    return f"{NAME} {100 * s['acc']:.1f}% on {s['n']:,} kept questions"
+        return f"{name}: answered; scored once the answer key is built"
+    return f"{name} {100 * s['acc']:.1f}% on {s['n']:,} kept questions"
 
 
 # ---------------------------------------------------------------------------
@@ -830,18 +952,43 @@ def _dur(seconds: float) -> str:
         f"about {max(1, round(seconds / 60))} min"
 
 
-def run_estimate(served: bool, secs_each: float | None = None) -> dict:
+def run_estimate(served: bool, secs_each: float | None = None, which: str = "pro",
+                 model_dir: Path | None = None) -> dict:
     """what a model's Mobile-MMLU-Pro run takes: {questions, answers,
-    judgements, seconds, line, missing}"""
-    n = len(load()) or manifest()["file"]["n"]
+    judgements, seconds, line, missing}. 14.4: `which` "full", the full set's
+    run. With `model_dir`, only the questions this model has no pick for —
+    one run, two scores: a Pro run counts towards the full set's, and a full
+    run's picks are Pro's too: {of, reused} say so"""
+    full = which == "full"
+    missing = available() or (full_available() if full else "")
+    rows = [] if missing else pool() if full else load()
+    total = len(rows) or (_stats_n("all") if full else manifest()["file"]["n"])
+    n = len(to_ask(model_dir, FULL_TASK if full else TASK)) if rows and model_dir else total
     each = secs_each if secs_each and secs_each > 0 else (SERVED_GUESS_S if served else HF_GUESS_S)
     sec = n * each
+    sample = rows or (_stats_rows("full") if full else None)
+    reused = total - n
+    by = _sat(model_dir) if reused else []
+    by_words = (f"its {by[0]} run" if len(by) == 1 else "its Mobile-MMLU runs")
+    line = (f"nothing to ask: all {total:,} answered already, by {by_words}" if not n
+            else f"{n:,} answers, {_dur(sec)}" + ("" if secs_each and secs_each > 0
+                                                  else ", a rough guess")
+            + (f" · {reused:,} answered already, by {by_words}" if reused else ""))
     return {"questions": n, "prompts": n, "answers": n, "judgements": 0, "seconds": round(sec),
-            "each": each, "measured": bool(secs_each and secs_each > 0),
-            "tokens_in": round(n * tokens_in(ask_prompt if served else mc_prompt, load() or None)),
-            "line": f"{n:,} answers, {_dur(sec)}" + ("" if secs_each and secs_each > 0
-                                                     else ", a rough guess"),
-            "missing": available()}
+            "each": each, "measured": bool(secs_each and secs_each > 0), "of": total,
+            "reused": reused,
+            "tokens_in": round(n * tokens_in(ask_prompt if served else mc_prompt, sample)),
+            "tokens_out": n * 2, "line": line, "missing": missing}
+
+
+def _sat(model_dir: Path | None) -> list[str]:
+    """which of the two sets this model has answers to: their names"""
+    d = Path(model_dir) if model_dir else None
+    if not d or not d.is_dir():
+        return []
+    return [name for name, task, f in ((NAME, TASK, PRED_FILE), (FULL_NAME, FULL_TASK,
+                                                                  FULL_PRED_FILE))
+            if (d / f).exists() or _samples(d, task)]
 
 
 # ---------------------------------------------------------------------------

@@ -1023,7 +1023,9 @@ def _run_tasks(rec: dict, suite: str, tasks: list[str] | None, part: str = "") -
     from . import runner
     todo = config.tasks_for_suite(suite, part=part)
     chosen = [t for t in (tasks or []) if t in todo]
-    return [t for t in chosen or todo if suite == "everyday" or not runner._task_done(
+    # 14.4: a Mobile-MMLU task is counted by its questions left (estimate)
+    return [t for t in chosen or todo if suite == "everyday"
+            or t in (config.MMP_TASK, config.MMF_TASK) or not runner._task_done(
         model_dir(rec) / f"{t}_{config.NFEWSHOT.get(t, 0)}shot", t)]
 
 
@@ -1068,9 +1070,12 @@ def estimate(rec: dict, suite: str, tasks: list[str] | None = None, subset: int 
         elif task == config.SIMPLEQA_TASK:
             import simpleqa as _sq                  # 12n.2: its questions, as the run sends them
             docs = [{"id": q["id"], "prompt": q["prompt"]} for q in _sq.load()]
-        elif task == config.MMP_TASK:
+        elif task in (config.MMP_TASK, config.MMF_TASK):
             import mobile_mmlu as _mmp              # 14.3: the authors' prompt, a letter back
-            docs = [{"id": q["id"], "prompt": _mmp.ask_prompt(q)} for q in _mmp.load()]
+            # 14.4: the full set's too; either asks only what has no pick yet
+            rows = _mmp.pool() if task == config.MMF_TASK else _mmp.load()
+            docs = [{"id": rows[i]["id"], "prompt": _mmp.ask_prompt(rows[i])}
+                    for i in _mmp.to_ask(model_dir(rec), task)]
         elif task in config.MAB_ALL:
             import mobileaibench as _mab            # 12o.3: its prompts, and its system line
             docs = [{"id": q["id"], "prompt": q["prompt"]} for q in _mab.load(task)]

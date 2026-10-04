@@ -469,7 +469,7 @@ MAB_TRUST_TASKS = [MAB_ADV, MAB_PRIVACY, MAB_SOCCHEM]
 MAB_ALL = MAB_TASKS + MAB_JUDGED_TASKS + MAB_TRUST_TASKS
 # 14.3: and Mobile-MMLU-Pro (MBZUAI), on our own answer key: the "mmlu" part
 MMP_TASK = "mobile_mmlu_pro"
-MAB_PARTS = ("", "judged", "trust", "mmlu")
+MAB_PARTS = ("", "judged", "trust", "mmlu", "mmlu_full")
 # 14.2: what is never committed (Privacy Leakage: real people's names) — fetched
 # at deploy by scripts/fetch_data.py into the server's data folder
 MAB_PRIVATE_DIR = Path(os.environ.get("MAB_PRIVATE_DIR", BENCH_ROOT / "data" / "mobileaibench"))
@@ -567,7 +567,8 @@ def tasks_for_suite(suite: str, bbq_all: bool = False, part: str = "") -> list[s
     """`bbq_all`: the full suite asks all 29,246 of BBQ's ambiguous questions
     instead of the seeded 3,000. 14.1: `part` — the mobile suite's "judged"
     part is MT-Bench's two turns; with none, its five sets with no judge.
-    14.2: "trust", its three trust sets; 14.3: "mmlu", Mobile-MMLU-Pro"""
+    14.2: "trust", its three trust sets; 14.3: "mmlu", Mobile-MMLU-Pro; 14.4:
+    "mmlu_full", the full Mobile-MMLU"""
     if suite == "control":
         return list(CONTROL_TASKS)
     if suite == "safety":
@@ -580,7 +581,8 @@ def tasks_for_suite(suite: str, bbq_all: bool = False, part: str = "") -> list[s
         return list(SHARED_TASKS)
     if suite == "mobile":
         return list(MAB_JUDGED_TASKS if part == "judged" else MAB_TRUST_TASKS if part == "trust"
-                    else [MMP_TASK] if part == "mmlu" else MAB_TASKS)
+                    else [MMP_TASK] if part == "mmlu" else [MMF_TASK] if part == "mmlu_full"
+                    else MAB_TASKS)
     if suite == "devicemark":
         return list(DM_TASKS)
     if suite == "judged":
