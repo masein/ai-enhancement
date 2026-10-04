@@ -40,16 +40,23 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import config, db, runner
+from . import config, db, gpu, runner
 
 CUT_RUN = "a run started"
 WAIT_WORDS = "answering another message, yours is next"
-WAIT_GPU = "waiting for the GPU"
+WAIT_GPU = "waiting for GPU memory: the two don't fit together, so they answer in turn"
 CPU_NOTE = "on the CPU while a run uses the GPU — slower"
 # 12d.3: a served model a run is testing, and one whose server is down
 TESTING_LINE = "Being tested right now (run #{sid}{left}). Chat starts when it's done."
 DOWN_LINE = "The server at {where} isn't answering."
 SERVED_READ_S = 120                # the longest wait for a served model's next piece
+GEN_GAP_S = 300                    # 16.2: the longest a local reply may stop before it fails
+# 16.2: running out of GPU memory in the middle, in one line; the message is kept
+OOM_LOAD = ("Ran out of GPU memory while loading {name} (it needed about {need}; {free} was "
+            "free). Your message is kept.")
+OOM_REPLY = ("Ran out of GPU memory while {name} was answering; it was unloaded to give the "
+             "memory back. Your message is kept.")
+NOT_RUNNING = "Its server isn't running"
 SUITE_WORDS = {"full": "Standard tests", "quick": "quick tests", "control": "control tests",
                "judged": "Knowledge exam", "everyday": "Everyday tasks",
                "generative": "instruction and maths tests", "safety": "Trust & safety tests"}
@@ -72,8 +79,12 @@ class FakeBackend:
     delay_s = 0.01
     responder = None
     loaded: list = []
+    # 16.2: "load" or "reply": where the fake runs out of GPU memory, as CUDA says it
+    oom = None
 
     def load(self, model_id: str, spec: dict, device: str):
+        if type(self).oom == "load":
+            raise RuntimeError("CUDA out of memory. Tried to allocate 2.00 GiB")
         type(self).loaded.append((model_id, device))
         return {"model": model_id, "device": device}
 
@@ -88,9 +99,11 @@ class FakeBackend:
                 f"{handle['model'].split('/')[-1]}, streamed a word at a time.")
         if settings.get("thinking_on"):
             text = "<think>\nLet me think this through, one step at a time.\n</think>\n\n" + text
-        for piece in re.findall(r"\S+\s*|\s+", text):
+        for i, piece in enumerate(re.findall(r"\S+\s*|\s+", text)):
             if should_stop():
                 return
+            if type(self).oom == "reply" and i == 3:
+                raise RuntimeError("CUDA out of memory. Tried to allocate 512.00 MiB")
             emit(piece)
             if type(self).delay_s:
                 time.sleep(type(self).delay_s)
@@ -103,8 +116,13 @@ class HFBackend:
 
     def load(self, model_id: str, spec: dict, device: str):
         from lm_eval.models.huggingface import HFLM
-        lm = HFLM(pretrained=spec["pretrained"], revision=spec["revision"] or "main",
-                  dtype=spec["dtype"], trust_remote_code=False, device=device, batch_size=1)
+        try:
+            lm = HFLM(pretrained=spec["pretrained"], revision=spec["revision"] or "main",
+                      dtype=spec["dtype"], trust_remote_code=False, device=device, batch_size=1)
+        except BaseException:
+            # 16.2: a half-loaded model gives its memory back before the error is said
+            self.unload({})
+            raise
         return {"model": lm.model, "tok": lm.tokenizer, "device": device}
 
     def unload(self, handle) -> None:
@@ -129,7 +147,9 @@ class HFBackend:
         enc = tok.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt",
                                       return_dict=True, **kw)
         ids, mask = enc["input_ids"].to(model.device), enc["attention_mask"].to(model.device)
-        streamer = TextIteratorStreamer(tok, skip_prompt=True, skip_special_tokens=True)
+        # 16.2: a reply that stops coming for this long is an error, never a hang
+        streamer = TextIteratorStreamer(tok, skip_prompt=True, skip_special_tokens=True,
+                                        timeout=GEN_GAP_S)
 
         class Stop(StoppingCriteria):
             def __call__(self, *a, **k):
@@ -140,12 +160,39 @@ class HFBackend:
                    stopping_criteria=StoppingCriteriaList([Stop()]), do_sample=temp > 0)
         if temp > 0:
             gen["temperature"] = temp
-        t = threading.Thread(target=lambda: torch.inference_mode()(model.generate)(**gen),
-                             daemon=True)
+        # 16.2: generate runs in its own thread: an error there (out of GPU memory,
+        # say) ends the stream and is raised here — before, the stream waited for
+        # ever and the model stayed busy
+        failed: list[BaseException] = []
+
+        def go():
+            try:
+                torch.inference_mode()(model.generate)(**gen)
+            except BaseException as e:                      # noqa: BLE001 — said by _run
+                failed.append(e)
+                streamer.end()
+        t = threading.Thread(target=go, daemon=True)
         t.start()
         for piece in streamer:
             emit(piece)
         t.join()
+        if failed:
+            raise failed[0]
+
+
+class OutOfMemory(Exception):
+    """16.2: chat ran out of GPU memory: its line, as the page says it"""
+
+
+def is_oom(e: BaseException) -> bool:
+    """CUDA's out-of-memory error, by its class or its words"""
+    try:
+        import torch
+        if isinstance(e, torch.cuda.OutOfMemoryError):
+            return True
+    except Exception:                                       # noqa: BLE001 — no torch here
+        pass
+    return isinstance(e, OutOfMemory) or "out of memory" in str(e).lower()
 
 
 class ServedDown(Exception):
@@ -424,7 +471,7 @@ class Engine:
                 return "cpu", CPU_NOTE
             return None, gpu_busy_line(run)
         free = gpu_free_bytes()
-        need = params * 2 + config.CHAT_GPU_MARGIN_GB * 1e9     # bfloat16: two bytes a weight
+        need = self.need(row)
         held = self.loaded.get(row["id"])
         if held and held.device == "cuda":
             return "cuda", ""
@@ -434,9 +481,15 @@ class Engine:
                                else "on the CPU: the GPU's memory is taken — slower")
             if free is None:
                 return None, "No GPU is free for chat on this server."
-            return None, (f"{row['name']} needs about {need / 1e9:.0f} GB of GPU memory and "
-                          f"{free / 1e9:.1f} GB is free now.")
+            return None, (f"{row['name']} needs about {gpu.gb_text(need)} of GPU memory and "
+                          f"{gpu.gb_text(free)} is free now.")
         return "cuda", ""
+
+    @staticmethod
+    def need(row: dict) -> float:
+        """what a model takes on the GPU, in bytes: two a weight (bfloat16) and
+        the margin (16.2: GB as gpu.py counts them, 1024³)"""
+        return float(row.get("params") or 0) * 2 + config.CHAT_GPU_MARGIN_GB * gpu.GB
 
     def _load(self, row: dict, device: str) -> Loaded:
         if device == "served":
@@ -544,6 +597,31 @@ class Engine:
                 "testing": testing if testing.startswith("served/") else "",
                 "testing_line": testing_line(run) if testing.startswith("served/") else ""}
 
+    # -- 16.2: each model's state, for the picker ----------------------------
+    def state(self, row: dict) -> dict:
+        """{state, why}: "ready" (loaded, or served and answering), "loads" (it
+        fits now: it loads on the first message), "cpu" (on the CPU, slower) or
+        "not_now", with the reason in words. Worked out without loading
+        anything; a served model's server is asked in the background
+        (served_up), never on this call"""
+        held = self.loaded.get(row["id"])
+        if row.get("served"):
+            run = runner.run_holding()
+            if run and run.get("hf_id") == row["id"]:
+                return {"state": "not_now", "why": testing_line(run)}
+            up = served_up(row["id"])
+            if up is False:
+                return {"state": "not_now", "why": NOT_RUNNING + "."}
+            return {"state": "ready", "why": "" if up else "its server is being checked"}
+        if held and held.device == "cuda" and not runner.LOCK.exists():
+            return {"state": "ready", "why": "loaded"}
+        device, why = self.place(row)
+        if device == "cuda":
+            return {"state": "loads", "why": "it fits now"}
+        if device == "cpu":
+            return {"state": "cpu", "why": why or "on the CPU — slower"}
+        return {"state": "not_now", "why": why}
+
     # -- a reply -------------------------------------------------------------
     def start(self, chat: dict, messages: list[dict], settings: dict, row: dict,
               on_done, stream_id: str | None = None, after: Stream | None = None) -> Stream:
@@ -565,7 +643,7 @@ class Engine:
             return True                # 12d.3: a served model takes no memory here
         if pa == "cpu" or pb == "cpu":
             return pa == pb == "cpu"
-        need = sum(float(r.get("params") or 0) * 2 + config.CHAT_GPU_MARGIN_GB * 1e9
+        need = sum(self.need(r)
                    for r in (a, b) if not (self.loaded.get(r["id"])
                                            and self.loaded[r["id"]].device == "cuda"))
         free = gpu_free_bytes()
@@ -603,7 +681,15 @@ class Engine:
                 st.emit({"t": "refused", "why": why})
                 return
             st.emit({"t": "place", "device": device, "note": why})
-            ld = self._load(row, device)
+            free_before = gpu_free_bytes() if device == "cuda" else None
+            try:
+                ld = self._load(row, device)
+            except Exception as e:
+                if device == "cuda" and is_oom(e):
+                    raise OutOfMemory(OOM_LOAD.format(
+                        name=row["name"], need=gpu.gb_text(self.need(row)),
+                        free=gpu.gb_text(free_before))) from None
+                raise
             if not ld.busy.acquire(blocking=False):
                 st.emit({"t": "wait", "why": WAIT_WORDS})
                 while not ld.busy.acquire(timeout=0.2):
@@ -640,7 +726,14 @@ class Engine:
                     sent.update(think=len(think), text=len(text))
 
                 be = ServedBackend() if device == "served" else self._backend()
-                meta = be.generate(ld.handle, messages, settings, should_stop, emit) or {}
+                try:
+                    meta = be.generate(ld.handle, messages, settings, should_stop, emit) or {}
+                except Exception as e:
+                    if device != "served" and is_oom(e):
+                        # a model that ran out mid-reply gives its memory back
+                        threading.Thread(target=self._unload, args=(ld,), daemon=True).start()
+                        raise OutOfMemory(OOM_REPLY.format(name=row["name"])) from None
+                    raise
                 raw = "".join(acc)
                 think, text = final_split(raw)
                 secs = max(0.001, time.time() - t0)
@@ -663,7 +756,9 @@ class Engine:
                 on_done(None, str(e)[:300])
             except Exception:                               # noqa: BLE001
                 pass
-            st.emit({"t": "error", "why": str(e)[:300]})
+            # 16.2: running out of GPU memory says so, and the page offers Try again
+            st.emit({"t": "error", "why": str(e)[:300], **({"oom": True} if isinstance(
+                e, OutOfMemory) else {})})
         finally:
             threading.Timer(600, lambda: self.streams.pop(st.id, None)).start()
 
@@ -676,16 +771,57 @@ def testing_line(run: dict) -> str:
     return TESTING_LINE.format(sid=run.get("sid") or "?", left=", " + m.group(0) if m else "")
 
 
+# 16.2: whether each served model's server answers — asked in the background,
+# a cheap request each (its /models), at most every HEALTH_S; never its key
+HEALTH_S = 30.0
+_health: dict[str, dict] = {}
+_health_lock = threading.Lock()
+
+
+def ping(rec: dict) -> bool:
+    """does the server answer at all? One request to its /models, 3 s"""
+    from . import served
+    try:
+        st, _ = served._http("GET", rec["base_url"].rstrip("/") + "/models", rec.get("key", ""),
+                             timeout=3)
+        return 200 <= st < 300
+    except Exception:                                       # noqa: BLE001 — down, in one word
+        return False
+
+
+def _check(mid: str) -> None:
+    from . import served
+    rec = served.get(mid)
+    ok = bool(rec) and ping(rec)
+    with _health_lock:
+        _health[mid] = {"ok": ok, "at": time.time(), "busy": False}
+
+
+def served_up(mid: str) -> bool | None:
+    """True or False as last asked; None before the first answer. A stale
+    answer starts a new check in the background and is returned meanwhile"""
+    with _health_lock:
+        h = _health.get(mid)
+        stale = not h or time.time() - h["at"] > HEALTH_S
+        if stale and not (h or {}).get("busy"):
+            _health[mid] = {**(h or {"ok": None, "at": 0.0}), "busy": True}
+            threading.Thread(target=_check, args=(mid,), daemon=True).start()
+        return (h or {}).get("ok")
+
+
 def gpu_busy_line(run: dict | None) -> str:
-    """"The GPU is running Qwen3.5-2B's Standard tests. Chat starts when it's
-    done." — the run gives no time left today, so it says "when it's done" """
-    if not run:
-        return ""
+    """16.2: "Run #181 is using the GPU (Qwen3.5-2B's Standard tests), about 40
+    min left." — its time left from its own progress line, when it has one"""
+    if not run:                     # handing it over: the run hasn't the lock yet
+        return "A run is starting on the GPU. Chat starts when it's done."
+    if not run.get("sid"):
+        return "A command-line run is using the GPU. Chat starts when it's done."
+    sub = db.get(run["sid"])
+    m = re.search(r"about [^·]*? left", (sub or {}).get("progress") or "")
     name = (run.get("hf_id") or "").split("/")[-1]
     what = SUITE_WORDS.get(run.get("suite") or "", "tests")
-    if not name:
-        return "The GPU is running a test. Chat starts when it's done."
-    return f"The GPU is running {name}'s {what}. Chat starts when it's done."
+    return (f"Run #{run['sid']} is using the GPU" + (f" ({name}'s {what})" if name else "")
+            + (f", {m.group(0)}" if m else "") + ". Chat starts when it's done.")
 
 
 def split(raw: str, thinks: bool) -> tuple[str, str]:

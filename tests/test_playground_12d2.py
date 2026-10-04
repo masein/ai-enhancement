@@ -1,6 +1,6 @@
 """12d.2: two models side by side, with the fake backend — one message to
 both; at once when both fit in free memory, one after the other when they
-don't ("waiting for the GPU"); Stop stops both; practice questions marked
+don't ("waiting for GPU memory"); Stop stops both; practice questions marked
 for both; a trained model under its base."""
 
 from __future__ import annotations
@@ -82,7 +82,7 @@ def test_two_models_that_dont_both_fit_answer_one_after_the_other(two, monkeypat
     c = compare(client, BIG, BIG2)
     r = send(client, c, "hello both")
     eb = events(client, r["stream_b"])
-    assert eb[0] == {"t": "wait", "why": "waiting for the GPU"}
+    assert eb[0] == {"t": "wait", "why": chat.WAIT_GPU}
     assert eb[-1]["t"] == "done" and eb[-1]["reply"]["words"] > 0
     assert events(client, r["stream"])[-1]["t"] == "done"
     # the first gave its memory back before the second loaded

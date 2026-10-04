@@ -23,7 +23,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import config, db
+from . import config, db, gpu
 from . import served as _served
 from . import devicemark as _devicemark
 from .hfmeta import PreflightError, preflight
@@ -403,10 +403,11 @@ def oom_said(text: str) -> dict | None:
 
 
 def oom_line(o: dict, before_mib: int | None = None) -> str:
-    """"this run's own process held 15.9 GiB and asked for 6 GiB more; the
-    card's other processes held 12.9 GiB, as when the task started: the run
-    grew, not the card" — `before_mib` is what the others held then"""
-    g = lambda v: f"{v:.1f}".rstrip("0").rstrip(".") + " GiB"
+    """"this run's own process held 15.9 GB and asked for 6 GB more; the
+    card's other processes held 12.9 GB, as when the task started: the run
+    grew, not the card" — `before_mib` is what the others held then. 16.2: GB
+    as everywhere the board says GPU memory (1024³, PyTorch's GiB)"""
+    g = lambda v: f"{v:.1f}".rstrip("0").rstrip(".") + " GB"
     line = (f"this run's own process held {g(o['own'])}"
             + (f" ({g(o['spare'])} of it reserved and unused)"
                if (o["spare"] or 0) >= _OOM_GREW_GIB else "")
@@ -1408,22 +1409,32 @@ def run_submission(sub: dict) -> None:
             db.update(sid, status=status, finished_at=time.time(), progress=line,
                       error="" if status == "done" else line)
             return
-        # -- wait for VRAM, then run the missing tasks ----------------------------
+        # -- wait for GPU memory, then run the missing tasks -----------------------
         need_mib = int(meta["need_gb"] * 1024) + config.FREE_MARGIN_MIB
+        need_b = gpu.mib_to_bytes(need_mib)
         t0 = time.time()
-        # 12f.1: a served model's memory is its server's: nothing to wait for here
-        while not rec and (free := gpu_free_mib()) < need_mib:
+        # 12f.1: a served model's memory is its server's: nothing to wait for here.
+        # 16.2: in GB, "GPU memory", as everywhere; and a card that can't be read
+        # is said in one line, never an internal error
+        while not rec:
+            try:
+                free = gpu_free_mib()
+            except (OSError, ValueError, IndexError, subprocess.SubprocessError) as e:
+                db.update(sid, status="failed", finished_at=time.time(),
+                          error=f"{gpu.WHY_NONE} (nvidia-smi: {str(e)[:120]}). Nothing was run.")
+                return
+            if free >= need_mib:
+                break
             if db.cancel_requested(sid):
                 db.update(sid, status="canceled", finished_at=time.time(),
-                          progress="canceled by request while waiting for VRAM")
+                          progress="canceled by request while waiting for GPU memory")
                 return
             db.update(sid, status="waiting_gpu",
-                      progress=f"waiting for VRAM: need {need_mib} MiB, "
-                               f"{free} MiB free")
+                      progress=gpu.waiting_line(need_b, gpu.mib_to_bytes(free)))
             if time.time() - t0 > config.GPU_WAIT_MAX_S:
                 db.update(sid, status="failed", finished_at=time.time(),
-                          error=f"gave up after {config.GPU_WAIT_MAX_S // 3600}h "
-                                f"waiting for {need_mib} MiB of free VRAM.")
+                          error=f"gave up after {config.GPU_WAIT_MAX_S // 3600} h waiting for "
+                                f"{gpu.gb_text(need_b)} of GPU memory.")
                 return
             time.sleep(config.GPU_POLL_S)
 

@@ -46,6 +46,16 @@ def _trained() -> dict[str, dict]:
     return out
 
 
+def states() -> dict:
+    """16.2: each offered model's state — {id: {state, why}} — and the GPU's
+    line: what the picker asks again every few seconds"""
+    from . import gpu
+    g = gpu.status()
+    return {"states": {m["id"]: chat.ENGINE.state(m) for m in chat.board_models() if m["chat"]},
+            "gpu": {"line": g.get("line") or "", "ok": g.get("ok"),
+                    "holders": [gpu.holder_words(h) for h in g.get("holders") or []]}}
+
+
 def models() -> dict:
     """what the picker lists — each with its scored settings, a trained model
     right under its base — and the line for what it leaves out"""
@@ -57,7 +67,9 @@ def models() -> dict:
                 "trained_from": (trained.get(m["id"]) or {}).get("base") or "",
                 "trained_on": (trained.get(m["id"]) or {}).get("date") or "",
                 # 12d.3: served elsewhere, and a phone build (12f.2): the picker's tags
-                "served": bool(m.get("served")), "phone": bool(m.get("phone"))}
+                "served": bool(m.get("served")), "phone": bool(m.get("phone")),
+                # 16.2: whether it can answer now, and why not
+                **chat.ENGINE.state(m)}
                for m in rows if m["chat"]]
     ids = {m["id"] for m in offered}
     bases = [m for m in offered if not (m["trained_from"] and m["trained_from"] in ids)]

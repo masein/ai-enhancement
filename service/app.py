@@ -34,7 +34,7 @@ from pydantic import BaseModel
 from . import (ai_models, builder, chat, config, db, disk, hfmeta, judge_test, llm, llm_poller,
                startup, suggest, worker)
 from . import playground
-from . import gguf, phone, reported, served, sizes
+from . import gguf, gpu, phone, reported, served, sizes
 from . import proposals as prop
 from . import reader
 
@@ -2073,6 +2073,10 @@ def judge_test_run(a: JtRunIn, x_token: str = Header(default="")):
         runs = judge_test.run([m.strip() for m in a.models if m.strip()], a.by.strip()[:80])
     except ValueError as e:
         raise HTTPException(422, str(e)) from None
+    except llm.LLMError as e:
+        # 16.2: a candidate's server that isn't answering (a local one: its
+        # vLLM is down) is said in its own words, never a bare HTTP 500
+        raise HTTPException(503, f"{e} Nothing was sent.") from None
     return {"runs": [{"batch_id": r["batch_id"], "name": r["candidate"]["name"]} for r in runs]}
 
 
@@ -2124,6 +2128,66 @@ def _who_of(by: str, x_who: str) -> str:
 def playground_page():
     return {**playground.models(), "status": chat.ENGINE.status(),
             "idle_unload_s": config.CHAT_IDLE_UNLOAD_S}
+
+
+@app.get("/api/playground/states")
+def playground_states():
+    """16.2: each model's state in the picker (Ready, Loads on the first message,
+    On the CPU, Not now and why) and the GPU's line — asked every few seconds"""
+    return playground.states()
+
+
+@app.get("/api/gpu")
+def gpu_status():
+    """16.2: GPU memory — total, used and free in GB, and what holds it — from
+    what the board knows for certain; "other" for the rest. Cached a few seconds"""
+    g = gpu.status()
+    return {k: v for k, v in g.items() if k not in ("total", "used", "free")} | {
+        "holders": [{"kind": h["kind"], "name": h["name"], "gb": h.get("gb"),
+                     "words": gpu.holder_words(h)} for h in g.get("holders") or []]}
+
+
+_NEED: dict[str, tuple[float, dict]] = {}
+
+
+@app.get("/api/gpu/need")
+def gpu_need(model: str, kind: str = "auto"):
+    """16.2: what a model loaded here needs of the GPU, beside what is free now,
+    and when its run would start — for Test a model, before Start. A served
+    model's memory is its server's; a GGUF file's, the host's llama.cpp"""
+    model = model.strip()
+    if served.is_served(model) or model.startswith("gguf/"):
+        return {"here": False, "line": "its memory is its server's, not this card's"}
+    now = time.time()
+    hit = _NEED.get(model)
+    if not hit or now - hit[0] > 600:
+        try:
+            meta = hfmeta.preflight(model, kind if kind in ("base", "instruct") else "auto")
+            got = {"need_gb": float(meta["need_gb"])}
+        except Exception as e:                          # noqa: BLE001 — said, never raised
+            got = {"why": str(e)[:200]}
+        _NEED[model] = hit = (now, got)
+    got = hit[1]
+    if "why" in got:
+        return {"here": True, "line": "", "why": got["why"]}
+    need = gpu.mib_to_bytes(int(got["need_gb"] * 1024) + config.FREE_MARGIN_MIB)
+    from . import runner
+    g = gpu.status()
+    run = runner.run_holding()
+    queued = [r for r in db.recent(50) if r.get("status") in ("queued", "preflight", "waiting_gpu",
+                                                             "waiting_lock")]
+    if run:
+        when = f"waits for {gpu.run_words(gpu._run_now() or {'sid': run.get('sid')})}"
+    elif queued:
+        when = f"waits for {len(queued)} run{'s' if len(queued) > 1 else ''} queued before it"
+    elif g.get("ok") and g["free"] < need:
+        when = "waits for GPU memory"
+    else:
+        when = "starts now"
+    free = f" · {gpu.gb_text(g['free'])} free now" if g.get("ok") else ""
+    return {"here": True, "need_gb": round(need / gpu.GB, 1),
+            "free_gb": g.get("free_gb"), "when": when,
+            "line": f"Needs about {gpu.gb_text(need)}{free} · {when}"}
 
 
 @app.get("/api/playground/status")

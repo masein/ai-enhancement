@@ -143,11 +143,14 @@ def test_while_a_run_tests_it_the_chat_waits_and_sends_nothing(live, page, serve
         pg(page, live["base"])
         pg_choose(page, LDA)
         n = len(lda.requests)
-        send(page, "Are you there?")
-        line = page.locator("[data-pg-refused]")
+        # 16.2: Not now before anything is sent — Send held back, the reason beside it
+        line = page.locator(f"[data-pg-notnow='{LDA}']")
         line.wait_for()
-        assert line.inner_text() == (f"Being tested right now (run #{sub['id']}, about 20 min left). "
-                                     "Chat starts when it's done.")
+        assert line.inner_text() == (f"k4-LDA MTP: not now. Being tested right now (run "
+                                     f"#{sub['id']}, about 20 min left). Chat starts when it's done.")
+        assert page.locator("[data-pg-send]").is_disabled()
+        send(page, "Are you there?")
+        assert page.locator("[data-pg-reply]").count() == 0
         assert len(lda.requests) == n
     finally:
         shutil.rmtree(runner.LOCK, ignore_errors=True)

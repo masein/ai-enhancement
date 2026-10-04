@@ -4135,6 +4135,14 @@ select { max-width:100%; }
    the accent tint it wore was 3.9:1 in the dark theme */
 .badge.instruct { color:var(--text-primary); font-weight:600; }
 .badge.ckpt { border-style:dashed; color:var(--text-secondary); }
+/* 16.2: a Playground model that can't answer now: in the list, greyed, its
+   reason in view */
+.pgopt.notnow .pgoname, .pgopt.notnow .pgotags { opacity:.55; }
+.pgstate { display:block; }
+.pgstate.notnow { color:var(--text-primary); }
+.pggpu { margin:4px 0 0; }
+.checklist .gpucheck { display:block; }
+.gpucheck .gpuholders { margin:4px 0 0 18px; padding:0; }
 /* 14.4.4: a restricted set's badge — its words in a box, never colour alone,
    right beside the name so a screenshot of the numbers takes it in */
 .badge.rbadge { color:var(--text-primary); font-family:inherit; font-weight:600;
@@ -17133,9 +17141,54 @@ function runStage(r) {
     const m = /^(\d+)\s*\/\s*(\d+)/.exec(r.progress || '');
     return { key: 'running', cls: 'running', text: m ? `running ${m[1]}/${m[2]}` : 'running' };
   }
+  // 16.2: "GPU memory", as everywhere; the status value stays waiting_gpu
+  if (r.status === 'waiting_gpu') return { key: r.status, cls: r.status, text: 'waiting for GPU memory' };
   return { key: r.status, cls: r.status, text: r.status };
 }
 
+// 16.2: GPU memory, from GET /api/gpu — the status dot's panel, the
+// Playground's line, Test a model's — and what a model loaded here needs
+async function loadGpu() {
+  if (!LIVE || !netReady() || state.gpuBusy) return;
+  state.gpuBusy = true;
+  try { state.gpu = await api('api/gpu'); } catch (e) { /* the next poll asks again */ }
+  state.gpuBusy = false;
+  const li = document.getElementById('checks-gpu');
+  if (li) li.replaceChildren(...gpuRows());
+}
+function gpuRows() {
+  const g = state.gpu;
+  if (!g) return [el('span', { class: 'small se', text: 'GPU memory: asking…' })];
+  if (!g.ok) return [el('span', { class: 'small se', 'data-gpu-line': '0', text: g.line || g.why })];
+  return [el('span', { class: 'check-short', 'data-gpu-line': '1', text: g.line }),
+    (g.holders || []).length ? el('ul', { class: 'small se gpuholders' }, g.holders.map(h =>
+      el('li', { 'data-gpu-holder': h.kind, text: h.words }))) : ''];
+}
+// in a slot of its own, painted in place: typing an id asks once the typing
+// stops, and the answer lands without redrawing the form under the cursor
+function gpuNeedLine(sf) {
+  return el('div', { 'data-gpu-need-slot': '1' }, gpuNeedBit(sf));
+}
+function gpuNeedBit(sf) {
+  const id = (sf.hf_id || '').trim();
+  if (!LIVE || !id || !id.includes('/') || isServedId(id) || id.startsWith('gguf/')) return '';
+  const N = state.gpuNeed = state.gpuNeed || {};
+  const key = id + '|' + (sf.kind || 'auto');
+  if (!(key in N) && netReady()) {
+    N[key] = null;
+    api(`api/gpu/need?model=${encodeURIComponent(id)}&kind=${encodeURIComponent(sf.kind || 'auto')}`)
+      .then(j => { N[key] = j; gpuNeedPaint(); })
+      .catch(() => { N[key] = { line: '' }; gpuNeedPaint(); });
+  }
+  const j = N[key];
+  if (!j) return el('p', { class: 'small se', 'data-gpu-need': 'asking', text: 'GPU memory: working it out…' });
+  if (!j.line) return '';
+  return el('p', { class: 'small', 'data-gpu-need': j.when || '1', text: j.line });
+}
+function gpuNeedPaint() {
+  const slot = document.querySelector('[data-gpu-need-slot]');
+  if (slot && state.sub) slot.replaceChildren(gpuNeedBit(state.sub));
+}
 // 12z D5: a failed or stopped run that a later run of the same model, suite,
 // part and thinking mode (and, for the exam, the same topics) finished
 function supersededBy(r) {
@@ -17242,7 +17295,9 @@ function vQueue(part = { form: true, list: true }) {
     sf.subsetFor = sf.hf_id.trim();
   }
   const f = {
-    hf_id: modelBox('submit', sf.hf_id, v => { sf.hf_id = v; },
+    hf_id: modelBox('submit', sf.hf_id, v => { sf.hf_id = v;
+        // 16.2: the GPU line for a typed id, once the typing stops
+        clearTimeout(gpuNeedPaint.t); gpuNeedPaint.t = setTimeout(gpuNeedPaint, 400); },
       it => { sf.hf_id = it.id; if (it.kind) sf.kind = it.kind; sf.allow = false;
               delete state.codeInfo[it.id]; render(); },
       { 'aria-label': 'model id',
@@ -17561,6 +17616,8 @@ function vQueue(part = { form: true, list: true }) {
       ownCodeBox(info, sf.allow, v => { sf.allow = v; gateSubmit(); }, 'submit'),
       topicBoxes, genOpts, sharedOpts, mabOpts, bbqOpts,
       orId ? orEstimateLine(sf) : '',
+      // 16.2: what it needs of the GPU, what is free, and when it starts
+      gpuNeedLine(sf),
       state.qmsg ? el('p', { class: 'warn', 'data-qmsg': '1', style: 'margin-top:8px',
         text: state.qmsg }) : '') : null,
     part.form ? servedCard(sf) : null,
@@ -22606,6 +22663,44 @@ function pgScore(m) {
     title: e ? 'Everyday tasks: hidden questions passed' : 'no Everyday result yet',
     text: e ? `Everyday ${evdCount(e)}` : 'Everyday —' });
 }
+// 16.2: whether a model can answer now — worked out on the server
+// (chat.Engine.state) and asked again every few seconds — and the GPU's line
+const PG_STATE_WORDS = { ready: 'Ready', loads: 'Loads on the first message',
+  cpu: 'On the CPU, slower', not_now: 'Not now' };
+function pgStateOf(id) {
+  const s = (state.pg.states || {})[id] || pgModel(id) || {};
+  return { state: s.state || '', why: s.why || '' };
+}
+function pgStateTag(id, short = false) {
+  const s = pgStateOf(id);
+  if (!s.state) return '';
+  return el('span', { class: 'small pgstate' + (s.state === 'not_now' ? ' notnow' : ' se'),
+    'data-pg-state': s.state, 'data-pg-state-of': id, title: short && s.why ? s.why : null,
+    text: PG_STATE_WORDS[s.state] + (!short && s.state === 'not_now' && s.why ? `: ${s.why}` : '') });
+}
+async function loadPgStates() {
+  const P = state.pg;
+  if (P.statesBusy || !netReady()) return;
+  P.statesBusy = true;
+  try {
+    const j = await api('api/playground/states');
+    const before = JSON.stringify([P.states, P.gpu]);
+    P.states = j.states || {}; P.gpu = j.gpu || null;
+    if (JSON.stringify([P.states, P.gpu]) !== before && pgActive()) render();
+  } catch (e) { /* the next tick asks again */ }
+  P.statesBusy = false;
+}
+function pgGpuLine() {
+  const g = state.pg.gpu;
+  if (!g || !g.line) return '';
+  return el('p', { class: 'small se pggpu', 'data-pg-gpu': '1', text: g.line,
+    title: (g.holders || []).length ? 'In use by: ' + g.holders.join(' · ') : null });
+}
+// the picked models that can't answer now: Send waits for them, the reason beside it
+function pgNotNow(P, c) {
+  const ids = c ? [c.model, c.model2] : [P.pick, P.pick2];
+  return ids.filter(Boolean).map(id => [id, pgStateOf(id)]).filter(([, x]) => x.state === 'not_now');
+}
 // the models chatted with lately come first, each in its group
 function pgRecency() {
   const at = {};
@@ -22640,11 +22735,15 @@ function pgCombo(which, cur, { disabled = false, skip = null, onPick } = {}) {
       const groups = pgOptionsIn((q || '').trim().toLowerCase(), skip);
       list.replaceChildren(...groups.flatMap(([label, ms]) => [
         el('p', { class: 'small se pghead', role: 'presentation', text: label }),
-        ...ms.map(x => el('button', { type: 'button', role: 'option', class: 'pgopt' + (x.id === cur ? ' on' : ''),
+        ...ms.map(x => el('button', { type: 'button', role: 'option',
+          class: 'pgopt' + (x.id === cur ? ' on' : '')
+            + (pgStateOf(x.id).state === 'not_now' ? ' notnow' : ''),
           'data-pg-option': x.id, 'aria-selected': String(x.id === cur),
           onclick: () => { popClose(true); onPick(x.id); } },
           el('span', { class: 'pgoname', text: x.trained_from ? `↳ ${x.name}` : x.name }),
-          el('span', { class: 'pgotags' }, ...pgTags(x)), pgScore(x)))]),
+          el('span', { class: 'pgotags' }, ...pgTags(x)), pgScore(x),
+          // 16.2: its state, the reason in view without hovering
+          pgStateTag(x.id)))]),
         groups.length ? '' : el('p', { class: 'small se', text: 'No model matches.' }));
     };
     fill('');
@@ -22691,7 +22790,10 @@ function pgPickerBar(P, c, cur) {
     // a trained model: what training changed, one click away
     !c && base && P.pick2 !== base.id ? el('button', { class: 'quiet', 'data-pg-suggest': base.id,
       text: `Compare with ${base.name} (before training)`,
-      onclick: () => { P.pick2 = base.id; render(); } }) : '');
+      onclick: () => { P.pick2 = base.id; render(); } }) : '',
+    // 16.2: the picked model's state, and one quiet line on the GPU
+    // (the bar has the word; a not-now model's reason is beside Send)
+    !compare && cur ? pgStateTag(cur, true) : '', pgGpuLine());
 }
 // Compare: a head for each column — its own picker, and its meta line
 function pgColHeads(P, c, cur, cur2) {
@@ -22851,11 +22953,13 @@ function pgReply(c, m, x, i, col = 'a') {
       el('details', { class: 'pgthink', 'data-pg-think': col, hidden: live.think ? null : '' },
         el('summary', { text: 'Thinking ▸' }), el('div', { class: 'small pgthinktext', text: live.think })),
       el('div', { class: 'pgtext', 'data-pg-live': col, text: live.text }),
-      live.refused ? el('p', { class: 'warn', 'data-pg-refused': '1', text: live.refused }) : '');
+      live.refused ? el('p', { class: 'warn', 'data-pg-refused': '1' }, live.refused,
+        pgTryAgain(c, i, col, live.refused)) : '');
     return wrap;
   }
   if (!r) {
-    wrap.append(el('p', { class: 'small se', 'data-pg-noreply': '1', text: x.refused || 'no reply' }));
+    wrap.append(el('p', { class: 'small se', 'data-pg-noreply': '1' }, x.refused || 'no reply',
+      pgTryAgain(c, i, col, x.refused)));
     return wrap;
   }
   wrap.append(
@@ -22917,7 +23021,10 @@ function pgInput(P, c, m, changed) {
     oninput: e => { P.input = e.target.value; pgGrow(e.target); pgLongLine(m, fits); },
     // Enter sends; Shift+Enter is a new line (and a word being composed is not sent)
     onkeydown: e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
-      e.preventDefault(); if (!pgLive()) pgSend(); } } });
+      e.preventDefault(); if (!pgLive() && !pgNotNow(P, c).length) pgSend(); } } });
+  // 16.2: a model that can't answer now holds Send back, and says why; the
+  // state is asked again every few seconds, so Send comes back on its own
+  const notNow = pgNotNow(P, c);
   requestAnimationFrame(() => pgGrow(box));
   // a run took the GPU in the middle of the last reply: said once, above the input
   const lastM = c && c.messages.length ? c.messages[c.messages.length - 1] : {};
@@ -22929,9 +23036,14 @@ function pgInput(P, c, m, changed) {
         text: 'Paused: a run started. Your conversation is kept.' }) : '',
       el('p', { class: 'warn', 'data-pg-long': '1', hidden: long ? null : '',
         text: `Too long for this model: about ${fits.toLocaleString('en')} words fits.` }),
+      // its reason names it already, or it is named first (two models: which one)
+      notNow.map(([id, x]) => el('p', { class: 'warn small', 'data-pg-notnow': id,
+        text: x.why.startsWith(pgName(id)) ? `Not now: ${x.why}` : `${pgName(id)}: not now. ${x.why}` })),
       el('div', { class: 'pgbox' }, box,
         live ? el('button', { class: 'primary', 'data-pg-stop': '1', text: 'Stop', onclick: pgStop })
-          : el('button', { class: 'primary', 'data-pg-send': '1', text: 'Send', disabled: long ? '' : null,
+          : el('button', { class: 'primary', 'data-pg-send': '1', text: 'Send',
+            disabled: long || notNow.length ? '' : null,
+            title: notNow.length ? notNow.map(([, x]) => x.why).join(' · ') : null,
             onclick: pgSend })),
       el('div', { class: 'pgunder' }, pgPracticeButton('input'),
         el('span', { class: 'se', 'aria-hidden': 'true', text: '·' }),
@@ -22949,7 +23061,7 @@ function pgLongLine(m, fits) {
   const long = m && words > fits;
   const line = document.querySelector('[data-pg-long]'), send = document.querySelector('[data-pg-send]');
   if (line) line.hidden = !long;
-  if (send) send.disabled = !!long;
+  if (send) send.disabled = !!long || pgNotNow(P, c).length > 0;
 }
 async function pgReset(c) {
   const P = state.pg;
@@ -23075,24 +23187,29 @@ function pgFollow(streamId, n, col) {
   };
   es.onerror = () => { if (!L.over) { es.close(); over(); } };
 }
+// 16.2: a reply that ran out of GPU memory: the message is kept; Try again asks again
+function pgTryAgain(c, i, col, why) {
+  if (!/^Ran out of GPU memory/.test(why || '')) return '';
+  return [' ', el('button', { class: 'quiet', 'data-pg-try-again': col === 'a' ? String(i) : `${i}|b`,
+    text: 'Try again', onclick: () => { state.pg.live = null; pgAgain(c, i, col); } })];
+}
 // the model is busy — the GPU a run's, or (12d.3) a served model under test:
 // ask again, on its own, once it is free
+// 16.2: on the model's own state — a refusal for memory is asked again once it
+// fits, not every 15 s and refused each time
 function pgRetryWhenFree(n, col) {
   const P = state.pg, chatId = P.id;
   const mid = P.chat ? (col === 'b' ? P.chat.model2 : P.chat.model) : '';
-  const served = !!(pgModel(mid) || {}).served;
   clearTimeout(P.retry);
   P.retry = setTimeout(async function tick() {
     const L = P.live && P.live.cols[col];
     if (!pgActive() || P.id !== chatId || !L || !L.refused) return;
-    try {
-      const s = await api('api/playground/status');
-      const busy = served ? s.testing === mid : !!s.run;
-      if (!busy) { const c = P.chat; P.live = null; pgAgain(c, n, col); return; }
-      L.refused = served ? s.testing_line : s.run; render();
-    } catch (e) { /* try again */ }
-    P.retry = setTimeout(tick, 15000);
-  }, 15000);
+    await loadPgStates();
+    const st = pgStateOf(mid);
+    if (st.state && st.state !== 'not_now') { const c = P.chat; P.live = null; pgAgain(c, n, col); return; }
+    if (st.why && L.refused !== st.why) { L.refused = st.why; render(); }
+    P.retry = setTimeout(tick, 5000);
+  }, 5000);
 }
 // Stop stops every column
 async function pgStop() {
@@ -23698,6 +23815,9 @@ function renderWarnings() {
   const list = () => el('div', { class: 'moremenu checkspop', id: 'pop-checks',
       'aria-label': 'checks', 'data-warnings': 'open' },
     el('ul', { class: 'checklist' },
+      // 16.2: GPU memory, in use and free, and what holds it — kept up to date
+      // in place by the poll (loadGpu), so the list never snaps shut
+      LIVE ? el('li', { class: 'check gpucheck', id: 'checks-gpu', 'data-gpu': '1' }, ...gpuRows()) : '',
       !n ? el('li', { class: 'small', 'data-checks-none': '1', text: 'No problems.' }) : '',
       judged ? el('li', { class: 'small checks-judged', 'data-checks-judged': String(judged),
         text: `${judged} of ${n} ${n > 1 ? 'are' : 'is'} about the judged suite` }) : '',
@@ -23975,6 +24095,9 @@ if (LIVE) {
   refreshResults().then(() => {
     if (DATA && !DATA.models.length) { state.tab = 'queue'; render(); }
     if (DATA) loadViews();
+    // 16.2: the status dot's GPU line, once the service answers — never one
+    // more request while it doesn't (the back-off counts them)
+    if (DATA && !NET.fails) loadGpu();
   });
   loadQueue();
   loadJudgeHealth();
@@ -23991,6 +24114,9 @@ if (LIVE) {
     // 12b.2: Home's lists, and a model's Improve tab — only while the service
     // answers: a board that cannot reach it does not ask for four more things
     const answering = DATA && !NET.fails;
+    // 16.2: GPU memory (cached on the server) and each Playground model's state
+    if (answering) loadGpu();
+    if (answering && pgActive()) loadPgStates();
     if (answering && onHome()) { loadReview(); loadTruns(); }
     if (state.tab === 'pipeline' || (answering && state.model && state.mtab === 'improve')) loadReview();
     if (state.tab === 'exam') loadExam();

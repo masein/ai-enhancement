@@ -4953,6 +4953,64 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 16.2 — GPU memory, said one way everywhere (4 Oct)
+
+- **One status:** `service/gpu.py`, served at `GET /api/gpu` and cached for 5 s.
+  It gives the card's total, used and free memory in GB (1024³, as nvidia-smi's
+  MiB are 1024², so the 32 GB card reads 31.8) and what holds it.
+  - **What holds it:** each process from `nvidia-smi --query-compute-apps` is
+    named by its `/proc/<pid>/cmdline`:
+    - `vllm` is the judge;
+    - `llama-server --port N` is the served model registered at that port,
+      else "llama-server on port N";
+    - `llama-perplexity` is a GGUF run;
+    - this service's own pid is the Playground;
+    - a child of this service is the run that holds the lock.
+    - Anything else is "other". It works because compose runs the board with
+      `pid: "host"`: nvidia-smi's pids are the ones in `/proc`.
+  - **Without memory for each process** (nvidia-smi says `[N/A]`), only the
+    Playground's own figure is known (torch's count, in this process). The
+    rest of the card's used memory is "other: N GB", never split by guesswork.
+  - **When the card can't be read:** a card nvidia-smi can't read is one line,
+    "GPU memory can't be read on this server." A run fails at once with it,
+    plus nvidia-smi's error and "Nothing was run.", where before the page said
+    "internal error".
+- **Where it shows:**
+  - the status dot's panel: the line and what holds it;
+  - the Playground: one quiet line, with what holds it on hover;
+  - Test a model: "Needs about 9.5 GB · 12.4 GB free now · starts now / waits
+    for run #N (…) / waits for N runs queued before it / waits for GPU
+    memory". This comes from `GET /api/gpu/need`: preflight's estimate plus
+    `FREE_MARGIN_MIB`, kept 10 min.
+  - Runs: "waiting for GPU memory", with "Waiting for GPU memory: needs 9.5 GB,
+    6.2 GB is free." A run's out-of-memory line (12q.G) now says GB as well.
+- **The Playground's picker:** each model's state comes from `Engine.state`,
+  worked out without loading anything. The page asks
+  `/api/playground/states` with the 5 s poll. The states are:
+  - **Ready:** loaded, or served and answering;
+  - **Loads on the first message:** it fits now;
+  - **On the CPU, slower;**
+  - **Not now** and why: too big for what is free, run #N using the GPU, a run
+    starting, or "Its server isn't running.".
+
+  Served models' servers are asked `GET /models` in the background
+  (`served_up`, at most every 30 s, 3 s timeout), never on the request itself.
+  A picked model that is Not now holds Send back, with its reason beside Send.
+  Send comes back on its own when the state changes. A refusal for memory is
+  re-sent once the model can run, not every 15 s.
+- **Running out mid-way** (`chat.is_oom`):
+  - while loading, the half-loaded model is freed (`HFBackend.load`);
+  - while answering, it is unloaded;
+  - either way the message is kept, with "Ran out of GPU memory while loading X
+    (it needed about N GB; M GB was free). Your message is kept." and a Try
+    again button;
+  - in a two-model chat the other reply stands.
+  - `generate` now runs with its failure caught: before, an error inside it
+    left the streamer waiting for ever. The streamer also gives up after
+    `GEN_GAP_S` (300 s) of silence.
+- **Also fixed:** the judge test against a local judge that is down answered
+  500. It now answers 503: "… Nothing was sent."
+
 ### 16.1 — two sizes, and the filter that hid GGUF and served models (4 Oct)
 
 - **Two sizes:** total, and active where they differ ("35B · 3B active").
