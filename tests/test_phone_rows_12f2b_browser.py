@@ -16,6 +16,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import open_benchmarks
+
 import gguf_data as gd
 import gguf_worker as gw
 from fake_openai import FakeServer
@@ -167,8 +169,8 @@ def test_the_reported_numbers_are_a_group_of_their_own_never_averaged(live, page
     assert page.locator("th[data-col^='rep:']").count() == 0
     # never a benchmark to average: not in Benchmarks ▾
     models(page, live)
-    page.locator("[data-benchmarks-menu]").click()
-    assert "tok/s" not in page.locator("#pop-benchmarks").inner_text()
+    open_benchmarks(page)
+    assert "tok/s" not in page.locator("#pop-columns").inner_text()
     assert page.errors == []
 
 

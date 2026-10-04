@@ -286,7 +286,7 @@ def go_tab(page, label: str) -> None:
         return
     if label == "Perplexity & Loss":
         go_tab(page, "Models")
-        page.locator("[data-chip='lm']").click()
+        choose_chip(page, "lm")
         return
     if label == "Queue":
         page.locator("#runs [data-runs]").click()
@@ -299,9 +299,52 @@ def go_tab(page, label: str) -> None:
     raise AssertionError(f"no place for the old tab {label!r}")
 
 
+# 16.3: the chips are gone — Row 1 says which tests, Group ▾ which group.
+# An old chip's name, as the view and group it is now
+CHIP_VIEW = {"all": ("standard", "all"), "knowledge": ("standard", "knowledge"),
+             "commonsense": ("standard", "commonsense"), "reasoning": ("standard", "reasoning"),
+             "math": ("standard", "math"), "trust": ("standard", "trust"),
+             "instruction": ("standard", "instruction"), "lm": ("standard", "lm"),
+             "mobile": ("mobile", "mobileaibench"), "devicemark": ("mobile", "devicemark"),
+             "ondevice": ("mobile", "devicemark"), "frontier": ("frontier", None)}
+
+
+def pick_view(page, test: str, group: str | None = None, show: str | None = None) -> None:
+    """16.3: Row 1's choice, then Group ▾'s, then Table or Chart"""
+    tab = page.locator(f"[data-models-view='{test}']")
+    if tab.get_attribute("aria-selected") != "true":
+        tab.click()
+        page.wait_for_selector(f"[data-models-view='{test}'][aria-selected='true']")
+    if group and page.locator("#pill-group").get_attribute("data-value") != group:
+        page.locator("#pill-group").click()
+        page.locator(f"#pop-group [data-choice='{group}']").click()
+        page.wait_for_selector(f"#pill-group[data-value='{group}']")
+    if show and page.locator("[data-lb-show]").get_attribute("data-lb-show") != show:
+        page.locator(f"[data-lb-show] [data-show='{show}']").click()
+        page.wait_for_selector(f"[data-lb-show='{show}']")
+
+
+def choose_chip(page, chip: str) -> None:
+    """an old chip, by the view and group it is now (16.3)"""
+    test, group = CHIP_VIEW[chip]
+    pick_view(page, test, group, "chart" if chip == "ondevice" else None)
+
+
+def open_benchmarks(page) -> None:
+    """16.3: Benchmarks ▾ is Columns ▾ ▸ "A table of the ticked ones" now: open
+    it there (its checklist is #pop-columns')"""
+    if not page.locator("#pop-columns").count():
+        page.locator("#pill-columns").click()
+    page.locator("#pop-columns").wait_for()
+    if page.locator("#pill-columns").get_attribute("data-columns-menu") != "built":
+        page.locator("#pop-columns [data-columns-mode-pick='built']").check()
+        page.wait_for_selector("#pill-columns[data-columns-menu='built']")
+    page.wait_for_selector("#pop-columns [data-bench-clear]")
+
+
 def open_filters(page) -> None:
-    """Models' Kind, Size, Status, Columns, Models and Scale live in
-    Filters ▾ at every width (12b): open it if it is not open."""
+    """Models' Size, Source, Type, Tested, Status and Scale live in Filters ▾
+    at every width (12b; 16.3): open it if it is not open."""
     if not page.locator("[data-filter-sheet]").count():
         page.locator("[data-filters]").click()
     page.locator("[data-filter-sheet]").wait_for()
@@ -386,9 +429,7 @@ def set_name(page, name: str) -> None:
 def show_all_columns(page) -> None:
     """The Leaderboard shows six task columns by default (phase 9c); a test
     about a column that may be hidden asks for all of them first."""
-    if page.locator("[data-filters]").count():            # 12b: the pills are in Filters ▾
-        open_filters(page)
-    menu = page.locator("[data-columns-menu]")
+    menu = page.locator("[data-columns-menu]")             # 16.3: Columns ▾, on Row 2
     if menu.count() == 0 or not menu.get_attribute("data-hidden-tasks"):
         return
     # the Columns pill opens 11a's popover (11c); Show all applies at once

@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import set_name
+from conftest import choose_chip, set_name
 
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase12b"
@@ -82,13 +82,12 @@ def reach_status(page):
 
 def reach_facts(page):
     place(page, "models")
-    page.locator("[data-filters]").click()
-    page.locator("[data-columns-menu]").click()
+    page.locator("[data-columns-menu]").click()             # 16.3: Columns ▾, on Row 2
 
 
 def reach_lm(page):
     place(page, "models")
-    page.locator("[data-chip='lm']").click()
+    choose_chip(page, "lm")
 
 
 def reach_model_tab(tab):
@@ -108,7 +107,7 @@ CONTRACT = [
     ("Leaderboard ▸ Insights", lambda p: place(p, "models"), "[data-lb-card] ~ [data-insights]"),
     ("Leaderboard ▸ About these benchmarks", lambda p: place(p, "benchmarks", "standard"),
      ".about"),
-    ("Models tab (its facts)", reach_facts, "#pop-columns [data-column-group='facts']"),
+    ("Models tab (its facts)", reach_facts, "#pop-columns [data-columns-section='details']"),
     # 12g.1: the Loop and Review are one pipeline for one model
     ("Loop", lambda p: place(p, "improve", "model"), "[data-pipeline] ~ [data-pipeline-stages]"),
     ("More ▸ Review", lambda p: place(p, "improve", "model"), "[data-stage='proposals']"),
@@ -117,7 +116,7 @@ CONTRACT = [
     ("More ▸ Exam", lambda p: place(p, "benchmarks", "exam"), "[data-panel='rubrics']"),
     ("Topic pages", reach_topic, "[data-topic-back]"),
     ("More ▸ Tasks", lambda p: place(p, "benchmarks", "standard"), ".panels"),
-    ("More ▸ Perplexity & Loss", reach_lm, "[data-chip='lm'][aria-pressed='true']"),
+    ("More ▸ Perplexity & Loss", reach_lm, "#pill-group[data-value='lm']"),
     ("More ▸ Provenance ▸ Run provenance", reach_model_tab("history"),
      f"[data-model-prov='{MODEL}']"),
     ("More ▸ Provenance ▸ Query, Export", lambda p: name_menu(p, "data"),
@@ -164,7 +163,7 @@ OLD = [
     ("#tab=overview", "#tab=home", "[data-needs-you]"),
     ("#tab=leaderboard", "#tab=models", "[data-models-view='standard'][aria-selected='true']"),
     ("#tab=models", "#tab=models", "[data-models-view='standard'][aria-selected='true']"),
-    ("#tab=leaderboard&chip=math", "#tab=models&chip=math", "[data-chip='math'][aria-pressed='true']"),
+    ("#tab=leaderboard&chip=math", "#tab=models&group=math", "#pill-group[data-value='math']"),
     ("#tab=leaderboard&chip=judged", "#tab=models&view=exam",
      "[data-models-view='exam'][aria-selected='true']"),
     # 12g.1: the pipeline, on the model with the most judged topics (a first visit)
@@ -176,7 +175,18 @@ OLD = [
     ("#tab=submit", "#tab=runs", "[data-dialog='test'] [data-submit-form]"),
     ("#tab=exam", "#tab=benchmarks&sub=exam", "[data-panel='rubrics']"),
     ("#tab=tasks", "#tab=benchmarks&sub=standard", ".panels"),
-    ("#tab=perplexity", "#tab=models&chip=lm", "[data-chip='lm'][aria-pressed='true']"),
+    ("#tab=perplexity", "#tab=models&group=lm", "#pill-group[data-value='lm']"),
+    # 16.3: the chips' names, before Row 1 and Group ▾, and Kind's
+    ("#tab=models&chip=mobile", "#tab=models&view=mobile&group=mobileaibench",
+     "#pill-group[data-value='mobileaibench']"),
+    ("#tab=models&chip=devicemark", "#tab=models&view=mobile&group=devicemark",
+     "#pill-group[data-value='devicemark']"),
+    ("#tab=models&chip=ondevice", "#tab=models&view=mobile&group=devicemark&show=chart",
+     "[data-ondevice]"),
+    ("#tab=models&chip=frontier", "#tab=models&view=frontier",
+     "[data-models-view='frontier'][aria-selected='true']"),
+    ("#tab=models&kind=checkpoint", "#tab=models&source=local", "[data-on='source']"),
+    ("#tab=models&kind=instruct", "#tab=models&type=instruct", "[data-on='type']"),
     ("#tab=provenance", "#tab=data", "#view h2:text-is('Run provenance')"),
     ("#everyday", "#tab=benchmarks&sub=everyday", "[data-everyday-table]"),
 ]
@@ -352,7 +362,7 @@ def test_the_switches_remember_the_last_choice(live, page):
     place(page, "home")
     place(page, "models")
     page.wait_for_selector("[data-lb-everyday]")
-    page.evaluate("localStorage.removeItem('bench-models-view'); "
+    page.evaluate("localStorage.removeItem('bench-models-last'); "
                   "localStorage.removeItem('bench-benchmarks-sub')")
     assert page.errors == []
 
@@ -361,38 +371,41 @@ def test_models_is_one_table_and_a_row_opens_the_model_page(live, page):
     home(page, live["base"])
     place(page, "models")
     table = page.locator("[data-lb-table]")
+    # 16.3: Row 1 — which tests, in the order every place names them; the
+    # exam while it has results — and Table or Chart
     assert [b.text_content() for b in page.locator("[data-models-view]").all()] == \
-        ["Standard", "Knowledge exam", "Everyday tasks"]
-    assert [b.text_content() for b in page.locator("[data-chip]").all()] == \
-        ["All tasks", "Knowledge", "Commonsense", "Reasoning", "Math", "Trust & safety",
-         "Instruction & maths", "Mobile tasks",                # 12h.1, 12o.3: MobileAIBench's two
-         "Language modelling",
-         "Frontier · reported",                                # 12n.1: reported scores' home
-         "On-device chart"]                                    # 12q.B: DeviceMark's axes
-    # Kind, Size, Status, Columns and Scale are in Filters ▾; 12h.2: Benchmarks
-    # and Models sit beside it
+        ["Standard", "Mobile", "Everyday", "Frontier", "Knowledge exam"]
+    assert page.locator("[data-lb-show] [data-show]").all_text_contents() == ["Table", "Chart"]
+    # Group ▾ in place of the chips: Standard's groups
+    page.locator("#pill-group").click()
+    assert [b.get_attribute("data-choice") for b in page.locator("#pop-group [data-choice]").all()] == \
+        ["all", "knowledge", "commonsense", "reasoning", "math", "trust", "instruction", "lm"]
+    page.keyboard.press("Escape")
+    assert page.locator("[data-chip]").count() == 0
+    # Row 2: Group, Models, Filters, Columns; Size, Source, Type, Tested and
+    # More (Status, Scale) in Filters ▾
+    assert page.locator("[data-pickers]").inner_text().split("\n")[:4] == \
+        ["Group: All ▾", "Models: all ▾", "Filters ▾", "Columns ▾"]
     assert page.locator(".lbbar > .pills").count() == 0
     page.locator("[data-filters]").click()
     sheet = page.locator("[data-filter-sheet]")
-    for pill in ("Kind", "Size", "Status", "Columns", "Scale"):
+    for pill in ("Size", "Source", "Type", "Tested", "Status", "Scale"):
         assert pill in sheet.text_content(), pill
-    assert page.locator("[data-pickers]").inner_text().split("\n")[:2] == \
-        ["Benchmarks: 6 ▾", "Models: all ▾"]
     # no row expands: a click on a row is the model page
     assert page.locator("[data-open-row], [data-lb-detail]").count() == 0
     page.locator("[data-filters-done]").click()
-    page.locator("[data-chip='math']").click()
-    page.wait_for_function("location.hash === '#tab=models&chip=math'")
+    choose_chip(page, "math")
+    page.wait_for_function("location.hash === '#tab=models&group=math'")
     table.locator(f"tr[data-lb-row='{MODEL}'] td.num").first.click()
     page.wait_for_selector("[data-model-hero]")
     assert page.evaluate("state.model") == MODEL
     # ← Back to Models is Back: the same entry, the chip it was on (12z B4: named)
     back = page.locator(".backlink")
     assert back.text_content() == "← Back to Models · Math"
-    assert back.get_attribute("href") == "#tab=models&chip=math"
+    assert back.get_attribute("href") == "#tab=models&group=math"
     n = page.evaluate("history.length")
     back.click()
-    page.wait_for_function("location.hash === '#tab=models&chip=math'")
+    page.wait_for_function("location.hash === '#tab=models&group=math'")
     assert page.evaluate("history.length") == n                     # went back, pushed nothing
     assert page.errors == []
 

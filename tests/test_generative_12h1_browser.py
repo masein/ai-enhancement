@@ -14,6 +14,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import choose_chip
+
 from generative_fixture import write_run
 
 pytestmark = pytest.mark.dashboard
@@ -51,7 +53,7 @@ def instruction_view(page, base, width=1400):
     page.set_viewport_size({"width": width, "height": 1000})
     page.goto(base + "/#tab=models")
     page.wait_for_selector("[data-lb-table]")
-    page.locator("[data-chip='instruction']").click()
+    choose_chip(page, "instruction")                       # 16.3: Group ▾
     page.wait_for_selector("th[data-col='ifeval']")
 
 

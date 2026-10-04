@@ -36,7 +36,7 @@ def switched_off(live):
 
 
 def test_switched_off_it_is_nowhere_on_the_page(live, page, switched_off):
-    go(page, live, "tab=models&chip=mobile", "th[data-col='mobile_mmlu_pro']")
+    go(page, live, "tab=models&view=mobile&group=mmlu", "th[data-col='mobile_mmlu_pro']")
     assert page.locator("[data-mmf-card]").count() == 0
     assert "Mobile-MMLU (full)" not in page.locator("#view").inner_text()
     # not badged either: nothing on the page is non-commercial
@@ -70,6 +70,6 @@ def test_switched_off_it_is_nowhere_on_the_page(live, page, switched_off):
 
 
 def test_switched_back_on_it_is_all_there_again(live, page):
-    go(page, live, "tab=models&chip=mobile", "[data-mmf-card]")
+    go(page, live, "tab=models&view=mobile&group=mmlu", "[data-mmf-card]")
     assert page.locator(f"[data-mmf-cell='{GOOD}']").inner_text() == "94.4%"
     assert page.errors == []

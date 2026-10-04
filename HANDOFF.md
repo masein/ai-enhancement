@@ -4953,6 +4953,80 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 16.3 — the Models toolbar (4 Oct)
+
+- **Three rows.**
+  - **Row 1:** which tests — Standard · Mobile · Everyday · Frontier, plus the
+    Knowledge exam while it has results — and Table | Chart on the right.
+  - **Row 2:** Group ▾, Models ▾, Filters ▾ ("Filters · 2"), Columns ▾, and
+    the saved views on a row of their own.
+  - **Row 3:** a chip with × for each filter on (and "Models: N chosen"),
+    Clear all, and "9 of 56 models". With nothing on, the count ends Row 2.
+- **The chip is still the key a table is drawn by.**
+  - `lbTest(L)` and `lbGroup(L)` read Row 1's choice and the group from
+    `L.view` and `L.chip`; `lbChoice(test, group)` goes the other way.
+  - `LB_GROUPS` lists each test's groups as [address name, words, chip].
+  - Mobile's chips: `mobileall`, `devicemark`, `mobile` (MobileAIBench) and
+    `mmlu`. Frontier is `chip: 'frontier'` on the standard view, as before.
+  - `ondevice` is no chip any more: it is `devicemark` with `show: 'chart'`.
+- **One place a benchmark (`CATS`):**
+  - MobileAIBench's three trust sets moved from Trust & safety to `mobile`;
+    Pro has a group of its own (`mmlu`).
+  - Standard ▸ All leaves out Mobile's tasks and Frontier's (GPQA, SimpleQA):
+    `stdTask`.
+- **Mobile.**
+  - **All:** DeviceMark's composite, MT-Bench and Pro.
+  - **DeviceMark:** 12x's columns; its Chart is the On-device chart.
+  - **MobileAIBench:** three header groups (no judge · judged · trust & safety,
+    judged).
+  - **Mobile-MMLU:** Pro and a column for each category (`mmpcat:`), with its
+    badge and "provisional key"; `mmfCard` under it.
+  - The full set is never a column, in All or beside Pro. The brief's
+    "MobileAIBench headline" doesn't exist, so All shows MT-Bench, its judged
+    part. Both are open questions put to masein.
+- **Chart (`lbChart`):**
+  - one `barPanel` for each task in view (`state.lbBenchNow`), for
+    `lbFilter`'s rows, on the toolbar's Scale;
+  - Frontier's is `frPanels`.
+  - `lbChartWhy` says why there is none: Everyday, the exam, Mobile ▸ All,
+    Language modelling, or the frozen report's DeviceMark.
+  - Table or Chart is remembered for each view (`bench-lb-show`) and is
+    `show=chart` in the address.
+  - `bench-models-last` reopens Models on the last view; the filters are the
+    address's.
+- **Filters.**
+  - **Source** (`sourceOf`: hf, local, gguf, served; more than one ticked)
+    and **Type** replace Kind.
+  - **Tested** (`testedSel`): `7d`, `30d` or `YYYY-MM-DD..YYYY-MM-DD`, plus
+    `,none` for the rows with no date. It is never silent:
+    "N models have no test date and are hidden · show them".
+  - The date is `testedMs`, the latest of:
+    - the lm_eval results' `date`;
+    - a judged run's `judged_at`;
+    - `testedAt`, which `results_payload` takes from `db.last_done()`, the
+      latest finished run of any kind, refreshed every 5 s.
+
+    Served, GGUF, DeviceMark-only and Everyday-only models had no date
+    before.
+- **Columns ▾ (one menu, both jobs).**
+  - "Show or hide columns" is Filters ▸ Columns: the board's Avg stays.
+  - "A table of the ticked ones, with their Avg" is Benchmarks ▾ (`L.cols`;
+    its checklist is `benchChecklist`).
+  - Model details: Size (on until hidden: `bench-lb-size`), Family, Type,
+    Source, Tested, Flags. Tested sorts. Type never says "checkpoint".
+- **Addresses.**
+  - Written: `view=mobile&group=devicemark&show=chart&size=xx&source=served&
+    type=instruct&tested=7d&cols=…&models=…`.
+  - Read from before: `chip=X` (`LB_OLD_CHIPS`: `mobile` → MobileAIBench,
+    `devicemark`/`ondevice` → Mobile ▸ DeviceMark, `frontier` → Frontier,
+    Standard's names → their group), `chip=judged`, `chip=truthfulness`,
+    `kind=checkpoint` → `source=local`, `kind=base|instruct` → `type`,
+    `view=phone`.
+  - Saved views keep their `chip`, so they open as before.
+- **Phone.** Row 1 wraps, the menus wrap, and the page never scrolls
+  sideways. The table starts 362 px below the card's top, against 346 for
+  the old chips (11h's budget is now 370).
+
 ### 16.2 — GPU memory, said one way everywhere (4 Oct)
 
 - **One status:** `service/gpu.py`, served at `GET /api/gpu` and cached for 5 s.

@@ -88,7 +88,7 @@ def no_sideways(page):
 
 @pytest.mark.parametrize("width", WIDTHS)
 def test_the_mobile_chip_has_it_provisional_and_a_labeller_unranked(live, page, width):
-    go(page, live, "tab=models&chip=mobile", "th[data-col='mobile_mmlu_pro']", width)
+    go(page, live, "tab=models&view=mobile&group=mmlu", "th[data-col='mobile_mmlu_pro']", width)
     th = page.locator("th[data-col='mobile_mmlu_pro']")
     assert th.locator(".hname").text_content() == "Mobile-MMLU-Pro"
     assert th.locator("[data-mmp-provisional]").text_content() == "provisional key"
@@ -105,7 +105,7 @@ def test_the_mobile_chip_has_it_provisional_and_a_labeller_unranked(live, page, 
 
 
 def test_its_tooltip_says_how_it_is_scored_on_whose_key_and_the_checks(live, page):
-    go(page, live, "tab=models&chip=mobile", "th[data-col='mobile_mmlu_pro']")
+    go(page, live, "tab=models&view=mobile&group=mmlu", "th[data-col='mobile_mmlu_pro']")
     tip = json.loads(page.locator("th[data-col='mobile_mmlu_pro']").get_attribute("data-tip"))
     # 14.4.4: its badge beside its name, then its sentence
     assert tip[0] == ("Mobile-MMLU-Pro (MBZUAI) — accuracy on our answer key’s kept questions · "

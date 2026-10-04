@@ -421,6 +421,12 @@ def results_payload() -> dict:
             if trained.get(m["id"]):
                 m["trainedFrom"] = trained[m["id"]]
         _cache.update(key=key, payload=payload)
+    # 16.3: each model's latest finished run of any kind, for Models' Tested —
+    # from the runs table, so a run whose files didn't move the tree counts too
+    done = db.last_done()
+    for m in _cache["payload"]["models"]:
+        if done.get(m["id"]):
+            m["testedAt"] = done[m["id"]]
     _cache["at"] = now
     return _cache["payload"]
 

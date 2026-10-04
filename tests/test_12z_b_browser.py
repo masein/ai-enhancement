@@ -74,7 +74,7 @@ def test_back_goes_back_and_names_where_it_goes(live, page, width):
     assert back.get_attribute("data-back-to") == "history"
     n = page.evaluate("history.length")
     back.click()
-    page.wait_for_function("location.hash === '#tab=models&chip=math'")
+    page.wait_for_function("location.hash === '#tab=models&group=math'")   # 16.3
     assert page.evaluate("history.length") == n
     # from another model's page, by a link: back to that model, by its name
     page.goto(live["base"] + "/#model=" + MODEL.replace("/", "%2F"))
@@ -104,36 +104,34 @@ def test_back_names_each_kind_of_address(live, page):
     start(page, live, 1400)
     words = page.evaluate("""() => ['tab=models&chip=devicemark', 'tab=models&view=everyday',
         'tab=models&view=exam&chip=judged', 'tab=benchmarks&sub=everyday', 'tab=improve&sub=model',
-        'tab=runs', '', 'tab=models&view=compare&m=a,b'].map(hashWords)""")
-    assert words == ["Models · DeviceMark", "Models · Everyday tasks", "Models · Knowledge exam",
+        'tab=runs', '', 'tab=models&view=compare&m=a,b',
+        'tab=models&view=mobile&group=mmlu&show=chart', 'tab=models&group=trust',
+        'tab=models&view=frontier'].map(hashWords)""")
+    # 16.3: Row 1's names, and the group after them
+    assert words == ["Models · Mobile · DeviceMark", "Models · Everyday", "Models · Knowledge exam",
                      "Benchmarks · Everyday tasks", "Improve · By model", "All runs", "Home",
-                     "Compare"]
+                     "Compare", "Models · Mobile · Mobile-MMLU", "Models · Trust & safety",
+                     "Models · Frontier"]
     assert page.errors == []
 
 
 @pytest.mark.parametrize("width", WIDTHS)
-@pytest.mark.parametrize("chip", ["ondevice", "frontier", "lm"])
-def test_the_chip_in_use_is_in_sight(live, page, width, chip):
+@pytest.mark.parametrize("chip,test,group", [("ondevice", "mobile", "devicemark"),
+                                             ("frontier", "frontier", None), ("lm", "standard", "lm")])
+def test_the_view_in_use_is_named_on_row_1_and_group(live, page, width, chip, test, group):
+    """16.3: no chip row to scroll: the view in use is Row 1's choice and Group ▾'s word"""
     start(page, live, width, f"#tab=models&chip={chip}")
-    on = page.locator(f"[data-lb-chips] [data-chip='{chip}']")
-    on.wait_for()
-    assert "on" in on.get_attribute("class").split()
-    page.wait_for_timeout(100)
-    inside = page.evaluate("""() => {
-        const row = document.querySelector('[data-lb-chips]'), on = row.querySelector('.chip-btn.on');
-        const r = row.getBoundingClientRect(), c = on.getBoundingClientRect();
-        return c.left >= r.left - 1 && c.right <= r.right + 1; }""")
-    assert inside
-    # the row says there is more to one side or the other when it scrolls
-    wide = page.evaluate("(r => r.scrollWidth > r.clientWidth + 1)(document.querySelector('[data-lb-chips]'))")
-    if wide:
-        row = page.locator("[data-lb-chips]")
-        assert "1" in (row.get_attribute("data-less"), row.get_attribute("data-more"))
-    # the On-device chart and Frontier have no benchmark columns to pick
-    assert page.locator("[data-benchmarks-menu]").count() == (1 if chip == "lm" else 0)
+    page.wait_for_selector(f"[data-models-view='{test}'][aria-selected='true']")
+    if group:
+        assert page.locator("#pill-group").get_attribute("data-value") == group
+    else:
+        assert page.locator("#pill-group").count() == 0          # Frontier has no groups
+    # the On-device chart, Frontier and Language modelling have no columns to pick
+    assert page.locator("[data-benchmarks-menu]").count() == 0
     no_sideways(page)
     if chip == "ondevice":
-        shot(page.locator(".lbbar"), f"chips-{chip}-{width}.png")
+        assert page.locator("[data-lb-show='chart']").count() == 1
+        shot(page.locator(".lbbar"), f"toolbar-{chip}-{width}.png")
     assert page.errors == []
 
 

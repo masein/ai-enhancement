@@ -4654,6 +4654,38 @@ sup.fr-mark { color:var(--text-secondary); margin-left:1px; }
 }
 .fsheet .pills { display:flex; flex-direction:column; align-items:stretch; gap:8px; margin:0; }
 .fsheet .pills .pill { width:100%; text-align:left; justify-content:space-between; }
+/* 16.3: Models' three rows — which tests and Table or Chart; the menus; what is on */
+.lbrow1 { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center;
+  gap:6px 12px; margin:8px 0 0; }
+.lbrow1 .subswitch, .card .lbrow1 .subswitch { margin:0; }
+.segbtn { display:inline-flex; flex:none; }
+.segbtn .chip-btn:first-child { border-radius:999px 0 0 999px; }
+.segbtn .chip-btn:last-child { border-radius:0 999px 999px 0; margin-left:-1px; }
+.segbtn .chip-btn[aria-disabled="true"] { cursor:help; }
+.lbbar .chiprow { margin-top:8px; }
+/* 16.3: Row 2's menus wrap, and never past the screen's edge */
+.lbbar .pickers { flex:1 1 auto; min-width:0; flex-wrap:wrap; row-gap:8px; }
+.lbbar .savedviews { margin:8px 0 0; }
+.lbactive { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center;
+  gap:6px 12px; margin:8px 0 0; }
+.lbactive .onchips { display:flex; flex-wrap:wrap; gap:6px; align-items:center; min-width:0; }
+.onchip { display:inline-flex; align-items:center; gap:2px; padding:2px 2px 2px 10px; border-radius:999px;
+  border:1px solid var(--border); background:var(--surface-1); font-size:var(--fs-1); }
+.onchip .chip-x { border:0; background:none; cursor:pointer; padding:0 8px; font-size:var(--fs-2);
+  line-height:1; color:var(--text-secondary); }
+.onchip .chip-x:hover { color:var(--text-primary); }
+.lbactive .lbcount, .lbbar .pickers > .lbcount { margin-left:auto; white-space:nowrap; flex:none; }
+.fsheet .fmore { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.colsec { padding:6px 0; border-top:1px solid var(--border); }
+.colsec:first-child { border-top:0; padding-top:0; }
+.colsec-head { font-weight:600; font-size:var(--fs-1); margin:0 0 4px; }
+.colsec > label { display:flex; align-items:center; gap:4px; white-space:nowrap; }
+.avgmode { display:flex; flex-direction:column; gap:2px; margin:0 0 6px; }
+.avgmode label { display:flex; align-items:center; gap:4px; }
+.trange { display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:8px 10px 4px;
+  border-top:1px solid var(--border); }
+.trange input[type=date] { width:auto; }
+#pop-group .gcount { font-size:var(--fs-1); }
 @media (max-width:720px) {
   .pager { flex-wrap:nowrap; gap:4px; overflow-x:auto; scrollbar-width:none; }
   .pager button { padding:3px 6px; }
@@ -5575,11 +5607,19 @@ const officialAvg = m => state.avgMode === 'raw' ? m.avgRaw : m.avg;
 // when this model was last evaluated — a judged run counts. SmolLM2-360M was
 // judged on 09-21 and the Models tab said 09-20
 function lastEval(m) {
-  const judged = Math.max(0, ...Object.values((m.judge || {}).tasks || {})
+  const t = testedMs(m);
+  return t ? new Date(t).toISOString().slice(0, 16) : (m.date || null);
+}
+// 16.3: when a model was last tested, in ms: its lm_eval results' date, a
+// judged run, and the latest finished run of any kind the service knows of
+// (testedAt: DeviceMark, served, GGUF and Everyday runs too) — or null
+function testedMs(m) {
+  const b = m.dmHome ? (DATA.models.find(x => x.id === m.dmHome) || m) : m;
+  const judged = Math.max(0, ...Object.values((b.judge || {}).tasks || {})
     .map(t => t.judged_at || 0));
-  const ran = m.date ? Date.parse(String(m.date)) / 1000 : 0;
-  const t = Math.max(judged, isNaN(ran) ? 0 : ran);
-  return t ? new Date(t * 1000).toISOString().slice(0, 16) : (m.date || null);
+  const ran = b.date ? Date.parse(String(b.date)) / 1000 : 0;
+  const t = Math.max(judged, isNaN(ran) ? 0 : ran, b.testedAt || 0);
+  return t ? t * 1000 : null;
 }
 
 const ord = n => { const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
@@ -7019,7 +7059,10 @@ function vModel() {
         state.after = { focus: `[data-mtab="${to}"]` };
         setModelTab(to);
       } },
+    // data-keep: a poll's redraw gives the focused tab its focus back — the
+    // arrow keys stopped working after one (and a test of them flaked)
     tabs.map(([id, label]) => el('button', { role: 'tab', class: 'mtab', 'data-mtab': id,
+      'data-keep': 'mtab-' + id,
       id: 'mtab-' + id, 'aria-selected': String(id === cur), 'aria-controls': 'mpanel',
       tabindex: id === cur ? '0' : '-1', text: label, onclick: () => setModelTab(id) })));
   const body = cur === 'answers' ? modelAnswersTab(m, kinds)
@@ -8358,8 +8401,8 @@ function bestByKind(ms) {
 // Models, on one of its three views
 function openModelsView(v) {
   const L = lbS();
-  try { localStorage.setItem('bench-models-view', v); } catch (e) { /* private */ }
-  Object.assign(L, { view: v, chip: v === 'exam' ? 'judged' : (L.stdChip || 'all') });
+  Object.assign(L, lbChoice(v, 'all'));
+  L.show = lbShowOf(lbViewKey(L));
   navigate({ tab: 'leaderboard', model: null, topic: null });
 }
 // the training runs' list alone — Home asks which datasets no run has used
@@ -9465,10 +9508,16 @@ function hashWords(h) {
   const p = new URLSearchParams(rest);
   const tab = p.get('tab') || (PLACE_WORDS.includes(s) || s === 'everyday' ? s : 'home');
   if (tab === 'models') {
-    const v = p.get('view') || p.get('sub'), c = LB_CHIPS.find(([k]) => k === p.get('chip'));
+    const v = p.get('view') || p.get('sub');
     if (v === 'compare') return 'Compare';
-    return ['Models', MODELS_VIEWS[v] && v !== 'standard' ? MODELS_VIEWS[v] : '',
-      c && c[0] !== 'all' ? c[1] : ''].filter(Boolean).join(' · ');
+    // 16.3: "Models · Mobile · DeviceMark"; an address from before it names a chip
+    const old = LB_OLD_CHIPS[p.get('chip')];
+    const test = old ? old[0] : MODELS_VIEWS[v] ? v : 'standard';
+    const gk = old ? old[1] : p.get('group') || (LB_GROUPS.standard.some(([k]) => k === p.get('chip'))
+      ? p.get('chip') : 'all');
+    const g = (LB_GROUPS[test] || []).find(([k]) => k === gk);
+    return ['Models', test !== 'standard' ? MODELS_VIEWS[test] : '',
+      g && g[0] !== 'all' ? g[1] : ''].filter(Boolean).join(' · ');
   }
   if (tab === 'benchmarks') return 'Benchmarks · ' + (p.get('q') ? benchName(p.get('q'))
     : SUB_WORDS[p.get('sub')] || 'Standard');
@@ -10026,20 +10075,20 @@ const CATS = [
   ['reasoning',    ['arc_challenge', 'arc_easy']],
   ['math',         ['gsm8k']],
   // 12k.2: Trust & safety — TruthfulQA, and the three that are never in Avg.
-  // 14.2: and MobileAIBench's three, in Columns ▾
-  ['trust',        ['truthfulqa_mc2', 'do_not_answer', 'xstest', 'bbq_3000', 'bbq_all',
-                    'mab_adv', 'mab_privacy', 'mab_socchem']],
+  // 16.3: MobileAIBench's three trust sets are under Mobile, a benchmark in one place
+  ['trust',        ['truthfulqa_mc2', 'do_not_answer', 'xstest', 'bbq_3000', 'bbq_all']],
   // 12h.1: the three that generate text — instruct models only, never in Avg
   ['instruction',  ['ifeval', 'mmlu_pro', 'hendrycks_math500']],
   // 12n.2: shared with the frontier — GPQA Diamond's two lm_eval forms and
   // SimpleQA Verified; never in Avg, never ranked with what others report
   ['shared',       ['gpqa_diamond_cot_zeroshot', 'gpqa_diamond_zeroshot', 'simpleqa_verified']],
   // 12o.3: MobileAIBench's HotpotQA and SQL — never in Avg, never in Improve.
-  // 14.1: and Dolly, CNN/DailyMail, XSum and MT-Bench
+  // 14.1: and Dolly, CNN/DailyMail, XSum and MT-Bench; 16.3: and its three
+  // trust sets (14.2), each part a group of its own on Mobile ▸ MobileAIBench
   ['mobile',       ['mab_hotpotqa', 'mab_sql', 'mab_dolly', 'mab_cnndm', 'mab_xsum',
-                    'mab_mtbench',
-                    // 14.3: and Mobile-MMLU-Pro, on our own key
-                    'mobile_mmlu_pro']],
+                    'mab_mtbench', 'mab_adv', 'mab_privacy', 'mab_socchem']],
+  // 14.3: Mobile-MMLU-Pro, on our own key — 16.3: Mobile ▸ Mobile-MMLU
+  ['mmlu',         ['mobile_mmlu_pro']],
 ];
 function radarAxes() {
   if (state.radarAxes === 'tasks') return DATA.accTasks.map(t => ({ key: t, label: t, tasks: [t] }));
@@ -10132,53 +10181,137 @@ function aboutBenchmarks(tasks, inline = false) {
 // Models tab's list merged into it; its facts are optional columns.
 // ===========================================================================
 
-// 12b: Standard's groups, and Language modelling (the old Perplexity & Loss
-// page). Judged topics is not a chip any more: it is Knowledge exam, on the
-// switch above the chips
+// 16.3: no chips. Row 1 says which tests — Standard · Mobile · Everyday ·
+// Frontier, and the Knowledge exam while it has results — and Group ▾ which
+// of their groups. A table is still drawn by its chip, the key below; a
+// group's third field names it. Standard's groups are 12b's; Mobile's are the
+// suites made for phone-size models, each in one place only
 const LB_CHIPS = [
-  ['all', 'All tasks'], ['knowledge', 'Knowledge'], ['commonsense', 'Commonsense'],
+  ['all', 'All'], ['knowledge', 'Knowledge'], ['commonsense', 'Commonsense'],
   ['reasoning', 'Reasoning'], ['math', 'Math'], ['trust', 'Trust & safety'],
-  ['instruction', 'Instruction & maths'], ['mobile', 'Mobile tasks'], ['lm', 'Language modelling'],
+  ['instruction', 'Instruction & maths'], ['lm', 'Language modelling'],
   // 12n.1: the home of reported scores (live: the frozen report carries none)
-  ['frontier', 'Frontier · reported'],
-  // 12q.B: DeviceMark's on-device chart, our phone builds on it (live, as Frontier)
-  ['ondevice', 'On-device chart'],
-  // 12x: its rows as columns of the table, ours and the models it pairs
-  ['devicemark', 'DeviceMark']];
-const LIVE_CHIPS = ['frontier', 'ondevice', 'devicemark'];
-// the four kinds of test, named the same and in the same order everywhere.
-// A kind with no data yet is not offered: On phone (12f.2) once a phone build
-// is registered
-// 12f.2b: On phone is no view of its own any more — phone builds are rows,
-// and #tab=models&view=phone is Models with them chosen
-const MODELS_VIEWS = { standard: 'Standard', exam: 'Knowledge exam', everyday: 'Everyday tasks' };
+  ['frontier', 'Frontier'],
+  // Mobile: one headline a suite; DeviceMark's rows as columns (12x), its
+  // Chart the On-device chart (12q.B); MobileAIBench in its three parts;
+  // Mobile-MMLU-Pro with its categories, and the full set's own table (14.4)
+  ['mobileall', 'All'], ['devicemark', 'DeviceMark'], ['mobile', 'MobileAIBench'],
+  ['mmlu', 'Mobile-MMLU']];
+const LIVE_CHIPS = ['frontier', 'devicemark'];
+const MOBILE_CHIPS = ['mobileall', 'devicemark', 'mobile', 'mmlu'];
+// the kinds of test, named the same and in the same order everywhere.
+// 12f.2b: #tab=models&view=phone is Models with the phone builds chosen
+const MODELS_VIEWS = { standard: 'Standard', mobile: 'Mobile', everyday: 'Everyday',
+  frontier: 'Frontier', exam: 'Knowledge exam' };
+// each one's Group ▾: [its name in the address, its words, its chip]
+const LB_GROUPS = {
+  standard: [['all', 'All', 'all'], ['knowledge', 'Knowledge', 'knowledge'],
+    ['commonsense', 'Commonsense', 'commonsense'], ['reasoning', 'Reasoning', 'reasoning'],
+    ['math', 'Math', 'math'], ['trust', 'Trust & safety', 'trust'],
+    ['instruction', 'Instruction & maths', 'instruction'], ['lm', 'Language modelling', 'lm']],
+  mobile: [['all', 'All', 'mobileall'], ['devicemark', 'DeviceMark', 'devicemark'],
+    ['mobileaibench', 'MobileAIBench', 'mobile'], ['mmlu', 'Mobile-MMLU', 'mmlu']] };
+// 16.3: a chip's name in an address from before Row 1 and Group ▾, where it is now
+const LB_OLD_CHIPS = { mobile: ['mobile', 'mobileaibench'], devicemark: ['mobile', 'devicemark'],
+  ondevice: ['mobile', 'devicemark'], frontier: ['frontier', 'all'] };
+// the views a table is drawn in: Standard's (its chip says which tests: Mobile
+// and Frontier are chips of it), the exam's and Everyday's
 function modelsViews() {
   const out = ['standard'];
   if (DATA.models.some(m => Object.keys((m.judge || {}).tasks || {}).some(t => t.startsWith('exam_'))))
     out.push('exam');
-  if (Object.keys(evd().models || {}).length) out.push('everyday');
+  if (LIVE || Object.keys(evd().models || {}).length) out.push('everyday');
   return out;
 }
-// Models opens on Standard, and remembers the viewer's last choice
-function modelsView() {
-  let v = 'standard';
-  try { v = localStorage.getItem('bench-models-view') || v; } catch (e) { /* private */ }
-  return modelsViews().includes(v) ? v : 'standard';
+// Row 1's choices on this board: Frontier is live only, as its chip was
+function lbTests() {
+  const vs = modelsViews();
+  return Object.keys(MODELS_VIEWS).filter(t => t === 'standard' || t === 'mobile'
+    || (t === 'frontier' ? LIVE : vs.includes(t)));
 }
-function setModelsView(v) {
+// which of Row 1's choices a state is, and which of its groups
+function lbTest(L = lbS()) {
+  if (['everyday', 'exam', 'compare'].includes(L.view)) return L.view;
+  if (L.chip === 'frontier') return 'frontier';
+  return MOBILE_CHIPS.includes(L.chip) ? 'mobile' : 'standard';
+}
+function lbGroup(L = lbS()) {
+  const g = (LB_GROUPS[lbTest(L)] || []).find(x => x[2] === L.chip);
+  return g ? g[0] : 'all';
+}
+// "Mobile · DeviceMark", "Knowledge", "Frontier": where a view is, in words
+function lbWhere(L = lbS()) {
+  const t = lbTest(L), g = (LB_GROUPS[t] || []).find(x => x[2] === L.chip);
+  if (t === 'standard') return g && g[0] !== 'all' ? g[1] : 'Standard';
+  return MODELS_VIEWS[t] + (g && g[0] !== 'all' ? ' · ' + g[1] : '');
+}
+// the state a choice of test and group is; a test chosen alone reopens on
+// its last group
+function lbChoice(test, group) {
   const L = lbS();
-  try { localStorage.setItem('bench-models-view', v); } catch (e) { /* private */ }
-  lbSet({ view: v, chip: v === 'exam' ? 'judged' : (L.stdChip || 'all') });
+  if (test === 'everyday' || test === 'exam')
+    return { view: test, chip: test === 'exam' ? 'judged' : L.chip === 'judged' ? 'all' : L.chip,
+      cols: null };
+  if (test === 'frontier') return { view: 'standard', chip: 'frontier', cols: null };
+  const gs = LB_GROUPS[test] || LB_GROUPS.standard;
+  const g = gs.find(x => x[0] === (group || (L.groupBy || {})[test])) || gs[0];
+  return { view: 'standard', chip: g[2], cols: null };
 }
-// the model facts the Models tab carried: columns, off until asked for
-const FACT_KEYS = ['family', 'kind', 'date', 'flags'];
+// Table or Chart, remembered for each view (its test and group) in this browser
+const lbViewKey = (L = lbS()) => `${lbTest(L)}:${lbGroup(L)}`;
+function lbShowOf(key) {
+  try { return (JSON.parse(localStorage.getItem('bench-lb-show') || '{}') || {})[key] || 'table'; }
+  catch (e) { return (state.lbShowBy || {})[key] || 'table'; }
+}
+function lbPick(test, group) {
+  const L = lbS(), next = lbChoice(test, group), after = { ...L, ...next };
+  L.groupBy = { ...(L.groupBy || {}), [lbTest(after)]: lbGroup(after) };
+  state.lbFilters = false;
+  lbSet({ ...next, show: lbShowOf(lbViewKey(after)) });
+}
+// what lbSet keeps: the view as the viewer's last (Models opens on it), and
+// its Table or Chart for that view
+function lbRemember(patch) {
+  const L = lbS();
+  if (L.view === 'compare') return;
+  const key = lbViewKey(L);
+  try {
+    localStorage.setItem('bench-models-last', JSON.stringify({ test: lbTest(L), group: lbGroup(L),
+      show: L.show }));
+    if ('show' in patch) {
+      const by = JSON.parse(localStorage.getItem('bench-lb-show') || '{}') || {};
+      by[key] = L.show;
+      localStorage.setItem('bench-lb-show', JSON.stringify(by));
+    }
+  } catch (e) { if ('show' in patch) state.lbShowBy = { ...(state.lbShowBy || {}), [key]: L.show }; }
+}
+// Models opens on the viewer's last view: its test, group, and Table or
+// Chart (the filters are the address's)
+function lbRemembered() {
+  let v = null;
+  try { v = JSON.parse(localStorage.getItem('bench-models-last') || 'null'); }
+  catch (e) { v = null; }
+  // before 16.3: the view alone
+  if (!v) try { const old = localStorage.getItem('bench-models-view');
+    if (old) v = { test: old }; } catch (e) { /* private */ }
+  if (!v || !lbTests().includes(v.test)) return {};
+  return { ...lbChoice(v.test, v.group || 'all'), show: v.show === 'chart' ? 'chart' : 'table' };
+}
+// the model facts the Models tab carried: columns, off until asked for.
+// 16.3: Columns ▸ Model details — family, type, size (on until hidden),
+// source, tested and flags
+const FACT_KEYS = ['family', 'kind', 'params', 'source', 'date', 'flags'];
 function lbFactsShown() {
-  try { return JSON.parse(localStorage.getItem('bench-lb-facts') || '[]'); }
-  catch (e) { return []; }
+  let on = state.lbFacts || [], sizeOff = !!state.lbSizeOff;
+  try {
+    on = JSON.parse(localStorage.getItem('bench-lb-facts') || '[]');
+    sizeOff = localStorage.getItem('bench-lb-size') === 'off';
+  } catch (e) { /* private: this page's memory */ }
+  return [...on.filter(k => k !== 'params'), ...(sizeOff ? [] : ['params'])];
 }
 const LB_GROUP = { knowledge: 'Knowledge', commonsense: 'Commonsense', reasoning: 'Reasoning',
   math: 'Math', trust: 'Trust & safety', instruction: 'Instruction & maths',
-  shared: 'Shared with the frontier', mobile: 'Mobile tasks (MobileAIBench)' };
+  shared: 'Shared with the frontier', mobile: 'MobileAIBench', mmlu: 'Mobile-MMLU' };
 // 12n.2: GPQA Diamond and SimpleQA Verified, measured here beside what others
 // report — never in Avg, never a training target, never in Improve
 const frontierTasks = () => DATA.frontierTasks || [];
@@ -10239,6 +10372,9 @@ const MAB_PAPER = 'their paper\u2019s numbers (16-bit) are under Frontier · rep
 // paper's three models land within 3 points of its numbers; a model that
 // labelled the key keeps its number off the column, never ranked
 const MMP = 'mobile_mmlu_pro';
+// 16.3: a model's Mobile-MMLU-Pro category, a fraction — none for a labeller
+const mmpCatVal = (m, cat) => mmpLabelled(m.id) ? null
+  : ((((m.mmp || {}).by_category || {})[cat] || {}).acc ?? null);
 const MMPD = () => DATA.mmp || {};
 const mmpProvisional = () => MMPD().provisional !== false;
 const mmpLabelled = id => (MMPD().labelled || {})[id] || null;
@@ -10479,8 +10615,6 @@ function genTip(t) {
     'instruct models only, and never part of the board\'s Avg — choose it under '
       + 'Benchmarks to average it with others'].filter(Boolean);
 }
-const LB_KINDS = [['all', 'All'], ['base', 'base'], ['instruct', 'instruct'],
-  ['checkpoint', 'checkpoint']];
 // 16.1: five buckets on the total size, more than one can be ticked
 // ("size=l,x"), and the rows with no size recorded as their own choice
 const LB_SIZES = [['all', 'All'], ['s', '< 200M'], ['m', '200M–1B'], ['l', '1–3B'],
@@ -10497,11 +10631,69 @@ function sizeSel(v) {
   return out;
 }
 const sizeVal = sel => sel.length ? sel.join(',') : 'all';
+const sizeWord = k => k === SIZE_NONE ? 'not recorded' : (LB_SIZES.find(([b]) => b === k) || [])[1];
 const sizeOkFor = (sel, m) => !sel.length
   || (m.params == null ? sel.includes(SIZE_NONE) : sel.includes(sizeBucket(m.params)));
 const LB_STATUS = [['all', 'All'], ['ranked', 'ranked'], ['preliminary', 'preliminary'],
   ['tainted', 'tainted']];
-const LB_DEFAULTS = { chip: 'all', kind: 'all', size: 'all', status: 'all' };
+// 16.3: where a model came from — this replaces Kind's "checkpoint", which
+// mixed where a model came from with what type it is — more than one ticked
+const LB_SOURCES = [['hf', 'Hugging Face'], ['local', 'Uploaded here'], ['gguf', 'GGUF file'],
+  ['served', 'Served']];
+const LB_TYPES = [['all', 'All'], ['base', 'base'], ['instruct', 'instruct']];
+function sourceOf(m) {
+  // 12x: a thinking-on DeviceMark row is its model's
+  const b = m.dmHome ? (DATA.models.find(x => x.id === m.dmHome) || m) : m;
+  if (b.served || (DATA.served || {})[b.id]) return 'served';
+  if (b.rowOf || ggufOnly(b)) return 'gguf';
+  return b.source === 'artifact' ? 'local' : 'hf';
+}
+const sourceSel = v => String(v || 'all').split(',').filter(x => LB_SOURCES.some(([k]) => k === x))
+  .filter((x, i, a) => a.indexOf(x) === i);
+const sourceVal = sel => sel.length ? sel.join(',') : 'all';
+const sourceWords = k => (LB_SOURCES.find(([x]) => x === k) || [k, k])[1];
+// Tested: the date of a model's latest finished run — "7d", "30d" or
+// "2026-09-01..2026-09-30", and ",none" for the models with no date, which a
+// date filter never hides silently (as sizes)
+const LB_TESTED = [['any', 'Any time'], ['7d', 'Last 7 days'], ['30d', 'Last 30 days']];
+const TESTED_NONE = 'none';
+function testedSel(v) {
+  const parts = String(v || 'any').split(','), none = parts.includes(TESTED_NONE);
+  const span = parts.find(x => x !== TESTED_NONE) || 'any';
+  const range = /^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/.exec(span);
+  if (range) return { span: 'range', from: range[1] <= range[2] ? range[1] : range[2],
+    to: range[1] <= range[2] ? range[2] : range[1], none };
+  return { span: LB_TESTED.some(([k]) => k === span) ? span : 'any', none };
+}
+function testedVal(t) {
+  const span = t.span === 'range' ? `${t.from}..${t.to}` : t.span;
+  return span === 'any' ? 'any' : span + (t.none ? ',' + TESTED_NONE : '');
+}
+// a model's tested date as the viewer's own day, "2026-09-28", or null
+function testedDay(m) {
+  const ms = testedMs(m);
+  if (ms == null) return null;
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-`
+    + String(d.getDate()).padStart(2, '0');
+}
+function testedOk(t, m) {
+  if (t.span === 'any') return true;
+  const ms = testedMs(m);
+  if (ms == null) return t.none;
+  if (t.span === 'range') { const d = testedDay(m); return d >= t.from && d <= t.to; }
+  return ms >= Date.now() - (t.span === '7d' ? 7 : 30) * 864e5;
+}
+function testedWords(t) {
+  if (t.span === 'range') {
+    const f = x => { const [y, mo, d] = x.split('-'); return `${+d} ${MONTHS[+mo - 1]}`
+      + (+y !== new Date().getFullYear() ? ` ${y}` : ''); };
+    return `${f(t.from)} – ${f(t.to)}`;
+  }
+  return (LB_TESTED.find(([k]) => k === t.span) || [, 'Any time'])[1];
+}
+// what the address and Filters ▾ hold, and their defaults (a plain link stays plain)
+const LB_DEFAULTS = { size: 'all', source: 'all', type: 'all', tested: 'any', status: 'all' };
 
 // everything the Leaderboard remembers lives here, not in the DOM: a render
 // every five seconds rebuilds the DOM, and an opened row must survive it
@@ -10514,7 +10706,9 @@ function lbS() {
       state.lbSe = localStorage.getItem('bench-lb-se') === 'on';
     } catch (e) { /* private mode: the defaults */ }
     state.lb = { ...LB_DEFAULTS, open: [], models: null, cols: null, tint, howto, shown: {},
-                 focus: null, weak: null, radarSrc: 'tasks', view: 'standard', stdChip: 'all',
+                 focus: null, weak: null, radarSrc: 'tasks', view: 'standard', chip: 'all',
+                 // 16.3: Table or Chart, and each test's last group
+                 show: 'table', groupBy: {},
                  // 12m.1: the compared models, the shape's source, the ticked rows,
                  // and Benchmarks' highlighted models (at most three)
                  cmp: null, shapeSrc: 'tasks', ticks: [], hl: null };
@@ -10529,11 +10723,13 @@ function lbHash() {
   // 12m.1: "view=compare&m=Qwen%2FQwen3-1.7B,served%2F…" — the models and nothing else
   if (L.view === 'compare')
     return 'view=compare' + ((L.cmp || []).length ? '&m=' + L.cmp.map(encodeURIComponent).join(',') : '');
-  if (L.view && L.view !== 'standard') out.push('view=' + L.view);
-  for (const k of Object.keys(LB_DEFAULTS)) {
-    if (k === 'chip' && L.view !== 'standard') continue;
+  // 16.3: "view=mobile&group=devicemark&show=chart&size=xx&tested=7d"
+  const test = lbTest(L), g = lbGroup(L);
+  if (test !== 'standard') out.push('view=' + test);
+  if (LB_GROUPS[test] && g !== 'all') out.push('group=' + g);
+  if (L.show === 'chart') out.push('show=chart');
+  for (const k of Object.keys(LB_DEFAULTS))
     if (L[k] !== LB_DEFAULTS[k]) out.push(`${k}=${encodeURIComponent(L[k])}`);
-  }
   // 12h.2: a table someone built — its benchmarks and its models — so the
   // address alone opens it: "cols=ifeval,mmlu_pro,math500&models=…"
   if (L.view === 'standard' && L.cols)
@@ -10546,15 +10742,31 @@ function lbFromHash(rest) {
   // an old link's "chip=judged" is the Knowledge exam view now (12b)
   // 12z B6: "sub=everyday" too, the way Benchmarks and Improve name their parts
   const sv = { knowledge: 'exam', judged: 'exam' }[p.get('sub')] || p.get('sub');
-  const view = p.get('chip') === 'judged' ? 'exam' : p.get('view') || sv;
-  // 12k.2: and "chip=truthfulness" is Trust & safety
-  if (p.get('chip') === 'truthfulness') p.set('chip', 'trust');
+  // 12k.2: "chip=truthfulness" is Trust & safety
+  const chip = p.get('chip') === 'truthfulness' ? 'trust' : p.get('chip');
+  const view = chip === 'judged' ? 'exam' : p.get('view') || sv;
   // 12f.2b: the old On phone view is Models with the phone builds chosen
   L.phoneFilter = view === 'phone';
-  L.view = Object.keys(MODELS_VIEWS).includes(view) || view === 'compare' ? view : 'standard';
-  L.stdChip = LB_CHIPS.some(([v]) => v === p.get('chip')) ? p.get('chip') : 'all';
-  L.chip = L.view === 'exam' ? 'judged' : L.stdChip;
-  L.kind = LB_KINDS.some(([v]) => v === p.get('kind')) ? p.get('kind') : 'all';
+  // 16.3: Row 1 and Group ▾. The chips' names before them land on their new
+  // view: "chip=mobile" (Mobile tasks) is Mobile ▸ MobileAIBench,
+  // "chip=devicemark" Mobile ▸ DeviceMark and "chip=ondevice" its Chart,
+  // "chip=frontier" Frontier, "chip=math" Standard ▸ Math
+  let test = view === 'compare' || Object.keys(MODELS_VIEWS).includes(view) ? view : 'standard';
+  let group = p.get('group') || 'all';
+  if (LB_OLD_CHIPS[chip]) [test, group] = LB_OLD_CHIPS[chip];
+  else if (LB_GROUPS.standard.some(([g]) => g === chip)) [test, group] = ['standard', chip];
+  if (test === 'compare') L.view = 'compare';
+  else {
+    Object.assign(L, lbChoice(test, group));
+    L.groupBy = { ...(L.groupBy || {}), [lbTest(L)]: lbGroup(L) };
+  }
+  L.show = p.get('show') === 'chart' || chip === 'ondevice' ? 'chart' : 'table';
+  // the filters; an old "kind=" is Source's "Uploaded here", or Type
+  const kind = p.get('kind');
+  L.source = sourceVal(sourceSel(p.get('source') || (kind === 'checkpoint' ? 'local' : '')));
+  const type = p.get('type') || kind;
+  L.type = LB_TYPES.some(([v]) => v === type) ? type : 'all';
+  L.tested = testedVal(testedSel(p.get('tested')));
   L.size = sizeVal(sizeSel(p.get('size')));
   L.status = LB_STATUS.some(([v]) => v === p.get('status')) ? p.get('status') : 'all';
   // 12h.2: the chosen benchmarks and models; a name this board does not know
@@ -10807,6 +11019,7 @@ function customAvg(m, ts) {
 // click, and the page paints
 function lbSet(patch) {
   Object.assign(lbS(), patch);
+  lbRemember(patch);                         // 16.3: the viewer's last view
   const want = hashFor();
   if (location.hash.slice(1) !== want) history.replaceState(history.state, '', '#' + want);
   render();
@@ -10949,17 +11162,21 @@ function lbColumns(ms) {
   const lead = [
     { key: 'rank', label: '#', group: '', nosort: true },
     { key: 'name', label: 'Model', group: '' },
-    { key: 'params', label: 'Params', num: true, group: '' },
+    // 16.3: a model detail, shown until hidden
+    { key: 'params', label: 'Size', short: 'Params', num: true, group: '', fact: true, optional: true },
     { key: 'avg', label: 'Avg', num: true, group: '',
       unit: state.avgMode === 'raw' ? 'raw · %' : 'above chance · %' }];
   // 12b: the Models tab's facts — family, kind, last evaluated, flags —
   // are columns under Filters ▾, off by default
+  // 16.3: Model details — Type in place of Kind (where a model came from is
+  // Source), and Tested, its latest finished run's date
   const tail = [
-    { key: 'family', label: 'Family', group: 'Model facts', fact: true, optional: true },
-    { key: 'kind', label: 'Kind', group: 'Model facts', fact: true, optional: true },
-    { key: 'date', label: 'Last evaluated', short: 'Updated', group: 'Model facts', fact: true,
+    { key: 'family', label: 'Family', group: 'Model details', fact: true, optional: true },
+    { key: 'kind', label: 'Type', group: 'Model details', fact: true, optional: true },
+    { key: 'source', label: 'Source', group: 'Model details', fact: true, optional: true },
+    { key: 'date', label: 'Tested', short: 'Tested', group: 'Model details', fact: true,
       optional: true },
-    { key: 'flags', label: 'Flags', group: 'Model facts', fact: true, optional: true }];
+    { key: 'flags', label: 'Flags', group: 'Model details', fact: true, optional: true }];
   // an area with no number for any model here is not a column (11e)
   const areasHere = areas.filter(a => ms.some(m => areaMmlu(m, a)));
   // 12h.2: the chosen benchmarks, and their own average: "Avg of 3"
@@ -10985,7 +11202,9 @@ function lbColumns(ms) {
   if (L.chip === 'all') {
     // today's view: the harness tasks, six by default, the rest one tick away
     const order = [...CATS.map(([g]) => LB_GROUP[g]), 'Other tasks', 'Perplexity'];
-    mid = [...DATA.accTasks.map(task), ...DATA.pplTasks.map(task)]
+    // 16.3: a benchmark in one place only — Mobile's suites are Mobile's, and
+    // GPQA and SimpleQA are Frontier's
+    mid = [...DATA.accTasks.filter(stdTask).map(task), ...DATA.pplTasks.map(task)]
       .map(c => ({ ...c, optional: true }))
       .sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group));
     // 12b: the judged columns are Knowledge exam's, on the switch
@@ -11004,6 +11223,29 @@ function lbColumns(ms) {
     // rank and average are Standard's
     lead.splice(0, lead.length, ...lead.filter(c => c.key !== 'rank' && c.key !== 'avg'));
     mid = dmCols();
+  } else if (L.chip === 'mobileall') {
+    // 16.3: Mobile ▸ All — one headline a suite: DeviceMark's composite, which
+    // DeviceMark defines; MT-Bench, MobileAIBench's judged part (its makers
+    // name no headline across its parts); Mobile-MMLU-Pro. The full set keeps
+    // its own table (14.4: never a column beside another)
+    lead.splice(0, lead.length, ...lead.filter(c => c.key !== 'rank' && c.key !== 'avg'));
+    mid = [...(LIVE && dmAny() ? [{ ...dmCol('composite'), group: 'DeviceMark' }] : []),
+      ...[MTBENCH, MMP].filter(t => (DATA.tasks || {})[t] || DATA.accTasks.includes(t))
+        .map(t => ({ ...task(t), group: t === MMP ? 'Mobile-MMLU' : 'MobileAIBench' }))];
+  } else if (L.chip === 'mobile') {
+    // 16.3: MobileAIBench in its three parts: no judge; judged; trust & safety, judged
+    lead.splice(0, lead.length, ...lead.filter(c => c.key !== 'rank' && c.key !== 'avg'));
+    const part = t => MAB_TRUST.includes(t) ? 'MobileAIBench · trust & safety, judged'
+      : mabJudged(t) ? 'MobileAIBench · judged' : 'MobileAIBench · no judge';
+    mid = [...MAB, ...MAB_TRUST].filter(t => DATA.accTasks.includes(t))
+      .map(t => ({ ...task(t), group: part(t) }));
+  } else if (L.chip === 'mmlu') {
+    // 16.3: Mobile-MMLU-Pro and its categories — the provisional-key note and
+    // its badge on the header; the full set's own table under this one (14.4)
+    lead.splice(0, lead.length, ...lead.filter(c => c.key !== 'rank' && c.key !== 'avg'));
+    mid = [...(DATA.accTasks.includes(MMP) ? [{ ...task(MMP), group: 'Mobile-MMLU-Pro' }] : []),
+      ...(MMPD().categories || []).map(cat => ({ key: 'mmpcat:' + cat, mmpcat: cat, label: cat,
+        short: cat, num: true, group: 'Mobile-MMLU-Pro by category', unit: '% on our key' }))];
   } else if (L.chip === 'judged') {
     // 12b: the Knowledge exam view stands on its own numbers — the Standard
     // rank and average are Standard's, and a model with no exam result is
@@ -11020,8 +11262,7 @@ function lbColumns(ms) {
       .map(t => MAB_TRUST.includes(t) ? { ...task(t), optional: true } : task(t));
     // 12h.1: Instruction & maths stands on its own three numbers — the
     // Standard rank and average are Standard's, and none of these is in them
-    // 12o.3: and Mobile tasks on its own two
-    if (L.chip === 'instruction' || L.chip === 'mobile')
+    if (L.chip === 'instruction')
       lead.splice(0, lead.length, ...lead.filter(c => c.key !== 'rank' && c.key !== 'avg'));
   }
   // 12f.2b: and, on All tasks, what was reported from the phone while a row
@@ -11109,9 +11350,16 @@ function lbColTipOf(c) {
     : '0 = guessing, 100 = perfect, so a 25% guess on a 4-option test counts as 0'];
   if (c.key === 'name') return ['Model — sort by name'];
   if (c.key === 'params') return ['Params — parameter count, from the harness config or the name'];
-  if (c.key === 'date') return ['Updated — when the model was last evaluated'];
+  if (c.key === 'date') return ['Tested — when the model’s latest finished run was, any kind: '
+    + 'the standard tests, a judged, Everyday, DeviceMark, served or GGUF run'];
   if (c.key === 'family') return ['Family — the Hub organisation, or a local run\'s name'];
-  if (c.key === 'kind') return ['Kind — base, instruct or an uploaded checkpoint'];
+  if (c.key === 'kind') return ['Type — base or instruct'];
+  if (c.key === 'source') return ['Source — where the model came from: Hugging Face, uploaded '
+    + 'here, a GGUF file, or served elsewhere'];
+  // 16.3: Mobile-MMLU-Pro by category
+  if (c.mmpcat) return [`Mobile-MMLU-Pro · ${c.mmpcat} — accuracy on our answer key’s kept `
+      + 'questions' + (mmpProvisional() ? ' · provisional key' : ''), MMP_HOW,
+    'a model that labelled the key is never ranked', 'never in any average · never a training target'];
   if (c.key === 'flags') return ['Flags — trained on diagnostics, or graded by a provisional judge'];
   if (c.key === 'avg') return [`Avg — mean of the required tasks, % ${scale}`,
     'the Scale pill switches it'];
@@ -11172,8 +11420,12 @@ function lbShownFor(cols) {
 }
 function lbSaveShown(next) {
   const L = lbS();
-  try { localStorage.setItem('bench-lb-facts', JSON.stringify(next.filter(k => FACT_KEYS.includes(k)))); }
-  catch (e) { /* private */ }
+  const facts = next.filter(k => FACT_KEYS.includes(k) && k !== 'params');
+  state.lbFacts = facts; state.lbSizeOff = !next.includes('params');
+  try {
+    localStorage.setItem('bench-lb-facts', JSON.stringify(facts));
+    localStorage.setItem('bench-lb-size', next.includes('params') ? 'on' : 'off');
+  } catch (e) { /* private */ }
   next = next.filter(k => !FACT_KEYS.includes(k));
   if (L.chip === 'all') {
     state.lbShown = next;
@@ -11189,8 +11441,13 @@ function lbFilter(ms, opts = {}) {
   // 16.1: a missing size is never hidden silently (lbSizeHidden says so)
   const sel = opts.anySize ? [] : sizeSel(L.size);
   const sizeOk = m => sizeOkFor(sel, m);
+  // 16.3: Source and Type, where Kind mixed the two; Tested, the latest finished run's date
+  const src = opts.anySource ? [] : sourceSel(L.source);
+  const tested = opts.anyDate ? { span: 'any' } : testedSel(L.tested);
   return ms.filter(m =>
-    (L.kind === 'all' || (L.kind === 'checkpoint' ? m.source === 'artifact' : m.kind === L.kind))
+    (!src.length || src.includes(sourceOf(m)))
+    && (L.type === 'all' || m.kind === L.type)
+    && testedOk(tested, m)
     && sizeOk(m)
     && (L.status === 'all'
         || (L.status === 'ranked' && officialAvg(m) != null)
@@ -11208,7 +11465,7 @@ function sizePill(ms) {
   const L = lbS(), sel = sizeSel(L.size);
   const none = lbFilter(ms, { anySize: true }).filter(m => m.params == null).length;
   const opts = [...LB_SIZES.slice(1), ...(none ? [[SIZE_NONE, `Size not recorded (${none})`]] : [])];
-  const word = k => k === SIZE_NONE ? 'not recorded' : (LB_SIZES.find(([b]) => b === k) || [])[1];
+  const word = sizeWord;
   const btn = el('button', { class: 'pill' + (sel.length ? ' on' : ''), id: 'pill-size',
     'data-pill': 'size', 'data-value': L.size,
     text: `Size: ${sel.length ? sel.map(word).join(', ') : 'All'} ▾` });
@@ -11313,13 +11570,83 @@ function tiedWithBest(c, m, best, val) {
 // the kind of test; a row opens the model page; models with nothing in this
 // view sit under one line at the bottom, not in rows of dashes
 function modelsHead(badge) {
-  const L = lbS(), views = modelsViews();
+  const L = lbS(), cur = lbTest(L), why = lbChartWhy(L);
+  // a view with no chart shows its table, whatever was chosen for it
+  const showing = why ? 'table' : L.show;
+  const seg = (v, text) => el('button', { class: 'chip-btn' + (showing === v ? ' on' : ''),
+    'data-show': v, 'aria-pressed': String(showing === v), text,
+    // 11e's way: an unavailable choice still takes the click, and says why
+    'aria-disabled': v === 'chart' && why ? 'true' : null, title: v === 'chart' && why ? why : null,
+    'aria-describedby': v === 'chart' && why ? 'why-no-chart' : null,
+    onclick: () => { if (v === 'chart' && why) { state.lbChartNote = !state.lbChartNote; render(); }
+      else lbSet({ show: v }); } });
   return [el('h2', {}, 'Models', badge || ''),
-    views.length > 1 ? el('nav', { class: 'subswitch', 'data-models-switch': '1', role: 'tablist',
-        'aria-label': 'kind of test' },
-      views.map(v => el('button', { class: 'chip-btn' + (L.view === v ? ' on' : ''), role: 'tab',
-        'data-models-view': v, 'aria-selected': String(L.view === v), text: MODELS_VIEWS[v],
-        onclick: () => setModelsView(v) }))) : ''];
+    // 16.3: Row 1 — which tests, left; Table or Chart, right
+    el('div', { class: 'lbrow1', 'data-lb-row1': '1' },
+      el('nav', { class: 'subswitch', 'data-models-switch': '1', role: 'tablist',
+          'aria-label': 'which tests' },
+        lbTests().map(v => el('button', { class: 'chip-btn' + (cur === v ? ' on' : ''), role: 'tab',
+          'data-models-view': v, 'data-keep': 'mview-' + v, 'aria-selected': String(cur === v),
+          text: MODELS_VIEWS[v],
+          onclick: () => lbPick(v) }))),
+      el('div', { class: 'segbtn', role: 'group', 'aria-label': 'table or chart',
+        'data-lb-show': showing }, seg('table', 'Table'), seg('chart', 'Chart'))),
+    why ? el('p', { class: 'chipnote', id: 'why-no-chart', role: 'note', 'data-why': 'chart',
+      hidden: state.lbChartNote ? null : '', text: why }) : ''];
+}
+// 16.3: where a view has no chart, why — the Chart button says it
+function lbChartWhy(L = lbS()) {
+  const t = lbTest(L);
+  if (t === 'everyday') return 'Everyday has no chart: each group is a count of questions passed, '
+    + 'each of its own size';
+  if (t === 'exam') return 'The Knowledge exam has no chart';
+  if (t === 'frontier' && !(state.rep || {}).loaded) return 'Frontier’s chart needs what others '
+    + 'report, still loading';
+  if (L.chip === 'mobileall' && !L.cols) return 'Mobile ▸ All sets different suites side by side, '
+    + 'each on its own scale: choose one under Group for its chart';
+  if (L.chip === 'lm' && !L.cols) return 'Language modelling’s charts are under its table';
+  if (L.chip === 'devicemark' && !LIVE) return 'DeviceMark’s chart is on the live board';
+  return '';
+}
+// 16.3: Chart — the ranked bars Benchmarks ▸ Standard drew (vTasks), one panel
+// a benchmark in view, for the models the toolbar keeps. Mobile ▸ DeviceMark's
+// is the On-device chart (lbOnDevice); Frontier's, what others report (frPanels)
+function lbChart(ms) {
+  const L = lbS(), rows = lbFilter(ms);
+  const hl = (L.hl || []).filter(id => rows.some(m => m.id === id)).slice(0, 3);
+  const cols = lbColumns(ms), shown = lbShownFor(cols);
+  const opt = cols.filter(c => c.optional && !c.fact);      // 16.3: benchmarks hidden, not details
+  const nHidden = opt.length - opt.filter(c => shown.has(c.key)).length;
+  const card = el('div', { class: 'card', 'data-lb-card': '1', 'data-lb-chart': lbViewKey(L) },
+    ...modelsHead(), lbToolbar(ms, cols, shown, nHidden));
+  if (lbTest(L) === 'frontier') {
+    const fr = frPanels(hl);
+    card.append(fr || el('p', { class: 'note', 'data-chart-none': '1',
+      text: 'Nothing reported for these models yet.' }));
+    return [card];
+  }
+  const ts = (state.lbBenchNow || []).filter(t => !isGgufKey(t) && !isDmKey(t)
+    && !(DATA.pplTasks || []).includes(t));
+  const have = ts.filter(t => rows.some(m => cell(t, m.id)));
+  const none = ts.filter(t => !have.includes(t));
+  // the scale is the toolbar's (Filters ▸ More ▸ Scale), as the table's Avg
+  const keep = state.accScale;
+  state.accScale = state.avgMode === 'raw' ? 'raw' : 'chance';
+  const panels = have.flatMap(t => [barPanel(t, rows, { lower: false, hl, refs: frRefs(t) }),
+    ...ggufPanel(t, rows, hl)]);
+  state.accScale = keep;
+  card.append(
+    el('p', { class: 'small se', 'data-chart-caption': '1', text: 'One panel a benchmark, models '
+      + 'ranked. Pointing at a model highlights it in every panel. Dashed line = chance. '
+      + 'Columns ▾ chooses the benchmarks; Filters ▾ and Models ▾ the models.' }),
+    panels.length ? el('div', { class: 'panels', 'data-chart-panels': String(have.length) }, panels)
+      : el('p', { class: 'note', 'data-chart-none': '1', text: rows.length
+        ? 'None of these models has a number in the benchmarks in view.'
+        : 'No models match these filters.' }),
+    none.length && panels.length ? el('p', { class: 'small se', 'data-empty-panels': none.join(',') },
+      `No numbers for these models: ${none.map(benchName).join(', ')}`) : '',
+    lbSizeHidden(ms), lbTestedHidden(ms));
+  return [card];
 }
 // ---- 12f.2: On phone ----
 // A phone build's card: what someone measured on the phone, typed in and
@@ -11730,8 +12057,8 @@ function lbFrontier(ms) {
     // 12q.B: DeviceMark's on-device board, our phone builds on it
     el('p', { class: 'small', 'data-frontier-ondevice': '1' },
       'On a phone: DeviceMark’s board and our phone builds, by their protocol — ',
-      el('a', { href: '#', 'data-frontier-ondevice-go': '1', text: 'On-device chart ▸',
-        onclick: e => { e.preventDefault(); lbSet({ chip: 'ondevice', cols: null }); } })));
+      el('a', { href: '#', 'data-frontier-ondevice-go': '1', text: 'Mobile ▸ DeviceMark ▸ Chart',
+        onclick: e => { e.preventDefault(); lbOnDeviceGo(); } })));
   if (!state.rep.loaded) {
     card.append(el('p', { class: 'small se', 'data-frontier-loading': '1',
       text: 'Loading what others report…' }));
@@ -12347,9 +12674,15 @@ function dmSetupCell(id, mode = 'off') {
   return el('td', { class: 'num', 'data-served-dm': `${id}|${mode}`,
     title: r && r.inherited ? r.inherited.line : null, text: r ? dmComp(r.composite) : '—' });
 }
+// 16.3: Mobile ▸ DeviceMark ▸ Chart, the On-device chart
+function lbOnDeviceGo() {
+  const L = lbS();
+  L.groupBy = { ...(L.groupBy || {}), mobile: 'devicemark' };
+  lbSet({ ...lbChoice('mobile', 'devicemark'), show: 'chart' });
+}
 // the On-device chart, scrolled to a row and marked
 function dmOpenRow(id) {
-  Object.assign(lbS(), { view: 'standard', chip: 'ondevice', cols: null });
+  Object.assign(lbS(), lbChoice('mobile', 'devicemark'), { show: 'chart' });
   state.dm.focus = id;
   navigate({ tab: 'leaderboard', model: null, topic: null });
 }
@@ -13284,7 +13617,7 @@ function vLeaderboard(ms) {
   repLoad();
   // 12m.1: Compare is a view of Models, reached by choosing models, not a switch
   if (L.view === 'compare') return vCompare();
-  if (!modelsViews().includes(L.view)) { L.view = 'standard'; L.chip = L.stdChip || 'all'; }
+  if (!modelsViews().includes(L.view)) Object.assign(L, lbChoice('standard', 'all'));
   // 12f.2b: the phone reports, for the "On the phone · reported" columns
   const PH = state.phone;
   if (LIVE && phoneBuilds().length && !PH.loaded && !PH.loading && netReady()) loadPhone();
@@ -13294,8 +13627,11 @@ function vLeaderboard(ms) {
     lbSet({ view: 'standard', models: ids.length ? ids : null });
   }
   if (L.view === 'everyday') return lbEveryday(ms);
-  if (L.view === 'standard' && L.chip === 'frontier' && !L.cols) return lbFrontier(ms);
-  if (L.view === 'standard' && L.chip === 'ondevice' && !L.cols) return lbOnDevice(ms);
+  if (L.view === 'standard' && L.chip === 'frontier' && !L.cols)
+    return L.show === 'chart' && !lbChartWhy(L) ? lbChart(ms) : lbFrontier(ms);
+  // 16.3: Mobile ▸ DeviceMark's Chart is the On-device chart (12q.B)
+  if (L.view === 'standard' && L.chip === 'devicemark' && !L.cols && L.show === 'chart' && LIVE)
+    return lbOnDevice(ms);
   // the exam's scores are not ranked until a person has agreed with the judge:
   // one line says so, instead of an empty table
   if (L.view === 'exam' && !judgedCalibrated())
@@ -13306,6 +13642,9 @@ function vLeaderboard(ms) {
   if (L.view === 'standard' && L.chip === 'lm' && !L.cols)
     return [el('div', { class: 'card', 'data-lb-card': '1' }, ...modelsHead(),
       lbToolbar(ms, lbColumns(ms), new Set(), 0)), ...vPpl(lbFilter(ms))];
+  // 16.3: Chart — the ranked bars, for the benchmarks and the models in view
+  if (L.view === 'standard' && L.show === 'chart' && !lbChartWhy(L) && !(L.cols && !L.cols.length))
+    return lbChart(ms);
   // 12h.2: every benchmark unticked — a sentence, not a table of names
   if (L.view === 'standard' && L.cols && !L.cols.length)
     return [el('div', { class: 'card', 'data-lb-card': '1' }, ...modelsHead(),
@@ -13317,14 +13656,14 @@ function vLeaderboard(ms) {
   ms = [...ms, ...dmMade];
   const cols = lbColumns(ms);
   const shown = lbShownFor(cols);
-  const opt = cols.filter(c => c.optional);
+  const opt = cols.filter(c => c.optional && !c.fact);      // 16.3: benchmarks hidden, not details
   const nHidden = opt.length - opt.filter(c => shown.has(c.key)).length;
   const custom = L.view === 'standard' && !!L.cols;
   // 12o.1: in the order it was left in — #, Model, Params and the Avg stay at
   // the left; the rest move within the group the header's top row names (on
   // All tasks), and a group as a block. With no group row, anywhere
   const LK = lbLayoutKey(L);
-  const grouped = L.chip === 'all';
+  const grouped = L.chip === 'all' || (['mobile', 'mmlu', 'mobileall'].includes(L.chip) && !custom);
   const lgroup = c => grouped ? c.group || '' : '';
   let visCols = layoutOrder(LK, cols.filter(c => !c.optional || shown.has(c.key)),
     { keyOf: c => c.key, groupOf: lgroup, fixed: c => LB_FIXED.has(c.key) });
@@ -13340,7 +13679,9 @@ function vLeaderboard(ms) {
     : c.key === 'name' ? m.name
     : c.key === 'date' ? lastEval(m)
     : c.key === 'family' ? famOf(m)
-    : c.key === 'kind' ? (m.source === 'artifact' ? 'checkpoint' : m.kind)
+    : c.key === 'kind' ? m.kind
+    : c.key === 'source' ? sourceWords(sourceOf(m))
+    : c.mmpcat ? mmpCatVal(m, c.mmpcat)
     : c.key === 'flags' ? [(m.tainted || []).length ? 'tainted' : '', m.provisional
         ? 'provisional' : ''].filter(Boolean).join(' ') || null
     : c.judged ? jval(m, c)
@@ -13385,7 +13726,8 @@ function vLeaderboard(ms) {
   // none of them leaves it out. A harness task, an MMLU area or topic needs
   // the model loaded here — a generative task a server answers, and the
   // exam; the GGUF group needs the file
-  const measures = c => !!(c.task || c.area || c.cat || c.judged || c.jarea || c.gguf || c.dm);
+  const measures = c => !!(c.task || c.area || c.cat || c.judged || c.jarea || c.gguf || c.dm
+    || c.mmpcat);
   const hasFile = m => !!(G().registered || {})[m.rowOf || m.id];
   // 12x: DeviceMark asks a served setup as it asks a Hugging Face model; a
   // GGUF file alone, or a setup's row, it never asks
@@ -13426,7 +13768,8 @@ function vLeaderboard(ms) {
   if (!custom && !lbAll.some(m => visCols.some(c => c.gguf && val(m, c) != null)))
     visCols = visCols.filter(c => !c.gguf);
   const lbPg = paged('leaderboard', lbAll, JSON.stringify([state.sort, state.q, state.kind,
-    state.src, state.avgMode, L.view, L.chip, L.kind, L.size, L.status, L.models, L.cols]));
+    state.src, state.avgMode, L.view, L.chip, L.source, L.type, L.tested, L.size, L.status,
+    L.models, L.cols]));
   const rows = lbPg.rows.flatMap(m => [m, ...((state.lbDupOpen || {})[m.id] ? dupsOf[m.id] || [] : [])]);
   // the leaders are bold whatever the Tint switch says; Tint only adds the wash
   const leaders = lbLeaders(visCols, val, dmMade);
@@ -13444,8 +13787,11 @@ function vLeaderboard(ms) {
   }
   const thead = el('thead', {},
     grouped ? el('tr', { class: 'grp' }, groups.map(({ g, n }) => el('th', {
-      colspan: String(n), class: g ? 'grp' : 'grp nogrp', scope: 'colgroup', text: g,
-      ...(g ? layoutGroupDrag(LK, g) : {}) }))) : '',
+      colspan: String(n), class: g ? 'grp' : 'grp nogrp', scope: 'colgroup',
+      ...(g ? layoutGroupDrag(LK, g) : {}) }, g,
+      // 16.3: Pro's categories: its badge once, on their heading
+      visCols.some(c => c.mmpcat && c.group === g)
+        ? rBadge(restrictOf(MMP), { 'data-group-head-restriction': g }) : ''))) : '',
     el('tr', { class: 'names' }, visCols.map(c => {
       const tipRows = lbColTip(c);
       const fixed = LB_FIXED.has(c.key);
@@ -13465,6 +13811,7 @@ function vLeaderboard(ms) {
           render(); } },
         el('span', { class: 'hname', text: c.short || c.label }),
         // 14.4.4: a restricted set's badge, beside its name (and its GGUF column's)
+        // (Pro's categories carry it once, on their group's heading)
         rBadge(restrictOf(c.task || c.gguf), { 'data-col-restriction': c.key }),
         // 14.3: until the paper's three models land within 3 points
         c.task === MMP && mmpProvisional() ? el('span', { class: 'hkey', 'data-mmp-provisional': '1',
@@ -13534,7 +13881,21 @@ function vLeaderboard(ms) {
         if (c.key === 'family') return el('td', { class: 'small', 'data-fact': 'family',
           text: famOf(m) });
         if (c.key === 'kind') return el('td', { class: 'small', 'data-fact': 'kind',
-          text: m.source === 'artifact' ? 'checkpoint' : m.kind || '—' });
+          text: m.kind || '—' });
+        if (c.key === 'source') return el('td', { class: 'small', 'data-fact': 'source',
+          text: sourceWords(sourceOf(m)) });
+        // 16.3: Mobile-MMLU-Pro by category, on our key; a model that labelled
+        // the key is never ranked, here either
+        if (c.mmpcat) {
+          const x = ((m.mmp || {}).by_category || {})[c.mmpcat];
+          if (mmpLabelled(m.id)) return el('td', { class: 'num se', 'data-mmpcat-cell': c.mmpcat,
+            text: '—', title: 'it labelled the key: never ranked' });
+          if (!x || x.acc == null) return el('td', { class: 'num se', 'data-mmpcat-cell': c.mmpcat,
+            text: '—' });
+          return one(c, m, x.acc, null, pctn, { 'data-mmpcat-cell': c.mmpcat,
+            title: `on ${Number(x.n || 0).toLocaleString('en')} kept questions`
+              + (mmpProvisional() ? ' · provisional key' : '') });
+        }
         if (c.key === 'flags') return el('td', { class: 'small', 'data-fact': 'flags' },
           (m.tainted || []).length ? el('span', { class: 'badge taint', text: 'tainted',
             title: 'trained on data derived from ' + m.tainted.join(', ') }) : '',
@@ -13799,11 +14160,12 @@ function vLeaderboard(ms) {
         .some(t => benchVal(t, m.id) != null) || dataCols.some(c => (c.gguf || c.dm)
           && val(m, c) != null)).length),
       statusLine(lbPg, 'models', [
-        L.chip === 'judged' || custom || dmv ? null
+        // 16.3: "ranked" where the board's Avg ranks — not on Mobile's views
+        !cols.some(c => c.key === 'avg') || custom || dmv ? null
           : `${lbAll.filter(m => officialAvg(m) != null).length} ranked`,
         `sorted by ${lbSortLabel(cols)}`,
-        L.chip !== 'all' && !custom ? (LB_CHIPS.find(([v]) => v === L.chip) || [])[1] : null]),
-      lbSizeHidden(ms),
+        L.chip !== 'all' && !custom ? lbWhere(L) : null]),
+      lbSizeHidden(ms), lbTestedHidden(ms),
       lbPg.pager,
       // the Models tab's empty state, kept: a sentence and the way back
       // 12n.1: what the empty table holds, counted truthfully
@@ -13826,16 +14188,16 @@ function vLeaderboard(ms) {
       // 12i.0: Clear in Models ▾ applies at once, and leaves this
       L.models && !L.models.length ? empty('No model chosen: tick one under Models ▾.',
         'All ranked', () => lbSet({ models: null }), { 'data-no-models': '1' })
-      : !rowsIn.length ? empty('No model matches these filters.', 'Clear the filters',
-        () => lbSet({ kind: 'all', size: 'all', status: 'all', models: null }))
+      : !rowsIn.length ? empty('No models match these filters.', 'Clear all', lbClearAll,
+        { 'data-no-match': '1' })
         : hfade('lb', el('div', { class: 'lb-wrap stick' + (state.lbWide ? ' hscroll' : ''),
           'data-hkeep': 'lb' }, table)),
       el('p', { class: 'lbcap', 'data-lb-caption': '1', text: 'Bold = best in the column or '
         + 'within its noise · hover a score for its ± error · hover a column name for its setup · '
         + 'click a row for the model' }),
       lbHowTo(ms)),
-    // 14.4: the full Mobile-MMLU's own table, under Mobile tasks'
-    L.view === 'standard' && L.chip === 'mobile' && !custom ? mmfCard() : '',
+    // 14.4: the full Mobile-MMLU's own table — 16.3: under Mobile ▸ Mobile-MMLU's
+    L.view === 'standard' && L.chip === 'mmlu' && !custom ? mmfCard() : '',
     insightsCard(ms)].filter(Boolean);
 }
 
@@ -13923,73 +14285,199 @@ function dupToggle(m, dups) {
 function motionOff() { return matchMedia('(prefers-reduced-motion: reduce)').matches; }
 
 // ---- the toolbar: one row ---------------------------------------------------
+// 16.3: Row 2 — Group ▾, Models ▾, Filters ▾, Columns ▾ — the saved views,
+// and Row 3: a chip for each filter on, Clear all, and how many models
 function lbToolbar(ms, cols, shown, nHidden) {
-  const L = lbS();
-  const calOk = judgedCalibrated();
-  const chips = el('div', { class: 'chips', role: 'group', 'aria-label': 'task groups',
-      'data-lb-chips': '1', 'data-hkeep': 'lb-chips', onscroll: e => chipsEdge(e.currentTarget) },
-    // 12x: DeviceMark's, while a model has a row
-    LB_CHIPS.filter(([v]) => (!LIVE_CHIPS.includes(v) || LIVE) && (v !== 'devicemark' || dmAny()))
-      .map(([v, t]) => {
-      const off = v === 'judged' && !calOk;
-      // 11e: an unavailable chip still takes the click (aria-disabled, not
-      // disabled) — the click says why, in one line under the chips; the
-      // tooltip and the screen reader say it without one
-      // 12h.2: a group chip fills the Benchmarks checklist with its own; while
-      // benchmarks are chosen, no group is the one shown
-      const on = L.chip === v && !(L.view === 'standard' && L.cols);
-      return el('button', { class: 'chip-btn' + (on ? ' on' : ''), 'data-chip': v,
-        'aria-pressed': String(on), 'aria-disabled': off ? 'true' : null,
-        'aria-describedby': off ? 'why-judged-chip' : null,
-        title: off ? judgedOffWhy() : null, text: t,
-        onclick: () => { if (!off) lbSet({ chip: v, cols: null });
-          else { state.lbChipWhy = !state.lbChipWhy; render(); } } });
-    }),
-    // 12h.2: the team's saved views, after a small divider
-    ...(LIVE && (state.views || []).length ? [el('span', { class: 'chipdiv', 'aria-hidden': 'true' }),
-      ...state.views.map(viewChip)] : []));
-  const std = L.view === 'standard';
-  const pills = el('div', { class: 'pills' },
-    pillMenu('kind', 'Kind', LB_KINDS, L.kind, v => lbSet({ kind: v })),
-    sizePill(ms),
-    pillMenu('status', 'Status', LB_STATUS, L.status, v => lbSet({ status: v })),
-    lbColumnsPill(cols, shown, nHidden),
-    std ? '' : lbModelsPill(ms),
-    pillMenu('scale', 'Scale', [['chance', 'above chance'], ['raw', 'raw accuracy']],
-      state.avgMode, v => { state.avgMode = v; render(); }));
-  const note = calOk ? '' : el('p', { class: 'chipnote', id: 'why-judged-chip', role: 'note',
-    'data-why': 'judged-chip', hidden: state.lbChipWhy ? null : '', text: judgedOffWhy() });
-  // 11h: on a phone the six pills are one "Filters ▾" beside the chips, and
-  // open as a sheet from the bottom; the chips are one row that scrolls.
-  // 12b: at every width — Kind, Size, Status, Columns, Models and Scale all
-  // sit in Filters ▾. Standard has its chips; the other kinds have none
-  const set = [L.kind !== LB_DEFAULTS.kind, L.size !== LB_DEFAULTS.size,
-    L.status !== LB_DEFAULTS.status, !std && !!L.models, state.avgMode === 'raw']
-    .filter(Boolean).length;
+  const L = lbS(), test = lbTest(L);
+  // the benchmarks in view now, for Columns ▾ and the Chart: read when used,
+  // as the panel outlives the render that built it
+  state.lbBenchNow = L.cols || (L.chip === 'devicemark' ? cols.filter(c => c.dm).map(c => c.key)
+    : cols.filter(c => c.task && !c.lower && !(DATA.tasks[c.task] || {})
+      .control && (!c.optional || shown.has(c.key))).map(c => c.task));
+  const set = lbFiltersOn();
   const open = !!state.lbFilters;
   const toggle = el('button', { class: 'pill' + (set ? ' on' : ''), 'data-filters': String(set),
     'aria-expanded': String(open), 'aria-controls': 'filter-sheet',
     text: `Filters${set ? ` · ${set}` : ''} ▾`,
     onclick: () => { state.lbFilters = !open; render(); } });
-  // the benchmarks in view now, for the checklist: read when it is used, as
-  // the panel outlives the render that built it
-  state.lbBenchNow = L.cols || (L.chip === 'devicemark' ? cols.filter(c => c.dm).map(c => c.key)
-    : cols.filter(c => c.task && !c.lower && !(DATA.tasks[c.task] || {})
-      .control && (!c.optional || shown.has(c.key))).map(c => c.task));
-  // 12z B5: the On-device chart and Frontier have no benchmark columns to pick
-  const picks = std && !['ondevice', 'frontier'].includes(L.chip);
+  const filters = el('div', { class: 'pills' },
+    sizePill(ms), sourcePill(ms),
+    pillMenu('type', 'Type', LB_TYPES, L.type, v => lbSet({ type: v })),
+    testedPill(ms),
+    el('div', { class: 'fmore', 'data-filters-more': '1' },
+      el('span', { class: 'small se', text: 'More' }),
+      pillMenu('status', 'Status', LB_STATUS, L.status, v => lbSet({ status: v })),
+      pillMenu('scale', 'Scale', [['chance', 'above chance'], ['raw', 'raw accuracy']],
+        state.avgMode, v => { state.avgMode = v; render(); })));
+  // Columns ▾ where a table of columns is drawn: Standard's and Mobile's, the exam's
+  const colsHere = (L.view === 'standard' && !['frontier', 'lm'].includes(L.chip)
+    && !(L.chip === 'devicemark' && L.show === 'chart')) || L.view === 'exam';
+  const views = LIVE && (state.views || []).length && L.view === 'standard'
+    ? el('div', { class: 'chips savedviews', role: 'group', 'aria-label': 'saved views',
+        'data-lb-chips': '1', 'data-hkeep': 'lb-chips', onscroll: e => chipsEdge(e.currentTarget) },
+      el('span', { class: 'small se', text: 'Saved views' }), ...state.views.map(viewChip)) : '';
+  // Row 3 while a filter is on; else its count ends Row 2, not a line of its own
+  const active = lbActiveRow(ms), count = active.dataset.lbActive === '0' ? active.lastChild : null;
   return el('div', { class: 'lbbar narrow' },
-    el('div', { class: 'chiprow' }, std ? chips : '',
+    el('div', { class: 'chiprow', 'data-lb-row2': '1' },
       el('div', { class: 'pickers', 'data-pickers': '1' },
-        std ? cmpGo() : '', picks ? lbBenchPill() : '', std ? lbModelsPill(ms) : '', toggle)),
-    note, std ? lbViewForm() : '',
+        LB_GROUPS[test] ? lbGroupPill(test) : '', lbModelsPill(ms), toggle,
+        colsHere ? lbColumnsPill(cols, shown, nHidden) : '',
+        L.view === 'standard' ? cmpGo() : '', count || '')),
+    views, L.view === 'standard' ? lbViewForm() : '',
     open ? el('div', { class: 'fsheet', id: 'filter-sheet', role: 'dialog', 'aria-label': 'filters',
         'data-filter-sheet': '1',
         onkeydown: e => { if (e.key === 'Escape' && !POP.panel) { state.lbFilters = false; render(); } } },
       el('div', { class: 'fsheet-head' }, el('b', { text: 'Filters' }),
         el('button', { class: 'ghost', text: 'Done', 'data-filters-done': '1',
           onclick: () => { state.lbFilters = false; render(); } })),
-      pills) : '');
+      filters) : '',
+    count ? '' : active);
+}
+// how many filters are on, for "Filters · 2"
+function lbFiltersOn() {
+  const L = lbS();
+  return [L.size !== 'all', L.source !== 'all', L.type !== 'all', L.tested !== 'any',
+    L.status !== 'all', state.avgMode === 'raw'].filter(Boolean).length;
+}
+// 16.3: Row 3 — a chip for each filter on (and the models chosen), Clear all,
+// and the count: "9 of 56 models"
+function lbActiveRow(ms) {
+  const L = lbS(), on = [];
+  const lc = w => w.charAt(0).toLowerCase() + w.slice(1);
+  const sizes = sizeSel(L.size);
+  if (sizes.length) on.push(['size', 'Size: ' + sizes.map(sizeWord).join(', '), { size: 'all' }]);
+  const src = sourceSel(L.source);
+  if (src.length) on.push(['source', 'Source: ' + src.map(sourceWords).join(', '), { source: 'all' }]);
+  if (L.type !== 'all') on.push(['type', 'Type: ' + L.type, { type: 'all' }]);
+  const t = testedSel(L.tested);
+  if (t.span !== 'any') on.push(['tested', 'Tested: ' + (t.span === 'range' ? testedWords(t)
+    : lc(testedWords(t))) + (t.none ? ', and no date' : ''), { tested: 'any' }]);
+  if (L.status !== 'all') on.push(['status', 'Status: ' + L.status, { status: 'all' }]);
+  if (state.avgMode === 'raw') on.push(['scale', 'Scale: raw accuracy', null]);
+  const chosen = (L.models || []).filter(id => !id.startsWith('reported/')).length;
+  if (L.models) on.push(['models', `Models: ${chosen} chosen`, { models: null }]);
+  const n = lbFilter(ms).length;
+  return el('div', { class: 'lbactive', 'data-lb-active': String(on.length) },
+    el('div', { class: 'onchips' }, on.map(([k, text, reset]) => el('span', { class: 'onchip',
+        'data-on': k }, text,
+      el('button', { class: 'chip-x', 'data-on-remove': k, 'aria-label': `remove ${text}`,
+        text: '×', onclick: () => { if (reset) lbSet(reset); else { state.avgMode = 'chance';
+          render(); } } }))),
+      on.length > 1 || (on.length && on[0][0] !== 'models') ? el('button', { class: 'quiet',
+        'data-clear-all': '1', text: 'Clear all', onclick: lbClearAll }) : ''),
+    el('span', { class: 'small se lbcount', 'data-lb-count': `${n}|${ms.length}`,
+      text: `${n} of ${ms.length} model${ms.length === 1 ? '' : 's'}` }));
+}
+function lbClearAll() {
+  state.avgMode = 'chance';
+  lbSet({ ...LB_DEFAULTS, models: null });
+}
+// 16.3: Group ▾ — one choice in place of the chips, each with how many
+// benchmarks it holds, and Mobile-MMLU its restriction badge (14.4.4)
+function lbGroupPill(test) {
+  const L = lbS(), cur = lbGroup(L);
+  const gs = LB_GROUPS[test].filter(([, , chip]) => !LIVE_CHIPS.includes(chip) || LIVE);
+  const words = (gs.find(([g]) => g === cur) || gs[0])[1];
+  const btn = el('button', { class: 'pill' + (cur !== 'all' ? ' on' : ''), id: 'pill-group',
+    'data-pill': 'group', 'data-value': cur, text: `Group: ${words} ▾` });
+  return popover(btn, () => el('div', { class: 'moremenu', id: 'pop-group', 'aria-label': 'group' },
+    gs.map(([g, t, chip]) => {
+      const n = lbGroupCount(chip);
+      return el('button', { role: 'menuitemradio', 'data-choice': g, 'aria-checked': String(g === cur),
+          onclick: () => { popClose(true); lbPick(test, g); } },
+        t, ...lbGroupBadges(chip),
+        el('span', { class: 'se gcount', 'data-group-count': String(n),
+          text: ` · ${n} ${chip === 'mobileall' ? 'suites' : n === 1 ? 'benchmark' : 'benchmarks'}` }));
+    })), { key: 'group' });
+}
+// the benchmarks a group holds, as the board knows them
+const MOBILE_TASKS = () => [...MAB, ...MAB_TRUST, MMP];
+const stdTask = t => !MOBILE_TASKS().includes(t) && !isFrontierTask(t);
+function lbGroupCount(chip) {
+  // All: every Standard group's, any other benchmark run here that is Standard's, and
+  // Language modelling's — counted as each group counts, run yet or not
+  if (chip === 'all') return new Set([...LB_GROUPS.standard.flatMap(([, , c]) =>
+    (CATS.find(([g]) => g === c) || [])[1] || []),
+    ...DATA.accTasks.filter(t => stdTask(t) && !(DATA.tasks[t] || {}).control),
+    ...DATA.pplTasks]).size;
+  if (chip === 'lm') return DATA.pplTasks.length;
+  if (chip === 'mobileall') return 3;
+  if (chip === 'devicemark') return DM_FIELDS.filter(x => !['composite', 'answered', 'tokens']
+    .includes(x.f)).length;
+  if (chip === 'mmlu') return MMFD().name ? 2 : 1;
+  return ((CATS.find(([g]) => g === chip) || [])[1] || []).length;
+}
+function lbGroupBadges(chip) {
+  if (chip !== 'mmlu' && chip !== 'mobileall') return [];
+  const seen = new Set();
+  // All shows Pro's column alone: the full set is never a column (14.4)
+  return [restrictOf(MMP), chip === 'mmlu' && MMFD().name ? restrictOf(MMF) : null]
+    .filter(r => r && !seen.has(r.badge)
+    && seen.add(r.badge)).flatMap(r => rBadge(r, { 'data-group-restriction': chip }));
+}
+// 16.3: Source — where a model came from, more than one ticked
+function sourcePill(ms) {
+  const L = lbS(), sel = sourceSel(L.source);
+  const pool = lbFilter(ms, { anySource: true });
+  const btn = el('button', { class: 'pill' + (sel.length ? ' on' : ''), id: 'pill-source',
+    'data-pill': 'source', 'data-value': L.source,
+    text: `Source: ${sel.length ? sel.map(sourceWords).join(', ') : 'All'} ▾` });
+  const toggle = k => { const now = sourceSel(lbS().source);
+    lbSet({ source: sourceVal(now.includes(k) ? now.filter(x => x !== k) : [...now, k]) }); };
+  return popover(btn, () => el('div', { class: 'moremenu', id: 'pop-source', 'aria-label': 'source' },
+    el('button', { role: 'menuitemradio', 'data-choice': 'all', 'aria-checked': String(!sel.length),
+      text: 'All', onclick: () => { popClose(true); lbSet({ source: 'all' }); } }),
+    LB_SOURCES.map(([v, t]) => el('button', { role: 'menuitemcheckbox', 'data-choice': v,
+      'aria-checked': String(sel.includes(v)),
+      text: `${t} (${pool.filter(m => sourceOf(m) === v).length})`,
+      onclick: () => { popClose(true); toggle(v); } }))), { key: 'source' });
+}
+// 16.3: Tested — the date of a model's latest finished run: Any time, the
+// last 7 or 30 days, or between two dates; "No test date (n)" while a row has none
+function testedPill(ms) {
+  const L = lbS(), t = testedSel(L.tested);
+  const none = lbFilter(ms, { anyDate: true }).filter(m => testedMs(m) == null).length;
+  const btn = el('button', { class: 'pill' + (t.span !== 'any' ? ' on' : ''), id: 'pill-tested',
+    'data-pill': 'tested', 'data-value': L.tested, text: `Tested: ${testedWords(t)} ▾` });
+  return popover(btn, () => {
+    const D = state.lbRange = { from: t.from || '', to: t.to || '', ...(state.lbRange || {}) };
+    const apply = () => {
+      if (!D.from || !D.to) return;
+      popClose(true);
+      lbSet({ tested: testedVal({ span: 'range', from: D.from <= D.to ? D.from : D.to,
+        to: D.from <= D.to ? D.to : D.from, none: t.none }) });
+    };
+    return el('div', { class: 'moremenu', id: 'pop-tested', 'aria-label': 'tested' },
+      LB_TESTED.map(([v, w]) => el('button', { role: 'menuitemradio', 'data-choice': v,
+        'aria-checked': String(t.span === v), text: w,
+        onclick: () => { popClose(true); lbSet({ tested: testedVal({ span: v, none: t.none }) }); } })),
+      el('div', { class: 'trange', 'data-tested-range': '1', role: 'group',
+          'aria-label': 'between two dates' },
+        el('span', { class: 'small', text: 'Between two dates' }),
+        el('input', { type: 'date', 'aria-label': 'from', 'data-tested-from': '1', value: D.from,
+          oninput: e => { D.from = e.target.value; } }),
+        el('input', { type: 'date', 'aria-label': 'to', 'data-tested-to': '1', value: D.to,
+          oninput: e => { D.to = e.target.value; },
+          onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); apply(); } } }),
+        el('button', { class: 'quiet', 'data-tested-apply': '1', text: 'Apply', onclick: apply })),
+      none && t.span !== 'any' ? el('button', { role: 'menuitemcheckbox', 'data-choice': TESTED_NONE,
+        'aria-checked': String(t.none), text: `No test date (${none})`,
+        onclick: () => { popClose(true); lbSet({ tested: testedVal({ ...t, none: !t.none }) }); } })
+        : '');
+  }, { key: 'tested', menu: false });
+}
+// 16.3: a date filter never hides a row silently either: "4 models have no
+// test date and are hidden · show them"
+function lbTestedHidden(ms) {
+  const t = testedSel(lbS().tested);
+  if (t.span === 'any' || t.none) return '';
+  const n = lbFilter(ms, { anyDate: true }).filter(m => testedMs(m) == null).length;
+  if (!n) return '';
+  return el('p', { class: 'small', 'data-tested-hidden': String(n) },
+    `${n} model${n === 1 ? ' has' : 's have'} no test date and ${n === 1 ? 'is' : 'are'} hidden · `,
+    el('button', { class: 'quiet', 'data-tested-show': '1', text: 'show them',
+      onclick: () => lbSet({ tested: testedVal({ ...t, none: true }) }) }));
 }
 // 12m.1: "Compare 3 ▸" while two to eight rows are ticked
 function cmpGo() {
@@ -14297,23 +14785,43 @@ function allNone(attrs, set) {
     el('button', { class: 'quiet', text: 'none', ...attrs('none'), onclick: () => set(false) })];
 }
 // Columns · 4 hidden ▾ — the current chip's columns, Show all, and the tint
+// 16.3: Columns ▾ — one menu in place of two. Benchmarks ▾ built a table of
+// the benchmarks ticked and averaged them ("Avg of 3"); Filters ▸ Columns
+// showed or hid a view's other columns and left its Avg as it was. Both jobs
+// stay, and the menu says which is on: "Show or hide columns", or "A table of
+// the ticked ones, with their Avg". Model details — family, type, size,
+// source, tested, flags — and the two display switches are under them
 function lbColumnsPill(cols, shown, nHidden) {
-  const L = lbS();
-  const opt = cols.filter(c => c.optional);
-  const btn = el('button', { class: 'pill' + (nHidden ? ' on' : ''), id: 'pill-columns',
-    'data-columns-menu': '1', 'data-hidden-tasks': nHidden ? String(nHidden) : null,
-    text: `Columns${nHidden ? ` · ${nHidden} hidden` : ''} ▾` });
+  const L = lbS(), built = L.view === 'standard' && !!L.cols;
+  const canBuild = L.view === 'standard' && !['frontier', 'lm'].includes(L.chip);
+  // "on" for a table built from ticks; some benchmarks hidden is the everyday state
+  const btn = el('button', { class: 'pill' + (built ? ' on' : ''), id: 'pill-columns',
+    'data-columns-menu': built ? 'built' : 'shown', 'data-hidden-tasks': nHidden ? String(nHidden) : null,
+    'data-benchmarks-menu': String((state.lbBenchNow || []).length),
+    text: built ? `Columns · Avg of ${L.cols.length} ▾` : 'Columns ▾' });
   return popover(btn, () => {
-    const tagOf = c => c.fact ? 'facts' : c.judged ? 'judged' : c.cat ? 'cats' : 'tasks';
-    const heads = { tasks: 'Task columns', judged: 'Judged topics (rubric 0–4)',
-                    cats: 'MMLU by topic', facts: 'Model facts' };
-    const tags = ['tasks', 'judged', 'cats', 'facts'].filter(t => opt.some(c => tagOf(c) === t));
-    return el('div', { class: 'moremenu colmenu-list', id: 'pop-columns', 'aria-label': 'columns' },
-      opt.length ? tags.map(tag => {
+    const opt = cols.filter(c => c.optional && !c.fact);
+    const now = () => lbShownFor(cols);
+    const mode = canBuild ? el('div', { class: 'small avgmode', role: 'radiogroup',
+        'aria-label': 'what the ticks do', 'data-columns-mode': built ? 'built' : 'shown' },
+      ...[['shown', 'Show or hide columns' + (L.chip === 'all' || CATS.some(([g]) => g === L.chip
+          && !['instruction'].includes(g)) && !MOBILE_CHIPS.includes(L.chip)
+          ? ' (the Avg stays the board’s)' : '')],
+        ['built', 'A table of the ticked ones, with their Avg']].map(([v, t]) =>
+        el('label', { class: 'small' }, el('input', { type: 'radio', name: 'colmode',
+          'data-columns-mode-pick': v, checked: (built ? 'built' : 'shown') === v ? '' : null,
+          onchange: () => {
+            if (v === 'built') lbSet({ cols: lbKnownCols((state.lbBenchNow || [])
+              .filter(x => lbBenchAll().includes(x))) || [] });
+            else lbSet({ cols: null });
+          } }), ' ' + t))) : '';
+    const bench = built ? benchChecklist() : (() => {
+      const tagOf = c => c.judged ? 'judged' : c.cat ? 'cats' : c.mmpcat ? 'mmpcats' : 'tasks';
+      const heads = { tasks: 'Tests in this view', judged: 'Judged topics (rubric 0–4)', cats: 'MMLU by topic',
+        mmpcats: 'Mobile-MMLU-Pro by category' };
+      const tags = ['tasks', 'judged', 'cats', 'mmpcats'].filter(t => opt.some(c => tagOf(c) === t));
+      return opt.length ? tags.map(tag => {
         const cs = opt.filter(c => tagOf(c) === tag), keys = cs.map(c => c.key);
-        // what is shown NOW, read when a control is used: the panel outlives
-        // the render that built it (11e)
-        const now = () => lbShownFor(cols);
         const setAll = on => lbSaveShown(on ? [...new Set([...now(), ...keys])]
           : [...now()].filter(k => !keys.includes(k)));
         return el('div', { class: 'colgroup', 'data-column-group': tag },
@@ -14326,31 +14834,47 @@ function lbColumnsPill(cols, shown, nHidden) {
             el('input', { type: 'checkbox', 'data-column': c.key, checked: shown.has(c.key) ? '' : null,
               onchange: e => lbSaveShown(e.target.checked ? [...now(), c.key]
                                                           : [...now()].filter(k => k !== c.key)) }),
-            ' ' + c.label)));
-      }) : el('p', { class: 'small', text: 'Every column of this group is shown.' }),
-      el('div', { class: 'frm' },
-        opt.length ? el('button', { class: 'quiet', 'data-show-all': '1', text: 'Show all',
-          onclick: () => lbSaveShown(opt.map(c => c.key)) }) : '',
+            ' ' + (c.task ? benchName(c.task) : c.label), rBadge(restrictOf(c.task), {}))));
+      }).concat(el('div', { class: 'frm' },
+        // said out loud, as the old pill's "36 hidden" was
+        el('span', { class: 'small se', 'data-columns-shown': `${opt.filter(c => shown.has(c.key)).length}|${opt.length}`,
+          text: `${opt.filter(c => shown.has(c.key)).length} of ${opt.length} shown` }),
+        el('button', { class: 'quiet', text: 'Show all', 'data-show-all': '1',
+          onclick: () => lbSaveShown([...now(), ...opt.map(c => c.key)]) }),
         L.chip === 'all' ? el('button', { class: 'quiet', text: 'the default six', onclick: () => {
           state.lbShown = null;
           try { localStorage.removeItem('bench-lb-shown'); } catch (e) { /* private */ }
-          render(); } }) : ''),
-      el('label', { class: 'small tintsw' },
-        el('input', { type: 'checkbox', 'data-tint': '1', checked: L.tint ? '' : null,
-          onchange: e => {
-            try { localStorage.setItem('bench-lb-tint', e.target.checked ? 'on' : 'off'); }
-            catch (x) { /* private */ }
-            lbSet({ tint: e.target.checked }); } }),
-        ' Tint the leaders'),
-      // 11f: the ± is a hover away by default; this puts it on every cell
-      el('label', { class: 'small tintsw' },
-        el('input', { type: 'checkbox', 'data-show-se': '1', checked: state.lbSe ? '' : null,
-          onchange: e => {
-            try { localStorage.setItem('bench-lb-se', e.target.checked ? 'on' : 'off'); }
-            catch (x) { /* private */ }
-            state.lbSe = e.target.checked; render(); } }),
-        ' Show ± errors'));
-  }, { key: 'columns', menu: false, rebuild: true });
+          render(); } }) : ''))
+        : [el('p', { class: 'small', text: 'Every benchmark of this view is shown.' })];
+    })();
+    const facts = cols.filter(c => c.fact);
+    return el('div', { class: 'moremenu colmenu-list benchmenu', id: 'pop-columns', 'aria-label': 'columns' },
+      el('div', { class: 'colsec', 'data-columns-section': 'benchmarks' },
+        el('div', { class: 'colsec-head', text: 'Benchmarks' }), mode, ...[bench].flat()),
+      facts.length ? el('div', { class: 'colsec', 'data-columns-section': 'details' },
+        el('div', { class: 'colsec-head', text: 'Model details' }),
+        facts.map(c => el('label', { class: 'small' },
+          el('input', { type: 'checkbox', 'data-column': c.key, checked: shown.has(c.key) ? '' : null,
+            onchange: e => lbSaveShown(e.target.checked ? [...now(), c.key]
+                                                        : [...now()].filter(k => k !== c.key)) }),
+          ' ' + c.label))) : '',
+      el('div', { class: 'colsec', 'data-columns-section': 'display' },
+        el('label', { class: 'small tintsw' },
+          el('input', { type: 'checkbox', 'data-tint': '1', checked: L.tint ? '' : null,
+            onchange: e => {
+              try { localStorage.setItem('bench-lb-tint', e.target.checked ? 'on' : 'off'); }
+              catch (x) { /* private */ }
+              lbSet({ tint: e.target.checked }); } }),
+          ' Tint the leaders'),
+        // 11f: the ± is a hover away by default; this puts it on every cell
+        el('label', { class: 'small tintsw' },
+          el('input', { type: 'checkbox', 'data-show-se': '1', checked: state.lbSe ? '' : null,
+            onchange: e => {
+              try { localStorage.setItem('bench-lb-se', e.target.checked ? 'on' : 'off'); }
+              catch (x) { /* private */ }
+              state.lbSe = e.target.checked; render(); } }),
+          ' Show ± errors')));
+  }, { key: 'columns', menu: false, rebuild: true, inCard: true });
 }
 
 // 12o.1: a model served and measured on its GGUF, by setup. The file a row
@@ -14541,60 +15065,55 @@ function lbModelsPill(ms) {
 
 // 12h.2: "Benchmarks: 3 ▾" — every Standard benchmark in its chip groups,
 // with a search. A tick applies at once; the average follows
-function lbBenchPill() {
-  const L = lbS();
-  const n = (state.lbBenchNow || []).length;
-  const btn = el('button', { class: 'pill' + (L.cols ? ' on' : ''), id: 'pill-benchmarks',
-    'data-benchmarks-menu': String(n), text: `Benchmarks: ${n} ▾` });
-  return popover(btn, () => {
-    const now = new Set(state.lbBenchNow || []);
-    const set = (t, on) => {
+// 12h.2: the benchmarks a built table holds — every Standard benchmark in its
+// group, a search, all · none for a group, Clear. 16.3: in Columns ▾
+function benchChecklist() {
+  const now = new Set(state.lbBenchNow || []);
+  const set = (t, on) => {
+    const next = new Set(state.lbBenchNow || []);
+    if (on) next.add(t); else next.delete(t);
+    lbSet({ cols: lbBenchAll().filter(x => next.has(x)) });
+  };
+  const list = el('div', { class: 'benchlist' });
+  const fill = () => {
+    const q = (state.lbBenchQ || '').trim().toLowerCase();
+    // a benchmark's own names: "math" finds MATH-500, not its whole group
+    const hit = ([t]) => !q || (t + ' ' + benchName(t)).toLowerCase().includes(q);
+    const groups = lbBenchPicker().map(([g, name, ts]) => [g, name, ts.filter(hit)])
+      .filter(([, , ts]) => ts.length);
+    // 12i.0: each by its own name alone; one not run yet is greyed and says so
+    // 12n.1: a group's box and all · none, over the ones that have run
+    const setGroup = (ts, on) => {
       const next = new Set(state.lbBenchNow || []);
-      if (on) next.add(t); else next.delete(t);
+      ts.forEach(t => on ? next.add(t) : next.delete(t));
       lbSet({ cols: lbBenchAll().filter(x => next.has(x)) });
     };
-    const list = el('div', { class: 'benchlist' });
-    const fill = () => {
-      const q = (state.lbBenchQ || '').trim().toLowerCase();
-      // a benchmark's own names: "math" finds MATH-500, not its whole group
-      const hit = ([t]) => !q || (t + ' ' + benchName(t)).toLowerCase().includes(q);
-      const groups = lbBenchPicker().map(([g, name, ts]) => [g, name, ts.filter(hit)])
-        .filter(([, , ts]) => ts.length);
-      // 12i.0: each by its own name alone; one not run yet is greyed and says so
-      // 12n.1: a group's box and all · none, over the ones that have run
-      const setGroup = (ts, on) => {
-        const next = new Set(state.lbBenchNow || []);
-        ts.forEach(t => on ? next.add(t) : next.delete(t));
-        lbSet({ cols: lbBenchAll().filter(x => next.has(x)) });
-      };
-      list.replaceChildren(...(groups.length ? groups.map(([g, name, ts]) => {
-        const ran = lbBenchPicker().find(x => x[0] === g)[2].filter(([, r]) => r).map(([t]) => t);
-        return el('div', { class: 'colgroup', 'data-bench-group': g },
-          el('div', { class: 'small se' },
-            groupBox({ 'data-bench-group-box': g, 'aria-label': `${name}: all or none` },
-              ran.filter(t => now.has(t)).length, ran.length, on => setGroup(ran, on)),
-            ' ' + name + ' ', ...allNone(w => ({ ['data-bench-group-' + w]: g }),
-              on => setGroup(ran, on))),
-          ts.map(([t, ran]) => el('label', { class: 'small' + (ran ? '' : ' notrun'),
-              'data-bench-row': t },
-            el('input', { type: 'checkbox', 'data-bench': t, checked: now.has(t) ? '' : null,
-              disabled: ran ? null : '', onchange: e => set(t, e.target.checked) }),
-            ' ' + benchName(t), rBadge(restrictOf(t), { 'data-bench-restriction': t }),
-            ran ? '' : el('span', { class: 'se', 'data-not-run': t, text: ' · not run yet' }))));
-      }) : [el('p', { class: 'small se', text: 'No benchmark matches.' })]));
-    };
-    fill();
-    return el('div', { class: 'moremenu benchmenu', id: 'pop-benchmarks', 'aria-label': 'benchmarks' },
-      el('input', { type: 'search', placeholder: 'search benchmarks…', 'aria-label': 'search benchmarks',
-        'data-keep': 'lbbench', value: state.lbBenchQ || '',
-        oninput: e => { state.lbBenchQ = e.target.value; fill(); } }),
-      list,
-      el('div', { class: 'frm' },
-        el('button', { class: 'quiet', text: 'Clear', 'data-bench-clear': '1',
-          onclick: () => lbSet({ cols: [] }) })),
-      el('p', { class: 'small se', 'data-bench-foot': '1', text: 'The average is over the ticked '
-        + 'ones only. Everyday tasks and the Knowledge exam keep their own tables.' }));
-  }, { key: 'benchmarks', menu: false, rebuild: true, inCard: true });
+    list.replaceChildren(...(groups.length ? groups.map(([g, name, ts]) => {
+      const ran = lbBenchPicker().find(x => x[0] === g)[2].filter(([, r]) => r).map(([t]) => t);
+      return el('div', { class: 'colgroup', 'data-bench-group': g },
+        el('div', { class: 'small se' },
+          groupBox({ 'data-bench-group-box': g, 'aria-label': `${name}: all or none` },
+            ran.filter(t => now.has(t)).length, ran.length, on => setGroup(ran, on)),
+          ' ' + name + ' ', ...allNone(w => ({ ['data-bench-group-' + w]: g }),
+            on => setGroup(ran, on))),
+        ts.map(([t, ran]) => el('label', { class: 'small' + (ran ? '' : ' notrun'),
+            'data-bench-row': t },
+          el('input', { type: 'checkbox', 'data-bench': t, checked: now.has(t) ? '' : null,
+            disabled: ran ? null : '', onchange: e => set(t, e.target.checked) }),
+          ' ' + benchName(t), rBadge(restrictOf(t), { 'data-bench-restriction': t }),
+          ran ? '' : el('span', { class: 'se', 'data-not-run': t, text: ' · not run yet' }))));
+    }) : [el('p', { class: 'small se', text: 'No benchmark matches.' })]));
+  };
+  fill();
+  return [el('input', { type: 'search', placeholder: 'search benchmarks…', 'aria-label': 'search benchmarks',
+      'data-keep': 'lbbench', value: state.lbBenchQ || '',
+      oninput: e => { state.lbBenchQ = e.target.value; fill(); } }),
+    list,
+    el('div', { class: 'frm' },
+      el('button', { class: 'quiet', text: 'Clear', 'data-bench-clear': '1',
+        onclick: () => lbSet({ cols: [] }) })),
+    el('p', { class: 'small se', 'data-bench-foot': '1', text: 'The average is over the ticked '
+      + 'ones only. Everyday tasks and the Knowledge exam keep their own tables.' })];
 }
 
 // 12h.2: one line above a table someone built — what is shown, Save view,
@@ -14608,7 +15127,7 @@ function lbCustomLine(nRows, nTested = nRows) {
     : `${nRows} model${nRows === 1 ? '' : 's'}`;
   if (L.view !== 'standard' || (!L.cols && !L.models)) return '';
   const what = L.cols ? (L.cols.length ? L.cols.map(benchName).join(', ') : 'no benchmarks')
-    : (LB_CHIPS.find(([v]) => v === L.chip) || [null, 'All tasks'])[1];
+    : lbWhere(L);
   const more = popover(el('button', { class: 'quiet cl-more', id: 'pill-custom-more',
       'data-custom-more': '1', 'aria-label': 'more: copy as CSV', text: '⋯' }),
     () => el('div', { class: 'moremenu', id: 'pop-custom-more', 'aria-label': 'more' },
@@ -14704,7 +15223,7 @@ function lbViewForm() {
             : { chip: L.chip, cols: L.cols, models: L.models, layout } });
         state.lbForm = null;
         await loadViews();
-        return { toast: `Saved “${v.name}” for the team — it is a chip after the groups` };
+        return { toast: `Saved “${v.name}” for the team — it is under Saved views` };
       }), cancel, actNote('view-save'));
   }
   const [what, id] = f.split(':');
@@ -23274,7 +23793,8 @@ function benchSub() {
 function goPlace(pid) {
   const p = PLACES.find(x => x[0] === pid);
   if (!p) return;
-  if (pid === 'models') lbS().view = modelsView();
+  // 16.3: the viewer's last view — its test, group, and Table or Chart
+  if (pid === 'models') Object.assign(lbS(), lbRemembered());
   navigate({ tab: pid === 'benchmarks' ? benchSub() : p[2][0], model: null, topic: null });
 }
 // the switch at the top of Improve and Benchmarks
@@ -23739,8 +24259,9 @@ function showMe(show) {
   }
   // 12b: the Models tab's list is the Models table: its filters say the same
   if (show.tab === 'models') {
-    Object.assign(lbS(), { view: 'standard', chip: 'all', stdChip: 'all', models: null,
-      kind: show.kind || 'all', size: 'all',
+    Object.assign(lbS(), { view: 'standard', chip: 'all', models: null, size: 'all',
+      source: show.kind === 'checkpoint' ? 'local' : 'all',
+      type: ['base', 'instruct'].includes(show.kind) ? show.kind : 'all', tested: 'any',
       status: show.tainted ? 'tainted' : show.prelim ? 'preliminary' : 'all' });
     return navigate({ tab: 'leaderboard', model: null, topic: null });
   }

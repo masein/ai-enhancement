@@ -88,7 +88,7 @@ def test_on_phone_is_no_view_and_its_old_link_chooses_the_phone_builds(live, pag
     Models with them chosen"""
     page.set_viewport_size({"width": 1400, "height": 900})
     register(live, fake, phone=True)
-    assert views(page, live) == ["Standard", "Knowledge exam", "Everyday tasks"]
+    assert views(page, live) == ["Standard", "Mobile", "Everyday", "Frontier", "Knowledge exam"]
     page.goto("about:blank")
     page.goto(live["base"] + "/#tab=models&view=phone")
     page.wait_for_function("location.hash.includes('models=')")

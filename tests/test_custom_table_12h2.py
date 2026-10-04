@@ -20,6 +20,8 @@ from urllib.parse import quote
 
 import pytest
 
+from conftest import choose_chip
+
 from generative_fixture import write_run
 
 pytestmark = pytest.mark.dashboard
@@ -56,14 +58,24 @@ def models_tab(page, base, hash_rest="", width=1400):
     page.wait_for_selector("[data-lb-card] [data-pickers]")
 
 
+def built(page):
+    """16.3: Columns ▾, open, on "A table of the ticked ones" (Benchmarks ▾'s job)"""
+    if not page.locator("#pop-columns").count():
+        page.locator("#pill-columns").click()
+    page.locator("#pop-columns").wait_for()
+    if page.locator("#pill-columns").get_attribute("data-columns-menu") != "built":
+        page.locator("#pop-columns [data-columns-mode-pick='built']").check()
+        page.wait_for_selector("#pill-columns[data-columns-menu='built']")
+        page.wait_for_selector("#pop-columns [data-bench-clear]")
+
+
 def choose(page, *tasks):
-    """Benchmarks ▾ → Clear → tick each"""
-    page.locator("#pill-benchmarks").click()
-    page.locator("#pop-benchmarks").wait_for()
-    page.locator("#pop-benchmarks [data-bench-clear]").click()
+    """Columns ▾ → a table of the ticked ones → Clear → tick each"""
+    built(page)
+    page.locator("#pop-columns [data-bench-clear]").click()
     page.wait_for_selector("[data-no-bench]")
     for t in tasks:
-        page.locator(f"#pop-benchmarks [data-bench='{t}']").check()
+        page.locator(f"#pop-columns [data-bench='{t}']").check()
     page.keyboard.press("Escape")
     page.wait_for_selector("th[data-col='cavg']" if tasks else "[data-no-bench]")
 
@@ -101,9 +113,11 @@ def expected_avg(page, mid, tasks):
 
 def test_three_benchmarks_make_an_average_of_those_three(live, page):
     models_tab(page, live["base"])
-    assert page.locator("#pill-benchmarks").inner_text() == "Benchmarks: 6 ▾"    # today's six
+    # today's six, shown with the board's Avg
+    assert page.locator("#pill-columns").get_attribute("data-benchmarks-menu") == "6"
+    assert page.locator("#pill-columns").inner_text() == "Columns ▾"
     choose(page, *THREE)
-    assert page.locator("#pill-benchmarks").inner_text() == "Benchmarks: 3 ▾"
+    assert page.locator("#pill-columns").inner_text() == "Columns · Avg of 3 ▾"
     heads = [h.lower() for h in page.locator("[data-lb-table] thead tr.names th .hname")
              .all_inner_texts()]
     # 12i.0: it says what it is
@@ -152,37 +166,38 @@ def test_a_model_missing_one_is_not_averaged_and_says_what_is_missing(live, page
 def test_a_chip_fills_the_checklist_and_a_tick_makes_it_custom(live, page):
     models_tab(page, live["base"])
     assert page.locator("[data-custom-line]").count() == 0          # today's table: no line
-    page.locator("[data-chip='instruction']").click()
+    choose_chip(page, "instruction")
     page.wait_for_selector("th[data-col='ifeval']")
-    assert page.locator("#pill-benchmarks").inner_text() == "Benchmarks: 3 ▾"
-    page.locator("#pill-benchmarks").click()
-    ticked = page.locator("#pop-benchmarks [data-bench]:checked")
+    assert page.locator("#pill-columns").get_attribute("data-benchmarks-menu") == "3"
+    built(page)                                   # 16.3: the shown ones are the ticks
+    ticked = page.locator("#pop-columns [data-bench]:checked")
     assert sorted(ticked.evaluate_all("es => es.map(e => e.dataset.bench)")) == sorted(THREE)
     # every Standard benchmark, in its chip groups — no Everyday, no exam, no perplexity
-    groups = page.locator("#pop-benchmarks [data-bench-group]").evaluate_all(
+    groups = page.locator("#pop-columns [data-bench-group]").evaluate_all(
         "es => es.map(e => e.dataset.benchGroup)")
     # 12i.0: a group nothing has run yet (Math: GSM8K) is listed too, greyed
-    # 12k.2: Truthfulness is Trust & safety
+    # 12k.2: Truthfulness is Trust & safety; 16.3: Mobile-MMLU a group of its own
     assert groups == ["knowledge", "commonsense", "reasoning", "math", "trust",
-                      "instruction", "shared", "mobile"]               # 12n.2, 12o.3
-    offered = page.locator("#pop-benchmarks [data-bench]").evaluate_all(
+                      "instruction", "shared", "mobile", "mmlu"]       # 12n.2, 12o.3
+    offered = page.locator("#pop-columns [data-bench]").evaluate_all(
         "es => es.map(e => e.dataset.bench)")
     assert not [t for t in offered if t.startswith(("exam_", "fr_", "everyday")) or t == "mmlu_perm"]
     shot(page, "12h2-benchmarks-1400-light.png")
     # the search narrows the list
-    page.locator("#pop-benchmarks input[type=search]").fill("math")
-    assert page.locator("#pop-benchmarks [data-bench]").evaluate_all(
+    page.locator("#pop-columns input[type=search]").fill("math")
+    assert page.locator("#pop-columns [data-bench]").evaluate_all(
         "es => es.map(e => e.dataset.bench)") == ["hendrycks_math500"]
-    page.locator("#pop-benchmarks input[type=search]").fill("")
-    page.locator("#pop-benchmarks [data-bench='hendrycks_math500']").uncheck()
+    page.locator("#pop-columns input[type=search]").fill("")
+    page.locator("#pop-columns [data-bench='hendrycks_math500']").uncheck()
     page.keyboard.press("Escape")
     page.wait_for_selector("th[data-col='cavg']")
     assert page.locator("th[data-col='cavg'] .hname").inner_text().lower() == "avg above chance"
-    assert page.locator("#pill-benchmarks").inner_text() == "Benchmarks: 2 ▾"
-    assert page.locator("[data-chip='instruction']").get_attribute("aria-pressed") == "false"
-    # the chip again: today's view, no line
-    page.locator("[data-chip='instruction']").click()
+    assert page.locator("#pill-columns").inner_text() == "Columns · Avg of 2 ▾"
+    # back to showing and hiding: today's view, no line
+    page.locator("#pill-columns").click()
+    page.locator("#pop-columns [data-columns-mode-pick='shown']").check()
     page.wait_for_selector("[data-custom-line]", state="detached")
+    page.keyboard.press("Escape")
     assert page.locator("th[data-col='cavg']").count() == 0
     assert page.errors == []
 
@@ -210,7 +225,7 @@ def test_a_model_subset_shows_only_those_rows_and_all_ranked_brings_the_default(
     page.keyboard.press("Escape")
     assert sorted(rows(page)) == sorted([MODEL, BASE])
     assert page.locator("#pill-models").inner_text() == "Models: 2 ▾"
-    assert page.locator("[data-custom-what]").inner_text() == "Custom · All tasks · 2 models"
+    assert page.locator("[data-custom-what]").inner_text() == "Custom · Standard · 2 models"
     assert "models=" + quote(MODEL, safe="") in page.evaluate("location.hash")
     # one click on a name still opens the model
     page.locator(f"tr[data-lb-row='{BASE}'] a.mname").click()
@@ -309,7 +324,7 @@ def test_a_saved_view_is_the_teams_and_only_its_owner_changes_it(live, browser):
         chip = pa.locator("[data-saved-view]", has_text="Phone shortlist")
         chip.wait_for()
         assert chip.get_attribute("aria-pressed") == "true"         # it is the view shown
-        assert pa.locator(".lbbar .chipdiv").count() == 1             # after the groups
+        assert pa.locator(".lbbar .savedviews").count() == 1          # 16.3: its own row
         vid = chip.get_attribute("data-saved-view")
         assert pa.locator(f"[data-view-menu='{vid}']").count() == 1   # its owner's ⋯
         pa.locator(f"[data-view-menu='{vid}']").click()
@@ -394,18 +409,17 @@ def test_at_phone_width_the_pickers_stack_and_the_table_scrolls_in_its_box(live,
     box = page.evaluate("""() => {
       const r = s => document.querySelector(s).getBoundingClientRect();
       const w = document.querySelector('.lb-wrap');
-      return { chipsBottom: r('.lbbar .chips').bottom, pickTop: r('[data-pickers]').top,
+      return { chipsBottom: r('[data-lb-row1]').bottom, pickTop: r('[data-pickers]').top,
                pickRight: Math.max(...[...document.querySelectorAll('[data-pickers] .pill')]
                  .map(b => b.getBoundingClientRect().right)),
                page: document.scrollingElement.scrollWidth, vw: innerWidth,
                wrap: [w.scrollWidth, w.clientWidth, getComputedStyle(w).overflowX] }; }""")
-    assert box["pickTop"] >= box["chipsBottom"] - 1          # under the chips, a row of their own
+    assert box["pickTop"] >= box["chipsBottom"] - 1          # 16.3: under Row 1, a row of their own
     assert box["pickRight"] <= box["vw"]
     assert box["page"] <= box["vw"]                           # the page never scrolls sideways…
     sw, cw, ov = box["wrap"]
     assert sw > cw and ov in ("auto", "scroll")               # …the table does, in its own box
     shot(page, "12h2-phone-400-light.png", full_page=True)
-    page.locator("#pill-benchmarks").click()
-    page.locator("#pop-benchmarks").wait_for()
+    built(page)
     shot(page, "12h2-phone-benchmarks-400-light.png")
     assert page.errors == []

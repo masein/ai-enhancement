@@ -92,13 +92,17 @@ def cols(page):
 
 
 @pytest.mark.parametrize("width", WIDTHS)
-def test_trust_and_safetys_view_is_as_it_was_and_columns_offers_the_three(live, page, width):
+def test_the_three_are_mobileaibenchs_trust_part_and_not_in_trust_and_safety(live, page, width):
+    # 16.3: a benchmark in one place — Trust & safety is ours, all its columns shown
     go(page, live, "tab=models&chip=trust", "[data-lb-table]", width)
-    assert not [c for c in cols(page) if c.startswith("mab_")]           # its default view
     show_all_columns(page)
-    page.wait_for_selector("th[data-col='mab_socchem']")
-    assert [c for c in cols(page) if c.startswith("mab_")] == ["mab_adv", "mab_privacy",
-                                                               "mab_socchem"]
+    assert not [c for c in cols(page) if c.startswith("mab_")]
+    # …and the three are Mobile ▸ MobileAIBench's trust & safety part, shown
+    go(page, live, "tab=models&view=mobile&group=mobileaibench", "th[data-col='mab_socchem']", width)
+    assert [c for c in cols(page) if c in ("mab_adv", "mab_privacy", "mab_socchem")] == \
+        ["mab_adv", "mab_privacy", "mab_socchem"]
+    assert "MobileAIBench · trust & safety, judged" in page.locator(
+        "[data-lb-table] thead tr.grp th").all_text_contents()
     # the marked shares, and what waits for the judge
     assert page.locator(f"tr[data-lb-row='{GOOD}'] td[data-watch$='|mab_privacy']").inner_text() \
         .startswith("100.0")
@@ -111,8 +115,7 @@ def test_trust_and_safetys_view_is_as_it_was_and_columns_offers_the_three(live, 
 
 
 def test_social_chemistrys_label_and_tooltip(live, page):
-    go(page, live, "tab=models&chip=trust", "[data-lb-table]")
-    show_all_columns(page)
+    go(page, live, "tab=models&view=mobile&group=mobileaibench", "[data-lb-table]")
     th = page.locator("th[data-col='mab_socchem']")
     th.wait_for()
     assert th.locator(".hname").text_content() == "Agrees with crowd"
