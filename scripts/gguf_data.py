@@ -37,7 +37,8 @@ version, as for the Everyday bank: results record the sha256 they were
 measured on.
 
 14.3: Mobile-MMLU-Pro is built apart, once our answer key is (and again
-when the key moves): `--only mobile_mmlu_pro`.
+when the key moves): `--only mobile_mmlu_pro`. 14.4: the full Mobile-MMLU
+(non-commercial) likewise, on its own key: `--only mobile_mmlu_full`.
 
 12f.5, once after deploying: MMLU again, lettered (the others' files don't
 change, so their results stay current):
@@ -202,7 +203,9 @@ def gpqa_task(doc: dict) -> dict | None:
 MC = {"mmlu": mmlu_task, "arc_challenge": arc_task, "arc_easy": arc_task,
       "truthfulqa": truthfulqa_task, "gpqa": gpqa_task,
       # 14.3: asked as MMLU is, its field the subject (mobile_mmlu.gguf_docs)
-      "mobile_mmlu_pro": mmlu_task}
+      "mobile_mmlu_pro": mmlu_task,
+      # 14.4: and the full Mobile-MMLU (non-commercial), on its own key
+      "mobile_mmlu_full": mmlu_task}
 # 12n.2: GPQA's dataset is gated — said in one line, as the board's runs say it
 GPQA_GATED = ("GPQA is gated: accept its terms at https://huggingface.co/datasets/Idavidrein/gpqa "
               "with this server's HF account")
@@ -274,11 +277,11 @@ def read_winogrande(text: str) -> list[dict]:
 def lm_eval_docs(task_name: str) -> list[dict]:
     """the documents lm_eval evaluates for a task (a group's subtasks in
     order), after its process_docs"""
-    if task_name == "mobile_mmlu_pro":
+    if task_name in ("mobile_mmlu_pro", "mobile_mmlu_full"):
         # 14.3: not lm_eval's: the kept questions of our answer key, from the
-        # file the data step fetched — never committed
+        # file the data step fetched — never committed. 14.4: the full set's
         import mobile_mmlu
-        return mobile_mmlu.gguf_docs()
+        return mobile_mmlu.gguf_docs("full" if task_name == "mobile_mmlu_full" else "pro")
     from lm_eval.tasks import TaskManager, get_task_dict
 
     def flat(d):
@@ -347,6 +350,14 @@ def build(out: Path, only: list[str] | None = None, docs_of=lm_eval_docs) -> dic
                 source=f"our answer key {mobile_mmlu.current_key().get('version')}, its kept "
                        f"questions of Mobile-MMLU-Pro {mobile_mmlu.manifest()['revision'][:7]}",
                 key=mobile_mmlu.current_key().get("version"))
+        if key == "mobile_mmlu_full":
+            import mobile_mmlu
+            fm = mobile_mmlu.full_manifest()
+            manifest["benchmarks"][key].update(
+                source=f"our answer key {mobile_mmlu.full_key().get('version')}, its kept "
+                       f"questions of Mobile-MMLU {fm['revision'][:7]}",
+                key=mobile_mmlu.full_key().get("version"),
+                licence=fm["licence"], restriction=fm["restriction"])
         print(f"{info['label']}: {n} of {len(docs)} questions"
               + (f" ({skipped} left out: the format can't hold them exactly)" if skipped else "")
               + f" -> {out / info['data']}")

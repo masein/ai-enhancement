@@ -525,8 +525,9 @@ def diagnose_model(model_dir: Path) -> dict:
         if task.startswith("gpqa"):
             continue
         # 14.3: nor Mobile-MMLU-Pro's: a Standard benchmark, never a training
-        # target — and its lm_eval target is a stand-in, our key kept apart
-        if task == "mobile_mmlu_pro":
+        # target — and its lm_eval target is a stand-in, our key kept apart.
+        # 14.4: nor the full Mobile-MMLU's (non-commercial: internal research only)
+        if task in ("mobile_mmlu_pro", "mobile_mmlu_full"):
             continue
         d = diagnose_task(files)
         if d:

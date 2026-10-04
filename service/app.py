@@ -496,7 +496,8 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
     if s.suite == "mobile" and part not in config.MAB_PARTS:
         raise HTTPException(422, "the mobile suite's part is judged (MT-Bench), trust "
                                  "(Adversarial Instruction, Privacy Leakage, Social Chemistry "
-                                 "101), mmlu (Mobile-MMLU-Pro), or none for its five sets with "
+                                 "101), mmlu (Mobile-MMLU-Pro), mmlu_full (the full "
+                                 "Mobile-MMLU, non-commercial), or none for its five sets with "
                                  "no judge")
     if s.suite == "mobile" and pair:
         raise HTTPException(422, "pair is for the devicemark suite only")
@@ -508,6 +509,11 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
     if s.suite == "mobile" and part == "mmlu" and _mmp().available():
         # 14.3: Mobile-MMLU-Pro is fetched at deploy too
         raise HTTPException(422, _mmp().available() + ". Nothing was queued.")
+    if s.suite == "mobile" and part == "mmlu_full":
+        # 14.4: and the full set, with Pro (its run asks Pro's wording of 9933ec55)
+        why = _mmp().available() or _mmp().full_available()
+        if why:
+            raise HTTPException(422, why + ". Nothing was queued.")
     if s.suite not in ("devicemark", "mobile") and (part or pair):
         raise HTTPException(422, "pair is for the devicemark suite only, and part for it and "
                                  "the mobile suite")
@@ -528,8 +534,8 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
     if s.suite == "shared" and s.kind == "base":
         raise HTTPException(422, config.SHARED_INSTRUCT_ONLY + ". Nothing was queued.")
     # 14.3: Mobile-MMLU-Pro is scored on the letters' log-likelihoods, as the
-    # paper ran it: a base model can sit it
-    if s.suite == "mobile" and s.kind == "base" and part != "mmlu":
+    # paper ran it: a base model can sit it (14.4: and the full set)
+    if s.suite == "mobile" and s.kind == "base" and part not in ("mmlu", "mmlu_full"):
         raise HTTPException(422, config.MAB_INSTRUCT_ONLY + ". Nothing was queued.")
     total = sum(config.MMLU_PRO_SUBJECTS.values())
     if s.subset and not 0 < s.subset < total:
@@ -574,7 +580,8 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
             if not ai_models.has_key():
                 raise HTTPException(409, "OpenRouter has no key on this server "
                                          "(OPENROUTER_API_KEY). Nothing was queued.")
-            why = served.over_limit_line(served.estimate(rec, s.suite, chosen, s.subset))
+            why = served.over_limit_line(served.estimate(rec, s.suite, chosen, s.subset,
+                                                         part=part))
             if why:
                 raise HTTPException(409, why + " Nothing was queued.")
     # 11i: a checkpoint that ships its own model code is answered HERE, before
@@ -1413,8 +1420,11 @@ def mab_estimate(model: str):
     rec = served.get(model) if served.is_served(model) else None
     each = ((rec or {}).get("speed") or {}).get("secs_each") if rec else _mab_hf_each()
     parts = _mab().estimate(bool(rec), each, _mab_judge())
-    # 14.3: Mobile-MMLU-Pro — a letter a question, or four log-likelihoods
-    parts["mmlu"] = _mmp().run_estimate(bool(rec), each if rec else None)
+    # 14.3: Mobile-MMLU-Pro — a letter a question, or four log-likelihoods.
+    # 14.4: each counts only what this model has no pick for, by either set's run
+    mdir = config.OUT_DIR / model.replace("/", "__")
+    parts["mmlu"] = _mmp().run_estimate(bool(rec), each if rec else None, "pro", mdir)
+    parts["mmlu_full"] = _mmp().run_estimate(bool(rec), each if rec else None, "full", mdir)
     return {"model": model, "parts": parts}
 
 
@@ -1423,7 +1433,7 @@ def _mab_hf_each() -> float | None:
     GPU: their GPU time over their answers"""
     rows = [r for r in db.recent(500) if r.get("suite") == "mobile" and r.get("status") == "done"
             and r.get("gpu_seconds") and not served.is_served(r.get("hf_id") or "")
-            and (r.get("part") or "") != "mmlu"]
+            and (r.get("part") or "") not in ("mmlu", "mmlu_full")]
     if not rows:
         return None
     m = _mab()

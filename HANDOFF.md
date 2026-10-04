@@ -4953,6 +4953,37 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 14.4.3 — the full Mobile-MMLU as a benchmark (4 Oct)
+
+- **The part**: the Mobile suite's `mmlu_full` (`config.MMF_TASK`,
+  `mobile_mmlu_full`), shown "Mobile-MMLU (full)"; Pro's `mmlu` keeps its
+  name and stays first. Refused without either set's files; a base model may
+  sit it. Scored as Pro: lm_eval's log-likelihood with no chat template (HF),
+  the letter to the authors' prompt (served/OpenRouter), llama-perplexity on
+  its own GGUF dataset (`gguf_data.py --only mobile_mmlu_full`, built from the
+  full key's kept questions; `gguf_bench` marks it `kept_apart`).
+- **One run, two scores**: the full run's task is the pool
+  (`build_full_tasks`: the full set's wording, plus Pro's wording of
+  `9933ec55`), so a full run asks both wordings and each set is scored on its
+  own (`collect` writes `mobile_mmlu_pro.json` and `mobile_mmlu_full.json`
+  from `picks()`, kept by label id). A Mobile-MMLU task asks only the
+  questions with no pick (`to_ask`; lm_eval `--samples` from `left.json`, the
+  served docs filtered): a Pro run counts towards a later full run, and a Pro
+  run after a full run asks nothing. `_task_done` isn't consulted for these
+  two: what's left to ask is.
+- **Scores**: accuracy on kept questions, overall, in the 9 categories and in
+  the 80 fields (`score()` adds `by_field`). The estimate before queuing
+  (`/api/mobileaibench/estimate` part `mmlu_full`, and OpenRouter's cost with
+  the part now passed) counts only what's left, and says which run answered
+  the rest.
+- **Kept apart**: `report_lm_eval` drops `mobile_mmlu_full` from a run's tasks
+  (never a column, never in Avg, rank or required) and carries `model.mmf`
+  and `DATA.mmf` (licence, restriction, key, checks, categories, fields). It
+  shows in its own table under Mobile tasks (`mmfCard`), a model page line
+  (`mmfLine`, with categories and fields; and on the GGUF block), and its
+  own group in Compare (`mmfCmpGroup`); not in the GGUF table or its pairs.
+  Never a training target (diagnose skips it).
+
 ### 14.4.2 — one answer key for both sets (4 Oct)
 
 - **One pool of labels, by question**: a label id is the question's id and the

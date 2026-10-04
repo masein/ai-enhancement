@@ -22,6 +22,7 @@ from test_14_3_mobile_mmlu import FIXTURE, RIGHT, a_key, fake_pin, pin_fixture, 
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase14_3"
 GOOD, SKEWED = "fx/good-750m", "fx/skewed-360m"
+NEW = "fx/chance-160m"                      # no Mobile-MMLU picks
 WIDTHS = [1400, 375]
 
 
@@ -176,7 +177,8 @@ def test_test_a_model_offers_the_multiple_choice_part(live, page, width):
     page.set_viewport_size({"width": width, "height": 1000})
     page.goto(live["base"] + "/#tab=home")
     set_name(page, "masein")
-    go(page, live, "model=" + quote(GOOD, safe=""), "[data-model-hero]", width)
+    # 14.4: a model that hasn't sat it (one that has would have nothing to ask)
+    go(page, live, "model=" + quote(NEW, safe=""), "[data-model-hero]", width)
     page.locator("[data-test-model]").click()
     page.locator("[data-dialog='test'] [data-select='suite']").click()
     page.locator("[role='option'][data-value='mobile']").click()
