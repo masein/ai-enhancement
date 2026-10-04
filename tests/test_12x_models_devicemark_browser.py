@@ -218,6 +218,10 @@ def test_the_devicemark_view_names_rows_whole_and_drops_standards_notions(live, 
     """12z C7: names cut to "Qwen3.6-35B-…" couldn't tell the original from the
     phone build; Params "—" for a served setup; "0 ranked" and "prelim 0/7"
     are Standard's; answered is a share"""
+    import service.app as appmod
+    from service import sizes
+    sizes.set_size(SETUP, "35B", "3B", "masein")             # 16.1: as the deploy step does
+    appmod._cache.update(key=None, payload=None, at=0.0)
     go(page, live, "tab=models&chip=devicemark", "[data-lb-table]", width=width)
     assert "dmview" in page.locator("[data-lb-table]").get_attribute("class").split()
     # the whole name, in two lines at most, nothing cut, at 1400; a phone wraps it already
@@ -227,10 +231,12 @@ def test_the_devicemark_view_names_rows_whole_and_drops_standards_notions(live, 
         fit = name.evaluate("e => [e.scrollHeight, e.clientHeight, e.scrollWidth, e.clientWidth, "
                             "e.getBoundingClientRect().width, e.closest('td').getBoundingClientRect().width]")
         assert fit[0] <= fit[1] + 1 and fit[2] <= fit[3] + 1, fit
-    # Params from what it is based on: Qwen3.6-35B-A3B
-    params = page.locator(f"tr[data-lb-row='{SETUP}'] td[data-params-from]")
-    assert params.get_attribute("data-params-from") == "Qwen/Qwen3.6-35B-A3B"
-    assert params.inner_text().startswith("35B")
+    # 16.1: Params as a person entered it — its base model's name, Qwen3.6-35B-A3B,
+    # is only the form's suggestion — 35B, 3B active
+    params = page.locator(f"tr[data-lb-row='{SETUP}'] td[data-params-src='entered']")
+    assert params.inner_text().split()[0] == "35B"
+    assert params.locator(".act").text_content() == "3B act"   # a phone's width hides it
+    assert params.get_attribute("title") == "entered by masein\n3B active"
     # none of Standard's: no prelim badge, no count of ranked models
     assert page.locator("[data-lb-table] .badge.prelim").count() == 0
     assert " ranked" not in page.locator("[data-statusline='models']").inner_text()

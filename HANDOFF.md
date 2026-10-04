@@ -4953,6 +4953,34 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 16.1 — two sizes, and the filter that hid GGUF and served models (4 Oct)
+
+- **Two sizes:** total, and active where they differ ("35B · 3B active").
+  Filters and sorting use the total. In the payload: `params`, `activeParams`,
+  `paramsSrc` (entered, config, file, base, name), `paramsBy` and `paramsBase`.
+- **Where a size comes from, in order** (`report_lm_eval.size_of`):
+  1. what a person entered: the `model_sizes` table, from the Size field when
+     a served model or a GGUF file is registered, an edit on the model's page
+     (`POST /api/models/size`), or `python -m service.sizes set`;
+  2. for a model run here, the harness's count;
+  3. a GGUF file's own header. The host worker reads it as it hashes the file
+     (`scripts/gguf_header.py`: tensors' elements summed; the experts' share
+     for active) and keeps it in `results/gguf_files.json` by path;
+  4. the board model it is based on or the same as, when that one has a size;
+  5. a Hub model's name alone. A served model's or a GGUF file's name only
+     suggests a size, behind a button in the form (12f.1).
+- **`params_from_name`:** an `A3B` token is the active size, never the total;
+  a size token must stand alone (no "8x7b", no "6b" of "0.6b").
+- **Size filter:** `< 200M · 200M–1B · 1–3B · 3–9B · > 9B` on the total, more
+  than one ticked (`size=l,x`; the old `size=xl`, "> 3B", opens 3–9B and > 9B).
+  "Size not recorded (n)" is the last choice while n > 0, and a filter that
+  hides unsized rows says so: "N models have no size recorded and are hidden
+  · show them".
+- **Our GPU:** a served row's memory is its server's (`place()` returns
+  "served" first). GGUF rows aren't the Playground's to load any more
+  (`why_not: "gguf"`; before, they were listed as HF models). Chat's sizes are
+  `model_meta.json`'s, which entered sizes never touch.
+
 ### 14.4.5 — the full Mobile-MMLU's switch (4 Oct)
 
 - **`MOBILE_MMLU_FULL=0`** in `.env` (passed through docker-compose; on by

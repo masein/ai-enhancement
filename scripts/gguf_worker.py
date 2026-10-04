@@ -102,6 +102,8 @@ class Worker:
         self.lock = self.results / ".run.lock"
         self.beat = self.results / "gguf_worker.json"
         self.hashes = self.results / "gguf_hashes.json"
+        # 16.1: what each file's header says — its size above all — for the board
+        self.files = self.results / "gguf_files.json"
         for d in (self.requests, self.out, self.requests / "done"):
             d.mkdir(parents=True, exist_ok=True)
         self.build = self._build()
@@ -259,6 +261,17 @@ class Worker:
         write_json(self.hashes, cache)
         return cache[key]
 
+    def header(self, p: Path, sha: str) -> dict | None:
+        """16.1: the file's header (scripts/gguf_header.py) — its parameters,
+        active ones, architecture, quantisation, context — kept by path for the
+        board, which can't see the host's files. Read only, never run"""
+        import gguf_header
+        got = gguf_header.read(p)
+        files = read_json(self.files) or {}
+        files[str(p)] = {"sha256": sha, "size": p.stat().st_size, "header": got, "at": now()}
+        write_json(self.files, files)
+        return got
+
     # -- a request -------------------------------------------------------------------
     def next_request(self) -> Path | None:
         reqs = sorted(self.requests.glob("*.json"), key=lambda p: p.stat().st_mtime)
@@ -339,7 +352,7 @@ class Worker:
             return
         sha = self.sha256(model)
         res["file"] = {"path": str(model), "name": model.name, "size": model.stat().st_size,
-                       "sha256": sha}
+                       "sha256": sha, "header": self.header(model, sha)}
         pin = req.get("pin") or {}
         if pin.get("sha256") and pin["sha256"] != sha:
             res.update(status="failed", finished_at=now(),

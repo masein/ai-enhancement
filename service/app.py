@@ -34,7 +34,7 @@ from pydantic import BaseModel
 from . import (ai_models, builder, chat, config, db, disk, hfmeta, judge_test, llm, llm_poller,
                startup, suggest, worker)
 from . import playground
-from . import gguf, phone, reported, served
+from . import gguf, phone, reported, served, sizes
 from . import proposals as prop
 from . import reader
 
@@ -398,7 +398,10 @@ def results_payload() -> dict:
                                        everyday=report.load_everyday(config.OUT_DIR),
                                        served=served_map,
                                        gguf=report.load_gguf(config.RESULTS_ROOT, config.OUT_DIR,
-                                                             served_map))
+                                                             served_map),
+                                       # 16.1: what people entered, and what the files say
+                                       sizes={"entered": db.sizes_all(),
+                                              "files": report.load_sizes(config.RESULTS_ROOT)})
         payload["live"] = True
         # 12q.C: each model's DeviceMark runs, for its page and "Open results"
         try:
@@ -1021,6 +1024,9 @@ class ServedIn(BaseModel):
     gguf_path: str = ""                # 12f.3: its GGUF file on the server
     gguf_flags: str = ""
     gguf_setups: str = ""              # 12f.3 addendum: "name: KEY=VALUE --flag", a line each
+    # 16.1: its size, as the person registering it confirms it: "35B", "3B"
+    size: str = ""
+    active: str = ""
     by: str = ""
 
 
@@ -1136,7 +1142,11 @@ def served_add(f: ServedIn, x_token: str = Header(default="")):
     doesn't answer is said in one line, and nothing is kept"""
     _check_token(x_token)
     try:
+        if f.size.strip():
+            sizes.check(f.size, f.active)              # before anything is kept
         out = {"model": served.register(f.model_dump(), f.by.strip()[:80])}
+        if f.size.strip():
+            out["size"] = sizes.set_size(out["model"]["id"], f.size, f.active, f.by)
     except ValueError as e:
         raise HTTPException(422, str(e)) from None
     _cache.update(key=None, payload=None, at=0.0)       # on Models at the next look
@@ -1255,6 +1265,8 @@ class GgufIn(BaseModel):
     how: str = ""
     flags: str = ""
     setups: str = ""                   # 12f.3 addendum
+    size: str = ""                     # 16.1: its size, confirmed: "35B"
+    active: str = ""                   # and its active parameters: "3B"
     by: str = ""
 
 
@@ -1294,11 +1306,38 @@ def gguf_page():
 def gguf_register(f: GgufIn, x_token: str = Header(default="")):
     _check_token(x_token)
     try:
+        if f.size.strip():
+            sizes.check(f.size, f.active)              # before anything is kept
         rec = gguf.register(f.model_dump(), f.by.strip()[:80])
+        got = sizes.set_size(rec["id"], f.size, f.active, f.by) if f.size.strip() else None
     except ValueError as e:
         raise HTTPException(422, str(e)) from None
     _cache.update(key=None, payload=None, at=0.0)
-    return {"model": {"id": rec["id"], **gguf.view(rec)}}
+    return {"model": {"id": rec["id"], **gguf.view(rec)}, **({"size": got} if got else {})}
+
+
+class SizeIn(BaseModel):
+    model: str
+    total: str = ""
+    active: str = ""
+    by: str = ""
+
+
+@app.post("/api/models/size")
+def model_size(a: SizeIn, x_token: str = Header(default="")):
+    """16.1: a model's size, as a person enters it on its page — its total and,
+    for a mixture of experts, its active parameters. First of the board's
+    sources for it; kept with who entered it"""
+    _check_token(x_token)
+    known = {m["id"] for m in results_payload()["models"]}
+    if a.model not in known:
+        raise HTTPException(404, f"no such model on the board: {a.model}")
+    try:
+        got = sizes.set_size(a.model, a.total, a.active, a.by)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    _cache.update(key=None, payload=None, at=0.0)
+    return got
 
 
 @app.post("/api/gguf/estimate")

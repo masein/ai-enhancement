@@ -194,6 +194,17 @@ CREATE TABLE IF NOT EXISTS trained_from (
   set_by      TEXT NOT NULL,
   set_at      REAL NOT NULL
 );
+-- 16.1: a model's size as a person entered it — its total parameters, and the
+-- active ones where they differ (a mixture of experts). The first source of a
+-- served model's or a GGUF file's size; the file's header and its base model
+-- come after (report_lm_eval.sizes)
+CREATE TABLE IF NOT EXISTS model_sizes (
+  model       TEXT PRIMARY KEY,
+  total       REAL NOT NULL,
+  active      REAL,
+  set_by      TEXT NOT NULL,
+  set_at      REAL NOT NULL
+);
 -- 12h.2: a Models table someone built — its benchmarks, its models — named
 -- and kept for the whole team. Only the name that saved it renames or deletes it
 CREATE TABLE IF NOT EXISTS views (
@@ -944,6 +955,22 @@ def trained_from_set(model: str, base: str, by: str) -> None:
         c.execute("INSERT INTO trained_from (model, base, set_by, set_at) VALUES (?,?,?,?) "
                   "ON CONFLICT(model) DO UPDATE SET base=excluded.base, set_by=excluded.set_by, "
                   "set_at=excluded.set_at", (model, base, by, time.time()))
+        c.commit()
+
+
+def sizes_all() -> dict[str, dict]:
+    """16.1: {model: {total, active, by, at}} — the sizes people entered"""
+    with closing(_conn()) as c:
+        rows = c.execute("SELECT model, total, active, set_by, set_at FROM model_sizes").fetchall()
+    return {m: {"total": t, "active": a, "by": by, "at": at} for m, t, a, by, at in rows}
+
+
+def size_set(model: str, total: float, active: float | None, by: str) -> None:
+    with closing(_conn()) as c:
+        c.execute("INSERT INTO model_sizes (model, total, active, set_by, set_at) "
+                  "VALUES (?,?,?,?,?) ON CONFLICT(model) DO UPDATE SET total=excluded.total, "
+                  "active=excluded.active, set_by=excluded.set_by, set_at=excluded.set_at",
+                  (model, float(total), float(active) if active else None, by, time.time()))
         c.commit()
 
 

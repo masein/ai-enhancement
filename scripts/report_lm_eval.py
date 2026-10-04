@@ -2089,16 +2089,69 @@ PROPORTION = {"acc", "acc_norm", "exact_match", "pass@1", "f1", "em", "rubric_pa
 MEAN_SCORES = {"mab_f1", "sqlparser_f1", "rougeL", "mtbench", "judged_correct", "kept_private",
                "agrees"}
 
-_PARAM_RE = re.compile(r"(\d+(?:\.\d+)?)([mb])(?![a-z0-9])", re.I)
+# a size token stands alone: "-410m", "-0.6b" — never "a3b" (an active size), "8x7b"
+# or the "6b" of "0.6b"
+_PARAM_RE = re.compile(r"(?<![a-z0-9.])(\d+(?:\.\d+)?)([mb])(?![a-z0-9])", re.I)
+# 16.1: "A3B" — a mixture of experts' active parameters, never its total
+_ACTIVE_RE = re.compile(r"(?<![a-z0-9.])a(\d+(?:\.\d+)?)b(?![a-z0-9])", re.I)
+
+
+def sizes_from_name(model_id: str) -> tuple[float | None, float | None]:
+    """(total, active) from a name: Qwen3.6-35B-A3B-k4-LDA-UD-Q4_K_XL -> 35e9
+    and 3e9; pythia-410m -> 410e6; Qwen3-0.6B -> 6e8. Q4_K_XL, k4 and a context
+    length (32k) are no size. The last size-looking token wins"""
+    name = model_id.split("/")[-1].lower()
+    hits, act = _PARAM_RE.findall(name), _ACTIVE_RE.findall(name)
+    total = float(hits[-1][0]) * (1e6 if hits[-1][1] == "m" else 1e9) if hits else None
+    return total, float(act[-1]) * 1e9 if act else None
 
 
 def params_from_name(model_id: str) -> float | None:
-    """pythia-410m -> 410e6, Qwen3-0.6B -> 6e8. Last size-looking token wins."""
-    hits = _PARAM_RE.findall(model_id.split("/")[-1].lower())
-    if not hits:
-        return None
-    v, unit = hits[-1]
-    return float(v) * (1e6 if unit == "m" else 1e9)
+    """pythia-410m -> 410e6, Qwen3-0.6B -> 6e8; Qwen3.6-35B-A3B -> 35e9 (16.1:
+    A3B is its active size, never its total)"""
+    return sizes_from_name(model_id)[0]
+
+
+def load_sizes(results_root: Path | None) -> dict:
+    """16.1: what the GGUF worker read from each file's header, by path
+    (results/gguf_files.json): {path: {sha256, size, header, at}}"""
+    try:
+        return json.loads((Path(results_root) / "gguf_files.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return {}
+
+
+def size_of(mid: str, r: dict, served: dict, entered: dict, files: dict,
+            by_model: dict, gguf_reg: dict | None = None, _seen: tuple = ()) -> dict:
+    """16.1: a row's size — {total, active, src, by, base} — from, in order:
+    what a person entered (by); for a model run here, the harness's count
+    (config); a GGUF file's own header, once the host worker has read it
+    (file); the board model it is based on or the same as (base); and, for a
+    Hub model alone, its name (name). A served model's or a GGUF file's name is
+    never read: it is a person's words (12f.1), suggested in the form only"""
+    e = (entered or {}).get(mid)
+    if e and e.get("total"):
+        return {"total": e["total"], "active": e.get("active"), "src": "entered", "by": e.get("by")}
+    arch = (r or {}).get("archinfo") or {}
+    if (r or {}).get("num_params"):
+        return {"total": r["num_params"], "active": arch.get("active_params"), "src": "config"}
+    sv = (served or {}).get(mid) or {}
+    reg = (gguf_reg or {}).get(mid) or {}
+    path = sv.get("gguf_path") or reg.get("path")
+    h = ((files or {}).get(path) or {}).get("header") if path else None
+    if h and h.get("params"):
+        return {"total": h["params"], "active": h.get("active_params"), "src": "file"}
+    for base in (sv.get("based_on"), sv.get("same_as"), reg.get("based_on")):
+        base = str(base or "").strip()
+        if base and base != mid and base not in _seen and base in by_model:
+            got = size_of(base, by_model[base], served, entered, files, by_model, gguf_reg,
+                          _seen + (mid,))
+            if got.get("total"):
+                return {**got, "src": "base", "base": base}
+    if mid in (served or {}) or mid.startswith("gguf/") or reg:
+        return {"total": None, "active": None, "src": None}
+    total, active = sizes_from_name(mid)
+    return {"total": total, "active": active if total else None, "src": "name" if total else None}
 
 
 def merge_runs(runs: list[dict]) -> dict[str, dict]:
@@ -2144,7 +2197,8 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
                   fingerprints: dict[str, str] | None = None,
                   everyday: dict | None = None,
                   served: dict | None = None,
-                  gguf: dict | None = None) -> dict:
+                  gguf: dict | None = None,
+                  sizes: dict | None = None) -> dict:
     """`everyday`: the pilot's questions and marks (load_everyday), carried
     beside the models and never inside them.
 
@@ -2269,8 +2323,13 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         got_req = [t for t in required if mid in cells.get(t, {}) and t not in tainted_acc]
         missing = [t for t in required if mid not in cells.get(t, {})]
         official = bool(required) and not missing and not (set(tainted_acc) & set(required))
-        # 12f.1: a served model's name is a person's words: no size read from it
-        params = r["num_params"] or (None if mid in served else params_from_name(mid))
+        # 12f.1: a served model's name is a person's words: no size read from it.
+        # 16.1: a size from what a person entered, the harness, a GGUF's header
+        # or its base model — and its active parameters where they differ
+        size = size_of(mid, r, served, (sizes or {}).get("entered") or {},
+                       (sizes or {}).get("files") or {}, by_model,
+                       (gguf or {}).get("registered") or {})
+        params = size["total"]
         judge = _judged_now(r, fingerprints)
         # 12i.1: only the current judge version's scores are in today's views;
         # an earlier one's go to the model's History, "judged by <model>"
@@ -2378,8 +2437,10 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             "source": "artifact" if mid.startswith("local/") else "hub",
             "kind": "instruct" if r["chat_template"] else "base",
             "params": params,
-            "paramsSrc": ("config" if r["num_params"] else
-                          "name" if params is not None else None),
+            "paramsSrc": size["src"],
+            # 16.1: "35B · 3B active"; who entered it, or the base it came from
+            "activeParams": size.get("active"), "paramsBy": size.get("by"),
+            "paramsBase": size.get("base"),
             "backend": r["backend"], "dtype": r["dtype"],
             "batch": r["batch_size"], "chat": r["chat_template"],
             "seed": r["seed"], "limit": r["limit"],
@@ -3948,10 +4009,12 @@ a.tchip { text-decoration:none; }
 .moremenu [role=menuitem], .moremenu [role=menuitemradio], .mlist [role=menuitem] {
   border:0; border-bottom:0; text-decoration:none; }
 .moremenu [role=menuitem][aria-current="true"], .mlist [role=menuitem][aria-current="true"],
-.moremenu [role=menuitemradio][aria-checked="true"] { background:var(--accent-soft); }
+.moremenu [role=menuitemradio][aria-checked="true"],
+.moremenu [role=menuitemcheckbox][aria-checked="true"] { background:var(--accent-soft); }
 .moremenu [role=menuitem][aria-current="true"]::after,
 .mlist [role=menuitem][aria-current="true"]::after,
-.moremenu [role=menuitemradio][aria-checked="true"]::after {
+.moremenu [role=menuitemradio][aria-checked="true"]::after,
+.moremenu [role=menuitemcheckbox][aria-checked="true"]::after {
   content:"✓"; color:var(--accent); margin-left:auto; padding-left:8px; }
 .mlist [role=menuitem] { display:flex; align-items:center; }
 .famdot { width:8px; height:8px; border-radius:50%; display:inline-block; flex:none; }
@@ -5209,6 +5272,29 @@ function shortNames(names, max = 22) {
 }
 const num  = (v, d = 3) => v == null ? '—'
   : (+v).toFixed(d).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+// 16.1: a model's size, total then active: "35B · 3B active". Filters and
+// sorting use the total. Where it came from is on hover
+const activeOf = m => m.activeParams || (m.archinfo || {}).active_params || null;
+const sizeText = m => m.params ? P(m.params) + (activeOf(m) ? ` · ${P(activeOf(m))} active` : '') : '';
+function sizeTip(m) {
+  return { entered: `entered by ${m.paramsBy || 'someone'}`, config: 'from the harness config',
+    file: 'from the file', base: `from its base model, ${m.paramsBase || ''}`,
+    name: 'from the model name' }[m.paramsSrc] || '';
+}
+// "908M active · 64 experts, 8 per token": a mixture of experts' line
+function activeTip(m) {
+  const a = m.archinfo || {};
+  return activeOf(m) ? `${P(activeOf(m))} active` + (a.experts ? ` · ${a.experts} experts, `
+    + `${a.experts_per_tok} per token` : '') : '';
+}
+// a suggestion from a name, for a form to fill and a person to confirm (12f.1:
+// a served model's name is never read silently): "35B-A3B" -> 35B, 3B active
+function sizesFromName(name) {
+  const n = String(name || '').split('/').pop().toLowerCase();
+  const tot = [...n.matchAll(/(?<![a-z0-9.])(\d+(?:\.\d+)?)([mb])(?![a-z0-9])/g)].pop();
+  const act = [...n.matchAll(/(?<![a-z0-9.])a(\d+(?:\.\d+)?)b(?![a-z0-9])/g)].pop();
+  return { total: tot ? tot[1] + tot[2].toUpperCase() : '', active: act ? act[1] + 'B' : '' };
+}
 const P    = v => v == null ? '—' : v >= 995e6 ? (v / 1e9).toFixed(v % 1e9 ? 1 : 0) + 'B'
                                   : Math.round(v / 1e6) + 'M';
 const cell = (t, m) => (DATA.cells[t] || {})[m];
@@ -5393,7 +5479,7 @@ function modelGroups(rows) {
     const k = r.judged ?? Object.keys((m.judge || {}).tasks || {})
       .filter(t => t.startsWith('exam_')).length;
     return { value: r.id, text: r.id, search: `${r.id} ${m.name || ''}`,
-             right: r.right || [m.params ? P(m.params) : null, k ? `${k} judged` : null]
+             right: r.right || [sizeText(m) || null, k ? `${k} judged` : null]
                .filter(Boolean).join(' · ') };
   }) }];
 }
@@ -5517,7 +5603,8 @@ function modelSentence(m) {
                                                    : 'a Hub model'}`
     + `, evaluated as ${m.kind === 'instruct' ? 'instruct-tuned (chat template applied)'
                                               : 'base (no chat template)'}`
-    + (m.params ? `, ${P(m.params)} parameters` : '') + '.');
+    + (m.params ? `, ${P(m.params)} parameters` + (activeOf(m) ? ` (${P(activeOf(m))} active)`
+      : '') : '') + '.');
   const r = rankOf(m), a = officialAvg(m);
   const tn = (m.tainted || []).map(tName).join(' and ');
   if (r && a != null) {
@@ -5915,7 +6002,7 @@ function barPanel(task, models, opts) {
     const tipRows = [
       fmt(c.v) + (c.se ? ` ± ${lower ? num(c.se, 3) : (100 * c.se).toFixed(1) + ' pts'}` : ''),
       `${task} — ${c.shots != null ? c.shots + '-shot, ' : ''}${c.n != null ? c.n + ' items' : ''}`,
-      m.id + (m.params ? ` · ${P(m.params)} params` : '')];
+      m.id + (m.params ? ` · ${sizeText(m)} params` : '')];
     if (dim) tipRows.splice(1, 0, '≈ chance — not statistically above it');
     if (opts.credit) tipRows.push(opts.credit);
     if (isCk) tipRows.push('uploaded checkpoint (local artifact)');
@@ -7051,16 +7138,6 @@ const SERVED_SUITES = ['everyday', 'judged', 'generative', 'safety', 'shared', '
 const servedOf = id => (DATA.served || {})[id]
   || (DATA.models.find(x => x.id === id) || {}).served || null;
 const isServedId = id => /^served\//.test(String(id || ''));
-// 12z C7: a served model's parameters, from the model it is based on: that
-// model's own count when it is on the board, else its name's ("35B-A3B")
-function paramsOf(m) {
-  const s = servedOf(m.dmHome || m.id), b = s && s.based_on;
-  if (!b) return null;
-  const base = DATA.models.find(x => x.id === b && x.params);
-  if (base) return { v: base.params, act: (base.archinfo || {}).active_params || null, from: b };
-  const t = /(?:^|[-_ ])(\d+(?:\.\d+)?)B(?:[-_ ]A(\d+(?:\.\d+)?)B)?(?![a-z])/i.exec(String(b).split('/').pop());
-  return t ? { v: parseFloat(t[1]) * 1e9, act: t[2] ? parseFloat(t[2]) * 1e9 : null, from: b } : null;
-}
 // 12m.3: a model from OpenRouter is served too, and says where: "via OpenRouter"
 const isOpenRouter = s => !!s && s.via === 'openrouter';
 function servedTag(id) {
@@ -7300,14 +7377,18 @@ function servedSetups(m) {
         + (drafts ? '' : ' MTP’s drafts accepted: no server has reported them yet.') }) : '');
 }
 function modelHead(m, kinds) {
-  const facts = [m.params ? P(m.params) : null, m.source === 'artifact' ? 'checkpoint' : m.kind,
-    famOf(m)].filter(Boolean).join(' · ');
+  const facts = [m.source === 'artifact' ? 'checkpoint' : m.kind, famOf(m)].filter(Boolean)
+    .join(' · ');
   return el('div', { class: 'card mhero', 'data-model-hero': '1' },
     el('div', { class: 'mtop' },
       el('div', { class: 'mtop-l' },
         el('div', { class: 'mhead' }, el('h1', { class: 'mtitle', text: m.name }),
           (m.served || ggufOnly(m) ? '' : warnBadge(m)) || '', dupBadge(m) || ''),
-        el('p', { class: 'mfacts', 'data-model-facts': '1', text: facts }),
+        el('p', { class: 'mfacts', 'data-model-facts': '1' },
+          // 16.1: its size first, where it came from on hover, and an edit
+          m.params ? el('span', { 'data-model-size': m.id, title: sizeTip(m), text: sizeText(m) })
+            : el('span', { class: 'se', 'data-model-size': m.id, text: 'size not recorded' }),
+          facts ? ' · ' + facts : '', sizeEdit(m)),
         // 12m.1: this model beside others, on Models ▸ Compare
         el('p', { class: 'small' }, el('button', { class: 'quiet', 'data-compare-with': m.id,
           text: 'Compare with…', onclick: () => openCompare([m.rowOf || m.id]) })),
@@ -7315,6 +7396,35 @@ function modelHead(m, kinds) {
       // 12b.3: the page's one main action is the header's, which reads Test
       // this model here — two filled buttons side by side was one too many
     el('div', { class: 'ktiles', 'data-kind-tiles': '1' }, kinds.map(k => kindTile(m, k))));
+}
+// 16.1: a model's size, as a person enters it — first of the board's sources.
+// The form opens on what the board has, or the name's suggestion to confirm
+function sizeEdit(m) {
+  if (!LIVE || m.reportedOnly || m.rowOf) return '';
+  const E = state.sizeEdit = state.sizeEdit || {};
+  if (E.id !== m.id) return [' ', el('button', { class: 'quiet small', 'data-size-edit': m.id,
+    text: m.params ? 'change' : 'enter it', onclick: () => {
+      const g = sizesFromName(m.served ? (servedOf(m.id) || {}).based_on || m.name : m.name);
+      Object.assign(E, { id: m.id, msg: '',
+        total: m.params ? P(m.params) : g.total, active: activeOf(m) ? P(activeOf(m)) : g.active });
+      render(); } })];
+  const box = (k, label) => el('label', { class: 'small' }, label + ' ',
+    el('input', { type: 'text', value: E[k] || '', style: 'width:6em', 'data-size-input': k,
+      'aria-label': label, oninput: e => { E[k] = e.target.value; } }));
+  return el('span', { class: 'sizeform', 'data-size-form': m.id }, ' ',
+    box('total', 'Size'), ' ', box('active', 'active'), ' ',
+    el('button', { class: 'quiet', 'data-size-save': m.id, text: 'Save', onclick: async () => {
+      if (!whoName()) { askName(); return; }
+      try {
+        await post('api/models/size', { model: m.id, total: E.total || '', active: E.active || '',
+          by: whoName() });
+        state.sizeEdit = {};
+        toast(`${m.name}: its size saved`, { key: 'size' });
+        await refreshResults();
+      } catch (e) { E.msg = e.message; render(); }
+    } }),
+    el('button', { class: 'quiet', text: 'Cancel', onclick: () => { state.sizeEdit = {}; render(); } }),
+    E.msg ? el('span', { class: 'warn small', 'data-size-msg': '1', text: ' ' + E.msg }) : '');
 }
 // 12g.1: what a checkpoint was trained from — set once by a person, from the
 // models on the board, or recorded by its training run. Improve's Retests pair
@@ -8000,11 +8110,8 @@ const evdEarlierRun = r => r.suite === 'everyday' && r.status === 'done'
 // the model's row of the old Run provenance table, and its hero's small print
 function provRecord(m) {
   const a = m.archinfo || {}, comp = computeOf(m);
-  const params = m.params ? P(m.params)
-    + (a.active_params ? ` · ${P(a.active_params)} active, ${a.experts} experts, `
-      + `${a.experts_per_tok} per token (${a.active_src})` : '')
-    + (m.paramsSrc ? ` · from the ${m.paramsSrc === 'config' ? 'harness config' : 'model name'}`
-      : '') : null;
+  const params = m.params ? sizeText(m) + [sizeTip(m), activeTip(m)].filter(Boolean)
+    .map(x => ' · ' + x).join('') : null;
   const sv = servedOf(m.id);
   const prov = [
     ['hub id', sv ? null : m.id], ['parameters', params],
@@ -9377,7 +9484,7 @@ const flop = v => {
 // (per epoch.ai, whose job this is) neither does anyone else for most of them.
 function computeOf(m) {
   const a = m.archinfo || {};
-  const N = a.active_params || m.params;
+  const N = activeOf(m) || m.params;
   if (!N) return null;
   const run = (state.trRuns || []).find(r =>
     r.hf_prefix && (m.id === r.hf_prefix || m.id.startsWith(r.hf_prefix)));
@@ -10366,8 +10473,24 @@ function genTip(t) {
 }
 const LB_KINDS = [['all', 'All'], ['base', 'base'], ['instruct', 'instruct'],
   ['checkpoint', 'checkpoint']];
+// 16.1: five buckets on the total size, more than one can be ticked
+// ("size=l,x"), and the rows with no size recorded as their own choice
 const LB_SIZES = [['all', 'All'], ['s', '< 200M'], ['m', '200M–1B'], ['l', '1–3B'],
-  ['xl', '> 3B']];
+  ['x', '3–9B'], ['xx', '> 9B']];
+const SIZE_NONE = 'none';
+const sizeBucket = p => p < 2e8 ? 's' : p < 1e9 ? 'm' : p < 3e9 ? 'l' : p <= 9e9 ? 'x' : 'xx';
+// the ticked buckets: [] is every size. Before 16.1 "xl" was "> 3B"
+function sizeSel(v) {
+  const out = [];
+  for (const k of String(v || 'all').split(','))
+    for (const x of k === 'xl' ? ['x', 'xx'] : [k])
+      if ((LB_SIZES.some(([b]) => b === x && b !== 'all') || x === SIZE_NONE) && !out.includes(x))
+        out.push(x);
+  return out;
+}
+const sizeVal = sel => sel.length ? sel.join(',') : 'all';
+const sizeOkFor = (sel, m) => !sel.length
+  || (m.params == null ? sel.includes(SIZE_NONE) : sel.includes(sizeBucket(m.params)));
 const LB_STATUS = [['all', 'All'], ['ranked', 'ranked'], ['preliminary', 'preliminary'],
   ['tainted', 'tainted']];
 const LB_DEFAULTS = { chip: 'all', kind: 'all', size: 'all', status: 'all' };
@@ -10424,7 +10547,7 @@ function lbFromHash(rest) {
   L.stdChip = LB_CHIPS.some(([v]) => v === p.get('chip')) ? p.get('chip') : 'all';
   L.chip = L.view === 'exam' ? 'judged' : L.stdChip;
   L.kind = LB_KINDS.some(([v]) => v === p.get('kind')) ? p.get('kind') : 'all';
-  L.size = LB_SIZES.some(([v]) => v === p.get('size')) ? p.get('size') : 'all';
+  L.size = sizeVal(sizeSel(p.get('size')));
   L.status = LB_STATUS.some(([v]) => v === p.get('status')) ? p.get('status') : 'all';
   // 12h.2: the chosen benchmarks and models; a name this board does not know
   // is dropped, and a list with nothing left is the default
@@ -11053,15 +11176,11 @@ function lbSaveShown(next) {
 
 // the filters, for the rows: kind, size and status, and the Models popover's
 // own selection
-function lbFilter(ms) {
+function lbFilter(ms, opts = {}) {
   const L = lbS();
-  const sizeOk = m => {
-    if (L.size === 'all') return true;
-    const p = m.params;
-    if (p == null) return false;
-    return L.size === 's' ? p < 2e8 : L.size === 'm' ? p >= 2e8 && p < 1e9
-      : L.size === 'l' ? p >= 1e9 && p < 3e9 : p >= 3e9;
-  };
+  // 16.1: a missing size is never hidden silently (lbSizeHidden says so)
+  const sel = opts.anySize ? [] : sizeSel(L.size);
+  const sizeOk = m => sizeOkFor(sel, m);
   return ms.filter(m =>
     (L.kind === 'all' || (L.kind === 'checkpoint' ? m.source === 'artifact' : m.kind === L.kind))
     && sizeOk(m)
@@ -11075,6 +11194,38 @@ function lbFilter(ms) {
 }
 
 // A "Label: Value ▾" pill with a single-choice menu on the shared popover
+// 16.1: Size — the five buckets, more than one ticked, and "Size not recorded
+// (n)" last while some row in view has none
+function sizePill(ms) {
+  const L = lbS(), sel = sizeSel(L.size);
+  const none = lbFilter(ms, { anySize: true }).filter(m => m.params == null).length;
+  const opts = [...LB_SIZES.slice(1), ...(none ? [[SIZE_NONE, `Size not recorded (${none})`]] : [])];
+  const word = k => k === SIZE_NONE ? 'not recorded' : (LB_SIZES.find(([b]) => b === k) || [])[1];
+  const btn = el('button', { class: 'pill' + (sel.length ? ' on' : ''), id: 'pill-size',
+    'data-pill': 'size', 'data-value': L.size,
+    text: `Size: ${sel.length ? sel.map(word).join(', ') : 'All'} ▾` });
+  const toggle = k => { const now = sizeSel(lbS().size);
+    lbSet({ size: sizeVal(now.includes(k) ? now.filter(x => x !== k) : [...now, k]) }); };
+  return popover(btn, () => el('div', { class: 'moremenu', id: 'pop-size', 'aria-label': 'size' },
+    el('button', { role: 'menuitemradio', 'data-choice': 'all', 'aria-checked': String(!sel.length),
+      text: 'All', onclick: () => { popClose(true); lbSet({ size: 'all' }); } }),
+    opts.map(([v, t]) => el('button', { role: 'menuitemcheckbox', 'data-choice': v,
+      'aria-checked': String(sel.includes(v)), text: t,
+      onclick: () => { popClose(true); toggle(v); } }))), { key: 'size' });
+}
+// 16.1: a size filter never hides a row silently: "7 models have no size
+// recorded and are hidden · show them"
+function lbSizeHidden(ms) {
+  const sel = sizeSel(lbS().size);
+  if (!sel.length || sel.includes(SIZE_NONE)) return '';
+  const n = lbFilter(ms, { anySize: true }).filter(m => m.params == null).length;
+  if (!n) return '';
+  return el('p', { class: 'small', 'data-size-hidden': String(n) },
+    `${n} model${n === 1 ? ' has' : 's have'} no size recorded and ${n === 1 ? 'is' : 'are'} `
+      + 'hidden · ',
+    el('button', { class: 'quiet', 'data-size-show': '1', text: 'show them',
+      onclick: () => lbSet({ size: sizeVal([...sel, SIZE_NONE]) }) }));
+}
 function pillMenu(key, label, opts, cur, pick, attrs = {}) {
   const now = (opts.find(([v]) => v === cur) || opts[0])[1];
   const btn = el('button', { class: 'pill' + (cur !== opts[0][0] ? ' on' : ''), id: 'pill-' + key,
@@ -12945,7 +13096,7 @@ function vCompare() {
       m.reportedOnly ? el('span', { text: m.name })
         : el('a', { href: '#model=' + encodeURIComponent(m.rowOf || m.id), text: m.name }),
       el('span', { class: 'se', 'data-cmp-kind': m.id, text: ' · ' + [cmpKind(m),
-        m.params ? P(m.params) : null, setup || null].filter(Boolean).join(' · ') }));
+        sizeText(m) || null, setup || null].filter(Boolean).join(' · ') }));
   }));
   const save = LIVE && ms.length >= 2 ? el('button', { class: 'quiet', 'data-save-view': '1',
     text: 'Save view', 'aria-expanded': String(state.lbForm === 'save'),
@@ -13408,18 +13559,13 @@ function vLeaderboard(ms) {
               : warnBadge(m) || '', dupBadge(m) || '',
             dupsOf[m.id] ? dupToggle(m, dupsOf[m.id]) : ''));
         if (c.key === 'params') {
-          const a = m.archinfo || {};
-          // 12z C7: a served model's, from what it is based on
-          const b = m.params == null ? paramsOf(m) : null;
-          if (b) return el('td', { class: 'num', 'data-params-from': b.from,
-              title: `from Based on: ${b.from}` + (b.act ? `\n${P(b.act)} active` : '') },
-            P(b.v), b.act ? el('span', { class: 'act', text: `${P(b.act)} act` }) : '');
-          return el('td', { class: 'num', title: (m.paramsSrc ? 'from ' + (m.paramsSrc === 'config'
-              ? 'harness config' : 'model name') : '') + (a.active_params
-              ? `\n${P(a.active_params)} active · ${a.experts} experts, ${a.experts_per_tok} per token`
-              : '') },
-            P(m.params), a.active_params
-              ? el('span', { class: 'act', text: `${P(a.active_params)} act` }) : '');
+          // 16.1: the board's one size — entered, the harness's, the file's or
+          // its base model's — total, and active where they differ
+          return el('td', { class: 'num', 'data-params-src': m.paramsSrc || null,
+              title: [sizeTip(m) || (m.params == null ? 'size not recorded' : ''), activeTip(m)]
+                .filter(Boolean).join('\n') },
+            P(m.params), activeOf(m)
+              ? el('span', { class: 'act', text: `${P(activeOf(m))} act` }) : '');
         }
         if (c.key === 'date') {
           const d = String(lastEval(m) || '');
@@ -13649,6 +13795,7 @@ function vLeaderboard(ms) {
           : `${lbAll.filter(m => officialAvg(m) != null).length} ranked`,
         `sorted by ${lbSortLabel(cols)}`,
         L.chip !== 'all' && !custom ? (LB_CHIPS.find(([v]) => v === L.chip) || [])[1] : null]),
+      lbSizeHidden(ms),
       lbPg.pager,
       // the Models tab's empty state, kept: a sentence and the way back
       // 12n.1: what the empty table holds, counted truthfully
@@ -13796,7 +13943,7 @@ function lbToolbar(ms, cols, shown, nHidden) {
   const std = L.view === 'standard';
   const pills = el('div', { class: 'pills' },
     pillMenu('kind', 'Kind', LB_KINDS, L.kind, v => lbSet({ kind: v })),
-    pillMenu('size', 'Size', LB_SIZES, L.size, v => lbSet({ size: v })),
+    sizePill(ms),
     pillMenu('status', 'Status', LB_STATUS, L.status, v => lbSet({ status: v })),
     lbColumnsPill(cols, shown, nHidden),
     std ? '' : lbModelsPill(ms),
@@ -17444,6 +17591,43 @@ function ggWorkerLine(w) {
     el('p', { text: `${w.line} It measures on the host, outside Docker: start it with` }),
     el('pre', { class: 'mono small gg-cmd', text: w.command }));
 }
+// 16.1: a registration's size — total and active — that the person confirms.
+// Its name (or what it's based on) only suggests one, behind a button: a
+// served model's name is never read silently (12f.1)
+function sizeFields(F, inp, pre) {
+  const sugOf = () => {
+    const g = sizesFromName(F.name), b = sizesFromName(F.based_on);
+    return g.total ? { ...g, from: 'its name' } : b.total ? { ...b, from: 'what it’s based on' }
+      : null;
+  };
+  const btn = el('button', { class: 'quiet small', 'data-size-suggest': pre, hidden: '',
+    onclick: () => {
+      const sug = sugOf();
+      if (!sug) return;
+      F.size = sug.total; F.active = sug.active;
+      const box = k => document.getElementById(`${pre}-${k}`);
+      if (box('size')) box('size').value = F.size;
+      if (box('active')) box('active').value = F.active;
+      btn.hidden = true;
+    } });
+  // typing the name or the base updates it here, in place: a render would
+  // replace the field the person is typing in
+  F._sizeRefresh = () => {
+    const sug = sugOf();
+    btn.hidden = !sug || !!F.size;
+    if (sug) btn.textContent = `Use ${sug.total}` + (sug.active ? ` · ${sug.active} active` : '')
+      + ` (from ${sug.from})`;
+  };
+  F._sizeRefresh();
+  return el('div', { class: 'frm', 'data-size-fields': pre },
+    inp('size', { placeholder: 'total, like 35B', style: 'width:8em',
+      oninput: e => { F.size = e.target.value; F._sizeRefresh(); } }),
+    inp('active', { placeholder: 'active, if fewer', style: 'width:8em', 'aria-label': 'active' }),
+    btn);
+}
+// what the name and base fields do as the person types: keep the value, and
+// update the size they suggest
+const sizeTyped = (F, key) => e => { F[key] = e.target.value; if (F._sizeRefresh) F._sizeRefresh(); };
 function ggufCard() {
   const Q = state.gg, F = Q.f;
   if (Q.open && !Q.page && !Q.loading && netReady()) loadGg();
@@ -17471,9 +17655,12 @@ function ggufCard() {
       + 'not comparable with the lm_eval ones.' }),
     ggWorkerLine((Q.page || {}).worker),
     el('div', { class: 'srvform' },
-      el('label', { for: 'gg-name', text: 'Name' }), inp('name', { placeholder: 'Qwen3.6-35B-A3B MTP UD-Q4_K_XL (original)' }),
+      // 16.1: typing the name or the base shows the size it suggests
+      el('label', { for: 'gg-name', text: 'Name' }), inp('name', { placeholder: 'Qwen3.6-35B-A3B MTP UD-Q4_K_XL (original)', oninput: sizeTyped(F, 'name') }),
       el('label', { for: 'gg-path', text: 'Path' }), inp('path', { placeholder: '/home/masein/model.gguf' }),
-      el('label', { for: 'gg-based_on', text: 'Based on' }), inp('based_on', { placeholder: 'Qwen/Qwen3.6-35B-A3B', list: 'srv-bases' }),
+      el('label', { for: 'gg-based_on', text: 'Based on' }), inp('based_on', { placeholder: 'Qwen/Qwen3.6-35B-A3B', list: 'srv-bases', oninput: sizeTyped(F, 'based_on') }),
+      // 16.1: its size, confirmed by the person registering it
+      el('label', { for: 'gg-size', text: 'Size' }), sizeFields(F, inp, 'gg'),
       el('label', { for: 'gg-how', text: 'How it\u2019s built' }),
       el('textarea', { id: 'gg-how', 'data-gg': 'how', 'data-keep': 'gg-how', rows: '2',
         placeholder: 'llama.cpp build, quantisation, what changed',
@@ -17719,13 +17906,16 @@ function servedCard(sf) {
       + 'that server.' }),
     el('div', { class: 'srvform' },
       el('label', { for: 'srv-name', text: 'Name' }),
-      inp('name', { placeholder: 'Qwen3.6-35B-A3B k4-LDA (phone build)' }),
+      // 16.1: typing the name or the base shows the size it suggests
+      inp('name', { placeholder: 'Qwen3.6-35B-A3B k4-LDA (phone build)', oninput: sizeTyped(F, 'name') }),
       el('label', { for: 'srv-base_url', text: 'Address' }),
       inp('base_url', { placeholder: 'http://host.docker.internal:8090/v1' }),
       el('label', { for: 'srv-key', text: 'Key' }),
       inp('key', { type: 'password', placeholder: 'optional · kept on the server, never shown again' }),
       el('label', { for: 'srv-based_on', text: 'Based on' }),
-      inp('based_on', { placeholder: 'Qwen/Qwen3.6-35B-A3B', list: 'srv-bases' }),
+      inp('based_on', { placeholder: 'Qwen/Qwen3.6-35B-A3B', list: 'srv-bases', oninput: sizeTyped(F, 'based_on') }),
+      // 16.1: its size, confirmed by the person registering it
+      el('label', { for: 'srv-size', text: 'Size' }), sizeFields(F, inp, 'srv'),
       // 12f.3: its GGUF file, for the benchmarks llama-perplexity measures
       el('label', { for: 'srv-gguf_path', text: 'GGUF file on the server' }),
       inp('gguf_path', { placeholder: 'optional · /home/masein/model.gguf' }),
@@ -23868,7 +24058,8 @@ def build_report(runs: list[dict], out_path: Path, title: str,
                  parents: dict | None = None, judge_identity: dict | None = None,
                  banner: str = "", banner_link: tuple[str, str] = ("", ""),
                  fingerprints: dict | None = None, everyday: dict | None = None,
-                 served: dict | None = None, gguf: dict | None = None) -> Path:
+                 served: dict | None = None, gguf: dict | None = None,
+                 sizes: dict | None = None) -> Path:
     if not runs:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(f"<h1>No lm-eval results found.</h1><p>{html.escape(banner)}</p>",
@@ -23879,7 +24070,8 @@ def build_report(runs: list[dict], out_path: Path, title: str,
     payload = for_export(build_payload(merge_runs(runs), title, source="",
                                        calibration=calibration, taint=taint, parents=parents,
                                        judge_identity=judge_identity, fingerprints=fingerprints,
-                                       everyday=everyday, served=served, gguf=gguf))
+                                       everyday=everyday, served=served, gguf=gguf,
+                                       sizes=sizes))
     blob = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
     page = (TEMPLATE
             .replace("__TITLE__", html.escape(title))
@@ -23943,6 +24135,8 @@ def main() -> int:
     out = build_report(runs, args.out, args.title, calibration=cal, fingerprints=fps,
                        everyday=load_everyday(args.results if args.results.is_dir() else None),
                        served=load_served(args.results if args.results.is_dir() else None),
+                       sizes={"files": load_sizes(args.results.parent if args.results.is_dir()
+                                                  else None)},
                        gguf=load_gguf(args.results.parent if args.results.is_dir() else None,
                                       args.results if args.results.is_dir() else None,
                                       load_served(args.results if args.results.is_dir()
