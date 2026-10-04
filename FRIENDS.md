@@ -56,6 +56,12 @@ command that resumes and takes the board's token from `BOARD_TOKEN`. A
 Hugging Face model links to Hugging Face at the commit our runs used. Whoever
 added a model can switch its downloads off.
 
+**Calling a model from your code** (16b): a model's page ▸ **Use as an
+API** shows its address (OpenAI-compatible, `/v1`), its name, a curl and a
+Python example, and **Create my key** (shown once: put it in `BOARD_API_KEY`).
+Runs come first: while one holds the GPU a model that has to load answers 503
+"try again later", and each model answers one request at a time.
+
 **From a script:**
 
 First grab the client (one stdlib-only file, no pip installs) straight from

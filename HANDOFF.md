@@ -4953,6 +4953,34 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 16b.3 — Use as an API (4 Oct)
+
+- **`/v1/models` and `/v1/chat/completions`** (streamed and not),
+  OpenAI-compatible (`service/api_v1.py`), behind each person's own key.
+  `model` is the board's model id.
+- **Through the Playground's engine** (`chat.ENGINE`): its placement (16.2),
+  its loader and idle unload, a served model through its server (the board
+  keeps the server's key). Not offered, with why (`GET /api/models/api`): a
+  base model, a GGUF with no server, OpenRouter (cost isn't counted for
+  chats), a thinking row.
+- **Keys** (`api_keys`): made with the board's write token (`POST
+  /api/keys`), `ebk_…`, shown once, kept as a sha256, with requests, tokens
+  and last used; Revoke by its owner or the board's owner. The write token is
+  not a key.
+- **Taking turns:** `place()` says None → 503, `Retry-After: 60`, its one
+  line (a run holding the GPU; a small model goes to the CPU; a served one
+  answers unless the run tests it). One request at a time for each model:
+  another waits `API_WAIT_S` (10), then 429 with `Retry-After: 10`. A reply
+  at most `API_MAX_TOKENS` (2048); a conversation over what the model reads
+  is 400 `context_length_exceeded`.
+- **Kept:** counts only. A reply lives in the engine's stream for its
+  request (in memory, gone ten minutes later); nothing is written but the
+  key's counts. An API call is never a benchmark result.
+- **The model page's Use as an API:** its state (Ready · Starts on the first
+  request · Not available now, and why), the address and the model's name, a
+  curl and a Python example (the key from `BOARD_API_KEY`), and My keys:
+  Create my key, each one's use, Revoke.
+
 ### 16b.2 — Download (4 Oct)
 
 - **A model's page** has one row of actions: Test this model (Measure for a

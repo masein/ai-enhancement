@@ -308,6 +308,19 @@ CREATE TABLE IF NOT EXISTS gguf_models (
   data        TEXT NOT NULL,
   updated_at  REAL NOT NULL
 );
+-- 16b.3: API keys, one for each person: shown once, kept as a sha256, with
+-- what they did — requests, tokens, last used — and never a prompt or a reply
+CREATE TABLE IF NOT EXISTS api_keys (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  who         TEXT NOT NULL,
+  prefix      TEXT NOT NULL,
+  hash        TEXT NOT NULL UNIQUE,
+  created_at  REAL NOT NULL,
+  last_used   REAL,
+  requests    INTEGER NOT NULL DEFAULT 0,
+  tokens      INTEGER NOT NULL DEFAULT 0,
+  revoked_at  REAL
+);
 -- 16b.2: whether a model's file may be downloaded — switched by the person
 -- who added it (or the board's owner); with no row, its upload's word, or
 -- the default — and each download, with who and when
@@ -1450,6 +1463,56 @@ def uploads_all() -> list[dict]:
 def upload_del(model_id: str) -> None:
     with closing(_conn()) as c:
         c.execute("DELETE FROM uploads WHERE model=?", (model_id,))
+        c.commit()
+
+
+_KEY_COLS = "id, who, prefix, created_at, last_used, requests, tokens, revoked_at"
+
+
+def _key(row) -> dict:
+    return dict(zip(("id", "who", "prefix", "created_at", "last_used", "requests", "tokens",
+                     "revoked_at"), row))
+
+
+def apikey_add(who: str, prefix: str, digest: str) -> int:
+    with closing(_conn()) as c:
+        cur = c.execute("INSERT INTO api_keys (who, prefix, hash, created_at) VALUES (?,?,?,?)",
+                        (who, prefix, digest, time.time()))
+        c.commit()
+        return cur.lastrowid
+
+
+def apikey_get(kid: int) -> dict | None:
+    with closing(_conn()) as c:
+        row = c.execute(f"SELECT {_KEY_COLS} FROM api_keys WHERE id=?", (kid,)).fetchone()
+    return _key(row) if row else None
+
+
+def apikey_by_hash(digest: str) -> dict | None:
+    with closing(_conn()) as c:
+        row = c.execute(f"SELECT {_KEY_COLS} FROM api_keys WHERE hash=?", (digest,)).fetchone()
+    return _key(row) if row else None
+
+
+def apikeys(who: str = "") -> list[dict]:
+    with closing(_conn()) as c:
+        rows = c.execute(f"SELECT {_KEY_COLS} FROM api_keys"
+                         + (" WHERE lower(who)=lower(?)" if who else "") + " ORDER BY id DESC",
+                         (who,) if who else ()).fetchall()
+    return [_key(r) for r in rows]
+
+
+def apikey_used(kid: int, tokens: int) -> None:
+    with closing(_conn()) as c:
+        c.execute("UPDATE api_keys SET requests=requests+1, tokens=tokens+?, last_used=? "
+                  "WHERE id=?", (int(tokens or 0), time.time(), kid))
+        c.commit()
+
+
+def apikey_revoke(kid: int) -> None:
+    with closing(_conn()) as c:
+        c.execute("UPDATE api_keys SET revoked_at=? WHERE id=? AND revoked_at IS NULL",
+                  (time.time(), kid))
         c.commit()
 
 

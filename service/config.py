@@ -138,6 +138,10 @@ CHAT_CPU_MAX_PARAMS_B = float(os.environ.get("CHAT_CPU_MAX_PARAMS_B", "1.0"))
 CHAT_GPU_MARGIN_GB = float(os.environ.get("CHAT_GPU_MARGIN_GB", "2.0"))
 # how long a run waits for chat to let go of the GPU before taking its lock
 CHAT_YIELD_WAIT_S = int(os.environ.get("CHAT_YIELD_WAIT_S", "60"))
+# 16b.3: Use as an API — a reply at most API_MAX_TOKENS; a second request for
+# a model that is answering waits API_WAIT_S, then is told to try again (429)
+API_MAX_TOKENS = int(os.environ.get("API_MAX_TOKENS", "2048"))
+API_WAIT_S = float(os.environ.get("API_WAIT_S", "10"))
 # the chats kept listed per person
 CHAT_LIST_N = 50
 
