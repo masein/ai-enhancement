@@ -56,10 +56,29 @@ def test_one_message_goes_to_both_and_both_stream(two):
     assert listed["names"] == "below-135m-it vs chat-1.7b-it"
 
 
+def _until(ok, what: str, timeout: float = 5.0) -> None:
+    end = time.time() + timeout
+    while not ok():
+        assert time.time() < end, f"timed out waiting for {what}"
+        time.sleep(0.01)
+
+
+def _second_started() -> bool:
+    return any(st.model == BIG2 and st.events for st in list(chat.ENGINE.streams.values()))
+
+
 def test_two_models_that_dont_both_fit_answer_one_after_the_other(two, monkeypatch):
     client = two
     # room for one 1.7B model (3.4 GB + the 2 GB margin), not two
     monkeypatch.setattr(chat, "gpu_free_bytes", lambda: 6 * 10 ** 9)
+
+    # the first answers only once the second has looked: it finds the first
+    # still answering, every time, however the threads are scheduled
+    def first_holds(mid, msgs, s):
+        if mid == BIG:
+            _until(_second_started, "the second reply to start")
+        return "a short reply"
+    monkeypatch.setattr(chat.FakeBackend, "responder", staticmethod(first_holds))
     c = compare(client, BIG, BIG2)
     r = send(client, c, "hello both")
     eb = events(client, r["stream_b"])
@@ -67,6 +86,29 @@ def test_two_models_that_dont_both_fit_answer_one_after_the_other(two, monkeypat
     assert eb[-1]["t"] == "done" and eb[-1]["reply"]["words"] > 0
     assert events(client, r["stream"])[-1]["t"] == "done"
     # the first gave its memory back before the second loaded
+    assert chat.FakeBackend.loaded == [(BIG, "cuda"), (BIG2, "cuda")]
+    assert BIG not in chat.ENGINE.loaded
+
+
+def test_the_first_gives_its_memory_back_even_when_it_finished_before_the_second_looked(
+        two, monkeypatch):
+    """the other order: the first reply is over before the second's thread
+    looks. Nothing to wait for, but the first model must still be unloaded
+    — left loaded, on the real GPU the second would be refused for memory"""
+    client = two
+    monkeypatch.setattr(chat, "gpu_free_bytes", lambda: 6 * 10 ** 9)
+    run = chat.Engine._run
+
+    def late(self, st, messages, settings, row, on_done, after=None):
+        if after is not None:
+            _until(lambda: after.done, "the first reply to finish")
+        return run(self, st, messages, settings, row, on_done, after)
+    monkeypatch.setattr(chat.Engine, "_run", late)
+    c = compare(client, BIG, BIG2)
+    r = send(client, c, "hello both")
+    eb = events(client, r["stream_b"])
+    assert eb[0]["t"] == "place" and eb[-1]["t"] == "done" and eb[-1]["reply"]["words"] > 0
+    assert not any(e["t"] == "wait" for e in eb)
     assert chat.FakeBackend.loaded == [(BIG, "cuda"), (BIG2, "cuda")]
     assert BIG not in chat.ENGINE.loaded
 

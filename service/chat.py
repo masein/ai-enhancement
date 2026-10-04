@@ -573,15 +573,18 @@ class Engine:
     def _run(self, st: Stream, messages, settings, row, on_done, after=None) -> None:
         reply = {"text": "", "thinking": "", "cut": "", "device": "", "secs": 0.0}
         try:
-            if after is not None and not after.done:
-                st.emit({"t": "wait", "why": WAIT_GPU})
+            if after is not None:
+                if not after.done:
+                    st.emit({"t": "wait", "why": WAIT_GPU})
                 while not after.done:
                     if st.stop.is_set():
                         on_done(None, "stopped before it began")
                         st.emit({"t": "done", "reply": None, "stopped": True})
                         return
                     time.sleep(0.05)
-                # the first one's model gives its memory back for this one
+                # the first one's model gives its memory back for this one —
+                # also when the first had finished before this thread looked:
+                # left loaded, it holds the memory this one needs
                 first = self.loaded.get(after.model)
                 if first and first.device == "cuda" and not first.busy.locked() \
                         and first.model != row["id"]:
