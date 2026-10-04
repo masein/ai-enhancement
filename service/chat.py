@@ -295,6 +295,14 @@ def board_models() -> list[dict]:
         if m.get("served"):
             continue                     # 12f.1: served elsewhere, never loaded here
         mid = m["model"]
+        if m.get("gguf"):
+            # 16.1: a GGUF file is the host worker's, never this loader's: whatever
+            # its size, it asks nothing of the GPU here. With a server it is a
+            # served model, listed below
+            out.append({"id": mid, "name": (m["gguf"] or {}).get("name") or mid, "kind": "",
+                        "params": None, "archinfo": {}, "source": "gguf", "chat": False,
+                        "why_not": "gguf"})
+            continue
         arch = {k: v for k, v in m.items() if k not in ("model", "kind", "params", "kind_reason")}
         templ = bool(arch.get("tmpl_sha")) or m.get("kind") == "instruct"
         why = ("" if templ else "base") if mid not in approved else "own code"

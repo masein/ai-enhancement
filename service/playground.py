@@ -16,6 +16,9 @@ from . import chat, config, db
 BASE_LINE = "Base models aren't listed: they have no chat format."
 OWN_CODE_LINE = "Models that run their own code aren't listed: chat doesn't run a model's code."
 # 12m.3: a chat's cost isn't metered the way a run's is
+# 16.1: a GGUF file with no server is measured by the host's worker, never chatted with
+GGUF_LINE = ("GGUF files aren't here: chat with one through its llama-server, registered "
+             "under Test a model ▸ A model served elsewhere.")
 OPENROUTER_LINE = ("Models from OpenRouter aren't listed: a chat's cost isn't counted against "
                    "the monthly AI limit.")
 NOT_JUDGED = "not marked here; the exam's judge marks it in runs"
@@ -70,6 +73,8 @@ def models() -> dict:
         lines.append(OWN_CODE_LINE)
     if any(m["why_not"] == "openrouter" for m in rows):
         lines.append(OPENROUTER_LINE)
+    if any(m["why_not"] == "gguf" for m in rows):
+        lines.append(GGUF_LINE)
     return {"models": offered, "left_out": lines}
 
 

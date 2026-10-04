@@ -232,7 +232,10 @@ def test_the_header_is_the_name_the_facts_one_action_and_a_tile_per_kind(live, p
     open_model(page, live["base"])
     hero = page.locator("[data-model-hero]")
     assert hero.locator("h1.mtitle").inner_text() == "good-750m"
-    assert hero.locator("[data-model-facts]").inner_text() == "750M · base · fx"
+    # 16.1: its size first, where it came from on hover, and an edit beside it
+    facts = hero.locator("[data-model-facts]")
+    assert facts.inner_text() == "750M · base · fx change"
+    assert facts.locator("[data-model-size]").get_attribute("title") == "from the harness config"
     assert MODEL not in hero.inner_text()                      # no ids in the main view
     # 12b.3: one filled button, and it is the header's, reading Test this model
     assert page.locator("#view button.primary").count() == 0
