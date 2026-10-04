@@ -336,20 +336,20 @@ def test_pytorchs_message_is_read_for_who_held_what():
 
 def test_the_line_says_which_grew():
     o = runner.oom_said(OOM)
-    own = ("this run's own process held 15.9 GiB (2 GiB of it reserved and unused) and asked "
-           "for 6 GiB more; the card's other processes held 12.9 GiB")
+    own = ("this run's own process held 15.9 GB (2 GB of it reserved and unused) and asked "
+           "for 6 GB more; the card's other processes held 12.9 GB")
     # the neighbour held the same when the task started: the run grew
     assert runner.oom_line(o, int(12.9 * 1024)) == (
         own + ", as when the task started: the run grew, not the card")
     assert runner.oom_line(o, int(12.4 * 1024)) == (
-        own + " (12.4 GiB when the task started): the run grew, not the card")
-    # a neighbour that took 4 GiB more meanwhile: the card got busier
+        own + " (12.4 GB when the task started): the run grew, not the card")
+    # a neighbour that took 4 GB more meanwhile: the card got busier
     assert runner.oom_line(o, int(8.9 * 1024)) == (
-        own + ", up from 8.9 GiB when the task started: the card got busier")
+        own + ", up from 8.9 GB when the task started: the card got busier")
     # what they held then isn't known: no verdict
     assert runner.oom_line(o) == own
     assert runner.oom_line({**o, "others": None, "spare": 0.2}) == (
-        "this run's own process held 15.9 GiB and asked for 6 GiB more")
+        "this run's own process held 15.9 GB and asked for 6 GB more")
 
 
 def test_a_run_out_of_memory_at_one_says_the_run_grew(svc, monkeypatch):  # noqa: F811
@@ -365,9 +365,9 @@ def test_a_run_out_of_memory_at_one_says_the_run_grew(svc, monkeypatch):  # noqa
     assert [_arg(c, "--tasks") for c in cmds] == ["dm_ifeval", "dm_mmlu_pro"]
     assert row["status"] == "failed"
     assert row["error"].startswith(
-        "dm_mmlu_pro: ran out of GPU memory at batch 1: this run's own process held 15.9 GiB "
-        "(2 GiB of it reserved and unused) and asked for 6 GiB more; the card's other processes "
-        "held 12.9 GiB, as when the task started: the run grew, not the card. There is no "
+        "dm_mmlu_pro: ran out of GPU memory at batch 1: this run's own process held 15.9 GB "
+        "(2 GB of it reserved and unused) and asked for 6 GB more; the card's other processes "
+        "held 12.9 GB, as when the task started: the run grew, not the card. There is no "
         "smaller batch to try: the model needs more than the card has free.")
     assert "busier" not in row["error"]
 
@@ -388,8 +388,8 @@ def test_a_retry_at_half_the_batch_logs_who_held_what(svc, monkeypatch):  # noqa
         ("dm_math", "1")]
     log = _log(sid)
     assert ("[service] dm_mmlu_pro ran out of GPU memory: again at batch 2 (this run's own "
-            "process held 15.9 GiB") in log
-    assert "up from 8 GiB when the task started: the card got busier)" in log
+            "process held 15.9 GB") in log
+    assert "up from 8 GB when the task started: the card got busier)" in log
     # the task after it says the batch it runs at, and why
     assert "[devicemark] 1 answer written at a time: 4 ran out of GPU memory" in log
 

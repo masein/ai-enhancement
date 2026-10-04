@@ -156,11 +156,12 @@ def test_with_the_run_lock_held_a_gpu_load_is_refused_in_one_line(svc, run_holds
     client = svc
     c = new_chat(client, BIG)
     evs, c = say(client, c, "hello")
-    assert evs == [{"t": "refused", "why": "The GPU is running Qwen3.5-2B's Standard tests. "
-                                           "Chat starts when it's done."}]
+    # 16.2: the run by its number (and its time left, when its line has one)
+    assert evs == [{"t": "refused", "why": "Run #1 is using the GPU (Qwen3.5-2B's Standard "
+                                           "tests). Chat starts when it's done."}]
     assert chat.FakeBackend.loaded == []
-    assert "pending" not in c["messages"][1] and c["messages"][1]["refused"].startswith("The GPU")
-    assert client.get("/api/playground/status").json()["run"].startswith("The GPU is running")
+    assert "pending" not in c["messages"][1] and c["messages"][1]["refused"].startswith("Run #1")
+    assert client.get("/api/playground/status").json()["run"].startswith("Run #1 is using the GPU")
 
 
 def test_a_small_model_answers_on_the_cpu_meanwhile(svc, run_holds):
@@ -248,8 +249,10 @@ def test_the_gpu_memory_check_says_why_in_one_line(svc, monkeypatch):
     client = svc
     monkeypatch.setattr(chat, "gpu_free_bytes", lambda: 3 * 10 ** 9)
     evs, _ = say(client, new_chat(client, BIG), "hi")
-    assert evs == [{"t": "refused", "why": "chat-1.7b-it needs about 5 GB of GPU memory and "
-                                           "3.0 GB is free now."}]
+    # 16.2: GB as everywhere on the board (1024³, as nvidia-smi counts): 1.7B
+    # weights at two bytes and the 2 GB margin need 5.2; 3e9 bytes free is 2.8
+    assert evs == [{"t": "refused", "why": "chat-1.7b-it needs about 5.2 GB of GPU memory and "
+                                           "2.8 GB is free now."}]
 
 
 # ---------------------------------------------------------------------------
