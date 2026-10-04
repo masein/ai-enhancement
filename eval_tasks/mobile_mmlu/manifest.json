@@ -1,0 +1,785 @@
+{
+ "name": "Mobile-MMLU (full)",
+ "by": "MBZUAI (VILA Lab): Bsharat et al., \"Mobile-MMLU: A Mobile Intelligence Language Understanding Benchmark\", arXiv 2503.20786, DMLR 2026",
+ "source": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU",
+ "revision": "f8c113fe45d6def9b0bb913b6d7fe242a3fb6968",
+ "licence": "CC BY-NC-ND 4.0",
+ "restriction": "non-commercial",
+ "decision": {
+  "by": "masein",
+  "on": "2026-10-04",
+  "what": "the full set is used for internal research evaluation only, labelled \"Non-commercial\" wherever the set or its scores appear",
+  "why": "14.3 left it out for its licence (non-commercial, no derivatives); masein decided to add it for internal research evaluation, so all 16,186 questions in 80 fields can be scored, with a label that keeps them out of anything commercial"
+ },
+ "licence_note": "for internal research evaluation only, never anything commercial (product claims, marketing, sales material or customer reports); nothing derived from it (our answer key, its questions) is published: its files live only in the server's data folder, never in this repo or its public mirror",
+ "gated": "no, checked 4 Oct 2026: the dataset is public and not gated, and its card is the licence and its 80 configs, no other terms (the authors' GitHub code, VILA-Lab/Mobile-MMLU, is MIT)",
+ "answers": "held back by the authors, who score through their portal",
+ "portal": "https://huggingface.co/spaces/SondosMB/Mobile-MMLU",
+ "files": [
+  {
+   "file": "test/accounting.csv",
+   "sha256": "9ce6939acc9ded183fd0b4f3fcc132dccf753421eb4b380fc0603f93122c2f12",
+   "bytes": 374835,
+   "n": 205,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/accounting.csv",
+   "committed": false
+  },
+  {
+   "file": "test/art_techniques_and_architecture.csv",
+   "sha256": "839ddf59a48d47298853972fe7ab37e3c470c98510efc70ab7ec34c6ab26e925",
+   "bytes": 307368,
+   "n": 175,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/art_techniques_and_architecture.csv",
+   "committed": false
+  },
+  {
+   "file": "test/automotive_care.csv",
+   "sha256": "0ba7dbbb382fff9cbeeb0f99ec7cae4e474a9eea01a58b6b99d003bfb7ac8ff7",
+   "bytes": 467594,
+   "n": 275,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/automotive_care.csv",
+   "committed": false
+  },
+  {
+   "file": "test/basic_life_skills.csv",
+   "sha256": "7e43e3c4534d6cdb798b6c781f816c0c030983b2c5b02c8dae6267ae57f51ed8",
+   "bytes": 362877,
+   "n": 209,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/basic_life_skills.csv",
+   "committed": false
+  },
+  {
+   "file": "test/basic_statistics.csv",
+   "sha256": "bbe478171e0c40cd2c1642c115a7df397d636f7f4c3fe98cfcf857eee8de2946",
+   "bytes": 409261,
+   "n": 219,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/basic_statistics.csv",
+   "committed": false
+  },
+  {
+   "file": "test/business_management.csv",
+   "sha256": "b514a51e02738dbfbed5c550f7637d621af7bcbfb71bc4c608a9b2b2104ad075",
+   "bytes": 297414,
+   "n": 167,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/business_management.csv",
+   "committed": false
+  },
+  {
+   "file": "test/career_development.csv",
+   "sha256": "4f394d3bb3ee88b9371d2be6bbb507a6052ed6fe0e4477966fde0befd9559994",
+   "bytes": 343478,
+   "n": 166,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/career_development.csv",
+   "committed": false
+  },
+  {
+   "file": "test/communication_and_public_speaking.csv",
+   "sha256": "943fd1dd9872791038d448a0a916f7e28d3978c3976d8023f0549284f5813d2c",
+   "bytes": 226767,
+   "n": 134,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/communication_and_public_speaking.csv",
+   "committed": false
+  },
+  {
+   "file": "test/conceptual_physics.csv",
+   "sha256": "76558708971cdb0d0a211aa844635945ddbe642e539fa008fc70983496ffc26a",
+   "bytes": 342884,
+   "n": 194,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/conceptual_physics.csv",
+   "committed": false
+  },
+  {
+   "file": "test/conflict_resolution.csv",
+   "sha256": "53a4bd67ab330f4a5ab4b13b4f698deec63d071db4dd0b2a40732c0a5e48b28e",
+   "bytes": 266413,
+   "n": 152,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/conflict_resolution.csv",
+   "committed": false
+  },
+  {
+   "file": "test/cooking_and_recipes.csv",
+   "sha256": "cfa00c508d9986c637c131d7437a336baa6fc4ad15a689e8fa4877e2be0b30b5",
+   "bytes": 428297,
+   "n": 274,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/cooking_and_recipes.csv",
+   "committed": false
+  },
+  {
+   "file": "test/creativity.csv",
+   "sha256": "63a7b8b22e59ce10448f7a113b30a5970d06ed4ebc108fd30d205744b7392d25",
+   "bytes": 407243,
+   "n": 210,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/creativity.csv",
+   "committed": false
+  },
+  {
+   "file": "test/cultural_awareness.csv",
+   "sha256": "73f25ba511f0ba04b02c561030494e333d6457769f08b29fab8bd4a1ed3e0504",
+   "bytes": 471024,
+   "n": 243,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/cultural_awareness.csv",
+   "committed": false
+  },
+  {
+   "file": "test/cybersecurity.csv",
+   "sha256": "1a3e001575d62aa1dd992495fa22e9b1c3b15a21f78417846810b959f4474951",
+   "bytes": 367311,
+   "n": 208,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/cybersecurity.csv",
+   "committed": false
+  },
+  {
+   "file": "test/digital_detox.csv",
+   "sha256": "b8759481fbd32fc657145ed4090db3f17081f013744054d4612a95016d7b3c6e",
+   "bytes": 353093,
+   "n": 196,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/digital_detox.csv",
+   "committed": false
+  },
+  {
+   "file": "test/digital_literacy.csv",
+   "sha256": "50f87f349cfbccedda79d061f883ce82ec38036d9a1698430690fe3ae12637b4",
+   "bytes": 357017,
+   "n": 198,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/digital_literacy.csv",
+   "committed": false
+  },
+  {
+   "file": "test/e_commerce.csv",
+   "sha256": "ce355cd896515f4bf366e0ea0cace29905aa1861373db092a8c512bb1d16e390",
+   "bytes": 374692,
+   "n": 186,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/e_commerce.csv",
+   "committed": false
+  },
+  {
+   "file": "test/education_techniques.csv",
+   "sha256": "1795a23a52cddb3e994f603980396b11eacc903f30f2fb36ab780132c5ed4ffb",
+   "bytes": 288790,
+   "n": 146,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/education_techniques.csv",
+   "committed": false
+  },
+  {
+   "file": "test/elementary_mathematics.csv",
+   "sha256": "d15496f1b70b30ac9436ba8e1cc69e09e53223ab272722b86c66ecbabbb533a7",
+   "bytes": 263327,
+   "n": 254,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/elementary_mathematics.csv",
+   "committed": false
+  },
+  {
+   "file": "test/emotional_intelligence.csv",
+   "sha256": "85718e51f87b6a5b85b2c6592ee227b535f552090172559ab1529178d325d26f",
+   "bytes": 206135,
+   "n": 133,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/emotional_intelligence.csv",
+   "committed": false
+  },
+  {
+   "file": "test/entertainment.csv",
+   "sha256": "0081c6b145ec04aae079f5c8cd03b5df9ef1df5d5ff4680d6db3ddab99b8929d",
+   "bytes": 297439,
+   "n": 207,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/entertainment.csv",
+   "committed": false
+  },
+  {
+   "file": "test/environmental_and_sustainable_living.csv",
+   "sha256": "5e50de43b935f346948444e35a3a86e488f41497a2a3fa079b26367b45996576",
+   "bytes": 374875,
+   "n": 178,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/environmental_and_sustainable_living.csv",
+   "committed": false
+  },
+  {
+   "file": "test/ergonomics.csv",
+   "sha256": "c88fb6015ee0f54ae4da33781c35e6e3db2e1bf07cfc4d6dc8077f67c8e4aaf5",
+   "bytes": 355455,
+   "n": 204,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/ergonomics.csv",
+   "committed": false
+  },
+  {
+   "file": "test/ethical_living.csv",
+   "sha256": "034ac2c2431fe43f637628077aaf0dc849901a885493cdcdf51fb3535da2c750",
+   "bytes": 314735,
+   "n": 171,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/ethical_living.csv",
+   "committed": false
+  },
+  {
+   "file": "test/ethics.csv",
+   "sha256": "3615d2a65e7f13cdf89cc8fe5a8d20529db99949b5e4a4bcdbc96466422c6450",
+   "bytes": 304202,
+   "n": 172,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/ethics.csv",
+   "committed": false
+  },
+  {
+   "file": "test/event_planning.csv",
+   "sha256": "3ba05f3c76e662956e1630dda1898129029daebdc18610a117121448633a444d",
+   "bytes": 413988,
+   "n": 201,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/event_planning.csv",
+   "committed": false
+  },
+  {
+   "file": "test/fashion_and_style.csv",
+   "sha256": "141d71d68daf531862a506389358cc6daf0fede8e034999baf2f956a49853694",
+   "bytes": 327955,
+   "n": 200,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/fashion_and_style.csv",
+   "committed": false
+  },
+  {
+   "file": "test/first_aid.csv",
+   "sha256": "8be32cfcec238229d80a7cac9edfbd890e6d51267e91526071b827c81885e7e0",
+   "bytes": 370328,
+   "n": 221,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/first_aid.csv",
+   "committed": false
+  },
+  {
+   "file": "test/food_safety.csv",
+   "sha256": "71e8e64d52e0b382731fd6f4df685e4f167b1cd4e71c5766ec29545288ee83cc",
+   "bytes": 321315,
+   "n": 219,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/food_safety.csv",
+   "committed": false
+  },
+  {
+   "file": "test/formal_logic.csv",
+   "sha256": "95c7b074769268676188934afd5db12564881d4ef6d2737b1786661443889e96",
+   "bytes": 260343,
+   "n": 210,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/formal_logic.csv",
+   "committed": false
+  },
+  {
+   "file": "test/gardening_and_horticulture.csv",
+   "sha256": "b5c7e1a1597c06143f70c2154aacd8ee0631b9d45be0b4d466ced93c211dad62",
+   "bytes": 344459,
+   "n": 212,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/gardening_and_horticulture.csv",
+   "committed": false
+  },
+  {
+   "file": "test/geography.csv",
+   "sha256": "0c56e837b43e2e622cc81993eeca73a5d275560bdb61bed68b62793abdeb183f",
+   "bytes": 381360,
+   "n": 211,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/geography.csv",
+   "committed": false
+  },
+  {
+   "file": "test/global_facts.csv",
+   "sha256": "92fed07f4d47fa8483a2f405f67d21430fda6369a734f9760f3e92b09bfe4c50",
+   "bytes": 413599,
+   "n": 228,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/global_facts.csv",
+   "committed": false
+  },
+  {
+   "file": "test/high_school_mathematics.csv",
+   "sha256": "0aa42184158136b260a3a58a6f6b7e1577304aba9840603ccb7201b0bb92cbea",
+   "bytes": 249903,
+   "n": 200,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/high_school_mathematics.csv",
+   "committed": false
+  },
+  {
+   "file": "test/hobbies.csv",
+   "sha256": "66f59d33e45d6f6c6139ca4a194910c6f88bfadc953438dc773794ff962a6c35",
+   "bytes": 401073,
+   "n": 208,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/hobbies.csv",
+   "committed": false
+  },
+  {
+   "file": "test/holidays_and_traditions.csv",
+   "sha256": "a19106c14b5f17dcc7104f1640b5ec36310ad739d60e79fbcbb18b6078c2e1e2",
+   "bytes": 477815,
+   "n": 236,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/holidays_and_traditions.csv",
+   "committed": false
+  },
+  {
+   "file": "test/home_maintenance.csv",
+   "sha256": "ff6045baee45c929bd548dbc9be1a9f833db20ea0189049f75c5713bc398b87d",
+   "bytes": 471530,
+   "n": 261,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/home_maintenance.csv",
+   "committed": false
+  },
+  {
+   "file": "test/home_safety.csv",
+   "sha256": "d8f6911efc0aa4261a1387e2c70f4b98fa6085ce423fcfd4e1d98951c65a6af1",
+   "bytes": 342865,
+   "n": 189,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/home_safety.csv",
+   "committed": false
+  },
+  {
+   "file": "test/human_resources.csv",
+   "sha256": "d3afb1bd76937a857f7fa6ea1d7fbefa22176151abebf433cd51c1de7d44467a",
+   "bytes": 295775,
+   "n": 144,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/human_resources.csv",
+   "committed": false
+  },
+  {
+   "file": "test/interior_design.csv",
+   "sha256": "63818d52fae6e282d794d24a71a3614fac5b0d161ce3df4b822b3f5e45af81ab",
+   "bytes": 349834,
+   "n": 200,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/interior_design.csv",
+   "committed": false
+  },
+  {
+   "file": "test/law.csv",
+   "sha256": "1a613d594973d52c4a492c1364e25cadd9950f692111fb4dd93e300c85eb0681",
+   "bytes": 420005,
+   "n": 206,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/law.csv",
+   "committed": false
+  },
+  {
+   "file": "test/legal_rights.csv",
+   "sha256": "bf3f65f4535465e0f621236a5db9fac695577352e4231ecbca0d9c52752f7b43",
+   "bytes": 416063,
+   "n": 219,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/legal_rights.csv",
+   "committed": false
+  },
+  {
+   "file": "test/linguistics.csv",
+   "sha256": "fe32db4cda5f65acc88375d4899ee994dc7eb3406a4e8a4b7b4673868a1688b9",
+   "bytes": 423138,
+   "n": 223,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/linguistics.csv",
+   "committed": false
+  },
+  {
+   "file": "test/logical_fallacies.csv",
+   "sha256": "cabf397789b1330f17c43d8ccc9db8565727a72717269065d35fb63d6301600b",
+   "bytes": 405029,
+   "n": 293,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/logical_fallacies.csv",
+   "committed": false
+  },
+  {
+   "file": "test/marketing__and_sales_strarigies.csv",
+   "sha256": "fb47465c2c9a2a974b35aa8fa401254926b7bc40d32482416d818c479399731f",
+   "bytes": 304356,
+   "n": 162,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/marketing__and_sales_strarigies.csv",
+   "committed": false
+  },
+  {
+   "file": "test/medical_and_health_knowledge.csv",
+   "sha256": "9d8d9efc794f5529ceb5f842422c31c504ae093faf04f08fc6bf0920f223fd06",
+   "bytes": 348784,
+   "n": 183,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/medical_and_health_knowledge.csv",
+   "committed": false
+  },
+  {
+   "file": "test/mental_health.csv",
+   "sha256": "2fd2475f7062e0dc2c4673d6bed360b268fc4748c673f71274a5cc3627b991b2",
+   "bytes": 221795,
+   "n": 130,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/mental_health.csv",
+   "committed": false
+  },
+  {
+   "file": "test/mobile_customization.csv",
+   "sha256": "55724f9300567ca2b429052922e337787e8ecbaa257699c433a3667cbefe5d8f",
+   "bytes": 347883,
+   "n": 230,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/mobile_customization.csv",
+   "committed": false
+  },
+  {
+   "file": "test/movie_and_tv_show.csv",
+   "sha256": "9c7bd75fcf903f44a810a65ce68085d57f2732d9daa6b3ee6256c645d1e1ffa9",
+   "bytes": 469552,
+   "n": 230,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/movie_and_tv_show.csv",
+   "committed": false
+  },
+  {
+   "file": "test/news_and_information.csv",
+   "sha256": "60fb294981fa87e5e06d1099cfccbdb0319efd8f19d052c079f809ab359c8b65",
+   "bytes": 354968,
+   "n": 203,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/news_and_information.csv",
+   "committed": false
+  },
+  {
+   "file": "test/nutrition_and_diet.csv",
+   "sha256": "767c32ce6161894d7d08e2bec96712576abc1968d0622d1618a41f3e7b2d95cf",
+   "bytes": 287740,
+   "n": 151,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/nutrition_and_diet.csv",
+   "committed": false
+  },
+  {
+   "file": "test/online_privacy.csv",
+   "sha256": "6381d466d0eec8abf2a45c78474448e0a62a0b2d069dfb22e6573ecdd705f96a",
+   "bytes": 377148,
+   "n": 219,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/online_privacy.csv",
+   "committed": false
+  },
+  {
+   "file": "test/outdoor_survival_skills.csv",
+   "sha256": "acf3531e6b0bdf0709f2b2e9bd27ef37a6e062ff7a349efc3d90852dd65a3948",
+   "bytes": 485082,
+   "n": 277,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/outdoor_survival_skills.csv",
+   "committed": false
+  },
+  {
+   "file": "test/parenting.csv",
+   "sha256": "0a345813a662c53fdd3bc92ee540cb9b8369e5358e6d5ded202a1969de929142",
+   "bytes": 283678,
+   "n": 144,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/parenting.csv",
+   "committed": false
+  },
+  {
+   "file": "test/personal_branding.csv",
+   "sha256": "56c15d2bd0cd57b47630d8ac1097fabba4138cf6c6fa95038223c6c125fd8894",
+   "bytes": 350368,
+   "n": 186,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/personal_branding.csv",
+   "committed": false
+  },
+  {
+   "file": "test/personal_finance.csv",
+   "sha256": "7e58a01bccd64ed5aaadf6c9be6ea9bf4edea0348750de0ac259236f8c25add0",
+   "bytes": 387979,
+   "n": 223,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/personal_finance.csv",
+   "committed": false
+  },
+  {
+   "file": "test/pet_care.csv",
+   "sha256": "eb8bdddf28d3de77890643a078596de5f037786ee9b5abd12fd7f095fc897503",
+   "bytes": 380974,
+   "n": 208,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/pet_care.csv",
+   "committed": false
+  },
+  {
+   "file": "test/photography_basics_and_smartphone_photography.csv",
+   "sha256": "b0c46a615f4ffb5d494a088e47e3f33e7439eea025a8ea872f58cf26266827b0",
+   "bytes": 336670,
+   "n": 214,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/photography_basics_and_smartphone_photography.csv",
+   "committed": false
+  },
+  {
+   "file": "test/physical_fitness.csv",
+   "sha256": "1563db917b610552bf420d0731023ae2c9f047c13dcd0ab6e3888c1d1f19a7e7",
+   "bytes": 344964,
+   "n": 190,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/physical_fitness.csv",
+   "committed": false
+  },
+  {
+   "file": "test/podcasting.csv",
+   "sha256": "d4ecccd1be69d18ec4c23332301f2c91316e872588b87c4916c4c096e8611ea8",
+   "bytes": 395981,
+   "n": 211,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/podcasting.csv",
+   "committed": false
+  },
+  {
+   "file": "test/political_systems.csv",
+   "sha256": "6990cfe63555dbe6968f48cee51ab7bc0544f8d7c298eeb8c9959bf5c2d619eb",
+   "bytes": 442794,
+   "n": 193,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/political_systems.csv",
+   "committed": false
+  },
+  {
+   "file": "test/project_management.csv",
+   "sha256": "6c8755cc782230af5df7dfa3767805a6cfb93aafda211bed4abd5af1144a1d76",
+   "bytes": 310859,
+   "n": 176,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/project_management.csv",
+   "committed": false
+  },
+  {
+   "file": "test/public_speaking.csv",
+   "sha256": "30253927a1349758b29fa37631739a8a301f8308a505f310a8b694419415a8a5",
+   "bytes": 235975,
+   "n": 158,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/public_speaking.csv",
+   "committed": false
+  },
+  {
+   "file": "test/reading_and_literature.csv",
+   "sha256": "ceea792a10915e8a2c4125c44eae685f58f4cafe1b445fa6e27943c512624d7f",
+   "bytes": 528465,
+   "n": 248,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/reading_and_literature.csv",
+   "committed": false
+  },
+  {
+   "file": "test/relationships.csv",
+   "sha256": "e4e0b5f2d9483ec2a4882fe8280affccca966c126d7b2881932ddbf6a93e1651",
+   "bytes": 295405,
+   "n": 173,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/relationships.csv",
+   "committed": false
+  },
+  {
+   "file": "test/religious_studies.csv",
+   "sha256": "03f43e9a4fbc09428cbb73aca699caafebbde34412c8e22d02b651befe17a2da",
+   "bytes": 487419,
+   "n": 215,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/religious_studies.csv",
+   "committed": false
+  },
+  {
+   "file": "test/science_fundamentals.csv",
+   "sha256": "1e63f7fcf235e61dc64367d330c2380446463c2613b148fb4a01bbee6c090835",
+   "bytes": 368465,
+   "n": 191,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/science_fundamentals.csv",
+   "committed": false
+  },
+  {
+   "file": "test/shopping.csv",
+   "sha256": "0ad2507cbd1b555903464a6cf6833fbc191a3a144741eec39a45df742f9ed0e3",
+   "bytes": 384492,
+   "n": 241,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/shopping.csv",
+   "committed": false
+  },
+  {
+   "file": "test/social_etiquette.csv",
+   "sha256": "8f878cf5afad9bd999ea97056552ce86b04e50378801c8fed844165f92376789",
+   "bytes": 279496,
+   "n": 200,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/social_etiquette.csv",
+   "committed": false
+  },
+  {
+   "file": "test/social_media.csv",
+   "sha256": "a2472a59a4bbf108ae8f738a54b2388bcc25e33c1cfef5163ba4f3d35121ae7b",
+   "bytes": 402412,
+   "n": 217,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/social_media.csv",
+   "committed": false
+  },
+  {
+   "file": "test/social_sciences.csv",
+   "sha256": "10dbb5a991713543c4304db7b0e04bb918c93f321252565cb265888c162a59cc",
+   "bytes": 381334,
+   "n": 207,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/social_sciences.csv",
+   "committed": false
+  },
+  {
+   "file": "test/sports.csv",
+   "sha256": "3b539bfffec577cc40fa4f6d403fb71ea12462878df819d080304ebd7e18da46",
+   "bytes": 308876,
+   "n": 188,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/sports.csv",
+   "committed": false
+  },
+  {
+   "file": "test/technical_help.csv",
+   "sha256": "f84dea99843b3238044ed12f172ad9cd07d3e4a4d1d65d1b6c749ffe17a2bc4d",
+   "bytes": 460904,
+   "n": 254,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/technical_help.csv",
+   "committed": false
+  },
+  {
+   "file": "test/teens_and_youth.csv",
+   "sha256": "7fb3208c5a05037882541161057fe405781e3c4499ce5191597b88d9752ed4f3",
+   "bytes": 336403,
+   "n": 161,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/teens_and_youth.csv",
+   "committed": false
+  },
+  {
+   "file": "test/time_management.csv",
+   "sha256": "4b76cc4f2432360c14f510b8589bb03542f423165ed11324f0a5a4757c1e5ae9",
+   "bytes": 348023,
+   "n": 211,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/time_management.csv",
+   "committed": false
+  },
+  {
+   "file": "test/travel_planning.csv",
+   "sha256": "19d715f8638ad2d24777fcb139ccea99d4fca1aee24614e972224aae29d1d878",
+   "bytes": 410699,
+   "n": 214,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/travel_planning.csv",
+   "committed": false
+  },
+  {
+   "file": "test/waste_management.csv",
+   "sha256": "d6fdf567ff568870cf52f5bbbe35837e3dc34b21ed8ee1955d739246d1d3687a",
+   "bytes": 367651,
+   "n": 207,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/waste_management.csv",
+   "committed": false
+  },
+  {
+   "file": "test/weather_forecasting.csv",
+   "sha256": "39e29a5dae158c330a0c31bde19d2f554284146a14bd15a207f09201315a441b",
+   "bytes": 325649,
+   "n": 205,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/weather_forecasting.csv",
+   "committed": false
+  },
+  {
+   "file": "test/world_history.csv",
+   "sha256": "f8d157762411e4429880a69ae2042a013f95e53a73c8a31f7d16dcac34897fd6",
+   "bytes": 479008,
+   "n": 206,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/world_history.csv",
+   "committed": false
+  },
+  {
+   "file": "test/writing_skills.csv",
+   "sha256": "bed106a1c8d03982530c77b74a1a49e8c77fab222b74c36275d83be0691ac7ac",
+   "bytes": 432141,
+   "n": 203,
+   "url": "https://huggingface.co/datasets/MBZUAI-LLM/Mobile-MMLU/resolve/f8c113fe45d6def9b0bb913b6d7fe242a3fb6968/test/writing_skills.csv",
+   "committed": false
+  }
+ ],
+ "columns": [
+  "question_id",
+  "Question",
+  "A",
+  "B",
+  "C",
+  "D"
+ ],
+ "field_from": "the file's name: test/<field>.csv, one file a field",
+ "n": 16186,
+ "fields": {
+  "accounting": 205,
+  "art_techniques_and_architecture": 175,
+  "automotive_care": 275,
+  "basic_life_skills": 209,
+  "basic_statistics": 219,
+  "business_management": 167,
+  "career_development": 166,
+  "communication_and_public_speaking": 134,
+  "conceptual_physics": 194,
+  "conflict_resolution": 152,
+  "cooking_and_recipes": 274,
+  "creativity": 210,
+  "cultural_awareness": 243,
+  "cybersecurity": 208,
+  "digital_detox": 196,
+  "digital_literacy": 198,
+  "e_commerce": 186,
+  "education_techniques": 146,
+  "elementary_mathematics": 254,
+  "emotional_intelligence": 133,
+  "entertainment": 207,
+  "environmental_and_sustainable_living": 178,
+  "ergonomics": 204,
+  "ethical_living": 171,
+  "ethics": 172,
+  "event_planning": 201,
+  "fashion_and_style": 200,
+  "first_aid": 221,
+  "food_safety": 219,
+  "formal_logic": 210,
+  "gardening_and_horticulture": 212,
+  "geography": 211,
+  "global_facts": 228,
+  "high_school_mathematics": 200,
+  "hobbies": 208,
+  "holidays_and_traditions": 236,
+  "home_maintenance": 261,
+  "home_safety": 189,
+  "human_resources": 144,
+  "interior_design": 200,
+  "law": 206,
+  "legal_rights": 219,
+  "linguistics": 223,
+  "logical_fallacies": 293,
+  "marketing__and_sales_strarigies": 162,
+  "medical_and_health_knowledge": 183,
+  "mental_health": 130,
+  "mobile_customization": 230,
+  "movie_and_tv_show": 230,
+  "news_and_information": 203,
+  "nutrition_and_diet": 151,
+  "online_privacy": 219,
+  "outdoor_survival_skills": 277,
+  "parenting": 144,
+  "personal_branding": 186,
+  "personal_finance": 223,
+  "pet_care": 208,
+  "photography_basics_and_smartphone_photography": 214,
+  "physical_fitness": 190,
+  "podcasting": 211,
+  "political_systems": 193,
+  "project_management": 176,
+  "public_speaking": 158,
+  "reading_and_literature": 248,
+  "relationships": 173,
+  "religious_studies": 215,
+  "science_fundamentals": 191,
+  "shopping": 241,
+  "social_etiquette": 200,
+  "social_media": 217,
+  "social_sciences": 207,
+  "sports": 188,
+  "technical_help": 254,
+  "teens_and_youth": 161,
+  "time_management": 211,
+  "travel_planning": 214,
+  "waste_management": 207,
+  "weather_forecasting": 205,
+  "world_history": 206,
+  "writing_skills": 203
+ },
+ "mean_chars": {
+  "Question": 171.49,
+  "A": 396.22,
+  "B": 398.79,
+  "C": 398.36,
+  "D": 398.07
+ },
+ "stats_from": "the fetched files at this revision, 4 Oct 2026 (counts and mean lengths, no text)",
+ "overlap": {
+  "pro": 9497,
+  "full": 16186,
+  "pro_in_full": 9497,
+  "same_wording": 9496,
+  "full_only": 6689,
+  "checked": "4 Oct 2026, by question id and by text: every Mobile-MMLU-Pro question is in the full set, in the same field with the same four options in the same order",
+  "worded_apart": {
+   "9933ec55": {
+    "pro": "a556794a",
+    "full": "a2928f17",
+    "note": "the same id, options and field; one span of its question worded differently in each set (sha256 of each wording's question text, first 8 hex)"
+   }
+  }
+ },
+ "paper_checks": {
+  "setting": "lm-evaluation-harness, 0-shot, accuracy (the paper's Table 2, Mobile-MMLU (0-shot) column)",
+  "table": "arXiv 2503.20786, Table 2: Comparison of performance on Mobile-MMLU and Mobile-MMLU-Pro with prior MMLU and MMLU-Pro benchmarks",
+  "within": 3.0,
+  "models": {
+   "Qwen/Qwen2.5-3B-Instruct": 68.1,
+   "meta-llama/Llama-3.2-3B-Instruct": 50.2,
+   "google/gemma-2-2b-it": 38.9
+  }
+ }
+}

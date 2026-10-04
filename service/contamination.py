@@ -41,6 +41,7 @@ MAB_DIR = Path(__file__).resolve().parent.parent / "eval_tasks" / "mobileaibench
 NOT_ITEMS = {"mt_bench_judge_prompts"}
 # 14.3: Mobile-MMLU-Pro's manifest; its file lives only in the server's data folder
 MMP_DIR = Path(__file__).resolve().parent.parent / "eval_tasks" / "mobile_mmlu_pro"
+MMF_DIR = Path(__file__).resolve().parent.parent / "eval_tasks" / "mobile_mmlu"
 MAX_DROP_SHARE = 0.02
 NEAR_DUP_SHINGLE = 5
 NEAR_DUP_JACCARD = 0.8
@@ -140,6 +141,13 @@ class BenchmarkIndex:
             p = Path(config.MMP_DIR) / mm["file"]["file"]
             if p.exists():
                 out.append(p)
+        except (OSError, ValueError, KeyError):
+            pass
+        # 14.4: and the full Mobile-MMLU's 80 files, each once it's here
+        try:
+            mf = json.loads((MMF_DIR / "manifest.json").read_text(encoding="utf-8"))
+            out += [p for p in (Path(config.MMF_DIR) / f["file"] for f in mf["files"])
+                    if p.exists()]
         except (OSError, ValueError, KeyError):
             pass
         return out

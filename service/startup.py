@@ -80,6 +80,10 @@ REQUIRED_REPO_FILES = [
     "eval_tasks/mobileaibench/_mab_template_yaml",
     "eval_tasks/mobileaibench/hotpot_qa.csv",
     "eval_tasks/mobileaibench/sql_create_context.csv",
+    # 14.3, 14.4: Mobile-MMLU-Pro's and the full Mobile-MMLU's manifests — their
+    # pins and licences (the questions are the data step's, never the image's)
+    "eval_tasks/mobile_mmlu_pro/manifest.json",
+    "eval_tasks/mobile_mmlu/manifest.json",
     # 12q: devicemark's battery, the ids it was drawn from, and its prompts
     "eval_tasks/devicemark/battery-v1.json",
     "eval_tasks/devicemark/source_ids.json",

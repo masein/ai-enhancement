@@ -23,6 +23,7 @@ eval_tasks/*
 !eval_tasks/simpleqa
 !eval_tasks/mobileaibench
 !eval_tasks/mobile_mmlu_pro
+!eval_tasks/mobile_mmlu
 !eval_tasks/devicemark
 logs/
 artifacts/

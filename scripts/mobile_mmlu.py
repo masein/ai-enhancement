@@ -1,15 +1,20 @@
 """14.3: Mobile-MMLU-Pro (MBZUAI's Mobile-MMLU, DMLR 2026) — four-option
 questions about everyday phone topics, in 80 fields such as first aid,
-travel planning, cooking and tech help — with our own answer key.
+travel planning, cooking and tech help — with our own answer key. 14.4: and
+the full Mobile-MMLU beside it.
 
-**Why the Pro subset.** The full Mobile-MMLU (16,186 questions) is CC
-BY-NC-ND 4.0, which a company can't use. The Pro subset (9,497 questions) is
-CC BY-ND 4.0: we may use it internally, and must publish nothing derived from
-it. So the file is never committed — the mirror is public, and our key is a
-derivative. The deploy's data step (scripts/fetch_data.py) fetches it from the
-revision eval_tasks/mobile_mmlu_pro/manifest.json pins, checks its sha256,
-and keeps it in the server's data folder (MMP_DIR); the key lives beside it,
-in key/. Tests use invented rows with the same columns.
+**The two sets.** Mobile-MMLU-Pro (9,497 questions) is CC BY-ND 4.0: its
+scores may be used, and nothing derived from it is published. It stays the
+default: its scores are the ones that may leave the board. The full
+Mobile-MMLU (16,186 questions, every Pro question among them) is CC BY-NC-ND
+4.0. 14.3 left it out for that; on 4 Oct 2026 masein decided to add it for
+internal research evaluation only, labelled "Non-commercial" wherever the set
+or its scores appear (eval_tasks/mobile_mmlu/manifest.json records the
+decision). Neither file is ever committed — the mirror is public, and our key
+is a derivative. The deploy's data step (scripts/fetch_data.py) fetches each
+from the revision its manifest pins, checks every file's sha256, and keeps
+them in the server's data folder (MMP_DIR, MMF_DIR); the key lives beside
+Pro's, in key/. Tests use invented rows with the same columns.
 
 **Why our own key.** The authors hold the answers back and score through
 their portal. Ours comes from strong models of different makers agreeing
@@ -161,6 +166,96 @@ def load() -> list[dict]:
 
 def by_id() -> dict[str, dict]:
     return {q["id"]: q for q in load()}
+
+
+# ---------------------------------------------------------------------------
+# 14.4: the full Mobile-MMLU — 80 files, one a field
+# ---------------------------------------------------------------------------
+
+FULL_DATA_DIR = REPO / "eval_tasks" / "mobile_mmlu"
+FULL_TASK = "mobile_mmlu_full"
+FULL_NAME = "Mobile-MMLU (full)"
+FULL_PRED_FILE = "mobile_mmlu_full.json"
+FULL_MISSING = ("Mobile-MMLU (full) isn't on this server: fetch it with the data step "
+                "(scripts/fetch_data.py)")
+
+
+def full_manifest() -> dict:
+    return json.loads((FULL_DATA_DIR / "manifest.json").read_text(encoding="utf-8"))
+
+
+def full_dir() -> Path:
+    """the server's data folder for the full Mobile-MMLU: never the repo"""
+    if os.environ.get("MMF_DIR"):
+        return Path(os.environ["MMF_DIR"])
+    try:
+        from service import config
+        return Path(config.MMF_DIR)
+    except ImportError:
+        return REPO / "data" / "mobile_mmlu"
+
+
+def full_files() -> list[tuple[dict, Path]]:
+    """each pinned file and where the data step keeps it"""
+    return [(f, full_dir() / f["file"]) for f in full_manifest()["files"]]
+
+
+def full_available() -> str:
+    """'' when every pinned file of the full set is on this server; else why
+    not, in one line"""
+    ok = all(p.is_file() and p.stat().st_size == f["bytes"] for f, p in full_files())
+    return "" if ok else FULL_MISSING
+
+
+_full_rows: dict = {}
+
+
+def load_full() -> list[dict]:
+    """every question of the full set — {id, question, A–D, field, category},
+    its field from its file's name — once each file's sha256 is the pinned
+    one; [] when the set isn't here"""
+    if full_available():
+        return []
+    files = full_files()
+    k = tuple((str(p), p.stat().st_mtime_ns, p.stat().st_size) for _, p in files)
+    if _full_rows.get("k") != k:
+        csv.field_size_limit(10 ** 9)
+        rows = []
+        for f, p in files:
+            raw = p.read_bytes()
+            sha = hashlib.sha256(raw).hexdigest()
+            if sha != f["sha256"]:
+                raise ValueError(f"{p} isn't the pinned file (sha256 {sha[:12]}, pinned "
+                                 f"{f['sha256'][:12]}): fetch it again with the data step")
+            field = Path(f["file"]).stem
+            for r in csv.DictReader(io.StringIO(raw.decode("utf-8"), newline="")):
+                rows.append({"id": r["question_id"].strip(), "question": r["Question"],
+                             **{L: r[L] for L in LETTERS}, "field": field,
+                             "category": FIELD_CATEGORY.get(field, OTHER)})
+        _full_rows.update(k=k, rows=rows)
+    return _full_rows["rows"]
+
+
+def full_by_id() -> dict[str, dict]:
+    return {q["id"]: q for q in load_full()}
+
+
+def overlap(pro: list[dict] | None = None, full: list[dict] | None = None) -> dict:
+    """how Pro sits in the full set, by question id and by text: {pro, full,
+    pro_in_full, pro_not_in_full, same_wording, worded_apart: [ids],
+    same_options, full_only}"""
+    pro = load() if pro is None else pro
+    full = load_full() if full is None else full
+    F = {q["id"]: q for q in full}
+    norm = lambda s: re.sub(r"\s+", " ", s or "").strip()      # noqa: E731
+    both = [q for q in pro if q["id"] in F]
+    apart = sorted(q["id"] for q in both if norm(q["question"]) != norm(F[q["id"]]["question"]))
+    return {"pro": len(pro), "full": len(full), "pro_in_full": len(both),
+            "pro_not_in_full": sorted(q["id"] for q in pro if q["id"] not in F),
+            "same_wording": len(both) - len(apart), "worded_apart": apart,
+            "same_options": sum(1 for q in both
+                                if [q[L] for L in LETTERS] == [F[q["id"]][L] for L in LETTERS]),
+            "full_only": len(set(F) - {q["id"] for q in pro})}
 
 
 def credit() -> dict:
@@ -689,8 +784,21 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--stats", action="store_true",
                     help="estimate from the published mean lengths, without the file")
     ap.add_argument("--key", action="store_true", help="the key's counts, overall and per category")
+    ap.add_argument("--overlap", action="store_true",
+                    help="14.4: how Pro sits in the full set, by question id and by text")
     a = ap.parse_args(argv)
     sys.path.insert(0, str(REPO))
+    if a.overlap:
+        why = available() or full_available()
+        if why:
+            print(why)
+            return 1
+        o = overlap()
+        print(f"Pro {o['pro']:,} · full {o['full']:,} · Pro's in the full set {o['pro_in_full']:,}"
+              f" (not: {len(o['pro_not_in_full'])}) · worded the same {o['same_wording']:,} · "
+              f"worded apart {', '.join(o['worded_apart']) or 'none'} · same options "
+              f"{o['same_options']:,} · only in the full set {o['full_only']:,}")
+        return 0
     if a.dry_run:
         try:
             from service import mmp_key

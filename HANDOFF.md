@@ -4953,13 +4953,40 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 14.4.1 — the full Mobile-MMLU's data (4 Oct)
+
+- **The decision**: masein, 4 Oct 2026 — the full Mobile-MMLU (16,186
+  questions, 80 fields, CC BY-NC-ND 4.0) for internal research evaluation
+  only, labelled "Non-commercial" wherever the set or its scores appear;
+  recorded in `eval_tasks/mobile_mmlu/manifest.json` (`decision`,
+  `restriction: "non-commercial"`). Pro's manifest says so too (`full_set`),
+  and why Pro stays the default: its licence lets its scores be used.
+- **Checked first** (4 Oct): the Hub dataset is public, not gated, and its
+  card is the licence and its configs, no other terms. Pro sits in the full
+  set: all 9,497 of its ids, each in the same field with the same options in
+  the same order; 9,496 worded the same; one, `9933ec55`, worded apart (one
+  span of its question). 6,689 questions are the full set's only. The
+  manifest's `overlap` keeps the counts and the two wordings' hashes, no text;
+  `python scripts/mobile_mmlu.py --overlap` checks it again on the server.
+- **The data**: 80 files (`test/<field>.csv`, the field from the file's name),
+  each pinned by revision f8c113f and its sha256, fetched by
+  `scripts/fetch_data.py` into `MMF_DIR` (`$BENCH_ROOT/data/mobile_mmlu`) and
+  never committed; `mobile_mmlu.load_full()` refuses any file not as pinned.
+  In the contamination index once fetched. The image carries the manifest
+  only (`COPY eval_tasks/mobile_mmlu/`). Tests use invented rows
+  (`tests/fixtures/mmf_invented/`).
+- **The paper's check** for the full set (14.4.2): Table 2's Mobile-MMLU
+  (0-shot) column — Qwen2.5-3B-Instruct 68.1, Llama-3.2-3B-Instruct 50.2,
+  gemma-2-2b-it 38.9 — in the manifest's `paper_checks`.
+
 ### 14.3 — Mobile-MMLU-Pro, with our own answer key (1 Oct)
 
 - **The set**: MBZUAI's Mobile-MMLU-Pro (arXiv 2503.20786, DMLR 2026), 9,497
   four-option questions about everyday phone topics in 80 fields, grouped
   into the paper's 9 categories (`scripts/mobile_mmlu.py`, `CATEGORIES`).
   CC BY-ND 4.0: used here, never published. The full Mobile-MMLU is CC
-  BY-NC-ND 4.0 and isn't used.
+  BY-NC-ND 4.0: since 14.4 (4 Oct) it's on the board too, for internal
+  research evaluation only, labelled Non-commercial; Pro stays the default.
 - **Never committed** (the mirror is public, and our key is a derivative):
   `scripts/fetch_data.py` fetches `mobile-mmlu-pro.csv` from the Hub at
   revision 44ed870 (pinned with its sha256 in
