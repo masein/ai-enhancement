@@ -74,11 +74,15 @@ def test_the_picker_names_each_benchmark_and_lists_the_ones_not_run_yet(live, pa
     menu = page.locator("#pop-benchmarks")
     menu.wait_for()
     labels = {r.get_attribute("data-bench-row"): r for r in menu.locator("[data-bench-row]").all()}
-    # every one the board knows, by its own name and nothing else
+    # every one the board knows, by its own name and nothing else — 14.4.4: and a
+    # restricted set's badge beside it
     assert set(labels) == set(NAMES)
+    badges = page.evaluate("Object.fromEntries(Object.entries(DATA.restrictions || {})"
+                           ".map(([k, r]) => [k, r.badge]))")
     for t, name in NAMES.items():
         text = " ".join(labels[t].inner_text().split()).replace(" · not run yet", "")
-        assert text == name, (t, text)
+        assert text == name + (f" {badges[t]}" if t in badges else ""), (t, text)
+    assert badges.get("mobile_mmlu_pro") == "Internal use"
     # a benchmark nothing on this board has run is there, greyed, and can't be ticked
     ran = set(page.evaluate("DATA.accTasks"))
     for t in NAMES:

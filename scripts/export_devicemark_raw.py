@@ -53,6 +53,7 @@ for p in (str(REPO), str(HERE)):
         sys.path.insert(0, p)
 import devicemark as dm  # noqa: E402
 import remote_bundle as rb  # noqa: E402
+import restrictions  # noqa: E402
 
 RAW_NAME = dm.RAW_NAME
 NOT_HERE = ("only DeviceMark rows are exported: Everyday, the Knowledge exam, the reasoning lab, "
@@ -410,10 +411,19 @@ if __name__ == "__main__":
 '''
 
 
+def refused(tasks) -> str:
+    """14.4.4: '' when every task may leave the server; else why not — a
+    non-commercial set never does, whatever the row"""
+    return restrictions.stays_here(tasks)
+
+
 def export_row(row: Path, out: Path, public: bool | None = None, runs: list[dict] | None = None,
                say=print) -> Path:
     """one row's folder, scrubbed, under out/public or out/private"""
     from service import config
+    why = refused(dm.TASK.values())
+    if why:
+        raise SystemExit(f"{row.name}: {why} Nothing was exported.")
     data = json.loads((row / dm.OUT_NAME).read_text(encoding="utf-8"))
     if data.get("part", "full") != "full" or data.get("composite", {}).get("value") is None:
         raise SystemExit(f"{row.name} has no full battery scored: nothing to export")

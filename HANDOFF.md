@@ -4953,6 +4953,43 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 14.4.4 — what a restricted set may be used for, everywhere (4 Oct)
+
+- **One rule, from the manifests** (`scripts/restrictions.py`): a manifest under
+  `eval_tasks/` with `restriction`, `licence`, `covers` (the board's task keys,
+  its GGUF benchmarks' too) and `board_name` is a restricted set. The full
+  Mobile-MMLU is "non-commercial", Pro "internal-use". A reported source says
+  it in `reported.SOURCES` (Artificial Analysis: "internal-only", in the
+  board's own words). Each gives a badge and one sentence (`entry`). A new
+  kind of restriction is a word in `BADGE` and, unless it has its own words,
+  `WORDS`.
+- **Where it shows:**
+  - the badge (`rBadge`, words in a bordered box, `.badge.rbadge`) beside the
+    name: column headers and their tooltips, Pro's cell tooltip, the model
+    page's lines and results list, Compare's groups and rows, Benchmarks'
+    panels and its picker, the GGUF table and Measure dialog, the GGUF chart's
+    axis, the question browser, Test a model's parts, the key's card, the
+    Frontier credit, the Outside data card and what others report;
+  - a banner with the sentence (`rBanner`) on the full set's own table, the
+    question browser, the key's card and the Outside data card;
+  - the queue's confirmation (the toast, and `restriction` in the reply).
+- **The API and exports:** `/api/results` (`restrictions`, and `licence` and
+  `restriction` in `mmp` and `mmf`), `/api/reported`, `/api/gguf`,
+  `/api/mobile-mmlu/key`, the part estimates. Every CSV carries `licence` and
+  `restriction` as columns: Download CSV, Download filtered CSV, Copy as CSV
+  (a pair for each restricted column) and the command line's `--csv`.
+- **Refused:**
+  - a non-commercial set never leaves the server: the single-file report
+    (`for_export`), the 15.4 raw export (`export_devicemark_raw.refused`) and
+    the remote bundles (`remote_bundle.refused`);
+  - a restricted set is never a training target (`/api/proposals`), a few-shot
+    example (the runner) or a source of questions (the question builder
+    rejects a draft that copies a benchmark's 13 words in a row);
+  - the full set's questions are never browsed (`/api/questions` 403).
+- The portal file (`/api/mobile-mmlu/predictions`) keeps the authors' two
+  columns: it is Pro's picks, uploaded to the authors, and their portal
+  takes that format only.
+
 ### 14.4.3 — the full Mobile-MMLU as a benchmark (4 Oct)
 
 - **The part**: the Mobile suite's `mmlu_full` (`config.MMF_TASK`,

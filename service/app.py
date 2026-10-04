@@ -647,8 +647,12 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
                  allow_remote_code=s.allow_remote_code, tasks=chosen,
                  thinking=s.thinking, subset=s.subset, bbq_all=s.bbq_all,
                  part=part, pair=pair)
+    # 14.4.4: a restricted set's run says so as it is queued
+    rx = next((e for e in (_restrictions().of(t) for t in config.tasks_for_suite(
+        s.suite, part=part)) if e), None) if s.suite == "mobile" else None
     return {"id": sid, "status": "queued", "tasks": sorted(chosen),
-            **({"part": part} if part else {}), **({"pair": pair} if pair else {})}
+            **({"part": part} if part else {}), **({"pair": pair} if pair else {}),
+            **({"restriction": rx} if rx else {})}
 
 
 def _devicemark_check(hf_id: str, kind: str, part: str, pair: str, thinking: bool) -> str:
@@ -1276,6 +1280,8 @@ def gguf_page():
     order = [b for b in gguf.gb.ORDER if not gguf.gb.BENCHMARKS[b].get("apart") or b in man]
     return {"worker": gguf.worker(), "benchmarks": gguf.gb.BENCHMARKS, "order": order,
             "datasets": man, "models": models,
+            # 14.4.4: each restricted benchmark's badge and sentence
+            "restrictions": _restrictions().sets(),
             "default_flags": " ".join(gguf.gb.DEFAULT_FLAGS), "mtp_line": gguf.gb.MTP_LINE}
 
 
@@ -1425,6 +1431,11 @@ def mab_estimate(model: str):
     mdir = config.OUT_DIR / model.replace("/", "__")
     parts["mmlu"] = _mmp().run_estimate(bool(rec), each if rec else None, "pro", mdir)
     parts["mmlu_full"] = _mmp().run_estimate(bool(rec), each if rec else None, "full", mdir)
+    # 14.4.4: and what each set's questions and scores may be used for
+    for p, t in (("mmlu", config.MMP_TASK), ("mmlu_full", config.MMF_TASK)):
+        rx = _restrictions().of(t)
+        if rx and p in parts:
+            parts[p]["restriction"] = rx
     return {"model": model, "parts": parts}
 
 
@@ -1464,6 +1475,13 @@ def mab_judge(a: MabJudgeIn, x_token: str = Header(default="")):
 
 # -- 14.3: Mobile-MMLU-Pro and our answer key -----------------------------------
 
+def _restrictions():
+    """scripts/restrictions.py: what a restricted set may be used for (14.4.4)"""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import restrictions
+    return restrictions
+
+
 def _mmp():
     from . import mmp_key
     return mmp_key.mmp
@@ -1483,6 +1501,9 @@ def _mmp_key_page() -> dict:
          for mid in m.full_manifest()["paper_checks"]["models"]}, "full")
     st["portal"] = m.portal_scores()
     st["credit"] = m.credit()
+    # 14.4.4: each set's badge and sentence, for the card and any reader of this page
+    st["restrictions"] = {t: rx for t in (config.MMP_TASK, config.MMF_TASK)
+                          if (rx := _restrictions().of(t))}
     return st
 
 
@@ -3326,6 +3347,10 @@ def proposal_create(p: ProposalIn, x_token: str = Header(default="")):
     or a model that wrote nothing is refused with the same words the page
     shows."""
     _check_token(x_token)
+    # 14.4.4: a restricted set is never a training target
+    why = _restrictions().never_trained([p.topic, p.everyday])
+    if why:
+        raise HTTPException(422, why + ". Nothing was proposed.")
     if served.is_served(p.model):
         raise HTTPException(422, IMPROVE_SERVED)
     backend = _require_llm()
@@ -3667,6 +3692,8 @@ def _qtask(task: str) -> None:
     from . import questions
     if questions.GPQA.match(task):
         raise HTTPException(403, questions.NOT_LISTED)
+    if task == questions.MMF:
+        raise HTTPException(403, questions.MMF_NOT_LISTED)        # 14.4.4
     if task not in questions.tasks():
         raise HTTPException(404, f"No questions on file for {task}: no model has answered it yet")
 

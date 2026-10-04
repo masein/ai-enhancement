@@ -30,6 +30,7 @@ import hashlib
 import io
 import json
 import re
+import sys
 import threading
 import urllib.request
 import zipfile
@@ -42,7 +43,12 @@ SOURCES = {
               "licence": "CC BY 4.0", "url": "https://epoch.ai/benchmarks"},
     "aa": {"name": "Artificial Analysis", "credit": "Data: Artificial Analysis",
            "licence": "their free Data API: internal use, with credit",
-           "url": "https://artificialanalysis.ai"},
+           "url": "https://artificialanalysis.ai",
+           # 14.4.4: badged "Internal only" wherever its numbers are, in the
+           # board's own words (the Outside data card said them first)
+           "restriction": "internal-only",
+           "sentence": ("Artificial Analysis’s free data is for internal use: this board is on "
+                        "the tailnet, and its numbers are never in the single-file report.")},
     "card": {"name": "model card", "credit": "as the model card or paper reports it",
              "licence": "", "url": ""},
     # 14.1: a benchmark's own paper, its numbers as printed — from a file in the
@@ -411,6 +417,16 @@ def card_add(f: dict, entered_by: str) -> dict:
 # the page's view
 # ---------------------------------------------------------------------------
 
+def restrictions() -> dict[str, dict]:
+    """14.4.4: {source: {key, name, licence, restriction, badge, sentence}}
+    for each source whose numbers are restricted"""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import restrictions as rs
+    return {s: rs.entry("reported:" + s, m["name"], m.get("licence") or "", m["restriction"],
+                        m.get("sentence") or "")
+            for s, m in SOURCES.items() if m.get("restriction")}
+
+
 def view(board: list[str] | None = None) -> dict:
     """what /api/reported returns: each source's line and credit, the models
     (a board model when one is the same model), and every score"""
@@ -440,6 +456,8 @@ def view(board: list[str] | None = None) -> dict:
                    "imported": _dt.datetime.fromtimestamp(last["at"]).strftime("%Y-%m-%d")
                    if last else ""}
     return {"sources": srcs, "models": list(models.values()), "scores": scores,
+            # 14.4.4: each restricted source's badge and sentence, as the sets' are
+            "restrictions": restrictions(),
             "aliases": [{"alias": a, "target": t} for a, t in sorted(al.items())],
             "settings": {"makers": config.REPORTED_MAKERS, "per_maker": config.REPORTED_PER_MAKER}}
 
