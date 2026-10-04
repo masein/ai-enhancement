@@ -699,6 +699,14 @@ def gpu_total_mib() -> int | None:
         return None
 
 
+def _restricted(task: str) -> str:
+    """14.4.4: '' for a task whose questions may be few-shot examples; else why
+    not (a restricted set's never are)"""
+    _scripts()
+    import restrictions
+    return restrictions.never_trained([task])
+
+
 def mmlu_pro_subset(n: int, seed: int = config.GEN_SUBSET_SEED) -> dict[str, list[int]]:
     """A fixed, seeded subset of MMLU-Pro: `n` items, each subject in its
     share of the 12,032, the same items for every model. Only a full run is
@@ -1471,6 +1479,13 @@ def run_submission(sub: dict) -> None:
             gen_task = generative or devicemark or (
                 shared and (task == config.GPQA_COT or th["separate"]))
             shots = config.NFEWSHOT.get(task, 0)
+            if shots and _restricted(task):
+                # 14.4.4: a restricted set's questions are never few-shot examples
+                failed_tasks.append(task)
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n[service] {task}: {_restricted(task)} — asked 0-shot only; "
+                             f"not asked\n")
+                continue
             task_out = config.OUT_DIR / row_safe / f"{task}_{shots}shot"
             label = f"{i}/{len(tasks)} · {task} ({shots}-shot)"
             turn2_dir = None

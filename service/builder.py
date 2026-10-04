@@ -848,8 +848,26 @@ def _dedup(d: dict) -> None:
             _flag(it, "dup", f"looks like {o['label']}", other=o, how=how)
 
 
+BENCH_COPY = ("copies a benchmark's question (13 words in a row): a benchmark is never a "
+              "source of questions — refused")
+
+
+def _bench_gate(d: dict) -> None:
+    """14.4.4: a drafted question that copies a pinned benchmark's — Mobile-MMLU's
+    restricted sets among them — is refused, whatever the duplicate setting:
+    a benchmark is never a source of questions"""
+    ix = contamination.index(config.OUT_DIR, config.EXAM_DIR)
+    for it in d["items"]:
+        if it["auto"] or it["verdict"] == "reject":
+            continue
+        if any(ix.source_of(w) == "benchmark" for w in ix.hits(_text(d, it["q"]))):
+            _flag(it, "bench", BENCH_COPY)
+            it["verdict"] = "reject"
+
+
 def _finalize(d: dict) -> None:
     """checked: duplicates, a tenth of the rest drawn at random, then review"""
+    _bench_gate(d)
     if d["spec"].get("dedup", True):
         _dedup(d)
     pool = [it for it in d["items"] if not it["auto"] and not it["flags"]

@@ -36,6 +36,12 @@ HIDDEN_WHY = {
     "everyday": "hidden: they score it and are not shown",
 }
 NOT_LISTED = "GPQA Diamond's questions are never shown, as its authors ask"
+# 14.4.4: nor the full Mobile-MMLU's — non-commercial, kept apart; its run's
+# lm_eval target is a stand-in, so a browser of its samples would show a wrong
+# "right answer". Its scores are on its own table
+MMF = "mobile_mmlu_full"
+MMF_NOT_LISTED = ("The full Mobile-MMLU's questions aren't shown here: it is non-commercial and "
+                  "kept apart. Its scores are in its own table under Models ▸ Mobile tasks")
 GGUF_TOTAL = "llama.cpp records only the total"
 
 
@@ -137,8 +143,8 @@ def tasks() -> list[str]:
             for t in d.glob("*_*shot") if d.is_dir() else []:
                 m = re.fullmatch(r"(.+)_\d+shot", t.name)
                 # the Everyday pilot's legacy task is the Everyday bank's, not a benchmark
-                if m and not GPQA.match(m.group(1)) and not m.group(1).startswith(
-                        "everyday_"):
+                if m and not GPQA.match(m.group(1)) and m.group(1) != MMF \
+                        and not m.group(1).startswith("everyday_"):
                     seen.add(m.group(1))
             if (d / "everyday.json").exists():
                 seen.add("everyday")
@@ -626,6 +632,8 @@ def table(task: str) -> dict:
     """{models: [ids], rows: {key: row with results by model and its half}}"""
     if GPQA.match(task):
         raise PermissionError(NOT_LISTED)
+    if task == MMF:
+        raise PermissionError(MMF_NOT_LISTED)
     dirs = model_dirs(task)
     stamp = (task, _stamp(task, dirs))
     with _lock:
@@ -818,7 +826,7 @@ def _gguf_key(task: str) -> str | None:
     except ImportError:
         return None
     key = next((k for k, v in gb.BENCHMARKS.items() if v.get("lm_eval") == task), None)
-    return None if not key or GPQA.match(key) else key
+    return None if not key or GPQA.match(key) or key == MMF else key
 
 
 def _gkey(task: str, doc: dict) -> str | None:

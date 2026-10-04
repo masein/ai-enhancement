@@ -5,6 +5,10 @@
  "revision": "f8c113fe45d6def9b0bb913b6d7fe242a3fb6968",
  "licence": "CC BY-NC-ND 4.0",
  "restriction": "non-commercial",
+ "board_name": "Mobile-MMLU (full)",
+ "covers": [
+  "mobile_mmlu_full"
+ ],
  "decision": {
   "by": "masein",
   "on": "2026-10-04",

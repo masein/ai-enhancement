@@ -97,7 +97,7 @@ def test_mobile_tasks_has_the_full_sets_own_table_and_no_column_of_it(live, page
     assert page.locator("th[data-col='mobile_mmlu_full']").count() == 0
     assert page.locator("th[data-col='mobile_mmlu_pro']").count() == 1
     card = page.locator("[data-mmf-card]")
-    assert card.locator("h2").inner_text() == "Mobile-MMLU (full)"
+    assert card.locator("h2").inner_text() == "Mobile-MMLU (full) Non-commercial"
     rows = card.locator("[data-mmf-row]")
     assert rows.evaluate_all("xs => xs.map(x => x.dataset.mmfRow)") == [GOOD, CHANCE]
     assert card.locator(f"[data-mmf-cell='{GOOD}']").inner_text() == "94.4%"      # 17 of 18
@@ -120,10 +120,11 @@ def test_the_model_page_has_the_full_sets_line_categories_and_fields(live, page,
     line = page.locator(f"[data-mmf-line='{GOOD}']")
     line.wait_for()
     assert line.locator("p").first.inner_text() == (
-        "Mobile-MMLU (full) 94.4% on 18 kept questions · log-likelihood · provisional key")
+        "Mobile-MMLU (full) Non-commercial 94.4% on 18 kept questions · log-likelihood · "
+        "provisional key")
     # one run, two scores: Pro's line from the same picks
     assert page.locator(f"[data-mmp-line='{GOOD}'] p").first.inner_text().startswith(
-        "Mobile-MMLU-Pro 100.0% on 12 kept questions")
+        "Mobile-MMLU-Pro Internal use 100.0% on 12 kept questions")
     line.locator(f"[data-mmf-cats='{GOOD}'] > summary").click()
     names = line.locator("[data-mmf-cat]").evaluate_all("xs => xs.map(x => x.dataset.mmfCat)")
     assert names and set(names) <= set(mmp.CATEGORIES)
@@ -168,7 +169,7 @@ def test_test_a_model_offers_the_full_set_with_what_it_takes(live, page, width):
     part = page.locator("[data-mab-part='mmlu_full']")
     # its Pro run counts: only the seven it hasn't answered
     assert part.inner_text().strip().startswith(
-        "multiple choice, the full set — Mobile-MMLU (full) · 7 answers")
+        "multiple choice, the full set — Mobile-MMLU (full) Non-commercial · 7 answers")
     assert "12 answered already, by its Mobile-MMLU-Pro run" in part.inner_text()
     assert part.locator("input").is_enabled()
     # and Pro's own part, answered whole, has nothing to ask

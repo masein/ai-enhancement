@@ -1824,6 +1824,54 @@ def mmp_labellers() -> set[str]:
         return set()
 
 
+def restriction_meta() -> dict:
+    """14.4.4: {key: {name, licence, restriction, badge, sentence}} for every
+    restricted set on this board (scripts/restrictions.py)"""
+    try:
+        import restrictions                     # scripts/, beside this file
+        return restrictions.sets()
+    except (ImportError, OSError, ValueError):
+        return {}
+
+
+def for_export(payload: dict) -> dict:
+    """14.4.4: the page's data as it may leave the server — a set that never
+    does (non-commercial) is taken out whole: its scores, its key's counts,
+    its GGUF cells and its badge"""
+    try:
+        import restrictions
+    except ImportError:
+        return payload
+    stays = {k for k, e in (payload.get("restrictions") or {}).items()
+             if e.get("restriction") in restrictions.STAYS}
+    if not stays:
+        return payload
+    out = dict(payload)
+    if "mobile_mmlu_full" in stays:
+        out["mmf"] = None
+        out["models"] = [{k: v for k, v in m.items() if k != "mmf"}
+                         for m in payload.get("models") or []]
+    out["cells"] = {t: v for t, v in (payload.get("cells") or {}).items() if t not in stays}
+    out["extra"] = [r for r in payload.get("extra") or [] if r[1] not in stays]
+    g = payload.get("gguf")
+    if g:
+        g = dict(g)
+        g["order"] = [b for b in g.get("order") or [] if b not in stays]
+        g["benchmarks"] = {b: v for b, v in (g.get("benchmarks") or {}).items() if b not in stays}
+        g["models"] = {m: {b: c for b, c in cells.items() if b not in stays}
+                       for m, cells in (g.get("models") or {}).items()}
+        g["setups"] = {m: [{**x, "benches": {b: c for b, c in (x.get("benches") or {}).items()
+                                             if b not in stays}} for x in rows]
+                       for m, rows in (g.get("setups") or {}).items()}
+        g["history"] = {m: [{**h, "benchmarks": {b: c for b, c in (h.get("benchmarks") or {})
+                                                 .items() if b not in stays}} for h in hs]
+                        for m, hs in (g.get("history") or {}).items()}
+        out["gguf"] = g
+    out["restrictions"] = {k: e for k, e in (payload.get("restrictions") or {}).items()
+                           if k not in stays}
+    return out
+
+
 def mmp_meta(by_model: dict, cells: dict, served: dict) -> dict | None:
     """14.3: Mobile-MMLU-Pro's credit, our key (its version and counts) and
     the paper's three models beside ours. A row whose model labelled the key
@@ -1851,6 +1899,8 @@ def mmp_meta(by_model: dict, cells: dict, served: dict) -> dict | None:
                                       "counts": key.get("counts") or {},
                                       "built_at": key.get("built_at")},
             "decided": mmp.DECIDED, "categories": list(mmp.CATEGORIES),
+            # 14.4.4: its licence and restriction, as the full set's meta carries them
+            "licence": mmp.manifest()["licence"], "restriction": mmp.manifest()["restriction"],
             "checks": checks, "provisional": checks["provisional"], "labelled": labelled,
             "portal": mmp.portal_scores(), "missing": mmp.available()}
 
@@ -2703,6 +2753,9 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         "mab": mab_meta(),
         "mmp": mmp_meta(by_model, cells, served),
         "mmf": mmf_meta(by_model, served),
+        # 14.4.4: what each restricted set's questions and scores may be used
+        # for — its badge and its sentence, from its manifest
+        "restrictions": restriction_meta(),
         "thinkingModes": _thinking_modes(),
         "published": {m: {t: {"v": v, "note": note} for t, (v, note) in ts.items()}
                       for m, ts in _PUBLISHED.items()},
@@ -4001,6 +4054,15 @@ select { max-width:100%; }
    the accent tint it wore was 3.9:1 in the dark theme */
 .badge.instruct { color:var(--text-primary); font-weight:600; }
 .badge.ckpt { border-style:dashed; color:var(--text-secondary); }
+/* 14.4.4: a restricted set's badge — its words in a box, never colour alone,
+   right beside the name so a screenshot of the numbers takes it in */
+.badge.rbadge { color:var(--text-primary); font-family:inherit; font-weight:600;
+  border-color:var(--warning); white-space:nowrap; cursor:help; margin-left:2px;
+  /* its words as written, in a table header too */
+  text-transform:none; letter-spacing:normal; }
+.rbanner { border-left:2px solid var(--warning); padding:6px 0 6px 12px; margin:8px 0;
+  font-size:var(--fs-2); color:var(--text-primary); }
+.rbanner .badge { margin-left:0; margin-right:6px; }
 /* 12f.1: served elsewhere — grey, its tooltip how */
 .badge.served { color:var(--text-secondary); cursor:help;
   background:color-mix(in srgb, var(--text-secondary) 12%, transparent); }
@@ -5646,6 +5708,8 @@ function barPanel(task, models, opts) {
   const panel = el('div', { class: 'panel', 'data-panel': opts.key || task,
       'data-panel-models': String(rows.length) },
     el('h3', {}, opts.label || taskLabel(task),
+      // 14.4.4: a restricted set's badge, beside its name
+      rBadge(opts.restriction || restrictOf(task), { 'data-panel-restriction': opts.key || task }),
       // 12o.2: its questions, and each chosen model's answer to each
       !opts.key && canBrowse(task) ? [' ', qxLink(task)] : ''),
     opts.info ? '' : taskChips(task, { panel: true }),
@@ -7074,9 +7138,13 @@ function mabPartOpts(sf) {
             : null, disabled: gone(v) ? '' : null,
             onchange: () => { sf.part = v; render(); } }),
           ` ${words} — ${ts.map(t => LB_SHORT[t] || t).join(', ')}`,
+          // 14.4.4: a restricted set's badge beside the part, its sentence once chosen
+          ...ts.map(t => rBadge(restrictOf(t), { 'data-mab-part-restriction': t })),
           el('span', { class: 'se', 'data-mab-part-est': v || 'none',
             text: gone(v) ? ` · ${gone(v)}` : e ? ` · ${e.line}`
               : est.failed ? '' : ' · working out how long…' })),
+        (sf.part || '') === v ? ts.filter(t => restrictOf(t)).map(t => el('p', { class: 'small',
+          'data-mab-part-sentence': t, text: restrictOf(t).sentence })) : '',
         e && e.judge ? el('p', { class: 'small se mabjudge', 'data-mab-judge-est': '1',
           text: `The judge (${who(e.judge)}): ${e.judge.line}`
             + (e.judge.guess ? ', each answer guessed at '
@@ -7448,10 +7516,14 @@ function sharedLine(m) {
     && FR_SHARED.some(x => frKey(x) === frKey(s.benchmark))).sort((a, b) => frRank(a) - frRank(b));
   return el('div', { class: 'small', 'data-shared-line': m.id },
     el('p', { class: 'small', text: bits.join(' · ') }),
-    reps.length ? el('p', { class: 'small se', 'data-shared-cal': m.id, title: FR_CAL,
-      text: reps.map(s => `${repSrc(s.source).name} reports ${s.benchmark} ${repShow(s)}`)
-        .join(' · ') + ' — same questions, different prompt and settings: a large gap means '
-        + 'our method differs, not the model' }) : '',
+    reps.length ? el('p', { class: 'small se', 'data-shared-cal': m.id, title: FR_CAL },
+      reps.map(s => `${repSrc(s.source).name} reports ${s.benchmark} ${repShow(s)}`)
+        .join(' · '),
+      // 14.4.4: Artificial Analysis's "Internal only", beside its numbers
+      ...[...new Set(reps.map(s => s.source))].filter(s => repRestrict(s)).map(s =>
+        rBadge(repRestrict(s), { 'data-shared-restriction': s })),
+      ' — same questions, different prompt and settings: a large gap means '
+        + 'our method differs, not the model') : '',
     na ? el('p', { class: 'small se', text: ((DATA.shared || {}).simpleqa || {}).honest || '' })
       : '');
 }
@@ -7489,14 +7561,17 @@ function mmpLine(m) {
   if (!x) return '';
   const lab = mmpLabelled(m.id);
   const pc = v => `${(100 * v).toFixed(1)}%`;
-  const head = x.acc == null ? 'Mobile-MMLU-Pro: answered; scored once our answer key is built'
-    : `Mobile-MMLU-Pro ${pc(x.acc)} on ${x.n.toLocaleString('en')} kept questions`
+  const head = x.acc == null ? ': answered; scored once our answer key is built'
+    : ` ${pc(x.acc)} on ${x.n.toLocaleString('en')} kept questions`
       + (lab ? ' · not ranked: it labelled the key' : '')
       + (mmpProvisional() ? ' · provisional key' : '');
   const cats = Object.entries(x.by_category || {});
+  const r = restrictOf(MMP);
   return el('div', { class: 'small mmpline', 'data-mmp-line': m.id },
-    el('p', { class: 'small', title: [MMP_HOW, mmpKeyLine(), mmpChecksLine(), mmpCredit()]
-      .filter(Boolean).join('\n'), text: head }),
+    // 14.4.4: its badge beside its name
+    el('p', { class: 'small', title: [MMP_HOW, mmpKeyLine(), mmpChecksLine(), mmpCredit(),
+      r ? r.sentence : ''].filter(Boolean).join('\n') }, 'Mobile-MMLU-Pro',
+      rBadge(r, { 'data-mmp-restriction': m.id }), head),
     cats.length ? el('details', { class: 'mmpcats', 'data-mmp-cats': m.id },
       el('summary', { class: 'small se', text: `its ${cats.length} categories ▸` }),
       el('table', { class: 'mmptab' }, el('tbody', {}, cats.map(([c, v]) => el('tr',
@@ -7606,7 +7681,7 @@ function resultsPart(m) {
       const atChance = i.chance > 0 && (c.v - 1.96 * (c.se || 0)) <= i.chance;
       rows.push(el('tr', {},
         el('td', {}, el('span', { title: i.desc || '', class: 'tname',
-          text: taskLabel(t) })),
+          text: taskLabel(t) }), rBadge(restrictOf(t), { 'data-result-restriction': t })),
         el('td', { class: 'num' + (atChance ? ' dimmed' : ''),
           text: i.lower ? num(c.v, 3) : t === MTBENCH ? `${(10 * c.v).toFixed(2)} / 10` : pct(c.v) },
           c.se ? el('span', { class: 'se', text: ` ±${(100 * c.se).toFixed(1)}` }) : ''),
@@ -7808,7 +7883,8 @@ function ggufPart(m) {
         el('th', { class: 'num', text: 'Questions' }))),
       el('tbody', {}, rows.map(b => {
         const any = sets.map(x => (x.benches || {})[b]).find(Boolean);
-        return el('tr', { 'data-gguf-row': b }, el('td', { text: ggufLabel(b) }),
+        return el('tr', { 'data-gguf-row': b }, el('td', {}, ggufLabel(b),
+            rBadge(restrictOf(b), { 'data-gguf-row-restriction': b })),
           sets.map(x => el('td', { class: 'num', 'data-gguf-cell-setup': x.name },
             ...[].concat(one((x.benches || {})[b])))),
           el('td', { class: 'num se', text: any && any.full
@@ -9891,6 +9967,7 @@ function aboutBenchmarks(tasks, inline = false) {
     return el('div', { class: 'about-item' },
       el('div', { class: 'about-head' },
         el('span', { class: 'about-name', text: taskLabel(t) }),
+        rBadge(restrictOf(t), { 'data-about-restriction': t }),
         i.domain ? el('span', { class: 'tchip dom', text: i.domain }) : '',
         i.options ? el('span', { class: 'tchip', text: i.options + '-choice' }) : '',
         i.chance > 0 ? el('span', { class: 'tchip', text: 'chance ' + pct(i.chance) }) : '',
@@ -10055,6 +10132,35 @@ function mmpCredit() {
   const c = MMPD().credit || {};
   return c.name ? `${c.name}: ${c.by} · ${c.licence}, used here and never published` : '';
 }
+// 14.4.4: what a restricted set's questions and scores may be used for, from
+// its manifest (scripts/restrictions.py): a badge in words beside its name —
+// in every header, row, card, legend and tooltip — and one sentence, on a
+// banner where the set has a page or a section of its own
+const RESTRICT = () => (DATA && DATA.restrictions) || {};
+const restrictOf = key => key == null ? null
+  : RESTRICT()[String(key).replace(/^gguf:/, '')] || null;
+// a source of reported scores (Artificial Analysis's: "Internal only")
+const repRestrict = src => ((REP().restrictions || {})[src]) || null;
+function rSpan(r, attrs = {}) {
+  return el('span', { class: 'badge rbadge', 'data-restriction': r.restriction, title: r.sentence,
+    'aria-label': `${r.badge}: ${r.sentence}`, ...attrs }, r.badge);
+}
+// with a space before it, so a copy of the line reads "Mobile-MMLU-Pro Internal use …"
+const rBadge = (r, attrs = {}) => r ? [' ', rSpan(r, attrs)] : '';
+function rBanner(r, attrs = {}) {
+  if (!r) return '';
+  return el('p', { class: 'rbanner', role: 'note', 'data-restriction-banner': r.key, ...attrs },
+    rSpan(r), ' ' + r.sentence);
+}
+// in a tooltip, a legend or a line of text: " · Internal use"
+const rWords = r => r ? ` · ${r.badge}` : '';
+// an export's row carries its set's licence and restriction, as columns
+const R_COLS = ['licence', 'restriction'];
+const rCols = key => { const r = restrictOf(key); return r ? [r.licence, r.badge] : ['', '']; };
+// the Mobile suite's multiple-choice parts and the set each asks
+const MAB_PART_TASK = { mmlu: 'mobile_mmlu_pro', mmlu_full: 'mobile_mmlu_full' };
+// a GGUF benchmark's restriction as the GGUF list sends it (/api/gguf)
+const ggRestrict = (page, b) => ((page || {}).restrictions || {})[b] || null;
 // 14.4: the full Mobile-MMLU, on its own key (the pool's labels of its own
 // wording) — kept apart: its own table on Mobile tasks, a line on the model
 // page, a group of Compare. Never a column, never in any average, rank or
@@ -10092,11 +10198,11 @@ function mmfLine(m) {
   const x = m.mmf, rs = mmfResults(m.id);
   if (!x && !rs.length) return '';
   const lab = mmfLabelled(m.id);
-  const heads = rs.map(r => `${MMFD().name || 'Mobile-MMLU (full)'} ${mmfPc(r.acc)} on `
+  const heads = rs.map(r => ` ${mmfPc(r.acc)} on `
     + `${(r.n || 0).toLocaleString('en')} kept questions · ${r.src}`
     + (lab && !r.gguf ? ' · not ranked: it labelled the key' : ''));
-  if (x && x.acc == null) heads.push('Mobile-MMLU (full): answered; scored once its answer key '
-    + 'is built');
+  if (x && x.acc == null) heads.push(': answered; scored once its answer key is built');
+  const rx = restrictOf(MMF);
   const cats = Object.entries((x || {}).by_category || {});
   const fields = Object.entries((x || {}).by_field || {});
   const tab = (rows, attr) => el('table', { class: 'mmptab' },
@@ -10104,9 +10210,12 @@ function mmfLine(m) {
       el('td', { class: 'num', text: v.acc == null ? '—' : mmfPc(v.acc) }),
       el('td', { class: 'num se', text: `n ${v.n.toLocaleString('en')}` })))));
   return el('div', { class: 'small mmpline', 'data-mmf-line': m.id },
+    // 14.4.4: its badge beside its name, on every line a screenshot could take
     heads.map(h => el('p', { class: 'small', title: [MMP_HOW, mmfKeyLine(), mmfChecksLine(),
-      'kept apart: never in any average, rank or overall'].filter(Boolean).join('\n'),
-      text: h + (mmfProvisional() ? ' · provisional key' : '') })),
+      'kept apart: never in any average, rank or overall', rx ? rx.sentence : '']
+      .filter(Boolean).join('\n') }, MMFD().name || 'Mobile-MMLU (full)',
+      rBadge(rx, { 'data-mmf-restriction': m.id }),
+      h + (mmfProvisional() ? ' · provisional key' : ''))),
     cats.length ? el('details', { class: 'mmpcats', 'data-mmf-cats': m.id },
       el('summary', { class: 'small se', text: `its ${cats.length} categories ▸` }),
       tab(cats, 'data-mmf-cat')) : '',
@@ -10147,7 +10256,9 @@ function mmfCard() {
       return el('td', { class: 'num' + (v ? '' : ' se'), text: v && v.acc != null ? mmfPc(v.acc)
         : '—' }); })));
   return el('div', { class: 'card', 'data-mmf-card': '1' },
-    el('h2', { text: D.name }),
+    el('h2', {}, D.name, rBadge(restrictOf(MMF), { 'data-mmf-restriction': 'card' })),
+    // 14.4.4: what its questions and scores may be used for, above its numbers
+    rBanner(restrictOf(MMF)),
     el('p', { class: 'small', 'data-mmf-about': '1', text: `${(D.n || 0).toLocaleString('en')} `
       + 'four-option questions about everyday phone topics in 80 fields and the paper’s 9 '
       + 'categories, 0-shot, asked as Mobile-MMLU-Pro is and scored on our own key '
@@ -10177,7 +10288,8 @@ function mmfCmpGroup() {
     return v && v.acc != null ? { v: v.acc, se: v.se || null, tag: 'our key' + prov,
       tip: `on ${v.n.toLocaleString('en')} kept questions` } : null;
   };
-  return { key: 'mmf', name: D.name, credit: `${D.licence} · kept apart: never averaged`, rows: [
+  return { key: 'mmf', name: D.name, credit: `${D.licence} · kept apart: never averaged`,
+    restriction: restrictOf(MMF), rows: [
     { key: 'mmf', label: 'Accuracy · kept questions', get: m => run(m, null) },
     { key: 'mmf:gguf', label: 'Accuracy · llama.cpp on the GGUF', get: m => {
       const g = ggufOf(m.rowOf || m.id, MMF);
@@ -10782,7 +10894,12 @@ const LB_SHORT = { arc_challenge: 'ARC-C', arc_easy: 'ARC-E', truthfulqa_mc2: 'T
 // A column's setup, in words — its tooltip, and its accessible name. The
 // header shows only the name; this is where the n-shot, the unit and the
 // scale went (11f).
+// 14.4.4: a restricted set's tooltip says its badge beside the name, then its sentence
 function lbColTip(c) {
+  const rows = lbColTipOf(c), r = restrictOf(c.task || c.gguf);
+  return r && rows.length ? [rows[0] + rWords(r), r.sentence, ...rows.slice(1)] : rows;
+}
+function lbColTipOf(c) {
   const scale = state.avgMode === 'raw' ? 'raw accuracy' : 'above chance';
   if (c.rep) return [`${c.label} — ${c.unit}, measured on the phone and reported by whoever `
     + 'measured it', 'the board never measures a phone; never in any average'];
@@ -11127,7 +11244,8 @@ function frontierRef(t) {
   const s = LIVE ? (REP().scores || []).filter(x => x.unit !== 'points' && repSame(t, x.benchmark))
     .sort((a, b) => b.value - a.value)[0] : null;
   if (s) return { v: s.value, asof: s.date || repSrc(s.source).imported || '',
-    src: `${(anyModel(s.model) || { name: s.model }).name}, ${repTag(s)} · ${repSrc(s.source).credit}` };
+    src: `${(anyModel(s.model) || { name: s.model }).name}, ${repTag(s)} · ${repSrc(s.source).credit}`
+      + rWords(repRestrict(s.source)) };
   return (DATA.tasks[t] || {}).frontier || null;
 }
 // 12n.1: Benchmarks ▸ Standard's Frontier group: a panel for each of the
@@ -11147,6 +11265,7 @@ function frPanels(hl) {
     const any = [...mine.values()][0], other = cells.length - mine.size;
     return [barPanel('fr:' + c.key, rows.map(r => r.m).filter(m => mine.has(m.id)), { lower: false,
       hl, key: 'fr:' + c.key, label: c.name, info: { chance: null }, credit: repSrc(any.source).credit,
+      restriction: repRestrict(any.source),
       method: repTag(any) + (other ? ` · ${other} more reported another way, in the Frontier view`
         : ''),
       get: m => { const x = mine.get(m.id);
@@ -11156,7 +11275,7 @@ function frPanels(hl) {
   return el('div', { 'data-frontier-panels': String(panels.length) },
     el('h3', { class: 'domhead' }, 'Frontier · reported',
       el('span', { class: 'se', text: ` · ${panels.length} benchmark${panels.length > 1 ? 's' : ''} · `
-        + frCredit() })),
+        + frCredit() }), ...frBadges()),
     el('div', { class: 'panels' }, panels));
 }
 // the Compare groups, one a source: "Reported · Epoch AI", its credit in the head
@@ -11179,7 +11298,7 @@ function repCmpGroups(ms) {
     const bench = (all_[source] ? every : every.filter(keep))
       .sort((a, b) => count(b) - count(a) || natCmp(a, b));
     return { key: 'rep:' + source, name: `Reported · ${repSrc(source).name}`,
-      credit: repSrc(source).credit,
+      credit: repSrc(source).credit, restriction: repRestrict(source),
       more: every.length > bench.length || all_[source] ? { n: every.length, open: !!all_[source],
         toggle: () => { all_[source] = !all_[source]; render(); } } : null,
       rows: bench.map(b => ({ key: `rep:${source}:${b}`, label: b,
@@ -11226,14 +11345,17 @@ function outsideCard() {
     el('h2', { text: 'Outside data' }),
     el('p', { class: 'sub', text: 'Scores reported elsewhere, imported daily, each credited where '
       + 'it shows. Never measured here, so never a column the board measured, an average or a '
-      + 'rank. Artificial Analysis’s free data is for internal use: this board is on the '
-      + 'tailnet, and its numbers are never in the single-file report.' }),
+      + 'rank.' }),
+    // 14.4.4: Artificial Analysis's "Internal only", in the board's own words
+    rBanner(repRestrict('aa')) || el('p', { class: 'small', text: 'Artificial Analysis’s free '
+      + 'data is for internal use: this board is on the tailnet, and its numbers are never in '
+      + 'the single-file report.' }),
     el('ul', { class: 'small', 'data-rep-lines': state.rep.loaded ? '1' : 'loading' },
       ['epoch', 'aa'].map(s => el('li', { 'data-rep-line': s },
         !state.rep.loaded ? `${repSrc(s).name}: loading…`
           : (R.sources[s] || {}).line || `${repSrc(s).name}: not imported yet`,
         (R.sources[s] || {}).credit ? el('span', { class: 'se', text: ' · ' + R.sources[s].credit })
-          : ''))),
+          : '', rBadge(repRestrict(s), { 'data-rep-restriction': s })))),
     el('p', { class: 'small se', text: `The default import: each of ${((R.settings || {}).makers
       || []).join(', ') || 'OpenAI, Google, Anthropic'}’s ${(R.settings || {}).per_maker || 10} `
       + 'most recent models, and the open models already on the board (REPORTED_MAKERS, '
@@ -11416,6 +11538,12 @@ function frCredit() {
       : x.credit + (x.imported ? ` · imported ${evdDay(x.imported)}` : '');
   }).join(' · ');
 }
+// 14.4.4: the badge of each restricted source whose numbers are shown (Artificial Analysis's)
+function frBadges() {
+  const used = new Set((REP().scores || []).map(s => s.source));
+  return [...used].filter(s => repRestrict(s)).map(s => rBadge(repRestrict(s),
+    { 'data-frontier-restriction': s }));
+}
 const FR_CAL = 'Same questions, different prompt and settings. A large gap means our method '
   + 'differs, not the model.';
 function lbFrontier(ms) {
@@ -11476,7 +11604,9 @@ function lbFrontier(ms) {
     // a value its source took from another: a small mark, the source in the tooltip
     const mark = x.rep && repElse(x.rep) ? el('sup', { class: 'fr-mark', text: '†',
       title: x.rep.setting }) : '';
-    const repTip = x.rep ? [`${repShow(x.rep)} · ${repTag(x.rep)}`, ...(x.rep.url ? [x.rep.url] : []),
+    // 14.4.4: a restricted source's badge in its number's tooltip
+    const repTip = x.rep ? [`${repShow(x.rep)} · ${repTag(x.rep)}${rWords(repRestrict(x.rep.source))}`,
+      ...(x.rep.url ? [x.rep.url] : []),
       ...(x.rep.date ? ['as of ' + x.rep.date] : []),
       ...x.reps.slice(1).map(s => `also ${repShow(s)} · ${repTag(s)}`)] : [];
     // each part says its setting and value: what it is ranked with, and how
@@ -11555,7 +11685,7 @@ function lbFrontier(ms) {
           ...layoutBits('frontier', c.key, c.name));
       })));
   card.append(
-    el('p', { class: 'small', 'data-frontier-credit': '1', text: frCredit() }),
+    el('p', { class: 'small', 'data-frontier-credit': '1' }, frCredit(), ...frBadges()),
     el('p', { class: 'small se', 'data-frontier-cols': `${cols.length}|${every.length}` },
       F.all ? `All ${every.length} benchmarks reported. ` : `The ${ndef} benchmarks reported for at `
         + `least half of the ${(REP().models || []).length} imported models, and those measured `
@@ -12841,6 +12971,8 @@ function vCompare() {
         el('button', { class: 'quiet cmp-fold', 'aria-expanded': String(open),
           'data-cmp-fold': g.key, onclick: () => { state.cmpOpen[g.key] = !open; render(); } },
           (open ? '▾ ' : '▸ ') + g.name),
+        // 14.4.4: a restricted set's or source's badge, beside its name
+        rBadge(g.restriction, { 'data-cmp-restriction': g.key }),
         g.credit ? el('span', { class: 'small se', 'data-cmp-credit': g.key, text: ' · ' + g.credit })
           : '',
         !rows.length ? el('span', { class: 'small se', text: ' · none shared by two of these' })
@@ -12852,6 +12984,7 @@ function vCompare() {
       const d = two ? cmpDelta(row, r) : null;
       body.append(el('tr', { 'data-cmp-row': row.key },
         el('th', { scope: 'row', class: 'cmp-name pin' }, row.label,
+          rBadge(restrictOf(row.key), { 'data-cmp-row-restriction': row.key }),
           row.lower ? el('span', { class: 'small se', 'data-cmp-lower': row.key,
             text: ' · lower is better' }) : '',
           // 12o.2: the benchmark's questions, these models' answers on each
@@ -12872,8 +13005,9 @@ function vCompare() {
             best ? el('b', { text: txt }) : txt,
             own && !mixed ? '' : el('div', { class: 'small se cmp-tag', text: c.tag }),
             // 12n.2: the same model as others report it, beside ours, never ranked
-            c.cal ? el('div', { class: 'small se', 'data-cmp-cal': ms[i].id, title: FR_CAL,
-              text: `${REP_SHORT[c.cal.source] || c.cal.source} ${repShow(c.cal)}` }) : '');
+            c.cal ? el('div', { class: 'small se', 'data-cmp-cal': ms[i].id, title: FR_CAL },
+              `${REP_SHORT[c.cal.source] || c.cal.source} ${repShow(c.cal)}`,
+              rBadge(repRestrict(c.cal.source), { 'data-cmp-cal-restriction': c.cal.source })) : '');
         }),
         two ? el('td', { class: 'num small' + (d && d.clear ? '' : ' se'),
           'data-cmp-delta': row.key, text: d ? `${d.txt} · ${d.words}` : '' }) : ''));
@@ -12913,7 +13047,9 @@ function shapeAxes(src) {
   if (src === 'judged') return judgedCalibrated() ? areas.map(a => ({ key: a, label: a,
     get: m => { const r = areaJudged(m, a); return r.v == null ? null
       : { n: r.v / 4, rows: [`${num(r.v, 2)} / 4 · ${r.k} of ${r.n} topics`] }; } })) : [];
-  if (src === 'gguf') return (G().order || []).map(b => ({ key: 'gguf:' + b, label: ggufLabel(b),
+  // 14.4.4: a restricted set's axis says its badge in the chart's own words
+  if (src === 'gguf') return (G().order || []).map(b => ({ key: 'gguf:' + b,
+    label: ggufLabel(b) + rWords(restrictOf(b)),
     get: m => {
       const g = ggufOf(m.id, b);
       if (!g) return null;
@@ -13151,6 +13287,8 @@ function vLeaderboard(ms) {
           dir: state.sort.key === c.key ? -state.sort.dir : (c.key === 'name' ? 1 : c.lower ? 1 : -1) };
           render(); } },
         el('span', { class: 'hname', text: c.short || c.label }),
+        // 14.4.4: a restricted set's badge, beside its name (and its GGUF column's)
+        rBadge(restrictOf(c.task || c.gguf), { 'data-col-restriction': c.key }),
         // 14.3: until the paper's three models land within 3 points
         c.task === MMP && mmpProvisional() ? el('span', { class: 'hkey', 'data-mmp-provisional': '1',
           text: 'provisional key' }) : '',
@@ -13385,7 +13523,8 @@ function vLeaderboard(ms) {
         if (cc && c.task === MMP) return one(c, m, cc.v, cc.se ? (100 * cc.se).toFixed(1) : null,
           pctn, { 'data-mmp-cell': m.id, title: [`on ${(cc.n || 0).toLocaleString('en')} of `
             + `${((m.mmp || {}).of || 0).toLocaleString('en')} kept questions`,
-          mmpProvisional() ? 'provisional key' : ''].filter(Boolean).join(' · ') });
+          mmpProvisional() ? 'provisional key' : '',
+          (restrictOf(MMP) || {}).badge].filter(Boolean).join(' · ') });
         if (!cc) return el('td', { class: 'num se', text: '—',
           title: chatOnly(c.task) && m.kind === 'base'
             ? 'instruct only: asked through the chat template'
@@ -14267,7 +14406,7 @@ function lbBenchPill() {
               'data-bench-row': t },
             el('input', { type: 'checkbox', 'data-bench': t, checked: now.has(t) ? '' : null,
               disabled: ran ? null : '', onchange: e => set(t, e.target.checked) }),
-            ' ' + benchName(t),
+            ' ' + benchName(t), rBadge(restrictOf(t), { 'data-bench-restriction': t }),
             ran ? '' : el('span', { class: 'se', 'data-not-run': t, text: ' · not run yet' }))));
       }) : [el('p', { class: 'small se', text: 'No benchmark matches.' })]));
     };
@@ -14478,13 +14617,17 @@ function lbCsv() {
     if (c.area) return pctn(areaScaled(v));
     return pctn(v);
   };
+  // 14.4.4: a restricted set's column carries its licence and restriction, as columns
+  const rOf = c => restrictOf(c.task || c.gguf);
   const head = t.cols.flatMap(c => {
     const name = c.short || c.label;
-    return hasSe(c) ? [name, name + ' ±'] : [name];
+    return [...(hasSe(c) ? [name, name + ' ±'] : [name]),
+      ...(rOf(c) ? [name + ' licence', name + ' restriction'] : [])];
   });
   const lines = [head.map(q).join(',')];
   for (const m of t.rows)
-    lines.push(t.cols.flatMap(c => hasSe(c) ? [text(m, c), se(m, c)] : [text(m, c)]).map(q).join(','));
+    lines.push(t.cols.flatMap(c => [...(hasSe(c) ? [text(m, c), se(m, c)] : [text(m, c)]),
+      ...(rOf(c) ? [rOf(c).licence, rOf(c).badge] : [])]).map(q).join(','));
   return lines.join('\n') + '\n';
 }
 
@@ -15364,8 +15507,9 @@ function vRuns(ms) {
         ? '"' + String(v).replace(/"/g, '""') + '"' : String(v);
       download('benchmark_query.csv', 'text/csv',
         [['model', 'task', 'metric', 'value', 'stderr', 'n_shot', 'n_samples',
-          ...PROV_COLS].join(','),
-         ...current.map(r => [...r, ...provOf(r[0])].map(esc).join(','))].join('\n'));
+          ...PROV_COLS, ...R_COLS].join(','),
+         ...current.map(r => [...r, ...provOf(r[0]), ...rCols(r[1])].map(esc).join(','))]
+          .join('\n'));
     }})));
   frag.push(el('div', { class: 'card' },
     el('h2', { text: 'Export' }),
@@ -17069,10 +17213,13 @@ function vQueue(part = { form: true, list: true }) {
         rememberQueued(j.id);
         // the form goes back to where it started: an empty model box and the
         // ticks it opens with, so the next submission is not the last one's
+        // 14.4.4: a restricted set's run says so as it is queued
+        const rq = restrictOf(body.suite === 'mobile' ? MAB_PART_TASK[body.part] : null);
         sf.hf_id = ''; sf.note = ''; sf.allow = false;
         sf.tasks = null; sf.control = false; sf.bbqAll = false; sf.subsetFor = null; sf.part = '';
         state.testOpen = false;                       // 12b: the dialog's job is done
-        toast(j.note ? `#${j.id}: ${j.note} —` : `Run #${j.id} queued —`,
+        toast((j.note ? `#${j.id}: ${j.note}` : `Run #${j.id} queued`)
+              + (rq ? ` · ${rq.name}: ${rq.badge}. ${rq.sentence}` : '') + ' —',
               { key: 'submit', go: () => followRun(j.id), link: 'follow it →' });
       } else {
         // refused: every field stays as it was, with the server's words
@@ -17374,6 +17521,7 @@ async function ggMeasureDialog(id, returnTo) {
       disabled: have(b) ? null : '', onchange: e => {
         if (e.target.checked) S.benches.add(b); else S.benches.delete(b); sync(); } }),
     el('span', { text: ggufLabel(b) }),
+    rBadge(restrictOf(b) || ggRestrict(page, b), { 'data-gg-restriction': b }),
     counts[b] = el('span', { class: 'small se mono', 'data-gg-count': b }),
     have(b) ? times[b] = el('span', { class: 'small se', 'data-gg-time': b }) : '',
     have(b) && sets.some(x => done(x.id, b)) ? el('span', { class: 'small se', 'data-gg-done': b,
@@ -18000,7 +18148,9 @@ function vStandardBench(ms) {
 // a model with no run of it. The other half is a count and a line — and the
 // owner's audit, logged. GPQA is never listed
 // ===========================================================================
-const canBrowse = t => !!LIVE && !!t && !/^gpqa/i.test(t) && !(DATA.pplTasks || []).includes(t);
+// 14.4.4: never the full Mobile-MMLU's (non-commercial, kept apart)
+const canBrowse = t => !!LIVE && !!t && !/^gpqa/i.test(t) && t !== 'mobile_mmlu_full'
+  && !(DATA.pplTasks || []).includes(t);
 function openQuestions(task, from) {
   Object.assign(state.qx, { task, offset: 0, q: '', subject: '', f: '', data: null, key: '',
     audit: false });
@@ -18146,8 +18296,11 @@ function vQuestions(ms) {
   const head = el('div', { class: 'card', 'data-qx-head': task },
     el('p', { class: 'small' }, back),
     el('h2', {}, benchName(task) + ' · questions',
+      rBadge(restrictOf(task), { 'data-qx-restriction': task }),
       X.audit ? el('span', { class: 'badge danger', 'data-qx-audit': '1',
         text: task === 'everyday' ? 'hidden half · audit' : 'report half · audit' }) : ''),
+    // 14.4.4: a restricted set's page says what its questions may be used for
+    rBanner(restrictOf(task)),
     info.desc ? el('p', { class: 'sub', 'data-qx-what': '1', text: info.desc }) : '',
     el('p', { class: 'small se', 'data-qx-source': '1', text: [meta.source ? 'Source: '
       + meta.source : 'Source: as lm_eval loads it', meta.licence ? 'licence ' + meta.licence
@@ -20909,8 +21062,8 @@ function provOf(name) {
 function exportCsv() {
   const esc = v => v == null ? '' : /[",\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v);
   const lines = [['model', 'task', 'metric', 'value', 'stderr', 'n_shot', 'n_samples',
-                  ...PROV_COLS].join(',')];
-  for (const r of DATA.extra) lines.push([...r, ...provOf(r[0])].map(esc).join(','));
+                  ...PROV_COLS, ...R_COLS].join(',')];
+  for (const r of DATA.extra) lines.push([...r, ...provOf(r[0]), ...rCols(r[1])].map(esc).join(','));
   download('benchmark.csv', 'text/csv', lines.join('\n'));
 }
 function exportJson() { download('benchmark.json', 'application/json', JSON.stringify(DATA, null, 1)); }
@@ -21176,11 +21329,12 @@ function mmpKeyCard() {
   const totalOf = X => X.usd != null ? usd(X.usd) : `${usd(X.usd_known)} and the unpriced`;
   const S = E.sets || { pro: E };
   const est = el('div', {},
-    el('h4', { text: 'Mobile-MMLU-Pro alone' }), estOf(S.pro || E, ''),
+    el('h4', {}, 'Mobile-MMLU-Pro alone', rBadge(restrictOf(MMP), { 'data-mmp-ru': 'estimate' })),
+    estOf(S.pro || E, ''),
     el('p', { class: 'small', 'data-mmp-set-total': 'pro' }, 'About ',
       el('b', { text: totalOf(S.pro || E) })),
-    S.full ? [el('h4', {}, 'The full Mobile-MMLU ', el('span', { class: 'badge prelim',
-        'data-mmp-nc': 'estimate', text: 'Non-commercial' })),
+    // 14.4.4: the general badge, from the manifest
+    S.full ? [el('h4', {}, 'The full Mobile-MMLU', rBadge(restrictOf(MMF), { 'data-mmp-nc': 'estimate' })),
       S.full.missing ? el('p', { class: 'small se', 'data-mmp-full-missing': '1',
         text: `${S.full.missing}: from the published lengths until then.` }) : '',
       estOf(S.full, 'full-'),
@@ -21208,6 +21362,8 @@ function mmpKeyCard() {
       + 'now (an app version, a price, a date), drops the question. No labeller may be local, '
       + 'in-house, or a model scored on either set.' }),
     el('p', { class: 'small se', 'data-mmp-credit': '1', text: mmpCreditOf(K.credit) }),
+    // 14.4.4: what each set's questions, our key and its scores may be used for
+    rBanner(restrictOf(MMP)), rBanner(restrictOf(MMF)),
     labs,
     el('h3', { text: 'Before Start: a dry run' }),
     el('p', { class: 'small se', text: 'Nothing is sent until you press Start. Tokens in are the '
@@ -21238,8 +21394,8 @@ function mmpKeyCard() {
         : 'No key yet: nothing has been labelled.' }),
     // 14.4: the full set's view of the same key
     el('p', { class: 'small', 'data-mmp-full-counts': cf && cf.questions ? `${cf.kept}|${cf.questions}`
-        : '0|0' }, 'The full Mobile-MMLU ', el('span', { class: 'badge prelim', 'data-mmp-nc': 'key',
-        text: 'Non-commercial' }), ': ', cf && cf.questions ? `${n(cf.kept)} of ${n(cf.questions)} `
+        : '0|0' }, 'The full Mobile-MMLU', rBadge(restrictOf(MMF), { 'data-mmp-nc': 'key' }),
+        ': ', cf && cf.questions ? `${n(cf.kept)} of ${n(cf.questions)} `
         + 'kept · ' + order.filter(k => cf[k]).map(k => `${words[k] || k} ${n(cf[k])}`).join(' · ')
         : K.full_available ? 'its files aren’t on this server.' : 'nothing labelled yet.'),
     Object.keys(cats).length ? el('details', { class: 'mmpcats', 'data-mmp-key-cats': '1' },
@@ -21258,8 +21414,8 @@ function mmpKeyCard() {
     checksTable(ch, ''),
     // 14.4: the full set's own check: Table 2's Mobile-MMLU column, on its view of the key
     K.checks_full ? [el('h4', {}, (K.checks_full.provisional ? 'The full Mobile-MMLU: '
-        + 'provisional key ' : 'The full Mobile-MMLU: key checked '), el('span', {
-        class: 'badge prelim', 'data-mmp-nc': 'checks', text: 'Non-commercial' })),
+        + 'provisional key' : 'The full Mobile-MMLU: key checked'),
+        rBadge(restrictOf(MMF), { 'data-mmp-nc': 'checks' })),
       el('p', { class: 'small se', text: `${K.checks_full.setting || ''}` }),
       checksTable(K.checks_full, 'full-')] : '',
     Object.keys(K.portal || {}).length ? el('p', { class: 'small', 'data-mmp-portal-scores': '1',
@@ -23699,10 +23855,12 @@ def build_report(runs: list[dict], out_path: Path, title: str,
         out_path.write_text(f"<h1>No lm-eval results found.</h1><p>{html.escape(banner)}</p>",
                             encoding="utf-8")
         return out_path
-    payload = build_payload(merge_runs(runs), title, source="", calibration=calibration,
-                            taint=taint, parents=parents, judge_identity=judge_identity,
-                            fingerprints=fingerprints, everyday=everyday, served=served,
-                            gguf=gguf)
+    # 14.4.4: the single-file report leaves the server: a non-commercial set
+    # is never in it
+    payload = for_export(build_payload(merge_runs(runs), title, source="",
+                                       calibration=calibration, taint=taint, parents=parents,
+                                       judge_identity=judge_identity, fingerprints=fingerprints,
+                                       everyday=everyday, served=served, gguf=gguf))
     blob = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
     page = (TEMPLATE
             .replace("__TITLE__", html.escape(title))
@@ -23752,7 +23910,8 @@ def main() -> int:
             cal = None
     fps = None
     for cand in ([args.exam_tasks] if args.exam_tasks else
-                 [Path(os.environ["BENCH_ROOT"]) / "exam" / "tasks"] * bool(os.environ.get("BENCH_ROOT"))
+                 ([Path(os.environ["BENCH_ROOT"]) / "exam" / "tasks"]
+                  if os.environ.get("BENCH_ROOT") else [])
                  + [args.results.resolve().parent.parent / "exam" / "tasks"]):
         if (cand / "manifest.json").is_file():
             import exam_build
@@ -23774,15 +23933,18 @@ def main() -> int:
     if args.csv:
         # provenance rides along with every row: a value whose template policy,
         # dtype, seed and harness build are unknown cannot be reproduced
+        # 14.4.4: and each row says its set's licence and restriction, as columns
         lines = ["model,task,metric,value,stderr,n_shot,n_samples,template_applied,"
                  "template_id,template_policy,dtype,backend,batch_size,seed,limit,"
-                 "harness_git,transformers,eval_finished"]
+                 "harness_git,transformers,eval_finished,licence,restriction"]
+        rmeta = restriction_meta()
         for r in runs:
             ai = r.get("archinfo") or {}
             for task, entry in r["tasks"].items():
                 for name, d in entry.items():
                     if not isinstance(d, dict) or "value" not in d:
                         continue
+                    rx = rmeta.get(task) or {}
                     lines.append(",".join(str(x) for x in [
                         r["model"], task, name, d["value"], d.get("stderr", ""),
                         r["n_shot"].get(task, ""), r["n_samples"].get(task, ""),
@@ -23792,7 +23954,7 @@ def main() -> int:
                         r["batch_size"] or "", r["seed"] if r["seed"] is not None else "",
                         "full" if r["limit"] is None else r["limit"],
                         r["git_hash"] or "", r["transformers_version"] or "",
-                        r["date"] or ""]))
+                        r["date"] or "", rx.get("licence", ""), rx.get("badge", "")]))
         args.csv.parent.mkdir(parents=True, exist_ok=True)
         args.csv.write_text("\n".join(lines), encoding="utf-8")
         print(f"wrote {args.csv}  ({len(lines) - 1} rows)")

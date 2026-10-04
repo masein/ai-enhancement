@@ -95,7 +95,7 @@ def test_the_mobile_chip_has_it_provisional_and_a_labeller_unranked(live, page, 
     good = page.locator(f"tr[data-lb-row='{GOOD}'] [data-mmp-cell='{GOOD}']")
     assert good.inner_text().startswith("90.0")              # 9 of the 10 kept
     assert json.loads(good.get_attribute("data-tip"))[-1] == ("on 10 of 10 kept questions · "
-                                                              "provisional key")
+                                                              "provisional key · Internal use")
     lab = page.locator(f"tr[data-lb-row='{SKEWED}'] [data-mmp-labelled='{SKEWED}']")
     assert lab.inner_text() == "labelled the key"
     assert lab.get_attribute("title") == "100.0% on the key it labelled: never ranked"
@@ -107,12 +107,15 @@ def test_the_mobile_chip_has_it_provisional_and_a_labeller_unranked(live, page, 
 def test_its_tooltip_says_how_it_is_scored_on_whose_key_and_the_checks(live, page):
     go(page, live, "tab=models&chip=mobile", "th[data-col='mobile_mmlu_pro']")
     tip = json.loads(page.locator("th[data-col='mobile_mmlu_pro']").get_attribute("data-tip"))
+    # 14.4.4: its badge beside its name, then its sentence
     assert tip[0] == ("Mobile-MMLU-Pro (MBZUAI) — accuracy on our answer key’s kept questions · "
-                      "provisional key")
-    assert tip[1].startswith("asked as MMLU is, 0-shot: the letters’ log-likelihood")
-    assert "strong models of different makers agreed on" in tip[2]
-    assert tip[3].startswith("our key ") and "10 of 12 questions kept" in tip[3]
-    assert tip[4].startswith("Provisional key — Qwen2.5-3B-Instruct not run (paper 60.6)")
+                      "provisional key · Internal use")
+    assert tip[1] == ("CC BY-ND 4.0. Its scores may be used. The questions and our answer key "
+                      "must not be published.")
+    assert tip[2].startswith("asked as MMLU is, 0-shot: the letters’ log-likelihood")
+    assert "strong models of different makers agreed on" in tip[3]
+    assert tip[4].startswith("our key ") and "10 of 12 questions kept" in tip[4]
+    assert tip[5].startswith("Provisional key — Qwen2.5-3B-Instruct not run (paper 60.6)")
     assert any("CC BY-ND 4.0, used here and never published" in x for x in tip)
     assert tip[-1] == "never in any average · never a training target"
     assert page.errors == []
@@ -125,8 +128,8 @@ def test_the_model_page_has_the_score_its_categories_and_the_portals_file(live, 
         page.locator("[data-kind-block='standard'] > summary").first.click()
     line = page.locator(f"[data-mmp-line='{GOOD}']")
     line.wait_for()
-    assert line.locator("p").first.inner_text() == ("Mobile-MMLU-Pro 90.0% on 10 kept questions "
-                                                    "· provisional key")
+    assert line.locator("p").first.inner_text() == ("Mobile-MMLU-Pro Internal use 90.0% on 10 "
+                                                    "kept questions · provisional key")
     line.locator(f"[data-mmp-cats='{GOOD}'] > summary").click()
     cats = line.locator("[data-mmp-cat]")
     names = cats.evaluate_all("xs => xs.map(x => x.dataset.mmpCat)")
@@ -185,7 +188,8 @@ def test_test_a_model_offers_the_multiple_choice_part(live, page, width):
     page.wait_for_function("document.querySelector(\"[data-mab-part-est='mmlu']\")"
                            "?.textContent.includes('answers')")
     part = page.locator("[data-mab-part='mmlu']")
-    assert part.inner_text().strip().startswith("multiple choice — Mobile-MMLU-Pro · 12 answers")
+    assert part.inner_text().strip().startswith(
+        "multiple choice — Mobile-MMLU-Pro Internal use · 12 answers")
     assert part.locator("input").is_enabled()
     no_sideways(page)
     shot(page.locator("[data-dialog='test'] .dlg"), f"test-mmlu-part-{width}.png")

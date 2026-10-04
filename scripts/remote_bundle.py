@@ -36,6 +36,7 @@ import os
 import platform
 import re
 import subprocess
+import sys
 import tarfile
 from pathlib import Path
 
@@ -54,10 +55,22 @@ SECRETS = ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN", "OPENROUTER_API_KEY", "LLM_API_
 MAX_BYTES = 2 * 1024 ** 3                  # a bundle is answers and a log: far less
 
 
+def refused(suite: str) -> str:
+    """14.4.4: '' when a suite's answers may travel in a bundle; else why not —
+    a bundle leaves the server (a rented box, a download), and a
+    non-commercial set never does"""
+    sys.path.insert(0, str(HERE))
+    import restrictions
+    return restrictions.stays_here(SUITES[suite]["tasks"])
+
+
 def bundle_name(suite: str, model: str, thinking: bool,
                 shard: tuple[int, int] | None = None) -> str:
     """"devicemark-Qwen__Qwen3.5-4B-thinking-on.tar.gz", and 15.5's shards
     "devicemark-Qwen__Qwen3.5-4B-thinking-on-shard-1-of-2.tar.gz" """
+    why = refused(suite)
+    if why:
+        raise ValueError(why)
     return (f"{SUITES[suite]['prefix']}-{model.replace('/', '__')}-thinking-"
             f"{'on' if thinking else 'off'}"
             + (f"-shard-{shard[0]}-of-{shard[1]}" if shard else "") + ".tar.gz")
