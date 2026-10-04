@@ -265,8 +265,22 @@ PLACE_OF = {
     # 12g.1: By topic and Review are one pipeline, By model
     "Loop": ("improve", "model"), "Review": ("improve", "model"),
     "Training": ("improve", "training"),
-    "Exam": ("benchmarks", "exam"), "Tasks": ("benchmarks", "standard"),
+    # 16.4: Benchmarks is a catalogue — the exam's tools are its card's
+    # Manage questions ▸, and Tasks' ranked bars are Models ▸ Chart
+    "Exam": ("benchmarks", "manage:exam"), "Tasks": ("models", "chart"),
+    "Benchmarks": ("benchmarks", None),
 }
+
+
+def reach_sub(page, sub: str) -> None:
+    """a place's part: Improve's switch; 16.4: a Benchmarks card's Manage
+    questions ▸, or Models' Chart"""
+    if sub == "chart":
+        pick_view(page, "standard", None, "chart")
+    elif sub.startswith("manage:"):
+        page.locator(f"[data-cat-manage='{sub[7:]}']").click()
+    else:
+        page.locator(f"[data-subswitch] [data-sub='{sub}']").click()
 
 
 def go_tab(page, label: str) -> None:
@@ -282,7 +296,7 @@ def go_tab(page, label: str) -> None:
         else:
             page.locator(f"#tabs [role=tab][data-tab='{place}']").click()
         if sub:
-            page.locator(f"[data-subswitch] [data-sub='{sub}']").click()
+            reach_sub(page, sub)
         return
     if label == "Perplexity & Loss":
         go_tab(page, "Models")

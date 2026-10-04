@@ -136,7 +136,8 @@ def test_compare_puts_ours_and_epochs_on_one_line_never_ranked_together(live, pa
 
 
 def test_benchmarks_panels_with_epochs_ticks(live, page):
-    go(page, live, "tab=benchmarks&sub=standard", "[data-panel='gpqa_diamond_cot_zeroshot']")
+    # 16.4: Models ▸ Frontier ▸ Chart — ours, with Epoch's ticks
+    go(page, live, "tab=models&view=frontier&show=chart", "[data-panel='gpqa_diamond_cot_zeroshot']")
     cot = page.locator("[data-panel='gpqa_diamond_cot_zeroshot']")
     labels = cot.locator("g.reftick text").all_text_contents()
     assert labels and all(re.fullmatch(r".+ \d+\.\d · Epoch", x) for x in labels), labels
@@ -195,6 +196,8 @@ def test_no_gpqa_question_is_on_any_page(live, page):
     for h, sel in (("tab=models&chip=frontier", "[data-frontier-table]"),
                    (f"tab=models&view=compare&m={ids(GOOD, SKEWED)}", "[data-compare]"),
                    ("tab=benchmarks&sub=standard", "[data-panel]"),
+                   ("tab=models&view=frontier&show=chart", "[data-panel]"),
+                   ("tab=benchmarks", "[data-catalog]"),
                    ("model=" + quote(GOOD, safe=""), "[data-model-hero]")):
         go(page, live, h, sel)
         assert leaks(page.content()) == [], h

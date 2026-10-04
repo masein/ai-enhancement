@@ -174,7 +174,9 @@ def test_mt_benchs_questions_a_row_a_turn_and_its_panel_out_of_10(live, page, wi
     assert "MT-Bench" in src and "FastChat" in src and "Apache-2.0" in src
     no_sideways(page)
     shot(page.locator("[data-qx-q]").first, f"mtbench-question-{width}.png")
-    go(page, live, f"tab=benchmarks&sub=standard&models={ids(GOOD)}", "[data-panel='mab_mtbench']",
+    # 16.4: its panel is on Models ▸ Mobile ▸ MobileAIBench ▸ Chart
+    go(page, live, f"tab=models&view=mobile&group=mobileaibench&show=chart&models={ids(GOOD)}",
+       "[data-panel='mab_mtbench']",
        width)
     panel = page.locator("[data-panel='mab_mtbench']")
     assert "5.50" in panel.inner_text() and "%" not in panel.locator("svg").text_content()

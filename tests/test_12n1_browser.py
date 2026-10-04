@@ -197,14 +197,13 @@ def test_every_picker_group_has_all_none_and_a_three_state_box(live, page):
     page.wait_for_selector("#pop-columns [data-bench-group-box='commonsense']"
                            "[data-group-state='all']")
     page.keyboard.press("Escape")
-    # the choice is the address's, shared with Benchmarks
-    page.locator("#tabs [role=tab][data-tab='benchmarks']").click()
-    page.locator("[data-subswitch] [data-sub='standard']").click()
-    page.wait_for_selector("[data-bench-pick]")
+    # the choice is the address's, shared with the Chart (Benchmarks ▸ Standard's, before 16.4)
+    page.locator("[data-lb-show] [data-show='chart']").click()
+    page.wait_for_selector("[data-lb-chart]")
     assert page.evaluate("lbS().models") == chosen
     assert "models=" in page.evaluate("location.hash")
-    assert int(page.locator("[data-bench-pick]").get_attribute("data-bench-pick")) == len(
-        [m for m in chosen if not m.startswith("reported/")])
+    assert page.locator("[data-on='models']").inner_text().startswith(
+        f"Models: {len([m for m in chosen if not m.startswith('reported/')])} chosen")
     assert page.errors == []
 
 
@@ -403,11 +402,13 @@ def test_benchmarks_draws_reported_numbers_as_ticks_on_their_benchmark_only(live
     chip = page.locator("[data-frontier-chip='mmlu']")
     assert chip.inner_text() == "frontier 91.2%"
     assert "Frontier Test 5.5, reported by model card · 5-shot" in chip.get_attribute("title")
-    # a Frontier group: a panel a default benchmark, bars of one setting
+    # a Frontier group: a panel a default benchmark, bars of one setting — 16.4:
+    # on Models ▸ Frontier ▸ Chart
+    shot(page.locator("[data-panel='mmlu']"), "mmlu-reference-ticks.png")
+    go(page, live, "tab=models&view=frontier&show=chart", "[data-frontier-panels]")
     fr = page.locator("[data-frontier-panels]")
     assert fr.locator("[data-panel='fr:gpqa diamond']").count() == 1
     assert fr.locator("[data-panel='fr:gpqa diamond'] path.bar").count() >= 2
-    shot(page.locator("[data-panel='mmlu']"), "mmlu-reference-ticks.png")
     assert page.errors == []
 
 
@@ -571,7 +572,7 @@ def test_the_empty_table_offers_every_set_that_covers_them(live, page):
 
 
 def test_labels_keep_what_tells_them_apart(live, page):
-    go(page, live, "tab=benchmarks&sub=standard", "[data-bench-pick]")
+    go(page, live, "tab=benchmarks&sub=standard", "[data-lb-chart]")      # 16.4: Models ▸ Chart
     names = ["Qwen3.6-35B-A3B k4-LDA · lookahead 1", "Qwen3.6-35B-A3B original · lookahead 1",
              "Qwen3.6-35B-A3B k4-LDA", "Qwen3.6-35B-A3B original", "SmolLM2-360M"]
     got = page.evaluate(f"Object.fromEntries(shortNames({json.dumps(names)}, 22))")
@@ -642,11 +643,16 @@ def test_everyday_and_the_exam_follow_the_choice(live, page):
     assert sorted(cols) == sorted([GOOD, SKEWED])
     assert f"models={ids(GOOD, SKEWED)}" in page.evaluate("location.hash")
     assert page.locator("[data-bench-pick='2']").count() == 1
-    page.locator("[data-subswitch] [data-sub='exam']").click()
+    # 16.4: back to the catalogue, and the exam's tools from its card
+    page.locator("[data-cat-back]").click()
+    page.locator("[data-cat-manage='exam']").click()
     page.wait_for_function("location.hash.includes('sub=exam')")
     assert f"models={ids(GOOD, SKEWED)}" in page.evaluate("location.hash")
-    page.locator("[data-subswitch] [data-sub='standard']").click()
-    page.wait_for_selector("[data-bench-pick='2']")
+    # and Models ▸ Chart has the same two
+    page.locator("#tabs [role=tab][data-tab='models']").click()
+    page.locator("[data-lb-show] [data-show='chart']").click()
+    page.wait_for_selector("[data-on='models']")
+    assert page.locator("[data-on='models']").inner_text().startswith("Models: 2 chosen")
     assert page.errors == []
 
 

@@ -296,7 +296,8 @@ def test_it_is_reached_from_benchmarks_and_test_a_model_offers_it(live, page):
     page.set_viewport_size({"width": 1400, "height": 1000})
     page.goto(live["base"] + "/#tab=runs")
     page.locator("#tabs [data-tab='benchmarks']").click()
-    page.locator("[data-subswitch] [data-sub='everyday']").click()
+    # 16.4: Everyday's card in the catalogue, Manage questions ▸
+    page.locator("[data-cat-card='everyday'] [data-cat-manage]").click()
     page.wait_for_selector("[data-everyday-table]")
     assert page.evaluate("location.hash") == "#tab=benchmarks&sub=everyday"
     assert page.locator("#tabs [data-tab='benchmarks']").get_attribute("aria-selected") == "true"

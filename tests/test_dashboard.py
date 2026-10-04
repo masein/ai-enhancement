@@ -27,7 +27,9 @@ pytestmark = pytest.mark.dashboard
 # place lit in the header, and the address (the live page adds Improve)
 FROZEN_TABS = {"Overview": ("Home", "#tab=home"), "Models": ("Models", "#tab=models"),
                "Leaderboard": ("Models", "#tab=models"),
-               "Tasks": ("Benchmarks", "#tab=benchmarks&sub=standard"),
+               # 16.4: Tasks' ranked bars are Models ▸ Chart; Benchmarks a catalogue
+               "Tasks": ("Models", "#tab=models&show=chart"),
+               "Benchmarks": ("Benchmarks", "#tab=benchmarks"),
                "Perplexity & Loss": ("Models", "#tab=models&group=lm"),
                "Provenance": ("", "#tab=data")}
 SCREENS = Path(__file__).resolve().parent / "_screens"
@@ -100,7 +102,7 @@ def test_old_hashes_still_land_where_they_used_to(surface):
     for old_hash, place, want in (("evals", "", "#tab=data"), ("provenance", "", "#tab=data"),
                                   ("ppl", "Models", "#tab=models&group=lm"),
                                   ("leaderboard", "Models", "#tab=models"),
-                                  ("tasks", "Benchmarks", "#tab=benchmarks&sub=standard")):
+                                  ("tasks", "Models", "#tab=models&show=chart")):
         surface.open("#tab=" + old_hash)
         assert surface.selected_tab() == place, old_hash
         assert pg.evaluate("location.hash") == want, old_hash
@@ -169,14 +171,14 @@ def test_model_without_a_diagnosis_says_so(surface, tree):
 def test_deep_link_and_back_forward(surface):
     pg = surface.open("#tab=leaderboard")
     assert surface.selected_tab() == "Models"
-    surface.tab("Tasks")
-    assert pg.evaluate("location.hash") == "#tab=benchmarks&sub=standard"
+    surface.tab("Benchmarks")                          # 16.4: its catalogue
+    assert pg.evaluate("location.hash") == "#tab=benchmarks"
     pg.go_back()
     pg.wait_for_function("location.hash === '#tab=models'")
     assert surface.selected_tab() == "Models"
     assert pg.locator("#view > *").count() > 0
     pg.go_forward()
-    pg.wait_for_function("location.hash === '#tab=benchmarks&sub=standard'")
+    pg.wait_for_function("location.hash === '#tab=benchmarks'")
     assert surface.selected_tab() == "Benchmarks"
 
     # into a model page from wherever the board links one, and Back out again

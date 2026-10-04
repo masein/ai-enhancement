@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import choose_chip, set_name
+from conftest import choose_chip, pick_view, reach_sub, set_name
 
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase12b"
@@ -45,7 +45,9 @@ def home(page, base, width=1512):
 def place(page, pid, sub=None):
     page.locator(f"#tabs [role=tab][data-tab='{pid}']").click()
     if sub:
-        page.locator(f"[data-subswitch] [data-sub='{sub}']").click()
+        # 16.4: Benchmarks' exam and Everyday are its cards' Manage questions ▸
+        reach_sub(page, {"exam": "manage:exam", "everyday": "manage:everyday"}.get(sub, sub)
+                  if pid == "benchmarks" else sub)
 
 
 def name_menu(page, item):
@@ -105,8 +107,9 @@ CONTRACT = [
      "[data-needs-you] ~ [data-running-now] ~ [data-best-by-kind]"),
     ("Leaderboard", lambda p: place(p, "models"), "[data-lb-table]"),
     ("Leaderboard ▸ Insights", lambda p: place(p, "models"), "[data-lb-card] ~ [data-insights]"),
-    ("Leaderboard ▸ About these benchmarks", lambda p: place(p, "benchmarks", "standard"),
-     ".about"),
+    # 16.4: what each test is: Benchmarks' catalogue, a card a benchmark
+    ("Leaderboard ▸ About these benchmarks", lambda p: place(p, "benchmarks"),
+     "[data-cat-card='mmlu']"),
     ("Models tab (its facts)", reach_facts, "#pop-columns [data-columns-section='details']"),
     # 12g.1: the Loop and Review are one pipeline for one model
     ("Loop", lambda p: place(p, "improve", "model"), "[data-pipeline] ~ [data-pipeline-stages]"),
@@ -115,7 +118,9 @@ CONTRACT = [
      "#view h2:text-is('Training runs')"),
     ("More ▸ Exam", lambda p: place(p, "benchmarks", "exam"), "[data-panel='rubrics']"),
     ("Topic pages", reach_topic, "[data-topic-back]"),
-    ("More ▸ Tasks", lambda p: place(p, "benchmarks", "standard"), ".panels"),
+    # 16.4: the ranked bars are Models ▸ Chart
+    ("More ▸ Tasks", lambda p: (place(p, "models"), pick_view(p, "standard", None, "chart")),
+     "[data-chart-panels]"),
     ("More ▸ Perplexity & Loss", reach_lm, "#pill-group[data-value='lm']"),
     ("More ▸ Provenance ▸ Run provenance", reach_model_tab("history"),
      f"[data-model-prov='{MODEL}']"),
@@ -174,7 +179,10 @@ OLD = [
     ("#tab=queue", "#tab=runs", "[data-all-runs]"),
     ("#tab=submit", "#tab=runs", "[data-dialog='test'] [data-submit-form]"),
     ("#tab=exam", "#tab=benchmarks&sub=exam", "[data-panel='rubrics']"),
-    ("#tab=tasks", "#tab=benchmarks&sub=standard", ".panels"),
+    # 16.4: Benchmarks ▸ Standard's ranked bars are Models ▸ Chart; Benchmarks a catalogue
+    ("#tab=tasks", "#tab=models&show=chart", "[data-chart-panels]"),
+    ("#tab=benchmarks&sub=standard", "#tab=models&show=chart", "[data-chart-panels]"),
+    ("#tab=benchmarks", "#tab=benchmarks", "[data-catalog]"),
     ("#tab=perplexity", "#tab=models&group=lm", "#pill-group[data-value='lm']"),
     # 16.3: the chips' names, before Row 1 and Group ▾, and Kind's
     ("#tab=models&chip=mobile", "#tab=models&view=mobile&group=mobileaibench",
@@ -350,13 +358,15 @@ def test_the_name_menu_holds_theme_data_and_help(live, page):
 # §4 and §5: Benchmarks, Models
 # ---------------------------------------------------------------------------
 
-def test_the_switches_remember_the_last_choice(live, page):
+def test_benchmarks_opens_on_its_catalogue_and_models_on_its_last_view(live, page):
     home(page, live["base"])
     place(page, "benchmarks", "exam")
+    page.wait_for_selector("[data-panel='rubrics']")
+    # 16.4: the exam's tools lead back to the catalogue, which Benchmarks opens on
+    assert page.locator("[data-cat-back]").get_attribute("href") == "#tab=benchmarks"
     place(page, "home")
     place(page, "benchmarks")
-    page.wait_for_selector("[data-panel='rubrics']")
-    assert page.locator("[data-sub='exam'][aria-selected='true']").count() == 1
+    page.wait_for_selector("[data-catalog]")
     place(page, "models")
     page.locator("[data-models-view='everyday']").click()
     place(page, "home")
@@ -459,7 +469,7 @@ def test_the_everyday_view_shows_the_pilot_rows_with_one_badge(live, page):
 # ---------------------------------------------------------------------------
 
 PLACES = [("home", "#tab=home"), ("models", "#tab=models"), ("improve", "#tab=improve"),
-          ("benchmarks", "#tab=benchmarks&sub=standard"), ("runs", "#tab=runs"),
+          ("benchmarks", "#tab=benchmarks"), ("runs", "#tab=runs"),
           ("data", "#tab=data"), ("help", "#tab=help")]
 
 
