@@ -112,6 +112,10 @@ def test_a_slow_hub_never_holds_the_answer_past_two_seconds(svc, monkeypatch):
     monkeypatch.setattr(suggest, "HUB_TIMEOUT_S", 0.3)
     monkeypatch.setattr(suggest, "hub_search", lambda q: time.sleep(2) or [])
     suggest._hub_cache.clear()
+    # the board's own results built first (kept 5 s), so the time is the Hub's
+    # wait alone: a cold build took the CI runners past 1.5 s by itself
+    from service.app import results_payload
+    results_payload()
     t0 = time.time()
     got = client.get("/api/models/suggest", params={"q": "good"}).json()
     assert time.time() - t0 < 1.5

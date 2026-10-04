@@ -1810,6 +1810,18 @@ def mmp_score(preds: dict | None) -> dict | None:
         return None
 
 
+def exam_on() -> bool:
+    """16.5: the Knowledge exam is shown only while KNOWLEDGE_EXAM=1 (the
+    service's config, or the environment where there is none). Off, it is
+    nowhere in the page's data; its files and judged scores stay on disk"""
+    try:
+        from service import config
+        return bool(config.KNOWLEDGE_EXAM)
+    except ImportError:
+        return os.environ.get("KNOWLEDGE_EXAM", "0").strip().lower() not in ("0", "no", "off",
+                                                                           "false")
+
+
 def mmf_on() -> bool:
     """14.4.5: the full Mobile-MMLU is shown unless MOBILE_MMLU_FULL=0 switches it
     off — then it is nowhere in the page's data; its files stay on disk"""
@@ -2222,6 +2234,13 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
     here and handed to the model page as `judge.history`. None when the exam
     directory is not known (a frozen report built from a results tree
     alone): then nothing is filtered."""
+    # 16.5: KNOWLEDGE_EXAM=0 — no judged exam result reaches any view: every
+    # number, column, card and line built from them is simply absent. The
+    # judge.json files are untouched
+    exam = exam_on()
+    if not exam:
+        by_model = {mid: {**r, "judge": None, "judge_mtime": None} for mid, r in by_model.items()}
+        calibration = None
     # 12i.4: a registered served model is a row before its first result
     served = served or {}
     # 12n.1: and a served model and its GGUF file are one
@@ -2829,6 +2848,8 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
     dates = sorted(str(r["date"]) for r in by_model.values() if r["date"])
     return {
         "title": title,
+        # 16.5: whether the Knowledge exam is shown at all (KNOWLEDGE_EXAM)
+        "examOn": exam,
         "generated": _dt.datetime.now(_TZ).strftime("%Y-%m-%d %H:%M %Z").strip(),
         "source": source,
         "models": model_rows,
@@ -2864,8 +2885,9 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         "sig": sig,
         # the judged suite: which tasks anyone ran, the judge, and whether a
         # person has agreed with it enough for the numbers to count
-        "judged": {"tasks": judged_tasks, "exam": EXAM_TASKS, "topics": EXAM_TOPICS,
-                   "control": FR_CONTROL, "judge": judge_meta, "kappaMin": KAPPA_MIN,
+        "judged": {"tasks": judged_tasks, "exam": EXAM_TASKS if exam else [],
+                   "topics": EXAM_TOPICS if exam else {},
+                   "control": FR_CONTROL if exam else None, "judge": judge_meta, "kappaMin": KAPPA_MIN,
                    # the judge this server runs now; files from other judges are their own series
                    "current": judge_identity or None,
                    "calibration": cal},
@@ -7453,7 +7475,7 @@ function servedSetups(m) {
       }))),
     srcs.length ? el('p', { class: 'small se', 'data-served-setups-note': pin.file,
       text: `Median tokens and Ran out: over every answer a setup gave on `
-        + (one ? SUITE[one] : 'Everyday tasks, else the Knowledge exam')
+        + (one ? SUITE[one] : examOn() ? 'Everyday tasks, else the Knowledge exam' : 'Everyday tasks')
         + ', practice and hidden'
         + (ns.length === 1 ? ` (${ns[0].toLocaleString('en')} answers)` : '')
         + '. Ran out: the budget ended while it was still thinking, with no answer written.'
@@ -9165,14 +9187,15 @@ function storeCard() {
   const b = v && v.backup;
   return el('div', { class: 'card', 'data-store-card': S.loaded ? '1' : 'loading' },
     el('h2', { text: 'The questions only this server holds' }),
-    el('p', { class: 'sub', text: 'Everyday’s hidden set and the exam’s questions live on the data '
-      + 'volume, not in the repo, which is public; the repo keeps what they should be. They are '
-      + 'backed up once a day to another disk.' }),
-    !S.loaded ? skeleton(2) : !(v && v.hidden && v.exam && v.backup)
+    el('p', { class: 'sub', text: (examOn() ? 'Everyday’s hidden set and the exam’s questions live '
+      : 'Everyday’s hidden set lives ') + 'on the data volume, not in the repo, which is public; the '
+      + 'repo keeps what they should be. Backed up once a day to another disk.' }),
+    !S.loaded ? skeleton(2) : !(v && v.hidden && v.backup)
       ? el('p', { class: 'small', text: 'Not available.' })
       : el('ul', { class: 'small' },
         line('hidden', 'Everyday’s hidden set', v.hidden),
-        line('exam', 'The exam’s report half', v.exam),
+        // 16.5: the exam's report half, while the exam is switched on
+        v.exam ? line('exam', 'The exam’s report half', v.exam) : '',
         el('li', { 'data-store': 'backup', class: v.backup_error ? 'st-bad'
             : v.backup_stale ? 'st-warn' : '' },
           (b.at ? `Backups: ${b.kept} in ${b.dir}, the newest ${when(b.at)} UTC`
@@ -9387,6 +9410,8 @@ function viewOfHash(name, params) {
     L.models = chosen.length ? chosen : null;
     L.hl = hl.length ? hl : null;
   }
+  // 16.5: the exam's tools, while it is switched off: the catalogue
+  if (v === 'exam' && DATA && !examOn()) v = 'tasks';
   if (!v || !has(v)) return null;
   if (v === 'leaderboard') {
     lbFromHash(params || '');
@@ -10257,11 +10282,16 @@ const LB_GROUPS = {
 // 16.3: a chip's name in an address from before Row 1 and Group ▾, where it is now
 const LB_OLD_CHIPS = { mobile: ['mobile', 'mobileaibench'], devicemark: ['mobile', 'devicemark'],
   ondevice: ['mobile', 'devicemark'], frontier: ['frontier', 'all'] };
+// 16.5: the Knowledge exam, switched off on the server (KNOWLEDGE_EXAM=0): the
+// payload carries none of it, and every view, card, tile, option and line of
+// it asks this before it draws
+const examOn = () => !!(DATA && DATA.examOn);
 // the views a table is drawn in: Standard's (its chip says which tests: Mobile
 // and Frontier are chips of it), the exam's and Everyday's
 function modelsViews() {
   const out = ['standard'];
-  if (DATA.models.some(m => Object.keys((m.judge || {}).tasks || {}).some(t => t.startsWith('exam_'))))
+  if (examOn() && DATA.models.some(m => Object.keys((m.judge || {}).tasks || {})
+    .some(t => t.startsWith('exam_'))))
     out.push('exam');
   if (LIVE || Object.keys(evd().models || {}).length) out.push('everyday');
   return out;
@@ -13077,8 +13107,8 @@ function phoneMeasured(b, id) {
       el('tbody', {}, rows.map(([k, a, c]) => el('tr', { 'data-phone-row': k },
         el('td', { text: k }), el('td', { class: 'num', text: a }),
         el('td', { class: 'num se', text: c || '—' }))))))
-      : el('p', { class: 'small', text: 'Not tested here yet: Test it on Everyday tasks, the '
-        + 'Knowledge exam or IFEval, MMLU-Pro and MATH-500.' }),
+      : el('p', { class: 'small', text: 'Not tested here yet: Test it on Everyday tasks'
+        + (examOn() ? ', the Knowledge exam' : '') + ' or IFEval, MMLU-Pro and MATH-500.' }),
     el('p', { class: 'small se', text: 'The server’s own speed isn’t shown: it doesn’t '
       + 'represent the phone.' }));
 }
@@ -13339,13 +13369,14 @@ function cmpGroups(ms) {
     { key: 'everyday', name: 'Everyday tasks', rows: [
       { key: 'evd', label: 'All groups', get: m => cmpEvd(m.id, null) },
       ...evdGroups().map(([g, label]) => ({ key: 'evd:' + g, label, get: m => cmpEvd(m.id, g) }))] },
-    { key: 'exam', name: 'Knowledge exam', rows: [
+    // 16.5: only while the Knowledge exam is switched on
+    ...examOn() ? [{ key: 'exam', name: 'Knowledge exam', rows: [
       { key: 'javg', label: 'Judged average', fmt: 'j', get: m => m.judgedAvg == null ? null
         : { v: m.judgedAvg, se: null, tag: 'judged 0–4' + prov(m) } },
       ...Object.keys(DATA.meta.areas || {}).map(a => ({ key: 'jarea:' + a, label: a, fmt: 'j',
         get: m => { const r = areaJudged(m, a);
           return r.v == null ? null : { v: r.v, se: null, tip: `${r.k} of ${r.n} topics judged`,
-            tag: 'judged 0–4' + prov(m) }; } }))] },
+            tag: 'judged 0–4' + prov(m) }; } }))] }] : [],
     // 12k.2: its own group, judged 0–2; over-refusal lower is better, never "best"
     { key: 'trust', name: 'Trust & safety', rows: [
       safe('trust:dna', 'Do-Not-Answer', t => t.refuses),
@@ -13678,7 +13709,11 @@ function vLeaderboard(ms) {
   repLoad();
   // 12m.1: Compare is a view of Models, reached by choosing models, not a switch
   if (L.view === 'compare') return vCompare();
-  if (!modelsViews().includes(L.view)) Object.assign(L, lbChoice('standard', 'all'));
+  if (!modelsViews().includes(L.view)) {
+    Object.assign(L, lbChoice('standard', 'all'));
+    // 16.5: the address too (an exam view while the exam is switched off)
+    if (DATA && location.hash.includes('view=')) history.replaceState(history.state, '', '#' + hashFor());
+  }
   // 12f.2b: the phone reports, for the "On the phone · reported" columns
   const PH = state.phone;
   if (LIVE && phoneBuilds().length && !PH.loaded && !PH.loading && netReady()) loadPhone();
@@ -15177,7 +15212,8 @@ function benchChecklist() {
       el('button', { class: 'quiet', text: 'Clear', 'data-bench-clear': '1',
         onclick: () => lbSet({ cols: [] }) })),
     el('p', { class: 'small se', 'data-bench-foot': '1', text: 'The average is over the ticked '
-      + 'ones only. Everyday tasks and the Knowledge exam keep their own tables.' })];
+      + 'ones only. ' + (examOn() ? 'Everyday tasks and the Knowledge exam keep their own tables.'
+        : 'Everyday tasks keeps its own table.') })];
 }
 
 // 12h.2: one line above a table someone built — what is shown, Save view,
@@ -15418,11 +15454,14 @@ function lbHowTo(ms) {
 function insightsCard(ms) {
   return el('div', { class: 'card', 'data-insights': '1' },
     el('h2', { text: 'Insights' }),
-    el('p', { class: 'sub', text: 'What the table says at a glance: which models are the best '
-      + 'for their size, where one model is weakest, and how a handful of models compare shape '
-      + 'for shape. Every judged number here is a score on the hidden questions.' }),
+    // 16.5: the weakest-topic chart is the Knowledge exam's
+    el('p', { class: 'sub', text: examOn() ? 'What the table says at a glance: which models are '
+      + 'the best for their size, where one model is weakest, and how a handful of models compare '
+      + 'shape for shape. Every judged number here is a score on the hidden questions.'
+      : 'What the table says at a glance: which models are the best for their size, and how a '
+        + 'handful of models compare shape for shape.' }),
     el('div', { class: 'igrid', style: 'margin-top:var(--sp-4)' },
-      frontierChart(ms), weakestChart(), radarBlock(ms)));
+      frontierChart(ms), examOn() ? weakestChart() : '', radarBlock(ms)));
 }
 
 const logx = (v, lo, hi, a, b) => a + (Math.log10(v) - Math.log10(lo))
@@ -15647,7 +15686,7 @@ function radarBlock(ms) {
           onclick: () => cmpToggle(id, DATA.models) }));
     }), addPop);
   const src = el('div', { class: 'seg', role: 'group', 'aria-label': 'radar source' },
-    RADAR_SRC.map(([v, t]) => {
+    RADAR_SRC.filter(([v]) => v !== 'judged' || examOn()).map(([v, t]) => {   // 16.5
       const off = v === 'judged' && !calOk;
       return el('button', { 'aria-pressed': String(L.radarSrc === v), 'data-radar-src': v, text: t,
         disabled: off ? '' : null, title: off ? judgedOffWhy() : null,
@@ -17856,10 +17895,11 @@ function vQueue(part = { form: true, list: true }) {
         + 'first look. A full run later adds only the tasks still missing.' }],
       ['control', 'control — MMLU, options rotated', { sub: 'The position-bias experiment: '
         + 'MMLU with the options moved round. About a fifth of a full MMLU.' }],
-      ['judged', 'judged — the written exam' + (state.loop.blocked ? ' (unavailable)' : ''),
+      // 16.5: only while the Knowledge exam is switched on
+      ...examOn() ? [['judged', 'judged — the written exam' + (state.loop.blocked ? ' (unavailable)' : ''),
         { disabled: !!state.loop.blocked, title: state.loop.blocked || '',
           sub: 'The exam topics, answered in writing and graded by the judge: the model\'s '
-            + 'judged score per topic.' }],
+            + 'judged score per topic.' }]] : [],
       // 12a: the pilot. 12c replaces this drop-down with cards
       ['everyday', evdSuiteLabel(sf.hf_id.trim())],
       // 12h.1: instruct models only; MMLU-Pro alone is hours
@@ -19179,7 +19219,7 @@ function catCards() {
       line: 'Scores published by others — Epoch AI, model cards and papers — beside ours on the '
         + 'same tests, never ranked with them.', qwords: 'theirs',
       by: frCredit() || 'imported on AI models ▸ Outside data', avg: 'never in the Avg' }] : []];
-  const exam = LIVE && TABS.some(([id]) => id === 'exam') ? [{ key: 'exam', name: 'Knowledge exam',
+  const exam = LIVE && examOn() && TABS.some(([id]) => id === 'exam') ? [{ key: 'exam', name: 'Knowledge exam',
     see: modelsViews().includes('exam') ? ['exam'] : null,
     line: 'Open questions across the topics, written for this board and marked against a rubric.',
     marked: 'the judge, on a 0–4 rubric, once a person has agreed with it',
@@ -20209,11 +20249,21 @@ const judgedTopics = m => ((DATA.judged || {}).exam || []).filter(t => {
 });
 // what Improve can work on: every model with a judged topic, or a proposal or
 // dataset of its own — the most judged topics first
+// 16.5: what the exam switched off hides here, counted: kept, never deleted
+function examHiddenLine() {
+  const h = DATA.examHidden;
+  if (examOn() || !h || !(h.proposals || h.datasets)) return '';
+  const n = (k, w) => `${h[k]} ${w}${h[k] === 1 ? '' : 's'}`;
+  return el('p', { class: 'small se', 'data-exam-hidden': `${h.proposals}|${h.datasets}`,
+    text: `${n('proposals', 'proposal')} and ${n('datasets', 'dataset')} built from Knowledge `
+      + 'exam results are hidden while the exam is switched off — kept, not deleted.' });
+}
 function impModels() {
   const own = new Set([...(state.rv.proposals || []), ...(state.rv.datasets || [])]
     .map(x => x.model));
+  // 16.5: with the exam switched off, Improve works from Everyday's weak groups
   return DATA.models.filter(m => !m.duplicateOf && !m.served
-      && (judgedTopics(m).length || own.has(m.id)))
+      && (judgedTopics(m).length || own.has(m.id) || (!examOn() && evdOf(m.id))))
     .sort((a, b) => judgedTopics(b).length - judgedTopics(a).length || natCmp(a.name, b.name));
 }
 // the model shown: the address's, else the viewer's last, else the one with
@@ -20353,7 +20403,10 @@ function vPipeline() {
   const earlier = DATA.models.some(x => x.judgedEarlier);
   if (!m) return [el('div', { class: 'card', 'data-pipeline': 'none' },
     el('h2', { text: 'Improve' }),
-    earlier ? empty('Nothing to improve yet: the exam answers on file were judged by another '
+    examHiddenLine(),
+    !examOn() ? empty('Nothing to improve yet: no model has an Everyday tasks result.',
+      'Everyday tasks', () => navigate({ tab: 'everyday', model: null, topic: null }))
+    : earlier ? empty('Nothing to improve yet: the exam answers on file were judged by another '
       + 'judge, and a score compares only with its own judge’s.', 'Re-judge them',
       () => navigate({ tab: 'ai', model: null, topic: null }))
       : empty('Nothing to improve yet: no model has sat the Knowledge exam.', 'Sit the exam',
@@ -20371,14 +20424,16 @@ function vPipeline() {
   const head = el('div', { class: 'card imphead', 'data-pipeline': m.id },
     el('div', { class: 'rvbar' },
       el('h2', { class: 'imp-title' }, 'Improving: ', picker),
-      el('button', proposeGate({ class: 'primary', 'data-imp-propose': '1', text: 'Propose',
+      // 16.5: an exam topic's proposal, only while the exam is switched on
+      examOn() ? el('button', proposeGate({ class: 'primary', 'data-imp-propose': '1', text: 'Propose',
         onclick: () => npDialog({ model: m.id, topic: first ? frName(first.task) : '',
           returnTo: '[data-imp-propose]' }) }, first ? `opens on ${frName(first.task)}, the `
           + 'weakest topic a proposal can be made from'
-          : 'no weak spot a proposal can be made from yet'))),
-    el('p', { class: 'sub', text: 'What the Knowledge exam and Everyday tasks say this model is '
-      + 'missing, the data made for it, and what training changed. The Standard benchmarks are only watched here, '
-      + 'never trained toward.' }),
+          : 'no weak spot a proposal can be made from yet')) : ''),
+    examHiddenLine(),
+    el('p', { class: 'sub', text: 'What ' + (examOn() ? 'the Knowledge exam and Everyday tasks say'
+      : 'Everyday tasks says') + ' this model is missing, the data made for it, and what training '
+      + 'changed. The Standard benchmarks are only watched here, never trained toward.' }),
     !llm.configured && llm.reason ? el('p', { class: 'warn', text: llm.reason }) : '',
     // 12z D1: why Propose waits, in words, where the buttons are
     proposeDown() ? el('p', { class: 'warn', 'data-propose-down-why': '1' }, judgeChip(), ' ',
@@ -20610,6 +20665,7 @@ function judgeCount(j) {
 let _loopInFlight = false;
 let _loopSig = '';
 async function loadLoop() {
+  if (DATA && !examOn()) return;     // 16.5: the exam's, switched off: nothing asked
   if (_loopInFlight) return;      // a 5 s poll must not stack requests
   _loopInFlight = true;
   try {
@@ -21260,7 +21316,7 @@ async function sitGo(m, s) {
 
 function modelSitPanel(m) {
   const s = state.msit;
-  if (!LIVE || !s.open || s.model !== m.id) { state.msitRedraw = null; return null; }
+  if (!LIVE || !examOn() || !s.open || s.model !== m.id) { state.msitRedraw = null; return null; }
   if (!state.loop.loaded && netReady()) loadLoop();
   const card = el('div', { class: 'card', 'data-panel': 'msit' });
   const paint = () => {
@@ -21363,6 +21419,7 @@ function suiteCell(r, key) {
 // ---------------------------------------------------------------------------
 
 async function loadAnswers(model, topic) {
+  if (DATA && !examOn()) return;     // 16.5: the exam's, switched off: nothing asked
   const a = state.ans;
   a.loading = true; a.model = model; a.topic = topic;
   try {
@@ -21638,6 +21695,7 @@ function loopOutputPanel(r) {
 // score) and a diagnose half (what a proposal may read). Nothing an LLM wrote
 // reaches the bank unread, and no report-half question is ever shown again.
 async function loadExam() {
+  if (DATA && !examOn()) return;     // 16.5: the exam's, switched off: nothing asked
   try {
     const q = state.ex.topic ? '?topic=' + encodeURIComponent(state.ex.topic) : '';
     const [status, cands] = await Promise.all([
@@ -22094,6 +22152,7 @@ function exRubricUpload(st) {
 }
 
 async function loadRubrics() {
+  if (DATA && !examOn()) return;     // 16.5: the exam's, switched off: nothing asked
   const st = state.exrub;
   try {
     const j = await api('api/exam/rubrics');
@@ -22545,8 +22604,14 @@ function judgeTestCard() {
         text: done ? 'Look at your marks' : started ? 'Continue marking' : 'Start marking',
         onclick: () => { A.mark = true; A.at = done ? 0 : pr.next; navigate({ tab: 'ai' }); } })
         : ''),
+    // 16.5: the sample's Knowledge exam answers, kept with their marks while it is off
+    jt && jt.exam_hidden ? el('p', { class: 'small se', 'data-jt-exam-hidden': String(jt.exam_hidden),
+      text: `${jt.exam_hidden} of the sample’s answers are the Knowledge exam’s: kept with their `
+        + 'marks, and neither shown nor asked of a candidate judge while it is switched off.' }) : '',
     !jt ? skeleton(2) : !jt.answers.length ? el('p', { class: 'note', 'data-jt-empty': '1',
-      text: 'No judged answers are on file yet. Sit the Knowledge exam with a model first.' })
+      text: examOn() ? 'No judged answers are on file yet. Sit the Knowledge exam with a model first.'
+        : 'No judged answers are on file yet: the judge test draws from Everyday tasks\u2019 '
+          + 'judged answers. Run Everyday tasks on a model first.' })
       : el('p', { class: 'small', 'data-jt-progress': `${pr.marked}|${pr.total}` },
         `You’ve marked ${pr.marked} of ${pr.total}` + (pr.skipped ? ` · ${pr.skipped} skipped`
           : '') + '.'),
@@ -22711,6 +22776,8 @@ function qbForm() {
   }
   if (Q.kind && Q.kind !== Q.form.kind) { Q.form.kind = Q.kind; }
   Q.kind = null;
+  // 16.5: Everyday's questions alone while the Knowledge exam is switched off
+  if (!examOn() && Q.form.kind === 'knowledge') Q.form.kind = 'everyday';
   return Q.form;
 }
 function qbSave() {
@@ -23005,7 +23072,8 @@ function qbStepOne() {
   return el('div', { class: 'card', 'data-qb-what': F.kind },
     el('h2', { text: 'What' }),
     el('div', { class: 'subswitch', role: 'radiogroup', 'aria-label': 'kind of question' },
-      [['knowledge', 'Knowledge exam'], ['everyday', 'Everyday tasks']].map(([k, t]) =>
+      [['knowledge', 'Knowledge exam'], ['everyday', 'Everyday tasks']]
+        .filter(([k]) => (P.kinds || ['knowledge', 'everyday']).includes(k)).map(([k, t]) =>
         el('button', { class: 'chip-btn' + (F.kind === k ? ' on' : ''), role: 'radio',
           'aria-checked': String(F.kind === k), 'data-qb-kind': k, text: t,
           onclick: () => { F.kind = k; Q.est = null; qbSave(); render(); } }))),
@@ -24141,10 +24209,14 @@ function render() {
   // 12b: the Test a model dialog is part of the view, so a poll redraws it
   // with everything else and keeps what is being typed into it
   const dlg = testDialog();
+  // 16.5: a topic page is the exam's: not while it is switched off
+  if (state.topic && DATA && !examOn()) { state.topic = null; state.tab = 'tasks'; }
   if (state.model) view.replaceChildren(...vModel(), ...dlg);
   else if (state.topic) view.replaceChildren(...vTopic(), ...dlg);
   else {
     if (!TABS.some(([id]) => id === state.tab)) state.tab = 'overview';
+    // 16.5: the exam's tools, while it is switched off: the catalogue
+    if (state.tab === 'exam' && DATA && !examOn()) state.tab = 'tasks';
     const place = placeOf(state.tab);
     view.replaceChildren(
       ...(place === 'improve' ? [subSwitch(place)] : []),

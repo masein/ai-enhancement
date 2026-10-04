@@ -111,6 +111,9 @@ services:
       # 14.4.5: 0 hides the full Mobile-MMLU everywhere and refuses new runs of
       # it (its files, picks and labels stay on disk); on by default
       MOBILE_MMLU_FULL: ${MOBILE_MMLU_FULL:-1}
+      # 16.5: 1 brings the Knowledge exam back as it was; off by default — then
+      # it appears nowhere and nothing about it is run (its files stay on disk)
+      KNOWLEDGE_EXAM: ${KNOWLEDGE_EXAM:-0}
     volumes:
       - ${BENCH_ROOT}:${BENCH_ROOT}
       - ${HF_HOME}:${HF_HOME}

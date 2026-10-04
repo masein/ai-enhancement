@@ -347,6 +347,13 @@ tokenizer-independent one.
 
 ### The exam
 
+**Switched off by default (16.5):** while `KNOWLEDGE_EXAM=0`, every endpoint in
+this section and the loop's (`/api/exam…`, `/api/loop`, `/api/answers`,
+`/api/judge`, `/api/judge/justifications`, `/api/judge/provenance`,
+`/api/ai/rejudge`) answers 409 that it is switched off, a `judged` submission is
+refused (422), and `/api/results` carries no exam data (`examOn: false`).
+`KNOWLEDGE_EXAM=1` brings it all back.
+
 `GET /api/exam` — the exam writer's identity, the bank per topic (accepted,
 report half, diagnose half, awaiting curation, target), the tasks built, and
 the draft command. `GET /api/exam/candidates?topic=` — drafts awaiting a

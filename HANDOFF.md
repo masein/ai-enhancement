@@ -4953,6 +4953,51 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 16.5 — the Knowledge exam is switched off (4 Oct)
+
+- **`KNOWLEDGE_EXAM`, default 0** (`config.KNOWLEDGE_EXAM`, passed through
+  docker-compose; `.env.example` says it). 1 brings everything back as it was.
+  Nothing is deleted: banks, rubrics, candidates, answers, judge.json files,
+  proposals and datasets stay on disk and in the database.
+- **The payload carries none of it.** `build_payload` drops every run's
+  judged results before reading them (`exam_on()`), so no judged number,
+  column, card or check is built. `judged.exam` and `topics` are empty, and
+  `examOn` is false. No other number moves: a test compares Avg, its inputs
+  and every cell with the switch on and off.
+- **The server asks, runs and writes nothing of it:**
+  - its 20 routes answer 409 `config.EXAM_OFF` (`dependencies=EXAM_ONLY`):
+    `/api/exam…`, `/api/loop`, `/api/answers`, `/api/judge`, the judge's
+    justifications and provenance, `/api/ai/rejudge`;
+  - a judged submission is refused (422); one queued before the switch fails
+    at the start of its run: "Its exam tasks were skipped: nothing was run.";
+  - exam questions are not listed (`questions.tasks()`);
+  - the builder offers Everyday alone (`kinds`), and a knowledge draft is
+    kept but not served;
+  - exam proposals and datasets are hidden from every route, counted in
+    `/api/results` as `examHidden`, and can't be deleted while hidden;
+  - a new judge-test sample is Everyday's alone. The current sample's exam
+    answers are neither shown nor asked of a candidate
+    (`judge_test.in_use`); its result stands;
+  - AI models' job lines lose the exam (`ai_models.does`), and changing the
+    judge offers no re-judge;
+  - Playground has no exam practice question;
+  - Data & sources has no exam store line, and there is no exam-report alarm;
+  - Models' Tested leaves judged runs out (`db.last_done(judged=False)`).
+- **The page checks `examOn()`** for:
+  - Row 1, the exam's addresses (`view=exam`, `sub=exam` and `#topic=` land
+    elsewhere), Benchmarks' card;
+  - Test a model's judged suite, the model page's sit panel;
+  - Compare's group, Insights' weakest-topic chart and judged radar source;
+  - Improve: its Propose for an exam topic, the models it lists (those with
+    Everyday results too), its words, and a line counting what is hidden;
+  - the judge test's empty and hidden lines, the builder's kinds;
+  - the exam loaders, which fetch nothing.
+- **Not hidden:**
+  - All runs keeps judged runs that already ran, as the log of what ran;
+  - the poller still collects a judge batch sent before the switch (nothing
+    new is sent);
+  - the server still checks at start-up that the exam's files exist.
+
 ### 16.4 — Benchmarks is a catalogue (4 Oct)
 
 - **One page, "what is this test?"** (`vCatalog`, still the `tasks` view, at

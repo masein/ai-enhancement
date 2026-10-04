@@ -428,7 +428,11 @@ def fingerprints(repo: Path | None = None) -> dict:
 def alarms() -> list[dict]:
     """the red banner on every page: a set that is missing or changed"""
     out = []
-    for key, st in (("hidden", _ev().hidden_status()), ("exam-report", exam_status())):
+    # 16.5: the exam's report half only while the Knowledge exam is switched on
+    sets = [("hidden", _ev().hidden_status())]
+    if config.KNOWLEDGE_EXAM:
+        sets.append(("exam-report", exam_status()))
+    for key, st in sets:
         if not st["ok"]:
             text, cmd = st["why"].rsplit(" · ", 1)
             out.append({"key": key, "text": text, "command": cmd})
@@ -440,7 +444,7 @@ def overview() -> dict:
     st = _ev().hidden_status()
     b = last_backup()
     stale = not b["at"] or time.time() - b["at"] > DAY_S + 2 * 3600
-    return {"hidden": st, "exam": exam_status(), "backup": b,
+    return {"hidden": st, "exam": exam_status() if config.KNOWLEDGE_EXAM else None, "backup": b,
             "backup_error": _last_try.get("error", ""), "backup_stale": stale,
             "export_key": bool(config.BACKUP_AGE_RECIPIENT)}
 

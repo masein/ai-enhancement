@@ -103,6 +103,9 @@ def _everyday_practice() -> dict[str, dict]:
 
 
 def _exam_practice() -> dict[str, dict]:
+    # 16.5: no Knowledge exam question to try while it is switched off
+    if not config.KNOWLEDGE_EXAM:
+        return {}
     _scripts()
     import exam_build as eb
     if not config.EXAM_DIR.is_dir():
