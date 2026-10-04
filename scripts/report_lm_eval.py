@@ -1352,6 +1352,9 @@ def parse_run(blob: dict, source: Path) -> dict:
         "git_hash": blob.get("git_hash"),
         "date": _norm_date(blob.get("date")),
         "transformers_version": blob.get("transformers_version"),
+        # 16b.2: the Hub commit the harness loaded (HFLM's model info), for
+        # "Get it on Hugging Face" at that revision
+        "model_sha": cfg.get("model_sha"),
         "eval_seconds": _to_float(blob.get("total_evaluation_time_seconds")),
         "archinfo": _model_meta(source),
         "diag": _beside(source, "diagnose.json"),
@@ -2204,6 +2207,7 @@ def merge_runs(runs: list[dict]) -> dict[str, dict]:
         m["eval_seconds"] = (m["eval_seconds"] or 0) + (r["eval_seconds"] or 0)
         m["date"] = r["date"]
         m["chat_template"] = m["chat_template"] or r["chat_template"]
+        m["model_sha"] = r.get("model_sha") or m.get("model_sha")
         m["limit"] = m["limit"] or r["limit"]
         m["num_params"] = m["num_params"] or r["num_params"]
         m["archinfo"] = m.get("archinfo") or r.get("archinfo")
@@ -2489,6 +2493,8 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             "paramsBase": size.get("base"),
             # 16.8: a thinking row's size is its model's row's
             "paramsOf": size.get("of"),
+            # 16b.2: the Hub commit its newest run loaded
+            "hubSha": r.get("model_sha"),
             "backend": r["backend"], "dtype": r["dtype"],
             "batch": r["batch_size"], "chat": r["chat_template"],
             "seed": r["seed"], "limit": r["limit"],
@@ -4292,6 +4298,12 @@ td.evdtotal .evd-ranout { display:block; white-space:normal; text-align:right; }
 .upfill { height:100%; width:100%; background:var(--accent); transform:scaleX(0);
   transform-origin:left; transition:transform .2s; }
 .upstore { margin-top:12px; border-top:1px solid var(--border); padding-top:8px; }
+/* 16b.2: a model page's actions, and Download's command */
+.mact { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:6px 0 0; }
+[data-dl-panel] [data-dl-facts], [data-dl-panel] [data-dl-sha] { overflow-wrap:anywhere;
+  word-break:break-all; }
+.dlcmd { white-space:pre-wrap; overflow-wrap:anywhere; padding:8px; background:var(--surface-2, var(--bg));
+  border:1px solid var(--border); border-radius:var(--r-1); }
 .uplist { margin:4px 0; padding-left:18px; font-size:var(--fs-1); }
 .uptable { width:100%; font-size:var(--fs-1); }
 .uptable td { overflow-wrap:anywhere; }
@@ -7180,7 +7192,7 @@ function vModel() {
     : cur === 'improve' ? modelImproveTab(m)
     : cur === 'history' ? modelHistoryTab(m)
     : modelScoresTab(m, kinds);
-  return [back, modelHead(m, kinds), modelSitPanel(m), strip,
+  return [back, modelHead(m, kinds), modelDownloadPanel(m), modelSitPanel(m), strip,
     el('div', { id: 'mpanel', role: 'tabpanel', 'aria-labelledby': 'mtab-' + cur,
       'data-mtab-panel': cur }, body)].filter(Boolean);
 }
@@ -7540,6 +7552,107 @@ function servedSetups(m) {
         + '. Ran out: the budget ended while it was still thinking, with no answer written.'
         + (drafts ? '' : ' MTP’s drafts accepted: no server has reported them yet.') }) : '');
 }
+// ---------------------------------------------------------------------------
+// 16b.2: a model page's actions — Test this model · Chat · Download — and
+// Download's panel: its file, its size and sha256, a link made for this one
+// download, and a command that resumes and never holds the token
+// ---------------------------------------------------------------------------
+const dlState = () => (state.dl = state.dl || { info: {}, open: null, busy: false, msg: '' });
+async function dlLoad(id) {
+  const D = dlState();
+  try { D.info[id] = await api('api/models/file?id=' + encodeURIComponent(id)); }
+  catch (e) { D.info[id] = { kind: 'error', line: 'Its file couldn’t be looked up.' }; }
+  render();
+}
+function modelActions(m) {
+  if (!LIVE || m.reportedOnly) return '';
+  const id = m.rowOf || m.id, gg = ggufOnly(m), D = dlState();
+  return el('div', { class: 'mact', 'data-model-actions': id },
+    el('button', { class: 'secondary', 'data-act-test': id,
+      text: gg ? 'Measure this model' : 'Test this model',
+      onclick: () => gg ? ggMeasureDialog(id, '[data-act-test]') : openTest(id) }),
+    el('button', { class: 'secondary', 'data-act-chat': id, text: 'Chat',
+      onclick: () => { state.after = { scroll: '#mpanel' }; setModelTab('chat'); } }),
+    el('button', { class: 'secondary' + (D.open === id ? ' on' : ''), 'data-act-download': id,
+      'aria-expanded': String(D.open === id), text: 'Download',
+      onclick: () => { D.open = D.open === id ? null : id; D.msg = '';
+        if (D.open) dlLoad(id); render(); } }),
+    el('button', { class: 'quiet', 'data-compare-with': m.id, text: 'Compare with…',
+      onclick: () => openCompare([m.rowOf || m.id]) }));
+}
+// the command: the board's own address, the token from the environment
+function dlCmd(i, id) {
+  const url = new URL('api/download?model=' + encodeURIComponent(id), location.href).href;
+  return `curl -C - -fL -H "X-Token: $BOARD_TOKEN" -H "X-Who: ${whoName() || 'your name'}" `
+    + `-o '${i.name}' '${url}'`;
+}
+async function dlGo(id) {
+  const D = dlState();
+  if (!whoName()) { askName(); return; }
+  D.busy = true; D.msg = ''; render();
+  try {
+    const j = await post('api/models/file/link', { model: id, by: whoName() });
+    if (j.url) { location.href = j.url; D.msg = `Downloading ${j.name}: if it stops, Download `
+      + 'again goes on where it stopped.'; setTimeout(() => dlLoad(id), 1500); }
+    else { D.msg = j.detail || 'Its archive is being made.'; setTimeout(() => dlLoad(id), 3000); }
+  } catch (e) { D.msg = String((e && e.message) || e); }
+  D.busy = false; dlLoad(id);
+}
+async function dlAllow(id, on) {
+  const D = dlState();
+  if (!whoName()) { askName(); return; }
+  try { D.info[id] = { ...D.info[id], ...(await post('api/models/file/allow',
+    { model: id, allowed: on, by: whoName() })) }; D.msg = ''; }
+  catch (e) { D.msg = String((e && e.message) || e); }
+  render();
+}
+function modelDownloadPanel(m) {
+  const D = dlState(), id = m.rowOf || m.id;
+  if (!LIVE || D.open !== id) return '';
+  const i = D.info[id], body = [];
+  if (!i) body.push(el('p', { class: 'small se', text: 'Looking for its file…' }));
+  else if (i.kind === 'hub') {
+    const sha = m.hubSha;
+    body.push(el('p', {}, el('a', { href: `https://huggingface.co/${id}` + (sha ? `/tree/${sha}` : ''),
+        target: '_blank', rel: 'noopener', 'data-dl-hub': id, text: 'Get it on Hugging Face ↗' })),
+      el('p', { class: 'small se', 'data-dl-hub-line': id, text: (sha
+        ? `At the commit our runs loaded, ${sha.slice(0, 12)}.`
+        : 'The commit our runs loaded isn’t recorded: this is its newest.')
+        + ' The board doesn’t copy Hugging Face’s files.' }));
+  } else if (!['gguf', 'folder'].includes(i.kind)) {
+    body.push(el('p', { class: 'small', 'data-dl-none': id, text: i.line }));
+  } else {
+    body.push(el('p', { class: 'small', 'data-dl-facts': id }, el('b', { text: i.name }),
+      ` · ${GBW(i.bytes)}` + (i.files ? ` · ${i.files} files, as one archive` : ''),
+      el('br'), i.sha256 ? el('span', { class: 'mono small', 'data-dl-sha': id, text: 'sha256 ' + i.sha256 })
+        : el('span', { class: 'se small', text: i.kind === 'folder' ? 'its archive is made on its first download'
+          : 'sha256: the host worker records it when it first measures the file' })));
+    if (!i.allowed) body.push(el('p', { class: 'small', 'data-dl-off': id,
+      text: 'Downloads are switched off' + (i.decided_by ? ` by ${i.decided_by}` : '')
+        + (i.off_why ? `: ${i.off_why}` : '') + '.' }));
+    else body.push(el('div', { class: 'frm' },
+        el('button', { class: 'primary', 'data-dl-go': id, disabled: D.busy ? '' : null,
+          text: D.busy ? 'Getting its link…' : 'Download', onclick: () => dlGo(id) }),
+        i.archive && i.archive.state === 'building' ? el('span', { class: 'small se',
+          'data-dl-archive': id, text: `Its archive is being made: ${i.archive.words}` }) : ''),
+      el('p', { class: 'small se', text: 'Or in a terminal: it goes on where it stopped (curl -C -). '
+        + 'The board’s token comes from BOARD_TOKEN, never from the command.' }),
+      el('pre', { class: 'mono small dlcmd', 'data-dl-cmd': id, text: dlCmd(i, id) }));
+    // the person who added it, or the board's owner, switches it
+    const me = (whoName() || '').trim().toLowerCase();
+    if (me && (me === String(i.adder || '').toLowerCase() || evdOwner()))
+      body.push(el('label', { class: 'small' }, el('input', { type: 'checkbox', 'data-dl-allow': id,
+        checked: i.allowed ? '' : null, onchange: e => dlAllow(id, e.target.checked) }),
+        ' Others can download it'));
+    body.push(el('p', { class: 'small se', 'data-dl-count': String(i.downloads || 0),
+      text: i.downloads ? `Downloaded ${i.downloads} time${i.downloads === 1 ? '' : 's'}`
+        + ((i.log || []).length ? ': ' + i.log.filter(x => !x.start).slice(0, 3)
+          .map(x => `${x.who}, ${whenShort(x.at)}`).join(' · ') : '') : 'Not downloaded yet.' }));
+  }
+  return el('div', { class: 'card', 'data-dl-panel': id },
+    el('h3', { text: 'Download' }), ...body,
+    D.msg ? el('p', { class: 'small', 'data-dl-msg': id, text: D.msg }) : '');
+}
 function modelHead(m, kinds) {
   const facts = [m.source === 'artifact' ? 'uploaded here' : m.kind, famOf(m)].filter(Boolean)
     .join(' · ');
@@ -7553,9 +7666,11 @@ function modelHead(m, kinds) {
           m.params ? el('span', { 'data-model-size': m.id, title: sizeTip(m), text: sizeText(m) })
             : el('span', { class: 'se', 'data-model-size': m.id, text: 'size not recorded' }),
           facts ? ' · ' + facts : '', sizeEdit(m)),
-        // 12m.1: this model beside others, on Models ▸ Compare
-        el('p', { class: 'small' }, el('button', { class: 'quiet', 'data-compare-with': m.id,
-          text: 'Compare with…', onclick: () => openCompare([m.rowOf || m.id]) })),
+        // 16b.2: its actions — Test this model · Chat · Download — and 12m.1's
+        // Compare with… beside them; the static report keeps Compare alone
+        LIVE ? modelActions(m) : el('p', { class: 'small' }, el('button', { class: 'quiet',
+          'data-compare-with': m.id, text: 'Compare with…',
+          onclick: () => openCompare([m.rowOf || m.id]) })),
         trainedFromLine(m), servedHead(m), ggufHead(m))),
       // 12b.3: the page's one main action is the header's, which reads Test
       // this model here — two filled buttons side by side was one too many

@@ -308,6 +308,23 @@ CREATE TABLE IF NOT EXISTS gguf_models (
   data        TEXT NOT NULL,
   updated_at  REAL NOT NULL
 );
+-- 16b.2: whether a model's file may be downloaded — switched by the person
+-- who added it (or the board's owner); with no row, its upload's word, or
+-- the default — and each download, with who and when
+CREATE TABLE IF NOT EXISTS download_allowed (
+  model       TEXT PRIMARY KEY,
+  allowed     INTEGER NOT NULL,
+  set_by      TEXT NOT NULL,
+  set_at      REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS download_log (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  model       TEXT NOT NULL,
+  who         TEXT NOT NULL,
+  how         TEXT NOT NULL,                      -- 'link' | 'token'
+  start       INTEGER NOT NULL,                   -- the byte it began at: >0 is a resume
+  at          REAL NOT NULL
+);
 -- 16b.1: a model added from a browser — a GGUF file or a model folder — and
 -- its file: where it is, its size and sha256, who added it and when, and
 -- whether others may download it
@@ -1434,6 +1451,43 @@ def upload_del(model_id: str) -> None:
     with closing(_conn()) as c:
         c.execute("DELETE FROM uploads WHERE model=?", (model_id,))
         c.commit()
+
+
+def download_get(model: str) -> dict | None:
+    with closing(_conn()) as c:
+        row = c.execute("SELECT allowed, set_by, set_at FROM download_allowed WHERE model=?",
+                        (model,)).fetchone()
+    return {"allowed": bool(row[0]), "by": row[1], "at": row[2]} if row else None
+
+
+def download_set(model: str, allowed: bool, by: str) -> None:
+    with closing(_conn()) as c:
+        c.execute("INSERT INTO download_allowed (model, allowed, set_by, set_at) VALUES (?,?,?,?) "
+                  "ON CONFLICT(model) DO UPDATE SET allowed=excluded.allowed, "
+                  "set_by=excluded.set_by, set_at=excluded.set_at",
+                  (model, 1 if allowed else 0, by, time.time()))
+        c.commit()
+
+
+def download_log(model: str, who: str, how: str, start: int) -> None:
+    with closing(_conn()) as c:
+        c.execute("INSERT INTO download_log (model, who, how, start, at) VALUES (?,?,?,?,?)",
+                  (model, who, how, int(start or 0), time.time()))
+        c.commit()
+
+
+def download_count(model: str) -> int:
+    """downloads begun from the first byte: a resume is the same download"""
+    with closing(_conn()) as c:
+        return c.execute("SELECT COUNT(*) FROM download_log WHERE model=? AND start=0",
+                         (model,)).fetchone()[0]
+
+
+def download_rows(model: str, limit: int = 20) -> list[dict]:
+    with closing(_conn()) as c:
+        rows = c.execute("SELECT who, how, start, at FROM download_log WHERE model=? "
+                         "ORDER BY id DESC LIMIT ?", (model, limit)).fetchall()
+    return [{"who": w, "how": h, "start": s, "at": a} for w, h, s, a in rows]
 
 
 def served_all() -> list[dict]:

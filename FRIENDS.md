@@ -49,6 +49,13 @@ its size, and whether others may download it) and its tests: a GGUF is
 measured by llama.cpp on the host, a folder gets the usual tests. One file is
 at most 30 GB; what is kept is listed under it, with Delete.
 
+**Taking a model away** (16b): a model's page has **Download** beside Test
+this model and Chat. A file on the board (a GGUF, or an uploaded folder as one
+zip) shows its name, size and sha256, a **Download** button, and a `curl -C -`
+command that resumes and takes the board's token from `BOARD_TOKEN`. A
+Hugging Face model links to Hugging Face at the commit our runs used. Whoever
+added a model can switch its downloads off.
+
 **From a script:**
 
 First grab the client (one stdlib-only file, no pip installs) straight from
