@@ -23766,6 +23766,12 @@ async function loadPgStates() {
     if (JSON.stringify([P.states, P.gpu]) !== before && pgActive()) render();
   } catch (e) { /* the next tick asks again */ }
   P.statesBusy = false;
+  // 16.8: a server being checked answers in a moment: asked again in a
+  // second, not at the next 5 s tick, so Send isn't held longer than it must be
+  if (pgActive() && Object.values(P.states || {}).some(s => s.state === 'checking')) {
+    clearTimeout(P.checkAgain);
+    P.checkAgain = setTimeout(loadPgStates, 1000);
+  }
 }
 function pgGpuLine() {
   const g = state.pg.gpu;

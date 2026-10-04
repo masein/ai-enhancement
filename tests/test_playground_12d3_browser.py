@@ -87,9 +87,12 @@ def pg(page, base, width=1280, theme=None):
         page.evaluate(f"applyTheme('{theme}')")
 
 
-def send(page, text):
+def send(page, text, wait=True):
     box = page.locator("[data-pg-input]")
     box.fill(text)
+    # 16.8: a served model's Send waits for its server's first answer
+    if wait:
+        page.wait_for_selector("[data-pg-send]:not([disabled])")
     box.press("Enter")
 
 
@@ -151,7 +154,7 @@ def test_while_a_run_tests_it_the_chat_waits_and_sends_nothing(live, page, serve
         assert line.inner_text() == (f"k4-LDA MTP: not now. Being tested right now (run "
                                      f"#{sub['id']}, about 20 min left). Chat starts when it's done.")
         assert page.locator("[data-pg-send]").is_disabled()
-        send(page, "Are you there?")
+        send(page, "Are you there?", wait=False)          # held: Enter sends nothing
         assert page.locator("[data-pg-reply]").count() == 0
         assert len(lda.requests) == n
     finally:
