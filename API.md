@@ -14,7 +14,10 @@ Either way: evaluation runs on the shared GPU, one job at a time, and results
 land on the team leaderboard. The pattern is **upload → submit → keep training →
 collect scores later**.
 
-Base URL (on the tailnet): `http://100.74.89.105:8899`
+Base URL (on the tailnet): `http://<board>:8899`. `<board>` is the board's address on the
+tailnet: `tailscale ip -4` on the server, or ask whoever runs it. It is never written into
+this repo, which has a public mirror. The client takes it from `--base` or `BENCH_URL`,
+and a client downloaded from `/client` already knows the board it came from.
 
 Auth: none by default. If the operator sets `SUBMIT_TOKEN`, send it as an
 `X-Token` header on POSTs (the dashboard picks it up from `?token=…` in the URL).
@@ -22,7 +25,7 @@ Auth: none by default. If the operator sets `SUBMIT_TOKEN`, send it as an
 The zero-dependency Python client in [`clients/bench_client.py`](clients/bench_client.py)
 wraps all of this in one stdlib-only file — vendor it into your repo. The
 service also serves it directly (`curl -o bench_client.py
-http://100.74.89.105:8899/client`), so you never need repo access to use it.
+http://<board>:8899/client`), so you never need repo access to use it.
 
 ---
 
@@ -32,7 +35,7 @@ Your model is a directory on your disk (anything `save_pretrained()` wrote):
 
 ```python
 from bench_client import Bench
-bench = Bench("http://100.74.89.105:8899")
+bench = Bench("http://<board>:8899")
 
 mid = bench.upload_artifact("run7-step4000", "ckpt_dir/")    # -> "local/run7-step4000"
 sid = bench.submit(mid, suite="quick", submitter="you")      # returns immediately
@@ -44,7 +47,7 @@ print(bench.scores(mid))
 Or from a shell, one line — upload, benchmark, wait, print the scores:
 
 ```bash
-python bench_client.py --base http://100.74.89.105:8899 \
+python bench_client.py --base http://<board>:8899 \
     upload run7-step4000 ckpt_dir/ --submit --suite quick --submitter you --wait
 ```
 
@@ -81,7 +84,7 @@ python bench_client.py --base … delete run7-step4000
 ```bash
 cd ckpt && zip -r ../ckpt.zip . && cd ..
 curl -X POST --data-binary @ckpt.zip -H 'Content-Type: application/zip' \
-     http://100.74.89.105:8899/api/artifacts/run7-step4000
+     http://<board>:8899/api/artifacts/run7-step4000
 # -> {"model_id": "local/run7-step4000", ...}
 ```
 
@@ -599,7 +602,7 @@ on the same step axis as your loss, joined through checkpoints.
 
 ```python
 from bench_client import Bench
-bench = Bench("http://100.74.89.105:8899")
+bench = Bench("http://<board>:8899")
 
 with bench.init("run7", project="llm", submitter="you",
                 config={"lr": 3e-4, "batch": 32}) as run:
@@ -647,11 +650,11 @@ prints a task × step score table at the end.
 
 ```bash
 # 1) prove the service works — no training, no HF account, ~a minute:
-python examples/train_and_benchmark.py --bench http://100.74.89.105:8899 --dry-run
+python examples/train_and_benchmark.py --bench http://<board>:8899 --dry-run
 
 # 2) the full pipeline — checkpoints go to the service's artifact storage,
 #    so NO Hugging Face account is needed:
-python examples/train_and_benchmark.py --bench http://100.74.89.105:8899 \
+python examples/train_and_benchmark.py --bench http://<board>:8899 \
     --steps 200 --checkpoint-every 100
 # (add --push-to <hf-user>/bench-demo to publish checkpoints to the Hub instead)
 ```
@@ -668,7 +671,7 @@ process). The service dedupes and resumes, so this is cheap and crash-safe:
 ```python
 # during training — after each checkpoint is saved (uploaded artifact or Hub repo)
 from bench_client import Bench, BenchError
-bench = Bench("http://100.74.89.105:8899")
+bench = Bench("http://<board>:8899")
 
 def on_checkpoint(step: int, repo_id: str):     # repo_id: "local/<name>" or "org/model"
     try:
@@ -688,7 +691,7 @@ the "is it actually getting better on capabilities, not just on loss" plot. If
 you prefer fire-and-forget without any client code, it's one curl:
 
 ```bash
-curl -s -X POST http://100.74.89.105:8899/api/submissions \
+curl -s -X POST http://<board>:8899/api/submissions \
      -H 'Content-Type: application/json' \
      -d "{\"hf_id\":\"myorg/run7-step$STEP\",\"suite\":\"quick\",\"submitter\":\"$USER\",\"note\":\"step $STEP\"}"
 ```

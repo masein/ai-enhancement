@@ -22,6 +22,9 @@ from test_12q_devicemark_runs import ME, svc  # noqa: F401 — svc is board's fi
 from test_15_2_import import board, local, row_of  # noqa: F401 — board is the fixture
 
 QWEN = "Qwen/Qwen3.5-4B"
+# a made-up address in the tailnet's range, built here so that no tailnet address
+# is ever written into the repo (it has a public mirror: test_no_tailnet_address)
+ADDR = ".".join(["100", "64", "12", "34"])
 HOST = "teraformer-box"
 LEAKS = re.compile(r"(?i)/home/|\b100\.\d{1,3}\.\d{1,3}\.\d{1,3}\b|teraformer-box|"
                    r"\bhf_[A-Za-z0-9]{20,}|\bsk-or-v1-|\bsk-[A-Za-z0-9_\-]{16,}|"
@@ -37,12 +40,12 @@ def row(board, monkeypatch):  # noqa: F811
     # what a server's log and setup can hold: its paths, addresses, host and keys
     log = config.LOGS_DIR / f"service_{sub['id']}_{QWEN.replace('/', '__')}.log"
     log.write_text(log.read_text() + "\n[service] cache at /home/masein/benchmarks/results/full\n"
-                   "judge http://100.74.89.105:8899/v1 and http://gemma-vllm:8000/v1 on "
+                   f"judge http://{ADDR}:8899/v1 and http://gemma-vllm:8000/v1 on "
                    f"{HOST} ({HOST}.tail1234.ts.net)\nAuthorization: Bearer abcdef0123456789xyz\n"
                    "HF_TOKEN=hf_FIXTUREsecret0123456789abcdef api_key=sk-or-v1-0123456789abcdef01\n")
     f = row_of(QWEN) / dm.OUT_NAME
     data = json.loads(f.read_text())
-    data["setup"].update(server_flags="--model /home/masein/models/q.gguf --host 100.74.89.105")
+    data["setup"].update(server_flags=f"--model /home/masein/models/q.gguf --host {ADDR}")
     f.write_text(json.dumps(data))
     return sub
 

@@ -4375,14 +4375,24 @@ def guide():
             "<body><main>" + _md_to_html(text) + "</main></body></html>")
 
 
+# an address the client may be told it came from: a scheme, a host or an IP, a port
+_BASE_OK = re.compile(r"https?://(?:[A-Za-z0-9.\-]+|\[[0-9A-Fa-f:]+\])(?::\d{1,5})?\Z")
+
+
 @app.get("/client")
-def client_file():
+def client_file(request: Request):
     """The one-file training client, served from the service itself — friends on
     the tailnet grab it with `curl -O http://…:8899/client` and never need
-    access to the git repo (which may be private)."""
+    access to the git repo (which may be private). It knows where it came
+    from: the address it was fetched at becomes its default board, so no
+    address is ever written into the repo (the mirror is public)"""
     if not _CLIENT_PY.exists():
         raise HTTPException(404, "bench_client.py not found in this build")
+    text = _CLIENT_PY.read_text(encoding="utf-8")
+    base = str(request.base_url).rstrip("/")
+    if _BASE_OK.match(base):
+        text = text.replace('DEFAULT_BASE = ""', f'DEFAULT_BASE = "{base}"', 1)
     return PlainTextResponse(
-        _CLIENT_PY.read_text(encoding="utf-8"),
+        text,
         media_type="text/x-python",
         headers={"Content-Disposition": 'attachment; filename="bench_client.py"'})

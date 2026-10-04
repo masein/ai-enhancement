@@ -28,8 +28,8 @@ sits under Benchmarks ▸ Everyday tasks.
 
 ## A1. The board's own address shows an empty page — urgent
 
-**Seen.** `http://100.74.89.105:8899/` and
-`http://100.74.89.105:8899/?token=…`, with no `#`, render the page title and
+**Seen.** `http://<board>:8899/` and
+`http://<board>:8899/?token=…`, with no `#`, render the page title and
 the footer line and nothing else: no navigation, no content, no console
 error. It stays empty. `#tab=home` renders Home correctly.
 
@@ -176,7 +176,7 @@ Not checked by me: 400 px. My browser wouldn't resize the window. Keep your
 
 ## Part A — done when
 
-1. `http://100.74.89.105:8899/` with no `#` opens Home.
+1. `http://<board>:8899/` with no `#` opens Home.
 2. The pilot's 03 is the English TL;DR and its groups are the five above.
 3. Deploy step 4 ends with no failures, and the PR says where else
    `task_index` is read.

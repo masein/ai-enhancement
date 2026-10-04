@@ -2214,7 +2214,7 @@ the live check found on 2026-09-24 at 17:30.
 cd ~/benchmarks/aienh && git pull origin main && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
 sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "no errors"
 git archive HEAD | sudo docker compose exec -T bench sh -c 'rm -rf /tmp/check && mkdir /tmp/check && cd /tmp/check && tar -x && exec env -i PATH="$PATH" HOME=/tmp/check LANG=C.UTF-8 python -m pytest -q -p no:cacheprovider -m "not gpu and not network and not dashboard"' 2>&1 | tail -15
-curl -s -o /dev/null -w "%{size_download} bytes\n" -H "Accept-Encoding: gzip" http://100.74.89.105:8899/api/results
+curl -s -o /dev/null -w "%{size_download} bytes\n" -H "Accept-Encoding: gzip" http://<board>:8899/api/results
 ```
 
 **Expected output:**
@@ -2224,7 +2224,7 @@ curl -s -o /dev/null -w "%{size_download} bytes\n" -H "Accept-Encoding: gzip" ht
 3. Step 3 ends `N passed, M deselected in …s`, with no `failed`. The
    harness test runs there, since the image has lm_eval.
 4. The last line prints a few hundred thousand bytes, not 1.4 million.
-5. `http://100.74.89.105:8899/` opens Home. The dot is green unless there is
+5. `http://<board>:8899/` opens Home. The dot is green unless there is
    a problem, and its list ends with **Known limits (n) ▸**.
 
 ### 12a.2 — Everyday tasks round 2: one bank of 111

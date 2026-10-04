@@ -12,14 +12,18 @@ Full mode:
   4. after training, waits for the evaluations and prints a task × checkpoint
      table: capability-vs-steps, next to the loss you watched during training
 
+<board> is the board's address on the tailnet (`tailscale ip -4` on the server,
+or ask whoever runs it); set BENCH_URL=http://<board>:8899 and --bench can be left
+out. It is never written into this repo, which has a public mirror.
+
 Connectivity check first (no training, no HF account, ~a minute of queue time):
 
-    python examples/train_and_benchmark.py --bench http://100.74.89.105:8899 --dry-run
+    python examples/train_and_benchmark.py --bench http://<board>:8899 --dry-run
 
 The real thing (needs `hf auth login` with a WRITE token):
 
     python examples/train_and_benchmark.py \
-        --bench http://100.74.89.105:8899 \
+        --bench http://<board>:8899 \
         --push-to <your-hf-username>/bench-demo \
         --steps 200 --checkpoint-every 100 --suite quick
 
@@ -32,7 +36,7 @@ Dependencies:  pip install torch transformers datasets huggingface_hub
 
 Training on a generated dataset (the find-the-gap pipeline, DIAGNOSE.md):
 
-    python examples/train_and_benchmark.py --bench http://100.74.89.105:8899 \
+    python examples/train_and_benchmark.py --bench http://<board>:8899 \
         --gap-dataset 3 --gap-ratio 0.25 --steps 200
 
   pulls dataset #3 from the service, mixes its items into the text stream at
@@ -53,6 +57,7 @@ from __future__ import annotations
 import argparse
 import getpass
 import math
+import os
 import sys
 import time
 from pathlib import Path
@@ -331,7 +336,9 @@ def collect(bench, submitted):
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0],
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    ap.add_argument("--bench", help="benchmark service base URL")
+    ap.add_argument("--bench", default=os.environ.get("BENCH_URL"),
+                    help="benchmark service base URL, http://<board>:8899 (default: "
+                         "BENCH_URL) — the board's tailnet address")
     ap.add_argument("--token", default="", help="X-Token if the server requires one")
     ap.add_argument("--dry-run", action="store_true",
                     help="skip training; submit a known public model to prove the service works")
