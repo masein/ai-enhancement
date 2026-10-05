@@ -4953,6 +4953,29 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 16b's review, the medium and low points (5 Oct)
+
+- **The upload quota** counts the other uploads under way, their unwritten
+  bytes too (`uploads.coming`): several started together can't pass
+  `ARTIFACT_QUOTA_GB`. The free-disk floor held already, piece by piece.
+- **A check a restart cut short** (every deploy restarts the container) starts
+  again: `uploads.resume_checks()` at start-up (lifespan) and on each sweep;
+  the checks running in this process are tracked (`_running`). Before, it was
+  "checking" for ever, its part kept and its quota held.
+- **An untrusted GGUF header** (`scripts/gguf_header.py`) keeps only the
+  fields the board reads — architecture, name, size label, file type, expert
+  counts, context length, and whether a chat template is there — a string to
+  256 characters, never an array; everything else is skipped by seeking,
+  never read into memory. Arrays nest at most three deep. `read()` gives None
+  on RecursionError, TypeError, ValueError and OverflowError too.
+- **/v1:** a request's turn at its model is one `api_v1.Turn`; `end()` stops
+  its reply if it is still going and frees the model, once, from whichever
+  gets there first. Streamed: an async generator that asks whether the client
+  left between events, and the response's background ends the turn too.
+  Whole: the route watches for the client leaving while the reply is made. A
+  reply that fails is said in the board's words ("…'s server failed on this
+  request"); the served model's own text goes to the service's log.
+
 ### 16b.2's review — an id or a name never becomes a path outside the model folders (5 Oct)
 
 - **What was wrong (HIGH):** Download built the folder from the id with no

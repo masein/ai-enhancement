@@ -48,15 +48,33 @@ class NotGguf(ValueError):
     pass
 
 
+# 16b review: an untrusted file's header keeps only what the board reads. A
+# string is kept to MAX_KEEP characters, an array never; everything else is
+# skipped by seeking, never read into memory
+MAX_KEEP = 256
+MAX_DEPTH = 3                    # arrays of arrays: no model's goes deeper
+_KEEP = {"general.architecture", "general.name", "general.size_label", "general.file_type"}
+_KEEP_SUFFIX = (".expert_count", ".expert_used_count", ".context_length")
+_PRESENT = "tokenizer.chat_template"     # whether it is there, never what it says
+
+
 class _Reader:
     def __init__(self, fh):
         self.fh = fh
+        fh.seek(0, 2)
+        self.size = fh.tell()
+        fh.seek(0)
 
     def take(self, n: int) -> bytes:
         b = self.fh.read(n)
         if len(b) != n:
             raise NotGguf("the header is cut short")
         return b
+
+    def skip(self, n: int) -> None:
+        if n < 0 or self.fh.tell() + n > self.size:
+            raise NotGguf("the header is cut short")
+        self.fh.seek(n, 1)
 
     def unpack(self, fmt: str):
         return struct.unpack(fmt, self.take(struct.calcsize(fmt)))[0]
@@ -67,35 +85,46 @@ class _Reader:
             raise NotGguf(f"a count of {n} is more than any model has")
         return n
 
-    def string(self) -> str:
+    def string(self, keep: bool = True) -> str | None:
         n = self.unpack("<Q")
         if n > MAX_STR:
             raise NotGguf("a string longer than any header holds")
-        return self.take(n).decode("utf-8", "replace")
+        if not keep:
+            self.skip(n)
+            return None
+        k = min(n, MAX_KEEP)
+        s = self.take(k).decode("utf-8", "replace")
+        self.skip(n - k)
+        return s
 
-    def value(self, t: int, keep: bool = True):
+    def value(self, t: int, keep: bool = True, depth: int = 0):
         if t in _SCALAR:
             return self.unpack(_SCALAR[t])
         if t == _STRING:
-            return self.string()
+            return self.string(keep)
         if t == _ARRAY:
+            if depth >= MAX_DEPTH:
+                raise NotGguf("arrays nested deeper than any model's")
             et, n = self.unpack("<I"), self.count()
-            if et in _SCALAR and not keep:
-                self.take(n * struct.calcsize(_SCALAR[et]))      # a vocabulary's scores: skipped
-                return None
-            items = [self.value(et, keep) for _ in range(n)]
-            return items if keep else None
+            if et in _SCALAR:
+                self.skip(n * struct.calcsize(_SCALAR[et]))     # a vocabulary's scores
+            else:
+                for _ in range(n):
+                    self.value(et, False, depth + 1)
+            return None                                         # an array is never kept
         raise NotGguf(f"an unknown value type {t}")
 
 
 def read(path: str | Path) -> dict | None:
     """{arch, name, size_label, params, active_params, expert_count,
     expert_used_count, file_type, context_length, chat_template} from the
-    file's header, or None when it isn't a GGUF one can read"""
+    file's header, or None when it isn't a GGUF one can read — a malformed
+    one included, whatever it trips"""
     try:
         with open(path, "rb") as fh:
             return _read(_Reader(fh))
-    except (OSError, NotGguf, struct.error, UnicodeDecodeError, MemoryError):
+    except (OSError, NotGguf, struct.error, UnicodeDecodeError, MemoryError, RecursionError,
+            TypeError, ValueError, OverflowError):
         return None
 
 
@@ -109,9 +138,14 @@ def _read(r: _Reader) -> dict:
     meta: dict = {}
     for _ in range(n_kv):
         key, t = r.string(), r.unpack("<I")
-        # the tokenizer's lists are long and not needed: read past them
-        keep = not key.startswith("tokenizer.ggml.")
-        meta[key] = r.value(t, keep)
+        if key == _PRESENT:
+            r.value(t, keep=False)
+            meta[key] = t == _STRING
+            continue
+        want = key in _KEEP or key.endswith(_KEEP_SUFFIX)
+        v = r.value(t, keep=want)
+        if want:
+            meta[key] = v
     total = experts = 0
     for _ in range(n_tensors):
         name = r.string()
@@ -133,13 +167,15 @@ def _read(r: _Reader) -> dict:
     if experts and isinstance(n_exp, int) and isinstance(used, int) and 0 < used <= n_exp:
         active = (total - experts) + experts * used // n_exp
     ft = meta.get("general.file_type")
+    ctx = meta.get(f"{arch}.context_length")
     return {"arch": arch or None, "name": meta.get("general.name"),
             "size_label": meta.get("general.size_label"),
             "params": total or None, "active_params": active,
-            "expert_count": n_exp, "expert_used_count": used,
-            "file_type": FILE_TYPES.get(ft, ft) if ft is not None else None,
-            "context_length": meta.get(f"{arch}.context_length"),
-            "chat_template": isinstance(meta.get("tokenizer.chat_template"), str),
+            "expert_count": n_exp if isinstance(n_exp, int) else None,
+            "expert_used_count": used if isinstance(used, int) else None,
+            "file_type": FILE_TYPES.get(ft, ft) if isinstance(ft, int) else None,
+            "context_length": ctx if isinstance(ctx, int) else None,
+            "chat_template": meta.get(_PRESENT) is True,
             "version": version}
 
 

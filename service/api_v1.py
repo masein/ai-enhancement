@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import secrets
 import threading
 import time
@@ -33,6 +34,7 @@ import time
 from . import chat, config, db
 
 KEY_PREFIX = "ebk_"
+log = logging.getLogger("api_v1")
 _model_locks: dict[str, threading.Lock] = {}
 _locks_lock = threading.Lock()
 
@@ -172,7 +174,28 @@ def _model_lock(model_id: str) -> threading.Lock:
         return _model_locks.setdefault(model_id, threading.Lock())
 
 
-def begin(body: dict, key: dict) -> tuple[chat.Stream, dict, threading.Lock]:
+class Turn:
+    """a request's turn at its model: end() stops its reply if it is still
+    going and frees the model — once, from whichever of the stream, the
+    response or a client leaving gets there first (16b review: a streamed
+    request's lock was freed only in its generator's finally, which a client
+    that left early might never reach)"""
+    def __init__(self, st: chat.Stream, lock: threading.Lock):
+        self.st, self.lock = st, lock
+        self._done = False
+        self._m = threading.Lock()
+
+    def end(self) -> None:
+        with self._m:
+            if self._done:
+                return
+            self._done = True
+        if not self.st.done:
+            self.st.stop.set()
+        self.lock.release()
+
+
+def begin(body: dict, key: dict) -> tuple[chat.Stream, dict, "Turn"]:
     """a reply under way — or ApiError: not offered, too long, busy (429), or
     a run holds the GPU (503)"""
     model_id = str(body.get("model") or "").strip()
@@ -212,24 +235,30 @@ def begin(body: dict, key: dict) -> tuple[chat.Stream, dict, threading.Lock]:
     except Exception:
         lock.release()
         raise
-    return st, {"row": row, "settings": settings, "messages": messages, "done": done}, lock
+    return st, {"row": row, "settings": settings, "messages": messages, "done": done}, \
+        Turn(st, lock)
+
+
+def wait_events(st: chat.Stream, i: int, timeout: float = 1.0) -> tuple[list, int, bool]:
+    """the events after i, waiting at most `timeout` for one: (events, the next
+    i, whether the stream has ended and every event is out)"""
+    with st.cond:
+        if i >= len(st.events) and not st.done:
+            st.cond.wait(timeout)
+        batch = st.events[i:]
+        return batch, len(st.events), st.done
 
 
 def _events(st: chat.Stream, timeout: float = 900.0):
     """the stream's events as they come, until it ends"""
     i, t0 = 0, time.time()
     while True:
-        with st.cond:
-            while i >= len(st.events) and not st.done:
-                if time.time() - t0 > timeout:
-                    st.stop.set()
-                    return
-                st.cond.wait(0.5)
-            batch = st.events[i:]
-            i = len(st.events)
-            ended = st.done
+        batch, i, ended = wait_events(st, i, 0.5)
         yield from batch
-        if ended and i >= len(st.events):
+        if ended and not batch:
+            return
+        if time.time() - t0 > timeout:
+            st.stop.set()
             return
 
 
@@ -245,7 +274,23 @@ def _finish(ev: dict) -> str:
     return "length" if reply.get("cut") and reply.get("cut") not in ("stopped",) else "stop"
 
 
-def complete(st: chat.Stream, ctx: dict, key: dict, lock: threading.Lock) -> dict:
+def failed(ev: dict, row: dict) -> ApiError:
+    """a reply that failed, in the board's words — never a served model's own
+    error text (16b review); that goes in the service's log. Running out of
+    GPU memory is said as the Playground says it"""
+    if ev.get("t") == "refused":
+        return ApiError(503, ev.get("why") or "Not now.", "server_error", retry_after=60)
+    if ev.get("oom"):
+        return ApiError(503, ev.get("why") or "Ran out of GPU memory.", "server_error",
+                        retry_after=60)
+    log.warning("api: %s failed: %s", row["id"], (ev.get("why") or "")[:300])
+    if row.get("served"):
+        return ApiError(502, f"{row['name']}'s server failed on this request. Try again; if it "
+                             "goes on, its server may need a look.", "server_error")
+    return ApiError(500, f"{row['name']} failed while answering. Try again.", "server_error")
+
+
+def complete(st: chat.Stream, ctx: dict, key: dict, turn: Turn) -> dict:
     """the whole reply, OpenAI's way"""
     try:
         text, think, finish = "", "", "stop"
@@ -257,11 +302,8 @@ def complete(st: chat.Stream, ctx: dict, key: dict, lock: threading.Lock) -> dic
                 think += ev["d"]
             elif t == "reset":
                 text, think = ev.get("text", ""), ev.get("think", "")
-            elif t == "refused":
-                raise ApiError(503, ev.get("why") or "not now", "server_error", retry_after=60)
-            elif t == "error":
-                raise ApiError(502 if "server" in (ev.get("why") or "") else 500,
-                               ev.get("why") or "the model failed", "server_error")
+            elif t in ("refused", "error"):
+                raise failed(ev, ctx["row"])
             elif t == "done":
                 finish = _finish(ev)
                 reply = ev.get("reply") or {}
@@ -276,11 +318,15 @@ def complete(st: chat.Stream, ctx: dict, key: dict, lock: threading.Lock) -> dic
                 "choices": [{"index": 0, "message": msg, "finish_reason": finish}],
                 "usage": usage}
     finally:
-        lock.release()
+        turn.end()
 
 
-def stream(st: chat.Stream, ctx: dict, key: dict, lock: threading.Lock):
-    """server-sent events, OpenAI's chunks: its thinking as reasoning_content"""
+async def astream(st: chat.Stream, ctx: dict, key: dict, turn: Turn, gone):
+    """server-sent events, OpenAI's chunks — its thinking as reasoning_content.
+    Asks `gone()` (the client left?) between events: a client that leaves
+    stops the reply and frees its model at once, and so does this
+    generator's end, however it ends"""
+    import asyncio
     cid, created, mid = "chatcmpl-" + st.id[:24], int(time.time()), ctx["row"]["id"]
 
     def chunk(delta: dict, finish: str | None = None, **more) -> str:
@@ -289,26 +335,31 @@ def stream(st: chat.Stream, ctx: dict, key: dict, lock: threading.Lock):
                                       "choices": [{"index": 0, "delta": delta,
                                                    "finish_reason": finish}], **more},
                                      ensure_ascii=False) + "\n\n"
-    text = ""
+    text, i, t0 = "", 0, time.time()
     try:
         yield chunk({"role": "assistant", "content": ""})
-        for ev in _events(st):
-            t = ev.get("t")
-            if t == "text":
-                text += ev["d"]
-                yield chunk({"content": ev["d"]})
-            elif t == "think":
-                yield chunk({"reasoning_content": ev["d"]})
-            elif t in ("refused", "error"):
-                yield "data: " + json.dumps(ApiError(503 if t == "refused" else 500,
-                                                     ev.get("why") or "failed").body()) + "\n\n"
+        while True:
+            if await gone():
                 return
-            elif t == "done":
-                usage = _usage(ctx, text, ctx["done"].get("reply"))
-                db.apikey_used(key["id"], usage["total_tokens"])
-                yield chunk({}, _finish(ev), usage=usage)
+            batch, i, ended = await asyncio.to_thread(wait_events, st, i, 1.0)
+            for ev in batch:
+                t = ev.get("t")
+                if t == "text":
+                    text += ev["d"]
+                    yield chunk({"content": ev["d"]})
+                elif t == "think":
+                    yield chunk({"reasoning_content": ev["d"]})
+                elif t in ("refused", "error"):
+                    yield "data: " + json.dumps(failed(ev, ctx["row"]).body()) + "\n\n"
+                    return
+                elif t == "done":
+                    usage = _usage(ctx, text, ctx["done"].get("reply"))
+                    db.apikey_used(key["id"], usage["total_tokens"])
+                    yield chunk({}, _finish(ev), usage=usage)
+            if ended and not batch:
+                break
+            if time.time() - t0 > 900:
+                return
         yield "data: [DONE]\n\n"
     finally:
-        if not st.done:                          # the caller went away: the reply stops
-            st.stop.set()
-        lock.release()
+        turn.end()
