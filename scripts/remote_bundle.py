@@ -1,6 +1,15 @@
 """15.1, 15.2: a row run on another machine, as one file — what a rented GPU's
 run (scripts/remote_run.py) hands the server (scripts/import_remote.py).
 
+17: and the Frontier benchmarks asked of a GGUF on a rented GPU
+(scripts/remote_gguf.py, format 2): frontier-<served id>-thinking-<on|off>.tar.gz
+holds bundle.json, setup.json (the GGUF's name, size and sha256, the
+llama-server build, its flags and environment, the GPU, each task's settings)
+and run.log, and each task's answers as the board keeps them:
+results/<row>/<task>_0shot/frontier/answers.jsonl. Never the GGUF, never the
+server's binary, never a key: write() refuses a model file or a library, and
+any file holding a secret the environment has.
+
 The suite is a parameter: DeviceMark's battery now. The Mobile tasks' "no
 judge" part and Mobile-MMLU-Pro for Hugging Face models are the next
 candidates; each needs only its entry in SUITES, its tasks' check and its
@@ -41,9 +50,17 @@ import tarfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-FORMAT = 1
-SUITES = {"devicemark": {"prefix": "devicemark",
-                         "tasks": ("dm_ifeval", "dm_mmlu_pro", "dm_math")}}
+if str(HERE) not in sys.path:
+    sys.path.insert(0, str(HERE))
+import frontier as _fb  # noqa: E402
+
+FORMAT = 1                                   # DeviceMark's, from remote_run.py
+SUITES = {"devicemark": {"prefix": "devicemark", "format": FORMAT,
+                         "tasks": ("dm_ifeval", "dm_mmlu_pro", "dm_math")},
+          # 17: a GGUF's Frontier run, from remote_gguf.py
+          "frontier": {"prefix": "frontier", "format": 2, "tasks": tuple(_fb.TASKS)}}
+# 17: what never travels in a bundle — a model's weights, a binary, a library
+NEVER = re.compile(r"(?i)\.(gguf|safetensors|bin|pt|pth|ckpt|so(\.\d+)*|tar|gz|zst|xz|zip)$")
 # what must be the server's, exactly, for a bundle to be imported
 PINNED = ("torch", "torch_cuda", "transformers", "lm_eval", "fla_core", "fast_kernels")
 PINNED_WORDS = {"torch": "torch", "torch_cuda": "torch's CUDA", "transformers": "transformers",
@@ -213,8 +230,23 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def leaks(files: dict[str, bytes], env: dict | None = None) -> list[str]:
+    """17: the files that hold a secret the environment has, or that are a
+    model file or a binary — each a reason not to write the bundle"""
+    env = os.environ if env is None else env
+    vals = [(var, (env.get(var) or "").encode()) for var in SECRETS]
+    out = [f"{n}: a model file or a binary" for n in files if NEVER.search(n)]
+    out += [f"{n}: holds {var}" for n, data in files.items() for var, v in vals
+            if len(v) >= 6 and v in data]
+    return out
+
+
 def write(path: Path, files: dict[str, bytes]) -> Path:
-    """the bundle: every file, sorted, with no times and no owners"""
+    """the bundle: every file, sorted, with no times and no owners — 17: and
+    never a model file, a binary or a secret"""
+    bad = leaks(files)
+    if bad:
+        raise ValueError("not written: " + "; ".join(bad))
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".part")
     with open(tmp, "wb") as raw, gzip.GzipFile(fileobj=raw, mode="wb", mtime=0,
@@ -247,7 +279,7 @@ def read(path: Path) -> dict:
             for m in tar.getmembers():
                 name = m.name
                 if (not m.isfile() or not _SAFE.match(name) or name.startswith("/")
-                        or ".." in Path(name).parts or "\\" in name):
+                        or ".." in Path(name).parts or "\\" in name or NEVER.search(name)):
                     raise ValueError(f"{path.name} holds {name!r}, which no bundle does")
                 files[name] = tar.extractfile(m).read()
     except (tarfile.TarError, OSError, EOFError) as e:

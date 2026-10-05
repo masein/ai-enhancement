@@ -36,11 +36,12 @@ def test_thinking_is_for_the_generative_and_shared_suites(svc):
     for suite in ("full", "safety", "everyday"):
         r = submit(client, suite=suite, thinking=True)
         assert r.status_code == 422
-        # 12q: and DeviceMark's battery — 16b: and the Mobile suite
+        # 12q: and DeviceMark's battery — 16b: and the Mobile suite — 17: and the Frontier
         assert r.json()["detail"] == ("thinking is for IFEval, MMLU-Pro and MATH-500 (suite "
                                       "generative), GPQA Diamond and SimpleQA Verified "
-                                      "(suite shared), the Mobile suite (suite mobile) and "
-                                      "DeviceMark's battery (suite devicemark) only")
+                                      "(suite shared), the Mobile suite (suite mobile), "
+                                      "DeviceMark's battery (suite devicemark) and the "
+                                      "Frontier benchmarks (suite frontier) only")
     r = submit(client, suite="shared", subset=100)
     assert r.status_code == 422
     assert r.json()["detail"] == "subset is for MMLU-Pro (suite generative) only"

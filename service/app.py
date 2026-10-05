@@ -540,12 +540,15 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
                                  "generative (IFEval, MMLU-Pro, MATH-500), safety "
                                  "(Do-Not-Answer, XSTest), shared (GPQA Diamond, "
                                  "SimpleQA Verified), mobile (MobileAIBench's text sets; "
-                                 "part judged: MT-Bench) or devicemark (DeviceMark's battery)")
-    if s.suite not in ("generative", "shared", "devicemark", "mobile") and s.thinking:
+                                 "part judged: MT-Bench), devicemark (DeviceMark's battery) "
+                                 "or frontier (the Frontier benchmarks, asked as Epoch AI asks "
+                                 "them)")
+    if s.suite not in ("generative", "shared", "devicemark", "mobile", "frontier") and s.thinking:
         raise HTTPException(422, "thinking is for IFEval, MMLU-Pro and MATH-500 (suite "
                                  "generative), GPQA Diamond and SimpleQA Verified (suite "
-                                 "shared), the Mobile suite (suite mobile) and DeviceMark's battery "
-                                 "(suite devicemark) only")
+                                 "shared), the Mobile suite (suite mobile), DeviceMark's battery "
+                                 "(suite devicemark) and the Frontier benchmarks (suite "
+                                 "frontier) only")
     part = (s.part or "").strip().lower()
     pair = (s.pair or "").strip()
     # 14.1: the mobile suite's two parts — none (no judge), or judged (MT-Bench)
@@ -629,12 +632,15 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
                                      f"Running on a server. Nothing was queued.")
         if s.suite not in served.SUITES:
             raise HTTPException(422, served.LOGLIK_LINE + " Nothing was queued.")
-        if s.thinking and s.suite != "devicemark":
+        # 17: a Frontier run says thinking on or off itself, as DeviceMark's does
+        if s.thinking and s.suite not in ("devicemark", "frontier"):
             raise HTTPException(422, "A served model thinks as it was registered: register it "
                                      "again to change that. Nothing was queued.")
         # 12m.3: a model from OpenRouter — a run that would pass this month's
         # AI limit is refused here, before it is queued, with its estimate
         rec = served.get(hf_id)
+        if s.suite == "frontier" and served.is_openrouter(rec):
+            raise HTTPException(422, config.FRONTIER_NOT_OPENROUTER + ". Nothing was queued.")
         if served.is_openrouter(rec):
             if not ai_models.has_key():
                 raise HTTPException(409, "OpenRouter has no key on this server "
@@ -643,6 +649,8 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
                                                          part=part))
             if why:
                 raise HTTPException(409, why + " Nothing was queued.")
+    elif s.suite == "frontier":
+        raise HTTPException(422, config.FRONTIER_SERVED_ONLY + ". Nothing was queued.")
     # 11i: a checkpoint that ships its own model code is answered HERE, before
     # anything is queued, in the words the page shows beside its disabled
     # button. #56 learned it at start, after the wait — and its Resubmit had

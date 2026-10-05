@@ -26,6 +26,14 @@ the import, its log the bundle's.
 
 A bundle already imported — by its sha256 — changes nothing.
 
+17: a GGUF's Frontier bundle (scripts/remote_gguf.py) is imported by
+scripts/import_frontier.py, onto the served model's row: it is refused unless
+its GGUF is the file registered for that model (--file-sha256 for a model
+whose file isn't registered here: the sha256 of the file its server serves).
+
+    sudo docker compose exec -T bench python scripts/import_remote.py \
+        /home/masein/benchmarks/bundles/frontier-<…>.tar.gz --by masein
+
 15.5: shards. A bundle from `remote_run.py --shard i/n` holds shard i of n of
 each task (devicemark.shard_of: every n-th item from the i-th) and is checked
 for exactly those items. It waits under results/shards/<row>/<task>/<i>-of-<n>/
@@ -41,6 +49,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import sys
 import time
@@ -86,7 +95,7 @@ def checks(b: dict) -> list[str]:
     bundle, setup = b["bundle"], b["setup"]
     if bundle.get("format") != rb.FORMAT:
         return [f"its format: the bundle's {bundle.get('format')}, this board reads {rb.FORMAT}"]
-    if bundle.get("suite") not in rb.SUITES:
+    if bundle.get("suite") != "devicemark":
         return [f"its suite: {bundle.get('suite')!r}, which this board doesn't import"]
     try:
         shard = rb.shard_of_bundle(bundle)
@@ -217,15 +226,26 @@ def _write_registry(row: Path, reg: dict) -> None:
     tmp.replace(row / sdm.REMOTE_NAME)
 
 
-def import_bundle(path: Path, by: str, say=print) -> int:
-    import devicemark as dm
-    from service import config, db
-    from service import devicemark as sdm
+def import_bundle(path: Path, by: str, say=print, file_sha: str = "") -> int:
     try:
         b = rb.read(path)
     except (ValueError, OSError) as e:
         say(f"refused: {e}")
         return REFUSED
+    # 17: a GGUF's Frontier run, onto a served model's row
+    if b["bundle"].get("suite") == "frontier":
+        import import_frontier
+        return import_frontier.import_bundle(b, path, by, say, file_sha)
+    if file_sha:
+        say("refused — --file-sha256 is for a GGUF's Frontier bundle")
+        return REFUSED
+    return import_devicemark(b, path, by, say)
+
+
+def import_devicemark(b: dict, path: Path, by: str, say=print) -> int:
+    import devicemark as dm
+    from service import config, db
+    from service import devicemark as sdm
     bundle, setup = b["bundle"], b["setup"]
     model, thinking = bundle.get("model") or "", bool(bundle.get("thinking"))
     row_name = bundle.get("row") or ""
@@ -424,6 +444,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--by", default="", help="your name, for the Runs list")
     ap.add_argument("--battery", action="store_true",
                     help="this server's battery hashes, for remote_run.py --battery")
+    ap.add_argument("--file-sha256", default="",
+                    help="17: a Frontier bundle of a served model whose file isn't registered "
+                         "here: the sha256 of the file its server serves (kept with --by)")
     a = ap.parse_args(argv)
     from service import db
     db.init()
@@ -439,7 +462,10 @@ def main(argv: list[str] | None = None) -> int:
         ap.error("a bundle, or --battery")
     if not a.by.strip():
         ap.error("--by: your name, for the Runs list")
-    return import_bundle(a.bundle, a.by.strip()[:80])
+    sha = a.file_sha256.strip().lower()
+    if sha and not re.fullmatch(r"[0-9a-f]{64}", sha):
+        ap.error("--file-sha256: 64 hex digits")
+    return import_bundle(a.bundle, a.by.strip()[:80], file_sha=sha)
 
 
 if __name__ == "__main__":

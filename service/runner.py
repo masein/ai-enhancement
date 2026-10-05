@@ -1353,6 +1353,9 @@ def run_submission(sub: dict) -> None:
     # 12q: DeviceMark's battery — a served setup asked over its server
     # (service/devicemark.py), a Hugging Face model as three tasks on hf
     devicemark = sub["suite"] == "devicemark"
+    # 17: the Frontier benchmarks — a served model's, asked over its server
+    # (service/frontier.py), on the board or on a rented GPU
+    frontier = sub["suite"] == "frontier"
     dm_plan = None                       # 12q.G: a Hugging Face model's (hf_plan)
     # 12f.0: a run that can't save doesn't start — in the status dot's words
     from . import disk
@@ -1384,6 +1387,10 @@ def run_submission(sub: dict) -> None:
             # its registration, the suites it can sit, and the file its server
             # serves now against the one registered: a different file stops here
             meta = _served.preflight(sub)
+            if frontier and _served.is_openrouter(meta.get("served")):
+                raise PreflightError(config.FRONTIER_NOT_OPENROUTER)
+        elif frontier:
+            raise PreflightError(config.FRONTIER_SERVED_ONLY)
         else:
             # the submitter's kind is passed in: 'auto' is resolved here, and
             # refused when it is genuinely ambiguous rather than guessed. 12a:
@@ -1459,7 +1466,7 @@ def run_submission(sub: dict) -> None:
     # 12h.1: a thinking-on run of a model that can turn thinking off is a row
     # of its own, "Qwen3.5-2B · thinking": its answers live apart, so nothing
     # ever averages them with the thinking-off ones
-    th = suite_thinking(sub, meta, rec) if generative or shared or mobile else None
+    th = suite_thinking(sub, meta, rec) if generative or shared or mobile or frontier else None
     if devicemark:
         # 12q: thinking off unless asked, said out loud either way — a served
         # setup's too, whatever it was registered with — and a thinking-on
@@ -1608,6 +1615,20 @@ def run_submission(sub: dict) -> None:
                 status, line = "failed", f"devicemark: {e}"
                 with open(log_path, "a") as lf:
                     lf.write(f"\n[service] devicemark: {e!r}\n")
+            db.update(sid, status=status, finished_at=time.time(), progress=line,
+                      error="" if status == "done" else line)
+            return
+        # 17: a served model's Frontier run — each question asked over its
+        # server, the answers kept as they land, and scored when all are in
+        if frontier:
+            from . import frontier as _frontier
+            try:
+                status, line = _frontier.run(sid, sub, rec, th, config.OUT_DIR / row_safe,
+                                             log_path)
+            except Exception as e:                      # noqa: BLE001 — said on the row
+                status, line = "failed", f"frontier: {e}"
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n[service] frontier: {e!r}\n")
             db.update(sid, status=status, finished_at=time.time(), progress=line,
                       error="" if status == "done" else line)
             return

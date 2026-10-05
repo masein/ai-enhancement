@@ -54,7 +54,9 @@ LOGLIK_LINE = ("Multiple-choice benchmarks need the model loaded here; this one 
 CHANGED_LINE = ("The server now serves a different file than the one registered. Register it "
                 "again if that's intended.")
 KEPT_FOR_NEXT = " · the answers it gave are kept: the next run asks only the rest"
-SUITES = ("everyday", "judged", "generative", "safety", "shared", "mobile", "devicemark")
+# 17: and the Frontier benchmarks (service/frontier.py), asked as chat messages too
+SUITES = ("everyday", "judged", "generative", "safety", "shared", "mobile", "devicemark",
+          "frontier")
 THINKING = {"on": "on", "off": "off", "auto": "the model decides"}
 PINNED = ("file", "size", "ctx", "build")
 TS_FMT = "%Y-%m-%dT%H-%M-%S.000000"
@@ -786,6 +788,9 @@ class Answer(str):
     # answer ({"chat": …, "fallback": …})
     fallback: dict | None = None
     error: dict | None = None
+    # 17: why it stopped, as the server says ("stop", "length"): an answer cut
+    # at its budget is scored as one that ran out of room
+    finish: str | None = None
 
 
 def ask(rec: dict, text: str, s: dict) -> str:
@@ -800,7 +805,8 @@ def ask(rec: dict, text: str, s: dict) -> str:
         body.update(_pinned_route(rec))
     base, key = _endpoint(rec)
     reply = _post(base + "/chat/completions", key, body, item=not is_openrouter(rec))
-    msg = (reply.get("choices") or [{}])[0].get("message") or {}
+    choice = (reply.get("choices") or [{}])[0]
+    msg = choice.get("message") or {}
     text = msg.get("content") or ""
     # llama-server says reasoning_content; OpenRouter says reasoning (12m.3)
     think = msg.get("reasoning_content") or msg.get("reasoning") or ""
@@ -809,6 +815,8 @@ def ask(rec: dict, text: str, s: dict) -> str:
     out.tokens = int(used) if isinstance(used, (int, float)) and used >= 0 else None
     out.usage = reply.get("usage") if isinstance(reply.get("usage"), dict) else None
     out.provider = str(reply.get("provider") or "")
+    out.finish = choice.get("finish_reason") if isinstance(choice.get("finish_reason"), str) \
+        else None
     t = reply.get("timings") or {}
     if isinstance(t.get("draft_n"), (int, float)) and t["draft_n"] > 0:
         out.draft = {"n": int(t["draft_n"]), "accepted": int(t.get("draft_n_accepted") or 0)}
@@ -854,6 +862,9 @@ def ask_raw(rec: dict, text: str, s: dict) -> "Answer":
     t = reply.get("timings") if isinstance(reply.get("timings"), dict) else {}
     used = reply.get("tokens_predicted", t.get("predicted_n"))
     out.tokens = int(used) if isinstance(used, (int, float)) and used >= 0 else None
+    # llama-server's /completion says "limit" where its chat endpoint says "length"
+    out.finish = ("length" if reply.get("stop_type") == "limit" else "stop"
+                  if reply.get("stop_type") in ("eos", "word") else None)
     if isinstance(t.get("draft_n"), (int, float)) and t["draft_n"] > 0:
         out.draft = {"n": int(t["draft_n"]), "accepted": int(t.get("draft_n_accepted") or 0)}
     return out
