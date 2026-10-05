@@ -7481,7 +7481,11 @@ function servedHead(m) {
   const s = servedOf(m.id);
   if (!s) return '';
   return el('div', { class: 'served-head', 'data-served-head': m.id },
-    el('p', { class: 'small', 'data-served-how': m.id }, servedTag(m.id), ' ', s.how),
+    el('p', { class: 'small' }, el('span', { 'data-served-how': m.id }, servedTag(m.id), ' ', s.how),
+      // 16c: corrected from the page, with its launch flags beside it
+      LIVE && !isOpenRouter(s) && !srvEditing(m.id) ? [' ', el('button', { class: 'quiet',
+        'data-served-how-edit': m.id, text: 'Edit', onclick: () => srvEditOpen(m.id) })] : ''),
+    srvEditing(m.id) ? srvEditForm(m) : '',
     el('p', { class: 'small se', 'data-served-pin': m.id, text: isOpenRouter(s)
       ? `Pinned to ${pinLine(s.pin)}, with no fallbacks. Every run checks it still is.`
       : 'Its server reported ' + pinLine(s.pin) + '. Every run checks it still does.' }),
@@ -7505,8 +7509,44 @@ function servedLaunch(m) {
       L.speculative == null ? '' : el('span', { class: 'se', 'data-served-drafts': String(L.speculative),
         text: ` · its server ${L.speculative ? 'drafts tokens (MTP or a draft model)'
           : 'drafts nothing'}` })),
-    ...(L.mismatch || []).map(x => el('p', { class: 'warn small', 'data-served-mismatch': m.id,
-      text: x })));
+    ...(L.mismatch || []).map(x => el('p', { class: 'warn small' },
+      el('span', { 'data-served-mismatch': m.id, text: x }),
+      LIVE && !srvEditing(m.id) ? [' ', el('button', { class: 'quiet',
+        'data-served-mismatch-edit': m.id, text: 'Edit ▸',
+        onclick: () => srvEditOpen(m.id) })] : '')));
+}
+// 16c: "How it's served" and the launch, corrected from the page — the
+// warning above says where they disagree, and this is where to act on it
+const srvEditing = id => (state.srvEdit || {}).id === id;
+function srvEditOpen(id) {
+  const s = servedOf(id) || {}, L = s.launch || {};
+  state.srvEdit = { id, how: s.how || '', flags: L.flags || '', env: L.env || '' };
+  render();
+}
+function srvEditForm(m) {
+  const E = state.srvEdit;
+  const field = (k, label, rows) => el('label', { class: 'small', style: 'display:block' }, label,
+    el('textarea', { rows: String(rows), 'data-served-edit': k, 'data-keep': 'srvedit-' + k,
+      style: 'display:block;width:100%', value: E[k],
+      oninput: e => { E[k] = e.target.value; } }, E[k]));
+  return el('div', { class: 'note', 'data-served-edit-form': m.id },
+    field('how', 'How it’s served', 2), field('flags', 'Launch flags', 2),
+    field('env', 'Environment', 1),
+    el('div', { class: 'frm' },
+      el('button', { class: 'primary', 'data-served-edit-save': m.id, text: 'Save',
+        onclick: async () => {
+          if (!whoName()) { askName(); return; }
+          try {
+            const r = await post(`api/served/${m.id.split('/').map(encodeURIComponent).join('/')}`
+              + '/launch', { how: E.how, flags: E.flags, env: E.env, by: whoName() }, 'PUT');
+            state.srvEdit = null;
+            toast(`${r.model.name}: how it’s served, saved`, { key: 'srv' });
+            await refreshResults();
+          } catch (e) { toast('Refused. ' + e.message, { key: 'srv' }); }
+          render(); } }),
+      el('button', { class: 'quiet', 'data-served-edit-cancel': m.id, text: 'Cancel',
+        onclick: () => { state.srvEdit = null; render(); } })),
+    el('p', { class: 'small se', text: 'What it said before is kept, with your name.' }));
 }
 // 12f.3 addendum: served entries whose servers report the same file are setups
 // of it — side by side: the score, the answers' median length, how many ran
@@ -9941,9 +9981,9 @@ function skeleton(rows = 4, attrs = {}) {
 const ACT = {};
 const actState = slot => ACT[slot] || (ACT[slot] = { busy: false, ok: '', err: '' });
 
-async function post(path, body) {
+async function post(path, body, method = 'POST') {
   const r = await fetch(path, {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
+    method, headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
     body: JSON.stringify(body || {}) }).catch(() => null);
   if (!r) throw new Error('the server is unreachable — it may be restarting');
   checkBuild(r);
@@ -23218,7 +23258,10 @@ function aiJobsTable(P) {
           + (j.chosen.precision && j.chosen.precision !== 'unknown' ? ` · ${j.chosen.precision}` : '')
           + ` · ${j.chosen.version}` }) : '',
       j.blocked ? el('div', { class: 'small warntext', 'data-ai-blocked': j.job, text: j.blocked })
-        : ''),
+        : '',
+      // 16c: its last batch on OpenRouter, when it failed or waits
+      j.last_batch ? el('div', { class: 'small warntext', 'data-ai-last-batch': j.job,
+        text: 'Its last batch: ' + j.last_batch }) : ''),
     el('td', { class: 'mono small aiprice', 'data-ai-price': j.job, text: aiPrice(j) }),
     el('td', { class: 'aiact' }, LIVE ? aiChange(j) : '')));
   return el('table', { class: 'aijobs', 'data-ai-jobs': '1' },
@@ -23227,22 +23270,42 @@ function aiJobsTable(P) {
     el('tbody', {}, rows));
 }
 
+// 16c: what the OpenRouter key may still spend — its own limit, on OpenRouter
+function aiKeyLine(k) {
+  if (!k) return '';
+  if (k.remaining == null && !k.why && k.limit == null)
+    return el('span', { class: 'se', 'data-ai-key-left': 'none',
+      text: ' · the OpenRouter key has no limit of its own' });
+  if (k.remaining == null)
+    return el('span', { class: 'se', 'data-ai-key-left': 'unknown',
+      text: ` · what the OpenRouter key may still spend couldn’t be asked: ${k.why}` });
+  return el('span', { 'data-ai-key-left': String(k.remaining) }, ' · the OpenRouter key may still '
+    + 'spend ', el('span', { class: 'mono', text: usd(k.remaining) }),
+    k.limit != null ? el('span', { class: 'se', text: ` of its ${usd(k.limit)}` }) : '');
+}
 function aiSpendLine(P) {
   const A = state.ai, s = P.spend;
   const edit = A.editLimit;
-  const input = el('input', { type: 'number', min: '0', step: '1', value: String(s.limit),
-    'aria-label': 'monthly limit in dollars', 'data-ai-limit-input': '1', style: 'width:6em' });
+  // 16c: a value typed is kept in the page's state, never lost to a redraw
+  const input = el('input', { type: 'number', min: '0', step: '1',
+    value: A.limitDraft != null ? A.limitDraft : String(s.limit), 'data-keep': 'ai-limit',
+    'aria-label': 'monthly limit in dollars', 'data-ai-limit-input': '1', style: 'width:6em',
+    oninput: e => { A.limitDraft = e.target.value; } });
   return el('div', { class: 'aispend', 'data-ai-spend': String(s.month) },
     el('p', { class: 'small' }, 'This month: ', el('span', { class: 'mono', text: usd(s.month) }),
       ' of ', el('span', { class: 'mono', 'data-ai-limit': String(s.limit), text: usd(s.limit) }),
+      aiKeyLine(s.key),
       ' · ', edit ? el('span', {}, input, ' ', el('button', { class: 'quiet', text: 'Save',
         'data-ai-limit-save': '1', onclick: async () => {
           if (!whoName()) { askName(); return; }
           try { A.page = await post('api/ai/limit', { usd: Number(input.value), by: whoName() });
-            A.editLimit = false; } catch (e) { toast('Refused. ' + e.message, { key: 'ai' }); }
-          render(); } }))
+            A.editLimit = false; A.limitDraft = null; }
+          catch (e) { toast('Refused. ' + e.message, { key: 'ai' }); }
+          render(); } }),
+        ' ', el('button', { class: 'quiet', text: 'Cancel', 'data-ai-limit-cancel': '1',
+          onclick: () => { A.editLimit = false; A.limitDraft = null; render(); } }))
         : el('button', { class: 'quiet', 'data-ai-limit-edit': '1', text: 'change the limit',
-          onclick: () => { A.editLimit = true; render(); } })),
+          onclick: () => { A.editLimit = true; A.limitDraft = null; render(); } })),
     // 12m.3: runs of models from OpenRouter count toward it too
     (s.by_job || {}).tests ? el('p', { class: 'small se', 'data-ai-spend-tests': String(s.by_job.tests),
       text: `${usd(s.by_job.tests)} of it on testing models from OpenRouter` }) : '',
@@ -23302,6 +23365,31 @@ async function loadMmpKey() {
   catch (e) { A.mmpMsg = e.message; }
   A.mmpAsked = false;
   if (state.tab === 'ai') render();
+}
+// 16c: AI models refreshes with the page's tick while it is open — the
+// spend, the key's allowance, each job's last batch and the labelling run —
+// and never redraws a form being edited: the figures wait for the next tick
+let AI_TICKS = 0;
+function aiEditing() {
+  const A = state.ai, a = document.activeElement;
+  return !!(A.editLimit || A.mark || A.editing || (POP.key && String(POP.key).startsWith('ai-'))
+    || (a && a.closest && a.closest('#view') && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)
+      && a.type !== 'radio' && a.type !== 'checkbox'));
+}
+async function aiTick() {
+  const A = state.ai;
+  if (A.ticking || !A.page) return;
+  A.ticking = true;
+  try {
+    const page = await api('api/ai');
+    // the key's card every other tick, every tick while its batches are out
+    const busy = A.mmp && (A.mmp.running || []).length;
+    const key = busy || ++AI_TICKS % 2 === 0 ? await api('api/mobile-mmlu/key') : null;
+    A.page = page;
+    if (key) A.mmp = key;
+    if (state.tab === 'ai' && !aiEditing()) render();
+  } catch (e) { /* netFail said so; the next tick asks again */ }
+  finally { A.ticking = false; }
 }
 async function mmpKeyAct(what) {
   const A = state.ai;
@@ -23369,9 +23457,11 @@ function mmpKeyCard() {
       el('p', { class: 'small', 'data-mmp-set-total': 'full' }, 'About ',
         el('b', { text: totalOf(S.full) }))] : '',
     S.all && S.full ? el('p', { class: 'small se', 'data-mmp-start-sends': '1',
-      text: `Start sends both, once each — a question the two sets word alike is labelled once — `
-        + `Pro’s questions first, so Pro’s key is whole before the rest: ${n(S.all.questions)} `
-        + 'questions in all.' }) : '');
+      text: (K.scope || {}).value === 'all' ? `Start sends both, once each — a question the two `
+        + `sets word alike is labelled once — Pro’s questions first, so Pro’s key is whole `
+        + `before the rest: ${n(S.all.questions)} questions in all.`
+        : `Pro only is chosen: Start sends Pro’s questions alone. The full set’s own wait until `
+        + `“Pro, then the full set” is chosen.` }) : '');
   const c = ((K.key || {}).counts || {}).all;
   const cats = ((K.key || {}).counts || {}).by_category || {};
   const cf = (((K.sets || {}).full || {}).counts || {}).all;
@@ -23381,6 +23471,27 @@ function mmpKeyCard() {
   const running = (K.running || []).length, stopped = !!K.stopped;
   const why = K.available || (K.problems || [])[0] || E.over_limit || '';
   const started = c && c.questions && (c.questions - c.waiting > 0 || running);
+  // 16c: what is labelled, chosen on the card; what Start sends, and its cost
+  const SC = K.scope || { value: 'pro' }, SN = K.sends || {};
+  const verb = started || stopped ? 'Carry on' : 'Start';
+  const cost = SN.usd != null ? usd(SN.usd) : `${usd(SN.usd_known)} and the unpriced`;
+  const labelOf = s => ((K.labellers || []).find(l => l.slot === s) || {}).label || s;
+  const scopeBox = K.full_on === false ? '' : el('div', { class: 'frm', role: 'radiogroup',
+      'aria-label': 'what is labelled', 'data-mmp-scope': SC.value },
+    el('span', { class: 'small', text: 'Label: ' }),
+    ...Object.entries(K.scopes || {}).map(([v, words]) => el('label', { class: 'small' },
+      el('input', { type: 'radio', name: 'mmp-scope', value: v, 'data-mmp-scope-pick': v,
+        checked: SC.value === v ? '' : null, disabled: LIVE ? null : '',
+        onchange: async () => {
+          if (!whoName()) { askName(); render(); return; }
+          try { A.mmp = (await post('api/mobile-mmlu/key/scope', { scope: v, by: whoName() })).page;
+            toast(`Label: ${words}`, { key: 'mmp' }); }
+          catch (e) { toast('Refused. ' + e.message, { key: 'mmp' }); }
+          render(); } }), ' ' + words, ' ')),
+    SC.by ? el('span', { class: 'small se', 'data-mmp-scope-by': SC.by,
+      text: `· chosen by ${SC.by}${SC.at ? ', ' + whenFull(SC.at) : ''}` })
+      : el('span', { class: 'small se', text: '· the default' }));
+  const proKept = (((K.sets || {}).pro || {}).counts || {}).all || {};
   return el('div', { class: 'card', 'data-mmp-key': (K.key || {}).version || 'none' }, head,
     el('p', { class: 'sub', text: 'The authors of Mobile-MMLU hold its answers back, so the '
       + 'board scores Mobile-MMLU-Pro and the full set on one key of its own — a question the two '
@@ -23400,20 +23511,34 @@ function mmpKeyCard() {
       + (E.third_share ? `; * the third answers only where the first two differ — `
         + `${Math.round(100 * E.third_share)}% is a guess until they have` : '') + '.' }),
     est,
-    el('p', { class: 'small', 'data-mmp-total': String(E.usd == null ? '' : E.usd) },
-      'Start: about ', el('b', { text: E.usd != null ? usd(E.usd) : `${usd(E.usd_known)} and the `
-        + 'unpriced' }), ` · this month ${usd(E.spent)} of ${usd(E.limit)} spent`),
-    LIVE ? el('div', { class: 'frm', 'data-mmp-run': running ? 'running' : stopped ? 'stopped'
-        : 'idle' },
-      el('button', { class: 'primary', 'data-mmp-start': '1', disabled: why ? '' : null,
-        title: why || null, text: started || stopped ? 'Carry on' : 'Start labelling',
+    scopeBox,
+    // 16c: what was chosen is done — said, and nothing to carry on with
+    K.done ? el('p', { class: 'small', 'data-mmp-done': SC.value }, el('b', {
+        text: SC.value === 'all' ? 'The key is whole' : 'Pro’s key is whole' }),
+      `: ${n(proKept.kept)} kept` + (SC.value === 'all' && cf && cf.questions
+        ? ` · the full set’s ${n(cf.kept)}` : '') + '. Nothing is left to send.')
+      : el('p', { class: 'small', 'data-mmp-total': String(SN.usd == null ? '' : SN.usd) },
+        `${verb}: about `, el('b', { text: cost }), ` · ${SN.words || ''}`,
+        ` · this month ${usd(E.spent)} of ${usd(E.limit)} spent`),
+    K.key_warning && !K.done ? el('p', { class: 'warn small', 'data-mmp-key-warning': '1',
+      text: K.key_warning }) : '',
+    LIVE && (!K.done || running) ? el('div', { class: 'frm', 'data-mmp-run': running ? 'running'
+        : stopped ? 'stopped' : 'idle' },
+      K.done ? '' : el('button', { class: 'primary', 'data-mmp-start': '1',
+        disabled: why ? '' : null, title: why || null,
+        text: `${verb === 'Start' ? 'Start labelling' : verb}: about ${cost} · ${SN.words || ''}`,
         onclick: () => mmpKeyAct('start') }),
       running ? el('button', { class: 'quiet', 'data-mmp-stop': '1', text: 'Stop',
         onclick: () => mmpKeyAct('stop') }) : '') : '',
     why ? el('p', { class: 'small warntext', 'data-mmp-why': '1', text: why }) : '',
-    running ? el('p', { class: 'small', 'data-mmp-running': String(running) },
-      K.running.map(r => `${r.slot} labeller: ${r.progress || `${n(r.n)} sent`}`).join(' · ')
-      + (stopped ? ' · stopped: Carry on takes it up again' : '')) : '',
+    running ? el('div', { class: 'small', 'data-mmp-running': String(running) },
+      ...K.running.map(r => el('p', { class: 'small', 'data-mmp-progress': r.slot,
+        text: `${labelOf(r.slot)}: ${r.progress || `${n(r.n)} sent`}` })),
+      stopped ? el('p', { class: 'small se', text: 'Stopped: Carry on takes it up again.' })
+        : '') : '',
+    // 16c: each labeller's last batch, when it failed, part or whole
+    ...Object.entries(K.last || {}).filter(([, x]) => x.failed).map(([s, x]) =>
+      el('p', { class: 'small warntext', 'data-mmp-last': s, text: x.line })),
     el('h3', { text: 'The key' }),
     c && c.questions ? el('p', { class: 'small', 'data-mmp-counts': `${c.kept}|${c.questions}` },
       `${n(c.kept)} of ${n(c.questions)} kept · ` + order.filter(k => c[k]).map(k =>
@@ -25941,6 +26066,7 @@ if (LIVE) {
     if (answering && onHome()) { loadReview(); loadTruns(); }
     if (state.tab === 'pipeline' || (answering && state.model && state.mtab === 'improve')) loadReview();
     if (state.tab === 'exam') loadExam();
+    if (answering && state.tab === 'ai') aiTick();       // 16c
     // 12h.2: a view someone else saved reaches this page within half a minute
     if (answering && state.tab === 'leaderboard' && Date.now() - VIEWS_AT > 30000) loadViews();
     // the Loop board and a topic page: without this nothing ever re-fetched

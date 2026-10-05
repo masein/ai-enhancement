@@ -79,6 +79,7 @@ class FakeOpenRouter:
         self.collects: set[str] = set()              # providers that may train on prompts
         self.reply = default_reply
         self.cost = 0.001                            # dollars a completion reports
+        self.key_data = {"limit": None, "limit_remaining": None, "usage": 0.0}
 
     @classmethod
     def install(cls, monkeypatch, key: str = KEY) -> "FakeOpenRouter":
@@ -98,6 +99,8 @@ class FakeOpenRouter:
         assert headers.get("authorization") == f"Bearer {KEY}" or path == "/models"
         if path == "/models":
             return 200, json.dumps({"data": MODELS}).encode()
+        if path == "/key":                           # 16c: the key's own allowance
+            return 200, json.dumps({"data": self.key_data}).encode()
         m = re.fullmatch(r"/models/(.+)/endpoints", path)
         if m:
             return 200, json.dumps({"data": {"id": m.group(1), "endpoints": ENDPOINTS}}).encode()

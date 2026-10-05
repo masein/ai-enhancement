@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 import time
 from pathlib import Path
 
@@ -76,6 +77,11 @@ FAMILY_NAMES = {"glm": "GLM", "deepseek": "DeepSeek", "qwen": "Qwen", "llama": "
                 "mistral": "Mistral", "google": "Google", "openai": "OpenAI",
                 "anthropic": "Anthropic", "kimi": "Kimi", "grok": "Grok", "smollm": "SmolLM"}
 CACHE_S = 24 * 3600                      # the model list is fetched once a day
+# 16c: a refresh that failed is not tried again on every call for this long —
+# drifted() asks for the list before each request of a batch and on every poll
+RETRY_S = 300
+_LIST_FAILED = {"at": 0.0, "asking": False}
+_LIST_LOCK = threading.Lock()
 _DATED = re.compile(r"-(20\d{6})$")
 
 
@@ -123,22 +129,9 @@ def per_million(price) -> float | None:
     return round(v * 1e6, 4) if v >= 0 else None
 
 
-def models(refresh: bool = False) -> list[dict]:
-    """OpenRouter's text models — {id, name, version, price_in, price_out,
-    context} — fetched live and kept a day. [] with no key: nothing is asked"""
-    if not has_key():
-        return []
-    p = _cache_path()
-    try:
-        cached = json.loads(p.read_text(encoding="utf-8"))
-        if not refresh and time.time() - cached.get("at", 0) < CACHE_S:
-            return cached["models"]
-    except (OSError, ValueError, KeyError):
-        cached = None
-    try:
-        data = _get("/models").get("data") or []
-    except Exception:                               # noqa: BLE001 — the day-old list stands
-        return (cached or {}).get("models") or []
+def _fetch_models() -> list[dict]:
+    """OpenRouter's list, asked now, kept on disk — or LLMError and friends"""
+    data = _get("/models").get("data") or []
     out = []
     for m in data:
         arch = m.get("architecture") or {}
@@ -155,13 +148,70 @@ def models(refresh: bool = False) -> list[dict]:
                     "context": m.get("context_length"),
                     # 12m.3: whether it thinks before it answers, when OpenRouter says
                     "reasons": ("reasoning" in params) if isinstance(params, list) else None})
+    p = _cache_path()
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps({"at": time.time(), "models": out}), encoding="utf-8")
     return out
 
 
-def model(model_id: str) -> dict | None:
-    return next((m for m in models() if m["id"] == model_id), None)
+def _refresh_models() -> list[dict] | None:
+    """one refresh; a failure is remembered for RETRY_S (16c)"""
+    try:
+        out = _fetch_models()
+    except BaseException:                           # noqa: BLE001 — the day-old list stands
+        with _LIST_LOCK:
+            _LIST_FAILED["at"] = time.time()
+        return None
+    with _LIST_LOCK:
+        _LIST_FAILED["at"] = 0.0
+    return out
+
+
+def _refresh_in_background() -> None:
+    def go():
+        try:
+            _refresh_models()
+        finally:
+            with _LIST_LOCK:
+                _LIST_FAILED["asking"] = False
+    with _LIST_LOCK:
+        if _LIST_FAILED.get("asking") or time.time() - _LIST_FAILED["at"] < RETRY_S:
+            return
+        _LIST_FAILED["asking"] = True
+    threading.Thread(target=go, name="openrouter-models", daemon=True).start()
+
+
+def models(refresh: bool = False, wait: bool = True) -> list[dict]:
+    """OpenRouter's text models — {id, name, version, price_in, price_out,
+    context} — fetched live and kept a day. [] with no key: nothing is asked.
+    16c: a day-old list is returned as it is and asked again in the
+    background — a page, a batch's requests and its status polls never wait
+    on OpenRouter for it — and a background refresh that failed isn't tried
+    again for RETRY_S. Only with no list at all, and `wait`, is it asked here
+    (a person choosing a model)"""
+    if not has_key():
+        return []
+    try:
+        cached = json.loads(_cache_path().read_text(encoding="utf-8"))
+        if not isinstance(cached.get("models"), list):
+            cached = None
+    except (OSError, ValueError, AttributeError):
+        cached = None
+    if refresh:
+        got = _refresh_models()
+        return got if got is not None else (cached or {}).get("models") or []
+    if cached and time.time() - cached.get("at", 0) < CACHE_S:
+        return cached["models"]
+    if cached or not wait:
+        _refresh_in_background()
+        return (cached or {}).get("models") or []
+    # a person choosing a model, with no list at all: asked now, whatever
+    # failed a moment ago — they are waiting for this answer
+    return _refresh_models() or []
+
+
+def model(model_id: str, wait: bool = True) -> dict | None:
+    return next((m for m in models(wait=wait) if m["id"] == model_id), None)
 
 
 def providers(model_id: str) -> list[dict] | None:
@@ -197,21 +247,80 @@ def provider_prefs(provider: str | None = None) -> dict:
 
 
 PROBE = "ping"
+PROBE_TIMEOUT_S = 30
+# 16c: never the key or a header in anything said back
+_SECRET = re.compile(r"(?i)bearer\s+\S+|sk-or-[\w-]+|authorization\S*")
 
 
-def accepts_prompts_kept_private(model_id: str, prov: dict) -> bool:
+def _error_of(text: str) -> tuple[str, dict]:
+    """OpenRouter's own message and metadata from an error body — {"error":
+    {"code", "message", "metadata"}} — wherever in `text` the body starts"""
+    text = str(text or "")
+    i = text.find("{")
+    try:
+        e = json.loads(text[i:]).get("error") if i >= 0 else None
+    except (ValueError, AttributeError):
+        e = None
+    if not isinstance(e, dict):
+        return "", {}
+    meta = e.get("metadata") if isinstance(e.get("metadata"), dict) else {}
+    return _SECRET.sub("…", str(e.get("message") or "")).strip()[:200], meta
+
+
+def refusal(status: int | None, text: str) -> tuple[str, str]:
+    """(kind, words): what OpenRouter said when it didn't answer, in plain
+    words — from its status and its error body (16c). Kinds: limit (the key's
+    own limit, or the account's credit), data (no provider takes a prompt it
+    may not store — only when OpenRouter says so), key, rate, unreached,
+    down, refused"""
+    msg, meta = _error_of(text)
+    low = f"{msg} {json.dumps(meta)}".lower()
+    if status is None:
+        if "no response within" in str(text) or "timed out" in str(text).lower():
+            return "unreached", "OpenRouter didn’t answer in time"
+        return "unreached", "OpenRouter couldn’t be reached"
+    if status == 402 or "key limit" in low or "openrouter_key_limit" in low \
+            or "insufficient credits" in low:
+        return "limit", ("OpenRouter refused the key: it has reached its own spending limit, or "
+                         "the account is out of credit. That is fixed on OpenRouter’s side: "
+                         "raise the key’s limit or add credit there")
+    if "data policy" in low or "data_collection" in low or "data collection" in low:
+        return "data", "no provider running it takes a prompt it may not store or train on"
+    if status == 401:
+        return "key", ("OpenRouter refused the key (HTTP 401): it has been disabled or "
+                       "replaced. The server’s OPENROUTER_API_KEY needs a look")
+    if status == 429:
+        return "rate", "OpenRouter is limiting this key’s requests (HTTP 429)"
+    if status in (408, 504):
+        return "unreached", "OpenRouter didn’t answer in time"
+    if status >= 500:
+        return "down", f"OpenRouter or the provider failed (HTTP {status})"
+    return "refused", f"OpenRouter refused it (HTTP {status})" + (f": {msg}" if msg else "")
+
+
+def probe(model_id: str, prov: dict) -> tuple[bool, str, str]:
     """12p.1: the provider takes a request that may not be stored or trained
-    on — one token, asked when a model is pinned"""
+    on — one token, asked when a model is pinned. 16c: (ok, kind, words), the
+    words what OpenRouter said when it didn't (refusal)"""
     from . import llm
     body = {"model": model_id, "max_tokens": 1,
             "messages": [{"role": "user", "content": PROBE}],
             "provider": provider_prefs(prov.get("tag") or prov.get("name"))}
     try:
-        status, _ = llm._http("POST", config.OPENROUTER_BASE_URL + "/chat/completions", _headers(),
-                              json.dumps(body).encode(), timeout=30)
-    except Exception:                               # noqa: BLE001 — refused, or down: not this one
-        return False
-    return status == 200
+        status, raw = llm._http("POST", config.OPENROUTER_BASE_URL + "/chat/completions",
+                                _headers(), json.dumps(body).encode(), timeout=PROBE_TIMEOUT_S)
+    except llm.LLMError as e:
+        return (False, *refusal(e.status, str(e)))
+    except Exception as e:                          # noqa: BLE001 — not reached: said so
+        return (False, *refusal(None, repr(e)))
+    if status == 200:
+        return True, "", ""
+    return (False, *refusal(status, raw.decode("utf-8", "replace") if isinstance(raw, bytes)
+                            else str(raw)))
+
+
+def accepts_prompts_kept_private(model_id: str, prov: dict) -> bool:
+    return probe(model_id, prov)[0]
 
 
 def first_provider(model_id: str) -> dict | None:
@@ -348,11 +457,25 @@ def pin(model_id: str) -> dict:
     up = [{k: v for k, v in p.items() if k != "up"} for p in providers(model_id) or [] if p["up"]]
     if not up:
         raise ValueError(f"OpenRouter lists no provider running {model_id} now")
-    # 12p.1: the first that takes a prompt it may not store or train on
-    prov = next((p for p in up if accepts_prompts_kept_private(m["id"], p)), None)
+    # 12p.1: the first that takes a prompt it may not store or train on. 16c:
+    # what OpenRouter said when one didn't — a refusal that isn't the
+    # provider's own (the key's limit, OpenRouter not answering) is the same
+    # for every provider, so the next isn't asked
+    prov, said = None, []
+    for p in up:
+        ok, kind, words = probe(m["id"], p)
+        if ok:
+            prov = p
+            break
+        said.append((kind, words))
+        if kind not in ("data", "refused", "down"):
+            break
     if not prov:
-        raise ValueError(f"every provider running {model_id} may store or train on prompts: "
-                         "choose another model")
+        other = next(((k, w) for k, w in said if k != "data"), None)
+        if other is None:
+            raise ValueError(f"every provider running {model_id} may store or train on prompts: "
+                             "choose another model")
+        raise ValueError(f"{model_id} couldn’t be pinned: {other[1]}")
     return {"kind": "openrouter", "id": m["id"], "version": m["version"],
             "name": m["name"], "provider": prov["tag"] or prov["name"],
             "provider_name": prov["name"], "precision": prov["precision"],
@@ -381,7 +504,12 @@ def drifted(c: dict) -> str:
     """'' while a pinned model still means what was saved; else why not"""
     if not c or c.get("kind") != "openrouter":
         return ""
-    now = model(c["id"])
+    # 16c: asked before each request of a batch and on every poll — never
+    # waits on OpenRouter: with no list yet, there is nothing to say
+    listed = models(wait=False)
+    if not listed:
+        return ""
+    now = next((m for m in listed if m["id"] == c["id"]), None)
     if now is None:
         return (f"{c['id']} is no longer on OpenRouter's list — choose the job's model again "
                 "on AI models")
@@ -406,6 +534,68 @@ def over_limit() -> str:
         return ""
     return (f"waiting: this month's AI spend has reached its ${cap:,.2f} limit — raise it on "
             f"AI models, or wait for next month")
+
+
+# ---------------------------------------------------------------------------
+# 16c: what the OpenRouter key may still spend — its own limit, set on
+# OpenRouter, apart from this board's monthly one. GET /api/v1/key: {data:
+# {limit, limit_remaining, usage, …}}, null for a key with no limit. Asked in
+# the background and kept a minute: a page shows the last answer and never
+# waits on OpenRouter for it
+# ---------------------------------------------------------------------------
+
+KEY_TTL_S = 60
+_KEY = {"got": None, "at": 0.0, "asking": False, "why": ""}
+_KEY_LOCK = threading.Lock()
+
+
+def _ask_key() -> None:
+    from . import llm
+    try:
+        _, raw = llm._http("GET", config.OPENROUTER_BASE_URL + "/key", _headers(), timeout=10)
+        d = json.loads(raw).get("data") or {}
+        got = {"limit": d.get("limit"), "remaining": d.get("limit_remaining"),
+               "usage": d.get("usage"), "reset": d.get("limit_reset")}
+        with _KEY_LOCK:
+            _KEY.update(got=got, why="")
+    except llm.LLMError as e:
+        with _KEY_LOCK:
+            _KEY["why"] = refusal(e.status, str(e))[1]
+    except BaseException as e:                      # noqa: BLE001 — a background line, said
+        with _KEY_LOCK:
+            _KEY["why"] = refusal(None, repr(e))[1]
+    finally:
+        with _KEY_LOCK:
+            _KEY.update(at=time.time(), asking=False)
+
+
+def key_allowance() -> dict | None:
+    """{limit, remaining, usage, at} as OpenRouter last said — remaining None
+    for a key with no limit of its own — or {why} when it couldn't be asked;
+    None before its first answer. Never waits: a stale answer is asked again
+    in the background"""
+    if not has_key():
+        return None
+    with _KEY_LOCK:
+        stale = time.time() - _KEY["at"] >= KEY_TTL_S
+        if stale and not _KEY["asking"]:
+            _KEY["asking"] = True
+            threading.Thread(target=_ask_key, name="openrouter-key", daemon=True).start()
+        if _KEY["got"] is None:
+            return {"why": _KEY["why"]} if _KEY["why"] else None
+        return {**_KEY["got"], "at": _KEY["at"], **({"why": _KEY["why"]} if _KEY["why"] else {})}
+
+
+def more_than_key(usd: float | None) -> str:
+    """'' unless `usd` is more than the OpenRouter key may still spend; else
+    the warning, in one line"""
+    k = key_allowance() or {}
+    left = k.get("remaining")
+    if usd is None or left is None or float(usd) <= float(left):
+        return ""
+    return (f"About ${float(usd):,.2f} is more than the OpenRouter key may still spend "
+            f"(${float(left):,.2f}): raise the key’s limit on OpenRouter first, or what is "
+            "sent stops where the key runs out")
 
 
 # ---------------------------------------------------------------------------

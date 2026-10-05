@@ -72,8 +72,10 @@ def test_the_key_card_shows_both_sets(live, page, width):
     full = card.locator("[data-mmp-full-est='first']").inner_text().split("\t")
     assert (pro[1].strip(), full[1].strip()) == ("0", "0")        # every one labelled
     assert card.locator("[data-mmp-nc='estimate']").inner_text() == "Non-commercial"
-    assert "Pro’s questions first" in card.locator("[data-mmp-start-sends]").inner_text()
-    assert "19 questions in all" in card.locator("[data-mmp-start-sends]").inner_text()
+    # 16c: Pro only by default — the full set's own wait until it is chosen
+    assert card.locator("[data-mmp-start-sends]").inner_text() == (
+        "Pro only is chosen: Start sends Pro’s questions alone. The full set’s own wait until "
+        "“Pro, then the full set” is chosen.")
     # each set's counts, from the one key
     assert card.locator("[data-mmp-counts]").inner_text().startswith("12 of 12 kept · ")
     assert card.locator("[data-mmp-full-counts]").get_attribute("data-mmp-full-counts") == "18|18"

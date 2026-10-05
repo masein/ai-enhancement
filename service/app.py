@@ -75,6 +75,13 @@ async def lifespan(_app: FastAPI):
             print(f"[uploads] checking again after the restart: {', '.join(again)}")
     except Exception as e:       # noqa: BLE001 — never stops the service starting
         print(f"[uploads] could not look at uploads under way: {e!r}")
+    try:                         # 16c: a labelling batch for a set not chosen is cancelled
+        from . import mmp_key
+        n = mmp_key.prune()
+        if n:
+            print(f"[mmp key] {n:,} question(s) of the full set cancelled: Pro only is chosen")
+    except Exception as e:       # noqa: BLE001 — never stops the service starting
+        print(f"[mmp key] could not look at the batches out: {e!r}")
     yield
     llm_poller.stop()
     worker.stop()
@@ -1384,6 +1391,9 @@ class ServedIn(BaseModel):
 class LaunchIn(BaseModel):
     flags: str = ""
     env: str = ""
+    # 16c: "How it's served" corrected from the page, beside its launch
+    how: str | None = None
+    by: str = ""
 
 
 @app.put("/api/served/{model_id:path}/launch")
@@ -1391,8 +1401,14 @@ def served_launch(model_id: str, f: LaunchIn, x_token: str = Header(default=""))
     """12z A1: a served setup's launch flags and environment — what its
     labels (lookahead, MTP) are read from — kept without asking its server"""
     _check_token(x_token)
+    if f.how is not None:
+        _name(f.by, "correcting how it's served")
+        if not f.how.strip():
+            raise HTTPException(422, "How it's served: the build and its flags. It is the record "
+                                     "of what was tested")
     try:
-        out = {"model": served.set_launch(model_id, f.flags, f.env),
+        out = {"model": served.set_launch(model_id, f.flags, f.env, how=f.how,
+                                          by=f.by.strip()[:80]),
                "launch": served.launch_of_id(model_id)}
     except ValueError as e:
         raise HTTPException(404, str(e)) from None
@@ -1814,6 +1830,23 @@ def _mab_judge() -> dict:
             "price_out": c.get("price_out") if c.get("kind") == "openrouter" else None}
 
 
+def _sibling_pace(rec: dict, key: str) -> tuple[float, str] | None:
+    """16c: (seconds an answer, name) measured with thinking `key` on another
+    served build of the model `rec` is based on — the newest — or None"""
+    base = str(rec.get("based_on") or "").strip().lower()
+    if not base:
+        return None
+    best = None
+    for r in db.served_all():
+        if r.get("id") == rec.get("id") or served.is_openrouter(r) \
+                or str(r.get("based_on") or "").strip().lower() != base:
+            continue
+        s = (r.get("speed_by") or {}).get(key)
+        if s and s.get("secs_each") and (best is None or (s.get("at") or 0) > best[0]):
+            best = (s.get("at") or 0, float(s["secs_each"]), r.get("name") or r["id"])
+    return (best[1], best[2]) if best else None
+
+
 def _served_pace(rec: dict, thinking: bool) -> tuple[float | None, str]:
     """16b: a served model's seconds an answer for the thinking setting a run
     asks with, and what the estimate says of it. A pace measured with the
@@ -1823,6 +1856,14 @@ def _served_pace(rec: dict, thinking: bool) -> tuple[float | None, str]:
     if by.get(key):
         return by[key]["secs_each"], (f", at its measured {by[key]['secs_each']:.1f} s an "
                                       f"answer with thinking {key}")
+    # 16c: not measured with this setting yet — another build of the same
+    # model's pace with it, and whose it is (the original's first estimate
+    # said 6.9 h; run #184, another build, took about 80 minutes)
+    sib = _sibling_pace(rec, key)
+    if sib:
+        secs, name = sib
+        return secs, (f", at {secs:.1f} s an answer as {name} measured it with thinking {key} "
+                      f"— another build of the same model; this one hasn’t been measured yet")
     other = by.get("off" if thinking else "on") or by.get("default") or (
         rec.get("speed") if not by else None)
     if other:
@@ -1964,6 +2005,26 @@ def mmp_key_start(a: MmpByIn, x_token: str = Header(default="")):
     except ValueError as e:
         raise HTTPException(409, str(e)) from None
     return {**sent, "page": _mmp_key_page()}
+
+
+class ScopeIn(BaseModel):
+    scope: str
+    by: str = ""
+
+
+@app.post("/api/mobile-mmlu/key/scope")
+def mmp_key_scope(a: ScopeIn, x_token: str = Header(default="")):
+    """16c: what is labelled — Mobile-MMLU-Pro only, or Pro, then the full set
+    — kept with who chose it and when. Pro only cancels what is out for the
+    full set's own questions"""
+    from . import mmp_key
+    _check_token(x_token)
+    _name(a.by, "choosing what is labelled")
+    try:
+        mmp_key.set_scope(a.scope.strip(), a.by.strip()[:80])
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    return {"page": _mmp_key_page()}
 
 
 @app.post("/api/mobile-mmlu/key/stop")
@@ -2252,9 +2313,40 @@ def _improving() -> list[str]:
     return sorted({p["model"] for p in db.proposal_list(limit=500)})
 
 
+# 16c: the batches a job sends, by their kind — a question builder's say which
+_JOB_OF_KIND = {"judge": "judge", "everyday": "judge", "safety": "judge", "simpleqa": "judge",
+                "mab": "judge", "everyday_remark": "judge", "proposal": "data",
+                "generation": "data"}
+
+
+def _job_last_batches() -> dict[str, str]:
+    """16c: each job's last batch on OpenRouter, in one line (llm.batch_line),
+    when it failed, part or whole, or waits at a run of refusals"""
+    out: dict[str, str] = {}
+    for r in db.batches_list(300):
+        bid = r["batch_id"]
+        if not str(bid).startswith("or_"):
+            continue
+        job = _JOB_OF_KIND.get(r["kind"])
+        if r["kind"] == "qb":
+            try:
+                job = json.loads((builder._batches_dir() / f"{bid}.json")
+                                 .read_text(encoding="utf-8")).get("job")
+            except (OSError, ValueError):
+                job = None
+        if not job or job in out:
+            continue
+        tl = llm.tally(bid)
+        err = r.get("error") if r.get("status") == "failed" else ""
+        out[job] = (llm.batch_line(tl, err or "")
+                    if (tl or {}).get("failed") or err or (tl or {}).get("halted") else "")
+    return {j: line for j, line in out.items() if line}
+
+
 def _ai_page() -> dict:
     import judge as _judge
     jobs = []
+    last = _job_last_batches()
     for k, j in ai_models.JOBS.items():
         c = ai_models.choice(k)
         p, m, _ = llm.identity(j["role"])
@@ -2262,12 +2354,15 @@ def _ai_page() -> dict:
                      "suggested": j["suggested"], "why": j["why"],
                      "chosen": c, "from": "page" if c else ("environment" if p else None),
                      "provider": p, "model": m, "now": ai_models.label(k),
-                     "blocked": llm.blocked(j["role"]) if (c or p) else ""})
+                     "blocked": llm.blocked(j["role"]) if (c or p) else "",
+                     "last_batch": last.get(k, "")})
     ident = _judge.identity()
     return {"has_key": ai_models.has_key(), "jobs": jobs,
             "local": {"name": ai_models.local_name(ask=True), "model": ai_models.local_model()},
             "spend": {"month": round(db.spend_this_month(), 4), "limit": ai_models.limit(),
-                      "by_job": db.spend_this_month_by_job(), "waiting": ai_models.over_limit()},
+                      "by_job": db.spend_this_month_by_job(), "waiting": ai_models.over_limit(),
+                      # 16c: what the OpenRouter key may still spend, as it last said
+                      "key": ai_models.key_allowance()},
             "warnings": ai_models.warnings(_improving()),
             "judge": {"id": ident["id"], "version": _judge.version(ident)}}
 
@@ -2306,17 +2401,17 @@ def _rejudge_scope() -> dict:
             j = json.loads((d / "judge.json").read_text(encoding="utf-8"))
         except (OSError, ValueError):
             j = None
-        if j and not j.get("skipped"):
-            head = j.get("judge") or {}
-            v = (head.get("version") or {}).get("key")
-            if not ((v and v == key) or (not v and head.get("id") == ident["id"])):
+        if isinstance(j, dict) and not j.get("skipped"):
+            # 16c: either shape of a file's judge (judge_test.judge_of)
+            jid, v = judge_test.judge_of(j.get("judge"))
+            if not ((v and v == key) or (not v and jid == ident["id"])):
                 n = sum(1 for t in (j.get("tasks") or {}).values()
                         for it in t.get("items") or [] if not it.get("no_answer"))
                 if n:
                     exam[j.get("model") or d.name.replace("__", "/", 1)] = {
                         "n": n, "tasks": sorted(j.get("tasks") or {})}
         e = _ev.read(d)
-        if e and (e.get("judge") or {}).get("version") != key:
+        if e and judge_test.judge_of(e.get("judge"))[1] != key:
             n = len(_ev.judged_verdicts(e))
             if n:
                 evd[e.get("model") or d.name.replace("__", "/", 1)] = n

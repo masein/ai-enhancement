@@ -775,6 +775,100 @@ def provisional(backend: Backend, verb: str) -> dict:
     return local_mark(backend.name, backend.model, verb, getattr(backend, "base", None))
 
 
+# 16c: a batch's tally, by its folder: (results' size, tally)
+_TALLY: dict[str, tuple[int, dict]] = {}
+_HTTP_STATUS = re.compile(r": HTTP (\d{3}): ")
+
+
+def plain_error(error: str, status: int | None = None) -> str:
+    """a request's error in plain words: OpenRouter's (ai_models.refusal),
+    else its own first line — never the key or a header"""
+    from . import ai_models
+    text = str(error or "")
+    if status is None:
+        m = _HTTP_STATUS.search(text)
+        status = int(m.group(1)) if m else None
+    if "openrouter" in text.lower() or status is not None or "no response within" in text:
+        return ai_models.refusal(status, text)[1]
+    return ai_models._SECRET.sub("…", text.splitlines()[0] if text else "")[:200]
+
+
+def batch_dir(batch_id: str) -> Path | None:
+    """a batch worked on disk (LocalOpenAI, OpenRouterChat), by its id"""
+    kind = {"or": "openrouter", "local": "local"}.get(str(batch_id).split("_")[0])
+    d = config.BENCH_ROOT / "llm_batches" / kind / batch_id if kind else None
+    return d if d and _BATCH_ID.fullmatch(batch_id) and (d / "requests.jsonl").exists() else None
+
+
+def _halted(d: Path, retry_s: float) -> str:
+    try:
+        h = json.loads((d / "halt.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ""
+    if time.time() - float(h.get("at") or 0) >= retry_s:
+        return ""                           # it tries again; a new run of refusals stops it again
+    return str(h.get("why") or "")
+
+
+def tally(batch_id: str, d: Path | None = None, retry_s: float | None = None) -> dict | None:
+    """16c: what a batch on disk did — {sent, answered, failed, cancelled,
+    first_error, status, halted, first_at, last_at, recent} — for a card. No
+    backend is built (a local one asks its server). Cached by the size of its
+    results: a page asks every few seconds"""
+    d = d or batch_dir(batch_id)
+    if d is None or not (d / "requests.jsonl").exists():
+        return None
+    retry_s = OpenRouterChat.HALT_RETRY_S if retry_s is None else retry_s
+    p = d / "results.jsonl"
+    size = p.stat().st_size if p.exists() else 0
+    hit = _TALLY.get(str(d))
+    if hit and hit[0] == size:
+        return {**hit[1], "halted": _halted(d, retry_s)}
+    ids = [r["custom_id"] for r in LocalOpenAI._requests(d)]
+    res = LocalOpenAI._results(d)
+    got = [res[c] for c in ids if c in res]
+    bad = [r for r in got if r.get("error") and not r.get("cancelled")]
+    ats = sorted(r["at"] for r in got if isinstance(r.get("at"), (int, float)))
+    out = {"sent": len(ids), "answered": sum(1 for r in got if not r.get("error")),
+           "failed": len(bad), "cancelled": sum(1 for r in got if r.get("cancelled")),
+           "first_error": bad[0]["error"] if bad else "",
+           "status": bad[0].get("status") if bad else None,
+           "first_at": ats[0] if ats else None, "last_at": ats[-1] if ats else None,
+           "recent": ats[-50:]}
+    _TALLY[str(d)] = (size, out)
+    return {**out, "halted": _halted(d, retry_s)}
+
+
+def batch_line(t: dict | None, error: str = "") -> str:
+    """16c: a batch in one line, the same for every job that uses OpenRouter:
+    what was sent, answered and failed, and the first error in plain words —
+    a batch that failed whole says why, and one that waits says so"""
+    if not t:
+        return plain_error(error) if error else ""
+    n = lambda x: f"{int(x or 0):,}"
+    bits = [f"{n(t['sent'])} sent", f"{n(t['answered'])} answered"]
+    if t.get("failed"):
+        bits.append(f"{n(t['failed'])} failed")
+    if t.get("cancelled"):
+        bits.append(f"{n(t['cancelled'])} cancelled")
+    left = t["sent"] - t["answered"] - t.get("failed", 0) - t.get("cancelled", 0)
+    if left and (t.get("halted") or error):
+        bits.append(f"{n(left)} not answered")
+    line = " · ".join(bits)
+    if t.get("failed"):
+        line += f". The first failure: {plain_error(t['first_error'], t.get('status'))}"
+    elif error:
+        line += f". {plain_error(error)}"
+    if t.get("halted"):
+        line += ". " + t["halted"][:1].upper() + t["halted"][1:]
+    return line + ("" if line.endswith(".") else ".")
+
+
+def refusal_kind(rec: dict) -> str:
+    from . import ai_models
+    return ai_models.refusal(rec.get("status"), rec.get("error", ""))[0]
+
+
 class LocalOpenAI(Backend):
     """A local OpenAI-compatible server (vLLM) presented as a batch backend.
 
@@ -912,16 +1006,60 @@ class LocalOpenAI(Backend):
         ids = [r["custom_id"] for r in self._requests(d)]
         res = self._results(d)
         got = [res[c] for c in ids if c in res]
-        failed = [r for r in got if r.get("error")]
+        # 16c: a question cancelled (its set no longer chosen) never failed
+        failed = [r for r in got if r.get("error") and not r.get("cancelled")]
         cut = sum(1 for r in got if r.get("finish_reason") == "length")
         detail = (f"{len(got)}/{len(ids)} done" + (f", {len(failed)} failed" if failed else "")
                   + (f", {cut} cut off at {self.cap_name}={self.max_tokens}" if cut else ""))
         if len(got) < len(ids):
             self._ensure_worker(batch_id)   # after a restart: resume, never re-run
-            return "pending", detail
-        if ids and len(failed) == len(ids):
+            why = self.halted(batch_id)
+            return "pending", (f"{detail} · {why}" if why else detail)
+        if failed and not any(not r.get("error") for r in got):
             return "failed", failed[0]["error"]
         return "done", detail
+
+    # -- 16c: what a batch did, a run of refusals, and a cancel ---------------
+
+    def tally(self, batch_id: str) -> dict:
+        return tally(batch_id, self.dir / batch_id, self.HALT_RETRY_S)
+
+    def halted(self, batch_id: str) -> str:
+        """'' unless the batch stopped at a run of refusals; then why it waits"""
+        return _halted(self.dir / batch_id, self.HALT_RETRY_S)
+
+    def resume(self, batch_id: str) -> None:
+        """a halted batch takes up again now (Carry on)"""
+        (self.dir / batch_id / "halt.json").unlink(missing_ok=True)
+        self._ensure_worker(batch_id)
+
+    def _halt(self, batch_id: str, rec: dict, n: int) -> None:
+        why = (f"waiting: OpenRouter refused {n} requests in a row — "
+               f"{plain_error(rec.get('error', ''), rec.get('status'))}. It tries again in "
+               f"{round(self.HALT_RETRY_S / 60)} minutes" + self.HALT_TAIL)
+        (self.dir / batch_id / "halt.json").write_text(json.dumps(
+            {"why": why, "status": rec.get("status"), "at": time.time(), "n": n}),
+            encoding="utf-8")
+
+    def cancel(self, batch_id: str, custom_ids, why: str) -> int:
+        """16c: questions of a batch that are no longer wanted — never sent;
+        each is recorded as cancelled (never failed). Returns how many"""
+        d = self._bdir(batch_id)
+        res = self._results(d)
+        drop = [c for c in custom_ids if c not in res]
+        if not drop:
+            return 0
+        p = d / "cancelled.json"
+        try:
+            had = set(json.loads(p.read_text(encoding="utf-8")))
+        except (OSError, ValueError):
+            had = set()
+        p.write_text(json.dumps(sorted(had | set(drop))), encoding="utf-8")
+        with open(d / "results.jsonl", "a", encoding="utf-8") as fh:
+            for c in drop:
+                fh.write(json.dumps({"custom_id": c, "text": "", "error": f"cancelled: {why}",
+                                     "cancelled": True, "attempts": 0, "at": time.time()}) + "\n")
+        return len(drop)
 
     def fetch(self, batch_id: str) -> dict[str, Result]:
         d = self._bdir(batch_id)
@@ -965,20 +1103,57 @@ class LocalOpenAI(Backend):
                     todo.put(row)
                     n += 1
             write = threading.Lock()
+            # 16c: a run of refusals no retry fixes (the key's limit): held,
+            # not written, until it ends — at HALT_AFTER the batch waits and
+            # they are asked again later, never thousands marked failed
+            streak: dict = {"key": None, "held": [], "halted": False}
+
+            def put(rec: dict) -> None:
+                with open(out, "a", encoding="utf-8") as fh:
+                    fh.write(json.dumps(rec) + "\n")
+
+            def flush() -> None:
+                for r in streak["held"]:
+                    put(r)
+                streak["held"], streak["key"] = [], None
+
+            def gone() -> set:
+                try:
+                    return set(json.loads((d / "cancelled.json").read_text(encoding="utf-8")))
+                except (OSError, ValueError):
+                    return set()
 
             def drain() -> None:
                 while True:
                     # 12i.1: a paid backend may have to wait (its monthly
                     # limit): what is left stays unanswered, the batch pending
-                    if self.waiting():
+                    if self.waiting() or streak["halted"] or self.halted(batch_id):
                         return
                     try:
                         row = todo.get_nowait()
                     except queue.Empty:
                         return
+                    if row["custom_id"] in gone():
+                        continue                    # cancelled: recorded by cancel()
                     rec = self._complete({**row, "batch_id": batch_id})
-                    with write, open(out, "a", encoding="utf-8") as fh:
-                        fh.write(json.dumps(rec) + "\n")
+                    with write:
+                        if self.HALT_AFTER and rec.get("error") \
+                                and rec.get("status") in self.HALT_STATUSES:
+                            if streak["halted"]:
+                                continue            # asked again when it takes up again
+                            k = (rec.get("status"), refusal_kind(rec))
+                            if streak["key"] != k:
+                                flush()
+                                streak["key"] = k
+                            streak["held"].append(rec)
+                            if len(streak["held"]) >= self.HALT_AFTER:
+                                self._halt(batch_id, rec, len(streak["held"]))
+                                streak["held"], streak["key"] = [], None
+                                streak["halted"] = True
+                            continue
+                        if not streak["halted"]:
+                            flush()
+                        put(rec)
 
             pool = [threading.Thread(target=drain, name=f"llm-{batch_id}-{i}", daemon=True)
                     for i in range(min(self.concurrency, n))]
@@ -986,6 +1161,9 @@ class LocalOpenAI(Backend):
                 t.start()
             for t in pool:
                 t.join()
+            with write:
+                if not streak["halted"]:
+                    flush()                         # a short run: those were refusals of their own
         finally:
             os.close(fd)          # releases the flock
 
@@ -993,9 +1171,17 @@ class LocalOpenAI(Backend):
         """'' when requests may go out; the local server never waits"""
         return ""
 
+    # 16c: a run of refusals no retry fixes stops a batch — OpenRouter's (0: never)
+    HALT_AFTER = 0
+    HALT_STATUSES = (401, 402, 403)
+    HALT_RETRY_S = 600
+    HALT_TAIL = ""
+
     @staticmethod
     def _transient(e: LLMError) -> bool:
-        return e.status is None or e.status >= 500 or bool(_OOM.search(str(e)))
+        # 16c: a rate limit (429) and a timeout (408) are retried with the back-off too
+        return e.status is None or e.status >= 500 or e.status in (408, 429) \
+            or bool(_OOM.search(str(e)))
 
     def _complete(self, row: dict) -> dict:
         """One request, synchronously, retried while the failure looks
@@ -1016,7 +1202,7 @@ class LocalOpenAI(Backend):
                                self.timeout)
             except LLMError as e:
                 if wait is None or not self._transient(e):
-                    rec["error"] = str(e)[:400]
+                    rec.update(error=str(e)[:400], status=e.status, at=time.time())
                     return rec
                 time.sleep(wait)
                 continue
@@ -1026,6 +1212,7 @@ class LocalOpenAI(Backend):
                 rec["finish_reason"] = choice.get("finish_reason")
             except (ValueError, KeyError, IndexError, TypeError, AttributeError):
                 rec["error"] = f"unreadable reply from {self.base}: {raw[:200]!r}"
+            rec["at"] = time.time()
             return rec
 
 
@@ -1043,6 +1230,7 @@ class OpenRouterChat(LocalOpenAI):
     nothing — it never falls back to another model."""
     name = "openrouter"
     prefix = "or"
+    HALT_AFTER = 20
 
     def __init__(self, model: str, key: str, root: Path, pin: dict | None = None,
                  role: str = "llm"):
@@ -1094,10 +1282,11 @@ class OpenRouterChat(LocalOpenAI):
                                self.timeout)
             except LLMError as e:
                 if wait is None or not self._transient(e):
-                    rec["error"] = str(e)[:400]
+                    rec.update(error=str(e)[:400], status=e.status, at=time.time())
                     return rec
                 time.sleep(wait)
                 continue
+            rec["at"] = time.time()
             try:
                 reply = json.loads(raw)
                 choice = reply["choices"][0]

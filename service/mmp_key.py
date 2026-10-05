@@ -49,6 +49,46 @@ SLOT_WHY = {"first": "the strong model the reasoning lab validates with",
             "third": "a third maker, for the splits"}
 IN_HOUSE = re.compile(r"qwen[\s_-]*3[._-]?6", re.I)
 STOPPED = "stopped — Start carries on where it stopped"
+# 16c: what is labelled — Mobile-MMLU-Pro alone (masein, 5 Oct: the default),
+# or Pro and then the full set
+SCOPES = {"pro": "Mobile-MMLU-Pro only", "all": "Pro, then the full set"}
+SCOPE_SHORT = {"pro": "Pro only", "all": "Pro, then the full set"}
+
+
+def scope() -> str:
+    """"pro" or "all": what the card chose — Pro alone while the full set is
+    switched off (14.4.5), and by default"""
+    if not mmp.full_on():
+        return "pro"
+    v = db.ai_get("mmp:scope", "pro")
+    return v if v in SCOPES else "pro"
+
+
+def scope_meta() -> dict:
+    m = db.ai_get_meta("mmp:scope") or {}
+    return {"value": scope(), "words": SCOPES[scope()], "by": m.get("by") or "",
+            "at": m.get("at"), "chosen": bool(m)}
+
+
+def set_scope(value: str, by: str) -> dict:
+    """the card's choice, kept with who chose it and when; Pro only cancels
+    what is out for the full set's own questions"""
+    if value not in SCOPES:
+        raise ValueError(f"no such choice: {value} — {' or '.join(SCOPES)}")
+    if value == "all" and not mmp.full_on():
+        raise ValueError("the full Mobile-MMLU is switched off on this server "
+                         "(MOBILE_MMLU_FULL=0): only Pro can be labelled")
+    db.ai_set("mmp:scope", value, by)
+    prune()
+    return scope_meta()
+
+
+class LabellerChat(llm.OpenRouterChat):
+    """a labeller's batch: OpenRouter's, held while the run is stopped"""
+    HALT_TAIL = ", or now with Carry on"
+
+    def waiting(self) -> str:
+        return STOPPED if stopped() else super().waiting()
 
 
 def _setting(slot: str) -> str:
@@ -205,9 +245,32 @@ def _out_now() -> dict[str, set]:
 
 def _rows() -> list[dict]:
     """the questions labelling may send: the pool — Pro's alone while the full
-    set is switched off (14.4.5). The key keeps every label either way"""
+    set is switched off (14.4.5), or (16c) while Pro alone is chosen. The key
+    keeps every label either way"""
     rows = mmp.pool()
-    return rows if mmp.full_on() else [q for q in rows if "pro" in q["sets"]]
+    return rows if scope() == "all" else [q for q in rows if "pro" in q["sets"]]
+
+
+def prune(why: str = "") -> int:
+    """16c: a batch out for questions that aren't chosen now is cancelled,
+    never left waiting — one held at the monthly limit would take up again by
+    itself when the month turns. Returns how many questions were cancelled"""
+    if scope() == "all":
+        return 0
+    try:
+        mine = {q["lid"] for q in _rows()}
+    except Exception:                               # noqa: BLE001 — no file here: nothing out
+        return 0
+    n = 0
+    for p in pending():
+        drop = [f"mmpk:{p['slot']}:{k}" for k in p.get("ids") or [] if k not in mine]
+        if drop:
+            try:
+                n += batch_backend(p["batch_id"]).cancel(
+                    p["batch_id"], drop, why or "the full set isn’t chosen (Pro only)")
+            except llm.LLMError:
+                continue
+    return n
 
 
 def left(rows: list[dict] | None = None) -> dict:
@@ -317,13 +380,6 @@ def stopped() -> dict | None:
 # the run: Start, Stop, and each batch as it lands
 # ---------------------------------------------------------------------------
 
-class LabellerChat(llm.OpenRouterChat):
-    """a labeller's batch: OpenRouter's, held while the run is stopped"""
-
-    def waiting(self) -> str:
-        return STOPPED if stopped() else super().waiting()
-
-
 def _backend(pin: dict) -> llm.Backend:
     if not config.OPENROUTER_API_KEY:
         raise llm.LLMError("OpenRouter has no key on this server")
@@ -368,7 +424,8 @@ def _pinned(slot: str, by: str) -> dict:
     try:
         value = ai_models.pin(d["id"])
     except ValueError as e:
-        raise ValueError(f"{SLOT_LABEL[slot]}: {e} — choose another on AI models") from None
+        # 16c: in OpenRouter's words (ai_models.refusal), "choose another" once
+        raise ValueError(f"{SLOT_LABEL[slot]}: {e}") from None
     db.ai_set(_setting(slot), value, by)
     return value
 
@@ -385,17 +442,23 @@ def start(by: str) -> dict:
     bad = problems()
     if bad:
         raise ValueError(bad[0])
+    # 16c: everything checked before anything is sent — all three labellers
+    # pinned, and each still the version it was pinned to. One that can't be
+    # sends nothing, and says why
+    for slot in mmp.SLOTS:
+        drift = ai_models.drifted(_pinned(slot, by))
+        if drift:
+            raise ValueError(f"{SLOT_LABEL[slot]}: {drift}")
     (mmp.key_dir() / "stopped.json").unlink(missing_ok=True)
+    prune()
     rows = _rows()
     now = due(rows)
     # 14.4: Pro's questions first; the rest once Pro's key is whole — sent then
-    # by advance(), once a Start
+    # by advance(), once a Start (16c: only when the full set is chosen)
     first_round_is_all = not pro_open(rows)
     mmp._write(mmp.key_dir() / "run.json", {"by": by, "at": time.time(),
                                              "rest_sent": first_round_is_all})
     sent = {}
-    for slot in ("first", "second"):
-        _pinned(slot, by)
     for slot in ("first", "second"):
         ids = now[slot]
         if ids:
@@ -403,9 +466,11 @@ def start(by: str) -> dict:
     third = advance(by)
     if third:
         sent["third"] = third
-    for p in pending():                       # a stopped batch takes up again
+    for p in pending():                       # a stopped or halted batch takes up again
         try:
-            batch_backend(p["batch_id"]).status(p["batch_id"])
+            be = batch_backend(p["batch_id"])
+            be.resume(p["batch_id"])
+            be.status(p["batch_id"])
         except llm.LLMError:
             pass
     return {"sent": sent, "pending": len(pending())}
@@ -473,15 +538,74 @@ def failed(batch_id: str, why: str) -> None:
     print(f"[mmp key] {batch_id} failed: {why}")
 
 
+def _progress(p: dict) -> str:
+    """16c: a batch out, as it goes: "1,859 of 2,714 · about 9 min left ·
+    $27.67 so far" — the pace from its last answers"""
+    tl = llm.tally(p["batch_id"])
+    if not tl:
+        return p.get("progress") or ""
+    done = tl["answered"] + tl["failed"] + tl["cancelled"]
+    bits = [f"{done:,} of {tl['sent']:,}"]
+    r = tl.get("recent") or []
+    if done < tl["sent"] and not tl.get("halted") and len(r) >= 5 and r[-1] > r[0]:
+        secs = (tl["sent"] - done) * (r[-1] - r[0]) / (len(r) - 1)
+        bits.append(f"about {max(1, round(secs / 60)):,} min left" if secs < 5400
+                    else f"about {secs / 3600:.1f} h left")
+    bits.append(f"${db.spend_of_batch(p['batch_id']):,.2f} so far")
+    line = " · ".join(bits)
+    why = tl.get("halted") or ""
+    return f"{line} · {why}" if why else line
+
+
+def last_batches() -> dict:
+    """16c: each labeller's last batch, in one line (llm.batch_line) — only
+    one that failed, part or whole, or waits at a run of refusals"""
+    out: dict = {}
+    for r in db.batches_list(500):
+        if r["kind"] != KIND:
+            continue
+        try:
+            slot = _meta(r["batch_id"])["slot"]
+        except (OSError, ValueError, KeyError):
+            continue
+        if slot in out:
+            continue
+        tl = llm.tally(r["batch_id"])
+        err = r.get("error") if r.get("status") == "failed" else ""
+        out[slot] = {"batch_id": r["batch_id"], "status": r.get("status"),
+                     "failed": bool((tl or {}).get("failed") or err or (tl or {}).get("halted")),
+                     "line": f"{SLOT_LABEL[slot]}’s last batch: {llm.batch_line(tl, err or '')}"}
+    return out
+
+
+def done_for_scope() -> bool:
+    """16c: what was chosen is labelled — nothing left to send, nothing out"""
+    try:
+        return not pending() and not any(left().values())
+    except Exception:                               # noqa: BLE001 — no file: not done
+        return False
+
+
 def status() -> dict:
     """the AI models page's card: the labellers, the dry run, the run, the key"""
     labs = labellers()
     k = mmp.current_key()
     out_now = pending()
     f = mmp.full_key()
+    est = estimate(stats=bool(mmp.available()))
+    sc = scope()
+    # 16c: what Start sends now — the chosen set's cost — and what the
+    # OpenRouter key may still spend
+    sends = ((est.get("sets") or {}).get("pro") if sc == "pro" else est) or est
     return {"available": mmp.available(), "full_available": mmp.full_available(),
             # 14.4.5: switched off, the card shows Pro alone
             "full_on": mmp.full_on(),
+            "scope": scope_meta(), "scopes": SCOPES if mmp.full_on() else {"pro": SCOPES["pro"]},
+            "sends": {"usd": sends.get("usd"), "usd_known": sends.get("usd_known"),
+                      "questions": sends.get("questions"), "words": SCOPE_SHORT[sc]},
+            "done": not mmp.available() and done_for_scope(),
+            "key_warning": ai_models.more_than_key(sends.get("usd")),
+            "key_allowance": ai_models.key_allowance(),
             # 14.4: each set's view of the one key
             "sets": {"pro": {"version": k.get("version") or "", "counts": k.get("counts") or {}},
                      **({"full": {"version": f.get("version") or "",
@@ -492,9 +616,10 @@ def status() -> dict:
                            "refused": refused(s, labs[s].get("id", ""), labs)}
                           for s in mmp.SLOTS],
             "problems": problems(),
-            "estimate": estimate(stats=bool(mmp.available())),
+            "estimate": est,
             "running": [{"slot": p["slot"], "n": len(p.get("ids") or []),
-                         "progress": p.get("progress", "")} for p in out_now],
+                         "progress": _progress(p)} for p in out_now],
+            "last": last_batches(),
             "stopped": stopped(),
             "key": {"version": k.get("version") or "", "counts": k.get("counts") or {},
                     "built_at": k.get("built_at"), "labels": mmp.DECIDED}}
