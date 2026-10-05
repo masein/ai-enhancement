@@ -410,3 +410,29 @@ def test_served_thinking_run_from_the_board(svc, monkeypatch):  # noqa: F811
         assert len(fake.requests) == n and db.get(sid2)["status"] == "done"
     finally:
         fake.close()
+
+
+def test_the_docs_command_is_the_scripts_and_fetches_its_bundle():
+    """docs/REMOTE-RUNS.md § G2–G4: the box's command parses as remote_gguf.py
+    reads it, and the server fetches and imports the bundle it writes"""
+    import shlex
+    doc = (Path(__file__).resolve().parents[1] / "docs" / "REMOTE-RUNS.md").read_text()
+    lines = doc.split("## G2.", 1)[1].split("```bash", 1)[1].split("```", 1)[0]
+    cmd = shlex.split(" ".join(x.rstrip("\\").strip() for x in lines.splitlines()
+                               if x.strip() and not x.startswith(("tmux", "cd ", "read "))))
+    assert cmd[:2] == ["python", "scripts/remote_gguf.py"]
+    seen = {}
+    real = rg.argparse.ArgumentParser.parse_args
+
+    def keep(self, argv=None, namespace=None):
+        a = real(self, argv, namespace)
+        seen["a"] = a
+        raise SystemExit(0)
+    import unittest.mock as um
+    with um.patch.object(rg.argparse.ArgumentParser, "parse_args", keep), \
+            pytest.raises(SystemExit):
+        rg.main(cmd[2:])
+    a = seen["a"]
+    assert a.thinking == "on" and a.gguf.startswith("hf://") and a.server.startswith("hf://")
+    name = rb.bundle_name("frontier", a.served_as, True)
+    assert f"{a.out}/{name}".replace(a.served_as.replace("/", "__"), "served__<name>") in doc

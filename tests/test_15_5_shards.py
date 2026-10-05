@@ -239,7 +239,9 @@ def test_the_docs_commands_for_the_two_waiting_runs():
         ("google/gemma-4-E2B-it", "1/3"): (None, "/workspace/gemma-1", "on"),
         ("google/gemma-4-E2B-it", "2/3"): (None, "/workspace/gemma-2", "on"),
         ("google/gemma-4-E2B-it", "3/3"): (None, "/workspace/gemma-3", "on")}
-    fetched = [x.split(":", 1)[1].split()[0] for x in doc.splitlines() if x.startswith("scp ")]
+    # 17: the GGUF section's own scp lines fetch Frontier bundles: not these
+    fetched = [x.split(":", 1)[1].split()[0] for x in doc.splitlines() if x.startswith("scp ")
+               and "/devicemark-" in x]
     assert fetched == [f"{out}/{rb.bundle_name('devicemark', m, True, dm.parse_shard(s))}"
                        for (m, s), (_, out, _) in got.items()]
 
