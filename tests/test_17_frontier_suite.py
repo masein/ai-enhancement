@@ -17,6 +17,7 @@ from fake_openai import FakeServer
 from service import config, db, questions, runner, served
 from service import frontier as sf
 from test_12q_devicemark_runs import ME, svc  # noqa: F401 — svc is the fixture
+from test_17_gguf_box import box  # noqa: F401 — the box's fixture
 
 
 def submit(client, hf_id: str, **kw):
@@ -268,3 +269,46 @@ def test_runner_refuses_a_frontier_run_of_a_hub_model(svc):  # noqa: F811
     runner.run_submission(db.get(sid))
     row = db.get(sid)
     assert row["status"] == "failed" and "running on a server" in row["error"]
+
+
+# ---------------------------------------------------------------------------
+# a box run of the others, end to end: MMLU-Pro's examples found on the box
+# and on the server, OTIS scored by code with Epoch's check waiting
+# ---------------------------------------------------------------------------
+
+def test_a_box_runs_mmlu_pro_and_otis_and_the_server_scores_them(box, monkeypatch):  # noqa: F811
+    import import_remote as ir
+    import remote_bundle as rb
+    from test_17_gguf_box import ROW, SERVED, register, run_box
+    mm = {"items": [{"id": str(k), "question": f"Q{k}?", "options": ["w", "x"],
+                     "answer": "A" if k % 2 else "B", "category": "law"} for k in range(6)],
+          "extra": {"shots": {"law": [{"question": "Q?", "options": ["a", "b"],
+                                       "cot_content": "A: Let's think step by step. (A)"}]}}}
+    otis = [{"id": f"o{k}", "question": f"Problem {k}.", "answer": "042" if k else "7"}
+            for k in range(3)]
+    monkeypatch.setattr(fb, "_fetch", lambda task: {"mmlupro_tiger": mm,
+                                                    "otis_aime_epoch": otis}[task])
+    # run_box names GPQA with --only; these replace it
+    import test_17_gguf_box as g
+    monkeypatch.setattr(g, "TASK", "mmlupro_tiger")
+    assert run_box(box, "run", "--only", "otis_aime_epoch") == 0
+    path = box["root"] / "run" / rb.bundle_name("frontier", SERVED, True)
+    b = rb.read(path)
+    assert set(b["bundle"]["tasks"]) == {"mmlupro_tiger", "otis_aime_epoch"}
+    # the box asked with the 5-shot examples: the fake saw them in each prompt
+    reqs = [json.loads(x) for x in box["log"].read_text().splitlines()]
+    mm_reqs = [r for r in reqs if "multiple choice questions (with answers) about law" in
+               r["messages"][-1]["content"]]
+    assert len(mm_reqs) == 6 and all("Question: Q?\nOptions: A. a\nB. b\nAnswer: Let's think "
+                                     "step by step. (A)" in r["messages"][-1]["content"]
+                                     for r in mm_reqs)
+    register(box["sha"])
+    assert ir.import_bundle(path, "masein", lambda x: None) == 0
+    row = config.OUT_DIR / ROW
+    res = json.loads(next(sf.task_dir(row, "mmlupro_tiger").glob("results_*.json")).read_text())
+    # the fake answers "ANSWER: A": TIGER-Lab's chain reads A; half the keys are A
+    assert res["results"]["mmlupro_tiger"]["acc,none"] == pytest.approx(0.5)
+    o = json.loads(next(sf.task_dir(row, "otis_aime_epoch").glob("results_*.json")).read_text())
+    # OTIS by code (every answer A: none an integer), Epoch's check waiting for Start
+    assert o["results"]["otis_aime_epoch"]["acc,none"] == 0.0
+    assert o["frontier"]["look"]["waiting"] == 3 * fb.BENCH["otis_aime_epoch"]["epochs"]
