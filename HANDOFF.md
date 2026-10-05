@@ -5009,6 +5009,9 @@ GGUF on a rented box, through the same code.
 - **`scripts/build_llama_tarball.sh`**: masein's, once — the fork compiled in
   nvidia/cuda 12.8 on Ubuntu 22.04 for sm 80–120, llama-server, its libraries
   and CUDA's runtime, cuBLAS and cuBLASLt, with a VERSION file.
+- **On the page**: the report's `FRONTIER_TASKS` takes `frontier.TASKS` too, so
+  these are never in an Avg or in Improve, and the Frontier view draws them
+  with what others report of the same benchmark (`REP_SAME`).
 - Tests: `tests/test_17_gguf_box.py` with `tests/fixtures/fake_llama_server.py`
   (stdlib, started from a test tarball).
 

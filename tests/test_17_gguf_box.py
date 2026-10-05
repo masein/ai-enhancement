@@ -238,9 +238,11 @@ def test_gguf_run_bundle_and_import(box):
     assert res["results"][TASK]["acc,none"] == pytest.approx(expected())
     assert res["frontier"]["where"] == "run on a rented GPU (NVIDIA GeForce RTX 5090)"
     assert res["frontier"]["epochs"] == RUNS and res["frontier"]["ran_out"] == 0
-    # the board reads it as the model's "· thinking" row
+    # the board reads it as the model's "· thinking" row — a Frontier benchmark,
+    # never in an average
     runs = [r for r in report.load_results(config.OUT_DIR) if r["model"] == SERVED + " · thinking"]
     assert runs and runs[0]["tasks"][TASK]["acc"]["value"] == pytest.approx(expected())
+    assert TASK in report.FRONTIER_TASKS
     # the Runs list has the import, with the bundle's log
     imp = [r for r in db.recent(10) if r["suite"] == "frontier"]
     assert imp and imp[0]["status"] == "done" and "rented GPU" in imp[0]["note"]

@@ -1474,6 +1474,20 @@ BBQ_TASKS = ("bbq_3000", "bbq_all")
 # for the same questions. Standard benchmarks: never in the Avg, never a
 # training target, never in Improve. GPQA's questions are never shown
 FRONTIER_TASKS = ("gpqa_diamond_zeroshot", "gpqa_diamond_cot_zeroshot", "simpleqa_verified")
+
+
+def _epoch_tasks() -> tuple[str, ...]:
+    """17: the Frontier benchmarks as Epoch AI runs them (scripts/frontier.py)"""
+    try:
+        import frontier
+        return tuple(frontier.TASKS)
+    except ImportError:                    # a frozen report without the scripts beside it
+        return ()
+
+
+# 17: …and the Frontier benchmarks as Epoch AI runs them, the same: never in an
+# Avg, never in Improve
+FRONTIER_TASKS = FRONTIER_TASKS + _epoch_tasks()
 # 12o.3: MobileAIBench's HotpotQA and SQL — never in the Avg, never a training
 # target, never in Improve
 MAB_TASKS = ("mab_hotpotqa", "mab_sql", "mab_dolly", "mab_cnndm", "mab_xsum", "mab_mtbench",
@@ -11622,6 +11636,7 @@ const BENCH_NAMES = { mmlu: 'MMLU', hellaswag: 'HellaSwag', piqa: 'PIQA', winogr
   hendrycks_math500: 'MATH-500', do_not_answer: 'Do-Not-Answer', xstest: 'XSTest',
   bbq_3000: 'BBQ', bbq_all: 'BBQ (all 29,246)',
   gpqa_diamond_cot_zeroshot: 'GPQA Diamond (CoT)', gpqa_diamond_zeroshot: 'GPQA Diamond (4 options)',
+  gpqa_diamond_epoch: 'GPQA Diamond (Epoch AI\u2019s way)',
   simpleqa_verified: 'SimpleQA Verified', mab_hotpotqa: 'HotpotQA (MobileAIBench)',
   mab_sql: 'SQL from a question (MobileAIBench)', mab_dolly: 'Dolly (MobileAIBench)',
   mab_cnndm: 'CNN/DailyMail (MobileAIBench)', mab_xsum: 'XSum (MobileAIBench)',
@@ -12062,7 +12077,7 @@ const LB_SHORT = { arc_challenge: 'ARC-C', arc_easy: 'ARC-E', truthfulqa_mc2: 'T
   ifeval: 'IFEval', mmlu_pro: 'MMLU-Pro', hendrycks_math500: 'MATH-500',
   do_not_answer: 'Do-Not-Answer', xstest: 'XSTest', bbq_3000: 'BBQ', bbq_all: 'BBQ, all',
   gpqa_diamond_cot_zeroshot: 'GPQA CoT', gpqa_diamond_zeroshot: 'GPQA 4 opts',
-  simpleqa_verified: 'SimpleQA', mab_hotpotqa: 'HotpotQA', mab_sql: 'SQL',
+  gpqa_diamond_epoch: 'GPQA', simpleqa_verified: 'SimpleQA', mab_hotpotqa: 'HotpotQA', mab_sql: 'SQL',
   mab_dolly: 'Dolly', mab_cnndm: 'CNN/DM', mab_xsum: 'XSum', mab_mtbench: 'MT-Bench',
   mab_adv: 'Adv. instr.', mab_privacy: 'Privacy', mab_socchem: 'Agrees with crowd',
   mobile_mmlu_pro: 'Mobile-MMLU-Pro', mobile_mmlu_full: 'Mobile-MMLU (full)',
@@ -12527,6 +12542,8 @@ const REP_SAME = { mmlu: ['mmlu'], mmlu_pro: ['mmlu-pro', 'mmlu pro'], hendrycks
   ['truthfulqa'], ifeval: ['ifeval'], piqa: ['piqa'],
   // 12n.2: measured here, three ways for GPQA
   gpqa_diamond_cot_zeroshot: ['gpqa diamond'], gpqa_diamond_zeroshot: ['gpqa diamond'],
+  // 17: as Epoch AI runs it
+  gpqa_diamond_epoch: ['gpqa diamond'],
   simpleqa_verified: ['simpleqa verified'] };
 const repSame = (t, b) => (REP_SAME[t] || []).includes(String(b).toLowerCase().trim());
 // 12n.1: what others report of a benchmark measured here — dashed reference
