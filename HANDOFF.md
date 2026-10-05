@@ -4953,6 +4953,32 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 16c's review (5 Oct)
+
+- **A printed shell line quotes every path** (`downloads.shell_path`,
+  `shlex.quote`; a leading `~/` stays outside the quotes so it still
+  expands), and makes the folder first: `mkdir -p … && ln … …`. A registered
+  GGUF path may hold no quote, backtick or control character
+  (`gguf._check_path`). The Download panel's `curl` line quotes its values
+  the same way (`shq` in the page).
+- **A run of refusals pauses a batch only when it is about the key**
+  (`LocalOpenAI.HALT_KINDS`: its limit or credit, the key refused, or a rate
+  limit that outlasted the retries). A request refused for its own content is
+  recorded as failed and the batch goes on — before, twenty of those paused it
+  for good, asked first each time it took up again.
+- **`mmp_key.prune()` cancels nothing unless Pro's file was read** and the
+  pool holds Pro's questions: an unreadable file gave an empty pool, and every
+  question out, Pro's included, was cancelled.
+- **Registering a served file changes only the setups the caller may**
+  (`served.set_file`): one someone else added is skipped unless the owner
+  registers it, and the panel lists which setups it will change before
+  Register (`served.file_setups`). A new path switches downloads off again, so
+  "Downloads stay off until you switch them on" is true.
+- **Whoever added a file, and the board's owner, may download it while
+  "Others can download it" is off** (`downloads.keeps`, by the name on the
+  link or the `X-Who` header): the panel shows them Download and the `curl`
+  line, and one line says others can't take it yet.
+
 ### 16c part 8 — Download and Use as an API open where they were clicked (5 Oct)
 
 masein, on the page of Qwen3.6 k4-LDA · MTP: "download button doesnt work". Its

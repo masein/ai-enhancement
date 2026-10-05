@@ -251,15 +251,20 @@ def _rows() -> list[dict]:
     return rows if scope() == "all" else [q for q in rows if "pro" in q["sets"]]
 
 
-def prune(why: str = "") -> int:
+def prune() -> int:
     """16c: a batch out for questions that aren't chosen now is cancelled,
     never left waiting — one held at the monthly limit would take up again by
-    itself when the month turns. Returns how many questions were cancelled"""
-    if scope() == "all":
+    itself when the month turns. Returns how many questions were cancelled.
+    16c review: nothing is cancelled unless Pro's file was read and the pool
+    holds Pro's questions — an unreadable file gives an empty pool, and every
+    question out, Pro's included, would have gone"""
+    if scope() == "all" or mmp.available():
         return 0
     try:
-        mine = {q["lid"] for q in _rows()}
+        mine = {q["lid"] for q in _rows() if "pro" in q["sets"]}
     except Exception:                               # noqa: BLE001 — no file here: nothing out
+        return 0
+    if not mine:
         return 0
     n = 0
     for p in pending():
@@ -267,7 +272,7 @@ def prune(why: str = "") -> int:
         if drop:
             try:
                 n += batch_backend(p["batch_id"]).cancel(
-                    p["batch_id"], drop, why or "the full set isn’t chosen (Pro only)")
+                    p["batch_id"], drop, "the full set isn’t chosen (Pro only)")
             except llm.LLMError:
                 continue
     return n

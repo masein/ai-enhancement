@@ -155,7 +155,12 @@ def test_choosing_pro_then_the_full_set_is_kept_with_who_and_when(live, page):
         page.locator("[data-mmp-scope-pick='all']").check()
         page.wait_for_selector("[data-mmp-scope='all'] [data-mmp-scope-by]")
         assert page.locator("[data-mmp-scope-by]").inner_text().startswith(f"· chosen by {ME}, ")
-        assert page.locator("[data-mmp-start]").inner_text().endswith("· Pro, then the full set")
+        # the Start line and the button: the cost of both sets, Pro's first
+        cost = page.evaluate("usd(state.ai.mmp.sends.usd)")
+        assert page.locator("[data-mmp-start]").inner_text() == (
+            f"Start labelling: about {cost} · Pro, then the full set")
+        assert page.locator("[data-mmp-total]").inner_text().startswith(
+            f"Start: about {cost} · Pro, then the full set · this month ")
         assert db.ai_get("mmp:scope") == "all"
     finally:
         db.ai_set("mmp:scope", "pro", ME)

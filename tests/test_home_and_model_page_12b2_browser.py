@@ -367,8 +367,15 @@ def test_answers_are_by_kind_then_topic_or_group(live, page):
     kinds = page.locator("#pop-sel-answers-pick [role='option']")
     page.wait_for_function("document.querySelectorAll(\"#pop-sel-answers-pick "
                            "[role='option']\").length > 2")
-    vals = kinds.evaluate_all("xs => xs.map(x => x.dataset.value)")
-    assert vals[:2] == ["everyday", "exam"] and all(v.startswith("b:") for v in vals[2:])
+    # exactly: Everyday, the exam, then every benchmark the server lists as
+    # readable for it, in the Results table's groups, by its plain name
+    listed = page.evaluate("fetch('api/answers/benchmarks?model=' + encodeURIComponent("
+                           "state.model)).then(r => r.json())")
+    want = page.evaluate("ts => domainGroups(ts).flatMap(([, g]) => g.map(t => ['b:' + t, "
+                         "resultName(t)]))", [x["task"] for x in listed["tasks"]])
+    got = kinds.evaluate_all("xs => xs.map(x => [x.dataset.value, "
+                             "x.querySelector('.opt-l').textContent])")
+    assert got == [["everyday", "Everyday"], ["exam", "Knowledge exam"], *want] and want
     page.keyboard.press("Escape")
     pick_answers(page, "exam")
     page.wait_for_selector("[data-panel='model-answers'] .anscard")
@@ -388,6 +395,12 @@ def test_answers_are_by_kind_then_topic_or_group(live, page):
     open_model(page, live["base"], STANDARD_ONLY)
     page.locator("[data-mtab='answers']").click()
     page.wait_for_selector("[data-answers-pick^='b:']")
+    # and one with no answers on file at all says so in one line
+    page.route("**/api/answers/benchmarks?*", lambda r: r.fulfill(json={"tasks": [], "why": {}}))
+    page.reload()
+    page.locator("[data-mtab='answers']").click()
+    assert page.locator("[data-answers-none]").inner_text() == (
+        "No answers on file to read yet: only its scores are.")
     assert page.errors == []
 
 

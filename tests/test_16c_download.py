@@ -5,6 +5,8 @@ records and small files written in; nothing runs."""
 
 from __future__ import annotations
 
+import shlex
+
 import pytest
 
 from conftest import make_service
@@ -81,10 +83,12 @@ def test_a_file_the_board_cant_read_gives_the_next_step(svc, tmp_path):
     r = put(client, "served/lda", away)
     assert r.status_code == 422
     root = str(config.BENCH_ROOT).rstrip("/")
+    # 16c review: the folder made first, every path quoted for a shell
     assert r.json()["detail"] == (
         f"The board can’t read {away}: the folders it sees are under {root}. Put the file, or a "
-        f"hard link to it, there — on the same disk a hard link takes no space: ln '{away}' "
-        f"'{root}/models/{FILE}' — then register that path.")
+        f"hard link to it, there — on the same disk a hard link takes no space: mkdir -p "
+        f"{shlex.quote(root + '/models')} && ln {shlex.quote(away)} "
+        f"{shlex.quote(root + '/models/' + FILE)} — then register that path.")
     # one registered before it moved says the same, on its panel
     rec = served.get("served/lda")
     rec["gguf_path"] = away

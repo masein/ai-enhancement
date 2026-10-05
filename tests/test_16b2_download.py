@@ -107,7 +107,9 @@ def test_the_token_is_needed_and_never_in_a_link(svc, monkeypatch):
 def test_who_may_download_it_is_the_word_of_the_one_who_added_it(svc):
     client, _ = svc
     mid = upload(client, model_bytes(), download=False)
-    r = client.post("/api/models/file/link", json={"model": mid, "by": ME})
+    # 16c review: who added it may take it while the switch is off; anyone else can't
+    assert client.post("/api/models/file/link", json={"model": mid, "by": ME}).status_code == 200
+    r = client.post("/api/models/file/link", json={"model": mid, "by": "omar"})
     assert r.status_code == 403 and r.json()["detail"] == f"Downloads of {mid} are switched off by masein."
     r = client.post("/api/models/file/allow", json={"model": mid, "allowed": True, "by": "omar"})
     assert r.status_code == 403 and r.json()["detail"] == \

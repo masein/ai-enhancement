@@ -1021,9 +1021,6 @@ class LocalOpenAI(Backend):
 
     # -- 16c: what a batch did, a run of refusals, and a cancel ---------------
 
-    def tally(self, batch_id: str) -> dict:
-        return tally(batch_id, self.dir / batch_id, self.HALT_RETRY_S)
-
     def halted(self, batch_id: str) -> str:
         """'' unless the batch stopped at a run of refusals; then why it waits"""
         return _halted(self.dir / batch_id, self.HALT_RETRY_S)
@@ -1137,11 +1134,15 @@ class LocalOpenAI(Backend):
                         continue                    # cancelled: recorded by cancel()
                     rec = self._complete({**row, "batch_id": batch_id})
                     with write:
-                        if self.HALT_AFTER and rec.get("error") \
-                                and rec.get("status") in self.HALT_STATUSES:
+                        # 16c review: only a refusal about the key — its limit,
+                        # the key itself, or a rate limit that outlasted the
+                        # retries — pauses; one refused for its own content is
+                        # recorded as failed and the batch goes on
+                        kind = refusal_kind(rec) if rec.get("error") else ""
+                        if self.HALT_AFTER and kind in self.HALT_KINDS:
                             if streak["halted"]:
                                 continue            # asked again when it takes up again
-                            k = (rec.get("status"), refusal_kind(rec))
+                            k = kind
                             if streak["key"] != k:
                                 flush()
                                 streak["key"] = k
@@ -1171,9 +1172,11 @@ class LocalOpenAI(Backend):
         """'' when requests may go out; the local server never waits"""
         return ""
 
-    # 16c: a run of refusals no retry fixes stops a batch — OpenRouter's (0: never)
+    # 16c: a run of refusals about the key stops a batch — OpenRouter's (0:
+    # never): its limit or credit, the key refused, or a lasting rate limit
+    # (ai_models.refusal's kinds)
     HALT_AFTER = 0
-    HALT_STATUSES = (401, 402, 403)
+    HALT_KINDS = ("limit", "key", "rate")
     HALT_RETRY_S = 600
     HALT_TAIL = ""
 

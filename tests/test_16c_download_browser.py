@@ -8,6 +8,7 @@ written in; nothing runs."""
 
 from __future__ import annotations
 
+import shlex
 from pathlib import Path
 from urllib.parse import quote
 
@@ -107,6 +108,16 @@ def test_its_file_is_registered_from_the_panel_for_every_setup_of_it(live, page)
     form.wait_for()
     assert form.locator(f"[data-dl-hint='{mid}']").inner_text() == (
         f"Its server reports {FILE}. One registration serves every setup of that file.")
+    # 16c review: which setups it will change, before Register
+    assert form.locator("[data-dl-setups]").inner_text() == (
+        "It will be registered for 2 setups of this file: Qwen3.6 k4-LDA · MTP, "
+        "Qwen3.6 k4-LDA · lookahead.")
+    # the terminal line quotes every value: a file's name runs nothing
+    cmd = page.evaluate("dlCmd({name: \"a'b; touch PWNED; echo .gguf\"}, 'served/x')")
+    words = shlex.split(cmd)
+    assert words[:4] == ["curl", "-C", "-", "-fL"] and words[8:10] == [
+        "-o", "a'b; touch PWNED; echo .gguf"] and len(words) == 11
+    assert words[5] == "X-Token: $BOARD_TOKEN" and words[7] == f"X-Who: {ME}"
     # a path the board can't read: the next step, in words
     away = f"/srv/llama-models/{FILE}"
     form.locator("[data-dl-path]").fill(away)
@@ -114,7 +125,8 @@ def test_its_file_is_registered_from_the_panel_for_every_setup_of_it(live, page)
     msg = page.locator(f"[data-dl-msg='{mid}']")
     msg.wait_for()
     assert msg.inner_text().startswith(f"The board can’t read {away}: the folders it sees are "
-                                       "under ") and f"ln '{away}'" in msg.inner_text()
+                                       "under ") and f"&& ln {shlex.quote(away)} " in \
+        msg.inner_text()
     # the file, linked in: registered for both setups, downloads still off
     f = Path(config.BENCH_ROOT) / "models" / FILE
     f.parent.mkdir(parents=True, exist_ok=True)
@@ -125,7 +137,13 @@ def test_its_file_is_registered_from_the_panel_for_every_setup_of_it(live, page)
                            ".textContent.startsWith('Registered')")
     assert msg.inner_text() == ("Registered for 2 setups of this file. Downloads stay off "
                                 "until you switch them on.")
-    assert page.locator(f"[data-dl-off='{mid}']").count() == 1
+    # 16c review: who added it may take it while the switch is off — one line
+    # says others can't yet, and the button and the curl line are there
+    assert page.locator(f"[data-dl-others-off='{mid}']").inner_text() == (
+        "Others can’t take it yet: “Others can download it” is off. You can, as who added it.")
+    assert page.locator(f"[data-dl-go='{mid}']").count() == 1
+    assert page.locator(f"[data-dl-cmd='{mid}']").count() == 1
+    assert page.locator(f"[data-dl-off='{mid}']").count() == 0
     assert page.locator(f"[data-dl-allow='{mid}']").count() == 1      # the switch, as before
     steady_shot(page.locator("[data-dl-panel]"), SCREENS / "registered-1400.png")
     # the other setup's button now says what it will give

@@ -80,7 +80,8 @@ def test_a_models_actions_and_its_download(live, page, phone, width):
     assert panel.locator("[data-dl-facts]").inner_text().startswith("DL-phone.gguf · 0.0 GB")
     assert panel.locator("[data-dl-sha]").inner_text() == "sha256 " + hashlib.sha256(data).hexdigest()
     cmd = panel.locator("[data-dl-cmd]").inner_text()
-    assert cmd.startswith('curl -C - -fL -H "X-Token: $BOARD_TOKEN" -H "X-Who: masein" '
+    # 16c review: every value quoted for a shell
+    assert cmd.startswith('curl -C - -fL -H "X-Token: $BOARD_TOKEN" -H \'X-Who: masein\' '
                           "-o 'DL-phone.gguf' '") and "api/download?model=gguf%2FDL-phone'" in cmd
     assert "token=" not in cmd
     # its adder sees the switch
