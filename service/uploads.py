@@ -46,7 +46,27 @@ PIECE = 64 * 1024 * 1024
 STALE_S = 24 * 3600
 KINDS = {".gguf": "gguf", ".zip": "zip"}
 _ID = re.compile(r"^[0-9a-f]{16}$")
-_ART_NAME = re.compile(r"^[A-Za-z0-9._\-]{1,80}$")
+# 16b review: a model folder's name, everywhere one is taken from a request —
+# letters, digits, dot, dash, underscore; no slash, no "..", never a leading
+# dot. "." and ".." matched the old rule, and became paths
+FOLDER_NAME = re.compile(r"^[A-Za-z0-9_\-][A-Za-z0-9._\-]{0,79}$")
+
+
+def folder_name_ok(name) -> bool:
+    return isinstance(name, str) and bool(FOLDER_NAME.match(name)) and ".." not in name
+
+
+def artifact_dir(name) -> Path | None:
+    """the model folder a name names, or None: a good name, and — links and
+    all, resolved — a folder directly inside ARTIFACTS_DIR"""
+    if not folder_name_ok(name):
+        return None
+    try:
+        root = config.ARTIFACTS_DIR.resolve(strict=True)
+        d = (root / name).resolve(strict=True)
+    except (OSError, RuntimeError):
+        return None
+    return d if d.parent == root and d.is_dir() else None
 # a run that hasn't ended (app.ACTIVE): its model's file stays
 RUN_ACTIVE = ("queued", "preflight", "waiting_gpu", "waiting_lock", "running")
 
@@ -136,15 +156,24 @@ def room_for(size: int, *, have: int = 0) -> str:
 # an upload in progress: a record and its bytes, under .parts/
 # ---------------------------------------------------------------------------
 
+def _uid(uid: str) -> None:
+    """an upload's id from a request: 16 hex characters, or nothing is touched"""
+    if not isinstance(uid, str) or not _ID.match(uid):
+        raise Refused(404, "No such upload.")
+
+
 def _rec_path(uid: str) -> Path:
+    _uid(uid)
     return parts() / f"{uid}.json"
 
 
 def data_path(uid: str) -> Path:
+    _uid(uid)
     return parts() / f"{uid}.part"
 
 
 def _dir_path(uid: str) -> Path:
+    _uid(uid)
     return parts() / f"{uid}.dir"
 
 
@@ -200,9 +229,9 @@ def check_name(kind: str, name: str, *, skip: str = "") -> str:
     """the model id it would be, or Refused: a name nothing else has"""
     from . import gguf
     name = (name or "").strip()
-    if kind == "zip" and not _ART_NAME.match(name):
-        raise Refused(422, "A name of letters, digits, dot, dash and underscore: it is the "
-                           "folder's name on the server")
+    if kind == "zip" and not folder_name_ok(name):
+        raise Refused(422, "A name of letters, digits, dot, dash and underscore, not starting "
+                           "with a dot: it is the folder's name on the server")
     if kind == "gguf" and not gguf.slug(name)[len(gguf.PREFIX):]:
         raise Refused(422, "A name: it is shown everywhere")
     mid = model_id(kind, name)
@@ -271,8 +300,9 @@ def at_offset(uid: str, at: int) -> dict:
 
 def touch(uid: str) -> None:
     try:
+        _uid(uid)
         rec = json.loads(_rec_path(uid).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+    except (OSError, ValueError, Refused):
         return
     rec["touched"] = time.time()
     _save(rec)

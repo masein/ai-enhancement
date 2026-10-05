@@ -408,7 +408,9 @@ def resolve_kind(hf_id: str, requested: str,
 
 def _preflight_local(name: str, allow_remote_code: bool = False) -> dict:
     """An uploaded artifact: same decisions as the Hub path, answered from disk."""
-    d = config.ARTIFACTS_DIR / name
+    # 16b review: a name, never a path — resolved, a folder in ARTIFACTS_DIR
+    from . import uploads
+    d = uploads.artifact_dir(name) or config.ARTIFACTS_DIR / ".missing"
     if not d.is_dir():
         raise PreflightError(f"no uploaded artifact named {name!r} — upload it first "
                              f"(POST /api/artifacts/{name}) or check the name.")

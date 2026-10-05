@@ -655,8 +655,8 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
         if blocked:
             raise HTTPException(403, f"remote code is not available: {blocked}. "
                                      f"See SERVICE.md § custom model code.")
-    if hf_id.startswith("local/") and not (
-            config.ARTIFACTS_DIR / hf_id.split("/", 1)[1]).is_dir():
+    # 16b review: "local/.." named BENCH_ROOT here, and was queued
+    if hf_id.startswith("local/") and uploads.artifact_dir(hf_id.split("/", 1)[1]) is None:
         # on the board is not on this server: #53 queued a checkpoint whose
         # results came from elsewhere, and the run failed at start, after the
         # person had waited for it. Nothing is queued now instead — and a
@@ -947,8 +947,9 @@ def _dir_bytes(d: Path) -> int:
 @app.post("/api/artifacts/{name}")
 async def artifact_upload(name: str, request: Request, x_token: str = Header(default="")):
     _check_token(x_token)
-    if not _ART_NAME_RE.match(name):
-        raise HTTPException(422, "artifact name: letters, digits, dot, dash, underscore only")
+    if not uploads.folder_name_ok(name):
+        raise HTTPException(422, "artifact name: letters, digits, dot, dash, underscore only, "
+                                 "not starting with a dot")
     dest = config.ARTIFACTS_DIR / name
     cap = int(config.ARTIFACT_MAX_GB * 1e9)
     quota = int(config.ARTIFACT_QUOTA_GB * 1e9)
@@ -1068,6 +1069,10 @@ async def upload_piece(uid: str, request: Request, offset: int = 0,
     """one piece at the offset the server has; a cut one keeps what arrived,
     and the next starts there"""
     _check_token(x_token)
+    try:
+        uploads.get(uid)                          # a well-formed id of an upload, first
+    except uploads.Refused as e:
+        raise _refused(e) from e
     lock = _PIECE_LOCKS.setdefault(uid, asyncio.Lock())
     if lock.locked():
         raise HTTPException(409, "A piece of this upload is being written: wait for it.")
@@ -1726,8 +1731,8 @@ def model_code(id: str = ""):
     hf_id = id.strip()
     out = hfmeta.remote_code_check(hf_id)
     name = hf_id[len("local/"):] if hf_id.startswith("local/") else ""
-    if name and _ART_NAME_RE.match(name) and not name.startswith("."):
-        out["weights"] = (config.ARTIFACTS_DIR / name).is_dir()
+    if name and uploads.folder_name_ok(name):
+        out["weights"] = uploads.artifact_dir(name) is not None
     return out
 
 
@@ -1748,14 +1753,15 @@ def artifact_index():
 @app.delete("/api/artifacts/{name}")
 def artifact_delete(name: str, x_token: str = Header(default="")):
     _check_token(x_token)
-    if not _ART_NAME_RE.match(name):
+    # 16b review: ".." matched the old rule, and this removed BENCH_ROOT
+    if not uploads.folder_name_ok(name):
         raise HTTPException(422, "bad artifact name")
     mid = f"local/{name}"
     for row in db.recent(200):
         if row["hf_id"] == mid and row["status"] in ACTIVE:
             raise HTTPException(409, "that artifact is queued or being evaluated")
-    d = config.ARTIFACTS_DIR / name
-    if not d.is_dir():
+    d = uploads.artifact_dir(name)
+    if d is None:
         raise HTTPException(404, "no such artifact")
     import shutil
     shutil.rmtree(d)

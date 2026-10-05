@@ -23,6 +23,7 @@ downloads off (16b decision 2); an upload starts as its form said."""
 
 from __future__ import annotations
 
+import os
 import secrets
 import sys
 import threading
@@ -38,6 +39,8 @@ import gguf_header  # noqa: E402
 LINK_S = 24 * 3600
 ARCHIVE_S = 24 * 3600
 OFF_BY_DEFAULT = "Downloads start off for a GGUF registered by its path (16b decision 2)"
+# the same words whether or not something is there: nothing about the disk
+NOT_A_MODEL = "There is no model file on this board for that id."
 _links: dict[str, dict] = {}
 _lock = threading.Lock()
 _building: dict[str, dict] = {}
@@ -51,6 +54,58 @@ class Refused(ValueError):
 
 def archives() -> Path:
     return config.UPLOADS_DIR / ".downloads"
+
+
+# ---------------------------------------------------------------------------
+# 16b.2's review: an id becomes a model folder here, and nowhere else
+# ---------------------------------------------------------------------------
+
+def folder_of(mid: str) -> Path | None:
+    """the model folder an id names, or None: "local/<name>", a name with no
+    slash and no "..", that does not start with a dot; resolved (links and
+    all), a folder directly inside ARTIFACTS_DIR; with config.json at its root.
+    Before this, "local/.." was the whole BENCH_ROOT and "local//etc" an
+    absolute path"""
+    if not isinstance(mid, str) or not mid.startswith("local/"):
+        return None
+    d = uploads.artifact_dir(mid[len("local/"):])
+    if d is None:
+        return None
+    cfg = d / "config.json"
+    return d if cfg.is_file() and not cfg.is_symlink() else None
+
+
+def _skipped() -> list[Path]:
+    """what an archive never reads: its own folder, and uploads in progress"""
+    out = []
+    for p in (archives(), config.UPLOADS_DIR / ".parts"):
+        try:
+            out.append(p.resolve())
+        except OSError:
+            continue
+    return out
+
+
+def files_of(d: Path) -> list[Path]:
+    """a model folder's files: regular ones only — never a link (to a file or
+    a folder, in it or out of it), never the archives' own folder"""
+    skip = _skipped()
+
+    def kept(p: Path) -> bool:
+        try:
+            r = p.resolve()
+        except OSError:
+            return False
+        return not any(r == s or s in r.parents for s in skip)
+    out = []
+    for top, dirs, names in os.walk(d, followlinks=False):
+        t = Path(top)
+        dirs[:] = sorted(x for x in dirs if not (t / x).is_symlink() and kept(t / x))
+        for n in sorted(names):
+            p = t / n
+            if not p.is_symlink() and p.is_file() and kept(p):
+                out.append(p)
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -81,6 +136,8 @@ def _readable(p: str) -> Path | None:
 
 def allowed(mid: str) -> tuple[bool, str, str]:
     """(allowed, who decided, the default's reason when no one has)"""
+    if mid.startswith("local/") and folder_of(mid) is None:
+        return False, "", ""                      # not a model folder: nothing to allow
     row = db.download_get(mid)
     if row:
         return bool(row["allowed"]), row["by"], ""
@@ -88,7 +145,7 @@ def allowed(mid: str) -> tuple[bool, str, str]:
     if up:
         return bool(up.get("download", True)), up.get("by") or "", ""
     if mid.startswith("local/"):
-        return True, "", ""                       # a folder uploaded with the API client
+        return True, "", ""                       # a model folder from the API client
     return False, "", OFF_BY_DEFAULT
 
 
@@ -108,15 +165,14 @@ def info(mid: str) -> dict:
     base = {"model": mid, "allowed": ok, "decided_by": by, "off_why": why_off,
             "adder": adder(mid), "downloads": db.download_count(mid)}
     if mid.startswith("local/"):
-        d = config.ARTIFACTS_DIR / mid[len("local/"):]
-        if not d.is_dir():
-            return {**base, "kind": "none", "line": "Its folder isn't on this server any more: "
-                    "its results stay on the board."}
+        d = folder_of(mid)
+        if d is None:
+            return {**base, "kind": "none", "line": NOT_A_MODEL}
         up = db.upload_get(mid) or {}
+        files = files_of(d)
         return {**base, "kind": "folder", "name": d.name + ".zip",
-                "bytes": uploads.dir_bytes(d), "sha256": None,
-                "files": sum(1 for f in d.rglob("*") if f.is_file()),
-                "archive": _archive_state(mid), "added": up.get("at")}
+                "bytes": sum(f.stat().st_size for f in files), "sha256": None,
+                "files": len(files), "archive": _archive_state(mid), "added": up.get("at")}
     path, rec = _gguf_path(mid)
     if path:
         f = _readable(path)
@@ -175,7 +231,7 @@ def file_for(mid: str) -> tuple[Path, str]:
         build_archive(mid)
         raise Refused(202, f"Its archive is being made: {a.get('words') or 'starting'}. "
                            "Ask again in a moment.")
-    return Path(a["path"]), Path(mid).name + ".zip"
+    return Path(a["path"]), folder_of(mid).name + ".zip"
 
 
 def link(mid: str, who: str) -> dict:
@@ -211,8 +267,10 @@ def logged(mid: str, who: str, how: str, start: int) -> None:
 # ---------------------------------------------------------------------------
 
 def _archive_path(mid: str) -> Path:
-    d = config.ARTIFACTS_DIR / mid[len("local/"):]
-    stamp = int(max((f.stat().st_mtime for f in d.rglob("*") if f.is_file()), default=0))
+    d = folder_of(mid)
+    if d is None:
+        raise Refused(404, NOT_A_MODEL)
+    stamp = int(max((f.stat().st_mtime for f in files_of(d)), default=0))
     return archives() / f"{d.name}-{stamp}.zip"
 
 
@@ -224,7 +282,7 @@ def _archive_state(mid: str) -> dict:
         return b
     try:
         p = _archive_path(mid)
-    except OSError:
+    except (OSError, Refused):
         return {"state": "none"}
     if p.exists():
         return {"state": "ready", "path": str(p), "bytes": p.stat().st_size}
@@ -240,35 +298,51 @@ def build_archive(mid: str) -> None:
 
 
 def _build(mid: str) -> None:
-    d = config.ARTIFACTS_DIR / mid[len("local/"):]
-    out = _archive_path(mid)
-    total = uploads.dir_bytes(d)
+    def said(state: str, words: str) -> None:
+        with _lock:
+            _building[mid] = {"state": state, "words": words}
+    d = folder_of(mid)
+    if d is None:
+        said("refused", NOT_A_MODEL)
+        return
+    files = files_of(d)
+    total = sum(p.stat().st_size for p in files)
     floor = uploads.limits()["floor"]
     f = uploads.free()
     if f is not None and f - total < floor:
-        with _lock:
-            _building[mid] = {"state": "refused", "words": (
-                f"making it would leave {uploads.gb_words(max(0, f - total))} free, and the disk "
-                f"keeps {uploads.gb_words(floor)} (UPLOAD_FREE_GB)")}
+        said("refused", f"making it would leave {uploads.gb_words(max(0, f - total))} free, "
+                        f"and the disk keeps {uploads.gb_words(floor)} (UPLOAD_FREE_GB)")
         return
+    out = _archive_path(mid)
     archives().mkdir(parents=True, exist_ok=True)
     tmp = out.with_suffix(".part")
     done = 0
     try:
         with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_STORED, allowZip64=True) as z:
-            for p in sorted(x for x in d.rglob("*") if x.is_file()):
+            for p in files:
+                # the disk, as it writes: never past its floor
+                size = p.stat().st_size
+                f = uploads.free()
+                if f is not None and f - size < floor:
+                    raise _Floor(f"the disk reached its floor while it was being made: "
+                                 f"{uploads.gb_words(f)} free, and the disk keeps "
+                                 f"{uploads.gb_words(floor)} (UPLOAD_FREE_GB)")
                 z.write(p, f"{d.name}/{p.relative_to(d)}")
-                done += p.stat().st_size
-                with _lock:
-                    _building[mid] = {"state": "building", "words":
-                                      f"{uploads.gb_words(done)} of {uploads.gb_words(total)}"}
+                done += size
+                said("building", f"{uploads.gb_words(done)} of {uploads.gb_words(total)}")
         tmp.replace(out)
         with _lock:
             _building[mid] = {"state": "ready", "path": str(out), "bytes": out.stat().st_size}
+    except _Floor as e:
+        tmp.unlink(missing_ok=True)
+        said("refused", str(e))
     except OSError as e:
         tmp.unlink(missing_ok=True)
-        with _lock:
-            _building[mid] = {"state": "refused", "words": f"it couldn't be made: {e}"}
+        said("refused", f"it couldn't be made: {e}")
+
+
+class _Floor(Exception):
+    """the disk reached UPLOAD_FREE_GB while an archive was being written"""
 
 
 def sweep(now: float | None = None) -> None:
