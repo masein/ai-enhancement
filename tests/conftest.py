@@ -206,6 +206,9 @@ def live(tmp_path_factory):
                  "OPENROUTER_BASE_URL": "http://127.0.0.1:9/api/v1"}.items():
         setattr(config, k, v)
     sit_hidden(root)
+    from service import ai_models                  # 16c: nothing remembered from another module
+    ai_models._KEY.update(got=None, at=0.0, asking=False, why="")
+    ai_models._LIST_FAILED.update(at=0.0, asking=False)
     worker_start = worker.start
     worker.start = lambda: None
     llm.reset()

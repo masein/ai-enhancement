@@ -186,9 +186,9 @@ def models(refresh: bool = False, wait: bool = True) -> list[dict]:
     context} — fetched live and kept a day. [] with no key: nothing is asked.
     16c: a day-old list is returned as it is and asked again in the
     background — a page, a batch's requests and its status polls never wait
-    on OpenRouter for it — and a refresh that failed isn't tried again for
-    RETRY_S. Only with no list at all, and `wait`, is it asked here (a person
-    choosing a model)"""
+    on OpenRouter for it — and a background refresh that failed isn't tried
+    again for RETRY_S. Only with no list at all, and `wait`, is it asked here
+    (a person choosing a model)"""
     if not has_key():
         return []
     try:
@@ -205,10 +205,8 @@ def models(refresh: bool = False, wait: bool = True) -> list[dict]:
     if cached or not wait:
         _refresh_in_background()
         return (cached or {}).get("models") or []
-    with _LIST_LOCK:
-        recent = time.time() - _LIST_FAILED["at"] < RETRY_S
-    if recent:
-        return []
+    # a person choosing a model, with no list at all: asked now, whatever
+    # failed a moment ago — they are waiting for this answer
     return _refresh_models() or []
 
 
