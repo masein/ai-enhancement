@@ -23850,7 +23850,8 @@ async function loadMmpKey() {
   try { A.mmp = await api('api/mobile-mmlu/key'); A.mmpMsg = ''; }
   catch (e) { A.mmpMsg = e.message; }
   A.mmpAsked = false;
-  if (state.tab === 'ai') render();
+  // 17: nor under a picker just opened — the card shows at the next tick
+  if (state.tab === 'ai' && !aiEditing()) render();
 }
 // 16c: AI models refreshes with the page's tick while it is open — the
 // spend, the key's allowance, each job's last batch and the labelling run —
@@ -24091,7 +24092,9 @@ async function loadFrontierGrading() {
   try { A.frg = await api('api/frontier/grading'); A.frgMsg = ''; }
   catch (e) { A.frgMsg = e.message; }
   A.frgAsked = false;
-  if (state.tab === 'ai') render();
+  // 16c's rule: never a redraw under a picker or a value being typed — the
+  // card shows at the next tick
+  if (state.tab === 'ai' && !aiEditing()) render();
 }
 async function frontierGradingAct(what) {
   const A = state.ai;

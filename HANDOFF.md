@@ -4990,6 +4990,11 @@ the prompts in `scripts/grader_prompts/`):
   the page's cell says "graded by openai/gpt-4.1-2025-04-14 with Google's
   grader prompt (84c004ec)", or "code, then Epoch AI's model check by … ·
   code alone 61.2". The number on the page is Epoch's way.
+- **AI models never redraws under a picker just opened** when the grading
+  card's or the key card's data lands (16c's rule, which their loaders
+  skipped): the card shows at the next tick. The grading card's extra load
+  made a redraw land just after a "change ▾" opened, replacing its button
+  under the cursor (`test_live_check_12i3_browser` failed 3 runs in 10).
 - Tests: `tests/test_17_grading.py`, `tests/test_17_grading_browser.py`.
 
 ### 17.2 — the Frontier benchmarks, one suite (5 Oct)
