@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import set_name
+from conftest import set_name, pick_answers
 
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase12z"
@@ -59,20 +59,19 @@ def test_the_answers_tab_has_a_switch_then_spaced_chips(live, page, width):
     page.locator("[data-mtab='answers']").click()
     seg = page.locator("[data-answers-kinds]")
     seg.wait_for()
-    # the source is a segmented control, not more chips
-    assert "seg" in seg.get_attribute("class").split()
+    # the source is one picker (16c: there may be twenty), not more chips
+    assert seg.locator("button.sel[data-answers-pick]").count() == 1
     assert seg.locator(".chip-btn").count() == 0
-    assert seg.get_attribute("role") == "group"
-    page.locator("[data-answers-kind='everyday']").click()
+    pick_answers(page, "everyday")
     page.wait_for_selector("[data-answers-groups] [data-answers-group]")
     # 8px between chips, 12px between the rows and under the description
     gaps = page.evaluate(GAPS, "[data-answers-groups] [data-answers-group]")
     assert gaps and all(g >= 7.5 for g in gaps), gaps
     assert page.evaluate(VGAP, ["[data-model-answers] > .sub", "[data-answers-kinds]"]) >= 11.5
     assert page.evaluate(VGAP, ["[data-answers-kinds]", "[data-answers-groups]"]) >= 11.5
-    # the two controls don't look alike: the switch is one bordered box
+    # the two controls don't look alike: the picker is one bordered box
     looks = page.evaluate("""() => {
-      const s = getComputedStyle(document.querySelector('[data-answers-kinds]'));
+      const s = getComputedStyle(document.querySelector('[data-answers-pick]'));
       const c = getComputedStyle(document.querySelector('[data-answers-group]'));
       return [s.borderTopWidth, c.borderRadius, s.borderRadius]; }""")
     assert looks[0] != "0px" and looks[1] != looks[2]

@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import pick_answers
+
 import everyday as ev
 import judge
 from test_12a10_claims import LEAVE, SCHOOL
@@ -41,7 +43,7 @@ def test_a_server_failure_and_a_raw_fallback_say_so(live, page, width):
         # the model's Answers tab
         open_model(page, live["base"], GOOD, width=width)
         page.locator("[data-mtab='answers']").click()
-        page.locator("[data-answers-kind='everyday']").click()
+        pick_answers(page, "everyday")
         page.locator("[data-answers-group='summarising']").click()
         row = page.locator(f"[data-answers-q='{SCHOOL}']")
         row.wait_for()

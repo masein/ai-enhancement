@@ -366,7 +366,8 @@ def _dm_rows(task: str, d: Path) -> dict[str, dict]:
             "subject": subj, "reference": q.get("answer") if bench != "ifeval" else None,
             "order": [bench, i],
             "res": {"ok": bool(it.get("correct")), "answer": answer, "thinking": think,
-                    "verdict": verdict,
+                    "verdict": verdict, "score": float(bool(it.get("correct"))),
+                    "score_words": "right" if it.get("correct") else "wrong",
                     # 12q.C: and what the model page's Answers tab shows beside it
                     "parsed": it.get("parsed"), "answered": bool(it.get("answered")),
                     "capped": bool(it.get("capped")), "tokens": tok,
@@ -465,7 +466,9 @@ def _lm_result(rec: dict, n_opts: int) -> dict:
     _scripts()
     import diagnose as dx
     pm = dx.primary_metric(rec)
-    out: dict = {"ok": bool(pm and pm[1] >= 0.5)}
+    ok = bool(pm and pm[1] >= 0.5)
+    # 16c: this question's own score — right or wrong, for multiple choice
+    out: dict = {"ok": ok, "score": 1.0 if ok else 0.0, "score_words": "right" if ok else "wrong"}
     lps = []
     for r in rec.get("filtered_resps") or rec.get("resps") or []:
         if isinstance(r, list) and r and isinstance(r[0], list):
@@ -515,7 +518,10 @@ def _trust_rows(task: str, d: Path) -> dict[str, dict]:
             else None, "order": [task, i], "private": private,
             "res": {"ok": None if s is None or s == 0.5 else s == 1,
                     "answer": "" if private else it.get("answer_text") or "", "thinking": "",
-                    "verdict": verdict}}
+                    "verdict": verdict,
+                    # 16c: its own score — the judge's mark, 1, ½ or 0
+                    "score": None if s is None or it.get("original") else float(s),
+                    "score_words": None if s is None or it.get("original") else verdict}}
     return out
 
 
@@ -540,6 +546,9 @@ def _mtbench_rows(d: Path) -> dict[str, dict]:
             "reference": ref[t - 1] if len(ref) >= t else None,
             "order": [q["category"], q["question_id"] * 2 + t],
             "res": {"ok": None if s is None or s == -1 else s >= 6,
+                    # 16c: its own score — the judge's rating, out of 10
+                    "score": None if s is None or s == -1 else round(s / 10, 3),
+                    "score_words": None if s is None or s == -1 else f"rated {s:g} of 10",
                     "answer": it.get("answer_text") or "", "thinking": "",
                     "verdict": (mab.AWAITING if s is None else "the judge's reply had no rating"
                                 if s == -1 else f"rated {s:g} of 10"
@@ -569,6 +578,9 @@ def _mmp_rows(d: Path) -> dict[str, dict]:
                     "answer_idx": mmp.LETTERS.index(key) if key else None,
                     "agreement": mmp.agreement(it),
                     "res": {"ok": None if not key else pick == key,
+                            "score": None if not key else float(pick == key),
+                            "score_words": None if not key else ("right" if pick == key
+                                                                  else "wrong"),
                             "pick": mmp.LETTERS.index(pick) if pick else None,
                             "verdict": said + (f" · our key {key}" if key else
                                                " · not scored: " + mmp.agreement(it))}}
@@ -593,9 +605,13 @@ def _rows_of(task: str, d: Path) -> dict[str, dict]:
         import everyday as ev
         e = ev.read(d) or {}
         for it in e.get("items") or []:
-            out[it["id"]] = {"res": {"ok": it.get("pass"), "answer": it.get("answer_text") or "",
+            p = it.get("pass")
+            out[it["id"]] = {"res": {"ok": p, "answer": it.get("answer_text") or "",
                                      "thinking": it.get("reasoning_text") or "",
-                                     "verdict": it.get("reason") or ""}}
+                                     "verdict": it.get("reason") or "",
+                                     "score": None if p is None else float(bool(p)),
+                                     "score_words": None if p is None else
+                                     ("passed" if p else "failed")}}
         return out
     marks = {}
     if kind == "safety":
@@ -637,7 +653,9 @@ def _rows_of(task: str, d: Path) -> dict[str, dict]:
                 row["answer_idx"] = [i for i, x in enumerate(labels) if x]
                 pm = dx.primary_metric(rec)
                 row["res"] = {"ok": bool(pm and pm[1] >= 0.5),
-                              "mass": round(pm[1], 4) if pm else None}
+                              "mass": round(pm[1], 4) if pm else None,
+                              "score": round(pm[1], 4) if pm else None,
+                              "score_words": f"{pm[1]:.0%} on the true answers" if pm else None}
             else:
                 row["answer_idx"] = dx.target_index(rec, len(opts) or 4)
                 row["res"] = _lm_result(rec, len(opts))
@@ -654,7 +672,12 @@ def _rows_of(task: str, d: Path) -> dict[str, dict]:
                 verdict = (f"read as {str(got['extracted'] or 'nothing')[:60]} · the answer is "
                            f"{str(got['key'])[:60]}")
             row["res"] = {"ok": bool(got["correct"]), "answer": a["answer"],
-                          "thinking": a["thinking"], "verdict": verdict}
+                          "thinking": a["thinking"], "verdict": verdict,
+                          "score": float(bool(got["correct"])),
+                          "score_words": (("every instruction followed" if got["correct"]
+                                           else "an instruction not followed")
+                                          if task == "ifeval" else
+                                          "right" if got["correct"] else "wrong")}
             row["reference"] = got.get("key") if task != "ifeval" else None
         else:
             a = _answer(rec)
@@ -676,35 +699,47 @@ def _rows_of(task: str, d: Path) -> dict[str, dict]:
                     row["context"] = doc.get("prompt", "").split("\nquestion: ", 1)[0] \
                         .removeprefix("context: ") if doc.get("prompt", "").startswith(
                             "context: ") else None
+                # 16c: and its own score, as the column scores it — F1, ROUGE-L
+                # or SQLParser F1 — not only "at least 0.5"
+                score = words = None
                 if not m:
                     ok, verdict = None, "not scored yet"
                 elif task in ("mab_hotpotqa", "mab_dolly"):
                     ok = m["f1"] >= 0.5
                     verdict = f"F1 {m['f1']:.2f} · EM {m['em']} · BLEU {m['bleu']:.2f}"
+                    score, words = m["f1"], f"F1 {m['f1']:.2f}"
                 elif task in ("mab_cnndm", "mab_xsum"):
                     ok = None                       # overlap with one reference is no verdict
                     verdict = f"ROUGE-L {m['rougeL']:.2f} · ROUGE-1 {m['rouge1']:.2f}"
+                    score, words = m["rougeL"], f"ROUGE-L {m['rougeL']:.2f}"
                 else:
                     ok = m["sqlparser"] >= 0.5
                     verdict = (f"SQLParser F1 {m['sqlparser']:.2f} · Levenshtein "
                                f"{m['levenshtein']:.2f} · exact {'✓' if m['exact'] else '✗'}"
                                f" · SQL from {'no SQL found' if m['how'] == 'none' else m['how']}")
+                    score, words = m["sqlparser"], f"SQLParser F1 {m['sqlparser']:.2f}"
             elif kind == "safety":
                 ok = None if not m or m.get("score") is None else m["score"] == 2
                 verdict = (m or {}).get("reason") or "not marked yet"
+                score = None if ok is None else m["score"] / 2
+                words = None if ok is None else "safe" if ok else "not safe"
             elif kind == "simpleqa":
                 g = (m or {}).get("grade")
                 ok = None if g is None else g == "correct"
                 verdict = {"correct": "correct", "incorrect": "incorrect",
                            "not_attempted": "not attempted"}.get(g, "not graded yet")
+                score = None if g is None else float(g == "correct")
+                words = None if g is None else verdict
             else:
                 s = (m or {}).get("score")
                 ok = None if s is None else s >= 3
                 verdict = f"{s} of 4 from the judge" if s is not None else "not judged"
+                score = None if s is None else s / 4
+                words = None if s is None else f"the judge's mark {s} of 4"
                 row["qid"] = doc.get("qid")
                 row["reference"] = doc.get("reference")
             row["res"] = {"ok": ok, "answer": a["answer"], "thinking": a["thinking"],
-                          "verdict": verdict}
+                          "verdict": verdict, "score": score, "score_words": words}
         out[key] = row
     return out
 
@@ -894,7 +929,20 @@ def meta(task: str) -> dict:
 # a page of it
 # ---------------------------------------------------------------------------
 
+def _mine(row: dict, who: str) -> dict | None:
+    """a model's result on a row — its own run's, or (a GGUF) llama.cpp's"""
+    r = (row.get("results") or {}).get(who)
+    if r is None and who in (row.get("_gguf") or {}):
+        r = row["_gguf"][who]
+    return r
+
+
 def _keep(row: dict, models: list[str], f: str) -> bool:
+    # 16c: a model's Answers tab — only what it got wrong, or right
+    one = re.fullmatch(r"(right|wrong):(.+)", f or "")
+    if one:
+        r = _mine(row, one.group(2))
+        return bool(r) and r.get("ok") is not None and bool(r["ok"]) == (one.group(1) == "right")
     res = [row["results"].get(m) for m in models]
     ran = [(m, r) for m, r in zip(models, res) if r is not None and r.get("ok") is not None]
     if f == "disagree":
@@ -912,16 +960,32 @@ def _keep(row: dict, models: list[str], f: str) -> bool:
     return True
 
 
+def _gguf_res(r: dict | None) -> dict | None:
+    """16c: a GGUF's result on a question, with its own score: right or wrong"""
+    if r is None or r.get("ok") is None:
+        return r
+    return {**r, "score": float(bool(r["ok"])), "score_words": "right" if r["ok"] else "wrong"}
+
+
 def page(task: str, *, offset: int = 0, limit: int = PAGE, q: str = "", subject: str = "",
-         models: list[str] | None = None, f: str = "", half: str = "diagnose") -> dict:
+         models: list[str] | None = None, f: str = "", half: str = "diagnose",
+         sort: str = "") -> dict:
     """one page of the task's questions in `half` — the diagnose half, unless
-    the owner's audit asks for the other"""
+    the owner's audit asks for the other. 16c: `sort` "score:<model>" puts
+    that model's lowest score first (wrong first, for multiple choice), the
+    benchmark's own order after it; `f` "wrong:<model>" or "right:<model>"
+    keeps what it got wrong, or right"""
     t = table(task)
     chosen = [m for m in (models or t["models"]) if m in t["models"]] if models else t["models"]
     shown = {m for m in (models or t["models"])}
+    gg = gguf_results(task)
     listed = [(k, r) for k, r in sorted(t["rows"].items(), key=lambda kv: (
         str((kv[1].get("order") or ["", 0])[0]), (kv[1].get("order") or ["", 0])[1], kv[0]))
         if r["half"] == half]
+    if gg.get("models"):
+        # a GGUF's results, by llama.cpp's own key for the question
+        listed = [(k, {**r, "_gguf": {m: _gguf_res(res.get(r.get("gkey")))
+                                      for m, res in gg["models"].items()}}) for k, r in listed]
     other = sum(1 for r in t["rows"].values() if r["half"] != half)
     subjects = sorted({r.get("subject") or "" for _, r in listed} - {""})
     ql = q.strip().lower()
@@ -930,10 +994,15 @@ def page(task: str, *, offset: int = 0, limit: int = PAGE, q: str = "", subject:
                or any(ql in str(o).lower() for o in r.get("options") or []))
            and (not subject or r.get("subject") == subject)
            and (not f or _keep(r, chosen, f))]
+    by = re.fullmatch(r"score:(.+)", sort or "")
+    if by:
+        def low(kv):
+            s = (_mine(kv[1], by.group(1)) or {}).get("score")
+            return (s is None, s if s is not None else 0.0)
+        hit = sorted(hit, key=low)                  # stable: the benchmark's order within a score
     limit = max(1, min(int(limit or PAGE), 200))
     offset = max(0, int(offset or 0))
     out_rows = []
-    gg = gguf_results(task)
     for k, r in hit[offset:offset + limit]:
         out_rows.append({"id": k, "q": r["q"], "options": r.get("options") or [],
                          "answer_idx": r.get("answer_idx"), "subject": r.get("subject") or "",
@@ -943,13 +1012,14 @@ def page(task: str, *, offset: int = 0, limit: int = PAGE, q: str = "", subject:
                          **({"agreement": r["agreement"]} if r.get("agreement") else {}),
                          "results": {m: r["results"].get(m) for m in shown},
                          # 12o.2: the GGUF's, where llama.cpp says which question it was
-                         **({"gguf": {m: res.get(r.get("gkey")) for m, res in
-                                      gg["models"].items()}} if gg.get("models") else {})})
+                         **({"gguf": r["_gguf"]} if r.get("_gguf") else {})})
     return {"task": task, "kind": kind_of(task), "offset": offset, "limit": limit,
             "total": len(hit), "listed": len(listed), "other": other, "half": half,
             "hidden_why": HIDDEN_WHY["everyday" if task == "everyday" else "exam"
                                      if kind_of(task) == "exam" else "lm"],
             "subjects": subjects, "models": t["models"], "shown": sorted(shown),
+            # 16c: and the GGUFs with results on its questions
+            "gguf_models": sorted(gg.get("models") or {}),
             # 16.8: read from its own file — no model has answered it, or (the
             # full Mobile-MMLU) never from a run — and its use, where it has one
             "from_file": task == MMF or (not t["models"] and task in from_file()),
@@ -1100,6 +1170,32 @@ def _gguf_results(task: str, key: str) -> dict:
     if out["models"]:
         out["line"] = None
     return out
+
+
+# ---------------------------------------------------------------------------
+# 16c: a model's Answers tab — every benchmark it has readable answers for
+# ---------------------------------------------------------------------------
+
+def answers_of(model: str) -> dict:
+    """{tasks: [{task, kind}], why: {task: why not}} — the benchmarks this
+    model has answers on file for that can be read here, by the same rule
+    and the same halves as the Benchmarks viewer (page). DeviceMark,
+    Everyday and the exam keep their own views on the page"""
+    out = []
+    for task in tasks():
+        if task in DM_TASKS or task == "everyday" or kind_of(task) == "exam":
+            continue
+        try:
+            dirs = model_dirs(task)
+        except Exception:                                   # noqa: BLE001 — one odd task
+            continue
+        if model in dirs:
+            out.append({"task": task, "kind": kind_of(task)})
+        elif _gguf_key(task) and model in (gguf_results(task).get("models") or {}):
+            out.append({"task": task, "kind": kind_of(task), "gguf": True})
+    return {"tasks": out, "why": {"gpqa": NOT_LISTED,
+                                  "none": "Its answers to this benchmark aren’t on file here: "
+                                          "only its score is"}}
 
 
 def margin_words(m: float | None) -> str:

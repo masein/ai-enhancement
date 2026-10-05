@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import choice, choose_chip, model_tab, open_filters, open_submit
+from conftest import choice, choose_chip, model_tab, open_filters, open_submit, pick_answers
 
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase11f"
@@ -487,7 +487,7 @@ def test_the_topic_combobox_narrows_as_you_type_and_is_grouped_by_area(live, pag
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto(live["base"] + "/#model=fx%2Fgood-750m")
     model_tab(page, "answers")                          # 12b.2: the Answers tab
-    page.locator("[data-answers-kind='exam']").click()   # 16.7: Everyday opens first
+    pick_answers(page, "exam")                       # 16.7: Everyday opens first; 16c: a picker
     box = page.locator(TOPIC_BOX)
     box.wait_for()
     box.click()
@@ -519,7 +519,7 @@ def test_the_topic_combobox_narrows_as_you_type_and_is_grouped_by_area(live, pag
 def test_a_chosen_value_survives_a_poll_while_the_list_is_open(live, page):
     page.goto(live["base"] + "/#model=fx%2Fgood-750m")
     model_tab(page, "answers")
-    page.locator("[data-answers-kind='exam']").click()
+    pick_answers(page, "exam")
     box = page.locator(TOPIC_BOX)
     box.wait_for()
     box.click()

@@ -4342,13 +4342,24 @@ def questions_list():
 
 @app.get("/api/questions/{task}")
 def questions_page(task: str, offset: int = 0, limit: int = 50, q: str = "", subject: str = "",
-                   models: str = "", f: str = ""):
+                   models: str = "", f: str = "", sort: str = ""):
     """a page of a benchmark's listable half, 50 a page, with each chosen
-    model's result on each question"""
+    model's result on each question — 16c: `sort=score:<model>` its lowest
+    score first, `f=wrong:<model>` or `right:<model>`"""
     from . import questions
     _qtask(task)
     return questions.page(task, offset=offset, limit=limit, q=q, subject=subject,
-                          models=_qmodels(models), f=f)
+                          models=_qmodels(models), f=f, sort=sort)
+
+
+@app.get("/api/answers/benchmarks")
+def answers_of(model: str):
+    """16c: the benchmarks a model has readable answers for — its Answers
+    tab's picker; read by the same rule and halves as the questions viewer"""
+    from . import questions
+    if not model.strip():
+        raise HTTPException(422, "model: the board's model id")
+    return questions.answers_of(model.strip())
 
 
 class QuestionsAuditIn(BaseModel):

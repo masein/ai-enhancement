@@ -8,7 +8,7 @@ import socket
 
 import pytest
 
-from conftest import go_tab, model_tab, open_filters
+from conftest import go_tab, model_tab, open_filters, pick_answers
 
 pytestmark = pytest.mark.dashboard
 
@@ -57,7 +57,7 @@ def test_the_model_page_picks_a_judged_topic_from_a_searchable_list(live, page):
     same component, and the one left on the model page."""
     page.goto(live["base"] + "/#model=fx%2Fgood-750m")
     model_tab(page, "answers")                          # 12b.2: the Answers tab
-    page.locator("[data-answers-kind='exam']").click()   # 16.7: Everyday opens first
+    pick_answers(page, "exam")                       # 16.7: Everyday opens first; 16c: a picker
     box = page.locator("[data-combobox='answers topic']")
     box.wait_for()
     box.click()
