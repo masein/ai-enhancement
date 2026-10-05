@@ -345,7 +345,9 @@ def test_a_full_runs_log_gives_the_ggufs_result_on_each_question(svc, tmp_path, 
     for r in rows:
         g = r["gguf"]["gguf/k8"]
         key = next(k for k in docs if docs[k]["question"] in k and r["q"] in k)
-        assert g == {"ok": want[key]}, r["id"]
+        # 16c: and its own score
+        assert g == {"ok": want[key], "score": float(want[key]),
+                     "score_words": "right" if want[key] else "wrong"}, r["id"]
 
 
 def test_winogrande_gives_its_pick_and_margin(svc, tmp_path, monkeypatch):
@@ -355,7 +357,8 @@ def test_winogrande_gives_its_pick_and_margin(svc, tmp_path, monkeypatch):
     assert p["gguf"]["models"] == ["gguf/k8"] and p["gguf"]["line"] is None
     g = [r["gguf"]["gguf/k8"] for r in rows if r["gguf"]["gguf/k8"]]
     # the fake prints scores -1.5 and -2.5, picks 1, answer 1
-    assert g and all(x == {"ok": True, "pick": 0, "margin": 0.4621} for x in g)
+    assert g and all(x == {"ok": True, "pick": 0, "margin": 0.4621, "score": 1.0,
+                           "score_words": "right"} for x in g)
 
 
 def test_a_subset_or_hellaswag_has_only_the_total(svc, tmp_path, monkeypatch):

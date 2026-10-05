@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from conftest import pick_answers
 from test_live_check_11k import clear, plant_proposal, sql
 from test_page_recovery import Live
 
@@ -356,13 +357,22 @@ def test_improve_is_this_models_proposals_and_datasets(live, page, tidy):
 def test_answers_are_by_kind_then_topic_or_group(live, page):
     open_model(page, live["base"])
     page.locator("[data-mtab='answers']").click()
-    kinds = page.locator("[data-answers-kind]")
-    assert kinds.all_inner_texts() == ["Everyday", "Knowledge exam"]
+    # 16c: one picker — Everyday and the exam in their own views, then each
+    # benchmark it has readable answers for
+    pick = page.locator("[data-answers-pick]")
+    pick.wait_for()
     # 16.7: the first in the board's order opens: Everyday, then the exam
-    assert page.locator("[data-answers-kind='everyday']").get_attribute("aria-pressed") == "true"
-    page.locator("[data-answers-kind='exam']").click()
+    assert pick.get_attribute("data-answers-pick") == "everyday"
+    pick.click()
+    kinds = page.locator("#pop-sel-answers-pick [role='option']")
+    page.wait_for_function("document.querySelectorAll(\"#pop-sel-answers-pick "
+                           "[role='option']\").length > 2")
+    vals = kinds.evaluate_all("xs => xs.map(x => x.dataset.value)")
+    assert vals[:2] == ["everyday", "exam"] and all(v.startswith("b:") for v in vals[2:])
+    page.keyboard.press("Escape")
+    pick_answers(page, "exam")
     page.wait_for_selector("[data-panel='model-answers'] .anscard")
-    page.locator("[data-answers-kind='everyday']").click()
+    pick_answers(page, "everyday")
     # 12a.2: one group at a time, the first to begin with. 12g.2: its practice
     # half's answers (Understanding's 18), beside the hidden half's score
     qs = page.locator("[data-answers-q]")
@@ -374,10 +384,10 @@ def test_answers_are_by_kind_then_topic_or_group(live, page):
     page.wait_for_function("document.querySelectorAll('[data-answers-q]').length === 29")
     assert set(page.locator("[data-answers-q] .evgroup").all_inner_texts()) == {"Summarise"}
     assert page.locator("[data-answers-q] [data-evd-question]").count() == 29
-    # a model that has written nothing says so in one line
+    # 16c: a model that has written nothing has its benchmarks' answers to read
     open_model(page, live["base"], STANDARD_ONLY)
     page.locator("[data-mtab='answers']").click()
-    assert page.locator("[data-answers-none]").inner_text().startswith("No written answers yet")
+    page.wait_for_selector("[data-answers-pick^='b:']")
     assert page.errors == []
 
 

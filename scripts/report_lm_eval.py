@@ -5070,6 +5070,8 @@ button.who { font-weight:600; font-family:var(--font-sans); font-size:var(--fs-1
 /* Models: a row opens the model page; the untested sit under one line */
 table.lb tr.clickrow { cursor:pointer; }
 table.lb tr.clickrow:hover td { background:var(--accent-soft); }
+/* 16c: a row that opens something is reached from the keyboard too */
+table.lb tr.clickrow:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
 table.lb tr.nottested td { background:var(--plane); }
 table.lb tr.nottested-row td { font-size:var(--fs-2); padding-left:24px; }
 /* a row across every column: its words stay in view while the table scrolls */
@@ -7968,7 +7970,17 @@ function modelTab(have) {
 function setModelTab(t) {
   state.mtab = t;
   try { localStorage.setItem('bench-model-tab', t); } catch (e) { /* private */ }
+  // 16c: leaving Answers leaves its benchmark, and the address says so
+  if (t !== 'answers' && state.mansBench) {
+    state.mansBench = null; state.mansVs = null;
+    if (location.hash.slice(1) !== hashFor()) history.replaceState(history.state, '', '#' + hashFor());
+  }
   render();
+}
+// 16c: a Results row opens this model's answers to its benchmark
+function openAnswers(m, task) {
+  state.mansX = null;
+  navigate({ mtab: 'answers', mansBench: task, mansVs: null });
 }
 
 // ---- Scores: one block per kind the model has taken, the newest open ----
@@ -8227,6 +8239,21 @@ function trustLine(m) {
   return el('p', { class: 'small', 'data-trust-line': m.id, title,
     text: text[0].toUpperCase() + text.slice(1) + '.' });
 }
+// 16c: a Results row's name in plain words — "CNN/DailyMail · ROUGE-L", as a
+// run's result line says it; the task id is in its tooltip
+const METRIC_WORDS = { acc: 'accuracy', acc_norm: 'accuracy', exact_match: 'exact match',
+  mc2: 'true answers', mab_f1: 'F1', rougeL: 'ROUGE-L', sqlparser_f1: 'SQLParser F1',
+  mtbench: 'out of 10', judged_correct: 'judged correct', kept_private: 'kept private',
+  agrees: 'agrees with the crowd', key_acc: 'our key', safe: 'safe replies',
+  correct: 'correct', prompt_level_strict_acc: 'instructions followed',
+  inst_level_strict_acc: 'instructions followed', bits_per_byte: 'bits per byte',
+  word_perplexity: 'perplexity' };
+function resultName(t) {
+  const mt = (DATA.tasks[t] || {}).metric || '';
+  const w = METRIC_WORDS[mt] || mt.replace(/_/g, ' ');
+  // the set is the group row's above it: "CNN/DailyMail", not "… (MobileAIBench)"
+  return benchName(t).replace(/ \(MobileAIBench\)$/, '') + (w ? ' · ' + w : '');
+}
 // Results: every task this model has, grouped by domain
 function resultsPart(m) {
   const rows = [];
@@ -8238,9 +8265,16 @@ function resultsPart(m) {
     for (const t of have) {
       const c = cell(t, m.id), i = DATA.tasks[t] || {};
       const atChance = i.chance > 0 && (c.v - 1.96 * (c.se || 0)) <= i.chance;
-      rows.push(el('tr', {},
-        el('td', {}, el('span', { title: i.desc || '', class: 'tname',
-          text: taskLabel(t) }), rBadge(restrictOf(t), { 'data-result-restriction': t })),
+      // 16c: the row opens this model's answers to it; its name in plain words
+      const go = LIVE && !(DATA.pplTasks || []).includes(t);
+      rows.push(el('tr', go ? { class: 'clickrow', tabindex: '0', role: 'link',
+          'data-result-row': t, 'aria-label': `${resultName(t)}: read ${m.name}’s answers`,
+          onclick: e => { if (e.target.closest('a, button')) return; openAnswers(m, t); },
+          onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault();
+            openAnswers(m, t); } } } : { 'data-result-row': t },
+        el('td', {}, el('span', { title: [t, i.desc].filter(Boolean).join(' — '), class: 'tname',
+          'data-result-name': t, text: resultName(t) }),
+          rBadge(restrictOf(t), { 'data-result-restriction': t })),
         el('td', { class: 'num' + (atChance ? ' dimmed' : ''),
           text: i.lower ? num(c.v, 3) : t === MTBENCH ? `${(10 * c.v).toFixed(2)} / 10` : pct(c.v) },
           c.se ? el('span', { class: 'se', text: ` ±${(100 * c.se).toFixed(1)}` }) : ''),
@@ -8259,7 +8293,8 @@ function resultsPart(m) {
     el('h2', { text: 'Results' }),
     el('p', { class: 'sub', text: 'Dashed mark is chance; the solid mark, where one '
       + 'exists, is the best published score — a different protocol from ours, shown '
-      + 'for orientation rather than comparison.' }),
+      + 'for orientation rather than comparison.' + (LIVE ? ' Click a row to read its answers.'
+        : '') }),
     el('div', { class: 'lb-wrap' }, el('table', { class: 'lb mtbl' },
       el('thead', {}, el('tr', {}, el('th', { text: 'Benchmark' }),
         el('th', { class: 'num', text: 'Score' }), el('th', { text: '' }),
@@ -8268,6 +8303,16 @@ function resultsPart(m) {
 }
 
 // ---- Answers: what the model wrote, by kind, then topic or group ----
+// 16c: every benchmark it has readable answers for, from one picker —
+// DeviceMark, Everyday and the exam keep their own views, reached from it too
+async function loadMansList(id) {
+  const L = state.mansList = state.mansList || {};
+  if (L[id] !== undefined || !LIVE || !netReady()) return;
+  L[id] = null;
+  try { L[id] = await api('api/answers/benchmarks?model=' + encodeURIComponent(id)); }
+  catch (e) { L[id] = { tasks: [], failed: true }; }
+  if (state.model === id) render();
+}
 function modelAnswersTab(m, kinds) {
   const J = DATA.judged || {};
   const tasks = (m.judge || {}).tasks || {};
@@ -8275,34 +8320,207 @@ function modelAnswersTab(m, kinds) {
   const cats = Object.keys(tasks).filter(t => (J.exam || []).includes(t))
     .sort((a, b) => (pubScore(tasks[a]) ?? 9) - (pubScore(tasks[b]) ?? 9));
   const dmModes = dmAnswerModes(m.id);
-  // 16.7: in the board's order, Mobile · Everyday · then the exam
+  if (LIVE && (state.mansList || {})[m.id] === undefined) loadMansList(m.id);
+  const list = ((state.mansList || {})[m.id] || {}).tasks || [];
+  const benches = list.map(x => x.task);
+  // a benchmark asked for (a Results row) that can't be read is listed too: it says why
+  if (state.mansBench && !benches.includes(state.mansBench)) benches.push(state.mansBench);
+  // 16.7: in the board's order, Mobile · Everyday · then the exam; then each
+  // benchmark, in the groups the Results table uses
   const have = [
     // 12q.C: DeviceMark's items are public benchmark items: all of them are shown
-    dmModes.length ? ['dm', 'Mobile · DeviceMark'] : null,
-    evdOf(m.id) ? ['everyday', 'Everyday'] : null,
-    cats.length ? ['exam', 'Knowledge exam'] : null].filter(Boolean);
+    dmModes.length ? ['dm', 'Mobile · DeviceMark', { sub: 'its own view' }] : null,
+    evdOf(m.id) ? ['everyday', 'Everyday', { sub: 'its own view' }] : null,
+    cats.length ? ['exam', 'Knowledge exam', { sub: 'its own view' }] : null,
+    ...domainGroups(benches).flatMap(([dom, ts]) => ts.map(t => ['b:' + t, resultName(t),
+      { sub: dom }]))].filter(Boolean);
   const card = el('div', { class: 'card', 'data-model-answers': m.id },
     el('h2', { text: 'Answers' }),
     el('p', { class: 'sub', text: 'What the model wrote, on the questions anyone may read. '
       + 'The hidden questions stay hidden: their score is all you see of them.' }));
   if (!have.length) {
-    card.append(el('p', { class: 'small', 'data-answers-none': '1', text: 'No written answers '
-      + 'yet: this model has not been asked DeviceMark’s protocol or the Everyday tasks'
-      + (examOn() ? ', or sat the Knowledge exam.' : '.') }));
+    card.append(LIVE && (state.mansList || {})[m.id] === null ? skeleton(2, { 'data-loading':
+      'answers-list' }) : el('p', { class: 'small', 'data-answers-none': '1', text: 'No answers '
+      + 'on file to read yet' + (LIVE ? ': only its scores are.' : ': the answers are read '
+        + 'from the live board.') }));
     return [card];
   }
-  const kind = have.some(([k]) => k === state.mans) ? state.mans : have[0][0];
-  // 12z C1: which answers is a switch, not a filter: a segmented control
-  if (have.length > 1) card.append(el('div', { class: 'seg ans-seg', role: 'group',
-      'aria-label': 'which answers', 'data-answers-kinds': '1' },
-    have.map(([k, label]) => el('button', { type: 'button', class: k === kind ? 'on' : '',
-      'data-answers-kind': k, 'aria-pressed': String(k === kind), text: label,
-      onclick: () => { state.mans = k; render(); } }))));
+  const cur = state.mansBench ? 'b:' + state.mansBench
+    : have.some(([k]) => k === state.mans) ? state.mans : have[0][0];
+  // one picker, not a row of buttons: there may be twenty
+  card.append(el('div', { class: 'frm', 'data-answers-kinds': '1' },
+    el('span', { class: 'small', text: 'Read: ' }),
+    Select('which answers', have, cur, v => {
+      if (v.startsWith('b:')) { state.mansX = null; navigate({ mansBench: v.slice(2), mansVs: null }); }
+      else {
+        state.mans = v; state.mansBench = null; state.mansVs = null;
+        if (location.hash.slice(1) !== hashFor()) history.replaceState(history.state, '',
+          '#' + hashFor());
+        render();
+      }
+    }, { key: 'answers-pick', 'data-answers-pick': cur })));
+  if (cur.startsWith('b:')) {
+    card.append(benchAnswers(m, cur.slice(2), list));
+    return [card];
+  }
+  const kind = cur;
   if (kind === 'exam' || kind === 'dm') card.append(!LIVE ? el('p', { class: 'small',
     text: 'The answers are read from the live board; this report does not carry them.' })
     : kind === 'exam' ? modelAnswers(m, cats) : dmAnswersList(m, dmModes));
   else card.append(evdAnswersList(m));
   return [card];
+}
+// 16c: one benchmark's answers — lowest score first, a filter, a search, 50 a
+// page, and a second model under the first, question by question
+const ANS_PAGE = 50;
+const NO_VERDICT = ['mab_cnndm', 'mab_xsum'];       // overlap with one reference: a score, no verdict
+function ansWho(m, d) {
+  if ((d.models || []).includes(m.id)) return m.id;
+  const g = ggufIdOf(m.id);
+  return (d.gguf_models || []).find(x => x === m.id || x === g) || null;
+}
+const ansRes = (row, who) => ((row.results || {})[who]) ?? ((row.gguf || {})[who]) ?? null;
+function ansKey(m, task) {
+  const X = state.mansX || {};
+  return JSON.stringify([m.id, task, state.mansVs || '', X.q || '', X.f || '',
+    X.sort || 'score', X.offset || 0]);
+}
+async function ansLoad(m, task) {
+  const X = state.mansX = state.mansX || {};
+  const key = ansKey(m, task);
+  X.key = key; X.loading = true;
+  try {
+    const g = ggufIdOf(m.id) || m.id;
+    const who = X.who || m.id;
+    const qs = new URLSearchParams({ offset: X.offset || 0, limit: ANS_PAGE, q: X.q || '',
+      models: [m.id, state.mansVs].filter(Boolean).join(','),
+      f: X.f ? `${X.f}:${who}` : '', sort: (X.sort || 'score') === 'score' ? `score:${who}` : '' });
+    const d = await qxGet(`api/questions/${encodeURIComponent(task)}?${qs}`);
+    if (X.key !== key) return;
+    // a GGUF's own answers are under its GGUF id: asked again by it
+    const w = ansWho(m, d);
+    if (w && w !== who) { X.who = w; X.loading = false; X.key = ''; render(); return; }
+    Object.assign(X, { data: d, error: '', who: w || m.id, g });
+  } catch (e) {
+    if (X.key !== key) return;
+    Object.assign(X, { data: null, error: String((e && e.message) || e) });
+  }
+  X.loading = false;
+  render();
+}
+function benchAnswers(m, task, list) {
+  if (!LIVE) return el('p', { class: 'small', text: 'The answers are read from the live board; '
+    + 'this report does not carry them.' });
+  const why = ((state.mansList || {})[m.id] || {}).why || {};
+  if (/^gpqa/i.test(task)) return el('p', { class: 'small', 'data-answers-why': task,
+    text: 'GPQA Diamond’s questions are never shown, as its authors ask.' });
+  const X = state.mansX = state.mansX && state.mansX.task === task && state.mansX.model === m.id
+    ? state.mansX : { task, model: m.id, sort: 'score', f: '', q: '', offset: 0 };
+  if (ansKey(m, task) !== X.key && !X.loading) ansLoad(m, task);
+  const d = X.data;
+  if (X.error && !d) return el('p', { class: 'small', 'data-answers-why': task,
+    text: /no questions on file/i.test(X.error) || !list.some(x => x.task === task)
+      ? (why.none || 'Its answers to this benchmark aren’t on file here: only its score is.')
+      : X.error });
+  if (!d) return skeleton(4, { 'data-loading': 'bench-answers' });
+  const who = X.who || m.id, mine = d.rows.some(r => ansRes(r, who));
+  const set = patch => { Object.assign(X, patch, { offset: 0 }); render(); };
+  const n = x => Number(x || 0).toLocaleString('en');
+  const all = d.listed + d.other;
+  // what can't be read is said once, at the top
+  const counts = el('p', { class: 'small', 'data-answers-counts': `${d.listed}|${d.other}` },
+    d.other ? `${n(d.listed)} of ${n(all)} can be read here. The other ${n(d.other)} are held `
+      + 'back, so they can never reach training data or a question writer.'
+      : `All ${n(all)} can be read here.`);
+  const others = [...(d.models || []), ...(d.gguf_models || [])].filter(x => x !== who);
+  const tools = el('div', { class: 'toolbar qx-bar', 'data-answers-tools': task },
+    el('input', { type: 'search', placeholder: 'search the questions', 'aria-label': 'search',
+      'data-keep': 'ans-q', value: X.q || '', style: 'flex:1;min-width:160px',
+      'data-answers-search': '1', oninput: e => { clearTimeout(X._t); const v = e.target.value;
+        X._t = setTimeout(() => set({ q: v }), 250); } }),
+    el('div', { class: 'seg', role: 'group', 'aria-label': 'order', 'data-answers-sort': X.sort },
+      [['score', 'Lowest score first'], ['order', 'The benchmark’s order']].map(([v, l]) =>
+        el('button', { type: 'button', class: X.sort === v ? 'on' : '', 'aria-pressed':
+          String(X.sort === v), 'data-answers-sort-pick': v, text: l,
+          onclick: () => set({ sort: v }) }))),
+    NO_VERDICT.includes(task) ? '' : el('div', { class: 'seg', role: 'group',
+        'aria-label': 'which questions', 'data-answers-filter': X.f || 'all' },
+      [['', 'All'], ['wrong', 'Wrong'], ['right', 'Right']].map(([v, l]) =>
+        el('button', { type: 'button', class: (X.f || '') === v ? 'on' : '', 'aria-pressed':
+          String((X.f || '') === v), 'data-answers-filter-pick': v || 'all', text: l,
+          onclick: () => set({ f: v }) }))),
+    // a second model on the same questions — two is enough
+    others.length ? Select('compare with', [['', 'Compare with…'], ...others.map(x =>
+      [x, evdName(x)])], state.mansVs || '', v => { X.offset = 0;
+        navigate({ mansVs: v || null }); }, { key: 'answers-vs', 'data-answers-vs':
+          state.mansVs || '' }) : '');
+  const from = d.total ? d.offset + 1 : 0, to = Math.min(d.offset + d.limit, d.total);
+  const pager = () => el('div', { class: 'frm qx-pager', 'data-answers-pager':
+      `${from}|${to}|${d.total}` },
+    el('span', { class: 'small', text: d.total ? `${from}–${to} of ${n(d.total)}`
+      : 'No question matches' }),
+    el('button', { class: 'quiet', text: '← Previous', disabled: d.offset ? null : '',
+      onclick: () => { X.offset = Math.max(0, d.offset - ANS_PAGE); render(); } }),
+    el('button', { class: 'quiet', text: 'Next →', disabled: to < d.total ? null : '',
+      onclick: () => { X.offset = d.offset + ANS_PAGE; render(); } }));
+  return el('div', { 'data-bench-answers': task, 'aria-busy': X.loading ? 'true' : null },
+    el('h3', {}, resultName(task), rBadge(restrictOf(task), { 'data-answers-restriction': task })),
+    counts,
+    !mine && !d.rows.length ? '' : !mine ? el('p', { class: 'small se', 'data-answers-why': task,
+      text: (why.none || 'Its answers aren’t on file here') + '.' }) : '',
+    tools, pager(), ...d.rows.map(r => ansRow(r, d, who, state.mansVs)),
+    d.rows.length > 5 ? pager() : '');
+}
+// a question: the text, its source (folded when long), the options or the
+// reference, then each model's answer, its thinking folded, and its own score
+function ansRow(row, d, who, vs) {
+  const L = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const right = new Set(Array.isArray(row.answer_idx) ? row.answer_idx
+    : row.answer_idx != null ? [row.answer_idx] : []);
+  const ctx = row.context || '';
+  const what = /^CREATE/.test(ctx) ? 'the table' : ['mab_cnndm', 'mab_xsum'].includes(d.task)
+    ? 'the article' : d.task === 'mab_hotpotqa' ? 'the passages' : 'the text';
+  return el('section', { class: 'qx-q', 'data-answers-q': row.id },
+    row.subject ? el('div', { class: 'small se qx-subj', text: row.subject }) : '',
+    el('div', { class: 'qx-text', text: row.q }),
+    ctx ? (ctx.length > 600 ? el('details', { class: 'qx-ctx', 'data-answers-context': row.id },
+      el('summary', { class: 'small se', text: `Show ${what} ▸ ${ctx.length.toLocaleString('en')} `
+        + 'characters' }), el('div', { class: 'small qx-ctx-t', text: ctx }))
+      : el('div', { class: 'small qx-ctx-t', 'data-answers-context': row.id, text: ctx })) : '',
+    (row.options || []).length ? el('ol', { class: 'qx-opts' }, row.options.map((o, i) =>
+      el('li', { class: right.has(i) ? 'qx-right' : '', 'data-qx-opt': String(i) },
+        el('b', { text: (L[i] || i + 1) + '. ' }), o,
+        right.has(i) ? el('span', { class: 'qx-ok', text: ' ✓ the right answer' }) : ''))) : '',
+    row.reference ? el('p', { class: 'small', 'data-answers-ref': row.id },
+      el('span', { class: 'se', text: 'Reference: ' }), String(row.reference)) : '',
+    row.agreement ? el('p', { class: 'small se', text: 'Our key: ' + row.agreement }) : '',
+    ...[who, vs].filter(Boolean).map(id => ansResult(id, ansRes(row, id), row)));
+}
+function ansResult(id, r, row) {
+  const L = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const name = evdName(id);
+  if (!r) return el('div', { class: 'qx-res qx-none', 'data-answers-res': id },
+    el('span', { class: 'qx-m', text: name }), el('span', { class: 'se', text: ' · not answered' }));
+  const mark = r.ok == null ? '' : el('span', { class: r.ok ? 'qx-ok' : 'qx-no',
+    text: r.ok ? '✓ ' : '✗ ', 'aria-label': r.ok ? 'right' : 'wrong' });
+  // the verdict's words beyond the score: "ROUGE-L 0.60" then "ROUGE-1 0.60"
+  const head = r.score_words || r.verdict || 'not marked yet';
+  const more = !r.verdict || r.verdict === head ? ''
+    : r.verdict.startsWith(head + ' · ') ? r.verdict.slice(head.length + 3) : r.verdict;
+  return el('div', { class: 'qx-res qx-gen', 'data-answers-res': id,
+      'data-answers-score': r.score == null ? '' : String(r.score) },
+    el('div', {}, el('span', { class: 'qx-m', text: name }), ' · ', mark,
+      el('b', { 'data-answers-score-words': id, text: head }),
+      more ? el('span', { class: 'se', text: ' · ' + more }) : ''),
+    r.pick != null ? el('div', { class: 'small', 'data-answers-pick': id,
+      text: `Picked ${L[r.pick] || r.pick + 1}` + ((row.options || [])[r.pick]
+        ? `: ${row.options[r.pick]}` : '') }) : '',
+    r.thinking ? el('details', { class: 'evthink', 'data-answers-thinking': id },
+      el('summary', { text: `Its thinking ▸ ${r.thinking.split(/\s+/).length.toLocaleString('en')} `
+        + 'words' }), el('div', { class: 'evthink-t', text: r.thinking })) : '',
+    r.answer != null && r.answer !== '' ? el('div', { class: 'qx-ans', text: r.answer })
+      : (r.pick == null && !(row.options || []).length ? el('div', { class: 'qx-ans se',
+        text: r.no_answer ? 'no answer' : '—' }) : ''));
 }
 // 12a.2: a model's everyday answers, one group at a time — the first it was
 // asked opens; 333 answers at once is not a page anyone reads
@@ -8444,7 +8662,14 @@ function ggufPart(m) {
         el('th', { class: 'num', text: 'Questions' }))),
       el('tbody', {}, rows.map(b => {
         const any = sets.map(x => (x.benches || {})[b]).find(Boolean);
-        return el('tr', { 'data-gguf-row': b }, el('td', {}, ggufLabel(b),
+        // 16c: a row opens its answers: the question, the options, its pick
+        const lm = Object.keys(GGUF_OF).find(k => GGUF_OF[k] === b);
+        const go = LIVE && lm;
+        return el('tr', go ? { 'data-gguf-row': b, class: 'clickrow', tabindex: '0', role: 'link',
+            'aria-label': `${ggufLabel(b)}: read its answers`,
+            onclick: e => { if (e.target.closest('a, button')) return; openAnswers(m, lm); },
+            onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault();
+              openAnswers(m, lm); } } } : { 'data-gguf-row': b }, el('td', {}, ggufLabel(b),
             rBadge(restrictOf(b), { 'data-gguf-row-restriction': b })),
           sets.map(x => el('td', { class: 'num', 'data-gguf-cell-setup': x.name },
             ...[].concat(one((x.benches || {})[b])))),
@@ -9657,11 +9882,18 @@ function evdDialog(pre = {}) {
 // A dashboard whose Back button leaves the page instead of returning to the list
 // you came from is the single most reported annoyance in apps shaped like this.
 // ---------------------------------------------------------------------------
-const hashFor = () => (state.model ? 'model=' + encodeURIComponent(state.model)
+const hashFor = () => (state.model ? 'model=' + encodeURIComponent(state.model) + answersHash()
                                   : state.topic ? 'topic=' + encodeURIComponent(state.topic)
                                   : viewHash(state.tab))
   // 11g: an open reader rides along, so a pasted link opens it too
   + (state.read ? '&read=' + encRead(state.read) : '');
+// 16c: a model's answers to one benchmark, from a Results row — in the
+// address, so the link can be shared and Back returns to Scores
+function answersHash() {
+  return state.mtab === 'answers' && state.mansBench
+    ? '&answers=' + encodeURIComponent(state.mansBench)
+      + (state.mansVs ? '&vs=' + encodeURIComponent(state.mansVs) : '') : '';
+}
 // 12b: "tab=improve&sub=review&view=datasets", "tab=models&view=exam"
 function viewHash(v) {
   const place = placeOf(v);
@@ -9763,9 +9995,19 @@ function routeFromHash() {
   const [rest, rd] = splitRead(location.hash);
   state.read = rd;
   const h = decodeURIComponent(rest);
-  const m = /^model=(.+)$/.exec(h);
+  const m = /^model=([^&]+)(?:&(.*))?$/.exec(h);
   if (m && DATA.models.some(x => x.id === canonId(m[1]))) {
     state.model = canonId(m[1]); state.topic = null;
+    // 16c: a benchmark's answers, from a Results row; without one, a page
+    // that was on them is back on Scores
+    const ap = new URLSearchParams(m[2] || '');
+    if (ap.get('answers')) {
+      Object.assign(state, { mtab: 'answers', mansBench: ap.get('answers'),
+        mansVs: ap.get('vs') || null });
+    } else if (state.mansBench) {
+      if (state.mtab === 'answers') state.mtab = 'scores';
+      state.mansBench = null; state.mansVs = null;
+    }
     // 12z B1: a GGUF's own address lands on the page it is joined to, at its
     // GGUF's block, open
     if (state.model !== m[1] && /^gguf\//.test(m[1])) {

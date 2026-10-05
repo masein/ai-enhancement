@@ -339,6 +339,18 @@ CHIP_VIEW = {"all": ("standard", "all"), "knowledge": ("standard", "knowledge"),
              "ondevice": ("mobile", "devicemark"), "frontier": ("frontier", None)}
 
 
+def pick_answers(page, value: str) -> None:
+    """16c: the model page's Answers picker — "everyday", "exam", "dm", or
+    "b:<task>" for a benchmark — one picker, not a row of buttons"""
+    pick = page.locator("[data-answers-pick]")
+    pick.wait_for()
+    if pick.get_attribute("data-answers-pick") == value:
+        return
+    pick.click()
+    page.locator(f"#pop-sel-answers-pick [role='option'][data-value='{value}']").click()
+    page.wait_for_selector(f"[data-answers-pick='{value}']")
+
+
 def pick_view(page, test: str, group: str | None = None, show: str | None = None) -> None:
     """16.3: Row 1's choice, then Group ▾'s, then Table or Chart"""
     tab = page.locator(f"[data-models-view='{test}']")

@@ -4953,6 +4953,46 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 16c part 1 — a model's answers read from its Results (5 Oct)
+
+masein: "when I click on the rows, be able to see the questions and answers".
+
+- **A Results row is a link** (`openAnswers`). It opens the model's Answers
+  tab on that benchmark. The address carries it
+  (`#model=…&answers=<task>&vs=<other>`), so the link can be shared and Back
+  returns to Scores. The whole row is the target: a pointer, a hover state,
+  Enter or Space from the keyboard. A GGUF's row opens the lm_eval benchmark
+  it asks the questions of (`GGUF_OF`).
+- **Plain names in Results** (`resultName`): "CNN/DailyMail · ROUGE-L", as a
+  run's result line says it; the task id is in the tooltip.
+- **The Answers tab lists every benchmark the model has readable answers for**
+  (`GET /api/answers/benchmarks?model=`, `questions.answers_of`), in the
+  Results table's groups, in one picker. DeviceMark, Everyday and the exam
+  keep their own views, reached from the same picker.
+- **Each question:** the question; its source text, folded when long ("Show
+  the article ▸ 4,244 characters"); the options, the right one marked, or the
+  reference; each model's answer, its thinking folded; and **its own score**
+  (`score`, `score_words` on every result in `questions.py`): F1, ROUGE-L,
+  SQLParser F1, the judge's mark (MT-Bench out of 10, the exam's 0–4), right
+  or wrong for multiple choice, passed or failed. Before, a MobileAIBench
+  question carried only `ok`, "at least 0.5".
+- **Lowest score first** by default (`sort=score:<model>`; wrong first for
+  multiple choice), or the benchmark's own order. The search box, 50 a page,
+  and one filter: All · Wrong · Right (`f=wrong:<model>`). A summary's
+  ROUGE-L has no verdict, so it has no filter, only the order.
+- **What can't be read is said once, at the top:** "488 of 1,000 can be read
+  here. The other 512 are held back, so they can never reach training data or
+  a question writer." A row whose benchmark can't be read still opens, and
+  says why (GPQA, by its authors' request; or no answers on file). A GGUF's
+  answers are its question, the options, its pick (WinoGrande) or right or
+  wrong, and the right answer.
+- **Compare with…** adds one more model, its answer and score under the
+  first, question by question. Two is enough.
+- **Nothing new becomes readable:** the tab reads through `questions.page`,
+  the Benchmarks viewer's own function and halves. The hidden halves, the
+  exam's report half and the full Mobile-MMLU stay as they were; the static
+  report says the answers are read from the live board.
+
 ### 16c — what OpenRouter said, "Pro only", AI models current, and three small fixes (5 Oct)
 
 From the Mobile-MMLU-Pro labelling run of 5 Oct, when the OpenRouter key reached
