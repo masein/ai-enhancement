@@ -350,13 +350,25 @@ def register(f: dict, by: str) -> dict:
     return public(rec)
 
 
-def set_launch(served_id: str, flags: str, env: str) -> dict:
+def set_launch(served_id: str, flags: str, env: str, how: str | None = None,
+               by: str = "") -> dict:
     """12z A1: a served setup's launch flags and environment, as typed — kept
-    without asking its server (only one may be up at a time)"""
+    without asking its server (only one may be up at a time). 16c: and "How
+    it's served", corrected from the page — what it said before is kept, with
+    who corrected it and when"""
     rec = get(served_id)
     if not rec or is_openrouter(rec):
         raise ValueError(f"no served llama-server {served_id}")
     rec["flags"], rec["env"] = (flags or "").strip(), (env or "").strip()
+    if how is not None:
+        how = how.strip()
+        if not how:
+            raise ValueError("How it's served: the build and its flags. It is the record of "
+                             "what was tested")
+        if how != rec.get("how"):
+            rec.setdefault("how_was", []).append({"how": rec.get("how") or "", "by": by,
+                                                  "at": time.time()})
+            rec["how"] = how
     db.served_put(rec)
     write_meta(rec)
     return public(rec)

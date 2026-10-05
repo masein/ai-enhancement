@@ -109,6 +109,9 @@ def test_pros_questions_go_first_and_the_rest_once_pros_key_is_whole(svc, monkey
         return {"custom_id": row["custom_id"], "text": json.dumps(reply), "error": "",
                 "attempts": 1, "finish_reason": "stop"}
     monkeypatch.setattr(mmp_key.LabellerChat, "_complete", complete)
+    # 16c: "Pro, then the full set" is a choice on the card now (Pro only by default)
+    assert client.post("/api/mobile-mmlu/key/scope", json={"scope": "all", "by": "masein"}) \
+        .status_code == 200
     page = client.get("/api/mobile-mmlu/key").json()
     sets = page["estimate"]["sets"]
     assert (sets["pro"]["questions"], sets["full"]["questions"], sets["all"]["questions"]) == (

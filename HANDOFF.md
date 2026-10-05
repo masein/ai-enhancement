@@ -4953,6 +4953,71 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 16c — what OpenRouter said, "Pro only", AI models current, and three small fixes (5 Oct)
+
+From the Mobile-MMLU-Pro labelling run of 5 Oct, when the OpenRouter key reached
+its own spending limit (about 12:38): Gemini's batch had 2,714 of 9,497 refused,
+each recorded as failed, and the card said nothing; the third labeller was
+blamed for a data policy it doesn't have; Carry on said "Refused" after it had
+sent a batch; the page showed hours-old figures.
+
+- **What OpenRouter said, said** (`ai_models.refusal`): from the status and the
+  error body — the key's limit or credit (402, `limit_source`), "fixed on
+  OpenRouter's side"; no provider taking a prompt it may not store, only when
+  OpenRouter's message says data policy; not reached, or timed out; 401, 429,
+  5xx. Never the key or a header (`_SECRET`). `pin()` stops at the first
+  refusal that isn't the provider's own. `probe()` replaces the bare boolean.
+- **A batch's line** (`llm.tally`, `llm.batch_line`): sent, answered, failed,
+  cancelled, and the first failure in those words — the same line for every
+  job on OpenRouter: each labeller's last batch on the key's card
+  (`mmp_key.last_batches`), each job's last batch under its model on AI models
+  (`app._job_last_batches`), only when it failed, part or whole, or waits.
+  Each request's record now has its time and its status.
+- **A run of refusals stops a batch:** 20 in a row with the same 401, 402 or
+  403 (`OpenRouterChat.HALT_AFTER`) and the batch waits (`halt.json`), the way
+  it waits at the monthly limit — those 20 aren't recorded as failed, they are
+  asked again. It tries again after 10 minutes; Carry on takes a labeller's up
+  at once (`resume`). A 429 and a 408 are retried with the back-off.
+- **Start checks everything first:** all three labellers pinned, and none
+  drifted, before anything is sent; one that can't be says why and nothing is
+  sent.
+- **The key's own allowance** (`ai_models.key_allowance`): `GET /api/v1/key`'s
+  `limit_remaining`, asked in the background and kept a minute — a page never
+  waits on it — beside "This month" on AI models; a labelling run dearer than
+  it is warned on the card (`more_than_key`).
+- **"Pro only" is a choice on the card** (`mmp_key.scope`, `POST
+  /api/mobile-mmlu/key/scope`, setting `mmp:scope`, with who and when): Pro
+  only by default (masein, 5 Oct). The Start line and the button give the
+  chosen set's cost ("Carry on: about $13.40 · Pro only"). `advance` sends the
+  full set's own only when it is chosen; changed later, the next Start sends
+  it. Under Pro only a batch out for the full set's questions is cancelled
+  (`prune`: at start-up, on the choice, and at Start) — each recorded
+  cancelled, never failed, and never sent when the month turns. When what was
+  chosen is done, the card says "Pro's key is whole: N kept" and offers no
+  Carry on.
+- **AI models current:** it refreshes with the page's tick while it is open
+  (the key's card every other tick, every tick while its batches are out), and
+  never redraws while a form is being edited; a typed limit is kept in the
+  page's state. A batch out shows "1,859 of 2,714 · about 9 min left · $27.67
+  so far", the pace from its last answers.
+- **`/api/judge-test/result` no longer answers 500:** a file's "judge" is read
+  in every shape it has — judge.json's `{"version": {"key"}}`, everyday.json's
+  `{"version": "<key>"}`, an older file's id alone (`judge_test.judge_of`);
+  one odd file never breaks the table. The AI models page's Judge test card
+  asks for it when the tab opens; it reads only files and the database, so it
+  should, judge offline or not.
+- **No page or batch waits on OpenRouter's model list** (`ai_models.models`):
+  a day-old list is returned as it is and asked again in the background; a
+  refresh that failed isn't tried again for five minutes; `drifted()` never
+  waits. (The 10-minute stall of 5 Oct was the network path, not the board.)
+- **"How it's served" is corrected from the page:** Edit beside it, and on the
+  warning that it disagrees with the launch flags (`PUT
+  /api/served/{id}/launch` takes `how` and `by`; what it said before is kept in
+  `how_was`).
+- **A served model's first Mobile estimate** uses the thinking-off pace of
+  another build of the same model (the same "based on"), and says whose
+  (`app._sibling_pace`), until it has one of its own.
+
 ### 16b — one thinking rule for the Mobile suite, and for a served model's I&M and Frontier (5 Oct)
 
 - **What was wrong:** the Mobile suite asked every model with its chat

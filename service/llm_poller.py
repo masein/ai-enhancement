@@ -391,7 +391,9 @@ def _mark_failed(r: dict, why: str) -> None:
         # 12a.6: each model this re-mark sent says so, instead of waiting
         for d in (p for p in config.OUT_DIR.iterdir() if p.is_dir()) if config.OUT_DIR.is_dir() else []:
             out = _everyday.read(d)
-            if out and (out.get("judge") or {}).get("batch_id") == r["batch_id"] and out.get("waiting"):
+            head = (out or {}).get("judge")
+            if out and isinstance(head, dict) and head.get("batch_id") == r["batch_id"] \
+                    and out.get("waiting"):
                 _everyday.judge_failed(d, why)
 
 

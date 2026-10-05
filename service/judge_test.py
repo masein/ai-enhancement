@@ -545,10 +545,25 @@ def _spent(batch_id: str) -> float:
     return db.spend_of_batch(batch_id)
 
 
+def judge_of(head) -> tuple[str, str]:
+    """16c: (id, version key) from a file's "judge" — judge.json keeps
+    {"id", "version": {"key", …}}, everyday.json {"id", "version": "<key>"},
+    and an older file the id alone, as a string. ("", "") for anything else"""
+    if isinstance(head, str):
+        return head, ""
+    if not isinstance(head, dict):
+        return "", ""
+    v = head.get("version")
+    key = v.get("key") if isinstance(v, dict) else v if isinstance(v, str) else ""
+    return str(head.get("id") or ""), str(key or "")
+
+
 def current_marks() -> dict[str, int | None]:
     """the judge this server runs now, on these answers: a candidate run of
     its version if there is one, else its marks on file (judge.json, and
-    everyday.json's verdicts) when they are its version's"""
+    everyday.json's verdicts) when they are its version's. 16c: either shape
+    of a file's judge is read (judge_of), and one odd file never breaks the
+    table — its answers just aren't the current judge's"""
     _scripts()
     import judge
     key = judge.version()["key"]
@@ -557,15 +572,20 @@ def current_marks() -> dict[str, int | None]:
         return got
     ident = judge.identity()
     out = {}
+    heads: dict[Path, tuple[str, str] | None] = {}
     for a in answers():
         jf = config.OUT_DIR / a["model"].replace("/", "__") / (
             "judge.json" if a["kind"] == "exam" else "everyday.json")
-        try:
-            j = json.loads(jf.read_text(encoding="utf-8")).get("judge") or {}
-        except (OSError, ValueError):
+        if jf not in heads:
+            try:
+                got_j = json.loads(jf.read_text(encoding="utf-8"))
+                heads[jf] = judge_of(got_j.get("judge") if isinstance(got_j, dict) else None)
+            except (OSError, ValueError):
+                heads[jf] = None
+        if heads[jf] is None:
             continue
-        v = (j.get("version") or {}).get("key")
-        if (v and v == key) or (not v and j.get("id") == ident["id"]):
+        jid, v = heads[jf]
+        if (v and v == key) or (not v and jid and jid == ident["id"]):
             out[a["key"]] = a["judge"]
     return out
 

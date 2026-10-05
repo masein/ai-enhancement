@@ -130,8 +130,14 @@ def make_service(root: Path, monkeypatch, *, llm_provider: str = "fake", tree: b
                       # not the repo's, so its report half is checked by the tests
                       # that mean to
                       "BACKUP_DIR": root / "backups",
-                      "EXAM_REPORT_MANIFEST": root / "no-exam-report-manifest.json"}.items():
+                      "EXAM_REPORT_MANIFEST": root / "no-exam-report-manifest.json",
+                      # 16c: a test that sets a key and forgets the fake reaches nothing
+                      # outside: the page asks the key's allowance in the background
+                      "OPENROUTER_BASE_URL": "http://127.0.0.1:9/api/v1"}.items():
         monkeypatch.setattr(config, name, val)
+    from service import ai_models
+    ai_models._KEY.update(got=None, at=0.0, asking=False, why="")
+    ai_models._LIST_FAILED.update(at=0.0, asking=False)
     sit_hidden(root)
     monkeypatch.setattr(worker, "start", lambda: None)
     monkeypatch.setattr(llm_poller, "start", lambda: None)
@@ -171,7 +177,8 @@ def live(tmp_path_factory):
         "DATASETS_DIR", "SUBMIT_TOKEN", "LLM_PROVIDER", "LLM_MODEL", "LLM_API_KEY", "LLM_POLL_S",
         "EXAM_DIR", "EXAM_PROVIDER", "EXAM_MODEL", "EXAM_API_KEY", "JUDGED_TASKS_DIR",
         "EVERYDAY_TASKS_DIR", "TRUST_TASKS_DIR", "BACKUP_DIR", "EXAM_REPORT_MANIFEST",
-        "DM_TASKS_DIR", "DM_ITEMS", "MMP_DIR", "MMP_TASKS_DIR", "MMF_DIR", "MMF_TASKS_DIR")}
+        "DM_TASKS_DIR", "DM_ITEMS", "MMP_DIR", "MMP_TASKS_DIR", "MMF_DIR", "MMF_TASKS_DIR",
+        "OPENROUTER_BASE_URL")}
     for k, v in {"BENCH_ROOT": root, "RESULTS_ROOT": root / "results",
                  "OUT_DIR": root / "results" / "full", "DB_PATH": root / "service.sqlite3",
                  "ARTIFACTS_DIR": root / "artifacts", "LOGS_DIR": root / "logs",
@@ -194,7 +201,9 @@ def live(tmp_path_factory):
                  "DM_TASKS_DIR": root / "devicemark" / "tasks",
                  "DM_ITEMS": root / "devicemark" / "items-v1.jsonl",
                  "BACKUP_DIR": root / "backups",
-                 "EXAM_REPORT_MANIFEST": root / "no-exam-report-manifest.json"}.items():
+                 "EXAM_REPORT_MANIFEST": root / "no-exam-report-manifest.json",
+                 # 16c: nothing outside, as make_service
+                 "OPENROUTER_BASE_URL": "http://127.0.0.1:9/api/v1"}.items():
         setattr(config, k, v)
     sit_hidden(root)
     worker_start = worker.start

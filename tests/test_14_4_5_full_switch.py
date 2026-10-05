@@ -157,6 +157,10 @@ def test_labelling_sends_pro_alone_while_off(svc, monkeypatch):
     pro = {q["lid"] for q in mmp.pool() if "pro" in q["sets"]}
     assert set(sent["first"]) == pro and set(sent["second"]) == pro
     monkeypatch.setattr(config, "MOBILE_MMLU_FULL", True)
+    # 16c: switched on, the full set's own are left once "Pro, then the full set" is chosen
+    assert len(mmp_key.left()["first"]) == 12
+    from service import db
+    db.ai_set("mmp:scope", "all", "masein")
     assert len(mmp_key.left()["first"]) == 19
 
 
