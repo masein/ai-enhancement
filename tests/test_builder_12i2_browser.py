@@ -221,6 +221,15 @@ def test_a_near_duplicate_shows_side_by_side_and_keep_old_drops_it(live, page, m
             return "\n".join(json.dumps(x) for x in rows)
         return llm.default_responder(req)
     monkeypatch.setattr(llm.FakeBatches, "responder", staticmethod(writer))
+    # and an earlier batch that shares #3, accepted in Try 10: it is flagged
+    # and reviewed again, ahead of #11 — as an earlier test's draft may share
+    # any of the first ten (each draft's fake questions are a window of one pool)
+    real = builder._others
+
+    def others(d):
+        return real(d) + [{"src": "earlier", "id": "earlier:3", "label": "#3 of an earlier batch",
+                           "text": builder._text(d, d["items"][2]["q"])}]
+    monkeypatch.setattr(builder, "_others", others)
     start(page, live["base"], count=20, dedup=True)
     for k in range(5):
         page.keyboard.press("a")
@@ -228,6 +237,15 @@ def test_a_near_duplicate_shows_side_by_side_and_keep_old_drops_it(live, page, m
     page.locator("[data-qb-rest]").click()
     page.wait_for_function("state.qb.draft.status === 'review' && state.qb.draft.stage === 'rest'",
                            timeout=30000)
+    # the flagged come first, in their order: #3 opens, reviewed again
+    first = page.locator("[data-qb-item='3']")
+    first.wait_for()
+    assert first.locator("[data-qb-flag='dup']").inner_text() == "looks like #3 of an earlier batch"
+    # #11 is reached as a reviewer reaches it, with →
+    at = page.evaluate("qbReviewable(state.qb.draft).findIndex(i => i.n === 11)")
+    assert at >= 1
+    for _ in range(at):
+        page.keyboard.press("ArrowRight")
     box = page.locator("[data-qb-dup='11']")
     box.wait_for()
     assert box.locator("[data-qb-dup-other]").inner_text() == bank["prompt"]
