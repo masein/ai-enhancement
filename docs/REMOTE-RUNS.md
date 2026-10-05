@@ -503,14 +503,19 @@ quantisation) on one 80–96 GB card (an H100 80 GB, or an RTX PRO 6000):
 
 ```bash
 python scripts/remote_gguf.py --as served/gemma-4-26b-a4b-bf16 \
-  --gguf hf://<you>/evalboard-private/<its BF16 file>-00001-of-0000N.gguf \
+  --gguf hf://ggml-org/gemma-4-26B-A4B-it-GGUF@bb4531cda34d1ea09d9814959ed4d5833cf2a4c8/gemma-4-26B-A4B-it-BF16.gguf \
   --server hf://<you>/evalboard-private/llama-server-cuda12.8.tar.gz \
   --based-on google/gemma-4-26b-a4b-it --thinking on --slots 8 \
   --only gpqa_diamond_epoch --only otis_aime_epoch --out /workspace/gemma-cal
 ```
 
-A split GGUF is given by its first part: the box fetches every part, and its
-identity is the sha256 of the parts' names and sha256s. The board doesn't serve
+The BF16 file is public, in one piece (ggml-org's, pinned to its commit): the
+box fetches it itself, nothing to upload. (A split GGUF would be given by its
+first part: the box fetches every part, and its identity is the sha256 of the
+parts' names and sha256s.) Check its first answers carry their thinking
+(`answers.jsonl` holds `<think>`): Gemma's template is told to think with
+`chat_template_kwargs`, and a template that ignores it answers without. If
+they don't, stop the box and say so before the run. The board doesn't serve
 Gemma 4, so its first import registers it: `--register "Gemma 4 26B A4B (BF16,
 rented GPU)"`. Then alias it to Epoch's entry for the model on the Frontier
 view, so the cell reads "measured here … · Epoch …".
