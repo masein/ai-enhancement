@@ -88,6 +88,15 @@ POSITION_SKEW = 0.20
 CONFIDENT_SHARE = 0.35
 
 
+
+def _frontier_tasks() -> tuple[str, ...]:
+    """17: the Frontier benchmarks as Epoch AI runs them (scripts/frontier.py)"""
+    try:
+        import frontier
+        return tuple(frontier.TASKS)
+    except ImportError:
+        return ()
+
 def conf_lift(n: int) -> float:
     """Where 'confident' starts, per option count. Certainty is lift n, so a
     fixed 2.0 is unreachable on a 2-option task; scale it down there."""
@@ -521,8 +530,9 @@ def diagnose_model(model_dir: Path) -> dict:
             continue
         task = re.sub(r"_\d+shot$", "", task_dir.name)
         # 12n.2: GPQA's questions never leave the server — no examples of them
-        # are written where a page can read them
-        if task.startswith("gpqa"):
+        # are written where a page can read them. 17: nor any Frontier
+        # benchmark's: never diagnosed, never in Improve
+        if task.startswith("gpqa") or task in _frontier_tasks():
             continue
         # 14.3: nor Mobile-MMLU-Pro's: a Standard benchmark, never a training
         # target — and its lm_eval target is a stand-in, our key kept apart.

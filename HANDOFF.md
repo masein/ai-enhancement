@@ -4953,6 +4953,65 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17.2 — the Frontier benchmarks, one suite (5 Oct)
+
+Stage 2 of phase 17: the other six beside GPQA Diamond, each as Epoch AI or
+its owners run it (`scripts/frontier.py`'s docstring has each one's source):
+- **OTIS Mock AIME 2024–2025** (`otis_aime_epoch`): Epoch's prompt, the last
+  "ANSWER: X" read as an integer; Epoch's model extractor is a second look in
+  stage 3 (its prompt is unpublished). 8 runs (Epoch: 16). Listed: Apache-2.0,
+  and nobody asks otherwise.
+- **MATH Level 5** (`math_l5_epoch`): Epoch's prompt and its own answer
+  extraction (ported from its scorer.py), equivalence by math-verify; Epoch's
+  model equivalence check is stage 3's second look. 1 run (Epoch: 8).
+  **Unlisted**: competitions' problems whose copyright is disputed (the first
+  Hugging Face home was taken down; Epoch withholds its MATH logs).
+- **Humanity's Last Exam** (`hle_text_cais`): CAIS's system prompt (the one
+  its repository sends to every question now), text-only questions (no
+  image); graded in stage 3 by CAIS's judge prompt, o3-mini-2025-01-31.
+  **Unlisted**, as its card asks.
+- **SimpleQA Verified** (`simpleqa_epoch`): the question, a blank line, and
+  Epoch's single-best-guess line (27 Aug 2026; Epoch doesn't say what
+  separates them); graded in stage 3 by Google's grader prompt and
+  gpt-4.1-2025-04-14; the share correct. The repo's pinned CSV on the board,
+  the same file from Hugging Face on a box (the manifest's sha256 checked).
+- **MMLU-Pro** (`mmlupro_tiger`): TIGER-Lab's API protocol word for word —
+  5-shot chain of thought from the category's validation rows, its three
+  regexes after `.replace('**', '')`, no random guess — on **all 12,032**
+  test questions (masein, 5 Oct), asked in category order so the examples'
+  prefix stays in llama-server's cache.
+- **ARC-AGI-2** (`arc_agi2_public`): ARC Prize's harness prompt and grid
+  parser on the public evaluation set (GitHub, at its commit), two attempts;
+  a task scores the share of its test grids either attempt solved, the score
+  the tasks' mean (`summary`'s `pass@2`). An unreadable attempt is wrong (the
+  harness asks again).
+- **Scoring** (`service/frontier.marks`): one reader for the score, the
+  question viewer and stage 3's grader — a run's `ok` is the code's, the
+  grader's (None until graded: the cell waits, saying so), or for a benchmark
+  Epoch checks with a model, the code's when right and the check's when wrong
+  or unread (until the check runs, the cell is the code's, said). An answer
+  that ran out of room is wrong and never sent to a grader.
+- **Thinking on or off for a served model** in every suite Test a model offers
+  the box for: `app.py` refused it outside DeviceMark while the dialog
+  offered it (and the Mobile suite's box was never sent). A model from
+  OpenRouter is refused: it has no switch. A Frontier run names its
+  benchmarks (`tasks`), and Test a model ticks them, each with its runs,
+  budgets and, where it isn't Epoch's way, how ("text-only questions",
+  "public set", "TIGER-Lab's 5-shot protocol").
+- **On the board**: a Frontier run stops before asking when its server's slot
+  can't hold the budget and the prompt, saying the `-c` it needs. The
+  Frontier view's columns and tags come from the catalogue (`frontierBench`):
+  "measured here · Epoch AI's way · 4 runs (Epoch AI: 16)".
+- **The question viewer** lists a Frontier benchmark's diagnose half from the
+  server's copy of its dataset (never fetched for a page): GPQA, HLE and
+  MATH Level 5 never, a 403 saying why. None of them is diagnosed or in
+  Improve.
+- **The box**: a split GGUF (its first part named; identity = the sha256 of
+  the parts' names and sha256s); `import_remote.py --register "<name>"` makes
+  the served entry for a model only rented GPUs run (the calibration's Gemma
+  4 26B A4B), pinned to the bundle's file.
+- Tests: `tests/test_17_frontier_suite.py`, `tests/test_17_frontier_browser.py`.
+
 ### 17.1 — a GGUF's Frontier benchmarks on a rented GPU (5 Oct)
 
 Stage 1 of phase 17 (docs/REMOTE-RUNS.md § "A GGUF's Frontier benchmarks"):

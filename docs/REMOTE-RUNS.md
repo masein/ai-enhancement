@@ -309,8 +309,11 @@ The board then shows a "raw" link on the row's card and beside the row in the On
 
 # A GGUF's Frontier benchmarks on a rented GPU (17)
 
-The Frontier benchmarks (GPQA Diamond now; the others in stage 2) asked of a
-GGUF — the original Qwen3.6 build or the LDA one — on rented GPUs, and
+The Frontier benchmarks — GPQA Diamond, OTIS Mock AIME 2024–2025, MATH Level
+5, Humanity's Last Exam (text-only), SimpleQA Verified, MMLU-Pro (all 12,032)
+and ARC-AGI-2 (public set), each as Epoch AI or its owners run it
+(`scripts/frontier.py` says how) — asked of a GGUF, the original Qwen3.6
+build or the LDA one, on rented GPUs, and
 brought back onto that served model's row on the board, or its "· thinking"
 row. `scripts/remote_gguf.py` does it, in the same runner image:
 - it starts llama-server on the box (127.0.0.1 only) from a **tarball** you
@@ -340,7 +343,11 @@ Then a **read** token for the boxes (Hugging Face → Settings → Access Tokens
 fine-grained: read on `<you>/evalboard-private`, and "read access to contents
 of all public gated repos you can access"). On the same account, accept GPQA's
 terms at <https://huggingface.co/datasets/Idavidrein/gpqa>: it is gated, and
-the box fetches it with this token.
+the box fetches it with this token. The same for OTIS Mock AIME
+(<https://huggingface.co/datasets/EpochAI/otis-mock-aime-24-25>) and Humanity's
+Last Exam (<https://huggingface.co/datasets/cais/hle>): both gated, both
+approved at once. The board's own token (HF_TOKEN in its `.env`) needs the
+three too: the import reads the questions to check the answers cover them.
 
 **The tarball**, on the server, from the fork at the commit build-lda was built
 from. That commit is the one build-lda prints:
@@ -383,10 +390,25 @@ on the model, with your name.
 ## G1. What to rent
 
 The template from step 2, with **Disk space: 80 GB** (the GGUF, 23 GB; the
-tarball; the datasets). In the search: an **RTX 5090** (32 GB), **max CUDA
-12.8 or newer**, and **inet down ≥ 1,000 Mbps** (the GGUF in about 4 minutes;
-destroy a box that pulls below 25 MB/s). 8 slots of 34,816 tokens each fit
-beside the 23 GB file for GPQA with thinking on.
+tarball; the datasets, HLE's images among them). In the search: an **RTX 5090**
+(32 GB), **max CUDA 12.8 or newer**, and **inet down ≥ 1,000 Mbps** (the GGUF
+in about 4 minutes; destroy a box that pulls below 25 MB/s).
+
+A slot holds a benchmark's budget and its prompt; the box sizes the context
+from the benchmarks it runs (`--only`). What fits beside the 23 GB file, with
+the KV cache in q8_0 (`--flags "-ctk q8_0 -ctv q8_0 --flash-attn on"`):
+
+| Benchmarks on the box | Slot, thinking on | `--slots` |
+|---|---|---|
+| GPQA, HLE, MMLU-Pro, SimpleQA | 34,816–36,864 | 8 |
+| OTIS, MATH Level 5 | 67,584 | 8 |
+| ARC-AGI-2 (its prompts run to 30,000 tokens) | 98,304 | 5 |
+| any, thinking off | 6,144–40,960 | 8 |
+
+**The pilot first** (30 minutes, one box): `--only` each benchmark in turn with
+`--shard 1/40` (a handful of questions each), thinking on and off. Its lines
+give each benchmark's seconds an answer; the shards below come from them. Its
+bundles aren't imported: a shard of 40 waits for the other 39.
 
 ## G2. Run, under tmux
 
@@ -437,3 +459,69 @@ switch, and that the answers cover their questions (a shard's: exactly its
 own). A shard waits until the others are in. Then each benchmark is scored by
 code, its result says "run on a rented GPU (<the GPU>)", and the Runs list gets
 the import with the box's log.
+
+## G5. The full run: which box runs what
+
+Each build (the original and the LDA one) the same way, one `--out` a box.
+Before the pilot's paces, from each benchmark's answers and an assumed length
+for each (below), at about 1,400 tokens a second on one 5090:
+
+| Box | Thinking | `--only` | `--shard` | about |
+|---|---|---|---|---|
+| 1–3 | on | `mmlupro_tiger` | `1/3` … `3/3` | 2.8 h each |
+| 4–5 | on | `hle_text_cais` | `1/2`, `2/2` | 2.6 h each |
+| 6 | on | `gpqa_diamond_epoch`, `otis_aime_epoch` | — | 2.7 h |
+| 7 | on | `math_l5_epoch`, `simpleqa_epoch` | — | 1.9 h |
+| 8 | on | `arc_agi2_public` (`--slots 5`) | — | 2.8 h |
+| 9 | off | every benchmark but ARC-AGI-2 | — | 2.4 h |
+
+ARC-AGI-2 isn't asked with thinking off: it would score nothing. Nine boxes a
+build, eighteen in all, about 3 hours; the bundles import in any order.
+
+## G6. The calibration: Gemma 4 26B A4B
+
+The same pipeline on a model Epoch AI has measured, so a gap between our
+number and Epoch's is the method's: GPQA Diamond and OTIS Mock AIME, with the
+reasoning Epoch ran it with (the model version in the board's Epoch import
+says which; thinking on unless it says otherwise), from the **BF16** GGUF (no
+quantisation) on one 80–96 GB card (an H100 80 GB, or an RTX PRO 6000):
+
+```bash
+python scripts/remote_gguf.py --as served/gemma-4-26b-a4b-bf16 \
+  --gguf hf://<you>/evalboard-private/<its BF16 file>-00001-of-0000N.gguf \
+  --server hf://<you>/evalboard-private/llama-server-cuda12.8.tar.gz \
+  --based-on google/gemma-4-26b-a4b-it --thinking on --slots 8 \
+  --only gpqa_diamond_epoch --only otis_aime_epoch --out /workspace/gemma-cal
+```
+
+A split GGUF is given by its first part: the box fetches every part, and its
+identity is the sha256 of the parts' names and sha256s. The board doesn't serve
+Gemma 4, so its first import registers it: `--register "Gemma 4 26B A4B (BF16,
+rented GPU)"`. Then alias it to Epoch's entry for the model on the Frontier
+view, so the cell reads "measured here … · Epoch …".
+
+**What counts as a match**, said before the run: our number and Epoch's
+(73.2 on GPQA Diamond and 82.2 on OTIS Mock AIME in the board's import) differ
+by less than 1.96 × √(our standard error² + Epoch's²), Epoch's error as its
+import gives it. With 198 and 45 questions that is a band of about ±9 points on
+GPQA and about ±16 on OTIS: GPQA is the real test, and OTIS a check that
+nothing is badly off. A miss is reported with its interval, never adjusted.
+
+## The bill, before the pilot
+
+Assumed mean answer lengths, thinking on (off): GPQA 8,000 (600), OTIS 20,000
+(2,000), MATH Level 5 6,000 (1,000), HLE 12,000 (700), SimpleQA 1,500 (60),
+MMLU-Pro 3,500 (450), ARC-AGI-2 30,000 (not asked). The pilot replaces them.
+
+| | Tokens written, one build | Card-hours, one build |
+|---|---|---|
+| Thinking on | about 101 M (MMLU-Pro 42 M, HLE 26 M, ARC 10 M) | about 20.5 |
+| Thinking off | about 9.5 M (MMLU-Pro 5.4 M) | about 2.4 |
+| MMLU-Pro's prompts (5 examples each, 27.7 M tokens a build and setting) | — | about 0.2 with the examples' prefix cached (questions go in category order), 1.5 without |
+
+Both builds: about **46 card-hours**, eighteen 5090s for about 3 hours,
+**about $27** at $0.44–0.63 an hour (within a 2× band, $20–55). The
+calibration: about 12 M tokens, about 3.5 hours of an 80–96 GB card, about $4.
+Grading (stage 3, after the dry run and a yes): MMLU-Pro is scored by code, so
+it adds nothing; SimpleQA Verified and HLE with their owners' graders about
+$63 for the four runs.

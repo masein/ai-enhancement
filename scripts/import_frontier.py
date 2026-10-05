@@ -24,6 +24,11 @@ question. Then the task is scored by code, as on the board (code-scored
 benchmarks are scored at import), and its results say it ran on a rented GPU.
 
 A bundle already imported — by its sha256 — changes nothing.
+
+A model the board doesn't serve — the calibration's Gemma 4 26B A4B, run on
+rented GPUs only — is registered by its first import (--register "<name>"):
+a served entry with no server here, its file pinned by the bundle's sha256,
+its build and launch as the box recorded them.
 """
 
 from __future__ import annotations
@@ -65,6 +70,29 @@ def _answers(b: dict, row: str, task: str) -> dict[tuple[str, int], dict]:
         except (ValueError, KeyError, TypeError):
             continue
     return out
+
+
+def registered_here(b: dict, name: str, by: str) -> dict:
+    """a served entry for a model run only on rented GPUs, from its bundle"""
+    from service import db, served
+    setup = b["setup"]
+    gg, srv = setup.get("gguf") or {}, setup.get("server") or {}
+    rec = {"id": b["bundle"]["model"], "name": name.strip()[:80], "base_url": "", "key": "",
+           "based_on": setup.get("based_on") or "", "thinking": "auto", "phone": False,
+           "how": (f"{gg.get('name')} on rented GPUs, llama.cpp {srv.get('build') or '?'} "
+                   f"({srv.get('commit') or '?'}): " + " ".join(srv.get("argv") or [])),
+           "gguf_path": "", "gguf_flags": "", "gguf_setups": [],
+           "pin": {"model": gg.get("name"), "file": gg.get("name"), "size": gg.get("size"),
+                   "ctx": srv.get("n_ctx"), "build": srv.get("build")},
+           "file_sha256": {"sha256": gg.get("sha256"), "by": by, "at": time.time(),
+                           "name": gg.get("name") or "",
+                           **({"parts": gg["parts"]} if gg.get("parts") else {})},
+           "rented_only": True, "answered": [], "by": by, "at": time.time(),
+           "flags": " ".join(srv.get("flags") or []),
+           "env": " ".join(f"{k}={v}" for k, v in (srv.get("env") or {}).items())}
+    db.served_put(rec)
+    served.write_meta(rec)
+    return rec
 
 
 def checks(b: dict, rec: dict | None, file_sha: str = "") -> list[str]:
@@ -154,6 +182,15 @@ def checks(b: dict, rec: dict | None, file_sha: str = "") -> list[str]:
     return out
 
 
+def _would_be(b: dict) -> dict:
+    """what --register would keep, for the checks before it is kept"""
+    setup = b["setup"]
+    gg = setup.get("gguf") or {}
+    return {"id": b["bundle"].get("model") or "", "name": "", "based_on":
+            setup.get("based_on") or "", "pin": {"file": gg.get("name"), "model": gg.get("name")},
+            "file_sha256": {"sha256": gg.get("sha256")}}
+
+
 def registry(row: Path) -> dict:
     try:
         return json.loads((row / REGISTRY).read_text(encoding="utf-8"))
@@ -179,7 +216,8 @@ def where_of(row: Path, task: str) -> str:
             else f"run on rented GPUs ({', '.join(gpus)})")
 
 
-def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "") -> int:
+def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
+                  register: str = "") -> int:
     from service import config, db, served
     from service import frontier as sf
     bundle, setup = b["bundle"], b["setup"]
@@ -201,12 +239,22 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "") -
         say(f"imported already, as Runs #{was['sid']} on {was['at']}: nothing changed")
         return 0
     rec = served.get(model) if served.is_served(model) else None
-    bad = checks(b, rec, file_sha)
+    if register and rec:
+        say(f"refused — {model} is registered here already: import without --register")
+        return REFUSED
+    if register and not served.is_served(model):
+        say(f"refused — {model!r} isn't a served model's id (served/<name>)")
+        return REFUSED
+    bad = checks(b, rec or (_would_be(b) if register else None), file_sha)
     if bad:
         for line in bad:
             say(f"refused — {line}")
         say("nothing was imported")
         return REFUSED
+    if register:
+        rec = registered_here(b, register, by)
+        say(f"{model} registered as {rec['name']}: a model run on rented GPUs only, its file "
+            f"{(gg.get('name') or '')} pinned by its sha256 {str(gg.get('sha256'))[:16]}…")
     if file_sha and not registered_sha(rec):
         rec["file_sha256"] = {"sha256": file_sha, "by": by, "at": time.time(),
                               "name": gg.get("name") or ""}
