@@ -313,8 +313,12 @@ def test_the_generative_three_go_through_lm_evals_local_chat_completions(svc, fa
         assert "--device" not in cmd and cmd[cmd.index("--batch_size") + 1] == "1"
         assert "--apply_chat_template" in cmd and "--use_cache" in cmd
         margs = cmd[cmd.index("--model_args") + 1]
-        assert f"base_url={fake.base}/chat/completions" in margs
+        # 16b: through the board's relay, which says the thinking switch lm_eval can't
+        assert re.search(r"base_url=http://127\.0\.0\.1:\d+/[0-9a-f]{24}/v1/chat/completions",
+                         margs) and fake.base not in margs
         assert "num_concurrent=1" in margs and KEY not in margs
+    log = next(config.LOGS_DIR.glob(f"service_{sid}_*.log")).read_text()
+    assert "thinking off, said by the board's relay (lm_eval sends no switch)" in log
     # its results are the served row's, and say how it was served
     rows = {m["id"]: m for m in client.get("/api/results").json()["models"]}
     assert rows[SID]["name"] == NAME

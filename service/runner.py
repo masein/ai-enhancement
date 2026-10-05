@@ -640,6 +640,30 @@ def gen_thinking(sub: dict, meta: dict) -> dict:
             "think_end": a.get("think_end") or "</think>"}
 
 
+# 16b (masein, 5 Oct): the thinking rule of the Mobile suite on every path,
+# and of Instruction & maths and Frontier for a served model too — a model
+# that can turn its thinking off answers with it off, unless a person asks for
+# a thinking run, which is a row of its own ("· thinking"). A served model is
+# asked with enable_thinking said out loud, whatever its registration says
+# (one from OpenRouter has no switch: it thinks as it does). Everyday, Trust &
+# safety and the exam keep the chat template's own default (decided 5 Oct)
+THINKING_RULE = ("Asked with thinking off for a model that can turn it off — served models "
+                 "too — unless a thinking run is asked for: that is a row of its own "
+                 "(“· thinking”)")
+THINKING_NAME = "thinking.json"
+
+
+def suite_thinking(sub: dict, meta: dict, rec: dict | None) -> dict:
+    """{mode, on, separate, budget, think_end} for a run of the Mobile suite, or
+    of Instruction & maths or Frontier: gen_thinking's rule, on every path"""
+    if rec and not _served.is_openrouter(rec):
+        on = bool(sub.get("thinking"))
+        return {"mode": "switch", "on": on, "separate": on,
+                "budget": config.GEN_THINKING_MAX_GEN_TOKS if on else config.GEN_MAX_GEN_TOKS,
+                "think_end": (meta.get("archinfo") or {}).get("think_end") or "</think>"}
+    return gen_thinking(sub, meta)
+
+
 def gen_model_args(pretrained: str, th: dict, *, backend: str, remote_code: bool = False,
                    revision: str | None = None, gpu_util: float | None = None,
                    max_length: int | None = None) -> str:
@@ -780,6 +804,167 @@ def set_aside_cut(task_out: Path) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(task_out), str(dest))
     return dest
+
+
+# ---------------------------------------------------------------------------
+# 16b: answers made under the other thinking setting are never reused — a
+# model's thinking-on answers kept in its own row (run #180's, a Hugging Face
+# model's under its template's default) are its thinking row's; anything else
+# goes beside the tree, as 15.7a's do
+# ---------------------------------------------------------------------------
+
+_THINK = re.compile(r"(?s)^\s*(?:<think>)?(.*?)</think>")
+
+
+def _reply_thinks(text) -> bool:
+    """a reply that holds thinking: text before a </think>, as a local run's
+    has it and a served model's is put back (served.ask)"""
+    m = _THINK.match(str(text or ""))
+    return bool(m and m.group(1).strip())
+
+
+def answered_thinking(task_out: Path, unmarked: str = "off") -> str | None:
+    """the thinking setting a task's answers on disk were made with — "on",
+    "off", or "default" (as a server decided: not known) — from its
+    THINKING_NAME, else its replies; None when it holds none. Replies with no
+    thinking in them are `unmarked`'s: "off" where a reply keeps its thinking
+    (a local run's, a served one's through served.ask); a served model's
+    lm_eval answers lost theirs to the server's reasoning field, so theirs is
+    what it was registered with (unmarked_of). The replies only, never the
+    prompt (a template that switches the thinking off writes an empty block
+    into it)"""
+    files = list(task_out.rglob("samples_*.jsonl")) if task_out.is_dir() else []
+    if not files:
+        return None
+    try:
+        return "on" if json.loads((task_out / THINKING_NAME).read_text())["enable_thinking"] \
+            else "off"
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    for f in files:
+        with open(f, encoding="utf-8") as fh:
+            for line in fh:
+                if "</think>" not in line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except ValueError:
+                    continue
+                for r in (rec.get("filtered_resps") or []) + (rec.get("resps") or []):
+                    while isinstance(r, list) and r:
+                        r = r[0]
+                    if _reply_thinks(r):
+                        return "on"
+    return unmarked
+
+
+def unmarked_of(rec: dict | None, through_lm_eval: bool) -> str:
+    """what a task's answers with no thinking in their replies were made with
+    (answered_thinking): a served model's through lm_eval, before 16b, as it
+    was registered — "the model decides" is not known"""
+    if not (rec and through_lm_eval):
+        return "off"
+    return {"on": "on", "off": "off"}.get(rec.get("thinking"), "default")
+
+
+def mark_thinking(task_out: Path, th: dict) -> None:
+    """what a task's answers are asked with, beside them, before it asks"""
+    task_out.mkdir(parents=True, exist_ok=True)
+    (task_out / THINKING_NAME).write_text(json.dumps(
+        {"enable_thinking": bool(th["on"]), "rule": THINKING_RULE, "at": time.time()}),
+        encoding="utf-8")
+
+
+def _verdicts_of(task: str, key: str) -> bool:
+    """whether a MobileAIBench verdict ("<task>:<id>:<turn>") is on this task's
+    answers: MT-Bench's two turns are one task's verdicts, by their turn"""
+    if task.startswith("mab_mtbench_t"):
+        return key.startswith("mab_mtbench:") and key.endswith(":" + task[-1])
+    return key.startswith(task + ":")
+
+
+def sort_thinking(task_out: Path, task: str, want_on: bool, thinking_row: Path | None,
+                  meta_row: dict | None = None, unmarked: str = "off") -> tuple[str, Path] | None:
+    """answers kept under another setting: thinking-on answers in a model's
+    own row go to its thinking row (`thinking_row`) when that has none for this
+    task; otherwise — the other way round, or a setting not known — beside the
+    tree, results/earlier/<row>/<task>-thinking-<on|off|default>-<time>. Their
+    judge's verdicts go with them. ("thinking row" | "earlier", where) — or
+    None when the answers are this setting's, or there are none"""
+    was = answered_thinking(task_out, unmarked)
+    if was is None or was == ("on" if want_on else "off"):
+        return None
+    row = task_out.parent
+    if was == "on" and not want_on and thinking_row is not None \
+            and not (thinking_row / task_out.name).exists():
+        thinking_row.mkdir(parents=True, exist_ok=True)
+        if not (thinking_row / "model_meta.json").exists() and meta_row:
+            (thinking_row / "model_meta.json").write_text(json.dumps(meta_row), encoding="utf-8")
+        dest, kind = thinking_row / task_out.name, "thinking row"
+    else:
+        dest = (config.OUT_DIR.with_name("earlier") / row.name
+                / f"{task_out.name}-thinking-{was}-{int(time.time())}")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        kind = "earlier"
+    shutil.move(str(task_out), str(dest))
+    if kind == "thinking row":
+        _results_say_thinking(dest)
+    # the judge's verdicts on those answers go with them (they are keyed by
+    # question: left here, they would be read as new answers' marks)
+    if task in config.MAB_ALL:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+        import mobileaibench as _mab
+        got = _mab.read_judged(row)
+        vs = got.get("verdicts") or {}
+        moving = {k: v for k, v in vs.items() if _verdicts_of(task, k)}
+        if moving:
+            got["verdicts"] = {k: v for k, v in vs.items() if k not in moving}
+            _mab.write_judged(row, got)
+            if kind == "thinking row":
+                there = _mab.read_judged(dest.parent)
+                there["verdicts"] = {**(there.get("verdicts") or {}), **moving}
+                _mab.write_judged(dest.parent, there)
+            else:
+                (dest / "verdicts.json").write_text(json.dumps(moving), encoding="utf-8")
+    for d in {row, dest.parent} if kind == "thinking row" else {row}:
+        _mobile_scores_again(d)
+    return kind, dest
+
+
+def _results_say_thinking(task_out: Path) -> None:
+    """answers moved into a thinking row: their results say they thought, as a
+    thinking run's do (enable_thinking=True in model_args), so the report files
+    them under "· thinking" and not the model's own row"""
+    for f in task_out.rglob("results*.json"):
+        try:
+            blob = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        cfg = blob.setdefault("config", {})
+        args = cfg.get("model_args") or ""
+        if isinstance(args, dict):
+            cfg["model_args"] = {**args, "enable_thinking": True}
+        elif "enable_thinking=True" not in str(args):
+            cfg["model_args"] = re.sub(r",?enable_thinking=False", "", str(args)) \
+                + ",enable_thinking=True"
+        else:
+            continue
+        f.write_text(json.dumps(blob, indent=1), encoding="utf-8")
+
+
+def _mobile_scores_again(row: Path) -> None:
+    """a row's Mobile scores from the answers it holds now — none left, none kept"""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import mobile_mmlu as _mm
+    import mobileaibench as _mab
+    out = _mab.mark(row)
+    if out:
+        _mab.write(row, out)
+    else:
+        (row / _mab.OUT_NAME).unlink(missing_ok=True)
+    if _mm.collect(row) is None:
+        for name in (_mm.PRED_FILE, _mm.FULL_PRED_FILE):
+            (row / name).unlink(missing_ok=True)
 
 
 def _has_results(task_out: Path) -> bool:
@@ -1026,7 +1211,8 @@ def _ask_served(sid: int, rec: dict, meta: dict, task: str, task_out: Path, labe
                 log_path: Path, everyday: bool, asked: list[str] | None, safety: bool = False,
                 meter: _served.Meter | None = None, evd_dir: Path | None = None,
                 trust_dir: Path | None = None, sq_dir: Path | None = None,
-                mab_dir: Path | None = None, odd: dict | None = None):
+                mab_dir: Path | None = None, odd: dict | None = None,
+                th: dict | None = None):
     """one Everyday, exam or Trust & safety task, asked over the model's
     server. (status, stopped): 0 or CANCELED, and a ServerStopped when it
     stopped answering — what it answered before that is written and kept.
@@ -1068,6 +1254,9 @@ def _ask_served(sid: int, rec: dict, meta: dict, task: str, task_out: Path, labe
         import mobile_mmlu as _mmp
         docs = [docs[i] for i in _mmp.to_ask(task_out.parent, task) if i < len(docs)]
     s = _served.settings_for(rec, meta, everyday)
+    # 16b: the Mobile suite and Frontier's SimpleQA — the switch, said out loud
+    if th is not None and th.get("mode") == "switch" and not _served.is_openrouter(rec):
+        s["chat_template_kwargs"] = {"enable_thinking": bool(th["on"])}
     if task in config.MAB_ALL:
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
         import mobileaibench as _mab
@@ -1270,7 +1459,7 @@ def run_submission(sub: dict) -> None:
     # 12h.1: a thinking-on run of a model that can turn thinking off is a row
     # of its own, "Qwen3.5-2B · thinking": its answers live apart, so nothing
     # ever averages them with the thinking-off ones
-    th = gen_thinking(sub, meta) if generative or shared else None
+    th = suite_thinking(sub, meta, rec) if generative or shared or mobile else None
     if devicemark:
         # 12q: thinking off unless asked, said out loud either way — a served
         # setup's too, whatever it was registered with — and a thinking-on
@@ -1493,6 +1682,10 @@ def run_submission(sub: dict) -> None:
         odd: dict = {}             # 12s: the questions its server failed on, counted
         if (generative or shared) and meter:
             relay = _served.Relay(rec, meter).__enter__()
+        elif (generative or shared) and rec and th and th["mode"] == "switch":
+            # 16b: lm_eval sends no chat_template_kwargs: the relay adds the switch
+            relay = _served.Relay(rec, extra={"chat_template_kwargs": {
+                "enable_thinking": bool(th["on"])}}).__enter__()
         for i, task in enumerate(tasks, 1):
             if canceled or db.cancel_requested(sid):
                 canceled = True
@@ -1572,6 +1765,30 @@ def run_submission(sub: dict) -> None:
                     lf.write(f"\n[service] {task}: its replies were saved before 15.7, cut at "
                              f"the end of the thinking — kept at {moved}, asking again with "
                              f"each reply whole\n")
+            if th is not None and th["mode"] == "switch" and (
+                    mobile or (rec and (generative or shared))):
+                # 16b: answers made under the other thinking setting are never reused
+                meta_think = None
+                if not th["on"]:
+                    meta_think = {"model": sub["hf_id"] + " · thinking",
+                                  "base_model": sub["hf_id"], "kind": kind,
+                                  "params": meta.get("params"),
+                                  "kind_reason": meta.get("kind_reason"),
+                                  **(meta.get("archinfo") or {})}
+                unmarked = unmarked_of(rec, gen_task)
+                was = answered_thinking(task_out, unmarked)
+                got = sort_thinking(task_out, task, bool(th["on"]),
+                                    None if th["on"] else config.OUT_DIR / (safe + "__thinking"),
+                                    meta_think, unmarked)
+                if got:
+                    with open(log_path, "a") as lf:
+                        lf.write(f"\n[service] {task}: its answers on disk were made "
+                                 + ("as its server decided" if was == "default"
+                                    else f"with thinking {was}")
+                                 + f", and this run asks with it {'on' if th['on'] else 'off'} "
+                                 f"— moved to "
+                                 f"{'its thinking row' if got[0] == 'thinking row' else 'earlier'} "
+                                 f"({got[1]}), asking again\n")
             mm_left = None
             if task in (config.MMP_TASK, config.MMF_TASK):
                 # 14.4: one run, two scores — a Mobile-MMLU task asks only the
@@ -1600,6 +1817,9 @@ def run_submission(sub: dict) -> None:
                     lf.write(f"\n[service] {task}: the answers on disk are to other questions "
                              f"than the task holds now; kept at {moved}, answering again\n")
             db.update(sid, status="running", progress=label)
+            if th is not None and th["mode"] == "switch" and (
+                    mobile or (rec and (generative or shared))):
+                mark_thinking(task_out, th)              # 16b
 
             if rec and not gen_task:
                 # 12f.1: Everyday and the exam, asked over the server with the
@@ -1609,7 +1829,7 @@ def run_submission(sub: dict) -> None:
                                               everyday, asked, safety=safety, meter=meter,
                                               evd_dir=evd_dir, trust_dir=trust_dir,
                                               sq_dir=sq_dir, mab_dir=turn2_dir or mab_dir,
-                                              odd=odd)
+                                              odd=odd, th=th if (mobile or shared) else None)
                 gpu_seconds += time.time() - t_task
                 db.update(sid, gpu_seconds=gpu_seconds)
                 if status == CANCELED:
@@ -1629,6 +1849,14 @@ def run_submission(sub: dict) -> None:
             spec = load_spec(sub["hf_id"], meta)
             pretrained = spec["pretrained"]
             margs = model_args(spec)
+            # 16b: the Mobile suite asked as a chat — the switch said out loud,
+            # as the generative three's (gen_model_args). Mobile-MMLU is asked
+            # with no chat template, the paper's way, where it switches nothing:
+            # said all the same, so a thinking run's results are its row's
+            if mobile and th and th["mode"] == "switch":
+                margs += f",enable_thinking={th['on']}"
+                if th["on"]:
+                    margs += f",think_end_token={th['think_end']}"
             # 11l: a reasoning model thinks before it answers, and 256 tokens
             # ran out inside the thinking on every question of run #60. Only
             # its judged answers get more room, and only when its template is
@@ -1668,7 +1896,9 @@ def run_submission(sub: dict) -> None:
                         return lm_eval_cmd(
                             _served.lm_eval_model_args(rec, relay), task, shots, 1, task_out,
                             chat=True, max_gen_toks=th["budget"], backend=be,
-                            samples=samples, cache=_served.cache_path(rec, task))
+                            samples=samples,
+                            cache=_served.cache_path(rec, task, th["on"]
+                                                     if th["mode"] == "switch" else None))
                     return lm_eval_cmd(
                         gen_model_args(pretrained, th, backend=be, remote_code=remote_code,
                                        revision=meta.get("revision"),
@@ -1724,12 +1954,16 @@ def run_submission(sub: dict) -> None:
                 lf.flush()
                 mark = log_path.stat().st_size      # this task's output starts here
                 if rec:
+                    # 16b: the relay says the switch, lm_eval can't
+                    said = relay is not None and not relay.meter
                     lf.write(f"[served] {rec['name']} at {rec['base_url']} · "
-                             f"{rec['pin'].get('version') or rec['pin'].get('file')} · thinking "
-                             f"as the server does (lm_eval sends no switch) · "
-                             f"{_served.concurrency(rec)} at a time"
+                             f"{rec['pin'].get('version') or rec['pin'].get('file')} · "
+                             + (f"thinking {'on' if th['on'] else 'off'}, said by the board's "
+                                f"relay (lm_eval sends no switch)" if said else
+                                "thinking as the server does (lm_eval sends no switch)")
+                             + f" · {_served.concurrency(rec)} at a time"
                              + (" · through the board's relay, which counts each answer's cost"
-                                if relay else "") + "\n")
+                                if relay and relay.meter else "") + "\n")
                     lf.flush()
                 # 12f.1: a served run's key, and its progress from lm_eval's bar;
                 # a local run is called as it always was. 12m.3: and a model from

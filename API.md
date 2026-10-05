@@ -318,6 +318,23 @@ A served setup's thinking here is the request's (`chat_template_kwargs`),
 whatever it was registered with. A stopped run keeps its answers; the next
 asks only the rest.
 
+#### 16b: one thinking rule — `"suite": "mobile"`, `"generative"`, `"shared"`
+
+The Mobile suite (MobileAIBench's parts and Mobile-MMLU), Instruction & maths
+(`generative`) and Frontier (`shared`) ask a model that can turn its thinking
+off with it off — a served model too, whatever it was registered with —
+unless `"thinking": true`, which is a row of its own (`… · thinking`). A
+Hugging Face model is told in its model_args (`enable_thinking=…`); a served
+one in each request (`chat_template_kwargs`), through the board's relay where
+lm_eval asks, since lm_eval can't send it. One from OpenRouter has no switch
+and thinks as it does. Everyday, Trust & safety and the exam keep the chat
+template's own default. Answers made under the other setting are never
+reused: a run moves them to the thinking row, or beside the tree
+(`results/earlier/<row>/<task>-thinking-<on|off|default>-<time>`), and asks
+again. `GET /api/mobileaibench/estimate?model=…&thinking=false` gives each
+part's time at the pace measured for that setting (a served model's
+`speed_by`), says when that setting has none yet, and returns the rule.
+
 ### GET /api/devicemark — each row that sat the battery
 
 `{"version", "whose", "cap", "server_speed_label", "rows": [...]}`: per row

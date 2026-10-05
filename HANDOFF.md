@@ -4953,6 +4953,47 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 16b — one thinking rule for the Mobile suite, and for a served model's I&M and Frontier (5 Oct)
+
+- **What was wrong:** the Mobile suite asked every model with its chat
+  template's default — thinking on, for a Qwen3 — on Hugging Face and over a
+  server alike, unlabelled; run #180 (a served model, MobileAIBench) took a
+  day and a half thinking. Instruction & maths and Frontier asked a Hugging
+  Face model with its thinking off (12h.1) but a served one as its server
+  decided (lm_eval can't send `chat_template_kwargs`).
+- **The rule** (`runner.THINKING_RULE`, `suite_thinking`): a model that can
+  turn its thinking off is asked with it off — served models too, whatever
+  they were registered with — unless a thinking run is asked for, which is a
+  row of its own (`__thinking`, "· thinking"). Hugging Face: `enable_thinking`
+  in model_args, Mobile-MMLU too (no chat template there, so it switches
+  nothing, but it files a thinking run's results in its row). Served:
+  `chat_template_kwargs` on each request (`_ask_served`), and through a relay
+  for lm_eval (`served.Relay(rec, extra=…)`, no meter). OpenRouter: no
+  switch. Everyday, Trust & safety and the exam: unchanged, the template's
+  default (masein, 5 Oct).
+- **Never reused across settings:** each task's folder says what it was asked
+  with (`thinking.json`, written before it asks); answers from before say it
+  by their replies (`answered_thinking`: text before a `</think>`), or — a
+  served model's lm_eval answers, whose thinking the server kept apart — by
+  its registration ("the model decides" is not known: `default`).
+  `sort_thinking` moves thinking-on answers in a model's own row to its
+  thinking row (results relabelled `enable_thinking=True`, MobileAIBench
+  verdicts moved by task and turn, both rows' Mobile scores made again) when
+  that row has none for the task; otherwise beside the tree, as 15.7a. lm_eval's
+  cache for a served model is kept per setting (`cache_path(…, thinking)`).
+- **Said:** on the cards of the suites it decides (MobileAIBench, Mobile-MMLU,
+  IFEval, MMLU-Pro, MATH-500, GPQA, SimpleQA); on the row ("thinking off" in
+  the Mobile, Instruction & maths and Frontier views; a thinking row's badge
+  says the rule); in Test a model, above the Mobile parts, with "Think before
+  answering" for a model with a switch or a served one.
+- **The estimate before Start:** a served model's pace is kept by setting
+  (`speed_by`: on, off, default); the Mobile parts' times use the one asked
+  with, and say when it has none yet ("— with thinking on not measured yet;
+  with thinking off it took 4.0 s an answer").
+- **Deploy:** `python -m service.thinking_sort` (a dry run) lists what is on
+  disk under the other setting; `--apply`, with the queue idle, moves it.
+  Run #180's MobileAIBench answers go to the served model's thinking row.
+
 ### 16b's review, the medium and low points (5 Oct)
 
 - **The upload quota** counts the other uploads under way, their unwritten
