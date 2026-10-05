@@ -2293,7 +2293,11 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
     # a GGUF file with no server
     for m in models:
         if m in served:
-            display[m] = served[m]["name"]
+            # 16b: a served model's thinking row is its name and "· thinking", as
+            # a Hub model's is — never its model's name alone
+            nm = served[m]["name"]
+            display[m] = nm + " · thinking" if m.endswith(" · thinking") \
+                and not nm.endswith(" · thinking") else nm
         elif m in ((gguf or {}).get("registered") or {}):
             display[m] = gguf["registered"][m]["name"]
 
@@ -3880,6 +3884,8 @@ table.lb td.model:has([data-phone-tag]) .mcell { max-width:var(--namew, 342px); 
 /* a long badge ("duplicate of <name>") gives way too, after the name: every
    child stays inside the cell. The short ones (base, prelim) keep their word */
 table.lb .mcell .badge { flex:none; white-space:nowrap; }
+/* 16b: "thinking off" gives way before its row's name is cut */
+table.lb td.model.squeezed .badge.give { display:none; }
 table.lb .mcell .badge[data-duplicate], table.lb .mcell .badge[data-near-duplicate] {
   flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; }
 table.lb .mcell .duptoggle { flex:none; padding:0 2px; min-height:0; }
@@ -7378,19 +7384,22 @@ function mabSuiteLabel(id) {
     + 'and three trust sets judged; Mobile-MMLU-Pro' + (MMFD().name ? ', or the full Mobile-MMLU'
       : '');
 }
-function mabEstimate(id) {
+function mabEstimate(id, thinking = false) {
   const E = state.mabEst = state.mabEst || {};
   if (!id || !LIVE) return null;
-  if (!(id in E) && netReady()) {
-    E[id] = null;
-    api('api/mobileaibench/estimate?model=' + encodeURIComponent(id))
-      .then(j => { E[id] = j.parts; if (state.testOpen) render(); })
-      .catch(() => { E[id] = { failed: true }; });
+  // 16b: at the pace of the setting it asks with — a thinking run's is its own
+  const k = id + (thinking ? '|thinking' : '');
+  if (!(k in E) && netReady()) {
+    E[k] = null;
+    api('api/mobileaibench/estimate?model=' + encodeURIComponent(id)
+      + (thinking ? '&thinking=true' : ''))
+      .then(j => { E[k] = j.parts; if (state.testOpen) render(); })
+      .catch(() => { E[k] = { failed: true }; });
   }
-  return E[id];
+  return E[k];
 }
-function mabPartOpts(sf) {
-  const id = sf.hf_id.trim(), est = mabEstimate(id) || {};
+function mabPartOpts(sf, thinkBox = '') {
+  const id = sf.hf_id.trim(), est = mabEstimate(id, !!sf.thinking) || {};
   const parts = (DATA.mab || {}).parts || {};
   const P = [['', 'no judge', (parts.none || {}).tasks || MAB.filter(t => t !== MTBENCH)],
              ['judged', 'judged', ['MT-Bench']],
@@ -7405,6 +7414,9 @@ function mabPartOpts(sf) {
     : v === 'mmlu_full' ? MMFD().missing || '' : '';
   const who = j => j.label && j.label !== 'none' ? j.label : j.id || 'none set up';
   return el('div', { class: 'mabopts', 'data-mab-opts': '1' },
+    // 16b: the rule, and the choice of a thinking run
+    el('p', { class: 'small se', 'data-thinking-rule': 'mobile', text: THINKING_RULE_WORDS }),
+    thinkBox ? el('div', { class: 'genopts', 'data-mab-think': '1' }, thinkBox) : '',
     el('p', { class: 'small', text: 'Part:' }),
     ...P.map(([v, words, ts]) => {
       const e = est[v || 'none'];
@@ -10950,6 +10962,27 @@ const isGen = t => genTasks().includes(t);
 // preflight read from its chat template: switch, always or never
 const thinkingModeOf = id => (DATA.thinkingModes || {})[id]
   || (((DATA.models.find(x => x.id === id) || {}).archinfo) || {}).thinking || null;
+// 16b: whether a run can ask a model with its thinking off — a model with a
+// switch, and a served one (said to its server; not one from OpenRouter)
+const canSwitchThinking = id => thinkingModeOf(id) === 'switch'
+  || (isServedId(id) && !!servedOf(id) && !isOpenRouter(servedOf(id)));
+// 16b: the rule, said on the suites' cards and in Test a model
+const THINKING_RULE_WORDS = 'Thinking off for a model that can turn it off, served models too, '
+  + 'unless a thinking run is asked for: that is a row of its own (“· thinking”).';
+// 16b: the views whose answers the rule decides: Mobile, Instruction & maths, Frontier
+const thinkRuleView = (L = lbS()) => ['mobile', 'frontier'].includes(lbTest(L))
+  || (lbTest(L) === 'standard' && L.chip === 'instruction');
+// the rule on the row: a thinking row (or a model that can't stop) says
+// "thinking"; in a view the rule decides, a model that can turn it off says
+// "thinking off"
+function thinkBadge(m, ruled) {
+  if (m.thinkingRow || ((m.gen || {}).thinking || {}).mode === 'always')
+    return el('span', { class: 'badge instruct', 'data-thinking-badge': m.id,
+      title: genMode(m) + (m.thinkingRow ? '\n\n' + THINKING_RULE_WORDS : ''), text: 'thinking' });
+  return ruled && canSwitchThinking(m.dmHome || m.id) ? el('span', { class: 'badge quiet give',
+    'data-thinking-off': m.id, title: 'Asked with thinking off.\n\n' + THINKING_RULE_WORDS,
+    text: 'thinking off' }) : '';
+}
 // how a model's generative answers were asked: "thinking off · on vllm"
 function genMode(m) {
   const g = m.gen || {}, th = g.thinking || {};
@@ -12528,6 +12561,7 @@ function lbFrontier(ms) {
         : mnameLink(r.m, frShort, { href: '#model=' + encodeURIComponent(r.m.id) }),
       !r.m.reportedOnly ? el('span', { class: 'badge', 'data-fr-ours': r.m.id,
         title: 'measured on this board', text: 'ours' }) : '',
+      !r.m.reportedOnly ? thinkBadge(r.m, true) : '',
       sortC ? el('span', { class: 'se small', text: ' ' + (r.maker || 'measured here') }) : ''));
   const ncol = cols.length + 1;
   const tbody = el('tbody', {});
@@ -14297,7 +14331,10 @@ function vLeaderboard(ms) {
         // paints into Params
         if (c.key === 'name') return el('td', { class: 'model pin', 'data-model': m.id,
             style: `--fam:${famColor(m)}`,
-            title: modelSentence(m) + `\n\nfamily: ${famOf(m)}\n` + m.id },
+            title: modelSentence(m) + `\n\nfamily: ${famOf(m)}\n` + m.id
+              // 16b: the rule, where the row's badge may give way
+              + (!m.thinkingRow && thinkRuleView(L) && canSwitchThinking(m.dmHome || m.id)
+                ? '\n\nAsked with thinking off. ' + THINKING_RULE_WORDS : '') },
           el('div', { class: 'mcell' },
             // 12m.1: tick two to eight rows, then Compare ▸
             L.view === 'standard' ? el('input', { type: 'checkbox', class: 'cmptick',
@@ -14312,10 +14349,9 @@ function vLeaderboard(ms) {
               ? el('span', { class: 'badge instruct', text: 'instruct' })
               : el('span', { class: 'badge', text: 'base' })),
             phoneTag(m) || servedTag(m.dmHome || m.id),
-            // 12h.1: a thinking row, or a model that cannot stop thinking
-            m.thinkingRow || ((m.gen || {}).thinking || {}).mode === 'always'
-              ? el('span', { class: 'badge instruct', 'data-thinking-badge': m.id,
-                  title: genMode(m), text: 'thinking' }) : '',
+            // 12h.1: a thinking row, or a model that cannot stop thinking —
+            // 16b: and where the rule is the suite's, one asked with it off
+            thinkBadge(m, thinkRuleView(L)),
             // a thinking row has only these three: Standard's "preliminary" is not its.
             // 16.8: "prelim 0/7" counts Standard's required benchmarks: Standard's alone
             m.thinkingRow || m.served || ggufOnly(m) || dmv || lbTest(L) !== 'standard' ? ''
@@ -14681,21 +14717,31 @@ function fitNames(root) {
   for (const t of tables) {
     t.style.removeProperty('--namew');
     t.querySelectorAll('.mname[data-cut]').forEach(n => n.removeAttribute('data-cut'));
+    t.querySelectorAll('.mn-short[data-short]').forEach(s => { s.textContent = s.dataset.short; });
+    t.querySelectorAll('td.model.squeezed').forEach(td => td.classList.remove('squeezed'));
   }
   const widths = tables.map(t => {
     const td = t.querySelector('tbody td.model'), cs = getComputedStyle(td);
     return Math.floor(td.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
   });
   tables.forEach((t, i) => t.style.setProperty('--namew', widths[i] + 'px'));
-  const cut = tables.flatMap(t => [...t.querySelectorAll('tbody td.model .mname')]
-    .filter(n => n.querySelector('.mn-short') && n.scrollWidth > n.clientWidth + 1))
-    .map(n => {
-      const full = n.getAttribute('title') || '', font = getComputedStyle(n).font;
-      return [n, fitLabel(full, n.querySelector('.mn-short').textContent, n.clientWidth - 1, font,
-        n.scrollWidth / Math.max(1, textWidth(full, font)))];
-    });
+  const names = tables.flatMap(t => [...t.querySelectorAll('tbody td.model .mname')])
+    .filter(n => n.querySelector('.mn-short'));
+  const over = n => n.scrollWidth > n.clientWidth + 1;
+  // 16b: a badge that may give way ("thinking off": its words are in the
+  // name's tooltip too) goes before its row's name is cut — the name first
+  names.filter(over).map(n => n.closest('td.model'))
+    .filter(td => td && td.querySelector('.badge.give'))
+    .forEach(td => td.classList.add('squeezed'));
+  const cut = names.filter(over).map(n => {
+    const full = n.getAttribute('title') || '', font = getComputedStyle(n).font;
+    return [n, fitLabel(full, n.querySelector('.mn-short').textContent, n.clientWidth - 1, font,
+      n.scrollWidth / Math.max(1, textWidth(full, font)))];
+  });
   for (const [n, label] of cut) {
-    n.querySelector('.mn-short').textContent = label;
+    const s = n.querySelector('.mn-short');
+    s.dataset.short = s.dataset.short || s.textContent;
+    s.textContent = label;
     n.dataset.cut = '1';
   }
 }
@@ -18400,18 +18446,20 @@ function vQueue(part = { form: true, list: true }) {
   // the model thinks first (a model with a switch only; off by default, and a
   // row of its own), and a seeded MMLU-Pro subset (off: the full 12,032 is the
   // only run comparable to published numbers)
-  const canThink = thinkingModeOf(sf.hf_id.trim()) === 'switch';
+  // 16b: a served model has a switch too (not one from OpenRouter, which thinks as it does)
+  const canThink = canSwitchThinking(sf.hf_id.trim());
   if (!canThink) sf.thinking = false;
   const thinkBox = canThink ? el('label', { class: 'spread', 'data-think-switch': '1' },
       el('input', { type: 'checkbox', checked: sf.thinking ? '' : null,
-        onchange: e => { sf.thinking = e.target.checked; } }),
+        onchange: e => { sf.thinking = e.target.checked; if (sf.suite === 'mobile') render(); } }),
       ' Think before answering', el('span', { class: 'small se',
         text: ' — off by default; its scores are a row of their own' })) : '';
   // 12o.1: GPQA as Epoch runs it, with reasoning — the shared suite thinks too
   const sharedOpts = sf.suite === 'shared' && canThink
     ? el('div', { class: 'genopts', 'data-shared-opts': '1' }, thinkBox) : '';
-  // 14.1: the Mobile tasks suite's two parts, each with what it takes
-  const mabOpts = sf.suite === 'mobile' ? mabPartOpts(sf) : '';
+  // 14.1: the Mobile tasks suite's two parts, each with what it takes.
+  // 16b: thinking off unless a thinking run is asked for, as the generative three
+  const mabOpts = sf.suite === 'mobile' ? mabPartOpts(sf, canThink ? thinkBox : '') : '';
   const genOpts = sf.suite === 'generative' ? el('div', { class: 'genopts', 'data-gen-opts': '1' },
     thinkBox,
     el('label', { class: 'spread small' }, 'MMLU-Pro subset ',
@@ -19965,7 +20013,9 @@ function catCards() {
         qnote: k === 'bbq' ? `(a seeded ${((DATA.trust || {}).bbqSubset || {}).n
           ? Number(DATA.trust.bbqSubset.n).toLocaleString('en') : '3,000'} by default)` : '' };
     }),
-    ...['ifeval', 'mmlu_pro', 'hendrycks_math500'].map(t => harness(t, ['standard', 'instruction'])),
+    // 16b: how thinking is asked, on each card it applies to
+    ...['ifeval', 'mmlu_pro', 'hendrycks_math500'].map(t => ({ ...harness(t, ['standard', 'instruction']),
+      protocol: THINKING_RULE_WORDS })),
     ...(DATA.pplTasks || []).length ? [{ key: 'lm', name: 'Language modelling', tasks: DATA.pplTasks,
       line: 'Perplexity on pinned corpus slices: the same tokens for every model.',
       marked: 'bits per byte — lower is better; no chance level',
@@ -19985,6 +20035,7 @@ function catCards() {
       avg: 'its own composite; never in the Avg' },
     { key: 'mobileaibench', name: 'MobileAIBench', see: ['mobile', 'mobileaibench'],
       line: 'Tasks for models on a phone, in three parts: no judge; judged; trust & safety, judged.',
+      protocol: THINKING_RULE_WORDS,
       by: mab.cite, url: mab.url, licence: mab.licence, tasks: [...MAB, ...MAB_TRUST],
       qwords: 'its own sample of each source', avg: 'never in the Avg',
       parts: [...MAB, ...MAB_TRUST].map(t => {
@@ -19996,6 +20047,8 @@ function catCards() {
       }) },
     { key: 'mobile_mmlu', name: 'Mobile-MMLU', see: ['mobile', 'mmlu'],
       line: 'Multiple-choice questions people ask on a phone, in 80 fields.',
+      protocol: 'A Hugging Face model is asked with no chat template, the paper’s way; a served '
+        + 'model through its chat. ' + THINKING_RULE_WORDS,
       by: ((MMPD().credit || {}).by) || '', url: ((MMPD().credit || {}).url) || '',
       licence: '', avg: 'never in the Avg', tasks: [MMP],
       parts: [
@@ -20027,13 +20080,14 @@ function catCards() {
     { ...harness('gpqa_diamond_cot_zeroshot', ['frontier']), key: 'gpqa',
       name: 'GPQA Diamond', tasks: [GPQA_COT, GPQA_LL], ...CAT_HARNESS.gpqa,
       marked: 'two ways, never averaged together: the answer written out (CoT), and the four '
-        + 'options scored', avg: 'never in the Avg' },
+        + 'options scored', avg: 'never in the Avg', protocol: THINKING_RULE_WORDS },
     { key: 'simpleqa', name: 'SimpleQA Verified', tasks: [SIMPLEQA], see: ['frontier'],
       line: 'Short factual questions with one right answer.',
       marked: 'the judge, with the dataset’s own grader', by: (sh.simpleqa || {}).cite
         || 'Google DeepMind, SimpleQA Verified (2025)',
       url: (sh.simpleqa || {}).url || 'https://huggingface.co/datasets/google/simpleqa-verified',
-      licence: (sh.simpleqa || {}).licence || 'MIT', avg: 'never in the Avg' },
+      licence: (sh.simpleqa || {}).licence || 'MIT', avg: 'never in the Avg',
+      protocol: THINKING_RULE_WORDS },
     ...LIVE ? [{ key: 'reported', name: 'What others report', see: ['frontier'],
       line: 'Scores published by others — Epoch AI, model cards and papers — beside ours on the '
         + 'same tests, never ranked with them.', qwords: 'theirs',

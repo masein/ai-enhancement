@@ -502,6 +502,8 @@ def register_openrouter(model_id: str, by: str) -> dict:
     old = get(rec["id"])
     if old and old.get("speed"):
         rec["speed"] = old["speed"]
+    if old and old.get("speed_by"):
+        rec["speed_by"] = old["speed_by"]
     db.served_put(rec)
     write_meta(rec)
     return public(rec)
@@ -530,13 +532,24 @@ def view(rec: dict) -> dict:
                 "subset": config.OPENROUTER_GEN_SUBSET} if is_openrouter(rec) else {})}
 
 
-def record_speed(model_id: str, secs_each: float, n: int) -> None:
+def thinking_key(s: dict) -> str:
+    """the thinking setting a run's questions were asked with: on, off, or
+    the server's own default (nothing said)"""
+    v = (s.get("chat_template_kwargs") or {}).get("enable_thinking")
+    return "default" if v is None else "on" if v else "off"
+
+
+def record_speed(model_id: str, secs_each: float, n: int, thinking: str = "default") -> None:
     """a run's measured seconds per answer, kept with the model (a speed
-    over fewer than ten answers says too little to keep)"""
+    over fewer than ten answers says too little to keep). 16b: and by the
+    thinking setting it was asked with — a model that thinks takes many times
+    longer, so an estimate reads the pace of the setting it asks"""
     rec = get(model_id)
     if not rec or n < 10 or secs_each <= 0:
         return
-    rec["speed"] = {"secs_each": round(secs_each, 3), "n": n, "at": time.time()}
+    rec["speed"] = {"secs_each": round(secs_each, 3), "n": n, "at": time.time(),
+                    "thinking": thinking}
+    rec.setdefault("speed_by", {})[thinking] = dict(rec["speed"])
     db.served_put(rec)
     write_meta(rec)
 
@@ -870,7 +883,8 @@ def answer_task(rec: dict, task: str, docs: list[dict], task_out: Path, s: dict,
     with ThreadPoolExecutor(max_workers=concurrency(rec)) as pool:
         list(pool.map(one, range(total)))
     if answers:
-        record_speed(rec["id"], (time.time() - t0) / len(answers), len(answers))
+        record_speed(rec["id"], (time.time() - t0) / len(answers), len(answers),
+                     thinking_key(s))
     # what is finished is kept, in order: a stop keeps the answers before the
     # first gap. 12m.3: at the AI limit, every answer — each is paid for
     at_limit = any(isinstance(e, LimitReached) for e in halt)
@@ -902,6 +916,13 @@ def answer_task(rec: dict, task: str, docs: list[dict], task_out: Path, s: dict,
         e.done, e.total = len(kept), total
         raise e
     return 0
+
+
+def _row_mark(task_out: Path) -> str:
+    """16b: a thinking run's results say so, as a local one's model_args do
+    (enable_thinking=True): the report files them under its thinking row
+    ("· thinking"), never the model's own — the row is the folder's"""
+    return ",enable_thinking=True" if task_out.parent.name.endswith("__thinking") else ""
 
 
 def _write(rec: dict, task: str, docs: list[dict], answers: dict[int, str], task_out: Path,
@@ -943,7 +964,8 @@ def _write(rec: dict, task: str, docs: list[dict], answers: dict[int, str], task
         "versions": {task: 1.0}, "n-shot": {task: 0},
         "higher_is_better": {task: {"bypass": True}},
         "n-samples": {task: {"original": total, "effective": len(answers)}},
-        "config": {"model": "served", "model_args": f"pretrained={rec['id']}", "batch_size": 1,
+        "config": {"model": "served", "model_args": f"pretrained={rec['id']}"
+                   + _row_mark(task_out), "batch_size": 1,
                    "batch_sizes": [], "device": None, "limit": None,
                    "random_seed": config.SEED, "gen_kwargs": {"max_gen_toks": s["max_tokens"]}},
         "chat_template": "the server's own", "date": time.time(),
@@ -978,13 +1000,15 @@ def job_env(env: dict, rec: dict) -> dict:
     return env
 
 
-def cache_path(rec: dict, task: str) -> Path:
+def cache_path(rec: dict, task: str, thinking: bool | None = None) -> Path:
     """lm_eval's cache of the answers it has, per file served: a run the server
-    stopped asks only the rest, and a different file starts again"""
+    stopped asks only the rest, and a different file starts again. 16b: and per
+    thinking setting — the relay adds the switch after lm_eval keys its cache,
+    so an answer made with the other setting would be read back as this one's"""
     pin = hashlib.sha256(json.dumps(rec["pin"], sort_keys=True).encode()).hexdigest()[:12]
     d = model_dir(rec) / "served_cache" / pin
     d.mkdir(parents=True, exist_ok=True)
-    return d / task
+    return d / (task if thinking is None else f"{task}-thinking-{'on' if thinking else 'off'}")
 
 
 def adopt_lm_eval_results(task_out: Path, rec: dict) -> None:
@@ -1002,7 +1026,7 @@ def adopt_lm_eval_results(task_out: Path, rec: dict) -> None:
         args = cfg.get("model_args") or ""
         if isinstance(args, dict):
             args = ",".join(f"{k}={v}" for k, v in args.items())
-        cfg["model_args"] = f"pretrained={rec['id']}," + str(args)
+        cfg["model_args"] = f"pretrained={rec['id']}{_row_mark(task_out)}," + str(args)
         blob["chat_template"] = blob.get("chat_template") or "the server's own"
         blob["served"] = {**view(rec), "settings": {"backend": BACKEND,
                                                     "concurrency": config.SERVED_CONCURRENCY,
@@ -1218,8 +1242,10 @@ class Relay:
     on, and the runner stops lm_eval at its next look. The lm_eval child never
     sees the key"""
 
-    def __init__(self, rec: dict, meter: Meter):
-        self.rec, self.meter = rec, meter
+    def __init__(self, rec: dict, meter: "Meter | None" = None, extra: dict | None = None):
+        """16b: with no `meter`, a served model's own: each request goes to its
+        server with `extra` added (the thinking switch lm_eval can't send)"""
+        self.rec, self.meter, self.extra = rec, meter, dict(extra or {})
         self.nonce = secrets.token_hex(12)
         relay = self
 
@@ -1260,28 +1286,36 @@ class Relay:
             body = json.loads(raw or b"{}")
         except ValueError:
             return 400, {"error": {"message": "not JSON"}}
-        texts = [str(m.get("content") or "") for m in body.get("messages") or []]
-        held = self.meter.worst(texts, int(body.get("max_tokens") or config.GEN_MAX_GEN_TOKS))
-        if not self.meter.room(held):
-            return 402, {"error": {"message": "stopped at this month's AI limit"}}
-        out = {**body, "model": self.rec["pin"]["model"], **_pinned_route(self.rec)}
+        meter = self.meter
+        held = 0.0
+        if meter:
+            texts = [str(m.get("content") or "") for m in body.get("messages") or []]
+            held = meter.worst(texts, int(body.get("max_tokens") or config.GEN_MAX_GEN_TOKS))
+            if not meter.room(held):
+                return 402, {"error": {"message": "stopped at this month's AI limit"}}
+            out = {**body, "model": self.rec["pin"]["model"], **_pinned_route(self.rec)}
+        else:
+            out = {**body, **self.extra}
         base, key = _endpoint(self.rec)
         try:
             st, got = _http("POST", base + "/chat/completions", key, out,
                             timeout=config.SERVED_TIMEOUT_S)
             reply = json.loads(got) if st == 200 else None
         except Exception as e:                              # noqa: BLE001 — lm_eval retries
-            self.meter.release(held)
+            if meter:
+                meter.release(held)
             return 502, {"error": {"message": str(getattr(e, "reason", e))[:200]}}
         if not isinstance(reply, dict) or not reply.get("choices"):
-            self.meter.release(held)
+            if meter:
+                meter.release(held)
             try:
                 said = json.loads(got)
             except ValueError:
                 said = {"error": {"message": got[:200].decode("utf-8", "replace")}}
             return (st if st != 200 else 502), said
-        self.meter.count(held, reply.get("usage") if isinstance(reply.get("usage"), dict)
-                         else None, str(reply.get("provider") or ""))
+        if meter:
+            meter.count(held, reply.get("usage") if isinstance(reply.get("usage"), dict)
+                        else None, str(reply.get("provider") or ""))
         for c in reply["choices"]:                          # a reply that ran out thinking
             msg = c.get("message") or {}
             if msg.get("content") is None:

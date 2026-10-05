@@ -534,10 +534,11 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
                                  "(Do-Not-Answer, XSTest), shared (GPQA Diamond, "
                                  "SimpleQA Verified), mobile (MobileAIBench's text sets; "
                                  "part judged: MT-Bench) or devicemark (DeviceMark's battery)")
-    if s.suite not in ("generative", "shared", "devicemark") and s.thinking:
+    if s.suite not in ("generative", "shared", "devicemark", "mobile") and s.thinking:
         raise HTTPException(422, "thinking is for IFEval, MMLU-Pro and MATH-500 (suite "
                                  "generative), GPQA Diamond and SimpleQA Verified (suite "
-                                 "shared) and DeviceMark's battery (suite devicemark) only")
+                                 "shared), the Mobile suite (suite mobile) and DeviceMark's battery "
+                                 "(suite devicemark) only")
     part = (s.part or "").strip().lower()
     pair = (s.pair or "").strip()
     # 14.1: the mobile suite's two parts — none (no judge), or judged (MT-Bench)
@@ -1813,8 +1814,27 @@ def _mab_judge() -> dict:
             "price_out": c.get("price_out") if c.get("kind") == "openrouter" else None}
 
 
+def _served_pace(rec: dict, thinking: bool) -> tuple[float | None, str]:
+    """16b: a served model's seconds an answer for the thinking setting a run
+    asks with, and what the estimate says of it. A pace measured with the
+    other setting is not this one's: said, never used"""
+    by = rec.get("speed_by") or {}
+    key = "on" if thinking else "off"
+    if by.get(key):
+        return by[key]["secs_each"], (f", at its measured {by[key]['secs_each']:.1f} s an "
+                                      f"answer with thinking {key}")
+    other = by.get("off" if thinking else "on") or by.get("default") or (
+        rec.get("speed") if not by else None)
+    if other:
+        how = other.get("thinking") or "default"
+        said = ("as its server decides" if how == "default" else how)
+        return None, (f" — with thinking {key} not measured yet; with thinking {said} it took "
+                      f"{other['secs_each']:.1f} s an answer")
+    return None, ""
+
+
 @app.get("/api/mobileaibench/estimate")
-def mab_estimate(model: str):
+def mab_estimate(model: str, thinking: bool = False):
     """14.1: what each part of a model's MobileAIBench run takes, before
     Start: its answers and time — the model's own measured seconds an answer
     when it has some, else the page's guess — and for the judged part the
@@ -1822,7 +1842,12 @@ def mab_estimate(model: str):
     if not _HF_ID_RE.match(model):
         raise HTTPException(422, "model must be a model id on the board")
     rec = served.get(model) if served.is_served(model) else None
-    each = ((rec or {}).get("speed") or {}).get("secs_each") if rec else _mab_hf_each()
+    note = ""
+    if rec and not served.is_openrouter(rec):
+        # 16b: the pace of the setting it asks with — off unless a thinking run
+        each, note = _served_pace(rec, thinking)
+    else:
+        each = ((rec or {}).get("speed") or {}).get("secs_each") if rec else _mab_hf_each()
     parts = _mab().estimate(bool(rec), each, _mab_judge())
     # 14.3: Mobile-MMLU-Pro — a letter a question, or four log-likelihoods.
     # 14.4: each counts only what this model has no pick for, by either set's run
@@ -1835,7 +1860,13 @@ def mab_estimate(model: str):
         rx = _restrictions().of(t)
         if rx and p in parts:
             parts[p]["restriction"] = rx
-    return {"model": model, "parts": parts}
+    if note:
+        for p in parts.values():
+            if isinstance(p, dict) and p.get("line"):
+                p["line"] += note
+    from . import runner as _runner
+    return {"model": model, "parts": parts, "thinking": thinking,
+            "rule": _runner.THINKING_RULE}
 
 
 def _mab_hf_each() -> float | None:
