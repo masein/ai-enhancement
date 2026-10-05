@@ -365,6 +365,13 @@ def test_answers_are_by_kind_then_topic_or_group(live, page):
     assert pick.get_attribute("data-answers-pick") == "everyday"
     pick.click()
     kinds = page.locator("#pop-sel-answers-pick [role='option']")
+    import time as _t
+    t0 = _t.time()
+    dbg = page.evaluate("fetch('api/answers/benchmarks?model=' + encodeURIComponent(state.model))"
+                        ".then(async r => [r.status, await r.text()])")
+    print("DEBUG-API", round(_t.time() - t0, 2), str(dbg)[:3000])
+    print("DEBUG-LIST", page.evaluate("JSON.stringify((state.mansList || {})[state.model])")[:2000])
+    print("DEBUG-ERR", page.errors)
     page.wait_for_function("document.querySelectorAll(\"#pop-sel-answers-pick "
                            "[role='option']\").length > 2")
     # exactly: Everyday, the exam, then every benchmark the server lists as
