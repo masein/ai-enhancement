@@ -132,18 +132,26 @@ def limits() -> dict:
             "floor": int(config.UPLOAD_FREE_GB * GB)}
 
 
-def room_for(size: int, *, have: int = 0) -> str:
+def coming(skip: str = "") -> int:
+    """the bytes the other uploads under way have still to send: the quota
+    counts them, so several started together can't pass it (16b review)"""
+    return sum(max(0, r["size"] - r["offset"]) for r in _all()
+               if r["state"] == "receiving" and r["id"] != skip)
+
+
+def room_for(size: int, *, have: int = 0, skip: str = "") -> str:
     """'' when `size` more bytes may be written (`have` of them already are),
-    else why not — with the numbers"""
+    else why not — with the numbers. `skip`: this upload, already counted"""
     lim, more = limits(), max(0, size - have)
     if size > lim["max"]:
         return (f"This file is {gb_words(size)}: one upload is at most "
                 f"{gb_words(lim['max'])} (UPLOAD_MAX_GB).")
-    u = used()
-    if u + more > lim["quota"]:
-        return (f"Uploads would hold {gb_words(u + more)}, over the {gb_words(lim['quota'])} "
-                f"they may (ARTIFACT_QUOTA_GB): {gb_words(u)} are in use. Delete one you no "
-                "longer need.")
+    u, c = used(), coming(skip)
+    if u + c + more > lim["quota"]:
+        return (f"Uploads would hold {gb_words(u + c + more)}, over the "
+                f"{gb_words(lim['quota'])} they may (ARTIFACT_QUOTA_GB): {gb_words(u)} are in "
+                "use" + (f" and {gb_words(c)} more are on their way" if c else "")
+                + ". Delete one you no longer need.")
     f = free()
     if f is not None and f - more < lim["floor"]:
         return (f"The disk would keep {gb_words(max(0, f - more))} free after this file, and an "
@@ -292,7 +300,7 @@ def at_offset(uid: str, at: int) -> dict:
     if at != rec["offset"]:
         raise Refused(409, f"The server has {rec['offset']} bytes of {rec['filename']}: send "
                            f"from there (offset={rec['offset']}).")
-    why = room_for(rec["size"], have=rec["offset"])
+    why = room_for(rec["size"], have=rec["offset"], skip=uid)
     if why and "disk" in why:                     # the disk filled meanwhile: stop here
         raise Refused(507, why)
     return rec
@@ -324,6 +332,7 @@ def sweep(now: float | None = None) -> list[str]:
     """an upload untouched for a day, finished or not, is removed — its parts
     and its unpacked folder too. And a part no record names"""
     now = now or time.time()
+    resume_checks()
     gone = []
     for rec in _all():
         if now - float(rec.get("touched") or rec.get("at") or 0) > STALE_S \
@@ -357,8 +366,42 @@ def finish(uid: str) -> dict:
     rec = {k: v for k, v in rec.items() if k != "offset"}
     rec.update(state="checking", touched=time.time())
     _save(rec)
-    threading.Thread(target=_check, args=(uid,), daemon=True).start()
+    _start_check(uid)
     return {**rec, "offset": rec["size"]}
+
+
+_running: set[str] = set()
+_running_lock = threading.Lock()
+
+
+def _start_check(uid: str) -> None:
+    with _running_lock:
+        if uid in _running:
+            return
+        _running.add(uid)
+
+    def go():
+        try:
+            _check(uid)
+        finally:
+            with _running_lock:
+                _running.discard(uid)
+    threading.Thread(target=go, daemon=True).start()
+
+
+def resume_checks() -> list[str]:
+    """16b review: a check a restart cut short (every deploy restarts the
+    container) is started again — its part kept, its quota held, "checking"
+    for ever before. At start-up, and on each sweep"""
+    again = []
+    for rec in _all():
+        if rec["state"] == "checking":
+            with _running_lock:
+                running = rec["id"] in _running
+            if not running:
+                _start_check(rec["id"])
+                again.append(rec["id"])
+    return again
 
 
 def sha256_of(path: Path) -> str:

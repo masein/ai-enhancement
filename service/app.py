@@ -30,6 +30,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse, PlainTextResponse,
                                StreamingResponse)
 from pydantic import BaseModel
+from starlette.background import BackgroundTask
 
 from . import (ai_models, builder, chat, config, db, disk, hfmeta, judge_test, llm, llm_poller,
                startup, suggest, worker)
@@ -68,6 +69,12 @@ async def lifespan(_app: FastAPI):
     worker.start()
     llm_poller.start()
     chat.start_janitor()         # 12d.1: an idle chat model unloads
+    try:                         # 16b review: an upload's check a restart cut short
+        again = uploads.resume_checks()
+        if again:
+            print(f"[uploads] checking again after the restart: {', '.join(again)}")
+    except Exception as e:       # noqa: BLE001 — never stops the service starting
+        print(f"[uploads] could not look at uploads under way: {e!r}")
     yield
     llm_poller.stop()
     worker.stop()
@@ -1302,16 +1309,27 @@ async def v1_chat(request: Request, authorization: str = Header(default="")):
         except ValueError:
             raise api_v1.ApiError(400, "The body is a JSON object, OpenAI's chat request") \
                 from None
-        st, ctx, lock = await asyncio.to_thread(api_v1.begin, body, key)
+        st, ctx, turn = await asyncio.to_thread(api_v1.begin, body, key)
     except api_v1.ApiError as e:
         return _api_error(e)
     if body.get("stream"):
-        # identity: the gzip middleware would hold the events back
-        return StreamingResponse(api_v1.stream(st, ctx, key, lock), media_type="text/event-stream",
+        # identity: the gzip middleware would hold the events back. The stream
+        # asks whether the client left between events, and ends its turn when
+        # it did; the response's background ends it too (16b review)
+        return StreamingResponse(api_v1.astream(st, ctx, key, turn, request.is_disconnected),
+                                 media_type="text/event-stream",
                                  headers={"Cache-Control": "no-store",
-                                          "Content-Encoding": "identity"})
+                                          "Content-Encoding": "identity"},
+                                 background=BackgroundTask(turn.end))
+    # 16b review: a client that leaves stops its reply, and frees its model
+    task = asyncio.ensure_future(asyncio.to_thread(api_v1.complete, st, ctx, key, turn))
     try:
-        return await asyncio.to_thread(api_v1.complete, st, ctx, key, lock)
+        while not task.done():
+            if await request.is_disconnected():
+                turn.end()
+                break
+            await asyncio.wait({task}, timeout=0.5)
+        return await task
     except api_v1.ApiError as e:
         return _api_error(e)
 
