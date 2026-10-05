@@ -5593,7 +5593,8 @@ function Select(label, opts, cur, onpick, attrs = {}) {
           el('span', { class: 'opt-sub', 'data-opt-sub': String(v), text: o.sub })) : null)));
     box.addEventListener('keydown', e => listKeys(e, box, pick));
     return box;
-  }, { key, menu: false, focus: '[role=option][aria-selected=true], [role=option]' });
+  }, { key, menu: false, listbox: true,
+       focus: '[role=option][aria-selected=true], [role=option]' });
   btn.setAttribute('aria-haspopup', 'listbox');
   return btn;
 }
@@ -26015,6 +26016,24 @@ function popReanchor() {
       const again = key && POP.panel.querySelector(
         `[data-column="${CSS.escape(key)}"], [data-filter="${CSS.escape(key)}"]`);
       if (again) again.focus();
+    }
+  }
+  // 17: a list opened before its choices arrived (Answers' "Read:", while the
+  // model's benchmarks load) shows them once they do — the panel swapped for a
+  // fresh one, its clicks and keys the new choices', the menu left open
+  if ((POP.opts || {}).listbox && POP.build) {
+    const fresh = POP.build();
+    const vals = root => [...root.querySelectorAll('[role=option]')]
+      .map(o => o.dataset.value).join('\n');
+    if (vals(fresh) !== vals(POP.panel)) {
+      const had = POP.panel.contains(document.activeElement);
+      fresh.dataset.pop = POP.key;
+      fresh.classList.add('pop');
+      POP.panel.replaceWith(fresh);
+      POP.panel = fresh;
+      const f = had && (fresh.querySelector('[role=option][aria-selected=true]')
+        || fresh.querySelector('[role=option]'));
+      if (f) f.focus();
     }
   }
   popPlace();

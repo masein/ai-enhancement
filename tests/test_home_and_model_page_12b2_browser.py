@@ -404,6 +404,29 @@ def test_answers_are_by_kind_then_topic_or_group(live, page):
     assert page.errors == []
 
 
+def test_read_opened_while_the_benchmarks_load_lists_them_when_they_arrive(live, page):
+    """17: "Read:" opened before the model's benchmarks arrive showed Everyday
+    and the exam only until it was opened again (CI hit it on a slow
+    runner); the open list now takes them in as they land"""
+    held = []
+    page.route("**/api/answers/benchmarks*", lambda route: held.append(route))
+    open_model(page, live["base"])
+    page.locator("[data-mtab='answers']").click()
+    page.wait_for_function("(state.mansList || {})[state.model] === null")   # asked, not back
+    page.locator("[data-answers-pick]").click()
+    opts = "#pop-sel-answers-pick [role='option']"
+    page.wait_for_selector(opts)
+    assert page.locator(opts).count() == 2                       # Everyday and the exam
+    assert len(held) == 1
+    held[0].continue_()
+    page.wait_for_function(f"document.querySelectorAll(\"{opts}\").length > 2")
+    # still open, and a benchmark in it is picked like any other choice
+    page.locator(f"{opts}[data-value='b:hellaswag']").click()
+    assert page.locator("[data-answers-pick]").get_attribute("data-answers-pick") == "b:hellaswag"
+    page.unroute("**/api/answers/benchmarks*")
+    assert page.errors == []
+
+
 def test_history_holds_the_runs_run_provenance_and_how_it_was_graded(live, page):
     open_model(page, live["base"])
     page.locator("[data-mtab='history']").click()
