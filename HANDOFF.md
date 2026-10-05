@@ -4953,6 +4953,68 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17.1 — a GGUF's Frontier benchmarks on a rented GPU (5 Oct)
+
+Stage 1 of phase 17 (docs/REMOTE-RUNS.md § "A GGUF's Frontier benchmarks"):
+GPQA Diamond as Epoch AI runs it, asked of a served model on the board or of a
+GGUF on a rented box, through the same code.
+- **`scripts/frontier.py`** (no service import: the board and the box read
+  it): each benchmark's definition — source pinned to a revision, licence,
+  runs, budgets (thinking on 32,768, off 4,096 for GPQA), the prompt's room —
+  Epoch's GPQA template word for word, the choices shuffled once a question
+  (seeded), and Inspect's `parse_answers` ported (wrappers off, the last line
+  that is "ANSWER: X", else the last inline one; one letter or nothing). An
+  answer cut at its budget, or whose thinking never closed, ran out: wrong,
+  and counted. The score is the share right over every run, its error over
+  questions. Sampling is the model card's (`PRESETS`: Qwen3.6's per thinking
+  setting, Gemma 4's), picked from the model's names, what it is based on and
+  its file; a seed a question and run. The questions are fetched where the
+  run is, with HF_TOKEN, and kept on that disk only.
+- **`service/frontier.py`**: a served model's run (`runner.run_submission`
+  dispatches suite "frontier" there, inside the run lock): every question of
+  every run through `served.answer_one`, the thinking switch said out loud,
+  answers appended as they land to `<row>/<task>_0shot/frontier/answers.jsonl`
+  — a run asks only what isn't answered. Scored by code once all are in, as
+  lm_eval's `results_*.json` (`acc,none`, its error, `pretrained=<id>` with
+  `enable_thinking=True` on the thinking row) and `samples_*.jsonl` (ids,
+  never a question). `served.Answer.finish` keeps the reply's finish reason.
+- **Suite "frontier"**: in `config.SUITES` (not looked for in lm_eval:
+  `NOT_LM_EVAL`) and `served.SUITES`. A served model may be asked with
+  thinking on or off (`app.py` let only DeviceMark); a Hugging Face model or a
+  model from OpenRouter is refused for now, saying why.
+- **`scripts/remote_gguf.py`**: the box. Fetches the GGUF and the llama-server
+  tarball (`hf://…` with HF_TOKEN, or paths), hashes the GGUF (kept, so a
+  second session doesn't read 23 GB again), unpacks the tarball (nothing
+  outside it), starts llama-server on 127.0.0.1 (`-c slots × slot context`,
+  `-np`, `-ngl 99`, `--jinja`, `--flags`, `--env`; no secret in its
+  environment), waits for /health, registers it in its own database as `--as`,
+  and runs the board's runner. `--shard i/n`; one `--out` holds one served id,
+  mode, file and shard. The bundle (format 2) holds each task answered whole,
+  `setup.json` (the GGUF's name, size and sha256; `--version`'s build and
+  commit, the binary's and tarball's sha256, argv, env, slots, the chat
+  template's sha256; the GPU; each task's settings) and the log with
+  llama-server's start. `remote_bundle.write` refuses a model file, a binary
+  or a library by name, and any file holding a secret's value; `read` refuses
+  such a member.
+- **`scripts/import_frontier.py`** (import_remote.py hands it suite
+  "frontier"): refuses a bundle whose served model isn't registered or is
+  from OpenRouter, whose GGUF's sha256 isn't the registered file's
+  (`gguf_pin`, or `file_sha256` that `--file-sha256` stores with `--by`),
+  whose protocol, revision, runs, budget, sampling or switch aren't what the
+  board would use for that model, or whose answers don't cover their
+  questions exactly. Shards wait under `results/shards/` and merge by
+  question. Then scored by code; the result's `frontier.where` says "run on a
+  rented GPU (<GPU>)"; `frontier_imports.json` on the row; a Runs entry with
+  the box's log.
+- **`scripts/build_llama_tarball.sh`**: masein's, once — the fork compiled in
+  nvidia/cuda 12.8 on Ubuntu 22.04 for sm 80–120, llama-server, its libraries
+  and CUDA's runtime, cuBLAS and cuBLASLt, with a VERSION file.
+- **On the page**: the report's `FRONTIER_TASKS` takes `frontier.TASKS` too, so
+  these are never in an Avg or in Improve, and the Frontier view draws them
+  with what others report of the same benchmark (`REP_SAME`).
+- Tests: `tests/test_17_gguf_box.py` with `tests/fixtures/fake_llama_server.py`
+  (stdlib, started from a test tarball).
+
 ### 16c's review (5 Oct)
 
 - **A printed shell line quotes every path** (`downloads.shell_path`,

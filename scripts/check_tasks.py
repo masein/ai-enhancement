@@ -222,7 +222,8 @@ def main() -> int:
         # the full suite's second choice, all of BBQ, is checked as its own line
         # the mobile suite's judged part (14.1) and the full suite's second choice,
         # all of BBQ, are checked as lines of their own
-        for suite, tasks in [(s, config.tasks_for_suite(s)) for s in config.SUITES] + [
+        for suite, tasks in [(s, config.tasks_for_suite(s)) for s in config.SUITES
+                             if s not in config.NOT_LM_EVAL] + [
                 ("mobile, judged", config.tasks_for_suite("mobile", part="judged")),
                 ("mobile, trust", config.tasks_for_suite("mobile", part="trust")),
                 ("mobile, mmlu", config.tasks_for_suite("mobile", part="mmlu")),

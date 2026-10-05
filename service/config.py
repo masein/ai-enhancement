@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 
 BENCH_ROOT = Path(os.environ.get("BENCH_ROOT", os.getcwd())).resolve()
@@ -577,6 +578,18 @@ DM_SCORE_AFTER_RUN = os.environ.get("DM_SCORE_AFTER_RUN", "1").strip() not in ("
 # --shard; devicemark.shard_of): the run builds and asks only those items. Empty
 # on the board, which asks every item
 DM_SHARD = os.environ.get("DM_SHARD", "").strip()
+# 17: the Frontier benchmarks (service/frontier.py). On a rented GPU
+# (scripts/remote_gguf.py) a run leaves its answers to be scored where they are
+# imported, asks only its shard ("i/n") when it is one, and says where it ran
+FRONTIER_SCORE_AFTER_RUN = os.environ.get("FRONTIER_SCORE_AFTER_RUN", "1").strip() not in (
+    "0", "no", "off")
+FRONTIER_SHARD = os.environ.get("FRONTIER_SHARD", "").strip()
+FRONTIER_WHERE = os.environ.get("FRONTIER_WHERE", "").strip()
+FRONTIER_SERVED_ONLY = ("The Frontier benchmarks are asked of a model running on a server for "
+                        "now: add it under Add a model ▸ Running on a server, or run its GGUF "
+                        "on a rented GPU (REMOTE-RUNS.md)")
+FRONTIER_NOT_OPENROUTER = ("The Frontier benchmarks aren't asked of a model from OpenRouter yet: "
+                           "they have no estimate against the monthly AI limit")
 # 12w: the parity check asks two setups, and only one llama-server may fit on
 # the card: how long the run waits for the setup it needs next to be started
 DM_SWAP_WAIT_S = int(os.environ.get("DM_SWAP_WAIT_S", "1800"))
@@ -585,9 +598,17 @@ DM_INSTRUCT_ONLY = ("DeviceMark's battery is asked through the chat template and
                     "runs as a base model")
 
 # every suite a run can ask for; scripts/check_tasks.py (deploy step 4) asks
-# the installed lm_eval to find every task of each
+# the installed lm_eval to find every task of each (17: but the Frontier
+# suite's, which the board asks itself: NOT_LM_EVAL)
 SUITES = ("quick", "full", "control", "judged", "everyday", "generative", "safety", "shared",
-          "mobile", "devicemark")
+          "mobile", "devicemark", "frontier")
+NOT_LM_EVAL = ("frontier",)
+
+
+def frontier_tasks() -> list[str]:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import frontier
+    return list(frontier.TASKS)
 
 
 def tasks_for_suite(suite: str, bbq_all: bool = False, part: str = "") -> list[str]:
@@ -612,6 +633,8 @@ def tasks_for_suite(suite: str, bbq_all: bool = False, part: str = "") -> list[s
                     else MAB_TASKS)
     if suite == "devicemark":
         return list(DM_TASKS)
+    if suite == "frontier":
+        return frontier_tasks()
     if suite == "judged":
         return judged_tasks()
     base = QUICK_TASKS if suite == "quick" else FULL_TASKS

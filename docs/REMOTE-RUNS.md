@@ -306,3 +306,134 @@ hf upload <you>/evalboard-devicemark-raw-private ~/benchmarks/raw-export/private
   ```
 
 The board then shows a "raw" link on the row's card and beside the row in the On-device chart's table.
+
+# A GGUF's Frontier benchmarks on a rented GPU (17)
+
+The Frontier benchmarks (GPQA Diamond now; the others in stage 2) asked of a
+GGUF — the original Qwen3.6 build or the LDA one — on rented GPUs, and
+brought back onto that served model's row on the board, or its "· thinking"
+row. `scripts/remote_gguf.py` does it, in the same runner image:
+- it starts llama-server on the box (127.0.0.1 only) from a **tarball** you
+  build once from the fork, and waits until it is healthy;
+- it asks through the board's own code (`service/frontier.py`): the same
+  prompt, the GGUF's own chat template (`--jinja`), the model card's sampling,
+  the thinking switch said out loud, one seed a question and run;
+- it keeps each answer as it lands: the same command again carries on;
+- it writes one file, `frontier-served__<name>-thinking-<on|off>[-shard-<i>-of-<n>].tar.gz`,
+  with the GGUF's sha256, the llama.cpp build and its sha256, the launch flags
+  and environment and the GPU. Never the GGUF, the server or a key.
+
+The fork, the GGUFs and your token never go in the repo or the image: the
+tarball and the GGUF sit in a private Hugging Face repository of yours, and the
+box pulls them with a token you type.
+
+## G0. Once
+
+**A private repository, and the token.** With a token that can write:
+
+```bash
+hf auth login
+hf repos create <you>/evalboard-private --private
+```
+
+Then a **read** token for the boxes (Hugging Face → Settings → Access Tokens →
+fine-grained: read on `<you>/evalboard-private`, and "read access to contents
+of all public gated repos you can access"). On the same account, accept GPQA's
+terms at <https://huggingface.co/datasets/Idavidrein/gpqa>: it is gated, and
+the box fetches it with this token.
+
+**The tarball**, on the server, from the fork at the commit build-lda was built
+from. That commit is the one build-lda prints:
+
+```bash
+cd ~/llama.cpp-teraformer
+LD_LIBRARY_PATH=$HOME/lda-env/lib:$PWD/build-lda/bin build-lda/bin/llama-server --version
+git log -1 --format=%H
+```
+
+The two must match (check out build-lda's if they don't). Then:
+
+```bash
+~/benchmarks/aienh/scripts/build_llama_tarball.sh ~/llama.cpp-teraformer ~/llama-server-cuda12.8.tar.gz
+```
+
+It compiles in Docker (nvidia/cuda 12.8 on Ubuntu 22.04, the runner image's
+CUDA and C library) for the A100 to the RTX 5090, about 15 minutes; nothing
+runs. The last line gives its size and sha256.
+
+**Upload** the tarball, and each GGUF the boxes will run:
+
+```bash
+hf upload <you>/evalboard-private ~/llama-server-cuda12.8.tar.gz llama-server-cuda12.8.tar.gz
+hf upload <you>/evalboard-private ~/Qwen3.6-35B-A3B-k4-LDA-UD-Q4_K_XL.gguf Qwen3.6-35B-A3B-k4-LDA-UD-Q4_K_XL.gguf
+```
+
+**The file's sha256, on the board.** The import refuses a file that isn't the
+one registered for the served model. If its file is registered on its page
+(Download ▸ register its file) and the GGUF worker has hashed it, the board has
+the sha256 already. Otherwise, on the server:
+
+```bash
+sha256sum ~/Qwen3.6-35B-A3B-k4-LDA-UD-Q4_K_XL.gguf
+```
+
+and give it to the first import (`--file-sha256`, step G4): the board keeps it
+on the model, with your name.
+
+## G1. What to rent
+
+The template from step 2, with **Disk space: 80 GB** (the GGUF, 23 GB; the
+tarball; the datasets). In the search: an **RTX 5090** (32 GB), **max CUDA
+12.8 or newer**, and **inet down ≥ 1,000 Mbps** (the GGUF in about 4 minutes;
+destroy a box that pulls below 25 MB/s). 8 slots of 34,816 tokens each fit
+beside the 23 GB file for GPQA with thinking on.
+
+## G2. Run, under tmux
+
+On each box:
+
+```bash
+tmux new -s f
+cd /app
+read -rs HF_TOKEN && export HF_TOKEN
+python scripts/remote_gguf.py --as served/<name> \
+  --gguf hf://<you>/evalboard-private/Qwen3.6-35B-A3B-k4-LDA-UD-Q4_K_XL.gguf \
+  --server hf://<you>/evalboard-private/llama-server-cuda12.8.tar.gz \
+  --based-on Qwen/Qwen3.6-35B-A3B --thinking on --slots 8 \
+  --env "LLAMA_MOE_ROUTE_MODE=lookahead LLAMA_MOE_ROUTE_LOOKAHEAD=1" \
+  --out /workspace/lda-on
+```
+
+- `--as`: the served model's id on the board (its page's address, `served/…`).
+  Its row gets the answers; thinking on goes on its "· thinking" row.
+- `--based-on`: what the board says it is based on. It picks the card's
+  sampling, and the import checks the box asked as the board would.
+- `--env` and `--flags`: the build's own setup. The LDA build's route
+  variables, as on the server; none for the original build. No `--cpu-moe`:
+  the card holds the whole model.
+- `--shard i/n` splits each benchmark across n boxes, one `--out` each.
+
+It prints the file's sha256, the build and the GPU, each benchmark's share,
+then a line as the run moves: answers, the pace, the time left. If the box
+stops, run **the same command** again: it asks only what is not answered.
+
+## G3. Fetch, from the server
+
+```bash
+scp -i ~/.ssh/vast_ed25519 -P <port> root@<host>:/workspace/lda-on/frontier-served__<name>-thinking-on.tar.gz ~/benchmarks/bundles/
+```
+
+## G4. Import
+
+```bash
+cd ~/benchmarks/aienh
+sudo docker compose exec -T bench python scripts/import_remote.py ~/benchmarks/bundles/frontier-served__<name>-thinking-on.tar.gz --by masein
+```
+
+With `--file-sha256 <the sha256 from G0>` the first time, if the board has no
+hash of the file. It checks the served model, the file's sha256, each
+benchmark's protocol and dataset revision, the budget, sampling and thinking
+switch, and that the answers cover their questions (a shard's: exactly its
+own). A shard waits until the others are in. Then each benchmark is scored by
+code, its result says "run on a rented GPU (<the GPU>)", and the Runs list gets
+the import with the box's log.

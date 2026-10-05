@@ -1,0 +1,577 @@
+#!/usr/bin/env python3
+"""17: the Frontier benchmarks asked of a GGUF on a rented GPU, with one
+command — and back to the board as one file (scripts/import_remote.py takes
+it in, onto the served model's row: --as).
+
+It runs inside the board's runner image (ghcr.io/masein/evalboard-runner),
+which holds no llama.cpp: the server comes as a tarball the person points it
+at (--server: scripts/build_llama_tarball.sh makes one), fetched with the
+person's HF_TOKEN from a repo of theirs, or a path on the box. The GGUF the
+same way (--gguf). Neither is ever in the image or the bundle.
+
+Then it does what a served model's run on the board does, through the same
+code: it starts llama-server on this box (127.0.0.1 only) and waits until it
+is healthy, registers it in a database of its own under --out as the served
+model --as, and runs the board's runner (service/runner.py, run_submission →
+service/frontier.py): the same prompts, the GGUF's own chat template
+(--jinja), the model card's sampling, the thinking switch said out loud, one
+seed a question and run. Its answers are kept as they land: run the same
+command again after the process dies or the box is stopped, and it carries on
+from the next unanswered question.
+
+--shard i/n asks every n-th question from the i-th of each task, so n boxes
+share a run, one bundle each; the server takes them in any order.
+
+The bundle (frontier-<served id>-thinking-<on|off>[-shard-i-of-n].tar.gz)
+records the GGUF's name, size and sha256 — the server refuses one whose file
+isn't the file registered for --as — the llama-server build and its sha256,
+the launch flags and environment, the GPU, and each task's settings. It holds
+the answers of each task answered whole, and never the GGUF, the server, or a
+key.
+
+    HF_TOKEN=… python scripts/remote_gguf.py --as served/qwen3-6-35b-a3b-q4 \\
+        --gguf hf://you/private-ggufs/Qwen3.6-35B-A3B-Q4_K_M.gguf \\
+        --server hf://you/private-llama/llama-server-cuda.tar.gz \\
+        --based-on Qwen/Qwen3.6-35B-A3B --thinking on --out /workspace/run
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import shlex
+import subprocess
+import sys
+import tarfile
+import threading
+import time
+import urllib.request
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+REPO = HERE.parent
+for p in (str(REPO), str(HERE)):
+    if p not in sys.path:
+        sys.path.insert(0, p)
+import frontier as fb  # noqa: E402
+import remote_bundle as rb  # noqa: E402
+from remote_run import Out, board_commit  # noqa: E402
+
+SUITE = "frontier"
+STATE = "remote_gguf.json"
+OWN_LOG = "remote_gguf.log"
+SERVER_LOG = "llama-server.log"
+# what this script sets itself: given in --flags, refused
+OWN_FLAGS = {"-m", "--model", "--host", "--port", "-c", "--ctx-size", "-np", "--parallel",
+             "-hf", "--hf-repo", "-mu", "--model-url", "--api-key", "--api-key-file"}
+ENV = {"BENCH_ROOT": "BENCH_ROOT", "RESULTS_ROOT": "OUT_ROOT", "LOGS_DIR": "LOGS",
+       "DB_PATH": "SERVICE_DB", "FRONTIER_SHARD": "FRONTIER_SHARD",
+       "FRONTIER_SCORE_AFTER_RUN": "FRONTIER_SCORE_AFTER_RUN", "FRONTIER_WHERE": "FRONTIER_WHERE",
+       "SERVED_CONCURRENCY": "SERVED_CONCURRENCY", "SERVED_TIMEOUT_S": "SERVED_TIMEOUT_S",
+       "SERVED_RETRY_S": "SERVED_RETRY_S", "GPU_POLL_S": "GPU_POLL_S"}
+WHERE = "a rented GPU"
+
+
+def settings(out: Path, slots: int, shard: tuple[int, int] | None) -> dict:
+    bench = out / "bench"
+    return {"BENCH_ROOT": bench, "RESULTS_ROOT": bench / "results", "LOGS_DIR": bench / "logs",
+            "DB_PATH": bench / "service.sqlite3",
+            "FRONTIER_SHARD": f"{shard[0]}/{shard[1]}" if shard else "",
+            "FRONTIER_SCORE_AFTER_RUN": False, "FRONTIER_WHERE": WHERE,
+            "SERVED_CONCURRENCY": slots,
+            # a thinking answer of 65,536 tokens, at a slot's pace
+            "SERVED_TIMEOUT_S": int(os.environ.get("SERVED_TIMEOUT_S") or 7200),
+            "SERVED_RETRY_S": int(os.environ.get("SERVED_RETRY_S") or 300), "GPU_POLL_S": 10}
+
+
+def configure(out: Path, slots: int, shard: tuple[int, int] | None) -> dict:
+    """the board's config, pointed at --out: set in the environment before
+    the service is imported, and on config itself when it already was"""
+    vals = settings(out, slots, shard)
+    for k, v in vals.items():
+        os.environ[ENV[k]] = "0" if v is False else str(v)
+    from service import config, runner
+    for k, v in vals.items():
+        setattr(config, k, v)
+    config.OUT_DIR = config.RESULTS_ROOT / "full"
+    runner.LOCK = config.RESULTS_ROOT / ".run.lock"
+    for d in (config.OUT_DIR, config.LOGS_DIR):
+        d.mkdir(parents=True, exist_ok=True)
+    return vals
+
+
+# ---------------------------------------------------------------------------
+# the files: hf://[datasets/]<org>/<repo>[@<revision>]/<path>, or a path here
+# ---------------------------------------------------------------------------
+
+_HF = re.compile(r"^hf://(?P<type>datasets/|models/)?(?P<repo>[^/@\s]+/[^/@\s]+)"
+                 r"(?:@(?P<rev>[^/\s]+))?/(?P<path>\S+)$")
+
+
+def fetch(src: str, into: Path, say) -> Path:
+    """the file `src` names, on this box: fetched from Hugging Face with
+    HF_TOKEN (never printed), or the path given"""
+    m = _HF.match(src.strip())
+    if not m:
+        p = Path(src).expanduser().resolve()
+        if not p.is_file():
+            raise SystemExit(f"{src}: no such file on this box, and not hf://<org>/<repo>/<path>")
+        return p
+    from huggingface_hub import hf_hub_download
+    kind = "dataset" if m["type"] == "datasets/" else "model"
+    say(f"fetching {m['path']} from {m['repo']}" + (f" at {m['rev']}" if m["rev"] else ""))
+    try:
+        got = hf_hub_download(m["repo"], m["path"], repo_type=kind, revision=m["rev"],
+                              token=os.environ.get("HF_TOKEN") or None, local_dir=str(into))
+    except Exception as e:                          # noqa: BLE001 — said in one line
+        raise SystemExit(rb.scrub(f"{src} could not be fetched: {e}. A private repo needs "
+                                  "HF_TOKEN set on this box (typed here, never stored)")) from None
+    return Path(got).resolve()
+
+
+def sha256_cached(path: Path, state: dict, say) -> str:
+    """a file's sha256, kept with its size and time so a second session
+    doesn't read 20 GB again"""
+    st = path.stat()
+    key = f"{path}:{st.st_size}:{int(st.st_mtime)}"
+    known = state.setdefault("hashes", {})
+    if key not in known:
+        say(f"sha256 of {path.name} ({st.st_size / 1e9:.1f} GB)…")
+        known[key] = rb.sha256_file(path)
+    return known[key]
+
+
+def unpack_server(tarball: Path, into: Path) -> dict:
+    """the llama-server tarball, unpacked under `into` (nothing outside it,
+    no link out of it): {bin, libs, root}"""
+    sha = rb.sha256_file(tarball)
+    root = into / sha[:16]
+    if not (root / ".unpacked").exists():
+        root.mkdir(parents=True, exist_ok=True)
+        with tarfile.open(tarball, "r:*") as tar:
+            for m in tar.getmembers():
+                parts = Path(m.name).parts
+                if m.name.startswith("/") or ".." in parts or m.isdev():
+                    raise SystemExit(f"{tarball.name} holds {m.name!r}: not unpacked")
+                if (m.issym() or m.islnk()) and (m.linkname.startswith("/")
+                                                 or ".." in Path(m.linkname).parts):
+                    raise SystemExit(f"{tarball.name} links {m.name!r} outside itself: "
+                                     "not unpacked")
+            tar.extractall(root, **({"filter": "data"} if hasattr(tarfile, "data_filter")
+                                    else {}))
+        (root / ".unpacked").write_text(sha, encoding="utf-8")
+    bins = sorted(p for p in root.rglob("llama-server") if p.is_file())
+    if not bins:
+        raise SystemExit(f"{tarball.name} holds no llama-server")
+    exe = bins[0]
+    exe.chmod(exe.stat().st_mode | 0o111)
+    libs = sorted({str(p.parent) for p in root.rglob("*.so*") if p.is_file() or p.is_symlink()})
+    return {"bin": exe, "libs": libs, "root": root, "tarball_sha256": sha}
+
+
+# ---------------------------------------------------------------------------
+# llama-server
+# ---------------------------------------------------------------------------
+
+def parse_env(text: str) -> dict:
+    out = {}
+    for tok in shlex.split(text or ""):
+        if "=" not in tok or not re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tok):
+            raise SystemExit(f"--env: {tok!r} isn't NAME=value")
+        k, v = tok.split("=", 1)
+        out[k] = v
+    return out
+
+
+def own_flags(flags: list[str]) -> list[str]:
+    return [f for f in flags if f.split("=", 1)[0] in OWN_FLAGS]
+
+
+def server_env(srv: dict, extra: dict) -> dict:
+    env = {k: v for k, v in os.environ.items() if k not in rb.SECRETS}
+    libs = os.pathsep.join([*srv["libs"], os.environ.get("LD_LIBRARY_PATH", "")]).strip(os.pathsep)
+    env["LD_LIBRARY_PATH"] = libs
+    env.update(extra)
+    return env
+
+
+def version_of(exe: Path, env: dict) -> dict:
+    """what `llama-server --version` says: {text, build, commit}"""
+    try:
+        r = subprocess.run([str(exe), "--version"], capture_output=True, text=True, timeout=60,
+                           env=env)
+        text = (r.stdout + r.stderr).strip()
+    except (OSError, subprocess.SubprocessError) as e:
+        text = f"--version failed: {e}"
+    m = re.search(r"version:\s*(\d+)\s*\(([0-9a-f]+)\)", text)
+    return {"text": "\n".join(text.splitlines()[:6]), "build": int(m[1]) if m else None,
+            "commit": m[2] if m else None}
+
+
+def _get(url: str, timeout: float = 5) -> tuple[int, bytes]:
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as r:
+            return r.status, r.read()
+    except urllib.error.HTTPError as e:
+        return e.code, b""
+    except Exception:                                   # noqa: BLE001 — not up yet
+        return 0, b""
+
+
+class Server:
+    """llama-server on 127.0.0.1, started and stopped"""
+
+    def __init__(self, srv: dict, gguf: Path, port: int, slots: int, ctx: int,
+                 flags: list[str], env: dict, log: Path):
+        self.argv = [str(srv["bin"]), "-m", str(gguf), "--host", "127.0.0.1", "--port", str(port),
+                     "-c", str(ctx * slots), "-np", str(slots), "-ngl", "99", "--jinja",
+                     "--metrics", *flags]
+        self.env, self.log, self.port = server_env(srv, env), log, port
+        self.base = f"http://127.0.0.1:{port}"
+        self.proc: subprocess.Popen | None = None
+
+    def start(self, timeout: float, say) -> None:
+        self.log.parent.mkdir(parents=True, exist_ok=True)
+        fh = open(self.log, "ab")
+        fh.write(f"\n===== {time.strftime('%Y-%m-%d %H:%M:%S')} starting =====\n".encode())
+        fh.flush()
+        self.proc = subprocess.Popen(self.argv, stdout=fh, stderr=subprocess.STDOUT, env=self.env)
+        t0, said = time.time(), 0.0
+        while True:
+            if self.proc.poll() is not None:
+                raise SystemExit(f"llama-server stopped as it started (exit {self.proc.returncode})"
+                                 f":\n{self.tail(30)}")
+            st, _ = _get(self.base + "/health")
+            if st == 200:
+                say(f"llama-server is up ({time.time() - t0:.0f} s)")
+                return
+            if time.time() - t0 > timeout:
+                self.stop()
+                raise SystemExit(f"llama-server wasn't healthy after {timeout:.0f} s:\n"
+                                 f"{self.tail(30)}")
+            if time.time() - said > 30:
+                say(f"waiting for llama-server to load the model… ({time.time() - t0:.0f} s)")
+                said = time.time()
+            time.sleep(1)
+
+    def props(self) -> dict:
+        st, raw = _get(self.base + "/props")
+        try:
+            return json.loads(raw) if st == 200 else {}
+        except ValueError:
+            return {}
+
+    def tail(self, n: int) -> str:
+        try:
+            lines = self.log.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            return ""
+        return rb.scrub("\n".join(lines[-n:]))
+
+    def stop(self) -> None:
+        if self.proc and self.proc.poll() is None:
+            self.proc.terminate()
+            try:
+                self.proc.wait(30)
+            except subprocess.TimeoutExpired:
+                self.proc.kill()
+                self.proc.wait(10)
+
+
+def startup_log(path: Path, limit: int = 400) -> str:
+    """the server log's start, each session's, up to where it listens — what
+    it loaded and how — never a request"""
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return ""
+    out, on = [], False
+    for ln in lines:
+        if ln.startswith("===== ") and ln.rstrip().endswith("starting ====="):
+            on = True
+        if on:
+            out.append(ln)
+            if re.search(r"server is listening|all slots are idle", ln):
+                on = False
+    return rb.scrub("\n".join(out[:limit]))
+
+
+# ---------------------------------------------------------------------------
+# the run's record and its bundle
+# ---------------------------------------------------------------------------
+
+def register_here(served_as: str, name: str, based_on: str, base: str, thinking: bool,
+                  how: str) -> dict:
+    """the served model, in this box's own database, as the board keeps one"""
+    from service import db, served
+    p = served.probe(base + "/v1")
+    rec = {"id": served_as, "name": name, "base_url": base + "/v1", "key": "",
+           "based_on": based_on, "how": how, "thinking": "on" if thinking else "off",
+           "phone": False, "gguf_path": "", "gguf_flags": "", "gguf_setups": [],
+           "pin": served.pin_of(p), "answered": p["answered"], "by": "remote_gguf.py",
+           "at": time.time(), "flags": "", "env": "", "speculative": p.get("speculative")}
+    db.served_put(rec)
+    served.write_meta(rec)
+    return rec
+
+
+def task_state(row: Path | None, task: str) -> tuple[int, int]:
+    """(answered, of) for this box's share of a task"""
+    from service import config
+    from service import frontier as sf
+    items = fb.shard_of(fb.load(task, config.BENCH_ROOT), sf.shard())
+    want = {(it["id"], e) for it in items for e in range(fb.BENCH[task]["epochs"])}
+    got = set(sf.read_answers(sf.task_dir(row, task) / sf.ANSWERS)) if row else set()
+    return len(want & got), len(want)
+
+
+def make_bundle(out: Path, served_as: str, thinking: bool, tasks: list[str], state: dict,
+                shard: tuple[int, int] | None, gguf: dict, server: dict, rec: dict
+                ) -> tuple[Path | None, dict, dict]:
+    """the bundle of every task this box answered whole: its path (None when
+    none is), the tasks in it and those not finished"""
+    from service import config
+    from service import frontier as sf
+    safe = served_as.replace("/", "__")
+    row = config.OUT_DIR / (safe + "__thinking" if thinking else safe)
+    done, incomplete = {}, {}
+    for t in tasks:
+        n, of = task_state(row, t)
+        (done if n == of else incomplete)[t] = {"answers": n, "of": of}
+    if not done:
+        return None, done, incomplete
+    files: dict[str, bytes] = {}
+    for t in done:
+        d = sf.task_dir(row, t)
+        for name in (sf.ANSWERS, sf.SETUP):
+            files[f"results/{row.name}/{d.relative_to(row).as_posix()}/{name}"] = \
+                (d / name).read_bytes()
+    for r in {row, config.OUT_DIR / safe}:
+        if (r / "model_meta.json").exists():
+            files[f"results/{r.name}/model_meta.json"] = (r / "model_meta.json").read_bytes()
+    logs = sorted(config.LOGS_DIR.glob(f"service_*_{safe}.log"),
+                  key=lambda p: int(p.name.split("_")[1]))
+    log = "".join(p.read_text(encoding="utf-8", errors="replace") for p in logs)
+    own = out / OWN_LOG
+    log += ("\n===== remote_gguf =====\n" + own.read_text(encoding="utf-8")) if own.exists() else ""
+    log += "\n===== llama-server, as it started =====\n" + startup_log(out / SERVER_LOG)
+    per = {}
+    for t in tasks:
+        spec = fb.BENCH[t]
+        s = sf.settings(rec, t, thinking)
+        per[t] = {"protocol_version": spec["protocol_version"],
+                  "revision": spec["source"]["revision"], "epochs": spec["epochs"],
+                  "budget": s["max_tokens"], "family": sf.family_of(rec) or "",
+                  "sampling": {k: v for k, v in s.items()
+                               if k not in ("max_tokens", "chat_template_kwargs")},
+                  "switch": s.get("chat_template_kwargs"),
+                  **(done.get(t) or {}), **({"incomplete": True} if t in incomplete else {})}
+    setup = {"suite": SUITE, "protocol": fb.VERSION, "served_as": served_as,
+             "based_on": rec.get("based_on") or "", "thinking": "on" if thinking else "off",
+             "gguf": gguf, "server": server, "tasks": per, "gpu": rb.gpu_info(),
+             "where": WHERE, "runner": "service/runner.py → service/frontier.py, called directly",
+             "board_commit": board_commit(), "sessions": state.get("sessions", 1),
+             "shard": {"i": shard[0], "n": shard[1]} if shard else None,
+             "started_at": state.get("started_at"),
+             "finished_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+    files["run.log"] = rb.scrub(log).encode("utf-8")
+    files["setup.json"] = rb.scrub(json.dumps(setup, indent=1, sort_keys=True)).encode("utf-8")
+    digest = hashlib.sha256(b"".join(files[n] for n in sorted(files)
+                                     if n.endswith("/" + sf.ANSWERS))).hexdigest()
+    bundle = {"format": rb.SUITES[SUITE]["format"], "suite": SUITE, "model": served_as,
+              "thinking": thinking, "row": row.name, "gguf_sha256": gguf["sha256"],
+              "tasks": {t: x["answers"] for t, x in done.items()}, "incomplete": incomplete,
+              "answers_sha256": digest,
+              "files": {n: hashlib.sha256(b).hexdigest() for n, b in files.items()}}
+    if shard:
+        bundle["shard"] = {"i": shard[0], "n": shard[1]}
+    files["bundle.json"] = json.dumps(bundle, indent=1, sort_keys=True).encode("utf-8")
+    path = rb.write(out / rb.bundle_name(SUITE, served_as, thinking, shard), files)
+    return path, done, incomplete
+
+
+class Watch(threading.Thread):
+    """the run's line, each time it changes"""
+
+    def __init__(self, sid: int, say, every: float = 2.0):
+        super().__init__(daemon=True)
+        self.sid, self.say, self.every, self.prog = sid, say, every, ""
+        self.done_ev = threading.Event()
+
+    def run(self) -> None:
+        while not self.done_ev.wait(self.every):
+            self.tick()
+
+    def tick(self) -> None:
+        try:
+            from service import db
+            prog = (db.get(self.sid) or {}).get("progress") or ""
+        except Exception:                               # noqa: BLE001 — never the run's business
+            return
+        if prog and prog != self.prog:
+            self.prog = prog
+            self.say(f"· {prog}")
+
+    def stop(self) -> None:
+        self.done_ev.set()
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--as", dest="served_as", required=True,
+                    help="the served model on the board whose row the answers go on "
+                         "(served/<name>): its registered file must be this GGUF")
+    ap.add_argument("--gguf", required=True, help="hf://<org>/<repo>[@<rev>]/<file>.gguf, or a "
+                                                  "path on this box")
+    ap.add_argument("--server", required=True,
+                    help="the llama-server tarball (build_llama_tarball.sh): hf://… or a path")
+    ap.add_argument("--based-on", default="", help="the model it is a GGUF of, as the board "
+                                                   "registers it (Qwen/Qwen3.6-35B-A3B): it "
+                                                   "picks the model card's sampling")
+    ap.add_argument("--thinking", required=True, choices=("on", "off"))
+    ap.add_argument("--only", action="append", choices=fb.TASKS,
+                    help="one task (repeatable); every task when none is given")
+    ap.add_argument("--out", default="remote-gguf", help="where the run and its bundle go")
+    ap.add_argument("--shard", default="", help="i/n: this box's share of each task, every n-th "
+                                                "question from the i-th")
+    ap.add_argument("--slots", type=int, default=8, help="questions at a time (llama-server -np)")
+    ap.add_argument("--flags", default="", help="more llama-server flags, as typed")
+    ap.add_argument("--env", default="", help="llama-server's environment, NAME=value …")
+    ap.add_argument("--port", type=int, default=8090)
+    ap.add_argument("--load-timeout", type=float, default=3600)
+    ap.add_argument("--by", default="remote", help="who ran it, for the run's record")
+    a = ap.parse_args(argv)
+    if not a.served_as.startswith("served/") or not re.fullmatch(r"served/[A-Za-z0-9._-]+",
+                                                                 a.served_as):
+        ap.error("--as: a served model's id on the board, served/<name>")
+    try:
+        shard = fb.parse_shard(a.shard)
+    except ValueError as e:
+        ap.error(f"--shard: {e}")
+    if a.slots < 1:
+        ap.error("--slots: at least 1")
+    flags = shlex.split(a.flags)
+    if own_flags(flags):
+        ap.error(f"--flags: {', '.join(own_flags(flags))} are set by this script")
+    extra_env = parse_env(a.env)
+    out = Path(a.out).resolve()
+    thinking = a.thinking == "on"
+    tasks = [t for t in fb.TASKS if t in (a.only or fb.TASKS)]
+    configure(out, a.slots, shard)
+    say = Out(out / OWN_LOG)
+    from service import db, runner
+    db.init()
+    words = f"shard {shard[0]} of {shard[1]}" if shard else ""
+    say(f"{a.served_as} · thinking {a.thinking} · {', '.join(tasks)}"
+        + (f" · {words}" if shard else "") + f" · in {out}")
+
+    # the run this folder holds: one served model, one mode, one file, one shard
+    sp = out / STATE
+    state = json.loads(sp.read_text(encoding="utf-8")) if sp.exists() else {}
+    if state and (state.get("served_as"), state.get("thinking")) != (a.served_as, thinking):
+        raise SystemExit(f"{out} holds a run of {state.get('served_as')} (thinking "
+                         f"{'on' if state.get('thinking') else 'off'}): give this one another --out")
+    if state and (state.get("shard") or None) != (f"{shard[0]}/{shard[1]}" if shard else None):
+        raise SystemExit(f"{out} holds {('shard ' + state['shard']) if state.get('shard') else 'a whole run'}"
+                         f": give {words or 'a whole run'} another --out")
+
+    gguf_path = fetch(a.gguf, out / "files", say)
+    if re.search(r"-\d{5}-of-\d{5}\.gguf$", gguf_path.name):
+        raise SystemExit(f"{gguf_path.name} is one part of a split GGUF: merge it first "
+                         "(llama-gguf-split --merge) and register the merged file on the board")
+    sha = sha256_cached(gguf_path, state, say)
+    if state.get("gguf_sha256") and state["gguf_sha256"] != sha:
+        raise SystemExit(f"{out} holds answers of another file ({state['gguf_sha256'][:16]}, now "
+                         f"{sha[:16]}): they can't be mixed — start another --out")
+    gguf = {"name": gguf_path.name, "sha256": sha, "size": gguf_path.stat().st_size,
+            "source": a.gguf if a.gguf.startswith("hf://") else "a path on the box"}
+    tb = fetch(a.server, out / "files", say)
+    srv = unpack_server(tb, out / "server")
+    env = server_env(srv, extra_env)
+    ver = version_of(srv["bin"], env)
+    ctx = fb.slot_context(tasks, thinking)
+    server = {"version": ver["text"], "build": ver["build"], "commit": ver["commit"],
+              "binary_sha256": rb.sha256_file(srv["bin"]), "tarball_sha256": srv["tarball_sha256"],
+              "flags": flags, "env": extra_env, "slots": a.slots, "slot_context": ctx,
+              "argv": ["llama-server", "-m", gguf["name"], "--host", "127.0.0.1", "--port",
+                       str(a.port), "-c", str(ctx * a.slots), "-np", str(a.slots), "-ngl", "99",
+                       "--jinja", "--metrics", *flags]}
+    state.update({"served_as": a.served_as, "thinking": thinking, "gguf_sha256": sha,
+                  "started_at": state.get("started_at")
+                  or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                  "sessions": int(state.get("sessions", 0)) + 1,
+                  "shard": f"{shard[0]}/{shard[1]}" if shard else None})
+    sp.write_text(json.dumps(state, indent=1), encoding="utf-8")
+    gpu = rb.gpu_info()
+    say(f"{gguf['name']} · {gguf['size'] / 1e9:.1f} GB · sha256 {sha[:16]} · llama.cpp "
+        f"{ver['build'] or '?'} ({ver['commit'] or '?'}) · GPU {gpu.get('name') or 'unknown'} · "
+        f"{a.slots} slots of {ctx:,} tokens")
+
+    # the questions, fetched before the GPU is spent: a gated set needs HF_TOKEN
+    from service import config
+    for t in tasks:
+        try:
+            items = fb.load(t, config.BENCH_ROOT)
+        except Exception as e:                          # noqa: BLE001 — said in one line
+            raise SystemExit(rb.scrub(
+                f"{fb.BENCH[t]['label']}'s questions could not be fetched: {e}"
+                + (". It is gated: accept its terms on Hugging Face, and set HF_TOKEN on this "
+                   "box (typed here, never stored)" if fb.BENCH[t]["source"].get("gated")
+                   else ""))) from None
+        mine = fb.shard_of(items, shard)
+        say(f"{fb.BENCH[t]['label']}: {len(mine)} of its {len(items)} questions here × "
+            f"{fb.BENCH[t]['epochs']} run{'s' if fb.BENCH[t]['epochs'] > 1 else ''}")
+
+    srv_proc = Server(srv, gguf_path, a.port, a.slots, ctx, flags, extra_env, out / SERVER_LOG)
+    status = "failed"
+    rec = None
+    try:
+        srv_proc.start(a.load_timeout, say)
+        props = srv_proc.props()
+        tmpl = props.get("chat_template") or ""
+        server["chat_template_sha256"] = (hashlib.sha256(tmpl.encode("utf-8")).hexdigest()
+                                          if tmpl else None)
+        server["n_ctx"] = (props.get("default_generation_settings") or {}).get("n_ctx")
+        server["total_slots"] = props.get("total_slots")
+        rec = register_here(a.served_as, a.served_as.split("/", 1)[1], a.based_on,
+                            srv_proc.base, thinking,
+                            f"llama.cpp {ver['build'] or '?'} on {gpu.get('name') or 'a GPU'}: "
+                            + " ".join(server["argv"]))
+        sid = db.add(a.served_as, "instruct", SUITE, a.by, "run on a rented GPU (remote_gguf.py)",
+                     thinking=thinking, tasks=tasks if len(tasks) < len(fb.TASKS) else None)
+        watch = Watch(sid, say)
+        watch.start()
+        try:
+            runner.run_submission(db.get(sid))
+        finally:
+            watch.stop()
+            watch.tick()
+        row = db.get(sid) or {}
+        status = row.get("status") or "failed"
+        say(f"the run: {status} · {row.get('progress') or ''}"
+            + (f" · {row['error']}" if row.get("error") and row["error"] != row.get("progress")
+               else ""))
+    finally:
+        srv_proc.stop()
+    if rec is None:
+        return 1
+    path, done, incomplete = make_bundle(out, a.served_as, thinking, tasks, state, shard, gguf,
+                                         server, rec)
+    for t, x in incomplete.items():
+        say(f"{t}: {x['answers']:,} of {x['of']:,} answered — run the same command again to "
+            "carry on")
+    if not path:
+        say("no task is answered whole yet: no bundle")
+        return 1
+    say(f"bundle {path} · {path.stat().st_size / 1024 ** 2:.1f} MB · sha256 "
+        f"{rb.sha256_file(path)[:16]} · " + ", ".join(f"{t} ({x['answers']:,} answers)"
+                                                      for t, x in done.items()))
+    return 1 if incomplete else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
