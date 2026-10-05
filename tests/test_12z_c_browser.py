@@ -59,9 +59,12 @@ def test_the_answers_tab_has_a_switch_then_spaced_chips(live, page, width):
     page.locator("[data-mtab='answers']").click()
     seg = page.locator("[data-answers-kinds]")
     seg.wait_for()
-    # the source is one picker (16c: there may be twenty), not more chips
+    # the source is one control, not more chips: a group of one picker (16c:
+    # there may be twenty sources, so not a segmented row)
+    assert seg.get_attribute("role") == "group"
+    assert seg.get_attribute("aria-label") == "which answers"
     assert seg.locator("button.sel[data-answers-pick]").count() == 1
-    assert seg.locator(".chip-btn").count() == 0
+    assert seg.locator("button").count() == 1 and seg.locator(".chip-btn").count() == 0
     pick_answers(page, "everyday")
     page.wait_for_selector("[data-answers-groups] [data-answers-group]")
     # 8px between chips, 12px between the rows and under the description

@@ -267,8 +267,8 @@ def test_start_sends_the_rest_once_the_labellers_can_label(live, page):
         go(page, live, "tab=ai", "[data-mmp-key]:not([data-mmp-key='loading'])")
         btn = page.locator("[data-mmp-start]")
         # the key has labels — 16c: and the button says what Carry on sends, and its cost
-        assert btn.is_enabled() and btn.inner_text().startswith("Carry on: about $")
-        assert btn.inner_text().endswith(" · Pro only")
+        cost = page.evaluate("usd(state.ai.mmp.sends.usd)")
+        assert btn.is_enabled() and btn.inner_text() == f"Carry on: about {cost} · Pro only"
         btn.click()
         page.wait_for_function("document.querySelector('[data-toast]')")
         assert posted == [{"by": "masein"}]

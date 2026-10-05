@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import os
 import secrets
+import shlex
 import sys
 import threading
 import time
@@ -128,16 +129,27 @@ def _gguf_path(mid: str) -> tuple[str, dict]:
     return "", {}
 
 
+def shell_path(p: str) -> str:
+    """16c review: a path as a shell line takes it — quoted (shlex.quote), its
+    leading ~/ left outside the quotes so it still expands"""
+    p = str(p)
+    if p.startswith("~/"):
+        return "~/" + shlex.quote(p[2:])
+    return shlex.quote(p)
+
+
 def unreadable_words(path: str) -> str:
     """16c: a file the board can't read, and the fix — the container sees
     BENCH_ROOT alone (and the Hugging Face cache): a file elsewhere on the
     host goes in it, or a hard link to it does (on the same disk it takes no
-    space and no copy)"""
+    space and no copy). 16c review: the line to paste quotes every path"""
     name = Path(path).name or "the-file.gguf"
     root = str(config.BENCH_ROOT).rstrip("/")
+    models = f"{root}/models"
     return (f"The board can’t read {path}: the folders it sees are under {root}. Put the file, "
             f"or a hard link to it, there — on the same disk a hard link takes no space: "
-            f"ln '{path}' '{root}/models/{name}' — then register that path.")
+            f"mkdir -p {shell_path(models)} && ln {shell_path(path)} "
+            f"{shell_path(models + '/' + name)} — then register that path.")
 
 
 def _readable(p: str) -> Path | None:
@@ -192,7 +204,9 @@ def info(mid: str) -> dict:
     # 16c: a served model on this server can have its file registered from its
     # page, by whoever added it or the owner — its server's file name a hint
     reg = ({"can_register": True, "hint": (s.get("pin") or {}).get("file") or "",
-            "path": path} if s and not served.is_openrouter(s) else {})
+            "path": path,
+            # 16c review: which setups a registration reaches, said before Register
+            "setups": served.file_setups(s)} if s and not served.is_openrouter(s) else {})
     if path:
         f = _readable(path)
         if not f:
@@ -227,14 +241,23 @@ def set_allowed(mid: str, on: bool, by: str) -> dict:
 # the file, for one download
 # ---------------------------------------------------------------------------
 
-def file_for(mid: str) -> tuple[Path, str]:
+def keeps(mid: str, who: str) -> bool:
+    """16c review: whoever added a file, and the board's owner, may take it
+    while "Others can download it" is off — the switch is for the others"""
+    who = (who or "").strip()
+    added = adder(mid)
+    return bool(who) and ((added and who.lower() == added.lower()) or config.is_owner(who))
+
+
+def file_for(mid: str, who: str = "") -> tuple[Path, str]:
     """(path, file name) to stream — or Refused: not allowed, not a model file,
-    or its archive still being made (202)"""
+    or its archive still being made (202). `who`: the name asking — its adder
+    and the owner may, whatever the switch says"""
     i = info(mid)
     if i["kind"] not in ("gguf", "folder"):
         raise Refused(404, i.get("line") or f"{mid} has no file on this board: it is on "
                                              "Hugging Face.")
-    if not i["allowed"]:
+    if not i["allowed"] and not keeps(mid, who):
         raise Refused(403, f"Downloads of {mid} are switched off"
                            + (f" by {i['decided_by']}" if i["decided_by"] else "") + ".")
     if i["kind"] == "gguf":
@@ -256,7 +279,7 @@ def link(mid: str, who: str) -> dict:
     who = (who or "").strip()[:80]
     if not who:
         raise Refused(422, "Who is downloading it: a name")
-    _, name = file_for(mid)
+    _, name = file_for(mid, who)
     tid = secrets.token_urlsafe(24)
     with _lock:
         now = time.time()

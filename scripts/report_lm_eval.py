@@ -7682,11 +7682,14 @@ function modelActions(m) {
     el('button', { class: 'quiet', 'data-compare-with': m.id, text: 'Compare with…',
       onclick: () => openCompare([m.rowOf || m.id]) }));
 }
-// the command: the board's own address, the token from the environment
+// the command: the board's own address, the token from the environment.
+// 16c review: every value in it quoted for a shell — a name, a file's name,
+// the address — so nothing typed or named can run when it is pasted
+const shq = s => "'" + String(s).replace(/'/g, "'\\''") + "'";
 function dlCmd(i, id) {
   const url = new URL('api/download?model=' + encodeURIComponent(id), location.href).href;
-  return `curl -C - -fL -H "X-Token: $BOARD_TOKEN" -H "X-Who: ${whoName() || 'your name'}" `
-    + `-o '${i.name}' '${url}'`;
+  return `curl -C - -fL -H "X-Token: $BOARD_TOKEN" -H ${shq('X-Who: ' + (whoName() || 'your name'))} `
+    + `-o ${shq(i.name)} ${shq(url)}`;
 }
 async function dlGo(id) {
   const D = dlState();
@@ -7731,10 +7734,17 @@ function modelDownloadPanel(m) {
       el('br'), i.sha256 ? el('span', { class: 'mono small', 'data-dl-sha': id, text: 'sha256 ' + i.sha256 })
         : el('span', { class: 'se small', text: i.kind === 'folder' ? 'its archive is made on its first download'
           : 'sha256: the host worker records it when it first measures the file' })));
-    if (!i.allowed) body.push(el('p', { class: 'small', 'data-dl-off': id,
+    // 16c review: whoever added it, and the owner, may take it while the
+    // switch is off — the switch is for the others
+    const me = (whoName() || '').trim().toLowerCase();
+    const keeper = !!me && (me === String(i.adder || '').toLowerCase() || evdOwner());
+    if (!i.allowed && !keeper) body.push(el('p', { class: 'small', 'data-dl-off': id,
       text: 'Downloads are switched off' + (i.decided_by ? ` by ${i.decided_by}` : '')
         + (i.off_why ? `: ${i.off_why}` : '') + '.' }));
-    else body.push(el('div', { class: 'frm' },
+    else body.push(!i.allowed ? el('p', { class: 'small', 'data-dl-others-off': id,
+        text: 'Others can’t take it yet: “Others can download it” is off. You can, as '
+          + (me === String(i.adder || '').toLowerCase() ? 'who added it.' : 'the board’s owner.') })
+        : '', el('div', { class: 'frm' },
         el('button', { class: 'primary', 'data-dl-go': id, disabled: D.busy ? '' : null,
           text: D.busy ? 'Getting its link…' : 'Download', onclick: () => dlGo(id) }),
         i.archive && i.archive.state === 'building' ? el('span', { class: 'small se',
@@ -7743,8 +7753,7 @@ function modelDownloadPanel(m) {
         + 'The board’s token comes from BOARD_TOKEN, never from the command.' }),
       el('pre', { class: 'mono small dlcmd', 'data-dl-cmd': id, text: dlCmd(i, id) }));
     // the person who added it, or the board's owner, switches it
-    const me = (whoName() || '').trim().toLowerCase();
-    if (me && (me === String(i.adder || '').toLowerCase() || evdOwner()))
+    if (keeper)
       body.push(el('label', { class: 'small' }, el('input', { type: 'checkbox', 'data-dl-allow': id,
         checked: i.allowed ? '' : null, onchange: e => dlAllow(id, e.target.checked) }),
         ' Others can download it'));
@@ -7778,6 +7787,9 @@ function dlRegister(id, i) {
     box,
     i.hint ? el('p', { class: 'small se', 'data-dl-hint': id, text: `Its server reports `
       + `${i.hint}. One registration serves every setup of that file.` }) : '',
+    // 16c review: which setups it will change, said before Register — one
+    // someone else added is theirs (or the owner's) to register
+    ...dlSetupsLines(id, i, me),
     el('div', { class: 'frm' }, el('button', { class: 'primary', 'data-dl-register-save': id,
       text: 'Register its file', disabled: D.busy ? '' : null, onclick: async () => {
         D.busy = true; D.msg = '';
@@ -7785,13 +7797,32 @@ function dlRegister(id, i) {
           const r = await post(`api/served/${id.split('/').map(encodeURIComponent).join('/')}/file`,
             { path: D.path, by: whoName() }, 'PUT');
           D.info[id] = { ...r.file, log: [] };
-          for (const x of r.models || []) if (x !== id) delete D.info[x];
-          D.msg = `Registered for ${r.models.length} setup${r.models.length === 1 ? '' : 's'} of `
-            + 'this file. Downloads stay off until you switch them on.';
+          for (const x of [...(r.models || []), ...(r.skipped || []).map(s => s.id)])
+            if (x !== id) delete D.info[x];
+          const n = (r.models || []).length;
+          D.msg = `Registered for ${n} setup${n === 1 ? '' : 's'} of this file.`
+            + ((r.skipped || []).length ? ` Not for ${r.skipped.map(s => `${s.name} (added by `
+              + `${s.by})`).join(', ')}.` : '')
+            + ((r.switched_off || []).length ? ' Its downloads were on for another file: they '
+              + 'are off now, until you switch them on.'
+              : (r.file || {}).allowed ? ' Downloads stay on, as they were.'
+              : ' Downloads stay off until you switch them on.');
           D.path = null;
           await refreshResults();
         } catch (e) { D.msg = String((e && e.message) || e); }
         D.busy = false; render(); } })));
+}
+function dlSetupsLines(id, i, me) {
+  const S = i.setups || [];
+  if (S.length < 2) return [];
+  const mine = x => evdOwner() || !x.by || x.by.toLowerCase() === me;
+  const will = S.filter(mine), not = S.filter(x => !mine(x));
+  return [el('p', { class: 'small', 'data-dl-setups': will.map(x => x.id).join(',') },
+      `It will be registered for ${will.length} setup${will.length === 1 ? '' : 's'} of this `
+      + `file: ${will.map(x => x.name).join(', ')}.`),
+    not.length ? el('p', { class: 'small se', 'data-dl-setups-not': not.map(x => x.id).join(',') },
+      `Not for ${not.map(x => `${x.name}, added by ${x.by}`).join('; ')}: only whoever added `
+      + 'it, or the board’s owner, registers its file.') : ''];
 }
 // ---------------------------------------------------------------------------
 // 16b.3: Use as an API — its state, the address, the model's name, a curl and
@@ -8427,7 +8458,8 @@ function modelAnswersTab(m, kinds) {
   const cur = state.mansBench ? 'b:' + state.mansBench
     : have.some(([k]) => k === state.mans) ? state.mans : have[0][0];
   // one picker, not a row of buttons: there may be twenty
-  card.append(el('div', { class: 'frm', 'data-answers-kinds': '1' },
+  card.append(el('div', { class: 'frm', role: 'group', 'aria-label': 'which answers',
+      'data-answers-kinds': '1' },
     el('span', { class: 'small', text: 'Read: ' }),
     Select('which answers', have, cur, v => {
       if (v.startsWith('b:')) { state.mansX = null; navigate({ mansBench: v.slice(2), mansVs: null }); }
@@ -8469,7 +8501,6 @@ async function ansLoad(m, task) {
   const key = ansKey(m, task);
   X.key = key; X.loading = true;
   try {
-    const g = ggufIdOf(m.id) || m.id;
     const who = X.who || m.id;
     const qs = new URLSearchParams({ offset: X.offset || 0, limit: ANS_PAGE, q: X.q || '',
       models: [m.id, state.mansVs].filter(Boolean).join(','),
@@ -8479,7 +8510,7 @@ async function ansLoad(m, task) {
     // a GGUF's own answers are under its GGUF id: asked again by it
     const w = ansWho(m, d);
     if (w && w !== who) { X.who = w; X.loading = false; X.key = ''; render(); return; }
-    Object.assign(X, { data: d, error: '', who: w || m.id, g });
+    Object.assign(X, { data: d, error: '', who: w || m.id });
   } catch (e) {
     if (X.key !== key) return;
     Object.assign(X, { data: null, error: String((e && e.message) || e) });

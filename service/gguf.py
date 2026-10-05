@@ -188,6 +188,11 @@ def _check_path(path: str) -> str:
     if not path.lower().endswith(".gguf") or "/../" in path + "/" or "\0" in path:
         raise ValueError("The GGUF file's path ends in .gguf, with no .. in it: "
                          f"{path!r} isn't one")
+    # 16c review: a path is printed into a line to paste in a shell — never a
+    # quote, a backtick or a control character in it
+    if re.search(r"[\'\"`\x00-\x1f\x7f]", path):
+        raise ValueError("The GGUF file's path has no quotes, backticks or control characters "
+                         "in it")
     return path
 
 

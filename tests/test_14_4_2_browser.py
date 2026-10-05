@@ -76,6 +76,23 @@ def test_the_key_card_shows_both_sets(live, page, width):
     assert card.locator("[data-mmp-start-sends]").inner_text() == (
         "Pro only is chosen: Start sends Pro’s questions alone. The full set’s own wait until "
         "“Pro, then the full set” is chosen.")
+    # chosen: both, Pro's first — 19 questions in all — and the Start line says so
+    from service import db
+    try:
+        card.locator("[data-mmp-scope-pick='all']").check()
+        page.wait_for_selector("[data-mmp-scope='all']")
+        card = page.locator("[data-mmp-key]")
+        assert card.locator("[data-mmp-start-sends]").inner_text() == (
+            "Start sends both, once each — a question the two sets word alike is labelled once "
+            "— Pro’s questions first, so Pro’s key is whole before the rest: 19 questions in "
+            "all.")
+        # every one labelled here: both keys whole, and nothing to start
+        assert card.locator("[data-mmp-done='all']").inner_text() == (
+            "The key is whole: 12 kept · the full set’s 18. Nothing is left to send.")
+        assert card.locator("[data-mmp-start]").count() == 0
+    finally:
+        db.ai_set("mmp:scope", "pro", "masein")
+        page.evaluate("state.ai.mmp = null; render()")
     # each set's counts, from the one key
     assert card.locator("[data-mmp-counts]").inner_text().startswith("12 of 12 kept · ")
     assert card.locator("[data-mmp-full-counts]").get_attribute("data-mmp-full-counts") == "18|18"

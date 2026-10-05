@@ -319,10 +319,6 @@ def probe(model_id: str, prov: dict) -> tuple[bool, str, str]:
                             else str(raw)))
 
 
-def accepts_prompts_kept_private(model_id: str, prov: dict) -> bool:
-    return probe(model_id, prov)[0]
-
-
 def first_provider(model_id: str) -> dict | None:
     """The first provider OpenRouter lists for the model — the one pinned:
     {name, tag, precision, price_in, price_out}. Never one that is down"""

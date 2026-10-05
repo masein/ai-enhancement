@@ -1229,7 +1229,7 @@ def _send_file(path: Path, name: str) -> FileResponse:
 def model_file_by_link(tid: str, name: str, request: Request):
     try:
         got = downloads.by_link(tid)
-        path, fname = downloads.file_for(got["model"])
+        path, fname = downloads.file_for(got["model"], got["who"])
     except downloads.Refused as e:
         raise _dl_refused(e) from e
     downloads.logged(got["model"], got["who"], "link", _range_start(request))
@@ -1243,7 +1243,7 @@ def model_file_download(request: Request, model: str = "", x_token: str = Header
     page's command reads the token from $BOARD_TOKEN, never writes it"""
     _check_token(x_token)
     try:
-        path, fname = downloads.file_for(model)
+        path, fname = downloads.file_for(model, x_who)
     except downloads.Refused as e:
         raise _dl_refused(e) from e
     downloads.logged(model, x_who, "token", _range_start(request))
@@ -1427,7 +1427,7 @@ def served_file(model_id: str, f: ServedFileIn, x_token: str = Header(default=""
     Download panel — for every setup of that file"""
     _check_token(x_token)
     try:
-        ids = served.set_file(model_id, f.path, f.by)
+        got = served.set_file(model_id, f.path, f.by)
     except LookupError as e:
         raise HTTPException(404, str(e)) from None
     except PermissionError as e:
@@ -1435,7 +1435,7 @@ def served_file(model_id: str, f: ServedFileIn, x_token: str = Header(default=""
     except ValueError as e:
         raise HTTPException(422, str(e)) from None
     _cache.update(key=None, payload=None, at=0.0)
-    return {"models": ids, "file": downloads.info(model_id)}
+    return {**got, "file": downloads.info(model_id)}
 
 
 @app.get("/api/served")

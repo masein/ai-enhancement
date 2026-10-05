@@ -386,11 +386,25 @@ def same_file_ids(rec: dict) -> list[str]:
             and (r.get("pin") or {}).get("size") == pin.get("size")] or [rec["id"]]
 
 
-def set_file(served_id: str, path: str, by: str) -> list[str]:
+def file_setups(rec: dict) -> list[dict]:
+    """16c review: each setup a registration of `rec`'s file would reach —
+    {id, name, by, path} — for the panel to say before Register"""
+    out = []
+    for sid in same_file_ids(rec):
+        r = get(sid) or {}
+        out.append({"id": sid, "name": r.get("name") or sid, "by": r.get("by") or "",
+                    "path": r.get("gguf_path") or ""})
+    return sorted(out, key=lambda x: x["name"])
+
+
+def set_file(served_id: str, path: str, by: str) -> dict:
     """16c: a served model's GGUF file on this server, registered from its
     page by whoever added it or the board's owner — for every setup of that
-    file. The board must be able to read it: else what to do, in words.
-    Downloads stay off until someone switches them on (16b decision 2)"""
+    file they may change. The board must be able to read it: else what to do,
+    in words. Downloads stay off until someone switches them on (16b decision
+    2). 16c review: a setup someone else added is skipped unless the owner is
+    registering it, and a new path switches downloads off again.
+    {models: changed, skipped: [{id, name, by}], switched_off: [ids]}"""
     from . import downloads, gguf
     rec = get(served_id)
     if not rec or is_openrouter(rec):
@@ -398,10 +412,14 @@ def set_file(served_id: str, path: str, by: str) -> list[str]:
     by = (by or "").strip()[:80]
     if not by:
         raise PermissionError("Who is registering it: a name")
-    who = rec.get("by") or ""
-    if who and by.lower() != who.lower() and not config.is_owner(by):
-        raise PermissionError(f"Only {who}, who added it, or the board's owner registers its "
-                              "file.")
+    owner = config.is_owner(by)
+
+    def may(r: dict) -> bool:
+        who = r.get("by") or ""
+        return owner or not who or who.lower() == by.lower()
+    if not may(rec):
+        raise PermissionError(f"Only {rec.get('by')}, who added it, or the board's owner "
+                              "registers its file.")
     path = gguf._check_path(path)
     f = downloads._readable(path)
     if not f:
@@ -410,15 +428,23 @@ def set_file(served_id: str, path: str, by: str) -> list[str]:
     if size and abs(f.stat().st_size - size) > 0.03 * max(f.stat().st_size, size):
         raise ValueError(f"{f.name} is {f.stat().st_size / 1e9:.1f} GB; its server reports a "
                          f"{size / 1e9:.1f} GB file: this isn't the file it serves")
-    ids = same_file_ids(rec)
-    for sid in ids:
+    changed, skipped, off = [], [], []
+    for sid in same_file_ids(rec):
         r = get(sid)
+        if not may(r):
+            skipped.append({"id": sid, "name": r.get("name") or sid, "by": r.get("by") or ""})
+            continue
         if r.get("gguf_path") != path:
             r.pop("gguf_pin", None)                     # the host worker hashes it again
+            # a file switched on for downloads is not this one: off until switched on again
+            if (db.download_get(sid) or {}).get("allowed"):
+                db.download_set(sid, False, by)
+                off.append(sid)
         r.update(gguf_path=path, gguf_path_by=by, gguf_path_at=time.time())
         db.served_put(r)
         write_meta(r)
-    return ids
+        changed.append(sid)
+    return {"models": changed, "skipped": skipped, "switched_off": off}
 
 
 def launch(rec: dict | None) -> dict | None:
