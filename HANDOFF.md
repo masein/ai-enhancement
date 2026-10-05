@@ -4953,6 +4953,50 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17.3 — the Frontier benchmarks graded on the server (5 Oct)
+
+Stage 3 of phase 17 (`service/frontier_grade.py`, `scripts/frontier_graders.py`,
+the prompts in `scripts/grader_prompts/`):
+- **Nothing is sent by itself.** An import or a run scores what code can and
+  leaves the rest waiting: a graded benchmark has no score until every answer
+  is graded (its run line says so); MATH Level 5 and OTIS Mock AIME are scored
+  by code, said as such, until Epoch's check has looked at what the code marks
+  wrong. Only Start on AI models sends.
+- **The graders**, one slot each, pinned as the judge is (dated version, first
+  provider, no fallbacks), chosen on AI models; a slot nobody chose keeps its
+  suggestion, pinned on Start. Never local.
+  - SimpleQA Verified: Google's grader prompt from its starter code, read as
+    Google reads it (the first capital A, B or C anywhere — "INCORRECT" holds
+    a C — else the words, else NOT_ATTEMPTED); gpt-4.1-2025-04-14, Google's.
+  - Humanity's Last Exam: CAIS's judge prompt as written (its typos and
+    `|\%|`); o3-mini-2025-01-31, CAIS's. CAIS asks for structured output; its
+    fields are read from the text here. An unreadable reply is wrong.
+  - MATH Level 5: Epoch's equivalence prompt, on the answers the code marks
+    wrong (an unreadable one is wrong unasked, as Epoch's scorer has it).
+    Epoch's gemini-1.5-flash-002 is retired: the suggestion is Gemini 2.5 Flash.
+  - OTIS Mock AIME: Epoch's extractor prompt isn't published; ours
+    (`otis_extract.txt`) asks for the final integer without the key, on the
+    answers the code marks wrong or can't read.
+- **The dry run** (GET `/api/frontier/grading`): each grader's answers, tokens
+  in (the filled prompt, four characters a token), tokens out (as each grader
+  answers; o3-mini's reasoning counted), and the cost at its pinned or listed
+  price. Start (POST `…/start`) checks the key, the month's limit and each pin
+  before sending anything; Stop holds what is out.
+- **The grades** sit beside the answers (`grades.json`): each answer's grade,
+  the grader's pin and its prompt's sha256 (`graders` keeps every one used),
+  and an answer the grader refused, in its words — asked again by the next
+  Start. The benchmark is scored again as a batch lands.
+- **Beside the scores**: the results' `frontier.grader` and `frontier.code`;
+  the page's cell says "graded by openai/gpt-4.1-2025-04-14 with Google's
+  grader prompt (84c004ec)", or "code, then Epoch AI's model check by … ·
+  code alone 61.2". The number on the page is Epoch's way.
+- **AI models never redraws under a picker just opened** when the grading
+  card's or the key card's data lands (16c's rule, which their loaders
+  skipped): the card shows at the next tick. The grading card's extra load
+  made a redraw land just after a "change ▾" opened, replacing its button
+  under the cursor (`test_live_check_12i3_browser` failed 3 runs in 10).
+- Tests: `tests/test_17_grading.py`, `tests/test_17_grading_browser.py`.
+
 ### 17.2 — the Frontier benchmarks, one suite (5 Oct)
 
 Stage 2 of phase 17: the other six beside GPQA Diamond, each as Epoch AI or

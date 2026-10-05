@@ -218,7 +218,10 @@ def marks(row: Path, task: str, items: list[dict] | None = None) -> dict:
             elif spec.get("grader"):
                 ok = None if g is None else bool(g.get("ok"))
             elif spec.get("look") and not sc["ok"]:
-                ok = None if g is None else bool(g.get("ok"))
+                # MATH: an answer nothing can be read from is wrong, never asked
+                # (Epoch's scorer); OTIS's extractor reads those too
+                ok = (False if spec["look"] == "equivalent" and sc["read"] is None
+                      else None if g is None else bool(g.get("ok")))
             runs.setdefault(it["id"], []).append({
                 "epoch": e, "ok": ok, "code_ok": sc["ok"], "read": sc["read"],
                 "ran_out": sc["ran_out"], "answer": a.get("answer") or "",

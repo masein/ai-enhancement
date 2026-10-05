@@ -1,0 +1,392 @@
+"""17, stage 3: the Frontier benchmarks graded on the server — SimpleQA
+Verified and Humanity's Last Exam by their owners' graders, and MATH Level 5
+and OTIS Mock AIME given Epoch AI's model check as a second look on what the
+code marks wrong (scripts/frontier_graders.py has each prompt and its reading).
+
+**The graders.** One slot each, a model on OpenRouter pinned as the judge is
+(ai_models.pin: its dated version, its first provider, no fallbacks), chosen
+on AI models. A slot nobody has chosen for keeps its suggestion — the owners'
+model where it is still served — pinned when Start is pressed. Never local:
+a rented box holds no key, and the server's own judge isn't the owners'.
+
+**The run.** Nothing is sent by itself: an import or a run on the board
+scores what code can and leaves the rest waiting. The AI models page shows the
+dry run — each grader's answers, tokens and cost — and sends only on masein's
+Start; Stop holds it, and Start carries on. A batch is OpenRouter's, worked a
+few requests at a time (llm.OpenRouterChat); its spend counts against the
+month's AI limit as the "grader" job. As a batch lands, each answer's grade is
+kept beside the answers (grades.json: the grader's pin and its prompt's
+sha256, and each answer's grade), and the benchmark is scored again. An answer
+the grader refuses is kept as refused, in its words, and asked again by the
+next Start.
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+import time
+from pathlib import Path
+
+from . import ai_models, config, db, llm
+from . import frontier as sf
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+import frontier as fb  # noqa: E402
+import frontier_graders as fg  # noqa: E402
+
+KIND = "frgr"
+JOB = "grader"
+STOPPED = "stopped — Start carries on where it stopped"
+CHARS_A_TOKEN = 4                      # the dry run's count of a prompt, before it is sent
+
+
+class GraderChat(llm.OpenRouterChat):
+    """a grader's batch: OpenRouter's, held while the grading is stopped"""
+    HALT_TAIL = ", or now with Start"
+
+    def waiting(self) -> str:
+        return STOPPED if stopped() else super().waiting()
+
+
+def gdir() -> Path:
+    return config.BENCH_ROOT / "frontier" / "grading"
+
+
+def _setting(slot: str) -> str:
+    return "grader:" + slot
+
+
+def chosen(slot: str) -> dict | None:
+    return db.ai_get(_setting(slot))
+
+
+def _cached(model_id: str) -> dict | None:
+    try:
+        got = json.loads(ai_models._cache_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return next((m for m in got.get("models") or [] if m.get("id") == model_id), None)
+
+
+def grader(slot: str) -> dict:
+    """the slot's grader: chosen on AI models, else its suggestion — {kind,
+    id, name, version, provider, price_in, price_out}"""
+    c = chosen(slot)
+    if c:
+        return c
+    g = fg.GRADERS[slot]
+    m = _cached(g["suggested"]) or {}
+    return {"kind": "default", "id": g["suggested"], "name": m.get("name") or g["suggested"],
+            "version": m.get("version") or "", "price_in": m.get("price_in"),
+            "price_out": m.get("price_out")}
+
+
+def save(slot: str, model_id: str, by: str) -> dict:
+    """a grader, pinned on OpenRouter — never local"""
+    if slot not in fg.GRADERS:
+        raise ValueError(f"no such grader: {slot}")
+    if model_id == ai_models.LOCAL:
+        raise ValueError("a grader is a model on OpenRouter: the server's own judge isn't the "
+                         "benchmark owners'")
+    value = ai_models.pin(model_id)
+    db.ai_set(_setting(slot), value, by)
+    return value
+
+
+def stopped() -> dict | None:
+    try:
+        return json.loads((gdir() / "stopped.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def stop(by: str) -> dict:
+    """masein's Stop: nothing more is sent; what is in flight lands"""
+    gdir().mkdir(parents=True, exist_ok=True)
+    (gdir() / "stopped.json").write_text(json.dumps({"by": by, "at": time.time()}),
+                                         encoding="utf-8")
+    return {"stopped": True, "pending": len(pending())}
+
+
+# ---------------------------------------------------------------------------
+# what waits for a grader
+# ---------------------------------------------------------------------------
+
+def _meta(batch_id: str) -> dict:
+    return json.loads((gdir() / "batches" / f"{batch_id}.json").read_text(encoding="utf-8"))
+
+
+def pending() -> list[dict]:
+    """the batches out now, each with its record"""
+    out = []
+    for r in db.batches_pending():
+        if r["kind"] != KIND:
+            continue
+        try:
+            out.append({**_meta(r["batch_id"]), "batch_id": r["batch_id"],
+                        "progress": r.get("progress") or ""})
+        except (OSError, ValueError):
+            continue
+    return out
+
+
+def _model_of(row: Path) -> tuple[str, str]:
+    """(the row's model id, the served model it is a row of)"""
+    try:
+        m = json.loads((row / "model_meta.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        m = {}
+    mid = m.get("model") or row.name.replace("__", "/", 1)
+    return mid, m.get("base_model") or mid.replace(" · thinking", "")
+
+
+def waiting() -> list[dict]:
+    """every row's answers a grader is still to see, by benchmark — those out
+    in a batch now left out: [{slot, task, row, model, base, items}]"""
+    out_now = {(p["row"], p["task"], k) for p in pending() for k in p.get("keys") or []}
+    got = []
+    root = Path(config.OUT_DIR)
+    for slot, g in fg.GRADERS.items():
+        t = g["task"]
+        for row in sorted(root.glob(f"*/{t}_0shot/{sf.SUB}")) if root.is_dir() else []:
+            row = row.parent.parent
+            try:
+                todo = sf.to_grade(row, t)
+            except Exception:                           # noqa: BLE001 — no dataset here
+                continue
+            todo = [x for x in todo if (row.name, t, sf.gkey(x["id"], x["epoch"])) not in out_now]
+            if todo:
+                mid, base = _model_of(row)
+                got.append({"slot": slot, "task": t, "row": row.name, "model": mid,
+                            "base": base, "items": todo})
+    return got
+
+
+def _price(g: dict) -> tuple[float | None, float | None]:
+    return g.get("price_in"), g.get("price_out")
+
+
+def estimate() -> dict:
+    """the dry run: each grader's answers, tokens and cost for what waits.
+    Nothing is sent"""
+    fb.set_root(config.BENCH_ROOT)
+    per: dict[str, dict] = {}
+    rows = []
+    for w in waiting():
+        slot = w["slot"]
+        g = grader(slot)
+        items = {it["id"]: it for it in fb.load(w["task"], config.BENCH_ROOT)}
+        tin = sum(len(fg.render(slot, items[x["id"]], x)) for x in w["items"]) // CHARS_A_TOKEN
+        tout = len(w["items"]) * fg.GRADERS[slot]["out_tokens"]
+        pin, pout = _price(g)
+        # prices are per million tokens, as OpenRouter's list gives them
+        usd = ((tin * pin + tout * pout) / 1e6 if pin is not None and pout is not None
+               else None)
+        e = per.setdefault(slot, {"answers": 0, "tokens_in": 0, "tokens_out": 0, "usd": 0.0,
+                                  "usd_known": True})
+        e["answers"] += len(w["items"])
+        e["tokens_in"] += tin
+        e["tokens_out"] += tout
+        if usd is None:
+            e["usd_known"] = False
+        else:
+            e["usd"] += usd
+        rows.append({"slot": slot, "task": w["task"], "label": fb.BENCH[w["task"]]["label"],
+                     "model": w["model"], "answers": len(w["items"]),
+                     "usd": None if usd is None else round(usd, 4)})
+    for e in per.values():
+        e["usd"] = round(e["usd"], 4)
+    total = round(sum(e["usd"] for e in per.values()), 4)
+    est = {"graders": per, "rows": rows, "answers": sum(e["answers"] for e in per.values()),
+           "usd": total, "usd_known": all(e["usd_known"] for e in per.values())}
+    try:
+        est.update(over_limit=ai_models.over_limit(), limit=ai_models.limit(),
+                   spent=round(db.spend_this_month(), 2))
+    except Exception:                               # noqa: BLE001 — no database here
+        est.update(over_limit="", limit=None, spent=None)
+    return est
+
+
+# ---------------------------------------------------------------------------
+# the run: Start, Stop, and each batch as it lands
+# ---------------------------------------------------------------------------
+
+def _backend(pin: dict) -> llm.Backend:
+    if not config.OPENROUTER_API_KEY:
+        raise llm.LLMError("OpenRouter has no key on this server")
+    return GraderChat(pin["id"], config.OPENROUTER_API_KEY, config.BENCH_ROOT, pin=pin,
+                      role=JOB)
+
+
+def batch_backend(batch_id: str) -> llm.Backend:
+    try:
+        return _backend(_meta(batch_id)["pin"])
+    except (OSError, ValueError, KeyError) as e:
+        raise llm.LLMError(f"the grading batch {batch_id} has no record: {e}") from None
+
+
+def _pinned(slot: str, by: str) -> dict:
+    c = chosen(slot)
+    if c:
+        return c
+    try:
+        value = ai_models.pin(fg.GRADERS[slot]["suggested"])
+    except ValueError as e:
+        raise ValueError(f"{fg.GRADERS[slot]['label']}: {e}") from None
+    db.ai_set(_setting(slot), value, by)
+    return value
+
+
+def _submit(w: dict, pin: dict, by: str) -> str:
+    slot, task = w["slot"], w["task"]
+    items = {it["id"]: it for it in fb.load(task, config.BENCH_ROOT)}
+    g = fg.GRADERS[slot]
+    reqs = [llm.Request(f"frgr:{sf.gkey(x['id'], x['epoch'])}", "",
+                        fg.render(slot, items[x["id"]], x),
+                        max_tokens=min(g["max_tokens"], config.OPENROUTER_MAX_TOKENS),
+                        meta={"kind": KIND})
+            for x in w["items"] if x["id"] in items]
+    if not reqs:
+        return ""
+    bid = _backend(pin).submit(reqs)
+    p = gdir() / "batches" / f"{bid}.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({"slot": slot, "task": task, "row": w["row"], "model": w["model"],
+                             "base": w["base"], "pin": pin, "prompt_sha256": fg.prompt_sha(slot),
+                             "keys": [r.custom_id.split(":", 1)[1] for r in reqs],
+                             "by": by, "at": time.time()}), encoding="utf-8")
+    db.batch_add(bid, KIND, 0, len(reqs), "openrouter", pin["id"])
+    return bid
+
+
+def start(by: str) -> dict:
+    """masein's Start, after the dry run: each grader with answers to see
+    pinned, the stop lifted, and what waits sent. Started again, it carries on"""
+    why = ai_models.over_limit() or ("" if ai_models.has_key() else
+                                     "OpenRouter has no key on this server (OPENROUTER_API_KEY)")
+    if why:
+        raise ValueError(why)
+    work = waiting()
+    # everything checked before anything is sent: each grader pinned, and still
+    # the version it was pinned to
+    pins = {}
+    for slot in sorted({w["slot"] for w in work}):
+        pins[slot] = _pinned(slot, by)
+        drift = ai_models.drifted(pins[slot])
+        if drift:
+            raise ValueError(f"{fg.GRADERS[slot]['label']}: {drift}")
+    (gdir() / "stopped.json").unlink(missing_ok=True)
+    sent = []
+    for w in work:
+        bid = _submit(w, pins[w["slot"]], by)
+        if bid:
+            sent.append({"batch_id": bid, "slot": w["slot"], "task": w["task"],
+                         "model": w["model"], "n": len(w["items"])})
+    for p in pending():                       # a stopped or halted batch takes up again
+        try:
+            be = batch_backend(p["batch_id"])
+            be.resume(p["batch_id"])
+            be.status(p["batch_id"])
+        except llm.LLMError:
+            pass
+    return {"sent": sent, "pending": len(pending())}
+
+
+def grader_record(slot: str, pin: dict, by: str = "") -> dict:
+    """what the scores say graded them: the model as pinned, and the prompt"""
+    g = fg.GRADERS[slot]
+    return {"slot": slot, "label": g["label"], "model": pin.get("id"),
+            "version": pin.get("version") or pin.get("id"), "provider": pin.get("provider_name")
+            or pin.get("provider"), "prompt": g["prompt"], "prompt_words": g["prompt_words"],
+            "prompt_sha256": fg.prompt_sha(slot), "owners": g["owners"], "by": by}
+
+
+def finish(batch_id: str, results: dict) -> int:
+    """a batch landed: each answer's grade kept beside the answers, a refusal
+    in its words, and the benchmark scored again"""
+    from . import served
+    meta = _meta(batch_id)
+    slot, task, pin = meta["slot"], meta["task"], meta["pin"]
+    row = Path(config.OUT_DIR) / meta["row"]
+    d = sf.task_dir(row, task)
+    items = {it["id"]: it for it in fb.load(task, config.BENCH_ROOT)}
+    g = sf.read_grades(d)
+    g.setdefault("items", {})
+    g.setdefault("refused", {})
+    rec = grader_record(slot, pin, meta.get("by", ""))
+    graders = [x for x in g.get("graders") or [] if x.get("version") != rec["version"]
+               or x.get("prompt_sha256") != rec["prompt_sha256"]]
+    g["graders"] = [*graders, rec]
+    g["grader"] = rec
+    n = 0
+    for cid, res in results.items():
+        key = cid.split(":", 1)[1]
+        qid = key.rsplit("#", 1)[0]
+        if res.error:
+            g["refused"][key] = {"words": llm.plain_error(res.error), "by": rec["version"],
+                                 "at": time.time()}
+            continue
+        got = fg.read(slot, res.text, items.get(qid) or {})
+        g["items"][key] = {**got, "by": rec["version"], "at": time.time()}
+        g["refused"].pop(key, None)
+        n += 1
+    d.mkdir(parents=True, exist_ok=True)
+    tmp = d / (sf.GRADES + ".part")
+    tmp.write_text(json.dumps(g, indent=1, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(d / sf.GRADES)
+    rec_served = served.get(meta.get("base") or meta.get("model") or "")
+    if rec_served:
+        try:
+            sf.score_task(row, task, rec_served)
+        except Exception as e:                      # noqa: BLE001 — the grades are kept
+            print(f"[frontier grading] {meta['row']} {task}: scoring failed: {e!r}")
+    return n
+
+
+def failed(batch_id: str, why: str) -> None:
+    """a batch failed whole: what it landed is kept, the rest asked again by
+    the next Start"""
+    print(f"[frontier grading] {batch_id} failed: {why}")
+
+
+def _progress(p: dict) -> str:
+    tl = llm.tally(p["batch_id"])
+    if not tl:
+        return p.get("progress") or ""
+    done = tl["answered"] + tl["failed"] + tl["cancelled"]
+    line = f"{done:,} of {tl['sent']:,} · ${db.spend_of_batch(p['batch_id']):,.2f} so far"
+    return f"{line} · {tl['halted']}" if tl.get("halted") else line
+
+
+def refusals() -> list[dict]:
+    """each benchmark's answers its grader refused, with the last words"""
+    out = []
+    root = Path(config.OUT_DIR)
+    for slot, g in fg.GRADERS.items():
+        for d in sorted(root.glob(f"*/{g['task']}_0shot/{sf.SUB}")) if root.is_dir() else []:
+            ref = sf.read_grades(d).get("refused") or {}
+            if ref:
+                last = max(ref.values(), key=lambda x: x.get("at") or 0)
+                out.append({"slot": slot, "task": g["task"], "row": d.parent.parent.name,
+                            "n": len(ref), "words": last.get("words") or ""})
+    return out
+
+
+def status() -> dict:
+    """the AI models page's card: the graders, the dry run, the run"""
+    est = estimate()
+    return {"graders": [{"slot": s, "label": g["label"], "does": g["does"], "why": g["why"],
+                         "task": g["task"], "benchmark": fb.BENCH[g["task"]]["label"],
+                         "suggested": g["suggested"], "owners": g["owners"],
+                         "prompt": g["prompt_words"], "prompt_sha256": fg.prompt_sha(s),
+                         "chosen": chosen(s), "now": grader(s)}
+                        for s, g in fg.GRADERS.items()],
+            "estimate": est,
+            "key_warning": ai_models.more_than_key(est.get("usd")),
+            "running": [{"slot": p["slot"], "task": p["task"], "model": p["model"],
+                         "n": len(p.get("keys") or []), "progress": _progress(p)}
+                        for p in pending()],
+            "refused": refusals(),
+            "stopped": stopped(),
+            "has_key": ai_models.has_key()}

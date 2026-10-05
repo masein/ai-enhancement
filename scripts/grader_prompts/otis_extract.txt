@@ -1,0 +1,4 @@
+Below is a response to a math problem whose answer is an integer from 000 to 999. Extract the final answer the response gives. Reply with that integer alone. If the response gives no final answer, reply NONE.
+
+Response:
+{response}
