@@ -12847,7 +12847,8 @@ function frColumns() {
     const measured = DATA.models.some(m => here.some(h => h.get(m)));
     const [g, i, group] = frPlace(name);
     return { key: c.key, name, group, g, i, here, n: c.models.size, measured,
-      dflt: 2 * c.models.size >= n || measured || frShared().some(x => frKey(x) === c.key) };
+      // 12n.2's two always; 17's catalogue once measured here (the coverage rule)
+      dflt: 2 * c.models.size >= n || measured || FR_SHARED_12N.some(x => frKey(x) === c.key) };
   }).concat(frShared().filter(x => !by.has(frKey(x))).map(name => {
     // 12n.2: measured here before anyone reports it — a column of ours alone
     const here = frHere(name), [g, i, group] = frPlace(name);
