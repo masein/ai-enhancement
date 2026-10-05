@@ -620,9 +620,18 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
         if unknown:
             raise HTTPException(422, f"not built exam tasks: {', '.join(unknown)} — built "
                                      f"tasks are {', '.join(built)}")
+    elif s.suite == "frontier" and s.tasks:
+        # 17: the Frontier benchmarks a run asks — every one when none is named
+        every = config.frontier_tasks()
+        chosen = [t.strip() for t in s.tasks if t.strip()]
+        unknown = [t for t in chosen if t not in every]
+        if unknown:
+            raise HTTPException(422, f"not Frontier benchmarks: {', '.join(unknown)} — they are "
+                                     f"{', '.join(every)}")
+        chosen = [t for t in every if t in chosen]
     elif s.tasks:
-        raise HTTPException(422, "tasks narrows a judged run only; the other suites are "
-                                 "fixed lists")
+        raise HTTPException(422, "tasks narrows a judged run (exam topics) or a Frontier run "
+                                 "(its benchmarks) only; the other suites are fixed lists")
     # 12f.1: a model served elsewhere — registered, and asked only what a chat
     # endpoint can answer. Its server is asked at the start of the run
     srv = served.is_served(hf_id)
@@ -632,10 +641,13 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
                                      f"Running on a server. Nothing was queued.")
         if s.suite not in served.SUITES:
             raise HTTPException(422, served.LOGLIK_LINE + " Nothing was queued.")
-        # 17: a Frontier run says thinking on or off itself, as DeviceMark's does
-        if s.thinking and s.suite not in ("devicemark", "frontier"):
-            raise HTTPException(422, "A served model thinks as it was registered: register it "
-                                     "again to change that. Nothing was queued.")
+        # 17: a served model is asked with thinking on or off, said out loud (16b's
+        # switch, the runner's suite_thinking) — a row of its own when on — in
+        # every suite Test a model offers the box for. A model from OpenRouter
+        # has no switch to ask with: it thinks as it does
+        if s.thinking and served.is_openrouter(served.get(hf_id)):
+            raise HTTPException(422, "A model from OpenRouter thinks as it does: there is no "
+                                     "switch to ask it with. Nothing was queued.")
         # 12m.3: a model from OpenRouter — a run that would pass this month's
         # AI limit is refused here, before it is queued, with its estimate
         rec = served.get(hf_id)
@@ -4339,8 +4351,10 @@ def evd_audits():
 
 def _qtask(task: str) -> None:
     from . import questions
-    if questions.GPQA.match(task):
-        raise HTTPException(403, questions.NOT_LISTED)
+    # GPQA's, and 17's Frontier benchmarks whose authors ask the same
+    why = questions.unlisted_why(task)
+    if why:
+        raise HTTPException(403, why)
     if questions.kind_of(task) == "exam" and not config.KNOWLEDGE_EXAM:
         raise HTTPException(409, config.EXAM_OFF + ".")             # 16.5
     if task not in questions.tasks():

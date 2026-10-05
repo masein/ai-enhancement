@@ -105,6 +105,7 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
     """every question of `task` this run (or shard) holds and hasn't answered
     — (answered, of) when it stops. Raises served.ServerStopped when the
     server stops answering: what it answered before is kept"""
+    fb.set_root(config.BENCH_ROOT)
     spec = fb.BENCH[task]
     items = fb.shard_of(fb.load(task, config.BENCH_ROOT), shard())
     d = task_dir(row, task)
@@ -127,8 +128,10 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
             return
         text, _ = fb.prompt(task, it)
         seed = fb.seed_of(task, it["id"], e)
+        # HLE's system message, CAIS's
+        si = {**s, "seed": seed, **({"system": fb.system_of(task)} if fb.system_of(task) else {})}
         try:
-            a = served.answer_one(rec, text, {**s, "seed": seed})
+            a = served.answer_one(rec, text, si)
         except served.ServerStopped as x:
             with lock:
                 halt.append(x)
@@ -163,42 +166,128 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
 
 
 # ---------------------------------------------------------------------------
-# scoring: by code, once every question of every run is in
+# scoring: by code, once every question of every run is in — and (stage 3)
+# by a grader, or code with Epoch's model check as a second look
 # ---------------------------------------------------------------------------
+
+GRADES = "grades.json"
+
+
+def read_grades(d: Path) -> dict:
+    """what a grader (or Epoch's model check) said of each answer, by
+    "<question>#<run>", and who said it: {grader: {...}, items: {...}}"""
+    try:
+        g = json.loads((Path(d) / GRADES).read_text(encoding="utf-8"))
+        return g if isinstance(g, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def gkey(qid: str, epoch: int) -> str:
+    return f"{qid}#{epoch}"
+
+
+def marks(row: Path, task: str, items: list[dict] | None = None) -> dict:
+    """every answer of the task's, scored: {runs: {question: [run]}, missing:
+    [(question, run)], items}. A run: {epoch, ok, code_ok, read, ran_out,
+    answer, finish, tokens, error, grade} — `ok` the score the page uses: the
+    code's; for a benchmark Epoch checks with a model (`look`), the code's when
+    it says right and the check's when it says wrong or can't read (None
+    until the check has run); for a graded one, its grader's (None until
+    graded). An answer that ran out of room is wrong, and never sent to a
+    grader or a check"""
+    fb.set_root(config.BENCH_ROOT)
+    spec = fb.BENCH[task]
+    items = items if items is not None else fb.load(task, config.BENCH_ROOT)
+    d = task_dir(row, task)
+    got, grades = read_answers(d / ANSWERS), (read_grades(d).get("items") or {})
+    runs: dict[str, list[dict]] = {}
+    missing = []
+    for it in items:
+        _, need = fb.prompt(task, it)
+        for e in range(spec["epochs"]):
+            a = got.get((it["id"], e))
+            if a is None:
+                missing.append((it["id"], e))
+                continue
+            sc = fb.score(task, a.get("answer") or "", a.get("finish"), need)
+            g = grades.get(gkey(it["id"], e))
+            ok = sc["ok"]
+            if sc["ran_out"]:
+                ok = False
+            elif spec.get("grader"):
+                ok = None if g is None else bool(g.get("ok"))
+            elif spec.get("look") and not sc["ok"]:
+                ok = None if g is None else bool(g.get("ok"))
+            runs.setdefault(it["id"], []).append({
+                "epoch": e, "ok": ok, "code_ok": sc["ok"], "read": sc["read"],
+                "ran_out": sc["ran_out"], "answer": a.get("answer") or "",
+                "finish": a.get("finish"), "tokens": a.get("tokens"),
+                "error": a.get("error"), "grade": g})
+    return {"runs": runs, "missing": missing, "items": items}
+
+
+def to_grade(row: Path, task: str) -> list[dict]:
+    """stage 3: the answers a grader (or Epoch's model check) is still to see —
+    every answer of a graded benchmark, and for one Epoch checks with a model,
+    those the code marks wrong or can't read; never one that ran out of room"""
+    spec = fb.BENCH[task]
+    if not (spec.get("grader") or spec.get("look")):
+        return []
+    m = marks(row, task)
+    if m["missing"]:
+        return []
+    out = []
+    for it in m["items"]:
+        for r in m["runs"].get(it["id"], []):
+            if r["grade"] is None and r["ok"] is None and not r["ran_out"]:
+                out.append({"id": it["id"], "epoch": r["epoch"], "answer": r["answer"],
+                            "read": r["read"]})
+    return out
+
+
+def _share(per: dict[str, list[float]], task: str, items: list[dict]) -> dict:
+    """the benchmark's score from each question's runs: its own aggregate"""
+    groups = {it["id"]: fb.group_of(task, it) for it in items}
+    return fb.summary(per, task, groups)
+
 
 def score_task(row: Path, task: str, rec: dict) -> dict | None:
     """the task's score from its answers, written in lm_eval's layout — None
-    while a question of a run is still unanswered"""
+    while a question of a run is still unanswered. A graded benchmark is
+    written once every answer is graded; until then {waiting: n}. One Epoch
+    checks with a model is written with the code's score until the check is
+    done, and with both after: the page's is Epoch's way"""
     spec = fb.BENCH[task]
-    items = fb.load(task, config.BENCH_ROOT)
-    d = task_dir(row, task)
-    got = read_answers(d / ANSWERS)
-    missing = [(it["id"], e) for it in items for e in range(spec["epochs"])
-               if (it["id"], e) not in got]
-    if missing:
+    m = marks(row, task)
+    if m["missing"]:
         return None
-    per: dict[str, list[float]] = {}
-    rows, ran_out, unread, errors = [], 0, 0, 0
+    items, runs = m["items"], m["runs"]
+    d = task_dir(row, task)
+    flat = [r for it in items for r in runs[it["id"]]]
+    waiting = sum(1 for r in flat if r["ok"] is None)
+    ran_out = sum(1 for r in flat if r["ran_out"])
+    unread = sum(1 for r in flat if r["read"] is None and not r["ran_out"])
+    errors = sum(1 for r in flat if r["error"])
+    if spec.get("grader") and waiting:
+        return {"waiting": waiting, "of": len(flat), "label": spec["label"]}
+    code = (None if spec.get("grader") else
+            _share({q: [1.0 if r["code_ok"] else 0.0 for r in rs] for q, rs in runs.items()},
+                   task, items))
+    page = (code if waiting else
+            _share({q: [1.0 if r["ok"] else 0.0 for r in rs] for q, rs in runs.items()},
+                   task, items))
+    rows = []
     for k, it in enumerate(items):
+        rs = runs[it["id"]]
         _, need = fb.prompt(task, it)
-        runs = []
-        for e in range(spec["epochs"]):
-            a = got[(it["id"], e)]
-            sc = fb.score(task, a.get("answer") or "", a.get("finish"), need)
-            ran_out += sc["ran_out"]
-            unread += (sc["read"] is None and not sc["ran_out"])
-            errors += bool(a.get("error"))
-            runs.append({"epoch": e, **sc, "tokens": a.get("tokens")})
-        per[it["id"]] = [1.0 if r["ok"] else 0.0 for r in runs]
-        rows.append({"doc_id": k, "doc": {"id": it["id"]},
-                     # never the question: only its id (GPQA's are never shown)
+        rows.append({"doc_id": k, "doc": fb.doc_of(task, it),
                      "doc_hash": hashlib.sha256(f"{task}:{it['id']}".encode()).hexdigest(),
-                     "arguments": [], "target": need.get("key"),
-                     "resps": [[got[(it["id"], r["epoch"])].get("answer") or ""]
-                               for r in runs],
-                     "filtered_resps": [r["read"] or "" for r in runs],
-                     "acc": sum(per[it["id"]]) / len(runs), "frontier": runs})
-    sm = fb.summary(per)
+                     "arguments": [], "target": fb.target_of(task, need),
+                     "resps": [[r["answer"]] for r in rs],
+                     "filtered_resps": [r["read"] or "" for r in rs],
+                     "acc": sum(1.0 for r in rs if r["ok"]) / len(rs),
+                     "frontier": [{k2: v for k2, v in r.items() if k2 != "answer"} for r in rs]})
     stamp = time.strftime("%Y-%m-%dT%H-%M-%S.000000", time.gmtime())
     for old in [*d.glob("results_*.json"), *d.glob(f"samples_{task}_*.jsonl")]:
         old.unlink()
@@ -206,20 +295,29 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
         setup = json.loads((d / SETUP).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         setup = {}
+    g = read_grades(d).get("grader")
+    looked = sum(1 for r in flat if r["grade"] is not None)
     detail = {"version": fb.VERSION, "protocol": spec["protocol"], "epochs": spec["epochs"],
-              "questions": len(items), "answers": len(items) * spec["epochs"],
+              "questions": len(items), "answers": len(flat),
               "ran_out": ran_out, "unread": unread, "errors": errors,
               "budget": setup.get("budget"), "sampling": setup.get("sampling"),
               "family": setup.get("family"), "where": setup.get("where"),
-              "thinking": setup.get("thinking")}
+              "thinking": setup.get("thinking"), "note": spec.get("note") or "",
+              "scored_by": ("grader" if spec.get("grader") else "code, then Epoch's model check"
+                            if spec.get("look") and not waiting and looked else "code"),
+              "code": code, "grader": g,
+              **({"look": {"done": looked, "waiting": waiting}} if spec.get("look") else {})}
+    res = {"alias": task, "acc,none": page["score"], "acc_stderr,none": page["se"]}
+    if spec.get("look") and code:
+        res.update({"acc_code,none": code["score"], "acc_code_stderr,none": code["se"]})
     (d / f"results_{stamp}.json").write_text(json.dumps({
-        "results": {task: {"alias": task, "acc,none": sm["score"],
-                           "acc_stderr,none": sm["se"]}},
-        "group_subtasks": {task: []}, "n-shot": {task: 0},
+        "results": {task: res},
+        "group_subtasks": {task: []}, "n-shot": {task: spec.get("shots", 0)},
         "n-samples": {task: {"original": len(items), "effective": len(items)}},
         "higher_is_better": {task: {"acc": True}},
-        "configs": {task: {"task": task, "output_type": "generate_until", "num_fewshot": 0,
-                           "dataset_path": spec["source"]["hf"],
+        "configs": {task: {"task": task, "output_type": "generate_until",
+                           "num_fewshot": spec.get("shots", 0),
+                           "dataset_path": fb.source_name(task),
                            "dataset_kwargs": {"revision": spec["source"]["revision"]}}},
         "config": {"model": "frontier", "model_args": f"pretrained={rec['id']}"
                    + served._row_mark(d.parent)},
@@ -228,18 +326,25 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
         indent=1), encoding="utf-8")
     (d / f"samples_{task}_{stamp}.jsonl").write_text(
         "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
-    return {**sm, **detail}
+    return {**page, **detail, "epochs": spec["epochs"]}
 
 
 def words(task: str, sc: dict) -> str:
-    """"GPQA Diamond 61.6% ± 3.1 · 4 runs of 198 · 2 ran out" """
+    """"GPQA Diamond 61.6% ± 3.1 · 4 runs of 198 · 2 ran out" — or, for a
+    graded benchmark not yet graded, "SimpleQA Verified: 1,000 answers wait for
+    its grader" """
     spec = fb.BENCH[task]
+    if sc.get("waiting") is not None and sc.get("score") is None:
+        return (f"{spec['label']}: {sc['waiting']:,} answers wait for its grader (AI models ▸ "
+                "Start)")
     bits = [f"{spec['label']} {100 * sc['score']:.1f}% ± {100 * sc['se']:.1f}",
             f"{sc['epochs']} run{'s' if sc['epochs'] != 1 else ''} of {sc['questions']:,}"]
     if sc.get("ran_out"):
         bits.append(f"{sc['ran_out']} ran out of room")
     if sc.get("unread"):
-        bits.append(f"{sc['unread']} with no ANSWER line")
+        bits.append(f"{sc['unread']} with no answer read")
+    if (sc.get("look") or {}).get("waiting"):
+        bits.append(f"code's score: Epoch's model check not run on {sc['look']['waiting']:,}")
     return " · ".join(bits)
 
 
@@ -270,6 +375,15 @@ def run(sid: int, sub: dict, rec: dict, th: dict, row: Path, log_path: Path) -> 
                                + (f"{left / 3600:.1f} h left" if left >= 3600 else
                                   f"{max(1, round(left / 60))} min left" if n < total
                                   else "all answered"))
+        # 17: a slot of its server holds the prompt and the budget, or nothing is asked
+        ctx, need = (rec.get("pin") or {}).get("ctx"), fb.slot_context([task], on)
+        if isinstance(ctx, int) and 0 < ctx < need:
+            line = (f"{label}: its server's context is {ctx:,} tokens a slot, and thinking "
+                    f"{'on' if on else 'off'} needs {need:,} (the budget and the prompt) — "
+                    f"start it with a larger -c, or run its GGUF on a rented GPU. Nothing was "
+                    "asked")
+            log(f"[frontier] {line}")
+            return "failed", line
         try:
             fb.load(task, config.BENCH_ROOT)
         except Exception as e:                          # noqa: BLE001 — said on the row

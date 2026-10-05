@@ -132,6 +132,27 @@ def fetch(src: str, into: Path, say) -> Path:
     return Path(got).resolve()
 
 
+_SPLIT = re.compile(r"-(\d{5})-of-(\d{5})\.gguf$")
+
+
+def split_parts(src: str) -> list[str]:
+    """a split GGUF's every part, named as its first is (…-00001-of-00003.gguf);
+    one name for a file in one piece"""
+    m = _SPLIT.search(src)
+    if not m:
+        return [src]
+    n = int(m.group(2))
+    if int(m.group(1)) != 1:
+        raise SystemExit(f"{src}: give the first part, …-00001-of-{n:05d}.gguf")
+    return [src[:m.start()] + f"-{i:05d}-of-{n:05d}.gguf" for i in range(1, n + 1)]
+
+
+def split_sha(parts: list[tuple[str, str]]) -> str:
+    """a split GGUF's identity: the sha256 of its parts' names and sha256s, in
+    order — what the board registers for it (import_remote.py --register)"""
+    return hashlib.sha256("".join(f"{n} {h}\n" for n, h in parts).encode()).hexdigest()
+
+
 def sha256_cached(path: Path, state: dict, say) -> str:
     """a file's sha256, kept with its size and time so a second session
     doesn't read 20 GB again"""
@@ -479,16 +500,20 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit(f"{out} holds {('shard ' + state['shard']) if state.get('shard') else 'a whole run'}"
                          f": give {words or 'a whole run'} another --out")
 
-    gguf_path = fetch(a.gguf, out / "files", say)
-    if re.search(r"-\d{5}-of-\d{5}\.gguf$", gguf_path.name):
-        raise SystemExit(f"{gguf_path.name} is one part of a split GGUF: merge it first "
-                         "(llama-gguf-split --merge) and register the merged file on the board")
-    sha = sha256_cached(gguf_path, state, say)
+    # a split GGUF (…-00001-of-00002.gguf): every part, each hashed; llama-server
+    # is given the first and finds the others beside it
+    paths = [fetch(src, out / "files", say) for src in split_parts(a.gguf)]
+    gguf_path = paths[0]
+    shas = [sha256_cached(x, state, say) for x in paths]
+    sha = shas[0] if len(paths) == 1 else split_sha(
+        [(x.name, h) for x, h in zip(paths, shas)])
     if state.get("gguf_sha256") and state["gguf_sha256"] != sha:
         raise SystemExit(f"{out} holds answers of another file ({state['gguf_sha256'][:16]}, now "
                          f"{sha[:16]}): they can't be mixed — start another --out")
-    gguf = {"name": gguf_path.name, "sha256": sha, "size": gguf_path.stat().st_size,
-            "source": a.gguf if a.gguf.startswith("hf://") else "a path on the box"}
+    gguf = {"name": gguf_path.name, "sha256": sha, "size": sum(x.stat().st_size for x in paths),
+            "source": a.gguf if a.gguf.startswith("hf://") else "a path on the box",
+            **({"parts": [{"name": x.name, "sha256": h, "size": x.stat().st_size}
+                          for x, h in zip(paths, shas)]} if len(paths) > 1 else {})}
     tb = fetch(a.server, out / "files", say)
     srv = unpack_server(tb, out / "server")
     env = server_env(srv, extra_env)
