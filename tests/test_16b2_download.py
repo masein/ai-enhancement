@@ -180,7 +180,9 @@ def test_a_hub_model_is_fetched_from_hugging_face_and_a_served_one_has_no_file(s
     db.served_put(rec)
     served.write_meta(rec)
     i = client.get("/api/models/file", params={"id": "served/x"}).json()
-    assert i["kind"] == "served" and i["line"].startswith("Served elsewhere, and its file isn't")
+    # 16c: said plainly, and its file can be registered from its panel
+    assert i["kind"] == "served" and i["can_register"] and i["line"] == (
+        "Its file isn’t registered here, so there is nothing to download yet.")
 
 
 def test_a_runs_hub_commit_is_on_its_row():

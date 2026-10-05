@@ -4953,6 +4953,36 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 16c part 8 — Download and Use as an API open where they were clicked (5 Oct)
+
+masein, on the page of Qwen3.6 k4-LDA · MTP: "download button doesnt work". Its
+panel was drawn 699 px below the button (Use as an API's 871 px), under the
+setups table and the score tiles: in a 790 px window nothing seemed to happen.
+And for every served Qwen3.6 row it had nothing to give: the file wasn't
+registered, though the page names it and it is on this server.
+
+- **The panels open directly under the row of buttons**, inside the header's
+  card (`.mpanel`), and are scrolled into view when any of it is off screen
+  (`revealPanel`), clear of the sticky header. The button shows it is open;
+  a second click closes it; opening one closes the other.
+- **Download says what it will do before the click** (`dlKnow`,
+  `dlButtonSays`): the file is looked up as the page draws. With no file to
+  give the button is quiet, its reason on hover; with one, its name and size,
+  and whether downloads are switched off.
+- **A served model's file is registered from the panel**
+  (`PUT /api/served/{id}/file`, `served.set_file`), by whoever added it or
+  the board's owner: "Its file isn't registered. Where is it on this server?",
+  its server's file name as the hint. **One registration serves every setup
+  of that file** (`served.same_file_ids`: the same file name and size, as the
+  servers report them). A file of another size is refused.
+- **A file the board can't read says what to do**
+  (`downloads.unreadable_words`): the container sees BENCH_ROOT (and the
+  Hugging Face cache) alone, so: put the file, or a hard link to it, under
+  BENCH_ROOT — on the same disk a hard link takes no space and no copy — with
+  the `ln` line to do it, then register that path.
+- **Downloads still start off** for a file registered by its path (16b
+  decision 2); "Others can download it" is where it was.
+
 ### 16c part 1 — a model's answers read from its Results (5 Oct)
 
 masein: "when I click on the rows, be able to see the questions and answers".

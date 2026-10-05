@@ -4310,6 +4310,12 @@ td.evdtotal .evd-ranout { display:block; white-space:normal; text-align:right; }
 .apikeys { margin-top:10px; border-top:1px solid var(--border); padding-top:8px; }
 /* 16b.2: a model page's actions, and Download's command */
 .mact { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:6px 0 0; }
+/* 16c: Download's and Use as an API's panels open under their buttons, inside
+   the header's card — and clear of the sticky header when scrolled to */
+.mhero .mpanel { margin:10px 0 4px; padding:12px 14px; border:1px solid var(--line);
+  border-radius:8px; scroll-margin-top:84px; max-width:880px; }
+.mhero .mpanel h3 { margin-top:0; }
+.mact button.quiet[data-act-download] { border:1px dashed var(--line); }
 [data-dl-panel] [data-dl-facts], [data-dl-panel] [data-dl-sha] { overflow-wrap:anywhere;
   word-break:break-all; }
 .dlcmd { white-space:pre-wrap; overflow-wrap:anywhere; padding:8px; background:var(--surface-2, var(--bg));
@@ -7204,7 +7210,7 @@ function vModel() {
     : cur === 'improve' ? modelImproveTab(m)
     : cur === 'history' ? modelHistoryTab(m)
     : modelScoresTab(m, kinds);
-  return [back, modelHead(m, kinds), modelDownloadPanel(m), modelApiPanel(m), modelSitPanel(m),
+  return [back, modelHead(m, kinds), modelSitPanel(m),
     strip,
     el('div', { id: 'mpanel', role: 'tabpanel', 'aria-labelledby': 'mtab-' + cur,
       'data-mtab-panel': cur }, body)].filter(Boolean);
@@ -7623,6 +7629,32 @@ async function dlLoad(id) {
   catch (e) { D.info[id] = { kind: 'error', line: 'Its file couldn’t be looked up.' }; }
   render();
 }
+// 16c: what Download will do, known before the click — asked once a page
+function dlKnow(id) {
+  const D = dlState();
+  if (D.info[id] === undefined && netReady()) { D.info[id] = null; dlLoad(id); }
+  return D.info[id] || null;
+}
+function dlButtonSays(i) {
+  if (!i) return { quiet: false, title: 'Looking for its file…' };
+  if (i.kind === 'hub') return { quiet: false, title: 'On Hugging Face, at the commit our runs '
+    + 'loaded: the board doesn’t copy its files' };
+  if (['gguf', 'folder'].includes(i.kind)) return { quiet: false, title: `${i.name} · `
+    + `${GBW(i.bytes)}` + (i.allowed ? '' : ' · downloads are switched off') };
+  return { quiet: true, title: i.line || 'No file to download' };
+}
+// 16c: a panel just opened is brought into view when any of it is off
+// screen — its top first, below the sticky header
+function revealPanel(sel) {
+  requestAnimationFrame(() => {
+    const p = document.querySelector(sel);
+    if (!p) return;
+    const r = p.getBoundingClientRect(), top = 84;
+    if (r.top >= top && r.bottom <= innerHeight) return;
+    const by = r.top < top || r.height > innerHeight - top ? r.top - top : r.bottom - innerHeight + 12;
+    window.scrollBy({ top: by, behavior: 'auto' });
+  });
+}
 function modelActions(m) {
   if (!LIVE || m.reportedOnly) return '';
   const id = m.rowOf || m.id, gg = ggufOnly(m), D = dlState();
@@ -7632,15 +7664,21 @@ function modelActions(m) {
       onclick: () => gg ? ggMeasureDialog(id, '[data-act-test]') : openTest(id) }),
     el('button', { class: 'secondary', 'data-act-chat': id, text: 'Chat',
       onclick: () => { state.after = { scroll: '#mpanel' }; setModelTab('chat'); } }),
-    el('button', { class: 'secondary' + (D.open === id ? ' on' : ''), 'data-act-download': id,
-      'aria-expanded': String(D.open === id), text: 'Download',
+    // 16c: Download says what it will do before the click — quiet, its
+    // reason on hover, when there is no file to give
+    ((s) => el('button', { class: (s.quiet ? 'quiet' : 'secondary') + (D.open === id ? ' on' : ''),
+      'data-act-download': id, 'data-dl-kind': (D.info[id] || {}).kind || '', title: s.title,
+      'aria-expanded': String(D.open === id), 'aria-controls': 'dl-panel', text: 'Download',
       onclick: () => { D.open = D.open === id ? null : id; D.msg = '';
-        if (D.open) dlLoad(id); render(); } }),
+        if (D.open) { apiState().open = null; dlLoad(id); } render();
+        if (D.open) revealPanel('[data-dl-panel]'); } }))(dlButtonSays(dlKnow(id))),
     // 16b.3: Use as an API
     el('button', { class: 'secondary' + (apiState().open === id ? ' on' : ''), 'data-act-api': id,
-      'aria-expanded': String(apiState().open === id), text: 'Use as an API',
+      'aria-expanded': String(apiState().open === id), 'aria-controls': 'api-panel',
+      text: 'Use as an API',
       onclick: () => { const A = apiState(); A.open = A.open === id ? null : id; A.msg = '';
-        if (A.open) apiLoad(id); render(); } }),
+        if (A.open) { dlState().open = null; apiLoad(id); } render();
+        if (A.open) revealPanel('[data-api-panel]'); } }),
     el('button', { class: 'quiet', 'data-compare-with': m.id, text: 'Compare with…',
       onclick: () => openCompare([m.rowOf || m.id]) }));
 }
@@ -7684,7 +7722,9 @@ function modelDownloadPanel(m) {
         : 'The commit our runs loaded isn’t recorded: this is its newest.')
         + ' The board doesn’t copy Hugging Face’s files.' }));
   } else if (!['gguf', 'folder'].includes(i.kind)) {
-    body.push(el('p', { class: 'small', 'data-dl-none': id, text: i.line }));
+    body.push(el('p', { class: i.unreadable ? 'small warntext' : 'small', 'data-dl-none': id,
+      text: i.line }));
+    if (i.can_register) body.push(dlRegister(id, i));
   } else {
     body.push(el('p', { class: 'small', 'data-dl-facts': id }, el('b', { text: i.name }),
       ` · ${GBW(i.bytes)}` + (i.files ? ` · ${i.files} files, as one archive` : ''),
@@ -7713,9 +7753,45 @@ function modelDownloadPanel(m) {
         + ((i.log || []).length ? ': ' + i.log.filter(x => !x.start).slice(0, 3)
           .map(x => `${x.who}, ${whenShort(x.at)}`).join(' · ') : '') : 'Not downloaded yet.' }));
   }
-  return el('div', { class: 'card', 'data-dl-panel': id },
+  return el('div', { class: 'mpanel', id: 'dl-panel', 'data-dl-panel': id },
     el('h3', { text: 'Download' }), ...body,
     D.msg ? el('p', { class: 'small', 'data-dl-msg': id, text: D.msg }) : '');
+}
+// 16c: a served model on this server: its file registered from here, by
+// whoever added it or the owner — for every setup of that file
+function dlRegister(id, i) {
+  const D = dlState();
+  const me = (whoName() || '').trim().toLowerCase();
+  if (!(me && (me === String(i.adder || '').toLowerCase() || evdOwner())))
+    return el('p', { class: 'small se', 'data-dl-register-who': id, text: `${i.adder
+      ? i.adder + ', who added it,' : 'Whoever added it'} or the board’s owner can register its `
+      + 'file here.' });
+  D.path = D.path != null && D.pathFor === id ? D.path : (i.path || '');
+  D.pathFor = id;
+  const box = el('input', { type: 'text', 'data-dl-path': id, 'data-keep': 'dl-path',
+    value: D.path, placeholder: '/home/…/' + (i.hint || 'its-file.gguf'),
+    'aria-label': 'its file’s path on this server', style: 'width:100%;max-width:640px',
+    oninput: e => { D.path = e.target.value; } });
+  return el('div', { 'data-dl-register': id },
+    el('p', { class: 'small', text: i.unreadable ? 'Register it again once the board can read it:'
+      : 'Its file isn’t registered. Where is it on this server?' }),
+    box,
+    i.hint ? el('p', { class: 'small se', 'data-dl-hint': id, text: `Its server reports `
+      + `${i.hint}. One registration serves every setup of that file.` }) : '',
+    el('div', { class: 'frm' }, el('button', { class: 'primary', 'data-dl-register-save': id,
+      text: 'Register its file', disabled: D.busy ? '' : null, onclick: async () => {
+        D.busy = true; D.msg = '';
+        try {
+          const r = await post(`api/served/${id.split('/').map(encodeURIComponent).join('/')}/file`,
+            { path: D.path, by: whoName() }, 'PUT');
+          D.info[id] = { ...r.file, log: [] };
+          for (const x of r.models || []) if (x !== id) delete D.info[x];
+          D.msg = `Registered for ${r.models.length} setup${r.models.length === 1 ? '' : 's'} of `
+            + 'this file. Downloads stay off until you switch them on.';
+          D.path = null;
+          await refreshResults();
+        } catch (e) { D.msg = String((e && e.message) || e); }
+        D.busy = false; render(); } })));
 }
 // ---------------------------------------------------------------------------
 // 16b.3: Use as an API — its state, the address, the model's name, a curl and
@@ -7804,7 +7880,8 @@ function modelApiPanel(m) {
               onclick: () => apiRevoke(id, k.id) })))))) : '',
     el('button', { class: 'secondary', 'data-api-make': '1', text: 'Create my key',
       onclick: () => apiMakeKey(id) })));
-  return el('div', { class: 'card', 'data-api-panel': id }, el('h3', { text: 'Use as an API' }),
+  return el('div', { class: 'mpanel', id: 'api-panel', 'data-api-panel': id },
+    el('h3', { text: 'Use as an API' }),
     ...body, A.msg ? el('p', { class: 'small', 'data-api-msg': '1', text: A.msg }) : '');
 }
 function modelHead(m, kinds) {
@@ -7825,6 +7902,8 @@ function modelHead(m, kinds) {
         LIVE ? modelActions(m) : el('p', { class: 'small' }, el('button', { class: 'quiet',
           'data-compare-with': m.id, text: 'Compare with…',
           onclick: () => openCompare([m.rowOf || m.id]) })),
+        // 16c: their panels directly under the row of buttons
+        modelDownloadPanel(m), modelApiPanel(m),
         trainedFromLine(m), servedHead(m), ggufHead(m))),
       // 12b.3: the page's one main action is the header's, which reads Test
       // this model here — two filled buttons side by side was one too many
