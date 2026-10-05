@@ -271,8 +271,9 @@ def test_the_cell_is_the_share_correct_and_the_row_carries_not_attempted(svc, mo
     assert (m["avg"], m["avgRaw"], m["partialAvg"]) == (b["avg"], b["avgRaw"], b["partialAvg"])
     assert "simpleqa_verified" not in after["required"]
     # 17: and the Frontier benchmarks as Epoch AI runs them
+    import frontier
     assert after["frontierTasks"] == ["gpqa_diamond_zeroshot", "gpqa_diamond_cot_zeroshot",
-                                      "simpleqa_verified", "gpqa_diamond_epoch"]
+                                      "simpleqa_verified", *frontier.TASKS]
     assert after["shared"]["simpleqa"]["licence"] == "MIT"
     assert "honest, not wrong" in after["shared"]["simpleqa"]["honest"]
 

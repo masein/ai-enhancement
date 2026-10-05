@@ -92,7 +92,8 @@ def run_box(b: dict, out: str, *more: str, thinking: str = "on") -> int:
                         "--based-on", "Qwen/Qwen3.6-35B-A3B", "--thinking", thinking,
                         "--slots", "3", "--port", str(free_port()), "--load-timeout", "60",
                         "--flags", "--flash-attn on", "--env", "LLAMA_MOE_ROUTE_MODE=lookahead",
-                        "--out", str(b["root"] / out), *more])
+                        # 17.2: the suite has seven; the questions invented here are GPQA's
+                        "--only", TASK, "--out", str(b["root"] / out), *more])
     finally:
         for k, v in keep.items():
             setattr(config, k, v)
@@ -375,11 +376,13 @@ def test_served_thinking_run_from_the_board(svc, monkeypatch):  # noqa: F811
             return f"Checked.\nANSWER: {letter}"
         fake.reply = answer
         fake.reasoning = "thinking it through"
+        # 17.2: a slot holds GPQA's thinking budget and its prompt (34,816)
+        fake.ctx = 40960
         rec = served.register({"name": "lda box", "base_url": fake.base, "how": "llama-server",
                                "based_on": "Qwen/Qwen3.6-35B-A3B", "thinking": "off"}, ME)
         # registered thinking off, asked with thinking on: the run says so itself
         r = svc.post("/api/submissions", json={"hf_id": rec["id"], "suite": "frontier",
-                                          "thinking": True, "submitter": ME})
+                                          "thinking": True, "submitter": ME, "tasks": [TASK]})
         assert r.status_code == 200, r.text
         sid = r.json()["id"]
         # a Hugging Face model can't sit it yet; a model from OpenRouter neither
@@ -405,7 +408,7 @@ def test_served_thinking_run_from_the_board(svc, monkeypatch):  # noqa: F811
                 assert "Invented question" not in f.read_text()
         # asked again: every answer is kept, nothing is asked twice
         n = len(fake.requests)
-        sid2 = db.add(rec["id"], "instruct", "frontier", ME, "", thinking=True)
+        sid2 = db.add(rec["id"], "instruct", "frontier", ME, "", thinking=True, tasks=[TASK])
         runner.run_submission(db.get(sid2))
         assert len(fake.requests) == n and db.get(sid2)["status"] == "done"
     finally:

@@ -238,10 +238,11 @@ def test_each_suite_option_says_what_it_gets_you(live, page):
     page.get_by_label("suite").click()
     page.wait_for_selector("[role=listbox][aria-label='suite']")
     opts = page.locator("#pop-sel-submit-suite [role=option]")
-    # 16.7: Standard's, then Mobile, Everyday, Frontier, and the exam — Models' order
+    # 16.7: Standard's, then Mobile, Everyday, Frontier, and the exam — Models' order.
+    # 17: the Frontier benchmarks as Epoch AI runs them beside 12n.2's two
     assert [o.get_attribute("data-value") for o in opts.all()] == \
         ["full", "quick", "control", "generative", "safety", "mobile", "everyday", "shared",
-         "judged"]
+         "frontier", "judged"]
     # 12a: the Everyday option is its one short line (12a.2: the bank's), and 12c replaces the list
     assert opts.nth(6).text_content() == "Everyday — 310 questions, a few minutes"
     for o in opts.all()[:4]:

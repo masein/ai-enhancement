@@ -177,7 +177,7 @@ def test_a_judged_run_can_be_narrowed_to_one_topic(svc, monkeypatch):
     assert bad.status_code == 422 and "not built exam tasks" in bad.json()["detail"]
     wrong = client.post("/api/submissions", json={"hf_id": "org/m4", "suite": "full",
                                                   "tasks": [LAW]})
-    assert wrong.status_code == 422 and "judged run only" in wrong.json()["detail"]
+    assert wrong.status_code == 422 and "tasks narrows a judged run (exam topics)" in wrong.json()["detail"]
 
 
 def test_the_judge_grades_only_the_narrowed_tasks(svc, tmp_path):

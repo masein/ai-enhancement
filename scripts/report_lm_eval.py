@@ -150,8 +150,9 @@ def _trim_diag(d: dict | None) -> dict | None:
         return None
     out = {"split_salt": d.get("split_salt"), "tasks": {}}
     for task, v in d["tasks"].items():
-        # 12n.2: GPQA's questions are never shown — its diagnosis never reaches a page
-        if not isinstance(v, dict) or task.startswith("gpqa"):
+        # 12n.2: GPQA's questions are never shown — its diagnosis never reaches a page.
+        # 17: nor a Frontier benchmark's (never diagnosed, never in Improve)
+        if not isinstance(v, dict) or task.startswith("gpqa") or task in _epoch_tasks():
             continue
         t = {k: v.get(k) for k in
              ("metric", "n", "n_report", "n_diagnose", "score_all", "score_report",
@@ -1764,6 +1765,32 @@ def simpleqa_view(sq: dict | None) -> dict | None:
             "provisional": bool((sq.get("judge") or {}).get("provisional"))}
 
 
+def frontier_bench_meta() -> dict:
+    """17: the Frontier suite's benchmarks, in order, as Test a model and the
+    cells say them"""
+    try:
+        import frontier as fb
+    except ImportError:                    # a frozen report without the scripts beside it
+        return {}
+    out = {}
+    for t, b in fb.BENCH.items():
+        runs = b["epochs"]
+        ep = b.get("epoch_runs")
+        rw = (f"{runs} attempts (pass@{runs})" if b.get("aggregate") == f"pass@{runs}" else
+              f"{runs} run{'s' if runs != 1 else ''}"
+              + (f" (Epoch AI: {ep})" if ep and ep != runs else ""))
+        out[t] = {"runsWords": rw, "label": b["label"], "group": b["group"], "note": b.get("note") or "",
+                  # the name others report it by, its Frontier column
+                  "column": b.get("column") or b["label"], "unlistedWhy": fb.unlisted(t),
+                  "protocol": b["protocol"], "runs": runs, "budget": b["budget"],
+                  "scorer": "grader" if b.get("grader") else "code",
+                  "unlisted": bool(b.get("unlisted")), "reportedAs": b.get("reported_as") or [],
+                  "words": (f"{rw} · thinking on "
+                            f"{b['budget']['on']:,} tokens, off {b['budget']['off']:,}"
+                            + (" · graded" if b.get("grader") else ""))}
+    return out
+
+
 def shared_meta() -> dict:
     """12n.2: the credits the page says for SimpleQA Verified, and GPQA's line"""
     out = {"gpqa": {"url": GPQA_URL, "why": "GPQA Diamond's questions are never shown: the "
@@ -2903,6 +2930,9 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         # GPQA's questions are never shown
         "frontierTasks": list(FRONTIER_TASKS),
         "shared": shared_meta(),
+        # 17: the Frontier benchmarks as Epoch AI runs them — each one's name,
+        # runs, budgets, scorer, and how it differs from Epoch's, in a few words
+        "frontierBench": frontier_bench_meta(),
         "mabTasks": list(MAB_TASKS),
         "mab": mab_meta(),
         "mmp": mmp_meta(by_model, cells, served),
@@ -5563,7 +5593,8 @@ function Select(label, opts, cur, onpick, attrs = {}) {
           el('span', { class: 'opt-sub', 'data-opt-sub': String(v), text: o.sub })) : null)));
     box.addEventListener('keydown', e => listKeys(e, box, pick));
     return box;
-  }, { key, menu: false, focus: '[role=option][aria-selected=true], [role=option]' });
+  }, { key, menu: false, listbox: true,
+       focus: '[role=option][aria-selected=true], [role=option]' });
   btn.setAttribute('aria-haspopup', 'listbox');
   return btn;
 }
@@ -7343,7 +7374,7 @@ function avgVerdictOf(m) {
 // ---- 12f.1: a model served elsewhere ----
 const SERVED_LINE = 'Multiple-choice benchmarks need the model loaded here; this one is served '
   + 'elsewhere.';
-const SERVED_SUITES = ['everyday', 'judged', 'generative', 'safety', 'shared', 'mobile'];
+const SERVED_SUITES = ['everyday', 'judged', 'generative', 'safety', 'shared', 'mobile', 'frontier'];
 const servedOf = id => (DATA.served || {})[id]
   || (DATA.models.find(x => x.id === id) || {}).served || null;
 const isServedId = id => /^served\//.test(String(id || ''));
@@ -7419,6 +7450,27 @@ function mabEstimate(id, thinking = false) {
       .catch(() => { E[k] = { failed: true }; });
   }
   return E[k];
+}
+// 17: the Frontier benchmarks as Epoch AI (or their owners) run them
+const FB = () => DATA.frontierBench || {};
+const FRONTIER_TASKS_ALL = () => Object.keys(FB());
+const FRONTIER_SERVED_ONLY = 'Asked of a model running on a server for now: add it under Add a '
+  + 'model \u25b8 Running on a server, or run its GGUF on a rented GPU.';
+const frontierNames = () => FRONTIER_TASKS_ALL().map(t => FB()[t].label).join(', ');
+function frontierPick(sf, thinkBox = '') {
+  const skip = new Set(sf.fskip || []);
+  return el('div', { class: 'mabopts', 'data-frontier-opts': '1' },
+    el('p', { class: 'small se', 'data-thinking-rule': 'frontier', text: THINKING_RULE_WORDS }),
+    thinkBox ? el('div', { class: 'genopts', 'data-frontier-think': '1' }, thinkBox) : '',
+    el('p', { class: 'small', text: 'Benchmarks:' }),
+    ...FRONTIER_TASKS_ALL().map(t => { const b = FB()[t];
+      return el('label', { class: 'small spread', 'data-frontier-task': t,
+          style: 'display:block' },
+        el('input', { type: 'checkbox', checked: skip.has(t) ? null : '',
+          onchange: e => { const k = new Set(sf.fskip || []);
+            if (e.target.checked) k.delete(t); else k.add(t); sf.fskip = [...k]; } }),
+        ' ' + b.label, el('span', { class: 'se', text: ` \u2014 ${b.words}`
+          + (b.note ? ` \u00b7 ${b.note}` : '') })); }));
 }
 function mabPartOpts(sf, thinkBox = '') {
   const id = sf.hf_id.trim(), est = mabEstimate(id, !!sf.thinking) || {};
@@ -8208,7 +8260,7 @@ function sharedLine(m) {
   if (!bits.length) return '';
   repLoad();
   const reps = (REP().scores || []).filter(s => s.model === m.id
-    && FR_SHARED.some(x => frKey(x) === frKey(s.benchmark))).sort((a, b) => frRank(a) - frRank(b));
+    && frShared().some(x => frKey(x) === frKey(s.benchmark))).sort((a, b) => frRank(a) - frRank(b));
   return el('div', { class: 'small', 'data-shared-line': m.id },
     el('p', { class: 'small', text: bits.join(' · ') }),
     reps.length ? el('p', { class: 'small se', 'data-shared-cal': m.id, title: FR_CAL },
@@ -8538,6 +8590,9 @@ function benchAnswers(m, task, list) {
   const why = ((state.mansList || {})[m.id] || {}).why || {};
   if (/^gpqa/i.test(task)) return el('p', { class: 'small', 'data-answers-why': task,
     text: 'GPQA Diamond’s questions are never shown, as its authors ask.' });
+  // 17: nor a Frontier benchmark's whose authors ask the same (HLE)
+  if ((FB()[task] || {}).unlisted) return el('p', { class: 'small', 'data-answers-why': task,
+    text: FB()[task].unlistedWhy + '.' });
   const X = state.mansX = state.mansX && state.mansX.task === task && state.mansX.model === m.id
     ? state.mansX : { task, model: m.id, sort: 'score', f: '', q: '', offset: 0 };
   if (ansKey(m, task) !== X.key && !X.loading) ansLoad(m, task);
@@ -11095,6 +11150,10 @@ const isFrontierTask = t => frontierTasks().includes(t);
 const GPQA_COT = 'gpqa_diamond_cot_zeroshot', GPQA_LL = 'gpqa_diamond_zeroshot';
 const SIMPLEQA = 'simpleqa_verified';
 // each GPQA method's words: three cells, never ranked or averaged together
+// 17: a Frontier benchmark's cell says how it was run — Epoch AI's way, or in a
+// few words how it isn't ("HLE text-only") — and its runs
+const frMethod = t => { const b = FB()[t];
+  return b ? `${b.note || 'Epoch AI\u2019s way'} \u00b7 ${b.runsWords}` : ''; };
 const FR_METHOD = { [GPQA_COT]: 'CoT, 0-shot', [GPQA_LL]: '4 options scored, 0-shot',
   'gguf:gpqa': 'llama.cpp, 0-shot', [SIMPLEQA]: 'graded by the judge, the dataset\u2019s grader' };
 // a task a server can be asked: the generative three, GPQA's chain of thought, SimpleQA
@@ -11648,7 +11707,7 @@ const BENCH_NAMES = { mmlu: 'MMLU', hellaswag: 'HellaSwag', piqa: 'PIQA', winogr
   dm_math: 'MATH (DeviceMark protocol)' };
 const benchName = t => isGgufKey(t) ? `${ggufLabel(t.slice(5))} (GGUF)`
   : isDmKey(t) ? dmField(t.slice(3)).name
-  : BENCH_NAMES[t] || LB_SHORT[t] || t;
+  : BENCH_NAMES[t] || LB_SHORT[t] || (FB()[t] || {}).label || t;
 // the mean of the chosen benchmarks, on the Scale pill's scale; each error
 // scales as its score does, and the errors add as variances (separate item
 // sets), so the mean's is √Σse² / k. Null when a benchmark is missing; no ±
@@ -12545,7 +12604,8 @@ const REP_SAME = { mmlu: ['mmlu'], mmlu_pro: ['mmlu-pro', 'mmlu pro'], hendrycks
   // 17: as Epoch AI runs it
   gpqa_diamond_epoch: ['gpqa diamond'],
   simpleqa_verified: ['simpleqa verified'] };
-const repSame = (t, b) => (REP_SAME[t] || []).includes(String(b).toLowerCase().trim());
+const repSame = (t, b) => (REP_SAME[t] || (FB()[t] || {}).reportedAs || [])
+  .includes(String(b).toLowerCase().trim());
 // 12n.1: what others report of a benchmark measured here — dashed reference
 // ticks on its panel, never bars: "Claude Opus 5 93.9 · Epoch". The chosen
 // models' (Models ▾), or the three best reported when none is chosen
@@ -12724,8 +12784,8 @@ function outsideCard() {
 // how) with ours — never across them. Nothing here is averaged.
 // ===========================================================================
 const FR_GROUPS = [
-  ['Knowledge & reasoning', [/^gpqa\b/, /humanity.s last exam|^hle\b/, /^simpleqa/]],
-  ['Maths', [/otis|mock aime/, /^frontiermath/]],
+  ['Knowledge & reasoning', [/^gpqa\b/, /humanity.s last exam|^hle\b/, /^simpleqa/, /^mmlu-?pro\b/]],
+  ['Maths', [/otis|mock aime/, /^frontiermath/, /^math level 5/]],
   ['Coding & agents', [/^swe-?bench verified/, /^terminal.?bench/, /^deepswe/]],
   ['Puzzles & games', [/^arc-?agi/, /^simplebench/, /^chess puzzles?/]]];
 // one benchmark by its name across sources: "GPQA diamond" is "GPQA Diamond"
@@ -12753,13 +12813,20 @@ function frHere(name) {
   return [...ts.map(t => ({ key: t,
     get: m => { const c = cell(t, m.id);
       return c ? { v: c.v, se: c.se || null, tag: 'measured here · ' + (FR_METHOD[t]
-        || 'lm_eval, ' + (c.shots != null ? `${c.shots}-shot` : 'n-shot unknown')) } : null; } })),
+        || frMethod(t) || 'lm_eval, ' + (c.shots != null ? `${c.shots}-shot` : 'n-shot unknown'))
+      } : null; } })),
     ...ts.filter(t => GGUF_OF[t]).map(t => ({ key: 'gguf:' + GGUF_OF[t],
       get: m => { const g = ggufOf(m.id, GGUF_OF[t]);
         return g ? { v: g.v, se: g.se ?? null, tag: 'measured here · llama.cpp, 0-shot' } : null; } }))];
 }
 // 12n.2: the benchmarks measured here that the Frontier view always shows
-const FR_SHARED = ['GPQA Diamond', 'SimpleQA Verified'];
+const FR_SHARED_12N = ['GPQA Diamond', 'SimpleQA Verified'];
+// 17: and every Frontier benchmark run as Epoch AI runs it, under the name
+// others report it by (its column)
+const frShared = () => [...new Set([...FR_SHARED_12N,
+  ...Object.values(FB()).map(b => b.column || b.label)].map(frKey))]
+  .map(k => [...FR_SHARED_12N, ...Object.values(FB()).map(b => b.column || b.label)]
+    .find(x => frKey(x) === k));
 const caps = s => (String(s).match(/[A-Z]/g) || []).length;
 // every reported benchmark: its name, its group, how many imported models
 // have it, and whether it is one of the defaults — reported for at least
@@ -12781,8 +12848,9 @@ function frColumns() {
     const measured = DATA.models.some(m => here.some(h => h.get(m)));
     const [g, i, group] = frPlace(name);
     return { key: c.key, name, group, g, i, here, n: c.models.size, measured,
-      dflt: 2 * c.models.size >= n || measured || FR_SHARED.some(x => frKey(x) === c.key) };
-  }).concat(FR_SHARED.filter(x => !by.has(frKey(x))).map(name => {
+      // 12n.2's two always; 17's catalogue once measured here (the coverage rule)
+      dflt: 2 * c.models.size >= n || measured || FR_SHARED_12N.some(x => frKey(x) === c.key) };
+  }).concat(frShared().filter(x => !by.has(frKey(x))).map(name => {
     // 12n.2: measured here before anyone reports it — a column of ours alone
     const here = frHere(name), [g, i, group] = frPlace(name);
     return { key: frKey(name), name, group, g, i, here, n: 0, dflt: true,
@@ -14157,8 +14225,8 @@ function cmpGroups(ms) {
 // number, grey and never the row's method; a model in both shows both
 // is a benchmark shared with the frontier measured here for one of these models?
 function frMeasured(ms, key) {
-  if (!FR_SHARED.some(x => frKey(x) === key)) return false;
-  const here = frHere(FR_SHARED.find(x => frKey(x) === key));
+  if (!frShared().some(x => frKey(x) === key)) return false;
+  const here = frHere(frShared().find(x => frKey(x) === key));
   return ms.some(m => !m.reportedOnly && here.some(h => h.get(m)));
 }
 function frCmpGroup(ms) {
@@ -18839,6 +18907,12 @@ function vQueue(part = { form: true, list: true }) {
           + 'with the dataset\'s grader: beside what Epoch AI reports, never ranked with it. '
           + 'Instruct models only (a base model sits GPQA\'s four options in full); never in '
           + 'the average.' }],
+      // 17: the Frontier benchmarks as Epoch AI runs them — a served model's for now
+      ['frontier', 'Frontier — as Epoch AI runs them, ' + frontierNames(),
+        { sub: 'Each benchmark asked the way Epoch AI (or its owners) ask it, with its runs and '
+          + 'budget; scored by code, or by its owners\u2019 grader once you start it on AI '
+          + 'models. A model running on a server (or a GGUF on a rented GPU); never in the '
+          + 'average.', ...(srvId && !orId ? {} : { disabled: true, title: FRONTIER_SERVED_ONLY }) }],
       // 16.5: only while the Knowledge exam is switched on
       ...examOn() ? [['judged', 'Knowledge exam — written, graded by the judge' + (state.loop.blocked ? ' (unavailable)' : ''),
         { disabled: !!state.loop.blocked, title: state.loop.blocked || '',
@@ -18866,6 +18940,8 @@ function vQueue(part = { form: true, list: true }) {
   // 12o.1: GPQA as Epoch runs it, with reasoning — the shared suite thinks too
   const sharedOpts = sf.suite === 'shared' && canThink
     ? el('div', { class: 'genopts', 'data-shared-opts': '1' }, thinkBox) : '';
+  // 17: the Frontier benchmarks: which of them, and thinking on or off (a row of its own)
+  const frontierOpts = sf.suite === 'frontier' ? frontierPick(sf, canThink ? thinkBox : '') : '';
   // 14.1: the Mobile tasks suite's two parts, each with what it takes.
   // 16b: thinking off unless a thinking run is asked for, as the generative three
   const mabOpts = sf.suite === 'mobile' ? mabPartOpts(sf, canThink ? thinkBox : '') : '';
@@ -18908,8 +18984,14 @@ function vQueue(part = { form: true, list: true }) {
       if (sf.thinking) body.thinking = true;
       if (sf.subset) body.subset = sf.subset;
     }
-    if (sf.suite === 'shared' && sf.thinking) body.thinking = true;
+    // 17: the Mobile suite's box was offered and never sent; the Frontier's is sent too
+    if (['shared', 'mobile', 'frontier'].includes(sf.suite) && sf.thinking) body.thinking = true;
     if (sf.suite === 'mobile' && sf.part) body.part = sf.part;
+    if (sf.suite === 'frontier') {
+      const picked = FRONTIER_TASKS_ALL().filter(t => !(sf.fskip || []).includes(t));
+      if (!picked.length) { state.qmsg = 'pick at least one benchmark'; render(); return; }
+      if (picked.length < FRONTIER_TASKS_ALL().length) body.tasks = picked;
+    }
     if (sf.suite === 'full' && sf.bbqAll) body.bbq_all = true;
     if (sf.suite === 'judged') {
       body.tasks = [...(sf.tasks || []), ...(sf.control && J.control ? [J.control] : [])];
@@ -18941,6 +19023,7 @@ function vQueue(part = { form: true, list: true }) {
         const rq = restrictOf(body.suite === 'mobile' ? MAB_PART_TASK[body.part] : null);
         sf.hf_id = ''; sf.note = ''; sf.allow = false;
         sf.tasks = null; sf.control = false; sf.bbqAll = false; sf.subsetFor = null; sf.part = '';
+        sf.fskip = [];
         state.testOpen = false;                       // 12b: the dialog's job is done
         toast((j.note ? `#${j.id}: ${j.note}` : `Run #${j.id} queued`)
               + (rq ? ` · ${rq.name}: ${rq.badge}. ${rq.sentence}` : '') + ' —',
@@ -19132,7 +19215,7 @@ function vQueue(part = { form: true, list: true }) {
           + 'these answers, and it isn\u2019t answering now: '
           + ((state.judgeHealth || {}).why || 'the grading model is not answering')
           + '. The run can start; its marks wait until the judge answers.' }) : '',
-      topicBoxes, genOpts, sharedOpts, mabOpts, bbqOpts,
+      topicBoxes, genOpts, sharedOpts, frontierOpts, mabOpts, bbqOpts,
       orId ? orEstimateLine(sf) : '',
       // 16.2: what it needs of the GPU, what is free, and when it starts
       gpuNeedLine(sf),
@@ -22669,7 +22752,7 @@ const SUITE_NAMES = { full: 'Standard', quick: 'Standard · quick', control: 'St
   judged: 'Knowledge exam', everyday: 'Everyday', generative: 'Standard · Instruction & maths',
   safety: 'Standard · Trust & safety', gguf: 'Standard · on the GGUF',
   shared: 'Frontier', mobile: 'Mobile · MobileAIBench',
-  devicemark: 'Mobile · DeviceMark' };
+  devicemark: 'Mobile · DeviceMark', frontier: 'Frontier · as Epoch AI runs them' };
 // 12q: a devicemark run says its part: the battery, the pilot, the parity
 // check against the setup without MTP, or the speed test
 const DM_PARTS = { pilot: 'pilot (30 items)', parity: 'MTP parity', speed: 'speed test' };
@@ -25933,6 +26016,24 @@ function popReanchor() {
       const again = key && POP.panel.querySelector(
         `[data-column="${CSS.escape(key)}"], [data-filter="${CSS.escape(key)}"]`);
       if (again) again.focus();
+    }
+  }
+  // 17: a list opened before its choices arrived (Answers' "Read:", while the
+  // model's benchmarks load) shows them once they do — the panel swapped for a
+  // fresh one, its clicks and keys the new choices', the menu left open
+  if ((POP.opts || {}).listbox && POP.build) {
+    const fresh = POP.build();
+    const vals = root => [...root.querySelectorAll('[role=option]')]
+      .map(o => o.dataset.value).join('\n');
+    if (vals(fresh) !== vals(POP.panel)) {
+      const had = POP.panel.contains(document.activeElement);
+      fresh.dataset.pop = POP.key;
+      fresh.classList.add('pop');
+      POP.panel.replaceWith(fresh);
+      POP.panel = fresh;
+      const f = had && (fresh.querySelector('[role=option][aria-selected=true]')
+        || fresh.querySelector('[role=option]'));
+      if (f) f.focus();
     }
   }
   popPlace();

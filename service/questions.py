@@ -9,7 +9,10 @@ What may be listed is exactly what may be listed today:
   already takes its examples from; the report half is a count and a line;
 - the Knowledge exam lists its diagnose half, by the exam's own split;
 - Everyday lists its practice half;
-- GPQA is never listed, by its authors' request;
+- GPQA is never listed, by its authors' request — 17: nor Humanity's Last
+  Exam, whose card asks that it not be redistributed; the other Frontier
+  benchmarks list their diagnose half from this server's copy of the
+  dataset (scripts/frontier.py), never fetched for a page;
 - the owner's audit (app.py) opens a report or hidden half, logged.
 
 16.8: a benchmark no model has answered lists its questions from its own file
@@ -83,9 +86,26 @@ MAB_TURNS = ("mab_mtbench_t1", "mab_mtbench_t2")
 MMP = "mobile_mmlu_pro"
 
 
+def _fb():
+    _scripts()
+    import frontier
+    return frontier
+
+
+def unlisted_why(task: str) -> str:
+    """'' when a benchmark's questions may be listed; else why not — GPQA's
+    (every protocol of it), and 17's Frontier benchmarks whose authors ask"""
+    if GPQA.match(task):
+        return NOT_LISTED
+    return _fb().unlisted(task) if task in _fb().BENCH else ""
+
+
 def kind_of(task: str) -> str:
     """lm (log-likelihood, lm_eval), gen (written, read by generative.py),
-    safety, simpleqa, exam, everyday"""
+    safety, simpleqa, exam, everyday — 17: frontier, the Frontier benchmarks
+    as Epoch AI runs them"""
+    if task in _fb().BENCH:
+        return "frontier"
     if task == "everyday":
         return "everyday"
     if task.startswith("exam_") or task == "fr_control_mmlu":
@@ -153,7 +173,7 @@ def tasks() -> list[str]:
             for t in d.glob("*_*shot") if d.is_dir() else []:
                 m = re.fullmatch(r"(.+)_\d+shot", t.name)
                 # the Everyday pilot's legacy task is the Everyday bank's, not a benchmark
-                if m and not GPQA.match(m.group(1)) and m.group(1) != MMF \
+                if m and not unlisted_why(m.group(1)) and m.group(1) != MMF \
                         and not m.group(1).startswith("everyday_"):
                     seen.add(m.group(1))
             if (d / "everyday.json").exists():
@@ -314,6 +334,43 @@ def _dm_questions() -> dict:
                 rows[(r["bench"], r["key"])] = r
         _dm_q.update(stamp=stamp, rows=rows)
     return _dm_q["rows"]
+
+
+def _frontier_rows(task: str, d: Path) -> dict[str, dict]:
+    """17: a Frontier benchmark's answers, each question's runs scored as its
+    cell is (service/frontier.marks), beside the question from this server's
+    copy of the dataset — none when it has no copy"""
+    from . import frontier as sf
+    fb = _fb()
+    qs = fb.cached(task, config.BENCH_ROOT)
+    if not qs:
+        return {}
+    m = sf.marks(d, task, qs)
+    out = {}
+    for k, it in enumerate(qs):
+        rs = m["runs"].get(it["id"])
+        if not rs:
+            continue
+        shown = fb.shown(task, it)
+        right = sum(1 for r in rs if r["ok"])
+        waits = any(r["ok"] is None for r in rs)
+        first = rs[0]
+        text = first["answer"] or ""
+        think = text[:len(text) - len(fb.visible(text))].strip() if "</think>" in text else ""
+        n = len(rs)
+        out[it["id"]] = {
+            "q": shown["q"], "options": shown.get("options") or [],
+            "subject": shown.get("subject") or "", "reference": shown.get("reference"),
+            "context": shown.get("context"), "order": [shown.get("subject") or "", k],
+            "res": {"ok": None if waits else right * 2 > n, "answer": fb.visible(text),
+                    "thinking": re.sub(r"</?think>", "", think).strip(),
+                    "verdict": fb.verdict(task, first) + (
+                        f" · {right} of {n} runs right" if n > 1 else ""),
+                    "score": None if waits else right / n,
+                    "score_words": ("waits for its grader" if waits else
+                                    f"{right} of {n} runs right" if n > 1 else
+                                    "right" if right else "wrong")}}
+    return out
 
 
 def _dm_rows(task: str, d: Path) -> dict[str, dict]:
@@ -593,6 +650,8 @@ def _rows_of(task: str, d: Path) -> dict[str, dict]:
     _scripts()
     import diagnose as dx
     kind, out = kind_of(task), {}
+    if kind == "frontier":
+        return _frontier_rows(task, d)
     if kind == "dm":
         return _dm_rows(task, d)
     if kind == "mabj":
@@ -766,7 +825,10 @@ def _stamp(task: str, dirs: dict[str, Path]) -> tuple:
                                     "generative.json", "mobileaibench.json",
                                     "mobile_mmlu_pro.json")]
                  # 14.3: and our key, which scores every model's picks
-                 + ([_mmp_key_file()] if task == MMP else []))
+                 + ([_mmp_key_file()] if task == MMP else [])
+                 # 17: a Frontier benchmark's answers as they land, and its grades
+                 + [f for x in _task_dirs(d, task) for n in ("answers.jsonl", "grades.json")
+                    for f in x.rglob(n)])
         out.append((mid, tuple(sorted((str(f), f.stat().st_mtime_ns, f.stat().st_size)
                                       for f in files if f.exists()))))
     return tuple(out)
@@ -796,8 +858,9 @@ def half_of(task: str, key: str, row: dict) -> str:
 
 def table(task: str) -> dict:
     """{models: [ids], rows: {key: row with results by model and its half}}"""
-    if GPQA.match(task):
-        raise PermissionError(NOT_LISTED)
+    why = unlisted_why(task)
+    if why:
+        raise PermissionError(why)
     # 16.8: the full Mobile-MMLU from its file alone — a run's samples carry a
     # stand-in "right answer"
     dirs = {} if task == MMF else model_dirs(task)
@@ -887,6 +950,13 @@ def meta(task: str) -> dict:
                           f"authors hold theirs back",
                 "licence": f"{c['licence']} — used here, never published",
                 "revision": c["revision"], "url": c["url"]}
+    if kind == "frontier":
+        src = _fb().BENCH[task]["source"]
+        name = _fb().source_name(task)
+        return {"source": f"{name}: {_fb().BENCH[task]['protocol']}", "licence": src["licence"],
+                "revision": src["revision"],
+                "url": (f"https://huggingface.co/datasets/{src['hf']}" if src.get("hf")
+                        else f"https://github.com/{src['github']}" if src.get("github") else None)}
     if kind == "simpleqa":
         import simpleqa as sq
         c = sq.credit()
@@ -1039,7 +1109,7 @@ def _gguf_key(task: str) -> str | None:
     except ImportError:
         return None
     key = next((k for k, v in gb.BENCHMARKS.items() if v.get("lm_eval") == task), None)
-    return None if not key or GPQA.match(key) or key == MMF else key
+    return None if not key or unlisted_why(key) or key == MMF else key
 
 
 def _gkey(task: str, doc: dict) -> str | None:
