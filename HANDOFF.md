@@ -4953,6 +4953,34 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 16b.2's review — an id or a name never becomes a path outside the model folders (5 Oct)
+
+- **What was wrong (HIGH):** Download built the folder from the id with no
+  check (`ARTIFACTS_DIR / mid[len("local/"):]`): "local/.." was BENCH_ROOT
+  (the database, results, the checkout's .env), "local//etc/ssl" an absolute
+  path, and `allowed()` was True for any "local/" id. `GET /api/models/file`
+  (no token) said whether such a folder existed, its size and file count. The
+  archive was written under `UPLOADS_DIR/.downloads`, inside BENCH_ROOT, so it
+  could zip its own part file and grow until the disk filled.
+- **Found on the way, worse:** `DELETE /api/artifacts/{name}` took ".." (the
+  old name rule allowed dots) and `shutil.rmtree`'d BENCH_ROOT, with the token.
+  A submission of "local/.." was queued (its folder "existed").
+- **Now:**
+  - one name rule (`uploads.folder_name_ok`: letters, digits, dot, dash,
+    underscore, no "..", no leading dot) and one resolver
+    (`uploads.artifact_dir`: resolved, links and all, a folder directly inside
+    `ARTIFACTS_DIR`), used by Download (`downloads.folder_of`, which also wants
+    a real `config.json` at its root), the API client's upload and delete, a
+    submission's "local/" id, the own-code check and preflight;
+  - `allowed()` is True by default only for a model folder; anything else is
+    "There is no model file on this board for that id." — the same words
+    whether or not something is there, with no size or count;
+  - an archive lists a folder's regular files only (`files_of`): never a link
+    to a file or a folder, never the archives' own folder or uploads in
+    progress; it checks the disk before each file and stops at
+    `UPLOAD_FREE_GB`, removing its part;
+  - an upload's id is 16 hex characters before any file is named from it.
+
 ### 16b.3 — Use as an API (4 Oct)
 
 - **`/v1/models` and `/v1/chat/completions`** (streamed and not),
