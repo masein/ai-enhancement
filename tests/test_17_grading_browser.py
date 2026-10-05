@@ -55,7 +55,7 @@ def board(live):
     (row / "model_meta.json").write_text(json.dumps({"model": SERVED}))
     for task, answers in (("simpleqa_epoch", [(str(k), f"A{k}") for k in range(4)]),
                           ("math_l5_epoch", [("algebra/0", "ANSWER: 2"), ("algebra/1", "ANSWER: 3"),
-                                             ("algebra/2", "ANSWER: 1+1")])):
+                                             ("algebra/2", "ANSWER: 2.0")])):
         d = sf.task_dir(row, task)
         d.mkdir(parents=True, exist_ok=True)
         (d / sf.ANSWERS).write_text("".join(json.dumps(
@@ -83,8 +83,8 @@ def test_the_grading_card_names_each_grader_and_prices_start(live, page, width):
     assert "the owners’: gpt-4.1-2025-04-14" in sqa.inner_text()
     prompt = card.locator("[data-frontier-grader-prompt='simpleqa']").inner_text()
     assert "Google's grader prompt" in prompt and fg.prompt_sha("simpleqa")[:12] in prompt
-    # the dry run: four SimpleQA answers, and MATH's one wrong by code (1+1 is
-    # read and math-verify finds it equal: right by code, never asked)
+    # the dry run: four SimpleQA answers, and MATH's one wrong by code (2.0 is
+    # the key by code, with math-verify or without: right, never asked)
     est = page.evaluate("state.ai.frg.estimate")
     assert {(r["slot"], r["answers"]) for r in est["rows"]} == {("simpleqa", 4), ("math", 1)}
     cost = page.evaluate("usd(state.ai.frg.estimate.usd)")       # the page's own money format
