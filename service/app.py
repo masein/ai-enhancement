@@ -2094,6 +2094,56 @@ def mmp_labeller_set(slot: str, a: LabellerIn, x_token: str = Header(default="")
     return {"saved": saved, "page": _ai_page(), "key": _mmp_key_page()}
 
 
+# 17: the Frontier benchmarks' graders — the card on AI models: each grader,
+# the dry run, Start and Stop. Nothing is sent but on Start
+def _frontier_grading_page() -> dict:
+    from . import frontier_grade
+    return frontier_grade.status()
+
+
+@app.get("/api/frontier/grading")
+def frontier_grading_status():
+    return _frontier_grading_page()
+
+
+@app.post("/api/frontier/grading/start")
+def frontier_grading_start(a: MmpByIn, x_token: str = Header(default="")):
+    """masein's Start, after the dry run: each grader with answers to see
+    pinned, and what waits sent. Started again after a stop, it carries on"""
+    from . import frontier_grade
+    _check_token(x_token)
+    _name(a.by, "grading the Frontier benchmarks")
+    try:
+        sent = frontier_grade.start(a.by.strip()[:80])
+    except ValueError as e:
+        raise HTTPException(409, str(e)) from None
+    return {**sent, "page": _frontier_grading_page()}
+
+
+@app.post("/api/frontier/grading/stop")
+def frontier_grading_stop(a: MmpByIn, x_token: str = Header(default="")):
+    from . import frontier_grade
+    _check_token(x_token)
+    _name(a.by, "stopping the grading")
+    frontier_grade.stop(a.by.strip()[:80])
+    return {"page": _frontier_grading_page()}
+
+
+@app.post("/api/ai/graders/{slot}")
+def frontier_grader_set(slot: str, a: LabellerIn, x_token: str = Header(default="")):
+    """a Frontier benchmark's grader, pinned on OpenRouter — never local"""
+    from . import frontier_grade
+    _check_token(x_token)
+    if not a.by.strip():
+        raise HTTPException(422, "type your name first — it is recorded with the choice")
+    try:
+        saved = frontier_grade.save(slot, a.model.strip(), a.by.strip()[:80])
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    _cache.update(key=None, payload=None, at=0.0)
+    return {"saved": saved, "page": _ai_page(), "grading": _frontier_grading_page()}
+
+
 class PortalIn(BaseModel):
     model: str
     score: float

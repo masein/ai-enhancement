@@ -460,6 +460,21 @@ own). A shard waits until the others are in. Then each benchmark is scored by
 code, its result says "run on a rented GPU (<the GPU>)", and the Runs list gets
 the import with the box's log.
 
+## G4b. Grading, on AI models
+
+An import scores what code can: GPQA Diamond, MMLU-Pro and ARC-AGI-2 whole,
+and MATH Level 5 and OTIS Mock AIME by code. SimpleQA Verified and Humanity's
+Last Exam wait for their graders, and MATH's and OTIS's answers the code marks
+wrong wait for Epoch's model check. **Nothing is sent by itself.**
+
+AI models ▸ "Frontier benchmarks: grading" lists each grader with its model
+(the owners' where it is still served: gpt-4.1-2025-04-14 for SimpleQA,
+o3-mini-2025-01-31 for HLE) and its prompt's sha256, then the dry run — each
+benchmark's answers waiting, and what they would cost. "change ▾" picks
+another model; **Start grading** pins each grader and sends what waits; Stop
+holds it. As grades land, each benchmark is scored again, and its cell says
+who graded it, with which prompt (MATH and OTIS: the code's number beside it).
+
 ## G5. The full run: which box runs what
 
 Each build (the original and the LDA one) the same way, one `--out` a box.

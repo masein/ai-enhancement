@@ -1370,6 +1370,9 @@ def parse_run(blob: dict, source: Path) -> dict:
         "mmf": mmf,                                 # 14.4: kept apart
         # 12f.1: a model served elsewhere — how, and what its server reported
         "served": blob.get("served"),
+        # 17: a Frontier benchmark's: how it was scored, and by which grader
+        "frontier": {t: blob["frontier"] for t in tasks} if isinstance(blob.get("frontier"),
+                                                                        dict) else {},
         "tasks": tasks,
     }
 
@@ -1763,6 +1766,30 @@ def simpleqa_view(sq: dict | None) -> dict | None:
     return {"correct": share("correct"), "not_attempted": share("not_attempted"),
             "incorrect": share("incorrect"), "waiting": int(sq.get("waiting") or 0),
             "provisional": bool((sq.get("judge") or {}).get("provisional"))}
+
+
+def frontier_how(d: dict | None) -> str | None:
+    """17: how a Frontier benchmark's number was scored, in one line — by code;
+    by code, then Epoch AI's model check by its pinned model and prompt, with
+    the code's own number; or graded by the pinned grader and prompt"""
+    if not isinstance(d, dict):
+        return None
+    g = d.get("grader") or {}
+    who = (f"{g.get('version') or g.get('model')} with {g.get('prompt_words')} "
+           f"({str(g.get('prompt_sha256') or '')[:8]})") if g else ""
+    code = d.get("code") or {}
+    alone = (f"code alone {100 * code['score']:.1f}" if isinstance(code.get("score"), (int, float))
+             else "")
+    if d.get("scored_by") == "grader":
+        return f"graded by {who}" if who else "graded"
+    look = d.get("look")
+    if isinstance(look, dict):
+        if look.get("waiting"):
+            return ("by code: Epoch AI's model check waits for Start on "
+                    f"{look['waiting']:,} answers")
+        if look.get("done"):
+            return f"code, then Epoch AI's model check by {who} · {alone}".rstrip(" ·")
+    return "by code"
 
 
 def frontier_bench_meta() -> dict:
@@ -2258,6 +2285,7 @@ def merge_runs(runs: list[dict]) -> dict[str, dict]:
         m["generative"] = m.get("generative") or r.get("generative")
         m["safety"] = m.get("safety") or r.get("safety")
         m["mmp"] = m.get("mmp") or r.get("mmp")                 # 14.3
+        m.setdefault("frontier", {}).update(r.get("frontier") or {})    # 17
         m["mmf"] = m.get("mmf") or r.get("mmf")                 # 14.4
         m["served"] = r.get("served") or m.get("served")        # the newest run's
     return by_model
@@ -2364,6 +2392,9 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
                 # 12k.2: BBQ's bias score, for the cell's tooltip alone
                 **({"bias": entry["bias_score"]["value"]}
                    if task in BBQ_TASKS and "value" in (entry.get("bias_score") or {}) else {}),
+                # 17: how a Frontier benchmark was scored, its grader beside it
+                **({"how": frontier_how((run.get("frontier") or {}).get(task))}
+                   if (run.get("frontier") or {}).get(task) else {}),
             }
             metric_used.setdefault(task, name)
             if task not in all_tasks:
@@ -12814,6 +12845,8 @@ function frHere(name) {
     get: m => { const c = cell(t, m.id);
       return c ? { v: c.v, se: c.se || null, tag: 'measured here · ' + (FR_METHOD[t]
         || frMethod(t) || 'lm_eval, ' + (c.shots != null ? `${c.shots}-shot` : 'n-shot unknown'))
+        // 17: how it was scored, and its grader and prompt, beside the number
+        + (c.how ? ' · ' + c.how : '')
       } : null; } })),
     ...ts.filter(t => GGUF_OF[t]).map(t => ({ key: 'gguf:' + GGUF_OF[t],
       get: m => { const g = ggufOf(m.id, GGUF_OF[t]);
@@ -23643,6 +23676,7 @@ function aiChange(j) {
         const r = await post(j.url || `api/ai/jobs/${j.job}`, { model: id, by: whoName() });
         A.page = r.page;
         if (r.key) A.mmp = r.key;           // 14.3: a key labeller
+        if (r.grading) A.frg = r.grading;   // 17: a Frontier grader
         if (r.rejudge && r.rejudge.n) A.confirm = r.rejudge;
         toast(`${j.label}: ${aiName(r.saved)}`, { key: 'ai' });
       } catch (e) { toast('Refused. ' + e.message, { key: 'ai' }); }
@@ -23805,7 +23839,7 @@ function vAiModels() {
         text: w.text })),
       A.confirm ? aiRejudgeBox() : '',
       aiJobsTable(P)),
-    mmpKeyCard(), judgeTestCard(), outsideCard()];
+    mmpKeyCard(), frontierGradingCard(), judgeTestCard(), outsideCard()];
 }
 
 // ---- 14.3: Mobile-MMLU-Pro's answer key ---------------------------------------
@@ -23837,8 +23871,12 @@ async function aiTick() {
     // the key's card every other tick, every tick while its batches are out
     const busy = A.mmp && (A.mmp.running || []).length;
     const key = busy || ++AI_TICKS % 2 === 0 ? await api('api/mobile-mmlu/key') : null;
+    // 17: the Frontier grading's card the same way
+    const gbusy = A.frg && (A.frg.running || []).length;
+    const frg = gbusy || AI_TICKS % 2 === 0 ? await api('api/frontier/grading') : null;
     A.page = page;
     if (key) A.mmp = key;
+    if (frg) A.frg = frg;
     if (state.tab === 'ai' && !aiEditing()) render();
   } catch (e) { /* netFail said so; the next tick asks again */ }
   finally { A.ticking = false; }
@@ -24043,6 +24081,107 @@ function checksTable(ch, pre) {
 function mmpCreditOf(c) {
   c = c || {};
   return c.name ? `${c.name}: ${c.by} · ${c.licence} — ${c.note}` : '';
+}
+
+// ---- 17: the Frontier benchmarks' graders --------------------------------------
+async function loadFrontierGrading() {
+  const A = state.ai;
+  if (A.frgAsked) return;
+  A.frgAsked = true;
+  try { A.frg = await api('api/frontier/grading'); A.frgMsg = ''; }
+  catch (e) { A.frgMsg = e.message; }
+  A.frgAsked = false;
+  if (state.tab === 'ai') render();
+}
+async function frontierGradingAct(what) {
+  const A = state.ai;
+  if (!whoName()) { askName(); return; }
+  try {
+    const r = await post(`api/frontier/grading/${what}`, { by: whoName() });
+    A.frg = r.page;
+    toast(what === 'stop' ? 'Grading stopped: what is in flight lands, nothing more is sent'
+      : `Grading: ${(r.sent || []).reduce((a, x) => a + x.n, 0).toLocaleString('en')} answers `
+        + 'sent', { key: 'frg' });
+  } catch (e) { toast('Refused. ' + e.message, { key: 'frg' }); }
+  render();
+}
+function frontierGradingCard() {
+  const A = state.ai;
+  if (!A.frg && !A.frgMsg && netReady()) loadFrontierGrading();
+  const G = A.frg;
+  const head = el('h2', { text: 'Frontier benchmarks: grading' });
+  if (!G) return el('div', { class: 'card', 'data-frontier-grading': 'loading' }, head,
+    A.frgMsg ? el('p', { class: 'warn', text: A.frgMsg }) : skeleton(2));
+  const n = x => Number(x || 0).toLocaleString('en');
+  const E = G.estimate || {};
+  const graders = el('table', { class: 'aijobs', 'data-frontier-graders': '1' },
+    el('thead', {}, el('tr', {}, ['Grader', 'Model', 'Prompt', 'Price per million tokens', '']
+      .map(h => el('th', { text: h })))),
+    el('tbody', {}, (G.graders || []).map(g => {
+      const now = g.now || {};
+      const j = { job: 'grader-' + g.slot, label: g.label, suggested: g.suggested, why: g.why,
+        url: `api/ai/graders/${g.slot}`, noLocal: true };
+      return el('tr', { 'data-frontier-grader': g.slot },
+        el('td', {}, el('b', { text: g.label }), el('div', { class: 'small se', text: g.does })),
+        el('td', {}, el('span', { 'data-frontier-grader-now': g.slot,
+            text: String(now.name || now.id || '—').split(': ').pop() }),
+          el('div', { class: 'small se', text: g.chosen
+            ? `on ${now.provider_name || now.provider} · ${now.version}`
+            : `the suggestion — the owners’: ${g.owners}; pinned when you press Start` })),
+        el('td', { class: 'small', 'data-frontier-grader-prompt': g.slot },
+          g.prompt, el('div', { class: 'small se mono', text: 'sha256 ' + g.prompt_sha256.slice(0, 12) })),
+        el('td', { class: 'mono small aiprice', text: now.price_in != null
+          ? `${usd(now.price_in)} in · ${usd(now.price_out)} out` : 'priced once pinned' }),
+        el('td', { class: 'aiact' }, LIVE && A.page ? aiChange(j) : ''));
+    })));
+  const labelOf = s => ((G.graders || []).find(g => g.slot === s) || {}).label || s;
+  const rows = E.rows || [];
+  const dry = rows.length ? el('div', { class: 'mmpwrap' }, el('table', { class: 'mmptab',
+      'data-frontier-estimate': '1' },
+    el('thead', {}, el('tr', {}, ['Grader', 'Benchmark', 'Model', 'Answers', 'Cost']
+      .map(h => el('th', { text: h })))),
+    el('tbody', {}, rows.map(r => el('tr', { 'data-frontier-est': `${r.slot}|${r.model}` },
+      el('td', { text: labelOf(r.slot) }), el('td', { text: r.label }),
+      el('td', { text: r.model }), el('td', { class: 'num', text: n(r.answers) }),
+      el('td', { class: 'num', text: r.usd == null ? 'once pinned' : usd(r.usd) }))))))
+    : el('p', { class: 'small se', 'data-frontier-estimate': '0',
+      text: 'Nothing waits for a grader: every Frontier answer on file is scored.' });
+  const running = (G.running || []).length, stopped = !!G.stopped;
+  const why = !G.has_key ? 'OpenRouter has no key on this server (OPENROUTER_API_KEY)'
+    : E.over_limit || '';
+  const cost = E.usd_known ? usd(E.usd) : `${usd(E.usd)} and the unpriced`;
+  return el('div', { class: 'card', 'data-frontier-grading': String(E.answers || 0) }, head,
+    el('p', { class: 'sub', text: 'SimpleQA Verified and Humanity’s Last Exam are scored by '
+      + 'their owners’ graders; MATH Level 5 and OTIS Mock AIME by code, with Epoch AI’s model '
+      + 'check as a second look on the answers the code marks wrong. Each grader is pinned — its '
+      + 'dated version, its provider, its prompt’s sha256 — and named beside the scores it gives. '
+      + 'Nothing is sent until you press Start.' }),
+    graders,
+    el('h3', { text: 'Before Start: a dry run' }),
+    el('p', { class: 'small se', text: 'What Start would send now: each answer waiting for a '
+      + 'grader, in its prompt (four characters a token), at the grader’s price.' }),
+    dry,
+    E.answers ? el('p', { class: 'small', 'data-frontier-total': String(E.usd) },
+      `Start: about `, el('b', { text: cost }), ` for ${n(E.answers)} answers`,
+      ` · this month ${usd(E.spent)} of ${usd(E.limit)} spent`) : '',
+    G.key_warning && E.answers ? el('p', { class: 'warn small', 'data-frontier-key-warning': '1',
+      text: G.key_warning }) : '',
+    LIVE && (E.answers || running) ? el('div', { class: 'frm', 'data-frontier-run': running
+        ? 'running' : stopped ? 'stopped' : 'idle' },
+      E.answers ? el('button', { class: 'primary', 'data-frontier-start': '1',
+        disabled: why ? '' : null, title: why || null,
+        text: `${stopped ? 'Carry on' : 'Start grading'}: about ${cost}`,
+        onclick: () => frontierGradingAct('start') }) : '',
+      running ? el('button', { class: 'quiet', 'data-frontier-stop': '1', text: 'Stop',
+        onclick: () => frontierGradingAct('stop') }) : '') : '',
+    why && E.answers ? el('p', { class: 'small warntext', 'data-frontier-why': '1', text: why }) : '',
+    running ? el('div', { class: 'small', 'data-frontier-running': String(running) },
+      ...G.running.map(r => el('p', { class: 'small', 'data-frontier-progress': `${r.slot}|${r.model}`,
+        text: `${labelOf(r.slot)} · ${r.model}: ${r.progress || `${n(r.n)} sent`}` }))) : '',
+    ...(G.refused || []).map(r => el('p', { class: 'small warntext',
+      'data-frontier-refused': `${r.slot}|${r.row}`,
+      text: `${labelOf(r.slot)} refused ${n(r.n)} answer${r.n === 1 ? '' : 's'} of `
+        + `${r.row.replace('__', '/')}: ${r.words} — Start asks them again.` })));
 }
 
 // ---- the judge test ----------------------------------------------------------

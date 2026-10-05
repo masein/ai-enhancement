@@ -18,7 +18,8 @@ import traceback
 import sys
 from pathlib import Path
 
-from . import builder, config, contamination, db, judge_test, llm, mmp_key, proposals
+from . import (builder, config, contamination, db, frontier_grade, judge_test, llm, mmp_key,
+               proposals)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import everyday as _everyday  # noqa: E402
@@ -387,6 +388,9 @@ def _mark_failed(r: dict, why: str) -> None:
     elif r["kind"] == mmp_key.KIND:
         # 14.3: what it landed is kept; the next Start asks the rest
         mmp_key.failed(r["batch_id"], why)
+    elif r["kind"] == frontier_grade.KIND:
+        # 17: the same for a Frontier benchmark's grading
+        frontier_grade.failed(r["batch_id"], why)
     elif r["kind"] == "everyday_remark":
         # 12a.6: each model this re-mark sent says so, instead of waiting
         for d in (p for p in config.OUT_DIR.iterdir() if p.is_dir()) if config.OUT_DIR.is_dir() else []:
@@ -413,6 +417,9 @@ def tick() -> int:
                        else builder.batch_backend(r["batch_id"]) if r["kind"] == "qb"
                        # 14.3: a key labeller's batch belongs to the labeller it pinned
                        else mmp_key.batch_backend(r["batch_id"]) if r["kind"] == mmp_key.KIND
+                       # 17: a Frontier grader's batch belongs to the grader it pinned
+                       else frontier_grade.batch_backend(r["batch_id"])
+                       if r["kind"] == frontier_grade.KIND
                        else llm.client("judge" if r["kind"] in ("judge", "everyday", "everyday_remark",
                                                                 "safety", "simpleqa", "mab")
                                        else "llm"))
@@ -468,6 +475,8 @@ def tick() -> int:
                 builder.finish(r["batch_id"], results)
             elif r["kind"] == mmp_key.KIND:
                 mmp_key.finish(r["batch_id"], results)
+            elif r["kind"] == frontier_grade.KIND:
+                frontier_grade.finish(r["batch_id"], results)
             db.batch_finish(r["batch_id"], "done", "")
         except _everyday.HiddenMissing as e:
             # 12p.1: the judge's verdicts wait, pending, until the hidden set is back
