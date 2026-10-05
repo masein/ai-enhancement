@@ -374,6 +374,53 @@ def set_launch(served_id: str, flags: str, env: str, how: str | None = None,
     return public(rec)
 
 
+def same_file_ids(rec: dict) -> list[str]:
+    """16c: every served setup of the file `rec`'s server reports — the
+    page's "Setups of this file": its name and size, as the servers report
+    them"""
+    pin = rec.get("pin") or {}
+    if is_openrouter(rec) or not pin.get("file"):
+        return [rec["id"]]
+    return [r["id"] for r in db.served_all() if not is_openrouter(r)
+            and (r.get("pin") or {}).get("file") == pin["file"]
+            and (r.get("pin") or {}).get("size") == pin.get("size")] or [rec["id"]]
+
+
+def set_file(served_id: str, path: str, by: str) -> list[str]:
+    """16c: a served model's GGUF file on this server, registered from its
+    page by whoever added it or the board's owner — for every setup of that
+    file. The board must be able to read it: else what to do, in words.
+    Downloads stay off until someone switches them on (16b decision 2)"""
+    from . import downloads, gguf
+    rec = get(served_id)
+    if not rec or is_openrouter(rec):
+        raise LookupError(f"no served llama-server {served_id}")
+    by = (by or "").strip()[:80]
+    if not by:
+        raise PermissionError("Who is registering it: a name")
+    who = rec.get("by") or ""
+    if who and by.lower() != who.lower() and not config.is_owner(by):
+        raise PermissionError(f"Only {who}, who added it, or the board's owner registers its "
+                              "file.")
+    path = gguf._check_path(path)
+    f = downloads._readable(path)
+    if not f:
+        raise ValueError(downloads.unreadable_words(path))
+    size = (rec.get("pin") or {}).get("size")
+    if size and abs(f.stat().st_size - size) > 0.03 * max(f.stat().st_size, size):
+        raise ValueError(f"{f.name} is {f.stat().st_size / 1e9:.1f} GB; its server reports a "
+                         f"{size / 1e9:.1f} GB file: this isn't the file it serves")
+    ids = same_file_ids(rec)
+    for sid in ids:
+        r = get(sid)
+        if r.get("gguf_path") != path:
+            r.pop("gguf_pin", None)                     # the host worker hashes it again
+        r.update(gguf_path=path, gguf_path_by=by, gguf_path_at=time.time())
+        db.served_put(r)
+        write_meta(r)
+    return ids
+
+
 def launch(rec: dict | None) -> dict | None:
     """12z A1: a served setup's lookahead and MTP — what its launch says: its
     flags and environment (registered, or as flags in "How it's served"),

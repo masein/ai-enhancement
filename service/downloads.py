@@ -38,7 +38,9 @@ import gguf_header  # noqa: E402
 
 LINK_S = 24 * 3600
 ARCHIVE_S = 24 * 3600
-OFF_BY_DEFAULT = "Downloads start off for a GGUF registered by its path (16b decision 2)"
+# 16b decision 2: a GGUF registered by its path starts off
+OFF_BY_DEFAULT = ("they start off for a file registered by its path, until whoever added it, or "
+                  "the board's owner, switches them on")
 # the same words whether or not something is there: nothing about the disk
 NOT_A_MODEL = "There is no model file on this board for that id."
 _links: dict[str, dict] = {}
@@ -126,6 +128,18 @@ def _gguf_path(mid: str) -> tuple[str, dict]:
     return "", {}
 
 
+def unreadable_words(path: str) -> str:
+    """16c: a file the board can't read, and the fix — the container sees
+    BENCH_ROOT alone (and the Hugging Face cache): a file elsewhere on the
+    host goes in it, or a hard link to it does (on the same disk it takes no
+    space and no copy)"""
+    name = Path(path).name or "the-file.gguf"
+    root = str(config.BENCH_ROOT).rstrip("/")
+    return (f"The board can’t read {path}: the folders it sees are under {root}. Put the file, "
+            f"or a hard link to it, there — on the same disk a hard link takes no space: "
+            f"ln '{path}' '{root}/models/{name}' — then register that path.")
+
+
 def _readable(p: str) -> Path | None:
     try:
         f = Path(p).expanduser()
@@ -174,21 +188,24 @@ def info(mid: str) -> dict:
                 "bytes": sum(f.stat().st_size for f in files), "sha256": None,
                 "files": len(files), "archive": _archive_state(mid), "added": up.get("at")}
     path, rec = _gguf_path(mid)
+    s = served.get(mid)
+    # 16c: a served model on this server can have its file registered from its
+    # page, by whoever added it or the owner — its server's file name a hint
+    reg = ({"can_register": True, "hint": (s.get("pin") or {}).get("file") or "",
+            "path": path} if s and not served.is_openrouter(s) else {})
     if path:
         f = _readable(path)
         if not f:
-            return {**base, "kind": "none", "line": "Its file isn't readable by the board: it "
-                    "is on the host outside the folders the board sees."}
+            return {**base, **reg, "kind": "none", "unreadable": True,
+                    "line": unreadable_words(path)}
         sha = rec.get("sha256") or (rec.get("pin") or {}).get("sha256") or \
             (rec.get("gguf_pin") or {}).get("sha256")
         return {**base, "kind": "gguf", "name": f.name, "bytes": f.stat().st_size,
                 "sha256": sha, "path_known": True}
-    s = served.get(mid)
     if s:
-        return {**base, "kind": "served", "line": (
+        return {**base, **reg, "kind": "served", "line": (
             "Served by OpenRouter: there is no file to download." if served.is_openrouter(s)
-            else "Served elsewhere, and its file isn't registered here: there is nothing to "
-                 "download from this board.")}
+            else "Its file isn’t registered here, so there is nothing to download yet.")}
     return {**base, "kind": "hub"}
 
 

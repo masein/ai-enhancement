@@ -1416,6 +1416,28 @@ def served_launch(model_id: str, f: LaunchIn, x_token: str = Header(default=""))
     return out
 
 
+class ServedFileIn(BaseModel):
+    path: str
+    by: str = ""
+
+
+@app.put("/api/served/{model_id:path}/file")
+def served_file(model_id: str, f: ServedFileIn, x_token: str = Header(default="")):
+    """16c: a served model's GGUF file on this server, registered from its
+    Download panel — for every setup of that file"""
+    _check_token(x_token)
+    try:
+        ids = served.set_file(model_id, f.path, f.by)
+    except LookupError as e:
+        raise HTTPException(404, str(e)) from None
+    except PermissionError as e:
+        raise HTTPException(403 if f.by.strip() else 422, str(e)) from None
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    _cache.update(key=None, payload=None, at=0.0)
+    return {"models": ids, "file": downloads.info(model_id)}
+
+
 @app.get("/api/served")
 def served_list():
     return {"models": served.all_public(), "suites": list(served.SUITES),
