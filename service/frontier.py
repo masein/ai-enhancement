@@ -542,7 +542,8 @@ def answer_sha(answer: str) -> str:
     return hashlib.sha256((answer or "").encode("utf-8")).hexdigest()
 
 
-def marks(row: Path, task: str, items: list[dict] | None = None) -> dict:
+def marks(row: Path, task: str, items: list[dict] | None = None,
+          grades: dict | None = None) -> dict:
     """every answer of the task's, scored: {runs: {question: [run]}, missing:
     [(question, run)], items}. A run: {epoch, ok, code_ok, read, ran_out,
     answer, finish, tokens, error, grade} — `ok` the score the page uses: the
@@ -555,7 +556,8 @@ def marks(row: Path, task: str, items: list[dict] | None = None) -> dict:
     spec = fb.BENCH[task]
     items = items if items is not None else fb.load(task, config.BENCH_ROOT)
     d = task_dir(row, task)
-    gr = read_grades(d)
+    # 17g: the grades as Start would leave them (the dry run's), or on file
+    gr = read_grades(d) if grades is None else grades
     got, grades = read_answers(d / ANSWERS), (gr.get("items") or {})
     refused = gr.get("refused") or {}
     runs: dict[str, list[dict]] = {}
@@ -596,14 +598,15 @@ def marks(row: Path, task: str, items: list[dict] | None = None) -> dict:
     return {"runs": runs, "missing": missing, "items": items}
 
 
-def to_grade(row: Path, task: str) -> list[dict]:
+def to_grade(row: Path, task: str, grades: dict | None = None) -> list[dict]:
     """stage 3: the answers a grader (or Epoch's model check) is still to see —
     every answer of a graded benchmark, and for one Epoch checks with a model,
-    those the code marks wrong or can't read; never one that ran out of room"""
+    those the code marks wrong or can't read; never one that ran out of room.
+    17g: `grades` as Start would leave them, for the dry run"""
     spec = fb.BENCH[task]
     if not (spec.get("grader") or spec.get("look")):
         return []
-    m = marks(row, task)
+    m = marks(row, task, grades=grades)
     if m["missing"]:
         return []
     out = []

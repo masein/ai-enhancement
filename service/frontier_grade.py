@@ -42,6 +42,7 @@ next Start.
 from __future__ import annotations
 
 import contextlib
+import copy
 import fcntl
 import json
 import os
@@ -122,7 +123,9 @@ def save(slot: str, model_id: str, by: str) -> dict:
                          "benchmark owners'")
     value = ai_models.pin(model_id, JOB)
     db.ai_set(_setting(slot), value, by)
-    _reset_tries(slot, value)                  # 17d: another grader asks again
+    # 17g: nothing moves until Start — the dry run shows what it would do
+    # (17f moved the first's grades aside here, and choosing it again priced
+    # every answer again)
     return value
 
 
@@ -184,27 +187,38 @@ def _cancelled(batch_id: str) -> set[str]:
             if r.get("cancelled") and ":" in c}
 
 
-def waiting() -> list[dict]:
+def waiting(view: bool = False) -> list[dict]:
     """every row's answers a grader is still to see, by benchmark — those out
     in a batch now left out (17c: but not those cancelled from it, unsent):
-    [{slot, task, row, model, base, items}]"""
+    [{slot, task, row, model, base, items}]. 17g: `view` — as Start would
+    leave them with the grader chosen now (the dry run), each row saying what
+    the switch does (`switch`: kept, regrade, match) and how many grades
+    the grader gave before come back (`reused`)"""
     out_now = {(p["row"], p["task"], k) for p in pending()
                for k in set(p.get("keys") or []) - _cancelled(p["batch_id"])}
     got = []
     root = Path(config.OUT_DIR)
     for slot, g in fg.GRADERS.items():
         t = g["task"]
+        now = chosen(slot) if view else None
         for row in sorted(root.glob(f"*/{t}_0shot/{sf.SUB}")) if root.is_dir() else []:
-            row = row.parent.parent
+            d, row = row, row.parent.parent
+            seen, how, reused = None, "", 0
+            if now:
+                seen = copy.deepcopy(sf.read_grades(d))
+                how, reused = _switch(seen, now.get("version") or now.get("id"),
+                                      fg.prompt_sha(slot))
             try:
-                todo = sf.to_grade(row, t)
+                todo = sf.to_grade(row, t, grades=seen)
             except Exception:                           # noqa: BLE001 — no dataset here
                 continue
             todo = [x for x in todo if (row.name, t, sf.gkey(x["id"], x["epoch"])) not in out_now]
-            if todo:
+            if todo or how:
                 mid, base = _model_of(row)
                 got.append({"slot": slot, "task": t, "row": row.name, "model": mid,
-                            "base": base, "items": todo})
+                            "base": base, "items": todo,
+                            **({"switch": how, "why": (seen or {}).get("regrade", {}).get("why")
+                                or "", "reused": reused} if how else {})})
     return got
 
 
@@ -229,8 +243,14 @@ def estimate() -> dict:
     fb.set_root(config.BENCH_ROOT)
     per: dict[str, dict] = {}
     rows = []
-    for w in waiting():
+    for w in waiting(view=True):
         slot = w["slot"]
+        if not w["items"]:
+            # 17g: nothing to send — the grades it gave before come back
+            rows.append({"slot": slot, "task": w["task"], "label": fb.BENCH[w["task"]]["label"],
+                         "model": w["model"], "answers": 0, "usd": 0.0,
+                         "switch": w["switch"], "reused": w.get("reused") or 0})
+            continue
         g = grader(slot)
         items = {it["id"]: it for it in fb.load(w["task"], config.BENCH_ROOT)}
         tin = sum(len(fg.render(slot, items[x["id"]], x)) for x in w["items"]) // CHARS_A_TOKEN
@@ -262,13 +282,15 @@ def estimate() -> dict:
         else:
             e["usd"] += usd
             e["usd_max"] += most
-        again = (sf.read_grades(sf.task_dir(Path(config.OUT_DIR) / w["row"], w["task"]))
-                 .get("regrade") or {})
         rows.append({"slot": slot, "task": w["task"], "label": fb.BENCH[w["task"]]["label"],
                      "model": w["model"], "answers": len(w["items"]),
                      "usd": None if usd is None else round(usd, 4),
-                     # 17f: graded again whole by the grader chosen now, said
-                     **({"regrade": again["why"]} if again else {})})
+                     # 17f: graded again whole by the grader chosen now, said.
+                     # 17g: as Start would do it; and the grades it gave before
+                     **({"regrade": w["why"]} if w.get("switch") in ("regrade", "match")
+                        else {}),
+                     **({"switch": w["switch"], "reused": w.get("reused") or 0}
+                        if w.get("switch") else {})})
     for e in per.values():
         e["usd"], e["usd_max"] = round(e["usd"], 4), round(e["usd_max"], 4)
     total = round(sum(e["usd"] for e in per.values()), 4)
@@ -380,7 +402,10 @@ def _start(by: str) -> dict:
             else "")
         if why:
             moved.append((p, why))
-    work = waiting()
+    # 17g: what waits as Start leaves it — the grader chosen now taking over
+    # (its own grades back, a whole regrade, a top-up) — decided before
+    # anything changes, done once the stop is lifted
+    work = [w for w in waiting(view=True) if w["items"]]
     pins = {}
     for slot in sorted({w["slot"] for w in work} | {p["slot"] for p, _ in moved}):
         pins[slot] = _pinned(slot, by)
@@ -388,8 +413,11 @@ def _start(by: str) -> dict:
         if drift:
             raise ValueError(f"{fg.GRADERS[slot]['label']}: {drift}")
     (gdir() / "stopped.json").unlink(missing_ok=True)
-    for slot, pin in pins.items():
-        _reset_tries(slot, pin)
+    for slot in fg.GRADERS:
+        pin = pins.get(slot) or chosen(slot)
+        if pin:
+            _reset_tries(slot, pin)
+    work = [w for w in waiting() if w["slot"] in pins]
     # 17c: a batch out whose grader moved (OpenRouter repointed its id, or
     # another was chosen since) sends nothing more: its unsent requests are
     # cancelled, and go to the grader pinned now, with what waits. 17d: those
@@ -511,13 +539,9 @@ def _reset_tries(slot: str, pin: dict) -> None:
     for d in sorted(root.glob(f"*/{task}_0shot/{sf.SUB}")) if root.is_dir() else []:
         with grades_lock(d):
             g = sf.read_grades(d)
-            changed = _regrade(g, version, sha)
-            ref = g.get("refused") or {}
-            for x in ref.values():
-                if int(x.get("tries") or 0) and (x.get("by"), x.get("prompt_sha256")) != (
-                        version, sha):
-                    x["tries"] = 0
-                    changed = True
+            was = json.dumps(g, sort_keys=True)
+            _switch(g, version, sha)
+            changed = json.dumps(g, sort_keys=True) != was
             if changed:
                 _write_grades(d, g)
         if not changed:
@@ -547,16 +571,83 @@ def _regrade(g: dict, version: str, sha: str) -> bool:
     seen = sum(1 for x in items.values() if who(x) != mine) + ungraded
     if not ungraded or ungraded <= sf.UNGRADED_SHARE * seen:
         return False
-    g.setdefault("aside", []).append({
-        "at": time.time(), "for": {"by": version, "prompt_sha256": sha},
-        "why": f"its grader left {ungraded:,} of {seen:,} without a grade",
-        "items": {k: x for k, x in items.items() if who(x) != mine},
-        "refused": {k: x for k, x in ref.items() if who(x) != mine}})
-    g["items"] = {k: x for k, x in items.items() if who(x) == mine}
-    g["refused"] = {k: x for k, x in ref.items() if who(x) == mine}
+    _stash(g, mine)                             # 17g: each under its own name
     g["regrade"] = {"by": version, "prompt_sha256": sha, "at": time.time(),
                     "why": f"the first grader left {ungraded:,} of {seen:,} without a grade"}
     return True
+
+
+def _key(who: tuple) -> str:
+    """a grader's name in grades.json: its version and its prompt's sha256"""
+    return f"{who[0]} · {who[1]}"
+
+
+def _who(x: dict) -> tuple:
+    return (x.get("by"), x.get("prompt_sha256"))
+
+
+def _migrate(g: dict) -> None:
+    """17f's `aside` (a list, which nothing read) into `kept`, each grade
+    under its grader's name"""
+    for e in g.pop("aside", None) or []:
+        for part in ("items", "refused"):
+            for k, x in (e.get(part) or {}).items():
+                (g.setdefault("kept", {}).setdefault(_key(_who(x)), {})
+                 .setdefault(part, {}).setdefault(k, x))
+
+
+def _stash(g: dict, mine: tuple) -> None:
+    """17g: every grade and no-grade not by `mine` into `kept`, under its own
+    grader's name — never mixed in, and back when that grader is chosen"""
+    for part in ("items", "refused"):
+        keep = {}
+        for k, x in (g.get(part) or {}).items():
+            if _who(x) == mine:
+                keep[k] = x
+            else:
+                g.setdefault("kept", {}).setdefault(_key(_who(x)), {}).setdefault(part, {})[k] = x
+        g[part] = keep
+
+
+def _switch(g: dict, version: str, sha: str) -> tuple[str, int]:
+    """17g: the grader chosen now takes over a benchmark's grades, at Start
+    (and in the dry run, on a copy) — ('', 0), or what it did and how many of
+    its own grades came back:
+    - 'match': a regrade asked for, so that the rows compared are graded by
+      one grader (`regrade_to`) — every other grader's set aside by name;
+    - 'kept': it graded this benchmark before — what it graded comes back,
+      the grades here now kept under their own grader's name;
+    - 'regrade': 17f's — the one here left more than UNGRADED_SHARE ungraded.
+    Otherwise a top-up: the others' no-grades asked again (17d)"""
+    mine = (version, sha)
+    _migrate(g)
+    kept = g.get("kept") or {}
+    back = kept.get(_key(mine)) or {}
+    active = [x for part in ("items", "refused") for x in (g.get(part) or {}).values()]
+    how = ""
+    ask = g.get("regrade_to") or {}
+    if ask and (ask.get("by"), ask.get("prompt_sha256")) == mine:
+        _stash(g, mine)
+        g.pop("regrade_to", None)
+        g["regrade"] = {"by": version, "prompt_sha256": sha, "at": time.time(),
+                        "why": ask.get("why") or "asked so the rows compared share a grader"}
+        how = "match"
+    elif back and not any(_who(x) == mine for x in active):
+        _stash(g, mine)
+        how = "kept"
+    elif _regrade(g, version, sha):
+        how = "regrade"
+    reused = 0
+    if back and how in ("kept", "match"):
+        for part in ("items", "refused"):
+            g.setdefault(part, {}).update(back.get(part) or {})
+        reused = len(back.get("items") or {})
+        kept.pop(_key(mine), None)
+    # 17d: another grader's no-grades asked again, from none
+    for x in (g.get("refused") or {}).values():
+        if int(x.get("tries") or 0) and _who(x) != mine:
+            x["tries"] = 0
+    return how, reused
 
 
 def _cancel_unsent(p: dict, why: str) -> list[str]:
@@ -860,6 +951,94 @@ def refusals() -> list[dict]:
     return out
 
 
+def _score_grader(d: Path) -> dict:
+    """the grader a benchmark's written score names, {} when none"""
+    for f in sorted(d.glob("results_*.json")):
+        try:
+            return (json.loads(f.read_text(encoding="utf-8")).get("frontier") or {}) \
+                .get("grader") or {}
+        except (OSError, ValueError):
+            continue
+    return {}
+
+
+def _cost(slot: str, g: dict, task: str, todo: list[dict]) -> float | None:
+    """what sending `todo` to grader `g` costs, as the dry run prices it"""
+    pin, pout = _price(g)
+    if pin is None or pout is None:
+        return None
+    items = {it["id"]: it for it in fb.load(task, config.BENCH_ROOT)}
+    a = fg.ask(slot, reasons(g), structured(g))
+    tin = sum(len(fg.render(slot, items[x["id"]], x)) for x in todo
+              if x["id"] in items) // CHARS_A_TOKEN
+    return round((tin * pin + len(todo) * a["out_tokens"] * pout) / 1e6, 4)
+
+
+def mismatches() -> list[dict]:
+    """17g: a benchmark whose rows are scored by different graders, each
+    final on its own row — said on every one of them, and each row the grader
+    chosen now didn't grade offered its regrade by that grader, with its
+    price: [{slot, task, label, grader, rows: [{row, model, version, offer,
+    asked}]}]"""
+    out = []
+    root = Path(config.OUT_DIR)
+    fb.set_root(config.BENCH_ROOT)
+    for slot, gdef in fg.GRADERS.items():
+        t = gdef["task"]
+        rows = []
+        for d in sorted(root.glob(f"*/{t}_0shot/{sf.SUB}")) if root.is_dir() else []:
+            gr = _score_grader(d)
+            if gr.get("version"):
+                row = d.parent.parent
+                rows.append({"row": row.name, "model": _model_of(row)[0], "d": d,
+                             "version": gr["version"], "prompt_sha256": gr.get("prompt_sha256"),
+                             "asked": bool(sf.read_grades(d).get("regrade_to"))})
+        if len({(r["version"], r["prompt_sha256"]) for r in rows}) < 2:
+            continue
+        now = chosen(slot)
+        mine = (now.get("version") or now.get("id"), fg.prompt_sha(slot)) if now else None
+        for r in rows:
+            d = r.pop("d")
+            if mine and (r["version"], r["prompt_sha256"]) != mine:
+                seen = copy.deepcopy(sf.read_grades(d))
+                seen["regrade_to"] = {"by": mine[0], "prompt_sha256": mine[1]}
+                _switch(seen, *mine)
+                todo = sf.to_grade(d.parent.parent, t, grades=seen)
+                r["offer"] = {"answers": len(todo), "usd": _cost(slot, now, t, todo),
+                              "to": now.get("version") or now.get("id")}
+        out.append({"slot": slot, "task": t, "label": fb.BENCH[t]["label"],
+                    "grader": (now or {}).get("version") or (now or {}).get("id"), "rows": rows})
+    return out
+
+
+def regrade_row(row_name: str, task: str, by: str, undo: bool = False) -> dict:
+    """17g: a row graded again whole by the grader chosen now, at the next
+    Start — so that the rows compared share one grader. Nothing is sent now;
+    the dry run shows it, with its price"""
+    slot = next((s for s, g in fg.GRADERS.items() if g["task"] == task), None)
+    if slot is None:
+        raise ValueError(f"{task} has no grader")
+    if not row_name or "/" in row_name or row_name.startswith("."):
+        raise ValueError(f"{row_name!r} isn't a row")
+    d = sf.task_dir(Path(config.OUT_DIR) / row_name, task)
+    if not d.is_dir():
+        raise ValueError(f"{row_name} has no {fb.BENCH[task]['label']} answers")
+    now = chosen(slot)
+    if not now and not undo:
+        raise ValueError(f"no grader is chosen for {fb.BENCH[task]['label']}")
+    with grades_lock(d):
+        g = sf.read_grades(d)
+        if undo:
+            g.pop("regrade_to", None)
+        else:
+            name = now.get("version") or now.get("id")
+            g["regrade_to"] = {"by": name, "prompt_sha256": fg.prompt_sha(slot), "who": by,
+                               "at": time.time(),
+                               "why": f"asked by {by}, so that the rows compared share {name}"}
+        _write_grades(d, g)
+    return {"asked": not undo}
+
+
 def status() -> dict:
     """the AI models page's card: the graders, the dry run, the run"""
     est = estimate()
@@ -883,4 +1062,6 @@ def status() -> dict:
             "tries": GRADE_TRIES,
             "last": last_failed(),
             "probe_words": PROBE_WORDS,
-            "has_key": ai_models.has_key()}
+            "has_key": ai_models.has_key(),
+            # 17g: rows of one benchmark scored by different graders
+            "mismatches": mismatches()}

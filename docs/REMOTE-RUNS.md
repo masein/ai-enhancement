@@ -749,6 +749,18 @@ empty, cut at its cap or not a grade is listed under the card, with a batch
 that failed and why, and the next Start asks it again. A score from two
 graders or prompts names both and isn't final: choose one and grade again.
 
+Choosing another grader moves nothing: the dry run shows what Start would do
+with it, and Start does it. Each grader's grades are kept under its own name
+— choosing one that graded a benchmark before uses what it graded, and the
+dry run says how many. A run of refusals anywhere in a Start (five of the same
+with no reply between them, whatever else sits between) stops it and counts
+nothing against the answers; a key's spend cap, the account's credit and a
+provider's own failure are never a try. When a benchmark's rows end up
+scored by different graders (one build's first grader left too many
+ungraded, the other's didn't), both rows say so, and the card offers the
+other row's regrade by the grader chosen now, with its price, sent at the
+next Start.
+
 ## G5. The full run: which box runs what
 
 From the pilot's paces (one 5090, the phone build, 8 slots; ARC-AGI-2 at 5),

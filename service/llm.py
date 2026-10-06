@@ -1061,7 +1061,7 @@ class LocalOpenAI(Backend):
 
     def _halt(self, batch_id: str, rec: dict, n: int, first: bool = False) -> None:
         said = plain_error(rec.get("error", ""), rec.get("status"))
-        why = (f"waiting: the first {n} requests were all refused — {said}. Nothing was counted "
+        why = (f"waiting: {n} requests in a row were all refused — {said}. Nothing was counted "
                "against the answers: change what it refuses (the model, its provider), then "
                "Start again" if first else
                f"waiting: OpenRouter refused {n} requests in a row — {said}. It tries again in "
@@ -1139,8 +1139,12 @@ class LocalOpenAI(Backend):
             streak: dict = {"key": None, "held": [], "halted": False}
             # 17f: the first FIRST_REFUSALS replies all the same refusal (a
             # model id the provider doesn't know, a region it blocks): the
-            # batch stops and says it, nothing written against the answers
-            first: dict = {"key": None, "held": [], "over": not self.FIRST_REFUSALS}
+            # batch stops and says it, nothing written against the answers.
+            # 17g: anywhere in a Start, not only its first replies — a run of
+            # FIRST_REFUSALS of the same refusal with no reply between them,
+            # whatever else that isn't a reply (a timeout, another error) sits
+            # between; a reply ends the run, and what it held is written
+            first: dict = {"held": [], "n": {}}
 
             def put(rec: dict) -> None:
                 with open(out, "a", encoding="utf-8") as fh:
@@ -1176,22 +1180,22 @@ class LocalOpenAI(Backend):
                         # retries — pauses; one refused for its own content is
                         # recorded as failed and the batch goes on
                         kind = refusal_kind(rec) if rec.get("error") else ""
-                        if not first["over"]:
-                            k = (rec.get("status"), kind) if rec.get("error") else None
-                            if k is not None and first["key"] in (None, k):
-                                if streak["halted"]:
-                                    continue
-                                first["key"] = k
+                        if self.FIRST_REFUSALS and not (self.HALT_AFTER
+                                                        and kind in self.HALT_KINDS):
+                            if streak["halted"]:
+                                continue            # asked again when it takes up again
+                            if rec.get("error"):
+                                k = (rec.get("status"), kind)
                                 first["held"].append(rec)
-                                if len(first["held"]) >= self.FIRST_REFUSALS:
-                                    self._halt(batch_id, rec, len(first["held"]), first=True)
-                                    first["held"] = []
+                                first["n"][k] = first["n"].get(k, 0) + 1
+                                if first["n"][k] >= self.FIRST_REFUSALS:
+                                    self._halt(batch_id, rec, first["n"][k], first=True)
+                                    first["held"], first["n"] = [], {}
                                     streak["halted"] = True
                                 continue
-                            first["over"] = True
                             for r in first["held"]:
                                 put(r)
-                            first["held"] = []
+                            first["held"], first["n"] = [], {}
                         if self.HALT_AFTER and kind in self.HALT_KINDS:
                             if streak["halted"]:
                                 continue            # asked again when it takes up again

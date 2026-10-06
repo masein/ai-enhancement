@@ -507,3 +507,215 @@ def test_10_one_changed_answer_in_a_remade_shard_keeps_both_shards_grades(box): 
         config.OUT_DIR.with_name("shards") / ROW / TASK / "2-of-2" / sf.ANSWERS)}
     assert s2 and s2 <= set(now["items"])
     assert all(g["items"][k] == x for k, x in now["items"].items())
+
+
+# ---------------------------------------------------------------------------
+# part 3: grading (the stand-in grader of tests/test_17_grading.py; nothing
+# calls OpenRouter)
+# ---------------------------------------------------------------------------
+
+from service import ai_models, db, llm  # noqa: E402
+from service import frontier_grade as fgr  # noqa: E402
+from test_17_grading import ROW as GROW  # noqa: E402
+from test_17_grading import drain, write  # noqa: E402
+from test_17_grading import svc as gsvc  # noqa: E402,F401 — the grading fixture
+from test_17b_grading import GEMINI, GPT, O3, plain, stub  # noqa: E402
+
+GPT_V, GEMINI_V, O3_V = ("openai/gpt-4.1-2025-04-14", "google/gemini-2.5-flash-20250617",
+                         "openai/o3-mini-2025-01-31")
+SQA = "simpleqa_epoch"
+
+
+def gd(row: str = GROW) -> Path:
+    return sf.task_dir(config.OUT_DIR / row, SQA)
+
+
+def replies(monkeypatch, answer) -> list:
+    """the grader's replies as OpenRouter's requests keep them: answer(model,
+    custom_id) -> (text, error, status) — a refusal with its status and kind"""
+    asked = []
+
+    def complete(self, row):
+        asked.append((self.model, row["custom_id"]))
+        text, error, status = answer(self.model, row["custom_id"])
+        rec = {"custom_id": row["custom_id"], "text": text, "error": error, "attempts": 1,
+               "finish_reason": "stop" if text else ""}
+        if error:
+            rec.update(status=status, kind=ai_models.refusal(status, error)[0])
+        return rec
+    monkeypatch.setattr(fgr.GraderChat, "_complete", complete)
+    return asked
+
+
+def test_11_a_run_of_refusals_after_a_timeout_stops_and_counts_nothing(gsvc, monkeypatch):  # noqa: F811
+    monkeypatch.setattr(config, "OPENROUTER_CONCURRENCY", 1)         # in order
+    monkeypatch.setattr(fgr.GraderChat, "FIRST_REFUSALS", 3)
+    # graded yesterday: one answer, by this grader and prompt
+    fgr.save("simpleqa", GPT, "masein")
+    a0 = sf.read_answers(gd() / sf.ANSWERS)[("0", 0)]["answer"]
+    (gd() / sf.GRADES).write_text(json.dumps({"items": {"0#0": {
+        "ok": True, "by": GPT_V, "prompt_sha256": fgr.fg.prompt_sha("simpleqa"),
+        "answer_sha256": sf.answer_sha(a0)}}, "refused": {}}))
+    # today: the first reply a timeout, the rest "not a valid model ID"
+    replies(monkeypatch, lambda m, c: (("", "POST u: no response within 120 s", None)
+                                       if c.endswith(":1#0") else
+                                       ("", 'POST u: HTTP 400: {"error": {"message": "openai/'
+                                        'gpt-4.1 is not a valid model ID"}}', 400))
+            if m == GPT else ("No", "", None))
+    fgr.start("masein")
+    from test_17f_review import wait_halted
+    why = wait_halted()
+    assert why.startswith("waiting: 3 requests in a row were all refused"), why
+    # 308fcf3: the timeout ended "the first five", and each 400 took a try
+    ref = sf.read_grades(gd()).get("refused") or {}
+    assert not any(int(x.get("tries") or 0) for x in ref.values()), ref
+
+
+def test_11_a_spend_cap_or_a_providers_failure_is_never_a_try():
+    cap = 'POST u: HTTP 403: {"error": {"message": "Key spend cap reached"}}'
+    prov = 'POST u: HTTP 400: {"error": {"message": "Provider returned error"}}'
+    assert ai_models.refusal(403, cap)[0] == "limit"
+    assert ai_models.refusal(400, prov)[0] == "down"
+    for e, st in ((cap, 403), (prov, 400)):
+        assert not fgr._permanent(llm.Result(error=e, status=st))
+        assert not fgr._permanent(e)
+    # a refusal of the answer itself still is
+    assert fgr._permanent(llm.Result(error="HTTP 400: prompt too long", status=400))
+
+
+def ungraded_by(monkeypatch, model: str, key: str = ":2#0"):
+    """`model` gives no grade to one answer (three Starts), every other a grade"""
+    stub(monkeypatch, lambda m, r: ("I would rather not say", "stop", "")
+         if m == model and r["custom_id"].endswith(key) else plain(m, r))
+    for _ in range(3):
+        fgr.start("masein")
+        drain()
+
+
+def sqa_row(est: dict) -> dict | None:
+    return next((r for r in est["rows"] if r["slot"] == "simpleqa"), None)
+
+
+def test_12_choosing_a_grader_moves_nothing_and_choosing_the_first_again_uses_its_grades(
+        gsvc, monkeypatch):  # noqa: F811
+    fgr.save("simpleqa", GPT, "masein")
+    ungraded_by(monkeypatch, GPT)                    # 1 of 5 ungraded: more than 5%
+    before = (gd() / sf.GRADES).read_bytes()
+    fgr.save("simpleqa", GEMINI, "masein")
+    assert (gd() / sf.GRADES).read_bytes() == before            # 308fcf3: moved aside
+    row = sqa_row(fgr.estimate())
+    assert row["answers"] == 5 and "the first grader left 1 of 5" in row["regrade"]
+    # the first again: what it graded is used, nothing priced again
+    fgr.save("simpleqa", GPT, "masein")
+    assert (gd() / sf.GRADES).read_bytes() == before
+    row = sqa_row(fgr.estimate())
+    assert row is None or row["answers"] == 0                   # 308fcf3: 5, priced again
+
+
+def test_12_each_graders_grades_kept_by_name_and_a_third_grades_once(gsvc, monkeypatch):  # noqa: F811
+    fgr.save("simpleqa", GPT, "masein")
+    ungraded_by(monkeypatch, GPT)
+    fgr.save("simpleqa", GEMINI, "masein")
+    ungraded_by(monkeypatch, GEMINI, ":3#0")       # the second, whole — and one ungraded
+    g = sf.read_grades(gd())
+    assert {x["by"] for x in g["items"].values()} == {GEMINI_V}
+    assert {x["by"] for v in g["kept"].values() for x in v["items"].values()} == {GPT_V}
+    # the first chosen again: its own 4 grades back, nothing sent
+    fgr.save("simpleqa", GPT, "masein")
+    row = sqa_row(fgr.estimate())
+    assert row["answers"] == 0 and row["reused"] == 4
+    asked = stub(monkeypatch, plain)
+    fgr.start("masein")
+    drain()
+    assert not [c for m, c in asked if "algebra/" not in c]
+    g = sf.read_grades(gd())
+    assert {x["by"] for x in g["items"].values()} == {GPT_V}
+    assert {x["by"] for v in g["kept"].values() for x in v["items"].values()} == {GEMINI_V}
+    # a third: the five answers once each (17f's 98 requests for 30 answers)
+    fgr.save("simpleqa", O3, "masein")
+    assert sqa_row(fgr.estimate())["answers"] == 5
+    asked = stub(monkeypatch, plain)
+    fgr.start("masein")
+    drain()
+    assert len([c for m, c in asked if m == O3 and "algebra/" not in c]) == 5
+
+
+ROW2, SERVED2 = "served__orig-box", "served/orig-box"
+
+
+def two_rows():
+    db.served_put({"id": SERVED2, "name": "orig box", "base_url": "", "key": "", "how": "x",
+                   "based_on": "Qwen/Qwen3.6-35B-A3B", "thinking": "auto",
+                   "pin": {"file": "o.gguf"}, "by": "masein", "at": 0})
+    row = config.OUT_DIR / ROW2
+    row.mkdir(parents=True)
+    (row / "model_meta.json").write_text(json.dumps({"model": SERVED2}))
+    write(row, SQA, [(str(k), f"I think Answer {k}.", "stop" if k < 5 else "length")
+                     for k in range(6)])
+
+
+def graded_by(row: str) -> str:
+    """the grader the row's written score names"""
+    fs = list(gd(row).glob("results_*.json"))
+    return ((json.loads(fs[0].read_text())["frontier"].get("grader") or {}).get("version")
+            if fs else "")
+
+
+def test_13_two_rows_scored_by_two_graders_say_so_and_offer_the_regrade(gsvc, monkeypatch):  # noqa: F811
+    import report_lm_eval as report
+    two_rows()
+    fgr.save("simpleqa", GPT, "masein")
+    # the first grader gives no grade to one answer of the first row only
+    stub(monkeypatch, lambda m, r: ("I would rather not say", "stop", "")
+         if m == GPT and r["custom_id"].endswith(":2#0")
+         and fgr._meta(r["batch_id"])["row"] == GROW else plain(m, r))
+    for _ in range(3):
+        fgr.start("masein")
+        drain()
+    fgr.save("simpleqa", GEMINI, "masein")
+    stub(monkeypatch, plain)
+    fgr.start("masein")
+    drain()
+    graders = {r: graded_by(r) for r in (GROW, ROW2)}
+    assert graders == {GROW: GEMINI_V, ROW2: GPT_V}, graders      # each final on its row
+    # said on both rows' cells (308fcf3: nothing), and on the card with the offer
+    payload = report.build_payload(report.merge_runs(report.load_results(config.OUT_DIR)), "t",
+                                   source="")
+    cells = payload["cells"][SQA]
+    said = {m: c.get("graderDiffers") or "" for m, c in cells.items()}
+    assert len(said) == 2 and all("one benchmark, two graders" in w for w in said.values()), said
+    mm = fgr.mismatches()
+    assert [m["task"] for m in mm] == [SQA]
+    offer = {r["row"]: r.get("offer") for r in mm[0]["rows"]}
+    assert offer[GROW] is None and offer[ROW2]["answers"] == 5 and offer[ROW2]["usd"] > 0
+    # the offer taken: graded again by the grader chosen now at Start, priced first
+    fgr.regrade_row(ROW2, SQA, "masein")
+    row = next(r for r in fgr.estimate()["rows"] if r["model"] == SERVED2)
+    assert row["answers"] == 5 and "so that the rows compared share" in row["regrade"]
+    fgr.start("masein")
+    drain()
+    assert graded_by(ROW2) == GEMINI_V
+    assert not fgr.mismatches()
+
+
+# ---------------------------------------------------------------------------
+# 14: HLE's three reply shapes
+# ---------------------------------------------------------------------------
+
+def test_14_hles_three_shapes_are_read():
+    import frontier_graders as fgs
+    o = {"extracted_final_answer": "42", "reasoning": "matches", "correct": "yes",
+         "confidence": 90}
+    ex = {"extracted_final_answer": "<the final answer>", "reasoning": "<why>",
+          "correct": "yes or no", "confidence": "0-100"}
+    item = {"id": "h1", "answer": "42"}
+    two = json.dumps(o) + "\n" + json.dumps(o)
+    example = "Use this format:\n" + json.dumps(ex) + "\nMine:\n" + json.dumps({**o, "correct": "no"})
+    line = json.dumps(o) + "\nCorrect: yes — the extracted answer is the key's"
+    assert fgs.read("hle", two, item)["ok"] is True                    # 308fcf3: no grade
+    assert fgs.read("hle", example, item)["ok"] is False
+    assert fgs.read("hle", line, item)["ok"] is True
+    # objects or lines that say otherwise stay no grade
+    assert fgs.read("hle", json.dumps(o) + "\nCorrect: no", item)["ok"] is None
+    assert fgs.read("hle", json.dumps(o) + "\n" + json.dumps({**o, "correct": "no"}),
+                    item)["ok"] is None

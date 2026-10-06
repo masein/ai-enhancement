@@ -401,7 +401,8 @@ def test_8_a_new_grader_after_more_than_5_percent_grades_it_all_and_is_final(gsv
     assert f["grader"]["version"] == GEMINI_V and not f["grader"].get("topup")
     g = grades_of("simpleqa_epoch")
     assert {x["by"] for x in g["items"].values()} == {GEMINI_V}
-    assert len(g["aside"]) == 1 and {x["by"] for x in g["aside"][0]["items"].values()} == {GPT_V}
+    # 17g: the first's kept under its own name
+    assert [{x["by"] for x in v["items"].values()} for v in g["kept"].values()] == [{GPT_V}]
 
 
 def wait_halted(timeout: float = 15.0) -> str:
@@ -423,7 +424,7 @@ def test_9_a_refusal_of_every_answer_stops_and_counts_nothing(gsvc, monkeypatch)
          if m == GPT and "algebra/" not in r["custom_id"] else plain(m, r))
     fgr.start("masein")
     why = wait_halted()
-    assert why.startswith("waiting: the first 5 requests were all refused") and \
+    assert why.startswith("waiting: 5 requests in a row were all refused") and \
         "Nothing was counted against the answers" in why
     # b366baf: each Start burned a try on every answer, three Starts and ungraded
     assert not any(int(x.get("tries") or 0) for x in

@@ -2128,6 +2128,28 @@ def frontier_grading_start(a: MmpByIn, x_token: str = Header(default="")):
     return {**sent, "page": _frontier_grading_page()}
 
 
+class FrontierRegradeIn(BaseModel):
+    row: str
+    task: str
+    by: str
+    undo: bool = False
+
+
+@app.post("/api/frontier/grading/regrade")
+def frontier_grading_regrade(a: FrontierRegradeIn, x_token: str = Header(default="")):
+    """17g: a row graded again whole by the grader chosen now, at the next
+    Start, so the rows compared share one grader — nothing is sent now"""
+    from . import frontier_grade
+    _check_token(x_token)
+    _name(a.by, "asking for a regrade")
+    try:
+        got = frontier_grade.regrade_row(a.row.strip(), a.task.strip(), a.by.strip()[:80],
+                                         undo=a.undo)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    return {**got, "page": _frontier_grading_page()}
+
+
 @app.post("/api/frontier/grading/stop")
 def frontier_grading_stop(a: MmpByIn, x_token: str = Header(default="")):
     from . import frontier_grade

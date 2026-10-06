@@ -189,19 +189,41 @@ def _json_objects(text: str) -> list[tuple[int, int, dict]]:
             i += 1
 
 
-def _json_fields(text: str) -> dict | None:
-    """the reply's JSON object, when it holds exactly one and no verdict line
-    stands outside it — 17e: never an object quoted in a reply whose own
-    verdict is a line; 17f: wherever it sits (a sentence before or after it, a
-    code fence around it)"""
-    objs = _json_objects(text)
-    if len(objs) != 1:
-        return None
-    a, b, got = objs[0]
-    outside = text[:a] + text[b:]
-    if re.search(r"(?im)^[\s*_`\"'#>-]*correct[\s*_`\"'#>-]*:", outside):
-        return None
-    return got
+# 17g: a template's value, not a grade's — an example object the judge wrote
+# before its own ("<the answer>", "...", "yes or no", "0-100")
+_PLACEHOLDER = re.compile(r"(?is)^\s*(?:\.{2,}|…|<[^<>]*>|\[[^\[\]]*\]|string|integer|number|"
+                          r"(?:yes|true)\s*(?:/|\||or)\s*(?:no|false)|(?:no|false)\s*(?:/|\||or)\s*"
+                          r"(?:yes|true)|\d+\s*(?:-|–|to)\s*\d+\s*%?)\s*$")
+
+
+def _hle_object(text: str) -> tuple[str, dict | None]:
+    """17g: the reply's verdict object — ("grade", it), ("conflict", None)
+    when two say otherwise, or ("none", None). Objects quoted the same twice
+    are one; an example object (a template's values) is none; a "correct:"
+    line outside them that says the same is no conflict — one that says
+    otherwise is, unless every object is quoted inside a line (17e: the line
+    is then the verdict)"""
+    objs = [(a, b, o) for a, b, o in _json_objects(text) if "correct" in o]
+    real = [(a, b, o) for a, b, o in objs
+            if _yes_no(o.get("correct")) is not None
+            and not any(isinstance(v, str) and _PLACEHOLDER.match(v) for v in o.values())]
+    if not real:
+        return "none", None
+    import json
+    distinct = list({json.dumps(o, sort_keys=True): o for _, _, o in real}.values())
+    verdicts = {_yes_no(o["correct"]) for o in distinct}
+    alone = [a for a, _, _ in real
+             if not re.sub(r"[\s`*_>#-]|json", "", text[text.rfind("\n", 0, a) + 1:a])]
+    outside, k = "", 0
+    for a, b, _ in sorted(objs):
+        outside += text[k:a] + "\n"
+        k = max(k, b)
+    outside += text[k:]
+    w = r"[\s*_`\"'#>-]*"
+    said = {m.group(1).lower() for m in re.finditer(rf"(?im)^{w}correct{w}:{w}(yes|no)\b", outside)}
+    if len(verdicts) == 1 and said <= verdicts:
+        return "grade", distinct[-1]
+    return ("conflict", None) if alone else ("none", None)
 
 
 def _yes_no(v) -> str | None:
@@ -262,8 +284,13 @@ def read(slot: str, text: str, item: dict) -> dict:
         # alone; never a "correct: no" inside the judge's reasoning, and a
         # carriage return isn't part of the value
         t = text.replace("\r", "")
-        fields = _json_fields(t)
-        if fields is not None and _yes_no(fields.get("correct")) is not None:
+        # 17g: two identical objects, an example before the real one, and an
+        # object with a "Correct:" line after it are read; objects that say
+        # otherwise are no grade
+        how, fields = _hle_object(t)
+        if how == "conflict":
+            return unread(text, shown)
+        if fields is not None:
             ok = _yes_no(fields["correct"]) == "yes"
             ext = str(fields.get("extracted_final_answer") or "").strip()
             conf = re.fullmatch(r"\s*(\d{1,3})\s*%?\s*", str(fields.get("confidence", "")))
