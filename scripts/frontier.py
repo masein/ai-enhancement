@@ -746,25 +746,48 @@ def parity_items(root: Path) -> list[dict]:
 
 
 def parity_compare(server: list[dict], box: list[dict]) -> dict:
-    """the two sides' answers to the parity questions, compared: {n, same
-    (the same letter read), identical (the same reply), right_server,
-    right_box, missing, ok, words}"""
-    a = {r["id"]: r for r in server}
-    b = {r["id"]: r for r in box}
+    """the two sides' answers to the parity questions, compared: {n, both (a
+    letter read on both sides), same (the same letter), identical (the same
+    reply), read_server, read_box, right_server, right_box, missing,
+    problems, ok, words}. 17c: a question counts only when both sides read a
+    letter from it — two empty replies aren't the same answer — and each
+    side's file holds each question once"""
+    problems = []
+    for side, rows in (("the server's", server), ("the box's", box)):
+        ids = [str(r.get("id")) for r in rows]
+        twice = sorted({i for i in ids if ids.count(i) > 1})
+        if twice:
+            problems.append(f"{side} file holds question{'s' if len(twice) > 1 else ''} "
+                            f"{', '.join(twice[:5])} more than once")
+    a = {str(r["id"]): r for r in server}
+    b = {str(r["id"]): r for r in box}
+    letter_a = {i: read_mmlu_pro(r.get("answer") or "") for i, r in a.items()}
+    letter_b = {i: read_mmlu_pro(r.get("answer") or "") for i, r in b.items()}
     ids = sorted(set(a) & set(b))
     missing = sorted(set(a) ^ set(b))
-    same = sum(1 for i in ids if read_mmlu_pro(a[i]["answer"]) == read_mmlu_pro(b[i]["answer"]))
-    identical = sum(1 for i in ids if visible(a[i]["answer"]) == visible(b[i]["answer"]))
-    right = [sum(1 for i in ids if read_mmlu_pro(x[i]["answer"]) == x[i]["key"]) for x in (a, b)]
-    need = PARITY["same_at_least"]
-    ok = not missing and len(ids) == PARITY["n"] and same >= need
-    words = (f"{same} of {len(ids)} read as the same letter (the check asks {need} of "
-             f"{PARITY['n']}) · {identical} identical replies · right: the server {right[0]}, "
-             f"the box {right[1]}" + (f" · {len(missing)} answered on one side only"
-                                      if missing else ""))
-    return {"n": len(ids), "same": same, "identical": identical, "right_server": right[0],
-            "right_box": right[1], "missing": missing, "ok": ok,
-            "words": ("The same: " if ok else "Not the same: ") + words}
+    both = [i for i in ids if letter_a[i] and letter_b[i]]
+    same = sum(1 for i in both if letter_a[i] == letter_b[i])
+    identical = sum(1 for i in both if visible(a[i]["answer"]) == visible(b[i]["answer"]))
+    read = [sum(1 for v in x.values() if v) for x in (letter_a, letter_b)]
+    right = [sum(1 for i in ids if lt[i] and lt[i] == x[i].get("key"))
+             for x, lt in ((a, letter_a), (b, letter_b))]
+    need, n = PARITY["same_at_least"], PARITY["n"]
+    if min(read) < need:
+        problems.append(f"a letter was read from {read[0]} of the server's answers and "
+                        f"{read[1]} of the box's: each side needs {need} of {n}")
+    if len(ids) != n:
+        problems.append(f"{len(ids)} questions answered on both sides, not {n}")
+    if missing:
+        problems.append(f"{len(missing)} answered on one side only")
+    ok = not problems and same >= need
+    words = (f"{same} of the {len(both)} read on both sides as the same letter (the check asks "
+             f"{need} of {n}) · letters read: the server {read[0]}, the box {read[1]} · "
+             f"{identical} identical replies · right: the server {right[0]}, the box {right[1]}")
+    return {"n": len(ids), "both": len(both), "same": same, "identical": identical,
+            "read_server": read[0], "read_box": read[1], "right_server": right[0],
+            "right_box": right[1], "missing": missing, "problems": problems, "ok": ok,
+            "words": ("The same: " if ok else "Not the same: ")
+            + "; ".join([*problems, words] if problems else [words])}
 
 
 def group_of(task: str, item: dict) -> str:

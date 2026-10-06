@@ -240,10 +240,13 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
 # 17b: the parity check — the same questions on the server and on a box
 # ---------------------------------------------------------------------------
 
-def parity_ask(rec: dict, path: Path, progress=None) -> int:
+def parity_ask(rec: dict, path: Path, progress=None, identity: dict | None = None) -> int:
     """fb.PARITY's questions asked of `rec`, greedy and thinking off, as many at
     a time as it takes — each reply, its letter and the key, to `path`. Raises
-    served.ServerStopped when the server stops answering or fails on one"""
+    served.ServerStopped when the server stops answering or fails on one.
+    17c: the file's first line is `identity` — which side, which file, which
+    launch (scripts/frontier_parity.py) — so compare can refuse two sides
+    that differ"""
     fb.set_root(config.BENCH_ROOT)
     items = fb.parity_items(config.BENCH_ROOT)
     task = fb.PARITY["task"]
@@ -269,8 +272,9 @@ def parity_ask(rec: dict, path: Path, progress=None) -> int:
     with ThreadPoolExecutor(max_workers=served.concurrency(rec)) as pool:
         list(pool.map(one, items))
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    Path(path).write_text("".join(json.dumps(got[it["id"]], ensure_ascii=False) + "\n"
-                                  for it in items), encoding="utf-8")
+    Path(path).write_text(json.dumps({"parity_of": identity or {}}, ensure_ascii=False) + "\n"
+                          + "".join(json.dumps(got[it["id"]], ensure_ascii=False) + "\n"
+                                    for it in items), encoding="utf-8")
     return len(got)
 
 
