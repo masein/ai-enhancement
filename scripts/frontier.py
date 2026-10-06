@@ -353,6 +353,13 @@ def check_count(task: str, got, where: str) -> None:
     MMLU-Pro's 12,032, ARC-AGI-2's 120 tasks), or nothing is asked. 17c: on
     every load — a copy on disk from before the check is counted too"""
     n, want = _count(task, got), expected(task)
+    # 17d: a question twice in the file is never two questions
+    ids = [str(it.get("id")) for it in (got["items"] if isinstance(got, dict) else got)]
+    twice = sorted({i for i in ids if ids.count(i) > 1}) if len(set(ids)) != len(ids) else []
+    if twice:
+        raise ValueError(f"{BENCH[task]['label']}: question {', '.join(twice[:3])} is in the "
+                         f"questions that {where.split(' (')[0]} more than once — nothing is "
+                         "asked until each is there once")
     if want is not None and n != want:
         raise ValueError(f"{BENCH[task]['label']}: {n:,} questions {where}, and this board "
                          f"expects {want:,} — nothing is asked until they agree")
