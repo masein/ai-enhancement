@@ -4953,6 +4953,23 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17d.2 — the third review's part 2: before the imports (6 Oct)
+
+- **Bundles whose shards were set aside can be imported again**: their record
+  of import goes with them, and the import says which to import again once
+  the task's shards are run one way. They answered "imported already".
+- **Saving a served model's page keeps its file's sha256** while its server
+  serves the same file (name and size). The next import was refused, or
+  took another hash as the first.
+- **The counts that lower a score are on its cell**: "N the server never
+  answered, counted wrong" and "N its grader gave no grade, counted wrong".
+  A score with any ungraded answer isn't final and isn't ranked.
+- **G6 names the bundle its box writes** (`…-thinking-on-gpqa+otis.tar.gz`); the
+  docs test checks every import names one a box command there writes.
+- **`bundle.json`'s fields are type-checked** (`bundle_problems`), refused in
+  words where a wrong `row` or `model` gave a traceback.
+- Tests: `tests/test_17d_review.py` (part 2).
+
 ### 17d.1 — the third review's part 1: before the full run (6 Oct)
 
 The third review round re-ran the reproductions and a nine-box dry run on
