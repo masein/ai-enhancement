@@ -62,7 +62,8 @@ def test_the_frontier_benchmarks_thinking_on_are_what_is_queued(live, page, srv)
     assert "Humanity's Last Exam" in hle and "text-only questions" in hle and "graded" in hle
     assert "public set" in opts.locator("[data-frontier-task='arc_agi2_public']").inner_text()
     gpqa = opts.locator("[data-frontier-task='gpqa_diamond_epoch']").inner_text()
-    assert "4 runs (Epoch AI: 16) · thinking on 32,768 tokens, off 4,096" in gpqa
+    # 17f: the limits of 6 Oct
+    assert "4 runs (Epoch AI: 16) · thinking on 81,920 tokens, off 16,384" in gpqa
     assert "2 attempts (pass@2)" in opts.locator("[data-frontier-task='arc_agi2_public']").inner_text()
     opts.locator("[data-think-switch] input").check()
     opts.locator("[data-frontier-task='arc_agi2_public'] input").uncheck()

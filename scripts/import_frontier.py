@@ -656,13 +656,39 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
     staging = config.OUT_DIR.with_name("staging") / f"{row_name}-{stamp}" / row_name
     lines, ready, todo_shards, aside_shards = [], {}, {}, []
 
-    def stage(t: str, answers: dict, task_setup: bytes) -> None:
+    def stage(t: str, answers: dict, task_setup: bytes, keep: Path | None = None) -> None:
         d = sf.task_dir(staging, t)
         d.mkdir(parents=True, exist_ok=True)
         (d / sf.ANSWERS).write_text("".join(
             json.dumps(answers[k], ensure_ascii=False) + "\n" for k in sorted(answers)),
             encoding="utf-8")
         (d / sf.SETUP).write_bytes(task_setup)
+        # 17f: the grades of answers that didn't change go with them (each
+        # grade names the answer it graded: a changed one is graded again)
+        if keep is not None and (keep / sf.GRADES).exists():
+            shutil.copy2(keep / sf.GRADES, d / sf.GRADES)
+
+    def against(t: str, new: dict, where: Path, task_setup: bytes, what: str) -> str:
+        """17f: 'same', 'more' or 'other' — told by the answers, not the
+        tarball's bytes (a step's bundle made again is the same answers in a
+        new tarball), and said. Another setup is 'other', whatever the answers"""
+        have = sf.read_answers(where / sf.ANSWERS)
+        try:
+            old_setup = json.loads((where / sf.SETUP).read_text(encoding="utf-8"))
+            new_setup = json.loads(task_setup or b"{}")
+        except (OSError, ValueError):
+            old_setup = new_setup = {}
+        other = [k for k in sf.setup_differs(old_setup, new_setup) if k != "shard"]
+        how = "other" if other else compare_answers(have, new)
+        if how == "same":
+            lines.append(f"{t}: the same {len(new):,} answers as {what} — nothing changed, its "
+                         "grades kept")
+        elif how == "more":
+            kept = sum(1 for k in have if k in new and not have[k].get("unanswered"))
+            more = len(new) - kept
+            lines.append(f"{t}: {more:,} answer{'s' if more != 1 else ''} more than {what} "
+                         f"holds, the grades of the {kept:,} unchanged kept")
+        return how
 
     # 17c: everything staged and scored first — the row, the shards waiting
     # and the registry change only once every task has scored, in one go
@@ -679,16 +705,29 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             lines.append(f"{t}: {len(cut):,} of these {len(ans):,} answers ran out of room, "
                          f"{loops:,} of them ending in a loop (the last passage repeating) — "
                          "for information")
+        # 17f: and the questions the box wrote off, the server having failed on them
+        off = sorted({str(r.get("id")) for r in ans.values() if r.get("unanswered")})
+        if off:
+            n_off = sum(1 for r in ans.values() if r.get("unanswered"))
+            lines.append(f"{t}: {n_off:,} written off as no answer, counted wrong — the server "
+                         f"failed on {', '.join(off[:5])}{' …' if len(off) > 5 else ''} "
+                         "(remote_gguf.py --ask-written-off asks them again)")
         entry = {"gpu": gpu, "sha256": b["sha256"], "bundle": path.name, "at": stamp,
                  "by": by, "gguf_sha256": gg.get("sha256"), "llama_cpp": srv.get("build"),
                  "answers": len(ans), "setup": shard_setup(srv)}
         if shard:
             i, n = shard
             sh = (reg.get("shards") or {}).get(t) or {}
-            if (sh.get("n") and sh["n"] != n) or (aside and t in set_aside_for):
+            resetting = bool((sh.get("n") and sh["n"] != n) or (aside and t in set_aside_for))
+            if resetting:
                 aside_shards.append((t, sh.get("n")))
                 sh = {}
             sh = {"n": n, "have": {**dict(sh.get("have") or {}), str(i): entry}}
+            # 17f: the shard here already, the same answers: nothing to do —
+            # unless its shards are being set aside, or split another way
+            if not resetting and against(t, ans, shards / t / f"{i}-of-{n}", tsetup,
+                                         f"shard {i} of {n} here") == "same":
+                continue
             todo_shards[t] = (sh, b["files"][prefix + sf.ANSWERS], tsetup)
             lines.append(f"{t}: shard {i} of {n}, {len(ans):,} answers from a rented GPU ({gpu})")
             held = 0 if on else sum(1 for r in ans.values() if sf.thought(r.get("answer") or ""))
@@ -707,7 +746,10 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             for j in range(1, n + 1):
                 merged.update(ans if j == i else
                               sf.read_answers(shards / t / f"{j}-of-{n}" / sf.ANSWERS))
-            stage(t, merged, tsetup)
+            how = against(t, merged, sf.task_dir(row, t), tsetup, "the row")
+            if how == "same":
+                continue
+            stage(t, merged, tsetup, keep=sf.task_dir(row, t) if how == "more" else None)
             parts = [sh["have"][str(j)] for j in range(1, n + 1)]
             ready[t] = {**entry, "gpus": sorted({x["gpu"] for x in parts}), "shards": n,
                         "shard_bundles": [{"shard": j, **{k: x[k] for k in ("gpu", "sha256",
@@ -716,10 +758,22 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
                         "answers": len(merged)}
             lines.append(f"{t}: every shard is in ({n} of {n}) · {len(merged):,} answers")
         else:
-            stage(t, ans, tsetup)
+            how = against(t, ans, sf.task_dir(row, t), tsetup, "the row")
+            if how == "same":
+                continue
+            stage(t, ans, tsetup, keep=sf.task_dir(row, t) if how == "more" else None)
             ready[t] = {**entry, "gpus": [gpu]}
             lines.append(f"{t}: {len(ans):,} answers from a rented GPU ({gpu})")
 
+    if not ready and not todo_shards and not aside_shards:
+        # 17f: every task's answers are here already: a bundle made again
+        # changes nothing, and adds no run
+        shutil.rmtree(staging.parent, ignore_errors=True)
+        for x in lines:
+            say(x)
+        say(f"imported already: the same answers as the row {model}"
+            f"{' · thinking' if on else ''} holds — nothing changed")
+        return 0
     status, error, words, scored = "done", "", [], {}
     for t in ready:
         try:
@@ -805,6 +859,25 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
 
 
 WHERE_WORDS = "run on a rented GPU"
+
+
+def compare_answers(have: dict, new: dict) -> str:
+    """17f: a bundle's answers for a task against those here — 'same' (the
+    same answers), 'more' (those here, unchanged, and more; or one written
+    off here, answered now), or 'other' (a different run: set aside)"""
+    if not have:
+        return "other"
+    for k, r in have.items():
+        n = new.get(k)
+        if n is None:
+            return "other"
+        if (n.get("answer"), bool(n.get("unanswered"))) != (r.get("answer"),
+                                                            bool(r.get("unanswered"))) \
+                and not r.get("unanswered"):
+            return "other"
+    changed = any((new[k].get("answer"), bool(new[k].get("unanswered")))
+                  != (r.get("answer"), bool(r.get("unanswered"))) for k, r in have.items())
+    return "same" if len(new) == len(have) and not changed else "more"
 
 
 def _mark_where(row: Path, task: str, where: str) -> None:

@@ -166,6 +166,13 @@ def main(argv: list[str] | None = None) -> int:
             problems.append(f"{' and '.join(old)} file{'s were' if len(old) > 1 else ' was'} "
                             "written before 17d (no question count, and the box asked each "
                             "question once): ask both again")
+        elif not bh.get("twice"):
+            # 17f: the rule is the mean of the box's two runs, its false alarms
+            # at its own flip rate — a box file of one run would be compared by
+            # the old rule, silently
+            problems.append("the box's file holds one run of each question (twice: "
+                            f"{bh.get('twice')!r}): the rule needs its two runs — ask the box's "
+                            "parity again (remote_gguf.py --parity asks each twice)")
         elif sh.get("n") != bh.get("n"):
             problems.append(f"the server was asked {sh.get('n')} questions and the box "
                             f"{bh.get('n')}: ask both with the same --n")

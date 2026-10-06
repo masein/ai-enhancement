@@ -82,8 +82,8 @@ def test_8_the_memory_check_is_set_from_the_pilot(monkeypatch):
     for ctx, measured in ((36_864, 26_136), (67_584, 29_198)):
         fit, why = rg.kv_fit("hf://x/y/m.gguf", Q8, 8, ctx, PILOT_CARD)
         assert not why
-        # within 5% of what the pilot measured, and never below it
-        assert 0 <= fit["used"] / mib - measured < 0.05 * measured, (ctx, fit["used"] / mib)
+        # within 2.5% of what the pilot measured, and never below it (17f: as said)
+        assert 0 <= fit["used"] / mib - measured < 0.025 * measured, (ctx, fit["used"] / mib)
     # the plan's slots fit: 8, 8 and ARC-AGI-2's 5 (0f7c943's check allowed
     # them only with nothing to spare on the largest)
     allowed = [rg.kv_fit("hf://x/y/m.gguf", Q8, 8, c, PILOT_CARD)[0]["fit"]
@@ -125,7 +125,8 @@ def test_8_slots_fit_overrides_the_check_and_an_unread_header_is_said(box, monke
     assert run_box(box, "yes", "--gguf", str(path), "--slots", "8", "--flags", " ".join(Q8),
                    "--slots-fit") == 0
     own = (box["root"] / "yes" / rg.OWN_LOG).read_text()
-    assert "up to 3 slots fit with 1 GB spare — 8 run, as --slots-fit says" in own
+    # 17f: 8 slots of GPQA's 83,968; the room said in MiB
+    assert "MiB short; up to 1 slot fit keeping 1,024 — 8 run, as --slots-fit says" in own
     # the fixture's file has no header to read: said, where it was silent
     assert run_box(box, "unread") == 0
     own = (box["root"] / "unread" / rg.OWN_LOG).read_text()
@@ -142,8 +143,12 @@ def test_2_3_each_plan_runs_every_benchmark_once_one_line_a_box():
     for name, boxes in fbx.PLANS.items():
         have: dict[tuple[str, str], set[int]] = {}
         of: dict[tuple[str, str], int] = {}
+        parity = 0
         for steps in boxes.values():
             for th, tasks, shard, slots in steps:
+                if th == "parity":
+                    parity += 1
+                    continue
                 i, n = fb.parse_shard(shard) if shard else (1, 1)
                 for t in tasks:
                     key = (th, t)
@@ -158,10 +163,11 @@ def test_2_3_each_plan_runs_every_benchmark_once_one_line_a_box():
         want = {("on", t) for t in fb.TASKS} | {("off", t) for t in fb.TASKS if t != fbx.ARC}
         assert set(have) == want, name
         assert all(have[k] == set(range(1, of[k] + 1)) for k in have), name
+        assert parity == 1, name                       # 17f: one box a build asks it first
     longest = {p: max(sum(fbx.hours(s) for s in st) for st in b.values())
                for p, b in fbx.PLANS.items()}
     assert longest["A"] <= 18 and longest["B"] <= 10.5
-    assert len(fbx.PLANS["A"]) == 6 and len(fbx.PLANS["B"]) == 10
+    assert len(fbx.PLANS["A"]) == 9 and len(fbx.PLANS["B"]) == 15
     # ARC-AGI-2's answers are its test grids', not its tasks'
     assert fbx.ANSWERS[fbx.ARC] == 334
 
@@ -183,13 +189,17 @@ def test_3_a_box_line_runs_its_steps_and_carries_on_past_one_that_stops(monkeypa
     assert code == 1 and len(ran) == 2
     one, two = ran
     assert one[1].endswith("remote_gguf.py")
-    assert one[one.index("--thinking") + 1] == "on" and one[one.index("--shard") + 1] == "1/2"
-    assert one[one.index("--only") + 1] == HLE and one[one.index("--out") + 1] == "/workspace/A1-1"
+    assert one[one.index("--thinking") + 1] == "on" and one[one.index("--shard") + 1] == "1/4"
+    # 17f: the build's own folder, the box's label, 7 slots where 8 don't fit
+    assert one[one.index("--only") + 1] == HLE
+    assert one[one.index("--out") + 1] == "/workspace/phone/A1-1"
+    assert one[one.index("--label") + 1] == "A1" and one[one.index("--min-slots") + 1] == "7"
+    assert one[one.index("--files") + 1] == "/workspace/files"
     assert one[one.index("--flags") + 1] == "-ctk q8_0 -ctv q8_0 --flash-attn on"
     assert two[two.index("--thinking") + 1] == "off" and "--shard" not in two
     out = capsys.readouterr().out
     assert "A1, step 1: not whole (exit 1)" in out and "paste the same line again" in out
-    assert "A1, step 2: whole — its bundle is in /workspace/A1-2" in out
+    assert "A1, step 2: whole — its bundle is in /workspace/phone/A1-2" in out
 
 
 # ---------------------------------------------------------------------------
@@ -205,6 +215,14 @@ def a_bundle(path: Path, model: str) -> Path:
     return path
 
 
+def a_listing(dirs: dict[str, Path]) -> str:
+    """what a box's listing prints: its bundles and their sha256, no progress"""
+    import hashlib
+    return json.dumps({"bundles": [{"path": remote, "sha256": hashlib.sha256(
+        local.read_bytes()).hexdigest()} for remote, local in dirs.items()], "parity": [],
+        "progress": []})
+
+
 def test_4_one_command_fetches_and_imports_every_box(tmp_path, monkeypatch, capsys):
     import frontier_fetch as ff
     there = tmp_path / "boxes"
@@ -216,23 +234,25 @@ def test_4_one_command_fetches_and_imports_every_box(tmp_path, monkeypatch, caps
     key = tmp_path / "id_ed25519"
     key.write_text("not a key")
     dest = tmp_path / "bundles"
-    on_box = {"1.2.3.4": ["/workspace/A1-1/frontier-served__phone-thinking-on-hle-shard-1-of-2"
-                          ".tar.gz", "/workspace/A1-2/frontier-served__orig-thinking-off-hle"
-                          ".tar.gz"],
-              "5.6.7.8": ["/workspace/x/frontier-served__gemma-thinking-on-gpqa.tar.gz"]}
+    on_box = {"1.2.3.4": {f"/workspace/phone/A1-1/{n}": there / n for n in
+                          ["frontier-served__phone-thinking-on-hle-shard-1-of-2.tar.gz"]}
+              | {f"/workspace/orig/A1-2/{n}": there / n for n in
+                 ["frontier-served__orig-thinking-off-hle.tar.gz"]},
+              "5.6.7.8": {"/workspace/x/y/frontier-served__gemma-thinking-on-gpqa.tar.gz":
+                          there / "frontier-served__gemma-thinking-on-gpqa.tar.gz"}}
     calls = []
 
-    def run(cmd, cwd=None):
+    def run(cmd, cwd=None, timeout=None, stdin=None):
         calls.append(cmd)
         if cmd[0] == "ssh":
-            host = cmd[-2].split("@")[1]
+            host = next(x for x in cmd if "@" in x).split("@")[1]
             if host == "9.9.9.9":
-                return 2, "ls: cannot access '/workspace/*/frontier-*.tar.gz': No such file"
-            return 0, "\n".join(on_box[host]) + "\n"
+                return 255, "ssh: connect to host 9.9.9.9 port 4300: Connection timed out"
+            return 0, a_listing(on_box[host])
         if cmd[0] == "scp":
-            for src in cmd[cmd.index("StrictHostKeyChecking=accept-new") + 1:-1]:
-                name = Path(src.split(":", 1)[1]).name
-                (Path(cmd[-1]) / name).write_bytes((there / name).read_bytes())
+            src, to = cmd[-2], Path(cmd[-1])
+            host, remote = src.split("@")[1].split(":", 1)
+            to.write_bytes(on_box[host][remote].read_bytes())
             return 0, ""
         assert cmd[:8] == ff.IMPORT and cwd == ff.REPO
         if "orig" in cmd[8]:
@@ -243,22 +263,20 @@ def test_4_one_command_fetches_and_imports_every_box(tmp_path, monkeypatch, caps
     code = ff.main(["--key", str(key), "--dest", str(dest), "--sha", f"served/phone={sha}",
                     "--sha", f"served/orig={'cd' * 32}", "1.2.3.4:4100", "root@5.6.7.8:4200",
                     "9.9.9.9:4300"])
-    out = capsys.readouterr().out.splitlines()
+    out = capsys.readouterr().out
     assert code == 1
-    assert out[0].startswith("1.2.3.4:4100: 2 bundles · ")
-    assert out[1] == "5.6.7.8:4200: 1 bundle · frontier-served__gemma-thinking-on-gpqa.tar.gz"
-    assert out[2] == "9.9.9.9:4300: no bundle there yet"
-    assert ("frontier-served__gemma-thinking-on-gpqa.tar.gz: no --sha for served/gemma — import "
-            "it by hand (G4, G6)") in out
-    assert ("frontier-served__orig-thinking-off-hle.tar.gz: refused — the file isn't the one "
-            "registered") in out
-    assert ("frontier-served__phone-thinking-on-hle-shard-1-of-2.tar.gz: the row served/phone · "
-            "thinking: HLE: shard 1 of 2 in") in out
+    assert ("frontier-served__gemma-thinking-on-gpqa.tar.gz: copied; no --sha for served/gemma "
+            "— import it by hand (G4, G6)") in out
+    assert ("frontier-served__orig-thinking-off-hle.tar.gz: copied · refused — the file isn't "
+            "the one registered") in out
+    assert ("frontier-served__phone-thinking-on-hle-shard-1-of-2.tar.gz: copied · the row "
+            "served/phone · thinking: HLE: shard 1 of 2 in") in out
+    assert "9.9.9.9:4300: couldn't be asked — ssh: connect to host" in out
     imports = [c for c in calls if c[0] == "sudo"]
-    assert len(imports) == 2
-    assert [c[c.index("--file-sha256") + 1] for c in imports] == ["cd" * 32, sha]
+    assert [c[c.index("--file-sha256") + 1] for c in imports] == [sha, "cd" * 32]
     ssh = next(c for c in calls if c[0] == "ssh")
     assert ssh[:5] == ["ssh", "-i", str(key), "-p", "4100"]
+    assert "BatchMode=yes" in ssh and "ConnectTimeout=15" in ssh
 
 
 # ---------------------------------------------------------------------------
@@ -361,12 +379,12 @@ def test_10_a_resume_left_with_one_question_that_truly_fails_finishes(svc, monke
         rec = served.register({"name": "board box", "base_url": fake.base, "how": "x",
                                "based_on": "Qwen/Qwen3.6-35B-A3B", "thinking": "off"}, ME)
         row = config.OUT_DIR / rec["id"].replace("/", "__")
-        assert sf.ask_task(rec, TASK, row, False) == (N * RUNS, N * RUNS)
-        # stopped before question 3 was written off: only its runs are left
         path = sf.task_dir(row, TASK) / sf.ANSWERS
-        kept = [x for x in path.read_text().splitlines() if '"rec003"' not in x]
-        path.write_text("\n".join(kept) + "\n")
-        # 5083cc7: "failed on every question it was asked (4)" on every resume
+        # 17f: a 5xx is the server's: kept, and asked again by each run, until
+        # it has failed on three separate runs (5083cc7 stopped every resume
+        # with "failed on every question it was asked")
+        for k in range(1, sf.WRITE_OFF_RUNS):
+            assert sf.ask_task(rec, TASK, row, False) == (N * RUNS - RUNS, N * RUNS), k
         assert sf.ask_task(rec, TASK, row, False) == (N * RUNS, N * RUNS)
         never = [r for r in sf.read_answers(path).values() if r.get("unanswered")]
         assert sorted(r["id"] for r in never) == ["rec003"] * RUNS

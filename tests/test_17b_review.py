@@ -113,7 +113,7 @@ def test_1_the_launch_recorded_is_the_one_launched(box, monkeypatch, tmp_path): 
     got = json.loads(seen.read_text().splitlines()[-1])
     argv = got["argv"]
     rec = rb.read(bundle_of(box, "run"))["setup"]["server"]
-    assert argv[argv.index("-c") + 1] == str(3 * (32768 + 2048))
+    assert argv[argv.index("-c") + 1] == str(3 * (81920 + 2048))          # 17f: the new limit
     assert argv[argv.index("-np") + 1] == "3" and "--jinja" in argv
     assert argv[argv.index("--flash-attn") + 1] == "on"
     # what is recorded is what was launched: the same flags, the same environment
@@ -419,7 +419,14 @@ def test_11_a_task_that_cant_be_scored_leaves_the_row_as_it_was(box, monkeypatch
     def boom(*a, **k):
         raise RuntimeError("the scorer broke")
     monkeypatch.setattr(sf, "score_task", boom)
-    code, said = imported(bundle_of(box, "again"))
+
+    # 17f: other answers (the same ones change nothing, and need no scoring)
+    def other(files):
+        lines = files[answers_name()].decode().splitlines()
+        r = json.loads(lines[0])
+        r["answer"] += "\n(asked again)"
+        files[answers_name()] = ("\n".join([json.dumps(r), *lines[1:]]) + "\n").encode()
+    code, said = imported(rewrite(bundle_of(box, "again"), other))
     assert code == 1 and any("not imported — scoring it failed" in x for x in said), said
     assert results_of() == before
     assert not list(config.OUT_DIR.with_name("staging").glob("*"))

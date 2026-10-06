@@ -30,8 +30,10 @@ Each benchmark's protocol, from its source (fetched 5 Oct 2026):
   its grid parser, two attempts, a task the share of its test grids solved.
 
 Every run uses the model card's sampling (PRESETS) where Epoch uses each API's
-default temperature, a seed a question and run, and the budgets decided on 5
-Oct (thinking on 32,768 or 65,536 tokens, off 4,096 or 8,192). An answer that
+default temperature, a seed a question and run, and the budgets decided on 6
+Oct after the pilot (thinking on: 81,920 for GPQA, HLE, OTIS and ARC-AGI-2,
+65,536 for MATH, 32,768 for MMLU-Pro and SimpleQA; off: 16,384 for GPQA, HLE
+and OTIS, 8,192 for MATH and MMLU-Pro, 4,096 for SimpleQA). An answer that
 runs out of room is wrong, and counted.
 
 The questions are never in the repo, the runner image or a bundle: they are
@@ -97,8 +99,13 @@ ARC_TEMPLATE = ("You are participating in a puzzle solving competition. You are 
 MATH_CONFIGS = ("algebra", "counting_and_probability", "geometry", "intermediate_algebra",
                 "number_theory", "prealgebra", "precalculus")
 
-ON_LONG, OFF_LONG = 65536, 8192          # OTIS, MATH Level 5, ARC-AGI-2
-ON, OFF = 32768, 4096                    # GPQA, HLE, MMLU-Pro, SimpleQA Verified
+ON_LONG, OFF_LONG = 65536, 8192          # MATH Level 5
+ON, OFF = 32768, 4096                    # SimpleQA Verified (MMLU-Pro: ON with thinking on)
+# 17f: masein's yes of 6 Oct to 17e's proposal — Qwen3.6's card's 81,920 for
+# hard benchmark problems with thinking on (GPQA, HLE, OTIS, ARC-AGI-2), four
+# times the old limit with it off (GPQA, HLE, OTIS), and twice MMLU-Pro's:
+# on the pilot 17 of 54 HLE answers and 8 of 16 OTIS ran out of room
+HARD_ON, HARD_OFF, MMLU_OFF = 81920, 16384, 8192
 
 BENCH: dict[str, dict] = {
     "gpqa_diamond_epoch": {
@@ -110,7 +117,7 @@ BENCH: dict[str, dict] = {
         "source": {"hf": "Idavidrein/gpqa", "config": "gpqa_diamond", "split": "train",
                    "revision": "83022cefff930aea54f654c0b282e74b9eeda5c6", "gated": True,
                    "licence": "CC BY 4.0"},
-        "n": 198, "epochs": 4, "epoch_runs": 16, "budget": {"on": ON, "off": OFF},
+        "n": 198, "epochs": 4, "epoch_runs": 16, "budget": {"on": HARD_ON, "off": HARD_OFF},
         # the prompt's room in a slot's context, above the budget
         "room": 2048, "scorer": "choice", "unlisted": True},
     "otis_aime_epoch": {
@@ -121,7 +128,7 @@ BENCH: dict[str, dict] = {
         "source": {"hf": "EpochAI/otis-mock-aime-24-25", "split": "train",
                    "revision": "3072536d76ff88f487f65148c5245165b5d8e627", "gated": True,
                    "licence": "Apache-2.0"},
-        "n": 45, "epochs": 8, "epoch_runs": 16, "budget": {"on": ON_LONG, "off": OFF_LONG},
+        "n": 45, "epochs": 8, "epoch_runs": 16, "budget": {"on": HARD_ON, "off": HARD_OFF},
         "room": 2048, "scorer": "integer", "look": "extract"},
     "math_l5_epoch": {
         "short": "math-l5", "label": "MATH Level 5", "column": "MATH level 5", "group": "Maths",
@@ -148,7 +155,7 @@ BENCH: dict[str, dict] = {
         "source": {"hf": "cais/hle", "split": "test",
                    "revision": "5a81a4c7271a2a2a312b9a690f0c2fde837e4c29", "gated": True,
                    "licence": "MIT"},
-        "n": 2158, "epochs": 1, "budget": {"on": ON, "off": OFF}, "room": 4096,
+        "n": 2158, "epochs": 1, "budget": {"on": HARD_ON, "off": HARD_OFF}, "room": 4096,
         "scorer": "graded", "system": HLE_SYSTEM,
         "grader": {"who": "CAIS's judge", "prompt": "hle_judge", "model": "openai/o3-mini",
                    "version": "o3-mini-2025-01-31"},
@@ -179,7 +186,7 @@ BENCH: dict[str, dict] = {
         "source": {"hf": "TIGER-Lab/MMLU-Pro", "split": "test",
                    "revision": "527feea0afed1de15a8c115abf7be4c912123315", "gated": False,
                    "licence": "MIT"},
-        "n": 12032, "epochs": 1, "budget": {"on": ON, "off": OFF}, "room": 4096,
+        "n": 12032, "epochs": 1, "budget": {"on": ON, "off": MMLU_OFF}, "room": 4096,
         "scorer": "mmlu_pro"},
     "arc_agi2_public": {
         "short": "arc-agi-2", "label": "ARC-AGI-2", "group": "Puzzles", "reported_as": ["arc-agi-2", "arc agi 2"],
@@ -190,7 +197,7 @@ BENCH: dict[str, dict] = {
         "source": {"github": "arcprize/ARC-AGI-2", "path": "data/evaluation",
                    "revision": "f3283f727488ad98fe575ea6a5ac981e4a188e49", "gated": False,
                    "licence": "Apache-2.0"},
-        "n": 120, "epochs": 2, "aggregate": "pass@2", "budget": {"on": ON_LONG, "off": OFF_LONG},
+        "n": 120, "epochs": 2, "aggregate": "pass@2", "budget": {"on": HARD_ON, "off": OFF_LONG},
         # a task's training pairs, 30 × 30 grids at most, are long prompts
         "room": 32768, "scorer": "grid"},
 }

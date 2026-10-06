@@ -589,6 +589,10 @@ FRONTIER_SCORE_AFTER_RUN = os.environ.get("FRONTIER_SCORE_AFTER_RUN", "1").strip
     "0", "no", "off")
 FRONTIER_SHARD = os.environ.get("FRONTIER_SHARD", "").strip()
 FRONTIER_WHERE = os.environ.get("FRONTIER_WHERE", "").strip()
+# 17f: a run that asks again the questions earlier runs wrote off as no answer
+# (remote_gguf.py --ask-written-off)
+FRONTIER_ASK_WRITTEN_OFF = os.environ.get("FRONTIER_ASK_WRITTEN_OFF", "").strip() not in (
+    "", "0", "no", "off")
 FRONTIER_SERVED_ONLY = ("The Frontier benchmarks are asked of a model running on a server for "
                         "now: add it under Add a model ▸ Running on a server, or run its GGUF "
                         "on a rented GPU (REMOTE-RUNS.md)")

@@ -4953,6 +4953,38 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17f.1 — the token limits, and the boxes (6 Oct)
+
+masein said yes to the limits, chose plan A and GPQA alone for the
+calibration.
+- **The limits** (`scripts/frontier.py`): 81,920 with thinking on for GPQA,
+  HLE, OTIS and ARC-AGI-2; 16,384 off for GPQA, HLE and OTIS; 8,192 off for
+  MMLU-Pro. A model served on the board needs as much context a slot.
+- **The plans redone** (`frontier_box.py`, G5): each answer that ran out on
+  the pilot runs to the new limit; HLE with thinking on runs 7 slots (86,016
+  tokens: 8 would leave 950 MiB). A: 9 boxes a build, the longest 17.9 h; B:
+  15, 10.2 h; about 300 box-hours, $132–189 for A.
+- **A step planned at 8 slots runs what fits, down to 7** (`--min-slots`),
+  saying so; the room left is printed in MiB either way.
+- **Imported already, by the answers** (`import_frontier.compare_answers`): a
+  bundle made again changes nothing and keeps the grades; more answers are
+  added, the rest keep theirs; another setup is set aside as before.
+- **The fetch** (`frontier_fetch.py`): one listing a box over SSH (bundles
+  with their sha256, the parity file, each step's progress); copies kept only
+  when the sha256 agrees ("NOT copied" otherwise); a box imported before the
+  next is asked; timeouts and batch mode; each box's line says whether it is
+  safe to destroy; a non-zero exit when one failed; `--every 15m`;
+  `--parity` compares the box's file with the server's.
+- **A folder a build** (`/workspace/<build>/<box>-<step>`), so a box can run
+  the other build; **the parity questions first** on A3 (B12).
+- **A 5xx is the server's**: kept, the run carrying on to the next benchmark,
+  written off only after three runs; a 4xx or a timeout is the question's
+  own. `--ask-written-off`; the import counts what was written off.
+- **compare refuses a box file of one run.**
+- **The box's label and the image's tag** go into the bundle's setup.json, and
+  each step keeps a progress file for the fetch.
+- Tests: `tests/test_17f_review.py` (parts 1–2).
+
 ### 17e.2 — leftovers from checking 17d (6 Oct)
 
 - **Parity (9)**: the box's side is the mean of its two runs, question by
