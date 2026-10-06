@@ -71,8 +71,10 @@ GRADE_TRIES = sf.GRADE_TRIES
 
 
 class GraderChat(llm.OpenRouterChat):
-    """a grader's batch: OpenRouter's, held while the grading is stopped"""
+    """a grader's batch: OpenRouter's, held while the grading is stopped —
+    17f: and stopped, its refusal said, when its first replies all refuse"""
     HALT_TAIL = ", or now with Start"
+    FIRST_REFUSALS = 5
 
     def waiting(self) -> str:
         return STOPPED if stopped() else super().waiting()
@@ -672,12 +674,14 @@ def _record(d: Path, slot: str, pin: dict, meta: dict, items: dict, results: dic
                                          f"its reply couldn't be read: {e!r}"[:300], rec,
                                          sent.get(key), counts=True, kind="unread")
     # 17e: a refusal that never changes is a try. 17f: only where the same
-    # grader graded other answers of this batch — a refusal of every answer
-    # (a model id the provider doesn't know, a region it blocks) is the
-    # grader's, and burned every answer's three tries
+    # grader and prompt graded other answers of this benchmark — a refusal of
+    # every answer (a model id the provider doesn't know, a region it blocks)
+    # is the grader's, and burned every answer's three tries
+    mine = bool(n) or any((x.get("by"), x.get("prompt_sha256"))
+                          == (rec["version"], rec["prompt_sha256"]) for x in g["items"].values())
     for key, why, res in errors:
         g["refused"][key] = _refusal(g["refused"].get(key), why, rec, sent[key],
-                                     counts=bool(n) and _permanent(res), kind="error")
+                                     counts=mine and _permanent(res), kind="error")
     _write_grades(d, g)
     return n
 

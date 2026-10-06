@@ -437,8 +437,10 @@ def test_9_a_short_batch_all_refused_counts_no_try(gsvc, monkeypatch):  # noqa: 
 
 
 def test_9_a_refusal_is_read_whole_before_its_words_are_cut():
-    long = "x" * 600 + " openrouter_key_limit: the key's limit is reached"
-    rec = llm._refused({"custom_id": "c"}, llm.LLMError(f"POST u: HTTP 403: {long}", status=403))
+    # OpenRouter's body: a long message, the key's limit in its metadata at the end
+    body = json.dumps({"error": {"message": "x" * 600,
+                                 "metadata": {"reason": "openrouter_key_limit"}}})
+    rec = llm._refused({"custom_id": "c"}, llm.LLMError(f"POST u: HTTP 403: {body}", status=403))
     assert len(rec["error"]) == 400 and rec["kind"] == "limit" and rec["status"] == 403
     # b366baf read the cut words, and a key limit counted as a try
     assert not fgr._permanent(llm.Result(error=rec["error"], status=403, kind=rec["kind"]))

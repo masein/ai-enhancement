@@ -1289,7 +1289,6 @@ class OpenRouterChat(LocalOpenAI):
     name = "openrouter"
     prefix = "or"
     HALT_AFTER = 20
-    FIRST_REFUSALS = 5
 
     def __init__(self, model: str, key: str, root: Path, pin: dict | None = None,
                  role: str = "llm"):
