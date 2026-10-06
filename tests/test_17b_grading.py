@@ -197,7 +197,9 @@ def test_21_each_graders_reasoning_is_set_and_its_cap_sized_for_it(svc, monkeypa
     math = est["graders"]["math"]
     assert math["cap"] == 16 + fg.REASONING_ROOM and math["reasoning"] == {"enabled": False}
     assert math["tokens_out"] == 2 * 2 and math["tokens_out_max"] == 2 * math["cap"]
-    assert math["usd_max"] == pytest.approx((math["tokens_in"] * 0.3 + 2 * math["cap"] * 2.5)
+    # 17d: at most, each answer asked its three times too
+    assert math["usd_max"] == pytest.approx(sf.GRADE_TRIES * (math["tokens_in"] * 0.3
+                                                              + 2 * math["cap"] * 2.5)
                                             / 1e6, abs=1e-4)
     assert est["graders"]["simpleqa"]["cap"] == 16 and est["usd_max"] >= est["usd"]
     assert fg.ask("hle", True) == {"max_tokens": 4096, "reasoning": {"effort": "medium"},
@@ -247,7 +249,8 @@ def test_23_hle_is_graded_end_to_end_by_the_last_correct_and_an_unread_reply_ask
                   "differ\ncorrect: yes\nconfidence: 90",
             "h1": '{"extracted_final_answer": "X", "reasoning": "differs", "correct": "no", '
                   '"confidence": 40}',
-            "h2": "correct: no — on reflection, correct: yes",
+            # 17d: the last "correct:" line, its value alone
+            "h2": "correct: no\non reflection, it matches\ncorrect: yes",
             "h3": "I can't tell"}
 
     def answer(model, row):

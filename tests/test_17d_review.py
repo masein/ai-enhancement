@@ -285,6 +285,164 @@ def test_15_a_bundle_json_of_the_wrong_types_is_refused_in_words(box):  # noqa: 
 
 
 # ---------------------------------------------------------------------------
+# part 3: before Start on grading (the stand-in grader of tests/test_17_grading.py)
+# ---------------------------------------------------------------------------
+
+from test_17_grading import ROW as GROW  # noqa: E402
+from test_17_grading import drain, results  # noqa: E402
+from test_17_grading import svc as gsvc  # noqa: E402,F401 — the grading fixture
+from test_17b_grading import GEMINI, GPT, plain, stub  # noqa: E402
+
+
+def grades_of(task: str) -> dict:
+    return sf.read_grades(sf.task_dir(config.OUT_DIR / GROW, task))
+
+
+def test_16_a_grader_that_cant_be_reached_uses_no_tries_and_another_asks_again(
+        gsvc, monkeypatch):  # noqa: F811
+    from service import frontier_grade as fgr
+    down = {"on": True}
+    stub(monkeypatch, lambda m, r: ("", "", "HTTP 503: the provider is down")
+         if m == GPT and down["on"] else plain(m, r))
+    for _ in range(3):
+        fgr.start("masein")
+        drain()
+    ref = grades_of("simpleqa_epoch")["refused"]
+    assert ref and all(x["tries"] == 0 for x in ref.values())       # 0f7c943: 3, ungraded
+    assert {r["slot"]: r["answers"] for r in gsvc.get("/api/frontier/grading").json()
+            ["estimate"]["rows"]} == {"simpleqa": 5}
+    # a reply that came and isn't a grade counts; another grader starts again
+    down["on"] = False
+    stub(monkeypatch, lambda m, r: ("I would rather not say", "stop", "")
+         if m == GPT and r["custom_id"].endswith(":2#0") else plain(m, r))
+    for _ in range(3):
+        fgr.start("masein")
+        drain()
+    assert grades_of("simpleqa_epoch")["refused"]["2#0"]["tries"] == 3
+    fgr.save("simpleqa", GEMINI, "masein")
+    assert grades_of("simpleqa_epoch")["refused"]["2#0"]["tries"] == 0
+    asked = stub(monkeypatch, plain)
+    fgr.start("masein")
+    drain()
+    assert [c for m, c in asked if m == GEMINI and "algebra/" not in c] == ["frgr:2#0"]
+
+
+def test_17_a_grader_answering_in_prose_leaves_no_score(gsvc, monkeypatch):  # noqa: F811
+    from service import frontier_grade as fgr
+    stub(monkeypatch, lambda m, r: ("Let me think about whether this is right…", "stop", "")
+         if m == GPT else plain(m, r))
+    for _ in range(3):
+        fgr.start("masein")
+        drain()
+    assert results("simpleqa_epoch") is None                  # 0f7c943: 0.0%, "graded"
+    sc = sf.score_task(config.OUT_DIR / GROW, "simpleqa_epoch",
+                       served.get("served/lda-box"))
+    assert sc["no_score"].startswith("SimpleQA Verified: its grader gave no grade on 5 of the 5")
+    card = gsvc.get("/api/frontier/grading").json()["refused"]
+    assert [(x["slot"], x["ungraded"], x["form"]) for x in card] == [("simpleqa", 5, True)]
+
+
+def test_18_hles_verdict_is_the_field_on_its_own_line():
+    import frontier_graders as fg
+    got = fg.read("hle", "reasoning: is 4 correct: no, it's 5\ncorrect: yes\nconfidence: 90%",
+                  {})
+    assert got["ok"] is True and got["confidence"] == 90
+    assert fg.read("hle", "correct: yes, with caveats", {})["ok"] is None
+    assert fg.read("hle", "correct: yes\r", {})["ok"] is True
+    assert fg.read("hle", '{"correct": "no", "confidence": 40}', {})["ok"] is False
+
+
+def test_19_a_batch_that_cant_land_stays_and_is_never_paid_twice(gsvc, monkeypatch):  # noqa: F811
+    from service import frontier_grade as fgr
+    from service import llm_poller
+    asked = stub(monkeypatch, plain)
+    fgr.start("masein")
+    real = fb.load
+    broken = {"on": True}
+    monkeypatch.setattr(fb, "load", lambda task, root: (_ for _ in ()).throw(
+        OSError("the disk is full")) if broken["on"] else real(task, root))
+    end = time.time() + 10
+    while time.time() < end and any((llm_tally(p) or {}).get("answered", 0) < (llm_tally(p) or
+                                    {}).get("sent", 1) for p in fgr.pending()):
+        time.sleep(0.05)
+    for _ in range(31):                                       # 0f7c943: failed at 30
+        llm_poller.tick()
+    assert len(fgr.pending()) == 2
+    assert any("tried 31 times" in w["why"] for w in fgr.waits())
+    broken["on"] = False
+    drain()
+    fgr.start("masein")
+    drain()
+    assert len(asked) == 7 and results("simpleqa_epoch") is not None
+
+
+def llm_tally(p: dict) -> dict | None:
+    from service import llm
+    return llm.tally(p["batch_id"])
+
+
+def test_20_a_refused_carry_on_leaves_the_stop(gsvc, monkeypatch):  # noqa: F811
+    """after Stop the grader moved, Carry on was refused — and the poller then
+    sent the other grader's held requests"""
+    import threading
+    from service import ai_models
+    from service import frontier_grade as fgr
+    monkeypatch.setattr(config, "OPENROUTER_CONCURRENCY", 1)
+    gate = threading.Event()
+    seen: list = []
+
+    def answer(model, row):
+        seen.append(model)
+        if model == GPT and seen.count(GPT) == 1:
+            gate.wait(10)
+        return plain(model, row)
+    stub(monkeypatch, answer)
+    fgr.start("masein")
+    end = time.time() + 10
+    while time.time() < end and GPT not in seen:
+        time.sleep(0.05)
+    fgr.stop("masein")
+    gate.set()
+    monkeypatch.setattr(ai_models, "drifted",
+                        lambda pin: "moved" if (pin or {}).get("id") == GPT else "")
+    with pytest.raises(ValueError, match="moved"):
+        fgr.start("masein")
+    assert fgr.stopped()                                      # 0f7c943: lifted
+
+
+def test_21_requests_in_flight_land_before_start_sends_them_again(gsvc, monkeypatch):  # noqa: F811
+    import threading
+    from service import frontier_grade as fgr
+    monkeypatch.setattr(config, "OPENROUTER_CONCURRENCY", 2)
+    gate = threading.Event()
+    seen: list = []
+
+    def answer(model, row):
+        seen.append((model, row["custom_id"]))
+        if model == GPT:
+            gate.wait(10)                    # two in flight, held
+        return plain(model, row)
+    stub(monkeypatch, answer)
+    fgr.start("masein")
+    end = time.time() + 10
+    while time.time() < end and sum(1 for m, _ in seen if m == GPT) < 2:
+        time.sleep(0.05)
+    fgr.save("simpleqa", GEMINI, "masein")
+    threading.Timer(1.0, gate.set).start()                   # they land a second later
+    fgr.start("masein")
+    drain()
+    keys = [c for _, c in seen if "algebra/" not in c]
+    assert len(keys) == len(set(keys)) == 5                   # 0f7c943: the two asked twice
+
+
+def test_22_the_estimate_says_the_most_three_tries_could_cost(gsvc):  # noqa: F811
+    est = gsvc.get("/api/frontier/grading").json()["estimate"]
+    g = est["graders"]["simpleqa"]
+    assert g["usd_max"] == pytest.approx(
+        3 * (g["tokens_in"] * 2.0 + g["tokens_out_max"] * 8.0) / 1e6, abs=1e-4)
+
+
+# ---------------------------------------------------------------------------
 # 28 (sent mid-round): the parity check's sizes
 # ---------------------------------------------------------------------------
 

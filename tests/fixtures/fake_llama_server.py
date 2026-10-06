@@ -57,6 +57,7 @@ def main() -> int:
     ready_at = time.time() + float(os.environ.get("FAKE_LLAMA_LOAD_S") or 0)
     lock = threading.Lock()
     count = {"n": 0}
+    sent = {"n": 0}
     print(f"main: loading model {os.path.basename(model)}", flush=True)
 
     class H(BaseHTTPRequestHandler):
@@ -113,12 +114,20 @@ def main() -> int:
             with lock:
                 count["n"] += 1
                 n = count["n"]
+            if die_after and n > die_after:
+                # 17d: stopped as a box is, once its first K answers are sent —
+                # never in the middle of one (a reply another thread was still
+                # sending died with the process, and a run kept K-1)
+                end = time.time() + 10
+                while sent["n"] < die_after and time.time() < end:
+                    time.sleep(0.01)
+                print(f"fake: stopping after {die_after} answers", flush=True)
+                os._exit(3)
             self._send(200, {"id": "chatcmpl-1", "object": "chat.completion",
                              "choices": [{"index": 0, "message": msg, "finish_reason": "stop"}],
                              "usage": {"prompt_tokens": 50, "completion_tokens": 12}})
-            if die_after and n >= die_after:
-                print(f"fake: stopping after {n} answers", flush=True)
-                os._exit(3)
+            with lock:
+                sent["n"] += 1
 
     srv = ThreadingHTTPServer(("127.0.0.1", port), H)
     print(f"main: server is listening on http://127.0.0.1:{port}", flush=True)
