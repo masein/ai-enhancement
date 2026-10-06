@@ -75,6 +75,7 @@ MAX_BYTES = 2 * 1024 ** 3                  # a bundle is answers and a log: far 
 # Frontier benchmark come to about 400 MB)
 MAX_MEMBER = 512 * 1024 ** 2
 MAX_UNPACKED = 1024 ** 3
+HEADROOM = 16 * 1024 ** 2               # the members' headers, on top
 
 
 def refused(suite: str) -> str:
@@ -275,6 +276,33 @@ def write(path: Path, files: dict[str, bytes]) -> Path:
 _SAFE = re.compile(r"^(bundle\.json|setup\.json|run\.log|results/[^/]+/[^\0]+)$")
 
 
+class _Capped:
+    """17c: a bundle's unpacked bytes, read through a cap — no one read larger
+    than a bundle's file can be, and no more in all than a bundle can unpack
+    to. tarfile reads a long-name or pax header whole while it lists the
+    members, before any size is checked: a 1.5 MB bundle held 1.57 GB"""
+
+    def __init__(self, f, name: str):
+        self.f, self.name, self.n = f, name, 0
+
+    def read(self, size: int = -1) -> bytes:
+        if size is None or size < 0 or size > MAX_MEMBER:
+            raise ValueError(f"{self.name} holds a part larger than a bundle's file can be "
+                             f"({MAX_MEMBER // 1024 ** 2:,} MB)")
+        if self.n + size > MAX_UNPACKED + HEADROOM:
+            raise ValueError(f"{self.name} unpacks to more than a bundle can be "
+                             f"({MAX_UNPACKED // 1024 ** 2:,} MB)")
+        got = self.f.read(size)
+        self.n += len(got)
+        return got
+
+    def seek(self, pos: int, whence: int = 0) -> int:
+        return self.f.seek(pos, whence)
+
+    def tell(self) -> int:
+        return self.f.tell()
+
+
 def read(path: Path) -> dict:
     """{bundle, setup, log, files: {name: bytes}, sha256} — or ValueError
     saying what is wrong with the file. Only regular files under the names a
@@ -284,7 +312,8 @@ def read(path: Path) -> dict:
         raise ValueError(f"{path.name} is larger than a bundle can be")
     files: dict[str, bytes] = {}
     try:
-        with tarfile.open(path, "r:gz") as tar:
+        with gzip.open(path, "rb") as gz, \
+                tarfile.open(fileobj=_Capped(gz, path.name), mode="r:") as tar:
             members = tar.getmembers()
             # 17b: sizes from the headers, before a byte is read: a small file
             # can unpack to a great deal
