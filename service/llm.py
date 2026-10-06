@@ -97,6 +97,10 @@ class Result:
     error: str = ""
     # 12a.11: why the reply ended, where the backend says ("length": the cap cut it)
     finish: str = ""
+    # 17f: a refusal's HTTP status and kind (ai_models.refusal), read from the
+    # whole error before its words are cut to 400 characters
+    status: int | None = None
+    kind: str = ""
 
 
 def prompt_sha(*parts: str) -> str:
@@ -188,7 +192,8 @@ def _http(method: str, url: str, headers: dict, body: bytes | None = None,
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return r.status, r.read()
     except urllib.error.HTTPError as e:
-        raise LLMError(f"{method} {url}: HTTP {e.code}: {e.read()[:400].decode(errors='replace')}",
+        # 17f: the body whole (4,000 bytes) — a key-limit 403's words come late
+        raise LLMError(f"{method} {url}: HTTP {e.code}: {e.read()[:4000].decode(errors='replace')}",
                        status=e.code) from None
     except urllib.error.URLError as e:
         raise LLMError(f"{method} {url}: {e.reason}") from None
@@ -870,7 +875,15 @@ def batch_line(t: dict | None, error: str = "") -> str:
 
 def refusal_kind(rec: dict) -> str:
     from . import ai_models
-    return ai_models.refusal(rec.get("status"), rec.get("error", ""))[0]
+    return rec.get("kind") or ai_models.refusal(rec.get("status"), rec.get("error", ""))[0]
+
+
+def _refused(rec: dict, e: "LLMError") -> dict:
+    """17f: a request's error kept with its status and its kind, read from the
+    whole error — then its words cut to 400 characters"""
+    from . import ai_models
+    return {**rec, "error": str(e)[:400], "status": e.status,
+            "kind": ai_models.refusal(e.status, str(e))[0], "at": time.time()}
 
 
 class LocalOpenAI(Backend):
@@ -1046,9 +1059,12 @@ class LocalOpenAI(Backend):
         (self.dir / batch_id / "halt.json").unlink(missing_ok=True)
         self._ensure_worker(batch_id)
 
-    def _halt(self, batch_id: str, rec: dict, n: int) -> None:
-        why = (f"waiting: OpenRouter refused {n} requests in a row — "
-               f"{plain_error(rec.get('error', ''), rec.get('status'))}. It tries again in "
+    def _halt(self, batch_id: str, rec: dict, n: int, first: bool = False) -> None:
+        said = plain_error(rec.get("error", ""), rec.get("status"))
+        why = (f"waiting: the first {n} requests were all refused — {said}. Nothing was counted "
+               "against the answers: change what it refuses (the model, its provider), then "
+               "Start again" if first else
+               f"waiting: OpenRouter refused {n} requests in a row — {said}. It tries again in "
                f"{round(self.HALT_RETRY_S / 60)} minutes" + self.HALT_TAIL)
         (self.dir / batch_id / "halt.json").write_text(json.dumps(
             {"why": why, "status": rec.get("status"), "at": time.time(), "n": n}),
@@ -1083,7 +1099,8 @@ class LocalOpenAI(Backend):
             raise LLMError(f"local batch {batch_id} is not finished: "
                            f"{sum(c in res for c in ids)}/{len(ids)} done")
         return {c: Result(text=res[c].get("text") or "", error=res[c].get("error") or "",
-                          finish=res[c].get("finish_reason") or "")
+                          finish=res[c].get("finish_reason") or "",
+                          status=res[c].get("status"), kind=res[c].get("kind") or "")
                 for c in ids}
 
     # -- the worker ----------------------------------------------------------
@@ -1120,6 +1137,10 @@ class LocalOpenAI(Backend):
             # not written, until it ends — at HALT_AFTER the batch waits and
             # they are asked again later, never thousands marked failed
             streak: dict = {"key": None, "held": [], "halted": False}
+            # 17f: the first FIRST_REFUSALS replies all the same refusal (a
+            # model id the provider doesn't know, a region it blocks): the
+            # batch stops and says it, nothing written against the answers
+            first: dict = {"key": None, "held": [], "over": not self.FIRST_REFUSALS}
 
             def put(rec: dict) -> None:
                 with open(out, "a", encoding="utf-8") as fh:
@@ -1155,6 +1176,22 @@ class LocalOpenAI(Backend):
                         # retries — pauses; one refused for its own content is
                         # recorded as failed and the batch goes on
                         kind = refusal_kind(rec) if rec.get("error") else ""
+                        if not first["over"]:
+                            k = (rec.get("status"), kind) if rec.get("error") else None
+                            if k is not None and first["key"] in (None, k):
+                                if streak["halted"]:
+                                    continue
+                                first["key"] = k
+                                first["held"].append(rec)
+                                if len(first["held"]) >= self.FIRST_REFUSALS:
+                                    self._halt(batch_id, rec, len(first["held"]), first=True)
+                                    first["held"] = []
+                                    streak["halted"] = True
+                                continue
+                            first["over"] = True
+                            for r in first["held"]:
+                                put(r)
+                            first["held"] = []
                         if self.HALT_AFTER and kind in self.HALT_KINDS:
                             if streak["halted"]:
                                 continue            # asked again when it takes up again
@@ -1180,6 +1217,8 @@ class LocalOpenAI(Backend):
                 t.join()
             with write:
                 if not streak["halted"]:
+                    for r in first["held"]:         # a batch shorter than the first few
+                        put(r)
                     flush()                         # a short run: those were refusals of their own
         finally:
             os.close(fd)          # releases the flock
@@ -1192,6 +1231,7 @@ class LocalOpenAI(Backend):
     # never): its limit or credit, the key refused, or a lasting rate limit
     # (ai_models.refusal's kinds)
     HALT_AFTER = 0
+    FIRST_REFUSALS = 0
     HALT_KINDS = ("limit", "key", "rate")
     HALT_RETRY_S = 600
     HALT_TAIL = ""
@@ -1221,8 +1261,7 @@ class LocalOpenAI(Backend):
                                self.timeout)
             except LLMError as e:
                 if wait is None or not self._transient(e):
-                    rec.update(error=str(e)[:400], status=e.status, at=time.time())
-                    return rec
+                    return _refused(rec, e)
                 time.sleep(wait)
                 continue
             try:
@@ -1303,8 +1342,7 @@ class OpenRouterChat(LocalOpenAI):
                                self.timeout)
             except LLMError as e:
                 if wait is None or not self._transient(e):
-                    rec.update(error=str(e)[:400], status=e.status, at=time.time())
-                    return rec
+                    return _refused(rec, e)
                 time.sleep(wait)
                 continue
             rec["at"] = time.time()

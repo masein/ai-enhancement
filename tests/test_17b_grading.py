@@ -203,7 +203,7 @@ def test_21_each_graders_reasoning_is_set_and_its_cap_sized_for_it(svc, monkeypa
                                             / 1e6, abs=1e-4)
     assert est["graders"]["simpleqa"]["cap"] == 16 and est["usd_max"] >= est["usd"]
     assert fg.ask("hle", True) == {"max_tokens": 4096, "reasoning": {"effort": "medium"},
-                                   "out_tokens": 900}
+                                   "out_tokens": 900, "schema": None}
     sent = []
 
     def http(method, url, headers=None, payload=None, timeout=None):
@@ -384,16 +384,21 @@ def test_26_a_score_from_two_graders_says_so_and_isnt_final(svc, monkeypatch):  
 # ---------------------------------------------------------------------------
 
 def test_27_the_card_says_why_a_batch_failed(svc, monkeypatch):  # noqa: F811
-    """a data-policy refusal on all six left nothing on the card"""
+    """a data-policy refusal on all six left nothing on the card — 17f: the
+    first five all refused, the batch stops and the card says why, nothing
+    counted against the answers"""
     stub(monkeypatch, lambda m, r: ("", "", "HTTP 404: No endpoints found matching your data "
                                     "policy") if m == GPT else plain(m, r))
     fgr.start("masein")
-    drain()
-    last = page(svc)["last"]
-    assert [x["slot"] for x in last] == ["simpleqa"]
-    assert last[0]["line"].startswith("SimpleQA Verified's grader’s last batch: 5 sent · "
-                                      "0 answered · 5 failed. The first failure: ")
-    assert "data policy" in last[0]["line"]
+    for _ in range(300):
+        llm_poller.tick()
+        if any("the first 5 requests were all refused" in (w.get("why") or "")
+               for w in page(svc).get("waits") or []):
+            break
+        time.sleep(0.05)
+    why = " ".join(w.get("why") or "" for w in page(svc).get("waits") or [])
+    assert "the first 5 requests were all refused" in why and "data policy" in why, why
+    assert not (grades("simpleqa_epoch").get("refused") or {})
 
 
 def test_27_after_stop_or_at_the_limit_it_says_why_it_waits_and_carry_on_sends_the_rest(

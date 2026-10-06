@@ -351,3 +351,130 @@ def test_p2_7_a_box_file_of_one_run_is_refused_in_words(tmp_path, capsys):
                                              for x in [{"parity_of": head}, *rows]))
     assert fp.main(["compare", str(tmp_path / "s"), str(tmp_path / "b")]) == 1
     assert "the box's file holds one run of each question" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# part 3: before grading (the stand-in grader of tests/test_17_grading.py)
+# ---------------------------------------------------------------------------
+
+import time  # noqa: E402
+
+from service import llm, llm_poller  # noqa: E402
+from service import frontier_grade as fgr  # noqa: E402
+from test_17_grading import ROW as GROW  # noqa: E402
+from test_17_grading import drain, results  # noqa: E402
+from test_17_grading import svc as gsvc  # noqa: E402,F401 — the grading fixture
+from test_17b_grading import GEMINI, GPT, plain, stub  # noqa: E402
+
+GPT_V, GEMINI_V = "openai/gpt-4.1-2025-04-14", "google/gemini-2.5-flash-20250617"
+
+
+def grades_of(task: str) -> dict:
+    return sf.read_grades(sf.task_dir(config.OUT_DIR / GROW, task))
+
+
+def test_8_a_new_grader_after_more_than_5_percent_grades_it_all_and_is_final(gsvc, monkeypatch):  # noqa: F811
+    stub(monkeypatch, lambda m, r: ("I would rather not say", "stop", "")
+         if m == GPT and r["custom_id"].endswith(":2#0") else plain(m, r))
+    for _ in range(3):
+        fgr.start("masein")
+        drain()
+    assert results("simpleqa_epoch") is None                   # 1 of 5 ungraded: no score
+    # the card's advice: another grader — it grades every answer again
+    fgr.save("simpleqa", GEMINI, "masein")
+    est = gsvc.get("/api/frontier/grading").json()["estimate"]
+    row = next(r for r in est["rows"] if r["slot"] == "simpleqa")
+    assert row["answers"] == 5 and "the first grader left 1 of 5 without a grade" in row["regrade"]
+    asked = stub(monkeypatch, plain)
+    fgr.start("masein")
+    drain()
+    assert len([c for m, c in asked if m == GEMINI and "algebra/" not in c]) == 5
+    f = results("simpleqa_epoch")["frontier"]
+    # b366baf: "graded by 2 graders or prompts … not final", ranked with nothing
+    assert f.get("final") is not False and "graders" not in f
+    assert f["grader"]["version"] == GEMINI_V and not f["grader"].get("topup")
+    g = grades_of("simpleqa_epoch")
+    assert {x["by"] for x in g["items"].values()} == {GEMINI_V}
+    assert len(g["aside"]) == 1 and {x["by"] for x in g["aside"][0]["items"].values()} == {GPT_V}
+
+
+def wait_halted(timeout: float = 15.0) -> str:
+    end = time.time() + timeout
+    while time.time() < end:
+        llm_poller.tick()
+        for p in fgr.pending():
+            why = fgr.batch_backend(p["batch_id"]).halted(p["batch_id"])
+            if why:
+                return why
+        time.sleep(0.05)
+    pytest.fail("no batch halted")
+
+
+def test_9_a_refusal_of_every_answer_stops_and_counts_nothing(gsvc, monkeypatch):  # noqa: F811
+    stub(monkeypatch, lambda m, r: ("", "", "POST https://openrouter.ai/api/v1/chat/completions: "
+                                    "HTTP 400: {\"error\": {\"message\": \"openai/gpt-4.1 is not "
+                                    "a valid model ID\"}}")
+         if m == GPT and "algebra/" not in r["custom_id"] else plain(m, r))
+    fgr.start("masein")
+    why = wait_halted()
+    assert why.startswith("waiting: the first 5 requests were all refused") and \
+        "Nothing was counted against the answers" in why
+    # b366baf: each Start burned a try on every answer, three Starts and ungraded
+    assert not any(int(x.get("tries") or 0) for x in
+                   (grades_of("simpleqa_epoch").get("refused") or {}).values())
+
+
+def test_9_a_short_batch_all_refused_counts_no_try(gsvc, monkeypatch):  # noqa: F811
+    # MATH's two answers, both refused for good by the provider: no grade in
+    # the batch, so the refusal is the grader's, not theirs
+    stub(monkeypatch, lambda m, r: ("", "", "POST x: HTTP 403: {\"error\": {\"message\": "
+                                    "\"this region is blocked\"}}")
+         if "algebra/" in r["custom_id"] else plain(m, r))
+    fgr.start("masein")
+    drain()
+    ref = grades_of("math_l5_epoch").get("refused") or {}
+    assert ref and not any(int(x.get("tries") or 0) for x in ref.values())
+
+
+def test_9_a_refusal_is_read_whole_before_its_words_are_cut():
+    # OpenRouter's body: a long message, the key's limit in its metadata at the end
+    body = json.dumps({"error": {"message": "x" * 600,
+                                 "metadata": {"reason": "openrouter_key_limit"}}})
+    rec = llm._refused({"custom_id": "c"}, llm.LLMError(f"POST u: HTTP 403: {body}", status=403))
+    assert len(rec["error"]) == 400 and rec["kind"] == "limit" and rec["status"] == 403
+    # b366baf read the cut words, and a key limit counted as a try
+    assert not fgr._permanent(llm.Result(error=rec["error"], status=403, kind=rec["kind"]))
+    assert fgr._permanent(llm.Result(error="HTTP 403: flagged", status=403, kind="refused"))
+
+
+def test_10_hle_reads_one_json_object_wherever_it_sits():
+    import frontier_graders as fg
+    item = {"id": "h1", "answer": "x"}
+    for reply, ok in (('{"correct": "yes", "confidence": 90}\nThe response matches.', True),
+                      ('The answer matches the key.\n```json\n{"correct": "no"}\n```', False),
+                      ('{"extracted_final_answer": "4", "correct": true}', True),
+                      ('{"correct": false, "confidence": "80%"}', False),
+                      # 17e's: an object quoted in the reasoning, the verdict a line
+                      ('reasoning: the response printed {"correct": "yes"}\ncorrect: no', False)):
+        got = fg.read("hle", reply, item)
+        assert got["ok"] is ok, reply                         # b366baf: not a grade
+    # two objects: no grade, rather than a guess
+    assert fg.read("hle", '{"correct": "yes"} or {"correct": "no"}', item)["ok"] is None
+    # JSON only, as CAIS asked, where the grader takes a schema
+    assert fg.ask("hle", structured=True)["schema"] == fg.HLE_SCHEMA
+    assert fg.ask("hle", structured=False)["schema"] is None
+    assert fg.ask("simpleqa", structured=True)["schema"] is None
+
+
+def test_11_the_loops_and_the_plans_words():
+    loop = "Let me reconsider the options once more, carefully and slowly. " * 400
+    step = "".join(f"Step {k}: check the next case again and see.\n" for k in range(1000, 1600))
+    newlines = "thinking" + "\n" * 3000
+    grid = "[" + ",\n".join("[0, 0, 0, 0, 0, 0, 0, 0, 0, 0]" for _ in range(900))
+    table = "\n".join("| 0 | 0 | 0 | 0 |" for _ in range(1500))
+    zeros = "0" * 20000
+    assert [fb.ends_in_loop(x) for x in (loop, step, newlines)] == [True] * 3
+    assert [fb.ends_in_loop(x) for x in (grid, table, zeros)] == [False] * 3
+    import frontier_box as fbx
+    # listed in the order the box asks them
+    assert "GPQA Diamond, MATH Level 5" in fbx.words(("off", ("math_l5_epoch", GPQA), "", 8))

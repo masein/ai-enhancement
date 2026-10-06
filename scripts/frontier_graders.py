@@ -104,15 +104,18 @@ def prompt_sha(slot: str) -> str:
     return hashlib.sha256(prompt_text(slot).encode("utf-8")).hexdigest()
 
 
-def ask(slot: str, reasons: bool | None = None) -> dict:
+def ask(slot: str, reasons: bool | None = None, structured: bool | None = None) -> dict:
     """17b: what is sent with each answer, and what the dry run counts —
-    {max_tokens, reasoning, out_tokens}. `reasons`: whether OpenRouter lists
-    the chosen model as one that reasons"""
+    {max_tokens, reasoning, out_tokens, schema}. `reasons`: whether OpenRouter
+    lists the chosen model as one that reasons. 17f: `structured`, whether it
+    takes a JSON schema — HLE's judge is then asked for its four fields as
+    JSON only, as CAIS asked o3-mini"""
     g = GRADERS[slot]
     cap = g["max_tokens"]
     if reasons and g["reasoning"] == OFF:
         cap += REASONING_ROOM
-    return {"max_tokens": cap, "reasoning": dict(g["reasoning"]), "out_tokens": g["out_tokens"]}
+    return {"max_tokens": cap, "reasoning": dict(g["reasoning"]), "out_tokens": g["out_tokens"],
+            "schema": HLE_SCHEMA if slot == "hle" and structured else None}
 
 
 def _fill(t: str, values: dict) -> str:
@@ -165,21 +168,58 @@ def lone(text: str) -> str:
     return _WRAP.sub("", text or "")
 
 
-def _json_fields(text: str) -> dict | None:
-    """the reply's JSON object, when the whole reply is one (a code fence
-    around it allowed) — 17e: never an object quoted in a reply of text, which
-    beat the verdict on its own line"""
+def _json_objects(text: str) -> list[tuple[int, int, dict]]:
+    """17f: every JSON object in the reply that stands alone — (start, end,
+    object), objects inside another one not counted"""
     import json
-    t = text.strip()
-    m = re.fullmatch(r"```(?:json)?\s*(.*?)\s*```", t, re.S | re.I)
-    t = m.group(1).strip() if m else t
-    if not (t.startswith("{") and t.endswith("}")):
+    dec, out, i = json.JSONDecoder(), [], 0
+    while True:
+        i = text.find("{", i)
+        if i < 0:
+            return out
+        try:
+            got, end = dec.raw_decode(text, i)
+        except ValueError:
+            i += 1
+            continue
+        if isinstance(got, dict):
+            out.append((i, end, got))
+            i = end
+        else:
+            i += 1
+
+
+def _json_fields(text: str) -> dict | None:
+    """the reply's JSON object, when it holds exactly one and no verdict line
+    stands outside it — 17e: never an object quoted in a reply whose own
+    verdict is a line; 17f: wherever it sits (a sentence before or after it, a
+    code fence around it)"""
+    objs = _json_objects(text)
+    if len(objs) != 1:
         return None
-    try:
-        got = json.loads(t)
-    except ValueError:
+    a, b, got = objs[0]
+    outside = text[:a] + text[b:]
+    if re.search(r"(?im)^[\s*_`\"'#>-]*correct[\s*_`\"'#>-]*:", outside):
         return None
-    return got if isinstance(got, dict) else None
+    return got
+
+
+def _yes_no(v) -> str | None:
+    """17f: a verdict's value — yes and no, and JSON's true and false"""
+    if isinstance(v, bool):
+        return "yes" if v else "no"
+    w = str(v).strip().strip(".").lower()
+    return {"yes": "yes", "no": "no", "true": "yes", "false": "no"}.get(w)
+
+
+# 17f: CAIS's judge as CAIS ran it — OpenAI's structured outputs, its four
+# fields — asked where the grader takes a JSON schema
+HLE_SCHEMA = {"type": "object", "additionalProperties": False,
+              "required": ["extracted_final_answer", "reasoning", "correct", "confidence"],
+              "properties": {"extracted_final_answer": {"type": "string"},
+                             "reasoning": {"type": "string"},
+                             "correct": {"type": "string", "enum": ["yes", "no"]},
+                             "confidence": {"type": "integer"}}}
 
 
 def unread(text: str, show: bool = True) -> dict:
@@ -223,8 +263,8 @@ def read(slot: str, text: str, item: dict) -> dict:
         # carriage return isn't part of the value
         t = text.replace("\r", "")
         fields = _json_fields(t)
-        if fields is not None and str(fields.get("correct", "")).strip().lower() in ("yes", "no"):
-            ok = str(fields["correct"]).strip().lower() == "yes"
+        if fields is not None and _yes_no(fields.get("correct")) is not None:
+            ok = _yes_no(fields["correct"]) == "yes"
             ext = str(fields.get("extracted_final_answer") or "").strip()
             conf = re.fullmatch(r"\s*(\d{1,3})\s*%?\s*", str(fields.get("confidence", "")))
             return {"ok": ok, "words": ("the judge: correct" if ok else "the judge: incorrect")
