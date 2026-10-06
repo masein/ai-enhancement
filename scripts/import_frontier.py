@@ -85,7 +85,10 @@ _SPEC = re.compile(r"^(--spec-[a-z-]+|--draft[a-z-]*|-md|--model-draft|-ngld|--g
 # and through the environment: llama-server reads LLAMA_ARG_<FLAG> as its flag
 _SPEC_ENV = re.compile(r"^LLAMA_ARG_\w*(DRAFT|SPEC)\w*$")
 # lookahead said in words only, with no routing variable to compare
-_LOOKAHEAD_WORDS = re.compile(r"(?i)(?<!no )(?<!without )(?<!non-)\blookahead\b")
+_LOOKAHEAD_WORDS = re.compile(r"(?i)\blookahead\b")
+# 17d: lookahead said not to be used isn't lookahead said in words
+_NO_LOOKAHEAD = re.compile(r"(?i)\b(?:no|non|without)[\s-]+lookahead\b"
+                           r"|\blookahead[\s:=-]*(?:off|disabled|none|false|0)\b")
 
 
 def _env_pairs(text: str) -> dict[str, str]:
@@ -141,14 +144,16 @@ def record_launch(rec: dict) -> dict:
     def read(text: str) -> tuple[dict, list[str]]:
         pairs = _env_pairs(text)
         env = {k: v for k, v in pairs.items() if k.startswith(ROUTING_ENV)}
-        toks = [t for t in re.split(r"[\s,;()]+", text) if t]
+        # 17d: a flag's value without a sentence's full stop ("--spec-type mtp.")
+        toks = [t.rstrip(".") for t in re.split(r"[\s,;()]+", text) if t.rstrip(".")]
         spec = _spec_flags(toks) + sorted(f"{k}={v}" for k, v in pairs.items()
                                           if _SPEC_ENV.match(k))
         return env, sorted(set(spec))
     env, spec = read(" ".join(t for t in fields if t))
     if not env and not spec:
         env, spec = read(how)
-    words = bool(not env and _LOOKAHEAD_WORDS.search(f"{how} {rec.get('name') or ''}"))
+    words = bool(not env and _LOOKAHEAD_WORDS.search(
+        _NO_LOOKAHEAD.sub("", f"{how} {rec.get('name') or ''}")))
     return {"env": env, "spec": spec, "drafts": rec.get("speculative") is True,
             "words": words}
 
