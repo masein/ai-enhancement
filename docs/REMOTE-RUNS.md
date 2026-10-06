@@ -488,7 +488,9 @@ box's cache type or slots are the difference; either way, stop and say so
 before the full run.
 
 **Then the paces** (30 minutes, the same box): `--only` each benchmark in
-turn with `--shard 1/40` (a handful of questions each), thinking on and off.
+turn with `--shard 1/40` (a handful of questions each), thinking on and off —
+ARC-AGI-2 with `--slots 5`, as G5's box 8: eight of its slots are more
+context than the card holds, and the box refuses it before anything starts.
 Its lines give each benchmark's seconds an answer; the shards below come from
 them. Its bundles aren't imported: a shard of 40 waits for the other 39.
 
