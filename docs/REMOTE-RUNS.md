@@ -418,7 +418,12 @@ replies may part: they are counted, not required. One build at a time, the
 phone build first.
 
 On the server, with the queue idle and the build served as it serves the
-board:
+board. The folder first, as you: the container runs as root, and a folder it
+made would refuse the box's file later.
+
+```bash
+mkdir -p ~/benchmarks/parity
+```
 
 ```bash
 cd ~/benchmarks/aienh
