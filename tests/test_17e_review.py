@@ -293,3 +293,191 @@ def test_5_the_import_says_how_many_that_ran_out_end_in_a_loop(box):  # noqa: F8
     assert any(f"2 of these {len(invented()) * fb.BENCH['gpqa_diamond_epoch']['epochs']} "
                "answers ran out of room, 1 of them ending in a loop (the last passage "
                "repeating) — for information" in x for x in said), said
+
+
+# ---------------------------------------------------------------------------
+# part 3: leftovers from checking 17d on 5083cc7
+# ---------------------------------------------------------------------------
+
+from fake_openai import FakeServer  # noqa: E402
+from service import config, llm, served  # noqa: E402
+from service import frontier as sf  # noqa: E402
+from service import frontier_grade as fgr  # noqa: E402
+from test_12q_devicemark_runs import ME  # noqa: E402
+from test_17_gguf_box import N, RUNS, TASK  # noqa: E402
+from test_17_grading import ROW as GROW  # noqa: E402
+from test_17_grading import drain, results  # noqa: E402
+from test_17_grading import svc as gsvc  # noqa: E402,F401 — the grading fixture
+from test_17b_grading import GEMINI, GPT, plain, stub  # noqa: E402
+
+GPT_V, GEMINI_V = "openai/gpt-4.1-2025-04-14", "google/gemini-2.5-flash-20250617"
+
+
+def grades_of(task: str) -> dict:
+    return sf.read_grades(sf.task_dir(config.OUT_DIR / GROW, task))
+
+
+def test_9_the_box_side_is_the_mean_of_its_two_runs_and_its_false_alarms_are_said():
+    # 14% of answers flipping between two runs of one setup: 500 questions
+    # against one run called them apart in about 19% of checks; against the
+    # mean of two, about 7%; at 10%, 6.5% and 1.5%
+    assert 0.17 < fb.false_alarm(0.14, 500, 1) < 0.19
+    assert 0.06 < fb.false_alarm(0.14, 500, 2) < 0.08
+    assert 0.05 < fb.false_alarm(0.10, 500, 1) < 0.07
+    assert fb.false_alarm(0.10, 500, 2) < 0.02
+
+    def rows(n, twice=False):
+        out = []
+        for k in range(n):
+            right = k % 5 < 2
+            r = {"id": str(k), "key": "A", "answer": f"the answer is ({'A' if right else 'B'})"}
+            if twice:       # one question in ten flips, right to wrong as often as back
+                again = (not right) if k % 20 in (0, 3) else right
+                r["answer2"] = f"the answer is ({'A' if again else 'B'})"
+            out.append(r)
+        return out
+    got = fb.parity_compare(rows(500), rows(500, twice=True))
+    assert got["ok"] and got["flip"] == pytest.approx(0.10)
+    assert got["right_box"] == pytest.approx(200)               # the mean of its two runs
+    assert ("at the box's own flip rate (10% of questions right on one run and wrong on the "
+            "other), two identical setups would be called not the same in 1.5% of checks of 500 "
+            "questions") in got["words"]
+    # fewer than the floor: refused, said
+    got = fb.parity_compare(rows(400), rows(400, twice=True))
+    assert not got["ok"] and "400 questions on both sides, fewer than 500" in got["words"]
+
+
+def test_10_a_resume_left_with_one_question_that_truly_fails_finishes(svc, monkeypatch):  # noqa: F811
+    monkeypatch.setattr(fb, "_fetch", lambda task: invented())
+    fake = FakeServer()
+    try:
+        fake.reply = lambda body: "ANSWER: A"
+
+        def bad(body):
+            return ((500, "this question breaks the template")
+                    if "Invented question 3" in json.dumps(body) else None)
+        fake.chat_error = fake.raw_error = bad
+        fake.ctx = 40960
+        rec = served.register({"name": "board box", "base_url": fake.base, "how": "x",
+                               "based_on": "Qwen/Qwen3.6-35B-A3B", "thinking": "off"}, ME)
+        row = config.OUT_DIR / rec["id"].replace("/", "__")
+        assert sf.ask_task(rec, TASK, row, False) == (N * RUNS, N * RUNS)
+        # stopped before question 3 was written off: only its runs are left
+        path = sf.task_dir(row, TASK) / sf.ANSWERS
+        kept = [x for x in path.read_text().splitlines() if '"rec003"' not in x]
+        path.write_text("\n".join(kept) + "\n")
+        # 5083cc7: "failed on every question it was asked (4)" on every resume
+        assert sf.ask_task(rec, TASK, row, False) == (N * RUNS, N * RUNS)
+        never = [r for r in sf.read_answers(path).values() if r.get("unanswered")]
+        assert sorted(r["id"] for r in never) == ["rec003"] * RUNS
+    finally:
+        fake.close()
+
+
+def test_11_a_second_graders_top_up_is_final_and_named(gsvc, monkeypatch):  # noqa: F811
+    monkeypatch.setattr(sf, "UNGRADED_SHARE", 0.5)
+    # GPT gives no grade on one answer, three Starts running
+    stub(monkeypatch, lambda m, r: ("I would rather not say", "stop", "")
+         if m == GPT and r["custom_id"].endswith(":2#0") else plain(m, r))
+    for _ in range(3):
+        fgr.start("masein")
+        drain()
+    f = results("simpleqa_epoch")["frontier"]
+    assert f["final"] is False and f["ungraded"] == 1
+    # the card's advice: another grader, for that one
+    fgr.save("simpleqa", GEMINI, "masein")
+    asked = stub(monkeypatch, plain)
+    fgr.start("masein")
+    drain()
+    assert [c for m, c in asked if "algebra/" not in c] == ["frgr:2#0"]
+    f = results("simpleqa_epoch")["frontier"]
+    # 5083cc7: two graders, never final, ranked with nothing
+    assert f.get("final") is not False and "graders" not in f
+    assert f["grader"]["version"] == GPT_V and f["grader"]["topup"]["version"] == GEMINI_V
+    import report_lm_eval as rle
+    assert f"; {GEMINI_V} with Google's grader prompt" in rle.frontier_how(f)
+    assert "graded the 1 it gave no grade" in rle.frontier_how(f)
+    assert rle.frontier_setting(f).startswith(f"graded by {GPT_V} with")
+    assert GEMINI_V not in rle.frontier_setting(f)
+
+
+def test_12_a_refusal_that_never_changes_counts_as_a_try(gsvc, monkeypatch):  # noqa: F811
+    stub(monkeypatch, lambda m, r: ("", "", "POST https://openrouter.ai/api/v1/chat/completions: "
+                                    "HTTP 400: {\"error\": {\"message\": \"This endpoint's "
+                                    "maximum context length is 8192 tokens\"}}")
+         if r["custom_id"].endswith(":2#0") else plain(m, r))
+    for _ in range(3):
+        fgr.start("masein")
+        drain()
+    assert grades_of("simpleqa_epoch")["refused"]["2#0"]["tries"] == 3   # 5083cc7: 0
+    asked = stub(monkeypatch, plain)
+    fgr.start("masein")
+    drain()
+    assert not [c for m, c in asked if c.endswith(":2#0")]
+    # one that may pass another time still isn't a try
+    assert not fgr._permanent("POST x: HTTP 429: {\"error\": {\"message\": \"rate limited\"}}")
+    assert not fgr._permanent("POST x: HTTP 503: {\"error\": {\"message\": \"down\"}}")
+    assert fgr._permanent("POST x: HTTP 403: {\"error\": {\"message\": \"flagged by moderation\"}}")
+
+
+def test_13_grades_are_read_and_written_under_one_lock(gsvc):  # noqa: F811
+    import threading
+    d = sf.task_dir(config.OUT_DIR / GROW, "simpleqa_epoch")
+    done = threading.Event()
+    with fgr.grades_lock(d):
+        t = threading.Thread(target=lambda: (fgr._reset_tries("simpleqa", {"id": GPT,
+                                                                           "version": GPT_V}),
+                                             done.set()))
+        t.start()
+        assert not done.wait(0.5)            # it waits for the poller's hand
+    t.join(5)
+    assert done.is_set()
+
+
+def test_13_a_reply_that_landed_beats_a_cancel_written_after_it(tmp_path):
+    d = tmp_path / "b"
+    d.mkdir()
+    (d / "results.jsonl").write_text(
+        json.dumps({"custom_id": "x:1", "text": "A", "error": ""}) + "\n"
+        + json.dumps({"custom_id": "x:1", "text": "", "error": "cancelled: moved",
+                      "cancelled": True}) + "\n"
+        + json.dumps({"custom_id": "x:2", "text": "", "error": "cancelled: moved",
+                      "cancelled": True}) + "\n")
+    got = llm.LocalOpenAI._results(d)
+    assert got["x:1"]["text"] == "A" and got["x:2"].get("cancelled")
+
+
+def test_14_16_start_pins_a_slot_new_to_the_work_and_counts_what_moved(gsvc, monkeypatch):  # noqa: F811
+    fgr.save("simpleqa", GPT, "masein")
+    moved = {"slot": "simpleqa", "batch_id": "local_aaaaaaaaaaaa", "task": "simpleqa_epoch",
+             "pin": {"id": GEMINI, "version": GEMINI_V}}
+    monkeypatch.setattr(fgr, "pending", lambda: [moved])
+    monkeypatch.setattr(fgr, "_cancel_unsent", lambda p, why: ["a", "b", "c", "d", "e", "f"])
+    monkeypatch.setattr(fgr, "_settle", lambda ids, timeout=None: True)
+    # 2 of the 6 were in flight, and landed
+    monkeypatch.setattr(fgr, "_still_cancelled", lambda bid, ids: 4)
+    lists = iter([[], [{"slot": "math", "task": "math_l5_epoch", "model": "m", "items": [1]}]])
+    monkeypatch.setattr(fgr, "waiting", lambda: next(lists))
+    sent = []
+    monkeypatch.setattr(fgr, "_submit", lambda w, pin, by: sent.append((w["slot"], pin)) or "b1")
+
+    def backend(bid):
+        raise llm.LLMError("no such batch")
+    monkeypatch.setattr(fgr, "batch_backend", backend)
+    out = fgr.start("masein")               # 5083cc7: KeyError: 'math', a 500
+    assert [s for s, _ in sent] == ["math"] and out["moved"] == 4
+
+
+def test_15_hles_json_counts_only_as_the_whole_reply():
+    import frontier_graders as fg
+    item = {"id": "h1", "answer": "x"}
+    got = fg.read("hle", 'reasoning: the response printed {"correct": "yes"}\ncorrect: no', item)
+    assert got["ok"] is False                                  # 5083cc7: yes
+    assert fg.read("hle", '```json\n{"correct": "yes", "confidence": "90"}\n```', item)["ok"]
+
+
+def test_16_the_wording():
+    sc = {"score": 0.8, "se": 0.1, "epochs": 1, "questions": 5, "ungraded": 1, "final": False}
+    words = sf.words("simpleqa_epoch", sc)
+    assert "graded by 0 graders" not in words and "not final until those get a grade" in words
+    assert sf._pct(51 / 1000) == "5.1%" and sf._pct(0.2) == "20%"

@@ -481,15 +481,17 @@ def test_28_parity_compares_the_files_by_sha256_and_sizes_only_like_with_like(tm
     import frontier_parity as fp
     sha = "ab" * 32
     launch = {"env": {}, "spec": [], "drafts": False}
-    rows = [{"id": str(k), "key": "A", "answer": "the answer is (A)"} for k in range(50)]
+    rows = [{"id": str(k), "key": "A", "answer": "the answer is (A)"} for k in range(500)]
 
     def files(server_file: dict, box_file: dict, tag: str) -> tuple[str, str]:
         s = tmp_path / f"server-{tag}.jsonl"
         b = tmp_path / f"box-{tag}.jsonl"
+        # 17e: written since 17d, each says its count (the pilot's said none)
+        n = {} if tag == "old" else {"n": len(rows)}
         for path, head in ((s, {"side": "server", "as": SERVED, "file": server_file,
-                                "launch": launch}),
+                                "launch": launch, **n}),
                            (b, {"side": "box", "as": SERVED, "file": box_file,
-                                "server": {"flags": [], "env": {}}})):
+                                "server": {"flags": [], "env": {}}, **n})):
             path.write_text("".join(json.dumps(x) + "\n" for x in [{"parity_of": head},
                                                                     *rows]))
         return str(s), str(b)
@@ -500,11 +502,18 @@ def test_28_parity_compares_the_files_by_sha256_and_sizes_only_like_with_like(tm
                   "weights": 22_843_343_360}, "new")
     assert fp.main(["compare", s, b, "--file-sha256", sha]) == 0
     assert capsys.readouterr().out.startswith("The same: ")
-    # as the pilot wrote them (c43cdbe): one "size" each, of two kinds — not compared
+    # as the pilot wrote them (c43cdbe): one "size" each, of two kinds — not
+    # compared. 17e: but written before 17d, asked again
     s, b = files({"name": name, "size": 22_843_343_360, "sha256": ""},
                  {"name": name, "size": 22_854_339_808, "sha256": sha}, "old")
-    assert fp.main(["compare", s, b, "--file-sha256", sha]) == 0
+    assert fp.main(["compare", s, b, "--file-sha256", sha]) == 1
+    out = capsys.readouterr().out
+    assert "the server's and the box's files were written before 17d" in out
+    assert "22,843,343,360" not in out
     # the files whole, by sha256: another file is refused
+    s, b = files({"name": name, "weights": 22_843_343_360, "sha256": ""},
+                 {"name": name, "size": 22_854_339_808, "sha256": sha,
+                  "weights": 22_843_343_360}, "new")
     assert fp.main(["compare", s, b, "--file-sha256", "cd" * 32]) == 1
     assert "the box's file has sha256" in capsys.readouterr().out
     # weights on both sides that differ: refused
@@ -531,8 +540,9 @@ def test_29_parity_is_decided_on_accuracy_over_n_questions(svc, monkeypatch, tmp
         out = []
         for k in range(n):
             r = {"id": str(k), "key": "A", "answer": say.format("A" if k in right else wrong)}
-            if again:                           # its second run: two letters of ten part
-                r["answer2"] = r["answer"] if k % 10 > 1 else say.format("D")
+            if again:       # its second run: two wrong letters of ten part (17e: still wrong)
+                r["answer2"] = (say.format("D") if k % 10 < 2 and k not in right
+                                else r["answer"])
             out.append(r)
         return out
     server = rows(set(range(210)))
@@ -543,15 +553,16 @@ def test_29_parity_is_decided_on_accuracy_over_n_questions(svc, monkeypatch, tmp
     got = fb.parity_compare(server, boxed)
     assert got["ok"] and (got["right_server"], got["right_box"]) == (210, 210)
     assert -0.02 < got["lo"] < 0 < got["hi"] < 0.02
-    assert got["words"].startswith("The same: the box answers 42.0% right and the server 42.0% "
-                                   "on the same 500 questions — a difference of +0.0 points, 90% "
-                                   "interval -1.8 to +1.8, inside ±5 points")
+    assert got["words"].startswith("The same: the box answers 42.0% right (the mean of its two "
+                                   "runs) and the server 42.0% on the same 500 questions — a "
+                                   "difference of +0.0 points, 90% interval -1.8 to +1.8, inside "
+                                   "±5 points")
     # the letters, information only: 195 the same (the wrong ones part), and
     # the box against itself
-    assert got["letters"] == 195 and got["self"] == (500, 400, 400)
+    assert got["letters"] == 195 and got["self"] == (500, 442, 442)
     assert ("For information: the same letter on 195 of the 500 read on both sides, 0 "
             "identical replies; the box against a second run of itself: the same letter on "
-            "400 of 500, 400 identical") in got["words"]
+            "442 of 500, 442 identical") in got["words"]
     # ten points lower on the box: not the same
     got = fb.parity_compare(server, rows(set(range(50, 210))))
     assert not got["ok"] and got["hi"] < -0.05 and got["words"].startswith("Not the same: ")

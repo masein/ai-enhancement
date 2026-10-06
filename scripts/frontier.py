@@ -815,10 +815,29 @@ def score(task: str, answer: str, finish: str | None, need: dict) -> dict:
 # 90% interval inside ±MARGIN points — the two one-sided tests of equivalence,
 # at 5% each, its margin stated here before any run. Letter agreement and
 # identical replies are reported beside it for information, with the box's
-# agreement with a second run of itself
+# agreement with a second run of itself. 17e: the box's side is the mean of
+# its two runs, question by question — two identical setups whose answers
+# flip right and wrong on 14% of questions between runs were called not the
+# same in about 19% of checks of 500 against one run, about 7% against the
+# mean of two; and the rate at the box's own flip rate is printed. A pair of
+# fewer than FLOOR questions (the default) is refused, as is one written
+# before 17d
 PARITY = {"task": "mmlupro_tiger", "n": 500, "seed": "frontier-parity-1", "max_tokens": 2048,
           "sampling": {"temperature": 0.0, "top_k": 1, "seed": 0},
-          "margin": 0.05, "z": 1.645}
+          "margin": 0.05, "z": 1.645, "floor": 500}
+
+
+def false_alarm(flip: float, n: int, runs: int = 2) -> float:
+    """17e: how often two identical setups would be called not the same — the
+    box's side the mean of `runs` runs, each run's answers flipping right and
+    wrong against another's on `flip` of the questions (a run's variance a
+    question flip/2; the difference's, flip/2 × (1 + 1/runs))"""
+    from statistics import NormalDist
+    if n < 2 or flip <= 0:
+        return 0.0
+    sd = (flip / 2 * (1 + 1 / runs) / n) ** 0.5
+    room = PARITY["margin"] - PARITY["z"] * sd
+    return 1.0 if room <= 0 else 2 * (1 - NormalDist().cdf(room / sd))
 
 
 def parity_items(root: Path, n: int | None = None) -> list[dict]:
@@ -843,8 +862,10 @@ def _agree(a: dict, b: dict, key_a: str = "answer", key_b: str = "answer") -> tu
 def parity_compare(server: list[dict], box: list[dict]) -> dict:
     """the two sides' answers to the parity questions, compared on accuracy:
     {n, right_server, right_box, diff, lo, hi, same, letters, identical,
-    self, problems, ok, words} — `diff` the box's share right minus the
-    server's on the same questions, [lo, hi] its 90% paired interval"""
+    self, flip, false_alarm, problems, ok, words} — `diff` the box's share
+    right minus the server's on the same questions, [lo, hi] its 90% paired
+    interval. 17e: the box's side the mean of its two runs where it asked
+    twice"""
     problems = []
     for side, rows in (("the server's", server), ("the box's", box)):
         ids = [str(r.get("id")) for r in rows]
@@ -859,6 +880,10 @@ def parity_compare(server: list[dict], box: list[dict]) -> dict:
                         "only): ask both with the same --n")
     ids = sorted(set(a) & set(b))
     n = len(ids)
+    if n < PARITY["floor"]:
+        problems.append(f"{n:,} questions on both sides, fewer than {PARITY['floor']:,}: two "
+                        "identical setups would too often be called not the same — ask both "
+                        f"with --n {PARITY['floor']} or more")
     # 17c: two sides that read no letter aren't the same answer — each side
     # reads one from at least half its answers, or there is nothing to compare
     read = [sum(1 for i in ids if read_mmlu_pro(x[i].get("answer") or "")) for x in (a, b)]
@@ -870,8 +895,11 @@ def parity_compare(server: list[dict], box: list[dict]) -> dict:
     def right(x: dict, key: str = "answer") -> int:
         return int(bool(read_mmlu_pro(x.get(key) or "") and
                         read_mmlu_pro(x.get(key) or "") == x.get("key")))
-    d = [right(b[i]) - right(a[i]) for i in ids]
-    rs, rb = sum(right(a[i]) for i in ids), sum(right(b[i]) for i in ids)
+
+    def box_right(x: dict) -> float:
+        return (right(x) + right(x, "answer2")) / 2 if x.get("answer2") is not None else right(x)
+    d = [box_right(b[i]) - right(a[i]) for i in ids]
+    rs, rb = sum(right(a[i]) for i in ids), sum(box_right(b[i]) for i in ids)
     margin, z = PARITY["margin"], PARITY["z"]
     if n:
         mean = sum(d) / n
@@ -884,19 +912,29 @@ def parity_compare(server: list[dict], box: list[dict]) -> dict:
     both, letters, identical = _agree(a, b)
     own = {i: x for i, x in b.items() if x.get("answer2") is not None}
     self_agree = _agree(own, own, "answer", "answer2") if own else None
+    # 17e: the box's own flip rate — right on one of its runs, wrong on the
+    # other — and how often a check this size calls two identical setups apart
+    flip = (sum(1 for x in own.values() if right(x) != right(x, "answer2")) / len(own)
+            if own else None)
+    alarm = false_alarm(flip, n, 2 if own else 1) if flip is not None else None
     pt = lambda x: f"{100 * x:+.1f}"                         # noqa: E731
-    head = (f"the box answers {100 * rb / max(1, n):.1f}% right and the server "
-            f"{100 * rs / max(1, n):.1f}% on the same {n:,} questions — a difference of "
-            f"{pt(mean)} points, 90% interval {pt(lo)} to {pt(hi)}, "
+    head = (f"the box answers {100 * rb / max(1, n):.1f}% right"
+            + (" (the mean of its two runs)" if own else "")
+            + f" and the server {100 * rs / max(1, n):.1f}% on the same {n:,} questions — a "
+            f"difference of {pt(mean)} points, 90% interval {pt(lo)} to {pt(hi)}, "
             f"{'inside' if same else 'not inside'} ±{100 * margin:.0f} points")
     info = (f"For information: the same letter on {letters:,} of the {both:,} read on both "
             f"sides, {identical:,} identical replies"
             + (f"; the box against a second run of itself: the same letter on {self_agree[1]:,} "
-               f"of {self_agree[0]:,}, {self_agree[2]:,} identical" if self_agree else ""))
+               f"of {self_agree[0]:,}, {self_agree[2]:,} identical" if self_agree else "")
+            + (f"; at the box's own flip rate ({flip:.0%} of questions right on one run and "
+               f"wrong on the other), two identical setups would be called not the same in "
+               f"{alarm:.1%} of checks of {n:,} questions" if alarm is not None else ""))
     ok = not problems and same
     return {"n": n, "right_server": rs, "right_box": rb, "diff": mean, "lo": lo, "hi": hi,
             "same": same, "letters": letters, "both": both, "identical": identical,
-            "self": self_agree, "problems": problems, "ok": ok,
+            "self": self_agree, "flip": flip, "false_alarm": alarm, "problems": problems,
+            "ok": ok,
             "words": ("The same: " if ok else "Not the same: ")
             + "; ".join([*problems, head] if problems else [head]) + ". " + info + "."}
 

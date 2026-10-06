@@ -439,11 +439,14 @@ q8_0. Before anything else, the same 500 MMLU-Pro questions (`scripts/frontier.p
 both, each with its own launch.
 
 **The same** is decided on accuracy, stated here before the run: the
-difference in right answers on the same questions (the box's share right
-minus the server's), with its 90% paired interval, inside ±5 points. That is
-the two one-sided tests of equivalence at 5% each. At about one question in
-ten answered differently, 500 questions give an interval of about ±2.5
-points.
+difference in right answers on the same questions (the mean of the box's two
+runs, question by question, minus the server's), with its 90% paired
+interval, inside ±5 points. That is the two one-sided tests of equivalence
+at 5% each. Two identical setups whose answers flip right and wrong on one
+question in ten between runs are called not the same in about 1.5% of checks
+of 500 (6% against one run of the box; at 14%, 7% and 18%): compare prints
+the rate at the box's own flip rate. A pair of fewer than 500 questions is
+refused, and so is a pair of files written before 17d (the pilot's 50).
 
 Letter agreement and identical replies are reported beside it, for
 information only. Greedy decoding with other batch sizes, cache types and
@@ -502,9 +505,12 @@ scp -i ~/.ssh/id_ed25519 -P <port> root@<host>:/workspace/parity-phone/parity.js
 sudo docker compose exec -T bench python scripts/frontier_parity.py compare /home/masein/benchmarks/parity/phone-server.jsonl /home/masein/benchmarks/parity/phone-box.jsonl --file-sha256 <the phone file's sha256 from G0>
 ```
 
-It prints "The same: the box answers 42.4% right and the server 41.8% on the
-same 500 questions — a difference of +0.6 points, 90% interval -1.6 to +2.8,
-inside ±5 points. For information: the same letter on …", "Not the same: …",
+It prints "The same: the box answers 42.4% right (the mean of its two runs)
+and the server 41.8% on the same 500 questions — a difference of +0.6 points,
+90% interval -1.6 to +2.8, inside ±5 points. For information: the same letter
+on …; at the box's own flip rate (9% of questions right on one run and wrong
+on the other), two identical setups would be called not the same in 0.8% of
+checks of 500 questions", "Not the same: …",
 or "Not the same setup: …" (another file or launch: fix the box's command
 before anything else). The board has no sha256 of either build's
 file today, so `--file-sha256` is what compares the files whole; without it

@@ -160,7 +160,13 @@ def main(argv: list[str] | None = None) -> int:
                              "then the box's")
         (sh, srows), (bh, brows) = read(a.server), read(a.box)
         problems, notes = identity_problems(sh, bh, a.file_sha256.strip().lower())
-        if sh.get("n") != bh.get("n"):
+        # 17e: a file written before 17d says no count: its rule was letters
+        old = [side for side, h in (("the server's", sh), ("the box's", bh)) if "n" not in h]
+        if old:
+            problems.append(f"{' and '.join(old)} file{'s were' if len(old) > 1 else ' was'} "
+                            "written before 17d (no question count, and the box asked each "
+                            "question once): ask both again")
+        elif sh.get("n") != bh.get("n"):
             problems.append(f"the server was asked {sh.get('n')} questions and the box "
                             f"{bh.get('n')}: ask both with the same --n")
         if problems:
