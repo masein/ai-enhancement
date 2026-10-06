@@ -19415,8 +19415,12 @@ function rentedBoxes() {
       : `${(b.tasks || []).map(t => (FB()[t] || {}).label || t).join(', ')} · thinking ${b.thinking}` }),
     el('td', { class: 'num', text: b.n != null ? `${b.n.toLocaleString()} of ${b.of.toLocaleString()}`
       : b.state === 'whole' ? 'whole' : '—' }),
-    el('td', { text: b.safe ? 'done, safe to destroy' : b.state === 'whole' ? 'whole'
-      : b.finish ? when(b.finish) : '—' }),
+    // 17g: a step that stopped says so, and why — it read "starting" for ever
+    el('td', { class: b.state === 'stopped' && !b.safe ? 'warn' : '',
+      'data-box-stopped': b.state === 'stopped' ? '1' : null,
+      text: b.safe ? 'done, safe to destroy' : b.state === 'whole' ? 'whole'
+        : b.state === 'stopped' ? `stopped${b.why ? ': ' + b.why : ''}`
+        : b.finish ? when(b.finish) : '—' }),
     el('td', { class: b.quiet_min || b.reachable === false ? 'warn' : '',
       text: b.reachable === false ? `not reached at the last fetch (${rel(b.heard)} ago)`
         : b.quiet_min ? `not heard from for ${b.quiet_min} min`
@@ -19428,8 +19432,8 @@ function rentedBoxes() {
         'last heard'].map(h => el('th', { text: h })))),
       el('tbody', {}, B.map(row))),
     el('p', { class: 'small se', text: 'As frontier_fetch.py last read them (--every 15m keeps '
-      + 'it current). A box is safe to destroy once every bundle it holds is here and '
-      + 'imported.' }));
+      + 'it current). A box is safe to destroy once every step its plan gives it is whole, '
+      + 'its file here and imported.' }));
 }
 
 // ---------------------------------------------------------------------------

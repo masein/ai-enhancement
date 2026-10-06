@@ -440,12 +440,16 @@ above the file. Under the limits of 6 Oct:
 | MMLU-Pro, SimpleQA, thinking on | 34,816–36,864 | 8 | 26,136 MiB, measured | 8 fit |
 | MATH Level 5, thinking on | 67,584 | 8 | 29,198 MiB, measured | 8 fit |
 | GPQA, OTIS (or MATH with them), thinking on | 83,968 | 8 | about 30,830 MiB | 8 fit, 1,154 MiB spare |
-| HLE (or anything with it), thinking on | 86,016 | 7 | about 29,960 MiB | 8 would leave 950 MiB: 7 run |
+| HLE (or anything with it), thinking on | 86,016 | 8 | about 31,040 MiB | 8 fit, 1,570 MiB spare |
 | ARC-AGI-2 (its prompts run to 30,000 tokens), thinking on | 114,688 | 5 | about 29,600 MiB | 6 fit; 5, as the pilot ran it |
 | any, thinking off (ARC-AGI-2 isn't asked) | 5,120–20,480 | 8 | about 24,500 MiB at most | 8 fit |
 
 The box works this out from the GGUF's header before it fetches anything,
-keeping 1,024 MiB spare, and prints the room left in MiB either way. A step
+from the pilot's measured slope — 12.76 KiB a token of context, and 666 MiB
+above the file at 8 slots holding their recurrent state — keeping 1,024 MiB
+spare, and prints the room left in MiB and the basis either way. (17f's
+estimate counted a rounded-up overhead and the recurrent state again, 622 MiB
+above both readings, and ran HLE at 7.) A step
 planned at 8 slots that doesn't fit runs as many as do, down to 7
 (`--min-slots 7`, which the box's line gives), and says so; fewer than that
 is refused before the fetch. More slots would fit at the shorter contexts,
@@ -496,7 +500,7 @@ cd ~/benchmarks/aienh
 ```
 
 ```bash
-sudo docker compose exec -T bench python scripts/frontier_parity.py ask --as served/<phone-build> --out /home/masein/benchmarks/parity/phone-server.jsonl
+sudo docker compose exec -T bench python scripts/frontier_parity.py ask --as served/<phone-build> --out /home/masein/benchmarks/parity/phone-server-500.jsonl
 ```
 
 Its first line says how long the 500 take at this server's measured pace
@@ -525,7 +529,7 @@ scp -i ~/.ssh/id_ed25519 -P <port> root@<host>:/workspace/parity-phone/parity.js
 ```
 
 ```bash
-sudo docker compose exec -T bench python scripts/frontier_parity.py compare /home/masein/benchmarks/parity/phone-server.jsonl /home/masein/benchmarks/parity/phone-box.jsonl --file-sha256 <the phone file's sha256 from G0>
+sudo docker compose exec -T bench python scripts/frontier_parity.py compare /home/masein/benchmarks/parity/phone-server-500.jsonl /home/masein/benchmarks/parity/phone-box.jsonl --file-sha256 <the phone file's sha256 from G0>
 ```
 
 It prints "The same: the box answers 42.4% right (the mean of its two runs)
@@ -609,9 +613,14 @@ lookahead** gets its row only from a box run with its own variables, `--env
 Each step prints the file's sha256, the build and the GPU, the memory it
 expects, each benchmark's share, then a line as the run moves: answers, the
 pace, the time left. A step that stops doesn't stop the next; the last lines
-say how each ended. If the box stops, paste **the same line** again: each
-step asks only what is not answered, and a step already whole only makes its
-bundle again (a few minutes: the server loads, nothing is asked). Once
+say how each ended, and why. A step left short after asking (a question the
+server failed on with a 5xx, kept for the next run) runs again by itself, up
+to three runs, saying so — the third writes such a question off, and the
+step has its bundle. If the box stops, paste **the same line** again: each
+step asks only what is not answered, and a step already whole isn't run
+again (the parity step's 1,000 answers aren't asked twice). A parity step
+that stopped is asked again by the paste. A memory refusal's `--slots N` or
+`--slots-fit` go on the box's line as they are. Once
 its `--out` holds an answer, it refuses another build, other flags or another
 environment there; before that (a typo in `--flags`), the corrected command
 runs. Its `--out` keeps the served model, the thinking setting and the shard
@@ -650,26 +659,34 @@ the boxes' are compared with them:
 
 ```bash
 cd ~/benchmarks/aienh
-python3 scripts/frontier_fetch.py --key ~/.ssh/id_ed25519 --sha served/<phone-build>=<the phone file's sha256 from G0> --sha served/<original-build>=<the original file's sha256 from G0> --parity served/<phone-build>=/home/masein/benchmarks/parity/phone-server.jsonl --parity served/<original-build>=/home/masein/benchmarks/parity/orig-server.jsonl --every 15m <host 1>:<port 1> <host 2>:<port 2> <host 3>:<port 3>
+python3 scripts/frontier_fetch.py --key ~/.ssh/id_ed25519 --sha served/<phone-build>=<the phone file's sha256 from G0> --sha served/<original-build>=<the original file's sha256 from G0> --parity served/<phone-build>=/home/masein/benchmarks/parity/phone-server-500.jsonl --parity served/<original-build>=/home/masein/benchmarks/parity/orig-server-500.jsonl --every 15m <host 1>:<port 1> <host 2>:<port 2> <host 3>:<port 3>
 ```
 
-It asks for your password once (`sudo`, for the container): run it in a tmux
-pane of its own. `--every 15m` does it all again every 15 minutes until every
+It asks for your password once (`sudo`, for the container) and keeps it alive
+while it runs; if it lapses, one line says the next import waits for it. Run
+it in a tmux pane of its own. A `--parity` file that isn't there is refused
+before anything is fetched. `--every 15m` does it all again every 15 minutes until every
 box is done, and each time it sends the boxes' progress to the board: Runs ▸
 All runs opens with "On rented boxes", each step's box, model, what it asks,
 n of N, when it should finish and when it was last heard from (a box quiet
 for 45 minutes, or not reached at the last fetch, says so; one whose bundles
 are all home and imported reads "done, safe to destroy"). Only labels and
 progress go to the board, never a box's address; `--no-board` sends nothing. Each box's first line says whether it is **safe to destroy**:
-every step whole, and every bundle it holds here with the same sha256 and
-imported. Otherwise "NOT safe to destroy" and why — a step still asking (its
+every step its plan (G5) gives each build started there whole, and every
+bundle it holds here with the same sha256 and imported. Otherwise "NOT safe
+to destroy" and why — a step that hasn't started, a step still asking (its
 progress beside: what it asks, n of N, its restarts, when it was last
-written), a step stopped (paste its line again), a bundle NOT copied, an
-import refused. A copy goes to a temporary name and counts only when its
+written), a step stopped and why (llama-server dying at load, a gated
+question set, a parity question the server failed on: paste its line
+again), a bundle NOT copied, an import refused. A bundle of a model with no
+`--sha` (G6's calibration) counts once it is home, and its line gives the
+import to type. Each build's parity verdict is a line of its own every
+round. A copy goes to a temporary name and counts only when its
 sha256 is the box's: a failed copy leaves an older one here as it was. A box
 that doesn't answer is given up on (a 15-second connect timeout, no prompts)
 and said so. The exit code isn't 0 when a box couldn't be reached, a copy
-failed or an import was refused.
+failed, an import was refused, or a build's parity isn't the same or
+couldn't be compared.
 
 Run it whenever: a bundle made again (the box's line pasted again) holds the
 same answers, and the import says so and changes nothing, its grades kept; a
@@ -735,21 +752,20 @@ one build, under the limits of 6 Oct. Each answer that ran out of room on
 the pilot is taken to run to the new limit (2 of 20 GPQA, 17 of 54 HLE, 8 of
 16 OTIS and 3 of 10 ARC-AGI-2 with thinking on; 4 of 20 GPQA, 20 of 54 HLE, 8
 of 16 OTIS and 11 of 301 MMLU-Pro with it off), at the same tokens a second —
-the most it could take, more if the card writes slower at long contexts. HLE
-with thinking on runs 7 slots (G1): its hours are 8/7 of 8 slots'.
+the most it could take, more if the card writes slower at long contexts.
 
 | Benchmark | Answers | Thinking on | Thinking off |
 |---|---|---|---|
-| Humanity's Last Exam | 2,158 | 56.7 h (7 slots) | 8.5 h |
+| Humanity's Last Exam | 2,158 | 49.7 h | 8.5 h |
 | MMLU-Pro | 12,032 | 17.7 h | 7.4 h |
 | MATH Level 5 | 1,324 | 13.0 h | 1.9 h |
 | OTIS Mock AIME | 45 × 8 | 12.6 h | 1.7 h |
 | ARC-AGI-2 | 167 test grids × 2 | 11.6 h | not asked |
 | GPQA Diamond | 198 × 4 | 8.6 h | 2.0 h |
 | SimpleQA Verified | 1,000 | not measured; about 1 h | 0.2 h |
-| **One build** | | **121.2 h** | **21.7 h** |
+| **One build** | | **114.2 h** | **21.7 h** |
 
-142.9 box-hours a build, 286 for both, and half an hour a build for the
+135.8 box-hours a build, 272 for both, and half an hour a build for the
 parity questions. ARC-AGI-2's 120 tasks hold 167 test grids at the pinned
 revision, each asked twice. The paces come from small shards (16 to 301
 answers): read them as ±25%. `python scripts/frontier_box.py --list A`
@@ -759,25 +775,26 @@ prints a plan with each step's hours.
 
 | Box | Its steps | about |
 |---|---|---|
-| A1 | HLE on, shard 1/4; then GPQA and OTIS off | 17.9 h |
-| A2 | HLE on, shard 2/4; then MATH and SimpleQA off | 16.3 h |
-| A3 | the parity questions; then HLE on, shard 3/4 | 14.7 h |
-| A4 | HLE on, shard 4/4 | 14.2 h |
+| A1 | HLE on, shard 1/4; then GPQA and OTIS off | 16.1 h |
+| A2 | HLE on, shard 2/4; then MATH and SimpleQA off | 14.5 h |
+| A3 | the parity questions; then HLE on, shard 3/4 | 12.9 h |
+| A4 | HLE on, shard 4/4 | 12.4 h |
 | A5 | MMLU-Pro on | 17.7 h |
 | A6 | MATH and SimpleQA on | 14.0 h |
 | A7 | OTIS on; then MMLU-Pro off, shard 1/2 | 16.3 h |
 | A8 | ARC-AGI-2 on (5 slots); then MMLU-Pro off, shard 2/2 | 15.3 h |
 | A9 | GPQA on; then HLE off | 17.1 h |
 
-Nine boxes a build, eighteen in all: about **20 hours** from the first box to
-the last bundle, starting a box every ten minutes or so. Eight would do it
-with HLE in thirds, the longest 18.9 hours.
+Nine boxes a build, eighteen in all, the longest A5 at 17.7 hours: about
+**20 hours** from the first box to the last bundle, starting a box every ten
+minutes or so. (A box started on 308fcf3 runs HLE at 7 slots, about 1.8
+hours longer for a quarter: the shards merge either way.)
 
 **Plan B**: about 10 hours a box.
 
 | Box | Its steps | about |
 |---|---|---|
-| B1–B6 | HLE on, shard 1/6 … 6/6 | 9.5 h each |
+| B1–B6 | HLE on, shard 1/6 … 6/6 | 8.3 h each |
 | B7 | MMLU-Pro on, shard 1/2; then SimpleQA on | 9.9 h |
 | B8 | MMLU-Pro on, shard 2/2; then SimpleQA off | 9.0 h |
 | B9 | MATH on, shard 1/2; then MMLU-Pro off, shard 1/2 | 10.2 h |
@@ -845,10 +862,10 @@ nothing is badly off. A miss is reported with its interval, never adjusted.
 
 | | Box-hours, both builds | At $0.44–0.63 an hour | The paces ±25% |
 |---|---|---|---|
-| **Plan A**: 18 boxes, the longest 17.9 h | about 300 | **$132–189** | $101–234 |
-| Plan B: 30 boxes, the longest 10.2 h | about 310 | $136–195 | $105–240 |
+| **Plan A**: 18 boxes, the longest 17.7 h | about 287 | **$126–181** | $96–224 |
+| Plan B: 30 boxes, the longest 10.2 h | about 296 | $130–186 | $100–230 |
 
-G5's 286 box-hours, the parity questions' 1, and for each box about 0.3 hours
+G5's 272 box-hours, the parity questions' 1, and for each box about 0.3 hours
 to start (the fetch, the load) and 0.5 hours from its last bundle to being
 destroyed (the fetch's `--every 15m`, then destroying it). The calibration
 (G6): GPQA alone, $9–34. Grading (stage 3, after a yes): MMLU-Pro is scored

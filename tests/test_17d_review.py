@@ -69,7 +69,7 @@ def test_1_the_kv_cache_is_worked_out_from_the_header_and_the_card(box, monkeypa
     monkeypatch.setattr(rb, "gpu_info", lambda: {**GPU, "memory_mib": 8192})
     # 17e: with the buffers that grow with the context and the stated room
     with pytest.raises(SystemExit, match=r"8 slots of 83,968 tokens \(GPQA Diamond's, thinking "
-                                         r"on\) would use about 34.8 GB .*q8_0/q8_0 cache, 51.0 "
+                                         r"on\) would use about 34.7 GB .*q8_0/q8_0 cache, 51.0 "
                                          r"KB a token.*at most 1 slot fit — give --slots 1"):
         run_box(box, "run", "--gguf", str(path), "--slots", "8",
                 "--flags", "-ctk q8_0 -ctv q8_0 --flash-attn on")

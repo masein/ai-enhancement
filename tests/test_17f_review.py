@@ -42,29 +42,32 @@ def test_1_the_limits_of_6_oct():
                    MMLU: 8192, SQA: 4096}
 
 
-def test_1_both_plans_redone_with_hle_at_7_slots():
+def test_1_both_plans_redone_with_the_new_limits():
     import frontier_box as fbx
     hle_on = ("on", (HLE,), "1/4", 8)
-    assert fbx.slots_run(hle_on) == 7 and fbx.slots_run(("on", (GPQA,), "", 8)) == 8
+    # 17g: 8, by the pilot's measured slope (17f's estimate gave 7)
+    assert fbx.slots_run(hle_on) == 8 and fbx.slots_run(("on", (GPQA,), "", 8)) == 8
     assert fbx.slots_run(("on", ("arc_agi2_public",), "", 5)) == 5
     # a step's hours: the pilot's pace, the new limit's most, at the slots it runs
-    assert fbx.hours(hle_on) == pytest.approx(56.7 / 4, abs=0.1)
+    assert fbx.hours(hle_on) == pytest.approx(49.7 / 4, abs=0.1)
     a = {b: sum(fbx.hours(s) for s in st) for b, st in fbx.PLANS["A"].items()}
-    assert max(a.values()) == pytest.approx(17.9, abs=0.1) and len(a) == 9
-    assert sum(a.values()) == pytest.approx(142.9 + 0.5, abs=0.2)
+    assert max(a.values()) == pytest.approx(17.7, abs=0.1) and len(a) == 9
+    assert sum(a.values()) == pytest.approx(135.8 + 0.5, abs=0.2)
     b = {x: sum(fbx.hours(s) for s in st) for x, st in fbx.PLANS["B"].items()}
     assert max(b.values()) == pytest.approx(10.2, abs=0.1) and len(b) == 15
-    assert "7 slots (of 8: no more fit a 5090)" in fbx.words(hle_on)
+    assert "8 slots" in fbx.words(hle_on)
+    assert "6 slots (of 8: no more fit a 5090)" in fbx.words(("on", ("arc_agi2_public",), "", 8))
 
 
 def test_1_2_a_step_planned_at_8_runs_7_where_8_dont_fit_and_says_its_room(box, monkeypatch):  # noqa: F811
     monkeypatch.setattr(fb, "_fetch", questions)
     monkeypatch.setattr(rg, "header_of", lambda src: (PILOT_SHAPE, PILOT_FILE))
-    monkeypatch.setattr(rb, "gpu_info", lambda: {**GPU, "memory_mib": 32607})
+    # 17g: a 5090 holds 8 of HLE's (1,570 MiB spare); a 32,000 MiB card doesn't
+    monkeypatch.setattr(rb, "gpu_info", lambda: {**GPU, "memory_mib": 32000})
     assert run_box(box, "h", "--only", HLE, "--slots", "8", "--min-slots", "7",
                    "--flags", " ".join(Q8)) == 0
     own = (box["root"] / "h" / rg.OWN_LOG).read_text()
-    assert re.search(r"8 slots of 86,016 tokens would leave 9\d\d MiB of this card's 32,607, "
+    assert re.search(r"8 slots of 86,016 tokens would leave \d+ MiB of this card's 32,000, "
                      r"under the 1,024 kept spare: 7 run \(--min-slots 7\)", own), own
     assert re.search(r"[\d,]+ MiB spare; up to 7 slots fit keeping 1,024", own), own
     path = next((box["root"] / "h").glob("frontier-*.tar.gz"))
@@ -195,6 +198,7 @@ def fetch_world(tmp_path, monkeypatch, boxes: dict, scp_fails: set = frozenset()
         assert cmd[:9] == ff.COMPARE
         return 0, "The same: the box answers 42.4% right (the mean of its two runs) …\n"
     monkeypatch.setattr(ff, "run", run)
+    monkeypatch.setattr(ff, "keep_sudo", lambda: None, raising=False)
     key = tmp_path / "id_ed25519"
     key.write_text("not a key")
     return ff, calls, key
@@ -267,20 +271,20 @@ def test_p2_4_5_both_builds_on_one_box_and_the_parity_compared(tmp_path, monkeyp
     par = there / "parity.jsonl"
     par.write_text('{"parity_of": {}}\n')
     dest = tmp_path / "b" / "bundles"
+    ref = tmp_path / "phone-server-500.jsonl"      # 17g: checked at the start, so it's there
+    ref.write_text("{}\n")
     ff, calls, key = fetch_world(tmp_path, monkeypatch, {"1.1.1.1": (
         {f"/workspace/phone/A3-2/{p.name}": p, f"/workspace/orig/A3-2/{o.name}": o},
         [], {"/workspace/phone/A3-parity/parity.jsonl": par})})
     code = ff.main(["--key", str(key), "--dest", str(dest), "--sha", f"served/phone={'ab' * 32}",
-                    "--sha", f"served/orig={'cd' * 32}", "--parity",
-                    "served/phone=/home/masein/benchmarks/parity/phone-server.jsonl",
+                    "--sha", f"served/orig={'cd' * 32}", "--parity", f"served/phone={ref}",
                     "1.1.1.1:41"])
     out = capsys.readouterr().out
     assert code == 0, out
     imports = [c for c in calls if c[:8] == ff.IMPORT and "--file-sha256" in c]
     assert sorted(c[c.index("--file-sha256") + 1] for c in imports) == ["ab" * 32, "cd" * 32]
     compare = next(c for c in calls if c[:9] == ff.COMPARE)
-    assert compare[9:11] == ["/home/masein/benchmarks/parity/phone-server.jsonl",
-                             str(dest.parent / "parity" / "phone-box.jsonl")]
+    assert compare[9:11] == [str(ref), str(dest.parent / "parity" / "phone-box.jsonl")]
     assert "phone's parity: The same: the box answers 42.4% right" in out
 
 
