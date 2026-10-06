@@ -509,22 +509,50 @@ def checks(b: dict, rec: dict | None, file_sha: str = "") -> list[str]:
     return out
 
 
-def shard_conflicts(reg: dict, b: dict, tasks: list[str], shard: tuple[int, int]) -> list[str]:
+def shard_conflicts(reg: dict, b: dict, tasks: list[str], shard: tuple[int, int],
+                    shards: Path | None = None) -> list[str]:
     """17b: a task whose shards here were made with another build, other flags
-    or another environment than this one — never merged into one row"""
+    or another environment than this one — never merged into one row. 17g:
+    nor asked another way — each task's own setup (its token limit, its
+    protocol, its sampling: what `against` compares a row's answers by) read
+    from each shard waiting here, beside the bundle's"""
+    from service import frontier as sf
     mine = shard_setup(b["setup"].get("server") or {})
     out = []
+    again = ("every shard of a task is run the same way: import with --set-aside-shards to set "
+             "the shards here aside and start its shards again with this one")
     for t in tasks:
-        for j, x in sorted(((reg.get("shards") or {}).get(t) or {}).get("have", {}).items()):
-            if j == str(shard[0]) or not x.get("setup") or x["setup"] == mine:
+        sh = (reg.get("shards") or {}).get(t) or {}
+        try:
+            here = json.loads(b["files"].get(
+                f"results/{b['bundle'].get('row')}/{t}_0shot/{sf.SUB}/{sf.SETUP}") or b"{}")
+        except ValueError:
+            here = {}
+        for j, x in sorted((sh.get("have") or {}).items()):
+            if j == str(shard[0]):
                 continue
-            diff = [k for k in mine if mine[k] != x["setup"].get(k)]
-            out.append(f"{t}: shard {j} here was made with another setup ({', '.join(diff)}: "
-                       f"{', '.join(repr(x['setup'].get(k)) for k in diff)} there, "
-                       f"{', '.join(repr(mine[k]) for k in diff)} here) — every shard of a task "
-                       "is run the same way: import with --set-aside-shards to set the shards "
-                       "here aside and start its shards again with this one")
+            if x.get("setup") and x["setup"] != mine:
+                diff = [k for k in mine if mine[k] != x["setup"].get(k)]
+                out.append(f"{t}: shard {j} here was made with another setup ({', '.join(diff)}: "
+                           f"{', '.join(repr(x['setup'].get(k)) for k in diff)} there, "
+                           f"{', '.join(repr(mine[k]) for k in diff)} here) — {again}")
+                continue
+            # 17g: shards of another split are set aside anyway ("resetting")
+            if shards is None or not isinstance(here, dict) or sh.get("n") != shard[1]:
+                continue
+            there = sf._read_json(shards / t / f"{j}-of-{shard[1]}" / sf.SETUP)
+            diff = [k for k in sf.setup_differs(there, here) if k != "shard"]
+            if diff:
+                out.append(f"{t}: shard {j} here was asked another way ("
+                           + "; ".join(f"{k}: {_said(there.get(k))} there, {_said(here.get(k))} "
+                                       "here" for k in diff)
+                           + f") — {again}")
     return out
+
+
+def _said(v) -> str:
+    """a setup's value in a refusal: 16,384 rather than 16384"""
+    return f"{v:,}" if isinstance(v, int) and not isinstance(v, bool) else repr(v)
 
 
 def _would_be(b: dict, file_sha: str) -> dict:
@@ -624,7 +652,8 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
     tasks = [t for t in fb.TASKS if t in (bundle.get("tasks") or {})]
     set_aside_for: set[str] = set()
     if not bad and shard:
-        clash = shard_conflicts(reg, b, tasks, shard)
+        clash = shard_conflicts(reg, b, tasks, shard,
+                                config.OUT_DIR.with_name("shards") / row_name)
         if clash and aside:
             set_aside_for = {x.split(":", 1)[0] for x in clash}
             for x in clash:
@@ -664,9 +693,11 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             encoding="utf-8")
         (d / sf.SETUP).write_bytes(task_setup)
         # 17f: the grades of answers that didn't change go with them (each
-        # grade names the answer it graded: a changed one is graded again)
-        if keep is not None and (keep / sf.GRADES).exists():
-            shutil.copy2(keep / sf.GRADES, d / sf.GRADES)
+        # grade names the answer it graded: a changed one is graded again).
+        # 17g: whenever the setup is the same, however many changed — only
+        # those whose text is the same as the one graded
+        if keep is not None:
+            keep_grades(keep, d, answers)
 
     def against(t: str, new: dict, where: Path, task_setup: bytes, what: str) -> str:
         """17f: 'same', 'more' or 'other' — told by the answers, not the
@@ -679,7 +710,7 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
         except (OSError, ValueError):
             old_setup = new_setup = {}
         other = [k for k in sf.setup_differs(old_setup, new_setup) if k != "shard"]
-        how = "other" if other else compare_answers(have, new)
+        how = "setup" if other else compare_answers(have, new)
         if how == "same":
             lines.append(f"{t}: the same {len(new):,} answers as {what} — nothing changed, its "
                          "grades kept")
@@ -688,6 +719,12 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             more = len(new) - kept
             lines.append(f"{t}: {more:,} answer{'s' if more != 1 else ''} more than {what} "
                          f"holds, the grades of the {kept:,} unchanged kept")
+        elif how == "other" and have:
+            # 17g: some answers differ — the rest keep their grades
+            changed = sum(1 for k, r in have.items()
+                          if (new.get(k) or {}).get("answer") != r.get("answer"))
+            lines.append(f"{t}: {changed:,} of {len(have):,} answers differ from {what} — "
+                         "those are graded again, the unchanged keep their grades")
         return how
 
     # 17c: everything staged and scored first — the row, the shards waiting
@@ -751,7 +788,8 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             how = against(t, merged, sf.task_dir(row, t), tsetup, "the row")
             if how == "same":
                 continue
-            stage(t, merged, tsetup, keep=sf.task_dir(row, t) if how == "more" else None)
+            # 17g: one changed answer in a remade shard kept no grade of either
+            stage(t, merged, tsetup, keep=sf.task_dir(row, t) if how != "setup" else None)
             parts = [sh["have"][str(j)] for j in range(1, n + 1)]
             ready[t] = {**entry, "gpus": sorted({x["gpu"] for x in parts}), "shards": n,
                         "shard_bundles": [{"shard": j, **{k: x.get(k) for k in (
@@ -764,7 +802,7 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             how = against(t, ans, sf.task_dir(row, t), tsetup, "the row")
             if how == "same":
                 continue
-            stage(t, ans, tsetup, keep=sf.task_dir(row, t) if how == "more" else None)
+            stage(t, ans, tsetup, keep=sf.task_dir(row, t) if how != "setup" else None)
             ready[t] = {**entry, "gpus": [gpu], "boxes": [entry["box"]] if entry["box"] else []}
             lines.append(f"{t}: {len(ans):,} answers from a rented GPU ({gpu})")
 
@@ -882,6 +920,40 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
 
 
 WHERE_WORDS = "run on a rented GPU"
+
+
+def keep_grades(src: Path, dst: Path, answers: dict) -> int:
+    """17g: the grades (and no-grades, and those kept aside) of the answers
+    whose text is the one graded, from `src` to `dst` — every other dropped,
+    graded again. How many grades went with their answers"""
+    from service import frontier as sf
+    g = sf.read_grades(src)
+    if not g:
+        return 0
+    now = {sf.gkey(r.get("id"), r.get("epoch")): sf.answer_sha(r.get("answer") or "")
+           for r in answers.values() if isinstance(r, dict)}
+    kept = 0
+
+    def walk(x):
+        nonlocal kept
+        if isinstance(x, list):
+            return [walk(v) for v in x]
+        if not isinstance(x, dict):
+            return x
+        out = {}
+        for k, v in x.items():
+            if k in ("items", "refused") and isinstance(v, dict) and all(
+                    isinstance(e, dict) and "answer_sha256" in e for e in v.values()):
+                out[k] = {q: e for q, e in v.items() if now.get(q) == e["answer_sha256"]}
+                if k == "items" and x is g:
+                    kept += len(out[k])
+            else:
+                out[k] = walk(v)
+        return out
+    g = walk(g)
+    dst.mkdir(parents=True, exist_ok=True)
+    (dst / sf.GRADES).write_text(json.dumps(g, indent=1, ensure_ascii=False), encoding="utf-8")
+    return kept
 
 
 def compare_answers(have: dict, new: dict) -> str:
