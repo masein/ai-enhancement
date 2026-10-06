@@ -781,7 +781,11 @@ def words(task: str, sc: dict) -> str:
 def run(sid: int, sub: dict, rec: dict, th: dict, row: Path, log_path: Path) -> tuple[str, str]:
     """(status, line) for a Frontier run of a served model"""
     on = bool(th and th.get("on"))
-    tasks = [t for t in (json.loads(sub.get("tasks") or "[]") or fb.TASKS) if t in fb.BENCH]
+    # 17e: asked in the suite's order, as the box lists them — the run's
+    # record keeps its tasks sorted, which asked MMLU-Pro before SimpleQA:
+    # the pilot's stop by hand in MMLU-Pro left SimpleQA never asked
+    chosen = set(json.loads(sub.get("tasks") or "[]") or fb.TASKS)
+    tasks = [t for t in fb.TASKS if t in chosen]
     sh = shard()
 
     def log(text: str) -> None:

@@ -467,6 +467,14 @@ def test_the_docs_commands_are_the_scripts_and_paste_whole():
         assert not any(x.rstrip().endswith("\\") for x in lines), b   # one line each
     cmds = [shlex.split(x) for b in blocks for x in b.splitlines()
             if x.startswith("python scripts/remote_gguf.py")]
+    # 17e: a box's one line, each of its steps a remote_gguf.py command
+    import frontier_box as fbx
+    for b in blocks:
+        for x in b.splitlines():
+            if x.startswith("python scripts/frontier_box.py"):
+                fa = fbx.parser().parse_args(shlex.split(x)[2:])
+                cmds += [["python", *fbx.argv_of(fa.box.upper(), k, st, fa)[1:]]
+                         for k, st in enumerate(fbx.box_of(fa.box), 1)]
     assert len(cmds) >= 4                          # parity, the two builds, the calibration
     args = [parsed(c) for c in cmds]
     builds = {a.served_as: a for a in args if not a.parity}
@@ -484,6 +492,9 @@ def test_the_docs_commands_are_the_scripts_and_paste_whole():
     name = rb.bundle_name("frontier", phone.served_as, True,
                           parts=[fbm.BENCH[t]["short"] for t in phone.only])
     assert f"root@<host>:{phone.out}/{name} ~/benchmarks/bundles/" in sec
+    # 17e: and one command fetches and imports every box's
+    assert "python3 scripts/frontier_fetch.py --key ~/.ssh/id_ed25519 --sha " \
+        "served/<phone-build>=" in sec
     assert f"import_remote.py ~/benchmarks/bundles/{name} --by masein" in sec
     # 17d: and every import names a bundle a box command here writes (G6 named
     # the old one)

@@ -599,6 +599,21 @@ def ran_out(text: str, finish: str | None) -> bool:
     return finish == "length" or ("<think>" in t[:200] and "</think>" not in t)
 
 
+# 17e: an answer that ran out "ends in a loop" when the passage just before
+# where it was cut (LOOP_PASSAGE characters, clear of the cut itself) is
+# found LOOP_TIMES times or more in its last LOOP_WINDOW characters — the
+# last passage repeating. For information on the import's line only
+LOOP_PASSAGE, LOOP_TIMES, LOOP_WINDOW = 200, 3, 20_000
+
+
+def ends_in_loop(text: str) -> bool:
+    tail = (text or "")[-LOOP_WINDOW:]
+    if len(tail) < LOOP_PASSAGE * LOOP_TIMES + 200:
+        return False
+    passage = tail[-(LOOP_PASSAGE + 200):-200]
+    return passage.strip() != "" and tail.count(passage) >= LOOP_TIMES
+
+
 def read_choice(text: str, letters: str = LETTERS) -> str | None:
     """the letter a reply answers with, as Inspect's choice() reads it — None
     when it gives none, or more than one"""
