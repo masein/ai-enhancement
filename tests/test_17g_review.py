@@ -18,8 +18,12 @@ import pytest
 import frontier as fb
 import remote_bundle as rb
 import remote_gguf as rg
+from service import config
+from service import frontier as sf
 from test_12q_devicemark_runs import svc  # noqa: F401 — svc is the fixture
-from test_17_gguf_box import GPU, SERVED, box, run_box  # noqa: F401
+from test_17_gguf_box import (GPU, N, ROW, RUNS, SERVED, TASK, box,  # noqa: F401
+                              bundle_of, register, run_box)
+from test_17b_review import answers_name, imported, rewrite
 from test_17e_review import PILOT_FILE, PILOT_SHAPE, Q8, a_bundle, questions
 from test_17f_review import fetch_world, listing_of
 
@@ -416,3 +420,90 @@ def test_8_the_timeouts_comment_says_17fs_limit():
     i = src.index('"SERVED_TIMEOUT_S": int(')
     said = src[src.rindex("#", 0, i):i]
     assert "81,920" in said and "65,536" not in said
+
+
+# ---------------------------------------------------------------------------
+# part 2, 9: shards asked under two limits never merge
+# ---------------------------------------------------------------------------
+
+def test_9_shards_asked_under_another_limit_are_refused_not_merged(box, monkeypatch):  # noqa: F811
+    limit = fb.BENCH[TASK]["budget"]["on"]
+    monkeypatch.setitem(fb.BENCH[TASK]["budget"], "on", 4096)  # the limits before a deploy
+    assert run_box(box, "s1", "--shard", "1/2") == 0
+    assert run_box(box, "s2", "--shard", "2/2") == 0
+    register(box["sha"])
+    assert imported(bundle_of(box, "s1", (1, 2)))[0] == 0
+    code, said = imported(bundle_of(box, "s2", (2, 2)))
+    assert code == 0 and any("every shard is in (2 of 2)" in x for x in said), said
+    # the new limit: shard 1 asked again, at 81,920
+    monkeypatch.setitem(fb.BENCH[TASK]["budget"], "on", limit)
+    assert run_box(box, "s1b", "--shard", "1/2") == 0
+    code, said = imported(bundle_of(box, "s1b", (1, 2)))
+    assert code == 2, said
+    assert any(f"{TASK}: shard 2 here was asked another way (budget: 4,096 there, "
+               f"{limit:,} here) — every shard of a task is run the same way: import with "
+               "--set-aside-shards" in x for x in said), said
+    rows = json.loads((sf.task_dir(config.OUT_DIR / ROW, TASK) / sf.SETUP).read_text())
+    assert rows["budget"] == 4096                       # the row is as it was
+    # set aside, it starts the task's shards again — not scored with shard 2's
+    code, said = imported(bundle_of(box, "s1b", (1, 2)), aside=True)
+    assert code == 0 and any("shard 2 of 2 missing" in x for x in said), said
+
+
+# ---------------------------------------------------------------------------
+# part 2, 10: a few changed answers keep the other answers' grades
+# ---------------------------------------------------------------------------
+
+def graded_all(d: Path) -> dict:
+    """a grader's grade for every answer the row holds, each naming its answer"""
+    got = sf.read_answers(d / sf.ANSWERS)
+    g = {"grader": {"version": "g1"},
+         "items": {sf.gkey(q, e): {"ok": True, "by": "g1", "prompt_sha256": "p",
+                                   "answer_sha256": sf.answer_sha(r.get("answer") or "")}
+                   for (q, e), r in got.items()},
+         "refused": {}}
+    (d / sf.GRADES).write_text(json.dumps(g))
+    return g
+
+
+def changed(n: int, which=None):
+    def fix(files):
+        lines = [json.loads(x) for x in files[answers_name()].decode().splitlines()]
+        for r in lines[:n] if which is None else [x for x in lines if which(x)]:
+            r["answer"] = (r.get("answer") or "") + " — and something else"
+        files[answers_name()] = "".join(json.dumps(x) + "\n" for x in lines).encode()
+    return fix
+
+
+def test_10_two_changed_answers_keep_the_others_grades(box):  # noqa: F811
+    assert run_box(box, "run") == 0
+    register(box["sha"])
+    assert imported(bundle_of(box, "run"))[0] == 0
+    d = sf.task_dir(config.OUT_DIR / ROW, TASK)
+    g = graded_all(d)
+    code, said = imported(rewrite(bundle_of(box, "run"), changed(2)))
+    assert code == 0, said
+    assert any(f"{TASK}: 2 of {N * RUNS} answers differ from the row — those are graded again, "
+               "the unchanged keep their grades" in x for x in said), said
+    now = sf.read_grades(d)
+    assert len(now["items"]) == N * RUNS - 2 and now["grader"] == g["grader"]
+    assert all(g["items"][k] == x for k, x in now["items"].items())
+
+
+def test_10_one_changed_answer_in_a_remade_shard_keeps_both_shards_grades(box):  # noqa: F811
+    assert run_box(box, "s1", "--shard", "1/2") == 0
+    assert run_box(box, "s2", "--shard", "2/2") == 0
+    register(box["sha"])
+    assert imported(bundle_of(box, "s1", (1, 2)))[0] == 0
+    assert imported(bundle_of(box, "s2", (2, 2)))[0] == 0
+    d = sf.task_dir(config.OUT_DIR / ROW, TASK)
+    g = graded_all(d)
+    code, said = imported(rewrite(bundle_of(box, "s1", (1, 2)), changed(1)))
+    assert code == 0, said
+    now = sf.read_grades(d)
+    assert len(now["items"]) == N * RUNS - 1, said
+    # shard 2's every grade, and shard 1's unchanged ones
+    s2 = {sf.gkey(q, e) for (q, e) in sf.read_answers(
+        config.OUT_DIR.with_name("shards") / ROW / TASK / "2-of-2" / sf.ANSWERS)}
+    assert s2 and s2 <= set(now["items"])
+    assert all(g["items"][k] == x for k, x in now["items"].items())

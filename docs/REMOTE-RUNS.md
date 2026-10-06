@@ -690,7 +690,9 @@ couldn't be compared.
 
 Run it whenever: a bundle made again (the box's line pasted again) holds the
 same answers, and the import says so and changes nothing, its grades kept; a
-step's bundle with more answers adds them, the grades of the rest kept. A
+step's bundle with more answers adds them, the grades of the rest kept; one
+where some answers changed is graded again only for those, every unchanged
+answer keeping its grade (across a task's shards too). A
 step of two benchmarks fetched while only its first is whole brings that one;
 the second comes with a later fetch, and the first's answers and grades stay
 as they are. A shard waits for the others. A box's parity file is compared
@@ -718,7 +720,9 @@ setup as its task's other shards). Each benchmark is scored apart first: a
 bundle that fails a check, or a task that can't be scored, leaves the row as
 it was, and isn't counted as imported: the same command imports it once
 fixed. A shard of a task whose shards here were made with another setup (a
-rebuilt tarball) is refused; `--set-aside-shards` sets those aside, and this
+rebuilt tarball) or asked another way (another token limit, protocol or
+sampling: shards 1/2 and 2/2 at the old limits, then 1/2 again at the new) is
+refused, saying which; `--set-aside-shards` sets those aside, and this
 shard starts the task's shards again. A shard waits until the others are in. Then each benchmark is scored by
 code, its result says "run on a rented GPU (<the GPU>)", and the Runs list gets
 the import with the box's log.

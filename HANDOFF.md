@@ -4953,6 +4953,20 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17g.2 — the import (6 Oct)
+
+- **Shards asked another way never merge** (`shard_conflicts`): beside the
+  build, flags and environment, each task's own setup — its token limit,
+  protocol, sampling, everything `against` compares a row by — is read from
+  each shard waiting here. Shards 1/2 and 2/2 at 4,096 and a new 1/2 at
+  16,384 are refused, saying which; `--set-aside-shards` starts again.
+- **A few changed answers keep the rest's grades** (`keep_grades`): whenever
+  the setup is the same, every answer whose text is the one graded keeps its
+  grade (and its no-grades, and those kept aside); only the changed are
+  graded again. Across shards too: one changed answer in a remade shard keeps
+  both shards' other grades.
+- Tests: `tests/test_17g_review.py` (part 2).
+
 ### 17g.1 — the boxes and the fetch (6 Oct)
 
 - **"Done, safe to destroy" by the plan** (`frontier_fetch.one_box`): the box's
