@@ -165,6 +165,19 @@ def lone(text: str) -> str:
     return _WRAP.sub("", text or "")
 
 
+def _json_fields(text: str) -> dict | None:
+    """the reply's JSON object, when it is one"""
+    import json
+    a, b = text.find("{"), text.rfind("}")
+    if a < 0 or b <= a:
+        return None
+    try:
+        got = json.loads(text[a:b + 1])
+    except ValueError:
+        return None
+    return got if isinstance(got, dict) else None
+
+
 def unread(text: str, show: bool = True) -> dict:
     """17b: a reply that isn't a grade — never kept as one; the next Start
     asks again. 17c: its words without the reply for a benchmark that is
@@ -200,14 +213,23 @@ def read(slot: str, text: str, item: dict) -> dict:
             return unread(text)
         return {"ok": g == "A", "words": _SQA_WORDS[g], "said": said, "grade": g}
     if slot == "hle":
-        # the last "correct:" given — text or JSON — as CAIS's structured
-        # output has one field of each. 17c: its value alone ("yes/no" isn't one)
-        m = _last(r"(?i)(?<![a-z_])correct\W*:[\s\"'*]*(yes|no)(?=[\"'*.]*\s*(?:$|,|}))",
-                  text if "\n" not in text.strip() else text.replace("\r", ""))
-        if m is None:
-            m = _last(r"(?im)(?<![a-z_])correct\W*:[\s\"'*]*(yes|no)[\"'*.]*[ \t]*$", text)
-        conf = _last(r"(?i)(?<![a-z_])confidence\W*:\W*(\d{1,3})", text)
-        ext = _last(r"(?i)extracted_final_answer\W*:\s*\"?([^\n\"]+)", text)
+        # CAIS's fields: as JSON (its structured output), else each at the start
+        # of its own line — 17d: the last such "correct:" line, its value
+        # alone; never a "correct: no" inside the judge's reasoning, and a
+        # carriage return isn't part of the value
+        t = text.replace("\r", "")
+        fields = _json_fields(t)
+        if fields is not None and str(fields.get("correct", "")).strip().lower() in ("yes", "no"):
+            ok = str(fields["correct"]).strip().lower() == "yes"
+            ext = str(fields.get("extracted_final_answer") or "").strip()
+            conf = re.fullmatch(r"\s*(\d{1,3})\s*%?\s*", str(fields.get("confidence", "")))
+            return {"ok": ok, "words": ("the judge: correct" if ok else "the judge: incorrect")
+                    + (f" · read as {ext[:60]}" if ext else ""), "said": said,
+                    **({"confidence": int(conf.group(1))} if conf else {})}
+        w = r"[\s*_`\"'#>-]*"
+        m = _last(rf"(?im)^{w}correct{w}:{w}(yes|no)[\s*_`\"'.]*$", t)
+        conf = _last(rf"(?im)^{w}confidence{w}:{w}(\d{{1,3}})\s*%?[\s*_`\"'.]*$", t)
+        ext = _last(rf"(?im)^{w}extracted_final_answer{w}:\s*(.+)$", t)
         if not m:
             return unread(text, shown)
         ok = m.group(1).lower() == "yes"

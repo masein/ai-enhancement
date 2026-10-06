@@ -436,6 +436,9 @@ GRADES = "grades.json"
 # 17c: an answer whose grader's reply was no grade this many times is ungraded:
 # never sent again, counted wrong, and said (service/frontier_grade.py)
 GRADE_TRIES = 3
+# 17d: a benchmark with more than this share of what its grader was sent left
+# ungraded has no score: the grader isn't answering in its form
+UNGRADED_SHARE = 0.05
 
 
 def read_grades(d: Path) -> dict:
@@ -611,7 +614,18 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
                  and not r.get("unanswered"))
     errors = sum(1 for r in flat if r["error"])
     if spec.get("grader") and waiting:
+        # 17d: answers asked again (another grader chosen) wait: the score made
+        # without them is no longer the page's
+        _unwrite(d, task)
         return {"waiting": waiting, "of": len(flat), "label": spec["label"]}
+    seen = sum(1 for r in flat if r["grade"] is not None or r.get("ungraded"))
+    if ungraded and ungraded > UNGRADED_SHARE * seen:
+        _unwrite(d, task)
+        return {"no_score": (
+            f"{spec['label']}: its grader gave no grade on {ungraded:,} of the {seen:,} answers "
+            f"it was sent ({ungraded / seen:.0%}, more than {UNGRADED_SHARE:.0%}) — it isn't "
+            "answering in its form: no score; choose another grader on AI models"),
+            "ungraded": ungraded, "of": seen, "label": spec["label"]}
     code = (None if spec.get("grader") else
             _share({q: [1.0 if r["code_ok"] else 0.0 for r in rs] for q, rs in runs.items()},
                    task, items))
@@ -698,6 +712,12 @@ def graders_of(d: Path, flat: list[dict]) -> tuple[dict | None, list[dict]]:
     return None, every
 
 
+def _unwrite(d: Path, task: str) -> None:
+    """a task's written score taken away (its answers and grades stay)"""
+    for old in [*d.glob("results_*.json"), *d.glob(f"samples_{task}_*.jsonl")]:
+        old.unlink()
+
+
 def words(task: str, sc: dict) -> str:
     """"GPQA Diamond 61.6% ± 3.1 · 4 runs of 198 · 2 ran out" — or, for a
     graded benchmark not yet graded, "SimpleQA Verified: 1,000 answers wait for
@@ -705,6 +725,8 @@ def words(task: str, sc: dict) -> str:
     spec = fb.BENCH[task]
     if sc.get("refused"):
         return sc["refused"]
+    if sc.get("no_score"):
+        return sc["no_score"]
     if sc.get("waiting") is not None and sc.get("score") is None:
         return (f"{spec['label']}: {sc['waiting']:,} answers wait for its grader (AI models ▸ "
                 "Start)")
