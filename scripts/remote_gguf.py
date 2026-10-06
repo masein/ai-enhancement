@@ -261,9 +261,18 @@ MAX_CONTEXT = 8 * 67_584
 # cache type, beside the file on this card — before anything is fetched
 CACHE_BYTES = {"f32": 4.0, "f16": 2.0, "bf16": 2.0, "q8_0": 34 / 32, "q4_0": 18 / 32,
                "q4_1": 20 / 32, "q5_0": 22 / 32, "q5_1": 24 / 32, "iq4_nl": 18 / 32}
-# CUDA's context and llama-server's compute and output buffers, beside the
-# weights and the cache
-OVERHEAD = 2.5 * 1024 ** 3
+# 17e: set from the pilot (an RTX 5090, 32,607 MiB; the phone build's file,
+# 22,854,339,808 bytes; q8_0, flash attention): 8 slots of 36,864 tokens
+# used 26,136 MiB after load, 8 of 67,584 used 29,198 — 13,066 bytes a token
+# of context, of which the header's KV cache is 10,880, and 665 MiB above
+# the file. CTX_BUFFERS: llama-server's buffers that grow with the context,
+# beside its KV cache. OVERHEAD: CUDA's context and the fixed buffers, the
+# pilot's 665 MiB rounded up (the recurrent state is counted again on top,
+# a slot each). ROOM: what the pilot didn't show — the longest prompts'
+# compute, fragmentation — stated, never measured
+CTX_BUFFERS = 2186
+OVERHEAD = 768 * 1024 ** 2
+ROOM = 1024 ** 3
 HEADER_BYTES = 24 * 1024 ** 2          # the metadata: a vocabulary's arrays are a few MB
 
 
@@ -328,23 +337,28 @@ def header_of(src: str) -> tuple[dict | None, int | None]:
         return None, None
 
 
-def kv_fit(src: str, flags: list[str], slots: int, ctx: int, memory_mib: int | None) -> dict | None:
-    """{need, kv, file, card, fit}: the cache these slots take, the file and
-    the card, in bytes, and the most slots that fit — None when the header or
-    the card can't be read"""
+def kv_fit(src: str, flags: list[str], slots: int, ctx: int,
+           memory_mib: int | None) -> tuple[dict | None, str]:
+    """({used, kv, per_token, per_slot, file, card, fit, types, arch}, '') —
+    what these slots use on this card, in bytes, and the most that fit with
+    ROOM to spare; (None, why) when the header, the cache type or the card
+    can't be read"""
     shape, size = header_of(src)
-    if not shape or not size or not memory_mib:
-        return None
+    if not shape or not size:
+        return None, "the GGUF's header couldn't be read before the fetch"
+    if not memory_mib:
+        return None, "the card's memory couldn't be read (nvidia-smi)"
     ctk, ctv = cache_types(flags)
     per_token = kv_per_token(shape, ctk, ctv)
     if per_token is None:
-        return None
-    per_slot = per_token * ctx + recurrent_per_slot(shape)
+        return None, f"the cache type {ctk}/{ctv} isn't one this check knows"
+    per_slot = (per_token + CTX_BUFFERS) * ctx + recurrent_per_slot(shape)
     card = memory_mib * 1024 ** 2
-    room = card - size - OVERHEAD
-    return {"kv": per_slot * slots, "per_token": per_token, "per_slot": per_slot, "file": size,
-            "card": card, "fit": max(0, int(room // per_slot)), "types": f"{ctk}/{ctv}",
-            "arch": shape["arch"]}
+    room = card - size - OVERHEAD - ROOM
+    return {"used": size + OVERHEAD + per_slot * slots, "kv": per_token * ctx * slots,
+            "per_token": per_token, "per_slot": per_slot, "file": size, "card": card,
+            "fit": max(0, int(room // per_slot)), "types": f"{ctk}/{ctv}",
+            "arch": shape["arch"]}, ""
 
 
 def answered_here() -> bool:
@@ -647,6 +661,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--max-context", type=int, default=MAX_CONTEXT,
                     help="17c: the most context (slots × each slot's) the card holds beside "
                          f"the GGUF — G1's table for a 32 GB card: {MAX_CONTEXT:,}")
+    ap.add_argument("--slots-fit", action="store_true",
+                    help="17e: these --slots fit on this card — the memory check's estimate is "
+                         "printed, and not held to")
     ap.add_argument("--port", type=int, default=8090)
     ap.add_argument("--load-timeout", type=float, default=3600)
     ap.add_argument("--by", default="remote", help="who ran it, for the run's record")
@@ -685,25 +702,27 @@ def main(argv: list[str] | None = None) -> int:
     # 17d: worked out from the GGUF's header, its cache type and this card;
     # the stated --max-context only when those can't be read
     ctx = fb.slot_context(tasks, thinking)
-    fit = kv_fit(a.gguf, shlex.split(a.flags), a.slots, ctx, rb.gpu_info().get("memory_mib"))
-    if fit and fit["fit"] < a.slots:
-        big = max(tasks, key=lambda t: fb.slot_context([t], thinking))
+    fit, unread = kv_fit(a.gguf, shlex.split(a.flags), a.slots, ctx,
+                         rb.gpu_info().get("memory_mib"))
+    big = max(tasks, key=lambda t: fb.slot_context([t], thinking))
+    if fit and fit["fit"] < a.slots and not a.slots_fit:
         gb = 1024 ** 3
         raise SystemExit(
             f"{a.slots} slots of {ctx:,} tokens ({fb.BENCH[big]['label']}'s, thinking "
-            f"{'on' if thinking else 'off'}) need about {fit['kv'] / gb:.1f} GB of KV cache "
-            f"({fit['types']}, {fit['per_token'] / 1024:.1f} KB a token, from the GGUF's "
-            f"header) beside the {fit['file'] / gb:.1f} GB file, and this card has "
-            f"{fit['card'] / gb:.1f} GB: at most {fit['fit']} slot"
-            f"{'s' if fit['fit'] != 1 else ''} fit — give --slots {fit['fit']}"
-            + (" (or a larger card)" if fit["fit"] else ": a larger card") + ". Nothing was fetched")
-    if not fit and ctx * a.slots > a.max_context:
-        big = max(tasks, key=lambda t: fb.slot_context([t], thinking))
+            f"{'on' if thinking else 'off'}) would use about {fit['used'] / gb:.1f} GB with the "
+            f"{fit['file'] / gb:.1f} GB file ({fit['types']} cache, "
+            f"{fit['per_token'] / 1024:.1f} KB a token from the GGUF's header), and this card "
+            f"has {fit['card'] / gb:.1f} GB, {ROOM / gb:.0f} GB kept spare: at most "
+            f"{fit['fit']} slot{'s' if fit['fit'] != 1 else ''} fit — give --slots "
+            f"{fit['fit']}" + (" (or a larger card)" if fit["fit"] else ": a larger card")
+            + ", or --slots-fit if you know these do. Nothing was fetched")
+    if not fit and ctx * a.slots > a.max_context and not a.slots_fit:
         raise SystemExit(f"{a.slots} slots of {ctx:,} tokens ({fb.BENCH[big]['label']}'s, "
                          f"thinking {'on' if thinking else 'off'}) is {ctx * a.slots:,} tokens "
                          f"of context, and this card holds {a.max_context:,} (G1's table; "
-                         "--max-context for a larger card): give the box fewer benchmarks "
-                         "(--only) or fewer --slots. Nothing was fetched")
+                         "--max-context for a larger card) — " + unread + ": give the box fewer "
+                         "benchmarks (--only) or fewer --slots, or --slots-fit if you know these "
+                         "fit. Nothing was fetched")
     configure(out, a.slots, shard)
     say = Out(out / OWN_LOG)
     from service import db, runner
@@ -778,13 +797,23 @@ def main(argv: list[str] | None = None) -> int:
         say(f"not given to llama-server: {', '.join(shell_server_vars())}, set in this shell — "
             "its variables come from --env only, so each one it gets is recorded")
     if fit:
-        # 17d: the estimate the slots were checked with, said and recorded
+        # 17d: the estimate the slots were checked with, said and recorded.
+        # 17e: either way, --slots-fit or not
         gb = 1024 ** 3
-        server["kv_estimate"] = {k: fit[k] for k in ("kv", "per_token", "file", "card", "fit",
-                                                     "types")}
-        say(f"KV cache about {fit['kv'] / gb:.1f} GB for {a.slots} slots ({fit['types']}, "
-            f"{fit['per_token'] / 1024:.1f} KB a token) beside the {fit['file'] / gb:.1f} GB file "
-            f"on a {fit['card'] / gb:.1f} GB card: up to {fit['fit']} slots fit")
+        server["kv_estimate"] = {k: fit[k] for k in ("used", "kv", "per_token", "file", "card",
+                                                     "fit", "types")}
+        say(f"memory about {fit['used'] / gb:.1f} GB for {a.slots} slots of {ctx:,} tokens "
+            f"(the KV cache {fit['kv'] / gb:.1f} GB, {fit['types']}, "
+            f"{fit['per_token'] / 1024:.1f} KB a token) with the {fit['file'] / gb:.1f} GB file "
+            f"on a {fit['card'] / gb:.1f} GB card: up to {fit['fit']} slot"
+            f"{'s' if fit['fit'] != 1 else ''} fit with "
+            f"{ROOM / gb:.0f} GB spare"
+            + (f" — {a.slots} run, as --slots-fit says" if a.slots > fit["fit"] else ""))
+    else:
+        # 17e: said, where it carried on silently under the stated limit
+        say(f"memory not worked out: {unread}. The slots were checked against "
+            f"--max-context {a.max_context:,} only"
+            + (", and --slots-fit says they fit" if a.slots_fit else ""))
     say(f"{gguf['name']} · {gguf['size'] / 1e9:.1f} GB · sha256 {sha[:16]} · llama.cpp "
         f"{ver['build'] or '?'} ({ver['commit'] or '?'}) · GPU {gpu.get('name') or 'unknown'} · "
         f"{a.slots} slots of {ctx:,} tokens")

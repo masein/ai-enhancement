@@ -1795,8 +1795,12 @@ def frontier_how(d: dict | None) -> str | None:
         return None
     who = _graders_words(d)
     end = ": not final" if d.get("final") is False else ""
-    # 17d: the counts that lower the score, on its cell
-    counts = "".join(
+    # 17d: the counts that lower the score, on its cell. 17e: and the share
+    # that ran out of room, beside it — most of a thinking run's time
+    out, of = d.get("ran_out"), d.get("answers")
+    counts = (f" · {out / of:.0%} ran out of room ({out:,} of {of:,}), counted wrong"
+              if isinstance(out, int) and out and isinstance(of, int) and of else "")
+    counts += "".join(
         f" · {n:,} {w}" for n, w in ((d.get("unanswered"), "the server never answered, counted "
                                                            "wrong"),
                                      (d.get("ungraded"), "its grader gave no grade, counted "

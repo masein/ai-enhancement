@@ -4953,6 +4953,35 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17e.1 — the pilot's numbers: the run plan (6 Oct)
+
+The pilot (one RTX 5090, the phone build, `0f7c943`) measured the memory, the
+paces and the answer lengths. The full run is about 198 box-hours for both
+builds, where the plan said 46.
+- **G1, G5 and the bill redone** from them (docs/REMOTE-RUNS.md): two plans,
+  A (6 boxes a build, the longest 17.7 h) and B (10 boxes, 10.4 h), about
+  $89–129 either way. ARC-AGI-2 is 167 test grids asked twice (334 answers),
+  not about 400.
+- **One pasted line a box** (`scripts/frontier_box.py A3 --as … --gguf …
+  --server …`): its steps one after the other, each `remote_gguf.py` with its
+  own `--out`; a step that stops doesn't stop the next. `--list A` prints a
+  plan with its hours.
+- **One command to fetch and import** (`scripts/frontier_fetch.py`, on the
+  server): every box's bundles over SSH (`~/.ssh/id_ed25519`), each imported
+  with its build's `--file-sha256`, a line a bundle.
+- **SimpleQA with thinking on was never asked**: the box listed its
+  benchmarks in the suite's order and asked them in the run record's sorted
+  order, MMLU-Pro before SimpleQA, and the pilot's MMLU-Pro was stopped by
+  hand. Asked in the suite's order now.
+- **The memory check is set from the pilot** (point 8): 2,186 bytes a token
+  of buffers beside the header's KV cache, 768 MiB fixed, 1 GB stated room;
+  `--slots-fit` runs the slots given; an unread header is said.
+- **The share that ran out of room is on the cell**, and the import says how
+  many of those end in a loop (information only). The token limits beside
+  Epoch's and the model card's are in REMOTE-RUNS; none is changed.
+- **The calibration**: GPQA alone recommended ($5–20; with OTIS $16–62).
+- Tests: `tests/test_17e_review.py`.
+
 ### 17d.4 — the third review's part 4: blocks nothing (6 Oct)
 
 - **What a first `--out` keeps**: G2 says its served model, thinking setting

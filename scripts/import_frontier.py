@@ -670,6 +670,15 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
         prefix = f"results/{row_name}/{t}_0shot/{sf.SUB}/"
         ans = _answers(b, row_name, t)
         tsetup = b["files"].get(prefix + sf.SETUP, b"{}")
+        # 17e: the answers that ran out of room, and how many of them end in a
+        # loop — information only (the cell shows the share that ran out)
+        cut = [r.get("answer") or "" for r in ans.values()
+               if fb.ran_out(r.get("answer") or "", r.get("finish"))]
+        if cut:
+            loops = sum(1 for x in cut if fb.ends_in_loop(x))
+            lines.append(f"{t}: {len(cut):,} of these {len(ans):,} answers ran out of room, "
+                         f"{loops:,} of them ending in a loop (the last passage repeating) — "
+                         "for information")
         entry = {"gpu": gpu, "sha256": b["sha256"], "bundle": path.name, "at": stamp,
                  "by": by, "gguf_sha256": gg.get("sha256"), "llama_cpp": srv.get("build"),
                  "answers": len(ans), "setup": shard_setup(srv)}

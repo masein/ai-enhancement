@@ -373,7 +373,7 @@ def test_26_a_score_from_two_graders_says_so_and_isnt_final(svc, monkeypatch):  
     assert report.frontier_how(f) == (
         f"graded by 2 graders or prompts — openai/gpt-4.1-2025-04-14 with Google's grader "
         f"prompt ({sha}) on 3, google/gemini-2.5-flash-20250617 with Google's grader prompt "
-        f"({sha}) on 2: not final")
+        f"({sha}) on 2: not final · 17% ran out of room (1 of 6), counted wrong")
     assert report.frontier_setting(f) is None                  # ranked with nothing
     sc = sf.score_task(row_dir(), "simpleqa_epoch", rec())
     assert sf.words("simpleqa_epoch", sc).endswith("graded by 2 graders or prompts: not final")
