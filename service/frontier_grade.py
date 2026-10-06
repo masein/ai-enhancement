@@ -210,6 +210,12 @@ def _price(g: dict) -> tuple[float | None, float | None]:
     return g.get("price_in"), g.get("price_out")
 
 
+def structured(g: dict) -> bool | None:
+    """17f: whether the grader takes a JSON schema, as OpenRouter lists it"""
+    m = _cached(g.get("id") or "") or {}
+    return m.get("structured")
+
+
 def reasons(g: dict) -> bool | None:
     """whether OpenRouter lists the grader as a model that reasons"""
     return (_cached(g.get("id") or "") or {}).get("reasons")
@@ -227,7 +233,7 @@ def estimate() -> dict:
         items = {it["id"]: it for it in fb.load(w["task"], config.BENCH_ROOT)}
         tin = sum(len(fg.render(slot, items[x["id"]], x)) for x in w["items"]) // CHARS_A_TOKEN
         # 17b: what Start sends with each answer — its reasoning and its cap
-        a = fg.ask(slot, reasons(g))
+        a = fg.ask(slot, reasons(g), structured(g))
         cap = min(a["max_tokens"], config.OPENROUTER_MAX_TOKENS)
         tout = len(w["items"]) * a["out_tokens"]
         tmax = len(w["items"]) * cap
@@ -242,6 +248,8 @@ def estimate() -> dict:
         e = per.setdefault(slot, {"answers": 0, "tokens_in": 0, "tokens_out": 0, "usd": 0.0,
                                   "usd_known": True, "tokens_out_max": 0, "usd_max": 0.0,
                                   "cap": cap, "reasoning": a["reasoning"],
+                                  # 17f: JSON only, where the grader takes a schema
+                                  "json_only": bool(a["schema"]),
                                   "reasoning_words": fg.GRADERS[slot]["reasoning_words"]})
         e["answers"] += len(w["items"])
         e["tokens_in"] += tin
@@ -252,9 +260,13 @@ def estimate() -> dict:
         else:
             e["usd"] += usd
             e["usd_max"] += most
+        again = (sf.read_grades(sf.task_dir(Path(config.OUT_DIR) / w["row"], w["task"]))
+                 .get("regrade") or {})
         rows.append({"slot": slot, "task": w["task"], "label": fb.BENCH[w["task"]]["label"],
                      "model": w["model"], "answers": len(w["items"]),
-                     "usd": None if usd is None else round(usd, 4)})
+                     "usd": None if usd is None else round(usd, 4),
+                     # 17f: graded again whole by the grader chosen now, said
+                     **({"regrade": again["why"]} if again else {})})
     for e in per.values():
         e["usd"], e["usd_max"] = round(e["usd"], 4), round(e["usd_max"], 4)
     total = round(sum(e["usd"] for e in per.values()), 4)
@@ -302,12 +314,12 @@ def _pinned(slot: str, by: str) -> dict:
 def _submit(w: dict, pin: dict, by: str) -> str:
     slot, task = w["slot"], w["task"]
     items = {it["id"]: it for it in fb.load(task, config.BENCH_ROOT)}
-    a = fg.ask(slot, reasons(pin))
+    a = fg.ask(slot, reasons(pin), structured(pin))
     todo = [x for x in w["items"] if x["id"] in items]
     reqs = [llm.Request(f"frgr:{sf.gkey(x['id'], x['epoch'])}", "",
                         fg.render(slot, items[x["id"]], x),
                         max_tokens=min(a["max_tokens"], config.OPENROUTER_MAX_TOKENS),
-                        reasoning=a["reasoning"], meta={"kind": KIND})
+                        reasoning=a["reasoning"], meta={"kind": KIND}, schema=a["schema"])
             for x in todo]
     if not reqs:
         return ""
@@ -468,17 +480,23 @@ def _write_grades(d: Path, g: dict) -> None:
     tmp.replace(d / sf.GRADES)
 
 
-def _permanent(error: str) -> bool:
+def _permanent(res) -> bool:
     """17e: a refusal that will never change for this answer — too long (HTTP
     400, 413), its words (403, moderation), unprocessable (422): a try, where
     one that may pass another time (unreached, a limit, a rate, a provider
     down, the data policy) isn't. An answer always refused was sent again on
-    every Start, and its benchmark never scored"""
-    m = llm._HTTP_STATUS.search(error or "")
-    if not m:
+    every Start, and its benchmark never scored. 17f: its status and kind as
+    the request kept them, read from the whole error (`res` a Result, or the
+    error's words)"""
+    error = res if isinstance(res, str) else res.error
+    status, kind = (None, "") if isinstance(res, str) else (res.status, res.kind)
+    if status is None:
+        m = llm._HTTP_STATUS.search(error or "")
+        status = int(m.group(1)) if m else None
+    if status is None:
         return False
-    status = int(m.group(1))
-    return status in (400, 403, 413, 422) and ai_models.refusal(status, error)[0] == "refused"
+    kind = kind or ai_models.refusal(status, error)[0]
+    return status in (400, 403, 413, 422) and kind == "refused"
 
 
 def _reset_tries(slot: str, pin: dict) -> None:
@@ -491,8 +509,8 @@ def _reset_tries(slot: str, pin: dict) -> None:
     for d in sorted(root.glob(f"*/{task}_0shot/{sf.SUB}")) if root.is_dir() else []:
         with grades_lock(d):
             g = sf.read_grades(d)
+            changed = _regrade(g, version, sha)
             ref = g.get("refused") or {}
-            changed = False
             for x in ref.values():
                 if int(x.get("tries") or 0) and (x.get("by"), x.get("prompt_sha256")) != (
                         version, sha):
@@ -509,6 +527,34 @@ def _reset_tries(slot: str, pin: dict) -> None:
                 sf.score_task(row, task, rec)
             except Exception as e:                      # noqa: BLE001 — said, scored later
                 print(f"[frontier grading] {row.name} {task}: scoring failed: {e!r}")
+
+
+def _regrade(g: dict, version: str, sha: str) -> bool:
+    """17f: a first grader that left more than UNGRADED_SHARE of its answers
+    without a grade (the case the card advises another grader for): the one
+    chosen now grades the whole benchmark again — its cost in the dry run,
+    before Start — and its score is final. The first's grades and no-grades
+    are kept aside (`aside`), never mixed in. True when it changed `g`"""
+    mine = (version, sha)
+
+    def who(x: dict) -> tuple:
+        return (x.get("by"), x.get("prompt_sha256"))
+    items, ref = g.get("items") or {}, g.get("refused") or {}
+    ungraded = sum(1 for x in ref.values()
+                   if who(x) != mine and int(x.get("tries") or 0) >= GRADE_TRIES)
+    seen = sum(1 for x in items.values() if who(x) != mine) + ungraded
+    if not ungraded or ungraded <= sf.UNGRADED_SHARE * seen:
+        return False
+    g.setdefault("aside", []).append({
+        "at": time.time(), "for": {"by": version, "prompt_sha256": sha},
+        "why": f"its grader left {ungraded:,} of {seen:,} without a grade",
+        "items": {k: x for k, x in items.items() if who(x) != mine},
+        "refused": {k: x for k, x in ref.items() if who(x) != mine}})
+    g["items"] = {k: x for k, x in items.items() if who(x) == mine}
+    g["refused"] = {k: x for k, x in ref.items() if who(x) == mine}
+    g["regrade"] = {"by": version, "prompt_sha256": sha, "at": time.time(),
+                    "why": f"the first grader left {ungraded:,} of {seen:,} without a grade"}
+    return True
 
 
 def _cancel_unsent(p: dict, why: str) -> list[str]:
@@ -584,6 +630,7 @@ def _record(d: Path, slot: str, pin: dict, meta: dict, items: dict, results: dic
            for (q, e), a in sf.read_answers(d / sf.ANSWERS).items()}
     cap = meta.get("max_tokens")
     n = 0
+    errors = []
     for cid, res in results.items():
         key = cid.split(":", 1)[1]
         qid = key.rsplit("#", 1)[0]
@@ -600,14 +647,15 @@ def _record(d: Path, slot: str, pin: dict, meta: dict, items: dict, results: dic
             got = None if why else fg.read(slot, res.text, items.get(qid) or {})
             if got is not None and got.get("ok") is None:
                 why = got["unread"]
+            if why and res.error:
+                errors.append((key, why, res))          # 17f: counted once the batch is read
+                continue
             if why:
                 # 17c: counted, for this answer — at GRADE_TRIES it is ungraded.
-                # 17d: only a reply that came and isn't a grade is a try: a
-                # provider that refused, timed out or wasn't reached isn't; and
+                # 17d: only a reply that came and isn't a grade is a try; and
                 # another grader or prompt starts the count again
                 g["refused"][key] = _refusal(g["refused"].get(key), why, rec, sent[key],
-                                             counts=not res.error or _permanent(res.error),
-                                             kind="error" if res.error else "unread")
+                                             counts=True, kind="unread")
                 continue
             was = g["refused"].get(key) or {}
             # 17e: a grade where another grader or prompt gave none says so —
@@ -623,6 +671,13 @@ def _record(d: Path, slot: str, pin: dict, meta: dict, items: dict, results: dic
             g["refused"][key] = _refusal(g["refused"].get(key),
                                          f"its reply couldn't be read: {e!r}"[:300], rec,
                                          sent.get(key), counts=True, kind="unread")
+    # 17e: a refusal that never changes is a try. 17f: only where the same
+    # grader graded other answers of this batch — a refusal of every answer
+    # (a model id the provider doesn't know, a region it blocks) is the
+    # grader's, and burned every answer's three tries
+    for key, why, res in errors:
+        g["refused"][key] = _refusal(g["refused"].get(key), why, rec, sent[key],
+                                     counts=bool(n) and _permanent(res), kind="error")
     _write_grades(d, g)
     return n
 

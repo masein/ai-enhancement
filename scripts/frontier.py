@@ -609,16 +609,25 @@ def ran_out(text: str, finish: str | None) -> bool:
 # 17e: an answer that ran out "ends in a loop" when the passage just before
 # where it was cut (LOOP_PASSAGE characters, clear of the cut itself) is
 # found LOOP_TIMES times or more in its last LOOP_WINDOW characters — the
-# last passage repeating. For information on the import's line only
+# last passage repeating. For information on the import's line only. 17f:
+# numbers read as one ("Step 1001…", "Step 1002…" repeat), a tail of nothing
+# but whitespace is a loop, and a passage with no words — an ARC grid of
+# equal rows, a table of equal rows, a run of zeros — never is
 LOOP_PASSAGE, LOOP_TIMES, LOOP_WINDOW = 200, 3, 20_000
+_NUMBER = re.compile(r"\d+")
 
 
 def ends_in_loop(text: str) -> bool:
     tail = (text or "")[-LOOP_WINDOW:]
+    if len(tail) >= 1000 and not tail[-1000:].strip():
+        return True                             # endless newlines
+    tail = _NUMBER.sub("#", tail)
     if len(tail) < LOOP_PASSAGE * LOOP_TIMES + 200:
         return False
     passage = tail[-(LOOP_PASSAGE + 200):-200]
-    return passage.strip() != "" and tail.count(passage) >= LOOP_TIMES
+    if not re.search(r"[^\W\d_#]{2,}", passage):
+        return False                            # no words: a grid, a table, a run of digits
+    return tail.count(passage) >= LOOP_TIMES
 
 
 def read_choice(text: str, letters: str = LETTERS) -> str | None:
