@@ -4953,6 +4953,28 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17f.2 — before grading, and Save (6 Oct)
+
+- **A new grader after more than 5% ungraded grades it all** (`_regrade`): the
+  benchmark is graded again whole by the grader chosen now — said on the dry
+  run's row before Start — and its score is final; the first's grades and
+  no-grades are kept aside (`aside`), never mixed in. 5% or less stays a
+  top-up (17e).
+- **A refusal of every answer counts nothing**: a refusal is a try only where
+  the same grader and prompt graded other answers of the benchmark; a
+  grader's batch whose first 5 replies are all the same refusal stops and
+  says it (`GraderChat.FIRST_REFUSALS`); a refusal keeps its status and kind,
+  read from the whole error before its words are cut to 400 characters.
+- **HLE**: one JSON object anywhere in the reply, with no verdict line outside
+  it, is read; `true` and `false` are yes and no; two objects are no grade;
+  the judge is asked for CAIS's four fields as JSON only where the grader
+  takes a JSON schema (OpenRouter's `structured_outputs`).
+- **The loop count** reads numbers as one and a tail of whitespace as a loop;
+  a passage with no words (a grid, a table, zeros) never is.
+- **Save** (Add a model ▸ Running on a server) asks the name in the dialog and
+  says its word beside it, in view.
+- Tests: `tests/test_17f_review.py` (part 3); the grading tests to the rules.
+
 ### 17f.1 — the token limits, and the boxes (6 Oct)
 
 masein said yes to the limits, chose plan A and GPQA alone for the
