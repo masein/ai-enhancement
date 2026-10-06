@@ -360,7 +360,7 @@ _COLS = ["id", "hf_id", "kind", "suite", "submitter", "note", "status", "progres
          "error", "params", "vocab", "batch", "need_gb", "created_at", "started_at",
          "finished_at", "gpu_seconds", "arch", "allow_remote_code", "load_missing",
          "tasks", "judge_batch", "reuse_note", "bank_version", "thinking", "subset", "bbq_all",
-         "part", "pair"]
+         "part", "pair", "where_ran"]
 
 
 def _conn() -> sqlite3.Connection:
@@ -397,7 +397,10 @@ def init() -> None:
                      # 12q: a devicemark run's part (full, pilot, parity, speed) and the
                      # parity check's setup without MTP
                      "ALTER TABLE submissions ADD COLUMN part TEXT DEFAULT ''",
-                     "ALTER TABLE submissions ADD COLUMN pair TEXT DEFAULT ''"):
+                     "ALTER TABLE submissions ADD COLUMN pair TEXT DEFAULT ''",
+                     # 17f: where a run ran — '' on this server; an import's box
+                     # ("rented GPU · RTX 5090 · box A3"), never its address
+                     "ALTER TABLE submissions ADD COLUMN where_ran TEXT DEFAULT ''"):
             try:
                 c.execute(stmt)
             except sqlite3.OperationalError:

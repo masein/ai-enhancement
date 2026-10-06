@@ -451,6 +451,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--register", default="",
                     help="17: a Frontier bundle of a model this board doesn't serve (run on "
                          "rented GPUs only): its name here; the bundle's file is pinned")
+    ap.add_argument("--boxes", type=Path, default=None,
+                    help="17f: what frontier_fetch.py read from the rented boxes, for Runs' "
+                         "list (their labels and progress, never an address)")
     ap.add_argument("--set-aside-shards", action="store_true",
                     help="17c: a Frontier shard whose task's shards here were made with another "
                          "setup (a rebuilt tarball): those are set aside, and this one starts "
@@ -465,6 +468,15 @@ def main(argv: list[str] | None = None) -> int:
         if config.DM_ITEMS_SHA256:                  # 15.6: and whether they're the repo's
             print("the repo's items " + config.DM_ITEMS_SHA256 + (
                 " (the same)" if h["items"] == config.DM_ITEMS_SHA256 else " (they differ)"))
+        return 0
+    if a.boxes:
+        import import_frontier
+        try:
+            n = import_frontier.store_boxes(json.loads(a.boxes.read_text(encoding="utf-8")))
+        except (OSError, ValueError) as e:
+            print(f"refused — {a.boxes.name} couldn't be read: {e}")
+            return REFUSED
+        print(f"{n} step{'s' if n != 1 else ''} on rented boxes, as the fetch read them")
         return 0
     if not a.bundle:
         ap.error("a bundle, or --battery")

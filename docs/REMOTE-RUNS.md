@@ -276,6 +276,22 @@ container, the host name is the container's.
 
 **DeviceMark rows only.** Any other run is refused.
 
+**The Frontier runs** (17f) — the server's and those imported from rented
+boxes — have an exporter of their own, scrubbed the same way:
+
+```bash
+sudo docker compose exec -T -e SCRUB_HOSTS="$(hostname)" bench python scripts/export_frontier_raw.py --all --rented
+```
+
+One folder a run: `setup.json` (where it ran — "this server", or "rented GPU ·
+RTX 5090 · box A3" — the box's times, sessions, image and GGUF, and each
+benchmark's setup), `scores.json`, `items.jsonl` (each answer right or wrong,
+ran out or not, its tokens and grade), `log.txt` and a `README.md`. An
+answer's text only for MMLU-Pro, SimpleQA Verified and ARC-AGI-2: GPQA
+Diamond, OTIS Mock AIME and Humanity's Last Exam are gated and ask not to be
+redistributed, MATH's problems are withheld, and an answer quotes its
+question. A build served here (the Qwen3.6 builds) goes to `private/`.
+
 **The scrub.** Every file is scrubbed before it is written:
 - keys and tokens, by value and by shape;
 - home paths;
@@ -639,7 +655,12 @@ python3 scripts/frontier_fetch.py --key ~/.ssh/id_ed25519 --sha served/<phone-bu
 
 It asks for your password once (`sudo`, for the container): run it in a tmux
 pane of its own. `--every 15m` does it all again every 15 minutes until every
-box is done. Each box's first line says whether it is **safe to destroy**:
+box is done, and each time it sends the boxes' progress to the board: Runs ▸
+All runs opens with "On rented boxes", each step's box, model, what it asks,
+n of N, when it should finish and when it was last heard from (a box quiet
+for 45 minutes, or not reached at the last fetch, says so; one whose bundles
+are all home and imported reads "done, safe to destroy"). Only labels and
+progress go to the board, never a box's address; `--no-board` sends nothing. Each box's first line says whether it is **safe to destroy**:
 every step whole, and every bundle it holds here with the same sha256 and
 imported. Otherwise "NOT safe to destroy" and why — a step still asking (its
 progress beside: what it asks, n of N, its restarts, when it was last
