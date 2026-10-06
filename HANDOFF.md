@@ -4953,6 +4953,33 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17d.3 — the third review's part 3: before Start on grading (6 Oct)
+
+- **A try is a reply that came and isn't a grade**: a provider that refused,
+  timed out or wasn't reached uses none (three Starts against a 503 left
+  every answer ungraded, HLE 0.0% "graded", $0 spent). Another grader or
+  prompt starts the count again (`_reset_tries`, on choosing one and on
+  Start), and its answers are asked again.
+- **More than 5% ungraded is no score** (`UNGRADED_SHARE`): "its grader gave
+  no grade on 5 of the 5 answers it was sent … it isn't answering in its
+  form". The card says so and to choose another grader. A graded benchmark
+  that waits again drops its written score.
+- **HLE's verdict is the field at the start of its own line**, the last such
+  line (or the JSON's), its value alone, carriage returns stripped: "is 4
+  correct: no" in the reasoning no longer overrides "correct: yes", and
+  "correct: yes, with caveats" is unread.
+- **A batch whose replies can't be recorded stays pending** for as long as it
+  takes, said on the card: after 30 polls it was failed and paid for again.
+- **A refused Start leaves Stop as it was**: every check before the stop is
+  lifted.
+- **Requests in flight land before Start lists what to send again**: a
+  cancelled batch's answers are free again only once its worker is done
+  (`_working`, `_settle`, up to 30 s), and only those whose last word is the
+  cancel.
+- **The estimate's "at most" covers three tries an answer.**
+- Tests: `tests/test_17d_review.py` (part 3); the 17b/17c grading tests'
+  numbers and readings, and two Stop tests' waits for MATH's batch.
+
 ### 17d.p — points 28 and 29: the parity check (6 Oct)
 
 Found on the pilot.
