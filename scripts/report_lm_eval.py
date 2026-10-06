@@ -1782,7 +1782,10 @@ def _graders_words(d: dict) -> str:
         return (f"{len(every)} graders or prompts — "
                 + ", ".join(f"{one(g)} on {int(g.get('n') or 0):,}" for g in every))
     g = d.get("grader") or {}
-    return one(g) if g else ""
+    # 17e: a second grader that graded only what the first gave no grade
+    top = g.get("topup") or {}
+    return (one(g) + (f"; {one(top)} graded the {int(top.get('n') or 0):,} it gave no grade"
+                      if top else "")) if g else ""
 
 
 def frontier_how(d: dict | None) -> str | None:
@@ -1830,7 +1833,10 @@ def frontier_setting(d: dict | None) -> str | None:
         return None
     if d.get("final") is False:
         return None
-    who = _graders_words(d)
+    # 17e: ranked with its first grader's — a top-up is named on the cell only
+    g = d.get("grader") or {}
+    who = _graders_words({**d, "grader": {k: v for k, v in g.items() if k != "topup"}}
+                         if g else d)
     if d.get("scored_by") == "grader":
         return f"graded by {who}" if who else "graded"
     look = d.get("look")
@@ -24253,7 +24259,10 @@ async function frontierGradingAct(what) {
     A.frg = r.page;
     toast(what === 'stop' ? 'Grading stopped: what is in flight lands, nothing more is sent'
       : `Grading: ${(r.sent || []).reduce((a, x) => a + x.n, 0).toLocaleString('en')} answers `
-        + 'sent' + (r.pending ? ` · ${r.pending} batch${r.pending === 1 ? '' : 'es'} out` : ''),
+        + 'sent' + (r.pending ? ` · ${r.pending} batch${r.pending === 1 ? '' : 'es'} out` : '')
+        // 17e: the requests moved to the grader chosen now, and a slot whose pin moved
+        + (r.moved ? ` · ${r.moved} moved to the grader chosen now` : '')
+        + ((r.skipped || []).length ? ` · not sent: ${r.skipped.join('; ')}` : ''),
       { key: 'frg' });
   } catch (e) { toast('Refused. ' + e.message, { key: 'frg' }); }
   A.frgBusy = '';

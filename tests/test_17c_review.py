@@ -48,7 +48,8 @@ def write(path: Path, head: dict, rows: list[dict]) -> Path:
 # 1: a question counts only when both sides read a letter
 # ---------------------------------------------------------------------------
 
-def test_1_two_sides_that_read_no_letter_are_not_the_same():
+def test_1_two_sides_that_read_no_letter_are_not_the_same(monkeypatch):
+    monkeypatch.setitem(fb.PARITY, "floor", 50)         # 17e: 500 on a real pair
     """50 empty replies on both sides printed "The same: 50 of 50" — 17d: still
     refused under the accuracy rule, where both would score nothing alike"""
     got = fb.parity_compare(lines(""), lines(""))
@@ -85,6 +86,7 @@ def test_1_the_same_file_twice_or_a_question_twice_is_refused(tmp_path):
 
 def test_2_each_side_says_what_answered_and_compare_refuses_another_setup(  # noqa: F811
         box, svc, monkeypatch, capsys):  # noqa: F811
+    monkeypatch.setitem(fb.PARITY, "floor", 50)         # 17e: 500 on a real pair
     monkeypatch.setattr(fb, "_fetch", lambda task: {"items": PARITY_ITEMS,
                                                     "extra": {"shots": {}}})
     # the box: lookahead routing, as run_box launches it
@@ -114,8 +116,9 @@ def test_2_each_side_says_what_answered_and_compare_refuses_another_setup(  # no
         assert sh["launch"]["env"] == {"LLAMA_MOE_ROUTE_MODE": "lookahead"}
         capsys.readouterr()
         assert fp.main(["compare", str(spath), str(bpath), "--file-sha256", box["sha"]]) == 0
-        assert capsys.readouterr().out.startswith("The same: the box answers 100.0% right and "
-                                                  "the server 100.0% on the same 50 questions")
+        assert capsys.readouterr().out.startswith("The same: the box answers 100.0% right (the "
+                                                  "mean of its two runs) and the server 100.0% "
+                                                  "on the same 50 questions")
         # without the file's sha256 the board has none: compared by name and size, said
         assert fp.main(["compare", str(spath), str(bpath)]) == 0
         assert "compared by name" in capsys.readouterr().out

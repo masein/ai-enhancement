@@ -983,6 +983,12 @@ class LocalOpenAI(Backend):
                 row = json.loads(line)
             except json.JSONDecodeError:
                 continue          # a line cut short by a crash: that request runs again
+            # 17e: a reply that landed beats a cancel, whichever came last —
+            # one landing between cancel()'s read and its append was dropped,
+            # and asked again
+            was = out.get(row["custom_id"])
+            if row.get("cancelled") and was and not was.get("cancelled"):
+                continue
             out[row["custom_id"]] = row
         return out
 

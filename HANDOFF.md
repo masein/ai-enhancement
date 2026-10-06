@@ -4953,6 +4953,34 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17e.2 — leftovers from checking 17d (6 Oct)
+
+- **Parity (9)**: the box's side is the mean of its two runs, question by
+  question; compare prints how often a check this size calls two identical
+  setups apart at the box's own flip rate (`fb.false_alarm`); fewer than 500
+  questions, or files written before 17d, are refused.
+- **A resume left with one question that truly fails finishes (10)**: with
+  answers from before, the server is asked one of those first; only nothing
+  answered at all is the server's failure.
+- **A second grader's top-up is final (11)**: one that graded only answers the
+  first gave no grade (5% at most) is named beside it on the cell, and the
+  score ranks with the first grader's. Each such grade keeps whose no-grade
+  it follows (`after`).
+- **A refusal that never changes is a try (12)**: HTTP 400, 403, 413 or 422,
+  OpenRouter's "refused"; a rate, a limit, a provider down or the data policy
+  still isn't.
+- **Two races (13)**: grades.json read and written under one lock
+  (`grades_lock`), by the poller and by choosing a grader; a reply that landed
+  beats a cancel row whichever came last.
+- **Start (14, 16)**: a slot new to the work after the second listing is
+  pinned there (a 500 before); the moved count is what stayed cancelled once
+  the requests in flight landed, and Start's note says it and any slot whose
+  pin moved.
+- **HLE (15)**: its JSON counts only when the whole reply is the object.
+- **Wording (16)**: "not final until those get a grade", never "graded by 0
+  graders"; 51 of 1,000 is "5.1%, more than 5%".
+- Tests: `tests/test_17e_review.py` (part 3).
+
 ### 17e.1 — the pilot's numbers: the run plan (6 Oct)
 
 The pilot (one RTX 5090, the phone build, `0f7c943`) measured the memory, the
