@@ -162,7 +162,9 @@ def test_start_grades_and_both_numbers_are_kept(svc, monkeypatch):
     assert g["prompt_sha256"] == fg.prompt_sha("simpleqa") and g["owners"] == "gpt-4.1-2025-04-14"
     assert report.frontier_how(s["frontier"]) == (
         f"graded by openai/gpt-4.1-2025-04-14 with Google's grader prompt "
-        f"({fg.prompt_sha('simpleqa')[:8]})")
+        f"({fg.prompt_sha('simpleqa')[:8]})"
+        # 17e: the share that ran out of room, beside the score
+        " · 17% ran out of room (1 of 6), counted wrong")
     # MATH: Epoch's way on the page (one more right), the code's beside it
     m = results("math_l5_epoch")["results"]["math_l5_epoch"]
     assert m["acc,none"] == pytest.approx(0.5) and m["acc_code,none"] == pytest.approx(0.25)
