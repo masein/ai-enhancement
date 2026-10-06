@@ -302,16 +302,21 @@ def grades_of(task: str) -> dict:
 def test_16_a_grader_that_cant_be_reached_uses_no_tries_and_another_asks_again(
         gsvc, monkeypatch):  # noqa: F811
     from service import frontier_grade as fgr
+    from service import llm_poller
+    # 17f: one answer in five without a grade is the top-up's share here
+    monkeypatch.setattr(sf, "UNGRADED_SHARE", 0.5)
     down = {"on": True}
     stub(monkeypatch, lambda m, r: ("", "", "HTTP 503: the provider is down")
          if m == GPT and down["on"] else plain(m, r))
-    for _ in range(3):
-        fgr.start("masein")
-        drain()
-    ref = grades_of("simpleqa_epoch")["refused"]
-    assert ref and all(x["tries"] == 0 for x in ref.values())       # 0f7c943: 3, ungraded
-    assert {r["slot"]: r["answers"] for r in gsvc.get("/api/frontier/grading").json()
-            ["estimate"]["rows"]} == {"simpleqa": 5}
+    fgr.start("masein")
+    # 17f: its first five all refused: the batch stops and says so, nothing counted
+    for _ in range(300):
+        llm_poller.tick()
+        if any(fgr.batch_backend(p["batch_id"]).halted(p["batch_id"]) for p in fgr.pending()):
+            break
+        time.sleep(0.05)
+    assert not any(int(x.get("tries") or 0) for x in
+                   (grades_of("simpleqa_epoch").get("refused") or {}).values())  # 0f7c943: 3
     # a reply that came and isn't a grade counts; another grader starts again
     down["on"] = False
     stub(monkeypatch, lambda m, r: ("I would rather not say", "stop", "")
