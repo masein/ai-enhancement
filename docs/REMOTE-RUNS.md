@@ -513,14 +513,14 @@ refused before anything starts.
 ## G3. Fetch, from the server
 
 ```bash
-scp -i ~/.ssh/vast_ed25519 -P <port> root@<host>:/workspace/lda-on/frontier-served__<name>-thinking-on.tar.gz ~/benchmarks/bundles/
+scp -i ~/.ssh/vast_ed25519 -P <port> root@<host>:/workspace/phone-on/frontier-served__<phone-build>-thinking-on.tar.gz ~/benchmarks/bundles/
 ```
 
 ## G4. Import
 
 ```bash
 cd ~/benchmarks/aienh
-sudo docker compose exec -T bench python scripts/import_remote.py ~/benchmarks/bundles/frontier-served__<name>-thinking-on.tar.gz --by masein
+sudo docker compose exec -T bench python scripts/import_remote.py ~/benchmarks/bundles/frontier-served__<phone-build>-thinking-on.tar.gz --by masein
 ```
 
 With `--file-sha256 <the sha256 from G0>` the first time, if the board has no
