@@ -1832,12 +1832,13 @@ def frontier_where(d: dict | None) -> str:
     w = str((d or {}).get("where") or "")
     if not w or w == "this server":
         return "this server"
-    m = re.match(r"run on a rented GPU \((.*)\)$", w)
-    if m:
-        g = ", ".join(sorted({re.sub(r"^(NVIDIA\s+)?(GeForce\s+)?", "", x.strip())
-                              for x in m.group(1).split(",") if x.strip()}))
-        return f"rented GPU · {g}" if g else "rented GPU"
-    return "rented GPU" if w == "a rented GPU" else w
+    # 17g: in import_frontier.where_words's words, the one wording — an older
+    # score's "run on a rented GPU (…)" read into it
+    m = re.match(r"run on a rented GPUs? \((.*)\)$", w)
+    if m or w == "a rented GPU":
+        import import_frontier as imf
+        return imf.where_words(m.group(1).split(",") if m else [], [])
+    return w
 
 
 def frontier_setting(d: dict | None) -> str | None:
@@ -14481,8 +14482,9 @@ function vCompare() {
       el('span', { class: 'key', style: `background:${trColor(i)}` }),
       m.reportedOnly ? el('span', { text: m.name })
         : el('a', { href: '#model=' + encodeURIComponent(m.rowOf || m.id), text: m.name }),
-      el('span', { class: 'se', 'data-cmp-kind': m.id, text: ' · ' + [cmpKind(m),
-        sizeText(m) || null, setup || null].filter(Boolean).join(' · ') }));
+      // 17g: its kind and size; how it's served (a paragraph) on hover
+      el('span', { class: 'se', 'data-cmp-kind': m.id, title: setup || null,
+        text: ' · ' + [cmpKind(m), sizeText(m) || null].filter(Boolean).join(' · ') }));
   }));
   const save = LIVE && ms.length >= 2 ? el('button', { class: 'quiet', 'data-save-view': '1',
     text: 'Save view', 'aria-expanded': String(state.lbForm === 'save'),
@@ -14499,15 +14501,15 @@ function vCompare() {
     return ms.length ? [card, shapeCard(ms, 'cmp')] : [card];
   }
   const two = ms.length === 2;
-  // 12n.1: each keeps what tells it from the others
-  const short = shortNames(ms.map(m => m.name), 22);
   // 12o.1: a model column moves anywhere — its place is its place in the address
   const onOrder = order => lbSet({ cmp: order });
   const head = el('tr', {}, el('th', { scope: 'col', class: 'pin', 'data-lcol': 'bench' },
       'Benchmark', ...layoutBits('compare', 'bench', 'Benchmark', { movable: false })),
     ms.map((m, i) => el('th', { class: 'num', scope: 'col', 'data-cmp-col': m.id,
         title: `${m.name}\n${m.id}`, ...layoutDrag('compare', m.id, '', { onOrder }) },
-      el('span', { class: 'key', style: `background:${trColor(i)}` }), ' ' + short.get(m.name),
+      // 17g: the whole name — cut once drawn, only where it doesn't fit (cmpFitHeads)
+      el('span', { class: 'key', style: `background:${trColor(i)}` }), ' ',
+      el('span', { 'data-cmp-head': m.id, 'data-name': m.name, text: m.name }),
       ...layoutBits('compare', m.id, m.name, { onOrder }))),
     two ? el('th', { class: 'num', scope: 'col', 'data-cmp-delta-head': '1',
       title: `${ms[0].name} minus ${ms[1].name}, where both were measured the same way`,
@@ -14576,9 +14578,10 @@ function vCompare() {
         + 'of these models has too are shown' }))));
     bodies.push(body);
   }
-  card.append(bodies.length ? hfade('cmp', el('div', { class: 'lb-wrap', 'data-hkeep': 'cmp' },
-      layoutApply(el('table', { class: 'lb cmp', 'data-cmp-table': '1', ...layoutAttrs('compare') },
-        el('thead', {}, head), ...bodies))))
+  const table = bodies.length ? layoutApply(el('table', { class: 'lb cmp', 'data-cmp-table': '1',
+    ...layoutAttrs('compare') }, el('thead', {}, head), ...bodies)) : null;
+  if (table) requestAnimationFrame(() => cmpFitHeads(table));
+  card.append(table ? hfade('cmp', el('div', { class: 'lb-wrap', 'data-hkeep': 'cmp' }, table))
     : el('p', { class: 'small', text: 'Nothing is measured for these models yet.' }),
     el('p', { class: 'lbcap', text: 'Bold is the best of the cells measured the way the row '
       + 'says; a grey cell was measured another way, says how, and isn’t ranked. '
@@ -14586,6 +14589,67 @@ function vCompare() {
         + '"clear" means |z| > 1.96 on their errors. ' : '')
       + 'Nothing here is averaged.' }));
   return [card, shapeCard(ms, 'cmp')];
+}
+// 17g: compare's column names, each whole when its column has room for it.
+// One that doesn't fit drops what the names share and keeps what tells it
+// apart, at whichever end that is: one file's setups differ at their end,
+// two models at their front ("Bonsai 2…", "Qwen3.6-35B-A3B…"). `fits(text)`
+// says whether a text fits its column. Returns name -> what to show
+function headNames(names, fits) {
+  const words = n => String(n).match(/[^\s\-_·/]+[\s\-_·/]*|^[\s\-_·/]+/g) || [String(n)];
+  const ws = names.map(words), out = new Map();
+  let k = 0, j = 0;
+  if (ws.length > 1) {
+    const least = Math.min(...ws.map(w => w.length));
+    while (k < least - 1 && ws.every(w => w[k] === ws[0][k])) k++;
+    while (j < least - 1 - k && ws.every(w => w[w.length - 1 - j] === ws[0][ws[0].length - 1 - j])) j++;
+  }
+  const clean = t => t.replace(/^[\s\-_·/]+|[\s\-_·/]+$/g, '');
+  const lead = k ? '…' : '', tail = j ? '…' : '';
+  // they differ at the front (two models): its front is kept; else its end
+  const front = k === 0;
+  names.forEach((n, i) => {
+    if (fits(n)) { out.set(n, n); return; }
+    const core = ws[i].slice(k, ws[i].length - j);
+    const whole = lead + clean(core.join('')) + tail;
+    if (fits(whole)) { out.set(n, whole); return; }
+    const make = t => (front ? lead + t + '…' : '…' + t + tail);
+    let part = core.slice();
+    while (part.length > 1 && !fits(make(clean(part.join('')))))
+      part = front ? part.slice(0, -1) : part.slice(1);
+    let t = clean(part.join(''));
+    // one word still too long: its letters, from the end that tells it apart
+    while (t.length > 2 && !fits(make(t))) t = front ? t.slice(0, -1) : t.slice(1);
+    out.set(n, make(t));
+  });
+  // two cut alike: their middles go instead, so each still tells itself apart
+  const seen = {};
+  for (const [n, l] of out) (seen[l] = seen[l] || []).push(n);
+  for (const ns of Object.values(seen)) if (ns.length > 1) ns.forEach(n => out.set(n, midTrunc(n, 22)));
+  return out;
+}
+// 17g: compare's headers cut to their columns as drawn — nothing cut while
+// the table fits its card
+function cmpFitHeads(table) {
+  if (!table || !table.isConnected) return;
+  const heads = [...table.querySelectorAll('[data-cmp-head]')];
+  if (!heads.length) return;
+  heads.forEach(h => { h.textContent = h.dataset.name; });
+  const wrap = table.parentElement;
+  if (table.scrollWidth <= wrap.clientWidth + 1) return;
+  const th = heads[0].closest('th'), cs = getComputedStyle(th);
+  const bench = table.querySelector('thead th[data-lcol="bench"]');
+  const delta = table.querySelector('thead th[data-cmp-delta-head]');
+  const pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 18;   // the key, the gap
+  const room = (wrap.clientWidth - (bench ? bench.offsetWidth : 0) - (delta ? delta.offsetWidth : 0))
+    / heads.length - pad;
+  const c = cmpFitHeads.ctx || (cmpFitHeads.ctx = document.createElement('canvas').getContext('2d'));
+  c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  const up = cs.textTransform === 'uppercase';
+  const lines = cs.whiteSpace === 'nowrap' ? 1 : 2;
+  const fits = x => c.measureText(up ? x.toUpperCase() : x).width <= Math.max(40, room) * lines;
+  const got = headNames(heads.map(h => h.dataset.name), fits);
+  heads.forEach(h => { h.textContent = got.get(h.dataset.name) || h.dataset.name; });
 }
 // ---- 12m.1: shapes, one method at a time ----
 // The radar takes one kind of measurement, draws only the axes at least two
@@ -19276,8 +19340,10 @@ function vQueue(part = { form: true, list: true }) {
                                        : r.status === state.qStatus)) &&
       // 17f: where it ran
       (state.qWhere === 'all' || (state.qWhere === 'rented') === !!r.where_ran) &&
-      (!q || `#${r.id} ${r.hf_id} ${r.submitter || ''} ${r.note || ''} ${r.status} `
-               .toLowerCase().includes(q)));
+      // 17g: "#12" is run 12 alone, never #120 too (a score's link to its runs)
+      (!q || (/^#\d+$/.test(q) ? `#${r.id}` === q
+        : `#${r.id} ${r.hf_id} ${r.submitter || ''} ${r.note || ''} ${r.status} `
+          .toLowerCase().includes(q))));
     const c = QCOLS.find(x => x.key === state.qSort.key) || QCOLS[0];
     return rows.sort((a, b) => {
       const va = a[c.key], vb = b[c.key];
@@ -19301,6 +19367,7 @@ function vQueue(part = { form: true, list: true }) {
   const qThead = el('thead');
   const qTbody = el('tbody');
   const qPager = el('div');
+  const qBoxes = el('div', { 'data-rented-wrap': '1' });
   const qOlder = el('div', { class: 'frm' });
   const qTableWrap = el('div', { class: 'lb-wrap stick' }, el('table', { 'data-queue-table': '1' },
     qThead, qTbody));
@@ -19309,6 +19376,8 @@ function vQueue(part = { form: true, list: true }) {
       openTest(); });
   // in place, same reason as everywhere: the 5s poll must never eat a keystroke
   function rebuildQueue() {
+    // 17g: the boxes' list with the table — the poll redraws only this
+    qBoxes.replaceChildren(rentedBoxes() || '');
     const any = state.queue.length > 0;
     qToolbar.style.display = any ? '' : 'none';
     qTableWrap.style.display = any ? '' : 'none';
@@ -19337,7 +19406,9 @@ function vQueue(part = { form: true, list: true }) {
             ...await api(`api/submissions?limit=100&before=${oldest}`)];
         } finally { rebuildQueue(); }
       } }) : '');
-    const pg = paged('queue', rs, JSON.stringify([state.qQ, state.qStatus, state.qSort]),
+    // 17g: and the where filter, as the others, back to page 1
+    const pg = paged('queue', rs, JSON.stringify([state.qQ, state.qStatus, state.qWhere,
+                                                  state.qSort]),
                      rebuildQueue, 25, true);
     if (pg.pager.parentNode !== qPager) qPager.replaceChildren(pg.pager);
     const was = snapWatch(qTbody);
@@ -19409,7 +19480,7 @@ function vQueue(part = { form: true, list: true }) {
     where === 'here' ? (state.gg.open = true, ggufCard()) : null,
     part.list ? el('div', { class: 'card', 'data-all-runs': '1' },
       el('h2', { text: 'All runs' }),
-      rentedBoxes(),
+      qBoxes,
       qToolbar, qPager, qTableWrap, qOlder, qEmpty) : null].filter(Boolean);
 }
 
@@ -19418,7 +19489,9 @@ function vQueue(part = { form: true, list: true }) {
 // when it was last heard from; a box quiet for a while says so
 function loadBoxes() {
   state.boxesAt = Date.now();
-  api('api/frontier/boxes').then(d => { state.boxes = d; render(); }).catch(() => {});
+  // 17g: the list alone redrawn, as the poll redraws it
+  api('api/frontier/boxes').then(d => { state.boxes = d; (state.queueRedraw || render)(); })
+    .catch(() => {});
 }
 function rentedBoxes() {
   if (netReady() && (!state.boxesAt || Date.now() - state.boxesAt > 30000)) loadBoxes();
@@ -19439,10 +19512,13 @@ function rentedBoxes() {
         : b.state === 'stopped' ? `stopped${b.why ? ': ' + b.why : ''}`
         : b.finish ? when(b.finish) : '—' }),
     el('td', { class: b.quiet_min || b.reachable === false ? 'warn' : '',
+      'data-box-heard': b.reachable === false ? 'unreached' : b.quiet_min ? 'quiet' : 'ok',
       text: b.reachable === false ? `not reached at the last fetch (${rel(b.heard)} ago)`
         : b.quiet_min ? `not heard from for ${b.quiet_min} min`
         : b.heard ? rel(b.heard) + ' ago' : '—' }));
-  return el('details', { class: 'rented-boxes', open: '', 'data-rented-boxes': String(B.length) },
+  return el('details', { class: 'rented-boxes', open: state.boxesShut ? null : '',
+      'data-rented-boxes': String(B.length),
+      ontoggle: e => { state.boxesShut = !e.target.open; } },
     el('summary', { text: `On rented boxes · ${B.length} step${B.length === 1 ? '' : 's'}` }),
     el('table', { class: 'mmptab small' },
       el('thead', {}, el('tr', {}, ['box', 'model', 'asking', 'answered', 'expected finish',
@@ -24538,11 +24614,11 @@ function frontierGradingCard() {
     ...(G.mismatches || []).map(mm => el('div', { class: 'small', 'data-frontier-mismatch': mm.task },
       el('p', { class: 'small warntext', text: `${mm.label}: its rows are scored by different `
         + 'graders, each final on its own row — not comparable: '
-        + mm.rows.map(r => `${r.model} by ${r.version}`).join('; ') }),
+        + mm.rows.map(r => `${r.name || r.model} by ${r.version}`).join('; ') }),
       ...mm.rows.filter(r => r.offer).map(r => el('p', { class: 'small',
           'data-frontier-offer': `${mm.task}|${r.row}` },
-        r.asked ? `${r.model}: graded again by ${r.offer.to} at the next Start — `
-          : `${r.model}: grade it again by ${r.offer.to}, as the others are — `
+        r.asked ? `${r.name || r.model}: graded again by ${r.offer.to} at the next Start — `
+          : `${r.name || r.model}: grade it again by ${r.offer.to}, as the others are — `
             + `${n(r.offer.answers)} answers, about `
             + (r.offer.usd == null ? 'unpriced' : usd(r.offer.usd)) + ' ',
         LIVE ? el('button', { class: 'quiet', 'data-frontier-regrade-row': `${mm.task}|${r.row}`,

@@ -414,7 +414,32 @@ def init() -> None:
         c.execute("UPDATE submissions SET status='canceled', progress='canceled (the service "
                   "restarted while stopping it)' WHERE status='canceling'")
         _backfill_judge_batch(c)
+        _backfill_where(c)
         c.commit()
+
+
+_IMPORTED = re.compile(r"^imported from a rented GPU \((?P<gpu>[^)]*)\)(?P<rest>.*)$")
+
+
+def _backfill_where(c: sqlite3.Connection) -> None:
+    """17g: a run imported before 17f — and every DeviceMark import — says
+    where it ran, from its own record ("imported from a rented GPU (…) ·
+    box A3 · …"): they read "this server", and the rented filter hid them"""
+    rows = c.execute("SELECT id, note FROM submissions WHERE (where_ran IS NULL OR "
+                     "where_ran = '') AND note LIKE 'imported from a rented GPU (%'").fetchall()
+    if not rows:
+        return
+    try:
+        import import_frontier as imf
+    except ImportError:                   # a frozen copy without the scripts beside it
+        return
+    for sid, note in rows:
+        m = _IMPORTED.match(note or "")
+        if not m:
+            continue
+        box = re.search(r" · box (\S+)", m["rest"])
+        c.execute("UPDATE submissions SET where_ran=? WHERE id=?",
+                  (imf.where_words([m["gpu"]], [box[1]] if box else []), sid))
 
 
 _BATCH_IN_PROGRESS = re.compile(r"judge batch (\S+) submitted")

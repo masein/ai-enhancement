@@ -520,7 +520,8 @@ def test_13_14_15_an_import_says_where_and_when_it_ran(box):  # noqa: F811
     assert rle.frontier_where({"where": "run on a rented GPU (NVIDIA GeForce RTX 5090)"}) == \
         "rented GPU · RTX 5090"
     assert rle.frontier_where({}) == "this server"
-    assert imf2.where_words(["NVIDIA GeForce RTX 5090"] * 2, ["A2", "A1"]) == \
+    # 17g: one entry a card — two boxes of one card each
+    assert imf2.where_words(["NVIDIA GeForce RTX 5090"], ["A2", "A1"]) == \
         "rented GPU · RTX 5090 · boxes A1, A2"
 
 
@@ -544,7 +545,8 @@ def test_16_the_boxes_progress_on_the_board_never_their_address(svc, tmp_path, m
     assert (a5["n"], a5["of"]) == (3000, 12032) and a5["quiet_min"] is None
     assert a5["finish"] == pytest.approx(now - 60 + 13.3 * 3600, abs=60)
     a9 = next(b for b in got if b["label"] == "A9")
-    assert a9["safe"] and a9["quiet_min"] == 180
+    # 17g: a whole step writes no more — quiet only while it should be writing
+    assert a9["safe"] and a9["quiet_min"] is None
     # the fetch posts its reading; the file it posts holds no address either
     posted = []
     monkeypatch.setattr(ff, "run", lambda cmd, cwd=None, timeout=None, stdin=None: (

@@ -292,6 +292,23 @@ def _withheld(line: str, qids: set, texts: list) -> bool:
     return any(q in line for q in qids if len(q) >= 6)
 
 
+def withhold(lines: list[str], extra: list[str] | None = None) -> tuple[list[str], int]:
+    """17g: a log's lines, each that quotes a hidden question withheld — the
+    board's own view and the raw-run export alike. `extra`: more questions'
+    openings, lower-cased (a gated benchmark's, for the export)"""
+    qids, texts = _hidden_marks()
+    texts = [*texts, *(extra or [])]
+    out, n = [], 0
+    for line in lines:
+        if _withheld(line, qids, texts):
+            n += 1
+            out.append("[line withheld — it quotes a hidden question]" if not gpqa_line(line)
+                       else "[line withheld — it quotes a GPQA question, never shown]")
+        else:
+            out.append(line)
+    return out, n
+
+
 def log_lines(sid: int, tail: int = 200) -> dict:
     """The last `tail` lines of a run's log (up to 2,000), numbered, with any
     line that quotes a hidden question withheld."""
@@ -318,15 +335,7 @@ def log_lines(sid: int, tail: int = 200) -> dict:
     lines = path.read_text(errors="replace").splitlines()
     n = max(1, min(int(tail), LOG_MAX))
     keep = lines[-n:]
-    qids, texts = _hidden_marks()
-    out, withheld = [], 0
-    for line in keep:
-        if _withheld(line, qids, texts):
-            withheld += 1
-            out.append("[line withheld — it quotes a hidden question]" if not gpqa_line(line)
-                       else "[line withheld — it quotes a GPQA question, never shown]")
-        else:
-            out.append(line)
+    out, withheld = withhold(keep)
     return {**base, "total": len(lines), "first": len(lines) - len(keep) + 1, "lines": out,
             "withheld": withheld}
 

@@ -257,12 +257,14 @@ Ours get the same link.
 
 ```bash
 cd ~/benchmarks/aienh
-sudo docker compose exec -T -e SCRUB_HOSTS="$(hostname)" bench python scripts/export_devicemark_raw.py --all
-sudo docker compose exec -T -e SCRUB_HOSTS="$(hostname)" bench python scripts/export_devicemark_raw.py --run <run id>
+sudo docker compose exec -T -e SCRUB_HOSTS="$(hostname)" -e SCRUB_ACCOUNTS=<your Hugging Face account> bench python scripts/export_devicemark_raw.py --all
+sudo docker compose exec -T -e SCRUB_HOSTS="$(hostname)" -e SCRUB_ACCOUNTS=<your Hugging Face account> bench python scripts/export_devicemark_raw.py --run <run id>
 ```
 
 `SCRUB_HOSTS` gives the export the server's host name to remove: inside the
-container, the host name is the container's.
+container, the host name is the container's. `SCRUB_ACCOUNTS` (17g) gives
+the Hugging Face accounts to remove wherever they name a path (the account
+the builds and the llama-server tarball are kept under).
 
 **What it writes.** One folder a row, under `~/benchmarks/raw-export/public/` or `…/private/`:
 - `items.jsonl`, `setup.json`, `scores.json` and `log.txt`;
@@ -272,7 +274,9 @@ container, the host name is the container's.
 **Public or private, by default.**
 - Public: a public Hugging Face model, DeviceMark's calibration models among them.
 - Private: a Qwen3.6 build, a setup served here, or a checkpoint.
-- `--public` or `--private` decides instead.
+- `--private` keeps any run private. `--public` never makes one public that
+  the board doesn't know as public (17g): a build stays in `private/`,
+  whatever the flags, and the export says so.
 
 **DeviceMark rows only.** Any other run is refused.
 
@@ -280,7 +284,7 @@ container, the host name is the container's.
 boxes — have an exporter of their own, scrubbed the same way:
 
 ```bash
-sudo docker compose exec -T -e SCRUB_HOSTS="$(hostname)" bench python scripts/export_frontier_raw.py --all --rented
+sudo docker compose exec -T -e SCRUB_HOSTS="$(hostname)" -e SCRUB_ACCOUNTS=<your Hugging Face account> bench python scripts/export_frontier_raw.py --all --rented
 ```
 
 One folder a run: `setup.json` (where it ran — "this server", or "rented GPU ·
@@ -290,13 +294,25 @@ ran out or not, its tokens and grade), `log.txt` and a `README.md`. An
 answer's text only for MMLU-Pro, SimpleQA Verified and ARC-AGI-2: GPQA
 Diamond, OTIS Mock AIME and Humanity's Last Exam are gated and ask not to be
 redistributed, MATH's problems are withheld, and an answer quotes its
-question. A build served here (the Qwen3.6 builds) goes to `private/`.
+question. Each run exports what it brought (17g): a box's shard its own
+questions, this server's run nothing of a benchmark an import replaced (the
+README says which). `log.txt` withholds each line that quotes a hidden or
+gated question, as the board's log view does. Public only for a model the
+board knows as public: a public Hugging Face model, or a served one
+registered with `--public-weights` (G6's calibration); a build served here
+(the Qwen3.6 builds) goes to `private/` whatever the flags.
 
 **The scrub.** Every file is scrubbed before it is written:
 - keys and tokens, by value and by shape;
 - home paths;
 - this machine's host name and the tailnet's;
-- private and tailnet addresses.
+- private and tailnet addresses;
+- (17g) every IPv4 address, an ssh or scp port and the user before an
+  address, a rented GPU host's name (`ssh4.vast.ai`), a key given as a flag
+  (`--api-key <value>`) or named `x-token`, `SUBMIT_TOKEN`, `HF_TOKEN` or
+  `OPENROUTER_API_KEY` whatever its value, a URL's internal host
+  (`*.internal`, `*.lan`, …), and the Hugging Face account a private repo is
+  kept under (and those in `SCRUB_ACCOUNTS`).
 
 **Upload: your step.** Hugging Face sets privacy per repository, so the public and private rows go to two repositories. Once:
 
@@ -858,10 +874,11 @@ parts' names and sha256s.) Check its first answers carry their thinking
 they don't, stop the box and say so before the run. The board doesn't serve
 Gemma 4, so its first import registers it, with the file's sha256 as Hugging
 Face publishes it (the box's first line prints the one it hashed: they must
-agree):
+agree), and with `--public-weights`, so its raw runs may be exported public
+(17g: nothing else ever is):
 
 ```bash
-sudo docker compose exec -T bench python scripts/import_remote.py ~/benchmarks/bundles/frontier-served__gemma-4-26b-a4b-bf16-thinking-on-gpqa.tar.gz --by masein --register "Gemma 4 26B A4B (BF16, rented GPU)" --file-sha256 463c88dbc5f692e812013e6449253eae4cff0fc10fbbd8d0f038d3690f03eb72
+sudo docker compose exec -T bench python scripts/import_remote.py ~/benchmarks/bundles/frontier-served__gemma-4-26b-a4b-bf16-thinking-on-gpqa.tar.gz --by masein --register "Gemma 4 26B A4B (BF16, rented GPU)" --public-weights --file-sha256 463c88dbc5f692e812013e6449253eae4cff0fc10fbbd8d0f038d3690f03eb72
 ```
 
 Then alias it to Epoch's entry for the model on the Frontier view, so the cell
