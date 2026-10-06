@@ -549,8 +549,10 @@ then a line as the run moves: answers, the pace, the time left. If the box
 stops, run **the same command** again: it asks only what is not answered. Once
 its `--out` holds an answer, it refuses another build, other flags or another
 environment there; before that (a typo in `--flags`), the corrected command
-runs. Something already answering on its port (an earlier llama-server) is
-refused before anything starts. llama-server gets its `LLAMA_*` and `GGML_*`
+runs. Its `--out` keeps the served model, the thinking setting and the shard
+it was first started with, answered or not: for another of those, another
+`--out`. Something already answering on its port (an earlier llama-server)
+is refused before anything starts. llama-server gets its `LLAMA_*` and `GGML_*`
 variables from `--env` only, each one recorded: one exported in the shell
 isn't passed, and the first lines say so.
 

@@ -24351,8 +24351,10 @@ function frontierGradingCard() {
       ...waits.map(w => el('p', { class: 'small warntext', 'data-frontier-wait': '1',
         text: (w.why || w) + (w.carry ? ' — ' + w.carry : '') })))
       : '',
-    why && (E.answers || held) ? el('p', { class: 'small warntext', 'data-frontier-why': '1',
-      text: why }) : '',
+    // 17d: once — a wait line may already say it (the month's limit)
+    why && (E.answers || held) && !waits.some(w => (w.why || w) === why)
+      ? el('p', { class: 'small warntext', 'data-frontier-why': '1',
+        text: why }) : '',
     running ? el('div', { class: 'small', 'data-frontier-running': String(running) },
       ...G.running.map(r => el('p', { class: 'small', 'data-frontier-progress': `${r.slot}|${r.model}`,
         text: `${labelOf(r.slot)} · ${r.model}: ${r.progress || `${n(r.n)} sent`}` }))) : '',
