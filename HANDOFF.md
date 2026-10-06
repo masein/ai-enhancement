@@ -4953,6 +4953,19 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17d.4 — the third review's part 4: blocks nothing (6 Oct)
+
+- **What a first `--out` keeps**: G2 says its served model, thinking setting
+  and shard stay with it, answered or not (point 23, left as it is).
+- **A flag read from "How it's served" loses a sentence's full stop**:
+  "--spec-type mtp." refused an MTP box.
+- **Lookahead said not to be used isn't lookahead in words**: "no-lookahead",
+  "lookahead off", "non lookahead", "lookahead: disabled".
+- **The month's limit is said once on the grading card**, beside its disabled
+  button.
+- **A question twice in a question file is refused on load**, in words.
+- Tests: `tests/test_17d_review.py` (part 4), `tests/test_17d_browser.py`.
+
 ### 17d.3 — the third review's part 3: before Start on grading (6 Oct)
 
 - **A try is a reply that came and isn't a grade**: a provider that refused,
