@@ -153,6 +153,40 @@ def record_launch(rec: dict) -> dict:
             "words": words}
 
 
+# 17d: the flags that change what a server answers — the board's own resume
+# asks again when one of them changes (an import lets the box's differ: the
+# parity check covers them)
+_ANSWERS = re.compile(r"^(-ctk|--cache-type-k|-ctv|--cache-type-v|--chat-template|"
+                      r"--chat-template-file|--chat-template-kwargs|--reasoning-budget|"
+                      r"--reasoning-format|--override-kv|--rope-scaling|--rope-scale|"
+                      r"--rope-freq-base|--rope-freq-scale|--yarn-[a-z-]+|--no-jinja|"
+                      r"--jinja)$")
+
+
+def answer_flags(rec: dict) -> list[str]:
+    """the registered launch's flags that change its answers, each with its
+    value, from its own fields (its launch flags and its GGUF setup's)"""
+    from service import db
+    texts = [rec.get("flags") or ""]
+    sa = rec.get("same_as") or {}
+    if sa.get("gguf"):
+        g = db.gguf_get(sa["gguf"]) or {}
+        su = next((x for x in g.get("setups") or [] if x.get("id") == sa.get("setup")), None)
+        if su:
+            texts.append(" ".join(su.get("flags") or []))
+    toks = [t for t in re.split(r"\s+", " ".join(texts)) if t]
+    out = []
+    for i, t in enumerate(toks):
+        name, _, val = t.partition("=")
+        if not _ANSWERS.match(name):
+            continue
+        if not val and i + 1 < len(toks) and (not toks[i + 1].startswith("-")
+                                              or re.fullmatch(r"-\d+", toks[i + 1])):
+            val = toks[i + 1]
+        out.append(f"{name}={val}" if val else name)
+    return sorted(set(out))
+
+
 def box_launch(server: dict) -> dict:
     env = {k: str(v) for k, v in (server.get("env") or {}).items() if k.startswith(ROUTING_ENV)}
     spec = _spec_flags([str(x) for x in server.get("flags") or []]) + sorted(
@@ -427,7 +461,11 @@ def checks(b: dict, rec: dict | None, file_sha: str = "") -> list[str]:
             out.append(f"{t}: {len(bad):,} of its {len(lines):,} answer lines aren't answers — "
                        f"line {k} {w}")
             continue
-        why = sf.thinking_refused(t, "on" if on else "off", [r["answer"] for r in lines])
+        # 17d: a shard's off answers that thought are counted, never refused
+        # here — the 1% rule is the whole benchmark's, once its shards merge
+        # (score_task); a thinking shard with none is refused at once
+        answers = [r["answer"] for r in lines]
+        why = sf.thinking_refused(t, "on" if on else "off", answers) if not shard or on else ""
         if why:
             out.append(why)
         try:
@@ -622,6 +660,12 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             sh = {"n": n, "have": {**dict(sh.get("have") or {}), str(i): entry}}
             todo_shards[t] = (sh, b["files"][prefix + sf.ANSWERS], tsetup)
             lines.append(f"{t}: shard {i} of {n}, {len(ans):,} answers from a rented GPU ({gpu})")
+            held = 0 if on else sum(1 for r in ans.values() if sf.thought(r.get("answer") or ""))
+            if held:
+                # 17d: counted here, judged on the whole once its shards merge
+                lines.append(f"{t}: {held} of this shard's {len(ans):,} answers hold thinking, "
+                             f"though it was off — the 1% rule is the whole benchmark's, once "
+                             "its shards merge")
             missing = [j for j in range(1, n + 1) if str(j) not in sh["have"]]
             if missing:
                 lines.append(f"{t}: shard{'s' if len(missing) > 1 else ''} "

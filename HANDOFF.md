@@ -4953,6 +4953,50 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17d.1 — the third review's part 1: before the full run (6 Oct)
+
+The third review round re-ran the reproductions and a nine-box dry run on
+0f7c943 (`docs/prompts/phase-17d-third-review-fixes.md`). Part 1 blocks the
+full run:
+- **The KV cache, worked out before the download** (`remote_gguf.kv_fit`,
+  `gguf_header.shape`). The box reads the GGUF's metadata, its first 24 MiB
+  from Hugging Face or the file here, for the attention's shape: layers, KV
+  heads (a hybrid's attention layers only), key and value lengths, and a
+  recurrent layer's state. With the cache type (`-ctk`/`-ctv`) and the
+  card's memory (`nvidia-smi`), it works out:
+  - the cache a token takes;
+  - the cache the slots take beside the file and an overhead (`OVERHEAD`,
+    2.5 GiB until the pilot's numbers);
+  - the most slots that fit, refusing more in words before anything is
+    fetched.
+
+  When the header or the card can't be read, it uses the stated
+  `--max-context` rule, as before.
+- **The first 20 answers' thinking is checked** (`frontier.early_thinking`), on
+  the box as on the board. A thinking run none of whose first 20 answers
+  thought, or an off run most of whose did, stops in words, and a resume
+  says so before asking anything.
+- **The 1% rule is the whole benchmark's**: a shard's off answers that thought
+  are counted on its import ("1 of this shard's 24 answers hold thinking"), and
+  judged when its shards merge.
+- **A server down near the end writes nothing off**: before a question is
+  written as no answer, the server must answer again one it answered before
+  (`still_answers`), else the run stops and the next asks them.
+- **A timeout from a server that answers `/health` is that question's own
+  failure** (`served.TimedOut`), not a stopped run; it isn't asked twice more
+  within one try.
+- **A box names its benchmarks** (`--only`), thinking on or off.
+- **The board's resume**: drafting compared only when both sides know it (a
+  `/slots` probe that failed isn't another setup); and flags that change
+  answers count (`import_frontier.answer_flags`: cache types, chat template,
+  reasoning budget and format, rope and yarn). Two set aside within a second
+  keep their own folders.
+- **`visible()` is linear**: the leading spaces taken whole.
+- **The tarball script** stops in words where `set -e` stopped it silently: the
+  build-info `grep`, `find -exec … +`, and a library it couldn't pack.
+- A stop with a reason says its reason on the run's line.
+- Tests: `tests/test_17d_review.py` (part 1).
+
 ### 17c.5 — the second review's part 5: the lookahead and MTP rows (6 Oct)
 
 Not needed for this run (no lookahead or MTP row is filled), done because it

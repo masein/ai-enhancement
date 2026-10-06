@@ -564,7 +564,9 @@ def prompt(task: str, item: dict) -> tuple[str, dict]:
     raise KeyError(task)
 
 
-_THINK = re.compile(r"(?s)^\s*(?:<think>)?.*?</think>")
+# 17d: the leading spaces taken whole (possessive): a reply of 20,000 newlines
+# and no </think> took 2 s a call, the pattern backtracking into them
+_THINK = re.compile(r"(?s)^\s*+(?:<think>)?.*?</think>")
 # Inspect's multiple-choice parse (inspect_ai solver/_multiple_choice.py,
 # parse_answers, as of 5 Oct 2026), the single-answer case: wrappers off
 # ($B$, **B**, (B)), then the last line that is "ANSWER: X", else the last
@@ -578,7 +580,10 @@ _ANSWER_ANY = re.compile(r"(?i)ANSWER\s*:\s*([A-Za-z\d ,]+)(?:[^\w]|\n|$|\.)")
 
 def visible(text: str) -> str:
     """the reply without its thinking"""
-    return _THINK.sub("", text or "", count=1).strip()
+    text = text or ""
+    if "</think>" not in text:
+        return text.strip()
+    return _THINK.sub("", text, count=1).strip()
 
 
 def ran_out(text: str, finish: str | None) -> bool:

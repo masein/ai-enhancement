@@ -71,6 +71,7 @@ class ServerStopped(Exception):
     def __init__(self, done: int, total: int, why: str = "", refused: str = ""):
         super().__init__(refused or f"the server stopped answering at {done} of {total}")
         self.done, self.total, self.why, self.task = done, total, why, ""
+        self.refused = refused
 
 
 class LimitReached(ServerStopped):
@@ -88,6 +89,10 @@ class LimitReached(ServerStopped):
 
 class _Retry(Exception):
     """worth asking again: no answer, a timeout, a 5xx, 408 or 429"""
+
+    def __init__(self, msg: str = "", timed_out: bool = False):
+        super().__init__(msg)
+        self.timed_out = timed_out
 
 
 class ItemError(Exception):
@@ -840,7 +845,9 @@ def _post(url: str, key: str, body: dict, item: bool = True,
     try:
         st, raw = _http("POST", url, key, body, timeout=timeout or config.SERVED_TIMEOUT_S)
     except Exception as e:                                  # noqa: BLE001 — no answer: retried
-        raise _Retry(str(getattr(e, "reason", e))) from None
+        why = str(getattr(e, "reason", e))
+        raise _Retry(why, timed_out=isinstance(e, TimeoutError) or "timed out" in why.lower()
+                     ) from None
     if item and st in ITEM_STATUSES:
         raise ItemError(f"HTTP {st}: {_said(raw)}")
     if st in (408, 429) or st >= 500:
@@ -891,12 +898,21 @@ def answer_one(rec: dict, text: str, s: dict) -> "Answer":
     the server's chat parsing, marked with the server's words; and if that
     fails too, no answer — an empty one, with both errors. A server that
     isn't answering at all is another matter (_Retry, then ServerStopped)"""
+    def timed_out(e: TimedOut) -> "Answer":
+        # 17d: not asked twice more within this one: each could take most of an hour
+        a = Answer("")
+        a.error = {"chat": str(e), "fallback": "not asked: a timeout"}
+        return a
     try:
         return _ask_patiently(rec, text, s)
+    except TimedOut as e:
+        return timed_out(e)
     except ItemError:
         pass
     try:
         return _ask_patiently(rec, text, s)
+    except TimedOut as e:
+        return timed_out(e)
     except ItemError as e:
         said = str(e)
     try:
@@ -909,13 +925,35 @@ def answer_one(rec: dict, text: str, s: dict) -> "Answer":
         return a
 
 
+class TimedOut(ItemError):
+    """17d: no answer within the timeout, from a server that is up — this
+    question's own failure, never a reason to stop the run"""
+
+
+def healthy(rec: dict) -> bool:
+    """17d: the server answers /health now (llama-server's)"""
+    if is_openrouter(rec):
+        return False
+    try:
+        st, _ = _http("GET", root_of(rec["base_url"]) + "/health", rec.get("key", ""),
+                      timeout=10)
+        return st == 200
+    except Exception:                                       # noqa: BLE001 — not up
+        return False
+
+
 def _ask_patiently(rec: dict, text: str, s: dict, how=None) -> str:
-    """a server that doesn't answer is asked again for SERVED_RETRY_S"""
+    """a server that doesn't answer is asked again for SERVED_RETRY_S. 17d: a
+    timeout from a server that still answers /health is the question's own
+    failure (TimedOut), not a server that stopped"""
     t0 = time.time()
     while True:
         try:
             return (how or ask)(rec, text, s)
         except _Retry as e:
+            if e.timed_out and healthy(rec):
+                raise TimedOut(f"no answer within {round(timeout_for(s))} s, from a server that "
+                               "answers /health") from None
             if time.time() - t0 >= config.SERVED_RETRY_S:
                 raise ServerStopped(0, 0, str(e)) from None
             time.sleep(min(5.0, max(0.05, config.SERVED_RETRY_S / 24)))

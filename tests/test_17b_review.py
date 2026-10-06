@@ -212,11 +212,12 @@ def test_5_a_thinking_row_with_no_thinking_is_refused(box, monkeypatch):  # noqa
     """a box whose server never thought (a --reasoning-budget 0) filled a
     thinking row"""
     monkeypatch.setenv("FAKE_LLAMA_THINK", "never")
-    assert run_box(box, "run") == 0
-    register(box["sha"])
-    code, said = imported(bundle_of(box, "run"))
-    assert code == ir.REFUSED and any("thinking was asked for, and none of its 48 answers holds "
-                                      "any" in x for x in said), said
+    # 17d: the box stops after its first 20 answers, saying why — not three
+    # hours later at the import (tests/test_17d_review.py has the import's)
+    assert run_box(box, "run") == 1
+    assert not bundle_of(box, "run").exists()
+    own = (box["root"] / "run" / rg.OWN_LOG).read_text()
+    assert "thinking was asked for, and none of the first 20 answers holds any" in own
 
 
 def test_5_an_off_row_with_thinking_is_not_scored(svc, monkeypatch):  # noqa: F811

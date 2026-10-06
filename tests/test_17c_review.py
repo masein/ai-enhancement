@@ -242,7 +242,8 @@ def test_8_a_context_the_card_cant_hold_is_refused_before_the_download(tmp_path)
     with pytest.raises(SystemExit, match="8 slots of 98,304 tokens \\(ARC-AGI-2's, thinking "
                                          "on\\) is 786,432 tokens of context"):
         rg.main(["--as", SERVED, "--gguf", "hf://me/private/m.gguf", "--server",
-                 "hf://me/private/s.tar.gz", "--thinking", "on", "--out", str(tmp_path / "o")])
+                 "hf://me/private/s.tar.gz", "--thinking", "on", "--only", "arc_agi2_public",
+                 "--out", str(tmp_path / "o")])
     assert not (tmp_path / "files").exists() and not (tmp_path / "o").exists()
 
 

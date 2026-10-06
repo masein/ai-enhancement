@@ -123,11 +123,16 @@ def _setup(rec: dict, task: str, on: bool, s: dict) -> dict:
 
 
 def launch_setup(rec: dict) -> dict:
-    """the registered launch, normalised as the import normalises a box's"""
+    """the registered launch, normalised as the import normalises a box's —
+    17d: and the flags that change what the server answers (its cache types,
+    its chat template, its reasoning budget and format, rope and yarn), the
+    board's own resume only; `drafts` None when the server's /slots didn't say"""
     import import_frontier as imf
     got = imf.record_launch(rec)
+    sp = rec.get("speculative")
     return {"env": dict(sorted(got["env"].items())), "spec": sorted(got["spec"]),
-            "drafts": bool(got["drafts"])}
+            "drafts": None if sp is None else bool(sp),
+            "answers": imf.answer_flags(rec)}
 
 
 # 17b: what a task's answers depend on — a change asks them all again. 17c:
@@ -139,8 +144,19 @@ SETUP_KEYS = ("version", "protocol_version", "source", "epochs", "thinking", "bu
 def setup_differs(old: dict, new: dict) -> list[str]:
     """the parts of a task's setup that changed, by name — 17c: a part the old
     setup.json doesn't hold (one written before it was kept) is unknown, not
-    changed (setup_unknown)"""
-    return [k for k in SETUP_KEYS if k in old and old.get(k) != new.get(k)]
+    changed (setup_unknown). 17d: the launch part by part, each compared
+    only when both sides say it (a /slots probe that failed isn't a change)"""
+    out = []
+    for k in SETUP_KEYS:
+        if k not in old:
+            continue
+        if k == "launch_setup" and isinstance(old[k], dict) and isinstance(new.get(k), dict):
+            if any(old[k][p] != new[k].get(p) for p in old[k]
+                   if p in new[k] and old[k][p] is not None and new[k][p] is not None):
+                out.append(k)
+        elif old.get(k) != new.get(k):
+            out.append(k)
+    return out
 
 
 def setup_unknown(old: dict) -> list[str]:
@@ -165,9 +181,36 @@ def set_aside(row: Path, task: str, why: str) -> Path | None:
     stamp = time.strftime("%Y-%m-%dT%H-%M-%S")
     aside = (Path(config.OUT_DIR).with_name("earlier") / Path(row).name
              / f"{task}_0shot-frontier-{why}-{stamp}")
+    # 17d: two set aside within one second each keep their own folder
+    k = 1
+    while aside.exists():
+        k += 1
+        aside = aside.with_name(f"{task}_0shot-frontier-{why}-{stamp}-{k}")
     aside.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(d), str(aside))
     return aside
+
+
+# 17d: a run's first answers checked for thinking, on the box as on the board
+# — a server that ignores the switch stops in words after these many, not
+# three hours later at the import
+EARLY = 20
+
+
+def early_thinking(task: str, on: bool, answers: list[str]) -> str:
+    """'' unless the first EARLY answers say the server isn't doing what was
+    asked: a thinking run none of whose answers thought, or an off run most
+    of whose did"""
+    label = fb.BENCH[task]["label"]
+    n = sum(1 for a in answers if thought(a))
+    if on and not n:
+        return (f"{label}: thinking was asked for, and none of the first {len(answers)} answers "
+                "holds any — the server isn't thinking (a --reasoning-budget 0, or a chat "
+                "template that ignores the switch?): stopped")
+    if not on and n > len(answers) / 2:
+        return (f"{label}: thinking was off, and {n} of the first {len(answers)} answers hold "
+                "thinking — the server thinks anyway: stopped")
+    return ""
 
 
 def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
@@ -211,6 +254,21 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
     limit = served.item_error_limit(len(items))
     t0, n0 = time.time(), have
     count = {"n": have}
+    early = {"checked": False}
+
+    def check_early() -> str:
+        """the first EARLY answers' thinking, once there are that many"""
+        if early["checked"]:
+            return ""
+        got = [r["answer"] for r in read_answers(path).values() if not r.get("unanswered")]
+        if len(got) < EARLY:
+            return ""
+        early["checked"] = True
+        return early_thinking(task, on, got[:EARLY])
+
+    why = check_early()                         # a resume: checked before anything is asked
+    if why:
+        raise served.ServerStopped(have, total, why, refused=why)
 
     def write(line: dict) -> int:
         with lock:
@@ -258,6 +316,11 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
         if a.fallback:
             line["fallback"] = a.fallback
         n = write(line)
+        if n >= EARLY and not early["checked"]:
+            with lock:
+                why = check_early()
+                if why and not halt:
+                    halt.append(served.ServerStopped(0, total, why, refused=why))
         if progress:
             progress(n, total, (time.time() - t0) / max(1, n - n0))
 
@@ -285,6 +348,14 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
             raise served.ServerStopped(count["n"], total, why, refused=(
                 f"the server failed on every question it was asked ({len(failed)}), asked its "
                 f"own way and without its chat parsing ({why}): stopped"))
+        # 17d: before a question is written off, the server must still answer
+        # one it answered before: a server that went down near the end of a
+        # benchmark left its last questions as no answer for good
+        if failed and not still_answers(rec, task, path, s, failed):
+            why = next(iter(failed.values()))
+            raise served.ServerStopped(count["n"], total, why, refused=(
+                f"the server stopped answering ({why}): {len(failed)} question(s) it failed on "
+                "are asked again by the next run, nothing written for them"))
         for (qid, e), why in sorted(failed.items()):
             write({"id": qid, "epoch": e, "seed": fb.seed_of(task, qid, e), "answer": "",
                    "finish": None, "tokens": None, "unanswered": why[:300] or "no reason given",
@@ -292,6 +363,26 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
             log(f"[frontier] {task}: question {qid}, run {e}: the server failed on it twice — "
                 f"written as no answer, counted wrong ({why[:200]})")
     return count["n"], total
+
+
+def still_answers(rec: dict, task: str, path: Path, s: dict, failed: dict) -> bool:
+    """17d: the server answers again a question it answered before (a few
+    tokens of it) — or, with none answered here, its /health"""
+    answered = [r for k, r in read_answers(path).items()
+                if k not in failed and not r.get("unanswered")]
+    if not answered:
+        return served.healthy(rec)
+    r = answered[0]
+    it = next((x for x in fb.load(task, config.BENCH_ROOT) if x["id"] == r["id"]), None)
+    if it is None:
+        return served.healthy(rec)
+    text, _ = fb.prompt(task, it)
+    si = {**s, "max_tokens": 16, "seed": fb.seed_of(task, it["id"], r.get("epoch", 0)),
+          **({"system": fb.system_of(task)} if fb.system_of(task) else {})}
+    try:
+        return not served.answer_one(rec, text, si).error
+    except (served.ServerStopped, ValueError):
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -686,8 +777,10 @@ def run(sid: int, sub: dict, rec: dict, th: dict, row: Path, log_path: Path) -> 
             n, total = ask_task(rec, task, row, on, progress,
                                 canceled=lambda: db.cancel_requested(sid), log=log)
         except served.ServerStopped as e:
-            line = (f"{label}: {e}" if str(e).startswith(("the server refused",
-                                                           "the server failed on")) else
+            # 17d: a stop with a reason says the reason (the thinking check's
+            # starts with the benchmark's name)
+            said = getattr(e, "refused", "") or ""
+            line = (said if said.startswith(label) else f"{label}: {said}" if said else
                     f"{label}: the server stopped answering at {e.done:,} of {e.total:,}")
             line += served.KEPT_FOR_NEXT
             log(f"[frontier] {line} ({e.why})")
