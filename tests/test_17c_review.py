@@ -10,6 +10,7 @@ runs."""
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import sys
 import types
@@ -19,10 +20,14 @@ import pytest
 
 import frontier as fb
 import frontier_parity as fp
+import remote_bundle as rb
+import remote_gguf as rg
 from fake_openai import FakeServer
-from service import db, served
+from service import config, db, served
+from service import frontier as sf
 from test_12q_devicemark_runs import ME, svc  # noqa: F401 — svc is the fixture
-from test_17_gguf_box import GGUF_NAME, SERVED, box, run_box  # noqa: F401 — box is a fixture
+from test_17_gguf_box import (GGUF_NAME, N, RUNS, SERVED, TASK, box,  # noqa: F401
+                              bundle_of, invented, run_box)
 
 PARITY_ITEMS = [{"id": str(k), "question": f"Q{k}?", "options": ["w", "x", "y"],
                  "answer": "A", "category": "law"} for k in range(60)]
@@ -160,3 +165,183 @@ def test_3_the_parity_run_and_the_full_run_fetch_the_gguf_once(box, monkeypatch)
     import remote_gguf as rg
     assert "sha256 of" in (box["root"] / "parity" / rg.OWN_LOG).read_text()
     assert "sha256 of" not in (box["root"] / "run" / rg.OWN_LOG).read_text()
+
+
+# ---------------------------------------------------------------------------
+# part 2: before the full run
+# ---------------------------------------------------------------------------
+
+def a_served(fake: FakeServer, **more) -> dict:
+    fake.ctx = 40960
+    return served.register({"name": "board box", "base_url": fake.base, "how": "x",
+                            "based_on": "Qwen/Qwen3.6-35B-A3B", "thinking": "off", **more}, ME)
+
+
+def test_4_a_question_that_always_fails_is_no_answer_and_the_run_carries_on(svc, monkeypatch):  # noqa: F811
+    """a prompt too long for its slot answers 400 every time: the task was never
+    scored, the benchmarks after it never asked, and the question never named"""
+    monkeypatch.setattr(fb, "_fetch", lambda task: invented())
+    fake = FakeServer()
+    try:
+        fake.reply = lambda body: "ANSWER: A"
+        too_long = (lambda body: (400, "the request exceeds the available context size")
+                    if re.search(r"Invented question 3\b", json.dumps(body)) else None)
+        fake.chat_error = fake.raw_error = too_long
+        rec = a_served(fake)
+        row = config.OUT_DIR / rec["id"].replace("/", "__")
+        logged: list[str] = []
+        assert sf.ask_task(rec, TASK, row, False, log=logged.append) == (N * RUNS, N * RUNS)
+        lines = [json.loads(x) for x in (sf.task_dir(row, TASK) / sf.ANSWERS).read_text()
+                 .splitlines()]
+        never = [x for x in lines if x.get("unanswered")]
+        assert [(x["id"], x["answer"]) for x in never] == [("rec003", "")] * RUNS
+        assert "exceeds the available context size" in never[0]["unanswered"]
+        assert any("question rec003, run 0: the server failed on it twice — written as no "
+                   "answer, counted wrong" in x for x in logged), logged
+        # scored, counted wrong, and named on the row
+        sc = sf.score_task(row, TASK, rec)
+        assert sc["unanswered"] == RUNS and sc["unanswered_ids"] == ["rec003"]
+        assert "4 the server never answered, counted wrong (rec003)" in sf.words(TASK, sc)
+        # a server that fails every question it is asked stops, keeping none
+        fake.chat_error = fake.raw_error = lambda body: (500, "it failed")
+        row2 = config.OUT_DIR / "served__another"
+        with pytest.raises(served.ServerStopped, match="the server failed on"):
+            sf.ask_task({**rec, "id": "served/another"}, TASK, row2, False)
+        assert not sf.read_answers(sf.task_dir(row2, TASK) / sf.ANSWERS)
+    finally:
+        fake.close()
+
+
+def test_5_6_thinking_as_scoring_reads_it_and_a_few_in_an_off_row_are_counted():
+    closing_only = "weighing the options\n</think>\n\nANSWER: A"
+    assert sf.thought(closing_only) and fb.visible(closing_only) == "ANSWER: A"
+    assert not sf.thought("<think>\n\n</think>\n\nANSWER: A")
+    assert sf.thinking_refused(TASK, "on", [closing_only] * 10) == ""
+    # one in 12,032 with thinking: scored, and said; more than 1%: refused
+    plain = ["ANSWER: A"] * 199
+    assert sf.thinking_refused(TASK, "off", [closing_only, *plain]) == ""
+    assert sf.thinking_kept("off", [closing_only, *plain]) == 1
+    assert "more than 1%" in sf.thinking_refused(TASK, "off", [closing_only] * 3 + plain)
+    assert "1 thought though thinking was off (scored on what follows the thinking)" in \
+        sf.words(TASK, {"score": 0.5, "se": 0.1, "epochs": 1, "questions": 200,
+                        "thinking_held": 1})
+
+
+def test_7_a_box_names_its_benchmarks_in_its_bundle(box):  # noqa: F811
+    """G5's boxes 6, 7 and 8 all wrote frontier-served__<build>-thinking-on.tar.gz"""
+    assert run_box(box, "run") == 0
+    assert bundle_of(box, "run").name == "frontier-served__lda-box-thinking-on-gpqa.tar.gz"
+    assert bundle_of(box, "run").exists()
+    names = {rb.bundle_name("frontier", SERVED, True, parts=p)
+             for p in (["gpqa", "otis"], ["math-l5", "simpleqa"], ["arc-agi-2"])}
+    assert len(names) == 3
+
+
+def test_8_a_context_the_card_cant_hold_is_refused_before_the_download(tmp_path):
+    with pytest.raises(SystemExit, match="8 slots of 98,304 tokens \\(ARC-AGI-2's, thinking "
+                                         "on\\) is 786,432 tokens of context"):
+        rg.main(["--as", SERVED, "--gguf", "hf://me/private/m.gguf", "--server",
+                 "hf://me/private/s.tar.gz", "--thinking", "on", "--out", str(tmp_path / "o")])
+    assert not (tmp_path / "files").exists() and not (tmp_path / "o").exists()
+
+
+def test_9_a_variable_in_the_shell_never_reaches_llama_server(box, monkeypatch, tmp_path):  # noqa: F811
+    seen = tmp_path / "argv.jsonl"
+    monkeypatch.setenv("FAKE_LLAMA_ARGV", str(seen))
+    monkeypatch.setenv("LLAMA_MOE_ROUTE_LOOKAHEAD", "4")
+    monkeypatch.setenv("GGML_CUDA_FORCE_MMQ", "1")
+    assert run_box(box, "run") == 0
+    got = json.loads(seen.read_text().splitlines()[-1])["env"]
+    assert got == {"LLAMA_MOE_ROUTE_MODE": "lookahead"}       # --env's, and only it
+    srv = rb.read(bundle_of(box, "run"))["setup"]["server"]
+    assert srv["env"] == got
+    own = (box["root"] / "run" / rg.OWN_LOG).read_text()
+    assert "not given to llama-server: GGML_CUDA_FORCE_MMQ, LLAMA_MOE_ROUTE_LOOKAHEAD" in own
+
+
+def test_10_a_launch_that_answered_nothing_pins_nothing(box, monkeypatch):  # noqa: F811
+    """a typo in --flags: the corrected command was refused"""
+    monkeypatch.setenv("FAKE_LLAMA_MODEL_PATH", "/models/another.gguf")
+    with pytest.raises(SystemExit):
+        run_box(box, "run", "--flags", "-ctk q8_0 --typo")
+    monkeypatch.delenv("FAKE_LLAMA_MODEL_PATH")
+    assert run_box(box, "run", "--flags", "-ctk q8_0") == 0
+    # once it holds answers, another setup is refused as before
+    with pytest.raises(SystemExit, match="another setup"):
+        run_box(box, "run", "--flags", "-ctk f16")
+
+
+def test_11_12_otis_reads_the_last_answer_only_and_never_hangs():
+    """"ANSWER: 42 … ANSWER: 43 (mod 1000)" read 42, right against a key of 42;
+    an integer, 200 spaces and text took over 100 s; 4,301 digits raised"""
+    import time
+    r = fb.read_integer
+    assert r("ANSWER: 42\nwait, that's off\nANSWER: 43 (mod 1000)") is None
+    assert r("ANSWER: 42\nANSWER: 43") == "43"
+    sc = fb.score("otis_aime_epoch", "ANSWER: 42\nANSWER: 43 (mod 1000)", "stop",
+                  {"answer": "42"})
+    assert sc["read"] is None and sc["ok"] is False            # the model check reads it
+    for slow in ("ANSWER: 5" + " " * 200 + "x" * 50, "ANSWER: " + "9" * 4301,
+                 ("ANSWER: 5" + " \t" * 5000 + "x\n") * 50):
+        t0 = time.time()
+        assert r(slow) is None
+        assert time.time() - t0 < 1.0
+    assert r("**ANSWER: $\\boxed{7}$**") == "7" and r("ANSWER: 1,024.") == "1024"
+
+
+def test_13_the_boards_resume_compares_the_launch_as_the_import_does(svc, monkeypatch):  # noqa: F811
+    monkeypatch.setattr(fb, "_fetch", lambda task: invented())
+    fake = FakeServer()
+    try:
+        fake.reply = lambda body: "ANSWER: A"
+        rec = a_served(fake)
+        db.served_put({**rec, "flags": "--flash-attn on -np 4 -c 163840"})
+        rec = served.get(rec["id"])
+        row = config.OUT_DIR / rec["id"].replace("/", "__")
+        logged: list[str] = []
+        assert sf.ask_task(rec, TASK, row, False, log=logged.append)[0] == N * RUNS
+        n = len(fake.requests)
+        # reordered, more slots, another context: the same launch
+        db.served_put({**rec, "flags": "-np 8 -c 327680 --flash-attn on"})
+        assert sf.ask_task(served.get(rec["id"]), TASK, row, False, log=logged.append)[0] \
+            == N * RUNS
+        assert len(fake.requests) == n and not any("another setup" in x for x in logged)
+        # a setup.json from before 17b: what it doesn't say is unknown — kept, said
+        p = sf.task_dir(row, TASK) / sf.SETUP
+        old = json.loads(p.read_text())
+        p.write_text(json.dumps({k: v for k, v in old.items()
+                                 if k not in ("server", "launch", "launch_setup")}))
+        assert sf.ask_task(served.get(rec["id"]), TASK, row, False, log=logged.append)[0] \
+            == N * RUNS
+        assert len(fake.requests) == n
+        assert any("doesn't say their launch_setup, server: they are kept, with those unknown"
+                   in x for x in logged), logged
+        assert json.loads(p.read_text())["unknown_earlier"] == ["launch_setup", "server"]
+        # lookahead now registered: another setup, set aside and asked again
+        db.served_put({**served.get(rec["id"]), "env": "LLAMA_MOE_ROUTE_MODE=lookahead"})
+        sf.ask_task(served.get(rec["id"]), TASK, row, False, log=logged.append)
+        assert len(fake.requests) == n + N * RUNS
+    finally:
+        fake.close()
+
+
+def test_14_15_a_copy_on_disk_is_counted_and_a_count_isnt_a_gated_sets_terms(monkeypatch,
+                                                                            tmp_path):
+    monkeypatch.setattr(fb, "expected", fb._expected_n)          # the real count (conftest)
+    p = fb._cache(tmp_path, "mmlupro_tiger")
+    p.parent.mkdir(parents=True)
+    p.write_text(json.dumps({"items": [{"id": str(k), "category": "law"} for k in range(11000)],
+                             "extra": {}}))
+    with pytest.raises(ValueError, match="11,000 questions are in this machine's copy") as e:
+        fb.load("mmlupro_tiger", tmp_path)
+    assert "12,032" in str(e.value)
+    hle = fb._cache(tmp_path, "hle_text_cais")
+    hle.write_text(json.dumps([{"id": str(k)} for k in range(2500)]))
+    with pytest.raises(ValueError) as e:
+        fb.load("hle_text_cais", tmp_path)
+    said = fb.load_failed("hle_text_cais", e.value)
+    assert said.startswith("Humanity's Last Exam: 2,500 questions are in this machine's copy")
+    assert "accept its terms" not in said
+    refused = fb.load_failed("hle_text_cais", OSError("401 Client Error: Unauthorized: gated"))
+    assert refused.endswith("accept its terms on Hugging Face with the account whose token "
+                            "this machine has")

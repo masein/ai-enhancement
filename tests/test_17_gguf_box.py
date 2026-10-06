@@ -107,7 +107,9 @@ def run_box(b: dict, out: str, *more: str, thinking: str = "on") -> int:
 
 def bundle_of(b: dict, out: str, shard: tuple[int, int] | None = None,
               thinking: bool = True) -> Path:
-    return b["root"] / out / rb.bundle_name("frontier", SERVED, thinking, shard)
+    # 17c: a box that runs some of the suite says which in its bundle's name
+    return b["root"] / out / rb.bundle_name("frontier", SERVED, thinking, shard,
+                                            parts=[fb.BENCH[TASK]["short"]])
 
 
 def record(sha: str | None) -> dict:
@@ -471,7 +473,14 @@ def test_the_docs_commands_are_the_scripts_and_paste_whole():
     assert phone.env == "" and orig.env == ""       # neither build has routing variables
     assert all(a.gguf.startswith("hf://") and a.server.startswith("hf://") for a in args)
     assert any(a.parity and a.thinking == "off" for a in args)
+    # 17c: every box command fits the card, as remote_gguf.py checks first
+    for a in args:
+        tasks = [fb.PARITY["task"]] if a.parity else (a.only or fb.TASKS)
+        on = a.thinking == "on" and not a.parity
+        assert fb.slot_context(tasks, on) * a.slots <= a.max_context, a
     # 17b: G3 fetches the bundle G2's phone command writes, and G4 imports it
-    name = rb.bundle_name("frontier", phone.served_as, True)
+    import frontier as fbm
+    name = rb.bundle_name("frontier", phone.served_as, True,
+                          parts=[fbm.BENCH[t]["short"] for t in phone.only])
     assert f"root@<host>:{phone.out}/{name} ~/benchmarks/bundles/" in sec
     assert f"import_remote.py ~/benchmarks/bundles/{name} --by masein" in sec

@@ -372,7 +372,8 @@ def test_10_register_never_takes_the_bundles_word(box):  # noqa: F811
     assert code == ir.REFUSED and any("has a row here already" in x for x in said), said
     # an id holding "__", naming another row: refused
     assert run_box(box, "evil", "--as", "served/lda-box__x") == 0
-    evil = box["root"] / "evil" / rb.bundle_name("frontier", "served/lda-box__x", True)
+    evil = box["root"] / "evil" / rb.bundle_name("frontier", "served/lda-box__x", True,
+                                                 parts=["gpqa"])
     code, said = imported(evil, register="Evil", file_sha=box["sha"])
     assert code == ir.REFUSED and any("can't be a new model's id" in x for x in said), said
     assert served.get("served/lda-box__x") is None
@@ -471,6 +472,7 @@ def test_16_otis_reads_an_integer_only_when_nothing_follows_it():
 
 
 def test_17_a_benchmark_that_loads_another_count_asks_nothing(monkeypatch, tmp_path):
+    monkeypatch.setattr(fb, "expected", fb._expected_n)      # the real count (conftest)
     monkeypatch.setattr(fb, "_fetch_source", lambda task: invented()[:3])
     with pytest.raises(ValueError, match="GPQA Diamond: 3 questions came from Idavidrein/gpqa "
                                          "at 83022cefff93, and this board expects 198"):

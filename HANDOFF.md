@@ -4953,6 +4953,56 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17c.2 — the second review's part 2: before the full run (6 Oct)
+
+- **One failing question no longer blocks its benchmark and the ones after
+  it** (`service/frontier.ask_task`).
+  - A question the server fails on is asked once more at the end of its
+    benchmark. Failing again, it is written as no answer
+    (`"unanswered": why`), counted wrong and never graded, and named in the
+    log and on the row ("4 the server never answered, counted wrong
+    (rec003)"). The run carries on.
+  - The limit counts questions, not runs, so one question's eight runs are
+    one.
+  - A server that fails on more than the limit, or on every question it is
+    asked, stops the run and keeps none of them.
+- **Thinking checked as scoring reads it.** `thought()` uses `fb.visible`'s
+  pattern, so answers holding only `</think>` (`--reasoning-format none`
+  with a template that opens `<think>` in the prompt) are thinking. An off
+  row with at most 1% of its answers thinking is scored and says how many;
+  above that it is refused.
+- **A bundle's name carries its benchmarks** when the box ran some of the
+  suite: `frontier-served__<build>-thinking-on-gpqa+otis.tar.gz`. G5's
+  boxes 6, 7 and 8 wrote one name.
+- **A context the card can't hold is refused before the download**: slots ×
+  each slot's context over `--max-context`, by default G1's 540,672 for a
+  32 GB card (8 slots of OTIS's and MATH's 67,584). A run with no `--only`
+  and thinking on (8 × ARC-AGI-2's 98,304) is refused. G2's commands now
+  carry `--only` (G5's box 6).
+- **llama-server's environment is built by the script**: the box's, without
+  its secrets or any `LLAMA_*`/`GGML_*`, plus `--env`. Every one of those it
+  gets is recorded and pinned, and one exported in the shell is named in
+  the first lines.
+- **The setup is pinned once an answer is written**: a launch that answered
+  nothing (a typo in `--flags`) pins nothing.
+- **OTIS reads the last "ANSWER:" only.** "ANSWER: 42 … ANSWER: 43 (mod
+  1000)" is unread (the model check reads it), not 42. The integer has six
+  digits at most, spaces and tabs only, possessive, so it can't hang or
+  raise.
+- **The board's resume compares the launch as the import does**:
+  `launch_setup`, routing and speculative decoding. Reordered flags, slots
+  and context don't count. A key an earlier `setup.json` doesn't hold is
+  unknown, not changed: the answers are kept, and it is said (and kept as
+  `unknown_earlier`).
+- **Every load counts the questions**, a copy on disk too: 11,000 cached
+  MMLU-Pro questions are refused, in words. `tests/conftest.py` lets
+  invented sets through for the whole session; a test of the count puts the
+  real check back.
+- **A count that doesn't agree says so in its own words**
+  (`fb.load_failed`); a gated set's terms are named only when access was
+  refused.
+- Tests: `tests/test_17c_review.py` (part 2).
+
 ### 17c.b — nine fixes found on the deployed board and the server (6 Oct)
 
 - **`build_llama_tarball.sh`**:

@@ -87,14 +87,18 @@ def refused(suite: str) -> str:
 
 
 def bundle_name(suite: str, model: str, thinking: bool,
-                shard: tuple[int, int] | None = None) -> str:
+                shard: tuple[int, int] | None = None, parts: list[str] | None = None) -> str:
     """"devicemark-Qwen__Qwen3.5-4B-thinking-on.tar.gz", and 15.5's shards
-    "devicemark-Qwen__Qwen3.5-4B-thinking-on-shard-1-of-2.tar.gz" """
+    "devicemark-Qwen__Qwen3.5-4B-thinking-on-shard-1-of-2.tar.gz". 17c: and the
+    benchmarks a box ran, when it ran some of a suite —
+    "frontier-served__x-thinking-on-otis+math-l5-shard-1-of-2.tar.gz" — so two
+    boxes of one model and setting never write the same name"""
     why = refused(suite)
     if why:
         raise ValueError(why)
     return (f"{SUITES[suite]['prefix']}-{model.replace('/', '__')}-thinking-"
             f"{'on' if thinking else 'off'}"
+            + (f"-{'+'.join(parts)}" if parts else "")
             + (f"-shard-{shard[0]}-of-{shard[1]}" if shard else "") + ".tar.gz")
 
 

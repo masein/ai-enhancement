@@ -115,17 +115,37 @@ def _setup(rec: dict, task: str, on: bool, s: dict) -> dict:
         "server": {"file": pin.get("file") or "", "size": pin.get("size"),
                    "build": pin.get("build") or ""},
         "launch": {"flags": rec.get("flags") or "", "env": rec.get("env") or ""},
+        # 17c: the launch as the import compares it — routing and speculative
+        # decoding, read from the flags, the environment and "How it's
+        # served" — so reordered flags, slots and context don't count
+        "launch_setup": launch_setup(rec),
         "shard": {"i": sh[0], "n": sh[1]} if sh else None}
 
 
-# 17b: what a task's answers depend on — a change asks them all again
+def launch_setup(rec: dict) -> dict:
+    """the registered launch, normalised as the import normalises a box's"""
+    import import_frontier as imf
+    got = imf.record_launch(rec)
+    return {"env": dict(sorted(got["env"].items())), "spec": sorted(got["spec"]),
+            "drafts": bool(got["drafts"])}
+
+
+# 17b: what a task's answers depend on — a change asks them all again. 17c:
+# the launch as the import compares it, not its text
 SETUP_KEYS = ("version", "protocol_version", "source", "epochs", "thinking", "budget",
-              "sampling", "family", "server", "launch")
+              "sampling", "family", "server", "launch_setup")
 
 
 def setup_differs(old: dict, new: dict) -> list[str]:
-    """the parts of a task's setup that changed, by name"""
-    return [k for k in SETUP_KEYS if old.get(k) != new.get(k)]
+    """the parts of a task's setup that changed, by name — 17c: a part the old
+    setup.json doesn't hold (one written before it was kept) is unknown, not
+    changed (setup_unknown)"""
+    return [k for k in SETUP_KEYS if k in old and old.get(k) != new.get(k)]
+
+
+def setup_unknown(old: dict) -> list[str]:
+    """the parts an earlier setup.json doesn't say — kept as unknown, and said"""
+    return [k for k in SETUP_KEYS if k not in old] + list(old.get("unknown_earlier") or [])
 
 
 def _read_json(p: Path) -> dict:
@@ -161,13 +181,23 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
     d = task_dir(row, task)
     s = settings(rec, task, on)
     new = _setup(rec, task, on, s)
-    # 17b: answers made with another setup are never mixed with these
+    # 17b: answers made with another setup are never mixed with these. 17c:
+    # what the earlier setup.json doesn't say is unknown — the answers kept,
+    # and said, here and in setup.json from now on
     old = _read_json(d / SETUP)
-    changed = setup_differs(old, new) if old else []
-    if changed and (d / ANSWERS).exists():
-        aside = set_aside(row, task, "another-setup")
-        log(f"[frontier] {task}: its answers were made with another setup ({', '.join(changed)}"
-            f"): set aside at {aside}, and asked again")
+    if (d / ANSWERS).exists() and read_answers(d / ANSWERS):
+        changed = setup_differs(old, new) if old else []
+        unknown = sorted(set(setup_unknown(old))) if old else list(SETUP_KEYS)
+        if changed:
+            aside = set_aside(row, task, "another-setup")
+            log(f"[frontier] {task}: its answers were made with another setup "
+                f"({', '.join(changed)}): set aside at {aside}, and asked again")
+        elif unknown:
+            new["unknown_earlier"] = unknown
+            log(f"[frontier] {task}: its earlier answers' setup.json "
+                + ("is missing or unreadable" if not old else
+                   f"doesn't say their {', '.join(unknown)}")
+                + ": they are kept, with those unknown")
     d.mkdir(parents=True, exist_ok=True)
     (d / SETUP).write_text(json.dumps(new, indent=1, sort_keys=True), encoding="utf-8")
     path = d / ANSWERS
@@ -177,9 +207,17 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
     total, have = len(want), len(want) - len(todo)
     lock = threading.Lock()
     halt: list[Exception] = []
-    failed: list[str] = []
+    failed: dict[tuple[str, int], str] = {}
+    limit = served.item_error_limit(len(items))
     t0, n0 = time.time(), have
     count = {"n": have}
+
+    def write(line: dict) -> int:
+        with lock:
+            with open(path, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps(line, ensure_ascii=False) + "\n")
+            count["n"] += 1
+            return count["n"]
 
     def one(job) -> None:
         it, e = job
@@ -202,13 +240,16 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
             return
         if a.error:
             # 17b: no answer either way (its chat endpoint twice, then without
-            # its chat parsing) isn't an answer: never kept, asked again next
-            # run — and more of them than the limit, the server isn't right
+            # its chat parsing) isn't an answer — and more questions than the
+            # limit failing, the server isn't right: stopped, nothing of
+            # theirs kept. 17c: the limit counts questions, not runs (a
+            # question's eight runs are one question)
             with lock:
-                failed.append(a.error.get("chat") or "")
-                if len(failed) > served.item_error_limit(total) and not halt:
+                failed[(it["id"], e)] = a.error.get("chat") or ""
+                qs = {k[0] for k in failed}
+                if len(qs) > limit and not halt:
                     halt.append(served.ServerStopped(0, total, a.error.get("chat") or "", refused=(
-                        f"the server failed on {len(failed)} questions, asked its own way and "
+                        f"the server failed on {len(qs)} questions, asked its own way and "
                         f"without its chat parsing ({a.error.get('chat')}): stopped")))
             return
         line = {"id": it["id"], "epoch": e, "seed": seed, "answer": str(a),
@@ -216,23 +257,40 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
                 "at": round(time.time(), 3)}
         if a.fallback:
             line["fallback"] = a.fallback
-        with lock:
-            with open(path, "a", encoding="utf-8") as fh:
-                fh.write(json.dumps(line, ensure_ascii=False) + "\n")
-            count["n"] += 1
-            n = count["n"]
+        n = write(line)
         if progress:
             progress(n, total, (time.time() - t0) / max(1, n - n0))
 
+    def stop_if_halted() -> None:
+        if halt:
+            e = halt[0]
+            e.done, e.total = count["n"], total
+            raise e
+
     with ThreadPoolExecutor(max_workers=served.concurrency(rec)) as pool:
         list(pool.map(one, todo))
-    if halt:
-        e = halt[0]
-        e.done, e.total = count["n"], total
-        raise e
-    if failed:
-        log(f"[frontier] {task}: {len(failed)} question(s) the server failed on — not kept, "
-            f"asked again next run ({failed[0]})")
+    stop_if_halted()
+    if failed and not canceled():
+        # 17c: each one the server failed on is asked once more; failing
+        # again, it is written as no answer — counted wrong, named in the log
+        # and on the row — and the run carries on to the next benchmark
+        again = [(it, e) for it, e in todo if (it["id"], e) in failed]
+        failed.clear()
+        with ThreadPoolExecutor(max_workers=served.concurrency(rec)) as pool:
+            list(pool.map(one, again))
+        stop_if_halted()
+        if failed and count["n"] == have:
+            # nothing at all answered this run: the server, not the questions
+            why = next(iter(failed.values()))
+            raise served.ServerStopped(count["n"], total, why, refused=(
+                f"the server failed on every question it was asked ({len(failed)}), asked its "
+                f"own way and without its chat parsing ({why}): stopped"))
+        for (qid, e), why in sorted(failed.items()):
+            write({"id": qid, "epoch": e, "seed": fb.seed_of(task, qid, e), "answer": "",
+                   "finish": None, "tokens": None, "unanswered": why[:300] or "no reason given",
+                   "at": round(time.time(), 3)})
+            log(f"[frontier] {task}: question {qid}, run {e}: the server failed on it twice — "
+                f"written as no answer, counted wrong ({why[:200]})")
     return count["n"], total
 
 
@@ -334,8 +392,8 @@ def marks(row: Path, task: str, items: list[dict] | None = None) -> dict:
             if g is not None and g.get("answer_sha256") != answer_sha(a.get("answer") or ""):
                 g = None                    # 17b: graded another answer: graded again
             ok = sc["ok"]
-            if sc["ran_out"]:
-                ok = False
+            if sc["ran_out"] or a.get("unanswered"):
+                ok = False                  # 17c: no answer from the server: wrong, never graded
             elif spec.get("grader"):
                 ok = None if g is None else bool(g.get("ok"))
             elif spec.get("look") and not sc["ok"]:
@@ -347,7 +405,7 @@ def marks(row: Path, task: str, items: list[dict] | None = None) -> dict:
                 "epoch": e, "ok": ok, "code_ok": sc["ok"], "read": sc["read"],
                 "ran_out": sc["ran_out"], "answer": a.get("answer") or "",
                 "finish": a.get("finish"), "tokens": a.get("tokens"),
-                "error": a.get("error"), "grade": g})
+                "error": a.get("error"), "unanswered": a.get("unanswered"), "grade": g})
     return {"runs": runs, "missing": missing, "items": items}
 
 
@@ -376,31 +434,49 @@ def _share(per: dict[str, list[float]], task: str, items: list[dict]) -> dict:
     return fb.summary(per, task, groups)
 
 
-_THOUGHT = re.compile(r"(?s)^\s*<think>(.*?)(?:</think>|$)")
+_UNCLOSED = re.compile(r"(?s)^\s*<think>(.*)$")
+# 17c: an off row is scored with at most this share of its answers holding
+# thinking — each scored on what follows it, as scoring reads every reply —
+# and refused above it
+THINKING_OFF_SHARE = 0.01
 
 
 def thought(answer: str) -> bool:
-    """an answer that holds thinking: words inside its <think> block (an empty
-    block, as a template that is told not to think writes, is none)"""
-    m = _THOUGHT.match(answer or "")
+    """an answer that holds thinking — 17c: what scoring strips as thinking
+    (fb.visible's pattern: everything up to the first </think>, the opening
+    tag or not, as a template that opens <think> in the prompt leaves it),
+    or a <think> never closed; an empty block, as a template told not to
+    think writes, is none"""
+    a = answer or ""
+    m = fb._THINK.match(a)
+    if m:
+        return bool(re.sub(r"</?think>", "", m.group(0)).strip())
+    m = _UNCLOSED.match(a)
     return bool(m and m.group(1).strip())
 
 
 def thinking_refused(task: str, thinking: str | None, answers: list[str]) -> str:
     """'' when the answers are what the thinking setting asked for; else why
     not, in words — a thinking row none of whose answers thought (the server
-    was told not to, or its template ignores the switch), or an off row whose
-    answers did"""
+    was told not to, or its template ignores the switch), or an off row more
+    than THINKING_OFF_SHARE of whose answers did"""
     label = fb.BENCH[task]["label"]
     n = sum(1 for a in answers if thought(a))
     if thinking == "on" and answers and not n:
         return (f"{label}: thinking was asked for, and none of its {len(answers):,} answers "
                 "holds any — the server didn't think (a --reasoning-budget 0, or a chat "
                 "template that ignores the switch?): not scored")
-    if thinking == "off" and n:
+    if thinking == "off" and n > THINKING_OFF_SHARE * len(answers):
         return (f"{label}: thinking was off, and {n:,} of its {len(answers):,} answers hold "
-                "thinking — the server thought anyway: not scored")
+                f"thinking — more than {THINKING_OFF_SHARE:.0%}: the server thought anyway: "
+                "not scored")
     return ""
+
+
+def thinking_kept(thinking: str | None, answers: list[str]) -> int:
+    """17c: an off row's answers that hold thinking, at most
+    THINKING_OFF_SHARE of them — scored, and said"""
+    return sum(1 for a in answers if thought(a)) if thinking == "off" else 0
 
 
 def score_task(row: Path, task: str, rec: dict) -> dict | None:
@@ -417,13 +493,17 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
     d = task_dir(row, task)
     flat = [r for it in items for r in runs[it["id"]]]
     # 17b: the server did what was asked — thinking on, or off
-    why = thinking_refused(task, _read_json(d / SETUP).get("thinking"),
-                           [r["answer"] for r in flat])
+    thinking = _read_json(d / SETUP).get("thinking")
+    why = thinking_refused(task, thinking, [r["answer"] for r in flat])
     if why:
         return {"refused": why}
+    held = thinking_kept(thinking, [r["answer"] for r in flat])
+    # 17c: the questions the server never answered, counted wrong and named
+    never = sorted({q for q, rs in runs.items() for r in rs if r.get("unanswered")})
     waiting = sum(1 for r in flat if r["ok"] is None)
     ran_out = sum(1 for r in flat if r["ran_out"])
-    unread = sum(1 for r in flat if r["read"] is None and not r["ran_out"])
+    unread = sum(1 for r in flat if r["read"] is None and not r["ran_out"]
+                 and not r.get("unanswered"))
     errors = sum(1 for r in flat if r["error"])
     if spec.get("grader") and waiting:
         return {"waiting": waiting, "of": len(flat), "label": spec["label"]}
@@ -456,6 +536,10 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
     detail = {"version": fb.VERSION, "protocol": spec["protocol"], "epochs": spec["epochs"],
               "questions": len(items), "answers": len(flat),
               "ran_out": ran_out, "unread": unread, "errors": errors,
+              # 17c: an off row's few answers that thought anyway, scored
+              **({"thinking_held": held} if held else {}),
+              **({"unanswered": sum(1 for r in flat if r.get("unanswered")),
+                  "unanswered_ids": never[:20]} if never else {}),
               "budget": setup.get("budget"), "sampling": setup.get("sampling"),
               "family": setup.get("family"), "where": setup.get("where"),
               "thinking": setup.get("thinking"), "note": spec.get("note") or "",
@@ -522,6 +606,13 @@ def words(task: str, sc: dict) -> str:
         bits.append(f"{sc['ran_out']} ran out of room")
     if sc.get("unread"):
         bits.append(f"{sc['unread']} with no answer read")
+    if sc.get("unanswered"):
+        ids = sc.get("unanswered_ids") or []
+        bits.append(f"{sc['unanswered']} the server never answered, counted wrong "
+                    f"({', '.join(ids[:5])}{' …' if len(ids) > 5 else ''})")
+    if sc.get("thinking_held"):
+        bits.append(f"{sc['thinking_held']} thought though thinking was off (scored on what "
+                    "follows the thinking)")
     if (sc.get("look") or {}).get("waiting"):
         bits.append(f"code's score: Epoch's model check not run on {sc['look']['waiting']:,}")
     if sc.get("final") is False:
@@ -568,11 +659,9 @@ def run(sid: int, sub: dict, rec: dict, th: dict, row: Path, log_path: Path) -> 
         try:
             fb.load(task, config.BENCH_ROOT)
         except Exception as e:                          # noqa: BLE001 — said on the row
-            line = (f"{label}: its questions could not be fetched"
-                    + (" — it is gated: accept its terms on Hugging Face with the account "
-                       "whose token this machine has (HF_TOKEN)"
-                       if fb.BENCH[task]["source"].get("gated") else "")
-                    + ". Nothing was asked")
+            # 17c: in the error's own words — a count that doesn't agree isn't
+            # a gated set's terms
+            line = f"{fb.load_failed(task, e)}. Nothing was asked"
             log(f"[frontier] {line} ({e!r})")
             return "failed", line
         try:
