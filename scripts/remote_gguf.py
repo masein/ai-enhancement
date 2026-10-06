@@ -650,9 +650,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--port", type=int, default=8090)
     ap.add_argument("--load-timeout", type=float, default=3600)
     ap.add_argument("--by", default="remote", help="who ran it, for the run's record")
+    ap.add_argument("--n", type=int, default=fb.PARITY["n"],
+                    help="17d: --parity's number of questions (the server's ask the same)")
     ap.add_argument("--parity", action="store_true",
-                    help="17b: the parity check's 50 questions, thinking off and greedy, to "
-                         "--out/parity.jsonl — no bundle (scripts/frontier_parity.py compare)")
+                    help="17b: the parity check's --n questions, thinking off and greedy and "
+                         "each asked twice, to --out/parity.jsonl — no bundle "
+                         "(scripts/frontier_parity.py compare)")
     a = ap.parse_args(argv)
     if not a.served_as.startswith("served/") or not re.fullmatch(r"served/[A-Za-z0-9._-]+",
                                                                  a.served_as):
@@ -827,12 +830,17 @@ def main(argv: list[str] | None = None) -> int:
             dest = out / "parity.jsonl"
             # 17c: what answered, for compare: the file, the launch, the slots
             ident = {"side": "box", "as": a.served_as,
-                     "file": {k: gguf[k] for k in ("name", "size", "sha256")},
+                     # 17d: the file on disk, and llama-server's count of its
+                     # weights (what the server's side has)
+                     "file": {**{k: gguf[k] for k in ("name", "size", "sha256")},
+                              "weights": seen.get("size")},
                      "server": {k: server[k] for k in ("build", "commit", "binary_sha256",
                                                        "flags", "env", "argv", "slots")},
                      "speculative": seen.get("speculative"), "gpu": gpu.get("name")}
+            # 17d: each question twice — the box's agreement with itself, beside
+            # its agreement with the server
             n = sf.parity_ask(rec, dest, lambda k, of: say(f"parity {k} of {of}"),
-                              identity=ident)
+                              identity=ident, n=a.n, twice=True)
             say(f"parity: {n} answers · {dest} — fetch it, then on the server: "
                 "scripts/frontier_parity.py compare <server's> <this>")
             return 0

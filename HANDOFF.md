@@ -4953,6 +4953,38 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17d.p — points 28 and 29: the parity check (6 Oct)
+
+Found on the pilot.
+
+**28, the sizes.** `frontier_parity.py compare` refused every real pair:
+"the server's file is 22,843,343,360 bytes, the box's 22,854,339,808". The
+server's size is its pin's, llama-server's count of the weights; the box's
+was the file on disk, about 11 MB larger for the header. Now:
+- the files are compared by sha256 (`--file-sha256`);
+- a size only like with like: each side's file says llama-server's count of
+  its weights (`weights`), and those are compared;
+- the box's disk size is never compared with the server's count.
+
+**29, the rule.** Over 50 questions, the server and the box agreed on 42 to
+46 letters of 49 whatever the box's cache and slots, and two runs on one box
+on 43 of 50: letter agreement measured run-to-run noise, not the setup, and
+46 of 50 couldn't be met. Now:
+- `--n` on both sides sets the number of questions, 500 by default;
+- "the same" is decided on accuracy: the box's share right minus the
+  server's on the same questions, its 90% paired interval inside ±5 points
+  (`PARITY["margin"]`, the two one-sided tests at 5% each). At about one
+  question in ten answered differently, 500 give about ±2.5;
+- letter agreement and identical replies are printed for information, beside
+  the box's agreement with a second run of itself (the box asks each
+  question twice);
+- `ask` says how long its questions take at the server's measured pace with
+  thinking off, and how long they took.
+
+The pilot's 50-question files don't meet the new rule (at 50 the interval is
+about ±8 points): both sides are asked again with 500. Tests:
+`tests/test_17d_review.py` (28, 29).
+
 ### 17d.2 — the third review's part 2: before the imports (6 Oct)
 
 - **Bundles whose shards were set aside can be imported again**: their record

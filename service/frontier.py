@@ -389,39 +389,60 @@ def still_answers(rec: dict, task: str, path: Path, s: dict, failed: dict) -> bo
 # 17b: the parity check — the same questions on the server and on a box
 # ---------------------------------------------------------------------------
 
-def parity_ask(rec: dict, path: Path, progress=None, identity: dict | None = None) -> int:
+def parity_ask(rec: dict, path: Path, progress=None, identity: dict | None = None,
+               n: int | None = None, twice: bool = False) -> int:
     """fb.PARITY's questions asked of `rec`, greedy and thinking off, as many at
     a time as it takes — each reply, its letter and the key, to `path`. Raises
     served.ServerStopped when the server stops answering or fails on one.
     17c: the file's first line is `identity` — which side, which file, which
     launch (scripts/frontier_parity.py) — so compare can refuse two sides
-    that differ"""
+    that differ. 17d: `n` questions (PARITY's 500 by default); `twice`, each
+    asked a second time (`answer2`) — the box's agreement with itself, which
+    compare reports beside its agreement with the server"""
     fb.set_root(config.BENCH_ROOT)
-    items = fb.parity_items(config.BENCH_ROOT)
+    items = fb.parity_items(config.BENCH_ROOT, n)
     task = fb.PARITY["task"]
     s = {"max_tokens": fb.PARITY["max_tokens"], **fb.PARITY["sampling"]}
     if not served.is_openrouter(rec):
         s["chat_template_kwargs"] = {"enable_thinking": False}
     got: dict[str, dict] = {}
     lock = threading.Lock()
+    total = len(items) * (2 if twice else 1)
+    done = {"n": 0}
 
-    def one(it: dict) -> None:
-        text, need = fb.prompt(task, it)
+    def ask(it: dict) -> "served.Answer":
+        text, _ = fb.prompt(task, it)
         a = served.answer_one(rec, text, s)
         if a.error:
             raise served.ServerStopped(0, len(items), a.error.get("chat") or "", refused=(
                 f"the server failed on parity question {it['id']}: {a.error.get('chat')}"))
         with lock:
+            done["n"] += 1
+            k = done["n"]
+        if progress:
+            progress(k, total)
+        return a
+
+    def one(it: dict) -> None:
+        a = ask(it)
+        _, need = fb.prompt(task, it)
+        with lock:
             got[it["id"]] = {"id": it["id"], "key": need["key"], "answer": str(a),
                              "read": fb.read_mmlu_pro(str(a)), "finish": a.finish,
                              "tokens": a.tokens}
-            n = len(got)
-        if progress:
-            progress(n, len(items))
+
+    def again(it: dict) -> None:
+        a = ask(it)
+        with lock:
+            got[it["id"]].update(answer2=str(a), read2=fb.read_mmlu_pro(str(a)))
     with ThreadPoolExecutor(max_workers=served.concurrency(rec)) as pool:
         list(pool.map(one, items))
+    if twice:
+        with ThreadPoolExecutor(max_workers=served.concurrency(rec)) as pool:
+            list(pool.map(again, items))
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    Path(path).write_text(json.dumps({"parity_of": identity or {}}, ensure_ascii=False) + "\n"
+    head = {**(identity or {}), "n": len(items), "seed": fb.PARITY["seed"], "twice": twice}
+    Path(path).write_text(json.dumps({"parity_of": head}, ensure_ascii=False) + "\n"
                           + "".join(json.dumps(got[it["id"]], ensure_ascii=False) + "\n"
                                     for it in items), encoding="utf-8")
     return len(got)

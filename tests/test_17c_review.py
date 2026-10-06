@@ -49,17 +49,18 @@ def write(path: Path, head: dict, rows: list[dict]) -> Path:
 # ---------------------------------------------------------------------------
 
 def test_1_two_sides_that_read_no_letter_are_not_the_same():
-    """50 empty replies on both sides printed "The same: 50 of 50" """
+    """50 empty replies on both sides printed "The same: 50 of 50" — 17d: still
+    refused under the accuracy rule, where both would score nothing alike"""
     got = fb.parity_compare(lines(""), lines(""))
-    assert got["ok"] is False and got["both"] == 0 and got["same"] == 0
+    assert got["ok"] is False and got["both"] == 0
     assert got["words"].startswith("Not the same: a letter was read from 0 of the server's "
-                                   "answers and 0 of the box's: each side needs 46 of 50")
-    # one side unreadable on five: the 45 read on both don't make 46
+                                   "answers and 0 of the box's, of 50: too few to compare")
+    # one side unreadable on five: five points apart on fifty, not the same
     five_unread = lines(lambda k: "" if k < 5 else "the answer is (A)")
     got = fb.parity_compare(lines("the answer is (A)"), five_unread)
-    assert got["ok"] is False and (got["both"], got["same"], got["read_box"]) == (45, 45, 45)
+    assert got["ok"] is False and (got["right_server"], got["right_box"]) == (50, 45)
     got = fb.parity_compare(lines("the answer is (A)"), lines("The answer is (A)."))
-    assert got["ok"] is True and got["same"] == 50 and got["identical"] == 0
+    assert got["ok"] is True and got["letters"] == 50 and got["identical"] == 0
 
 
 def test_1_the_same_file_twice_or_a_question_twice_is_refused(tmp_path):
@@ -87,40 +88,43 @@ def test_2_each_side_says_what_answered_and_compare_refuses_another_setup(  # no
     monkeypatch.setattr(fb, "_fetch", lambda task: {"items": PARITY_ITEMS,
                                                     "extra": {"shots": {}}})
     # the box: lookahead routing, as run_box launches it
-    assert run_box(box, "parity", "--parity") == 0
+    assert run_box(box, "parity", "--parity", "--n", "50") == 0
     bpath = box["root"] / "parity" / "parity.jsonl"
     bh, brows = fp.read(bpath)
     assert bh["side"] == "box" and bh["as"] == SERVED and len(brows) == 50
-    assert bh["file"] == {"name": GGUF_NAME, "size": box["gguf"].stat().st_size,
-                          "sha256": box["sha"]}
+    assert all("answer2" in r for r in brows)          # 17d: asked twice, for its own noise
+    assert {k: bh["file"][k] for k in ("name", "size", "sha256")} == {
+        "name": GGUF_NAME, "size": box["gguf"].stat().st_size, "sha256": box["sha"]}
     assert bh["server"]["env"] == {"LLAMA_MOE_ROUTE_MODE": "lookahead"}
     # the server: the same file, registered with the same routing
     fake = FakeServer()
     try:
         fake.model_path = f"/models/{GGUF_NAME}"
-        fake.size = box["gguf"].stat().st_size
+        # 17d: llama-server's count of the same file's weights, as the box's says
+        fake.size = 21_000_000_000
         fake.reply = lambda body: "the answer is (A)"
         rec = served.register({"name": "lda box", "base_url": fake.base, "how": "llama-server",
                                "thinking": "off"}, ME)
         assert rec["id"] == SERVED
         db.served_put({**rec, "env": "LLAMA_MOE_ROUTE_MODE=lookahead"})
         spath = box["root"] / "server.jsonl"
-        assert fp.main(["ask", "--as", SERVED, "--out", str(spath)]) == 0
+        assert fp.main(["ask", "--as", SERVED, "--out", str(spath), "--n", "50"]) == 0
         sh, _ = fp.read(spath)
         assert sh["side"] == "server" and sh["file"]["name"] == GGUF_NAME
         assert sh["launch"]["env"] == {"LLAMA_MOE_ROUTE_MODE": "lookahead"}
         capsys.readouterr()
         assert fp.main(["compare", str(spath), str(bpath), "--file-sha256", box["sha"]]) == 0
-        assert capsys.readouterr().out.startswith("The same: 50 of the 50 read on both sides")
+        assert capsys.readouterr().out.startswith("The same: the box answers 100.0% right and "
+                                                  "the server 100.0% on the same 50 questions")
         # without the file's sha256 the board has none: compared by name and size, said
         assert fp.main(["compare", str(spath), str(bpath)]) == 0
-        assert "compared by name and size" in capsys.readouterr().out
+        assert "compared by name" in capsys.readouterr().out
         # another file's sha256: refused
         assert fp.main(["compare", str(spath), str(bpath), "--file-sha256", "0" * 64]) == 1
         assert "the box's file has sha256" in capsys.readouterr().out
         # the server registered with no routing: the box isn't the registered setup
         db.served_put({**rec, "env": ""})
-        assert fp.main(["ask", "--as", SERVED, "--out", str(spath)]) == 0
+        assert fp.main(["ask", "--as", SERVED, "--out", str(spath), "--n", "50"]) == 0
         capsys.readouterr()
         assert fp.main(["compare", str(spath), str(bpath), "--file-sha256", box["sha"]]) == 1
         out = capsys.readouterr().out
@@ -131,7 +135,7 @@ def test_2_each_side_says_what_answered_and_compare_refuses_another_setup(  # no
         fake.model_path = "/models/another.gguf"
         n = fake.answered
         with pytest.raises(SystemExit, match="serves a different file"):
-            fp.main(["ask", "--as", SERVED, "--out", str(spath)])
+            fp.main(["ask", "--as", SERVED, "--out", str(spath), "--n", "50"])
         assert fake.answered == n
     finally:
         fake.close()
@@ -159,7 +163,7 @@ def test_3_the_parity_run_and_the_full_run_fetch_the_gguf_once(box, monkeypatch)
     monkeypatch.setitem(sys.modules, "huggingface_hub",
                         types.SimpleNamespace(hf_hub_download=download))
     hf = ["--gguf", f"hf://me/private/{GGUF_NAME}", "--server", "hf://me/private/llama-server.tar.gz"]
-    assert run_box(box, "parity", "--parity", *hf) == 0
+    assert run_box(box, "parity", "--parity", "--n", "50", *hf) == 0
     assert run_box(box, "run", *hf) == 0
     assert {d for _, d in calls} == {str(box["root"] / "files")}
     # …and hashed once: the full run's log says no sha256 was read
