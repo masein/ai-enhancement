@@ -667,7 +667,7 @@ Face publishes it (the box's first line prints the one it hashed: they must
 agree):
 
 ```bash
-sudo docker compose exec -T bench python scripts/import_remote.py ~/benchmarks/bundles/frontier-served__gemma-4-26b-a4b-bf16-thinking-on.tar.gz --by masein --register "Gemma 4 26B A4B (BF16, rented GPU)" --file-sha256 463c88dbc5f692e812013e6449253eae4cff0fc10fbbd8d0f038d3690f03eb72
+sudo docker compose exec -T bench python scripts/import_remote.py ~/benchmarks/bundles/frontier-served__gemma-4-26b-a4b-bf16-thinking-on-gpqa+otis.tar.gz --by masein --register "Gemma 4 26B A4B (BF16, rented GPU)" --file-sha256 463c88dbc5f692e812013e6449253eae4cff0fc10fbbd8d0f038d3690f03eb72
 ```
 
 Then alias it to Epoch's entry for the model on the Frontier view, so the cell

@@ -14,6 +14,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import socket
 import tarfile
 from pathlib import Path
@@ -484,3 +485,10 @@ def test_the_docs_commands_are_the_scripts_and_paste_whole():
                           parts=[fbm.BENCH[t]["short"] for t in phone.only])
     assert f"root@<host>:{phone.out}/{name} ~/benchmarks/bundles/" in sec
     assert f"import_remote.py ~/benchmarks/bundles/{name} --by masein" in sec
+    # 17d: and every import names a bundle a box command here writes (G6 named
+    # the old one)
+    for m in re.finditer(r"import_remote\.py ~/benchmarks/bundles/(\S+)", sec):
+        assert any(m.group(1) == rb.bundle_name(
+            "frontier", a.served_as, a.thinking == "on",
+            parts=[fbm.BENCH[t]["short"] for t in fb.TASKS if t in a.only]) for a in args
+                   if not a.parity), m.group(1)

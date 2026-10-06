@@ -359,6 +359,24 @@ def _types(v, want, path: str, out: list[str]) -> None:
                       else want.__name__))
 
 
+# 17d: and bundle.json's own fields (a wrong type gave a traceback)
+_BUNDLE_TYPES = {"format": int, "model": str, "row": str, "thinking": bool, "tasks": dict,
+                 "gguf_sha256": str, "shard": dict, "files": dict}
+
+
+def bundle_problems(bundle) -> list[str]:
+    """each field the import reads of bundle.json, the type it must be"""
+    if not isinstance(bundle, dict):
+        return ["its bundle.json isn't a JSON object"]
+    out: list[str] = []
+    for k, want in _BUNDLE_TYPES.items():
+        v = bundle.get(k)
+        if v is not None and (not isinstance(v, want)
+                              or (isinstance(v, bool) and want is not bool)):
+            out.append(f"bundle.json's {k} is {type(v).__name__}, not {want.__name__}")
+    return out
+
+
 def setup_problems(setup) -> list[str]:
     """17c: each field the import reads of setup.json, the type it must be"""
     if not isinstance(setup, dict):
@@ -563,8 +581,7 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
     from service import config, db, served
     from service import frontier as sf
     # 17c: its setup.json read only once every field is the type it must be
-    bad = (setup_problems(b["setup"]) if isinstance(b.get("bundle"), dict)
-           else ["its bundle.json isn't a JSON object"])
+    bad = bundle_problems(b.get("bundle")) or setup_problems(b["setup"])
     if bad:
         for line in bad:
             say(f"refused — {line}")
@@ -705,6 +722,18 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
     if status == "done":
         # every task scored: the shards and the row take them now, together
         for t, n_was in aside_shards:
+            # 17d: the bundles those shards came from aren't imported any more:
+            # their record goes, so the same command brings each back
+            was = ((reg.get("shards") or {}).get(t) or {}).get("have") or {}
+            gone = {x.get("sha256") for x in was.values()} - {b["sha256"]}
+            if gone:
+                reg["imports"] = [x for x in reg.get("imports") or []
+                                  if x.get("sha256") not in gone]
+                names = sorted({x.get("bundle") or "" for x in was.values()
+                                if x.get("sha256") in gone})
+                lines.append(f"{t}: the shards set aside came from {', '.join(names)} — import "
+                             f"{'it' if len(names) == 1 else 'them'} again once this task's "
+                             "shards are run one way")
             old = shards / t
             if old.exists():
                 where = (config.OUT_DIR.with_name("earlier") / row_name

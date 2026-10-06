@@ -352,6 +352,12 @@ def register(f: dict, by: str) -> dict:
     # 12o.1: registered again, it keeps the file someone said it serves
     if old.get("same_as"):
         rec["same_as"] = old["same_as"]
+    # 17d: and the sha256 an import was given for its file, while its server
+    # still serves that file — saving its page dropped it
+    was = old.get("pin") or {}
+    if old.get("file_sha256") and (rec["pin"].get("file"), rec["pin"].get("size")) == (
+            was.get("file"), was.get("size")):
+        rec["file_sha256"] = old["file_sha256"]
     db.served_put(rec)
     write_meta(rec)
     return public(rec)
