@@ -89,6 +89,9 @@ def identity_problems(server: dict, box: dict, file_sha: str = "") -> tuple[list
                      "name and size. Give --file-sha256 (sha256sum on the server) to compare "
                      "them whole.")
     reg = server.get("launch") or {}
+    if reg.get("words"):
+        out.append(f"{server.get('as')}'s record says lookahead in words, with no routing "
+                   "variable to compare the box with: give its launch's environment on its page")
     got = imf.box_launch(box.get("server") or {})
     if dict(reg.get("env") or {}) != got["env"]:
         out.append(f"routing: the box ran with {_launch_words(got['env'], [])}; "
