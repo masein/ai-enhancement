@@ -19630,7 +19630,15 @@ async function loadServed() {
 }
 async function srvDo(what) {
   const S = state.srv;
-  if (what === 'save' && !whoName()) { askName(); return; }
+  // 17f: no name yet — asked here, beside Save: the header's box opened
+  // behind the dialog, and Save seemed to do nothing
+  if (what === 'save' && !whoName()) {
+    S.needName = true;
+    S.msg = 'Your name is recorded with what you save: type it here, then Save.';
+    render();
+    srvMsgIntoView(true);
+    return;
+  }
   S.busy = what; S.msg = ''; S.saved = false;
   render();
   try {
@@ -19638,7 +19646,7 @@ async function srvDo(what) {
       S.reported = (await post('api/served/check', { ...S.f })).reported;
     } else {
       const m = (await post('api/served', { ...S.f, by: whoName() })).model;
-      S.reported = m.pin; S.saved = true;
+      S.reported = m.pin; S.saved = true; S.needName = false;
       S.f.key = '';                                      // sent once, never shown again
       S.list = null;
       Object.assign(state.sub, { hf_id: m.id, kind: 'instruct', note: '' });
@@ -19653,6 +19661,17 @@ async function srvDo(what) {
   }
   S.busy = '';
   render();
+  srvMsgIntoView();
+}
+// 17f: the form's word, beside Save and brought into view — it was drawn
+// under a long form, out of sight
+function srvMsgIntoView(name = false) {
+  requestAnimationFrame(() => {
+    const m = document.querySelector('[data-srv-msg]');
+    if (m && m.scrollIntoView) m.scrollIntoView({ block: 'nearest' });
+    const i = name && document.querySelector('[data-srv-name]');
+    if (i) i.focus();
+  });
 }
 // ---------------------------------------------------------------------------
 // 16b.1: Add a model — where is the model? On Hugging Face (as before), on my
@@ -20044,13 +20063,20 @@ function servedCard(sf) {
     el('div', { class: 'frm', style: 'margin-top:10px' },
       el('button', { class: 'quiet', 'data-srv-check': '1', disabled: busy ? '' : null,
         text: S.busy === 'check' ? 'Checking…' : 'Check', onclick: () => srvDo('check') }),
+      // 17f: the name, asked here when there is none
+      S.needName ? el('input', { type: 'text', 'data-srv-name': '1', value: whoName(),
+        'aria-label': 'your name', placeholder: 'your name', autocomplete: 'name',
+        oninput: e => { setWho(e.target.value.trim()); renderWho(true); },
+        onkeydown: e => { if (e.key === 'Enter' && whoName()) srvDo('save'); } }) : '',
       el('button', { class: 'primary', 'data-srv-save': '1', disabled: busy ? '' : null,
-        text: S.busy === 'save' ? 'Checking and saving…' : 'Save', onclick: () => srvDo('save') })),
+        text: S.busy === 'save' ? 'Checking and saving…' : 'Save', onclick: () => srvDo('save') }),
+      // 17f: its word beside it, in sight
+      S.msg ? el('span', { class: 'warn small', 'data-srv-msg': '1', role: 'status',
+        text: S.msg }) : ''),
     S.reported ? el('p', { class: 'small', 'data-srv-reported': '1',
       text: (S.saved ? 'Saved, pinned to what the server reports: ' : 'The server reports: ')
         + pinLine(S.reported) + (S.saved ? '. Pick what to test it on above, then Start test.'
           : '') }) : '',
-    S.msg ? el('p', { class: 'warn small', 'data-srv-msg': '1', text: S.msg }) : '',
     (S.list || []).length ? el('ul', { class: 'srvlist', 'data-srv-list': '1' },
       S.list.map(r => el('li', { 'data-srv-row': r.id },
         el('b', { text: r.name }), servedTag(r.id) || el('span', { class: 'badge served',
@@ -24309,7 +24335,11 @@ function frontierGradingCard() {
     el('thead', {}, el('tr', {}, ['Grader', 'Benchmark', 'Model', 'Answers', 'Cost']
       .map(h => el('th', { text: h })))),
     el('tbody', {}, rows.map(r => el('tr', { 'data-frontier-est': `${r.slot}|${r.model}` },
-      el('td', { text: labelOf(r.slot) }), el('td', { text: r.label }),
+      el('td', { text: labelOf(r.slot) }),
+      // 17f: graded again whole by the grader chosen now — said before Start
+      el('td', {}, r.label, r.regrade ? el('div', { class: 'small se', 'data-frontier-regrade': '1',
+        text: `every answer graded again by the grader chosen now: ${r.regrade} — `
+          + 'its grades are kept aside, not mixed in' }) : ''),
       el('td', { text: r.model }), el('td', { class: 'num', text: n(r.answers) }),
       el('td', { class: 'num', text: r.usd == null ? 'once pinned' : usd(r.usd) }))))))
     : el('p', { class: 'small se', 'data-frontier-estimate': '0',

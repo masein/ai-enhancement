@@ -147,7 +147,10 @@ def _fetch_models() -> list[dict]:
                     "price_in": pin, "price_out": pout,
                     "context": m.get("context_length"),
                     # 12m.3: whether it thinks before it answers, when OpenRouter says
-                    "reasons": ("reasoning" in params) if isinstance(params, list) else None})
+                    "reasons": ("reasoning" in params) if isinstance(params, list) else None,
+                    # 17f: whether it takes a JSON schema (OpenAI's structured outputs)
+                    "structured": (("structured_outputs" in params)
+                                   if isinstance(params, list) else None)})
     p = _cache_path()
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps({"at": time.time(), "models": out}), encoding="utf-8")
