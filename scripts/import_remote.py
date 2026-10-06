@@ -226,7 +226,8 @@ def _write_registry(row: Path, reg: dict) -> None:
     tmp.replace(row / sdm.REMOTE_NAME)
 
 
-def import_bundle(path: Path, by: str, say=print, file_sha: str = "", register: str = "") -> int:
+def import_bundle(path: Path, by: str, say=print, file_sha: str = "", register: str = "",
+                  aside: bool = False) -> int:
     try:
         b = rb.read(path)
     except (ValueError, OSError) as e:
@@ -235,7 +236,7 @@ def import_bundle(path: Path, by: str, say=print, file_sha: str = "", register: 
     # 17: a GGUF's Frontier run, onto a served model's row
     if b["bundle"].get("suite") == "frontier":
         import import_frontier
-        return import_frontier.import_bundle(b, path, by, say, file_sha, register)
+        return import_frontier.import_bundle(b, path, by, say, file_sha, register, aside)
     if file_sha or register:
         say("refused — --file-sha256 and --register are for a GGUF's Frontier bundle")
         return REFUSED
@@ -450,6 +451,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--register", default="",
                     help="17: a Frontier bundle of a model this board doesn't serve (run on "
                          "rented GPUs only): its name here; the bundle's file is pinned")
+    ap.add_argument("--set-aside-shards", action="store_true",
+                    help="17c: a Frontier shard whose task's shards here were made with another "
+                         "setup (a rebuilt tarball): those are set aside, and this one starts "
+                         "the task's shards again")
     a = ap.parse_args(argv)
     from service import db
     db.init()
@@ -468,7 +473,8 @@ def main(argv: list[str] | None = None) -> int:
     sha = a.file_sha256.strip().lower()
     if sha and not re.fullmatch(r"[0-9a-f]{64}", sha):
         ap.error("--file-sha256: 64 hex digits")
-    return import_bundle(a.bundle, a.by.strip()[:80], file_sha=sha, register=a.register.strip())
+    return import_bundle(a.bundle, a.by.strip()[:80], file_sha=sha, register=a.register.strip(),
+                         aside=a.set_aside_shards)
 
 
 if __name__ == "__main__":

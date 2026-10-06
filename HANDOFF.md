@@ -4953,6 +4953,34 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17c.3 — the second review's part 3: before the imports (6 Oct)
+
+- **One swap for the bundle** (`scripts/import_frontier.import_bundle`).
+  - Every task is staged and scored first.
+  - Only when all of them score do the row, the shards waiting and the
+    registry change, together. Shards of another count or setup are set
+    aside then too.
+  - A bundle that fails isn't recorded as imported, so the same command
+    imports it once fixed. Before, its tasks swapped in one at a time, and a
+    second import said "imported already".
+- **`--set-aside-shards`**, named in the refusal: a task whose shards here
+  were made with another setup (a rebuilt tarball) has them set aside, and
+  this shard starts its shards again. Without it, such a task could never
+  import.
+- **`setup.json` is type-checked** before anything reads it
+  (`setup_problems`): each field the import reads, in words. A list as
+  `gpu.name` swapped the row in, then failed with a traceback.
+- **A bundle is read through a byte cap** (`remote_bundle._Capped`): no one
+  read larger than a bundle's file can be, and no more in all than a bundle
+  can unpack to. tarfile reads a long-name header whole while it lists the
+  members: a 1.5 MB bundle held 1.57 GB.
+- **REMOTE-RUNS**:
+  - G4 puts `--file-sha256` (each build's sha256 from G0) on every import.
+  - G0 says where the board's token is: the token file in `HF_HOME`, there
+    is no `HF_TOKEN`. It also says how to see its account (`hf auth
+    whoami`), which needs the three gated sets.
+- Tests: `tests/test_17c_review.py` (part 3).
+
 ### 17c.2 — the second review's part 2: before the full run (6 Oct)
 
 - **One failing question no longer blocks its benchmark and the ones after

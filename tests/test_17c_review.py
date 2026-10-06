@@ -26,8 +26,9 @@ from fake_openai import FakeServer
 from service import config, db, served
 from service import frontier as sf
 from test_12q_devicemark_runs import ME, svc  # noqa: F401 — svc is the fixture
-from test_17_gguf_box import (GGUF_NAME, N, RUNS, SERVED, TASK, box,  # noqa: F401
-                              bundle_of, invented, run_box)
+from test_17_gguf_box import (GGUF_NAME, N, ROW, RUNS, SERVED, TASK, box,  # noqa: F401
+                              bundle_of, invented, register, run_box)
+from test_17b_review import imported, results_of, rewrite
 
 PARITY_ITEMS = [{"id": str(k), "question": f"Q{k}?", "options": ["w", "x", "y"],
                  "answer": "A", "category": "law"} for k in range(60)]
@@ -345,3 +346,95 @@ def test_14_15_a_copy_on_disk_is_counted_and_a_count_isnt_a_gated_sets_terms(mon
     refused = fb.load_failed("hle_text_cais", OSError("401 Client Error: Unauthorized: gated"))
     assert refused.endswith("accept its terms on Hugging Face with the account whose token "
                             "this machine has")
+
+
+# ---------------------------------------------------------------------------
+# part 3: before the imports
+# ---------------------------------------------------------------------------
+
+OTIS = [{"id": f"o{k}", "question": f"Problem {k}.", "answer": "42"} for k in range(3)]
+
+
+def two_tasks(monkeypatch):
+    monkeypatch.setattr(fb, "_fetch", lambda task: {TASK: invented(),
+                                                    "otis_aime_epoch": OTIS}[task])
+
+
+def test_16_a_bundle_with_a_task_that_cant_be_scored_imports_nothing(box, monkeypatch):  # noqa: F811
+    """tasks swapped in one at a time, and the bundle recorded as imported: the
+    second import said "imported already" and exited 0"""
+    two_tasks(monkeypatch)
+    assert run_box(box, "run", "--only", "otis_aime_epoch") == 0
+    register(box["sha"])
+    path = box["root"] / "run" / rb.bundle_name("frontier", SERVED, True,
+                                                parts=["gpqa", "otis"])
+    real = sf.score_task
+
+    def otis_breaks(row, task, rec):
+        if task == "otis_aime_epoch":
+            raise RuntimeError("the scorer broke")
+        return real(row, task, rec)
+    monkeypatch.setattr(sf, "score_task", otis_breaks)
+    code, said = imported(path)
+    assert code == 1 and any("nothing was imported; the row is as it was" in x for x in said)
+    assert results_of() is None                       # GPQA, which scored, isn't in either
+    assert not sf.task_dir(config.OUT_DIR / ROW, TASK).exists()
+    # not recorded as imported: once it can be scored, the same command imports it
+    monkeypatch.setattr(sf, "score_task", real)
+    code, said = imported(path)
+    assert code == 0 and not any("imported already" in x for x in said), said
+    assert results_of() is not None and results_of(task="otis_aime_epoch") is not None
+
+
+def test_17_a_rerun_with_a_rebuilt_tarball_sets_the_old_shards_aside(box):  # noqa: F811
+    assert run_box(box, "s1", "--shard", "1/2") == 0
+    assert run_box(box, "s2", "--shard", "2/2", "--flags", "-ctk q8_0") == 0
+    register(box["sha"])
+    assert imported(bundle_of(box, "s1", (1, 2)))[0] == 0
+    code, said = imported(bundle_of(box, "s2", (2, 2)))
+    assert code == 2 and any("import with --set-aside-shards" in x for x in said), said
+    # the flag: shard 1 set aside, shard 2 starts the task's shards again
+    code, said = imported(bundle_of(box, "s2", (2, 2)), aside=True)
+    assert code == 0, said
+    assert any("the shards waiting here were set aside" in x for x in said), said
+    assert any("shard 1 of 2 missing" in x for x in said), said
+    assert list(config.OUT_DIR.with_name("earlier").glob(f"{ROW}/{TASK}-shards*"))
+    # shard 1 again, with the second's setup: the task is whole
+    assert run_box(box, "s1b", "--shard", "1/2", "--flags", "-ctk q8_0") == 0
+    assert imported(bundle_of(box, "s1b", (1, 2)))[0] == 0
+    assert results_of() is not None
+
+
+def test_18_a_setup_json_of_the_wrong_types_is_refused_before_anything(box):  # noqa: F811
+    """a list as gpu.name swapped the row in, then failed with a traceback and
+    no Runs entry"""
+    assert run_box(box, "run") == 0
+    register(box["sha"])
+
+    def odd(files):
+        setup = json.loads(files["setup.json"])
+        setup["gpu"]["name"] = ["RTX 5090", "twice"]
+        setup["server"]["slots"] = "eight"
+        files["setup.json"] = json.dumps(setup).encode()
+    code, said = imported(rewrite(bundle_of(box, "run"), odd))
+    assert code == 2, said
+    assert any("setup.json's server.slots is str, not int" in x for x in said), said
+    assert any("setup.json's gpu.name is list, not str" in x for x in said), said
+    assert results_of() is None and not sf.task_dir(config.OUT_DIR / ROW, TASK).exists()
+
+
+def test_19_a_long_name_header_is_never_read_whole(tmp_path, monkeypatch):
+    """a 1.5 MB bundle held 1.57 GB in memory: tarfile reads a GNU long name
+    whole while it lists the members"""
+    import io
+    import tarfile
+    path = tmp_path / "b.tar.gz"
+    with tarfile.open(path, "w:gz", format=tarfile.GNU_FORMAT) as tar:
+        for name, data in (("bundle.json", b"{}"), ("setup.json", b"{}"),
+                           ("results/" + "x" * 5000 + "/answers.jsonl", b"")):
+            ti = tarfile.TarInfo(name)
+            ti.size = len(data)
+            tar.addfile(ti, io.BytesIO(data))
+    monkeypatch.setattr(rb, "MAX_MEMBER", 1024)
+    with pytest.raises(ValueError, match="holds a part larger than a bundle's file can be"):
+        rb.read(path)

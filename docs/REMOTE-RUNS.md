@@ -346,8 +346,18 @@ terms at <https://huggingface.co/datasets/Idavidrein/gpqa>: it is gated, and
 the box fetches it with this token. The same for OTIS Mock AIME
 (<https://huggingface.co/datasets/EpochAI/otis-mock-aime-24-25>) and Humanity's
 Last Exam (<https://huggingface.co/datasets/cais/hle>): both gated, both
-approved at once. The board's own token (HF_TOKEN in its `.env`) needs the
-three too: the import reads the questions to check the answers cover them.
+approved at once.
+
+**The board's own token** needs the three too: the import reads the questions
+to check the answers cover them. The board has no `HF_TOKEN`: it reads the
+token file in its `HF_HOME` (the `.env`'s, mounted at the same path in the
+container), the one `hf auth login` writes there. Its account changed on
+6 Oct, so check which it is, then accept the three sets' terms on that
+account:
+
+```bash
+HF_HOME="$(sed -n 's/^HF_HOME=//p' ~/benchmarks/aienh/.env)" hf auth whoami
+```
 
 **The tarball**, on the server, from the fork at the commit build-lda was built
 from. That commit is the one build-lda prints:
@@ -562,18 +572,24 @@ scp -i ~/.ssh/vast_ed25519 -P <port> root@<host>:/workspace/phone-gpqa-otis/fron
 
 ```bash
 cd ~/benchmarks/aienh
-sudo docker compose exec -T bench python scripts/import_remote.py ~/benchmarks/bundles/frontier-served__<phone-build>-thinking-on-gpqa+otis.tar.gz --by masein
+sudo docker compose exec -T bench python scripts/import_remote.py ~/benchmarks/bundles/frontier-served__<phone-build>-thinking-on-gpqa+otis.tar.gz --by masein --file-sha256 <the phone file's sha256 from G0>
 ```
 
-With `--file-sha256 <the sha256 from G0>` the first time, if the board has no
-hash of the file. It checks the served model, the file's sha256, the launch
+`--file-sha256` on every import of a build, with that build's sha256 from G0
+(the original build's bundles with the original file's). The board has no
+hash of either build's file today: the first import keeps the one given on
+the model, with your name, and every later one is checked against it (a
+different one is refused). It checks the served model, the file's sha256, the launch
 against the one registered (routing and speculative decoding), each
 benchmark's protocol and dataset revision, the budget, sampling and thinking
 switch, every answer line, that thinking was on or off as asked, and that the
 answers cover their questions (a shard's: exactly its own, made with the same
 setup as its task's other shards). Each benchmark is scored apart first: a
 bundle that fails a check, or a task that can't be scored, leaves the row as
-it was. A shard waits until the others are in. Then each benchmark is scored by
+it was, and isn't counted as imported: the same command imports it once
+fixed. A shard of a task whose shards here were made with another setup (a
+rebuilt tarball) is refused; `--set-aside-shards` sets those aside, and this
+shard starts the task's shards again. A shard waits until the others are in. Then each benchmark is scored by
 code, its result says "run on a rented GPU (<the GPU>)", and the Runs list gets
 the import with the box's log.
 
