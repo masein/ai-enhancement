@@ -217,3 +217,68 @@ def test_10_the_tarball_script_stops_in_words_where_it_stopped_silently():
         in script
     assert "-exec cp -P -t /out/llama/lib/ {} +" in script and "-exec cp -P {}" not in script
     assert "|| { echo \"couldn't pack $so: nothing was packed\" >&2; exit 1; }" in script
+
+
+# ---------------------------------------------------------------------------
+# part 2: before the imports
+# ---------------------------------------------------------------------------
+
+def test_11_bundles_whose_shards_were_set_aside_can_be_imported_again(box):  # noqa: F811
+    """they answered "imported already" for good"""
+    assert run_box(box, "s1", "--shard", "1/2") == 0
+    assert run_box(box, "s2", "--shard", "2/2", "--flags", "-ctk q8_0") == 0
+    register(box["sha"])
+    assert imported(bundle_of(box, "s1", (1, 2)))[0] == 0
+    code, said = imported(bundle_of(box, "s2", (2, 2)), aside=True)
+    assert code == 0 and any(f"came from {bundle_of(box, 's1', (1, 2)).name} — import it again"
+                             in x for x in said), said
+    # shard 2 run again the first box's way; then the first box's bundle again
+    assert run_box(box, "s2b", "--shard", "2/2") == 0
+    assert imported(bundle_of(box, "s2b", (2, 2)), aside=True)[0] == 0
+    code, said = imported(bundle_of(box, "s1", (1, 2)))
+    assert code == 0 and not any("imported already" in x for x in said), said
+    assert any("every shard is in (2 of 2)" in x for x in said), said
+
+
+def test_12_saving_a_served_models_page_keeps_its_file_hash(svc):  # noqa: F811
+    fake = FakeServer()
+    try:
+        rec = a_served(fake)
+        db.served_put({**rec, "file_sha256": {"sha256": "ab" * 32, "by": "masein"}})
+        served.register({"name": "board box", "base_url": fake.base, "how": "llama-server, "
+                         "edited", "thinking": "off"}, ME)
+        assert served.get(rec["id"])["file_sha256"]["sha256"] == "ab" * 32
+        # another file served now: the hash isn't carried to it
+        fake.model_path = "/models/another.gguf"
+        served.register({"name": "board box", "base_url": fake.base, "how": "x",
+                         "thinking": "off"}, ME)
+        assert "file_sha256" not in served.get(rec["id"])
+    finally:
+        fake.close()
+
+
+def test_13_the_counts_that_lower_a_score_are_on_its_cell():
+    import report_lm_eval as report
+    assert report.frontier_how({"scored_by": "code", "unanswered": 3}) == (
+        "by code · 3 the server never answered, counted wrong")
+    g = {"version": "openai/o3-mini-2025-01-31", "prompt_words": "CAIS's judge prompt",
+         "prompt_sha256": "ab" * 32}
+    d = {"scored_by": "grader", "grader": g, "ungraded": 2, "final": False}
+    assert report.frontier_how(d) == ("graded by openai/o3-mini-2025-01-31 with CAIS's judge "
+                                      "prompt (abababab): not final · 2 its grader gave no grade, "
+                                      "counted wrong")
+    assert report.frontier_setting(d) is None                     # ranked with nothing
+
+
+def test_15_a_bundle_json_of_the_wrong_types_is_refused_in_words(box):  # noqa: F811
+    assert run_box(box, "run") == 0
+    register(box["sha"])
+
+    def odd(files):
+        bundle = json.loads(files["bundle.json"])
+        bundle["row"], bundle["model"] = ["a", "b"], 7
+        files["bundle.json"] = json.dumps(bundle).encode()
+    code, said = imported(rewrite(bundle_of(box, "run"), odd))
+    assert code == 2, said
+    assert any("bundle.json's row is list, not str" in x for x in said), said
+    assert any("bundle.json's model is int, not str" in x for x in said), said
