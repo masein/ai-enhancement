@@ -242,7 +242,7 @@ def test_privacy_views_show_ids_and_masked_replies_only(svc):
 
 def test_a_server_is_asked_each_privacy_question_with_its_own_system_line(monkeypatch, invented):
     bodies = []
-    monkeypatch.setattr(served, "_post", lambda url, key, body, item=True: bodies.append(body) or
+    monkeypatch.setattr(served, "_post", lambda url, key, body, item=True, timeout=None: bodies.append(body) or
                         {"choices": [{"message": {"content": "No."}}]})
     rec = {"id": "served/phone", "name": "phone", "base_url": "http://x/v1",
            "pin": {"file": "f.gguf"}}

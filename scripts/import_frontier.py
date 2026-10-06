@@ -1,5 +1,8 @@
 """17: a GGUF's Frontier bundle from a rented GPU (scripts/remote_gguf.py),
-into the board — scripts/import_remote.py hands it here by its suite.
+into the board — scripts/import_remote.py hands it here by its suite. A
+bundle is untrusted (17b): every check is made before anything on the board
+changes, and a task's answers are scored in a folder of their own before they
+take the row's place.
 
 The checks. It refuses the bundle, saying which check failed, when:
 - the served model it names (--as on the box) isn't registered here, or is a
@@ -9,31 +12,49 @@ The checks. It refuses the bundle, saying which check failed, when:
   model's page — or, for a model whose file isn't registered here, the
   sha256 the person importing gives (--file-sha256, kept on the model with
   their name);
+- 17b: its launch isn't the one registered for that model. Compared: the
+  routing environment (every LLAMA_MOE_* variable: lookahead or not) and
+  speculative decoding (--spec-type, --draft-*, a draft model; and a server
+  registered as drafting tokens). Free to differ, as they change where the
+  model runs and not what it computes: memory and offload (-ngl, --cpu-moe,
+  --n-cpu-moe, -ot), context (-c), slots (-np), the KV cache's type (-ctk,
+  -ctv), flash attention, threads, batch sizes, GGML_CPU_* — the parity check
+  (scripts/frontier_parity.py) is what says the box answers as the server;
 - a task's protocol, its dataset's revision or its runs aren't this board's;
 - the questions weren't asked as the board asks this model: each task's
   budget, the model card's sampling and the thinking switch, as
   service/frontier.py would set them for it here;
+- 17b: an answer line isn't one (each field's type and range), or is a line
+  the server failed on; a thinking bundle none of whose answers thought, or a
+  thinking-off one whose answers did;
 - its answers don't cover its questions (its shard's, for a shard), or
-  answer questions outside them.
+  answer questions outside them;
+- 17b: a shard made with another build, other flags or another environment
+  than the shards of its task already here.
 
 The merge. A whole bundle's task replaces the task's answers on the row (the
 model's, or its "· thinking" row) — the earlier ones kept under
 results/earlier/. A shard waits under results/shards/<row>/<task>/<i>-of-<n>/
 until every shard of the task is in; then they are merged, question by
-question. Then the task is scored by code, as on the board (code-scored
-benchmarks are scored at import), and its results say it ran on a rented GPU.
+question. Each task is scored by code in results/staging/ first, as on the
+board (code-scored benchmarks are scored at import); only a task scored there
+takes the row's place, and its results say it ran on a rented GPU. The row's
+model record is the board's own (never the bundle's).
 
 A bundle already imported — by its sha256 — changes nothing.
 
 A model the board doesn't serve — the calibration's Gemma 4 26B A4B, run on
-rented GPUs only — is registered by its first import (--register "<name>"):
-a served entry with no server here, its file pinned by the bundle's sha256,
-its build and launch as the box recorded them.
+rented GPUs only — is registered by its first import (--register "<name>",
+with --file-sha256: the sha256 masein checked, never the bundle's word for
+it): a served entry with no server here, its file pinned, its build and
+launch as the box recorded them. Its id may not hold "__" and no row of it
+may exist yet.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import sys
 import time
@@ -50,6 +71,11 @@ import remote_bundle as rb  # noqa: E402
 REFUSED = 2
 SUITE = "frontier"
 REGISTRY = "frontier_imports.json"
+_ID = re.compile(r"^served/[A-Za-z0-9._-]+$")
+_ENV_TOKEN = re.compile(r"\b([A-Z][A-Z0-9_]*)=([A-Za-z0-9_.:/+-]+)")
+ROUTING_ENV = "LLAMA_MOE_"
+_SPEC = re.compile(r"^(--spec-[a-z-]+|--draft[a-z-]*|-md|--model-draft|-ngld|--gpu-layers-draft"
+                   r"|-cd|--ctx-size-draft|-devd|--device-draft)$")
 
 
 def registered_sha(rec: dict) -> str:
@@ -59,16 +85,118 @@ def registered_sha(rec: dict) -> str:
             or (rec.get("file_sha256") or {}).get("sha256") or "")
 
 
-def _answers(b: dict, row: str, task: str) -> dict[tuple[str, int], dict]:
+# ---------------------------------------------------------------------------
+# the launch: what a box ran against what the board registered
+# ---------------------------------------------------------------------------
+
+def _spec_flags(tokens: list[str]) -> list[str]:
+    """speculative decoding's flags among `tokens`, each with its value"""
+    out = []
+    for i, t in enumerate(tokens):
+        name, _, val = t.partition("=")
+        if not _SPEC.match(name):
+            continue
+        if not val and i + 1 < len(tokens) and not tokens[i + 1].startswith("-"):
+            val = tokens[i + 1]
+        out.append(f"{name}={val}" if val else name)
+    return sorted(out)
+
+
+def record_launch(rec: dict) -> dict:
+    """the registered setup's routing environment and speculative flags — its
+    launch flags and environment as typed, "How it's served", and the GGUF
+    setup it serves the same file as (served.launch's sources)"""
+    from service import db
+    texts = [rec.get("flags") or "", rec.get("env") or "", rec.get("how") or ""]
+    sa = rec.get("same_as") or {}
+    if sa.get("gguf"):
+        g = db.gguf_get(sa["gguf"]) or {}
+        su = next((x for x in g.get("setups") or [] if x.get("id") == sa.get("setup")), None)
+        if su:
+            texts += [" ".join(f"{k}={v}" for k, v in (su.get("env") or {}).items()),
+                      " ".join(su.get("flags") or [])]
+    text = " ".join(t for t in texts if t)
+    env = {k: v for k, v in _ENV_TOKEN.findall(text) if k.startswith(ROUTING_ENV)}
+    toks = [t for t in re.split(r"[\s,;()]+", text) if t]
+    return {"env": env, "spec": _spec_flags(toks), "drafts": rec.get("speculative") is True}
+
+
+def box_launch(server: dict) -> dict:
+    env = {k: str(v) for k, v in (server.get("env") or {}).items() if k.startswith(ROUTING_ENV)}
+    return {"env": env, "spec": _spec_flags([str(x) for x in server.get("flags") or []])}
+
+
+def launch_differs(rec: dict, server: dict) -> list[str]:
+    """each way the box's launch differs from the registered one, in words"""
+    want, got = record_launch(rec), box_launch(server)
+    out = []
+    if want["env"] != got["env"]:
+        w = " ".join(f"{k}={v}" for k, v in sorted(want["env"].items())) or "none"
+        g = " ".join(f"{k}={v}" for k, v in sorted(got["env"].items())) or "none"
+        out.append(f"routing: the box ran with {g}; {rec['id']} is registered with {w}")
+    if want["spec"] != got["spec"] or (want["drafts"] and not got["spec"]):
+        w = " ".join(want["spec"]) or ("drafting tokens (its server says so)" if want["drafts"]
+                                       else "none")
+        g = " ".join(got["spec"]) or "none"
+        out.append(f"speculative decoding: the box ran with {g}; {rec['id']} is registered "
+                   f"with {w}")
+    return out
+
+
+def shard_setup(server: dict) -> dict:
+    """17b: what every shard of a task must share"""
+    return {"binary_sha256": server.get("binary_sha256"), "commit": server.get("commit"),
+            "build": server.get("build"), "flags": list(server.get("flags") or []),
+            "env": dict(server.get("env") or {})}
+
+
+# ---------------------------------------------------------------------------
+# the answers: read, and each line checked
+# ---------------------------------------------------------------------------
+
+def _lines(b: dict, row: str, task: str) -> list:
     from service import frontier as sf
     name = f"results/{row}/{task}_0shot/{sf.SUB}/{sf.ANSWERS}"
-    out: dict[tuple[str, int], dict] = {}
-    for line in b["files"].get(name, b"").decode("utf-8").splitlines():
-        try:
-            r = json.loads(line)
-            out[(str(r["id"]), int(r["epoch"]))] = r
-        except (ValueError, KeyError, TypeError):
+    out = []
+    for line in b["files"].get(name, b"").decode("utf-8", "replace").splitlines():
+        if not line.strip():
             continue
+        try:
+            out.append(json.loads(line))
+        except ValueError:
+            out.append(None)
+    return out
+
+
+def bad_line(r, epochs: int) -> str:
+    """'' when a bundle's answer line is one; else what is wrong with it"""
+    if not isinstance(r, dict):
+        return "isn't a JSON object"
+    if r.get("error"):
+        return "is a question the server failed on, not an answer"
+    if not isinstance(r.get("id"), str) or not r["id"]:
+        return "has no question id"
+    if not isinstance(r.get("epoch"), int) or isinstance(r.get("epoch"), bool) \
+            or not 0 <= r["epoch"] < epochs:
+        return f"has a run {r.get('epoch')!r}, not one of 0 to {epochs - 1}"
+    if not isinstance(r.get("answer"), str):
+        return "has an answer that isn't text"
+    if r.get("finish") is not None and not isinstance(r["finish"], str):
+        return "has a finish reason that isn't text"
+    for k in ("tokens", "seed"):
+        if r.get(k) is not None and (not isinstance(r[k], int) or isinstance(r[k], bool)
+                                     or r[k] < 0):
+            return f"has a {k} that isn't a count"
+    if r.get("fallback") is not None and not isinstance(r["fallback"], dict):
+        return "has a fallback that isn't a record"
+    return ""
+
+
+def _answers(b: dict, row: str, task: str) -> dict[tuple[str, int], dict]:
+    out: dict[tuple[str, int], dict] = {}
+    for r in _lines(b, row, task):
+        if isinstance(r, dict) and not bad_line(r, 10 ** 6):
+            out[(r["id"], r["epoch"])] = r
     return out
 
 
@@ -93,6 +221,22 @@ def registered_here(b: dict, name: str, by: str) -> dict:
     db.served_put(rec)
     served.write_meta(rec)
     return rec
+
+
+def register_refused(model: str, file_sha: str) -> str:
+    """17b: '' when a bundle's model may be registered by its import; else why
+    not — the id from the bundle is never trusted to name a row"""
+    from service import config
+    if not file_sha:
+        return ("--register needs --file-sha256: the sha256 of the file, as you checked it — "
+                "never the bundle's own word for it")
+    if not _ID.match(model) or "__" in model:
+        return f"{model!r} can't be a new model's id: served/<name>, with no \"__\" in it"
+    safe = model.replace("/", "__")
+    have = [r for r in (safe, safe + "__thinking") if (config.OUT_DIR / r).exists()]
+    if have:
+        return f"{model} has a row here already ({', '.join(have)}): import without --register"
+    return ""
 
 
 def checks(b: dict, rec: dict | None, file_sha: str = "") -> list[str]:
@@ -134,6 +278,10 @@ def checks(b: dict, rec: dict | None, file_sha: str = "") -> list[str]:
         out.append(f"its GGUF isn't the file registered for {model}: the bundle's "
                    f"{(setup.get('gguf') or {}).get('name') or 'file'} has sha256 "
                    f"{theirs[:16]}…, the registered file {have[:16]}…")
+    # 17b: the launch registered for this model, not another setup of its file
+    for d in launch_differs(rec, setup.get("server") or {}):
+        out.append(f"its launch isn't the one registered for {model} — {d}. Run the box with "
+                   f"that setup's own variables and flags (docs/REMOTE-RUNS.md G2)")
     if setup.get("protocol") != fb.VERSION:
         out.append(f"the protocol: the bundle's {setup.get('protocol')}, this board's "
                    f"{fb.VERSION}")
@@ -166,14 +314,28 @@ def checks(b: dict, rec: dict | None, file_sha: str = "") -> list[str]:
         if got.get("switch") != s.get("chat_template_kwargs"):
             out.append(f"{t}: its thinking switch {got.get('switch')}; this board says "
                        f"{s.get('chat_template_kwargs')}")
+        # 17b: each line an answer, and none a question the server failed on
+        lines = _lines(b, bundle.get("row") or "", t)
+        bad = [(k, bad_line(r, spec["epochs"])) for k, r in enumerate(lines, 1)]
+        bad = [(k, w) for k, w in bad if w]
+        if bad:
+            k, w = bad[0]
+            out.append(f"{t}: {len(bad):,} of its {len(lines):,} answer lines aren't answers — "
+                       f"line {k} {w}")
+            continue
+        why = sf.thinking_refused(t, "on" if on else "off", [r["answer"] for r in lines])
+        if why:
+            out.append(why)
         try:
             items = fb.shard_of(fb.load(t, config.BENCH_ROOT), shard)
         except Exception as e:                          # noqa: BLE001 — said in one line
             out.append(f"{t}: this server can't read its questions to check the answers ({e})")
             continue
         want = {(it["id"], e) for it in items for e in range(spec["epochs"])}
-        ans = set(_answers(b, bundle.get("row") or "", t))
+        ans = {(r["id"], r["epoch"]) for r in lines}
         of = f" (shard {shard[0]} of {shard[1]})" if shard else ""
+        if len(ans) != len(lines):
+            out.append(f"{t}: {len(lines) - len(ans):,} answers given twice{of}")
         if not want <= ans:
             out.append(f"{t}: {len(want & ans)} of {len(want)} answers{of}")
         elif ans - want:
@@ -182,13 +344,34 @@ def checks(b: dict, rec: dict | None, file_sha: str = "") -> list[str]:
     return out
 
 
-def _would_be(b: dict) -> dict:
-    """what --register would keep, for the checks before it is kept"""
+def shard_conflicts(reg: dict, b: dict, tasks: list[str], shard: tuple[int, int]) -> list[str]:
+    """17b: a task whose shards here were made with another build, other flags
+    or another environment than this one — never merged into one row"""
+    mine = shard_setup(b["setup"].get("server") or {})
+    out = []
+    for t in tasks:
+        for j, x in sorted(((reg.get("shards") or {}).get(t) or {}).get("have", {}).items()):
+            if j == str(shard[0]) or not x.get("setup") or x["setup"] == mine:
+                continue
+            diff = [k for k in mine if mine[k] != x["setup"].get(k)]
+            out.append(f"{t}: shard {j} here was made with another setup ({', '.join(diff)}: "
+                       f"{', '.join(repr(x['setup'].get(k)) for k in diff)} there, "
+                       f"{', '.join(repr(mine[k]) for k in diff)} here) — every shard of a task "
+                       "is run the same way")
+    return out
+
+
+def _would_be(b: dict, file_sha: str) -> dict:
+    """what --register would keep, for the checks before it is kept — its file
+    the sha256 masein gave"""
     setup = b["setup"]
     gg = setup.get("gguf") or {}
+    srv = setup.get("server") or {}
     return {"id": b["bundle"].get("model") or "", "name": "", "based_on":
             setup.get("based_on") or "", "pin": {"file": gg.get("name"), "model": gg.get("name")},
-            "file_sha256": {"sha256": gg.get("sha256")}}
+            "file_sha256": {"sha256": file_sha},
+            "flags": " ".join(srv.get("flags") or []),
+            "env": " ".join(f"{k}={v}" for k, v in (srv.get("env") or {}).items())}
 
 
 def registry(row: Path) -> dict:
@@ -216,6 +399,19 @@ def where_of(row: Path, task: str) -> str:
             else f"run on rented GPUs ({', '.join(gpus)})")
 
 
+def write_meta(row: Path, rec: dict, thinking: bool) -> None:
+    """17b: the row's model record — the board's own, never the bundle's"""
+    from service import served
+    if not thinking:
+        served.write_meta(rec)
+        return
+    row.mkdir(parents=True, exist_ok=True)
+    (row / "model_meta.json").write_text(json.dumps(
+        {"model": rec["id"] + " · thinking", "base_model": rec["id"], "kind": "instruct",
+         "params": None, "kind_reason": "served elsewhere: asked through its server's own chat "
+                                        "template", **served.archinfo(rec)}), encoding="utf-8")
+
+
 def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
                   register: str = "") -> int:
     from service import config, db, served
@@ -232,20 +428,26 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
         f"{'on' if on else 'off'} · {', '.join(bundle.get('tasks') or {}) or 'no task'}"
         + (f" · shard {shard[0]} of {shard[1]}" if shard else "")
         + f" · {gg.get('name') or 'its GGUF'} ({str(gg.get('sha256'))[:16]})")
-    row = config.OUT_DIR / row_name if row_name and "/" not in row_name else None
-    reg = registry(row) if row else {"imports": []}
+    if not row_name or "/" in row_name or row_name.startswith("."):
+        say(f"refused — its row {row_name!r} isn't a row's name")
+        return REFUSED
+    row = config.OUT_DIR / row_name
+    reg = registry(row)
     was = next((x for x in reg.get("imports") or [] if x.get("sha256") == b["sha256"]), None)
     if was:
         say(f"imported already, as Runs #{was['sid']} on {was['at']}: nothing changed")
         return 0
     rec = served.get(model) if served.is_served(model) else None
-    if register and rec:
-        say(f"refused — {model} is registered here already: import without --register")
-        return REFUSED
-    if register and not served.is_served(model):
-        say(f"refused — {model!r} isn't a served model's id (served/<name>)")
-        return REFUSED
-    bad = checks(b, rec or (_would_be(b) if register else None), file_sha)
+    if register:
+        why = ("" if not rec else f"{model} is registered here already: import without "
+               "--register") or register_refused(model, file_sha)
+        if why:
+            say(f"refused — {why}")
+            return REFUSED
+    bad = checks(b, rec or (_would_be(b, file_sha) if register else None), file_sha)
+    tasks = [t for t in fb.TASKS if t in (bundle.get("tasks") or {})]
+    if not bad and shard:
+        bad = shard_conflicts(reg, b, tasks, shard)
     if bad:
         for line in bad:
             say(f"refused — {line}")
@@ -254,7 +456,7 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
     if register:
         rec = registered_here(b, register, by)
         say(f"{model} registered as {rec['name']}: a model run on rented GPUs only, its file "
-            f"{(gg.get('name') or '')} pinned by its sha256 {str(gg.get('sha256'))[:16]}…")
+            f"{(gg.get('name') or '')} pinned by the sha256 you gave, {file_sha[:16]}…")
     if file_sha and not registered_sha(rec):
         rec["file_sha256"] = {"sha256": file_sha, "by": by, "at": time.time(),
                               "name": gg.get("name") or ""}
@@ -267,21 +469,12 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
         f"on {gpu}")
 
     stamp = time.strftime("%Y-%m-%dT%H-%M-%S")
-    earlier = config.OUT_DIR.with_name("earlier") / row_name
     shards = config.OUT_DIR.with_name("shards") / row_name
-    tasks = [t for t in fb.TASKS if t in (bundle.get("tasks") or {})]
-    lines, scored = [], []
+    staging = config.OUT_DIR.with_name("staging") / f"{row_name}-{stamp}" / row_name
+    lines, ready = [], {}
 
-    def set_aside(t: str) -> None:
-        dest = sf.task_dir(row, t)
-        if dest.exists():
-            aside = earlier / f"{t}_0shot-frontier-before-import-{stamp}"
-            aside.parent.mkdir(parents=True, exist_ok=True)
-            shutil.move(str(dest), str(aside))
-            lines.append(f"{t}: the answers here before are kept at {aside}")
-
-    def put(t: str, answers: dict, task_setup: bytes) -> None:
-        d = sf.task_dir(row, t)
+    def stage(t: str, answers: dict, task_setup: bytes) -> None:
+        d = sf.task_dir(staging, t)
         d.mkdir(parents=True, exist_ok=True)
         (d / sf.ANSWERS).write_text("".join(
             json.dumps(answers[k], ensure_ascii=False) + "\n" for k in sorted(answers)),
@@ -294,14 +487,15 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
         tsetup = b["files"].get(prefix + sf.SETUP, b"{}")
         entry = {"gpu": gpu, "sha256": b["sha256"], "bundle": path.name, "at": stamp,
                  "by": by, "gguf_sha256": gg.get("sha256"), "llama_cpp": srv.get("build"),
-                 "answers": len(ans)}
+                 "answers": len(ans), "setup": shard_setup(srv)}
         if shard:
             i, n = shard
             sh = (reg.setdefault("shards", {}).get(t) or {})
             if sh.get("n") and sh["n"] != n:
                 old = shards / t
                 if old.exists():
-                    aside = earlier / f"{t}-shards-of-{sh['n']}-before-import-{stamp}"
+                    aside = (config.OUT_DIR.with_name("earlier") / row_name
+                             / f"{t}-shards-of-{sh['n']}-before-import-{stamp}")
                     aside.parent.mkdir(parents=True, exist_ok=True)
                     shutil.move(str(old), str(aside))
                     lines.append(f"{t}: shards of {sh['n']} waiting here are kept at {aside}")
@@ -323,42 +517,49 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             merged: dict = {}
             for j in range(1, n + 1):
                 merged.update(sf.read_answers(shards / t / f"{j}-of-{n}" / sf.ANSWERS))
-            set_aside(t)
-            put(t, merged, tsetup)
+            stage(t, merged, tsetup)
             parts = [sh["have"][str(j)] for j in range(1, n + 1)]
-            reg.setdefault("tasks", {})[t] = {
-                **entry, "gpus": sorted({x["gpu"] for x in parts}), "shards": n,
-                "shard_bundles": [{"shard": j, **{k: x[k] for k in ("gpu", "sha256", "bundle")}}
-                                  for j, x in enumerate(parts, 1)], "answers": len(merged)}
+            ready[t] = {**entry, "gpus": sorted({x["gpu"] for x in parts}), "shards": n,
+                        "shard_bundles": [{"shard": j, **{k: x[k] for k in ("gpu", "sha256",
+                                                                            "bundle")}}
+                                          for j, x in enumerate(parts, 1)],
+                        "answers": len(merged)}
             lines.append(f"{t}: every shard is in ({n} of {n}) · {len(merged):,} answers")
         else:
-            set_aside(t)
-            put(t, ans, tsetup)
-            reg.setdefault("tasks", {})[t] = {**entry, "gpus": [gpu]}
+            stage(t, ans, tsetup)
+            ready[t] = {**entry, "gpus": [gpu]}
             lines.append(f"{t}: {len(ans):,} answers from a rented GPU ({gpu})")
-        scored.append(t)
-    # the model's record where this board has none (a thinking row's)
-    for name, data in b["files"].items():
-        rel = Path(name)
-        if rel.parts[0] == "results" and len(rel.parts) == 3 and rel.name == "model_meta.json" \
-                and rel.parts[1] == row_name and not (row / "model_meta.json").exists():
-            row.mkdir(parents=True, exist_ok=True)
-            (row / "model_meta.json").write_bytes(data)
     reg.setdefault("imports", [])
     _write_registry(row, reg)
 
-    # each task whose answers are all in, scored by code, as the board scores it
+    # 17b: each task scored where it was staged; only then does it take the
+    # row's place (the earlier answers kept under results/earlier/)
     status, error, words = "done", "", []
-    for t in scored:
+    for t, entry in ready.items():
         try:
-            sc = sf.score_task(row, t, rec)
-        except Exception as e:                          # noqa: BLE001 — the answers are on disk
+            sc = sf.score_task(staging, t, rec)
+        except Exception as e:                          # noqa: BLE001 — the row is untouched
             status, error = "failed", f"scoring {t}: {e}"
-            words.append(f"{fb.BENCH[t]['label']}: answers imported; scoring failed: {e}")
+            words.append(f"{fb.BENCH[t]['label']}: not imported — scoring it failed ({e}); the "
+                         "row is as it was")
             continue
+        if sc and sc.get("refused"):
+            status, error = "failed", sc["refused"]
+            words.append(f"{sc['refused']} — not imported; the row is as it was")
+            continue
+        aside = sf.set_aside(row, t, "before-import")
+        if aside:
+            lines.append(f"{t}: the answers here before are kept at {aside}")
+        dest = sf.task_dir(row, t)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(sf.task_dir(staging, t)), str(dest))
+        reg.setdefault("tasks", {})[t] = entry
         if sc:
-            _mark_where(row, t, f"{WHERE_WORDS} ({', '.join(reg['tasks'][t]['gpus'])})")
+            _mark_where(row, t, f"{WHERE_WORDS} ({', '.join(entry['gpus'])})")
             words.append(sf.words(t, sc))
+    shutil.rmtree(staging.parent, ignore_errors=True)
+    if ready:
+        write_meta(row, rec, on)
     line = " · ".join(words) or "; ".join(x for x in lines if "missing" in x) or "imported"
     of = f" · shard {shard[0]} of {shard[1]}" if shard else ""
     sid = db.add(model, "instruct", SUITE, by,

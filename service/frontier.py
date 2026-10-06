@@ -12,6 +12,15 @@ process killed, the box stopped — carries on from the next unanswered
 question when it is started again. A shard (FRONTIER_SHARD i/n) asks every
 n-th question from the i-th.
 
+17b: an answer is only an answer. A question the server failed on (an error
+of its own, twice, and again without its chat parsing) is never kept: the
+next run asks it again, and more failures than served.item_error_limit stop
+the run. Answers made with another setup — another file or build on the
+server, another launch, budget, sampling or thinking switch — are never mixed
+with the new ones: they are set aside when the run starts, and asked again.
+A thinking row with no thinking in any answer, or a thinking-off row with
+thinking in its answers, is not scored: the server didn't do what was asked.
+
 When every question of every run is answered, the task is scored by code and
 written in lm_eval's layout (results_*.json, samples_*.jsonl beside the
 answers), so the board reads its cell as it reads any other: the share right
@@ -23,6 +32,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
+import shutil
 import sys
 import threading
 import time
@@ -54,8 +65,11 @@ def read_answers(path: Path) -> dict[tuple[str, int], dict]:
     for line in lines:
         try:
             r = json.loads(line)
+            # 17b: a line the server failed on (an earlier run's) isn't an answer
+            if r.get("error"):
+                continue
             out[(str(r["id"]), int(r["epoch"]))] = r
-        except (ValueError, KeyError, TypeError):
+        except (ValueError, KeyError, TypeError, AttributeError):
             continue
     return out
 
@@ -85,23 +99,59 @@ def _where() -> str:
     return config.FRONTIER_WHERE or "this server"
 
 
-def _write_setup(d: Path, rec: dict, task: str, on: bool, s: dict) -> None:
+def _setup(rec: dict, task: str, on: bool, s: dict) -> dict:
     spec = fb.BENCH[task]
     sh = shard()
-    (d / SETUP).write_text(json.dumps({
+    pin = rec.get("pin") or {}
+    return {
         "version": fb.VERSION, "task": task, "protocol": spec["protocol"],
         "protocol_version": spec["protocol_version"], "source": spec["source"],
         "epochs": spec["epochs"], "thinking": "on" if on else "off",
         "budget": s["max_tokens"], "family": family_of(rec) or "server defaults",
         "sampling": {k: v for k, v in s.items() if k not in ("max_tokens",
                                                             "chat_template_kwargs")},
-        "where": _where(), "file": (rec.get("pin") or {}).get("file") or "",
-        "shard": {"i": sh[0], "n": sh[1]} if sh else None}, indent=1, sort_keys=True),
-        encoding="utf-8")
+        "where": _where(), "file": pin.get("file") or "",
+        # 17b: what its server serves, and how it was launched
+        "server": {"file": pin.get("file") or "", "size": pin.get("size"),
+                   "build": pin.get("build") or ""},
+        "launch": {"flags": rec.get("flags") or "", "env": rec.get("env") or ""},
+        "shard": {"i": sh[0], "n": sh[1]} if sh else None}
+
+
+# 17b: what a task's answers depend on — a change asks them all again
+SETUP_KEYS = ("version", "protocol_version", "source", "epochs", "thinking", "budget",
+              "sampling", "family", "server", "launch")
+
+
+def setup_differs(old: dict, new: dict) -> list[str]:
+    """the parts of a task's setup that changed, by name"""
+    return [k for k in SETUP_KEYS if old.get(k) != new.get(k)]
+
+
+def _read_json(p: Path) -> dict:
+    try:
+        got = json.loads(Path(p).read_text(encoding="utf-8"))
+        return got if isinstance(got, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def set_aside(row: Path, task: str, why: str) -> Path | None:
+    """a task's answers (and their grades and scores) moved out of the row, to
+    results/earlier/<row>/, as an import sets them aside"""
+    d = task_dir(row, task)
+    if not d.exists():
+        return None
+    stamp = time.strftime("%Y-%m-%dT%H-%M-%S")
+    aside = (Path(config.OUT_DIR).with_name("earlier") / Path(row).name
+             / f"{task}_0shot-frontier-{why}-{stamp}")
+    aside.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(d), str(aside))
+    return aside
 
 
 def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
-             canceled=lambda: False) -> tuple[int, int]:
+             canceled=lambda: False, log=lambda line: None) -> tuple[int, int]:
     """every question of `task` this run (or shard) holds and hasn't answered
     — (answered, of) when it stops. Raises served.ServerStopped when the
     server stops answering: what it answered before is kept"""
@@ -109,9 +159,17 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
     spec = fb.BENCH[task]
     items = fb.shard_of(fb.load(task, config.BENCH_ROOT), shard())
     d = task_dir(row, task)
-    d.mkdir(parents=True, exist_ok=True)
     s = settings(rec, task, on)
-    _write_setup(d, rec, task, on, s)
+    new = _setup(rec, task, on, s)
+    # 17b: answers made with another setup are never mixed with these
+    old = _read_json(d / SETUP)
+    changed = setup_differs(old, new) if old else []
+    if changed and (d / ANSWERS).exists():
+        aside = set_aside(row, task, "another-setup")
+        log(f"[frontier] {task}: its answers were made with another setup ({', '.join(changed)}"
+            f"): set aside at {aside}, and asked again")
+    d.mkdir(parents=True, exist_ok=True)
+    (d / SETUP).write_text(json.dumps(new, indent=1, sort_keys=True), encoding="utf-8")
     path = d / ANSWERS
     done = read_answers(path)
     want = [(it, e) for it in items for e in range(spec["epochs"])]
@@ -119,6 +177,7 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
     total, have = len(want), len(want) - len(todo)
     lock = threading.Lock()
     halt: list[Exception] = []
+    failed: list[str] = []
     t0, n0 = time.time(), have
     count = {"n": have}
 
@@ -141,13 +200,22 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
                 halt.append(served.ServerStopped(0, 0, str(x), refused=(
                     f"the server refused a question: {x}")))
             return
+        if a.error:
+            # 17b: no answer either way (its chat endpoint twice, then without
+            # its chat parsing) isn't an answer: never kept, asked again next
+            # run — and more of them than the limit, the server isn't right
+            with lock:
+                failed.append(a.error.get("chat") or "")
+                if len(failed) > served.item_error_limit(total) and not halt:
+                    halt.append(served.ServerStopped(0, total, a.error.get("chat") or "", refused=(
+                        f"the server failed on {len(failed)} questions, asked its own way and "
+                        f"without its chat parsing ({a.error.get('chat')}): stopped")))
+            return
         line = {"id": it["id"], "epoch": e, "seed": seed, "answer": str(a),
                 "finish": getattr(a, "finish", None), "tokens": a.tokens,
                 "at": round(time.time(), 3)}
         if a.fallback:
             line["fallback"] = a.fallback
-        if a.error:
-            line["error"] = a.error
         with lock:
             with open(path, "a", encoding="utf-8") as fh:
                 fh.write(json.dumps(line, ensure_ascii=False) + "\n")
@@ -162,7 +230,48 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
         e = halt[0]
         e.done, e.total = count["n"], total
         raise e
+    if failed:
+        log(f"[frontier] {task}: {len(failed)} question(s) the server failed on — not kept, "
+            f"asked again next run ({failed[0]})")
     return count["n"], total
+
+
+# ---------------------------------------------------------------------------
+# 17b: the parity check — the same questions on the server and on a box
+# ---------------------------------------------------------------------------
+
+def parity_ask(rec: dict, path: Path, progress=None) -> int:
+    """fb.PARITY's questions asked of `rec`, greedy and thinking off, as many at
+    a time as it takes — each reply, its letter and the key, to `path`. Raises
+    served.ServerStopped when the server stops answering or fails on one"""
+    fb.set_root(config.BENCH_ROOT)
+    items = fb.parity_items(config.BENCH_ROOT)
+    task = fb.PARITY["task"]
+    s = {"max_tokens": fb.PARITY["max_tokens"], **fb.PARITY["sampling"]}
+    if not served.is_openrouter(rec):
+        s["chat_template_kwargs"] = {"enable_thinking": False}
+    got: dict[str, dict] = {}
+    lock = threading.Lock()
+
+    def one(it: dict) -> None:
+        text, need = fb.prompt(task, it)
+        a = served.answer_one(rec, text, s)
+        if a.error:
+            raise served.ServerStopped(0, len(items), a.error.get("chat") or "", refused=(
+                f"the server failed on parity question {it['id']}: {a.error.get('chat')}"))
+        with lock:
+            got[it["id"]] = {"id": it["id"], "key": need["key"], "answer": str(a),
+                             "read": fb.read_mmlu_pro(str(a)), "finish": a.finish,
+                             "tokens": a.tokens}
+            n = len(got)
+        if progress:
+            progress(n, len(items))
+    with ThreadPoolExecutor(max_workers=served.concurrency(rec)) as pool:
+        list(pool.map(one, items))
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    Path(path).write_text("".join(json.dumps(got[it["id"]], ensure_ascii=False) + "\n"
+                                  for it in items), encoding="utf-8")
+    return len(got)
 
 
 # ---------------------------------------------------------------------------
@@ -255,6 +364,33 @@ def _share(per: dict[str, list[float]], task: str, items: list[dict]) -> dict:
     return fb.summary(per, task, groups)
 
 
+_THOUGHT = re.compile(r"(?s)^\s*<think>(.*?)(?:</think>|$)")
+
+
+def thought(answer: str) -> bool:
+    """an answer that holds thinking: words inside its <think> block (an empty
+    block, as a template that is told not to think writes, is none)"""
+    m = _THOUGHT.match(answer or "")
+    return bool(m and m.group(1).strip())
+
+
+def thinking_refused(task: str, thinking: str | None, answers: list[str]) -> str:
+    """'' when the answers are what the thinking setting asked for; else why
+    not, in words — a thinking row none of whose answers thought (the server
+    was told not to, or its template ignores the switch), or an off row whose
+    answers did"""
+    label = fb.BENCH[task]["label"]
+    n = sum(1 for a in answers if thought(a))
+    if thinking == "on" and answers and not n:
+        return (f"{label}: thinking was asked for, and none of its {len(answers):,} answers "
+                "holds any — the server didn't think (a --reasoning-budget 0, or a chat "
+                "template that ignores the switch?): not scored")
+    if thinking == "off" and n:
+        return (f"{label}: thinking was off, and {n:,} of its {len(answers):,} answers hold "
+                "thinking — the server thought anyway: not scored")
+    return ""
+
+
 def score_task(row: Path, task: str, rec: dict) -> dict | None:
     """the task's score from its answers, written in lm_eval's layout — None
     while a question of a run is still unanswered. A graded benchmark is
@@ -268,6 +404,11 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
     items, runs = m["items"], m["runs"]
     d = task_dir(row, task)
     flat = [r for it in items for r in runs[it["id"]]]
+    # 17b: the server did what was asked — thinking on, or off
+    why = thinking_refused(task, _read_json(d / SETUP).get("thinking"),
+                           [r["answer"] for r in flat])
+    if why:
+        return {"refused": why}
     waiting = sum(1 for r in flat if r["ok"] is None)
     ran_out = sum(1 for r in flat if r["ran_out"])
     unread = sum(1 for r in flat if r["read"] is None and not r["ran_out"])
@@ -337,6 +478,8 @@ def words(task: str, sc: dict) -> str:
     graded benchmark not yet graded, "SimpleQA Verified: 1,000 answers wait for
     its grader" """
     spec = fb.BENCH[task]
+    if sc.get("refused"):
+        return sc["refused"]
     if sc.get("waiting") is not None and sc.get("score") is None:
         return (f"{spec['label']}: {sc['waiting']:,} answers wait for its grader (AI models ▸ "
                 "Start)")
@@ -399,9 +542,10 @@ def run(sid: int, sub: dict, rec: dict, th: dict, row: Path, log_path: Path) -> 
             return "failed", line
         try:
             n, total = ask_task(rec, task, row, on, progress,
-                                canceled=lambda: db.cancel_requested(sid))
+                                canceled=lambda: db.cancel_requested(sid), log=log)
         except served.ServerStopped as e:
-            line = (f"{label}: {e}" if str(e).startswith("the server refused") else
+            line = (f"{label}: {e}" if str(e).startswith(("the server refused",
+                                                           "the server failed on")) else
                     f"{label}: the server stopped answering at {e.done:,} of {e.total:,}")
             line += served.KEPT_FOR_NEXT
             log(f"[frontier] {line} ({e.why})")
@@ -409,6 +553,11 @@ def run(sid: int, sub: dict, rec: dict, th: dict, row: Path, log_path: Path) -> 
         if db.cancel_requested(sid):
             return "canceled", f"{label}: stopped at {n:,} of {total:,}; the answers are kept"
         log(f"[frontier] {task}: {n:,} of {total:,} answered")
+        if n < total:
+            # 17b: the questions the server failed on, not kept: the next run asks them
+            return "failed", " · ".join([*lines, f"{label}: {n:,} of {total:,} answered — the "
+                                         f"server failed on {total - n:,}; the next run asks "
+                                         "them again"])
         if not config.FRONTIER_SCORE_AFTER_RUN or sh:
             lines.append(f"{label}: {n:,} of {total:,} answered")
             continue
@@ -416,4 +565,6 @@ def run(sid: int, sub: dict, rec: dict, th: dict, row: Path, log_path: Path) -> 
         lines.append(words(task, sc) if sc else f"{label}: {n:,} of {total:,} answered")
         if sc:
             log(f"[frontier] {words(task, sc)}")
+        if sc and sc.get("refused"):
+            return "failed", " · ".join(lines)
     return "done", " · ".join(lines)

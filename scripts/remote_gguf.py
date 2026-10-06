@@ -29,7 +29,20 @@ the launch flags and environment, the GPU, and each task's settings. It holds
 the answers of each task answered whole, and never the GGUF, the server, or a
 key.
 
-    HF_TOKEN=… python scripts/remote_gguf.py --as served/qwen3-6-35b-a3b-q4 \\
+17b: the box runs the setup it says it runs. A port something already answers
+on is refused before anything starts; once healthy, the child must still be
+running and its /props must name this file. The build (the binary's sha256
+and its commit), the flags and the environment are kept in --out's state and
+a resume with others is refused (the slots may change; each session's are
+recorded). --parity asks the parity check's 50 questions instead
+(scripts/frontier_parity.py): the pilot's first step.
+
+The token is typed, never on the command line (where the shell's history
+would keep it):
+
+    read -rs HF_TOKEN && export HF_TOKEN
+
+    python scripts/remote_gguf.py --as served/qwen3-6-35b-a3b-q4 \\
         --gguf hf://you/private-ggufs/Qwen3.6-35B-A3B-Q4_K_M.gguf \\
         --server hf://you/private-llama/llama-server-cuda.tar.gz \\
         --based-on Qwen/Qwen3.6-35B-A3B --thinking on --out /workspace/run
@@ -43,6 +56,7 @@ import json
 import os
 import re
 import shlex
+import socket
 import subprocess
 import sys
 import tarfile
@@ -254,7 +268,19 @@ class Server:
         self.base = f"http://127.0.0.1:{port}"
         self.proc: subprocess.Popen | None = None
 
-    def start(self, timeout: float, say) -> None:
+    def taken(self) -> bool:
+        """something already answers on the port (an earlier llama-server?)"""
+        with socket.socket() as sk:
+            sk.settimeout(2)
+            return sk.connect_ex(("127.0.0.1", self.port)) == 0
+
+    def start(self, timeout: float, say, gguf: Path | None = None) -> None:
+        # 17b: a server already on the port would answer for this one — its
+        # file's answers under this file's sha256. Nothing starts
+        if self.taken():
+            raise SystemExit(f"something already answers on 127.0.0.1:{self.port} — an earlier "
+                             "llama-server? Stop it (pkill -f llama-server) or give another "
+                             "--port. Nothing was started")
         self.log.parent.mkdir(parents=True, exist_ok=True)
         fh = open(self.log, "ab")
         fh.write(f"\n===== {time.strftime('%Y-%m-%d %H:%M:%S')} starting =====\n".encode())
@@ -267,6 +293,17 @@ class Server:
                                  f":\n{self.tail(30)}")
             st, _ = _get(self.base + "/health")
             if st == 200:
+                # 17b: the one that answers is ours, and serves this file
+                if self.proc.poll() is not None:
+                    raise SystemExit(f"something answers on 127.0.0.1:{self.port}, but the "
+                                     f"llama-server started here has stopped (exit "
+                                     f"{self.proc.returncode}):\n{self.tail(30)}")
+                served = str(self.props().get("model_path") or "")
+                if gguf is not None and Path(served).name != Path(gguf).name:
+                    self.stop()
+                    raise SystemExit(f"the server on 127.0.0.1:{self.port} serves "
+                                     f"{Path(served).name or 'no file it names'}, not "
+                                     f"{Path(gguf).name}: nothing was asked")
                 say(f"llama-server is up ({time.time() - t0:.0f} s)")
                 return
             if time.time() - t0 > timeout:
@@ -325,15 +362,18 @@ def startup_log(path: Path, limit: int = 400) -> str:
 # ---------------------------------------------------------------------------
 
 def register_here(served_as: str, name: str, based_on: str, base: str, thinking: bool,
-                  how: str) -> dict:
-    """the served model, in this box's own database, as the board keeps one"""
+                  how: str, flags: list[str] | None = None, env: dict | None = None) -> dict:
+    """the served model, in this box's own database, as the board keeps one —
+    17b: with the launch it was given, which each task's setup records"""
     from service import db, served
     p = served.probe(base + "/v1")
     rec = {"id": served_as, "name": name, "base_url": base + "/v1", "key": "",
            "based_on": based_on, "how": how, "thinking": "on" if thinking else "off",
            "phone": False, "gguf_path": "", "gguf_flags": "", "gguf_setups": [],
            "pin": served.pin_of(p), "answered": p["answered"], "by": "remote_gguf.py",
-           "at": time.time(), "flags": "", "env": "", "speculative": p.get("speculative")}
+           "at": time.time(), "flags": shlex.join(flags or []),
+           "env": " ".join(f"{k}={v}" for k, v in sorted((env or {}).items())),
+           "speculative": p.get("speculative")}
     db.served_put(rec)
     served.write_meta(rec)
     return rec
@@ -465,6 +505,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--port", type=int, default=8090)
     ap.add_argument("--load-timeout", type=float, default=3600)
     ap.add_argument("--by", default="remote", help="who ran it, for the run's record")
+    ap.add_argument("--parity", action="store_true",
+                    help="17b: the parity check's 50 questions, thinking off and greedy, to "
+                         "--out/parity.jsonl — no bundle (scripts/frontier_parity.py compare)")
     a = ap.parse_args(argv)
     if not a.served_as.startswith("served/") or not re.fullmatch(r"served/[A-Za-z0-9._-]+",
                                                                  a.served_as):
@@ -518,6 +561,9 @@ def main(argv: list[str] | None = None) -> int:
     srv = unpack_server(tb, out / "server")
     env = server_env(srv, extra_env)
     ver = version_of(srv["bin"], env)
+    if a.parity:
+        # 17b: the parity check's questions, thinking off, whatever --thinking says
+        tasks, thinking = [fb.PARITY["task"]], False
     ctx = fb.slot_context(tasks, thinking)
     server = {"version": ver["text"], "build": ver["build"], "commit": ver["commit"],
               "binary_sha256": rb.sha256_file(srv["bin"]), "tarball_sha256": srv["tarball_sha256"],
@@ -525,6 +571,20 @@ def main(argv: list[str] | None = None) -> int:
               "argv": ["llama-server", "-m", gguf["name"], "--host", "127.0.0.1", "--port",
                        str(a.port), "-c", str(ctx * a.slots), "-np", str(a.slots), "-ngl", "99",
                        "--jinja", "--metrics", *flags]}
+    # 17b: one build, one launch in this --out: a resume with another binary,
+    # other flags or another environment would mix two setups' answers
+    setup = {"binary_sha256": server["binary_sha256"], "commit": ver["commit"],
+             "build": ver["build"], "flags": flags, "env": extra_env}
+    if state.get("setup") and state["setup"] != setup:
+        was = state["setup"]
+        diff = [k for k in setup if setup[k] != was.get(k)]
+        raise SystemExit(f"{out} holds answers made with another setup — its "
+                         + ", ".join(f"{k} {was.get(k)!r} then, {setup[k]!r} now" for k in diff)
+                         + ": they can't be mixed — start another --out, or give the same")
+    state["setup"] = setup
+    state.setdefault("slots", []).append({"session": int(state.get("sessions", 0)) + 1,
+                                          "slots": a.slots})
+    server["sessions_slots"] = state["slots"]
     state.update({"served_as": a.served_as, "thinking": thinking, "gguf_sha256": sha,
                   "started_at": state.get("started_at")
                   or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -538,7 +598,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # the questions, fetched before the GPU is spent: a gated set needs HF_TOKEN
     from service import config
-    for t in tasks:
+    for t in [] if a.parity else tasks:
         try:
             items = fb.load(t, config.BENCH_ROOT)
         except Exception as e:                          # noqa: BLE001 — said in one line
@@ -555,7 +615,7 @@ def main(argv: list[str] | None = None) -> int:
     status = "failed"
     rec = None
     try:
-        srv_proc.start(a.load_timeout, say)
+        srv_proc.start(a.load_timeout, say, gguf_path)
         props = srv_proc.props()
         tmpl = props.get("chat_template") or ""
         server["chat_template_sha256"] = (hashlib.sha256(tmpl.encode("utf-8")).hexdigest()
@@ -565,7 +625,14 @@ def main(argv: list[str] | None = None) -> int:
         rec = register_here(a.served_as, a.served_as.split("/", 1)[1], a.based_on,
                             srv_proc.base, thinking,
                             f"llama.cpp {ver['build'] or '?'} on {gpu.get('name') or 'a GPU'}: "
-                            + " ".join(server["argv"]))
+                            + " ".join(server["argv"]), flags, extra_env)
+        if a.parity:
+            from service import frontier as sf
+            dest = out / "parity.jsonl"
+            n = sf.parity_ask(rec, dest, lambda k, of: say(f"parity {k} of {of}"))
+            say(f"parity: {n} answers · {dest} — fetch it, then on the server: "
+                "scripts/frontier_parity.py compare <server's> <this>")
+            return 0
         sid = db.add(a.served_as, "instruct", SUITE, a.by, "run on a rented GPU (remote_gguf.py)",
                      thinking=thinking, tasks=tasks if len(tasks) < len(fb.TASKS) else None)
         watch = Watch(sid, say)

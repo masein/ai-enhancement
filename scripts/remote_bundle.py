@@ -70,6 +70,11 @@ PINNED_WORDS = {"torch": "torch", "torch_cuda": "torch's CUDA", "transformers": 
 SECRETS = ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN", "OPENROUTER_API_KEY", "LLM_API_KEY",
            "JUDGE_API_KEY", "EXAM_API_KEY", "SUBMIT_TOKEN", "VAST_API_KEY")
 MAX_BYTES = 2 * 1024 ** 3                  # a bundle is answers and a log: far less
+# 17b: and what it holds once unpacked, before any of it is read: one file at
+# most this, all of them at most that (a whole box's thinking answers to every
+# Frontier benchmark come to about 400 MB)
+MAX_MEMBER = 512 * 1024 ** 2
+MAX_UNPACKED = 1024 ** 3
 
 
 def refused(suite: str) -> str:
@@ -276,7 +281,19 @@ def read(path: Path) -> dict:
     files: dict[str, bytes] = {}
     try:
         with tarfile.open(path, "r:gz") as tar:
-            for m in tar.getmembers():
+            members = tar.getmembers()
+            # 17b: sizes from the headers, before a byte is read: a small file
+            # can unpack to a great deal
+            big = next((m for m in members if m.size > MAX_MEMBER), None)
+            if big is not None:
+                raise ValueError(f"{path.name}: {big.name} unpacks to {big.size / 1024 ** 2:,.0f} "
+                                 f"MB, more than a bundle's file can be "
+                                 f"({MAX_MEMBER // 1024 ** 2:,} MB)")
+            total = sum(m.size for m in members)
+            if total > MAX_UNPACKED:
+                raise ValueError(f"{path.name} unpacks to {total / 1024 ** 2:,.0f} MB, more than "
+                                 f"a bundle can be ({MAX_UNPACKED // 1024 ** 2:,} MB)")
+            for m in members:
                 name = m.name
                 if (not m.isfile() or not _SAFE.match(name) or name.startswith("/")
                         or ".." in Path(name).parts or "\\" in name or NEVER.search(name)):

@@ -405,39 +405,110 @@ the KV cache in q8_0 (`--flags "-ctk q8_0 -ctv q8_0 --flash-attn on"`):
 | ARC-AGI-2 (its prompts run to 30,000 tokens) | 98,304 | 5 |
 | any, thinking off | 6,144–40,960 | 8 |
 
-**The pilot first** (30 minutes, one box): `--only` each benchmark in turn with
-`--shard 1/40` (a handful of questions each), thinking on and off. Its lines
-give each benchmark's seconds an answer; the shards below come from them. Its
-bundles aren't imported: a shard of 40 waits for the other 39.
+## G1b. The pilot's first step: does the box answer as the server does?
+
+The box isn't the server: the whole model on the card, 8 slots, the KV cache in
+q8_0. Before anything else, the same 50 MMLU-Pro questions (`scripts/frontier.py`
+`PARITY`), thinking off and greedy, on both, each with its own launch.
+**Compared:** the letter each side reads from each reply (TIGER-Lab's
+extraction), and whether the replies are identical. **The same:** the same
+letter on at least 46 of the 50. Greedy decoding on two machines with other
+batch sizes, cache types and kernels isn't bit-for-bit the same, so whole
+replies may part: they are counted, not required. One build at a time, the
+phone build first.
+
+On the server, with the queue idle and the build served as it serves the
+board:
+
+```bash
+cd ~/benchmarks/aienh
+```
+
+```bash
+sudo docker compose exec -T bench python scripts/frontier_parity.py ask --as served/<phone-build> --out /home/masein/benchmarks/parity/phone-server.jsonl
+```
+
+On the box (G2's first three blocks: tmux, `cd /app`, the token), the same
+build with the full run's flags:
+
+```bash
+python scripts/remote_gguf.py --as served/<phone-build> --gguf hf://<you>/evalboard-private/Qwen3.6-35B-A3B-k4-LDA-UD-Q4_K_XL.gguf --server hf://<you>/evalboard-private/llama-server-cuda12.8.tar.gz --based-on Qwen/Qwen3.6-35B-A3B --thinking off --slots 8 --flags "-ctk q8_0 -ctv q8_0 --flash-attn on" --parity --out /workspace/parity-phone
+```
+
+Then on the server:
+
+```bash
+scp -i ~/.ssh/vast_ed25519 -P <port> root@<host>:/workspace/parity-phone/parity.jsonl ~/benchmarks/parity/phone-box.jsonl
+```
+
+```bash
+sudo docker compose exec -T bench python scripts/frontier_parity.py compare /home/masein/benchmarks/parity/phone-server.jsonl /home/masein/benchmarks/parity/phone-box.jsonl
+```
+
+It prints "The same: 48 of 50 read as the same letter …" or "Not the same: …".
+Not the same: run the box's parity again with the server's own launch
+(`--slots 1`, no `--flags`), into another `--out`. If that is the same, the
+box's cache type or slots are the difference; either way, stop and say so
+before the full run.
+
+**Then the paces** (30 minutes, the same box): `--only` each benchmark in
+turn with `--shard 1/40` (a handful of questions each), thinking on and off.
+Its lines give each benchmark's seconds an answer; the shards below come from
+them. Its bundles aren't imported: a shard of 40 waits for the other 39.
 
 ## G2. Run, under tmux
 
-On each box:
+On each box, one block at a time:
 
 ```bash
 tmux new -s f
-cd /app
-read -rs HF_TOKEN && export HF_TOKEN
-python scripts/remote_gguf.py --as served/<name> \
-  --gguf hf://<you>/evalboard-private/Qwen3.6-35B-A3B-k4-LDA-UD-Q4_K_XL.gguf \
-  --server hf://<you>/evalboard-private/llama-server-cuda12.8.tar.gz \
-  --based-on Qwen/Qwen3.6-35B-A3B --thinking on --slots 8 \
-  --env "LLAMA_MOE_ROUTE_MODE=lookahead LLAMA_MOE_ROUTE_LOOKAHEAD=1" \
-  --out /workspace/lda-on
 ```
+
+```bash
+cd /app
+```
+
+```bash
+read -rs HF_TOKEN && export HF_TOKEN
+```
+
+Type the token and press Enter: nothing shows, and nothing keeps it.
+
+Then **one command for each build**, each with that build's own launch — the
+import refuses a bundle whose routing variables or speculative-decoding flags
+aren't the ones registered for its `--as` (memory, context, slots, the cache
+type, flash attention and threads may differ: the parity check covers them).
+
+The **phone build** (k4-LDA), registered as "routing local (no lookahead)":
+no routing variables.
+
+```bash
+python scripts/remote_gguf.py --as served/<phone-build> --gguf hf://<you>/evalboard-private/Qwen3.6-35B-A3B-k4-LDA-UD-Q4_K_XL.gguf --server hf://<you>/evalboard-private/llama-server-cuda12.8.tar.gz --based-on Qwen/Qwen3.6-35B-A3B --thinking on --slots 8 --flags "-ctk q8_0 -ctv q8_0 --flash-attn on" --out /workspace/phone-on
+```
+
+The **original build** (k=8): none either.
+
+```bash
+python scripts/remote_gguf.py --as served/<original-build> --gguf hf://<you>/evalboard-private/<original-build-file>.gguf --server hf://<you>/evalboard-private/llama-server-cuda12.8.tar.gz --based-on Qwen/Qwen3.6-35B-A3B --thinking on --slots 8 --flags "-ctk q8_0 -ctv q8_0 --flash-attn on" --out /workspace/orig-on
+```
+
+A setup registered **with lookahead** gets its row only from a box run with
+its own variables, `--env "LLAMA_MOE_ROUTE_MODE=lookahead LLAMA_MOE_ROUTE_LOOKAHEAD=1"`,
+and its own `--as`.
 
 - `--as`: the served model's id on the board (its page's address, `served/…`).
   Its row gets the answers; thinking on goes on its "· thinking" row.
 - `--based-on`: what the board says it is based on. It picks the card's
   sampling, and the import checks the box asked as the board would.
-- `--env` and `--flags`: the build's own setup. The LDA build's route
-  variables, as on the server; none for the original build. No `--cpu-moe`:
-  the card holds the whole model.
+- No `--cpu-moe`: the card holds the whole model.
 - `--shard i/n` splits each benchmark across n boxes, one `--out` each.
 
 It prints the file's sha256, the build and the GPU, each benchmark's share,
 then a line as the run moves: answers, the pace, the time left. If the box
-stops, run **the same command** again: it asks only what is not answered.
+stops, run **the same command** again: it asks only what is not answered, and
+refuses another build, other flags or another environment in that `--out`.
+Something already answering on its port (an earlier llama-server) is
+refused before anything starts.
 
 ## G3. Fetch, from the server
 
@@ -453,10 +524,14 @@ sudo docker compose exec -T bench python scripts/import_remote.py ~/benchmarks/b
 ```
 
 With `--file-sha256 <the sha256 from G0>` the first time, if the board has no
-hash of the file. It checks the served model, the file's sha256, each
+hash of the file. It checks the served model, the file's sha256, the launch
+against the one registered (routing and speculative decoding), each
 benchmark's protocol and dataset revision, the budget, sampling and thinking
-switch, and that the answers cover their questions (a shard's: exactly its
-own). A shard waits until the others are in. Then each benchmark is scored by
+switch, every answer line, that thinking was on or off as asked, and that the
+answers cover their questions (a shard's: exactly its own, made with the same
+setup as its task's other shards). Each benchmark is scored apart first: a
+bundle that fails a check, or a task that can't be scored, leaves the row as
+it was. A shard waits until the others are in. Then each benchmark is scored by
 code, its result says "run on a rented GPU (<the GPU>)", and the Runs list gets
 the import with the box's log.
 
@@ -477,7 +552,12 @@ who graded it, with which prompt (MATH and OTIS: the code's number beside it).
 
 ## G5. The full run: which box runs what
 
-Each build (the original and the LDA one) the same way, one `--out` a box.
+Each build the same way, one `--out` a box: G2's command for that build — the
+phone build's with no routing variables, the original's with none — with the
+box's `--only`, `--shard` and its own `--out` (`/workspace/phone-mmlu-1`,
+`/workspace/orig-hle-2`, …). Every shard of a benchmark is run with the same
+tarball, flags and environment: the import refuses to merge shards that
+differ.
 Before the pilot's paces, from each benchmark's answers and an assumed length
 for each (below), at about 1,400 tokens a second on one 5090:
 
@@ -499,14 +579,13 @@ The same pipeline on a model Epoch AI has measured, so a gap between our
 number and Epoch's is the method's: GPQA Diamond and OTIS Mock AIME, with the
 reasoning Epoch ran it with (the model version in the board's Epoch import
 says which; thinking on unless it says otherwise), from the **BF16** GGUF (no
-quantisation) on one 80–96 GB card (an H100 80 GB, or an RTX PRO 6000):
+quantisation, 50.5 GB) on one 80–96 GB card (an H100 80 GB, or an RTX PRO
+6000), with **100 GB of disk**:
+
+After G2's first three blocks (tmux, `cd /app`, the token):
 
 ```bash
-python scripts/remote_gguf.py --as served/gemma-4-26b-a4b-bf16 \
-  --gguf hf://ggml-org/gemma-4-26B-A4B-it-GGUF@bb4531cda34d1ea09d9814959ed4d5833cf2a4c8/gemma-4-26B-A4B-it-BF16.gguf \
-  --server hf://<you>/evalboard-private/llama-server-cuda12.8.tar.gz \
-  --based-on google/gemma-4-26b-a4b-it --thinking on --slots 8 \
-  --only gpqa_diamond_epoch --only otis_aime_epoch --out /workspace/gemma-cal
+python scripts/remote_gguf.py --as served/gemma-4-26b-a4b-bf16 --gguf hf://ggml-org/gemma-4-26B-A4B-it-GGUF@bb4531cda34d1ea09d9814959ed4d5833cf2a4c8/gemma-4-26B-A4B-it-BF16.gguf --server hf://<you>/evalboard-private/llama-server-cuda12.8.tar.gz --based-on google/gemma-4-26b-a4b-it --thinking on --slots 8 --only gpqa_diamond_epoch --only otis_aime_epoch --out /workspace/gemma-cal
 ```
 
 The BF16 file is public, in one piece (ggml-org's, pinned to its commit): the
@@ -516,9 +595,16 @@ parts' names and sha256s.) Check its first answers carry their thinking
 (`answers.jsonl` holds `<think>`): Gemma's template is told to think with
 `chat_template_kwargs`, and a template that ignores it answers without. If
 they don't, stop the box and say so before the run. The board doesn't serve
-Gemma 4, so its first import registers it: `--register "Gemma 4 26B A4B (BF16,
-rented GPU)"`. Then alias it to Epoch's entry for the model on the Frontier
-view, so the cell reads "measured here … · Epoch …".
+Gemma 4, so its first import registers it, with the file's sha256 as Hugging
+Face publishes it (the box's first line prints the one it hashed: they must
+agree):
+
+```bash
+sudo docker compose exec -T bench python scripts/import_remote.py ~/benchmarks/bundles/frontier-served__gemma-4-26b-a4b-bf16-thinking-on.tar.gz --by masein --register "Gemma 4 26B A4B (BF16, rented GPU)" --file-sha256 463c88dbc5f692e812013e6449253eae4cff0fc10fbbd8d0f038d3690f03eb72
+```
+
+Then alias it to Epoch's entry for the model on the Frontier view, so the cell
+reads "measured here … · Epoch …".
 
 **What counts as a match**, said before the run: our number and Epoch's
 (73.2 on GPQA Diamond and 82.2 on OTIS Mock AIME in the board's import) differ
