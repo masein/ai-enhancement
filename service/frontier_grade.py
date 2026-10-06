@@ -380,10 +380,26 @@ def _start(by: str) -> dict:
     # another was chosen since) sends nothing more: its unsent requests are
     # cancelled, and go to the grader pinned now, with what waits. 17d: those
     # in flight land first — they are never asked twice
-    n_moved = sum(_cancel_unsent(p, why) for p, why in moved)
+    cancelled = {p["batch_id"]: _cancel_unsent(p, why) for p, why in moved}
+    skipped = []
     if moved:
         _settle([p["batch_id"] for p, _ in moved])
         work = waiting()
+        # 17e: a slot new to the work — another's batch landed with replies
+        # to ask again while this waited — pinned now (it raised KeyError: a
+        # 500 after the stop was lifted); one whose pin moved waits, said
+        for slot in sorted({w["slot"] for w in work} - set(pins)):
+            pin = _pinned(slot, by)
+            drift = ai_models.drifted(pin)
+            if drift:
+                skipped.append(f"{fg.GRADERS[slot]['label']}: {drift}")
+                continue
+            pins[slot] = pin
+            _reset_tries(slot, pin)
+        work = [w for w in work if w["slot"] in pins]
+    # 17e: moved are those still cancelled once the requests in flight landed
+    # (Start said 6 when 4 moved: 2 were in flight, and landed)
+    n_moved = sum(_still_cancelled(b, ids) for b, ids in cancelled.items())
     sent = []
     for w in work:
         bid = _submit(w, pins[w["slot"]], by)
@@ -397,7 +413,8 @@ def _start(by: str) -> dict:
             be.status(p["batch_id"])
         except llm.LLMError:
             pass
-    return {"sent": sent, "pending": len(pending()), "moved": n_moved}
+    return {"sent": sent, "pending": len(pending()), "moved": n_moved,
+            **({"skipped": skipped} if skipped else {})}
 
 
 SETTLE_S = 30.0                         # how long Start waits for requests in flight
@@ -430,6 +447,40 @@ def _settle(batch_ids: list[str], timeout: float | None = None) -> bool:
     return not any(_working(b) for b in batch_ids)
 
 
+@contextlib.contextmanager
+def grades_lock(d: Path):
+    """17e: one task's grades.json read, changed and written by one hand at a
+    time — choosing a grader while the poller recorded a batch overwrote the
+    batch's grades, and the next Start bought them again"""
+    d.mkdir(parents=True, exist_ok=True)
+    fd = os.open(d / "grades.lock", os.O_RDWR | os.O_CREAT, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+
+
+def _write_grades(d: Path, g: dict) -> None:
+    tmp = d / (sf.GRADES + ".part")
+    tmp.write_text(json.dumps(g, indent=1, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(d / sf.GRADES)
+
+
+def _permanent(error: str) -> bool:
+    """17e: a refusal that will never change for this answer — too long (HTTP
+    400, 413), its words (403, moderation), unprocessable (422): a try, where
+    one that may pass another time (unreached, a limit, a rate, a provider
+    down, the data policy) isn't. An answer always refused was sent again on
+    every Start, and its benchmark never scored"""
+    m = llm._HTTP_STATUS.search(error or "")
+    if not m:
+        return False
+    status = int(m.group(1))
+    return status in (400, 403, 413, 422) and ai_models.refusal(status, error)[0] == "refused"
+
+
 def _reset_tries(slot: str, pin: dict) -> None:
     """17d: another grader or prompt asks again what an earlier one gave no
     grade — the tries count again from none, and its scores wait"""
@@ -438,19 +489,19 @@ def _reset_tries(slot: str, pin: dict) -> None:
     root = Path(config.OUT_DIR)
     task = fg.GRADERS[slot]["task"]
     for d in sorted(root.glob(f"*/{task}_0shot/{sf.SUB}")) if root.is_dir() else []:
-        g = sf.read_grades(d)
-        ref = g.get("refused") or {}
-        changed = False
-        for x in ref.values():
-            if int(x.get("tries") or 0) and (x.get("by"), x.get("prompt_sha256")) != (version,
-                                                                                         sha):
-                x["tries"] = 0
-                changed = True
+        with grades_lock(d):
+            g = sf.read_grades(d)
+            ref = g.get("refused") or {}
+            changed = False
+            for x in ref.values():
+                if int(x.get("tries") or 0) and (x.get("by"), x.get("prompt_sha256")) != (
+                        version, sha):
+                    x["tries"] = 0
+                    changed = True
+            if changed:
+                _write_grades(d, g)
         if not changed:
             continue
-        tmp = d / (sf.GRADES + ".part")
-        tmp.write_text(json.dumps(g, indent=1, ensure_ascii=False), encoding="utf-8")
-        tmp.replace(d / sf.GRADES)
         row = d.parent.parent
         rec = served.get(_model_of(row)[1])
         if rec:
@@ -460,20 +511,32 @@ def _reset_tries(slot: str, pin: dict) -> None:
                 print(f"[frontier grading] {row.name} {task}: scoring failed: {e!r}")
 
 
-def _cancel_unsent(p: dict, why: str) -> int:
-    """a batch's requests not yet sent, cancelled — recorded so, never failed"""
+def _cancel_unsent(p: dict, why: str) -> list[str]:
+    """a batch's requests not yet sent, cancelled — recorded so, never failed.
+    17e: the ids it cancelled (some may still be in flight, and land)"""
     d = llm.batch_dir(p["batch_id"])
     if d is None:
-        return 0
+        return []
     landed = set(llm.LocalOpenAI._results(d))
     unsent = [r["custom_id"] for r in llm.LocalOpenAI._requests(d)
               if r["custom_id"] not in landed]
     if not unsent:
-        return 0
+        return []
     try:
-        return batch_backend(p["batch_id"]).cancel(p["batch_id"], unsent, why)
+        batch_backend(p["batch_id"]).cancel(p["batch_id"], unsent, why)
     except llm.LLMError:
+        return []
+    return unsent
+
+
+def _still_cancelled(batch_id: str, ids: list[str]) -> int:
+    """17e: of `ids`, those whose last word is the cancel — a reply that landed
+    beats it (service/llm.py)"""
+    d = llm.batch_dir(batch_id)
+    if d is None or not ids:
         return 0
+    res = llm.LocalOpenAI._results(d)
+    return sum(1 for c in ids if (res.get(c) or {}).get("cancelled"))
 
 
 def grader_record(slot: str, pin: dict, by: str = "", prompt_sha: str = "") -> dict:
@@ -495,6 +558,19 @@ def finish(batch_id: str, results: dict) -> int:
     row = Path(config.OUT_DIR) / meta["row"]
     d = sf.task_dir(row, task)
     items = {it["id"]: it for it in fb.load(task, config.BENCH_ROOT)}
+    with grades_lock(d):
+        n = _record(d, slot, pin, meta, items, results)
+    rec_served = served.get(meta.get("base") or meta.get("model") or "")
+    if rec_served:
+        try:
+            sf.score_task(row, task, rec_served)
+        except Exception as e:                      # noqa: BLE001 — the grades are kept
+            print(f"[frontier grading] {meta['row']} {task}: scoring failed: {e!r}")
+    return n
+
+
+def _record(d: Path, slot: str, pin: dict, meta: dict, items: dict, results: dict) -> int:
+    """a batch's replies into grades.json, under its lock"""
     g = sf.read_grades(d)
     g.setdefault("items", {})
     g.setdefault("refused", {})
@@ -530,27 +606,24 @@ def finish(batch_id: str, results: dict) -> int:
                 # provider that refused, timed out or wasn't reached isn't; and
                 # another grader or prompt starts the count again
                 g["refused"][key] = _refusal(g["refused"].get(key), why, rec, sent[key],
-                                             counts=not res.error,
+                                             counts=not res.error or _permanent(res.error),
                                              kind="error" if res.error else "unread")
                 continue
+            was = g["refused"].get(key) or {}
+            # 17e: a grade where another grader or prompt gave none says so —
+            # a second grader's top-up (service/frontier.py graders_of)
+            after = ({"after": {"by": was.get("by"), "prompt_sha256": was.get("prompt_sha256")}}
+                     if was and (was.get("by"), was.get("prompt_sha256"))
+                     != (rec["version"], rec["prompt_sha256"]) else {})
             g["items"][key] = {**got, "by": rec["version"], "prompt_sha256": rec["prompt_sha256"],
-                               "answer_sha256": sent[key], "at": time.time()}
+                               "answer_sha256": sent[key], "at": time.time(), **after}
             g["refused"].pop(key, None)
             n += 1
         except Exception as e:                      # noqa: BLE001 — that answer only
             g["refused"][key] = _refusal(g["refused"].get(key),
                                          f"its reply couldn't be read: {e!r}"[:300], rec,
                                          sent.get(key), counts=True, kind="unread")
-    d.mkdir(parents=True, exist_ok=True)
-    tmp = d / (sf.GRADES + ".part")
-    tmp.write_text(json.dumps(g, indent=1, ensure_ascii=False), encoding="utf-8")
-    tmp.replace(d / sf.GRADES)
-    rec_served = served.get(meta.get("base") or meta.get("model") or "")
-    if rec_served:
-        try:
-            sf.score_task(row, task, rec_served)
-        except Exception as e:                      # noqa: BLE001 — the grades are kept
-            print(f"[frontier grading] {meta['row']} {task}: scoring failed: {e!r}")
+    _write_grades(d, g)
     return n
 
 

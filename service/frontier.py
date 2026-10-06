@@ -342,8 +342,12 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
         with ThreadPoolExecutor(max_workers=served.concurrency(rec)) as pool:
             list(pool.map(one, again))
         stop_if_halted()
-        if failed and count["n"] == have:
-            # nothing at all answered this run: the server, not the questions
+        if failed and count["n"] == 0:
+            # nothing at all answered, here or before: the server, not the
+            # questions. 17e: a resume that answered nothing, with answers
+            # from before, asks the server one of those first (below) — a
+            # benchmark whose last question truly fails stopped here on every
+            # resume
             why = next(iter(failed.values()))
             raise served.ServerStopped(count["n"], total, why, refused=(
                 f"the server failed on every question it was asked ({len(failed)}), asked its "
@@ -644,7 +648,7 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
         _unwrite(d, task)
         return {"no_score": (
             f"{spec['label']}: its grader gave no grade on {ungraded:,} of the {seen:,} answers "
-            f"it was sent ({ungraded / seen:.0%}, more than {UNGRADED_SHARE:.0%}) — it isn't "
+            f"it was sent ({_pct(ungraded / seen)}, more than {UNGRADED_SHARE:.0%}) — it isn't "
             "answering in its form: no score; choose another grader on AI models"),
             "ungraded": ungraded, "of": seen, "label": spec["label"]}
     code = (None if spec.get("grader") else
@@ -687,10 +691,14 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
               "scored_by": ("grader" if spec.get("grader") else "code, then Epoch's model check"
                             if spec.get("look") and not waiting and looked else "code"),
               "code": code, "grader": g,
-              # 17b: more than one grader or prompt behind the score: said, not final
-              **({"graders": graders} if len(graders) > 1 else {}),
+              # 17b: more than one grader or prompt behind the score: said, not final.
+              # 17e: but a second that only graded what the first gave no
+              # grade (a top-up) is final, named beside the first
+              **({"graders": graders} if len(graders) > 1 and not (g or {}).get("topup")
+                 else {}),
               # 17d: and a score with an answer its grader gave no grade isn't final
-              **({"final": False} if len(graders) > 1 or ungraded else {}),
+              **({"final": False} if (len(graders) > 1 and not (g or {}).get("topup"))
+                 or ungraded else {}),
               **({"look": {"done": looked, "waiting": waiting}} if spec.get("look") else {})}
     res = {"alias": task, "acc,none": page["score"], "acc_stderr,none": page["se"]}
     if spec.get("look") and code:
@@ -717,20 +725,40 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
 def graders_of(d: Path, flat: list[dict]) -> tuple[dict | None, list[dict]]:
     """17b: who graded the answers the score counts — (the one grader and
     prompt, or None; every one, each with how many it graded). A grade keeps
-    its grader's version and its prompt's sha256"""
+    its grader's version and its prompt's sha256. 17e: a second grader that
+    graded only answers the first gave no grade, UNGRADED_SHARE of them at
+    most, is a top-up — the first is the score's grader, the top-up named
+    with it ({..., "topup": {version, prompt_sha256, n}})"""
     used: dict = {}
+    after: dict = {}
     for r in flat:
         gr = r.get("grade")
         if gr:
             k = (gr.get("by"), gr.get("prompt_sha256"))
             used[k] = used.get(k, 0) + 1
+            was = gr.get("after") or {}
+            after.setdefault(k, set()).add((was.get("by"), was.get("prompt_sha256")))
     known = {(x.get("version"), x.get("prompt_sha256")): x
              for x in read_grades(d).get("graders") or []}
     every = [{**known.get(k, {"version": k[0], "prompt_sha256": k[1]}), "n": n}
              for k, n in sorted(used.items(), key=lambda kv: -kv[1])]
     if len(every) == 1:
         return {k: v for k, v in every[0].items() if k != "n"}, every
+    if len(every) == 2:
+        main, top = every
+        mk = (main.get("version"), main.get("prompt_sha256"))
+        tk = (top.get("version"), top.get("prompt_sha256"))
+        if after.get(tk) == {mk} and top["n"] <= UNGRADED_SHARE * (main["n"] + top["n"]):
+            return ({**{k: v for k, v in main.items() if k != "n"},
+                     "topup": {k: top.get(k) for k in ("version", "prompt_sha256",
+                                                       "prompt_words", "n")}}, every)
     return None, every
+
+
+def _pct(x: float) -> str:
+    """17e: a share in words that never rounds onto the line it is set beside —
+    51 of 1,000 is 5.1%, not "5%, more than 5%" """
+    return f"{x:.0%}" if round(x * 100) != round(UNGRADED_SHARE * 100) else f"{x:.1%}"
 
 
 def _unwrite(d: Path, task: str) -> None:
@@ -770,7 +798,10 @@ def words(task: str, sc: dict) -> str:
     if (sc.get("look") or {}).get("waiting"):
         bits.append(f"code's score: Epoch's model check not run on {sc['look']['waiting']:,}")
     if sc.get("final") is False:
-        bits.append(f"graded by {len(sc.get('graders') or [])} graders or prompts: not final")
+        # 17e: "graded by 0 graders" said for one grader with ungraded answers
+        n = len(sc.get("graders") or [])
+        bits.append(f"graded by {n} graders or prompts: not final" if n > 1 else
+                    "not final until those get a grade (another grader on AI models)")
     return " · ".join(bits)
 
 

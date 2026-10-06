@@ -166,13 +166,17 @@ def lone(text: str) -> str:
 
 
 def _json_fields(text: str) -> dict | None:
-    """the reply's JSON object, when it is one"""
+    """the reply's JSON object, when the whole reply is one (a code fence
+    around it allowed) — 17e: never an object quoted in a reply of text, which
+    beat the verdict on its own line"""
     import json
-    a, b = text.find("{"), text.rfind("}")
-    if a < 0 or b <= a:
+    t = text.strip()
+    m = re.fullmatch(r"```(?:json)?\s*(.*?)\s*```", t, re.S | re.I)
+    t = m.group(1).strip() if m else t
+    if not (t.startswith("{") and t.endswith("}")):
         return None
     try:
-        got = json.loads(text[a:b + 1])
+        got = json.loads(t)
     except ValueError:
         return None
     return got if isinstance(got, dict) else None

@@ -239,6 +239,7 @@ def test_5_an_off_row_with_thinking_is_not_scored(svc, monkeypatch):  # noqa: F8
 
 
 def test_6_the_parity_check_compares_the_server_and_the_box(box, monkeypatch, svc):  # noqa: F811
+    monkeypatch.setitem(fb.PARITY, "floor", 50)         # 17e: 500 on a real pair
     items = [{"id": str(k), "question": f"Q{k}?", "options": ["w", "x", "y"],
               "answer": "A", "category": "law"} for k in range(60)]
     monkeypatch.setattr(fb, "_fetch", lambda task: {"items": items, "extra": {"shots": {}}})
@@ -265,8 +266,8 @@ def test_6_the_parity_check_compares_the_server_and_the_box(box, monkeypatch, sv
     got = fb.parity_compare(server_lines, box_lines)
     # 17d: decided on accuracy — the same questions right on both sides
     assert got["ok"] and got["letters"] == 50 and got["identical"] == 0
-    assert got["words"].startswith("The same: the box answers 100.0% right and the server "
-                                   "100.0% on the same 50 questions")
+    assert got["words"].startswith("The same: the box answers 100.0% right (the mean of its "
+                                   "two runs) and the server 100.0% on the same 50 questions")
     # ten the server got wrong: twenty points apart, not the same
     other = [{**r, "answer": "the answer is (B)"} if i < 10 else r
              for i, r in enumerate(server_lines)]
