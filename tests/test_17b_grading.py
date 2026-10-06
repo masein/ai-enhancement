@@ -261,7 +261,9 @@ def test_23_hle_is_graded_end_to_end_by_the_last_correct_and_an_unread_reply_ask
     assert g["items"]["h0#0"]["ok"] is True and g["items"]["h0#0"]["confidence"] == 90
     assert g["items"]["h1#0"]["ok"] is False and "read as X" in g["items"]["h1#0"]["words"]
     assert g["items"]["h2#0"]["ok"] is True
-    assert "h3#0" not in g["items"] and "I can't tell" in g["refused"]["h3#0"]["words"]
+    # 17c: no reply on the card for HLE (the judge may quote its gated question)
+    assert "h3#0" not in g["items"]
+    assert g["refused"]["h3#0"]["words"] == "the grader's reply isn't a grade"
     assert results("hle_text_cais") is None                     # one waits
     said["h3"] = "correct: yes"
     fgr.start("masein")
@@ -423,14 +425,17 @@ def test_27_after_stop_or_at_the_limit_it_says_why_it_waits_and_carry_on_sends_t
     llm_poller.tick()
     p = page(svc)
     # the one out when Stop was pressed landed; four wait
-    assert p["stopped"] and p["waits"] == ["Stopped by masein: 4 answers wait to be sent"]
+    assert p["stopped"] and p["waits"] == [{"why": "Stopped by masein: 4 answers wait to be "
+                                                   "sent", "carry": "Carry on sends the rest."}]
     n = len(seen)
     time.sleep(0.3)
     assert len(seen) == n                   # nothing more goes
     # the month's limit: said, and Carry on refused with it
     limit = "this month's AI spend has reached its limit"
     monkeypatch.setattr(ai_models, "over_limit", lambda: limit)
-    assert limit in page(svc)["waits"]
+    # 17c: at the limit Carry on can't send: said so, not "Carry on sends the rest"
+    assert {"why": limit, "carry": "Carry on waits until the limit is raised (AI models ▸ the "
+                                   "month's limit) or the month turns."} in page(svc)["waits"]
     with pytest.raises(ValueError, match="its limit"):
         fgr.start("masein")
     monkeypatch.setattr(ai_models, "over_limit", lambda: "")

@@ -146,7 +146,12 @@ def test_start_pressed_sends_once_and_stop_then_carry_on(live, page, monkeypatch
     gate.set()
     page.wait_for_selector("[data-frontier-waits]")
     assert "Stopped by masein: " in card.locator("[data-frontier-waits]").inner_text()
-    assert card.locator("[data-frontier-start]").inner_text() == "Carry on"
+    # 17c: Carry on says what it sends costs, and the dry run what is held
+    assert card.locator("[data-frontier-start]").inner_text().startswith("Carry on: about $")
+    held = card.locator("[data-frontier-estimate='0']").inner_text()
+    assert held.startswith("Nothing new waits for a grader: ") and "held in the batches out" in held
+    assert card.locator("[data-frontier-wait]").first.inner_text().endswith(
+        " — Carry on sends the rest.")
     assert card.locator("[data-frontier-run]").get_attribute("data-frontier-run") == "held"
     SCREENS.mkdir(parents=True, exist_ok=True)
     steady_shot(card, SCREENS / "ai-models-grading-stopped.png")

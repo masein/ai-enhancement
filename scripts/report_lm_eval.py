@@ -24281,6 +24281,8 @@ function frontierGradingCard() {
     })));
   const labelOf = s => ((G.graders || []).find(g => g.slot === s) || {}).label || s;
   const rows = E.rows || [];
+  // 17c: what the batches out still hold — after Stop, the limit, a halt
+  const H = G.held || {};
   const dry = rows.length ? el('div', { class: 'mmpwrap' }, el('table', { class: 'mmptab',
       'data-frontier-estimate': '1' },
     el('thead', {}, el('tr', {}, ['Grader', 'Benchmark', 'Model', 'Answers', 'Cost']
@@ -24290,11 +24292,18 @@ function frontierGradingCard() {
       el('td', { text: r.model }), el('td', { class: 'num', text: n(r.answers) }),
       el('td', { class: 'num', text: r.usd == null ? 'once pinned' : usd(r.usd) }))))))
     : el('p', { class: 'small se', 'data-frontier-estimate': '0',
-      text: 'Nothing waits for a grader: every Frontier answer on file is scored.' });
+      text: H.answers ? `Nothing new waits for a grader: ${n(H.answers)} answer`
+        + `${H.answers === 1 ? ' is' : 's are'} held in the batches out, unsent — about `
+        + `${usd(H.usd)}, which Carry on sends.`
+        : 'Nothing waits for a grader: every Frontier answer on file is scored.' });
   const running = (G.running || []).length, stopped = !!G.stopped;
   const why = !G.has_key ? 'OpenRouter has no key on this server (OPENROUTER_API_KEY)'
     : E.over_limit || '';
   const cost = E.usd_known ? usd(E.usd) : `${usd(E.usd)} and the unpriced`;
+  // 17c: Carry on's cost is what it sends — the held answers, and any new
+  const carry = (E.answers ? E.usd : 0) + (H.answers ? H.usd : 0);
+  const carryCost = (E.answers ? E.usd_known : true) && (H.answers ? H.usd_known : true)
+    ? usd(carry) : `${usd(carry)} and the unpriced`;
   // 17b: why what is out sends nothing now — Stop, a run of refusals, the
   // limit — and Carry on beside it; a press out disables both buttons
   const waits = G.waits || [], held = running && (stopped || waits.length > 0);
@@ -24321,14 +24330,17 @@ function frontierGradingCard() {
         ? 'held' : running ? 'running' : stopped ? 'stopped' : 'idle' },
       E.answers || held ? el('button', { class: 'primary', 'data-frontier-start': '1',
         disabled: why || busy ? '' : null, title: why || null,
-        text: busy === 'start' ? 'Sending…' : (stopped || held ? 'Carry on' : 'Start grading')
-          + (E.answers ? `: about ${cost}` : ''),
+        text: busy === 'start' ? 'Sending…' : stopped || held
+          ? 'Carry on' + (E.answers || H.answers ? `: about ${carryCost}` : '')
+          : 'Start grading' + (E.answers ? `: about ${cost}` : ''),
         onclick: () => frontierGradingAct('start') }) : '',
       running && !stopped ? el('button', { class: 'quiet', 'data-frontier-stop': '1',
         text: busy === 'stop' ? 'Stopping…' : 'Stop', disabled: busy ? '' : null,
         onclick: () => frontierGradingAct('stop') }) : '') : '',
     waits.length ? el('div', { class: 'small', 'data-frontier-waits': String(waits.length) },
-      ...waits.map(w => el('p', { class: 'small warntext', text: w + ' — Carry on sends the rest.' })))
+      // 17c: each reason with what Carry on does about it — or can't
+      ...waits.map(w => el('p', { class: 'small warntext', 'data-frontier-wait': '1',
+        text: (w.why || w) + (w.carry ? ' — ' + w.carry : '') })))
       : '',
     why && (E.answers || held) ? el('p', { class: 'small warntext', 'data-frontier-why': '1',
       text: why }) : '',
@@ -24341,8 +24353,12 @@ function frontierGradingCard() {
     ...(G.refused || []).map(r => el('p', { class: 'small warntext',
       'data-frontier-refused': `${r.slot}|${r.row}`,
       text: `${labelOf(r.slot)}: ${n(r.n)} answer${r.n === 1 ? '' : 's'} of `
-        + `${r.row.replace('__', '/')} not graded — ${r.words} — Start asks `
-        + `${r.n === 1 ? 'it' : 'them'} again.` })),
+        + `${r.row.replace('__', '/')} not graded — ${r.words}`
+        // 17c: asked again G.tries times, then ungraded for good, counted wrong
+        + (r.ungraded ? ` · ${n(r.ungraded)} after ${G.tries} tries: ungraded, counted wrong`
+          : '')
+        + (r.n - (r.ungraded || 0) ? ` — Start asks ${r.n - (r.ungraded || 0) === 1 ? 'it'
+          : `${n(r.n - (r.ungraded || 0))} of them`} again.` : '.') })),
     G.probe_words ? el('p', { class: 'small se', 'data-frontier-probe': '1',
       text: G.probe_words }) : '');
 }

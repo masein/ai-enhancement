@@ -429,6 +429,11 @@ def tick() -> int:
             print(f"[llm] {r['batch_id']}: {e} — trying again next tick")
             continue
         except llm.LLMError as e:
+            if r["kind"] == frontier_grade.KIND:
+                # 17c: a grading batch's replies on disk are paid for — with no
+                # key it waits for one (the card says so), never failed
+                print(f"[llm] {r['batch_id']}: {e} — kept, waiting")
+                continue
             db.batch_finish(r["batch_id"], "failed", f"LLM unavailable: {e}")
             _mark_failed(r, f"LLM unavailable: {e}")
             continue
@@ -483,6 +488,11 @@ def tick() -> int:
             print(f"[llm] {r['batch_id']}: {e} — kept until it is")
             continue
         except Exception as e:                       # noqa: BLE001 — one batch must not kill the loop
+            if r["kind"] == frontier_grade.KIND and frontier_grade.retry_finish(r["batch_id"], e):
+                # 17c: its replies are paid for: recorded at the next poll, not dropped
+                print(f"[llm] {r['batch_id']}: its replies couldn't be recorded ({e!r}) — "
+                      "trying again next tick")
+                continue
             traceback.print_exc()
             db.batch_finish(r["batch_id"], "failed", repr(e)[:400])
             _mark_failed(r, repr(e))

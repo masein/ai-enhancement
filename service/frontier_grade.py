@@ -64,6 +64,11 @@ CHARS_A_TOKEN = 4                      # the dry run's count of a prompt, before
 PROBE_WORDS = ("Choosing a grader asks each of its providers one token first, to check it "
                "keeps no prompt (a fraction of a cent each), counted in this month's spend.")
 _START = threading.Lock()
+# 17c: an answer whose reply was no grade this many times is listed as
+# ungraded (counted wrong) and never sent again; a batch whose replies can't be
+# recorded is tried this many times before it fails
+GRADE_TRIES = sf.GRADE_TRIES
+FINISH_TRIES = 30                       # about half an hour of polls (LLM_POLL_S, 60 s)
 
 
 class GraderChat(llm.OpenRouterChat):
@@ -166,10 +171,22 @@ def _model_of(row: Path) -> tuple[str, str]:
     return mid, m.get("base_model") or mid.replace(" · thinking", "")
 
 
+def _cancelled(batch_id: str) -> set[str]:
+    """17c: the answers of a batch whose requests were cancelled, unsent"""
+    d = llm.batch_dir(batch_id)
+    try:
+        ids = json.loads((d / "cancelled.json").read_text(encoding="utf-8")) if d else []
+    except (OSError, ValueError):
+        ids = []
+    return {c.split(":", 1)[1] for c in ids if ":" in c}
+
+
 def waiting() -> list[dict]:
     """every row's answers a grader is still to see, by benchmark — those out
-    in a batch now left out: [{slot, task, row, model, base, items}]"""
-    out_now = {(p["row"], p["task"], k) for p in pending() for k in p.get("keys") or []}
+    in a batch now left out (17c: but not those cancelled from it, unsent):
+    [{slot, task, row, model, base, items}]"""
+    out_now = {(p["row"], p["task"], k) for p in pending()
+               for k in set(p.get("keys") or []) - _cancelled(p["batch_id"])}
     got = []
     root = Path(config.OUT_DIR)
     for slot, g in fg.GRADERS.items():
@@ -346,6 +363,24 @@ def _start(by: str) -> dict:
         if drift:
             raise ValueError(f"{fg.GRADERS[slot]['label']}: {drift}")
     (gdir() / "stopped.json").unlink(missing_ok=True)
+    # 17c: a batch out whose grader moved (OpenRouter repointed its id, or
+    # another was chosen since) sends nothing more: its unsent requests are
+    # cancelled, and go to the grader pinned now, with what waits
+    moved = 0
+    for p in pending():
+        now = chosen(p["slot"]) or {}
+        why = ai_models.drifted(p["pin"]) or (
+            "another grader was chosen" if now and now.get("version") != p["pin"].get("version")
+            else "")
+        if why:
+            moved += _cancel_unsent(p, why)
+    if moved:
+        work = waiting()
+        for slot in sorted({w["slot"] for w in work} - set(pins)):
+            pins[slot] = _pinned(slot, by)
+            drift = ai_models.drifted(pins[slot])
+            if drift:
+                raise ValueError(f"{fg.GRADERS[slot]['label']}: {drift}")
     sent = []
     for w in work:
         bid = _submit(w, pins[w["slot"]], by)
@@ -359,16 +394,33 @@ def _start(by: str) -> dict:
             be.status(p["batch_id"])
         except llm.LLMError:
             pass
-    return {"sent": sent, "pending": len(pending())}
+    return {"sent": sent, "pending": len(pending()), "moved": moved}
 
 
-def grader_record(slot: str, pin: dict, by: str = "") -> dict:
-    """what the scores say graded them: the model as pinned, and the prompt"""
+def _cancel_unsent(p: dict, why: str) -> int:
+    """a batch's requests not yet sent, cancelled — recorded so, never failed"""
+    d = llm.batch_dir(p["batch_id"])
+    if d is None:
+        return 0
+    landed = set(llm.LocalOpenAI._results(d))
+    unsent = [r["custom_id"] for r in llm.LocalOpenAI._requests(d)
+              if r["custom_id"] not in landed]
+    if not unsent:
+        return 0
+    try:
+        return batch_backend(p["batch_id"]).cancel(p["batch_id"], unsent, why)
+    except llm.LLMError:
+        return 0
+
+
+def grader_record(slot: str, pin: dict, by: str = "", prompt_sha: str = "") -> dict:
+    """what the scores say graded them: the model as pinned, and the prompt —
+    17c: the prompt the batch was sent with, as its record kept it"""
     g = fg.GRADERS[slot]
     return {"slot": slot, "label": g["label"], "model": pin.get("id"),
             "version": pin.get("version") or pin.get("id"), "provider": pin.get("provider_name")
             or pin.get("provider"), "prompt": g["prompt"], "prompt_words": g["prompt_words"],
-            "prompt_sha256": fg.prompt_sha(slot), "owners": g["owners"], "by": by}
+            "prompt_sha256": prompt_sha or fg.prompt_sha(slot), "owners": g["owners"], "by": by}
 
 
 def finish(batch_id: str, results: dict) -> int:
@@ -383,7 +435,7 @@ def finish(batch_id: str, results: dict) -> int:
     g = sf.read_grades(d)
     g.setdefault("items", {})
     g.setdefault("refused", {})
-    rec = grader_record(slot, pin, meta.get("by", ""))
+    rec = grader_record(slot, pin, meta.get("by", ""), meta.get("prompt_sha256") or "")
     graders = [x for x in g.get("graders") or [] if x.get("version") != rec["version"]
                or x.get("prompt_sha256") != rec["prompt_sha256"]]
     g["graders"] = [*graders, rec]
@@ -401,6 +453,8 @@ def finish(batch_id: str, results: dict) -> int:
         try:
             if key not in sent or sent[key] != now.get(key):
                 continue                # the answer changed while out: graded again
+            if res.error and res.error.startswith("cancelled"):
+                continue                # 17c: never sent: it waits for the next Start
             why = (llm.plain_error(res.error) if res.error
                    else f"the reply was cut at its cap of {cap or 'its'} tokens"
                    if res.finish == "length" else "")
@@ -408,16 +462,24 @@ def finish(batch_id: str, results: dict) -> int:
             if got is not None and got.get("ok") is None:
                 why = got["unread"]
             if why:
+                # 17c: counted, for this answer — at GRADE_TRIES it is ungraded
+                was = g["refused"].get(key) or {}
+                tries = (int(was.get("tries") or 1) if was.get("answer_sha256") == sent[key]
+                         else 0) + 1
                 g["refused"][key] = {"words": why, "by": rec["version"], "at": time.time(),
-                                     "kind": "error" if res.error else "unread"}
+                                     "kind": "error" if res.error else "unread",
+                                     "tries": tries, "answer_sha256": sent[key]}
                 continue
             g["items"][key] = {**got, "by": rec["version"], "prompt_sha256": rec["prompt_sha256"],
                                "answer_sha256": sent[key], "at": time.time()}
             g["refused"].pop(key, None)
             n += 1
         except Exception as e:                      # noqa: BLE001 — that answer only
+            was = g["refused"].get(key) or {}
             g["refused"][key] = {"words": f"its reply couldn't be read: {e!r}"[:300],
-                                 "by": rec["version"], "at": time.time(), "kind": "unread"}
+                                 "by": rec["version"], "at": time.time(), "kind": "unread",
+                                 "tries": int(was.get("tries") or 0) + 1,
+                                 "answer_sha256": sent.get(key)}
     d.mkdir(parents=True, exist_ok=True)
     tmp = d / (sf.GRADES + ".part")
     tmp.write_text(json.dumps(g, indent=1, ensure_ascii=False), encoding="utf-8")
@@ -432,9 +494,36 @@ def finish(batch_id: str, results: dict) -> int:
 
 
 def failed(batch_id: str, why: str) -> None:
-    """a batch failed whole: what it landed is kept, the rest asked again by
-    the next Start"""
+    """a batch failed: the rest asked again by the next Start — 17c: and what
+    it landed read first, each reply paid for kept as its grade"""
     print(f"[frontier grading] {batch_id} failed: {why}")
+    d = llm.batch_dir(batch_id)
+    if d is None:
+        return
+    landed = {c: llm.Result(text=r.get("text") or "", error=r.get("error") or "",
+                            finish=r.get("finish_reason") or "")
+              for c, r in llm.LocalOpenAI._results(d).items()}
+    if landed:
+        try:
+            finish(batch_id, landed)
+        except Exception as e:                          # noqa: BLE001 — said, kept on disk
+            print(f"[frontier grading] {batch_id}: its {len(landed)} replies couldn't be "
+                  f"recorded: {e!r}")
+
+
+def retry_finish(batch_id: str, e: Exception) -> bool:
+    """17c: a batch whose replies couldn't be recorded (finish() failed outside
+    its answers: no question file, a disk error) is tried again by the next
+    poll, FINISH_TRIES times, its replies paid for kept — True while it waits"""
+    p = gdir() / "batches" / f"{batch_id}.json"
+    try:
+        meta = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    meta["finish_tries"] = int(meta.get("finish_tries") or 0) + 1
+    meta["finish_error"] = repr(e)[:300]
+    p.write_text(json.dumps(meta), encoding="utf-8")
+    return meta["finish_tries"] < FINISH_TRIES
 
 
 def _progress(p: dict) -> str:
@@ -477,29 +566,75 @@ def _unsent(p: dict) -> int:
     return max(0, tl["sent"] - tl["answered"] - tl.get("failed", 0) - tl.get("cancelled", 0))
 
 
-def waits() -> list[str]:
-    """17b: why the batches out send nothing now — Stop, a run of refusals,
-    the month's limit — each in words; Carry on lifts the first two"""
-    out = []
+CARRY = "Carry on sends the rest."
+
+
+def waits() -> list[dict]:
+    """17b: why the batches out send nothing now, each in words. 17c: each
+    with what Carry on does about it — {why, carry}: Stop and a run of
+    refusals, it lifts; a grader OpenRouter has moved, Start sends its unsent
+    to the one pinned now; the month's limit, a missing key and replies that
+    can't be recorded yet, it can't"""
+    out: list[dict] = []
     p = pending()
     if not p:
         return out
     st = stopped()
     if st:
-        out.append(f"Stopped by {st.get('by') or 'someone'}: "
-                   f"{sum(_unsent(x) for x in p):,} answers wait to be sent")
+        out.append({"why": f"Stopped by {st.get('by') or 'someone'}: "
+                           f"{sum(_unsent(x) for x in p):,} answers wait to be sent",
+                    "carry": CARRY})
     limit = ai_models.over_limit()
     if limit:
-        out.append(limit)
+        out.append({"why": limit, "carry": "Carry on waits until the limit is raised (AI "
+                                           "models ▸ the month's limit) or the month turns."})
+    if not ai_models.has_key():
+        out.append({"why": "OpenRouter has no key on this server (OPENROUTER_API_KEY): the "
+                           "batches out wait for it, their replies kept", "carry": ""})
     for x in p:
+        label = fg.GRADERS[x["slot"]]["label"]
         h = (llm.tally(x["batch_id"]) or {}).get("halted")
         if h:
-            out.append(f"{fg.GRADERS[x['slot']]['label']}: {h}")
+            out.append({"why": f"{label}: {h}", "carry": CARRY})
+        drift = ai_models.drifted(x.get("pin") or {})
+        if drift:
+            out.append({"why": f"{label}: {drift}",
+                        "carry": f"Start sends its {_unsent(x):,} unsent answers to the "
+                                 "grader pinned now."})
+        if x.get("finish_error"):
+            out.append({"why": f"{label}: its replies couldn't be recorded yet "
+                               f"({x['finish_error']}) — tried {x.get('finish_tries')} of "
+                               f"{FINISH_TRIES} times, kept on disk", "carry": ""})
     return out
 
 
+def held() -> dict:
+    """17c: what the batches out still have to send, and about what it costs
+    — what Carry on sends, beside the dry run's new answers"""
+    n, usd, known = 0, 0.0, True
+    for x in pending():
+        d = llm.batch_dir(x["batch_id"])
+        if d is None:
+            continue
+        landed = set(llm.LocalOpenAI._results(d))
+        unsent = [r for r in llm.LocalOpenAI._requests(d) if r["custom_id"] not in landed]
+        if not unsent:
+            continue
+        pin = x.get("pin") or {}
+        tin = sum(len(r.get("user") or "") for r in unsent) // CHARS_A_TOKEN
+        tout = len(unsent) * fg.ask(x["slot"], reasons(pin))["out_tokens"]
+        pi, po = _price(pin)
+        n += len(unsent)
+        if pi is None or po is None:
+            known = False
+        else:
+            usd += (tin * pi + tout * po) / 1e6
+    return {"answers": n, "usd": round(usd, 4), "usd_known": known}
+
+
 def refusals() -> list[dict]:
-    """each benchmark's answers its grader refused, with the last words"""
+    """each benchmark's answers its grader gave no grade, with the last words —
+    17c: and how many of them are ungraded for good, after GRADE_TRIES"""
     out = []
     root = Path(config.OUT_DIR)
     for slot, g in fg.GRADERS.items():
@@ -508,7 +643,9 @@ def refusals() -> list[dict]:
             if ref:
                 last = max(ref.values(), key=lambda x: x.get("at") or 0)
                 out.append({"slot": slot, "task": g["task"], "row": d.parent.parent.name,
-                            "n": len(ref), "words": last.get("words") or ""})
+                            "n": len(ref), "words": last.get("words") or "",
+                            "ungraded": sum(1 for x in ref.values()
+                                            if int(x.get("tries") or 0) >= GRADE_TRIES)})
     return out
 
 
@@ -531,6 +668,8 @@ def status() -> dict:
             "refused": refusals(),
             "stopped": stopped(),
             "waits": waits(),
+            "held": held(),
+            "tries": GRADE_TRIES,
             "last": last_failed(),
             "probe_words": PROBE_WORDS,
             "has_key": ai_models.has_key()}
