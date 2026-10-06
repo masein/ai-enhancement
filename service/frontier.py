@@ -342,6 +342,9 @@ def parity_ask(rec: dict, path: Path, progress=None, identity: dict | None = Non
 # ---------------------------------------------------------------------------
 
 GRADES = "grades.json"
+# 17c: an answer whose grader's reply was no grade this many times is ungraded:
+# never sent again, counted wrong, and said (service/frontier_grade.py)
+GRADE_TRIES = 3
 
 
 def read_grades(d: Path) -> dict:
@@ -377,7 +380,9 @@ def marks(row: Path, task: str, items: list[dict] | None = None) -> dict:
     spec = fb.BENCH[task]
     items = items if items is not None else fb.load(task, config.BENCH_ROOT)
     d = task_dir(row, task)
-    got, grades = read_answers(d / ANSWERS), (read_grades(d).get("items") or {})
+    gr = read_grades(d)
+    got, grades = read_answers(d / ANSWERS), (gr.get("items") or {})
+    refused = gr.get("refused") or {}
     runs: dict[str, list[dict]] = {}
     missing = []
     for it in items:
@@ -392,8 +397,14 @@ def marks(row: Path, task: str, items: list[dict] | None = None) -> dict:
             if g is not None and g.get("answer_sha256") != answer_sha(a.get("answer") or ""):
                 g = None                    # 17b: graded another answer: graded again
             ok = sc["ok"]
+            # 17c: no grade after GRADE_TRIES tries, for this answer: ungraded
+            no = refused.get(gkey(it["id"], e)) or {}
+            ungraded = (g is None and int(no.get("tries") or 0) >= GRADE_TRIES
+                        and no.get("answer_sha256") == answer_sha(a.get("answer") or ""))
             if sc["ran_out"] or a.get("unanswered"):
                 ok = False                  # 17c: no answer from the server: wrong, never graded
+            elif ungraded and (spec.get("grader") or (spec.get("look") and not sc["ok"])):
+                ok = False                  # 17c: counted wrong, said, never sent again
             elif spec.get("grader"):
                 ok = None if g is None else bool(g.get("ok"))
             elif spec.get("look") and not sc["ok"]:
@@ -405,7 +416,8 @@ def marks(row: Path, task: str, items: list[dict] | None = None) -> dict:
                 "epoch": e, "ok": ok, "code_ok": sc["ok"], "read": sc["read"],
                 "ran_out": sc["ran_out"], "answer": a.get("answer") or "",
                 "finish": a.get("finish"), "tokens": a.get("tokens"),
-                "error": a.get("error"), "unanswered": a.get("unanswered"), "grade": g})
+                "error": a.get("error"), "unanswered": a.get("unanswered"),
+                "ungraded": bool(ungraded and ok is False and not sc["ok"]), "grade": g})
     return {"runs": runs, "missing": missing, "items": items}
 
 
@@ -422,7 +434,8 @@ def to_grade(row: Path, task: str) -> list[dict]:
     out = []
     for it in m["items"]:
         for r in m["runs"].get(it["id"], []):
-            if r["grade"] is None and r["ok"] is None and not r["ran_out"]:
+            if r["grade"] is None and r["ok"] is None and not r["ran_out"] \
+                    and not r.get("ungraded"):
                 out.append({"id": it["id"], "epoch": r["epoch"], "answer": r["answer"],
                             "read": r["read"]})
     return out
@@ -500,6 +513,7 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
     held = thinking_kept(thinking, [r["answer"] for r in flat])
     # 17c: the questions the server never answered, counted wrong and named
     never = sorted({q for q, rs in runs.items() for r in rs if r.get("unanswered")})
+    ungraded = sum(1 for r in flat if r.get("ungraded"))
     waiting = sum(1 for r in flat if r["ok"] is None)
     ran_out = sum(1 for r in flat if r["ran_out"])
     unread = sum(1 for r in flat if r["read"] is None and not r["ran_out"]
@@ -538,6 +552,7 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
               "ran_out": ran_out, "unread": unread, "errors": errors,
               # 17c: an off row's few answers that thought anyway, scored
               **({"thinking_held": held} if held else {}),
+              **({"ungraded": ungraded} if ungraded else {}),
               **({"unanswered": sum(1 for r in flat if r.get("unanswered")),
                   "unanswered_ids": never[:20]} if never else {}),
               "budget": setup.get("budget"), "sampling": setup.get("sampling"),
@@ -606,6 +621,9 @@ def words(task: str, sc: dict) -> str:
         bits.append(f"{sc['ran_out']} ran out of room")
     if sc.get("unread"):
         bits.append(f"{sc['unread']} with no answer read")
+    if sc.get("ungraded"):
+        bits.append(f"{sc['ungraded']} its grader gave no grade {GRADE_TRIES} times, counted "
+                    "wrong")
     if sc.get("unanswered"):
         ids = sc.get("unanswered_ids") or []
         bits.append(f"{sc['unanswered']} the server never answered, counted wrong "

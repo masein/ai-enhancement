@@ -227,7 +227,9 @@ def test_each_grader_reads_its_reply_as_its_owners_do():
     # 17b: a bare letter as Google reads it; else whole words, as the board's
     # SimpleQA judge reads them ("INCORRECT" is B, never the C inside it);
     # else not a grade — asked again
-    assert fg.read("simpleqa", "it is INCORRECT", {})["grade"] == "B"
+    # 17c: only a lone grade — a word out of a sentence is no grade
+    assert fg.read("simpleqa", "it is INCORRECT", {})["ok"] is None
+    assert fg.read("simpleqa", "INCORRECT", {})["grade"] == "B"
     assert fg.read("simpleqa", "correct", {})["grade"] == "A"
     assert fg.read("simpleqa", "NOT_ATTEMPTED", {})["grade"] == "C"
     assert fg.read("simpleqa", "", {})["ok"] is None

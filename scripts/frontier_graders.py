@@ -5,20 +5,24 @@ only, after masein's Start.
 
 - SimpleQA Verified: Google's grader prompt from its own starter code (the
   Kaggle notebook it publishes with the dataset); graded by gpt-4.1-2025-04-14
-  in Google's runs. The share graded CORRECT is the score (Epoch's). 17b: a
-  bare letter is read as Google reads it; else whole words, as
-  scripts/simpleqa.parse_grade reads them; else the reply isn't a grade.
-  Google's own reading (the first A, B or C anywhere, else the words, else
-  NOT_ATTEMPTED) read "NOT_ATTEMPTED" and "As an AI…" as A — harmless with
-  gpt-4.1, which answers a letter, but not with another grader.
+  in Google's runs. The share graded CORRECT is the score (Epoch's). 17c: a
+  grade only in its exact form — a lone letter, a lone CORRECT, INCORRECT or
+  NOT_ATTEMPTED, or the prompt's own "B: INCORRECT", with only punctuation
+  or markup around it; anything else is no grade, asked again. Google's own
+  reading (the first A, B or C anywhere) read "NOT_ATTEMPTED" and "As an
+  AI…" as A, and 17b's whole words "not correct" as correct.
 - Humanity's Last Exam: CAIS's judge prompt (hle_eval/run_judge_results.py,
   its typos and |\\%| as they are), judged by o3-mini-2025-01-31 in CAIS's
   runs, at its default reasoning effort and a 4,096-token cap. CAIS asks for
   structured output; its fields are read from the reply here, as text
-  ("correct: yes") or JSON ("correct": "yes"), the last one given. 17b: a
-  reply nothing can be read from isn't a grade: asked again.
+  ("correct: yes") or JSON ("correct": "yes"), the last one given, its value
+  alone ("correct: yes/no" isn't one). 17b: a reply nothing can be read from
+  isn't a grade: asked again — 17c: its words never shown (the judge may
+  quote HLE's question, which is gated).
 - MATH Level 5: Epoch AI's equivalence prompt (its scorer.py), expression 1
-  the key and 2 the answer as Epoch's code extracted it; "Yes" is right. Epoch
+  the key and 2 the answer as Epoch's code extracted it; "Yes" is right (17c:
+  yes or no alone, punctuation or markup around it; anything else, asked
+  again — it was a final "not equivalent"). Epoch
   named gemini-1.5-flash-002, which is retired. Asked only of the answers the
   code marks wrong (an answer the code can't read, Epoch scores wrong without
   asking).
@@ -42,7 +46,6 @@ from __future__ import annotations
 
 import hashlib
 import re
-import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -152,50 +155,72 @@ def _last(pattern: str, text: str):
     return ms[-1] if ms else None
 
 
-def unread(text: str) -> dict:
+# 17c: a grade only in its exact expected form — a lone letter, word or yes/no,
+# with only punctuation or markup around it ("**B**", "(A)", "Yes.")
+_WRAP = re.compile(r"^[\s*_`\"'#>(\[]+|[\s*_`\"'.!:)\]]+$")
+
+
+def lone(text: str) -> str:
+    """the reply without the punctuation and markup around it"""
+    return _WRAP.sub("", text or "")
+
+
+def unread(text: str, show: bool = True) -> dict:
     """17b: a reply that isn't a grade — never kept as one; the next Start
-    asks again"""
-    return {"ok": None, "unread": "the grader's reply isn't a grade: "
-            + (f"“{text.strip()[:80]}”" if text.strip() else "it was empty"),
-            "said": text.strip()[:200]}
+    asks again. 17c: its words without the reply for a benchmark that is
+    never shown (the judge may quote its question)"""
+    return {"ok": None, "unread": "the grader's reply isn't a grade"
+            + ((f": “{text.strip()[:80]}”" if text.strip() else ": it was empty") if show
+               else ("" if text.strip() else ": it was empty")),
+            "said": text.strip()[:200] if show else ""}
 
 
 def read(slot: str, text: str, item: dict) -> dict:
     """the grader's reply, as its owners read it: {ok, words, said} — `said`
     what it answered, short — or 17b's unread(): {ok: None, unread}"""
     text = text or ""
-    said = text.strip()[:200]
+    shown = slot not in ("hle", "math")            # 17c: never a gated question's words
+    said = text.strip()[:200] if shown else ""
     if not text.strip():
-        return unread(text)
+        return unread(text, shown)
     if slot == "simpleqa":
-        # a bare letter, as Google reads it; else whole words, as the board's
-        # own SimpleQA judge reads them; else not a grade
-        m = re.fullmatch(r"\W*([ABC])\W*", text)
+        # 17c: a lone letter (as Google's reading takes it), a lone grade word,
+        # or the prompt's own "B: INCORRECT" — never a word out of a sentence
+        core = lone(text)
+        m = re.fullmatch(r"([ABC])(?:\s*[:.)\-]\s*((?i:CORRECT|INCORRECT|NOT[ _]ATTEMPTED)))?",
+                         core)
+        w = re.fullmatch(r"(?i)(CORRECT|INCORRECT|NOT[ _]ATTEMPTED)", core)
         if m:
             g = m.group(1)
-        else:
-            if str(HERE) not in sys.path:
-                sys.path.insert(0, str(HERE))
-            from simpleqa import parse_words
-            w = parse_words(text)
-            if w is None:
+            if m.group(2) and _SQA_OF[re.sub(r"[ _]", "_", m.group(2).lower())] != g:
                 return unread(text)
-            g = _SQA_OF[w]
+        elif w:
+            g = _SQA_OF[re.sub(r"[ _]", "_", w.group(1).lower())]
+        else:
+            return unread(text)
         return {"ok": g == "A", "words": _SQA_WORDS[g], "said": said, "grade": g}
     if slot == "hle":
         # the last "correct:" given — text or JSON — as CAIS's structured
-        # output has one field of each
-        m = _last(r"(?i)(?<![a-z_])correct\W*:\W*(yes|no)\b", text)
+        # output has one field of each. 17c: its value alone ("yes/no" isn't one)
+        m = _last(r"(?i)(?<![a-z_])correct\W*:[\s\"'*]*(yes|no)(?=[\"'*.]*\s*(?:$|,|}))",
+                  text if "\n" not in text.strip() else text.replace("\r", ""))
+        if m is None:
+            m = _last(r"(?im)(?<![a-z_])correct\W*:[\s\"'*]*(yes|no)[\"'*.]*[ \t]*$", text)
         conf = _last(r"(?i)(?<![a-z_])confidence\W*:\W*(\d{1,3})", text)
         ext = _last(r"(?i)extracted_final_answer\W*:\s*\"?([^\n\"]+)", text)
         if not m:
-            return unread(text)
+            return unread(text, shown)
         ok = m.group(1).lower() == "yes"
         return {"ok": ok, "words": ("the judge: correct" if ok else "the judge: incorrect")
                 + (f" · read as {ext.group(1).strip()[:60]}" if ext else ""),
                 "said": said, **({"confidence": int(conf.group(1))} if conf else {})}
     if slot == "math":
-        ok = text.strip().lower() == "yes"
+        # 17c: yes or no, alone — "Yes." and "**Yes**" are yes; anything else
+        # is no grade, where it was a final "not equivalent"
+        core = lone(text).lower()
+        if core not in ("yes", "no"):
+            return unread(text, shown)
+        ok = core == "yes"
         return {"ok": ok, "words": "equivalent" if ok else "not equivalent", "said": said}
     if slot == "otis":
         if re.fullmatch(r"\W*NONE\W*", text, re.I):

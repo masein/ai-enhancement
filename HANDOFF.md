@@ -4953,6 +4953,47 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17c.4 — the second review's part 4: before Start on grading (6 Oct)
+
+- **Replies paid for are never dropped.**
+  - A poll with no OpenRouter key leaves a grading batch pending; the card
+    says why. Before, it failed the batch, and the next Start paid again.
+  - A `finish()` that fails outside its answers (no question file, a disk
+    error) is tried again at each poll, up to `FINISH_TRIES` (30, about half
+    an hour). The card says it couldn't be recorded yet.
+  - `failed()` reads what a failed batch landed and records it.
+- **An answer whose reply is never a grade** is asked `GRADE_TRIES` (3)
+  times, its tries counted per answer. After that it is ungraded: never sent
+  again, counted wrong, listed on the card and said on the row ("1 its
+  grader gave no grade 3 times, counted wrong"). Before, every Start paid
+  for it again.
+- **A grade only in its exact form** (`frontier_graders.lone`), with only
+  punctuation or markup around it:
+  - SimpleQA: a lone letter, a lone grade word, or the prompt's own
+    "B: INCORRECT". "not correct", "The correct answer is Paris, so B" and
+    "B: the correct answer differs" were read as correct.
+  - MATH: yes or no. "Yes." and "**Yes**" were a final "not equivalent".
+  - HLE: the last "correct:" whose value stands alone; "correct: yes/no" is
+    unread.
+  - Anything else is asked again.
+- **A grade carries the prompt its batch was sent with** (the batch record's
+  sha256), not the one on disk when it landed.
+- **A grader OpenRouter moved:** its batch's reason is on the card. Start
+  cancels the batch's unsent requests (recorded as cancelled, never as
+  refused) and sends them to the grader pinned now. Before, they were stuck
+  out for good.
+- **An unread HLE or MATH reply never shows its words**: the judge may quote
+  a question that is never shown.
+- **The card after Stop and at the limit.**
+  - The dry run says what the batches out still hold, and Carry on shows
+    what it sends costs (`held()`). It said "Nothing waits" beside "3
+    answers wait".
+  - Each wait line says what Carry on does about it (`waits()` is
+    `{why, carry}`): at the limit it says Carry on waits, beside its
+    disabled button, not "Carry on sends the rest".
+- Tests: `tests/test_17c_grading.py`; the 17b grading tests' readings and
+  the card's words.
+
 ### 17c.3 — the second review's part 3: before the imports (6 Oct)
 
 - **One swap for the bundle** (`scripts/import_frontier.import_bundle`).
