@@ -4953,6 +4953,33 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17f.3 — the rented runs on the dashboard (6 Oct)
+
+- **Where a run ran, on every Runs row** (`submissions.where_ran`, a new
+  column): "this server", or "rented GPU · RTX 5090 · box A3" for an import;
+  a where filter beside status. One wording everywhere
+  (`import_frontier.where_words`).
+- **An imported run's own view** (the Reader's log, `api/runs/{sid}/lines` →
+  `rented`): when it ran on the box and for how long, its restarts, the box,
+  the runner image's tag, the GPU, the GGUF's sha256, the bundle and its
+  sha256, and when it was imported and by whom; the row's started and
+  finished times are the box's.
+- **A Frontier score says where it ran** — every box its shards came from —
+  with a link to each Runs row it came from.
+- **On rented boxes** (Runs): what `frontier_fetch.py` last read — each step's
+  box, model, what it asks, n of N, its expected finish (its benchmark's time
+  left and its box's later steps at the plan's hours) and when it was last
+  heard from; a box quiet for 45 minutes or not reached says so; one whose
+  bundles are all home and imported reads "done, safe to destroy". The fetch
+  sends labels and progress only (`import_remote.py --boxes`), never an
+  address; `--no-board` sends nothing.
+- **The raw-run export** had DeviceMark's rows only. `export_frontier_raw.py`
+  exports a Frontier run (the server's or an import) with where it ran, its
+  setup, scores, log and each answer's marks — the answers' text only for
+  MMLU-Pro, SimpleQA Verified and ARC-AGI-2; a build served here to
+  `private/`.
+- Tests: `tests/test_17f_review.py` (part 5), `tests/test_17f_browser.py`.
+
 ### 17f.2 — before grading, and Save (6 Oct)
 
 - **A new grader after more than 5% ungraded grades it all** (`_regrade`): the

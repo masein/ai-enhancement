@@ -581,7 +581,8 @@ def test_a_37_topic_row_is_one_line_and_its_list_opens_by_area(live, page):
         # as tall as the row that sat one topic: #56's stood 650px
         row_h = page.locator(f"tr[data-queue-row='{sid}']").bounding_box()["height"]
         one_h = page.locator(f"tr[data-queue-row='{one}']").bounding_box()["height"]
-        assert abs(row_h - one_h) <= 1 and row_h < 80, (row_h, one_h)
+        # 17f: a row is two lines now — where it ran, under the model's name
+        assert abs(row_h - one_h) <= 1 and row_h < 100, (row_h, one_h)
         assert page.locator(f"tr[data-queue-row='{one}'] [data-suite-cell='q']") \
             .text_content() == "Knowledge exam · Law"
         cell.locator("summary").click()

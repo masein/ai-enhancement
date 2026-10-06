@@ -186,6 +186,8 @@ def fetch_world(tmp_path, monkeypatch, boxes: dict, scp_fails: set = frozenset()
             files, _, parity = boxes[host]
             to.write_bytes({**files, **(parity or {})}[remote].read_bytes())
             return 0, ""
+        if cmd[:8] == ff.IMPORT and cmd[8] == "--boxes":
+            return 0, "2 steps on rented boxes, as the fetch read them"
         if cmd[:8] == ff.IMPORT:
             if any(r in cmd[8] for r in refused):
                 return 2, "refused — the file isn't the one registered\nnothing was imported"
@@ -228,7 +230,7 @@ def test_p2_2_3_a_failed_copy_says_not_copied_and_each_box_says_if_it_is_safe(tm
     assert (dest / b.name).read_bytes() == b"older" and not list(dest.glob("*.part"))
     assert "3.3.3.3:43: couldn't be asked — ssh: connect to host" in out
     # one box at a time: its import before the next box is asked
-    kinds = [c[0] if c[0] != "sudo" else "import" for c in calls]
+    kinds = [c[0] if c[0] != "sudo" else "import" for c in calls if "--boxes" not in c]
     assert kinds[:4] == ["ssh", "scp", "import", "ssh"]
     ssh = calls[0]
     for opt in ("BatchMode=yes", "ConnectTimeout=15", "ServerAliveInterval=15"):
@@ -274,7 +276,7 @@ def test_p2_4_5_both_builds_on_one_box_and_the_parity_compared(tmp_path, monkeyp
                     "1.1.1.1:41"])
     out = capsys.readouterr().out
     assert code == 0, out
-    imports = [c for c in calls if c[:8] == ff.IMPORT]
+    imports = [c for c in calls if c[:8] == ff.IMPORT and "--file-sha256" in c]
     assert sorted(c[c.index("--file-sha256") + 1] for c in imports) == ["ab" * 32, "cd" * 32]
     compare = next(c for c in calls if c[:9] == ff.COMPARE)
     assert compare[9:11] == ["/home/masein/benchmarks/parity/phone-server.jsonl",
@@ -478,3 +480,94 @@ def test_11_the_loops_and_the_plans_words():
     import frontier_box as fbx
     # listed in the order the box asks them
     assert "GPQA Diamond, MATH Level 5" in fbx.words(("off", ("math_l5_epoch", GPQA), "", 8))
+
+
+# ---------------------------------------------------------------------------
+# part 5: the rented runs on the dashboard
+# ---------------------------------------------------------------------------
+
+def test_13_14_15_an_import_says_where_and_when_it_ran(box):  # noqa: F811
+    import import_frontier as imf2
+    from service import reader
+    assert run_box(box, "a3", "--label", "A3") == 0
+    register(box["sha"])
+    code, said = imported(bundle_of(box, "a3"))
+    assert code == 0, said
+    run = db.recent(5)[0]
+    # 13: Runs says where it ran, one wording (b366baf: only the hover text)
+    assert run["where_ran"] == "rented GPU · RTX 5090 · box A3"
+    assert "box A3" in run["note"]
+    # 14: when it ran on the box, not when it was imported; its own view
+    setup = rb.read(bundle_of(box, "a3"))["setup"]
+    assert setup["box"] == "A3" and setup.get("image") is not None
+    assert run["started_at"] == pytest.approx(imf2._epoch(setup["started_at"]))
+    got = reader.log_lines(run["id"])["rented"]
+    assert (got["box"], got["where"], got["restarts"]) == ("A3", run["where_ran"], 0)
+    assert got["bundle"] == bundle_of(box, "a3").name and got["gguf_sha256"] == box["sha"]
+    assert got["by"] == "masein" and got["imported_at"]
+    # 15: the score says where, and the Runs rows it came from
+    res = json.loads(next(sf.task_dir(config.OUT_DIR / ROW, TASK).glob("results_*.json"))
+                     .read_text())
+    assert res["frontier"]["where"] == "rented GPU · RTX 5090 · box A3"
+    assert res["frontier"]["runs"] == [run["id"]]
+    import report_lm_eval as rle
+    assert rle.frontier_where(res["frontier"]) == "rented GPU · RTX 5090 · box A3"
+    assert rle.frontier_where({"where": "run on a rented GPU (NVIDIA GeForce RTX 5090)"}) == \
+        "rented GPU · RTX 5090"
+    assert rle.frontier_where({}) == "this server"
+    assert imf2.where_words(["NVIDIA GeForce RTX 5090"] * 2, ["A2", "A1"]) == \
+        "rented GPU · RTX 5090 · boxes A1, A2"
+
+
+def test_16_the_boxes_progress_on_the_board_never_their_address(svc, tmp_path, monkeypatch):  # noqa: F811
+    import frontier_fetch as ff
+    import import_frontier as imf2
+    now = time.time()
+    steps = [{"label": "A5", "model": "served/phone", "step": "A5-1", "thinking": "on",
+              "tasks": [MMLU], "state": "asking", "at": now - 60, "seen_at": now,
+              "line": "MMLU-Pro 3,000 of 12,032 · 5.3 s an answer · 13.3 h left",
+              "started_at": "2026-10-06T08:00:00Z", "sessions": 2, "reachable": True,
+              "safe": False, "host": "203.0.113.7", "port": 41022},
+             {"label": "A9", "model": "served/phone", "step": "A9-2", "thinking": "off",
+              "tasks": [HLE], "state": "whole", "at": now - 3 * 3600, "seen_at": now,
+              "line": "", "sessions": 1, "reachable": True, "safe": True}]
+    assert imf2.store_boxes(steps) == 2
+    raw = imf2.boxes_path().read_text()
+    assert "203.0.113.7" not in raw and "41022" not in raw and '"host"' not in raw
+    got = svc.get("/api/frontier/boxes").json()["boxes"]
+    a5 = next(b for b in got if b["label"] == "A5")
+    assert (a5["n"], a5["of"]) == (3000, 12032) and a5["quiet_min"] is None
+    assert a5["finish"] == pytest.approx(now - 60 + 13.3 * 3600, abs=60)
+    a9 = next(b for b in got if b["label"] == "A9")
+    assert a9["safe"] and a9["quiet_min"] == 180
+    # the fetch posts its reading; the file it posts holds no address either
+    posted = []
+    monkeypatch.setattr(ff, "run", lambda cmd, cwd=None, timeout=None, stdin=None: (
+        posted.append(cmd), (0, "2 steps on rented boxes, as the fetch read them"))[1])
+    dest = tmp_path / "bundles"
+    dest.mkdir()
+    line = ff.post_boxes([{k: v for k, v in x.items() if k not in ("host", "port")}
+                          for x in steps], dest)
+    assert line.startswith("the board's list of rented boxes: 2 steps")
+    assert posted[0][-2:] == ["--boxes", str(tmp_path / "boxes.json")]
+    assert "203.0.113.7" not in (tmp_path / "boxes.json").read_text()
+
+
+def test_17_a_frontier_run_goes_into_the_raw_export_with_where(box, tmp_path):  # noqa: F811
+    import export_frontier_raw as efr
+    assert run_box(box, "a3", "--label", "A3") == 0
+    register(box["sha"])
+    assert imported(bundle_of(box, "a3"))[0] == 0
+    sid = db.recent(5)[0]["id"]
+    dest = efr.export_run(sid, tmp_path / "raw")
+    assert dest.parent.name == "private"                       # a build served here
+    setup = json.loads((dest / "setup.json").read_text())
+    assert setup["where"] == "rented GPU · RTX 5090 · box A3" and setup["box"]["box"] == "A3"
+    items = [json.loads(x) for x in (dest / "items.jsonl").read_text().splitlines()]
+    assert len(items) == N * RUNS and all("answer" not in x for x in items)  # GPQA: withheld
+    assert "GPQA Diamond" in (dest / "README.md").read_text()
+    assert (dest / "log.txt").read_text() and (dest / "scores.json").exists()
+    # anything but a Frontier run: refused in words
+    other = db.add("x/y", "instruct", "everyday", "masein", "n")
+    with pytest.raises(SystemExit, match="this exports Frontier runs"):
+        efr.export_run(other, tmp_path / "raw")

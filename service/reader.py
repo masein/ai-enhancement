@@ -302,6 +302,16 @@ def log_lines(sid: int, tail: int = 200) -> dict:
     status = sub.get("status") or ""
     base = {"id": sid, "status": status, "model": sub["hf_id"],
             "active": status in ("preflight", "waiting_gpu", "waiting_lock", "running", "canceling")}
+    # 17f: a run imported from a rented box: when it ran there and for how long,
+    # its restarts, its box, the image, the GPU, the file, the bundle, the import
+    if sub.get("where_ran"):
+        import import_frontier as imf
+        got = imf.rented_of(sid)
+        if got:
+            base["rented"] = {k: got.get(k) for k in (
+                "where", "box", "image", "gpu", "gguf_sha256", "bundle", "sha256", "started_at",
+                "finished_at", "hours", "sessions", "restarts", "at", "by", "imported_at",
+                "shard")}
     if not path.exists():
         return {**base, "total": 0, "first": 1, "lines": [], "withheld": 0,
                 "note": "no log yet — the run has not started"}
