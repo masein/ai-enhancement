@@ -213,7 +213,9 @@ def test_a_labellers_batch_paused_by_refusals_says_so_and_carry_on_takes_it_up(
     end = time.time() + 10
     while time.time() < end and len(client.get("/api/mobile-mmlu/key").json()["running"]) < 2:
         time.sleep(0.05)
-    for _ in range(100):
+    # 17d: up to 15 s — two batches' five refusals each, on a busy CI runner,
+    # took longer than the 5 s this waited
+    for _ in range(300):
         page = client.get("/api/mobile-mmlu/key").json()
         lines = [r["progress"] for r in page["running"]]
         if lines and all("refused 5 requests in a row" in x for x in lines):
