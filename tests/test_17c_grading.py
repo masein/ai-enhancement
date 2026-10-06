@@ -105,6 +105,9 @@ def test_22_a_failed_batch_has_what_landed_read(svc, monkeypatch):  # noqa: F811
 def test_23_a_reply_never_readable_is_asked_three_times_then_ungraded(svc, monkeypatch):  # noqa: F811
     asked = stub(monkeypatch, lambda m, r: ("I would rather not say", "stop", "")
                  if r["custom_id"].endswith(":2#0") else plain(m, r))
+    # 17d: one in five is over the share that leaves no score — this is the
+    # path under it (tests/test_17d_review.py has the one over)
+    monkeypatch.setattr(sf, "UNGRADED_SHARE", 0.5)
     for _ in range(4):
         fgr.start("masein")
         drain()
@@ -219,13 +222,21 @@ def test_30_after_stop_the_card_says_what_is_held_and_what_carry_on_costs(svc, m
         return plain(model, row)
     stub(monkeypatch, answer)
     fgr.start("masein")
+    # MATH's two land first (its batch runs beside: one still unsent at Stop
+    # would be held too)
+    math = next(x["batch_id"] for x in fgr.pending() if x["slot"] == "math")
     for _ in range(200):
-        if any("algebra/" not in c for c in seen):
+        if any("algebra/" not in c for c in seen) and \
+                (llm.tally(math) or {}).get("answered") == 2:
             break
         time.sleep(0.05)
     fgr.stop("masein")
     gate.set()
-    time.sleep(0.5)
+    out = next(x["batch_id"] for x in fgr.pending() if x["slot"] == "simpleqa")
+    for _ in range(200):
+        if (llm.tally(out) or {}).get("answered") == 1:
+            break
+        time.sleep(0.05)
     page = svc.get("/api/frontier/grading").json()
     # nothing new waits; four are held out, unsent — with their cost
     assert page["estimate"]["answers"] == 0
