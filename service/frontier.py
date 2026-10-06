@@ -653,7 +653,9 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
                             if spec.get("look") and not waiting and looked else "code"),
               "code": code, "grader": g,
               # 17b: more than one grader or prompt behind the score: said, not final
-              **({"graders": graders, "final": False} if len(graders) > 1 else {}),
+              **({"graders": graders} if len(graders) > 1 else {}),
+              # 17d: and a score with an answer its grader gave no grade isn't final
+              **({"final": False} if len(graders) > 1 or ungraded else {}),
               **({"look": {"done": looked, "waiting": waiting}} if spec.get("look") else {})}
     res = {"alias": task, "acc,none": page["score"], "acc_stderr,none": page["se"]}
     if spec.get("look") and code:

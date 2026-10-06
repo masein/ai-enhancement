@@ -1777,7 +1777,7 @@ def _graders_words(d: dict) -> str:
         return (f"{g.get('version') or g.get('model')}"
                 + (f" with {g['prompt_words']}" if g.get("prompt_words") else "")
                 + f" ({str(g.get('prompt_sha256') or '')[:8]})")
-    if d.get("final") is False:
+    if len(d.get("graders") or []) > 1:
         every = d.get("graders") or []
         return (f"{len(every)} graders or prompts — "
                 + ", ".join(f"{one(g)} on {int(g.get('n') or 0):,}" for g in every))
@@ -1795,19 +1795,27 @@ def frontier_how(d: dict | None) -> str | None:
         return None
     who = _graders_words(d)
     end = ": not final" if d.get("final") is False else ""
+    # 17d: the counts that lower the score, on its cell
+    counts = "".join(
+        f" · {n:,} {w}" for n, w in ((d.get("unanswered"), "the server never answered, counted "
+                                                           "wrong"),
+                                     (d.get("ungraded"), "its grader gave no grade, counted "
+                                                         "wrong"))
+        if isinstance(n, int) and n)
     code = d.get("code") or {}
     alone = (f"code alone {100 * code['score']:.1f}" if isinstance(code.get("score"), (int, float))
              else "")
     if d.get("scored_by") == "grader":
-        return (f"graded by {who}" if who else "graded") + end
+        return (f"graded by {who}" if who else "graded") + end + counts
     look = d.get("look")
     if isinstance(look, dict):
         if look.get("waiting"):
             return ("by code: Epoch AI's model check waits for Start on "
-                    f"{look['waiting']:,} answers")
+                    f"{look['waiting']:,} answers") + counts
         if look.get("done"):
-            return f"code, then Epoch AI's model check by {who}{end} · {alone}".rstrip(" ·")
-    return "by code"
+            return (f"code, then Epoch AI's model check by {who}{end} · {alone}".rstrip(" ·")
+                    + counts)
+    return "by code" + counts
 
 
 def frontier_setting(d: dict | None) -> str | None:
