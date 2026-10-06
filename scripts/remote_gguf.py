@@ -692,19 +692,23 @@ def main(argv: list[str] | None = None) -> int:
                                           if tmpl else None)
         server["n_ctx"] = (props.get("default_generation_settings") or {}).get("n_ctx")
         server["total_slots"] = props.get("total_slots")
+        # 17c: what its slots say of speculation — the import compares it with
+        # the registered launch (a draft model under any spelling drafts)
+        from service import served as sv
+        try:
+            seen = sv.probe(srv_proc.base)
+        except ValueError:
+            seen = {}
+        if seen.get("speculative") is not None:
+            server["speculative"] = bool(seen["speculative"])
         rec = register_here(a.served_as, a.served_as.split("/", 1)[1], a.based_on,
                             srv_proc.base, thinking,
                             f"llama.cpp {ver['build'] or '?'} on {gpu.get('name') or 'a GPU'}: "
                             + " ".join(server["argv"]), flags, extra_env)
         if a.parity:
             from service import frontier as sf
-            from service import served as sv
             dest = out / "parity.jsonl"
             # 17c: what answered, for compare: the file, the launch, the slots
-            try:
-                seen = sv.probe(srv_proc.base)
-            except ValueError:
-                seen = {}
             ident = {"side": "box", "as": a.served_as,
                      "file": {k: gguf[k] for k in ("name", "size", "sha256")},
                      "server": {k: server[k] for k in ("build", "commit", "binary_sha256",

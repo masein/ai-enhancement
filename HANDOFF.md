@@ -4953,6 +4953,27 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17c.5 — the second review's part 5: the lookahead and MTP rows (6 Oct)
+
+Not needed for this run (no lookahead or MTP row is filled), done because it
+was cheap (`scripts/import_frontier.record_launch`, `box_launch`):
+- **A flag said twice is one flag**: the board's own MTP record has its flags
+  in "Launch flags" and in "How it's served", and its correct bundle was
+  refused, each flag counted twice.
+- **Speculative decoding under every spelling** llama-server takes: a draft
+  from Hugging Face (`-hfd`, `-hfrd`, `--hf-repo-draft`, `-hffd`, …), and
+  `LLAMA_ARG_*DRAFT*`/`*SPEC*` in the environment. The box also records what
+  its slots say (`/slots`), and the import compares that too.
+- **The registered setup from its own fields first** (launch flags and
+  environment, and the GGUF setup it serves the same file as). "How it's
+  served" is read only when they hold none.
+  - A quoted value reads (`LLAMA_MOE_ROUTE_MODE="lookahead"`).
+  - A bare one loses a sentence's full stop: "…LOOKAHEAD=1." refused a
+    correct box.
+  - Lookahead said only in words, with no variable, is refused in words,
+    where a plain box was accepted. The parity check refuses it too.
+- Tests: `tests/test_17c_rows.py`.
+
 ### 17c.4 — the second review's part 4: before Start on grading (6 Oct)
 
 - **Replies paid for are never dropped.**

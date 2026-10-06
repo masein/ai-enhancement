@@ -72,10 +72,29 @@ REFUSED = 2
 SUITE = "frontier"
 REGISTRY = "frontier_imports.json"
 _ID = re.compile(r"^served/[A-Za-z0-9._-]+$")
-_ENV_TOKEN = re.compile(r"\b([A-Z][A-Z0-9_]*)=([A-Za-z0-9_.:/+-]+)")
+# 17c: a value quoted or bare — a bare one without the full stop that ends a
+# sentence ("…LOOKAHEAD=1.")
+_ENV_TOKEN = re.compile(r"\b([A-Z][A-Z0-9_]*)=(?:\"([^\"]*)\"|'([^']*)'|([A-Za-z0-9_.:/+-]+))")
 ROUTING_ENV = "LLAMA_MOE_"
+# 17c: speculative decoding under every spelling llama-server takes — a draft
+# model fetched from Hugging Face (-hfd, --hf-repo-draft, …) too
 _SPEC = re.compile(r"^(--spec-[a-z-]+|--draft[a-z-]*|-md|--model-draft|-ngld|--gpu-layers-draft"
-                   r"|-cd|--ctx-size-draft|-devd|--device-draft)$")
+                   r"|-cd|--ctx-size-draft|-devd|--device-draft|-hfd|-hfrd|--hf-repo-draft"
+                   r"|-hffd|--hf-file-draft|-mdu|--model-draft-url|-ctkd|--cache-type-k-draft"
+                   r"|-ctvd|--cache-type-v-draft)$")
+# and through the environment: llama-server reads LLAMA_ARG_<FLAG> as its flag
+_SPEC_ENV = re.compile(r"^LLAMA_ARG_\w*(DRAFT|SPEC)\w*$")
+# lookahead said in words only, with no routing variable to compare
+_LOOKAHEAD_WORDS = re.compile(r"(?i)(?<!no )(?<!without )(?<!non-)\blookahead\b")
+
+
+def _env_pairs(text: str) -> dict[str, str]:
+    out = {}
+    for m in _ENV_TOKEN.finditer(text or ""):
+        v = next(g for g in m.groups()[1:] if g is not None)
+        out[m.group(1)] = v if m.group(2) is not None or m.group(3) is not None \
+            else v.rstrip(".,;:")
+    return out
 
 
 def registered_sha(rec: dict) -> str:
@@ -99,37 +118,58 @@ def _spec_flags(tokens: list[str]) -> list[str]:
         if not val and i + 1 < len(tokens) and not tokens[i + 1].startswith("-"):
             val = tokens[i + 1]
         out.append(f"{name}={val}" if val else name)
-    return sorted(out)
+    return sorted(set(out))                 # 17c: a flag said twice is one flag
 
 
 def record_launch(rec: dict) -> dict:
-    """the registered setup's routing environment and speculative flags — its
-    launch flags and environment as typed, "How it's served", and the GGUF
-    setup it serves the same file as (served.launch's sources)"""
+    """the registered setup's routing environment and speculative flags — 17c:
+    from its own fields first (its launch flags and environment, and the GGUF
+    setup it serves the same file as), "How it's served" only when they hold
+    none; a flag said in both counted once; quoted values read; lookahead said
+    in words only, with no variable, reported as such (`words`)"""
     from service import db
-    texts = [rec.get("flags") or "", rec.get("env") or "", rec.get("how") or ""]
+    fields = [rec.get("flags") or "", rec.get("env") or ""]
     sa = rec.get("same_as") or {}
     if sa.get("gguf"):
         g = db.gguf_get(sa["gguf"]) or {}
         su = next((x for x in g.get("setups") or [] if x.get("id") == sa.get("setup")), None)
         if su:
-            texts += [" ".join(f"{k}={v}" for k, v in (su.get("env") or {}).items()),
-                      " ".join(su.get("flags") or [])]
-    text = " ".join(t for t in texts if t)
-    env = {k: v for k, v in _ENV_TOKEN.findall(text) if k.startswith(ROUTING_ENV)}
-    toks = [t for t in re.split(r"[\s,;()]+", text) if t]
-    return {"env": env, "spec": _spec_flags(toks), "drafts": rec.get("speculative") is True}
+            fields += [" ".join(f"{k}={v}" for k, v in (su.get("env") or {}).items()),
+                       " ".join(su.get("flags") or [])]
+    how = rec.get("how") or ""
+
+    def read(text: str) -> tuple[dict, list[str]]:
+        pairs = _env_pairs(text)
+        env = {k: v for k, v in pairs.items() if k.startswith(ROUTING_ENV)}
+        toks = [t for t in re.split(r"[\s,;()]+", text) if t]
+        spec = _spec_flags(toks) + sorted(f"{k}={v}" for k, v in pairs.items()
+                                          if _SPEC_ENV.match(k))
+        return env, sorted(set(spec))
+    env, spec = read(" ".join(t for t in fields if t))
+    if not env and not spec:
+        env, spec = read(how)
+    words = bool(not env and _LOOKAHEAD_WORDS.search(f"{how} {rec.get('name') or ''}"))
+    return {"env": env, "spec": spec, "drafts": rec.get("speculative") is True,
+            "words": words}
 
 
 def box_launch(server: dict) -> dict:
     env = {k: str(v) for k, v in (server.get("env") or {}).items() if k.startswith(ROUTING_ENV)}
-    return {"env": env, "spec": _spec_flags([str(x) for x in server.get("flags") or []])}
+    spec = _spec_flags([str(x) for x in server.get("flags") or []]) + sorted(
+        f"{k}={v}" for k, v in (server.get("env") or {}).items() if _SPEC_ENV.match(k))
+    return {"env": env, "spec": sorted(set(spec)),
+            # 17c: what its slots said of speculation, when the box asked
+            "slots_draft": server.get("speculative")}
 
 
 def launch_differs(rec: dict, server: dict) -> list[str]:
     """each way the box's launch differs from the registered one, in words"""
     want, got = record_launch(rec), box_launch(server)
     out = []
+    if want.get("words"):
+        out.append(f"routing: {rec['id']}'s record says lookahead in words, with no routing "
+                   "variable to compare a box with — give its launch's environment on its page "
+                   "(Launch env), then import again")
     if want["env"] != got["env"]:
         w = " ".join(f"{k}={v}" for k, v in sorted(want["env"].items())) or "none"
         g = " ".join(f"{k}={v}" for k, v in sorted(got["env"].items())) or "none"
@@ -140,6 +180,12 @@ def launch_differs(rec: dict, server: dict) -> list[str]:
         g = " ".join(got["spec"]) or "none"
         out.append(f"speculative decoding: the box ran with {g}; {rec['id']} is registered "
                    f"with {w}")
+    # 17c: and what the box's own slots said, against what is registered
+    drafting = bool(want["spec"] or want["drafts"])
+    if got.get("slots_draft") is not None and bool(got["slots_draft"]) != drafting:
+        out.append(f"speculative decoding: the box's slots said they "
+                   f"{'draft' if got['slots_draft'] else 'don’t draft'} tokens; {rec['id']} is "
+                   f"registered {'drafting' if drafting else 'without it'}")
     return out
 
 
