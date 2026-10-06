@@ -37,7 +37,8 @@ def shot(part, name, **kw):
             part.screenshot(path=SCREENS / name, **kw)
             return
         except Error as e:
-            if "not attached" not in str(e) or attempt == 3:
+            # 17c: mid-render it can also be "not visible" for a moment
+            if not any(w in str(e) for w in ("not attached", "not visible")) or attempt == 3:
                 raise
 
 

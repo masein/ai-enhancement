@@ -10,7 +10,9 @@
 # 90, 120), with shared libraries. The tarball holds llama/bin/llama-server,
 # llama/lib/ (the build's libraries and CUDA's runtime, cuBLAS and cuBLASLt)
 # and llama/VERSION (the commit, whether the tree had changes, the
-# architectures, the image). A box needs an NVIDIA driver for CUDA 12.8.
+# architectures, the image) — 17c: and llama/LICENSE (llama.cpp's) and
+# llama/NOTICE (the CUDA libraries packed, and the EULA they come under). A box
+# needs an NVIDIA driver for CUDA 12.8.
 #
 #     scripts/build_llama_tarball.sh ~/llama.cpp-teraformer llama-server-cuda12.8.tar.gz
 #
@@ -35,7 +37,9 @@ fi
 # 17c: read whole, never through head: under pipefail, head closing the pipe
 # early killed git with SIGPIPE and the script exited 141 with no word (on a
 # tree with many changed or untracked files)
-if ! changes="$(git -C "$src" status --porcelain 2>&1)"; then
+# 17c: a file's mode isn't a change to the source (the fork's checkout on the
+# server: 2,934 files, modes only, 0 insertions and 0 deletions)
+if ! changes="$(git -C "$src" -c core.fileMode=false status --porcelain 2>&1)"; then
   echo "git can't list $src's changes: $changes" >&2
   exit 1
 fi
@@ -87,6 +91,8 @@ export LD_LIBRARY_PATH=/out/llama/lib:/usr/local/cuda/lib64
     esac
   done
 nvcc --version | tail -1 > /out/llama/.cuda
+# 17c: llama.cpp's licence travels with it
+cp /build/LICENSE /out/llama/LICENSE
 IN
 $DOCKER run --rm -v "$src":/src:ro -v "$work":/out -e ARCHS="$archs" "$image" bash /out/build.sh
 $DOCKER run --rm -v "$work":/out "$image" chown -R "$(id -u):$(id -g)" /out
@@ -100,5 +106,24 @@ $DOCKER run --rm -v "$work":/out "$image" chown -R "$(id -u):$(id -g)" /out
   echo "built $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 } > "$work/llama/VERSION"
 rm -f "$work/llama/.cuda"
+# 17c: what else it carries, and under what — needed for a copy shared beyond
+# the private repository, harmless for private use
+names() { for f in "$@"; do [ -e "$f" ] && printf '  %s\n' "$(basename "$f")"; done; return 0; }
+lib="$work/llama/lib"
+{
+  echo "llama-server, built from llama.cpp at the commit in VERSION. llama.cpp is under the MIT"
+  echo "licence: LICENSE, beside this file. Its own libraries in lib/:"
+  names "$lib"/libllama* "$lib"/libggml* "$lib"/libmtmd*
+  echo
+  echo "lib/ also holds NVIDIA CUDA libraries, copied from the $image image the build ran in:"
+  names "$lib"/libcudart.so* "$lib"/libcublas.so* "$lib"/libcublasLt.so*
+  echo "They are NVIDIA's, redistributed under the NVIDIA CUDA Toolkit End User License"
+  echo "Agreement (https://docs.nvidia.com/cuda/eula/), whose Attachment A lists them among"
+  echo "the files that may be distributed with an application."
+  echo
+  echo "The other libraries in lib/ are the image's Ubuntu 22.04 packages', each under its own"
+  echo "licence (/usr/share/doc/<package>/copyright in that image) — the GCC runtime libraries"
+  echo "(libgomp, libstdc++, libgcc_s) under the GPL v3 with the GCC Runtime Library Exception."
+} > "$work/llama/NOTICE"
 tar -C "$work" -czf "$out" llama
 echo "$out · $(du -h "$out" | cut -f1) · sha256 $(sha256sum "$out" | cut -d' ' -f1)"

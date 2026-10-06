@@ -6,13 +6,17 @@
    set's (it was filed as Pro's, and the full set's card had no "A run here");
 6. the Frontier suite's benchmarks each have what their card says;
 7. the tarball's link leaves libcuda's symbols to the box (the build container
-   has no driver), and it is built for no particular CPU.
+   has no driver), and it is built for no particular CPU;
+8. the tarball carries llama.cpp's LICENSE and a NOTICE naming the CUDA
+   libraries packed and the EULA they come under;
+9. a checkout whose files differ only in their modes has no changes.
 The page's side of 2–6 is tests/test_17c_board_six_browser.py. Nothing runs."""
 
 from __future__ import annotations
 
 import os
 import subprocess
+import tarfile
 from pathlib import Path
 
 import report_lm_eval as report
@@ -79,3 +83,62 @@ def test_7_the_tarball_links_without_a_driver_and_for_no_particular_cpu():
     # and nothing in it reads through a pipe that can close early under pipefail
     assert "| head" not in script
     assert "{ ldd " in script and "|| true; } | awk" in script
+
+
+# the build container, stood in for: what build.sh leaves in /out
+CONTAINER = r"""#!/bin/sh
+[ "$1" = info ] && exit 0
+out=""; prev=""
+for a in "$@"; do
+  if [ "$prev" = "-v" ]; then case "$a" in *:/out) out="${a%:/out}";; esac; fi
+  prev="$a"
+done
+case "$*" in
+  *"bash /out/build.sh"*)
+    mkdir -p "$out/llama/bin" "$out/llama/lib"
+    echo bin > "$out/llama/bin/llama-server"
+    for f in libllama.so libggml-cuda.so libcudart.so.12 libcublas.so.12 libcublasLt.so.12 \
+             libgomp.so.1; do echo x > "$out/llama/lib/$f"; done
+    echo "Cuda compilation tools, release 12.8, V12.8.93" > "$out/llama/.cuda"
+    printf 'int LLAMA_BUILD_NUMBER = 6543;\nchar const *LLAMA_COMMIT = "abc1234";\n' \
+      > "$out/build-info"
+    echo "MIT License (llama.cpp's)" > "$out/llama/LICENSE";;
+esac
+exit 0
+"""
+
+
+def test_8_9_the_tarball_carries_its_licences_and_modes_arent_changes(tmp_path):
+    src = tmp_path / "llama.cpp"
+    src.mkdir()
+    (src / "CMakeLists.txt").write_text("project(x)\n")
+    git = ["git", "-C", str(src), "-c", "user.email=t@t", "-c", "user.name=t"]
+    subprocess.run([*git, "init", "-q"], check=True)
+    subprocess.run([*git, "add", "CMakeLists.txt"], check=True)
+    subprocess.run([*git, "commit", "-qm", "x"], check=True)
+    # 9: modes only (the fork's checkout on the server) — no change to the source
+    subprocess.run([*git, "config", "core.fileMode", "true"], check=True)
+    (src / "CMakeLists.txt").chmod(0o755)
+    stub = tmp_path / "docker"
+    stub.write_text(CONTAINER)
+    stub.chmod(0o755)
+    out = tmp_path / "llama-server.tar.gz"
+    r = subprocess.run(["bash", str(REPO / "scripts" / "build_llama_tarball.sh"), str(src),
+                        str(out)], capture_output=True, text=True,
+                       env={**os.environ, "DOCKER": str(stub)})
+    assert r.returncode == 0, r.stderr[-800:]
+    assert r.stdout.startswith(f"{out} · ") and " · sha256 " in r.stdout
+    with tarfile.open(out) as tar:
+        names = set(tar.getnames())
+        notice = tar.extractfile("llama/NOTICE").read().decode()
+        version = tar.extractfile("llama/VERSION").read().decode()
+    assert {"llama/LICENSE", "llama/NOTICE", "llama/VERSION", "llama/bin/llama-server"} <= names
+    for so in ("libcudart.so.12", "libcublas.so.12", "libcublasLt.so.12"):
+        assert f"  {so}\n" in notice
+    assert "NVIDIA CUDA Toolkit End User License" in notice
+    assert "https://docs.nvidia.com/cuda/eula/" in notice and "  libllama.so\n" in notice
+    assert "build 6543" in version and "build_commit abc1234" in version
+    assert "uncommitted_changes no" in version and "has changes" not in r.stderr
+    # inside the container, llama.cpp's own LICENSE is what is packed
+    assert "cp /build/LICENSE /out/llama/LICENSE" in \
+        (REPO / "scripts" / "build_llama_tarball.sh").read_text()
