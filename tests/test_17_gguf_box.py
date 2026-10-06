@@ -191,11 +191,11 @@ def test_shards_split_and_settings():
     rec = record(None)
     on, off = sf.settings(rec, TASK, True), sf.settings(rec, TASK, False)
     # the model card's sampling for each setting, the thinking switch said out loud
-    assert on == {"max_tokens": 32768, "temperature": 1.0, "top_p": 0.95, "top_k": 20,
+    assert on == {"max_tokens": 81920, "temperature": 1.0, "top_p": 0.95, "top_k": 20,
                   "presence_penalty": 1.5, "chat_template_kwargs": {"enable_thinking": True}}
-    assert off["max_tokens"] == 4096 and off["temperature"] == 0.7 and \
+    assert off["max_tokens"] == 16384 and off["temperature"] == 0.7 and \
         off["chat_template_kwargs"] == {"enable_thinking": False}
-    assert fb.slot_context([TASK], True) == 32768 + 2048
+    assert fb.slot_context([TASK], True) == 81920 + 2048
     # the Frontier suite isn't lm_eval's: deploy step 4 doesn't look for it
     assert "frontier" in config.SUITES and "frontier" in config.NOT_LM_EVAL
     assert "frontier" in served.SUITES
@@ -220,7 +220,7 @@ def test_gguf_run_bundle_and_import(box, monkeypatch, tmp_path):
     assert srv["flags"] == ["--flash-attn", "on"]
     assert srv["env"] == {"LLAMA_MOE_ROUTE_MODE": "lookahead"}
     assert srv["argv"][:2] == ["llama-server", "-m"] and "--jinja" in srv["argv"]
-    assert srv["argv"][srv["argv"].index("-c") + 1] == str(3 * (32768 + 2048))
+    assert srv["argv"][srv["argv"].index("-c") + 1] == str(3 * (81920 + 2048))
     # 17b: …and the launch recorded is the one llama-server was started with
     got = json.loads(launched.read_text().splitlines()[-1])
     assert got["argv"][got["argv"].index("-m") + 2:] == srv["argv"][srv["argv"].index("-m") + 2:]
@@ -229,13 +229,13 @@ def test_gguf_run_bundle_and_import(box, monkeypatch, tmp_path):
     assert srv["binary_sha256"] and srv["tarball_sha256"] == rb.sha256_file(box["tarball"])
     assert srv["chat_template_sha256"] == hashlib.sha256(b"{# a fake template #}").hexdigest()
     assert setup["gpu"] == GPU and setup["where"] == "a rented GPU"
-    assert setup["tasks"][TASK]["budget"] == 32768 and setup["tasks"][TASK]["family"] == "qwen3.6"
+    assert setup["tasks"][TASK]["budget"] == 81920 and setup["tasks"][TASK]["family"] == "qwen3.6"
     assert bundle["format"] == 2 and bundle["row"] == ROW and bundle["tasks"] == {TASK: N * RUNS}
     # asked as the board asks: the card's sampling, the switch, a seed a question and run
     reqs = requests(box)
     assert len(reqs) == N * RUNS
     assert all(r["temperature"] == 1.0 and r["top_k"] == 20 and r["presence_penalty"] == 1.5
-               and r["max_tokens"] == 32768 and r["chat_template_kwargs"] == {
+               and r["max_tokens"] == 81920 and r["chat_template_kwargs"] == {
                    "enable_thinking": True} for r in reqs)
     assert len({r["seed"] for r in reqs}) == N * RUNS
     # no key and no model file in it, anywhere
@@ -389,7 +389,7 @@ def test_served_thinking_run_from_the_board(svc, monkeypatch):  # noqa: F811
         fake.reply = answer
         fake.reasoning = "thinking it through"
         # 17.2: a slot holds GPQA's thinking budget and its prompt (34,816)
-        fake.ctx = 40960
+        fake.ctx = 90112          # 17f: GPQA's 81,920 and its prompt
         rec = served.register({"name": "lda box", "base_url": fake.base, "how": "llama-server",
                                "based_on": "Qwen/Qwen3.6-35B-A3B", "thinking": "off"}, ME)
         # registered thinking off, asked with thinking on: the run says so itself
@@ -406,7 +406,7 @@ def test_served_thinking_run_from_the_board(svc, monkeypatch):  # noqa: F811
         assert row["status"] == "done", row
         assert "GPQA Diamond 100.0%" in row["progress"]
         assert all(b["chat_template_kwargs"] == {"enable_thinking": True}
-                   and b["max_tokens"] == 32768 for b in fake.requests)
+                   and b["max_tokens"] == 81920 for b in fake.requests)
         out = config.OUT_DIR / (rec["id"].replace("/", "__") + "__thinking")
         res = next(sf.task_dir(out, TASK).glob("results_*.json"))
         blob = json.loads(res.read_text())

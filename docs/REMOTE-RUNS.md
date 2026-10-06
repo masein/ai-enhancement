@@ -411,25 +411,30 @@ tarball; the datasets, HLE's images among them). In the search: an **RTX 5090**
 in about 4 minutes; destroy a box that pulls below 25 MB/s).
 
 A slot holds a benchmark's budget and its prompt; the box sizes the context
-from the benchmarks it runs (`--only`). What the pilot measured on a 5090
+from the benchmarks it runs (`--only`). The pilot measured, on a 5090
 (32,607 MiB) beside the phone build's file (22,854,339,808 bytes), the KV
-cache in q8_0 (`--flags "-ctk q8_0 -ctv q8_0 --flash-attn on"`), after load:
+cache in q8_0 (`--flags "-ctk q8_0 -ctv q8_0 --flash-attn on"`): 8 slots of
+36,864 used 26,136 MiB after load, 8 of 67,584 used 29,198. That is 12.76 KiB
+a token of context (the GGUF's header gives 10.6 of it as KV cache;
+llama-server's buffers that grow with the context, the rest) and 665 MiB
+above the file. Under the limits of 6 Oct:
 
-| Benchmarks on the box | Slot | `--slots` | Memory used |
-|---|---|---|---|
-| GPQA, HLE, MMLU-Pro, SimpleQA, thinking on | 34,816–36,864 | 8 | 26,136 MiB, measured |
-| OTIS, MATH Level 5, or anything run with them, thinking on | 67,584 | 8 | 29,198 MiB, measured |
-| ARC-AGI-2 (its prompts run to 30,000 tokens), thinking on | 98,304 | 5 | about 28,400 MiB (it started) |
-| any, thinking off (ARC-AGI-2 isn't asked) | 6,144–10,240 | 8 | about 23,500 MiB |
+| Benchmarks on the box | Slot | `--slots` | Memory used, by the pilot's numbers | The box's own check |
+|---|---|---|---|---|
+| MMLU-Pro, SimpleQA, thinking on | 34,816–36,864 | 8 | 26,136 MiB, measured | 8 fit |
+| MATH Level 5, thinking on | 67,584 | 8 | 29,198 MiB, measured | 8 fit |
+| GPQA, OTIS (or MATH with them), thinking on | 83,968 | 8 | about 30,830 MiB | 8 fit, 1,154 MiB spare |
+| HLE (or anything with it), thinking on | 86,016 | 7 | about 29,960 MiB | 8 would leave 950 MiB: 7 run |
+| ARC-AGI-2 (its prompts run to 30,000 tokens), thinking on | 114,688 | 5 | about 29,600 MiB | 6 fit; 5, as the pilot ran it |
+| any, thinking off (ARC-AGI-2 isn't asked) | 5,120–20,480 | 8 | about 24,500 MiB at most | 8 fit |
 
-That is 12.76 KiB a token of context (the GGUF's header gives 10.6 of it as KV
-cache; llama-server's buffers that grow with the context, the rest) and
-665 MiB above the file. The box works this out from the header before it
-fetches anything, keeping 1 GB spare, and refuses slots that don't fit, saying
-how many do; it prints its estimate either way. More slots would fit at the
-shorter contexts (16 of 36,864 is about 30,300 MiB), but nothing has measured
-whether they answer faster: the plan keeps 8. `--slots-fit` runs the slots
-given whatever the estimate says.
+The box works this out from the GGUF's header before it fetches anything,
+keeping 1,024 MiB spare, and prints the room left in MiB either way. A step
+planned at 8 slots that doesn't fit runs as many as do, down to 7
+(`--min-slots 7`, which the box's line gives), and says so; fewer than that
+is refused before the fetch. More slots would fit at the shorter contexts,
+but nothing has measured whether they answer faster: the plan keeps 8.
+`--slots-fit` runs the slots given whatever the estimate says.
 
 ## G1b. The pilot's first step: does the box answer as the server does?
 
@@ -489,7 +494,9 @@ python scripts/remote_gguf.py --as served/<phone-build> --gguf hf://<you>/evalbo
 ```
 
 It asks each question twice (1,000 answers at 8 slots), the second time for
-the box's agreement with itself.
+the box's agreement with itself. In the full run nothing more is needed:
+box A3 of each build (B12 in plan B) asks these first, and G3–G4's fetch
+compares the box's file with the server's when `--parity` names it.
 
 It fetches the GGUF and the tarball into `/workspace/files`, a folder every
 run on the box shares: the full run (G2) after it fetches and hashes nothing
@@ -547,22 +554,28 @@ Then **the box's one line**, G5's, with the build's three values. Its steps
 run one after the other (a thinking-on benchmark, then thinking-off ones),
 each a `remote_gguf.py` command with its own `--out`, so the box needs no
 second visit. The **phone build** (k4-LDA), registered as "routing local (no
-lookahead)": no routing variables. G5's box A3, for example:
+lookahead)": no routing variables. G5's box A5, for example:
 
 ```bash
-python scripts/frontier_box.py A3 --as served/<phone-build> --gguf hf://<you>/evalboard-private/Qwen3.6-35B-A3B-k4-LDA-UD-Q4_K_XL.gguf --server hf://<you>/evalboard-private/llama-server-cuda12.8.tar.gz
+python scripts/frontier_box.py A5 --as served/<phone-build> --gguf hf://<you>/evalboard-private/Qwen3.6-35B-A3B-k4-LDA-UD-Q4_K_XL.gguf --server hf://<you>/evalboard-private/llama-server-cuda12.8.tar.gz
 ```
 
 The **original build** (k=8): none either.
 
 ```bash
-python scripts/frontier_box.py A3 --as served/<original-build> --gguf hf://<you>/evalboard-private/<original-build-file>.gguf --server hf://<you>/evalboard-private/llama-server-cuda12.8.tar.gz
+python scripts/frontier_box.py A5 --as served/<original-build> --gguf hf://<you>/evalboard-private/<original-build-file>.gguf --server hf://<you>/evalboard-private/llama-server-cuda12.8.tar.gz
 ```
+
+Box A3 of each build asks the parity questions first (G1b's, 500 of
+MMLU-Pro, each twice: about half an hour), then its benchmarks. Each build's
+steps go in a folder of its own, `/workspace/<build>/A5-1`, … (the name
+after `served/`), so one box can run the other build after the first.
 
 Each step's command is printed before it runs: the box's benchmarks
 (`--only`), its shard, its slots, the thinking setting, `--flags "-ctk q8_0
--ctv q8_0 --flash-attn on"` and `--based-on Qwen/Qwen3.6-35B-A3B`, into
-`/workspace/<box>-<step>`. The import refuses a bundle whose routing
+-ctv q8_0 --flash-attn on"` and `--based-on Qwen/Qwen3.6-35B-A3B`, the box's
+label (`--label A5`, kept in its bundle and its progress file), into
+`/workspace/<build>/<box>-<step>`. The import refuses a bundle whose routing
 variables or speculative-decoding flags aren't the ones registered for its
 `--as` (memory, context, slots, the cache type, flash attention and threads
 may differ: the parity check covers them). A setup registered **with
@@ -593,34 +606,61 @@ variables from `--env` only, each one recorded: one exported in the shell
 isn't passed, and the first lines say so.
 
 A question the server fails on is asked once more at the end of its
-benchmark. Failing again, it is written as no answer, counted wrong, and named
-in the log and on the row; the run carries on to the next benchmark. A server
-that fails every question it is asked, or more than one in fifty, stops the
-run, and keeps none of them.
+benchmark. Failing again with an error of its own — a 4xx (its prompt and
+budget too long for the context), or no answer within the timeout from a
+server that is up — it is written as no answer, counted wrong, and named in
+the log, on the row and on the import's line. A 5xx is the server's, whatever
+its health check says: the question is kept, the run carries on to the next
+benchmark, the step isn't whole, and pasting the line again asks it again;
+only after failing on three separate runs is it written off.
+`--ask-written-off` on the box's line asks again what was written off. A
+server that fails every question it is asked, or more than one in fifty,
+stops the run, and keeps none of them.
 
 The bundle's name says the model, the thinking setting, the benchmarks and
-the shard — `frontier-served__<phone-build>-thinking-on-gpqa+otis.tar.gz`,
-`…-thinking-on-mmlu-pro-shard-1-of-3.tar.gz` — and the last line prints it.
+the shard — `frontier-served__<phone-build>-thinking-on-mmlu-pro.tar.gz` (box
+A5), `…-thinking-on-hle-shard-1-of-4.tar.gz` (A1), `…-thinking-off-gpqa+otis.tar.gz`
+(A1's second step) — and the last line prints it.
 
 ## G3–G4. Fetch and import, from the server
 
-One command for every box: each box's bundles are copied into
-`~/benchmarks/bundles` and imported with its build's `--file-sha256`, one
-line a box and one line a bundle. The boxes as vast.ai's SSH line gives them
-(`ssh -p <port> root@<host>`: give `<host>:<port>`), with your key:
+One command for every box: each box is asked over SSH, once, for its bundles
+(with their sha256), its parity file and each step's progress; its bundles
+are copied into `~/benchmarks/bundles` and imported with the build's
+`--file-sha256`, a box at a time, as soon as they are here. The boxes as
+vast.ai's SSH line gives them (`ssh -p <port> root@<host>`: give
+`<host>:<port>`), with your key; and the server's parity files from G1b, so
+the boxes' are compared with them:
 
 ```bash
 cd ~/benchmarks/aienh
-python3 scripts/frontier_fetch.py --key ~/.ssh/id_ed25519 --sha served/<phone-build>=<the phone file's sha256 from G0> --sha served/<original-build>=<the original file's sha256 from G0> <host 1>:<port 1> <host 2>:<port 2> <host 3>:<port 3>
+python3 scripts/frontier_fetch.py --key ~/.ssh/id_ed25519 --sha served/<phone-build>=<the phone file's sha256 from G0> --sha served/<original-build>=<the original file's sha256 from G0> --parity served/<phone-build>=/home/masein/benchmarks/parity/phone-server.jsonl --parity served/<original-build>=/home/masein/benchmarks/parity/orig-server.jsonl --every 15m <host 1>:<port 1> <host 2>:<port 2> <host 3>:<port 3>
 ```
 
-It asks for your password once (`sudo`, for the container). Run it whenever:
-a bundle imported already says so, and nothing changes; a shard waits for
-the others. A box with nothing whole yet says "no bundle there yet". By hand,
-one bundle:
+It asks for your password once (`sudo`, for the container): run it in a tmux
+pane of its own. `--every 15m` does it all again every 15 minutes until every
+box is done. Each box's first line says whether it is **safe to destroy**:
+every step whole, and every bundle it holds here with the same sha256 and
+imported. Otherwise "NOT safe to destroy" and why — a step still asking (its
+progress beside: what it asks, n of N, its restarts, when it was last
+written), a step stopped (paste its line again), a bundle NOT copied, an
+import refused. A copy goes to a temporary name and counts only when its
+sha256 is the box's: a failed copy leaves an older one here as it was. A box
+that doesn't answer is given up on (a 15-second connect timeout, no prompts)
+and said so. The exit code isn't 0 when a box couldn't be reached, a copy
+failed or an import was refused.
+
+Run it whenever: a bundle made again (the box's line pasted again) holds the
+same answers, and the import says so and changes nothing, its grades kept; a
+step's bundle with more answers adds them, the grades of the rest kept. A
+step of two benchmarks fetched while only its first is whole brings that one;
+the second comes with a later fetch, and the first's answers and grades stay
+as they are. A shard waits for the others. A box's parity file is compared
+with the server's when `--parity` gives it, and the verdict is printed (G1b);
+an import never waits for it. By hand, one bundle:
 
 ```bash
-scp -i ~/.ssh/id_ed25519 -P <port> root@<host>:/workspace/A3-1/frontier-served__<phone-build>-thinking-on-mmlu-pro.tar.gz ~/benchmarks/bundles/
+scp -i ~/.ssh/id_ed25519 -P <port> root@<host>:/workspace/<phone-build>/A5-1/frontier-served__<phone-build>-thinking-on-mmlu-pro.tar.gz ~/benchmarks/bundles/
 ```
 
 ```bash
@@ -670,57 +710,65 @@ graders or prompts names both and isn't final: choose one and grade again.
 ## G5. The full run: which box runs what
 
 From the pilot's paces (one 5090, the phone build, 8 slots; ARC-AGI-2 at 5),
-one build:
+one build, under the limits of 6 Oct. Each answer that ran out of room on
+the pilot is taken to run to the new limit (2 of 20 GPQA, 17 of 54 HLE, 8 of
+16 OTIS and 3 of 10 ARC-AGI-2 with thinking on; 4 of 20 GPQA, 20 of 54 HLE, 8
+of 16 OTIS and 11 of 301 MMLU-Pro with it off), at the same tokens a second —
+the most it could take, more if the card writes slower at long contexts. HLE
+with thinking on runs 7 slots (G1): its hours are 8/7 of 8 slots'.
 
 | Benchmark | Answers | Thinking on | Thinking off |
 |---|---|---|---|
-| Humanity's Last Exam | 2,158 | 47.5 s each, 28.5 h | 5.0 s, 3.0 h |
-| MMLU-Pro | 12,032 | 5.3 s, 17.7 h | 1.9 s, 6.4 h |
-| MATH Level 5 | 1,324 | 35.3 s, 13.0 h | 5.2 s, 1.9 h |
-| OTIS Mock AIME | 45 × 8 | 104.3 s, 10.4 h | 9.1 s, 0.9 h |
-| ARC-AGI-2 | 167 test grids × 2 | 109.4 s, 10.1 h | not asked |
-| GPQA Diamond | 198 × 4 | 23.2 s, 5.1 h | 4.3 s, 1.0 h |
-| SimpleQA Verified | 1,000 | not measured; about 1 h | 0.6 s, 0.2 h |
-| **One build** | | **85.9 h** | **13.3 h** |
+| Humanity's Last Exam | 2,158 | 56.7 h (7 slots) | 8.5 h |
+| MMLU-Pro | 12,032 | 17.7 h | 7.4 h |
+| MATH Level 5 | 1,324 | 13.0 h | 1.9 h |
+| OTIS Mock AIME | 45 × 8 | 12.6 h | 1.7 h |
+| ARC-AGI-2 | 167 test grids × 2 | 11.6 h | not asked |
+| GPQA Diamond | 198 × 4 | 8.6 h | 2.0 h |
+| SimpleQA Verified | 1,000 | not measured; about 1 h | 0.2 h |
+| **One build** | | **121.2 h** | **21.7 h** |
 
-99.1 box-hours a build, 198 for both. ARC-AGI-2's 120 tasks hold 167 test
-grids at the pinned revision, each asked twice. The paces come from small
-shards (16 to 301 answers): read them as ±25%.
+142.9 box-hours a build, 286 for both, and half an hour a build for the
+parity questions. ARC-AGI-2's 120 tasks hold 167 test grids at the pinned
+revision, each asked twice. The paces come from small shards (16 to 301
+answers): read them as ±25%. `python scripts/frontier_box.py --list A`
+prints a plan with each step's hours.
 
-Two plans, the same work and the same money; one line a box (G2), each
-build's boxes the same. **Plan A**: fewer boxes, each for longer.
-
-| Box | Its steps | about |
-|---|---|---|
-| A1 | HLE on, shard 1/2; then HLE off | 17.2 h |
-| A2 | HLE on, shard 2/2; then OTIS and MATH off | 17.1 h |
-| A3 | MMLU-Pro on | 17.7 h |
-| A4 | MATH and SimpleQA on; then GPQA and SimpleQA off | 15.1 h |
-| A5 | ARC-AGI-2 on (5 slots); then GPQA on | 15.3 h |
-| A6 | OTIS on; then MMLU-Pro off | 16.8 h |
-
-Six boxes a build, twelve in all: about **20 hours** from the first box to
-the last bundle, starting a box every ten minutes or so.
-
-**Plan B**: more boxes, each for about 10 hours.
+**Plan A** (chosen on 6 Oct): about 18 hours a box.
 
 | Box | Its steps | about |
 |---|---|---|
-| B1 | HLE on, shard 1/3; then OTIS off | 10.4 h |
-| B2 | HLE on, shard 2/3 | 9.5 h |
-| B3 | HLE on, shard 3/3 | 9.5 h |
-| B4 | MMLU-Pro on, shard 1/2; then SimpleQA on | 9.9 h |
-| B5 | MMLU-Pro on, shard 2/2; then GPQA and SimpleQA off | 10.0 h |
-| B6 | MATH on, shard 1/2; then MMLU-Pro off, shard 1/2 | 9.7 h |
-| B7 | MATH on, shard 2/2; then MMLU-Pro off, shard 2/2 | 9.7 h |
-| B8 | ARC-AGI-2 on (5 slots) | 10.1 h |
-| B9 | OTIS on | 10.4 h |
-| B10 | GPQA on; then HLE and MATH off | 10.0 h |
+| A1 | HLE on, shard 1/4; then GPQA and OTIS off | 17.9 h |
+| A2 | HLE on, shard 2/4; then MATH and SimpleQA off | 16.3 h |
+| A3 | the parity questions; then HLE on, shard 3/4 | 14.7 h |
+| A4 | HLE on, shard 4/4 | 14.2 h |
+| A5 | MMLU-Pro on | 17.7 h |
+| A6 | MATH and SimpleQA on | 14.0 h |
+| A7 | OTIS on; then MMLU-Pro off, shard 1/2 | 16.3 h |
+| A8 | ARC-AGI-2 on (5 slots); then MMLU-Pro off, shard 2/2 | 15.3 h |
+| A9 | GPQA on; then HLE off | 17.1 h |
 
-Ten boxes a build, twenty in all: about **13–14 hours** from the first box to
-the last bundle. An eleventh box a build would take the longest from 10.4
-hours to about 9.5. A box that stops loses its hours until its line is pasted
-again: shorter boxes lose less.
+Nine boxes a build, eighteen in all: about **20 hours** from the first box to
+the last bundle, starting a box every ten minutes or so. Eight would do it
+with HLE in thirds, the longest 18.9 hours.
+
+**Plan B**: about 10 hours a box.
+
+| Box | Its steps | about |
+|---|---|---|
+| B1–B6 | HLE on, shard 1/6 … 6/6 | 9.5 h each |
+| B7 | MMLU-Pro on, shard 1/2; then SimpleQA on | 9.9 h |
+| B8 | MMLU-Pro on, shard 2/2; then SimpleQA off | 9.0 h |
+| B9 | MATH on, shard 1/2; then MMLU-Pro off, shard 1/2 | 10.2 h |
+| B10 | MATH on, shard 2/2; then MMLU-Pro off, shard 2/2 | 10.2 h |
+| B11 | OTIS on, shard 1/2; then GPQA and MATH off | 10.2 h |
+| B12 | the parity questions; then OTIS on, shard 2/2; then OTIS off | 8.5 h |
+| B13 | ARC-AGI-2 on, shard 1/2 (5 slots); then HLE off, shard 1/2 | 10.1 h |
+| B14 | ARC-AGI-2 on, shard 2/2 (5 slots); then HLE off, shard 2/2 | 10.1 h |
+| B15 | GPQA on | 8.6 h |
+
+Fifteen boxes a build, thirty in all: about **13–14 hours**. A box that stops
+loses its hours until its line is pasted again: shorter boxes lose less.
 
 Every shard of a benchmark is run with the same tarball, flags and
 environment: the import refuses to merge shards that differ. The bundles
@@ -735,12 +783,11 @@ thinking on unless it says otherwise), from the **BF16** GGUF (no
 quantisation, 50.5 GB) on one 80–96 GB card (an H100 80 GB, or an RTX PRO
 6000), with **100 GB of disk**.
 
-GPQA alone is recommended. Gemma's pace isn't measured: at Qwen's on the
-5090, up to twice that for BF16's larger reads a token, GPQA's 792 answers
-take 5–10 hours, **$5–20** at $1–2 an hour; with OTIS Mock AIME's 360 as
-well, 15–31 hours, **$16–62**. OTIS's band below is ±16 points, so it tests
-little for two thirds of the cost. To run OTIS too, add `--only
-otis_aime_epoch` to the command below.
+GPQA alone, as chosen on 6 Oct. Gemma's pace isn't measured: at Qwen's on
+the 5090 under the limits of 6 Oct (81,920 with thinking on), up to twice
+that for BF16's larger reads a token, GPQA's 792 answers take 9–17 hours,
+**$9–34** at $1–2 an hour. (With OTIS Mock AIME's 360 as well it would be
+about 21–43 hours: OTIS's band below is ±16 points, so it tests little.)
 
 After G2's first three blocks (tmux, `cd /app`, the token):
 
@@ -775,48 +822,41 @@ nothing is badly off. A miss is reported with its interval, never adjusted.
 
 ## The bill, from the pilot
 
-| | Box-hours, both builds | At $0.44–0.63 an hour |
-|---|---|---|
-| Plan A: 12 boxes, the longest 17.7 h | about 202 | **$89–127** |
-| Plan B: 20 boxes, the longest 10.4 h | about 204 | **$90–129** |
+| | Box-hours, both builds | At $0.44–0.63 an hour | The paces ±25% |
+|---|---|---|---|
+| **Plan A**: 18 boxes, the longest 17.9 h | about 300 | **$132–189** | $101–234 |
+| Plan B: 30 boxes, the longest 10.2 h | about 310 | $136–195 | $105–240 |
 
-G5's 198 box-hours and about 0.3 hours a box to start (the fetch, the load).
-The paces are read as ±25%: $67–161 either way. A larger token limit (below)
-adds time. The parity check's boxes (500 questions twice, both builds): about
-1.2 box-hours, under $1. The calibration (G6): GPQA only, $5–20; with OTIS,
-$16–62. Grading (stage 3, after a yes): MMLU-Pro is scored by code and adds
-nothing; SimpleQA Verified's and HLE's graders, and Epoch's model check on
-MATH and OTIS, are priced by the dry run on AI models from the bundles' own
-answers once they are in.
+G5's 286 box-hours, the parity questions' 1, and for each box about 0.3 hours
+to start (the fetch, the load) and 0.5 hours from its last bundle to being
+destroyed (the fetch's `--every 15m`, then destroying it). The calibration
+(G6): GPQA alone, $9–34. Grading (stage 3, after a yes): MMLU-Pro is scored
+by code and adds nothing; SimpleQA Verified's and HLE's graders, and Epoch's
+model check on MATH and OTIS, are priced by the dry run on AI models from the
+bundles' own answers once they are in.
 
 ## Token limits: ours, the model's card's and Epoch's
 
 Epoch AI states no limit: it runs each model at its API's defaults, at the
 highest reasoning effort it offers (an exception it names: Grok 4 at 128,000,
 as xAI recommends). Qwen3.6-35B-A3B's card recommends 32,768 tokens "for most
-queries" and 81,920 "for benchmarking on highly complex problems". Ours, and
-what ran out of room on the pilot:
+queries" and 81,920 "for benchmarking on highly complex problems". On 6 Oct,
+after the pilot, masein said yes to 17e's proposal, and these are the limits
+now (`scripts/frontier.py`):
 
-| Benchmark | Ours, on (off) | Ran out, on | Ran out, off | Proposed, on (off) |
-|---|---|---|---|---|
-| GPQA Diamond | 32,768 (4,096) | 2 of 20 | 4 of 20 | 81,920 (16,384) |
-| Humanity's Last Exam | 32,768 (4,096) | 17 of 54 | 20 of 54 | 81,920 (16,384) |
-| OTIS Mock AIME | 65,536 (8,192) | 8 of 16 | 8 of 16 | 81,920 (16,384) |
-| MATH Level 5 | 65,536 (8,192) | 0 of 34 | 0 of 34 | as ours |
-| ARC-AGI-2 | 65,536 (not asked) | 3 of 10 | — | 81,920 |
-| MMLU-Pro | 32,768 (4,096) | 0 of 174 | 11 of 301 | as ours (8,192) |
-| SimpleQA Verified | 32,768 (4,096) | not asked | 0 of 25 | as ours |
+| Benchmark | Before, on (off) | Ran out on the pilot, on / off | Now, on (off) |
+|---|---|---|---|
+| GPQA Diamond | 32,768 (4,096) | 2 of 20 / 4 of 20 | 81,920 (16,384) |
+| Humanity's Last Exam | 32,768 (4,096) | 17 of 54 / 20 of 54 | 81,920 (16,384) |
+| OTIS Mock AIME | 65,536 (8,192) | 8 of 16 / 8 of 16 | 81,920 (16,384) |
+| MATH Level 5 | 65,536 (8,192) | 0 of 34 / 0 of 34 | as before |
+| ARC-AGI-2 | 65,536 (not asked) | 3 of 10 / — | 81,920 |
+| MMLU-Pro | 32,768 (4,096) | 0 of 174 / 11 of 301 | 32,768 (8,192) |
+| SimpleQA Verified | 32,768 (4,096) | not asked / 0 of 25 | as before |
 
-Ours is smaller than Epoch's wherever an answer ran out: Epoch's would let it
-go on. The proposal is the card's 81,920 for the hard benchmarks with
-thinking on, and four times ours with it off. **Nothing changes without
-masein's yes.** At the most, every answer that ran out running to the new
-limit at the same tokens a second: HLE on about 50 hours a build instead of
-28.5, GPQA on 8.6 instead of 5.1, OTIS on 12.6 instead of 10.4, ARC-AGI-2
-11.6 instead of 10.1, and the thinking-off runs about 22 hours instead of 13
-— about 136 box-hours a build instead of 99 (about $120–175 for both builds),
-more if long contexts slow the card. HLE's and GPQA's slots would hold 86,016
-tokens: by the pilot's numbers 8 fit with 1.5 GB to spare, and the box's
-check, keeping 1 GB more, allows 7 (8 with `--slots-fit`). Each import says how many of the answers that ran out end in a
-loop (the last passage repeating): those gain nothing from more room. Each
-cell shows the share that ran out, beside its score.
+A model served on the board needs as much context a slot to sit them: 83,968
+tokens for GPQA or OTIS with thinking on, 86,016 for HLE, 114,688 for
+ARC-AGI-2; a smaller one is refused in words before anything is asked. Each
+import says how many of the answers that ran out end in a loop (the last
+passage repeating), and each cell shows the share that ran out, beside its
+score.

@@ -246,8 +246,9 @@ def test_7_a_box_names_its_benchmarks_in_its_bundle(box):  # noqa: F811
 
 
 def test_8_a_context_the_card_cant_hold_is_refused_before_the_download(tmp_path):
-    with pytest.raises(SystemExit, match="8 slots of 98,304 tokens \\(ARC-AGI-2's, thinking "
-                                         "on\\) is 786,432 tokens of context"):
+    # 17f: ARC-AGI-2's 81,920 and its prompts' 32,768
+    with pytest.raises(SystemExit, match="8 slots of 114,688 tokens \\(ARC-AGI-2's, thinking "
+                                         "on\\) is 917,504 tokens of context"):
         rg.main(["--as", SERVED, "--gguf", "hf://me/private/m.gguf", "--server",
                  "hf://me/private/s.tar.gz", "--thinking", "on", "--only", "arc_agi2_public",
                  "--out", str(tmp_path / "o")])

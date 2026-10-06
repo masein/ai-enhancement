@@ -245,6 +245,14 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
     (d / SETUP).write_text(json.dumps(new, indent=1, sort_keys=True), encoding="utf-8")
     path = d / ANSWERS
     done = read_answers(path)
+    if config.FRONTIER_ASK_WRITTEN_OFF:
+        # 17f: asked again, what earlier runs wrote off (--ask-written-off)
+        again = [k for k, r in done.items() if r.get("unanswered")]
+        for k in again:
+            done.pop(k)
+        if again:
+            _failed_runs(d, clear=again)
+            log(f"[frontier] {task}: {len(again)} written off before, asked again")
     want = [(it, e) for it in items for e in range(spec["epochs"])]
     todo = [(it, e) for it, e in want if (it["id"], e) not in done]
     total, have = len(want), len(want) - len(todo)
@@ -360,13 +368,61 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
             raise served.ServerStopped(count["n"], total, why, refused=(
                 f"the server stopped answering ({why}): {len(failed)} question(s) it failed on "
                 "are asked again by the next run, nothing written for them"))
+        # 17f: written off only when the refusal is the question's own (a 4xx —
+        # too long for its context — or no answer within the timeout), or
+        # when it failed on WRITE_OFF_RUNS separate runs. A 5xx on real
+        # requests is the server's, whatever the probe says: kept, and asked
+        # again by the next run (20 left that all answered 500 were written
+        # off for good while the probe answered)
+        runs_failed = _failed_runs(d, add=[k for k, why in failed.items() if not _own(why)])
+        kept = 0
         for (qid, e), why in sorted(failed.items()):
+            n_runs = runs_failed.get(gkey(qid, e), 0)
+            if not _own(why) and n_runs < WRITE_OFF_RUNS:
+                kept += 1
+                continue
             write({"id": qid, "epoch": e, "seed": fb.seed_of(task, qid, e), "answer": "",
                    "finish": None, "tokens": None, "unanswered": why[:300] or "no reason given",
                    "at": round(time.time(), 3)})
-            log(f"[frontier] {task}: question {qid}, run {e}: the server failed on it twice — "
-                f"written as no answer, counted wrong ({why[:200]})")
+            log(f"[frontier] {task}: question {qid}, run {e}: the server failed on it twice"
+                + (f", on {n_runs} separate runs" if not _own(why) else "")
+                + f" — written as no answer, counted wrong ({why[:200]})")
+        if kept:
+            log(f"[frontier] {task}: {kept} question(s) the server failed on with an error that "
+                f"isn't theirs (a 5xx) — kept, and asked again by the next run; written off "
+                f"after {WRITE_OFF_RUNS} runs")
     return count["n"], total
+
+
+WRITE_OFF_RUNS = 3
+FAILED_RUNS = "failed_runs.json"
+
+
+def _own(why: str) -> bool:
+    """17f: the refusal is the question's own — a 4xx (its prompt and budget
+    too long for the context, a request the server can't take), or no answer
+    within the timeout from a server that is up — never a 5xx"""
+    m = re.match(r"HTTP (\d{3})", why or "")
+    if m:
+        return 400 <= int(m.group(1)) < 500 and int(m.group(1)) not in (401, 403, 408, 429)
+    return "no answer within" in (why or "")
+
+
+def _failed_runs(d: Path, add: list | None = None, clear: list | None = None) -> dict:
+    """17f: how many separate runs each question failed on with a 5xx —
+    counted once a run, cleared once it is asked again on purpose"""
+    p = d / FAILED_RUNS
+    try:
+        got = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        got = {}
+    for k in clear or []:
+        got.pop(gkey(*k), None)
+    for k in add or []:
+        got[gkey(*k)] = int(got.get(gkey(*k), 0)) + 1
+    if add or clear:
+        p.write_text(json.dumps(got), encoding="utf-8")
+    return got
 
 
 def still_answers(rec: dict, task: str, path: Path, s: dict, failed: dict) -> bool:
@@ -825,7 +881,7 @@ def run(sid: int, sub: dict, rec: dict, th: dict, row: Path, log_path: Path) -> 
     log(f"[frontier] {rec['id']} · thinking {'on' if on else 'off'} · "
         f"{', '.join(tasks)} · sampling {family_of(rec) or 'the server’s defaults'}"
         + (f" · shard {sh[0]} of {sh[1]}" if sh else "") + f" · on {_where()}")
-    lines = []
+    lines, incomplete = [], []
     for task in tasks:
         label = fb.BENCH[task]["label"]
 
@@ -869,10 +925,12 @@ def run(sid: int, sub: dict, rec: dict, th: dict, row: Path, log_path: Path) -> 
             return "canceled", f"{label}: stopped at {n:,} of {total:,}; the answers are kept"
         log(f"[frontier] {task}: {n:,} of {total:,} answered")
         if n < total:
-            # 17b: the questions the server failed on, not kept: the next run asks them
-            return "failed", " · ".join([*lines, f"{label}: {n:,} of {total:,} answered — the "
-                                         f"server failed on {total - n:,}; the next run asks "
-                                         "them again"])
+            # 17b: the questions the server failed on, not kept: the next run asks
+            # them. 17f: and this run carries on to the next benchmark — one
+            # question that fails with a 5xx left a box's other benchmarks unasked
+            incomplete.append(f"{label}: {n:,} of {total:,} answered — the server failed on "
+                              f"{total - n:,}; the next run asks them again")
+            continue
         if not config.FRONTIER_SCORE_AFTER_RUN or sh:
             lines.append(f"{label}: {n:,} of {total:,} answered")
             continue
@@ -882,4 +940,6 @@ def run(sid: int, sub: dict, rec: dict, th: dict, row: Path, log_path: Path) -> 
             log(f"[frontier] {words(task, sc)}")
         if sc and sc.get("refused"):
             return "failed", " · ".join(lines)
+    if incomplete:
+        return "failed", " · ".join([*lines, *incomplete])
     return "done", " · ".join(lines)

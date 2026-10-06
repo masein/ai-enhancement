@@ -65,12 +65,12 @@ def test_1_the_kv_cache_is_worked_out_from_the_header_and_the_card(box, monkeypa
     assert rg.kv_per_token(shape, "q8_0", "q8_0") == 52224
     hybrid = gguf_header.shape(open(gguf(tmp_path / "h.gguf", full_attention_interval=4), "rb"))
     assert sum(1 for h in hybrid["kv_heads"] if h) == 12
-    # an 8 GB card: 8 slots of GPQA's 34,816 — under the stated limit, more than it holds
+    # an 8 GB card: 8 slots of GPQA's 83,968 (17f) — more than it holds
     monkeypatch.setattr(rb, "gpu_info", lambda: {**GPU, "memory_mib": 8192})
     # 17e: with the buffers that grow with the context and the stated room
-    with pytest.raises(SystemExit, match=r"8 slots of 34,816 tokens \(GPQA Diamond's, thinking "
-                                         r"on\) would use about 14.9 GB .*q8_0/q8_0 cache, 51.0 "
-                                         r"KB a token.*at most 3 slots fit — give --slots 3"):
+    with pytest.raises(SystemExit, match=r"8 slots of 83,968 tokens \(GPQA Diamond's, thinking "
+                                         r"on\) would use about 34.8 GB .*q8_0/q8_0 cache, 51.0 "
+                                         r"KB a token.*at most 1 slot fit — give --slots 1"):
         run_box(box, "run", "--gguf", str(path), "--slots", "8",
                 "--flags", "-ctk q8_0 -ctv q8_0 --flash-attn on")
     assert not (box["root"] / "files").exists() or not any((box["root"] / "files").iterdir())
@@ -491,7 +491,8 @@ def test_28_parity_compares_the_files_by_sha256_and_sizes_only_like_with_like(tm
         for path, head in ((s, {"side": "server", "as": SERVED, "file": server_file,
                                 "launch": launch, **n}),
                            (b, {"side": "box", "as": SERVED, "file": box_file,
-                                "server": {"flags": [], "env": {}}, **n})):
+                                "server": {"flags": [], "env": {}}, **n,
+                                **({"twice": True} if n else {})})):
             path.write_text("".join(json.dumps(x) + "\n" for x in [{"parity_of": head},
                                                                     *rows]))
         return str(s), str(b)

@@ -81,6 +81,10 @@ from remote_run import Out, board_commit  # noqa: E402
 
 SUITE = "frontier"
 STATE = "remote_gguf.json"
+# 17f: what the step is doing, for frontier_fetch.py to read without
+# importing anything — its label, the model, the benchmark it asks, its line,
+# when it started and its sessions; never the box's address
+PROGRESS = "progress.json"
 OWN_LOG = "remote_gguf.log"
 SERVER_LOG = "llama-server.log"
 # what this script sets itself: given in --flags, refused
@@ -90,11 +94,13 @@ ENV = {"BENCH_ROOT": "BENCH_ROOT", "RESULTS_ROOT": "OUT_ROOT", "LOGS_DIR": "LOGS
        "DB_PATH": "SERVICE_DB", "FRONTIER_SHARD": "FRONTIER_SHARD",
        "FRONTIER_SCORE_AFTER_RUN": "FRONTIER_SCORE_AFTER_RUN", "FRONTIER_WHERE": "FRONTIER_WHERE",
        "SERVED_CONCURRENCY": "SERVED_CONCURRENCY", "SERVED_TIMEOUT_S": "SERVED_TIMEOUT_S",
-       "SERVED_RETRY_S": "SERVED_RETRY_S", "GPU_POLL_S": "GPU_POLL_S"}
+       "SERVED_RETRY_S": "SERVED_RETRY_S", "GPU_POLL_S": "GPU_POLL_S",
+       "FRONTIER_ASK_WRITTEN_OFF": "FRONTIER_ASK_WRITTEN_OFF"}
 WHERE = "a rented GPU"
 
 
-def settings(out: Path, slots: int, shard: tuple[int, int] | None) -> dict:
+def settings(out: Path, slots: int, shard: tuple[int, int] | None,
+             ask_again: bool = False) -> dict:
     bench = out / "bench"
     return {"BENCH_ROOT": bench, "RESULTS_ROOT": bench / "results", "LOGS_DIR": bench / "logs",
             "DB_PATH": bench / "service.sqlite3",
@@ -103,13 +109,15 @@ def settings(out: Path, slots: int, shard: tuple[int, int] | None) -> dict:
             "SERVED_CONCURRENCY": slots,
             # a thinking answer of 65,536 tokens, at a slot's pace
             "SERVED_TIMEOUT_S": int(os.environ.get("SERVED_TIMEOUT_S") or 7200),
-            "SERVED_RETRY_S": int(os.environ.get("SERVED_RETRY_S") or 300), "GPU_POLL_S": 10}
+            "SERVED_RETRY_S": int(os.environ.get("SERVED_RETRY_S") or 300), "GPU_POLL_S": 10,
+            "FRONTIER_ASK_WRITTEN_OFF": ask_again}
 
 
-def configure(out: Path, slots: int, shard: tuple[int, int] | None) -> dict:
+def configure(out: Path, slots: int, shard: tuple[int, int] | None,
+              ask_again: bool = False) -> dict:
     """the board's config, pointed at --out: set in the environment before
     the service is imported, and on config itself when it already was"""
-    vals = settings(out, slots, shard)
+    vals = settings(out, slots, shard, ask_again)
     for k, v in vals.items():
         os.environ[ENV[k]] = "0" if v is False else str(v)
     from service import config, runner
@@ -252,9 +260,11 @@ SERVER_VARS = ("LLAMA_", "GGML_")
 
 
 # 17c: what G1's table fits beside the 23 GB file on a 32 GB card, the KV
-# cache in q8_0: 8 slots of OTIS's and MATH's 67,584. A run asking more is
-# refused before anything is fetched (--max-context for a larger card)
-MAX_CONTEXT = 8 * 67_584
+# cache in q8_0, when the header can't be read. A run asking more is refused
+# before anything is fetched (--max-context for a larger card). 17f: the
+# pilot's card, 12.76 KiB a token measured, holds 8 slots of HLE's 86,016
+# with 1.5 GB spare
+MAX_CONTEXT = 8 * 86_016
 
 
 # 17d: the KV cache's size, worked out from the GGUF's own header and the
@@ -586,6 +596,8 @@ def make_bundle(out: Path, served_as: str, thinking: bool, tasks: list[str], sta
              "gguf": gguf, "server": server, "tasks": per, "gpu": rb.gpu_info(),
              "where": WHERE, "runner": "service/runner.py → service/frontier.py, called directly",
              "board_commit": board_commit(), "sessions": state.get("sessions", 1),
+             # 17f: G5's box, and the runner image's tag (the board's commit it was built at)
+             "box": state.get("label") or None, "image": (board_commit() or "")[:7] or None,
              "shard": {"i": shard[0], "n": shard[1]} if shard else None,
              "started_at": state.get("started_at"),
              "finished_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
@@ -607,12 +619,25 @@ def make_bundle(out: Path, served_as: str, thinking: bool, tasks: list[str], sta
     return path, done, incomplete
 
 
-class Watch(threading.Thread):
-    """the run's line, each time it changes"""
+def progress(out: Path, **fields) -> None:
+    """17f: the step's progress file, its fields merged in, the time it was
+    last written with them"""
+    p = out / PROGRESS
+    try:
+        was = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        was = {}
+    tmp = p.with_suffix(".part")
+    tmp.write_text(json.dumps({**was, **fields, "at": round(time.time())}), encoding="utf-8")
+    tmp.replace(p)
 
-    def __init__(self, sid: int, say, every: float = 2.0):
+
+class Watch(threading.Thread):
+    """the run's line, each time it changes — 17f: and in the progress file"""
+
+    def __init__(self, sid: int, say, every: float = 2.0, out: Path | None = None):
         super().__init__(daemon=True)
-        self.sid, self.say, self.every, self.prog = sid, say, every, ""
+        self.sid, self.say, self.every, self.prog, self.out = sid, say, every, "", out
         self.done_ev = threading.Event()
 
     def run(self) -> None:
@@ -628,6 +653,8 @@ class Watch(threading.Thread):
         if prog and prog != self.prog:
             self.prog = prog
             self.say(f"· {prog}")
+            if self.out is not None:
+                progress(self.out, line=prog)
 
     def stop(self) -> None:
         self.done_ev.set()
@@ -661,12 +688,20 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--max-context", type=int, default=MAX_CONTEXT,
                     help="17c: the most context (slots × each slot's) the card holds beside "
                          f"the GGUF — G1's table for a 32 GB card: {MAX_CONTEXT:,}")
+    ap.add_argument("--min-slots", type=int, default=0,
+                    help="17f: when --slots don't fit this card, run as many as do, down to "
+                         "this many, and say so (frontier_box.py gives one fewer than planned)")
+    ap.add_argument("--ask-written-off", action="store_true",
+                    help="17f: ask again the questions earlier runs wrote off as no answer (the "
+                         "server failed on them)")
     ap.add_argument("--slots-fit", action="store_true",
                     help="17e: these --slots fit on this card — the memory check's estimate is "
                          "printed, and not held to")
     ap.add_argument("--port", type=int, default=8090)
     ap.add_argument("--load-timeout", type=float, default=3600)
     ap.add_argument("--by", default="remote", help="who ran it, for the run's record")
+    ap.add_argument("--label", default="", help="17f: the box's label in G5's plan (A3), kept "
+                                                "in the bundle and the progress file")
     ap.add_argument("--n", type=int, default=fb.PARITY["n"],
                     help="17d: --parity's number of questions (the server's ask the same)")
     ap.add_argument("--parity", action="store_true",
@@ -702,9 +737,16 @@ def main(argv: list[str] | None = None) -> int:
     # 17d: worked out from the GGUF's header, its cache type and this card;
     # the stated --max-context only when those can't be read
     ctx = fb.slot_context(tasks, thinking)
-    fit, unread = kv_fit(a.gguf, shlex.split(a.flags), a.slots, ctx,
-                         rb.gpu_info().get("memory_mib"))
+    mem = rb.gpu_info().get("memory_mib")
+    fit, unread = kv_fit(a.gguf, shlex.split(a.flags), a.slots, ctx, mem)
     big = max(tasks, key=lambda t: fb.slot_context([t], thinking))
+    # 17f: a step planned at 8 slots runs what the card holds, down to
+    # --min-slots, and says so (HLE's 86,016 with thinking on: 7 on a 5090)
+    dropped = None
+    if fit and a.min_slots and a.min_slots <= fit["fit"] < a.slots and not a.slots_fit:
+        dropped = (a.slots, fit)
+        a.slots = fit["fit"]
+        fit, unread = kv_fit(a.gguf, shlex.split(a.flags), a.slots, ctx, mem)
     if fit and fit["fit"] < a.slots and not a.slots_fit:
         gb = 1024 ** 3
         raise SystemExit(
@@ -723,7 +765,7 @@ def main(argv: list[str] | None = None) -> int:
                          "--max-context for a larger card) — " + unread + ": give the box fewer "
                          "benchmarks (--only) or fewer --slots, or --slots-fit if you know these "
                          "fit. Nothing was fetched")
-    configure(out, a.slots, shard)
+    configure(out, a.slots, shard, a.ask_written_off)
     say = Out(out / OWN_LOG)
     from service import db, runner
     db.init()
@@ -736,7 +778,9 @@ def main(argv: list[str] | None = None) -> int:
     state = json.loads(sp.read_text(encoding="utf-8")) if sp.exists() else {}
     if state and (state.get("served_as"), state.get("thinking")) != (a.served_as, thinking):
         raise SystemExit(f"{out} holds a run of {state.get('served_as')} (thinking "
-                         f"{'on' if state.get('thinking') else 'off'}): give this one another --out")
+                         f"{'on' if state.get('thinking') else 'off'}): give this one another "
+                         "--out (17f: frontier_box.py puts each build in a folder of its own, "
+                         "/workspace/<build>/<box>-<step>)")
     if state and (state.get("shard") or None) != (f"{shard[0]}/{shard[1]}" if shard else None):
         raise SystemExit(f"{out} holds {('shard ' + state['shard']) if state.get('shard') else 'a whole run'}"
                          f": give {words or 'a whole run'} another --out")
@@ -790,8 +834,13 @@ def main(argv: list[str] | None = None) -> int:
                   "started_at": state.get("started_at")
                   or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                   "sessions": int(state.get("sessions", 0)) + 1,
-                  "shard": f"{shard[0]}/{shard[1]}" if shard else None})
+                  "shard": f"{shard[0]}/{shard[1]}" if shard else None,
+                  **({"label": a.label} if a.label else {})})
     sp.write_text(json.dumps(state, indent=1), encoding="utf-8")
+    progress(out, label=state.get("label") or "", model=a.served_as,
+             thinking="on" if thinking else "off", tasks=tasks, shard=state["shard"],
+             parity=bool(a.parity), started_at=state["started_at"], sessions=state["sessions"],
+             state="starting", line="")
     gpu = rb.gpu_info()
     if shell_server_vars():
         say(f"not given to llama-server: {', '.join(shell_server_vars())}, set in this shell — "
@@ -802,12 +851,21 @@ def main(argv: list[str] | None = None) -> int:
         gb = 1024 ** 3
         server["kv_estimate"] = {k: fit[k] for k in ("used", "kv", "per_token", "file", "card",
                                                      "fit", "types")}
+        mib = 1024 ** 2
+        if dropped:
+            was, big_fit = dropped
+            say(f"{was} slots of {ctx:,} tokens would leave "
+                f"{int(big_fit['card'] - big_fit['used']) // mib:,} "
+                f"MiB of this card's {big_fit['card'] // mib:,}, under the {ROOM // mib:,} kept "
+                f"spare: {a.slots} run (--min-slots {a.min_slots})")
         say(f"memory about {fit['used'] / gb:.1f} GB for {a.slots} slots of {ctx:,} tokens "
             f"(the KV cache {fit['kv'] / gb:.1f} GB, {fit['types']}, "
             f"{fit['per_token'] / 1024:.1f} KB a token) with the {fit['file'] / gb:.1f} GB file "
-            f"on a {fit['card'] / gb:.1f} GB card: up to {fit['fit']} slot"
-            f"{'s' if fit['fit'] != 1 else ''} fit with "
-            f"{ROOM / gb:.0f} GB spare"
+            f"on a {fit['card'] / gb:.1f} GB card: " + (
+                f"{int(fit['card'] - fit['used']) // mib:,} MiB spare" if fit["card"] >= fit["used"]
+                else f"{int(fit['used'] - fit['card']) // mib:,} MiB short")
+            + f"; up to {fit['fit']} slot{'s' if fit['fit'] != 1 else ''} fit keeping "
+            f"{ROOM // mib:,}"
             + (f" — {a.slots} run, as --slots-fit says" if a.slots > fit["fit"] else ""))
     else:
         # 17e: said, where it carried on silently under the stated limit
@@ -870,12 +928,15 @@ def main(argv: list[str] | None = None) -> int:
             # its agreement with the server
             n = sf.parity_ask(rec, dest, lambda k, of: say(f"parity {k} of {of}"),
                               identity=ident, n=a.n, twice=True)
-            say(f"parity: {n} answers · {dest} — fetch it, then on the server: "
-                "scripts/frontier_parity.py compare <server's> <this>")
+            say(f"parity: {n} answers · {dest} — frontier_fetch.py fetches it, and compares "
+                "it with the server's when given that (--parity)")
+            progress(out, state="whole", parity_file={"name": dest.name, "answers": n,
+                                                      "sha256": rb.sha256_file(dest)})
             return 0
         sid = db.add(a.served_as, "instruct", SUITE, a.by, "run on a rented GPU (remote_gguf.py)",
                      thinking=thinking, tasks=tasks if len(tasks) < len(fb.TASKS) else None)
-        watch = Watch(sid, say)
+        watch = Watch(sid, say, out=out)
+        progress(out, state="asking", session_at=round(time.time()))
         watch.start()
         try:
             runner.run_submission(db.get(sid))
@@ -890,6 +951,7 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         srv_proc.stop()
     if rec is None:
+        progress(out, state="stopped")
         return 1
     path, done, incomplete = make_bundle(out, a.served_as, thinking, tasks, state, shard, gguf,
                                          server, rec)
@@ -898,10 +960,13 @@ def main(argv: list[str] | None = None) -> int:
             "carry on")
     if not path:
         say("no task is answered whole yet: no bundle")
+        progress(out, state="stopped", incomplete=incomplete)
         return 1
+    sha = rb.sha256_file(path)
     say(f"bundle {path} · {path.stat().st_size / 1024 ** 2:.1f} MB · sha256 "
-        f"{rb.sha256_file(path)[:16]} · " + ", ".join(f"{t} ({x['answers']:,} answers)"
-                                                      for t, x in done.items()))
+        f"{sha[:16]} · " + ", ".join(f"{t} ({x['answers']:,} answers)" for t, x in done.items()))
+    progress(out, state="stopped" if incomplete else "whole", incomplete=incomplete,
+             bundle={"name": path.name, "sha256": sha})
     return 1 if incomplete else 0
 
 
