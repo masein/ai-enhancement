@@ -137,6 +137,12 @@ def test_a_file_that_isnt_a_gguf_is_refused_and_nothing_is_kept(svc):
     assert got["state"] == "failed"
     assert got["error"] == "notes.gguf isn't a GGUF file: its header can't be read as one. " \
                            "Nothing was kept."
+    # said first, then removed (uploads._failed): the bytes go a moment after
+    # the record says "failed" — a CI run once looked in between
+    for _ in range(100):
+        if not uploads.data_path(rec["id"]).exists():
+            break
+        time.sleep(0.02)
     assert not uploads.data_path(rec["id"]).exists()
 
 
