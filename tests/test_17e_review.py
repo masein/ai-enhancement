@@ -259,14 +259,16 @@ def test_4_one_command_fetches_and_imports_every_box(tmp_path, monkeypatch, caps
             return 2, "frontier-…\nrefused — the file isn't the one registered\nnothing was imported"
         return 0, "x.tar.gz · sha256 …\nthe row served/phone · thinking: HLE: shard 1 of 2 in\nRuns #4"
     monkeypatch.setattr(ff, "run", run)
+    monkeypatch.setattr(ff, "keep_sudo", lambda: None, raising=False)
     sha = "ab" * 32
     code = ff.main(["--key", str(key), "--dest", str(dest), "--sha", f"served/phone={sha}",
                     "--sha", f"served/orig={'cd' * 32}", "1.2.3.4:4100", "root@5.6.7.8:4200",
                     "9.9.9.9:4300"])
     out = capsys.readouterr().out
     assert code == 1
-    assert ("frontier-served__gemma-thinking-on-gpqa.tar.gz: copied; no --sha for served/gemma "
-            "— import it by hand (G4, G6)") in out
+    # 17g: home, its import to type, and the box counted as done for it
+    assert ("frontier-served__gemma-thinking-on-gpqa.tar.gz: copied — home; no --sha for "
+            "served/gemma: import it by hand: sudo docker compose exec") in out
     assert ("frontier-served__orig-thinking-off-hle.tar.gz: copied · refused — the file isn't "
             "the one registered") in out
     assert ("frontier-served__phone-thinking-on-hle-shard-1-of-2.tar.gz: copied · the row "

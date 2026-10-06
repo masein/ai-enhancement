@@ -252,7 +252,10 @@ def test_8_a_context_the_card_cant_hold_is_refused_before_the_download(tmp_path)
         rg.main(["--as", SERVED, "--gguf", "hf://me/private/m.gguf", "--server",
                  "hf://me/private/s.tar.gz", "--thinking", "on", "--only", "arc_agi2_public",
                  "--out", str(tmp_path / "o")])
-    assert not (tmp_path / "files").exists() and not (tmp_path / "o").exists()
+    assert not (tmp_path / "files").exists()
+    # 17g: and the step says it stopped, and why
+    got = json.loads((tmp_path / "o" / "progress.json").read_text())
+    assert got["state"] == "stopped" and "917,504 tokens of context" in got["why"]
 
 
 def test_9_a_variable_in_the_shell_never_reaches_llama_server(box, monkeypatch, tmp_path):  # noqa: F811

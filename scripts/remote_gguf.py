@@ -107,7 +107,7 @@ def settings(out: Path, slots: int, shard: tuple[int, int] | None,
             "FRONTIER_SHARD": f"{shard[0]}/{shard[1]}" if shard else "",
             "FRONTIER_SCORE_AFTER_RUN": False, "FRONTIER_WHERE": WHERE,
             "SERVED_CONCURRENCY": slots,
-            # a thinking answer of 65,536 tokens, at a slot's pace
+            # a thinking answer of 81,920 tokens (17f's limits), at a slot's pace
             "SERVED_TIMEOUT_S": int(os.environ.get("SERVED_TIMEOUT_S") or 7200),
             "SERVED_RETRY_S": int(os.environ.get("SERVED_RETRY_S") or 300), "GPU_POLL_S": 10,
             "FRONTIER_ASK_WRITTEN_OFF": ask_again}
@@ -276,12 +276,17 @@ CACHE_BYTES = {"f32": 4.0, "f16": 2.0, "bf16": 2.0, "q8_0": 34 / 32, "q4_0": 18 
 # used 26,136 MiB after load, 8 of 67,584 used 29,198 — 13,066 bytes a token
 # of context, of which the header's KV cache is 10,880, and 665 MiB above
 # the file. CTX_BUFFERS: llama-server's buffers that grow with the context,
-# beside its KV cache. OVERHEAD: CUDA's context and the fixed buffers, the
-# pilot's 665 MiB rounded up (the recurrent state is counted again on top,
-# a slot each). ROOM: what the pilot didn't show — the longest prompts'
-# compute, fragmentation — stated, never measured
+# beside its KV cache. ROOM: what the pilot didn't show — the longest
+# prompts' compute, fragmentation — stated, never measured. 17g: the fixed
+# part is the measured slope's, not an estimate on top of it — the pilot's
+# 666 MiB above the file at 8 slots held their 8 recurrent states, so what
+# is fixed is the rest (fixed_bytes): 17f counted 768 MiB and the recurrent
+# state again, 622 MiB above both readings, and ran HLE at 7 slots where 8
+# leave 1,570 MiB
 CTX_BUFFERS = 2186
-OVERHEAD = 768 * 1024 ** 2
+ABOVE_FILE, ABOVE_FILE_SLOTS = 666 * 1024 ** 2, 8
+BASIS = ("the pilot's measured slope (12.76 KiB a token of context, 666 MiB above the file at "
+         "8 slots)")
 ROOM = 1024 ** 3
 HEADER_BYTES = 24 * 1024 ** 2          # the metadata: a vocabulary's arrays are a few MB
 
@@ -364,11 +369,20 @@ def kv_fit(src: str, flags: list[str], slots: int, ctx: int,
         return None, f"the cache type {ctk}/{ctv} isn't one this check knows"
     per_slot = (per_token + CTX_BUFFERS) * ctx + recurrent_per_slot(shape)
     card = memory_mib * 1024 ** 2
-    room = card - size - OVERHEAD - ROOM
-    return {"used": size + OVERHEAD + per_slot * slots, "kv": per_token * ctx * slots,
+    fixed = fixed_bytes(shape)
+    room = card - size - fixed - ROOM
+    return {"used": size + fixed + per_slot * slots, "kv": per_token * ctx * slots,
             "per_token": per_token, "per_slot": per_slot, "file": size, "card": card,
             "fit": max(0, int(room // per_slot)), "types": f"{ctk}/{ctv}",
-            "arch": shape["arch"]}, ""
+            "arch": shape["arch"], "basis": BASIS}, ""
+
+
+def fixed_bytes(shape: dict) -> float:
+    """17g: what is fixed beside the file and the slots — the pilot's 666 MiB
+    above the file at 8 slots, less those 8 slots' recurrent state (counted a
+    slot at a time): 147 MiB for the phone build's 65 MiB a slot, 666 MiB for
+    a model with none"""
+    return max(0.0, ABOVE_FILE - ABOVE_FILE_SLOTS * recurrent_per_slot(shape))
 
 
 def answered_here() -> bool:
@@ -623,9 +637,12 @@ def progress(out: Path, **fields) -> None:
     """17f: the step's progress file, its fields merged in, the time it was
     last written with them"""
     p = out / PROGRESS
+    out.mkdir(parents=True, exist_ok=True)
     try:
         was = json.loads(p.read_text(encoding="utf-8"))
     except (OSError, ValueError):
+        was = {}
+    if not isinstance(was, dict):
         was = {}
     tmp = p.with_suffix(".part")
     tmp.write_text(json.dumps({**was, **fields, "at": round(time.time())}), encoding="utf-8")
@@ -660,7 +677,33 @@ class Watch(threading.Thread):
         self.done_ev.set()
 
 
+# 17g: the step this process is, once its folder is known — a step that
+# stops at start-up (llama-server dying at load, a gated question set, a
+# refused memory check, a parity question the server fails) says so in its
+# progress file, where it read "starting" for ever
+STEP: dict = {}
+
+
 def main(argv: list[str] | None = None) -> int:
+    STEP.clear()
+    try:
+        return _main(argv)
+    except SystemExit as e:
+        if STEP and e.code not in (0, None):
+            progress(STEP["out"], state="stopped",
+                     why=str(e.code if isinstance(e.code, str) else f"exit {e.code}")[:400])
+        raise
+    except KeyboardInterrupt:
+        if STEP:
+            progress(STEP["out"], state="stopped", why="stopped by hand")
+        raise
+    except Exception as e:                              # noqa: BLE001 — said, then raised
+        if STEP:
+            progress(STEP["out"], state="stopped", why=f"{type(e).__name__}: {e}"[:400])
+        raise
+
+
+def _main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--as", dest="served_as", required=True,
@@ -724,6 +767,10 @@ def main(argv: list[str] | None = None) -> int:
     extra_env = parse_env(a.env)
     out = Path(a.out).resolve()
     thinking = a.thinking == "on"
+    STEP["out"] = out
+    progress(out, label=a.label or "", model=a.served_as, thinking=a.thinking,
+             parity=bool(a.parity), tasks=[t for t in fb.TASKS if t in (a.only or [])],
+             state="starting", why="", line="")
     if not a.only and not a.parity:
         # 17d: a box names its benchmarks, thinking on or off — every one at
         # once is more context than a card holds, and asks ARC-AGI-2 with
@@ -753,11 +800,12 @@ def main(argv: list[str] | None = None) -> int:
             f"{a.slots} slots of {ctx:,} tokens ({fb.BENCH[big]['label']}'s, thinking "
             f"{'on' if thinking else 'off'}) would use about {fit['used'] / gb:.1f} GB with the "
             f"{fit['file'] / gb:.1f} GB file ({fit['types']} cache, "
-            f"{fit['per_token'] / 1024:.1f} KB a token from the GGUF's header), and this card "
-            f"has {fit['card'] / gb:.1f} GB, {ROOM / gb:.0f} GB kept spare: at most "
-            f"{fit['fit']} slot{'s' if fit['fit'] != 1 else ''} fit — give --slots "
+            f"{fit['per_token'] / 1024:.1f} KB a token from the GGUF's header; {fit['basis']}), "
+            f"and this card has {fit['card'] / gb:.1f} GB, {ROOM / gb:.0f} GB kept spare: at "
+            f"most {fit['fit']} slot{'s' if fit['fit'] != 1 else ''} fit — give --slots "
             f"{fit['fit']}" + (" (or a larger card)" if fit["fit"] else ": a larger card")
-            + ", or --slots-fit if you know these do. Nothing was fetched")
+            + ", or --slots-fit if you know these do (frontier_box.py's line takes both). "
+            "Nothing was fetched")
     if not fit and ctx * a.slots > a.max_context and not a.slots_fit:
         raise SystemExit(f"{a.slots} slots of {ctx:,} tokens ({fb.BENCH[big]['label']}'s, "
                          f"thinking {'on' if thinking else 'off'}) is {ctx * a.slots:,} tokens "
@@ -858,7 +906,8 @@ def main(argv: list[str] | None = None) -> int:
                 f"{int(big_fit['card'] - big_fit['used']) // mib:,} "
                 f"MiB of this card's {big_fit['card'] // mib:,}, under the {ROOM // mib:,} kept "
                 f"spare: {a.slots} run (--min-slots {a.min_slots})")
-        say(f"memory about {fit['used'] / gb:.1f} GB for {a.slots} slots of {ctx:,} tokens "
+        say(f"memory, from {fit['basis']}: "
+            f"about {fit['used'] / gb:.1f} GB for {a.slots} slots of {ctx:,} tokens "
             f"(the KV cache {fit['kv'] / gb:.1f} GB, {fit['types']}, "
             f"{fit['per_token'] / 1024:.1f} KB a token) with the {fit['file'] / gb:.1f} GB file "
             f"on a {fit['card'] / gb:.1f} GB card: " + (
@@ -926,8 +975,14 @@ def main(argv: list[str] | None = None) -> int:
                      "speculative": seen.get("speculative"), "gpu": gpu.get("name")}
             # 17d: each question twice — the box's agreement with itself, beside
             # its agreement with the server
-            n = sf.parity_ask(rec, dest, lambda k, of: say(f"parity {k} of {of}"),
-                              identity=ident, n=a.n, twice=True)
+            try:
+                n = sf.parity_ask(rec, dest, lambda k, of: say(f"parity {k} of {of}"),
+                                  identity=ident, n=a.n, twice=True)
+            except sv.ServerStopped as e:
+                # 17g: in words, where it was a traceback; parity has no
+                # resume — pasting the box's line asks it again
+                raise SystemExit(f"parity: {getattr(e, 'refused', '') or e} — nothing kept; "
+                                 "paste the box's line again to ask it again") from None
             say(f"parity: {n} answers · {dest} — frontier_fetch.py fetches it, and compares "
                 "it with the server's when given that (--parity)")
             progress(out, state="whole", parity_file={"name": dest.name, "answers": n,
@@ -951,22 +1006,23 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         srv_proc.stop()
     if rec is None:
-        progress(out, state="stopped")
+        progress(out, state="stopped", why="llama-server didn't come up")
         return 1
     path, done, incomplete = make_bundle(out, a.served_as, thinking, tasks, state, shard, gguf,
                                          server, rec)
     for t, x in incomplete.items():
         say(f"{t}: {x['answers']:,} of {x['of']:,} answered — run the same command again to "
             "carry on")
+    why = (row.get("error") or row.get("progress") or "")[:400]
     if not path:
         say("no task is answered whole yet: no bundle")
-        progress(out, state="stopped", incomplete=incomplete)
+        progress(out, state="stopped", incomplete=incomplete, why=why or "no task is whole yet")
         return 1
     sha = rb.sha256_file(path)
     say(f"bundle {path} · {path.stat().st_size / 1024 ** 2:.1f} MB · sha256 "
         f"{sha[:16]} · " + ", ".join(f"{t} ({x['answers']:,} answers)" for t, x in done.items()))
     progress(out, state="stopped" if incomplete else "whole", incomplete=incomplete,
-             bundle={"name": path.name, "sha256": sha})
+             bundle={"name": path.name, "sha256": sha}, why=why if incomplete else "")
     return 1 if incomplete else 0
 
 

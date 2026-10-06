@@ -31,6 +31,7 @@ paces (one RTX 5090, the phone build, 6 Oct) under the token limits of 6 Oct.
 from __future__ import annotations
 
 import argparse
+import json
 import shlex
 import subprocess
 import sys
@@ -78,6 +79,7 @@ PILOT = {"per_token": 10_880, "recurrent": 68_059_136, "file": 22_854_339_808,
 # its test grids, 167 in its 120 tasks at the pinned revision, each asked twice
 ANSWERS = {t: (167 if t == ARC else b["n"]) * b["epochs"] for t, b in fb.BENCH.items()}
 PARITY_STEP = ("parity", (), "", 8)
+RUNS = 3                    # 17g: a step's runs on its own (service/frontier.WRITE_OFF_RUNS)
 
 # a step: (thinking, its benchmarks, its shard, its slots). ARC-AGI-2's prompts
 # need 114,688 tokens a slot: 5 slots, and a step of its own
@@ -136,7 +138,8 @@ def fits(ctx: int) -> int:
     """the slots of `ctx` tokens the pilot's card holds, as remote_gguf.py
     checks them: its file, CUDA's and the buffers, and the room kept spare"""
     import remote_gguf as rg
-    room = PILOT["card_mib"] * 1024 ** 2 - PILOT["file"] - rg.OVERHEAD - rg.ROOM
+    fixed = max(0, rg.ABOVE_FILE - rg.ABOVE_FILE_SLOTS * PILOT["recurrent"])     # 17g
+    room = PILOT["card_mib"] * 1024 ** 2 - PILOT["file"] - fixed - rg.ROOM
     return int(room // ((PILOT["per_token"] + rg.CTX_BUFFERS) * ctx + PILOT["recurrent"]))
 
 
@@ -173,19 +176,54 @@ def words(step: Step) -> str:
             + (" (a guess)" if any((th, t) in GUESSED for t in tasks) else ""))
 
 
+def step_name(box: str, k: int, step: Step) -> str:
+    return f"{box}-parity" if step[0] == "parity" else f"{box}-{k}"
+
+
 def folder(a: argparse.Namespace, box: str, k: int, step: Step) -> Path:
     """17f: the build's own folder — another build on the same box goes
     beside it, never into it"""
     build = a.served_as.split("/", 1)[-1]
-    return Path(a.root) / build / (f"{box}-parity" if step[0] == "parity" else f"{box}-{k}")
+    return Path(a.root) / build / step_name(box, k, step)
+
+
+def planned(box: str) -> list[str]:
+    """17g: every step folder a box's line makes for a build, in order — the
+    fetch calls a box safe to destroy only when each is whole and home"""
+    plan = PLANS.get(box[:1].upper()) or {}
+    return [step_name(box.upper(), k, st) for k, st in enumerate(plan.get(box.upper()) or [], 1)]
+
+
+def state_of(out: Path) -> dict:
+    """a step's progress file (remote_gguf.py), {} when it has none"""
+    try:
+        got = json.loads((out / "progress.json").read_text(encoding="utf-8"))
+        return got if isinstance(got, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def whole(out: Path, step: Step) -> bool:
+    """17g: a step already whole — its file there — isn't run again by a paste
+    (parity has no resume: its 1,000 answers were asked again)"""
+    st = state_of(out)
+    if st.get("state") != "whole":
+        return False
+    if step[0] == "parity":
+        return (out / "parity.jsonl").exists()
+    return bool((st.get("bundle") or {}).get("name")) and (out / st["bundle"]["name"]).exists()
 
 
 def argv_of(box: str, k: int, step: Step, a: argparse.Namespace) -> list[str]:
     """remote_gguf.py's arguments for step k (1-based) of `box`"""
     th, tasks, shard, slots = step
+    if getattr(a, "slots", 0):                      # 17g: the line's own --slots, a cap
+        slots = min(slots, a.slots)
     out = [sys.executable, str(HERE / "remote_gguf.py"), "--as", a.served_as, "--gguf", a.gguf,
            "--server", a.server, "--based-on", a.based_on, "--label", box,
            "--files", str(Path(a.root) / "files"), "--flags", a.flags]
+    if getattr(a, "slots_fit", False):
+        out += ["--slots-fit"]
     if a.env:
         out += ["--env", a.env]
     if a.ask_written_off:
@@ -229,6 +267,11 @@ def parser() -> argparse.ArgumentParser:
     ap.add_argument("--root", default="/workspace", help="where the build's folder goes")
     ap.add_argument("--ask-written-off", action="store_true",
                     help="17f: each step asks again what earlier runs wrote off as no answer")
+    ap.add_argument("--slots", type=int, default=0,
+                    help="17g: at most this many slots a step (what a refusal advises)")
+    ap.add_argument("--slots-fit", action="store_true",
+                    help="17g: the slots given fit this card — the memory check's estimate is "
+                         "printed, and not held to")
     return ap
 
 
@@ -250,19 +293,41 @@ def main(argv: list[str] | None = None) -> int:
           f"{sum(hours(s) for s in steps):.1f} h at the pilot's paces", flush=True)
     ends = []
     for k, step in enumerate(steps, 1):
+        out = folder(a, box, k, step)
+        if whole(out, step):
+            print(f"\n{box}, step {k} of {len(steps)}: whole already — not run again", flush=True)
+            ends.append((k, step, 0, ""))
+            continue
         cmd = argv_of(box, k, step, a)
         print(f"\n{box}, step {k} of {len(steps)}: {words(step)}\n"
               + " ".join(shlex.quote(x) for x in cmd[1:]), flush=True)
         code = subprocess.run(cmd).returncode
-        ends.append((k, step, code))
+        # 17g: a step left short after asking (a question the server failed on
+        # with a 5xx is kept for the next run, written off after three) runs
+        # again by itself, up to RUNS — a one-benchmark step had no bundle
+        # until the line was pasted a third time
+        for again in range(2, RUNS + 1):
+            st = state_of(out)
+            if code == 0 or step[0] == "parity" or not st.get("incomplete"):
+                break
+            left = ", ".join(f"{fb.BENCH[t]['label'] if t in fb.BENCH else t} "
+                             f"{x.get('answers', 0):,} of {x.get('of', 0):,}"
+                             for t, x in st["incomplete"].items())
+            print(f"\n{box}, step {k}: not whole ({left}) — asking what is left again, run "
+                  f"{again} of {RUNS}", flush=True)
+            code = subprocess.run(cmd).returncode
+        ends.append((k, step, code, state_of(out).get("why") or ""))
     print()
-    for k, step, code in ends:
+    for k, step, code, why in ends:
         out = folder(a, box, k, step)
         what = "its parity file is" if step[0] == "parity" else "its bundle is"
-        print(f"{box}, step {k}: " + (f"whole — {what} in {out}" if code == 0 else
-                                       f"not whole (exit {code}) — its lines above say why; "
-                                       "paste the same line again to carry on"), flush=True)
-    return 0 if all(code == 0 for _, _, code in ends) else 1
+        print(f"{box}, step {k}: " + (
+            f"whole — {what} in {out}" if code == 0 else
+            f"not whole (exit {code})" + (f": {why}" if why else " — its lines above say why")
+            + (" — paste the same line again to ask the parity questions again"
+               if step[0] == "parity" else " — paste the same line again to carry on")),
+            flush=True)
+    return 0 if all(code == 0 for _, _, code, _ in ends) else 1
 
 
 if __name__ == "__main__":

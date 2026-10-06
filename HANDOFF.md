@@ -4953,6 +4953,37 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17g.1 — the boxes and the fetch (6 Oct)
+
+- **"Done, safe to destroy" by the plan** (`frontier_fetch.one_box`): the box's
+  label gives its steps (`frontier_box.planned`); the box is safe only when
+  every planned step of every build started there (its folder, listed even
+  before it writes progress) is whole, its file home with the box's sha256
+  and imported. A3 with only parity whole, a box between steps, and a second
+  build fetching its GGUF read NOT safe, and say which step.
+- **A step that stops at start-up says "stopped" and why**
+  (`remote_gguf.main`): the step writes "starting" as soon as its folder is
+  known; a refusal, llama-server not coming up, a gated set or a parity
+  question the server fails write "stopped" and the reason. The fetch, the
+  box's last lines and On rented boxes say it. A failed parity step is a
+  line, not a traceback, and a paste of the box's line asks it again (whole
+  steps are skipped).
+- **Parity**: `--parity`'s file is checked at the start (the server's are
+  `phone-server-500.jsonl` and `orig-server-500.jsonl`); each build's verdict
+  is printed on its own line every round, and the fetch exits 1 when one is
+  not the same or couldn't be compared.
+- **The box's line runs a short step again by itself**, up to three runs
+  (`frontier_box.RUNS`), saying what is left.
+- **Memory from the measured slope** (`remote_gguf.fixed_bytes`): the pilot's
+  666 MiB above the file at 8 slots held their recurrent state; HLE runs 8
+  slots (1,570 MiB spare), and the memory line names its basis.
+  `frontier_box.py` takes `--slots` (a cap) and `--slots-fit`.
+- **sudo** is asked once at the start and kept alive (`keep_sudo`); when it
+  lapses, one line says the next import waits for it.
+- **A model with no `--sha`** (G6): home, with the import to type; the box
+  counts as done.
+- Tests: `tests/test_17g_review.py` (part 1).
+
 ### 17f.3 — the rented runs on the dashboard (6 Oct)
 
 - **Where a run ran, on every Runs row** (`submissions.where_ran`, a new

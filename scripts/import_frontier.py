@@ -944,7 +944,7 @@ def _epoch(stamp) -> float | None:
 BOX_FIELDS = {"label": str, "model": str, "step": str, "thinking": str, "tasks": list,
               "shard": str, "parity": bool, "state": str, "line": str, "started_at": str,
               "sessions": int, "at": (int, float), "seen_at": (int, float), "reachable": bool,
-              "safe": bool}
+              "safe": bool, "why": str}
 QUIET_S = 45 * 60                       # a box not heard from for this long says so
 
 
