@@ -443,6 +443,33 @@ def test_22_the_estimate_says_the_most_three_tries_could_cost(gsvc):  # noqa: F8
 
 
 # ---------------------------------------------------------------------------
+# part 4: blocks nothing
+# ---------------------------------------------------------------------------
+
+def test_24_25_how_its_served_read_without_a_full_stop_or_a_negated_lookahead():
+    import import_frontier as imf
+    plain_box = {"flags": [], "env": {}}
+    mtp = {"id": "served/mtp", "flags": "", "env": "",
+           "how": "llama-server, drafting with --spec-type mtp."}
+    assert imf.record_launch(mtp)["spec"] == ["--spec-type=mtp"]
+    assert imf.launch_differs(mtp, {"flags": ["--spec-type", "mtp"], "env": {}}) == []
+    for how in ("routing no-lookahead", "lookahead off", "non lookahead routing",
+                "lookahead: disabled", "routing local (no lookahead)"):
+        rec = {"id": "served/x", "flags": "", "env": "", "how": how}
+        assert imf.launch_differs(rec, plain_box) == [], how
+    assert imf.launch_differs({"id": "served/y", "flags": "", "env": "",
+                               "how": "routing with lookahead"}, plain_box)
+
+
+def test_27_a_question_twice_in_a_file_is_refused(monkeypatch, tmp_path):
+    items = invented()
+    monkeypatch.setattr(fb, "_fetch_source", lambda task: [*items, items[0]])
+    with pytest.raises(ValueError, match="question rec000 is in the questions that came from "
+                                         "Idavidrein/gpqa at 83022cefff93 more than once"):
+        fb._fetch(TASK)
+
+
+# ---------------------------------------------------------------------------
 # 28 (sent mid-round): the parity check's sizes
 # ---------------------------------------------------------------------------
 
