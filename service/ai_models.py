@@ -298,14 +298,16 @@ def refusal(status: int | None, text: str) -> tuple[str, str]:
     return "refused", f"OpenRouter refused it (HTTP {status})" + (f": {msg}" if msg else "")
 
 
-def probe(model_id: str, prov: dict) -> tuple[bool, str, str]:
+def probe(model_id: str, prov: dict, job: str = "pin") -> tuple[bool, str, str]:
     """12p.1: the provider takes a request that may not be stored or trained
     on — one token, asked when a model is pinned. 16c: (ok, kind, words), the
-    words what OpenRouter said when it didn't (refusal)"""
+    words what OpenRouter said when it didn't (refusal). 17b: paid, so its
+    cost counts against the month's limit, as `job`'s"""
     from . import llm
     body = {"model": model_id, "max_tokens": 1,
             "messages": [{"role": "user", "content": PROBE}],
-            "provider": provider_prefs(prov.get("tag") or prov.get("name"))}
+            "provider": provider_prefs(prov.get("tag") or prov.get("name")),
+            "usage": {"include": True}}
     try:
         status, raw = llm._http("POST", config.OPENROUTER_BASE_URL + "/chat/completions",
                                 _headers(), json.dumps(body).encode(), timeout=PROBE_TIMEOUT_S)
@@ -314,9 +316,24 @@ def probe(model_id: str, prov: dict) -> tuple[bool, str, str]:
     except Exception as e:                          # noqa: BLE001 — not reached: said so
         return (False, *refusal(None, repr(e)))
     if status == 200:
+        _probe_spent(job, model_id, prov, raw)
         return True, "", ""
     return (False, *refusal(status, raw.decode("utf-8", "replace") if isinstance(raw, bytes)
                             else str(raw)))
+
+
+def _probe_spent(job: str, model_id: str, prov: dict, raw) -> None:
+    """17b: a probe's cost in the month's spend — OpenRouter's figure, else
+    its tokens (a short chat's, where it gives none) at the provider's price"""
+    from . import db
+    try:
+        u = json.loads(raw).get("usage") or {}
+    except (ValueError, TypeError, AttributeError):
+        u = {}
+    tin, tout = int(u.get("prompt_tokens") or 8), int(u.get("completion_tokens") or 1)
+    usd = u.get("cost")
+    usd = float(usd) if isinstance(usd, (int, float)) else cost(prov, tin, tout)
+    db.spend_add(job, model_id, prov.get("name") or "", tin, tout, usd, "probe")
 
 
 def first_provider(model_id: str) -> dict | None:
@@ -441,10 +458,11 @@ def is_local(job: str) -> bool:
     return _env(job)[0] == LOCAL
 
 
-def pin(model_id: str) -> dict:
+def pin(model_id: str, job: str = "pin") -> dict:
     """An OpenRouter model, pinned: the id, its dated version and its first
     provider, with that provider's prices — or ValueError, in one line. The
-    judge is pinned by this, and (12m.3) a model tested through OpenRouter"""
+    judge is pinned by this, and (12m.3) a model tested through OpenRouter.
+    17b: each provider asked is a paid token, counted as `job`'s"""
     if not has_key():
         raise ValueError("OpenRouter has no key on this server (OPENROUTER_API_KEY)")
     m = model(model_id)
@@ -459,7 +477,7 @@ def pin(model_id: str) -> dict:
     # for every provider, so the next isn't asked
     prov, said = None, []
     for p in up:
-        ok, kind, words = probe(m["id"], p)
+        ok, kind, words = probe(m["id"], p, job)
         if ok:
             prov = p
             break
@@ -491,7 +509,7 @@ def save(job: str, model_id: str, by: str) -> dict:
         if not has_key():
             raise ValueError("OpenRouter has no key on this server (OPENROUTER_API_KEY), "
                              "so only Local can be chosen")
-        value = pin(model_id)
+        value = pin(model_id, job)
     db.ai_set("job:" + job, value, by)
     return value
 

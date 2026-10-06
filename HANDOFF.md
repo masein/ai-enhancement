@@ -4953,6 +4953,62 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17b.2 — the review's part 6: grading, before anyone presses Start (6 Oct)
+
+Part 6 of the review of 1388058..62ec4d9 (`service/frontier_grade.py`,
+`scripts/frontier_graders.py`):
+- **Start sends once.** `start()` lists what waits and sends it under a
+  lock (a thread lock and a file lock), so a second press finds the first
+  one's batches out. The button is disabled, saying "Sending…", while its
+  request is out.
+- **Recorded, then sent.** `LocalOpenAI.submit(…, start=False)` puts the
+  batch on disk. Its record and its database row come next, then
+  `resume()` starts it, so a batch nobody recorded is never sent.
+  `finish()` reads one answer at a time: a reply it can't read fails that
+  answer, never the batch.
+- **A grade is a grade.** These are never a grade:
+  - an empty reply;
+  - one cut at its cap;
+  - SimpleQA's reply that is neither a bare letter nor whole words
+    (`simpleqa.parse_words`);
+  - HLE's with no "correct:" (it takes the last one given, text or JSON);
+  - OTIS's that is neither an integer nor NONE.
+
+  Each is listed on the card and asked again by the next Start.
+- **Each grader's reasoning is set** (`frontier_graders.ask`, OpenRouter's
+  `reasoning`), its cap sized for it:
+  - SimpleQA, MATH and OTIS: off, at 16, 16 and 32 tokens.
+  - HLE: o3-mini's medium, as CAIS ran it, at CAIS's 4,096.
+  - A chosen model OpenRouter lists as reasoning gets 2,048 more where
+    reasoning is off, in case it can't be switched off.
+
+  The dry run counts with the same numbers and says the most the caps
+  allow.
+- **The answer it graded.** A grade keeps:
+  - the sha256 of the answer it was sent;
+  - its grader's version;
+  - its prompt's sha256.
+
+  A grade for an answer replaced since is dropped, and the answer waits
+  again. A score from more than one grader or prompt names each with its
+  count (`frontier.graders`) and says "not final"; the Frontier view ranks
+  it with nothing.
+- **Prompts filled in one pass**: an answer holding `{correct_answer}`
+  stays as written.
+- **The card** says:
+  - the last failed batch per grader and why (`llm.batch_line`);
+  - why the batches out wait: Stop, a run of refusals, the month's limit;
+  - with **Carry on** beside those reasons.
+
+  It also says that choosing a grader asks each provider one paid token.
+  That probe is now counted in the month's spend, under the job that
+  pinned it (`ai_models.probe(…, job)`).
+- **The Frontier view ranks by the setting** (`frontier_setting`), never by
+  the cell's note. "code alone 61.3" is that model's own number, and no two
+  models shared a pool.
+- Tests: `tests/test_17b_grading.py`, `tests/test_17b_grading_browser.py`;
+  `test_17_grading`'s SimpleQA reading changed from Google's.
+
 ### 17b.1 — the review's parts 1 to 5, before the pilot (6 Oct)
 
 An independent review of 1388058..62ec4d9 (`docs/prompts/phase-17b-review-fixes-before-renting.md`).
@@ -5050,9 +5106,12 @@ the prompts in `scripts/grader_prompts/`):
   - SimpleQA Verified: Google's grader prompt from its starter code, read as
     Google reads it (the first capital A, B or C anywhere — "INCORRECT" holds
     a C — else the words, else NOT_ATTEMPTED); gpt-4.1-2025-04-14, Google's.
+    (17b.2: a bare letter, else whole words, else not a grade.)
   - Humanity's Last Exam: CAIS's judge prompt as written (its typos and
     `|\%|`); o3-mini-2025-01-31, CAIS's. CAIS asks for structured output; its
     fields are read from the text here. An unreadable reply is wrong.
+    (17b.2: the last "correct:" given, text or JSON; an unread reply is asked
+    again.)
   - MATH Level 5: Epoch's equivalence prompt, on the answers the code marks
     wrong (an unreadable one is wrong unasked, as Epoch's scorer has it).
     Epoch's gemini-1.5-flash-002 is retired: the suggestion is Gemini 2.5 Flash.

@@ -296,6 +296,12 @@ def gkey(qid: str, epoch: int) -> str:
     return f"{qid}#{epoch}"
 
 
+def answer_sha(answer: str) -> str:
+    """17b: the answer a grade was given for — a grade counts only while the
+    answer it graded is the one on file"""
+    return hashlib.sha256((answer or "").encode("utf-8")).hexdigest()
+
+
 def marks(row: Path, task: str, items: list[dict] | None = None) -> dict:
     """every answer of the task's, scored: {runs: {question: [run]}, missing:
     [(question, run)], items}. A run: {epoch, ok, code_ok, read, ran_out,
@@ -321,6 +327,8 @@ def marks(row: Path, task: str, items: list[dict] | None = None) -> dict:
                 continue
             sc = fb.score(task, a.get("answer") or "", a.get("finish"), need)
             g = grades.get(gkey(it["id"], e))
+            if g is not None and g.get("answer_sha256") != answer_sha(a.get("answer") or ""):
+                g = None                    # 17b: graded another answer: graded again
             ok = sc["ok"]
             if sc["ran_out"]:
                 ok = False
@@ -439,7 +447,7 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
         setup = json.loads((d / SETUP).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         setup = {}
-    g = read_grades(d).get("grader")
+    g, graders = graders_of(d, flat)
     looked = sum(1 for r in flat if r["grade"] is not None)
     detail = {"version": fb.VERSION, "protocol": spec["protocol"], "epochs": spec["epochs"],
               "questions": len(items), "answers": len(flat),
@@ -450,6 +458,8 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
               "scored_by": ("grader" if spec.get("grader") else "code, then Epoch's model check"
                             if spec.get("look") and not waiting and looked else "code"),
               "code": code, "grader": g,
+              # 17b: more than one grader or prompt behind the score: said, not final
+              **({"graders": graders, "final": False} if len(graders) > 1 else {}),
               **({"look": {"done": looked, "waiting": waiting}} if spec.get("look") else {})}
     res = {"alias": task, "acc,none": page["score"], "acc_stderr,none": page["se"]}
     if spec.get("look") and code:
@@ -473,6 +483,25 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
     return {**page, **detail, "epochs": spec["epochs"]}
 
 
+def graders_of(d: Path, flat: list[dict]) -> tuple[dict | None, list[dict]]:
+    """17b: who graded the answers the score counts — (the one grader and
+    prompt, or None; every one, each with how many it graded). A grade keeps
+    its grader's version and its prompt's sha256"""
+    used: dict = {}
+    for r in flat:
+        gr = r.get("grade")
+        if gr:
+            k = (gr.get("by"), gr.get("prompt_sha256"))
+            used[k] = used.get(k, 0) + 1
+    known = {(x.get("version"), x.get("prompt_sha256")): x
+             for x in read_grades(d).get("graders") or []}
+    every = [{**known.get(k, {"version": k[0], "prompt_sha256": k[1]}), "n": n}
+             for k, n in sorted(used.items(), key=lambda kv: -kv[1])]
+    if len(every) == 1:
+        return {k: v for k, v in every[0].items() if k != "n"}, every
+    return None, every
+
+
 def words(task: str, sc: dict) -> str:
     """"GPQA Diamond 61.6% ± 3.1 · 4 runs of 198 · 2 ran out" — or, for a
     graded benchmark not yet graded, "SimpleQA Verified: 1,000 answers wait for
@@ -491,6 +520,8 @@ def words(task: str, sc: dict) -> str:
         bits.append(f"{sc['unread']} with no answer read")
     if (sc.get("look") or {}).get("waiting"):
         bits.append(f"code's score: Epoch's model check not run on {sc['look']['waiting']:,}")
+    if sc.get("final") is False:
+        bits.append(f"graded by {len(sc.get('graders') or [])} graders or prompts: not final")
     return " · ".join(bits)
 
 

@@ -1768,27 +1768,60 @@ def simpleqa_view(sq: dict | None) -> dict | None:
             "provisional": bool((sq.get("judge") or {}).get("provisional"))}
 
 
+def _graders_words(d: dict) -> str:
+    """the grader and prompt behind a score — 17b: or each of them, with how
+    many answers it graded, when there is more than one"""
+    def one(g: dict) -> str:
+        return (f"{g.get('version') or g.get('model')}"
+                + (f" with {g['prompt_words']}" if g.get("prompt_words") else "")
+                + f" ({str(g.get('prompt_sha256') or '')[:8]})")
+    if d.get("final") is False:
+        every = d.get("graders") or []
+        return (f"{len(every)} graders or prompts — "
+                + ", ".join(f"{one(g)} on {int(g.get('n') or 0):,}" for g in every))
+    g = d.get("grader") or {}
+    return one(g) if g else ""
+
+
 def frontier_how(d: dict | None) -> str | None:
     """17: how a Frontier benchmark's number was scored, in one line — by code;
     by code, then Epoch AI's model check by its pinned model and prompt, with
-    the code's own number; or graded by the pinned grader and prompt"""
+    the code's own number; or graded by the pinned grader and prompt. 17b: a
+    score from more than one grader or prompt names each, and says it isn't
+    final"""
     if not isinstance(d, dict):
         return None
-    g = d.get("grader") or {}
-    who = (f"{g.get('version') or g.get('model')} with {g.get('prompt_words')} "
-           f"({str(g.get('prompt_sha256') or '')[:8]})") if g else ""
+    who = _graders_words(d)
+    end = ": not final" if d.get("final") is False else ""
     code = d.get("code") or {}
     alone = (f"code alone {100 * code['score']:.1f}" if isinstance(code.get("score"), (int, float))
              else "")
     if d.get("scored_by") == "grader":
-        return f"graded by {who}" if who else "graded"
+        return (f"graded by {who}" if who else "graded") + end
     look = d.get("look")
     if isinstance(look, dict):
         if look.get("waiting"):
             return ("by code: Epoch AI's model check waits for Start on "
                     f"{look['waiting']:,} answers")
         if look.get("done"):
-            return f"code, then Epoch AI's model check by {who} · {alone}".rstrip(" ·")
+            return f"code, then Epoch AI's model check by {who}{end} · {alone}".rstrip(" ·")
+    return "by code"
+
+
+def frontier_setting(d: dict | None) -> str | None:
+    """17b: frontier_how without the model's own numbers — the setting the
+    Frontier view ranks within (two models graded alike share it); None for
+    a score that isn't final, ranked with nothing"""
+    if not isinstance(d, dict):
+        return None
+    if d.get("final") is False:
+        return None
+    who = _graders_words(d)
+    if d.get("scored_by") == "grader":
+        return f"graded by {who}" if who else "graded"
+    look = d.get("look")
+    if isinstance(look, dict) and not look.get("waiting") and look.get("done"):
+        return f"code, then Epoch AI's model check by {who}"
     return "by code"
 
 
@@ -2393,7 +2426,9 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
                 **({"bias": entry["bias_score"]["value"]}
                    if task in BBQ_TASKS and "value" in (entry.get("bias_score") or {}) else {}),
                 # 17: how a Frontier benchmark was scored, its grader beside it
-                **({"how": frontier_how((run.get("frontier") or {}).get(task))}
+                **({"how": frontier_how((run.get("frontier") or {}).get(task)),
+                    # 17b: the setting it is ranked in, without its own numbers
+                    "howSet": frontier_setting((run.get("frontier") or {}).get(task))}
                    if (run.get("frontier") or {}).get(task) else {}),
             }
             metric_used.setdefault(task, name)
@@ -12843,14 +12878,19 @@ function frHere(name) {
     .sort((a, b) => (b === GPQA_COT) - (a === GPQA_COT));
   return [...ts.map(t => ({ key: t,
     get: m => { const c = cell(t, m.id);
-      return c ? { v: c.v, se: c.se || null, tag: 'measured here · ' + (FR_METHOD[t]
-        || frMethod(t) || 'lm_eval, ' + (c.shots != null ? `${c.shots}-shot` : 'n-shot unknown'))
-        // 17: how it was scored, and its grader and prompt, beside the number
-        + (c.how ? ' · ' + c.how : '')
-      } : null; } })),
+      if (!c) return null;
+      const at = 'measured here · ' + (FR_METHOD[t]
+        || frMethod(t) || 'lm_eval, ' + (c.shots != null ? `${c.shots}-shot` : 'n-shot unknown'));
+      // 17: how it was scored, and its grader and prompt, beside the number.
+      // 17b: ranked by the setting alone ("code alone 61.3" is this model's
+      // own), and a score that isn't final ranked with nothing
+      return { v: c.v, se: c.se || null, tag: at + (c.how ? ' · ' + c.how : ''),
+        set: 'howSet' in c ? (c.howSet == null ? null : at + ' · ' + c.howSet) : at };
+    } })),
     ...ts.filter(t => GGUF_OF[t]).map(t => ({ key: 'gguf:' + GGUF_OF[t],
       get: m => { const g = ggufOf(m.id, GGUF_OF[t]);
-        return g ? { v: g.v, se: g.se ?? null, tag: 'measured here · llama.cpp, 0-shot' } : null; } }))];
+        return g ? { v: g.v, se: g.se ?? null, tag: 'measured here · llama.cpp, 0-shot',
+          set: 'measured here · llama.cpp, 0-shot' } : null; } }))];
 }
 // 12n.2: the benchmarks measured here that the Frontier view always shows
 const FR_SHARED_12N = ['GPQA Diamond', 'SimpleQA Verified'];
@@ -12940,7 +12980,8 @@ function frLeaders(rows, c) {
     const x = frCell(r.m, c);
     if (x.rep && !x.borrowed) add('rep|' + x.rep.source + '|' + x.rep.setting,
       { k: r.m.id + '|rep', v: x.rep.value, se: x.rep.se ?? null });
-    if (x.here) add('here|' + x.here.tag, { k: r.m.id + '|here', v: x.here.v, se: x.here.se });
+    if (x.here && x.here.set) add('here|' + x.here.set,
+      { k: r.m.id + '|here', v: x.here.v, se: x.here.se });
   }
   const lead = new Set();
   for (const pool of Object.values(pools)) {
@@ -13035,7 +13076,8 @@ function lbFrontier(ms) {
       ...(x.rep.date ? ['as of ' + x.rep.date] : []),
       ...x.reps.slice(1).map(s => `also ${repShow(s)} · ${repTag(s)}`)] : [];
     // each part says its setting and value: what it is ranked with, and how
-    const hereAt = { 'data-fr-set': 'here|' + (x.here || {}).tag, 'data-fr-v': x.here
+    const hereAt = { 'data-fr-set': 'here|' + ((x.here || {}).set || (x.here || {}).tag),
+      'data-fr-v': x.here
       ? String(x.here.v) : null, 'data-fr-lead': hl ? '1' : null };
     const repAt = { 'data-fr-set': x.rep ? `${x.rep.source}|${x.rep.setting}` : null,
       'data-fr-v': x.rep ? String(x.rep.value) : null, 'data-fr-lead': rl ? '1' : null };
@@ -24099,13 +24141,19 @@ async function loadFrontierGrading() {
 async function frontierGradingAct(what) {
   const A = state.ai;
   if (!whoName()) { askName(); return; }
+  // 17b: one press at a time — the button stays disabled while it is out
+  if (A.frgBusy) return;
+  A.frgBusy = what;
+  render();
   try {
     const r = await post(`api/frontier/grading/${what}`, { by: whoName() });
     A.frg = r.page;
     toast(what === 'stop' ? 'Grading stopped: what is in flight lands, nothing more is sent'
       : `Grading: ${(r.sent || []).reduce((a, x) => a + x.n, 0).toLocaleString('en')} answers `
-        + 'sent', { key: 'frg' });
+        + 'sent' + (r.pending ? ` · ${r.pending} batch${r.pending === 1 ? '' : 'es'} out` : ''),
+      { key: 'frg' });
   } catch (e) { toast('Refused. ' + e.message, { key: 'frg' }); }
+  A.frgBusy = '';
   render();
 }
 function frontierGradingCard() {
@@ -24125,7 +24173,10 @@ function frontierGradingCard() {
       const j = { job: 'grader-' + g.slot, label: g.label, suggested: g.suggested, why: g.why,
         url: `api/ai/graders/${g.slot}`, noLocal: true };
       return el('tr', { 'data-frontier-grader': g.slot },
-        el('td', {}, el('b', { text: g.label }), el('div', { class: 'small se', text: g.does })),
+        el('td', {}, el('b', { text: g.label }), el('div', { class: 'small se', text: g.does }),
+          // 17b: its reasoning, set, and the cap sized for it
+          g.ask ? el('div', { class: 'small se', 'data-frontier-grader-ask': g.slot,
+            text: `${g.reasoning_words} · at most ${n(g.ask.max_tokens)} tokens a reply` }) : ''),
         el('td', {}, el('span', { 'data-frontier-grader-now': g.slot,
             text: String(now.name || now.id || '—').split(': ').pop() }),
           el('div', { class: 'small se', text: g.chosen
@@ -24153,6 +24204,10 @@ function frontierGradingCard() {
   const why = !G.has_key ? 'OpenRouter has no key on this server (OPENROUTER_API_KEY)'
     : E.over_limit || '';
   const cost = E.usd_known ? usd(E.usd) : `${usd(E.usd)} and the unpriced`;
+  // 17b: why what is out sends nothing now — Stop, a run of refusals, the
+  // limit — and Carry on beside it; a press out disables both buttons
+  const waits = G.waits || [], held = running && (stopped || waits.length > 0);
+  const busy = A.frgBusy || '';
   return el('div', { class: 'card', 'data-frontier-grading': String(E.answers || 0) }, head,
     el('p', { class: 'sub', text: 'SimpleQA Verified and Humanity’s Last Exam are scored by '
       + 'their owners’ graders; MATH Level 5 and OTIS Mock AIME by code, with Epoch AI’s model '
@@ -24166,25 +24221,39 @@ function frontierGradingCard() {
     dry,
     E.answers ? el('p', { class: 'small', 'data-frontier-total': String(E.usd) },
       `Start: about `, el('b', { text: cost }), ` for ${n(E.answers)} answers`,
+      E.usd_max != null && E.usd_max > E.usd ? el('span', { 'data-frontier-most': String(E.usd_max),
+        text: ` (at most ${usd(E.usd_max)}, were every reply to use its cap)` }) : '',
       ` · this month ${usd(E.spent)} of ${usd(E.limit)} spent`) : '',
     G.key_warning && E.answers ? el('p', { class: 'warn small', 'data-frontier-key-warning': '1',
       text: G.key_warning }) : '',
-    LIVE && (E.answers || running) ? el('div', { class: 'frm', 'data-frontier-run': running
-        ? 'running' : stopped ? 'stopped' : 'idle' },
-      E.answers ? el('button', { class: 'primary', 'data-frontier-start': '1',
-        disabled: why ? '' : null, title: why || null,
-        text: `${stopped ? 'Carry on' : 'Start grading'}: about ${cost}`,
+    LIVE && (E.answers || running) ? el('div', { class: 'frm', 'data-frontier-run': held
+        ? 'held' : running ? 'running' : stopped ? 'stopped' : 'idle' },
+      E.answers || held ? el('button', { class: 'primary', 'data-frontier-start': '1',
+        disabled: why || busy ? '' : null, title: why || null,
+        text: busy === 'start' ? 'Sending…' : (stopped || held ? 'Carry on' : 'Start grading')
+          + (E.answers ? `: about ${cost}` : ''),
         onclick: () => frontierGradingAct('start') }) : '',
-      running ? el('button', { class: 'quiet', 'data-frontier-stop': '1', text: 'Stop',
+      running && !stopped ? el('button', { class: 'quiet', 'data-frontier-stop': '1',
+        text: busy === 'stop' ? 'Stopping…' : 'Stop', disabled: busy ? '' : null,
         onclick: () => frontierGradingAct('stop') }) : '') : '',
-    why && E.answers ? el('p', { class: 'small warntext', 'data-frontier-why': '1', text: why }) : '',
+    waits.length ? el('div', { class: 'small', 'data-frontier-waits': String(waits.length) },
+      ...waits.map(w => el('p', { class: 'small warntext', text: w + ' — Carry on sends the rest.' })))
+      : '',
+    why && (E.answers || held) ? el('p', { class: 'small warntext', 'data-frontier-why': '1',
+      text: why }) : '',
     running ? el('div', { class: 'small', 'data-frontier-running': String(running) },
       ...G.running.map(r => el('p', { class: 'small', 'data-frontier-progress': `${r.slot}|${r.model}`,
         text: `${labelOf(r.slot)} · ${r.model}: ${r.progress || `${n(r.n)} sent`}` }))) : '',
+    // 17b: a batch that failed, whole or in part, says why
+    ...(G.last || []).map(r => el('p', { class: 'small warntext',
+      'data-frontier-last': r.slot, text: r.line })),
     ...(G.refused || []).map(r => el('p', { class: 'small warntext',
       'data-frontier-refused': `${r.slot}|${r.row}`,
-      text: `${labelOf(r.slot)} refused ${n(r.n)} answer${r.n === 1 ? '' : 's'} of `
-        + `${r.row.replace('__', '/')}: ${r.words} — Start asks them again.` })));
+      text: `${labelOf(r.slot)}: ${n(r.n)} answer${r.n === 1 ? '' : 's'} of `
+        + `${r.row.replace('__', '/')} not graded — ${r.words} — Start asks `
+        + `${r.n === 1 ? 'it' : 'them'} again.` })),
+    G.probe_words ? el('p', { class: 'small se', 'data-frontier-probe': '1',
+      text: G.probe_words }) : '');
 }
 
 // ---- the judge test ----------------------------------------------------------
