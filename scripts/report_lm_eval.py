@@ -24330,7 +24330,8 @@ function frontierGradingCard() {
     E.answers ? el('p', { class: 'small', 'data-frontier-total': String(E.usd) },
       `Start: about `, el('b', { text: cost }), ` for ${n(E.answers)} answers`,
       E.usd_max != null && E.usd_max > E.usd ? el('span', { 'data-frontier-most': String(E.usd_max),
-        text: ` (at most ${usd(E.usd_max)}, were every reply to use its cap)` }) : '',
+        text: ` (at most ${usd(E.usd_max)}, were every reply to use its cap and every answer `
+          + `be asked its ${G.tries || 3} times)` }) : '',
       ` · this month ${usd(E.spent)} of ${usd(E.limit)} spent`) : '',
     G.key_warning && E.answers ? el('p', { class: 'warn small', 'data-frontier-key-warning': '1',
       text: G.key_warning }) : '',
@@ -24360,7 +24361,10 @@ function frontierGradingCard() {
       'data-frontier-last': r.slot, text: r.line })),
     ...(G.refused || []).map(r => el('p', { class: 'small warntext',
       'data-frontier-refused': `${r.slot}|${r.row}`,
-      text: `${labelOf(r.slot)}: ${n(r.n)} answer${r.n === 1 ? '' : 's'} of `
+      text: (r.form ? `${labelOf(r.slot)} isn't answering in its form — ${n(r.ungraded)} `
+        + `ungraded, too many for a score: choose another grader above, and Start asks them `
+        + 'again. ' : '')
+        + `${labelOf(r.slot)}: ${n(r.n)} answer${r.n === 1 ? '' : 's'} of `
         + `${r.row.replace('__', '/')} not graded — ${r.words}`
         // 17c: asked again G.tries times, then ungraded for good, counted wrong
         + (r.ungraded ? ` · ${n(r.ungraded)} after ${G.tries} tries: ungraded, counted wrong`
