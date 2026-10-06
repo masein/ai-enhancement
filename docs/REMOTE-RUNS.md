@@ -424,15 +424,24 @@ the KV cache in q8_0 (`--flags "-ctk q8_0 -ctv q8_0 --flash-attn on"`):
 ## G1b. The pilot's first step: does the box answer as the server does?
 
 The box isn't the server: the whole model on the card, 8 slots, the KV cache in
-q8_0. Before anything else, the same 50 MMLU-Pro questions (`scripts/frontier.py`
-`PARITY`), thinking off and greedy, on both, each with its own launch.
-**Compared:** the letter each side reads from each reply (TIGER-Lab's
-extraction), and whether the replies are identical. **The same:** the same
-letter on at least 46 of the 50, a question counting only when both sides
-read a letter from it (two empty replies aren't the same answer). Greedy
-decoding on two machines with other batch sizes, cache types and kernels
-isn't bit-for-bit the same, so whole replies may part: they are counted, not
-required. One build at a time, the phone build first.
+q8_0. Before anything else, the same 500 MMLU-Pro questions (`scripts/frontier.py`
+`PARITY`; `--n` on both sides for another number), thinking off and greedy, on
+both, each with its own launch.
+
+**The same** is decided on accuracy, stated here before the run: the
+difference in right answers on the same questions (the box's share right
+minus the server's), with its 90% paired interval, inside ±5 points. That is
+the two one-sided tests of equivalence at 5% each. At about one question in
+ten answered differently, 500 questions give an interval of about ±2.5
+points.
+
+Letter agreement and identical replies are reported beside it, for
+information only. Greedy decoding with other batch sizes, cache types and
+kernels isn't bit-for-bit the same: on the pilot (50 questions), two runs on
+one box agreed on 43 letters of 50, and the box with any setup against the
+server on 42 to 46 of 49. So the box asks each question twice, and its
+agreement with itself is printed beside its agreement with the server. One
+build at a time, the phone build first.
 
 Each side's file opens with what answered: the served model, the file's name,
 size and sha256, and the launch. The server's side is asked only while its
@@ -456,12 +465,18 @@ cd ~/benchmarks/aienh
 sudo docker compose exec -T bench python scripts/frontier_parity.py ask --as served/<phone-build> --out /home/masein/benchmarks/parity/phone-server.jsonl
 ```
 
+Its first line says how long the 500 take at this server's measured pace
+with thinking off; its last, how long they took.
+
 On the box (G2's first three blocks: tmux, `cd /app`, the token), the same
 build with the full run's flags:
 
 ```bash
 python scripts/remote_gguf.py --as served/<phone-build> --gguf hf://<you>/evalboard-private/Qwen3.6-35B-A3B-k4-LDA-UD-Q4_K_XL.gguf --server hf://<you>/evalboard-private/llama-server-cuda12.8.tar.gz --based-on Qwen/Qwen3.6-35B-A3B --thinking off --slots 8 --flags "-ctk q8_0 -ctv q8_0 --flash-attn on" --parity --out /workspace/parity-phone
 ```
+
+It asks each question twice (1,000 answers at 8 slots), the second time for
+the box's agreement with itself.
 
 It fetches the GGUF and the tarball into `/workspace/files`, a folder every
 run on the box shares: the full run (G2) after it fetches and hashes nothing
@@ -477,11 +492,15 @@ scp -i ~/.ssh/vast_ed25519 -P <port> root@<host>:/workspace/parity-phone/parity.
 sudo docker compose exec -T bench python scripts/frontier_parity.py compare /home/masein/benchmarks/parity/phone-server.jsonl /home/masein/benchmarks/parity/phone-box.jsonl --file-sha256 <the phone file's sha256 from G0>
 ```
 
-It prints "The same: 48 of the 50 read on both sides as the same letter …",
-"Not the same: …", or "Not the same setup: …" (another file or launch: fix the
-box's command before anything else). The board has no sha256 of either build's
+It prints "The same: the box answers 42.4% right and the server 41.8% on the
+same 500 questions — a difference of +0.6 points, 90% interval -1.6 to +2.8,
+inside ±5 points. For information: the same letter on …", "Not the same: …",
+or "Not the same setup: …" (another file or launch: fix the box's command
+before anything else). The board has no sha256 of either build's
 file today, so `--file-sha256` is what compares the files whole; without it
-they are compared by name and size, and it says so.
+they are compared by name, and by llama-server's count of their weights
+(never the server's count against the box's file on disk, about 11 MB larger
+for its header), and it says so.
 Not the same: run the box's parity again with the server's own launch
 (`--slots 1`, no `--flags`), into another `--out`. If that is the same, the
 box's cache type or slots are the difference; either way, stop and say so

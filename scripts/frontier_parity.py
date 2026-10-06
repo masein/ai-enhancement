@@ -5,12 +5,16 @@ thinking off and greedy, asked of the served model on the server (`ask`, in
 the board's container) and of the same GGUF on the box, with the box's own
 flags (`remote_gguf.py --parity`); then `compare` reads both.
 
-What is compared: the letter each side reads from each reply (TIGER-Lab's
-extraction), and whether the replies are identical. What counts as the same:
-the same letter on at least 46 of the 50, a question counting only when both
-sides read a letter from it. Greedy decoding on two machines with other batch
-sizes, KV cache types and kernels isn't bit-for-bit the same, so whole
-replies may part, and are counted, not required.
+17d: the same 500 questions by default (`--n` on both sides). "The same" is
+decided on accuracy: the difference in right answers on the same questions
+(the box's share right minus the server's, question by question), its 90%
+paired interval inside ±5 points (PARITY's margin, stated before the run: the
+two one-sided tests of equivalence). Letter agreement and identical replies
+are information only, beside the box's agreement with a second run of itself
+(the box asks each question twice): on the pilot, two runs on one box agreed
+on 43 letters of 50, so letters measured run-to-run noise, not the setup.
+`ask` says how long its questions take at this server's measured pace with
+thinking off, and how long they took.
 
 17c: each side's file opens with what answered — the side, the served model,
 the file (name, size, sha256) and the launch (its routing environment and
@@ -38,6 +42,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -141,6 +146,8 @@ def main(argv: list[str] | None = None) -> int:
     a1 = sub.add_parser("ask", help="ask the served model on this server")
     a1.add_argument("--as", dest="served_as", required=True, help="served/<name>")
     a1.add_argument("--out", required=True, type=Path)
+    a1.add_argument("--n", type=int, default=fb.PARITY["n"],
+                    help="17d: the number of questions (the box's --parity --n the same)")
     a2 = sub.add_parser("compare", help="the server's answers beside the box's")
     a2.add_argument("server", type=Path)
     a2.add_argument("box", type=Path)
@@ -153,6 +160,9 @@ def main(argv: list[str] | None = None) -> int:
                              "then the box's")
         (sh, srows), (bh, brows) = read(a.server), read(a.box)
         problems, notes = identity_problems(sh, bh, a.file_sha256.strip().lower())
+        if sh.get("n") != bh.get("n"):
+            problems.append(f"the server was asked {sh.get('n')} questions and the box "
+                            f"{bh.get('n')}: ask both with the same --n")
         if problems:
             print("Not the same setup: " + "; ".join(problems))
             return 1
@@ -168,9 +178,17 @@ def main(argv: list[str] | None = None) -> int:
     if not rec or served.is_openrouter(rec):
         raise SystemExit(f"{a.served_as} isn't a model served by a llama-server here")
     ident = server_identity(rec)
+    # 17d: how long this takes, at the pace the board measured with thinking off
+    pace = ((rec.get("speed_by") or {}).get("off") or {}).get("secs_each")
+    print(f"{a.n} questions, thinking off: "
+          + (f"about {round(a.n * pace / 60)} min at {pace:.1f} s an answer (this server's "
+             "pace with thinking off)" if pace else
+             "this server has no pace with thinking off on record yet"), flush=True)
+    t0 = time.time()
     n = sf.parity_ask(rec, a.out, lambda k, of: print(f"{k} of {of}", end="\r", flush=True),
-                      identity=ident)
-    print(f"\n{n} answers · {a.out}")
+                      identity=ident, n=a.n)
+    took = time.time() - t0
+    print(f"\n{n} answers in {took / 60:.0f} min ({took / max(1, n):.1f} s an answer) · {a.out}")
     return 0
 
 

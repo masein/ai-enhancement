@@ -328,3 +328,81 @@ def test_28_parity_compares_the_files_by_sha256_and_sizes_only_like_with_like(tm
     assert fp.main(["compare", s, b, "--file-sha256", sha]) == 1
     assert "llama-server counts the server's weights as 22,843,343,360 bytes" in \
         capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# 29 (sent mid-round): the parity check decided on accuracy
+# ---------------------------------------------------------------------------
+
+def test_29_parity_is_decided_on_accuracy_over_n_questions(svc, monkeypatch, tmp_path, capsys):  # noqa: F811
+    """letters agreed on 42 to 46 of 49 between the server and the box, and on
+    43 of 50 between two runs on one box: letter agreement over 50 measured
+    run-to-run noise, not the setup"""
+    import frontier_parity as fp
+
+    def rows(right: set[int], n: int = 500, wrong: str = "B", again: bool = False,
+             say: str = "the answer is ({})") -> list[dict]:
+        out = []
+        for k in range(n):
+            r = {"id": str(k), "key": "A", "answer": say.format("A" if k in right else wrong)}
+            if again:                           # its second run: two letters of ten part
+                r["answer2"] = r["answer"] if k % 10 > 1 else say.format("D")
+            out.append(r)
+        return out
+    server = rows(set(range(210)))
+    # 500 questions, 15 more right on the box and 15 fewer, the wrong ones
+    # another letter, every reply worded otherwise: the same — 90% interval
+    # about ±1.8 points
+    boxed = rows(set(range(15, 225)), wrong="C", again=True, say="The answer is ({}).")
+    got = fb.parity_compare(server, boxed)
+    assert got["ok"] and (got["right_server"], got["right_box"]) == (210, 210)
+    assert -0.02 < got["lo"] < 0 < got["hi"] < 0.02
+    assert got["words"].startswith("The same: the box answers 42.0% right and the server 42.0% "
+                                   "on the same 500 questions — a difference of +0.0 points, 90% "
+                                   "interval -1.8 to +1.8, inside ±5 points")
+    # the letters, information only: 195 the same (the wrong ones part), and
+    # the box against itself
+    assert got["letters"] == 195 and got["self"] == (500, 400, 400)
+    assert ("For information: the same letter on 195 of the 500 read on both sides, 0 "
+            "identical replies; the box against a second run of itself: the same letter on "
+            "400 of 500, 400 identical") in got["words"]
+    # ten points lower on the box: not the same
+    got = fb.parity_compare(server, rows(set(range(50, 210))))
+    assert not got["ok"] and got["hi"] < -0.05 and got["words"].startswith("Not the same: ")
+    # the pilot's 50: 41 right on the server and 44 on the box — at 50 the
+    # interval can't fit inside ±5 points, which is why it is 500
+    got = fb.parity_compare(rows(set(range(41)), 50), rows(set(range(2, 46)), 50))
+    assert not got["ok"] and got["lo"] < -0.02 and got["hi"] > 0.14
+
+    # --n on both sides, and compare refuses two that differ
+    monkeypatch.setattr(fb, "_fetch", lambda task: {"items": [
+        {"id": str(k), "question": f"Q{k}?", "options": ["w", "x", "y"], "answer": "A",
+         "category": "law"} for k in range(60)], "extra": {"shots": {}}})
+    fake = FakeServer()
+    try:
+        fake.reply = lambda body: "the answer is (A)"
+        rec = served.register({"name": "parity", "base_url": fake.base, "how": "x",
+                               "thinking": "off"}, ME)
+        # the time it takes, said before it asks: this server's pace thinking off
+        db.served_put({**served.get(rec["id"]),
+                       "speed_by": {"off": {"secs_each": 3.6, "n": 120}}})
+        out = tmp_path / "server.jsonl"
+        assert fp.main(["ask", "--as", rec["id"], "--out", str(out), "--n", "20"]) == 0
+        said = capsys.readouterr().out
+        assert said.startswith("20 questions, thinking off: about 1 min at 3.6 s an answer "
+                               "(this server's pace with thinking off)")
+        assert re.search(r"\n20 answers in \d+ min \([\d.]+ s an answer\)", said), said
+        sh, srows = fp.read(out)
+        assert sh["n"] == 20 and len(srows) == 20 and "answer2" not in srows[0]
+        # 500 by default; a box asked 30 is refused beside it
+        assert fb.PARITY["n"] == 500 and fb.PARITY["margin"] == 0.05
+        box_file = tmp_path / "box.jsonl"
+        sf.parity_ask(rec, box_file, identity={"side": "box", "as": rec["id"]}, n=30,
+                      twice=True)
+        bh, brows = fp.read(box_file)
+        assert bh["n"] == 30 and bh["twice"] and all("answer2" in r for r in brows)
+    finally:
+        fake.close()
+    assert fp.main(["compare", str(out), str(box_file)]) == 1
+    assert "the server was asked 20 questions and the box 30: ask both with the same --n" \
+        in capsys.readouterr().out

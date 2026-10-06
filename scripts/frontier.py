@@ -783,31 +783,46 @@ def score(task: str, answer: str, finish: str | None, need: dict) -> dict:
     raise KeyError(task)
 
 
-# 17b: the parity check — does a box answer as the server does? The same 50
+# 17b: the parity check — does a box answer as the server does? The same
 # MMLU-Pro questions (public, scored by code), thinking off and greedy, asked
 # with each side's own launch: the box's flags, slots and KV cache, the
-# server's. Greedy decoding on two machines with other batch sizes, cache
-# types and kernels isn't bit-for-bit the same, so whole replies may part; the
-# letter each side reads must not, but for a few
-PARITY = {"task": "mmlupro_tiger", "n": 50, "seed": "frontier-parity-1", "max_tokens": 2048,
-          "sampling": {"temperature": 0.0, "top_k": 1, "seed": 0}, "same_at_least": 46}
+# server's. 17d: decided on accuracy, not on letters — on the pilot, letter
+# agreement over 50 questions measured run-to-run noise (two runs on one box
+# agreed on 43 of 50), not the setup. "The same": the paired difference in
+# right answers (the box's minus the server's, question by question) with its
+# 90% interval inside ±MARGIN points — the two one-sided tests of equivalence,
+# at 5% each, its margin stated here before any run. Letter agreement and
+# identical replies are reported beside it for information, with the box's
+# agreement with a second run of itself
+PARITY = {"task": "mmlupro_tiger", "n": 500, "seed": "frontier-parity-1", "max_tokens": 2048,
+          "sampling": {"temperature": 0.0, "top_k": 1, "seed": 0},
+          "margin": 0.05, "z": 1.645}
 
 
-def parity_items(root: Path) -> list[dict]:
-    """the parity check's questions: the same 50 of MMLU-Pro on every machine"""
+def parity_items(root: Path, n: int | None = None) -> list[dict]:
+    """the parity check's questions: the same n of MMLU-Pro on every machine"""
     items = load(PARITY["task"], root)
     pick = sorted(random.Random(PARITY["seed"]).sample(range(len(items)),
-                                                       min(PARITY["n"], len(items))))
+                                                       min(n or PARITY["n"], len(items))))
     return [items[i] for i in pick]
 
 
+def _agree(a: dict, b: dict, key_a: str = "answer", key_b: str = "answer") -> tuple[int, int, int]:
+    """(both read a letter, the same letter, identical replies) over a's and b's ids"""
+    ids = sorted(set(a) & set(b))
+    la = {i: read_mmlu_pro(a[i].get(key_a) or "") for i in ids}
+    lb = {i: read_mmlu_pro(b[i].get(key_b) or "") for i in ids}
+    both = [i for i in ids if la[i] and lb[i]]
+    return (len(both), sum(1 for i in both if la[i] == lb[i]),
+            sum(1 for i in ids if (a[i].get(key_a) or "") and visible(a[i].get(key_a) or "")
+                == visible(b[i].get(key_b) or "")))
+
+
 def parity_compare(server: list[dict], box: list[dict]) -> dict:
-    """the two sides' answers to the parity questions, compared: {n, both (a
-    letter read on both sides), same (the same letter), identical (the same
-    reply), read_server, read_box, right_server, right_box, missing,
-    problems, ok, words}. 17c: a question counts only when both sides read a
-    letter from it — two empty replies aren't the same answer — and each
-    side's file holds each question once"""
+    """the two sides' answers to the parity questions, compared on accuracy:
+    {n, right_server, right_box, diff, lo, hi, same, letters, identical,
+    self, problems, ok, words} — `diff` the box's share right minus the
+    server's on the same questions, [lo, hi] its 90% paired interval"""
     problems = []
     for side, rows in (("the server's", server), ("the box's", box)):
         ids = [str(r.get("id")) for r in rows]
@@ -817,33 +832,51 @@ def parity_compare(server: list[dict], box: list[dict]) -> dict:
                             f"{', '.join(twice[:5])} more than once")
     a = {str(r["id"]): r for r in server}
     b = {str(r["id"]): r for r in box}
-    letter_a = {i: read_mmlu_pro(r.get("answer") or "") for i, r in a.items()}
-    letter_b = {i: read_mmlu_pro(r.get("answer") or "") for i, r in b.items()}
+    if set(a) != set(b):
+        problems.append(f"the two files hold other questions ({len(set(a) ^ set(b))} on one side "
+                        "only): ask both with the same --n")
     ids = sorted(set(a) & set(b))
-    missing = sorted(set(a) ^ set(b))
-    both = [i for i in ids if letter_a[i] and letter_b[i]]
-    same = sum(1 for i in both if letter_a[i] == letter_b[i])
-    identical = sum(1 for i in both if visible(a[i]["answer"]) == visible(b[i]["answer"]))
-    read = [sum(1 for v in x.values() if v) for x in (letter_a, letter_b)]
-    right = [sum(1 for i in ids if lt[i] and lt[i] == x[i].get("key"))
-             for x, lt in ((a, letter_a), (b, letter_b))]
-    need, n = PARITY["same_at_least"], PARITY["n"]
-    if min(read) < need:
-        problems.append(f"a letter was read from {read[0]} of the server's answers and "
-                        f"{read[1]} of the box's: each side needs {need} of {n}")
-    if len(ids) != n:
-        problems.append(f"{len(ids)} questions answered on both sides, not {n}")
-    if missing:
-        problems.append(f"{len(missing)} answered on one side only")
-    ok = not problems and same >= need
-    words = (f"{same} of the {len(both)} read on both sides as the same letter (the check asks "
-             f"{need} of {n}) · letters read: the server {read[0]}, the box {read[1]} · "
-             f"{identical} identical replies · right: the server {right[0]}, the box {right[1]}")
-    return {"n": len(ids), "both": len(both), "same": same, "identical": identical,
-            "read_server": read[0], "read_box": read[1], "right_server": right[0],
-            "right_box": right[1], "missing": missing, "problems": problems, "ok": ok,
+    n = len(ids)
+    # 17c: two sides that read no letter aren't the same answer — each side
+    # reads one from at least half its answers, or there is nothing to compare
+    read = [sum(1 for i in ids if read_mmlu_pro(x[i].get("answer") or "")) for x in (a, b)]
+    if not n or min(read) < n / 2:
+        problems.append(f"a letter was read from {read[0]:,} of the server's answers and "
+                        f"{read[1]:,} of the box's, of {n:,}: too few to compare (each side "
+                        "needs half)")
+
+    def right(x: dict, key: str = "answer") -> int:
+        return int(bool(read_mmlu_pro(x.get(key) or "") and
+                        read_mmlu_pro(x.get(key) or "") == x.get("key")))
+    d = [right(b[i]) - right(a[i]) for i in ids]
+    rs, rb = sum(right(a[i]) for i in ids), sum(right(b[i]) for i in ids)
+    margin, z = PARITY["margin"], PARITY["z"]
+    if n:
+        mean = sum(d) / n
+        var = sum((x - mean) ** 2 for x in d) / (n - 1) if n > 1 else 0.0
+        se = (var / n) ** 0.5
+        lo, hi = mean - z * se, mean + z * se
+    else:
+        mean = lo = hi = 0.0
+    same = bool(n) and lo >= -margin and hi <= margin
+    both, letters, identical = _agree(a, b)
+    own = {i: x for i, x in b.items() if x.get("answer2") is not None}
+    self_agree = _agree(own, own, "answer", "answer2") if own else None
+    pt = lambda x: f"{100 * x:+.1f}"                         # noqa: E731
+    head = (f"the box answers {100 * rb / max(1, n):.1f}% right and the server "
+            f"{100 * rs / max(1, n):.1f}% on the same {n:,} questions — a difference of "
+            f"{pt(mean)} points, 90% interval {pt(lo)} to {pt(hi)}, "
+            f"{'inside' if same else 'not inside'} ±{100 * margin:.0f} points")
+    info = (f"For information: the same letter on {letters:,} of the {both:,} read on both "
+            f"sides, {identical:,} identical replies"
+            + (f"; the box against a second run of itself: the same letter on {self_agree[1]:,} "
+               f"of {self_agree[0]:,}, {self_agree[2]:,} identical" if self_agree else ""))
+    ok = not problems and same
+    return {"n": n, "right_server": rs, "right_box": rb, "diff": mean, "lo": lo, "hi": hi,
+            "same": same, "letters": letters, "both": both, "identical": identical,
+            "self": self_agree, "problems": problems, "ok": ok,
             "words": ("The same: " if ok else "Not the same: ")
-            + "; ".join([*problems, words] if problems else [words])}
+            + "; ".join([*problems, head] if problems else [head]) + ". " + info + "."}
 
 
 def group_of(task: str, item: dict) -> str:
