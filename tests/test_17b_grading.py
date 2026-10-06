@@ -392,12 +392,12 @@ def test_27_the_card_says_why_a_batch_failed(svc, monkeypatch):  # noqa: F811
     fgr.start("masein")
     for _ in range(300):
         llm_poller.tick()
-        if any("the first 5 requests were all refused" in (w.get("why") or "")
+        if any("5 requests in a row were all refused" in (w.get("why") or "")
                for w in page(svc).get("waits") or []):
             break
         time.sleep(0.05)
     why = " ".join(w.get("why") or "" for w in page(svc).get("waits") or [])
-    assert "the first 5 requests were all refused" in why and "data policy" in why, why
+    assert "5 requests in a row were all refused" in why and "data policy" in why, why
     assert not (grades("simpleqa_epoch").get("refused") or {})
 
 

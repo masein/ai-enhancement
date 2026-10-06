@@ -4953,6 +4953,34 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17g.3 — grading (6 Oct)
+
+- **A run of refusals stops a Start anywhere** (`llm.LocalOpenAI._work`,
+  GraderChat's `FIRST_REFUSALS`): five of the same error with no reply
+  between them, whatever else that isn't a reply sits between (a timeout
+  before the "not a valid model ID"s), stop the batch and count nothing; a
+  reply ends the run and what it held is written. A key's spend cap, the
+  account's credit (`limit`) and "Provider returned error" (`down`) are never
+  a try (`ai_models.refusal`).
+- **Each grader's grades under its own name** (`grades.json` `kept`, by
+  version and prompt sha256; 17f's `aside` list is read into it). Choosing a
+  grader moves nothing (`save`); the dry run shows what Start would do with it
+  (`waiting(view=True)`, `_switch`), and Start does it. A grader chosen again
+  gets back what it graded (the dry run says how many); a new one after more
+  than 5% ungraded regrades whole, the others kept by name; otherwise a
+  top-up.
+- **One grader for the rows compared** (`mismatches`, `regrade_row`,
+  `POST api/frontier/grading/regrade`): a benchmark whose rows are scored by
+  different graders says so on every row's cell (`graderDiffers`) and on the
+  card, which offers each row the grader chosen now didn't grade its regrade,
+  priced; taken, the next Start grades it again (`regrade_to`).
+- **HLE's three shapes** (`frontier_graders._hle_object`): two identical
+  objects are one, an example object (a template's values) is none, and a
+  "Correct:" line that says what the object says is no conflict; objects or a
+  line that say otherwise stay no grade, and 17e's quoted object still yields
+  to the line.
+- Tests: `tests/test_17g_review.py` (part 3).
+
 ### 17g.2 — the import (6 Oct)
 
 - **Shards asked another way never merge** (`shard_conflicts`): beside the

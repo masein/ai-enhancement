@@ -2484,6 +2484,19 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             metric_used.setdefault(task, name)
             if task not in all_tasks:
                 all_tasks.append(task)
+    # 17g: one benchmark, its rows scored by different graders — each final on
+    # its own row, and not comparable: said on every one of them
+    for task, per in cells.items():
+        named = {mid: (((by_model[mid].get("frontier") or {}).get(task) or {}).get("grader")
+                       or {}).get("version") for mid in per}
+        named = {mid: v for mid, v in named.items() if v}
+        if len(set(named.values())) > 1:
+            for mid, v in named.items():
+                others = sorted({f"{display.get(o, o)} by {w}" for o, w in named.items()
+                                 if w != v})
+                per[mid]["graderDiffers"] = (
+                    f"graded by {v}; {'; '.join(others)} — one benchmark, two graders: not "
+                    "comparable until one grades both (AI models offers the regrade)")
 
     # headline tasks: groups + standalones (children live in the Runs tab), canonical
     # order first. A task missing for some models still shows — the dashboard renders
@@ -12937,7 +12950,9 @@ function frHere(name) {
       return { v: c.v, se: c.se || null, tag: at + (c.how ? ' · ' + c.how : ''),
         set: 'howSet' in c ? (c.howSet == null ? null : at + ' · ' + c.howSet) : at,
         // 17f: where it ran, and the Runs rows it came from
-        where: c.where || '', runs: c.runs || [] };
+        where: c.where || '', runs: c.runs || [],
+        // 17g: the rows beside it scored by another grader
+        differs: c.graderDiffers || '' };
     } })),
     ...ts.filter(t => GGUF_OF[t]).map(t => ({ key: 'gguf:' + GGUF_OF[t],
       get: m => { const g = ggufOf(m.id, GGUF_OF[t]);
@@ -13159,6 +13174,8 @@ function lbFrontier(ms) {
             + (x.here.se ? ` ± ${pct1(x.here.se)}` : ''), `${r.m.name} · ${c.name}`, x.here.tag,
             'ranked only with the cells measured the same way here'])},
         b(hl, pct1(x.here.v)), el('div', { class: 'small se fr-tag', text: x.here.tag }),
+        x.here.differs ? el('div', { class: 'small warntext', 'data-fr-grader-differs': r.m.id,
+          text: x.here.differs }) : '',
         x.here.where ? frWhere(x.here) : '');
     return el('td', { class: 'num tcell', 'data-fr-cell': c.key, 'data-fr-rep': r.m.id,
         'data-fr-setting': x.rep.setting, 'data-lead': rl ? '1' : null, style: tint, tabindex: '0',
@@ -24436,7 +24453,10 @@ function frontierGradingCard() {
       // 17f: graded again whole by the grader chosen now — said before Start
       el('td', {}, r.label, r.regrade ? el('div', { class: 'small se', 'data-frontier-regrade': '1',
         text: `every answer graded again by the grader chosen now: ${r.regrade} — `
-          + 'its grades are kept aside, not mixed in' }) : ''),
+          + 'the earlier grades are kept under their grader’s name, not mixed in' }) : '',
+        // 17g: a grader chosen again: what it graded before comes back
+        r.reused ? el('div', { class: 'small se', 'data-frontier-reused': String(r.reused),
+          text: `${n(r.reused)} grades it gave before are used again` }) : ''),
       el('td', { text: r.model }), el('td', { class: 'num', text: n(r.answers) }),
       el('td', { class: 'num', text: r.usd == null ? 'once pinned' : usd(r.usd) }))))))
     : el('p', { class: 'small se', 'data-frontier-estimate': '0',
@@ -24513,8 +24533,39 @@ function frontierGradingCard() {
           : '')
         + (r.n - (r.ungraded || 0) ? ` — Start asks ${r.n - (r.ungraded || 0) === 1 ? 'it'
           : `${n(r.n - (r.ungraded || 0))} of them`} again.` : '.') })),
+    // 17g: one benchmark, rows scored by different graders — said, and each
+    // row the grader chosen now didn't grade offered its regrade, priced
+    ...(G.mismatches || []).map(mm => el('div', { class: 'small', 'data-frontier-mismatch': mm.task },
+      el('p', { class: 'small warntext', text: `${mm.label}: its rows are scored by different `
+        + 'graders, each final on its own row — not comparable: '
+        + mm.rows.map(r => `${r.model} by ${r.version}`).join('; ') }),
+      ...mm.rows.filter(r => r.offer).map(r => el('p', { class: 'small',
+          'data-frontier-offer': `${mm.task}|${r.row}` },
+        r.asked ? `${r.model}: graded again by ${r.offer.to} at the next Start — `
+          : `${r.model}: grade it again by ${r.offer.to}, as the others are — `
+            + `${n(r.offer.answers)} answers, about `
+            + (r.offer.usd == null ? 'unpriced' : usd(r.offer.usd)) + ' ',
+        LIVE ? el('button', { class: 'quiet', 'data-frontier-regrade-row': `${mm.task}|${r.row}`,
+          disabled: A.frgBusy ? '' : null,
+          text: r.asked ? 'Undo' : 'Grade it again at Start',
+          onclick: () => frontierRegradeRow(mm.task, r.row, r.asked) }) : ''))) ),
     G.probe_words ? el('p', { class: 'small se', 'data-frontier-probe': '1',
       text: G.probe_words }) : '');
+}
+async function frontierRegradeRow(task, row, undo) {
+  const A = state.ai;
+  if (!whoName()) { askName(); return; }
+  if (A.frgBusy) return;
+  A.frgBusy = 'regrade';
+  render();
+  try {
+    const r = await post('api/frontier/grading/regrade', { row, task, by: whoName(), undo: !!undo });
+    A.frg = r.page;
+    toast(undo ? 'Not graded again' : 'Graded again at the next Start — the dry run shows it',
+      { key: 'frg' });
+  } catch (e) { toast('Refused. ' + e.message, { key: 'frg' }); }
+  A.frgBusy = '';
+  render();
 }
 
 // ---- the judge test ----------------------------------------------------------

@@ -282,8 +282,10 @@ def refusal(status: int | None, text: str) -> tuple[str, str]:
         if "no response within" in str(text) or "timed out" in str(text).lower():
             return "unreached", "OpenRouter didn’t answer in time"
         return "unreached", "OpenRouter couldn’t be reached"
+    # 17g: a key's spend cap, the account's credit — never the answer's
     if status == 402 or "key limit" in low or "openrouter_key_limit" in low \
-            or "insufficient credits" in low:
+            or "insufficient credits" in low or re.search(r"spend(ing)? (cap|limit)", low) \
+            or "credit" in low:
         return "limit", ("OpenRouter refused the key: it has reached its own spending limit, or "
                          "the account is out of credit. That is fixed on OpenRouter’s side: "
                          "raise the key’s limit or add credit there")
@@ -296,7 +298,8 @@ def refusal(status: int | None, text: str) -> tuple[str, str]:
         return "rate", "OpenRouter is limiting this key’s requests (HTTP 429)"
     if status in (408, 504):
         return "unreached", "OpenRouter didn’t answer in time"
-    if status >= 500:
+    # 17g: the provider's own failure, passed on as a 400 — never the answer's
+    if status >= 500 or "provider returned error" in low:
         return "down", f"OpenRouter or the provider failed (HTTP {status})"
     return "refused", f"OpenRouter refused it (HTTP {status})" + (f": {msg}" if msg else "")
 

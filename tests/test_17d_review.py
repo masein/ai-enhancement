@@ -326,7 +326,10 @@ def test_16_a_grader_that_cant_be_reached_uses_no_tries_and_another_asks_again(
         drain()
     assert grades_of("simpleqa_epoch")["refused"]["2#0"]["tries"] == 3
     fgr.save("simpleqa", GEMINI, "masein")
-    assert grades_of("simpleqa_epoch")["refused"]["2#0"]["tries"] == 0
+    # 17g: nothing moves until Start — the dry run shows the one asked again
+    assert grades_of("simpleqa_epoch")["refused"]["2#0"]["tries"] == 3
+    row = next(r for r in fgr.estimate()["rows"] if r["slot"] == "simpleqa")
+    assert row["answers"] == 1
     asked = stub(monkeypatch, plain)
     fgr.start("masein")
     drain()
