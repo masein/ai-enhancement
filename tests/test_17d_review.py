@@ -282,3 +282,49 @@ def test_15_a_bundle_json_of_the_wrong_types_is_refused_in_words(box):  # noqa: 
     assert code == 2, said
     assert any("bundle.json's row is list, not str" in x for x in said), said
     assert any("bundle.json's model is int, not str" in x for x in said), said
+
+
+# ---------------------------------------------------------------------------
+# 28 (sent mid-round): the parity check's sizes
+# ---------------------------------------------------------------------------
+
+def test_28_parity_compares_the_files_by_sha256_and_sizes_only_like_with_like(tmp_path, capsys):
+    """every real pair was refused: "the server's file is 22,843,343,360 bytes, the
+    box's 22,854,339,808" — llama-server's count of the weights against the
+    file on disk"""
+    import frontier_parity as fp
+    sha = "ab" * 32
+    launch = {"env": {}, "spec": [], "drafts": False}
+    rows = [{"id": str(k), "key": "A", "answer": "the answer is (A)"} for k in range(50)]
+
+    def files(server_file: dict, box_file: dict, tag: str) -> tuple[str, str]:
+        s = tmp_path / f"server-{tag}.jsonl"
+        b = tmp_path / f"box-{tag}.jsonl"
+        for path, head in ((s, {"side": "server", "as": SERVED, "file": server_file,
+                                "launch": launch}),
+                           (b, {"side": "box", "as": SERVED, "file": box_file,
+                                "server": {"flags": [], "env": {}}})):
+            path.write_text("".join(json.dumps(x) + "\n" for x in [{"parity_of": head},
+                                                                    *rows]))
+        return str(s), str(b)
+    name = "Qwen3.6-35B-A3B-k4-LDA-UD-Q4_K_XL.gguf"
+    # as this round writes them: the server's weights, the box's file and weights
+    s, b = files({"name": name, "weights": 22_843_343_360, "sha256": ""},
+                 {"name": name, "size": 22_854_339_808, "sha256": sha,
+                  "weights": 22_843_343_360}, "new")
+    assert fp.main(["compare", s, b, "--file-sha256", sha]) == 0
+    assert capsys.readouterr().out.startswith("The same: ")
+    # as the pilot wrote them (c43cdbe): one "size" each, of two kinds — not compared
+    s, b = files({"name": name, "size": 22_843_343_360, "sha256": ""},
+                 {"name": name, "size": 22_854_339_808, "sha256": sha}, "old")
+    assert fp.main(["compare", s, b, "--file-sha256", sha]) == 0
+    # the files whole, by sha256: another file is refused
+    assert fp.main(["compare", s, b, "--file-sha256", "cd" * 32]) == 1
+    assert "the box's file has sha256" in capsys.readouterr().out
+    # weights on both sides that differ: refused
+    s, b = files({"name": name, "weights": 22_843_343_360, "sha256": ""},
+                 {"name": name, "size": 22_854_339_808, "sha256": sha,
+                  "weights": 21_000_000_000}, "other")
+    assert fp.main(["compare", s, b, "--file-sha256", sha]) == 1
+    assert "llama-server counts the server's weights as 22,843,343,360 bytes" in \
+        capsys.readouterr().out

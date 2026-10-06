@@ -23,7 +23,9 @@ registered (served.check_pin). `compare` refuses:
 - a box whose launch isn't the one registered for the model.
 The board may have no sha256 of the server's file: the two are then compared
 by name and size, and saying so; --file-sha256 (sha256sum on the server)
-compares them whole.
+compares them whole. 17d: a size only with its like — llama-server's count of
+the weights on both sides, never the server's count against the box's file
+on disk.
 
     sudo docker compose exec -T bench python scripts/frontier_parity.py ask \\
         --as served/<name> --out /home/masein/benchmarks/parity/<name>-server.jsonl
@@ -74,9 +76,13 @@ def identity_problems(server: dict, box: dict, file_sha: str = "") -> tuple[list
     fs, fx = server.get("file") or {}, box.get("file") or {}
     if fs.get("name") != fx.get("name"):
         out.append(f"the server serves {fs.get('name')}, the box ran {fx.get('name')}")
-    if fs.get("size") and fx.get("size") and int(fs["size"]) != int(fx["size"]):
-        out.append(f"the server's file is {int(fs['size']):,} bytes, the box's "
-                   f"{int(fx['size']):,}")
+    # 17d: sizes only like with like — llama-server's count of the weights on
+    # both sides; never the server's count against the box's file on disk
+    # (about 11 MB apart for the header: every real pair was refused)
+    if isinstance(fs.get("weights"), int) and isinstance(fx.get("weights"), int) \
+            and fs["weights"] != fx["weights"]:
+        out.append(f"llama-server counts the server's weights as {fs['weights']:,} bytes and "
+                   f"the box's as {fx['weights']:,}")
     if file_sha and fs.get("sha256") and file_sha != fs["sha256"]:
         out.append(f"--file-sha256 {file_sha[:16]}… isn't the sha256 the board has for "
                    f"{server.get('as')}, {fs['sha256'][:16]}…")
@@ -86,8 +92,8 @@ def identity_problems(server: dict, box: dict, file_sha: str = "") -> tuple[list
                    f"{want[:16]}…")
     if not want:
         notes.append("The board has no sha256 of the server's file: the two were compared by "
-                     "name and size. Give --file-sha256 (sha256sum on the server) to compare "
-                     "them whole.")
+                     "name, and by llama-server's count of their weights where both said it. "
+                     "Give --file-sha256 (sha256sum on the server) to compare them whole.")
     reg = server.get("launch") or {}
     if reg.get("words"):
         out.append(f"{server.get('as')}'s record says lookahead in words, with no routing "
@@ -120,7 +126,9 @@ def server_identity(rec: dict) -> dict:
     p = served.probe(rec["base_url"], rec.get("key", ""))
     pin = rec.get("pin") or {}
     return {"side": "server", "as": rec["id"],
-            "file": {"name": pin.get("file") or p.get("file"), "size": pin.get("size")
+            # 17d: llama-server's count of the weights, said as such — never the
+            # file's size on disk, which this side doesn't know
+            "file": {"name": pin.get("file") or p.get("file"), "weights": pin.get("size")
                      or p.get("size"), "sha256": imf.registered_sha(rec)},
             "launch": imf.record_launch(rec), "speculative": p.get("speculative"),
             "build": p.get("build") or pin.get("build")}

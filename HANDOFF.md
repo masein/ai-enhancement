@@ -4953,6 +4953,21 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17d.p — point 28: the parity check's sizes (6 Oct)
+
+Found on the pilot. `frontier_parity.py compare` refused every real pair:
+"the server's file is 22,843,343,360 bytes, the box's 22,854,339,808". The
+server's size is its pin's, llama-server's count of the weights; the box's
+was the file on disk, about 11 MB larger for the header. Now:
+- the files are compared by sha256 (`--file-sha256`);
+- a size only like with like: each side's file says llama-server's count of
+  its weights (`weights`), and those are compared;
+- the box's disk size is never compared with the server's count.
+
+Parity files written before this mark no kind of size, so no size of theirs is
+compared: they compare by sha256, and the pilot's files need not be asked
+again. Tests: `tests/test_17d_review.py` (28).
+
 ### 17d.2 — the third review's part 2: before the imports (6 Oct)
 
 - **Bundles whose shards were set aside can be imported again**: their record

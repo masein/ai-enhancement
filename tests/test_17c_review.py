@@ -91,14 +91,15 @@ def test_2_each_side_says_what_answered_and_compare_refuses_another_setup(  # no
     bpath = box["root"] / "parity" / "parity.jsonl"
     bh, brows = fp.read(bpath)
     assert bh["side"] == "box" and bh["as"] == SERVED and len(brows) == 50
-    assert bh["file"] == {"name": GGUF_NAME, "size": box["gguf"].stat().st_size,
-                          "sha256": box["sha"]}
+    assert {k: bh["file"][k] for k in ("name", "size", "sha256")} == {
+        "name": GGUF_NAME, "size": box["gguf"].stat().st_size, "sha256": box["sha"]}
     assert bh["server"]["env"] == {"LLAMA_MOE_ROUTE_MODE": "lookahead"}
     # the server: the same file, registered with the same routing
     fake = FakeServer()
     try:
         fake.model_path = f"/models/{GGUF_NAME}"
-        fake.size = box["gguf"].stat().st_size
+        # 17d: llama-server's count of the same file's weights, as the box's says
+        fake.size = 21_000_000_000
         fake.reply = lambda body: "the answer is (A)"
         rec = served.register({"name": "lda box", "base_url": fake.base, "how": "llama-server",
                                "thinking": "off"}, ME)
@@ -114,7 +115,7 @@ def test_2_each_side_says_what_answered_and_compare_refuses_another_setup(  # no
         assert capsys.readouterr().out.startswith("The same: 50 of the 50 read on both sides")
         # without the file's sha256 the board has none: compared by name and size, said
         assert fp.main(["compare", str(spath), str(bpath)]) == 0
-        assert "compared by name and size" in capsys.readouterr().out
+        assert "compared by name" in capsys.readouterr().out
         # another file's sha256: refused
         assert fp.main(["compare", str(spath), str(bpath), "--file-sha256", "0" * 64]) == 1
         assert "the box's file has sha256" in capsys.readouterr().out

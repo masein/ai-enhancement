@@ -827,7 +827,10 @@ def main(argv: list[str] | None = None) -> int:
             dest = out / "parity.jsonl"
             # 17c: what answered, for compare: the file, the launch, the slots
             ident = {"side": "box", "as": a.served_as,
-                     "file": {k: gguf[k] for k in ("name", "size", "sha256")},
+                     # 17d: the file on disk, and llama-server's count of its
+                     # weights (what the server's side has)
+                     "file": {**{k: gguf[k] for k in ("name", "size", "sha256")},
+                              "weights": seen.get("size")},
                      "server": {k: server[k] for k in ("build", "commit", "binary_sha256",
                                                        "flags", "env", "argv", "slots")},
                      "speculative": seen.get("speculative"), "gpu": gpu.get("name")}
