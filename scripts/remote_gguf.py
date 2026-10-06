@@ -257,6 +257,96 @@ SERVER_VARS = ("LLAMA_", "GGML_")
 MAX_CONTEXT = 8 * 67_584
 
 
+# 17d: the KV cache's size, worked out from the GGUF's own header and the
+# cache type, beside the file on this card — before anything is fetched
+CACHE_BYTES = {"f32": 4.0, "f16": 2.0, "bf16": 2.0, "q8_0": 34 / 32, "q4_0": 18 / 32,
+               "q4_1": 20 / 32, "q5_0": 22 / 32, "q5_1": 24 / 32, "iq4_nl": 18 / 32}
+# CUDA's context and llama-server's compute and output buffers, beside the
+# weights and the cache
+OVERHEAD = 2.5 * 1024 ** 3
+HEADER_BYTES = 24 * 1024 ** 2          # the metadata: a vocabulary's arrays are a few MB
+
+
+def cache_types(flags: list[str]) -> tuple[str, str]:
+    """-ctk and -ctv as given; llama-server's f16 when not"""
+    k = v = "f16"
+    for i, f in enumerate(flags):
+        name, _, val = f.partition("=")
+        val = val or (flags[i + 1] if i + 1 < len(flags) else "")
+        if name in ("-ctk", "--cache-type-k"):
+            k = val
+        elif name in ("-ctv", "--cache-type-v"):
+            v = val
+    return k, v
+
+
+def kv_per_token(shape: dict, ctk: str, ctv: str) -> float | None:
+    """bytes of KV cache a token takes, every layer with attention"""
+    if ctk not in CACHE_BYTES or ctv not in CACHE_BYTES:
+        return None
+    return sum(h * (shape["key_length"] * CACHE_BYTES[ctk]
+                    + shape["value_length"] * CACHE_BYTES[ctv]) for h in shape["kv_heads"])
+
+
+def recurrent_per_slot(shape: dict) -> float:
+    """a hybrid's recurrent layers' state, a slot's (f32, as llama.cpp keeps it)"""
+    m = shape.get("ssm") or {}
+    if not m or not all(isinstance(m.get(k), int) for k in ("conv_kernel", "inner_size",
+                                                            "state_size")):
+        return 0.0
+    n_group = m.get("group_count") if isinstance(m.get("group_count"), int) else 1
+    conv = (m["conv_kernel"] - 1) * (m["inner_size"] + 2 * n_group * m["state_size"])
+    state = m["state_size"] * m["inner_size"]
+    return sum(1 for h in shape["kv_heads"] if h == 0) * (conv + state) * 4.0
+
+
+def header_of(src: str) -> tuple[dict | None, int | None]:
+    """(the GGUF's shape, its size in bytes, every part of a split one) — read
+    before it is fetched: its first megabytes from Hugging Face, or the file
+    here. (None, None) when it can't be"""
+    import io
+
+    import gguf_header
+    parts = split_parts(src)
+    try:
+        if not _HF.match(src.strip()):
+            with open(Path(parts[0]).expanduser(), "rb") as fh:
+                got = gguf_header.shape(fh)
+            return got, sum(Path(x).expanduser().stat().st_size for x in parts)
+        from huggingface_hub import HfFileSystem
+        fs = HfFileSystem(token=os.environ.get("HF_TOKEN") or None)
+
+        def path_of(x: str) -> str:
+            m = _HF.match(x.strip())
+            return (f"{'datasets/' if m['type'] == 'datasets/' else ''}{m['repo']}"
+                    + (f"@{m['rev']}" if m["rev"] else "") + f"/{m['path']}")
+        with fs.open(path_of(parts[0]), "rb", block_size=HEADER_BYTES) as fh:
+            head = fh.read(HEADER_BYTES)
+        return (gguf_header.shape(io.BytesIO(head)),
+                sum(int(fs.info(path_of(x))["size"]) for x in parts))
+    except Exception:                                   # noqa: BLE001 — checked after the fetch
+        return None, None
+
+
+def kv_fit(src: str, flags: list[str], slots: int, ctx: int, memory_mib: int | None) -> dict | None:
+    """{need, kv, file, card, fit}: the cache these slots take, the file and
+    the card, in bytes, and the most slots that fit — None when the header or
+    the card can't be read"""
+    shape, size = header_of(src)
+    if not shape or not size or not memory_mib:
+        return None
+    ctk, ctv = cache_types(flags)
+    per_token = kv_per_token(shape, ctk, ctv)
+    if per_token is None:
+        return None
+    per_slot = per_token * ctx + recurrent_per_slot(shape)
+    card = memory_mib * 1024 ** 2
+    room = card - size - OVERHEAD
+    return {"kv": per_slot * slots, "per_token": per_token, "per_slot": per_slot, "file": size,
+            "card": card, "fit": max(0, int(room // per_slot)), "types": f"{ctk}/{ctv}",
+            "arch": shape["arch"]}
+
+
 def answered_here() -> bool:
     """17c: this --out holds an answer — its setup is pinned from then on"""
     from service import config
@@ -579,13 +669,32 @@ def main(argv: list[str] | None = None) -> int:
     extra_env = parse_env(a.env)
     out = Path(a.out).resolve()
     thinking = a.thinking == "on"
+    if not a.only and not a.parity:
+        # 17d: a box names its benchmarks, thinking on or off — every one at
+        # once is more context than a card holds, and asks ARC-AGI-2 with
+        # thinking off
+        ap.error("--only: name this box's benchmarks, one --only each (G5's table)")
     tasks = [t for t in fb.TASKS if t in (a.only or fb.TASKS)]
     if a.parity:
         # 17b: the parity check's questions, thinking off, whatever --thinking says
         tasks, thinking = [fb.PARITY["task"]], False
-    # 17c: a context the card can't hold is refused here, before the download
+    # 17c: a context the card can't hold is refused here, before the download.
+    # 17d: worked out from the GGUF's header, its cache type and this card;
+    # the stated --max-context only when those can't be read
     ctx = fb.slot_context(tasks, thinking)
-    if ctx * a.slots > a.max_context:
+    fit = kv_fit(a.gguf, shlex.split(a.flags), a.slots, ctx, rb.gpu_info().get("memory_mib"))
+    if fit and fit["fit"] < a.slots:
+        big = max(tasks, key=lambda t: fb.slot_context([t], thinking))
+        gb = 1024 ** 3
+        raise SystemExit(
+            f"{a.slots} slots of {ctx:,} tokens ({fb.BENCH[big]['label']}'s, thinking "
+            f"{'on' if thinking else 'off'}) need about {fit['kv'] / gb:.1f} GB of KV cache "
+            f"({fit['types']}, {fit['per_token'] / 1024:.1f} KB a token, from the GGUF's "
+            f"header) beside the {fit['file'] / gb:.1f} GB file, and this card has "
+            f"{fit['card'] / gb:.1f} GB: at most {fit['fit']} slot"
+            f"{'s' if fit['fit'] != 1 else ''} fit — give --slots {fit['fit']}"
+            + (" (or a larger card)" if fit["fit"] else ": a larger card") + ". Nothing was fetched")
+    if not fit and ctx * a.slots > a.max_context:
         big = max(tasks, key=lambda t: fb.slot_context([t], thinking))
         raise SystemExit(f"{a.slots} slots of {ctx:,} tokens ({fb.BENCH[big]['label']}'s, "
                          f"thinking {'on' if thinking else 'off'}) is {ctx * a.slots:,} tokens "
@@ -665,6 +774,14 @@ def main(argv: list[str] | None = None) -> int:
     if shell_server_vars():
         say(f"not given to llama-server: {', '.join(shell_server_vars())}, set in this shell — "
             "its variables come from --env only, so each one it gets is recorded")
+    if fit:
+        # 17d: the estimate the slots were checked with, said and recorded
+        gb = 1024 ** 3
+        server["kv_estimate"] = {k: fit[k] for k in ("kv", "per_token", "file", "card", "fit",
+                                                     "types")}
+        say(f"KV cache about {fit['kv'] / gb:.1f} GB for {a.slots} slots ({fit['types']}, "
+            f"{fit['per_token'] / 1024:.1f} KB a token) beside the {fit['file'] / gb:.1f} GB file "
+            f"on a {fit['card'] / gb:.1f} GB card: up to {fit['fit']} slots fit")
     say(f"{gguf['name']} · {gguf['size'] / 1e9:.1f} GB · sha256 {sha[:16]} · llama.cpp "
         f"{ver['build'] or '?'} ({ver['commit'] or '?'}) · GPU {gpu.get('name') or 'unknown'} · "
         f"{a.slots} slots of {ctx:,} tokens")

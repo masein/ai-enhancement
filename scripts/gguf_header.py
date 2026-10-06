@@ -179,6 +179,80 @@ def _read(r: _Reader) -> dict:
             "version": version}
 
 
+# 17d: what the KV cache's size depends on — the attention's shape, which
+# layers have it, and a recurrent layer's state (a hybrid's) — read from the
+# metadata alone, before the tensors
+_SHAPE_SUFFIX = (".block_count", ".attention.head_count_kv", ".attention.head_count",
+                 ".attention.key_length", ".attention.value_length", ".embedding_length",
+                 ".full_attention_interval", ".ssm.conv_kernel", ".ssm.inner_size",
+                 ".ssm.state_size", ".ssm.group_count", ".ssm.time_step_rank")
+MAX_LAYERS = 4096                # a per-layer array kept: one int a layer
+
+
+def _small_ints(r: _Reader, t: int):
+    """a per-layer array of integers, kept; anything else skipped"""
+    if t != _ARRAY:
+        return r.value(t)
+    et, n = r.unpack("<I"), r.count()
+    if et in _SCALAR and et not in (6, 7, 12) and n <= MAX_LAYERS:
+        return [r.unpack(_SCALAR[et]) for _ in range(n)]
+    if et in _SCALAR:
+        r.skip(n * struct.calcsize(_SCALAR[et]))
+    else:
+        for _ in range(n):
+            r.value(et, False, 1)
+    return None
+
+
+def shape(fh) -> dict | None:
+    """17d: {arch, layers, kv_heads (one a layer), key_length, value_length,
+    ssm: {...} or None} from a GGUF's metadata — `fh` a file or its first
+    megabytes (a header cut short after the shape is fine). None when it
+    can't be read"""
+    try:
+        r = _Reader(fh)
+        if r.take(4) != MAGIC or r.unpack("<I") not in (2, 3):
+            return None
+        r.count()
+        n_kv = r.count()
+        meta: dict = {}
+        try:
+            for _ in range(n_kv):
+                key, t = r.string(), r.unpack("<I")
+                if key == "general.architecture" or key.endswith(_SHAPE_SUFFIX):
+                    meta[key] = _small_ints(r, t)
+                else:
+                    r.value(t, keep=False)
+        except NotGguf:
+            pass                                    # cut short: what was read is enough
+        arch = str(meta.get("general.architecture") or "")
+        get = lambda k: meta.get(f"{arch}.{k}")    # noqa: E731
+        layers, heads = get("block_count"), get("attention.head_count")
+        if not arch or not isinstance(layers, int) or layers <= 0:
+            return None
+        kv = get("attention.head_count_kv")
+        kv = kv if isinstance(kv, list) else [kv if isinstance(kv, int) else heads] * layers
+        interval = get("full_attention_interval")
+        if isinstance(interval, int) and interval > 1:
+            # a hybrid: one layer in `interval` has attention, the rest a recurrent state
+            kv = [h if (i + 1) % interval == 0 else 0 for i, h in enumerate(kv)]
+        emb = get("embedding_length")
+        head_dim = (emb // heads) if isinstance(emb, int) and isinstance(heads, int) and heads \
+            else None
+        k_len = get("attention.key_length") or head_dim
+        v_len = get("attention.value_length") or head_dim
+        if not isinstance(k_len, int) or not isinstance(v_len, int):
+            return None
+        ssm = {k: get(f"ssm.{k}") for k in ("conv_kernel", "inner_size", "state_size",
+                                              "group_count", "time_step_rank")}
+        return {"arch": arch, "layers": layers, "kv_heads": [int(x or 0) for x in kv],
+                "key_length": k_len, "value_length": v_len,
+                "ssm": ssm if isinstance(ssm["inner_size"], int) else None}
+    except (OSError, NotGguf, struct.error, UnicodeDecodeError, MemoryError, TypeError,
+            ValueError, OverflowError):
+        return None
+
+
 def main(argv: list[str] | None = None) -> int:
     paths = argv if argv is not None else sys.argv[1:]
     if not paths:

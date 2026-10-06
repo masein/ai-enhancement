@@ -71,10 +71,15 @@ if [ -z "$info" ] || grep -q 'LLAMA_COMMIT = "unknown"' "$info" || grep -q 'LLAM
   echo "the build doesn't know its commit (see $info): nothing was packed" >&2
   exit 1
 fi
-grep -E 'LLAMA_(BUILD_NUMBER|COMMIT) =' "$info" > /out/build-info
+# 17d: guarded — under set -e a grep that finds nothing ended the build without a word
+if ! grep -E 'LLAMA_(BUILD_NUMBER|COMMIT) =' "$info" > /out/build-info; then
+  echo "the build's $info names no build number or commit: nothing was packed" >&2
+  exit 1
+fi
 mkdir -p /out/llama/bin /out/llama/lib
 cp -L build-tarball/bin/llama-server /out/llama/bin/
-find build-tarball -name "*.so*" \( -type f -o -type l \) -exec cp -P {} /out/llama/lib/ \;
+# 17d: "+", not ";" — find then says when a copy failed, and the build stops
+find build-tarball -name "*.so*" \( -type f -o -type l \) -exec cp -P -t /out/llama/lib/ {} +
 for l in libcudart.so libcublas.so libcublasLt.so; do
   cp -P /usr/local/cuda/lib64/${l}* /out/llama/lib/
 done
@@ -87,7 +92,8 @@ export LD_LIBRARY_PATH=/out/llama/lib:/usr/local/cuda/lib64
   | sort -u | while read -r so; do
     case "$(basename "$so")" in
       libc.so*|libm.so*|libpthread.so*|libdl.so*|librt.so*|ld-linux*|libcuda.so*|libnvidia*) ;;
-      *) [ -e "/out/llama/lib/$(basename "$so")" ] || cp -L "$so" /out/llama/lib/ ;;
+      *) [ -e "/out/llama/lib/$(basename "$so")" ] || cp -L "$so" /out/llama/lib/ \
+           || { echo "couldn't pack $so: nothing was packed" >&2; exit 1; } ;;
     esac
   done
 nvcc --version | tail -1 > /out/llama/.cuda
