@@ -170,7 +170,9 @@ BENCH: dict[str, dict] = {
                    "model": "openai/gpt-4.1", "version": "gpt-4.1-2025-04-14"}},
     "mmlupro_tiger": {
         "label": "MMLU-Pro", "group": "Knowledge", "reported_as": ["mmlu-pro", "mmlu pro"],
-        "note": "TIGER-Lab's 5-shot protocol",
+        # 17b: what differs from TIGER-Lab's own script, in a few words
+        "note": "TIGER-Lab's 5-shot prompt; the card's sampling, not temperature 0; no "
+                "random guess when unread",
         "protocol": "TIGER-Lab's (evaluate_from_api.py): 5-shot chain of thought from the "
                     "question's category, \"The answer is (X)\", its three-regex extraction",
         "protocol_version": "tiger-mmlu-pro-api-f418b116", "shots": 5,
@@ -329,7 +331,28 @@ def _arc_rows() -> list[dict]:
     return out
 
 
+def _count(task: str, got) -> int:
+    """the questions a benchmark holds — ARC-AGI-2 counted by its tasks"""
+    items = got["items"] if isinstance(got, dict) else got
+    if BENCH[task].get("aggregate") == "pass@2":
+        return len({group_of(task, it) for it in items})
+    return len(items)
+
+
 def _fetch(task: str):
+    """the dataset at its pinned revision — 17b: holding the questions it should
+    (HLE's text-only filter, MMLU-Pro's 12,032, ARC-AGI-2's 120 tasks), or
+    nothing is asked"""
+    got = _fetch_source(task)
+    n, want = _count(task, got), BENCH[task]["n"]
+    if n != want:
+        raise ValueError(f"{BENCH[task]['label']}: {n:,} questions came from "
+                         f"{source_name(task)} at {BENCH[task]['source']['revision'][:12]}, and "
+                         f"this board expects {want:,} — nothing is asked until they agree")
+    return got
+
+
+def _fetch_source(task: str):
     """the dataset at its pinned revision, with HF_TOKEN for a gated one — a
     list of questions, or {items, extra} (MMLU-Pro's examples)"""
     if task == "gpqa_diamond_epoch":
@@ -547,7 +570,10 @@ def read_choice(text: str, letters: str = LETTERS) -> str | None:
 
 # OTIS: the last "ANSWER: X", an integer from 0 to 999 (Epoch's extractor reads
 # what the model gave as its final answer; a line of code reads the same, mostly)
-_OTIS = re.compile(r"(?i)ANSWER\s*:\s*\**\s*\$?\s*(?:\\boxed\{)?\s*(-?\d{1,3}(?:,\d{3})*)\b")
+# 17b: and nothing after the digits but a brace, a dollar, bold or a full stop —
+# "3.5", "3/4", "2^{10}", "12 or 13" are no integer, for the second look to read
+_OTIS = re.compile(r"(?im)ANSWER\s*:\s*\**\s*\$?\s*(?:\\boxed\{)?\s*(-?\d+(?:,\d{3})*)"
+                   r"\s*\}?\s*\$?\s*\**\s*\.?\s*$")
 
 
 def read_integer(text: str) -> str | None:
@@ -699,6 +725,46 @@ def score(task: str, answer: str, finish: str | None, need: dict) -> dict:
         got = (m[-1].strip() if m else vis.strip()[-300:]) if not out else None
         return {"ok": None, "read": got or None, "ran_out": out}
     raise KeyError(task)
+
+
+# 17b: the parity check — does a box answer as the server does? The same 50
+# MMLU-Pro questions (public, scored by code), thinking off and greedy, asked
+# with each side's own launch: the box's flags, slots and KV cache, the
+# server's. Greedy decoding on two machines with other batch sizes, cache
+# types and kernels isn't bit-for-bit the same, so whole replies may part; the
+# letter each side reads must not, but for a few
+PARITY = {"task": "mmlupro_tiger", "n": 50, "seed": "frontier-parity-1", "max_tokens": 2048,
+          "sampling": {"temperature": 0.0, "top_k": 1, "seed": 0}, "same_at_least": 46}
+
+
+def parity_items(root: Path) -> list[dict]:
+    """the parity check's questions: the same 50 of MMLU-Pro on every machine"""
+    items = load(PARITY["task"], root)
+    pick = sorted(random.Random(PARITY["seed"]).sample(range(len(items)),
+                                                       min(PARITY["n"], len(items))))
+    return [items[i] for i in pick]
+
+
+def parity_compare(server: list[dict], box: list[dict]) -> dict:
+    """the two sides' answers to the parity questions, compared: {n, same
+    (the same letter read), identical (the same reply), right_server,
+    right_box, missing, ok, words}"""
+    a = {r["id"]: r for r in server}
+    b = {r["id"]: r for r in box}
+    ids = sorted(set(a) & set(b))
+    missing = sorted(set(a) ^ set(b))
+    same = sum(1 for i in ids if read_mmlu_pro(a[i]["answer"]) == read_mmlu_pro(b[i]["answer"]))
+    identical = sum(1 for i in ids if visible(a[i]["answer"]) == visible(b[i]["answer"]))
+    right = [sum(1 for i in ids if read_mmlu_pro(x[i]["answer"]) == x[i]["key"]) for x in (a, b)]
+    need = PARITY["same_at_least"]
+    ok = not missing and len(ids) == PARITY["n"] and same >= need
+    words = (f"{same} of {len(ids)} read as the same letter (the check asks {need} of "
+             f"{PARITY['n']}) · {identical} identical replies · right: the server {right[0]}, "
+             f"the box {right[1]}" + (f" · {len(missing)} answered on one side only"
+                                      if missing else ""))
+    return {"n": len(ids), "same": same, "identical": identical, "right_server": right[0],
+            "right_box": right[1], "missing": missing, "ok": ok,
+            "words": ("The same: " if ok else "Not the same: ") + words}
 
 
 def group_of(task: str, item: dict) -> str:

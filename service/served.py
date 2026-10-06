@@ -804,7 +804,8 @@ def ask(rec: dict, text: str, s: dict) -> str:
     if is_openrouter(rec):
         body.update(_pinned_route(rec))
     base, key = _endpoint(rec)
-    reply = _post(base + "/chat/completions", key, body, item=not is_openrouter(rec))
+    reply = _post(base + "/chat/completions", key, body, item=not is_openrouter(rec),
+                  timeout=timeout_for(s))
     choice = (reply.get("choices") or [{}])[0]
     msg = choice.get("message") or {}
     text = msg.get("content") or ""
@@ -823,12 +824,21 @@ def ask(rec: dict, text: str, s: dict) -> str:
     return out
 
 
-def _post(url: str, key: str, body: dict, item: bool = True) -> dict:
+def timeout_for(s: dict) -> float:
+    """17b: how long one answer may take — SERVED_TIMEOUT_S, or the budget at
+    SERVED_MIN_TOK_S tokens a second when that is longer, so an answer near
+    its budget isn't cut off and taken for a server that stopped"""
+    return max(float(config.SERVED_TIMEOUT_S),
+               int(s.get("max_tokens") or 0) / max(0.1, config.SERVED_MIN_TOK_S) + 120.0)
+
+
+def _post(url: str, key: str, body: dict, item: bool = True,
+          timeout: float | None = None) -> dict:
     """a request to the server: its reply, _Retry when it isn't answering,
     ItemError when it answers this request with an error of its own (`item`:
     a llama-server's), ValueError when it refuses it"""
     try:
-        st, raw = _http("POST", url, key, body, timeout=config.SERVED_TIMEOUT_S)
+        st, raw = _http("POST", url, key, body, timeout=timeout or config.SERVED_TIMEOUT_S)
     except Exception as e:                                  # noqa: BLE001 — no answer: retried
         raise _Retry(str(getattr(e, "reason", e))) from None
     if item and st in ITEM_STATUSES:
@@ -854,9 +864,14 @@ def ask_raw(rec: dict, text: str, s: dict) -> "Answer":
            if s.get("chat_template_kwargs") else {})}).get("prompt")
     if not isinstance(prompt, str) or not prompt:
         raise ItemError("/apply-template gave no prompt")
+    # 17b: with the same sampling as the chat request (a model with no preset
+    # sends none: the server's own), never the temperature alone
+    sampling = {k: s[k] for k in ("temperature", "top_p", "top_k", "min_p", "presence_penalty",
+                                  "repeat_penalty", "seed") if s.get(k) is not None}
     reply = _post(root + "/completion", key, {
-        "prompt": prompt, "n_predict": s["max_tokens"], "temperature": s["temperature"],
-        "stop": list(s.get("stop") or []), "cache_prompt": False, "stream": False})
+        "prompt": prompt, "n_predict": s["max_tokens"], **sampling,
+        "stop": list(s.get("stop") or []), "cache_prompt": False, "stream": False},
+        timeout=timeout_for(s))
     raw = reply.get("content") or ""
     out = Answer(("<think>\n" + raw) if re.search(r"<think>\s*$", prompt) else raw)
     t = reply.get("timings") if isinstance(reply.get("timings"), dict) else {}

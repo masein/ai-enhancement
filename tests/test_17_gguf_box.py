@@ -112,8 +112,10 @@ def bundle_of(b: dict, out: str, shard: tuple[int, int] | None = None,
 
 def record(sha: str | None) -> dict:
     """the served model as the board keeps it, its file hashed when it was registered"""
+    # 17b: registered with the launch the box runs it with (run_box's --env)
     rec = {"id": SERVED, "name": "lda box", "base_url": "http://127.0.0.1:9/v1", "key": "",
            "based_on": "Qwen/Qwen3.6-35B-A3B", "how": "build-lda, --cpu-moe", "thinking": "auto",
+           "env": "LLAMA_MOE_ROUTE_MODE=lookahead", "flags": "--cpu-moe",
            "phone": False, "gguf_path": "", "gguf_flags": "", "gguf_setups": [],
            "pin": {"model": GGUF_NAME, "file": GGUF_NAME, "size": 21_000_000_000, "ctx": 16384,
                    "build": "b6500"}, "answered": ["models"], "by": ME, "at": 0}
@@ -200,7 +202,9 @@ def test_shards_split_and_settings():
 # a GGUF on a rented box, and back
 # ---------------------------------------------------------------------------
 
-def test_gguf_run_bundle_and_import(box):
+def test_gguf_run_bundle_and_import(box, monkeypatch, tmp_path):
+    launched = tmp_path / "launched.jsonl"
+    monkeypatch.setenv("FAKE_LLAMA_ARGV", str(launched))
     assert run_box(box, "run") == 0
     path = bundle_of(box, "run")
     b = rb.read(path)
@@ -214,6 +218,11 @@ def test_gguf_run_bundle_and_import(box):
     assert srv["env"] == {"LLAMA_MOE_ROUTE_MODE": "lookahead"}
     assert srv["argv"][:2] == ["llama-server", "-m"] and "--jinja" in srv["argv"]
     assert srv["argv"][srv["argv"].index("-c") + 1] == str(3 * (32768 + 2048))
+    # 17b: …and the launch recorded is the one llama-server was started with
+    got = json.loads(launched.read_text().splitlines()[-1])
+    assert got["argv"][got["argv"].index("-m") + 2:] == srv["argv"][srv["argv"].index("-m") + 2:]
+    assert got["argv"][got["argv"].index("-m") + 1] == str(box["gguf"])
+    assert got["env"]["LLAMA_MOE_ROUTE_MODE"] == srv["env"]["LLAMA_MOE_ROUTE_MODE"]
     assert srv["binary_sha256"] and srv["tarball_sha256"] == rb.sha256_file(box["tarball"])
     assert srv["chat_template_sha256"] == hashlib.sha256(b"{# a fake template #}").hexdigest()
     assert setup["gpu"] == GPU and setup["where"] == "a rented GPU"
@@ -415,27 +424,52 @@ def test_served_thinking_run_from_the_board(svc, monkeypatch):  # noqa: F811
         fake.close()
 
 
-def test_the_docs_command_is_the_scripts_and_fetches_its_bundle():
-    """docs/REMOTE-RUNS.md § G2–G4: the box's command parses as remote_gguf.py
-    reads it, and the server fetches and imports the bundle it writes"""
-    import shlex
+def gguf_section() -> str:
     doc = (Path(__file__).resolve().parents[1] / "docs" / "REMOTE-RUNS.md").read_text()
-    lines = doc.split("## G2.", 1)[1].split("```bash", 1)[1].split("```", 1)[0]
-    cmd = shlex.split(" ".join(x.rstrip("\\").strip() for x in lines.splitlines()
-                               if x.strip() and not x.startswith(("tmux", "cd ", "read "))))
-    assert cmd[:2] == ["python", "scripts/remote_gguf.py"]
+    return doc.split("# A GGUF's Frontier benchmarks", 1)[1]
+
+
+def bash_blocks(text: str) -> list[str]:
+    return [b.split("```", 1)[0] for b in text.split("```bash\n")[1:]]
+
+
+def parsed(cmd: list[str]):
+    """the arguments remote_gguf.py reads from a command, run no further"""
     seen = {}
     real = rg.argparse.ArgumentParser.parse_args
 
     def keep(self, argv=None, namespace=None):
-        a = real(self, argv, namespace)
-        seen["a"] = a
+        seen["a"] = real(self, argv, namespace)
         raise SystemExit(0)
     import unittest.mock as um
     with um.patch.object(rg.argparse.ArgumentParser, "parse_args", keep), \
             pytest.raises(SystemExit):
         rg.main(cmd[2:])
-    a = seen["a"]
-    assert a.thinking == "on" and a.gguf.startswith("hf://") and a.server.startswith("hf://")
-    name = rb.bundle_name("frontier", a.served_as, True)
-    assert f"{a.out}/{name}".replace(a.served_as.replace("/", "__"), "served__<name>") in doc
+    return seen["a"]
+
+
+def test_the_docs_commands_are_the_scripts_and_paste_whole():
+    """docs/REMOTE-RUNS.md § G0–G6: every block pastes whole (17b: a token read
+    and tmux each alone — read -rs took the next line as the token), every box
+    command parses as remote_gguf.py reads it, each build's with its own
+    routing variables or none, and the server fetches the bundle G2 writes"""
+    import shlex
+    sec = gguf_section()
+    blocks = bash_blocks(sec)
+    assert blocks
+    for b in blocks:
+        lines = [x for x in b.splitlines() if x.strip()]
+        if any(x.startswith(("read -rs", "tmux new")) for x in lines):
+            assert len(lines) == 1, b
+        assert not any(x.rstrip().endswith("\\") for x in lines), b   # one line each
+    cmds = [shlex.split(x) for b in blocks for x in b.splitlines()
+            if x.startswith("python scripts/remote_gguf.py")]
+    assert len(cmds) >= 4                          # parity, the two builds, the calibration
+    args = [parsed(c) for c in cmds]
+    builds = {a.served_as: a for a in args if not a.parity}
+    phone, orig = builds["served/<phone-build>"], builds["served/<original-build>"]
+    assert phone.env == "" and orig.env == ""       # neither build has routing variables
+    assert all(a.gguf.startswith("hf://") and a.server.startswith("hf://") for a in args)
+    assert any(a.parity and a.thinking == "off" for a in args)
+    name = rb.bundle_name("frontier", "served/x", True).replace("served__x", "served__<name>")
+    assert f"{name}" in sec

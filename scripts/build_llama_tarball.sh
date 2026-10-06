@@ -14,7 +14,9 @@
 #
 #     scripts/build_llama_tarball.sh ~/llama.cpp-teraformer llama-server-cuda12.8.tar.gz
 #
-# Docker on this machine, and no GPU: nothing is run, only compiled.
+# Docker on this machine (sudo docker when plain docker isn't allowed), and no
+# GPU: nothing is run, only compiled. It fails, saying why, when git can't
+# read the checkout or the build doesn't know its commit.
 set -euo pipefail
 
 src="${1:?usage: build_llama_tarball.sh <llama.cpp checkout> <out.tar.gz>}"
@@ -24,30 +26,61 @@ archs="${LLAMA_CUDA_ARCHS:-80;86;89;90;120}"
 
 src="$(cd "$src" && pwd)"
 [ -f "$src/CMakeLists.txt" ] || { echo "$src isn't a llama.cpp checkout" >&2; exit 1; }
-commit="$(git -C "$src" rev-parse HEAD 2>/dev/null || echo unknown)"
-dirty="$(git -C "$src" status --porcelain 2>/dev/null | head -c1 | wc -c | tr -d ' ')"
+# 17b: a checkout git can't read stops here, in git's own words
+if ! commit="$(git -C "$src" rev-parse HEAD 2>&1)"; then
+  echo "git can't read $src: $commit" >&2
+  echo "(for \"dubious ownership\": git config --global --add safe.directory $src)" >&2
+  exit 1
+fi
+dirty="$(git -C "$src" status --porcelain | head -c1 | wc -c | tr -d ' ')"
 [ "$dirty" = "0" ] || echo "note: $src has changes not committed — recorded in VERSION" >&2
-echo "building llama-server at ${commit:0:12} for sm ${archs} in ${image}" >&2
+# 17b: the server's docker needs sudo; this one, when plain docker isn't allowed
+DOCKER="${DOCKER:-docker}"
+if ! $DOCKER info >/dev/null 2>&1; then DOCKER="sudo docker"; fi
+echo "building llama-server at ${commit:0:12} for sm ${archs} in ${image} ($DOCKER)" >&2
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
-docker run --rm -v "$src":/src:ro -v "$work":/out -e ARCHS="$archs" "$image" bash -euo pipefail -c '
-  apt-get update -qq && apt-get install -y -qq --no-install-recommends cmake git build-essential >/dev/null
-  cp -a /src /build && cd /build && rm -rf build-tarball
-  cmake -S . -B build-tarball -DGGML_CUDA=ON -DBUILD_SHARED_LIBS=ON -DLLAMA_CURL=OFF \
-        -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES="$ARCHS" >/dev/null
-  cmake --build build-tarball --target llama-server -j"$(nproc)"
-  mkdir -p /out/llama/bin /out/llama/lib
-  cp -L build-tarball/bin/llama-server /out/llama/bin/
-  find build-tarball -name "*.so*" \( -type f -o -type l \) -exec cp -P {} /out/llama/lib/ \;
-  for l in libcudart.so libcublas.so libcublasLt.so; do
-    cp -P /usr/local/cuda/lib64/${l}* /out/llama/lib/
+cat > "$work/build.sh" <<'IN'
+set -euo pipefail
+apt-get update -qq && apt-get install -y -qq --no-install-recommends cmake git build-essential >/dev/null
+cp -a /src /build && cd /build && rm -rf build-tarball
+# 17b: a copy owned by another user is "dubious" to git, and llama.cpp then
+# builds as "0 (unknown)": marked safe, so the build knows its commit
+git config --global --add safe.directory '*'
+cmake -S . -B build-tarball -DGGML_CUDA=ON -DBUILD_SHARED_LIBS=ON -DLLAMA_CURL=OFF \
+      -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES="$ARCHS" >/dev/null
+cmake --build build-tarball --target llama-server -j"$(nproc)"
+info=$(find build-tarball -name build-info.cpp | head -1)
+if [ -z "$info" ] || grep -q 'LLAMA_COMMIT = "unknown"' "$info" || grep -q 'LLAMA_BUILD_NUMBER = 0;' "$info"; then
+  echo "the build doesn't know its commit (see $info): nothing was packed" >&2
+  exit 1
+fi
+grep -E 'LLAMA_(BUILD_NUMBER|COMMIT) =' "$info" > /out/build-info
+mkdir -p /out/llama/bin /out/llama/lib
+cp -L build-tarball/bin/llama-server /out/llama/bin/
+find build-tarball -name "*.so*" \( -type f -o -type l \) -exec cp -P {} /out/llama/lib/ \;
+for l in libcudart.so libcublas.so libcublasLt.so; do
+  cp -P /usr/local/cuda/lib64/${l}* /out/llama/lib/
+done
+# 17b: and every other library they need but the C library's and the driver's
+# (libgomp, libstdc++, libgcc_s) — a box's image may hold other versions
+export LD_LIBRARY_PATH=/out/llama/lib:/usr/local/cuda/lib64
+ldd /out/llama/bin/llama-server /out/llama/lib/*.so* 2>/dev/null | awk '/=> \//{print $3}' \
+  | sort -u | while read -r so; do
+    case "$(basename "$so")" in
+      libc.so*|libm.so*|libpthread.so*|libdl.so*|librt.so*|ld-linux*|libcuda.so*|libnvidia*) ;;
+      *) [ -e "/out/llama/lib/$(basename "$so")" ] || cp -L "$so" /out/llama/lib/ ;;
+    esac
   done
-  nvcc --version | tail -1 > /out/llama/.cuda
-  chown -R '"$(id -u):$(id -g)"' /out'
+nvcc --version | tail -1 > /out/llama/.cuda
+IN
+$DOCKER run --rm -v "$src":/src:ro -v "$work":/out -e ARCHS="$archs" "$image" bash /out/build.sh
+$DOCKER run --rm -v "$work":/out "$image" chown -R "$(id -u):$(id -g)" /out
 {
   echo "commit $commit"
   echo "uncommitted_changes $([ "$dirty" = "0" ] && echo no || echo yes)"
+  sed -e 's/^.*LLAMA_BUILD_NUMBER = \([0-9]*\);.*/build \1/' -e 's/^.*LLAMA_COMMIT = "\([^"]*\)";.*/build_commit \1/' "$work/build-info"
   echo "cuda_archs $archs"
   echo "image $image"
   echo "cuda $(cat "$work/llama/.cuda")"

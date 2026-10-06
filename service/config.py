@@ -153,6 +153,10 @@ SERVED_CONCURRENCY = int(os.environ.get("SERVED_CONCURRENCY", "1"))
 SERVED_RETRY_S = int(os.environ.get("SERVED_RETRY_S", "120"))
 # one answer may take this long: a thinking answer on a CPU-offloaded model
 SERVED_TIMEOUT_S = int(os.environ.get("SERVED_TIMEOUT_S", "900"))
+# 17b: and longer for a long budget — the budget at this many tokens a second,
+# slower than any setup measured here (a thinking answer of 32,768 tokens may
+# take 55 minutes before it counts as a server that stopped)
+SERVED_MIN_TOK_S = float(os.environ.get("SERVED_MIN_TOK_S", "10"))
 
 # The benchmark suite — one place, mirrored from run_benchmarks.sh. quick is for
 # iteration (minutes); full is the comparable number. Both write into the same

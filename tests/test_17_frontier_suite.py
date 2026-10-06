@@ -78,7 +78,9 @@ def test_the_page_says_each_benchmark_and_how_it_differs(svc):  # noqa: F811
     notes = {t: b["note"] for t, b in meta.items()}
     assert notes["hle_text_cais"] == "text-only questions"
     assert notes["arc_agi2_public"] == "public set"
-    assert notes["mmlupro_tiger"] == "TIGER-Lab's 5-shot protocol"
+    # 17b: and both ways it differs from TIGER-Lab's own script
+    assert notes["mmlupro_tiger"] == ("TIGER-Lab's 5-shot prompt; the card's sampling, not "
+                                      "temperature 0; no random guess when unread")
     # Epoch's own four, run its way: no note (their runs are in the cell's tag)
     assert not any(notes[t] for t in ("gpqa_diamond_epoch", "otis_aime_epoch", "math_l5_epoch",
                                       "simpleqa_epoch"))
@@ -124,7 +126,12 @@ def test_math_level5_epoch_extraction():
     assert fb.last_boxed_only_string("so \\boxed{\\frac{a}{b}} ok") == "\\boxed{\\frac{a}{b}}"
     assert fb.remove_boxed("\\boxed{\\frac{a}{b}}") == "\\frac{a}{b}"
     sc = fb.score("math_l5_epoch", "ANSWER: 0.5", "stop", need)
-    assert sc["read"] == "0.5" and sc["ok"] in (True, False)            # math-verify decides
+    try:
+        import math_verify  # noqa: F401
+        same = True                          # ½ is 0.5 to math-verify, the image's
+    except ImportError:
+        same = False                         # CI's runner has none: a plain comparison
+    assert sc["read"] == "0.5" and sc["ok"] is same
     assert fb.score("math_l5_epoch", "ANSWER: \\frac{1}{2}", "stop", need)["ok"] is True
     assert fb.score("math_l5_epoch", "ANSWER: 3", "stop", need)["ok"] is False
 
@@ -186,32 +193,59 @@ def test_graded_ones_wait_and_hle_reads_its_answer_line():
 # ---------------------------------------------------------------------------
 
 def test_unlisted_questions_are_in_no_response(svc, monkeypatch):  # noqa: F811
-    """GPQA's and HLE's text never leaves the server: not in the list of
-    benchmarks, not in a page of questions, not in a model's answers"""
+    """GPQA's, HLE's and MATH's text never leaves the server: not in the list
+    of benchmarks, a page of questions, the owner's audit, the board, a
+    model's answers or the grading card — 17b: with each answer restating its
+    question, as a model's answer often does, and each task scored, its
+    samples written"""
+    from test_17_gguf_box import record
     hidden = [t for t in fb.TASKS if fb.unlisted(t)]
     assert set(hidden) == {"gpqa_diamond_epoch", "hle_text_cais", "math_l5_epoch"}
     secret = "Invented question that must never be shown"
+    rec = record(None)
+    db.served_put(rec)
+    row = config.OUT_DIR / "served__lda-box"
     for t in hidden:
         monkeypatch.setattr(fb, "_fetch", lambda task, t=t: [
             {"id": f"q{k}", "question": f"{secret} {k}?", "right": "right", "answer": "x",
              "wrong": ["a", "b", "c"], "options": ["right", "a"], "answer_type": "exactMatch",
              "group": f"g{k}"} for k in range(4)])
+        monkeypatch.setitem(fb.BENCH[t], "n", 4)
         fb.load(t, config.BENCH_ROOT)
-        row = config.OUT_DIR / "served__lda-box"
         d = sf.task_dir(row, t)
         d.mkdir(parents=True, exist_ok=True)
+        (d / sf.SETUP).write_text(json.dumps({"thinking": "off"}))
         (d / sf.ANSWERS).write_text("".join(json.dumps(
-            {"id": f"q{k}", "epoch": e, "answer": "ANSWER: A", "finish": "stop"}) + "\n"
+            {"id": f"q{k}", "epoch": e, "answer": f"You asked: {secret} {k}?\nANSWER: A",
+             "finish": "stop"}) + "\n"
             for k in range(4) for e in range(fb.BENCH[t]["epochs"])))
-        (row / "model_meta.json").write_text(json.dumps({"model": "served/lda-box"}))
-    listed = svc.get("/api/questions").json()
-    assert not any(t in json.dumps(listed) for t in hidden)
+        sc = sf.score_task(row, t, rec)
+        if fb.BENCH[t].get("grader"):                       # HLE waits for its grader
+            assert sc["waiting"] == 4 * fb.BENCH[t]["epochs"]
+        else:
+            samples = list(d.glob(f"samples_{t}_*.jsonl"))
+            assert samples and list(d.glob("results_*.json"))
+            # a samples line keeps the question's id, never its text
+            assert all(secret not in json.dumps(json.loads(x)["doc"])
+                       for x in samples[0].read_text().splitlines())
+    (row / "model_meta.json").write_text(json.dumps({"model": "served/lda-box"}))
+    seen = [svc.get("/api/questions"),
+            svc.get("/api/answers/benchmarks", params={"model": "served/lda-box"}),
+            svc.get("/api/frontier/grading"), svc.get("/api/results")]
+    assert [r.status_code for r in seen] == [200] * 4
+    assert any(t in seen[-1].text for t in hidden)            # the board has the scores
     for t in hidden:
-        r = svc.get(f"/api/questions/{t}")
-        assert r.status_code in (403, 404), r.status_code
-        assert secret not in r.text
-        r = svc.get("/api/answers/benchmarks", params={"model": "served/lda-box"})
-        assert secret not in r.text and t not in [x["task"] for x in r.json()["tasks"]]
+        seen.append(r := svc.get(f"/api/questions/{t}"))
+        assert r.status_code == 403, r.status_code
+        seen.append(r := svc.post(f"/api/questions/{t}/audit",
+                                  json={"by": "masein", "confirm": True}))
+        assert r.status_code == 403, r.status_code
+        seen.append(r := svc.get(f"/api/questions/{t}",
+                                 params={"models": "served/lda-box"}))
+        assert t not in [x["task"] for x in seen[1].json()["tasks"]]
+    assert not any(t in json.dumps(seen[0].json()) for t in hidden)
+    for r in seen:
+        assert secret not in r.text, r.url
     with pytest.raises(PermissionError):
         questions.table(hidden[0])
 

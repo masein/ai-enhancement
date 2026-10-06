@@ -4953,6 +4953,88 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17b.1 — the review's parts 1 to 5, before the pilot (6 Oct)
+
+An independent review of 1388058..62ec4d9 (`docs/prompts/phase-17b-review-fixes-before-renting.md`).
+Parts 1 to 5 block the pilot; part 6 (grading) is 17b.2.
+- **The box runs the setup it says it runs** (`scripts/remote_gguf.py`):
+  - a port that already answers is refused; nothing is started. After
+    `/health`, the child must still be running and `/props` must name this
+    GGUF.
+  - The state file pins the binary's sha256, its commit and build, the
+    flags and the environment. A resume with any of them changed is refused,
+    naming which. The slots may change, and each session's are kept.
+  - `--parity` asks the parity check's 50 questions and stops: no bundle.
+- **The import compares the launch with the registered one**
+  (`scripts/import_frontier.py`):
+  - Compared: the routing environment (`LLAMA_MOE_*`), the speculative
+    flags (`--spec-*`, `--draft*`, `-md`, …), and a row registered as
+    drafting.
+  - May differ: memory and offload, context, slots, the KV cache type, flash
+    attention, threads, batch sizes, `GGML_CPU_*`.
+  - Shards made with another setup are never merged.
+  - REMOTE-RUNS G2 and G5 give one command per build, its `--env` the
+    registered one's.
+- **The board's own resume** compares `setup.json`, now with the server's
+  file, size and build and the launch. Answers made with another setup are
+  set aside under `earlier/` and asked again.
+- **Thinking checked at scoring**: a row asked to think whose answers hold
+  none, or one asked not to whose answers hold thinking, isn't scored. It
+  says why: an import refuses it, and a run fails.
+- **The parity check is the pilot's first step** (REMOTE-RUNS G1b,
+  `scripts/frontier_parity.py`):
+  - The questions: 50 MMLU-Pro questions, seed `frontier-parity-1`, thinking
+    off, temperature 0, top_k 1, seed 0, 2,048 tokens.
+  - Compared: TIGER-Lab's letter from each reply, and whether the replies
+    are identical.
+  - The same: at least 46 of 50 with the same letter. Identical replies are
+    counted, not required, since greedy decoding on two machines isn't bit
+    for bit.
+- **A failed answer is not an answer**:
+  - A question the server failed on is never written, so the next run asks
+    it again.
+  - More failures than `served.item_error_limit` stop the run.
+  - The import refuses an error line.
+  - `ask_raw` sends the card's sampling, seed included, and a model with no
+    preset sends none, where it raised KeyError.
+  - **The timeout follows the budget**: `served.timeout_for` waits for
+    `max_tokens` at `SERVED_MIN_TOK_S` (10 tokens/s), plus 2 minutes, or
+    `SERVED_TIMEOUT_S` if that is longer. A 32,768-token answer
+    waits 57 minutes, not 15.
+- **The import treats a bundle as untrusted**:
+  - `--register` needs `--file-sha256` (the file's, from where it was
+    published). It refuses an id holding `__` and an id that has a row
+    here already.
+  - Every answers line is checked for its types.
+  - The tasks are scored in `staging/` and swapped in only when each
+    scores: a refused or failing task leaves the row as it was.
+  - The board writes the row's `model_meta.json` itself.
+  - `remote_bundle.read` caps a member at 512 MiB and the whole at 1 GiB,
+    from the headers, before reading.
+- **The commands masein pastes**:
+  - the token is `read -rs HF_TOKEN && export HF_TOKEN`, never on a command
+    line;
+  - every G0–G6 block pastes whole;
+  - G6 registers Gemma with its sha256 from Hugging Face.
+  - `build_llama_tarball.sh`:
+    - says when git can't read the checkout;
+    - sets `safe.directory` in the build container;
+    - fails a build that doesn't know its commit;
+    - falls back to `sudo docker`;
+    - packs every library `ldd` names but glibc and the driver (libgomp
+      among them).
+- **Scoring by code**:
+  - OTIS's integer must end the line: "ANSWER: 3.5", "3/4" and "2^{10}" are
+    unread, not 3 or 2.
+  - Each benchmark's count is checked on load (HLE's text-only set,
+    MMLU-Pro's 12,032, ARC-AGI-2's 120 tasks), and a wrong count keeps
+    nothing.
+  - MMLU-Pro's note says it uses the card's sampling, not TIGER-Lab's
+    temperature 0, and no random guess.
+- Tests: `tests/test_17b_review.py`; `test_17_gguf_box` now checks the launch
+  the server saw; `test_17_frontier_suite`'s unlisted test scores answers that
+  restate their questions and reads every response.
+
 ### 17.3 — the Frontier benchmarks graded on the server (5 Oct)
 
 Stage 3 of phase 17 (`service/frontier_grade.py`, `scripts/frontier_graders.py`,

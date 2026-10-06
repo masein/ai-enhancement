@@ -9,7 +9,11 @@ doesn't — and with its thinking apart (reasoning_content) when the chat
 template is told to think. FAKE_LLAMA_LOG is a file each request's body is
 appended to; FAKE_LLAMA_DIE_AFTER=K stops the process after K answers, as a
 box that is stopped does; FAKE_LLAMA_LOAD_S is how long it "loads" before
-/health says ok."""
+/health says ok. 17b: FAKE_LLAMA_ARGV is a file its command line is written
+to (what was launched, not what was recorded); FAKE_LLAMA_MODEL_PATH the file
+its /props names instead of -m's; FAKE_LLAMA_STATUS a status every chat
+request (and /apply-template) answers with; FAKE_LLAMA_THINK=never answers
+without thinking whatever it is told."""
 
 from __future__ import annotations
 
@@ -36,7 +40,15 @@ def main() -> int:
     if "--version" in argv:
         print(VERSION, file=sys.stderr)
         return 0
+    if os.environ.get("FAKE_LLAMA_ARGV"):
+        with open(os.environ["FAKE_LLAMA_ARGV"], "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"argv": argv, "env": {k: v for k, v in os.environ.items()
+                                                       if k.startswith(("LLAMA_", "GGML_"))}})
+                     + "\n")
     model = arg(argv, "-m", "--model")
+    shown = os.environ.get("FAKE_LLAMA_MODEL_PATH") or model
+    status = int(os.environ.get("FAKE_LLAMA_STATUS") or 200)
+    never_think = os.environ.get("FAKE_LLAMA_THINK") == "never"
     port = int(arg(argv, "--port", default="8080"))
     ctx = int(arg(argv, "-c", "--ctx-size", default="4096"))
     slots = int(arg(argv, "-np", "--parallel", default="1"))
@@ -69,7 +81,7 @@ def main() -> int:
                     "id": os.path.basename(model), "object": "model", "owned_by": "llamacpp",
                     "meta": {"n_ctx_train": 262144, "size": 21_000_000_000}}]})
             if self.path == "/props":
-                return self._send(200, {"model_path": model, "build_info": "b6543-abc1234",
+                return self._send(200, {"model_path": shown, "build_info": "b6543-abc1234",
                                         "total_slots": slots,
                                         "chat_template": "{# a fake template #}",
                                         "default_generation_settings": {"n_ctx": ctx // slots}})
@@ -81,6 +93,11 @@ def main() -> int:
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)))
             if self.path not in ("/v1/chat/completions", "/chat/completions"):
                 return self._send(404, {"error": {"message": "not found"}})
+            if status != 200:
+                if log:
+                    with lock, open(log, "a", encoding="utf-8") as fh:
+                        fh.write(json.dumps(body) + "\n")
+                return self._send(status, {"error": {"code": status, "message": "it failed"}})
             if log:
                 with lock, open(log, "a", encoding="utf-8") as fh:
                     fh.write(json.dumps(body) + "\n")
@@ -88,7 +105,8 @@ def main() -> int:
             opts = dict(re.findall(r"(?m)^([ABCD])\) (.*)$", text))
             right = next((k for k, v in opts.items() if v.startswith("right")), "A")
             pick = (next(k for k in "ABCD" if k != right) if "hard" in text else right)
-            on = (body.get("chat_template_kwargs") or {}).get("enable_thinking")
+            on = (body.get("chat_template_kwargs") or {}).get("enable_thinking") \
+                and not never_think
             msg = {"role": "assistant", "content": f"The options compared.\nANSWER: {pick}"}
             if on:
                 msg["reasoning_content"] = "Weighing each option in turn."
