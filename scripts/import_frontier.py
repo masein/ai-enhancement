@@ -714,7 +714,9 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
                          "(remote_gguf.py --ask-written-off asks them again)")
         entry = {"gpu": gpu, "sha256": b["sha256"], "bundle": path.name, "at": stamp,
                  "by": by, "gguf_sha256": gg.get("sha256"), "llama_cpp": srv.get("build"),
-                 "answers": len(ans), "setup": shard_setup(srv)}
+                 "answers": len(ans), "setup": shard_setup(srv),
+                 # 17f: G5's box it ran on, as its line said (never its address)
+                 "box": setup.get("box") or ""}
         if shard:
             i, n = shard
             sh = (reg.get("shards") or {}).get(t) or {}
@@ -752,9 +754,10 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             stage(t, merged, tsetup, keep=sf.task_dir(row, t) if how == "more" else None)
             parts = [sh["have"][str(j)] for j in range(1, n + 1)]
             ready[t] = {**entry, "gpus": sorted({x["gpu"] for x in parts}), "shards": n,
-                        "shard_bundles": [{"shard": j, **{k: x[k] for k in ("gpu", "sha256",
-                                                                            "bundle")}}
+                        "shard_bundles": [{"shard": j, **{k: x.get(k) for k in (
+                                               "gpu", "sha256", "bundle", "box")}}
                                           for j, x in enumerate(parts, 1)],
+                        "boxes": sorted({x.get("box") for x in parts if x.get("box")}),
                         "answers": len(merged)}
             lines.append(f"{t}: every shard is in ({n} of {n}) · {len(merged):,} answers")
         else:
@@ -762,7 +765,7 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             if how == "same":
                 continue
             stage(t, ans, tsetup, keep=sf.task_dir(row, t) if how == "more" else None)
-            ready[t] = {**entry, "gpus": [gpu]}
+            ready[t] = {**entry, "gpus": [gpu], "boxes": [entry["box"]] if entry["box"] else []}
             lines.append(f"{t}: {len(ans):,} answers from a rented GPU ({gpu})")
 
     if not ready and not todo_shards and not aside_shards:
@@ -825,7 +828,6 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             shutil.move(str(sf.task_dir(staging, t)), str(dest))
             reg.setdefault("tasks", {})[t] = entry
             if scored.get(t):
-                _mark_where(row, t, f"{WHERE_WORDS} ({', '.join(entry['gpus'])})")
                 words.append(sf.words(t, scored[t]))
         if ready:
             write_meta(row, rec, on)
@@ -835,10 +837,17 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
     shutil.rmtree(staging.parent, ignore_errors=True)
     line = " · ".join(words) or "; ".join(x for x in lines if "missing" in x) or "imported"
     of = f" · shard {shard[0]} of {shard[1]}" if shard else ""
+    box = setup.get("box") or ""
+    here = where_words([gpu], [box] if box else [])
     sid = db.add(model, "instruct", SUITE, by,
-                 f"imported from a rented GPU ({gpu}){of} · {path.name}", thinking=on,
+                 f"imported from a rented GPU ({gpu}){of}{f' · box {box}' if box else ''} · "
+                 f"{path.name}", thinking=on,
                  tasks=tasks if len(tasks) < len(fb.TASKS) else None, status=status)
-    db.update(sid, finished_at=time.time(), progress=line, error=error)
+    # 17f: the row says where it ran, and when on the box — its import's time
+    # is when it was made here (created_at)
+    ran = {k: _epoch(setup.get(k)) for k in ("started_at", "finished_at")}
+    db.update(sid, finished_at=ran["finished_at"] or time.time(), progress=line, error=error,
+              where_ran=here, **({"started_at": ran["started_at"]} if ran["started_at"] else {}))
     log = config.LOGS_DIR / f"service_{sid}_{model.replace('/', '__')}.log"
     log.parent.mkdir(parents=True, exist_ok=True)
     log.write_text(f"===== [{sid}] imported {path.name} (sha256 {b['sha256'][:16]}) by {by}: "
@@ -846,11 +855,25 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
                    + "".join(f"\n[import] {x}" for x in lines) + f"\n[import] {line}\n",
                    encoding="utf-8")
     if status == "done":
-        # 17c: recorded as imported only when it was
+        # 17c: recorded as imported only when it was. 17f: with what the run's
+        # own view shows — the box, its times and sessions, the image, the file
         reg.setdefault("imports", []).append(
             {"sha256": b["sha256"], "sid": sid, "tasks": tasks, "gpu": gpu, "by": by,
-             "at": stamp, "bundle": path.name, **({"shard": list(shard)} if shard else {})})
+             "at": stamp, "bundle": path.name, **({"shard": list(shard)} if shard else {}),
+             "box": box, "where": here, "image": setup.get("image") or "",
+             "started_at": setup.get("started_at"), "finished_at": setup.get("finished_at"),
+             "sessions": setup.get("sessions"), "gguf_sha256": gg.get("sha256"),
+             "imported_at": time.time()})
         _write_registry(row, reg)
+        # 17f: each score says where it ran — every box its shards came from —
+        # and the Runs rows it came from
+        for t, entry in ready.items():
+            if not scored.get(t):
+                continue
+            shas = {x.get("sha256") for x in entry.get("shard_bundles") or []} | {b["sha256"]}
+            runs = sorted({x["sid"] for x in reg["imports"] if x.get("sha256") in shas})
+            _mark_where(row, t, where_words(entry.get("gpus") or [gpu], entry.get("boxes") or []),
+                        runs)
     for x in lines:
         say(x)
     say(f"the row {model}{' · thinking' if on else ''}: {line}")
@@ -880,10 +903,130 @@ def compare_answers(have: dict, new: dict) -> str:
     return "same" if len(new) == len(have) and not changed else "more"
 
 
-def _mark_where(row: Path, task: str, where: str) -> None:
-    """the task's results say where it ran (the score's own detail)"""
+def _mark_where(row: Path, task: str, where: str, runs: list[int] | None = None) -> None:
+    """the task's results say where it ran (the score's own detail) — 17f: and
+    the Runs rows it came from"""
     from service import frontier as sf
     for f in sf.task_dir(row, task).glob("results_*.json"):
         blob = json.loads(f.read_text(encoding="utf-8"))
         blob.setdefault("frontier", {})["where"] = where
+        if runs:
+            blob["frontier"]["runs"] = runs
         f.write_text(json.dumps(blob, indent=1), encoding="utf-8")
+
+
+def short_gpu(name: str) -> str:
+    """'NVIDIA GeForce RTX 5090' → 'RTX 5090'"""
+    return re.sub(r"^(NVIDIA\s+)?(GeForce\s+)?", "", (name or "").strip()) or "a GPU"
+
+
+def where_words(gpus: list[str], boxes: list[str]) -> str:
+    """17f: where a run ran, one wording everywhere — 'this server' for the
+    board's own (said by the page), 'rented GPU · RTX 5090 · box A3' for an
+    import, 'boxes A1, A2' when its shards came from several"""
+    g = ", ".join(sorted({short_gpu(x) for x in gpus if x})) or "a GPU"
+    b = sorted({x for x in boxes if x})
+    return f"rented GPU · {g}" + (f" · box{'es' if len(b) > 1 else ''} {', '.join(b)}" if b
+                                   else "")
+
+
+def _epoch(stamp) -> float | None:
+    """'2026-10-06T08:12:03Z' → seconds"""
+    try:
+        import calendar
+        return float(calendar.timegm(time.strptime(str(stamp), "%Y-%m-%dT%H:%M:%SZ")))
+    except (TypeError, ValueError):
+        return None
+
+
+# 17f: what the rented boxes are doing, as frontier_fetch.py last read them —
+# each step's label, model, what it asks, its line, its times, never an address
+BOX_FIELDS = {"label": str, "model": str, "step": str, "thinking": str, "tasks": list,
+              "shard": str, "parity": bool, "state": str, "line": str, "started_at": str,
+              "sessions": int, "at": (int, float), "seen_at": (int, float), "reachable": bool,
+              "safe": bool}
+QUIET_S = 45 * 60                       # a box not heard from for this long says so
+
+
+def boxes_path() -> Path:
+    from service import config
+    return Path(config.BENCH_ROOT) / "frontier" / "boxes.json"
+
+
+def store_boxes(records: list) -> int:
+    """the fetch's last reading of each step, kept on the board: only the
+    fields above, each of its type — anything else is dropped"""
+    keep = []
+    for r in records if isinstance(records, list) else []:
+        if not isinstance(r, dict):
+            continue
+        x = {k: r[k] for k, t in BOX_FIELDS.items() if k in r and isinstance(r[k], t)
+             and not (t is int and isinstance(r[k], bool))}
+        if x.get("label") and x.get("model") and x.get("step"):
+            keep.append(x)
+    p = boxes_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_suffix(".part")
+    tmp.write_text(json.dumps({"posted_at": time.time(), "boxes": keep}), encoding="utf-8")
+    tmp.replace(p)
+    return len(keep)
+
+
+_LEFT = re.compile(r"(?:(?P<h>[\d.]+) h|(?P<m>\d+) min) left")
+_NOF = re.compile(r"(?P<n>[\d,]+) of (?P<of>[\d,]+)")
+
+
+def read_boxes(now: float | None = None) -> dict:
+    """17f: the boxes for Runs — each step with what it asks, n of N, when it
+    should finish (its benchmark's time left, and its box's later steps at
+    the plan's hours), and when it was last heard from"""
+    now = time.time() if now is None else now
+    try:
+        got = json.loads(boxes_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"boxes": [], "posted_at": None}
+    try:
+        import frontier_box as fbx
+    except ImportError:                                   # the plan beside the script
+        fbx = None
+    out = []
+    for r in got.get("boxes") or []:
+        line = r.get("line") or ""
+        m, nof = _LEFT.search(line), _NOF.search(line)
+        left = (float(m["h"]) * 3600 if m and m["h"] else int(m["m"]) * 60 if m else None)
+        later = 0.0
+        if fbx is not None and left is not None:
+            try:
+                steps = fbx.box_of(r["label"])
+                k = int(r["step"].rsplit("-", 1)[1]) if not r["step"].endswith("parity") else 0
+                later = sum(fbx.hours(s) for s in steps[k:] if s[0] != "parity") * 3600
+            except (SystemExit, ValueError, IndexError, KeyError):
+                later = 0.0
+        heard = max(float(r.get("seen_at") or 0), 0.0)
+        quiet = (now - float(r.get("at") or 0)) if r.get("at") else None
+        out.append({**r,
+                    "n": int(nof["n"].replace(",", "")) if nof else None,
+                    "of": int(nof["of"].replace(",", "")) if nof else None,
+                    "finish": (float(r.get("at") or now) + left + later) if left is not None
+                    else None,
+                    "heard": heard or None,
+                    "quiet_min": round(quiet / 60) if quiet and quiet > QUIET_S else None})
+    return {"boxes": out, "posted_at": got.get("posted_at")}
+
+
+def rented_of(sid: int) -> dict | None:
+    """17f: what an imported run's own view shows — its import's record, found
+    by its Runs id in the row it went to"""
+    from service import config
+    root = config.OUT_DIR
+    for p in sorted(root.glob(f"*/{REGISTRY}")) if root.is_dir() else []:
+        try:
+            reg = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        hit = next((x for x in reg.get("imports") or [] if x.get("sid") == sid), None)
+        if hit:
+            ran = [_epoch(hit.get(k)) for k in ("started_at", "finished_at")]
+            return {**hit, "hours": round((ran[1] - ran[0]) / 3600, 2) if all(ran) else None,
+                    "restarts": max(0, int(hit.get("sessions") or 1) - 1)}
+    return None

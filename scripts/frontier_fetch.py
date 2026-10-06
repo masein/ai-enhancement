@@ -190,13 +190,13 @@ def progress_words(p: dict) -> str:
 
 
 def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
-            shas: dict, parity: dict, seen: dict) -> tuple[bool, bool, list[str]]:
-    """(done and safe to destroy, failed, its lines): one box listed, copied,
-    imported and compared, its last line saying which"""
+            shas: dict, parity: dict, seen: dict) -> tuple[bool, bool, list[str], list[dict]]:
+    """(done and safe to destroy, failed, its lines, its steps for the board):
+    one box listed, copied, imported and compared, its last line saying which"""
     name = f"{box['host']}:{box['port']}"
     got, why = listing(box, key)
     if got is None:
-        return False, True, [f"{name}: couldn't be asked — {why}. NOT safe to destroy"]
+        return False, True, [f"{name}: couldn't be asked — {why}. NOT safe to destroy"], []
     lines, problems, failed = [], [], False
     labels = sorted({str(p.get("label")) for p in got["progress"] if p.get("label")})
     who = f"{name} ({', '.join(labels) or 'no label'})"
@@ -205,7 +205,7 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
         if p.get("state") != "whole":
             problems.append(f"{Path(str(p.get('dir'))).name} is {p.get('state') or 'not whole'}")
     if not got["bundles"] and not got["parity"] and not got["progress"]:
-        return False, False, [f"{name}: no bundle there yet — NOT safe to destroy"]
+        return False, False, [f"{name}: no bundle there yet — NOT safe to destroy"], []
     for b in got["bundles"]:
         ok, words = copy(box, key, b["path"], b["sha256"], dest)
         here = dest / Path(b["path"]).name
@@ -254,7 +254,24 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
     lines.insert(0, f"{who}: " + ("done, safe to destroy — every step whole, every bundle here "
                                   "with the box's sha256 and imported" if safe else
                                   "NOT safe to destroy — " + "; ".join(problems)))
-    return safe, failed, lines
+    # 17f: each step as the board shows it on Runs — its label and progress,
+    # never the box's address
+    now = time.time()
+    steps = [{**{k: p.get(k) for k in ("label", "model", "thinking", "tasks", "shard", "parity",
+                                        "state", "line", "started_at", "sessions", "at")
+                 if p.get(k) is not None},
+              "step": Path(str(p.get("dir"))).name, "seen_at": now, "reachable": True,
+              "safe": safe} for p in got["progress"]]
+    return safe, failed, lines, steps
+
+
+def post_boxes(steps: list[dict], dest: Path) -> str:
+    """17f: the boxes' steps to the board, for Runs' "On rented boxes" list"""
+    path = dest.parent / "boxes.json"
+    path.write_text(json.dumps(steps), encoding="utf-8")
+    code, said = run([*IMPORT, "--boxes", str(path)], cwd=REPO, timeout=IMPORT_S)
+    return ("the board's list of rented boxes: " + last(said, "updated") if code == 0 else
+            "the board's list of rented boxes NOT updated — " + last(said, f"exit {code}"))
 
 
 def every_s(text: str) -> float:
@@ -276,6 +293,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="served/<name>=<the server's parity file>: compare the box's with it")
     ap.add_argument("--dest", default="~/benchmarks/bundles", help="where the bundles go")
     ap.add_argument("--by", default="masein", help="your name, for the Runs list")
+    ap.add_argument("--no-board", dest="board", action="store_false",
+                    help="17f: don't send the boxes' progress to the board (Runs' list)")
     ap.add_argument("--every", type=every_s, default=0,
                     help="17f: do it again every 15m (or 900s, 1h) until every box is done")
     a = ap.parse_args(argv)
@@ -304,13 +323,21 @@ def main(argv: list[str] | None = None) -> int:
     dest.mkdir(parents=True, exist_ok=True)
     (dest.parent / "parity").mkdir(parents=True, exist_ok=True)
     seen: dict[str, str] = {}
+    known: dict[str, list[dict]] = {}
     while True:
         failed_any, done = False, []
         for box in boxes:
-            safe, failed, lines = one_box(box, a, key, dest, shas, parity, seen)
+            safe, failed, lines, steps = one_box(box, a, key, dest, shas, parity, seen)
             print("\n".join(lines), flush=True)
             failed_any |= failed
             done.append(safe)
+            name = f"{box['host']}:{box['port']}"
+            if steps:
+                known[name] = steps
+            elif failed and name in known:
+                known[name] = [{**x, "reachable": False} for x in known[name]]
+        if a.board and known:
+            print(post_boxes([x for v in known.values() for x in v], dest), flush=True)
         if not a.every or all(done):
             return 1 if failed_any else 0
         print(f"— again in {round(a.every / 60)} min ({sum(done)} of {len(done)} boxes done)",

@@ -1825,6 +1825,21 @@ def frontier_how(d: dict | None) -> str | None:
     return "by code" + counts
 
 
+def frontier_where(d: dict | None) -> str:
+    """17f: where a Frontier score was run, as Runs says it — 'this server', or
+    'rented GPU · RTX 5090 · boxes A1, A2' (an import's, older ones 'run on a
+    rented GPU (…)')"""
+    w = str((d or {}).get("where") or "")
+    if not w or w == "this server":
+        return "this server"
+    m = re.match(r"run on a rented GPU \((.*)\)$", w)
+    if m:
+        g = ", ".join(sorted({re.sub(r"^(NVIDIA\s+)?(GeForce\s+)?", "", x.strip())
+                              for x in m.group(1).split(",") if x.strip()}))
+        return f"rented GPU · {g}" if g else "rented GPU"
+    return "rented GPU" if w == "a rented GPU" else w
+
+
 def frontier_setting(d: dict | None) -> str | None:
     """17b: frontier_how without the model's own numbers — the setting the
     Frontier view ranks within (two models graded alike share it); None for
@@ -2460,7 +2475,10 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
                 # 17: how a Frontier benchmark was scored, its grader beside it
                 **({"how": frontier_how((run.get("frontier") or {}).get(task)),
                     # 17b: the setting it is ranked in, without its own numbers
-                    "howSet": frontier_setting((run.get("frontier") or {}).get(task))}
+                    "howSet": frontier_setting((run.get("frontier") or {}).get(task)),
+                    # 17f: where it ran, and the Runs rows it came from
+                    "where": frontier_where((run.get("frontier") or {}).get(task)),
+                    "runs": ((run.get("frontier") or {}).get(task) or {}).get("runs") or []}
                    if (run.get("frontier") or {}).get(task) else {}),
             }
             metric_used.setdefault(task, name)
@@ -5417,7 +5435,7 @@ const state = {
   ceSort: { key: 'task', dir: 1 },     // cross-entropy table
   queue: [], qmsg: '',
   queueOlder: [], queueTotal: null,                     // 12z A6: runs before the newest 100
-  qQ: '', qStatus: 'all', qSort: { key: 'id', dir: -1 },   // queue filter/sort
+  qQ: '', qStatus: 'all', qWhere: 'all', qSort: { key: 'id', dir: -1 },   // queue filter/sort
   trSel: [], trColors: {}, trSmooth: 0, trLog: false,      // Training tab
   trRuns: [], trSeries: {}, trFetching: false,
   trQ: '', trStatus: 'all', trOrder: 'updated',            // runs-list filter/sort
@@ -12917,12 +12935,22 @@ function frHere(name) {
       // 17b: ranked by the setting alone ("code alone 61.3" is this model's
       // own), and a score that isn't final ranked with nothing
       return { v: c.v, se: c.se || null, tag: at + (c.how ? ' · ' + c.how : ''),
-        set: 'howSet' in c ? (c.howSet == null ? null : at + ' · ' + c.howSet) : at };
+        set: 'howSet' in c ? (c.howSet == null ? null : at + ' · ' + c.howSet) : at,
+        // 17f: where it ran, and the Runs rows it came from
+        where: c.where || '', runs: c.runs || [] };
     } })),
     ...ts.filter(t => GGUF_OF[t]).map(t => ({ key: 'gguf:' + GGUF_OF[t],
       get: m => { const g = ggufOf(m.id, GGUF_OF[t]);
         return g ? { v: g.v, se: g.se ?? null, tag: 'measured here · llama.cpp, 0-shot',
           set: 'measured here · llama.cpp, 0-shot' } : null; } }))];
+}
+// 17f: a Frontier score's where — every box its shards came from — and a
+// link to each Runs row it came from
+function frWhere(h) {
+  return el('div', { class: 'small se fr-where', 'data-fr-where': h.where },
+    `ran on ${h.where}`, ...(h.runs || []).flatMap(sid => [' · ', el('a', {
+      href: '#tab=runs', 'data-fr-run': String(sid), text: '#' + sid,
+      onclick: () => { state.qQ = `#${sid} `; state.qStatus = 'all'; state.qWhere = 'all'; } })]));
 }
 // 12n.2: the benchmarks measured here that the Frontier view always shows
 const FR_SHARED_12N = ['GPQA Diamond', 'SimpleQA Verified'];
@@ -13130,7 +13158,8 @@ function lbFrontier(ms) {
           'data-tip': JSON.stringify([`${pct1(x.here.v)}`
             + (x.here.se ? ` ± ${pct1(x.here.se)}` : ''), `${r.m.name} · ${c.name}`, x.here.tag,
             'ranked only with the cells measured the same way here'])},
-        b(hl, pct1(x.here.v)), el('div', { class: 'small se fr-tag', text: x.here.tag }));
+        b(hl, pct1(x.here.v)), el('div', { class: 'small se fr-tag', text: x.here.tag }),
+        x.here.where ? frWhere(x.here) : '');
     return el('td', { class: 'num tcell', 'data-fr-cell': c.key, 'data-fr-rep': r.m.id,
         'data-fr-setting': x.rep.setting, 'data-lead': rl ? '1' : null, style: tint, tabindex: '0',
         ...repAt,
@@ -18467,6 +18496,25 @@ function readBank(wrap, r, d) {
   draw();
 }
 
+// 17f: where a run ran — "this server", or an import's box
+function runWhere(r) {
+  return r.where_ran || 'this server';
+}
+// 17f: an imported run's own facts: when it ran on its box and for how long,
+// its restarts, the box, the image, the GPU, the file, the bundle, the import
+function rentedFacts(x) {
+  const t = v => (v ? String(v).replace('T', ' ').replace('Z', ' UTC') : '—');
+  const row = (k, v) => el('tr', {}, el('th', { text: k }), el('td', { text: v }));
+  return el('table', { class: 'mmptab small', 'data-rented-facts': '1' }, el('tbody', {},
+    row('where', x.where || 'rented GPU'),
+    row('ran on the box', `${t(x.started_at)} to ${t(x.finished_at)}`
+      + (x.hours != null ? ` · ${x.hours} h` : '')),
+    row('restarts', String(x.restarts ?? 0)),
+    row('box', x.box || '—'), row('runner image', x.image || '—'), row('GPU', x.gpu || '—'),
+    row('GGUF sha256', x.gguf_sha256 || '—'),
+    row('bundle', `${x.bundle || '—'}` + (x.sha256 ? ` · sha256 ${String(x.sha256).slice(0, 16)}…` : '')),
+    row('imported', `${x.imported_at ? absT(x.imported_at) : (x.at || '—')} by ${x.by || '—'}`)));
+}
 // ---- 5. a run's log ---------------------------------------------------------------
 function readLog(wrap, r, d, got) {
   const k = readKey(r);
@@ -18526,6 +18574,7 @@ function readLog(wrap, r, d, got) {
   }, { passive: true });
   follow.textContent = d.active ? (opt.follow ? '● following' : 'paused — scroll to the end to follow') : '';
   wrap._body.replaceChildren(
+    d.rented ? rentedFacts(d.rented) : '',
     el('div', { class: 'frm rd-filters' }, search, nextHit, wrapBox, earlier, follow),
     d.withheld ? el('p', { class: 'small se', text: `${d.withheld} line${d.withheld === 1 ? '' : 's'} `
       + 'withheld: they quote a hidden question.' }) : '',
@@ -19158,7 +19207,9 @@ function vQueue(part = { form: true, list: true }) {
         try { const a = JSON.parse(r.arch);
               return `\n${a.arch || ''} · hidden ${a.hidden ?? '—'} · layers ${a.layers ?? '—'} · vocab ${a.vocab ?? '—'}`; }
         catch { return ''; } })() : '') }, r.suite === 'gguf' ? runName(r) : r.hf_id,
-      el('span', { class: 'badge' + (r.kind === 'instruct' ? ' instruct' : ''), text: r.kind })),
+      el('span', { class: 'badge' + (r.kind === 'instruct' ? ' instruct' : ''), text: r.kind }),
+      // 17f: where it ran, one wording everywhere
+      el('div', { class: 'small se', 'data-run-where': String(r.id), text: runWhere(r) })),
     // a judged row says what it sat, in one line: the list is behind ▸ (11i)
     el('td', { class: 'small' }, suiteCell(r, 'q')),
     el('td', { text: r.submitter || '—' }),
@@ -19205,6 +19256,8 @@ function vQueue(part = { form: true, list: true }) {
       (state.qStatus === 'all'
         || (state.qStatus === 'active' ? ACTIVE_STATUS.has(r.status)
                                        : r.status === state.qStatus)) &&
+      // 17f: where it ran
+      (state.qWhere === 'all' || (state.qWhere === 'rented') === !!r.where_ran) &&
       (!q || `#${r.id} ${r.hf_id} ${r.submitter || ''} ${r.note || ''} ${r.status} `
                .toLowerCase().includes(q)));
     const c = QCOLS.find(x => x.key === state.qSort.key) || QCOLS[0];
@@ -19224,6 +19277,8 @@ function vQueue(part = { form: true, list: true }) {
       [['all', 'status: all'], ['active', 'active'], ['queued', 'queued'],
        ['done', 'done'], ['failed', 'failed'], ['canceled', 'canceled']],
       state.qStatus, v => { state.qStatus = v; rebuildQueue(); }),
+    mkSel('where filter', [['all', 'where: all'], ['here', 'this server'],
+      ['rented', 'rented GPUs']], state.qWhere, v => { state.qWhere = v; rebuildQueue(); }),
     qCount);
   const qThead = el('thead');
   const qTbody = el('tbody');
@@ -19336,7 +19391,44 @@ function vQueue(part = { form: true, list: true }) {
     where === 'here' ? (state.gg.open = true, ggufCard()) : null,
     part.list ? el('div', { class: 'card', 'data-all-runs': '1' },
       el('h2', { text: 'All runs' }),
+      rentedBoxes(),
       qToolbar, qPager, qTableWrap, qOlder, qEmpty) : null].filter(Boolean);
+}
+
+// 17f: what the rented boxes are doing, as frontier_fetch.py last read them —
+// each step's box, model, what it asks, n of N, when it should finish, and
+// when it was last heard from; a box quiet for a while says so
+function loadBoxes() {
+  state.boxesAt = Date.now();
+  api('api/frontier/boxes').then(d => { state.boxes = d; render(); }).catch(() => {});
+}
+function rentedBoxes() {
+  if (netReady() && (!state.boxesAt || Date.now() - state.boxesAt > 30000)) loadBoxes();
+  const B = ((state.boxes || {}).boxes || []);
+  if (!B.length) return '';
+  const when = t => (t ? new Date(t * 1000).toLocaleString('en-GB', { weekday: 'short',
+    hour: '2-digit', minute: '2-digit' }) : '—');
+  const row = b => el('tr', { 'data-rented-box': `${b.label}|${b.step}` },
+    el('td', { text: `${b.label} · ${b.step}` }), el('td', { text: b.model }),
+    el('td', { text: b.parity ? 'the parity questions'
+      : `${(b.tasks || []).map(t => (FB()[t] || {}).label || t).join(', ')} · thinking ${b.thinking}` }),
+    el('td', { class: 'num', text: b.n != null ? `${b.n.toLocaleString()} of ${b.of.toLocaleString()}`
+      : b.state === 'whole' ? 'whole' : '—' }),
+    el('td', { text: b.safe ? 'done, safe to destroy' : b.state === 'whole' ? 'whole'
+      : b.finish ? when(b.finish) : '—' }),
+    el('td', { class: b.quiet_min || b.reachable === false ? 'warn' : '',
+      text: b.reachable === false ? `not reached at the last fetch (${rel(b.heard)} ago)`
+        : b.quiet_min ? `not heard from for ${b.quiet_min} min`
+        : b.heard ? rel(b.heard) + ' ago' : '—' }));
+  return el('details', { class: 'rented-boxes', open: '', 'data-rented-boxes': String(B.length) },
+    el('summary', { text: `On rented boxes · ${B.length} step${B.length === 1 ? '' : 's'}` }),
+    el('table', { class: 'mmptab small' },
+      el('thead', {}, el('tr', {}, ['box', 'model', 'asking', 'answered', 'expected finish',
+        'last heard'].map(h => el('th', { text: h })))),
+      el('tbody', {}, B.map(row))),
+    el('p', { class: 'small se', text: 'As frontier_fetch.py last read them (--every 15m keeps '
+      + 'it current). A box is safe to destroy once every bundle it holds is here and '
+      + 'imported.' }));
 }
 
 // ---------------------------------------------------------------------------

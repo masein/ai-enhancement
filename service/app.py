@@ -2106,6 +2106,14 @@ def frontier_grading_status():
     return _frontier_grading_page()
 
 
+@app.get("/api/frontier/boxes")
+def frontier_boxes():
+    """17f: the rented boxes, as frontier_fetch.py last read them — for Runs'
+    "On rented boxes" list. Labels and progress; never an address"""
+    import import_frontier
+    return import_frontier.read_boxes()
+
+
 @app.post("/api/frontier/grading/start")
 def frontier_grading_start(a: MmpByIn, x_token: str = Header(default="")):
     """masein's Start, after the dry run: each grader with answers to see
