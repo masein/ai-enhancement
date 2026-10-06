@@ -15,6 +15,7 @@ import os
 import sys
 import threading
 import time
+from contextlib import closing
 
 import pytest
 
@@ -147,8 +148,17 @@ def test_queue_rows_have_the_actions_their_state_allows(live, page):
     d = db.add(MODEL, "base", "judged", "omar", "", tasks=["exam_law"])
     rid = db.judge_run_create(MODEL, "b_open", 42, "stub/overlap-v1", "{}")
     db.judge_run_update(rid, status="done", finished_at=time.time())
-    db.batch_add("b_open", "judge", rid, 42, "local", "chat")
-    db.batch_finish("b_open", "done", "")
+    # the judge batch written finished, in one write: added as 'submitted' and
+    # finished after, the live board's own LLM poller could read it as pending
+    # in between and — no judge configured here — mark it failed after the
+    # finish. The row then offered Retry grading, never Open results: a CI
+    # flake, on runners slow enough to widen the window
+    with closing(db._conn()) as c:
+        c.execute("INSERT INTO llm_batches (batch_id, kind, ref_id, n_items, provider, model, "
+                  "created_at, status, finished_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                  ("b_open", "judge", rid, 42, "local", "chat", time.time(), "done",
+                   time.time()))
+        c.commit()
     db.update(d, status="done", judge_batch="b_open")          # answered and judged
     page.goto(base + "/#tab=queue")
     page.wait_for_selector(f"[data-row-cancel='{q}']")
