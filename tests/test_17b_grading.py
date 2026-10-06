@@ -404,8 +404,12 @@ def test_27_after_stop_or_at_the_limit_it_says_why_it_waits_and_carry_on_sends_t
         return plain(model, row)
     stub(monkeypatch, answer)
     fgr.start("masein")
-    for _ in range(100):
-        if any("algebra/" not in c for c in seen):
+    # MATH's two land first (its batch runs beside SimpleQA's: one of them
+    # still unsent at Stop counted with SimpleQA's, and a CI run read 5)
+    math = next(x["batch_id"] for x in fgr.pending() if x["slot"] == "math")
+    for _ in range(200):
+        if any("algebra/" not in c for c in seen) and \
+                (llm.tally(math) or {}).get("answered") == 2:
             break
         time.sleep(0.05)
     fgr.stop("masein")

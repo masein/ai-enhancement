@@ -45,7 +45,8 @@ def shot(part, name):
             part.screenshot(path=SCREENS / name)
             return
         except PlaywrightError as e:
-            if "not attached" not in str(e) or i == 2:
+            # 17c: mid-render it can also be "not visible" for a moment
+            if not any(w in str(e) for w in ("not attached", "not visible")) or i == 2:
                 raise
 
 
