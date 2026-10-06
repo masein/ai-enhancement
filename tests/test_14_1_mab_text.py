@@ -189,7 +189,7 @@ def test_the_second_turn_carries_the_models_own_first_answer(tmp_path):
 
 def test_a_server_is_asked_the_whole_conversation(monkeypatch):
     bodies = []
-    monkeypatch.setattr(served, "_post", lambda url, key, body, item=True: bodies.append(body) or
+    monkeypatch.setattr(served, "_post", lambda url, key, body, item=True, timeout=None: bodies.append(body) or
                         {"choices": [{"message": {"content": "SECOND"}}]})
     rec = {"name": "phone", "base_url": "http://x/v1", "pin": {"file": "f.gguf"}}
     hist = [{"role": "user", "content": "Q1"}, {"role": "assistant", "content": "A1"}]

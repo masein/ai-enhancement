@@ -27,8 +27,18 @@ HOW = "llama.cpp build, Q4_K_XL, --cpu-moe"
 
 
 def shot(part, name, **kw):
+    """a part's screenshot — taken again when the page's 5-second poll
+    replaced the part mid-shot, as test_14_3_browser.steady_shot does (17b:
+    the past batches' list failed one CI run "not attached to the DOM")"""
+    from playwright.sync_api import Error
     SCREENS.mkdir(parents=True, exist_ok=True)
-    part.screenshot(path=SCREENS / name, **kw)
+    for attempt in range(4):
+        try:
+            part.screenshot(path=SCREENS / name, **kw)
+            return
+        except Error as e:
+            if "not attached" not in str(e) or attempt == 3:
+                raise
 
 
 def api(live, path, body=None):

@@ -125,13 +125,10 @@ def test_math_level5_epoch_extraction():
     assert read("no final line") is None
     assert fb.last_boxed_only_string("so \\boxed{\\frac{a}{b}} ok") == "\\boxed{\\frac{a}{b}}"
     assert fb.remove_boxed("\\boxed{\\frac{a}{b}}") == "\\frac{a}{b}"
+    # ½ is 0.5 — to math-verify, the image's, and to the plain comparison
+    # where it isn't installed (CI's runner)
     sc = fb.score("math_l5_epoch", "ANSWER: 0.5", "stop", need)
-    try:
-        import math_verify  # noqa: F401
-        same = True                          # ½ is 0.5 to math-verify, the image's
-    except ImportError:
-        same = False                         # CI's runner has none: a plain comparison
-    assert sc["read"] == "0.5" and sc["ok"] is same
+    assert sc["read"] == "0.5" and sc["ok"] is True
     assert fb.score("math_l5_epoch", "ANSWER: \\frac{1}{2}", "stop", need)["ok"] is True
     assert fb.score("math_l5_epoch", "ANSWER: 3", "stop", need)["ok"] is False
 
