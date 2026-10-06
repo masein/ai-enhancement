@@ -28,7 +28,8 @@ def test_each_tasks_time_is_the_median_of_its_runs_here(tmp_path):
         if "mmlu" in r["tasks"] and r.get("eval_seconds"):
             last[r["model"]] = float(r["eval_seconds"])
     assert times["mmlu"] == {"secs": round(statistics.median(last.values())), "n": len(last)}
-    assert set(times) <= set(payload["accTasks"]) | set(payload["pplTasks"])
+    # 17c: and the full Mobile-MMLU's, never a column
+    assert set(times) <= set(payload["accTasks"]) | set(payload["pplTasks"]) | {report.MMF_TASK}
 
 
 def test_a_served_models_run_is_left_out(tmp_path):
