@@ -471,5 +471,7 @@ def test_the_docs_commands_are_the_scripts_and_paste_whole():
     assert phone.env == "" and orig.env == ""       # neither build has routing variables
     assert all(a.gguf.startswith("hf://") and a.server.startswith("hf://") for a in args)
     assert any(a.parity and a.thinking == "off" for a in args)
-    name = rb.bundle_name("frontier", "served/x", True).replace("served__x", "served__<name>")
-    assert f"{name}" in sec
+    # 17b: G3 fetches the bundle G2's phone command writes, and G4 imports it
+    name = rb.bundle_name("frontier", phone.served_as, True)
+    assert f"root@<host>:{phone.out}/{name} ~/benchmarks/bundles/" in sec
+    assert f"import_remote.py ~/benchmarks/bundles/{name} --by masein" in sec

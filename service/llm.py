@@ -85,6 +85,10 @@ class Request:
     # response_format json_schema (strict), which vLLM and llama-server decode
     # to (guided decoding), so every reply parses; anthropic relies on the prompt
     schema: dict | None = None
+    # 17b: OpenRouter's reasoning switch ({"enabled": false}, {"effort": …}),
+    # set by a caller that must not leave it to the model's default; a model
+    # that doesn't reason ignores it, and the local server never gets it
+    reasoning: dict | None = None
 
 
 @dataclass
@@ -982,7 +986,10 @@ class LocalOpenAI(Backend):
             out[row["custom_id"]] = row
         return out
 
-    def submit(self, requests: list[Request]) -> str:
+    def submit(self, requests: list[Request], start: bool = True) -> str:
+        """the batch on disk, and (start) its worker sending it. 17b: a caller
+        that must record the batch before anything is sent passes
+        start=False, then resume() — a batch nobody recorded is never sent"""
         bid = f"{self.prefix}_" + uuid.uuid4().hex[:12]
         d = self.dir / bid
         d.mkdir(parents=True)
@@ -995,10 +1002,13 @@ class LocalOpenAI(Backend):
         tmp = d / "requests.jsonl.tmp"
         tmp.write_text("".join(json.dumps({"custom_id": r.custom_id, "system": r.system,
                                            "user": r.user, "max_tokens": r.max_tokens,
-                                           "json": r.json, "schema": r.schema}) + "\n"
+                                           "json": r.json, "schema": r.schema,
+                                           **({"reasoning": r.reasoning} if r.reasoning
+                                              is not None else {})}) + "\n"
                                for r in requests), encoding="utf-8")
         tmp.replace(d / "requests.jsonl")
-        self._ensure_worker(bid)
+        if start:
+            self._ensure_worker(bid)
         return bid
 
     def status(self, batch_id: str) -> tuple[str, str]:
@@ -1272,6 +1282,8 @@ class OpenRouterChat(LocalOpenAI):
                 # 12p.1: and never a provider that may store or train on the prompt
                 "provider": ai_models.provider_prefs(self.pin.get("provider")),
                 "usage": {"include": True}}
+        if row.get("reasoning") is not None:
+            body["reasoning"] = row["reasoning"]
         if row.get("schema"):
             body["response_format"] = json_schema_format(row["schema"])
         elif row.get("json"):
