@@ -188,7 +188,12 @@ def test_test_a_model_offers_the_suite(live, page):
     page.locator("[data-dialog='test'] [data-select='suite']").click()
     opt = page.locator("[role='option'][data-value='shared']")
     opt.wait_for()
-    assert opt.inner_text().startswith("Frontier — GPQA Diamond (CoT), SimpleQA")   # 16.7
+    assert opt.inner_text().startswith("Frontier · quick pair — GPQA Diamond (CoT), SimpleQA")
+    # 17c: the two Frontier entries part at their first words
+    firsts = [x.split(" — ")[0] for x in page.locator(
+        "[role='option'][data-value='shared'], [role='option'][data-value='frontier']")
+        .all_inner_texts()]
+    assert firsts == ["Frontier · quick pair", "Frontier · Epoch AI’s way"]
     assert page.errors == []
 
 

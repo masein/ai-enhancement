@@ -1292,8 +1292,9 @@ def parse_run(blob: dict, source: Path) -> dict:
             tasks[MMP_TASK]["key_acc"] = {"value": mmp["acc"], "stderr": mmp.get("se") or 0.0,
                                           "_filt_value": "board"}
     # 14.4: the full Mobile-MMLU is never a column: its own table (DATA.mmf),
-    # no composite, rank or "overall". Non-commercial: internal research only
-    tasks.pop(MMF_TASK, None)
+    # no composite, rank or "overall". Non-commercial: internal research only.
+    # 17c: a full run's time is the full set's, never Pro's
+    mmf_run = tasks.pop(MMF_TASK, None) is not None
     fpreds = _beside(source, "mobile_mmlu_full.json") if mmf_on() else None   # 14.4.5
     mmf = mmf_score(fpreds) or ({"acc": None, "answered": fpreds.get("n"),
                                  "how": fpreds.get("how")} if fpreds else None)
@@ -1368,6 +1369,7 @@ def parse_run(blob: dict, source: Path) -> dict:
     "mab": mab,
         "mmp": mmp,
         "mmf": mmf,                                 # 14.4: kept apart
+        "mmf_run": mmf_run,
         # 12f.1: a model served elsewhere — how, and what its server reported
         "served": blob.get("served"),
         # 17: a Frontier benchmark's: how it was scored, and by which grader
@@ -1845,6 +1847,15 @@ def frontier_bench_meta() -> dict:
                   "protocol": b["protocol"], "runs": runs, "budget": b["budget"],
                   "scorer": "grader" if b.get("grader") else "code",
                   "unlisted": bool(b.get("unlisted")), "reportedAs": b.get("reported_as") or [],
+                  # 17c: its card on Benchmarks — the set, where it comes from, its licence
+                  "n": b["n"], "licence": b["source"].get("licence") or "",
+                  "gated": bool(b["source"].get("gated")), "source": fb.source_name(t),
+                  "url": (f"https://huggingface.co/datasets/{b['source']['hf']}"
+                          if b["source"].get("hf") else
+                          f"https://github.com/{b['source']['github']}"
+                          if b["source"].get("github") else ""),
+                  "revision": str(b["source"].get("revision") or "")[:12],
+                  "grader": (b.get("grader") or {}).get("version") or "",
                   "words": (f"{rw} · thinking on "
                             f"{b['budget']['on']:,} tokens, off {b['budget']['off']:,}"
                             + (" · graded" if b.get("grader") else ""))}
@@ -2292,7 +2303,10 @@ def merge_runs(runs: list[dict]) -> dict[str, dict]:
     for r in sorted(runs, key=lambda r: str(r.get("date") or "")):
         # 16.4: how long each task's run took here — one invocation a task, so
         # its time is that task's; a served model's is its server's: left out
-        secs = ({t: r["eval_seconds"] for t in r["tasks"]}
+        # 17c: a full Mobile-MMLU run's time is the full set's (its results
+        # give Pro's cell, but its run is four fifths longer than Pro's)
+        secs = ({(MMF_TASK if r.get("mmf_run") and t == MMP_TASK else t): r["eval_seconds"]
+                 for t in r["tasks"]}
                 if r.get("eval_seconds") and not r.get("served") else {})
         m = by_model.get(r["model"])
         if m is None:
@@ -2455,7 +2469,7 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
     # 16.4: how long a run of each takes on this server — the median over the
     # models run here, for the catalogue's "A run here"
     task_time = {}
-    for t in headline:
+    for t in [*headline, MMF_TASK]:
         xs = sorted(float(r["task_secs"][t]) for r in by_model.values()
                     if (r.get("task_secs") or {}).get(t))
         if xs:
@@ -18977,13 +18991,15 @@ function vQueue(part = { form: true, list: true }) {
       // 12a: the pilot. 12c replaces this drop-down with cards
       ['everyday', evdSuiteLabel(sf.hf_id.trim())],
       // 12n.2: the questions frontier labs are measured on, measured here
-      ['shared', 'Frontier — GPQA Diamond (CoT), SimpleQA Verified',
+      // 17c: told apart at a glance: the quick pair any model sits, and the
+      // suite as Epoch AI runs it
+      ['shared', 'Frontier · quick pair — GPQA Diamond (CoT), SimpleQA Verified',
         { sub: 'GPQA Diamond thinking step by step, and 1,000 short facts graded by the judge '
           + 'with the dataset\'s grader: beside what Epoch AI reports, never ranked with it. '
           + 'Instruct models only (a base model sits GPQA\'s four options in full); never in '
           + 'the average.' }],
       // 17: the Frontier benchmarks as Epoch AI runs them — a served model's for now
-      ['frontier', 'Frontier — as Epoch AI runs them, ' + frontierNames(),
+      ['frontier', 'Frontier · Epoch AI’s way — ' + frontierNames(),
         { sub: 'Each benchmark asked the way Epoch AI (or its owners) ask it, with its runs and '
           + 'budget; scored by code, or by its owners\u2019 grader once you start it on AI '
           + 'models. A model running on a server (or a GGUF on a rented GPU); never in the '
@@ -20489,6 +20505,53 @@ const MAB_SOURCE = { mab_hotpotqa: 'HotpotQA', mab_sql: 'sql-create-context',
   mab_dolly: 'databricks-dolly-15k', mab_cnndm: 'CNN/DailyMail', mab_xsum: 'XSum',
   mab_mtbench: 'MT-Bench', mab_adv: 'Adversarial Instruction (TrustLLM)',
   mab_privacy: 'Privacy Leakage (the Enron email corpus)', mab_socchem: 'Social Chemistry 101' };
+// 17c: the Frontier suite's benchmarks the catalogue had no card for — what
+// each is, who made it, how it is marked here, and how it differs from Epoch
+// AI's way (or its owners'). The set's size, source and licence come from
+// scripts/frontier.py (DATA.frontierBench)
+const CAT_FRONTIER = {
+  otis_aime_epoch: { line: 'Mock AIME exams from OTIS, 2024 and 2025: 45 problems, each answered '
+      + 'with an integer from 0 to 999.',
+    by: 'OTIS (Evan Chen’s Olympiad Training for Individual Study); the set as Epoch AI '
+      + 'publishes it',
+    marked: 'by code, exact match on the integer of the last “ANSWER:”; Epoch AI’s model '
+      + 'check reads the answers the code marks wrong or can’t read, once you start it on AI '
+      + 'models',
+    differs: 'Epoch AI’s prompt and scoring. 8 runs, not Epoch’s 16. Epoch’s extractor prompt '
+      + 'isn’t published, so the check’s prompt is ours; until it runs, the score is the '
+      + 'code’s, and says so.' },
+  math_l5_epoch: { line: 'The hardest problems of MATH’s test set, Level 5: competition '
+      + 'maths answered in the model’s own words.',
+    by: 'Hendrycks et al., Measuring Mathematical Problem Solving With the MATH Dataset '
+      + '(NeurIPS 2021)',
+    marked: 'Epoch AI’s answer extraction, equivalence by code (math-verify); Epoch AI’s '
+      + 'model check on the answers the code marks wrong, once you start it on AI models',
+    differs: 'Epoch AI’s prompt and extraction. 1 run, not Epoch’s 8. Epoch’s checker, '
+      + 'gemini-1.5-flash-002, is retired: Gemini 2.5 Flash, reasoning off. The problems '
+      + 'are never shown here.' },
+  hle_text_cais: { line: 'Questions written by experts to sit at the edge of what is known, '
+      + 'across many fields — the ones with no image.',
+    by: 'Center for AI Safety and Scale AI, Humanity’s Last Exam (2025)',
+    marked: 'CAIS’s judge prompt, by the grader chosen on AI models (CAIS’s: '
+      + 'o3-mini-2025-01-31), once you start it: the share judged correct',
+    differs: 'CAIS’s system prompt and judge. Text-only questions, 1 run. Never shown: its '
+      + 'authors ask that it not be shared.' },
+  arc_agi2_public: { line: 'Grid puzzles: infer the rule from a few examples, then draw the test '
+      + 'output.',
+    by: 'ARC Prize Foundation, ARC-AGI-2 (2025)',
+    marked: 'by code: ARC Prize’s grid parser, two attempts; a task scores the share of its '
+      + 'test grids either attempt solved, the score the tasks’ mean',
+    differs: 'ARC Prize’s harness prompt and parser, on the public evaluation set — not the '
+      + 'semi-private set ARC Prize’s own board scores.' },
+  mmlupro_tiger: { line: 'MMLU made harder: ten options, the reasoning written out — every '
+      + 'one of its test questions.',
+    by: 'Wang et al., MMLU-Pro: A More Robust and Challenging Multi-Task Language '
+      + 'Understanding Benchmark (TIGER-Lab, NeurIPS 2024)',
+    marked: 'by code: TIGER-Lab’s three regular expressions read the letter from “The '
+      + 'answer is (X)”',
+    differs: 'TIGER-Lab’s own API protocol, 5-shot chain of thought from the question’s '
+      + 'category: the model card’s sampling, not temperature 0, and no random guess when '
+      + 'nothing is read.' } };
 const CAT_SECTIONS = [['standard', 'Standard'], ['mobile', 'Mobile'], ['everyday', 'Everyday'],
   ['frontier', 'Frontier'], ['exam', 'Knowledge exam']];
 
@@ -20506,7 +20569,8 @@ function catTime(ts) {
   const xs = ts.map(t => (DATA.taskTime || {})[t]).filter(Boolean);
   if (!xs.length) return null;
   const x = xs.sort((a, b) => b.n - a.n)[0];
-  return { text: `about ${durationWords(x.secs)} a model on this server`,
+  // 17c: durationWords says "about" itself
+  return { text: `${durationWords(x.secs)} a model on this server`,
     title: `the median of ${x.n} run${x.n === 1 ? '' : 's'} here, served models’ left out — `
       + 'their time is their server’s' };
 }
@@ -20517,6 +20581,14 @@ function catSee(test, group) {
 }
 function catLink(url, text) {
   return url ? el('a', { href: url, target: '_blank', rel: 'noopener', text }) : text;
+}
+// 17c: one rule for a Mobile-MMLU set's Questions — all of its questions, and
+// how many our key keeps: "9,497 (9,462 on our key)"
+function mmQuestions(counts, n) {
+  const c = ((counts || {}).all) || {};
+  const total = c.questions || n || null;
+  return total ? { questions: total, qnote: c.kept != null && c.kept !== total
+    ? `(${Number(c.kept).toLocaleString('en')} on our key)` : '' } : {};
 }
 // one card — or a suite's, with its parts under it
 function catCard(c) {
@@ -20548,7 +20620,8 @@ function catCard(c) {
     c.parts ? el('details', { class: 'catparts', 'data-cat-parts': c.key,
         open: (state.catOpen || {})[c.key] ? '' : null,
         ontoggle: e => { state.catOpen = { ...(state.catOpen || {}), [c.key]: e.target.open }; } },
-      el('summary', { text: `Its ${c.parts.length} parts ▸` }),
+      // 17c: the browser draws the summary's own marker
+      el('summary', { text: `Its ${c.parts.length} parts` }),
       el('div', { class: 'catgrid' }, c.parts.map(catCard))) : '',
     el('div', { class: 'catacts' },
       c.see ? el('button', { class: 'quiet', 'data-cat-see': c.key, text: 'See scores ▸',
@@ -20590,6 +20663,10 @@ function catCards() {
       qwords: `${DATA.pplTasks.length} slice${DATA.pplTasks.length === 1 ? '' : 's'}` }] : []];
   const mab = mabc[0] || {};
   const dmRows = Object.values(DATA.devicemark || {}).filter(x => x && (x.off || x.on)).length;
+  // 17c: Mobile-MMLU's card is the full set's when it is on — its questions,
+  // of which Pro's are a part, its run time and its models — and Pro's when not
+  const proQ = mmQuestions((MMPD().key || {}).counts);
+  const fullQ = MMFD().name ? mmQuestions((MMFD().key || {}).counts, MMFD().n) : null;
   const mobile = [
     { key: 'devicemark', name: 'DeviceMark', see: ['mobile', 'devicemark'],
       line: 'Models on a phone: instruction following, knowledge and maths, scored as DeviceMark '
@@ -20617,7 +20694,10 @@ function catCards() {
       protocol: 'A Hugging Face model is asked with no chat template, the paper’s way; a served '
         + 'model through its chat. ' + THINKING_RULE_WORDS,
       by: ((MMPD().credit || {}).by) || '', url: ((MMPD().credit || {}).url) || '',
-      licence: '', avg: 'never in the Avg', tasks: [MMP],
+      licence: '', avg: 'never in the Avg',
+      ...fullQ && fullQ.questions ? { tasks: [MMF], questions: fullQ.questions,
+        qnote: proQ.questions ? `(${proQ.questions.toLocaleString('en')} of them Mobile-MMLU-Pro)`
+          : '', models: (mmfTableRows() || []).length } : { tasks: [MMP], ...proQ },
       parts: [
         { key: MMP, name: 'Mobile-MMLU-Pro', tasks: [MMP],
           line: 'Its harder half, ten options each; our answer key'
@@ -20625,10 +20705,10 @@ function catCards() {
           marked: 'options scored, on our key: what strong models of different makers agreed on',
           by: ((MMPD().credit || {}).by) || '', url: ((MMPD().credit || {}).url) || '',
           licence: ((MMPD().credit || {}).licence) || '',
-          avg: 'never in the Avg' },
+          avg: 'never in the Avg', ...proQ },
         ...MMFD().name ? [{ key: MMF, name: MMFD().name, tasks: [MMF], restriction: restrictOf(MMF),
           line: 'The full set, kept apart: its own table, never a column beside Pro’s.',
-          marked: 'options scored, on its own key', questions: MMFD().n || null,
+          marked: 'options scored, on its own key', ...fullQ,
           by: ((MMPD().credit || {}).by) || '', url: MMFD().source || '',
           licence: MMFD().licence || '', avg: 'never in the Avg',
           models: (mmfTableRows() || []).length }] : []] }];
@@ -20655,6 +20735,17 @@ function catCards() {
       url: (sh.simpleqa || {}).url || 'https://huggingface.co/datasets/google/simpleqa-verified',
       licence: (sh.simpleqa || {}).licence || 'MIT', avg: 'never in the Avg',
       protocol: THINKING_RULE_WORDS },
+    // 17c: the rest of the Frontier suite, each with its card
+    ...Object.keys(CAT_FRONTIER).filter(t => FB()[t]).map(t => {
+      const b = FB()[t], c = CAT_FRONTIER[t];
+      return { key: t, name: b.label === 'MMLU-Pro' ? 'MMLU-Pro, all of it' : b.label,
+        tasks: [t], see: ['frontier'], line: c.line, marked: c.marked, by: c.by,
+        url: b.url || '',
+        licence: (b.licence || '') + (b.gated ? ' (gated)' : ''), questions: b.n,
+        qnote: t === 'arc_agi2_public' ? 'tasks' : '',
+        protocol: `How it differs from Epoch AI’s way: ${c.differs}`,
+        avg: 'never in the Avg' };
+    }),
     ...LIVE ? [{ key: 'reported', name: 'What others report', see: ['frontier'],
       line: 'Scores published by others — Epoch AI, model cards and papers — beside ours on the '
         + 'same tests, never ranked with them.', qwords: 'theirs',

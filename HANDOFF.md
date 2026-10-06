@@ -4953,6 +4953,48 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17c.b — nine fixes found on the deployed board and the server (6 Oct)
+
+- **`build_llama_tarball.sh`**:
+  - It read git's changes through `head` under `pipefail`: on a checkout
+    with many untracked files git died of SIGPIPE and the script exited 141
+    before a word (on the server). They are read whole now, and `ldd`'s list
+    can't end the script either.
+  - The link leaves libcuda's symbols to the box
+    (`-DCMAKE_EXE_LINKER_FLAGS=-Wl,--allow-shlib-undefined`, as llama.cpp's
+    `.devops/cuda.Dockerfile` does): the build container has no driver.
+  - `-DGGML_NATIVE=OFF`, so the binary isn't built for the server's own CPU.
+  - The tarball carries llama.cpp's `LICENSE` and a `NOTICE`: the CUDA
+    libraries packed (libcudart, libcublas, libcublasLt) and the CUDA EULA
+    they come under, and the GCC runtime's licence. A shared copy needs them.
+  - A file whose mode alone changed is no change
+    (`git -c core.fileMode=false status`): the fork's checkout on the server
+    showed 2,934 such files, and VERSION said "uncommitted_changes yes".
+- **Mobile-MMLU on Benchmarks**:
+  - The suite's card is the full set's: 16,186 questions, "(9,497 of them
+    Mobile-MMLU-Pro)", its run time and models. It was Pro's, its tasks
+    being Pro's only.
+  - Both parts count their questions one way, "9,497 (9,462 on our key)".
+  - A full run's time is now the full set's (`mmf_run`; it was filed as
+    Pro's), so the full set's card has its "A run here".
+- **"A run here"** said "about about": `catTime` no longer adds the
+  "about" `durationWords` gives.
+- **A suite's "Its 2 parts"** has the browser's marker only.
+- **Test this model**: "Frontier · quick pair — …" and "Frontier · Epoch AI's
+  way — …".
+- **Benchmarks ▸ Frontier** has a card for OTIS Mock AIME, MATH Level 5,
+  Humanity's Last Exam, ARC-AGI-2 and all of MMLU-Pro (`CAT_FRONTIER`, with
+  the set, source and licence from `frontier_bench_meta`). Each says what it
+  is, who made it, its licence, how it is marked, and how it differs from
+  Epoch AI's way.
+- Three tests that flaked on CI are steadier:
+  - `test_17b_grading`'s Stop test waits for MATH's batch to land before
+    Stop (one of its requests still unsent was counted with SimpleQA's);
+  - the screenshot helpers (`steady_shot`, and test_12i4's and test_12q's
+    own) take a part again when it is "not visible" mid-render, as they did
+    when it was "not attached".
+- Tests: `tests/test_17c_board_six.py`, `tests/test_17c_board_six_browser.py`.
+
 ### 17c.1 — the second review's part 1: the parity check (6 Oct)
 
 The second review round re-ran the first one's reproductions on 0a81fc2
