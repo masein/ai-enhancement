@@ -410,10 +410,16 @@ def test_27_after_stop_or_at_the_limit_it_says_why_it_waits_and_carry_on_sends_t
         time.sleep(0.05)
     fgr.stop("masein")
     gate.set()
-    time.sleep(0.5)
+    # the reply that was out when Stop was pressed lands
+    out = next(x["batch_id"] for x in fgr.pending() if x["slot"] == "simpleqa")
+    for _ in range(200):
+        if (llm.tally(out) or {}).get("answered") == 1:
+            break
+        time.sleep(0.05)
     llm_poller.tick()
     p = page(svc)
-    assert p["stopped"] and p["waits"] == ["Stopped by masein: 5 answers wait to be sent"]
+    # the one out when Stop was pressed landed; four wait
+    assert p["stopped"] and p["waits"] == ["Stopped by masein: 4 answers wait to be sent"]
     n = len(seen)
     time.sleep(0.3)
     assert len(seen) == n                   # nothing more goes

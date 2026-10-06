@@ -469,6 +469,14 @@ def last_failed() -> list[dict]:
     return [x for x in out.values() if x["failed"]]
 
 
+def _unsent(p: dict) -> int:
+    """a batch's answers not yet answered, failed or cancelled"""
+    tl = llm.tally(p["batch_id"])
+    if not tl:
+        return len(p.get("keys") or [])
+    return max(0, tl["sent"] - tl["answered"] - tl.get("failed", 0) - tl.get("cancelled", 0))
+
+
 def waits() -> list[str]:
     """17b: why the batches out send nothing now — Stop, a run of refusals,
     the month's limit — each in words; Carry on lifts the first two"""
@@ -479,7 +487,7 @@ def waits() -> list[str]:
     st = stopped()
     if st:
         out.append(f"Stopped by {st.get('by') or 'someone'}: "
-                   f"{sum(len(x.get('keys') or []) for x in p):,} answers wait to be sent")
+                   f"{sum(_unsent(x) for x in p):,} answers wait to be sent")
     limit = ai_models.over_limit()
     if limit:
         out.append(limit)
