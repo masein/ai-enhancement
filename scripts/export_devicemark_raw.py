@@ -85,6 +85,24 @@ _ADDR = re.compile(r"\b(?:100\.\d{1,3}|10\.\d{1,3}|192\.168|172\.(?:1[6-9]|2\d|3
                    r"|169\.254)\.\d{1,3}\.\d{1,3}\b")
 _ADDR6 = re.compile(r"\bfd7a:115c:a1e0:[0-9a-f:]*", re.I)
 _LOCAL_URL = re.compile(r"\b(https?://)(?!huggingface\.co\b)([A-Za-z0-9_-]+)(:\d+)?(?=[/\s\"']|$)")
+# 17g: what the scrub missed — a box's address and port (ssh -p 41234
+# root@203.0.113.77, ssh4.vast.ai), a key given as a flag (--api-key <value>,
+# kept whole in a task's launch flags), x-token: and SUBMIT_TOKEN= with no
+# digit, a URL's dotted internal host, and the Hugging Face path naming the
+# account the builds are kept under
+_PUBLIC_ADDR = re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])")
+_PORT = re.compile(r"(?i)(\b(?:ssh|scp|rsync)\b[^\n]*?\s-[pP]\s*)\d{2,5}\b")
+_USER_AT = re.compile(r"\b[a-z_][a-z0-9_-]{0,31}@(?=\[(?:host|address)\])")
+_RENTED_HOST = re.compile(r"\b(?:[\w-]+\.)+(?:vast\.ai|runpod\.io|runpod\.net|lambdalabs\.com|"
+                          r"tensordock\.com|paperspace\.com)\b", re.I)
+_FLAG_KEY = re.compile(r"(?i)(--(?:api[-_]?key|hf[-_]?token|token|key|password|secret)[=\s]+)"
+                       r"(?!\[)[^\s\"']{4,}")
+_NAMED_KEY = re.compile(r"(?i)\b(x-token|submit_token|openrouter_api_key|hf_token|"
+                        r"huggingface_hub_token)(\"?\s*[:=]\s*\"?)(?!\[)[^\s\"',}]{4,}")
+_INTERNAL_URL = re.compile(r"(?i)\b(https?://)(?:[\w-]+\.)+(?:internal|lan|local|localdomain|"
+                           r"home|corp|intranet|private|docker)(?=[:/\s\"']|$)")
+_HF_ACCOUNT = re.compile(r"(?i)\b(hf://|huggingface\.co/(?:datasets/|models/)?)"
+                         r"(?!\[)([\w.-]+)/(?=[\w.-]*private|evalboard)")
 WHAT_THE_SCRUB_REMOVES = (
     "API keys and tokens: the environment's secrets by value, and anything key-shaped "
     "(hf_…, sk-…, sk-or-v1-…, gh?_…, AKIA…, xox?-…, AIza…, a key-shaped value assigned to "
@@ -94,7 +112,13 @@ WHAT_THE_SCRUB_REMOVES = (
     "host names: this machine's own and any in SCRUB_HOSTS, the tailnet's (*.ts.net), and a "
     "URL's dotless host (http://gemma-vllm:8000)",
     "private addresses: tailnet and CGNAT 100.x, 10.x, 172.16–31.x, 192.168.x, 127.x, 169.254.x "
-    "and the tailnet's IPv6 (fd7a:115c:a1e0::)")
+    "and the tailnet's IPv6 (fd7a:115c:a1e0::)",
+    "rented boxes: every IPv4 address, an ssh or scp port, the user before an address, and a "
+    "rented GPU host's name (*.vast.ai, *.runpod.io, …)",
+    "a key given as a flag (--api-key, --hf-token, --token …) or named x-token, SUBMIT_TOKEN, "
+    "OPENROUTER_API_KEY or HF_TOKEN, whatever its value",
+    "a URL's internal host (*.internal, *.lan, *.local, …), and the Hugging Face account a "
+    "private repo is kept under (hf://<account>/…-private, and any in SCRUB_ACCOUNTS)")
 
 
 def scrub(text: str, env: dict | None = None, hosts: list[str] | None = None) -> str:
@@ -104,6 +128,8 @@ def scrub(text: str, env: dict | None = None, hosts: list[str] | None = None) ->
     text = rb.scrub(text, env)
     for p in _KEYS:
         text = p.sub("[key withheld]", text)
+    text = _FLAG_KEY.sub(lambda m: f"{m.group(1)}[key withheld]", text)
+    text = _NAMED_KEY.sub(lambda m: f"{m.group(1)}{m.group(2)}[key withheld]", text)
     text = _KEY_AFTER.sub(lambda m: f"{m.group(1)}{m.group(2)}[key withheld]", text)
     text = _BEARER.sub(lambda m: f"{m.group(1)}[key withheld]", text)
     root = str(env.get("BENCH_ROOT") or "")
@@ -114,9 +140,19 @@ def scrub(text: str, env: dict | None = None, hosts: list[str] | None = None) ->
     for h in sorted({h for h in (hosts if hosts is not None else _hosts()) if len(h) >= 3},
                     key=len, reverse=True):
         text = re.sub(rf"(?<![\w-]){re.escape(h)}(?![\w-])", "[host]", text, flags=re.I)
+    # 17g: the Hugging Face accounts SCRUB_ACCOUNTS names, wherever they stand
+    for acct in sorted({a.strip() for a in env.get("SCRUB_ACCOUNTS", "").split(",")
+                        if len(a.strip()) >= 2}, key=len, reverse=True):
+        text = re.sub(rf"(?<![\w-]){re.escape(acct)}(?=/)", "[account]", text, flags=re.I)
     text = _TAILNET.sub("[host]", text)
+    text = _RENTED_HOST.sub("[host]", text)
+    text = _INTERNAL_URL.sub(lambda m: f"{m.group(1)}[host]", text)
+    text = _HF_ACCOUNT.sub(lambda m: f"{m.group(1)}[account]/", text)
     text = _ADDR6.sub("[address]", text)
     text = _ADDR.sub("[address]", text)
+    text = _PUBLIC_ADDR.sub("[address]", text)
+    text = _PORT.sub(lambda m: f"{m.group(1)}[port]", text)
+    text = _USER_AT.sub("[user]@", text)
     return _LOCAL_URL.sub(lambda m: f"{m.group(1)}[host]{m.group(3) or ''}", text)
 
 
@@ -439,7 +475,9 @@ def export_row(row: Path, out: Path, public: bool | None = None, runs: list[dict
     items = [item_record(s, items_src.get((s["bench"], str(s["key"]))), setup.get("reading"))
              for s in scored]
     scores = scores_of(data, items)
-    pub = public_by_default(row, setup) if public is None else public
+    # 17g: never public for a model the board doesn't know as public, whatever
+    # the flags — --private may still keep a public one private
+    pub = public_by_default(row, setup) and public is not False
     dest = out / ("public" if pub else "private") / row.name
     if dest.exists():
         shutil.rmtree(dest)

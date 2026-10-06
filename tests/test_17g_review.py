@@ -719,3 +719,217 @@ def test_14_hles_three_shapes_are_read():
     assert fgs.read("hle", json.dumps(o) + "\nCorrect: no", item)["ok"] is None
     assert fgs.read("hle", json.dumps(o) + "\n" + json.dumps({**o, "correct": "no"}),
                     item)["ok"] is None
+
+
+# ---------------------------------------------------------------------------
+# part 4: the dashboard and the export
+# ---------------------------------------------------------------------------
+
+from service import served  # noqa: E402
+from test_17b_review import results_of  # noqa: E402
+
+LONG = [{**x, "question": f"Invented question number {k} about the boiling point of a "
+                         "liquid at altitude?"} for k, x in enumerate(__import__(
+                             "test_17_gguf_box").invented())]
+
+
+def a3_imported(box, monkeypatch=None, label: str = "A3"):  # noqa: F811
+    if monkeypatch is not None:
+        monkeypatch.setattr(fb, "_fetch", lambda task: [dict(x) for x in LONG])
+    assert run_box(box, "a3", "--label", label) == 0
+    register(box["sha"])
+    assert imported(bundle_of(box, "a3"))[0] == 0
+    return db.recent(5)[0]["id"]
+
+
+def test_15_the_exported_log_withholds_each_line_quoting_a_hidden_question(
+        box, tmp_path, monkeypatch):  # noqa: F811
+    import export_frontier_raw as efr
+    sid = a3_imported(box, monkeypatch)
+    log = config.LOGS_DIR / f"service_{sid}_{SERVED.replace('/', '__')}.log"
+    q = LONG[3]["question"]
+    log.write_text(log.read_text() + f"\n[frontier] the server failed on: {q}\n"
+                   "What is the correct answer to this question: which one?\n(A) the first\n")
+    text = (efr.export_run(sid, tmp_path / "raw") / "log.txt").read_text()
+    assert q not in text and "the correct answer to this question" not in text  # 308fcf3: both
+    assert "[line withheld — it quotes a hidden question]" in text
+    assert "[line withheld — it quotes a GPQA question, never shown]" in text
+
+
+def test_15_the_scrub_takes_a_boxs_address_flags_tokens_hosts_and_the_account():
+    import export_devicemark_raw as dmx
+    for raw, gone in (("ssh -p 41234 root@203.0.113.77 -L 8080:localhost:8080",
+                       ("41234", "203.0.113.77", "root@")),
+                      ("scp -P 41234 root@ssh4.vast.ai:/workspace/x .",
+                       ("41234", "ssh4.vast.ai", "root@")),
+                      ('{"flags": "--api-key abcdefghij --flash-attn on"}', ("abcdefghij",)),
+                      ("x-token: correcthorse", ("correcthorse",)),
+                      ("SUBMIT_TOKEN=correcthorsebattery", ("correcthorsebattery",)),
+                      ("http://bench.internal:8080/api, http://vllm.lan/v1",
+                       ("bench.internal", "vllm.lan")),
+                      ("hf://masein/evalboard-private/llama-server.tar.gz", ("masein",))):
+        got = dmx.scrub(raw, env={}, hosts=[])
+        assert not any(g in got for g in gone), got
+    assert "masein" not in dmx.scrub("hf://masein/phone-builds/q.gguf",
+                                     env={"SCRUB_ACCOUNTS": "masein"}, hosts=[])
+    # what may stay: a public repo's path, a version, words
+    assert dmx.scrub("hf://ggml-org/gemma-GGUF@bb45/g.gguf", env={}, hosts=[]) == \
+        "hf://ggml-org/gemma-GGUF@bb45/g.gguf"
+    assert dmx.scrub("llama.cpp 6543 · token: limit reached", env={}, hosts=[]) == \
+        "llama.cpp 6543 · token: limit reached"
+
+
+def test_15_never_public_for_a_model_the_board_doesnt_know_as_public(box, tmp_path, capsys):  # noqa: F811
+    import export_frontier_raw as efr
+    sid = a3_imported(box)
+    assert efr.export_run(sid, tmp_path / "raw", public=True).parent.name == "private"
+    assert efr.main(["--all", "--public", "--out", str(tmp_path / "all")]) == 0
+    assert "isn't known here as a public model: private" in capsys.readouterr().out
+    assert not (tmp_path / "all" / "public").exists()            # 308fcf3: the build, public
+    # a Qwen3.6 build stays private even marked public; a public model registered so isn't
+    db.served_put({**served.get(SERVED), "public_weights": {"by": "masein", "at": 0}})
+    assert not efr.known_public({"hf_id": SERVED})
+    db.served_put({"id": "served/gemma-cal", "name": "gemma", "base_url": "", "key": "",
+                   "how": "x", "based_on": "google/gemma-4-26b-a4b-it", "thinking": "auto",
+                   "pin": {"file": "g.gguf"}, "by": "masein", "at": 0})
+    assert not efr.known_public({"hf_id": "served/gemma-cal"})
+    db.served_put({**served.get("served/gemma-cal"), "public_weights": {"by": "masein", "at": 0}})
+    assert efr.known_public({"hf_id": "served/gemma-cal"})
+    assert efr.known_public({"hf_id": "google/gemma-3-1b-it"})
+
+
+def test_15_each_run_exports_what_it_brought(box, tmp_path):  # noqa: F811
+    import export_frontier_raw as efr
+    assert run_box(box, "s1", "--shard", "1/2", "--label", "A1") == 0
+    assert run_box(box, "s2", "--shard", "2/2", "--label", "A2") == 0
+    register(box["sha"])
+    assert imported(bundle_of(box, "s1", (1, 2)))[0] == 0
+    assert imported(bundle_of(box, "s2", (2, 2)))[0] == 0
+    got = []
+    for sid in [r["id"] for r in db.recent(5)][:2]:
+        dest = efr.export_run(sid, tmp_path / "raw")
+        got.append({(x["id"], x["epoch"]) for x in map(
+            json.loads, (dest / "items.jsonl").read_text().splitlines())})
+    # 308fcf3: each shard's run, every answer of the row
+    assert got[0] and got[1] and not got[0] & got[1] and len(got[0] | got[1]) == N * RUNS
+
+
+def test_16_a_score_made_again_keeps_where_it_ran_and_its_runs(box):  # noqa: F811
+    a3_imported(box)
+    f = results_of()["frontier"]
+    assert f["where"] == "rented GPU · RTX 5090 · box A3" and f["runs"]
+    # grading scores it again
+    sf.score_task(config.OUT_DIR / ROW, TASK, served.get(SERVED))
+    f2 = results_of()["frontier"]
+    assert (f2["where"], f2["runs"]) == (f["where"], f["runs"])   # 308fcf3: "a rented GPU", none
+
+
+def test_17_earlier_imports_say_where_they_ran(svc):  # noqa: F811
+    fr = db.add("served/x", "instruct", "frontier", "masein", "imported from a rented GPU "
+                "(NVIDIA GeForce RTX 4090) · shard 1 of 2 · box A2 · x.tar.gz", status="done")
+    dm = db.add("google/gemma-3-1b-it", "instruct", "devicemark", "masein",
+                "imported from a rented GPU (NVIDIA GeForce RTX 4090) · y.tar.gz", status="done")
+    here = db.add("served/x", "instruct", "frontier", "masein", "a board run", status="done")
+    db.init()
+    assert db.get(fr)["where_ran"] == "rented GPU · RTX 4090 · box A2"
+    assert db.get(dm)["where_ran"] == "rented GPU · RTX 4090"      # 308fcf3: "this server"
+    assert not db.get(here)["where_ran"]
+
+
+def test_18_the_boxes_list_quiet_only_while_asking_done_leaves_destroyed_unreached(svc):  # noqa: F811
+    import import_frontier as imf
+    now = time.time()
+
+    def step(label, k, state, at, seen, safe):
+        return {"label": label, "model": "served/phone", "step": f"{label}-{k}",
+                "state": state, "at": at, "seen_at": seen, "safe": safe, "reachable": True,
+                "thinking": "on", "tasks": [MMLU], "line": ""}
+    first = [step("A1", 1, "whole", now - 600 * 60, now, False),     # done; its box on step 2
+             step("A1", 2, "asking", now - 60, now, False),
+             step("A4", 1, "asking", now - 60, now, False),
+             step("A5", 1, "whole", now - 60, now, True),
+             step("A9", 1, "whole", now - 31 * 86400, now - 30 * 86400, True)]
+    imf.store_boxes(first)
+    got = {b["step"]: b for b in imf.read_boxes(now)["boxes"]}
+    assert got["A1-1"]["quiet_min"] is None                         # 308fcf3: 600
+    assert "A9-1" not in got                                        # 308fcf3: 30 days on
+    # the next fetch reads A1 alone: A4, destroyed before done, isn't reached; A5 was done
+    imf.store_boxes(first[:2])
+    got = {b["step"]: b for b in imf.read_boxes(now)["boxes"]}
+    assert got["A4-1"]["reachable"] is False and "A5-1" not in got  # 308fcf3: A4 vanished
+
+
+def test_19_a_malformed_progress_file_breaks_nothing(tmp_path, monkeypatch, capsys, svc):  # noqa: F811
+    import import_frontier as imf
+    bad = [progress_of("phone", "A5-1", "asking", sessions="two", tasks=[1], at=float("nan")),
+           progress_of("phone", "A6-1", "asking", tasks=[MMLU])]
+    ff, calls, key = fetch_one(tmp_path, monkeypatch, {}, bad,
+                               steps=[("phone", "A5-1"), ("phone", "A6-1")])
+    ff.main(["--key", str(key), "--dest", str(tmp_path / "b" / "bundles"), "--sha", PHONE,
+             "--no-board", "1.1.1.1:41"])
+    out = capsys.readouterr().out
+    assert "A5 A5-1" in out and "A6 A6-1" in out                    # 308fcf3: a traceback
+    # the board: NaN never kept, the list's endpoint answers JSON
+    imf.store_boxes([{"label": "A5", "model": "served/phone", "step": "A5-1", "at": float("nan"),
+                      "sessions": "two", "tasks": [1], "state": "asking"}])
+    json.dumps(imf.read_boxes(), allow_nan=False)
+    assert svc.get("/api/frontier/boxes").status_code == 200
+
+
+def test_19_a_box_given_as_a_number_is_refused_before_anything_moves(box):  # noqa: F811
+    assert run_box(box, "a3", "--label", "A3") == 0
+    register(box["sha"])
+
+    def numbers(files):
+        st = json.loads(files["setup.json"])
+        st.update(box=5, sessions="two")
+        files["setup.json"] = json.dumps(st).encode()
+    code, said = imported(rewrite(bundle_of(box, "a3"), numbers))
+    assert code == 2 and any("setup.json's box" in x for x in said), said  # 308fcf3: TypeError
+    assert any("setup.json's sessions" in x for x in said)
+    assert not sf.task_dir(config.OUT_DIR / ROW, TASK).exists()
+
+
+def test_20_the_whole_run_is_checked_before_the_first_question(svc, monkeypatch, tmp_path):  # noqa: F811
+    asked = []
+    monkeypatch.setattr(sf, "ask_task", lambda rec, task, row, on, progress, canceled, log:
+                        (asked.append(task), (1, 1))[1])
+    monkeypatch.setattr(fb, "load", lambda task, root=None: [])
+    monkeypatch.setattr(config, "FRONTIER_SCORE_AFTER_RUN", False)
+    sid = db.add("served/x", "instruct", "frontier", "masein", "n")
+    ctx = fb.slot_context(["gpqa_diamond_epoch"], True)               # 83,968
+    status, line = sf.run(sid, {"tasks": "[]"}, {"id": "served/x", "pin": {"ctx": ctx}},
+                          {"on": True}, tmp_path / "row", tmp_path / "log")
+    fit = [t for t in fb.TASKS if fb.slot_context([t], True) <= ctx]
+    # 308fcf3: stopped at HLE, SimpleQA and MMLU-Pro never asked
+    assert asked == fit and HLE not in asked and {"simpleqa_epoch", MMLU} <= set(asked)
+    assert status == "failed" and "Humanity's Last Exam" in line and "Not asked; the rest are" \
+        in line
+
+
+def test_21_where_in_one_wording_an_unknown_gpu_and_a_box_of_two_cards(monkeypatch):
+    import import_frontier as imf
+    import report_lm_eval as rle
+    assert imf.where_words(["a GPU"], []) == "rented GPU"              # 308fcf3: "· a GPU"
+    assert rle.frontier_where({"where": "run on a rented GPU (NVIDIA GeForce RTX 4090)"}) == \
+        "rented GPU · RTX 4090" == imf.where_words(["NVIDIA GeForce RTX 4090"], [])
+    two = "NVIDIA GeForce RTX 5090, 575.51, 32607\nNVIDIA GeForce RTX 5090, 575.51, 32607\n"
+    monkeypatch.setattr(rb.subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(
+        a, 0, stdout=two))
+    g = rb.gpu_info()
+    assert g["count"] == 2 and g["names"] == ["NVIDIA GeForce RTX 5090"] * 2
+    assert imf.where_words(imf.gpu_names({"gpu": g}), ["A3"]) == \
+        "rented GPU · 2 × RTX 5090 · box A3"                            # 308fcf3: its first
+
+
+def test_21_the_loop_count_reads_letter_counters_and_dots_never_tables_or_colour_grids():
+    import itertools
+    import string
+    two = ["".join(p) for p in itertools.product(string.ascii_lowercase, repeat=2)]
+    case = "".join(f"Case {x}: we try the next arrangement of the pieces and check whether it "
+                   "holds the rule.\n" for x in two[:300])
+    dots = "The answer is " + "." * 3000
+    table = "".join(f"| step {k} | value {k * 3} | ratio {k / 7:.3f} |\n" for k in range(400))
+    grid = "".join("black black red blue green green black yellow\n" for _ in range(400))
+    assert fb.ends_in_loop(case) and fb.ends_in_loop(dots)
+    assert not fb.ends_in_loop(table) and not fb.ends_in_loop(grid)

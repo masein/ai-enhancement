@@ -54,10 +54,12 @@ may exist yet.
 from __future__ import annotations
 
 import json
+import math
 import re
 import shutil
 import sys
 import time
+from collections import Counter
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -285,8 +287,10 @@ def _answers(b: dict, row: str, task: str) -> dict[tuple[str, int], dict]:
     return out
 
 
-def registered_here(b: dict, name: str, by: str) -> dict:
-    """a served entry for a model run only on rented GPUs, from its bundle"""
+def registered_here(b: dict, name: str, by: str, public_weights: bool = False) -> dict:
+    """a served entry for a model run only on rented GPUs, from its bundle —
+    17g: with public weights when the import said so (G6's calibration), the
+    one way a served model's raw runs may be exported public"""
     from service import db, served
     setup = b["setup"]
     gg, srv = setup.get("gguf") or {}, setup.get("server") or {}
@@ -301,6 +305,7 @@ def registered_here(b: dict, name: str, by: str) -> dict:
                            "name": gg.get("name") or "",
                            **({"parts": gg["parts"]} if gg.get("parts") else {})},
            "rented_only": True, "answered": [], "by": by, "at": time.time(),
+           **({"public_weights": {"by": by, "at": time.time()}} if public_weights else {}),
            "flags": " ".join(srv.get("flags") or []),
            "env": " ".join(f"{k}={v}" for k, v in (srv.get("env") or {}).items())}
     db.served_put(rec)
@@ -332,9 +337,13 @@ _SETUP_TYPES = {
     "server": {"build": (int, str), "commit": str, "version": str, "slots": int,
                "flags": [str], "env": dict, "argv": [str], "binary_sha256": str,
                "tarball_sha256": str},
-    "gpu": {"name": str},
+    "gpu": {"name": str, "count": int, "names": [str]},
     "tasks": {"*": {"protocol_version": str, "revision": str, "epochs": int, "budget": int,
                     "family": str}},
+    # 17g: what the run's own view and the where read — checked before
+    # anything moves (a box given as a number was a crash after the answers
+    # had moved)
+    "box": str, "sessions": int, "started_at": str, "finished_at": str, "image": str,
 }
 
 
@@ -582,17 +591,6 @@ def _write_registry(row: Path, reg: dict) -> None:
     tmp.replace(row / REGISTRY)
 
 
-def where_of(row: Path, task: str) -> str:
-    """"run on a rented GPU (NVIDIA GeForce RTX 5090)" for a task whose answers
-    a bundle brought — '' for one answered on the board"""
-    x = (registry(row).get("tasks") or {}).get(task)
-    if not x:
-        return ""
-    gpus = x.get("gpus") or [x.get("gpu") or "a GPU"]
-    return (f"run on a rented GPU ({gpus[0]})" if len(gpus) == 1
-            else f"run on rented GPUs ({', '.join(gpus)})")
-
-
 def write_meta(row: Path, rec: dict, thinking: bool) -> None:
     """17b: the row's model record — the board's own, never the bundle's"""
     from service import served
@@ -607,7 +605,7 @@ def write_meta(row: Path, rec: dict, thinking: bool) -> None:
 
 
 def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
-                  register: str = "", aside: bool = False) -> int:
+                  register: str = "", aside: bool = False, public_weights: bool = False) -> int:
     """17c: `aside` (--set-aside-shards) sets aside the shards waiting here of
     each task this bundle holds a shard of, when they were made with another
     setup: this bundle's shard starts the task's shards again"""
@@ -666,7 +664,7 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
         say("nothing was imported")
         return REFUSED
     if register:
-        rec = registered_here(b, register, by)
+        rec = registered_here(b, register, by, public_weights)
         say(f"{model} registered as {rec['name']}: a model run on rented GPUs only, its file "
             f"{(gg.get('name') or '')} pinned by the sha256 you gave, {file_sha[:16]}…")
     if file_sha and not registered_sha(rec):
@@ -749,7 +747,8 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             lines.append(f"{t}: {n_off:,} written off as no answer, counted wrong — the server "
                          f"failed on {', '.join(off[:5])}{' …' if len(off) > 5 else ''} "
                          "(remote_gguf.py --ask-written-off asks them again)")
-        entry = {"gpu": gpu, "sha256": b["sha256"], "bundle": path.name, "at": stamp,
+        entry = {"gpu": gpu, "gpu_names": gpu_names(setup), "sha256": b["sha256"],
+                 "bundle": path.name, "at": stamp,
                  "by": by, "gguf_sha256": gg.get("sha256"), "llama_cpp": srv.get("build"),
                  "answers": len(ans), "setup": shard_setup(srv),
                  # 17f: G5's box it ran on, as its line said (never its address)
@@ -791,7 +790,11 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             # 17g: one changed answer in a remade shard kept no grade of either
             stage(t, merged, tsetup, keep=sf.task_dir(row, t) if how != "setup" else None)
             parts = [sh["have"][str(j)] for j in range(1, n + 1)]
-            ready[t] = {**entry, "gpus": sorted({x["gpu"] for x in parts}), "shards": n,
+            # 17g: each box's cards, a box of two named twice
+            cards: Counter = Counter()
+            for x in parts:
+                cards |= Counter(x.get("gpu_names") or [x["gpu"]])
+            ready[t] = {**entry, "gpus": sorted(cards.elements()), "shards": n,
                         "shard_bundles": [{"shard": j, **{k: x.get(k) for k in (
                                                "gpu", "sha256", "bundle", "box")}}
                                           for j, x in enumerate(parts, 1)],
@@ -803,7 +806,8 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             if how == "same":
                 continue
             stage(t, ans, tsetup, keep=sf.task_dir(row, t) if how != "setup" else None)
-            ready[t] = {**entry, "gpus": [gpu], "boxes": [entry["box"]] if entry["box"] else []}
+            ready[t] = {**entry, "gpus": gpu_names(setup),
+                        "boxes": [entry["box"]] if entry["box"] else []}
             lines.append(f"{t}: {len(ans):,} answers from a rented GPU ({gpu})")
 
     if not ready and not todo_shards and not aside_shards:
@@ -816,6 +820,9 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             f"{' · thinking' if on else ''} holds — nothing changed")
         return 0
     status, error, words, scored = "done", "", [], {}
+    # 17g: where it ran, in words, before anything moves
+    box = setup.get("box") or ""
+    here = where_words(gpu_names(setup), [box] if box else [])
     for t in ready:
         try:
             sc = sf.score_task(staging, t, rec)
@@ -875,8 +882,6 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
     shutil.rmtree(staging.parent, ignore_errors=True)
     line = " · ".join(words) or "; ".join(x for x in lines if "missing" in x) or "imported"
     of = f" · shard {shard[0]} of {shard[1]}" if shard else ""
-    box = setup.get("box") or ""
-    here = where_words([gpu], [box] if box else [])
     sid = db.add(model, "instruct", SUITE, by,
                  f"imported from a rented GPU ({gpu}){of}{f' · box {box}' if box else ''} · "
                  f"{path.name}", thinking=on,
@@ -905,21 +910,14 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
         _write_registry(row, reg)
         # 17f: each score says where it ran — every box its shards came from —
         # and the Runs rows it came from
-        for t, entry in ready.items():
-            if not scored.get(t):
-                continue
-            shas = {x.get("sha256") for x in entry.get("shard_bundles") or []} | {b["sha256"]}
-            runs = sorted({x["sid"] for x in reg["imports"] if x.get("sha256") in shas})
-            _mark_where(row, t, where_words(entry.get("gpus") or [gpu], entry.get("boxes") or []),
-                        runs)
+        for t in ready:
+            if scored.get(t):
+                _mark_where(row, t, *where_and_runs(row, t))
     for x in lines:
         say(x)
     say(f"the row {model}{' · thinking' if on else ''}: {line}")
     say(f"Runs #{sid}, its log the bundle's")
     return 0 if status == "done" else 1
-
-
-WHERE_WORDS = "run on a rented GPU"
 
 
 def keep_grades(src: Path, dst: Path, answers: dict) -> int:
@@ -987,19 +985,49 @@ def _mark_where(row: Path, task: str, where: str, runs: list[int] | None = None)
         f.write_text(json.dumps(blob, indent=1), encoding="utf-8")
 
 
-def short_gpu(name: str) -> str:
-    """'NVIDIA GeForce RTX 5090' → 'RTX 5090'"""
-    return re.sub(r"^(NVIDIA\s+)?(GeForce\s+)?", "", (name or "").strip()) or "a GPU"
+def short_gpu(name) -> str:
+    """'NVIDIA GeForce RTX 5090' → 'RTX 5090' — 17g: '' for none, or an unknown"""
+    n = re.sub(r"^(NVIDIA\s+)?(GeForce\s+)?", "", str(name or "").strip())
+    return "" if n.lower() in ("", "a gpu", "none", "unknown") else n
+
+
+def gpu_names(setup: dict) -> list[str]:
+    """17g: every card a box ran on — the bundle's list when it has one (the
+    image after 308fcf3), else its first card's, once"""
+    g = setup.get("gpu") if isinstance(setup.get("gpu"), dict) else {}
+    names = [str(x) for x in g.get("names") or [] if x]
+    return names or ([str(g["name"])] if g.get("name") else [])
 
 
 def where_words(gpus: list[str], boxes: list[str]) -> str:
     """17f: where a run ran, one wording everywhere — 'this server' for the
     board's own (said by the page), 'rented GPU · RTX 5090 · box A3' for an
-    import, 'boxes A1, A2' when its shards came from several"""
-    g = ", ".join(sorted({short_gpu(x) for x in gpus if x})) or "a GPU"
-    b = sorted({x for x in boxes if x})
-    return f"rented GPU · {g}" + (f" · box{'es' if len(b) > 1 else ''} {', '.join(b)}" if b
-                                   else "")
+    import, 'boxes A1, A2' when its shards came from several. 17g: the one
+    implementation (the page and Runs read it), 'rented GPU' alone for a GPU
+    it doesn't know, and every card of a box: '2 × RTX 5090'"""
+    count: dict[str, int] = {}
+    for x in gpus or []:                      # one entry a card
+        n = short_gpu(x)
+        if n:
+            count[n] = count.get(n, 0) + 1
+    g = ", ".join(f"{k} × {n}" if k > 1 else n for n, k in sorted(count.items()))
+    b = sorted({str(x) for x in boxes or [] if x})
+    return "rented GPU" + (f" · {g}" if g else "") + (
+        f" · box{'es' if len(b) > 1 else ''} {', '.join(b)}" if b else "")
+
+
+def where_and_runs(row: Path, task: str) -> tuple[str, list[int]]:
+    """17g: where a task's answers on the row ran, and the Runs rows they came
+    from — from the row's own record of its imports, so a score made again
+    (grading) says it as the import did"""
+    reg = registry(row)
+    x = (reg.get("tasks") or {}).get(task)
+    if not isinstance(x, dict):
+        return "", []
+    shas = {s.get("sha256") for s in x.get("shard_bundles") or []} | {x.get("sha256")}
+    runs = sorted({i["sid"] for i in reg.get("imports") or []
+                   if i.get("sha256") in shas and isinstance(i.get("sid"), int)})
+    return where_words(x.get("gpus") or [x.get("gpu") or ""], x.get("boxes") or []), runs
 
 
 def _epoch(stamp) -> float | None:
@@ -1018,6 +1046,9 @@ BOX_FIELDS = {"label": str, "model": str, "step": str, "thinking": str, "tasks":
               "sessions": int, "at": (int, float), "seen_at": (int, float), "reachable": bool,
               "safe": bool, "why": str}
 QUIET_S = 45 * 60                       # a box not heard from for this long says so
+# 17g: a step done (its box safe to destroy) leaves the list this long after
+# the fetch last saw it — thirty days on it still read "done, safe to destroy"
+DONE_KEEP_S = 6 * 3600
 
 
 def boxes_path() -> Path:
@@ -1025,17 +1056,39 @@ def boxes_path() -> Path:
     return Path(config.BENCH_ROOT) / "frontier" / "boxes.json"
 
 
+def _fine(v, t) -> bool:
+    """17g: a value of its field's type — a number finite (a box's `at: NaN`
+    broke the list's endpoint for every box), a list of text only"""
+    if t is list:
+        return isinstance(v, list) and all(isinstance(x, str) for x in v)
+    if not isinstance(v, t) or (isinstance(v, bool) and bool not in (
+            t if isinstance(t, tuple) else (t,))):
+        return False
+    return not isinstance(v, float) or math.isfinite(v)
+
+
 def store_boxes(records: list) -> int:
     """the fetch's last reading of each step, kept on the board: only the
-    fields above, each of its type — anything else is dropped"""
+    fields above, each of its type — anything else is dropped. 17g: a step
+    the board had that this reading hasn't is kept as not reached (a box
+    destroyed before it was done vanished), unless it was done — a box safe
+    to destroy and gone was destroyed"""
     keep = []
     for r in records if isinstance(records, list) else []:
         if not isinstance(r, dict):
             continue
-        x = {k: r[k] for k, t in BOX_FIELDS.items() if k in r and isinstance(r[k], t)
-             and not (t is int and isinstance(r[k], bool))}
+        x = {k: r[k] for k, t in BOX_FIELDS.items() if k in r and _fine(r[k], t)}
         if x.get("label") and x.get("model") and x.get("step"):
             keep.append(x)
+    now = {(x["label"], x["model"], x["step"]) for x in keep}
+    try:
+        was = json.loads(boxes_path().read_text(encoding="utf-8")).get("boxes") or []
+    except (OSError, ValueError, AttributeError):
+        was = []
+    for x in was if isinstance(was, list) else []:
+        if isinstance(x, dict) and (x.get("label"), x.get("model"), x.get("step")) not in now \
+                and not x.get("safe"):
+            keep.append({**x, "reachable": False})
     p = boxes_path()
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_suffix(".part")
@@ -1062,8 +1115,13 @@ def read_boxes(now: float | None = None) -> dict:
     except ImportError:                                   # the plan beside the script
         fbx = None
     out = []
-    for r in got.get("boxes") or []:
-        line = r.get("line") or ""
+    for r in got.get("boxes") or [] if isinstance(got, dict) else []:
+        if not isinstance(r, dict):
+            continue
+        seen = _num(r.get("seen_at"))
+        if r.get("safe") and seen and now - seen > DONE_KEEP_S:
+            continue
+        line = r.get("line") if isinstance(r.get("line"), str) else ""
         m, nof = _LEFT.search(line), _NOF.search(line)
         left = (float(m["h"]) * 3600 if m and m["h"] else int(m["m"]) * 60 if m else None)
         later = 0.0
@@ -1074,16 +1132,28 @@ def read_boxes(now: float | None = None) -> dict:
                 later = sum(fbx.hours(s) for s in steps[k:] if s[0] != "parity") * 3600
             except (SystemExit, ValueError, IndexError, KeyError):
                 later = 0.0
-        heard = max(float(r.get("seen_at") or 0), 0.0)
-        quiet = (now - float(r.get("at") or 0)) if r.get("at") else None
-        out.append({**r,
+        heard = max(seen or 0.0, 0.0)
+        # 17g: quiet only while it should be writing — a step whole or stopped
+        # writes no more, and read "not heard from for 600 min" on a box
+        # still working
+        at = _num(r.get("at"))
+        quiet = (now - at) if at and r.get("state") in ("asking", "starting") else None
+        out.append({**r, "at": at, "seen_at": seen,
                     "n": int(nof["n"].replace(",", "")) if nof else None,
                     "of": int(nof["of"].replace(",", "")) if nof else None,
-                    "finish": (float(r.get("at") or now) + left + later) if left is not None
-                    else None,
+                    "finish": ((at or now) + left + later) if left is not None else None,
                     "heard": heard or None,
                     "quiet_min": round(quiet / 60) if quiet and quiet > QUIET_S else None})
     return {"boxes": out, "posted_at": got.get("posted_at")}
+
+
+def _num(v) -> float | None:
+    """a finite number from the boxes' file, else None"""
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return None
+    return x if math.isfinite(x) else None
 
 
 def rented_of(sid: int) -> dict | None:

@@ -980,6 +980,7 @@ def mismatches() -> list[dict]:
     chosen now didn't grade offered its regrade by that grader, with its
     price: [{slot, task, label, grader, rows: [{row, model, version, offer,
     asked}]}]"""
+    from . import served
     out = []
     root = Path(config.OUT_DIR)
     fb.set_root(config.BENCH_ROOT)
@@ -990,7 +991,11 @@ def mismatches() -> list[dict]:
             gr = _score_grader(d)
             if gr.get("version"):
                 row = d.parent.parent
-                rows.append({"row": row.name, "model": _model_of(row)[0], "d": d,
+                mid, base = _model_of(row)
+                name = (served.get(base) or {}).get("name") or mid
+                rows.append({"row": row.name, "model": mid, "d": d,
+                             "name": name + (" · thinking" if mid.endswith(" · thinking")
+                                             and not name.endswith(" · thinking") else ""),
                              "version": gr["version"], "prompt_sha256": gr.get("prompt_sha256"),
                              "asked": bool(sf.read_grades(d).get("regrade_to"))})
         if len({(r["version"], r["prompt_sha256"]) for r in rows}) < 2:

@@ -612,21 +612,40 @@ def ran_out(text: str, finish: str | None) -> bool:
 # last passage repeating. For information on the import's line only. 17f:
 # numbers read as one ("Step 1001…", "Step 1002…" repeat), a tail of nothing
 # but whitespace is a loop, and a passage with no words — an ARC grid of
-# equal rows, a table of equal rows, a run of zeros — never is
+# equal rows, a table of equal rows, a run of zeros — never is. 17g: letters
+# as a counter read as one too, a tail of dots is a loop, and a table (rows
+# differing in their numbers) or a grid in colour words never is
 LOOP_PASSAGE, LOOP_TIMES, LOOP_WINDOW = 200, 3, 20_000
 _NUMBER = re.compile(r"\d+")
+# 17g: a counter in letters — "Case aa:", "Case ab:", "(c)" — read as one, as
+# numbers are: a word of up to three letters before a colon, a full stop or
+# a closing bracket
+_LETTERS = re.compile(r"(?<![^\W\d_])[A-Za-z]{1,3}(?=[:.)\]])")
+# 17g: ARC-AGI-2's colours, a grid written in words
+_COLOURS = {"black", "blue", "red", "green", "yellow", "grey", "gray", "magenta", "pink",
+            "orange", "azure", "cyan", "maroon", "brown", "purple", "white", "teal"}
+
+
+def _table(passage: str) -> bool:
+    """17g: rows of a table — most lines hold two cells' separators or more"""
+    rows = [x for x in passage.splitlines() if x.strip()]
+    return len(rows) >= 2 and sum(1 for x in rows if x.count("|") >= 2 or x.count("\t") >= 2
+                                  or x.count(",") >= 2) * 2 >= len(rows)
 
 
 def ends_in_loop(text: str) -> bool:
     tail = (text or "")[-LOOP_WINDOW:]
-    if len(tail) >= 1000 and not tail[-1000:].strip():
-        return True                             # endless newlines
-    tail = _NUMBER.sub("#", tail)
+    if len(tail) >= 1000 and not re.search(r"[^\W_]", tail[-1000:]):
+        return True                             # endless newlines, dots, dashes
+    tail = _LETTERS.sub("@", _NUMBER.sub("#", tail))
     if len(tail) < LOOP_PASSAGE * LOOP_TIMES + 200:
         return False
     passage = tail[-(LOOP_PASSAGE + 200):-200]
-    if not re.search(r"[^\W\d_#]{2,}", passage):
-        return False                            # no words: a grid, a table, a run of digits
+    words = re.findall(r"[^\W\d_#@]{2,}", passage)
+    # the passage's first and last words may be cut: the colours are read inside
+    inner = words[1:-1] if len(words) > 2 else words
+    if not words or all(w.lower() in _COLOURS for w in inner) or _table(passage):
+        return False                            # a grid (in digits or colours), a table
     return tail.count(passage) >= LOOP_TIMES
 
 

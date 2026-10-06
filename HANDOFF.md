@@ -4953,6 +4953,46 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17g.4 — the dashboard and the export (6 Oct)
+
+- **The export publishes nothing the board withholds** (`export_frontier_raw`):
+  `log.txt` withholds each line quoting a hidden or gated question
+  (`reader.withhold`, the board's own log view's); the scrub takes every IPv4
+  address, an ssh/scp port and the user before an address, a rented GPU
+  host's name, a key given as a flag or named `x-token`/`SUBMIT_TOKEN`/…
+  whatever its value, a URL's internal host, and the Hugging Face account of
+  a private repo (and `SCRUB_ACCOUNTS`); public only for a model the board
+  knows as public (`known_public`: a public Hub model, or a served one
+  registered `--public-weights`), whatever the flags — DeviceMark's export
+  too; and each run exports what it brought (`brought`: an import's shard
+  its own questions, a run whose answers were replaced none, said).
+- **A score made again keeps where it ran and its runs** (`score_task` →
+  `import_frontier.where_and_runs`, from the row's record of its imports).
+- **Earlier imports say where they ran**: `db.init` fills `where_ran` from
+  each import's own record; a DeviceMark import sets it.
+- **On rented boxes**: quiet only while a step should be writing; a done
+  step leaves the list 6 hours after it was last seen; a step the next fetch
+  doesn't read is "not reached" unless it was done; the poll redraws the list
+  with the table.
+- **A malformed file breaks nothing**: NaN and the wrong types never reach
+  the list or its endpoint; a bundle's `box`, `sessions`, times and image are
+  type-checked, and where it ran is worked out before anything moves.
+- **The whole run's context is checked before the first question**
+  (`frontier.run`): a benchmark a slot can't hold is said and left, every
+  one that fits is asked.
+- **Small ones**: one where wording (`import_frontier.where_words`, the page's
+  `frontier_where` reads it; `where_of` and `WHERE_WORDS` gone); an unknown
+  GPU reads "rented GPU"; a box's every card (`gpu_info` `names`, `count`:
+  "2 × RTX 5090"); "#12" is run 12 alone; the where filter goes back to page
+  1; the loop count reads letter counters and endless dots, never a table or
+  a grid in colour words.
+- **Compare** (point 22): a column's name whole while its column has room,
+  cut after it is drawn only where it doesn't fit — what the names share
+  dropped, what tells them apart kept, at whichever end (`headNames`,
+  `cmpFitHeads`); the lines above say the kind and the size, how it's served
+  on hover.
+- Tests: `tests/test_17g_review.py` (part 4), `tests/test_17g_browser.py`.
+
 ### 17g.3 — grading (6 Oct)
 
 - **A run of refusals stops a Start anywhere** (`llm.LocalOpenAI._work`,

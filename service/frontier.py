@@ -736,6 +736,13 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
         setup = {}
     g, graders = graders_of(d, flat)
     looked = sum(1 for r in flat if r["grade"] is not None)
+    # 17g: where it ran and the Runs rows it came from, from the row's record
+    # of its imports — grading scores again, and dropped what the import marked
+    where, came = setup.get("where"), []
+    if where and where != "this server":
+        import import_frontier as imf
+        w, came = imf.where_and_runs(row, task)
+        where = w or where
     detail = {"version": fb.VERSION, "protocol": spec["protocol"], "epochs": spec["epochs"],
               "questions": len(items), "answers": len(flat),
               "ran_out": ran_out, "unread": unread, "errors": errors,
@@ -745,7 +752,7 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
               **({"unanswered": sum(1 for r in flat if r.get("unanswered")),
                   "unanswered_ids": never[:20]} if never else {}),
               "budget": setup.get("budget"), "sampling": setup.get("sampling"),
-              "family": setup.get("family"), "where": setup.get("where"),
+              "family": setup.get("family"), "where": where, **({"runs": came} if came else {}),
               "thinking": setup.get("thinking"), "note": spec.get("note") or "",
               "scored_by": ("grader" if spec.get("grader") else "code, then Epoch's model check"
                             if spec.get("look") and not waiting and looked else "code"),
@@ -885,6 +892,24 @@ def run(sid: int, sub: dict, rec: dict, th: dict, row: Path, log_path: Path) -> 
         f"{', '.join(tasks)} · sampling {family_of(rec) or 'the server’s defaults'}"
         + (f" · shard {sh[0]} of {sh[1]}" if sh else "") + f" · on {_where()}")
     lines, incomplete = [], []
+    # 17g: the whole run checked before the first question — a benchmark a
+    # slot of its server can't hold (the prompt and the budget) is said and
+    # left, and every one that fits is asked: at -c 83,968 three were asked,
+    # then HLE stopped the run, and two that fit never were
+    ctx = (rec.get("pin") or {}).get("ctx")
+    big = [t for t in tasks if isinstance(ctx, int) and 0 < ctx < fb.slot_context([t], on)]
+    if big:
+        skip = (f"{', '.join(fb.BENCH[t]['label'] for t in big)}: its server's context is "
+                f"{ctx:,} tokens a slot, and thinking {'on' if on else 'off'} needs "
+                + ", ".join(f"{fb.slot_context([t], on):,}" for t in big)
+                + " (the budget and the prompt) — start it with a larger -c, or run its GGUF on "
+                "a rented GPU. " + ("Nothing was asked" if len(big) == len(tasks) else
+                                    "Not asked; the rest are"))
+        log(f"[frontier] {skip}")
+        if len(big) == len(tasks):
+            return "failed", skip
+        incomplete.append(skip)
+        tasks = [t for t in tasks if t not in big]
     for task in tasks:
         label = fb.BENCH[task]["label"]
 
@@ -895,15 +920,6 @@ def run(sid: int, sub: dict, rec: dict, th: dict, row: Path, log_path: Path) -> 
                                + (f"{left / 3600:.1f} h left" if left >= 3600 else
                                   f"{max(1, round(left / 60))} min left" if n < total
                                   else "all answered"))
-        # 17: a slot of its server holds the prompt and the budget, or nothing is asked
-        ctx, need = (rec.get("pin") or {}).get("ctx"), fb.slot_context([task], on)
-        if isinstance(ctx, int) and 0 < ctx < need:
-            line = (f"{label}: its server's context is {ctx:,} tokens a slot, and thinking "
-                    f"{'on' if on else 'off'} needs {need:,} (the budget and the prompt) — "
-                    f"start it with a larger -c, or run its GGUF on a rented GPU. Nothing was "
-                    "asked")
-            log(f"[frontier] {line}")
-            return "failed", line
         try:
             fb.load(task, config.BENCH_ROOT)
         except Exception as e:                          # noqa: BLE001 — said on the row

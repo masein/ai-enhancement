@@ -227,7 +227,7 @@ def _write_registry(row: Path, reg: dict) -> None:
 
 
 def import_bundle(path: Path, by: str, say=print, file_sha: str = "", register: str = "",
-                  aside: bool = False) -> int:
+                  aside: bool = False, public_weights: bool = False) -> int:
     try:
         b = rb.read(path)
     except (ValueError, OSError) as e:
@@ -236,8 +236,9 @@ def import_bundle(path: Path, by: str, say=print, file_sha: str = "", register: 
     # 17: a GGUF's Frontier run, onto a served model's row
     if b["bundle"].get("suite") == "frontier":
         import import_frontier
-        return import_frontier.import_bundle(b, path, by, say, file_sha, register, aside)
-    if file_sha or register:
+        return import_frontier.import_bundle(b, path, by, say, file_sha, register, aside,
+                                             public_weights=public_weights)
+    if file_sha or register or public_weights:
         say("refused — --file-sha256 and --register are for a GGUF's Frontier bundle")
         return REFUSED
     return import_devicemark(b, path, by, say)
@@ -419,7 +420,11 @@ def import_devicemark(b: dict, path: Path, by: str, say=print) -> int:
                  f"imported from a rented GPU ({gpu}){of} · {path.name}", thinking=thinking,
                  part="full", tasks=tasks if len(tasks) < len(rb.SUITES[bundle["suite"]]["tasks"])
                  else None, status=status)
-    db.update(sid, finished_at=time.time(), progress=line, error=error)
+    # 17g: where it ran, as a Frontier import says it (it read "this server")
+    import import_frontier
+    db.update(sid, finished_at=time.time(), progress=line, error=error,
+              where_ran=import_frontier.where_words(import_frontier.gpu_names(setup) or [gpu],
+                                                    []))
     log = config.LOGS_DIR / f"service_{sid}_{model.replace('/', '__')}.log"
     log.parent.mkdir(parents=True, exist_ok=True)
     log.write_text(f"===== [{sid}] imported {path.name} (sha256 {b['sha256'][:16]}) by {by}: "
@@ -451,6 +456,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--register", default="",
                     help="17: a Frontier bundle of a model this board doesn't serve (run on "
                          "rented GPUs only): its name here; the bundle's file is pinned")
+    ap.add_argument("--public-weights", action="store_true",
+                    help="17g: with --register, a model whose weights are public (G6's "
+                         "calibration): its raw runs may be exported public. Nothing else ever "
+                         "is")
     ap.add_argument("--boxes", type=Path, default=None,
                     help="17f: what frontier_fetch.py read from the rented boxes, for Runs' "
                          "list (their labels and progress, never an address)")
@@ -485,8 +494,10 @@ def main(argv: list[str] | None = None) -> int:
     sha = a.file_sha256.strip().lower()
     if sha and not re.fullmatch(r"[0-9a-f]{64}", sha):
         ap.error("--file-sha256: 64 hex digits")
+    if a.public_weights and not a.register.strip():
+        ap.error("--public-weights: with --register, when the model is registered")
     return import_bundle(a.bundle, a.by.strip()[:80], file_sha=sha, register=a.register.strip(),
-                         aside=a.set_aside_shards)
+                         aside=a.set_aside_shards, public_weights=a.public_weights)
 
 
 if __name__ == "__main__":

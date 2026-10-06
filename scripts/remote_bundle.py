@@ -165,13 +165,17 @@ def pin_differences(theirs: dict, ours: dict) -> list[str]:
 
 
 def gpu_info() -> dict:
-    """the GPU's name, its driver and its memory, as nvidia-smi says"""
+    """the GPU's name, its driver and its memory, as nvidia-smi says — 17g:
+    and every card's name, and how many (a box of two was named by its first)"""
     try:
-        out = subprocess.run(["nvidia-smi", "--query-gpu=name,driver_version,memory.total",
-                              "--format=csv,noheader,nounits"], capture_output=True, text=True,
-                             timeout=30).stdout.splitlines()[0]
-        name, driver, mib = (x.strip() for x in out.split(","))
-        return {"name": name, "driver": driver, "memory_mib": int(float(mib))}
+        lines = [x for x in subprocess.run(
+            ["nvidia-smi", "--query-gpu=name,driver_version,memory.total",
+             "--format=csv,noheader,nounits"], capture_output=True, text=True,
+            timeout=30).stdout.splitlines() if x.strip()]
+        name, driver, mib = (x.strip() for x in lines[0].split(","))
+        names = [x.split(",")[0].strip() for x in lines]
+        return {"name": name, "driver": driver, "memory_mib": int(float(mib)),
+                "count": len(names), "names": names}
     except (OSError, IndexError, ValueError, subprocess.SubprocessError):
         return {"name": None, "driver": None, "memory_mib": None}
 
