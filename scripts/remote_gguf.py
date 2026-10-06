@@ -245,8 +245,35 @@ def own_flags(flags: list[str]) -> list[str]:
     return [f for f in flags if f.split("=", 1)[0] in OWN_FLAGS]
 
 
+# 17c: llama-server's own variables reach it from --env only, so every one it
+# gets is recorded and pinned — one exported in the box's shell reached it
+# unrecorded, and a resume mixed two setups
+SERVER_VARS = ("LLAMA_", "GGML_")
+
+
+# 17c: what G1's table fits beside the 23 GB file on a 32 GB card, the KV
+# cache in q8_0: 8 slots of OTIS's and MATH's 67,584. A run asking more is
+# refused before anything is fetched (--max-context for a larger card)
+MAX_CONTEXT = 8 * 67_584
+
+
+def answered_here() -> bool:
+    """17c: this --out holds an answer — its setup is pinned from then on"""
+    from service import config
+    root = Path(config.OUT_DIR)
+    return any(p.stat().st_size for p in root.glob("*/*_0shot/frontier/answers.jsonl"))
+
+
+def shell_server_vars() -> list[str]:
+    """llama-server's variables set in this shell, which it isn't given"""
+    return sorted(k for k in os.environ if k.startswith(SERVER_VARS))
+
+
 def server_env(srv: dict, extra: dict) -> dict:
-    env = {k: v for k, v in os.environ.items() if k not in rb.SECRETS}
+    """the child's environment, built here: the box's, without its secrets or
+    any LLAMA_*/GGML_* it holds, the tarball's libraries, and --env"""
+    env = {k: v for k, v in os.environ.items()
+           if k not in rb.SECRETS and not k.startswith(SERVER_VARS)}
     libs = os.pathsep.join([*srv["libs"], os.environ.get("LD_LIBRARY_PATH", "")]).strip(os.pathsep)
     env["LD_LIBRARY_PATH"] = libs
     env.update(extra)
@@ -470,7 +497,9 @@ def make_bundle(out: Path, served_as: str, thinking: bool, tasks: list[str], sta
     if shard:
         bundle["shard"] = {"i": shard[0], "n": shard[1]}
     files["bundle.json"] = json.dumps(bundle, indent=1, sort_keys=True).encode("utf-8")
-    path = rb.write(out / rb.bundle_name(SUITE, served_as, thinking, shard), files)
+    # 17c: the benchmarks in the name when the box ran some of the suite
+    parts = [fb.BENCH[t]["short"] for t in tasks] if len(tasks) < len(fb.TASKS) else None
+    path = rb.write(out / rb.bundle_name(SUITE, served_as, thinking, shard, parts), files)
     return path, done, incomplete
 
 
@@ -525,6 +554,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--slots", type=int, default=8, help="questions at a time (llama-server -np)")
     ap.add_argument("--flags", default="", help="more llama-server flags, as typed")
     ap.add_argument("--env", default="", help="llama-server's environment, NAME=value …")
+    ap.add_argument("--max-context", type=int, default=MAX_CONTEXT,
+                    help="17c: the most context (slots × each slot's) the card holds beside "
+                         f"the GGUF — G1's table for a 32 GB card: {MAX_CONTEXT:,}")
     ap.add_argument("--port", type=int, default=8090)
     ap.add_argument("--load-timeout", type=float, default=3600)
     ap.add_argument("--by", default="remote", help="who ran it, for the run's record")
@@ -548,6 +580,18 @@ def main(argv: list[str] | None = None) -> int:
     out = Path(a.out).resolve()
     thinking = a.thinking == "on"
     tasks = [t for t in fb.TASKS if t in (a.only or fb.TASKS)]
+    if a.parity:
+        # 17b: the parity check's questions, thinking off, whatever --thinking says
+        tasks, thinking = [fb.PARITY["task"]], False
+    # 17c: a context the card can't hold is refused here, before the download
+    ctx = fb.slot_context(tasks, thinking)
+    if ctx * a.slots > a.max_context:
+        big = max(tasks, key=lambda t: fb.slot_context([t], thinking))
+        raise SystemExit(f"{a.slots} slots of {ctx:,} tokens ({fb.BENCH[big]['label']}'s, "
+                         f"thinking {'on' if thinking else 'off'}) is {ctx * a.slots:,} tokens "
+                         f"of context, and this card holds {a.max_context:,} (G1's table; "
+                         "--max-context for a larger card): give the box fewer benchmarks "
+                         "(--only) or fewer --slots. Nothing was fetched")
     configure(out, a.slots, shard)
     say = Out(out / OWN_LOG)
     from service import db, runner
@@ -577,7 +621,10 @@ def main(argv: list[str] | None = None) -> int:
     shas = [sha256_cached(x, state, say, files / "sha256.json") for x in paths]
     sha = shas[0] if len(paths) == 1 else split_sha(
         [(x.name, h) for x, h in zip(paths, shas)])
-    if state.get("gguf_sha256") and state["gguf_sha256"] != sha:
+    # 17c: pinned once an answer is written — a first launch that failed (a
+    # typo in --flags) pins nothing
+    pinned = answered_here()
+    if pinned and state.get("gguf_sha256") and state["gguf_sha256"] != sha:
         raise SystemExit(f"{out} holds answers of another file ({state['gguf_sha256'][:16]}, now "
                          f"{sha[:16]}): they can't be mixed — start another --out")
     gguf = {"name": gguf_path.name, "sha256": sha, "size": sum(x.stat().st_size for x in paths),
@@ -588,10 +635,6 @@ def main(argv: list[str] | None = None) -> int:
     srv = unpack_server(tb, out / "server")
     env = server_env(srv, extra_env)
     ver = version_of(srv["bin"], env)
-    if a.parity:
-        # 17b: the parity check's questions, thinking off, whatever --thinking says
-        tasks, thinking = [fb.PARITY["task"]], False
-    ctx = fb.slot_context(tasks, thinking)
     server = {"version": ver["text"], "build": ver["build"], "commit": ver["commit"],
               "binary_sha256": rb.sha256_file(srv["bin"]), "tarball_sha256": srv["tarball_sha256"],
               "flags": flags, "env": extra_env, "slots": a.slots, "slot_context": ctx,
@@ -602,7 +645,7 @@ def main(argv: list[str] | None = None) -> int:
     # other flags or another environment would mix two setups' answers
     setup = {"binary_sha256": server["binary_sha256"], "commit": ver["commit"],
              "build": ver["build"], "flags": flags, "env": extra_env}
-    if state.get("setup") and state["setup"] != setup:
+    if pinned and state.get("setup") and state["setup"] != setup:
         was = state["setup"]
         diff = [k for k in setup if setup[k] != was.get(k)]
         raise SystemExit(f"{out} holds answers made with another setup — its "
@@ -619,6 +662,9 @@ def main(argv: list[str] | None = None) -> int:
                   "shard": f"{shard[0]}/{shard[1]}" if shard else None})
     sp.write_text(json.dumps(state, indent=1), encoding="utf-8")
     gpu = rb.gpu_info()
+    if shell_server_vars():
+        say(f"not given to llama-server: {', '.join(shell_server_vars())}, set in this shell — "
+            "its variables come from --env only, so each one it gets is recorded")
     say(f"{gguf['name']} · {gguf['size'] / 1e9:.1f} GB · sha256 {sha[:16]} · llama.cpp "
         f"{ver['build'] or '?'} ({ver['commit'] or '?'}) · GPU {gpu.get('name') or 'unknown'} · "
         f"{a.slots} slots of {ctx:,} tokens")
@@ -629,11 +675,8 @@ def main(argv: list[str] | None = None) -> int:
         try:
             items = fb.load(t, config.BENCH_ROOT)
         except Exception as e:                          # noqa: BLE001 — said in one line
-            raise SystemExit(rb.scrub(
-                f"{fb.BENCH[t]['label']}'s questions could not be fetched: {e}"
-                + (". It is gated: accept its terms on Hugging Face, and set HF_TOKEN on this "
-                   "box (typed here, never stored)" if fb.BENCH[t]["source"].get("gated")
-                   else ""))) from None
+            # 17c: the error's own words; the terms only when access was refused
+            raise SystemExit(rb.scrub(fb.load_failed(t, e))) from None
         mine = fb.shard_of(items, shard)
         say(f"{fb.BENCH[t]['label']}: {len(mine)} of its {len(items)} questions here × "
             f"{fb.BENCH[t]['epochs']} run{'s' if fb.BENCH[t]['epochs'] > 1 else ''}")

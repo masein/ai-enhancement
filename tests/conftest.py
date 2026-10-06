@@ -34,6 +34,20 @@ from make_fixture import HIDDEN_FIXTURE, HIDDEN_FIXTURE_MANIFEST, sit_hidden  # 
 from service import config as _config  # noqa: E402
 
 
+@pytest.fixture(scope="session", autouse=True)
+def invented_question_sets():
+    """17c: scripts/frontier.py checks each benchmark's question count on every
+    load (BENCH's n). Every test's questions are invented, a handful each: the
+    count is let through here, for the whole session (a module's fixtures load
+    questions too), and a test of the count puts the real one back
+    (`monkeypatch.setattr(fb, "expected", fb._expected_n)`)"""
+    import frontier
+    real = frontier.expected
+    frontier.expected = lambda task: None
+    yield
+    frontier.expected = real
+
+
 def hidden_env(root: Path) -> dict:
     """what a subprocess needs to read the same bank"""
     sit_hidden(root)

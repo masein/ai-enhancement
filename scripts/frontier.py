@@ -102,7 +102,7 @@ ON, OFF = 32768, 4096                    # GPQA, HLE, MMLU-Pro, SimpleQA Verifie
 
 BENCH: dict[str, dict] = {
     "gpqa_diamond_epoch": {
-        "label": "GPQA Diamond", "group": "Science",
+        "short": "gpqa", "label": "GPQA Diamond", "group": "Science",
         # the names others report it under (the Frontier view joins on these)
         "reported_as": ["gpqa diamond"],
         "protocol": "Epoch AI's (v1.0.6): zero-shot, ANSWER: LETTER, Inspect's choice() parse",
@@ -114,7 +114,7 @@ BENCH: dict[str, dict] = {
         # the prompt's room in a slot's context, above the budget
         "room": 2048, "scorer": "choice", "unlisted": True},
     "otis_aime_epoch": {
-        "label": "OTIS Mock AIME 2024–2025", "column": "OTIS Mock AIME 2024-2025",
+        "short": "otis", "label": "OTIS Mock AIME 2024–2025", "column": "OTIS Mock AIME 2024-2025",
         "group": "Maths", "reported_as": ["otis mock aime 2024-2025", "otis mock aime"],
         "protocol": "Epoch AI's: its prompt, the last ANSWER: X, exact match",
         "protocol_version": "epoch-otis-2025-09",
@@ -124,7 +124,7 @@ BENCH: dict[str, dict] = {
         "n": 45, "epochs": 8, "epoch_runs": 16, "budget": {"on": ON_LONG, "off": OFF_LONG},
         "room": 2048, "scorer": "integer", "look": "extract"},
     "math_l5_epoch": {
-        "label": "MATH Level 5", "column": "MATH level 5", "group": "Maths",
+        "short": "math-l5", "label": "MATH Level 5", "column": "MATH level 5", "group": "Maths",
         "reported_as": ["math level 5"],
         "protocol": "Epoch AI's: its prompt and answer extraction, equivalence by code",
         "protocol_version": "epoch-math-l5-2025",
@@ -139,7 +139,7 @@ BENCH: dict[str, dict] = {
                      "whose copyright is disputed (their first home on Hugging Face was taken "
                      "down, and Epoch AI withholds its MATH logs)")},
     "hle_text_cais": {
-        "label": "Humanity's Last Exam", "group": "Knowledge & reasoning",
+        "short": "hle", "label": "Humanity's Last Exam", "group": "Knowledge & reasoning",
         "reported_as": ["humanity's last exam", "hle", "humanity's last exam (text only)",
                         "hle (text only)"],
         "note": "text-only questions",
@@ -155,7 +155,7 @@ BENCH: dict[str, dict] = {
         "unlisted": ("Humanity's Last Exam's questions are never shown: its authors ask that "
                      "it not be shared, re-uploaded or distributed")},
     "simpleqa_epoch": {
-        "label": "SimpleQA Verified", "group": "Knowledge",
+        "short": "simpleqa", "label": "SimpleQA Verified", "group": "Knowledge",
         "reported_as": ["simpleqa verified"],
         "protocol": "Epoch AI's: the question and its single-best-guess line, the share "
                     "graded correct",
@@ -169,7 +169,7 @@ BENCH: dict[str, dict] = {
         "grader": {"who": "Google's grader", "prompt": "simpleqa_google",
                    "model": "openai/gpt-4.1", "version": "gpt-4.1-2025-04-14"}},
     "mmlupro_tiger": {
-        "label": "MMLU-Pro", "group": "Knowledge", "reported_as": ["mmlu-pro", "mmlu pro"],
+        "short": "mmlu-pro", "label": "MMLU-Pro", "group": "Knowledge", "reported_as": ["mmlu-pro", "mmlu pro"],
         # 17b: what differs from TIGER-Lab's own script, in a few words
         "note": "TIGER-Lab's 5-shot prompt; the card's sampling, not temperature 0; no "
                 "random guess when unread",
@@ -182,7 +182,7 @@ BENCH: dict[str, dict] = {
         "n": 12032, "epochs": 1, "budget": {"on": ON, "off": OFF}, "room": 4096,
         "scorer": "mmlu_pro"},
     "arc_agi2_public": {
-        "label": "ARC-AGI-2", "group": "Puzzles", "reported_as": ["arc-agi-2", "arc agi 2"],
+        "short": "arc-agi-2", "label": "ARC-AGI-2", "group": "Puzzles", "reported_as": ["arc-agi-2", "arc agi 2"],
         "note": "public set",
         "protocol": "ARC Prize's harness: its prompt and grid parser, two attempts, a task the "
                     "share of its test grids solved",
@@ -339,16 +339,45 @@ def _count(task: str, got) -> int:
     return len(items)
 
 
+def _expected_n(task: str) -> int | None:
+    return BENCH[task]["n"]
+
+
+# the questions a benchmark must hold — tests/conftest.py lets invented sets
+# through, and the tests of the count put this back
+expected = _expected_n
+
+
+def check_count(task: str, got, where: str) -> None:
+    """17b: the benchmark holds the questions it should (HLE's text-only filter,
+    MMLU-Pro's 12,032, ARC-AGI-2's 120 tasks), or nothing is asked. 17c: on
+    every load — a copy on disk from before the check is counted too"""
+    n, want = _count(task, got), expected(task)
+    if want is not None and n != want:
+        raise ValueError(f"{BENCH[task]['label']}: {n:,} questions {where}, and this board "
+                         f"expects {want:,} — nothing is asked until they agree")
+
+
+def load_failed(task: str, e: Exception) -> str:
+    """17c: why a benchmark's questions couldn't be had, in the error's own
+    words — a count that doesn't agree says so — and a gated benchmark's terms
+    named only when access was what was refused"""
+    label = BENCH[task]["label"]
+    said = str(e).strip() or repr(e)
+    if not said.startswith(label):
+        said = f"{label}: its questions could not be fetched: {said}"
+    if BENCH[task]["source"].get("gated") and re.search(
+            r"\b40[13]\b|gated|unauthori[sz]ed|forbidden|access to|restricted", said, re.I):
+        said += (" — it is gated: accept its terms on Hugging Face with the account whose "
+                 "token this machine has")
+    return said
+
+
 def _fetch(task: str):
-    """the dataset at its pinned revision — 17b: holding the questions it should
-    (HLE's text-only filter, MMLU-Pro's 12,032, ARC-AGI-2's 120 tasks), or
-    nothing is asked"""
+    """the dataset at its pinned revision, its count checked"""
     got = _fetch_source(task)
-    n, want = _count(task, got), BENCH[task]["n"]
-    if n != want:
-        raise ValueError(f"{BENCH[task]['label']}: {n:,} questions came from "
-                         f"{source_name(task)} at {BENCH[task]['source']['revision'][:12]}, and "
-                         f"this board expects {want:,} — nothing is asked until they agree")
+    check_count(task, got, f"came from {source_name(task)} at "
+                           f"{BENCH[task]['source']['revision'][:12]}")
     return got
 
 
@@ -405,7 +434,10 @@ def load(task: str, root: Path) -> list[dict]:
     machine's own copy"""
     p = _cache(root, task)
     if p.exists():
-        return _read_cache(p)["items"]
+        got = _read_cache(p)
+        check_count(task, got, f"are in this machine's copy ({p}: remove it, and the next "
+                               "run fetches the pinned revision again)")
+        return got["items"]
     got = _fetch(task)
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_name(p.name + ".part")
@@ -572,13 +604,32 @@ def read_choice(text: str, letters: str = LETTERS) -> str | None:
 # what the model gave as its final answer; a line of code reads the same, mostly)
 # 17b: and nothing after the digits but a brace, a dollar, bold or a full stop —
 # "3.5", "3/4", "2^{10}", "12 or 13" are no integer, for the second look to read
-_OTIS = re.compile(r"(?im)ANSWER\s*:\s*\**\s*\$?\s*(?:\\boxed\{)?\s*(-?\d+(?:,\d{3})*)"
-                   r"\s*\}?\s*\$?\s*\**\s*\.?\s*$")
+# 17c: the last "ANSWER:" only — an answer the model replaced ("ANSWER: 42 …
+# ANSWER: 43 (mod 1000)") is never read from the line before — and an integer
+# that ends its line, at most six digits (and its thousands' commas), spaces
+# and tabs only between, each run of them taken whole (possessive): a long run
+# of digits or spaces can't hang or raise
+_OTIS_AT = re.compile(r"(?i)ANSWER[ \t]*:")
+_OTIS_INT = re.compile(r"[ \t]*+\**+[ \t]*+\$?[ \t]*+(?:\\boxed\{)?[ \t]*+"
+                       r"(-?\d{1,6}+(?:,\d{3}){0,2}+)(?![\d,])"
+                       r"[ \t]*+\}?[ \t]*+\$?[ \t]*+\**+[ \t]*+\.?[ \t]*+(?=\r?\n|\Z)")
 
 
 def read_integer(text: str) -> str | None:
-    found = _OTIS.findall(visible(text))
-    return str(int(found[-1].replace(",", ""))) if found else None
+    """OTIS's answer: the integer of the reply's last "ANSWER:", or None"""
+    vis = visible(text)
+    at = None
+    for at in _OTIS_AT.finditer(vis):
+        pass
+    if at is None:
+        return None
+    m = _OTIS_INT.match(vis, at.end())
+    if not m:
+        return None
+    try:
+        return str(int(m.group(1).replace(",", "")))
+    except ValueError:
+        return None
 
 
 def _math_helper(text: str) -> str | None:

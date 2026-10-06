@@ -504,18 +504,21 @@ Then **one command for each build**, each with that build's own launch — the
 import refuses a bundle whose routing variables or speculative-decoding flags
 aren't the ones registered for its `--as` (memory, context, slots, the cache
 type, flash attention and threads may differ: the parity check covers them).
+Each names its box's benchmarks with `--only` (G5's table): every benchmark
+at once would need more context than a 5090 holds, and is refused before
+anything is fetched. The two below are G5's box 6.
 
 The **phone build** (k4-LDA), registered as "routing local (no lookahead)":
 no routing variables.
 
 ```bash
-python scripts/remote_gguf.py --as served/<phone-build> --gguf hf://<you>/evalboard-private/Qwen3.6-35B-A3B-k4-LDA-UD-Q4_K_XL.gguf --server hf://<you>/evalboard-private/llama-server-cuda12.8.tar.gz --based-on Qwen/Qwen3.6-35B-A3B --thinking on --slots 8 --flags "-ctk q8_0 -ctv q8_0 --flash-attn on" --out /workspace/phone-on
+python scripts/remote_gguf.py --as served/<phone-build> --gguf hf://<you>/evalboard-private/Qwen3.6-35B-A3B-k4-LDA-UD-Q4_K_XL.gguf --server hf://<you>/evalboard-private/llama-server-cuda12.8.tar.gz --based-on Qwen/Qwen3.6-35B-A3B --thinking on --slots 8 --flags "-ctk q8_0 -ctv q8_0 --flash-attn on" --only gpqa_diamond_epoch --only otis_aime_epoch --out /workspace/phone-gpqa-otis
 ```
 
 The **original build** (k=8): none either.
 
 ```bash
-python scripts/remote_gguf.py --as served/<original-build> --gguf hf://<you>/evalboard-private/<original-build-file>.gguf --server hf://<you>/evalboard-private/llama-server-cuda12.8.tar.gz --based-on Qwen/Qwen3.6-35B-A3B --thinking on --slots 8 --flags "-ctk q8_0 -ctv q8_0 --flash-attn on" --out /workspace/orig-on
+python scripts/remote_gguf.py --as served/<original-build> --gguf hf://<you>/evalboard-private/<original-build-file>.gguf --server hf://<you>/evalboard-private/llama-server-cuda12.8.tar.gz --based-on Qwen/Qwen3.6-35B-A3B --thinking on --slots 8 --flags "-ctk q8_0 -ctv q8_0 --flash-attn on" --only gpqa_diamond_epoch --only otis_aime_epoch --out /workspace/orig-gpqa-otis
 ```
 
 A setup registered **with lookahead** gets its row only from a box run with
@@ -531,22 +534,35 @@ and its own `--as`.
 
 It prints the file's sha256, the build and the GPU, each benchmark's share,
 then a line as the run moves: answers, the pace, the time left. If the box
-stops, run **the same command** again: it asks only what is not answered, and
-refuses another build, other flags or another environment in that `--out`.
-Something already answering on its port (an earlier llama-server) is
-refused before anything starts.
+stops, run **the same command** again: it asks only what is not answered. Once
+its `--out` holds an answer, it refuses another build, other flags or another
+environment there; before that (a typo in `--flags`), the corrected command
+runs. Something already answering on its port (an earlier llama-server) is
+refused before anything starts. llama-server gets its `LLAMA_*` and `GGML_*`
+variables from `--env` only, each one recorded: one exported in the shell
+isn't passed, and the first lines say so.
+
+A question the server fails on is asked once more at the end of its
+benchmark. Failing again, it is written as no answer, counted wrong, and named
+in the log and on the row; the run carries on to the next benchmark. A server
+that fails every question it is asked, or more than one in fifty, stops the
+run, and keeps none of them.
+
+The bundle's name says the model, the thinking setting, the benchmarks and
+the shard — `frontier-served__<phone-build>-thinking-on-gpqa+otis.tar.gz`,
+`…-thinking-on-mmlu-pro-shard-1-of-3.tar.gz` — and the last line prints it.
 
 ## G3. Fetch, from the server
 
 ```bash
-scp -i ~/.ssh/vast_ed25519 -P <port> root@<host>:/workspace/phone-on/frontier-served__<phone-build>-thinking-on.tar.gz ~/benchmarks/bundles/
+scp -i ~/.ssh/vast_ed25519 -P <port> root@<host>:/workspace/phone-gpqa-otis/frontier-served__<phone-build>-thinking-on-gpqa+otis.tar.gz ~/benchmarks/bundles/
 ```
 
 ## G4. Import
 
 ```bash
 cd ~/benchmarks/aienh
-sudo docker compose exec -T bench python scripts/import_remote.py ~/benchmarks/bundles/frontier-served__<phone-build>-thinking-on.tar.gz --by masein
+sudo docker compose exec -T bench python scripts/import_remote.py ~/benchmarks/bundles/frontier-served__<phone-build>-thinking-on-gpqa+otis.tar.gz --by masein
 ```
 
 With `--file-sha256 <the sha256 from G0>` the first time, if the board has no

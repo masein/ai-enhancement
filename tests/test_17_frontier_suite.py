@@ -323,7 +323,8 @@ def test_a_box_runs_mmlu_pro_and_otis_and_the_server_scores_them(box, monkeypatc
     import test_17_gguf_box as g
     monkeypatch.setattr(g, "TASK", "mmlupro_tiger")
     assert run_box(box, "run", "--only", "otis_aime_epoch") == 0
-    path = box["root"] / "run" / rb.bundle_name("frontier", SERVED, True)
+    path = box["root"] / "run" / rb.bundle_name("frontier", SERVED, True,
+                                                parts=["otis", "mmlu-pro"])
     b = rb.read(path)
     assert set(b["bundle"]["tasks"]) == {"mmlupro_tiger", "otis_aime_epoch"}
     # the box asked with the 5-shot examples: the fake saw them in each prompt
