@@ -30,10 +30,10 @@ def test_12_save_with_no_name_asks_it_in_the_dialog_and_says_why_beside_save(liv
     msg = page.locator("[data-dialog='test'] [data-srv-msg]")
     assert "Your name is recorded with what you save" in msg.inner_text()
     assert not page.locator("#pop-who").is_visible()
-    # the word beside Save, in sight
-    box, save = msg.bounding_box(), page.locator("[data-srv-save]").bounding_box()
-    assert box and save and abs(box["y"] - save["y"]) < 40
-    assert 0 <= box["y"] <= 800
+    # the word beside Save — in Save's own row — and in sight
+    assert page.locator(".frm:has([data-srv-save]) [data-srv-msg]").count() == 1
+    box = msg.bounding_box()
+    assert box and 0 <= box["y"] and box["y"] + box["height"] <= 800
     name.fill("masein")
     name.press("Enter")
     page.wait_for_function("(document.querySelector('[data-srv-msg]') || {}).textContent"

@@ -249,7 +249,8 @@ def test_gguf_run_bundle_and_import(box, monkeypatch, tmp_path):
     row = config.OUT_DIR / ROW
     res = json.loads(next(sf.task_dir(row, TASK).glob("results_*.json")).read_text())
     assert res["results"][TASK]["acc,none"] == pytest.approx(expected())
-    assert res["frontier"]["where"] == "run on a rented GPU (NVIDIA GeForce RTX 5090)"
+    # 17f: where it ran, as Runs says it
+    assert res["frontier"]["where"] == "rented GPU · RTX 5090"
     assert res["frontier"]["epochs"] == RUNS and res["frontier"]["ran_out"] == 0
     # the board reads it as the model's "· thinking" row — a Frontier benchmark,
     # never in an average
@@ -309,7 +310,8 @@ def test_two_shards_add_up(box):
     res = json.loads(next(sf.task_dir(config.OUT_DIR / ROW, TASK).glob("results_*.json"))
                      .read_text())
     assert res["results"][TASK]["acc,none"] == pytest.approx(expected())
-    assert res["frontier"]["where"] == "run on a rented GPU (NVIDIA GeForce RTX 5090)"
+    # 17f: where it ran, as Runs says it
+    assert res["frontier"]["where"] == "rented GPU · RTX 5090"
 
 
 def test_another_file_is_refused(box):

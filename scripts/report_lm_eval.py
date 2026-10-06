@@ -19209,7 +19209,8 @@ function vQueue(part = { form: true, list: true }) {
         catch { return ''; } })() : '') }, r.suite === 'gguf' ? runName(r) : r.hf_id,
       el('span', { class: 'badge' + (r.kind === 'instruct' ? ' instruct' : ''), text: r.kind }),
       // 17f: where it ran, one wording everywhere
-      el('div', { class: 'small se', 'data-run-where': String(r.id), text: runWhere(r) })),
+      el('div', { class: 'small se', style: 'line-height:1.2',
+        'data-run-where': String(r.id), text: runWhere(r) })),
     // a judged row says what it sat, in one line: the list is behind ▸ (11i)
     el('td', { class: 'small' }, suiteCell(r, 'q')),
     el('td', { text: r.submitter || '—' }),
