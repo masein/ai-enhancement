@@ -569,7 +569,7 @@ def register_openrouter(model_id: str, by: str) -> dict:
     first provider, with that provider's prices. Whether it thinks is what
     OpenRouter says; not said, "the model decides". Added again, it is pinned
     again, to what OpenRouter lists now"""
-    p = ai_models.pin((model_id or "").strip())
+    p = ai_models.pin((model_id or "").strip(), SPEND_JOB)
     m = ai_models.model(p["id"]) or {}
     name = p["name"].split(": ", 1)[-1]
     thinking = "off" if m.get("reasons") is False else "auto"

@@ -47,7 +47,7 @@ def svc(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "OPENROUTER_API_KEY", "test-key")
     monkeypatch.setattr(llm, "_http", lambda *a, **k: pytest.fail("nothing calls OpenRouter"))
     monkeypatch.setattr(ai_models, "drifted", lambda pin: "")
-    monkeypatch.setattr(ai_models, "pin", lambda mid: {
+    monkeypatch.setattr(ai_models, "pin", lambda mid, job="pin": {
         "kind": "openrouter", "id": mid, "version": GRADERS[mid][0], "name": mid, "provider": "p",
         "provider_name": "Prov", "precision": "unknown", "price_in": GRADERS[mid][1],
         "price_out": GRADERS[mid][2]})
@@ -224,16 +224,19 @@ def test_each_grader_reads_its_reply_as_its_owners_do():
     item = {"answer": "042"}
     assert fg.read("simpleqa", "A", {})["ok"] is True
     assert fg.read("simpleqa", "C", {})["words"] == "not attempted"
-    # Google's own reading: the first capital A, B or C anywhere ("INCORRECT" holds a C),
-    # else the words, lower case included
-    assert fg.read("simpleqa", "it is INCORRECT", {})["grade"] == "C"
+    # 17b: a bare letter as Google reads it; else whole words, as the board's
+    # SimpleQA judge reads them ("INCORRECT" is B, never the C inside it);
+    # else not a grade — asked again
+    assert fg.read("simpleqa", "it is INCORRECT", {})["grade"] == "B"
     assert fg.read("simpleqa", "correct", {})["grade"] == "A"
-    assert fg.read("simpleqa", "", {})["grade"] == "C"
+    assert fg.read("simpleqa", "NOT_ATTEMPTED", {})["grade"] == "C"
+    assert fg.read("simpleqa", "", {})["ok"] is None
+    assert fg.read("simpleqa", "As an AI I cannot grade this", {})["ok"] is None
     h = fg.read("hle", "extracted_final_answer: 12\nreasoning: same\ncorrect: yes\nconfidence: 80",
                 {})
     assert h["ok"] is True and h["confidence"] == 80 and "read as 12" in h["words"]
     assert fg.read("hle", "correct: no", {})["ok"] is False
-    assert fg.read("hle", "I can't tell", {})["ok"] is False               # unread: wrong
+    assert fg.read("hle", "I can't tell", {})["ok"] is None                # unread: asked again
     assert fg.read("math", " Yes\n", {})["ok"] is True and fg.read("math", "No", {})["ok"] is False
     assert fg.read("otis", "42", item)["ok"] is True and fg.read("otis", "NONE", item)["ok"] is False
     # the prompts as their owners wrote them

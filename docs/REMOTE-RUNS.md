@@ -545,10 +545,17 @@ wrong wait for Epoch's model check. **Nothing is sent by itself.**
 AI models ▸ "Frontier benchmarks: grading" lists each grader with its model
 (the owners' where it is still served: gpt-4.1-2025-04-14 for SimpleQA,
 o3-mini-2025-01-31 for HLE) and its prompt's sha256, then the dry run — each
-benchmark's answers waiting, and what they would cost. "change ▾" picks
-another model; **Start grading** pins each grader and sends what waits; Stop
-holds it. As grades land, each benchmark is scored again, and its cell says
-who graded it, with which prompt (MATH and OTIS: the code's number beside it).
+benchmark's answers waiting, and what they would cost (and, at most, if
+every reply used its grader's cap). "change ▾" picks another model; choosing
+one asks each of its providers one paid token first, counted in the month's
+spend. **Start grading** pins each grader and sends what waits, once however
+often it is pressed; Stop holds it, and the card then says why it waits —
+Stop, a run of refusals, the month's limit — beside **Carry on**. As grades
+land, each benchmark is scored again, and its cell says who graded it, with
+which prompt (MATH and OTIS: the code's number beside it). A reply that is
+empty, cut at its cap or not a grade is listed under the card, with a batch
+that failed and why, and the next Start asks it again. A score from two
+graders or prompts names both and isn't final: choose one and grade again.
 
 ## G5. The full run: which box runs what
 

@@ -176,7 +176,7 @@ def save(slot: str, model_id: str, by: str) -> dict:
         raise ValueError(why)
     if not ai_models.has_key():
         raise ValueError("OpenRouter has no key on this server (OPENROUTER_API_KEY)")
-    value = ai_models.pin(model_id.strip())
+    value = ai_models.pin(model_id.strip(), JOB)
     db.ai_set(_setting(slot), value, by)
     return value
 
@@ -427,7 +427,7 @@ def _pinned(slot: str, by: str) -> dict:
         return c
     d = mmp.DEFAULT_LABELLERS[slot]
     try:
-        value = ai_models.pin(d["id"])
+        value = ai_models.pin(d["id"], JOB)
     except ValueError as e:
         # 16c: in OpenRouter's words (ai_models.refusal), "choose another" once
         raise ValueError(f"{SLOT_LABEL[slot]}: {e}") from None

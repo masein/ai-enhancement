@@ -70,7 +70,7 @@ def svc(tmp_path, monkeypatch):
     client.__exit__(None, None, None)
 
 
-def fake_pin(model_id: str) -> dict:
+def fake_pin(model_id: str, job: str = "pin") -> dict:
     return {"kind": "openrouter", "id": model_id, "version": model_id + "-20260901",
             "name": model_id.split("/")[-1], "provider": "prov/x", "provider_name": "Prov",
             "precision": "unknown", "price_in": 1.0, "price_out": 5.0}

@@ -90,7 +90,10 @@ def test_the_grading_card_names_each_grader_and_prices_start(live, page, width):
     cost = page.evaluate("usd(state.ai.frg.estimate.usd)")       # the page's own money format
     assert cost.startswith("$0.01")
     total = card.locator("[data-frontier-total]").inner_text()
-    assert total.startswith(f"Start: about {cost} for 5 answers · this month $")
+    # 17b: and what the caps allow, at most
+    most = page.evaluate("usd(state.ai.frg.estimate.usd_max)")
+    assert total.startswith(f"Start: about {cost} for 5 answers (at most {most}, were every "
+                            "reply to use its cap) · this month $")
     start = card.locator("[data-frontier-start]")
     assert start.is_enabled() and start.inner_text() == f"Start grading: about {cost}"
     # nothing has been sent

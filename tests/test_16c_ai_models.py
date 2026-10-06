@@ -132,7 +132,7 @@ def test_start_with_a_labeller_that_cant_be_pinned_sends_nothing_and_says_why_on
     chat = Chat()
     labelling(monkeypatch, chat)
 
-    def pin(model_id):
+    def pin(model_id, job="pin"):
         if model_id == mmp.DEFAULT_LABELLERS["third"]["id"]:
             raise ValueError(f"{model_id} couldn’t be pinned: {LIMIT_WORDS}")
         return fake_pin(model_id)

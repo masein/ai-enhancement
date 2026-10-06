@@ -130,7 +130,14 @@ def parse_grade(text: str) -> str | None:
     m = _LETTER.search(t)
     if m:
         return GRADES[m.group(1)]
-    m = _WORD.search(t.upper())
+    return parse_words(t)
+
+
+def parse_words(text: str) -> str | None:
+    """parse_grade's second half: CORRECT, INCORRECT or NOT_ATTEMPTED as whole
+    words, or None — 17b: how the Frontier suite's SimpleQA grader reads a
+    reply that isn't a bare letter"""
+    m = _WORD.search((text or "").upper())
     if m:
         return {"CORRECT": "correct", "INCORRECT": "incorrect"}.get(m.group(1), "not_attempted")
     return None

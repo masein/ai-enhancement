@@ -19,12 +19,34 @@ kept beside the answers (grades.json: the grader's pin and its prompt's
 sha256, and each answer's grade), and the benchmark is scored again. An answer
 the grader refuses is kept as refused, in its words, and asked again by the
 next Start.
+
+17b, before anyone presses Start:
+- **Start once.** Start lists what waits and sends it under a lock, across
+  threads and processes: a second press waits, then finds it out.
+- **Recorded, then sent.** A batch is on disk and in the database before its
+  first request goes; a batch nobody recorded is never sent.
+- **A grade is a grade.** An empty reply, one cut at its cap, one that can't
+  be read as a grade, or one `finish()` fails on (one answer at a time) is
+  listed beside the refusals, and asked again by the next Start. Each
+  grader's reasoning is set and its cap sized for it (frontier_graders.ask);
+  the dry run counts with the same numbers, and says what the caps allow.
+- **The answer it graded.** A grade keeps the sha256 of the answer it was
+  given, its grader's version and its prompt's sha256. An answer replaced
+  while its batch was out is graded again; a score from more than one
+  grader or prompt says so, and isn't final.
+- **The card** says why a batch failed and why one waits (Stop, a run of
+  refusals, the month's limit), with Carry on; and that choosing a grader
+  asks each provider one paid token, counted in the month's spend.
 """
 
 from __future__ import annotations
 
+import contextlib
+import fcntl
 import json
+import os
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -39,6 +61,9 @@ KIND = "frgr"
 JOB = "grader"
 STOPPED = "stopped — Start carries on where it stopped"
 CHARS_A_TOKEN = 4                      # the dry run's count of a prompt, before it is sent
+PROBE_WORDS = ("Choosing a grader asks each of its providers one token first, to check it "
+               "keeps no prompt (a fraction of a cent each), counted in this month's spend.")
+_START = threading.Lock()
 
 
 class GraderChat(llm.OpenRouterChat):
@@ -89,7 +114,7 @@ def save(slot: str, model_id: str, by: str) -> dict:
     if model_id == ai_models.LOCAL:
         raise ValueError("a grader is a model on OpenRouter: the server's own judge isn't the "
                          "benchmark owners'")
-    value = ai_models.pin(model_id)
+    value = ai_models.pin(model_id, JOB)
     db.ai_set(_setting(slot), value, by)
     return value
 
@@ -167,6 +192,11 @@ def _price(g: dict) -> tuple[float | None, float | None]:
     return g.get("price_in"), g.get("price_out")
 
 
+def reasons(g: dict) -> bool | None:
+    """whether OpenRouter lists the grader as a model that reasons"""
+    return (_cached(g.get("id") or "") or {}).get("reasons")
+
+
 def estimate() -> dict:
     """the dry run: each grader's answers, tokens and cost for what waits.
     Nothing is sent"""
@@ -178,28 +208,39 @@ def estimate() -> dict:
         g = grader(slot)
         items = {it["id"]: it for it in fb.load(w["task"], config.BENCH_ROOT)}
         tin = sum(len(fg.render(slot, items[x["id"]], x)) for x in w["items"]) // CHARS_A_TOKEN
-        tout = len(w["items"]) * fg.GRADERS[slot]["out_tokens"]
+        # 17b: what Start sends with each answer — its reasoning and its cap
+        a = fg.ask(slot, reasons(g))
+        cap = min(a["max_tokens"], config.OPENROUTER_MAX_TOKENS)
+        tout = len(w["items"]) * a["out_tokens"]
+        tmax = len(w["items"]) * cap
         pin, pout = _price(g)
         # prices are per million tokens, as OpenRouter's list gives them
         usd = ((tin * pin + tout * pout) / 1e6 if pin is not None and pout is not None
                else None)
+        most = ((tin * pin + tmax * pout) / 1e6 if pin is not None and pout is not None
+                else None)
         e = per.setdefault(slot, {"answers": 0, "tokens_in": 0, "tokens_out": 0, "usd": 0.0,
-                                  "usd_known": True})
+                                  "usd_known": True, "tokens_out_max": 0, "usd_max": 0.0,
+                                  "cap": cap, "reasoning": a["reasoning"],
+                                  "reasoning_words": fg.GRADERS[slot]["reasoning_words"]})
         e["answers"] += len(w["items"])
         e["tokens_in"] += tin
         e["tokens_out"] += tout
+        e["tokens_out_max"] += tmax
         if usd is None:
             e["usd_known"] = False
         else:
             e["usd"] += usd
+            e["usd_max"] += most
         rows.append({"slot": slot, "task": w["task"], "label": fb.BENCH[w["task"]]["label"],
                      "model": w["model"], "answers": len(w["items"]),
                      "usd": None if usd is None else round(usd, 4)})
     for e in per.values():
-        e["usd"] = round(e["usd"], 4)
+        e["usd"], e["usd_max"] = round(e["usd"], 4), round(e["usd_max"], 4)
     total = round(sum(e["usd"] for e in per.values()), 4)
     est = {"graders": per, "rows": rows, "answers": sum(e["answers"] for e in per.values()),
-           "usd": total, "usd_known": all(e["usd_known"] for e in per.values())}
+           "usd": total, "usd_max": round(sum(e["usd_max"] for e in per.values()), 4),
+           "usd_known": all(e["usd_known"] for e in per.values())}
     try:
         est.update(over_limit=ai_models.over_limit(), limit=ai_models.limit(),
                    spent=round(db.spend_this_month(), 2))
@@ -231,7 +272,7 @@ def _pinned(slot: str, by: str) -> dict:
     if c:
         return c
     try:
-        value = ai_models.pin(fg.GRADERS[slot]["suggested"])
+        value = ai_models.pin(fg.GRADERS[slot]["suggested"], JOB)
     except ValueError as e:
         raise ValueError(f"{fg.GRADERS[slot]['label']}: {e}") from None
     db.ai_set(_setting(slot), value, by)
@@ -241,28 +282,56 @@ def _pinned(slot: str, by: str) -> dict:
 def _submit(w: dict, pin: dict, by: str) -> str:
     slot, task = w["slot"], w["task"]
     items = {it["id"]: it for it in fb.load(task, config.BENCH_ROOT)}
-    g = fg.GRADERS[slot]
+    a = fg.ask(slot, reasons(pin))
+    todo = [x for x in w["items"] if x["id"] in items]
     reqs = [llm.Request(f"frgr:{sf.gkey(x['id'], x['epoch'])}", "",
                         fg.render(slot, items[x["id"]], x),
-                        max_tokens=min(g["max_tokens"], config.OPENROUTER_MAX_TOKENS),
-                        meta={"kind": KIND})
-            for x in w["items"] if x["id"] in items]
+                        max_tokens=min(a["max_tokens"], config.OPENROUTER_MAX_TOKENS),
+                        reasoning=a["reasoning"], meta={"kind": KIND})
+            for x in todo]
     if not reqs:
         return ""
-    bid = _backend(pin).submit(reqs)
+    # 17b: on disk and in the database before the first request goes
+    be = _backend(pin)
+    bid = be.submit(reqs, start=False)
     p = gdir() / "batches" / f"{bid}.json"
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps({"slot": slot, "task": task, "row": w["row"], "model": w["model"],
                              "base": w["base"], "pin": pin, "prompt_sha256": fg.prompt_sha(slot),
                              "keys": [r.custom_id.split(":", 1)[1] for r in reqs],
+                             # the answers sent: a grade counts for these alone
+                             "answers": {sf.gkey(x["id"], x["epoch"]): sf.answer_sha(x["answer"])
+                                         for x in todo},
+                             "max_tokens": reqs[0].max_tokens, "reasoning": a["reasoning"],
                              "by": by, "at": time.time()}), encoding="utf-8")
     db.batch_add(bid, KIND, 0, len(reqs), "openrouter", pin["id"])
+    be.resume(bid)
     return bid
+
+
+@contextlib.contextmanager
+def _one_start():
+    """17b: one Start at a time — in this process, and across processes"""
+    gdir().mkdir(parents=True, exist_ok=True)
+    with _START:
+        fd = os.open(gdir() / "start.lock", os.O_CREAT | os.O_RDWR, 0o644)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            yield
+        finally:
+            os.close(fd)
 
 
 def start(by: str) -> dict:
     """masein's Start, after the dry run: each grader with answers to see
-    pinned, the stop lifted, and what waits sent. Started again, it carries on"""
+    pinned, the stop lifted, and what waits sent. Started again, it carries on.
+    17b: what waits is listed inside the lock — a second press finds the
+    first one's batches out, and sends nothing twice"""
+    with _one_start():
+        return _start(by)
+
+
+def _start(by: str) -> dict:
     why = ai_models.over_limit() or ("" if ai_models.has_key() else
                                      "OpenRouter has no key on this server (OPENROUTER_API_KEY)")
     if why:
@@ -319,18 +388,36 @@ def finish(batch_id: str, results: dict) -> int:
                or x.get("prompt_sha256") != rec["prompt_sha256"]]
     g["graders"] = [*graders, rec]
     g["grader"] = rec
+    sent = meta.get("answers") or {}
+    now = {sf.gkey(q, e): sf.answer_sha(a.get("answer") or "")
+           for (q, e), a in sf.read_answers(d / sf.ANSWERS).items()}
+    cap = meta.get("max_tokens")
     n = 0
     for cid, res in results.items():
         key = cid.split(":", 1)[1]
         qid = key.rsplit("#", 1)[0]
-        if res.error:
-            g["refused"][key] = {"words": llm.plain_error(res.error), "by": rec["version"],
-                                 "at": time.time()}
-            continue
-        got = fg.read(slot, res.text, items.get(qid) or {})
-        g["items"][key] = {**got, "by": rec["version"], "at": time.time()}
-        g["refused"].pop(key, None)
-        n += 1
+        # 17b: one answer at a time — a reply this can't read fails that
+        # answer, never the batch and the replies beside it
+        try:
+            if key not in sent or sent[key] != now.get(key):
+                continue                # the answer changed while out: graded again
+            why = (llm.plain_error(res.error) if res.error
+                   else f"the reply was cut at its cap of {cap or 'its'} tokens"
+                   if res.finish == "length" else "")
+            got = None if why else fg.read(slot, res.text, items.get(qid) or {})
+            if got is not None and got.get("ok") is None:
+                why = got["unread"]
+            if why:
+                g["refused"][key] = {"words": why, "by": rec["version"], "at": time.time(),
+                                     "kind": "error" if res.error else "unread"}
+                continue
+            g["items"][key] = {**got, "by": rec["version"], "prompt_sha256": rec["prompt_sha256"],
+                               "answer_sha256": sent[key], "at": time.time()}
+            g["refused"].pop(key, None)
+            n += 1
+        except Exception as e:                      # noqa: BLE001 — that answer only
+            g["refused"][key] = {"words": f"its reply couldn't be read: {e!r}"[:300],
+                                 "by": rec["version"], "at": time.time(), "kind": "unread"}
     d.mkdir(parents=True, exist_ok=True)
     tmp = d / (sf.GRADES + ".part")
     tmp.write_text(json.dumps(g, indent=1, ensure_ascii=False), encoding="utf-8")
@@ -359,6 +446,50 @@ def _progress(p: dict) -> str:
     return f"{line} · {tl['halted']}" if tl.get("halted") else line
 
 
+def last_failed() -> list[dict]:
+    """17b: each grader's last batch, when it failed — whole, or some of its
+    requests — in one line (llm.batch_line), as the Mobile-MMLU key's card
+    says it"""
+    out: dict = {}
+    for r in db.batches_list(500):
+        if r["kind"] != KIND:
+            continue
+        try:
+            slot = _meta(r["batch_id"])["slot"]
+        except (OSError, ValueError, KeyError):
+            continue
+        if slot in out:
+            continue
+        tl = llm.tally(r["batch_id"])
+        err = r.get("error") if r.get("status") == "failed" else ""
+        out[slot] = {"slot": slot, "batch_id": r["batch_id"], "status": r.get("status"),
+                     "failed": bool((tl or {}).get("failed") or err),
+                     "line": f"{fg.GRADERS[slot]['label']}’s last batch: "
+                             f"{llm.batch_line(tl, err or '')}"}
+    return [x for x in out.values() if x["failed"]]
+
+
+def waits() -> list[str]:
+    """17b: why the batches out send nothing now — Stop, a run of refusals,
+    the month's limit — each in words; Carry on lifts the first two"""
+    out = []
+    p = pending()
+    if not p:
+        return out
+    st = stopped()
+    if st:
+        out.append(f"Stopped by {st.get('by') or 'someone'}: "
+                   f"{sum(len(x.get('keys') or []) for x in p):,} answers wait to be sent")
+    limit = ai_models.over_limit()
+    if limit:
+        out.append(limit)
+    for x in p:
+        h = (llm.tally(x["batch_id"]) or {}).get("halted")
+        if h:
+            out.append(f"{fg.GRADERS[x['slot']]['label']}: {h}")
+    return out
+
+
 def refusals() -> list[dict]:
     """each benchmark's answers its grader refused, with the last words"""
     out = []
@@ -380,7 +511,9 @@ def status() -> dict:
                          "task": g["task"], "benchmark": fb.BENCH[g["task"]]["label"],
                          "suggested": g["suggested"], "owners": g["owners"],
                          "prompt": g["prompt_words"], "prompt_sha256": fg.prompt_sha(s),
-                         "chosen": chosen(s), "now": grader(s)}
+                         "chosen": chosen(s), "now": grader(s),
+                         "ask": fg.ask(s, reasons(grader(s))),
+                         "reasoning_words": g["reasoning_words"]}
                         for s, g in fg.GRADERS.items()],
             "estimate": est,
             "key_warning": ai_models.more_than_key(est.get("usd")),
@@ -389,4 +522,7 @@ def status() -> dict:
                         for p in pending()],
             "refused": refusals(),
             "stopped": stopped(),
+            "waits": waits(),
+            "last": last_failed(),
+            "probe_words": PROBE_WORDS,
             "has_key": ai_models.has_key()}
