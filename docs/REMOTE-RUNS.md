@@ -378,14 +378,20 @@ hf upload <you>/evalboard-private ~/Qwen3.6-35B-A3B-k4-LDA-UD-Q4_K_XL.gguf Qwen3
 **The file's sha256, on the board.** The import refuses a file that isn't the
 one registered for the served model. If its file is registered on its page
 (Download ▸ register its file) and the GGUF worker has hashed it, the board has
-the sha256 already. Otherwise, on the server:
+the sha256 already. Otherwise, on the server, one line per build's file (each
+takes a minute or two):
 
 ```bash
 sha256sum ~/Qwen3.6-35B-A3B-k4-LDA-UD-Q4_K_XL.gguf
 ```
 
-and give it to the first import (`--file-sha256`, step G4): the board keeps it
-on the model, with your name.
+```bash
+sha256sum ~/<original-build-file>.gguf
+```
+
+Keep both: the parity check compares the box's file with them (G1b), and each
+build's first import gives its own (`--file-sha256`, step G4): the board keeps
+it on the model, with your name.
 
 ## G1. What to rent
 
@@ -412,10 +418,17 @@ q8_0. Before anything else, the same 50 MMLU-Pro questions (`scripts/frontier.py
 `PARITY`), thinking off and greedy, on both, each with its own launch.
 **Compared:** the letter each side reads from each reply (TIGER-Lab's
 extraction), and whether the replies are identical. **The same:** the same
-letter on at least 46 of the 50. Greedy decoding on two machines with other
-batch sizes, cache types and kernels isn't bit-for-bit the same, so whole
-replies may part: they are counted, not required. One build at a time, the
-phone build first.
+letter on at least 46 of the 50, a question counting only when both sides
+read a letter from it (two empty replies aren't the same answer). Greedy
+decoding on two machines with other batch sizes, cache types and kernels
+isn't bit-for-bit the same, so whole replies may part: they are counted, not
+required. One build at a time, the phone build first.
+
+Each side's file opens with what answered: the served model, the file's name,
+size and sha256, and the launch. The server's side is asked only while its
+server serves the file registered. `compare` refuses the same file twice, a
+question answered twice, two sides with other files, and a box whose routing
+or speculative decoding isn't the one registered for the build.
 
 On the server, with the queue idle and the build served as it serves the
 board. The folder first, as you: the container runs as root, and a folder it
@@ -440,6 +453,10 @@ build with the full run's flags:
 python scripts/remote_gguf.py --as served/<phone-build> --gguf hf://<you>/evalboard-private/Qwen3.6-35B-A3B-k4-LDA-UD-Q4_K_XL.gguf --server hf://<you>/evalboard-private/llama-server-cuda12.8.tar.gz --based-on Qwen/Qwen3.6-35B-A3B --thinking off --slots 8 --flags "-ctk q8_0 -ctv q8_0 --flash-attn on" --parity --out /workspace/parity-phone
 ```
 
+It fetches the GGUF and the tarball into `/workspace/files`, a folder every
+run on the box shares: the full run (G2) after it fetches and hashes nothing
+again. It prints the file’s sha256 (its first 16 characters).
+
 Then on the server:
 
 ```bash
@@ -447,10 +464,14 @@ scp -i ~/.ssh/vast_ed25519 -P <port> root@<host>:/workspace/parity-phone/parity.
 ```
 
 ```bash
-sudo docker compose exec -T bench python scripts/frontier_parity.py compare /home/masein/benchmarks/parity/phone-server.jsonl /home/masein/benchmarks/parity/phone-box.jsonl
+sudo docker compose exec -T bench python scripts/frontier_parity.py compare /home/masein/benchmarks/parity/phone-server.jsonl /home/masein/benchmarks/parity/phone-box.jsonl --file-sha256 <the phone file's sha256 from G0>
 ```
 
-It prints "The same: 48 of 50 read as the same letter …" or "Not the same: …".
+It prints "The same: 48 of the 50 read on both sides as the same letter …",
+"Not the same: …", or "Not the same setup: …" (another file or launch: fix the
+box's command before anything else). The board has no sha256 of either build's
+file today, so `--file-sha256` is what compares the files whole; without it
+they are compared by name and size, and it says so.
 Not the same: run the box's parity again with the server's own launch
 (`--slots 1`, no `--flags`), into another `--out`. If that is the same, the
 box's cache type or slots are the difference; either way, stop and say so

@@ -244,7 +244,7 @@ def test_6_the_parity_check_compares_the_server_and_the_box(box, monkeypatch, sv
     # the box: --parity asks the 50, thinking off, and makes no bundle
     log = box["log"]
     assert run_box(box, "parity", "--parity") == 0
-    box_lines = fp.read(box["root"] / "parity" / "parity.jsonl")
+    _, box_lines = fp.read(box["root"] / "parity" / "parity.jsonl")
     assert len(box_lines) == 50 and not list((box["root"] / "parity").glob("*.tar.gz"))
     asked = [json.loads(x) for x in log.read_text().splitlines()]
     assert all(r["chat_template_kwargs"] == {"enable_thinking": False}
@@ -257,19 +257,22 @@ def test_6_the_parity_check_compares_the_server_and_the_box(box, monkeypatch, sv
                                "thinking": "off"}, ME)
         out = box["root"] / "server.jsonl"
         assert fp.main(["ask", "--as", rec["id"], "--out", str(out)]) == 0
-        server_lines = fp.read(out)
+        _, server_lines = fp.read(out)
     finally:
         fake.close()
     assert [r["id"] for r in server_lines] == [r["id"] for r in box_lines]
     got = fb.parity_compare(server_lines, box_lines)
     assert got["ok"] and got["same"] == 50 and got["identical"] == 0
-    assert got["words"].startswith("The same: 50 of 50 read as the same letter")
+    assert got["words"].startswith("The same: 50 of the 50 read on both sides as the same "
+                                   "letter")
     # four that part: still the same; five: not
     for k, ok in ((4, True), (5, False)):
         other = [{**r, "answer": "the answer is (B)"} if i < k else r
                  for i, r in enumerate(server_lines)]
         assert fb.parity_compare(other, box_lines)["ok"] is ok
-    assert fp.main(["compare", str(out), str(box["root"] / "parity" / "parity.jsonl")]) == 0
+    # 17c: compare refuses these two — the server's answered as another model
+    # (tests/test_17c_review.py has the pair that compares)
+    assert fp.main(["compare", str(out), str(box["root"] / "parity" / "parity.jsonl")]) == 1
 
 
 # ---------------------------------------------------------------------------

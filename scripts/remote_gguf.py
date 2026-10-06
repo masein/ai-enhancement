@@ -37,6 +37,11 @@ a resume with others is refused (the slots may change; each session's are
 recorded). --parity asks the parity check's 50 questions instead
 (scripts/frontier_parity.py): the pilot's first step.
 
+17c: the GGUF and the tarball are fetched into one folder every run on the
+box shares (--files; a folder "files" beside --out), so the full run after
+the parity check fetches and hashes nothing again. The parity file opens
+with what answered: the file's name, size and sha256, and the launch.
+
 The token is typed, never on the command line (where the shell's history
 would keep it):
 
@@ -167,15 +172,30 @@ def split_sha(parts: list[tuple[str, str]]) -> str:
     return hashlib.sha256("".join(f"{n} {h}\n" for n, h in parts).encode()).hexdigest()
 
 
-def sha256_cached(path: Path, state: dict, say) -> str:
+def sha256_cached(path: Path, state: dict, say, shared: Path | None = None) -> str:
     """a file's sha256, kept with its size and time so a second session
-    doesn't read 20 GB again"""
+    doesn't read 20 GB again — 17c: and beside the shared files, so another
+    --out on this box doesn't either"""
     st = path.stat()
     key = f"{path}:{st.st_size}:{int(st.st_mtime)}"
     known = state.setdefault("hashes", {})
+    if key not in known and shared is not None:
+        try:
+            had = json.loads(shared.read_text(encoding="utf-8"))
+            if isinstance(had.get(key), str):
+                known[key] = had[key]
+        except (OSError, ValueError, AttributeError):
+            pass
     if key not in known:
         say(f"sha256 of {path.name} ({st.st_size / 1e9:.1f} GB)…")
         known[key] = rb.sha256_file(path)
+        if shared is not None:
+            try:
+                had = json.loads(shared.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                had = {}
+            had[key] = known[key]
+            shared.write_text(json.dumps(had, indent=1), encoding="utf-8")
     return known[key]
 
 
@@ -497,6 +517,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--only", action="append", choices=fb.TASKS,
                     help="one task (repeatable); every task when none is given")
     ap.add_argument("--out", default="remote-gguf", help="where the run and its bundle go")
+    ap.add_argument("--files", default="",
+                    help="17c: where the GGUF and the server tarball are fetched to, shared by "
+                         "every run on this box (default: a folder 'files' beside --out)")
     ap.add_argument("--shard", default="", help="i/n: this box's share of each task, every n-th "
                                                 "question from the i-th")
     ap.add_argument("--slots", type=int, default=8, help="questions at a time (llama-server -np)")
@@ -545,9 +568,13 @@ def main(argv: list[str] | None = None) -> int:
 
     # a split GGUF (…-00001-of-00002.gguf): every part, each hashed; llama-server
     # is given the first and finds the others beside it
-    paths = [fetch(src, out / "files", say) for src in split_parts(a.gguf)]
+    # 17c: one folder for every run on this box — the parity check's and the
+    # full run's — so the 23 GB file is fetched and hashed once
+    files = Path(a.files).resolve() if a.files else out.parent / "files"
+    files.mkdir(parents=True, exist_ok=True)
+    paths = [fetch(src, files, say) for src in split_parts(a.gguf)]
     gguf_path = paths[0]
-    shas = [sha256_cached(x, state, say) for x in paths]
+    shas = [sha256_cached(x, state, say, files / "sha256.json") for x in paths]
     sha = shas[0] if len(paths) == 1 else split_sha(
         [(x.name, h) for x, h in zip(paths, shas)])
     if state.get("gguf_sha256") and state["gguf_sha256"] != sha:
@@ -557,7 +584,7 @@ def main(argv: list[str] | None = None) -> int:
             "source": a.gguf if a.gguf.startswith("hf://") else "a path on the box",
             **({"parts": [{"name": x.name, "sha256": h, "size": x.stat().st_size}
                           for x, h in zip(paths, shas)]} if len(paths) > 1 else {})}
-    tb = fetch(a.server, out / "files", say)
+    tb = fetch(a.server, files, say)
     srv = unpack_server(tb, out / "server")
     env = server_env(srv, extra_env)
     ver = version_of(srv["bin"], env)
@@ -628,8 +655,20 @@ def main(argv: list[str] | None = None) -> int:
                             + " ".join(server["argv"]), flags, extra_env)
         if a.parity:
             from service import frontier as sf
+            from service import served as sv
             dest = out / "parity.jsonl"
-            n = sf.parity_ask(rec, dest, lambda k, of: say(f"parity {k} of {of}"))
+            # 17c: what answered, for compare: the file, the launch, the slots
+            try:
+                seen = sv.probe(srv_proc.base)
+            except ValueError:
+                seen = {}
+            ident = {"side": "box", "as": a.served_as,
+                     "file": {k: gguf[k] for k in ("name", "size", "sha256")},
+                     "server": {k: server[k] for k in ("build", "commit", "binary_sha256",
+                                                       "flags", "env", "argv", "slots")},
+                     "speculative": seen.get("speculative"), "gpu": gpu.get("name")}
+            n = sf.parity_ask(rec, dest, lambda k, of: say(f"parity {k} of {of}"),
+                              identity=ident)
             say(f"parity: {n} answers · {dest} — fetch it, then on the server: "
                 "scripts/frontier_parity.py compare <server's> <this>")
             return 0

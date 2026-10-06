@@ -4953,6 +4953,33 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17c.1 — the second review's part 1: the parity check (6 Oct)
+
+The second review round re-ran the first one's reproductions on 0a81fc2
+(`docs/prompts/phase-17c-second-review-fixes.md`). Part 1 blocks the pilot:
+- **A question counts only when both sides read a letter**
+  (`frontier.parity_compare`). Fifty empty replies on both sides were "the
+  same". The words give the letters each side read, and each side needs 46
+  of 50. The same file twice (by path or by bytes), and a file holding a
+  question twice, are refused.
+- **What answered, compared.** Each side's parity file opens with a
+  `{"parity_of": …}` line: the side, the served model, the file's name, size
+  and sha256, and the launch. On the box that is its flags and environment;
+  on the server, the launch registered for the model.
+  - The server's side is asked only while its server serves the file
+    registered (`served.check_pin`).
+  - `compare` refuses two sides with other models or files, and a box
+    whose routing or speculative decoding isn't the one registered.
+  - The board has no sha256 of either build's file today, so
+    `--file-sha256` (G0's `sha256sum`) compares the files whole; without it
+    they are compared by name and size, and it says so.
+- **One download per box.** `remote_gguf.py` fetches the GGUF and the
+  tarball into `--files`, by default a folder `files` beside `--out`
+  (`/workspace/files`), and keeps their sha256 there. The full run after the
+  parity check fetches and hashes nothing again.
+- Tests: `tests/test_17c_review.py`; `test_17b_review`'s parity test reads
+  the new first line.
+
 ### 17b.2 — the review's part 6: grading, before anyone presses Start (6 Oct)
 
 Part 6 of the review of 1388058..62ec4d9 (`service/frontier_grade.py`,
