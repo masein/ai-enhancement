@@ -8132,7 +8132,7 @@ function modelHead(m, kinds) {
           m.params ? el('span', { 'data-model-size': m.id, title: sizeTip(m), text: sizeText(m) })
             : el('span', { class: 'se', 'data-model-size': m.id, text: 'size not recorded' }),
           facts ? ' · ' + facts : '', sizeEdit(m)),
-        publicLine(m),
+        publicLine(m), publicFileLine(m),
         // 16b.2: its actions — Test this model · Chat · Download — and 12m.1's
         // Compare with… beside them; the static report keeps Compare alone
         LIVE ? modelActions(m) : el('p', { class: 'small' }, el('button', { class: 'quiet',
@@ -8184,6 +8184,63 @@ function publicLine(m) {
           onclick: () => { state.pubAsk = null; render(); } }))
       : el('button', { class: 'quiet small', 'data-public-weights-toggle': 'set',
         text: 'Mark its weights public', onclick: () => { state.pubAsk = id; render(); } }));
+}
+// 17j: the public file the model is — a Hugging Face repository and a path,
+// checked by the board (Hugging Face asked as anyone would, its sha256
+// against the registered file's). The export's typed-yes list says "the same
+// file as …, checked" for it, and CHECK for any other model marked public
+function publicFileLine(m) {
+  if (!LIVE || m.reportedOnly || m.rowOf) return '';
+  const id = String(m.id).replace(/ · thinking$/, '');
+  const rec = (DATA.public_files || {})[id];
+  const mark = (DATA.public_weights || {})[id];
+  const F = state.pubFile = state.pubFile || {};
+  const where = r => r.repo + (r.path ? '/' + r.path : '');
+  const send = async (repo, path) => {
+    if (!whoName()) { askName(); return; }
+    F.busy = true; F.msg = ''; render();
+    try {
+      const got = await post('api/models/public-file', { model: id, repo, path, by: whoName() });
+      state.pubFile = {};
+      toast(!got.file ? `${m.name}: its public file cleared`
+        : got.file.holds ? `${m.name}: the same file as ${where(got.file)}, checked`
+        : `${m.name}: not shown to be a public file — ${got.file.why}`, { key: 'pubfile' });
+      await refreshResults();
+    } catch (e) { F.busy = false; F.msg = e.message; render(); }
+  };
+  if (F.id === id) {
+    const box = (k, label, ph, w) => el('label', { class: 'small' }, label + ' ',
+      el('input', { type: 'text', value: F[k] || '', placeholder: ph, style: `width:${w}`,
+        'data-public-file-input': k, 'aria-label': label,
+        oninput: e => { F[k] = e.target.value; } }));
+    return el('p', { class: 'small', 'data-public-file': 'form' },
+      box('repo', 'Hugging Face repository', 'unsloth/Qwen3.6-35B-A3B-GGUF', '18em'), ' ',
+      box('path', 'file', 'BF16/x-00001-of-00002.gguf', '16em'), ' ',
+      el('button', { class: 'small', 'data-public-file-check': '1', disabled: F.busy ? '' : null,
+        text: F.busy ? 'Checking…' : 'Check', onclick: () => send(F.repo || '', F.path || '') }),
+      ' ', el('button', { class: 'quiet small', text: 'Cancel',
+        onclick: () => { state.pubFile = {}; render(); } }),
+      F.msg ? el('span', { class: 'warn small', 'data-public-file-msg': '1', text: ' ' + F.msg })
+        : '');
+  }
+  const open = el('button', { class: 'quiet small', 'data-public-file-edit': '1',
+    text: rec ? 'change' : 'Give its public file', onclick: () => {
+      Object.assign(F, { id, repo: rec ? rec.repo : '', path: rec ? rec.path : '', msg: '' });
+      render(); } });
+  const day = r => new Date(r.at * 1000).toISOString().slice(0, 10);
+  if (rec && rec.holds) {
+    return el('p', { class: 'small', 'data-public-file': 'checked' },
+      el('span', { class: 'se', text: `${rec.path ? 'The same file as' : 'The public repository'} `
+        + `${where(rec)}, checked on ${day(rec)} by ${rec.by}: Hugging Face shows it to anyone`
+        + (rec.path ? ', with the registered file’s sha256. ' : '. ') }), open, ' ',
+      el('button', { class: 'quiet small', text: 'clear', onclick: () => send('', '') }));
+  }
+  if (!rec && !mark) return '';             // asked only of a model marked public
+  return el('p', { class: 'small', 'data-public-file': 'check' },
+    el('span', { class: 'warntext', text: 'CHECK: not shown to be a public file — '
+      + (rec ? `${where(rec)}: ${rec.why || 'the file registered since isn’t the one checked'}`
+        : 'give its Hugging Face repository and path, and the board checks its sha256') + '. ' }),
+    open);
 }
 // 16.1: a model's size, as a person enters it — first of the board's sources.
 // The form opens on what the board has, or the name's suggestion to confirm

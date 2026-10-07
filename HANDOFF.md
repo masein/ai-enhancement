@@ -4953,6 +4953,42 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17j.4 — the export (7 Oct)
+
+- **The scrub's names worked out, said, and checked** (point 22,
+  `export_safe.scrub_names`): `","`, `"x"`, the container's own name or a
+  wrong account each opened `public/`. The export now adds what it can work
+  out — the container's name, the hosts the board's settings name (a served
+  model's, the judge's), the names a browser opened the board by
+  (`public_files.seen`, recorded by the app), and the accounts of the
+  repositories its models were fetched from (but a checked public file's) —
+  prints `will remove: hosts …; accounts …` above the yes-list, and refuses
+  `public/` for a value too short to be a name, a server name it doesn't
+  know, or no account.
+- **A model's page records the public file it is** (23,
+  `service/public_files.py`, `POST /api/models/public-file`): a Hugging Face
+  repository and path, checked by asking Hugging Face as anyone would (no
+  token) for the sha256 it publishes, against the registered file's (each
+  part's). The list says "the same file as unsloth/…, checked"; any other
+  model marked public gets `CHECK: not shown to be a public file`, and so
+  does one whose file was registered since the check.
+- **Free words out of kept lines** (24): the import's header no longer names
+  who imported it (old headers go out without it); a run's failure goes out
+  as "the run: failed"; a load failure, a stop and a written-off question
+  without their bracketed reasons; a tagged line still holding an
+  exception's text is left out.
+- **Quotes caught** (25): `&nbsp;` and other entities read, five words in a
+  row (was six), and base64 decoded.
+- **Fails loudly** (26): the sets load once (one that couldn't be was loaded
+  again for each run), the export says how many questions each gave (one
+  absent here: 0, said), and exits 1 when one couldn't be loaded.
+- **Small ones** (27): closed stdin (`<&-`) is a no, never a traceback;
+  every flag's and variable's value is checked by its kind (`KINDS`: a
+  number, one of its words, devices, a tensor override), so a 23-character
+  token no longer passes as `CUDA_VISIBLE_DEVICES`; a run's `where` is
+  picked from a list (`where_of`).
+- Tests: `tests/test_17j_export.py`, `tests/test_17j_export_browser.py`.
+
 ### Fix — a number field kept across a redraw (7 Oct)
 
 - **Build questions' count and AI models' monthly limit are text fields

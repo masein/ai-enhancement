@@ -37,6 +37,7 @@ from . import (ai_models, builder, chat, config, db, disk, hfmeta, judge_test, l
 from . import playground
 from . import api_v1, downloads, gguf, gpu, phone, reported, served, sizes, uploads
 from . import proposals as prop
+from . import public_files
 from . import reader
 
 # the report module is the single source of truth for parsing and for the page
@@ -104,6 +105,8 @@ async def _stamp_build(request: Request, call_next):
     response = await call_next(request)
     if request.url.path.startswith("/api/"):
         response.headers["X-Evalboard-Build"] = BUILD
+    # 17j: the names this server is opened by, for the raw-run export's scrub
+    public_files.seen(request.headers.get("host", ""))
     return response
 
 
@@ -451,6 +454,10 @@ def results_payload() -> dict:
         payload["live"] = True
         # 17h: the models whose weights the board was told are public
         payload["public_weights"] = db.public_all()
+        # 17j: the public file each model's page gave, and whether its check
+        # holds for the file registered now
+        payload["public_files"] = {m: {**r, "holds": public_files.still_same(m, r)}
+                                   for m, r in db.public_files_all().items()}
         # 12q.C: each model's DeviceMark runs, for its page and "Open results"
         try:
             payload["devicemark"] = _dm().model_runs(config.OUT_DIR, served.launch_of_id)
@@ -1753,6 +1760,39 @@ def model_public(a: PublicIn, x_token: str = Header(default="")):
     db.public_set(model, a.public, a.by.strip()[:80])
     _cache.update(key=None, payload=None, at=0.0)
     return {"model": model, "public": db.public_all().get(model)}
+
+
+class PublicFileIn(BaseModel):
+    model: str
+    repo: str = ""
+    path: str = ""
+    by: str = ""
+
+
+@app.post("/api/models/public-file")
+def model_public_file(a: PublicFileIn, x_token: str = Header(default="")):
+    """17j: the public file a model is — a Hugging Face repository and a path —
+    given on its page and checked: Hugging Face is asked as anyone would (no
+    token) for the sha256 it publishes, and it is compared with the file the
+    board registered. The export's typed-yes list then says "the same file as
+    …, checked", or CHECK. An empty repository clears it"""
+    _check_token(x_token)
+    _name(a.by, "giving a model's public file")
+    model = a.model.strip().removesuffix(" · thinking")
+    known = {m["id"].removesuffix(" · thinking") for m in results_payload()["models"]}
+    if model not in known and not served.is_served(model):
+        raise HTTPException(404, f"no such model on the board: {a.model}")
+    if not a.repo.strip():
+        db.public_file_set(model, None, a.by.strip()[:80])
+        _cache.update(key=None, payload=None, at=0.0)
+        return {"model": model, "file": None}
+    try:
+        rec = public_files.check(model, a.repo, a.path)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    db.public_file_set(model, rec, a.by.strip()[:80])
+    _cache.update(key=None, payload=None, at=0.0)
+    return {"model": model, "file": {**rec, "holds": public_files.still_same(model, rec)}}
 
 
 @app.post("/api/models/size")
