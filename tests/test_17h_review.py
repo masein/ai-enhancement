@@ -412,6 +412,7 @@ def test_19_publishing_waits_for_a_typed_yes_to_the_list(box, tmp_path, monkeypa
     from service import db
     from test_17_gguf_box import SERVED
     sid = _export_world(box, monkeypatch)
+    in_house = dmx.IN_HOUSE
     monkeypatch.setattr(dmx, "IN_HOUSE", re.compile(r"(?!x)x"))   # a build of a public model
     db.public_set(SERVED, True, "masein")
     asked = []
@@ -423,6 +424,9 @@ def test_19_publishing_waits_for_a_typed_yes_to_the_list(box, tmp_path, monkeypa
     monkeypatch.setattr(builtins, "input", lambda prompt="": "yes")
     assert efr.main(["--run", str(sid), "--out", str(tmp_path / "b")]) == 0
     assert (tmp_path / "b" / "public").exists()             # 0adb522: never, by the mark
+    # an in-house build: never, marked or not
+    monkeypatch.setattr(dmx, "IN_HOUSE", in_house)
+    assert not efr.known_public({"hf_id": SERVED})
 
 
 def test_20_a_quote_of_a_gated_question_never_reaches_the_log(box, tmp_path, monkeypatch):  # noqa: F811

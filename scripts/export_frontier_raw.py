@@ -121,8 +121,14 @@ def task_setup(t: dict) -> tuple[dict, int]:
 def known_public(r: dict) -> bool:
     """17h: a model the board was told is public (its page, or the import's
     --public-weights) — never by its name (teamacct/bonsai-2-27b read public),
-    never by a flag of the export's"""
-    return es.public(r["hf_id"])
+    never by a flag of the export's, and never an in-house build (a Qwen3.6
+    one), marked or not"""
+    from service import served
+    model = r["hf_id"]
+    based = (served.get(model) or {}).get("based_on") or "" if served.is_served(model) else ""
+    if dmx.IN_HOUSE.search(model) or dmx.IN_HOUSE.search(based):
+        return False
+    return es.public(model)
 
 
 def brought(r: dict, t: str, rented: dict, reg: dict) -> tuple[set | None, str]:
