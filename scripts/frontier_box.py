@@ -21,7 +21,8 @@ bundle again (the import tells its answers are the same: nothing changes).
 - the box's label goes with each step (remote_gguf.py --label A3): into its
   bundle's setup.json and its progress file;
 - a step planned at 8 slots runs 7 where the card holds no more
-  (--min-slots 7; HLE with thinking on, at 86,016 tokens a slot, on a 5090);
+  (--min-slots 7) — 17g: HLE with thinking on, at 86,016 tokens a slot, runs
+  8 on a 5090, by the pilot's measured slope;
 - one box a build (A3, B12) asks the parity questions first.
 
 --list A (or B) prints a plan: each box's steps and its hours, at the pilot's
@@ -35,6 +36,7 @@ import json
 import shlex
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -203,11 +205,15 @@ def state_of(out: Path) -> dict:
         return {}
 
 
-def whole(out: Path, step: Step) -> bool:
+def whole(out: Path, step: Step, ask_written_off: bool = False) -> bool:
     """17g: a step already whole — its file there — isn't run again by a paste
-    (parity has no resume: its 1,000 answers were asked again)"""
+    (parity has no resume: its 1,000 answers were asked again). 17h: with
+    --ask-written-off, one holding answers written off is (its progress says
+    how many; one from an image before 17h doesn't, and is run again)"""
     st = state_of(out)
     if st.get("state") != "whole":
+        return False
+    if ask_written_off and step[0] != "parity" and st.get("written_off", 1):
         return False
     if step[0] == "parity":
         return (out / "parity.jsonl").exists()
@@ -294,13 +300,14 @@ def main(argv: list[str] | None = None) -> int:
     ends = []
     for k, step in enumerate(steps, 1):
         out = folder(a, box, k, step)
-        if whole(out, step):
+        if whole(out, step, a.ask_written_off):
             print(f"\n{box}, step {k} of {len(steps)}: whole already — not run again", flush=True)
             ends.append((k, step, 0, ""))
             continue
         cmd = argv_of(box, k, step, a)
         print(f"\n{box}, step {k} of {len(steps)}: {words(step)}\n"
               + " ".join(shlex.quote(x) for x in cmd[1:]), flush=True)
+        began = time.time()
         code = subprocess.run(cmd).returncode
         # 17g: a step left short after asking (a question the server failed on
         # with a 5xx is kept for the next run, written off after three) runs
@@ -308,7 +315,11 @@ def main(argv: list[str] | None = None) -> int:
         # until the line was pasted a third time
         for again in range(2, RUNS + 1):
             st = state_of(out)
-            if code == 0 or step[0] == "parity" or not st.get("incomplete"):
+            # 17h: only a step this run left short, after asking — never one
+            # whose progress is an earlier run's (a refusal at start-up, run
+            # three times over a stale `incomplete`)
+            if code == 0 or step[0] == "parity" or not st.get("incomplete") \
+                    or st.get("state") != "stopped" or float(st.get("at") or 0) < began - 1:
                 break
             left = ", ".join(f"{fb.BENCH[t]['label'] if t in fb.BENCH else t} "
                              f"{x.get('answers', 0):,} of {x.get('of', 0):,}"

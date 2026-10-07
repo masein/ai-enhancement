@@ -32,7 +32,7 @@ import pytest
 
 import frontier as fb
 import test_17_grading as t17
-from service import ai_models, config, db, llm_poller
+from service import ai_models, config, db, llm, llm_poller
 from service import frontier as sf
 from service import frontier_grade as fgr
 from test_17_grading import ROW, svc, write  # noqa: F401 — svc is the fixture
@@ -143,16 +143,29 @@ def world(svc, monkeypatch):  # noqa: F811
 # the page, as status() gives it, and the rows as they are
 # ---------------------------------------------------------------------------
 
-def settle(timeout: float = 20.0) -> None:
-    """every batch's worker done, and what finished recorded"""
-    end, quiet = time.time() + timeout, 0
+def _progress() -> tuple:
+    """what the batches out have landed, and which are out"""
+    out = []
+    for p in fgr.pending():
+        d = llm.batch_dir(p["batch_id"])
+        out.append((p["batch_id"], len(llm.LocalOpenAI._results(d)) if d else -1))
+    return tuple(sorted(out))
+
+
+def settle(timeout: float = 60.0) -> None:
+    """nothing more lands and nothing more finishes — told by what landed,
+    never by a worker's lock: each tick starts a worker for a stopped batch,
+    which ends at once, and a busy runner caught it holding its lock every
+    time"""
+    end, quiet, was = time.time() + timeout, 0, None
     while time.time() < end:
         llm_poller.tick()
-        busy = [p for p in fgr.pending() if fgr._working(p["batch_id"])]
-        quiet = 0 if busy else quiet + 1
-        if quiet >= 3:
+        time.sleep(0.1)
+        now = _progress()
+        quiet = quiet + 1 if now == was else 0
+        was = now
+        if quiet >= 5 and not any(fgr._working(b) for b, _ in now):
             return
-        time.sleep(0.05)
     pytest.fail("the grading batches never settled")
 
 

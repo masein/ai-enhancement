@@ -1044,11 +1044,14 @@ def _epoch(stamp) -> float | None:
 BOX_FIELDS = {"label": str, "model": str, "step": str, "thinking": str, "tasks": list,
               "shard": str, "parity": bool, "state": str, "line": str, "started_at": str,
               "sessions": int, "at": (int, float), "seen_at": (int, float), "reachable": bool,
-              "safe": bool, "why": str}
+              "safe": bool, "why": str, "box_id": str}
 QUIET_S = 45 * 60                       # a box not heard from for this long says so
 # 17g: a step done (its box safe to destroy) leaves the list this long after
 # the fetch last saw it — thirty days on it still read "done, safe to destroy"
 DONE_KEEP_S = 6 * 3600
+# 17h: a step not reached for this long leaves the list (a box destroyed
+# mid-run stayed listed for ever)
+GONE_KEEP_S = 24 * 3600
 
 
 def boxes_path() -> Path:
@@ -1067,12 +1070,18 @@ def _fine(v, t) -> bool:
     return not isinstance(v, float) or math.isfinite(v)
 
 
-def store_boxes(records: list) -> int:
+def store_boxes(records) -> int:
     """the fetch's last reading of each step, kept on the board: only the
     fields above, each of its type — anything else is dropped. 17g: a step
     the board had that this reading hasn't is kept as not reached (a box
     destroyed before it was done vanished), unless it was done — a box safe
-    to destroy and gone was destroyed"""
+    to destroy and gone was destroyed. 17h: only for the boxes this fetch
+    asked ({"steps", "asked"}: their board names) — the others' steps stay as
+    they were (fetching one box marked every other "not reached")"""
+    asked = None
+    if isinstance(records, dict):
+        asked = {x for x in records.get("asked") or [] if isinstance(x, str)}
+        records = records.get("steps")
     keep = []
     for r in records if isinstance(records, list) else []:
         if not isinstance(r, dict):
@@ -1086,8 +1095,12 @@ def store_boxes(records: list) -> int:
     except (OSError, ValueError, AttributeError):
         was = []
     for x in was if isinstance(was, list) else []:
-        if isinstance(x, dict) and (x.get("label"), x.get("model"), x.get("step")) not in now \
-                and not x.get("safe"):
+        if not isinstance(x, dict) or (x.get("label"), x.get("model"), x.get("step")) in now:
+            continue
+        mine = asked is None or not x.get("box_id") or x.get("box_id") in asked
+        if not mine:
+            keep.append(x)                          # another fetch's box: as it was
+        elif not x.get("safe"):
             keep.append({**x, "reachable": False})
     p = boxes_path()
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -1097,8 +1110,8 @@ def store_boxes(records: list) -> int:
     return len(keep)
 
 
-_LEFT = re.compile(r"(?:(?P<h>[\d.]+) h|(?P<m>\d+) min) left")
-_NOF = re.compile(r"(?P<n>[\d,]+) of (?P<of>[\d,]+)")
+_LEFT = re.compile(r"(?:(?<![\d.])(?P<h>\d+(?:\.\d+)?) h|(?<![\d.])(?P<m>\d+) min) left")
+_NOF = re.compile(r"(?<![\d,])(?P<n>\d[\d,]*) of (?P<of>\d[\d,]*)")
 
 
 def read_boxes(now: float | None = None) -> dict:
@@ -1121,9 +1134,14 @@ def read_boxes(now: float | None = None) -> dict:
         seen = _num(r.get("seen_at"))
         if r.get("safe") and seen and now - seen > DONE_KEEP_S:
             continue
+        if r.get("reachable") is False and seen and now - seen > GONE_KEEP_S:
+            continue
         line = r.get("line") if isinstance(r.get("line"), str) else ""
+        # 17h: a line's numbers read only when they are numbers — "v 1.2.3 h
+        # left" or "pages , of , done" broke the list for every box
         m, nof = _LEFT.search(line), _NOF.search(line)
-        left = (float(m["h"]) * 3600 if m and m["h"] else int(m["m"]) * 60 if m else None)
+        left = _num(m["h"]) * 3600 if m and m["h"] and _num(m["h"]) is not None else \
+            int(m["m"]) * 60 if m and m["m"] else None
         later = 0.0
         if fbx is not None and left is not None:
             try:

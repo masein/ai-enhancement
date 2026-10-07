@@ -166,16 +166,19 @@ def pin_differences(theirs: dict, ours: dict) -> list[str]:
 
 def gpu_info() -> dict:
     """the GPU's name, its driver and its memory, as nvidia-smi says — 17g:
-    and every card's name, and how many (a box of two was named by its first)"""
+    and every card's name, and how many (a box of two was named by its first);
+    17h: and the memory already in use on the first"""
     try:
         lines = [x for x in subprocess.run(
-            ["nvidia-smi", "--query-gpu=name,driver_version,memory.total",
+            ["nvidia-smi", "--query-gpu=name,driver_version,memory.total,memory.used",
              "--format=csv,noheader,nounits"], capture_output=True, text=True,
             timeout=30).stdout.splitlines() if x.strip()]
-        name, driver, mib = (x.strip() for x in lines[0].split(","))
+        name, driver, mib, *used = (x.strip() for x in lines[0].split(","))
         names = [x.split(",")[0].strip() for x in lines]
+        # 17h: and what is in use already — the memory check reads what is free
         return {"name": name, "driver": driver, "memory_mib": int(float(mib)),
-                "count": len(names), "names": names}
+                "count": len(names), "names": names,
+                **({"memory_used_mib": int(float(used[0]))} if used and used[0] else {})}
     except (OSError, IndexError, ValueError, subprocess.SubprocessError):
         return {"name": None, "driver": None, "memory_mib": None}
 

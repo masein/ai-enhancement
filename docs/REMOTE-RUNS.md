@@ -455,15 +455,16 @@ above the file. Under the limits of 6 Oct:
 |---|---|---|---|---|
 | MMLU-Pro, SimpleQA, thinking on | 34,816–36,864 | 8 | 26,136 MiB, measured | 8 fit |
 | MATH Level 5, thinking on | 67,584 | 8 | 29,198 MiB, measured | 8 fit |
-| GPQA, OTIS (or MATH with them), thinking on | 83,968 | 8 | about 30,830 MiB | 8 fit, 1,154 MiB spare |
+| GPQA, OTIS (or MATH with them), thinking on | 83,968 | 8 | about 30,830 MiB | 8 fit, 1,775 MiB spare |
 | HLE (or anything with it), thinking on | 86,016 | 8 | about 31,040 MiB | 8 fit, 1,570 MiB spare |
-| ARC-AGI-2 (its prompts run to 30,000 tokens), thinking on | 114,688 | 5 | about 29,600 MiB | 6 fit; 5, as the pilot ran it |
+| ARC-AGI-2 (its prompts run to 30,000 tokens), thinking on | 114,688 | 5 | about 29,412 MiB | 6 fit; 5, as the pilot ran it |
 | any, thinking off (ARC-AGI-2 isn't asked) | 5,120–20,480 | 8 | about 24,500 MiB at most | 8 fit |
 
 The box works this out from the GGUF's header before it fetches anything,
 from the pilot's measured slope — 12.76 KiB a token of context, and 666 MiB
 above the file at 8 slots holding their recurrent state — keeping 1,024 MiB
-spare, and prints the room left in MiB and the basis either way. (17f's
+spare of what is free on the card (17h: memory something else holds is taken
+off first), and prints the room left in MiB and the basis either way. (17f's
 estimate counted a rounded-up overhead and the recurrent state again, 622 MiB
 above both readings, and ran HLE at 7.) A step
 planned at 8 slots that doesn't fit runs as many as do, down to 7
@@ -654,7 +655,9 @@ the log, on the row and on the import's line. A 5xx is the server's, whatever
 its health check says: the question is kept, the run carries on to the next
 benchmark, the step isn't whole, and pasting the line again asks it again;
 only after failing on three separate runs is it written off.
-`--ask-written-off` on the box's line asks again what was written off. A
+`--ask-written-off` on the box's line asks again what was written off — a
+step already whole runs again for it (17h), unless its progress says nothing
+was written off. A
 server that fails every question it is asked, or more than one in fifty,
 stops the run, and keeps none of them.
 
@@ -687,20 +690,32 @@ All runs opens with "On rented boxes", each step's box, model, what it asks,
 n of N, when it should finish and when it was last heard from (a box quiet
 for 45 minutes, or not reached at the last fetch, says so; one whose bundles
 are all home and imported reads "done, safe to destroy"). Only labels and
-progress go to the board, never a box's address; `--no-board` sends nothing. Each box's first line says whether it is **safe to destroy**:
-every step its plan (G5) gives each build started there whole, and every
-bundle it holds here with the same sha256 and imported. Otherwise "NOT safe
+progress go to the board, never a box's address; `--no-board` sends nothing (a
+fetch of some boxes leaves the others on the list as they were; a box not
+reached for a day leaves it). Each box's first line says whether it is
+**safe to destroy**: every step its plan (G5) gives each build started there
+whole, every other step on the box too (17h: a step outside the plan's
+folders, `--out /workspace/run`, G6's `/workspace/gemma-cal`, one started by
+hand), and every bundle it holds here with the same sha256 and imported. A
+box that read safe and isn't reached any more was destroyed: it is done, and
+`--every` ends. Otherwise "NOT safe
 to destroy" and why — a step that hasn't started, a step still asking (its
 progress beside: what it asks, n of N, its restarts, when it was last
 written), a step stopped and why (llama-server dying at load, a gated
 question set, a parity question the server failed on: paste its line
 again), a bundle NOT copied, an import refused. A bundle of a model with no
 `--sha` (G6's calibration) counts once it is home, and its line gives the
-import to type. Each build's parity verdict is a line of its own every
-round. A copy goes to a temporary name and counts only when its
+import to type (`--register` only for a model the board doesn't serve yet);
+the box's line says how many wait to be imported by hand. Each build's
+parity verdict is a line of its own every round, and kept on disk
+(`parity/verdicts.json` beside the bundles): a fetch started again says it,
+and exits 1 after "Not the same". A step asking that hasn't written for 45
+minutes says so (stopped? paste its line again). A copy goes to a temporary name and counts only when its
 sha256 is the box's: a failed copy leaves an older one here as it was. A box
 that doesn't answer is given up on (a 15-second connect timeout, no prompts)
-and said so. The exit code isn't 0 when a box couldn't be reached, a copy
+and said so. Only what the box prints is read (17h: its banner, "Welcome to
+vast.ai … Have fun!", and ssh's own lines come on stderr, and ssh and scp run
+with `LogLevel=ERROR`). The exit code isn't 0 when a box couldn't be reached, a copy
 failed, an import was refused, or a build's parity isn't the same or
 couldn't be compared.
 
@@ -902,7 +917,7 @@ nothing is badly off. A miss is reported with its interval, never adjusted.
 | | Box-hours, both builds | At $0.44–0.63 an hour | The paces ±25% |
 |---|---|---|---|
 | **Plan A**: 18 boxes, the longest 17.7 h | about 287 | **$126–181** | $96–224 |
-| Plan B: 30 boxes, the longest 10.2 h | about 296 | $130–186 | $100–230 |
+| Plan B: 30 boxes, the longest 10.2 h | about 297 | $131–187 | $101–230 |
 
 G5's 272 box-hours, the parity questions' 1, and for each box about 0.3 hours
 to start (the fetch, the load) and 0.5 hours from its last bundle to being

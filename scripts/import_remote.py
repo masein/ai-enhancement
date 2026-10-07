@@ -460,6 +460,9 @@ def main(argv: list[str] | None = None) -> int:
                     help="17g: with --register, a model whose weights are public (G6's "
                          "calibration): its raw runs may be exported public. Nothing else ever "
                          "is")
+    ap.add_argument("--served", action="store_true",
+                    help="17h: the models this board serves, as a JSON list (for "
+                         "frontier_fetch.py's by-hand lines)")
     ap.add_argument("--boxes", type=Path, default=None,
                     help="17f: what frontier_fetch.py read from the rented boxes, for Runs' "
                          "list (their labels and progress, never an address)")
@@ -477,6 +480,9 @@ def main(argv: list[str] | None = None) -> int:
         if config.DM_ITEMS_SHA256:                  # 15.6: and whether they're the repo's
             print("the repo's items " + config.DM_ITEMS_SHA256 + (
                 " (the same)" if h["items"] == config.DM_ITEMS_SHA256 else " (they differ)"))
+        return 0
+    if a.served:
+        print(json.dumps(sorted(r["id"] for r in db.served_all())))
         return 0
     if a.boxes:
         import import_frontier
