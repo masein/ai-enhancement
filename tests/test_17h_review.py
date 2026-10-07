@@ -337,3 +337,30 @@ def test_16_the_docs_and_the_help_say_todays_numbers():
     box_help = subprocess.run([sys.executable, str(REPO / "scripts" / "frontier_box.py"),
                                "--help"], capture_output=True, text=True).stdout
     assert "8 on a 5090" in " ".join(box_help.split())
+
+
+# ---------------------------------------------------------------------------
+# part 3, 17: the same answers with another finish or token count
+# ---------------------------------------------------------------------------
+
+def test_17_the_same_answers_with_new_flags_are_taken_and_keep_their_grades(box):  # noqa: F811
+    from service import config
+    from service import frontier as sf
+    from test_17_gguf_box import N, ROW, RUNS, TASK, bundle_of
+    from test_17b_review import answers_name, imported, rewrite
+    from test_17g_review import a3_imported, graded_all
+    a3_imported(box)
+    d = sf.task_dir(config.OUT_DIR / ROW, TASK)
+    g = graded_all(d)
+
+    def ran_out(files):
+        lines = [json.loads(x) for x in files[answers_name()].decode().splitlines()]
+        lines[0].update(finish="length", tokens=81920)
+        files[answers_name()] = "".join(json.dumps(x) + "\n" for x in lines).encode()
+    code, said = imported(rewrite(bundle_of(box, "a3"), ran_out))
+    assert code == 0, said
+    assert any(f"{TASK}: the same {N * RUNS} answers as the row, 1 with another finish or "
+               "token count — taken from this bundle, every grade kept" in x for x in said), said
+    now = sf.read_answers(d / sf.ANSWERS)
+    assert sorted(r.get("finish") for r in now.values()).count("length") == 1  # 0adb522: none
+    assert sf.read_grades(d)["items"] == g["items"]

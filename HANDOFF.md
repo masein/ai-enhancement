@@ -4953,6 +4953,14 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17h.3 — the import (7 Oct)
+
+- **The same answers with another finish or token count** (`compare_answers`
+  "flags"): taken from the bundle, every grade kept (each names its answer's
+  text, the same) — it said "nothing changed" and the row kept the old flags
+  while the import printed "1 ran out of room".
+- Tests: `tests/test_17h_review.py` (part 3).
+
 ### 17h.2 — the boxes and the fetch (7 Oct)
 
 - **A box's banner is never its listing** (point 25, `frontier_fetch.run`):

@@ -24463,8 +24463,13 @@ async function loadFrontierGrading() {
   catch (e) { A.frgMsg = e.message; }
   A.frgAsked = false;
   // 16c's rule: never a redraw under a picker or a value being typed — the
-  // card shows at the next tick
-  if (state.tab === 'ai' && !aiEditing()) render();
+  // card shows at the next tick. 17h: and only this card is redrawn — it
+  // answers later than the page around it, and a whole redraw took the card
+  // beside it (being used) from under the person using it
+  if (state.tab !== 'ai' || aiEditing()) return;
+  const was = document.querySelector('[data-frontier-grading]');
+  if (was) was.replaceWith(frontierGradingCard());
+  else render();
 }
 async function frontierGradingAct(what) {
   const A = state.ai;

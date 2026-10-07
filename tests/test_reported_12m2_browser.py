@@ -23,9 +23,13 @@ GOOD = "fx/good-750m"
 F55 = "reported/openai/frontier-test-5.5"
 
 
-def shot(part, name, **kw):
+def shot(part, name):
+    # 17h: taken again when the page's poll redraws the part mid-shot
+    # (test_14_3_browser.steady_shot) — the AI models page answers later since
+    # 17h.1, and its outside-data card was caught being replaced
+    from test_14_3_browser import steady_shot
     SCREENS.mkdir(parents=True, exist_ok=True)
-    part.screenshot(path=SCREENS / name, **kw)
+    steady_shot(part, SCREENS / name)
 
 
 @pytest.fixture(scope="module", autouse=True)
