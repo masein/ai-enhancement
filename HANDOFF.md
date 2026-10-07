@@ -4953,6 +4953,21 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### Fix — a number field kept across a redraw (7 Oct)
+
+- **Build questions' count and AI models' monthly limit are text fields
+  with a numeric keyboard** (`inputmode`), no longer `type="number"`. A
+  redraw (a poll's) gives a kept field (`data-keep`) its value, focus and
+  selection back, but a number field's selection can't be set: "20" typed
+  over a selected "60" went in before it. The question builder's
+  near-duplicate browser test met it on CI as a count of 2060 — the rest
+  written ten at a time past every wait — and failed one run in three or so.
+- `tests/test_builder_12i2_browser.py`: the race itself (select, redraw,
+  type: main gave "0260"), a check that no kept field is a number field,
+  `start()` checks the draft asks for the count typed, and the near-duplicate
+  test leaves out other tests' drafts (their fake questions come from the
+  same pool, and one shared #1 or #2 now and then).
+
 ### 17i.5 — the rented runs on the Runs page (7 Oct)
 
 - **A rented run is a row of Runs** (`import_frontier.rented_runs`,

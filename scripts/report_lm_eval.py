@@ -24307,7 +24307,9 @@ function aiSpendLine(P) {
   const A = state.ai, s = P.spend;
   const edit = A.editLimit;
   // 16c: a value typed is kept in the page's state, never lost to a redraw
-  const input = el('input', { type: 'number', min: '0', step: '1',
+  // a text field, its keyboard numeric, as Build questions' count: a redraw
+  // gives it its selection back (a number field's it can't)
+  const input = el('input', { type: 'text', inputmode: 'decimal', autocomplete: 'off',
     value: A.limitDraft != null ? A.limitDraft : String(s.limit), 'data-keep': 'ai-limit',
     'aria-label': 'monthly limit in dollars', 'data-ai-limit-input': '1', style: 'width:6em',
     oninput: e => { A.limitDraft = e.target.value; } });
@@ -25371,7 +25373,11 @@ function qbStepOne() {
         P.levels.map(l => el('label', { class: 'small' }, el('input', { type: 'radio', name: 'qb-level',
           value: l, 'data-qb-level': l, checked: F.level === l ? '' : null,
           onchange: () => { F.level = l; qbSave(); } }), ' ' + l)))) : '',
-      fld('How many', el('input', { type: 'number', min: '1', step: '1', value: String(F.count),
+      // a text field, its keyboard numeric: a redraw gives a number field its
+      // value back but never its selection, and "20" typed over a selected
+      // "60" went in before it — 2060
+      fld('How many', el('input', { type: 'text', inputmode: 'numeric', pattern: '[0-9]*',
+        autocomplete: 'off', value: String(F.count),
         'data-keep': 'qb-count', 'data-qb-count': '1', style: 'width:7em',
         oninput: e => { F.count = e.target.value; Q.est = null; qbSave(); render(); } }),
         under ? el('span', { class: 'small se', 'data-qb-under': '1', text: `fewer than `

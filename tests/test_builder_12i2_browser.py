@@ -55,6 +55,9 @@ def start(page, base, count=20, group="quick_maths", dedup=False):
         page.locator("[data-qb-dedup]").uncheck()
     page.locator("[data-qb-try]").click()
     page.wait_for_selector("[data-qb-item]", timeout=20000)
+    # the draft asks for what was typed — a count of 2060 (a redraw between
+    # selecting "60" and typing "20") wrote ten at a time past every wait
+    assert page.evaluate("state.qb.draft.spec.count") == count
 
 
 def test_build_questions_opens_from_both_banks(live, page):
@@ -227,8 +230,12 @@ def test_a_near_duplicate_shows_side_by_side_and_keep_old_drops_it(live, page, m
     real = builder._others
 
     def others(d):
-        return real(d) + [{"src": "earlier", "id": "earlier:3", "label": "#3 of an earlier batch",
-                           "text": builder._text(d, d["items"][2]["q"])}]
+        # the bank, and this one earlier batch alone: an earlier test's draft
+        # shared #1 or #2 with this one now and then (its fake questions come
+        # from the same pool), and it opened first
+        return [o for o in real(d) if o["src"] != "earlier"] + [
+            {"src": "earlier", "id": "earlier:3", "label": "#3 of an earlier batch",
+             "text": builder._text(d, d["items"][2]["q"])}]
     monkeypatch.setattr(builder, "_others", others)
     start(page, live["base"], count=20, dedup=True)
     for k in range(5):
@@ -271,3 +278,32 @@ def test_the_builder_at_phone_width(live, page, width):
     assert page.evaluate("document.scrollingElement.scrollWidth <= innerWidth")
     shot(page, f"12i2-try10-{width}-light.png", full_page=True)
     assert page.errors == []
+
+
+def test_a_redraw_while_the_count_is_selected_keeps_what_is_typed(live, page):
+    """what a redraw does to the count field: its selection comes back with
+    it, so typing replaces the number — a number field's selection never came
+    back, and "20" typed over a selected "60" went in before it (2060, the
+    near-duplicate test's ten-at-a-time writes past every wait on CI)"""
+    build_page(page, live["base"], "everyday")
+    assert page.locator("[data-qb-count]").input_value() == "60"
+    # selected, then a poll's redraw before the typing — in one step, so no
+    # other redraw falls between the select and the one asked for
+    page.evaluate("""() => { const e = document.querySelector('[data-qb-count]');
+                            e.focus(); e.select(); render(); }""")
+    page.keyboard.type("20")
+    assert page.locator("[data-qb-count]").input_value() == "20"   # main: 2060
+    assert page.locator("[data-qb-try]").inner_text() == "Try 10"
+    assert page.errors == []
+
+
+def test_no_field_kept_across_a_redraw_is_a_number_field():
+    """a redraw gives a kept field (data-keep) its value, its focus and its
+    selection — a number field's selection can't be set, so a number field
+    kept across redraws loses what is selected in it"""
+    import re
+    src = (Path(__file__).resolve().parents[1] / "scripts" / "report_lm_eval.py").read_text()
+    kept_numbers = [src[:m.start()].count("\n") + 1
+                    for m in re.finditer(r"el\('input', \{[^}]*\}", src)
+                    if "data-keep" in m.group(0) and re.search(r"type: 'number'", m.group(0))]
+    assert kept_numbers == [], f"number fields kept across a redraw, lines {kept_numbers}"
