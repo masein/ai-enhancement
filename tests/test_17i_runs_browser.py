@@ -42,6 +42,21 @@ def runs_page(page, live):
     page.wait_for_selector("[data-queue-table]")
 
 
+def where(page, value):
+    """the where filter, chosen as a person chooses it — and seen taken (on CI
+    the option's click once fell while the list redrew, and nothing was
+    chosen)"""
+    for _ in range(3):
+        page.get_by_label("where filter").click()
+        page.locator(f"[role=listbox][aria-label='where filter'] [data-value='{value}']").click()
+        try:
+            page.wait_for_function(f"state.qWhere === '{value}'", timeout=4000)
+            return
+        except Exception:                               # noqa: BLE001 — chosen again
+            page.keyboard.press("Escape")
+    raise AssertionError(f"the where filter never took {value!r}")
+
+
 def run_row(page, model, tasks, thinking="on"):
     return page.locator(f"[data-rented-run='rented:{model}|{tasks}|{thinking}']")
 
@@ -72,11 +87,9 @@ def test_27_a_run_on_four_boxes_is_one_row_of_runs_and_its_import_replaces_it(li
     SCREENS.mkdir(parents=True, exist_ok=True)
     steady_shot(page.locator("[data-all-runs]"), SCREENS / "runs-rented-merged.png")
     # the where filter: this server hides it, rented GPUs shows it
-    page.get_by_label("where filter").click()
-    page.locator("[role=listbox][aria-label='where filter'] [data-value='here']").click()
+    where(page, "here")
     page.wait_for_function("!document.querySelector('[data-rented-run]')")
-    page.get_by_label("where filter").click()
-    page.locator("[role=listbox][aria-label='where filter'] [data-value='rented']").click()
+    where(page, "rented")
     row.wait_for()
     # shard 1 imported: its Runs row stands for it, never a second row for that box
     sid = db.add(m, "instruct", "frontier", "masein", "imported from a rented GPU (RTX 5090)"
