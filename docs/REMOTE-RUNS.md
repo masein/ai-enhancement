@@ -866,8 +866,14 @@ often it is pressed; Stop holds it, and the card then says why it waits —
 Stop, a run of refusals, the month's limit — beside **Carry on**. As grades
 land, each benchmark is scored again, and its cell says who graded it, with
 which prompt (MATH and OTIS: the code's number beside it). A reply that is
-empty, cut at its cap or not a grade is listed under the card, with a batch
-that failed and why, and the next Start asks it again. A score from two
+empty, cut off by its cap or not a grade is listed under the card, with a
+batch that failed and why, and the next Start asks it again — 17j: a whole
+reply that ended exactly at its cap is read, and a grade. Humanity's Last
+Exam's replies are read as a careful person reads them
+(`tests/fixtures/hle_reader_cases.json`, 134 replies, is the reader's test);
+one that could be read two ways is no grade. The card says whether HLE's
+grader answers in CAIS's JSON schema; one that doesn't may reply in prose,
+which can be asked again, and paid. A score from two
 graders or prompts names both and isn't final: choose one and grade again.
 
 Choosing another grader moves nothing: the dry run shows what Start would do
