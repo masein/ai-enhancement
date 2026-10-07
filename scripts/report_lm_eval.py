@@ -8124,6 +8124,7 @@ function modelHead(m, kinds) {
           m.params ? el('span', { 'data-model-size': m.id, title: sizeTip(m), text: sizeText(m) })
             : el('span', { class: 'se', 'data-model-size': m.id, text: 'size not recorded' }),
           facts ? ' · ' + facts : '', sizeEdit(m)),
+        publicLine(m),
         // 16b.2: its actions — Test this model · Chat · Download — and 12m.1's
         // Compare with… beside them; the static report keeps Compare alone
         LIVE ? modelActions(m) : el('p', { class: 'small' }, el('button', { class: 'quiet',
@@ -8135,6 +8136,39 @@ function modelHead(m, kinds) {
       // 12b.3: the page's one main action is the header's, which reads Test
       // this model here — two filled buttons side by side was one too many
     el('div', { class: 'ktiles', 'data-kind-tiles': '1' }, kinds.map(k => kindTile(m, k))));
+}
+// 17h: whether the model's weights are public — the raw-run exports publish
+// a model so marked and nothing else; set here (or by an import's
+// --public-weights), and cleared here
+function publicLine(m) {
+  if (!LIVE || m.reportedOnly || m.rowOf) return '';
+  const id = String(m.id).replace(/ · thinking$/, '');
+  const mark = (DATA.public_weights || {})[id];
+  const send = async on => {
+    if (!whoName()) { askName(); return; }
+    try {
+      await post('api/models/public', { model: id, public: on, by: whoName() });
+      state.pubAsk = null;
+      toast(on ? `${m.name}: weights marked public` : `${m.name}: not public any more`,
+        { key: 'public' });
+      await refreshResults();
+    } catch (e) { toast('Refused. ' + e.message, { key: 'public' }); }
+  };
+  const asking = state.pubAsk === id;
+  return el('p', { class: 'small', 'data-public-weights': mark ? '1' : '0' },
+    mark ? el('span', { class: 'warntext', text: `Public weights — marked by ${mark.by} on `
+      + `${new Date(mark.at * 1000).toISOString().slice(0, 10)}: its raw runs may be published. ` })
+      : el('span', { class: 'se', text: 'Raw runs private: its weights aren’t marked public. ' }),
+    mark ? el('button', { class: 'quiet small', 'data-public-weights-toggle': 'clear',
+      text: 'Clear the mark', onclick: () => send(false) })
+      : asking ? el('span', {}, el('b', { text: 'Its raw runs may then be exported to public/ '
+          + '(the export still asks before it writes there). ' }),
+        el('button', { class: 'small', 'data-public-weights-yes': '1', text: 'Yes, mark it public',
+          onclick: () => send(true) }), ' ',
+        el('button', { class: 'quiet small', text: 'Cancel',
+          onclick: () => { state.pubAsk = null; render(); } }))
+      : el('button', { class: 'quiet small', 'data-public-weights-toggle': 'set',
+        text: 'Mark its weights public', onclick: () => { state.pubAsk = id; render(); } }));
 }
 // 16.1: a model's size, as a person enters it — first of the board's sources.
 // The form opens on what the board has, or the name's suggestion to confirm

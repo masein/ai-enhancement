@@ -449,6 +449,8 @@ def results_payload() -> dict:
                                        sizes={"entered": db.sizes_all(),
                                               "files": report.load_sizes(config.RESULTS_ROOT)})
         payload["live"] = True
+        # 17h: the models whose weights the board was told are public
+        payload["public_weights"] = db.public_all()
         # 12q.C: each model's DeviceMark runs, for its page and "Open results"
         try:
             payload["devicemark"] = _dm().model_runs(config.OUT_DIR, served.launch_of_id)
@@ -1730,6 +1732,27 @@ class SizeIn(BaseModel):
     total: str = ""
     active: str = ""
     by: str = ""
+
+
+class PublicIn(BaseModel):
+    model: str
+    public: bool
+    by: str = ""
+
+
+@app.post("/api/models/public")
+def model_public(a: PublicIn, x_token: str = Header(default="")):
+    """17h: a model's weights marked public, or the mark cleared, on its page —
+    the raw-run exports publish a model so marked, and nothing else"""
+    _check_token(x_token)
+    _name(a.by, "marking a model's weights public")
+    model = a.model.strip().removesuffix(" · thinking")
+    known = {m["id"].removesuffix(" · thinking") for m in results_payload()["models"]}
+    if model not in known and not served.is_served(model):
+        raise HTTPException(404, f"no such model on the board: {a.model}")
+    db.public_set(model, a.public, a.by.strip()[:80])
+    _cache.update(key=None, payload=None, at=0.0)
+    return {"model": model, "public": db.public_all().get(model)}
 
 
 @app.post("/api/models/size")

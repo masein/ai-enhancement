@@ -753,10 +753,11 @@ def test_15_the_exported_log_withholds_each_line_quoting_a_hidden_question(
     q = LONG[3]["question"]
     log.write_text(log.read_text() + f"\n[frontier] the server failed on: {q}\n"
                    "What is the correct answer to this question: which one?\n(A) the first\n")
-    text = (efr.export_run(sid, tmp_path / "raw") / "log.txt").read_text()
+    dest = efr.export_run(sid, tmp_path / "raw")
+    text = (dest / "log.txt").read_text()
     assert q not in text and "the correct answer to this question" not in text  # 308fcf3: both
-    assert "[line withheld — it quotes a hidden question]" in text
-    assert "[line withheld — it quotes a GPQA question, never shown]" in text
+    # 17h: left out, not marked — and said in the README
+    assert "quotes a question" in (dest / "README.md").read_text()
 
 
 def test_15_the_scrub_takes_a_boxs_address_flags_tokens_hosts_and_the_account():
@@ -787,18 +788,13 @@ def test_15_never_public_for_a_model_the_board_doesnt_know_as_public(box, tmp_pa
     sid = a3_imported(box)
     assert efr.export_run(sid, tmp_path / "raw", public=True).parent.name == "private"
     assert efr.main(["--all", "--public", "--out", str(tmp_path / "all")]) == 0
-    assert "isn't known here as a public model: private" in capsys.readouterr().out
+    assert "--public: no effect" in capsys.readouterr().out
     assert not (tmp_path / "all" / "public").exists()            # 308fcf3: the build, public
-    # a Qwen3.6 build stays private even marked public; a public model registered so isn't
-    db.served_put({**served.get(SERVED), "public_weights": {"by": "masein", "at": 0}})
-    assert not efr.known_public({"hf_id": SERVED})
-    db.served_put({"id": "served/gemma-cal", "name": "gemma", "base_url": "", "key": "",
-                   "how": "x", "based_on": "google/gemma-4-26b-a4b-it", "thinking": "auto",
-                   "pin": {"file": "g.gguf"}, "by": "masein", "at": 0})
+    # 17h: public only when the board's mark says so (its page, or --public-weights)
     assert not efr.known_public({"hf_id": "served/gemma-cal"})
-    db.served_put({**served.get("served/gemma-cal"), "public_weights": {"by": "masein", "at": 0}})
+    assert not efr.known_public({"hf_id": "google/gemma-3-1b-it"})  # never by its name
+    db.public_set("served/gemma-cal", True, "masein")
     assert efr.known_public({"hf_id": "served/gemma-cal"})
-    assert efr.known_public({"hf_id": "google/gemma-3-1b-it"})
 
 
 def test_15_each_run_exports_what_it_brought(box, tmp_path):  # noqa: F811
@@ -895,7 +891,8 @@ def test_19_a_box_given_as_a_number_is_refused_before_anything_moves(box):  # no
 
 def test_20_the_whole_run_is_checked_before_the_first_question(svc, monkeypatch, tmp_path):  # noqa: F811
     asked = []
-    monkeypatch.setattr(sf, "ask_task", lambda rec, task, row, on, progress, canceled, log:
+    monkeypatch.setattr(sf, "ask_task", lambda rec, task, row, on, progress, canceled, log,
+                        sid=None:
                         (asked.append(task), (1, 1))[1])
     monkeypatch.setattr(fb, "load", lambda task, root=None: [])
     monkeypatch.setattr(config, "FRONTIER_SCORE_AFTER_RUN", False)

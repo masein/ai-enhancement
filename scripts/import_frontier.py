@@ -305,11 +305,13 @@ def registered_here(b: dict, name: str, by: str, public_weights: bool = False) -
                            "name": gg.get("name") or "",
                            **({"parts": gg["parts"]} if gg.get("parts") else {})},
            "rented_only": True, "answered": [], "by": by, "at": time.time(),
-           **({"public_weights": {"by": by, "at": time.time()}} if public_weights else {}),
+
            "flags": " ".join(srv.get("flags") or []),
            "env": " ".join(f"{k}={v}" for k, v in (srv.get("env") or {}).items())}
     db.served_put(rec)
     served.write_meta(rec)
+    if public_weights:
+        db.public_set(rec["id"], True, by)          # 17h: the board's mark, shown and cleared on its page
     return rec
 
 

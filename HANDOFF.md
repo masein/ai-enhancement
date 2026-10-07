@@ -4953,6 +4953,32 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17h.4 — the export, by a list of what may go out (7 Oct)
+
+- **The approach changed** (`scripts/export_safe.py`): the exports write only
+  what a list allows — fields by schema (`pick`), the launch's flags and
+  variables by name (`flags`, `env`), log lines only in the runner's own
+  shapes (`log_lines`) — and leave everything else out, counted in the
+  README; the scrub (`export_devicemark_raw.scrub`) runs last, on what is
+  left (paths and host names our own lines hold). Three rounds of scrubbing
+  by pattern each left holes.
+- **Keys** (point 18): a key in an env string, as its own element of a flags
+  list, quoted, or a Bearer value with no digit never reaches setup.json —
+  neither exporter writes a launch whole.
+- **Public** (19): only a model marked public on its page (or by the import's
+  `--public-weights`, the same mark, shown and cleared there); never by its
+  name; and only after a typed yes to the list the export prints.
+- **Gated questions** (20): a line quoting six words in a row of any of a
+  gated benchmark's questions is left out (its later lines, its middle, its
+  JSON-escaped form); no question list, no log.
+- **The scrub** (21) also takes any IPv6 address, a port after an address or
+  in `-o Port=`, `-p … user@host`, a URL's user and password, any URL host
+  but Hugging Face's, and the account in `-hf acct/…` and `datasets/acct/…`.
+- **This server's runs** (22): each answer names the run that asked it
+  (`run`); an export of one run writes its own (one from before, the row's
+  latest run's).
+- Tests: `tests/test_17h_review.py` (part 4), `tests/test_17h_browser.py`.
+
 ### 17h.3 — the import (7 Oct)
 
 - **The same answers with another finish or token count** (`compare_answers`

@@ -214,7 +214,8 @@ def early_thinking(task: str, on: bool, answers: list[str]) -> str:
 
 
 def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
-             canceled=lambda: False, log=lambda line: None) -> tuple[int, int]:
+             canceled=lambda: False, log=lambda line: None,
+             sid: int | None = None) -> tuple[int, int]:
     """every question of `task` this run (or shard) holds and hasn't answered
     — (answered, of) when it stops. Raises served.ServerStopped when the
     server stops answering: what it answered before is kept"""
@@ -279,6 +280,8 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
         raise served.ServerStopped(have, total, why, refused=why)
 
     def write(line: dict) -> int:
+        if sid:
+            line = {**line, "run": sid}             # 17h: the run that asked it
         with lock:
             with open(path, "a", encoding="utf-8") as fh:
                 fh.write(json.dumps(line, ensure_ascii=False) + "\n")
@@ -964,7 +967,7 @@ def run(sid: int, sub: dict, rec: dict, th: dict, row: Path, log_path: Path) -> 
             return "failed", line
         try:
             n, total = ask_task(rec, task, row, on, progress,
-                                canceled=lambda: db.cancel_requested(sid), log=log)
+                                canceled=lambda: db.cancel_requested(sid), log=log, sid=sid)
         except served.ServerStopped as e:
             # 17d: a stop with a reason says the reason (the thinking check's
             # starts with the benchmark's name)

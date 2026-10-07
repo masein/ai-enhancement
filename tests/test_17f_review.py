@@ -332,7 +332,7 @@ def test_p2_6_a_5xx_is_kept_a_4xx_is_written_off_and_both_can_be_asked_again(svc
 def test_p2_6_a_benchmark_left_short_lets_the_run_carry_on(svc, monkeypatch):  # noqa: F811
     asked = []
 
-    def ask(rec, task, row, on, progress=None, canceled=None, log=None):
+    def ask(rec, task, row, on, progress=None, canceled=None, log=None, sid=None):
         asked.append(task)
         return (9, 10) if task == GPQA else (10, 10)
     monkeypatch.setattr(sf, "ask_task", ask)

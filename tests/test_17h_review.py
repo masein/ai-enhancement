@@ -364,3 +364,136 @@ def test_17_the_same_answers_with_new_flags_are_taken_and_keep_their_grades(box)
     now = sf.read_answers(d / sf.ANSWERS)
     assert sorted(r.get("finish") for r in now.values()).count("length") == 1  # 0adb522: none
     assert sf.read_grades(d)["items"] == g["items"]
+
+
+# ---------------------------------------------------------------------------
+# part 4: the export — by a list of what may go out
+# ---------------------------------------------------------------------------
+
+def _export_world(box, monkeypatch, questions=None):  # noqa: F811
+    """a box's run imported onto the row (the board's own served build)"""
+    import frontier as fb
+    from test_17g_review import LONG, a3_imported
+    items = questions or [dict(x) for x in LONG]
+    monkeypatch.setattr(fb, "_fetch", lambda task: [dict(x) for x in items])
+    return a3_imported(box)
+
+
+def test_18_no_key_survives_in_the_exported_setup(box, tmp_path, monkeypatch):  # noqa: F811
+    import export_frontier_raw as efr
+    from service import config
+    from service import frontier as sf
+    from test_17_gguf_box import ROW, TASK
+    sid = _export_world(box, monkeypatch)
+    f = sf.task_dir(config.OUT_DIR / ROW, TASK) / sf.SETUP
+    st = json.loads(f.read_text())
+    st["launch"] = {"flags": "--api-key 'quiet words' -ctk q8_0 --flash-attn on",
+                    "env": "LLAMA_API_KEY=plainword LLAMA_MOE_ROUTE_MODE=lookahead"}
+    st["launch_setup"] = {**(st.get("launch_setup") or {}),
+                          "env": {"LLAMA_MOE_ROUTE_MODE": "lookahead", "API_KEY": "nodigits"},
+                          "answers": ["--api-key", "elementkey", "-ctv", "q8_0"]}
+    st["server_flags"] = "Authorization: Bearer nodigitsatall"
+    f.write_text(json.dumps(st))
+    out = (efr.export_run(sid, tmp_path / "raw") / "setup.json").read_text()
+    for secret in ("quiet words", "plainword", "nodigits", "elementkey", "nodigitsatall",
+                   "api-key", "API_KEY"):
+        assert secret not in out, secret                    # 0adb522: through, whole
+    got = json.loads(out)["tasks"][TASK]
+    assert got["launch"] == {"flags": ["-ctk", "q8_0", "--flash-attn", "on"],
+                             "env": {"LLAMA_MOE_ROUTE_MODE": "lookahead"}}
+    assert got["launch_setup"]["answers"] == ["-ctv", "q8_0"]
+
+
+def test_19_publishing_waits_for_a_typed_yes_to_the_list(box, tmp_path, monkeypatch, capsys):  # noqa: F811
+    import builtins
+
+    import export_devicemark_raw as dmx
+    import export_frontier_raw as efr
+    from service import db
+    from test_17_gguf_box import SERVED
+    sid = _export_world(box, monkeypatch)
+    in_house = dmx.IN_HOUSE
+    monkeypatch.setattr(dmx, "IN_HOUSE", re.compile(r"(?!x)x"))   # a build of a public model
+    db.public_set(SERVED, True, "masein")
+    asked = []
+    monkeypatch.setattr(builtins, "input", lambda prompt="": (asked.append(prompt), "no")[1])
+    assert efr.main(["--run", str(sid), "--out", str(tmp_path / "a")]) == 0
+    out = capsys.readouterr().out
+    assert asked and f"  {SERVED}" in out and "not published" in out
+    assert not (tmp_path / "a" / "public").exists() and (tmp_path / "a" / "private").exists()
+    monkeypatch.setattr(builtins, "input", lambda prompt="": "yes")
+    assert efr.main(["--run", str(sid), "--out", str(tmp_path / "b")]) == 0
+    assert (tmp_path / "b" / "public").exists()             # 0adb522: never, by the mark
+    # an in-house build: never, marked or not
+    monkeypatch.setattr(dmx, "IN_HOUSE", in_house)
+    assert not efr.known_public({"hf_id": SERVED})
+
+
+def test_20_a_quote_of_a_gated_question_never_reaches_the_log(box, tmp_path, monkeypatch):  # noqa: F811
+    import export_frontier_raw as efr
+    import frontier as fb
+    from service import config
+    from test_17_gguf_box import SERVED, invented
+    q = ("First line of the problem about boiling water at altitude.\nSecond line asks for "
+         "the height in metres of the summit where it boils.")
+    items = [{**x, "question": q if k == 0 else x["question"]} for k, x in enumerate(invented())]
+    sid = _export_world(box, monkeypatch, items)
+    log = config.LOGS_DIR / f"service_{sid}_{SERVED.replace('/', '__')}.log"
+    log.write_text(log.read_text()
+                   + "[frontier] later line: Second line asks for the height in metres\n"
+                   + "[frontier] escaped: " + json.dumps(q)[1:60] + "\n"
+                   + "[frontier] middle: the problem about boiling water at altitude Second\n"
+                   + "[frontier] GPQA Diamond: 48 of 48 answered\n")
+    dest = efr.export_run(sid, tmp_path / "raw")
+    text = (dest / "log.txt").read_text()
+    for bit in ("Second line asks", "boiling water", "First line of the"):
+        assert bit not in text, bit                          # 0adb522: through
+    assert "GPQA Diamond: 48 of 48 answered" in text
+    # fail closed: no list of the questions, no log
+    real = fb.load
+    monkeypatch.setattr(fb, "load", lambda task, root=None: (_ for _ in ()).throw(
+        RuntimeError("gated")))
+    assert efr.questions(["gpqa_diamond_epoch"]) is None
+    monkeypatch.setattr(fb, "load", real)
+    monkeypatch.setattr(efr, "questions", lambda tasks: None)
+    dest = efr.export_run(sid, tmp_path / "raw2")
+    assert (dest / "log.txt").read_text() == ""
+    assert "no question list" in (dest / "README.md").read_text()
+
+
+def test_21_addresses_ports_hosts_and_the_account_are_scrubbed():
+    import export_devicemark_raw as dmx
+    for raw, gone in (("fd00:1234::5 and 2001:db8:85a3::8a2e:370:7334", ("fd00", "2001:db8")),
+                      ("[address]:41234", ("41234",)), ("ssh -o Port=2222 x", ("2222",)),
+                      ("-p 2222 user@host.example.com", ("2222", "user@", "example.com")),
+                      ("http://llm.corp.example.com/v1", ("corp.example.com",)),
+                      ("https://u:pw@internal.example.com/x", ("u:pw", "internal")),
+                      ("-hf acct/evalboard-q-gguf", ("acct/",)),
+                      ("datasets/acct/evalboard-raw-private", ("acct/",)),
+                      ("hf://acct/my-evalboard-builds/x", ("acct/",))):
+        got = dmx.scrub(raw, env={}, hosts=[])
+        assert not any(g in got for g in gone), (raw, got)   # 0adb522: through
+    assert dmx.scrub("2026-10-06 17:53:58 · v 1.2.3", env={}, hosts=[]) == \
+        "2026-10-06 17:53:58 · v 1.2.3"
+
+
+def test_22_two_runs_on_this_server_export_what_each_asked(box, tmp_path, monkeypatch):  # noqa: F811
+    import export_frontier_raw as efr
+    from service import config, db, served
+    from service import frontier as sf
+    from test_17_gguf_box import N, ROW, RUNS, SERVED, TASK, register
+    register(box["sha"])
+    rec = served.get(SERVED)
+    d = sf.task_dir(config.OUT_DIR / ROW, TASK)
+    d.mkdir(parents=True, exist_ok=True)
+    sids = [db.add(SERVED, "instruct", "frontier", "masein", "a board run", thinking=True,
+                   tasks=[TASK], status="done") for _ in range(2)]
+    (d / sf.ANSWERS).write_text("".join(json.dumps(
+        {"id": f"rec{k:03d}", "epoch": e, "answer": "ANSWER: A", "finish": "stop",
+         "tokens": 5, "run": sids[k % 2]}) + "\n" for k in range(N) for e in range(RUNS)))
+    (d / sf.SETUP).write_text(json.dumps({"thinking": "on", "where": "this server"}))
+    sf.score_task(config.OUT_DIR / ROW, TASK, rec)
+    got = [{(x["id"], x["epoch"]) for x in map(json.loads, (efr.export_run(
+        s, tmp_path / "raw") / "items.jsonl").read_text().splitlines())} for s in sids]
+    assert got[0] and got[1] and not got[0] & got[1]         # 0adb522: the same items
+    assert len(got[0] | got[1]) == N * RUNS
