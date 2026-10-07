@@ -8185,7 +8185,7 @@ function modelHead(m, kinds) {
           m.params ? el('span', { 'data-model-size': m.id, title: sizeTip(m), text: sizeText(m) })
             : el('span', { class: 'se', 'data-model-size': m.id, text: 'size not recorded' }),
           facts ? ' · ' + facts : '', sizeEdit(m)),
-        publicLine(m),
+        publicLine(m), publicFileLine(m),
         // 16b.2: its actions — Test this model · Chat · Download — and 12m.1's
         // Compare with… beside them; the static report keeps Compare alone
         LIVE ? modelActions(m) : el('p', { class: 'small' }, el('button', { class: 'quiet',
@@ -8237,6 +8237,63 @@ function publicLine(m) {
           onclick: () => { state.pubAsk = null; render(); } }))
       : el('button', { class: 'quiet small', 'data-public-weights-toggle': 'set',
         text: 'Mark its weights public', onclick: () => { state.pubAsk = id; render(); } }));
+}
+// 17j: the public file the model is — a Hugging Face repository and a path,
+// checked by the board (Hugging Face asked as anyone would, its sha256
+// against the registered file's). The export's typed-yes list says "the same
+// file as …, checked" for it, and CHECK for any other model marked public
+function publicFileLine(m) {
+  if (!LIVE || m.reportedOnly || m.rowOf) return '';
+  const id = String(m.id).replace(/ · thinking$/, '');
+  const rec = (DATA.public_files || {})[id];
+  const mark = (DATA.public_weights || {})[id];
+  const F = state.pubFile = state.pubFile || {};
+  const where = r => r.repo + (r.path ? '/' + r.path : '');
+  const send = async (repo, path) => {
+    if (!whoName()) { askName(); return; }
+    F.busy = true; F.msg = ''; render();
+    try {
+      const got = await post('api/models/public-file', { model: id, repo, path, by: whoName() });
+      state.pubFile = {};
+      toast(!got.file ? `${m.name}: its public file cleared`
+        : got.file.holds ? `${m.name}: the same file as ${where(got.file)}, checked`
+        : `${m.name}: not shown to be a public file — ${got.file.why}`, { key: 'pubfile' });
+      await refreshResults();
+    } catch (e) { F.busy = false; F.msg = e.message; render(); }
+  };
+  if (F.id === id) {
+    const box = (k, label, ph, w) => el('label', { class: 'small' }, label + ' ',
+      el('input', { type: 'text', value: F[k] || '', placeholder: ph, style: `width:${w}`,
+        'data-public-file-input': k, 'aria-label': label,
+        oninput: e => { F[k] = e.target.value; } }));
+    return el('p', { class: 'small', 'data-public-file': 'form' },
+      box('repo', 'Hugging Face repository', 'unsloth/Qwen3.6-35B-A3B-GGUF', '18em'), ' ',
+      box('path', 'file', 'BF16/x-00001-of-00002.gguf', '16em'), ' ',
+      el('button', { class: 'small', 'data-public-file-check': '1', disabled: F.busy ? '' : null,
+        text: F.busy ? 'Checking…' : 'Check', onclick: () => send(F.repo || '', F.path || '') }),
+      ' ', el('button', { class: 'quiet small', text: 'Cancel',
+        onclick: () => { state.pubFile = {}; render(); } }),
+      F.msg ? el('span', { class: 'warn small', 'data-public-file-msg': '1', text: ' ' + F.msg })
+        : '');
+  }
+  const open = el('button', { class: 'quiet small', 'data-public-file-edit': '1',
+    text: rec ? 'change' : 'Give its public file', onclick: () => {
+      Object.assign(F, { id, repo: rec ? rec.repo : '', path: rec ? rec.path : '', msg: '' });
+      render(); } });
+  const day = r => new Date(r.at * 1000).toISOString().slice(0, 10);
+  if (rec && rec.holds) {
+    return el('p', { class: 'small', 'data-public-file': 'checked' },
+      el('span', { class: 'se', text: `${rec.path ? 'The same file as' : 'The public repository'} `
+        + `${where(rec)}, checked on ${day(rec)} by ${rec.by}: Hugging Face shows it to anyone`
+        + (rec.path ? ', with the registered file’s sha256. ' : '. ') }), open, ' ',
+      el('button', { class: 'quiet small', text: 'clear', onclick: () => send('', '') }));
+  }
+  if (!rec && !mark) return '';             // asked only of a model marked public
+  return el('p', { class: 'small', 'data-public-file': 'check' },
+    el('span', { class: 'warntext', text: 'CHECK: not shown to be a public file — '
+      + (rec ? `${where(rec)}: ${rec.why || 'the file registered since isn’t the one checked'}`
+        : 'give its Hugging Face repository and path, and the board checks its sha256') + '. ' }),
+    open);
 }
 // 16.1: a model's size, as a person enters it — first of the board's sources.
 // The form opens on what the board has, or the name's suggestion to confirm
@@ -24791,7 +24848,20 @@ function frontierGradingCard() {
         el('td', {}, el('b', { text: g.label }), el('div', { class: 'small se', text: g.does }),
           // 17b: its reasoning, set, and the cap sized for it
           g.ask ? el('div', { class: 'small se', 'data-frontier-grader-ask': g.slot,
-            text: `${g.reasoning_words} · at most ${n(g.ask.max_tokens)} tokens a reply` }) : ''),
+            text: `${g.reasoning_words} · at most ${n(g.ask.max_tokens)} tokens a reply` }) : '',
+          // 17j: HLE's judge — in CAIS's JSON schema, or in prose and lines,
+          // read as a person reads them, where a reply that can't be read is
+          // asked again, and paid
+          'json_only' in g ? (g.json_only
+            ? el('div', { class: 'small se', 'data-frontier-json-only': '1',
+                text: 'answers in CAIS’s JSON schema (structured outputs): read the same way '
+                  + 'every time' })
+            : el('div', { class: 'small warntext', 'data-frontier-json-only': '0',
+                text: (g.json_only === false ? 'doesn’t take a JSON schema'
+                  : 'OpenRouter doesn’t say whether it takes a JSON schema')
+                  + ': it answers in prose or lines, read as a person reads them — a reply '
+                  + `that can’t be read is asked again, and paid (up to ${G.tries || 3} times). `
+                  + 'A judge that takes the schema costs no such tries' })) : ''),
         el('td', {}, el('span', { 'data-frontier-grader-now': g.slot,
             text: String(now.name || now.id || '—').split(': ').pop() }),
           el('div', { class: 'small se', text: g.chosen
@@ -24832,6 +24902,8 @@ function frontierGradingCard() {
         : 'Nothing waits for a grader: every Frontier answer on file is scored.' });
   const running = (G.running || []).length, stopped = !!G.stopped;
   const switching = rows.some(r => r.switch && !r.answers);
+  // 17j: rows whose batch still runs at the grader they left
+  const moving = (E.held || []).length > 0;
   const why = !G.has_key ? 'OpenRouter has no key on this server (OPENROUTER_API_KEY)'
     : E.over_limit || '';
   const cost = E.usd_known ? usd(E.usd) : `${usd(E.usd)} and the unpriced`;
@@ -24870,15 +24942,18 @@ function frontierGradingCard() {
     // 17i: a row whose replies are still on their way at the grader it left
     ...(E.held || []).map(h => el('p', { class: 'small se', 'data-frontier-held-row':
       `${h.task}|${h.row}`, text: h.words })),
-    LIVE && (E.answers || running || switching) ? el('div', { class: 'frm', 'data-frontier-run': held
-        ? 'held' : running ? 'running' : stopped ? 'stopped' : 'idle' },
-      // 17h: and a switch alone, nothing to send, has its Start too
-      E.answers || held || switching ? el('button', { class: 'primary', 'data-frontier-start': '1',
-        disabled: why || busy ? '' : null, title: why || null,
+    LIVE && (E.answers || running || switching || moving) ? el('div', { class: 'frm',
+        'data-frontier-run': held ? 'held' : running ? 'running' : stopped ? 'stopped' : 'idle' },
+      // 17h: and a switch alone, nothing to send, has its Start too. 17j: and
+      // rows another grader was chosen for while their batch runs — Start
+      // stops what the old one hasn't been sent (it was paid for all the rest)
+      E.answers || held || switching || moving ? el('button', { class: 'primary',
+        'data-frontier-start': '1', disabled: why || busy ? '' : null, title: why || null,
         text: busy === 'start' ? 'Sending…' : stopped || held
           ? 'Carry on' + (E.answers || H.answers ? `: about ${carryCost}` : '')
-          : 'Start grading' + (E.answers ? `: about ${cost}` : switching
-            ? ': nothing to send, the grades switched' : ''),
+          : 'Start grading' + (E.answers ? `: about ${cost}` : moving
+            ? ': nothing more to the grader it left, the rest to the one chosen now'
+            : switching ? ': nothing to send, the grades switched' : ''),
         onclick: () => frontierGradingAct('start') }) : '',
       (E.answers || held) && E.short ? el('button', { class: 'quiet', 'data-frontier-partial': '1',
         disabled: why || busy ? '' : null,

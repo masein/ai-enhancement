@@ -203,6 +203,14 @@ CREATE TABLE IF NOT EXISTS public_models (
   set_by      TEXT NOT NULL,
   set_at      REAL NOT NULL
 );
+-- 17j: the public file a model is, as its page gives it (a Hugging Face
+-- repository and a path), and what the board's check of it found
+CREATE TABLE IF NOT EXISTS public_files (
+  model       TEXT PRIMARY KEY,
+  data        TEXT NOT NULL,
+  set_by      TEXT NOT NULL,
+  set_at      REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS model_sizes (
   model       TEXT PRIMARY KEY,
   total       REAL NOT NULL,
@@ -1063,6 +1071,31 @@ def public_set(model: str, on: bool, by: str) -> None:
         c.commit()
 
 
+def public_files_all() -> dict[str, dict]:
+    """17j: {model: {repo, path, sha256, same, why, at, by}} — the public file
+    each model's page gave, and what the check found"""
+    if not config.DB_PATH.exists():
+        return {}
+    try:
+        with closing(_conn()) as c:
+            rows = c.execute("SELECT model, data, set_by FROM public_files").fetchall()
+    except sqlite3.OperationalError:
+        return {}
+    return {m: {**json.loads(d), "by": by} for m, d, by in rows}
+
+
+def public_file_set(model: str, rec: dict | None, by: str) -> None:
+    with closing(_conn()) as c:
+        if rec:
+            c.execute("INSERT INTO public_files (model, data, set_by, set_at) VALUES (?,?,?,?) "
+                      "ON CONFLICT(model) DO UPDATE SET data=excluded.data, "
+                      "set_by=excluded.set_by, set_at=excluded.set_at",
+                      (model, json.dumps(rec), by, time.time()))
+        else:
+            c.execute("DELETE FROM public_files WHERE model=?", (model,))
+        c.commit()
+
+
 def sizes_all() -> dict[str, dict]:
     """16.1: {model: {total, active, by, at}} — the sizes people entered"""
     with closing(_conn()) as c:
@@ -1269,6 +1302,20 @@ def spend_add(job: str, model: str, provider: str, tokens_in: int, tokens_out: i
                   (time.time(), job, model, provider, int(tokens_in or 0), int(tokens_out or 0),
                    float(usd or 0.0), batch_id))
         c.commit()
+
+
+def tokens_out_this_month(job: str, model: str, batch_ids: list[str]) -> tuple[float, int]:
+    """17j: (the mean tokens out, how many replies) of `model`'s replies for
+    `job` this month in these batches — what a grader's replies cost, read
+    from the ledger, not assumed"""
+    if not batch_ids:
+        return 0.0, 0
+    with closing(_conn()) as c:
+        marks = ",".join("?" * len(batch_ids))
+        row = c.execute(f"SELECT AVG(tokens_out), COUNT(*) FROM ai_spend WHERE at>=? AND job=? "
+                        f"AND model=? AND tokens_out>0 AND batch_id IN ({marks})",
+                        (_month_start(), job, model, *batch_ids)).fetchone()
+    return float(row[0] or 0.0), int(row[1] or 0)
 
 
 def spend_this_month() -> float:

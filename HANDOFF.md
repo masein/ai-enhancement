@@ -4995,6 +4995,43 @@ Not before the demo: a new hidden set changes every Everyday score.
 - Tests: `tests/test_17j_page.py`, `tests/test_17j_page_browser.py`,
   `tests/test_17j_window.py`, `tests/test_17j_copy_window_browser.py`.
 
+### 17j.4 — the export (7 Oct)
+
+- **The scrub's names worked out, said, and checked** (point 22,
+  `export_safe.scrub_names`): `","`, `"x"`, the container's own name or a
+  wrong account each opened `public/`. The export now adds what it can work
+  out — the container's name, the hosts the board's settings name (a served
+  model's, the judge's), the names a browser opened the board by
+  (`public_files.seen`, recorded by the app), and the accounts of the
+  repositories its models were fetched from (but a checked public file's) —
+  prints `will remove: hosts …; accounts …` above the yes-list, and refuses
+  `public/` for a value too short to be a name, a server name it doesn't
+  know, or no account.
+- **A model's page records the public file it is** (23,
+  `service/public_files.py`, `POST /api/models/public-file`): a Hugging Face
+  repository and path, checked by asking Hugging Face as anyone would (no
+  token) for the sha256 it publishes, against the registered file's (each
+  part's). The list says "the same file as unsloth/…, checked"; any other
+  model marked public gets `CHECK: not shown to be a public file`, and so
+  does one whose file was registered since the check.
+- **Free words out of kept lines** (24): the import's header no longer names
+  who imported it (old headers go out without it); a run's failure goes out
+  as "the run: failed"; a load failure, a stop and a written-off question
+  without their bracketed reasons; a tagged line still holding an
+  exception's text is left out.
+- **Quotes caught** (25): `&nbsp;` and other entities read, five words in a
+  row (was six), and base64 decoded.
+- **Fails loudly** (26): the sets load once (one that couldn't be was loaded
+  again for each run), the export says how many questions each gave (one
+  absent here: 0, said), and exits 1 when one couldn't be loaded.
+- **Small ones** (27): closed stdin (`<&-`) is a no, never a traceback;
+  every flag's and variable's value is checked by its kind (`KINDS`: a
+  number, one of its words, devices, a tensor override), so a 23-character
+  token no longer passes as `CUDA_VISIBLE_DEVICES`; a run's `where` is
+  picked from a list (`where_of`).
+- Tests: `tests/test_17j_export.py`, `tests/test_17j_export_browser.py`.
+
+
 ### 17j.3 — the boxes and the fetch (7 Oct)
 
 - **"Safe" has a time, and a box is destroyed after two rounds unreached**
@@ -5033,6 +5070,64 @@ Not before the demo: a new hidden set changes every Everyday score.
   (`served._same_size`); the by-hand line pastes as it is (what the board
   couldn't say is a line of its own); the docs say `--every 3m`.
 - Tests: `tests/test_17j_boxes.py`.
+
+### 17j.2 — grading (7 Oct)
+
+- **Rows held at the grader they left have their Start** (point 9): another
+  grader chosen while a batch runs — the card offered Stop alone, and the
+  grader left was paid for all the rest. Start stops what it hasn't been
+  sent (the server's Start already cancelled it); the rows move once their
+  replies land.
+- **A grader's no-grades alone are no grades to bring back** (10,
+  `_switch`): chosen back, a grader that left only refusals (provider
+  errors, no tries) graded the whole row again — 62 paid for 30 answers.
+  It asks its own no-grades again, those alone.
+- **Stopped at the month's limit, it waits for a press** (11,
+  `GraderChat.at_wait`, `llm` worker): it took itself up when the limit was
+  raised, and when the month turned. Nothing is sent to a paid grader
+  without a press since the last stop; the card says so.
+- **The dry run prices replies as the ledger says they cost** (12,
+  `out_tokens`): once a grader has replied to a benchmark this month, the
+  mean of its replies' tokens out, not the assumption (HLE's 900); the dry
+  run says which (`out_from`).
+- **The rules test** (13): four benchmarks (SimpleQA, HLE, MATH, OTIS), HLE's
+  replies drawn from the reviewers' cases file, Carry on counted only for a
+  row it would send something of, no send without a press after the limit
+  is raised or the month turns, and points 9 to 11 as sequences with what
+  must hold at their end.
+- Tests: `tests/test_17h_grading_rules.py`, `tests/test_17j_grading.py`,
+  `tests/test_17j_browser.py`.
+
+### 17j.1 — the HLE reader, by its cases (7 Oct)
+
+- **The reviewers' 134 replies are the reader's test**
+  (`tests/fixtures/hle_reader_cases.json`, `tests/test_17j_hle_reader.py`):
+  every one reads as a careful person reads it; 23 didn't on 0abb757 (9 a
+  wrong grade, 14 unread). Plus 2,000 strict JSON replies whose strings hold
+  braces, quotes, backslashes and quoted verdicts, each read as its own.
+- **What a verdict object is** (`frontier_graders._json_objects`): only a
+  `{` that opens with one of the four fields' names — a brace in prose, LaTeX
+  (`\left\{ … \right.`) or code is never one, and never makes the reply
+  "cut"; a reply is cut only when such an object never closes. Nothing
+  inside an object is read on its own (a verdict quoted in its reasoning).
+- **Read as a person reads it** (`_lenient`, `_mend`, `_by_fields`): JSON;
+  else with `\u` that isn't four hex digits, raw backslashes, raw newlines in
+  a string, an unquoted `yes` and trailing commas mended; else a Python
+  literal; else field by field (an apostrophe in a single-quoted object, a
+  quote left unescaped) — and when a field is named twice, no grade.
+- **Which verdict** (`_hle_object`): an object alone on its line wins only
+  over one inside a sentence that holds nothing but `correct`; otherwise two
+  that disagree are no grade. The line form is read from the text outside
+  objects (a multi-line example's `"correct": "yes"` line was the verdict).
+  An example needs its answer and its reasoning; square brackets are a
+  placeholder only for the prompt's own words (`[response]`).
+- **A reply that reached its cap is read** (`frontier_grade._apply`): a
+  whole one is a grade; one the cap cut off is no grade, and says the cap.
+- **The card says whether HLE's judge takes CAIS's JSON schema**
+  (`status()["graders"][…]["json_only"]`), and warns when it doesn't: replies
+  in prose can be asked again, and paid.
+- Tests: `tests/test_17j_hle_reader.py`, `tests/test_17j_browser.py`.
+
 
 ### Fix — a number field kept across a redraw (7 Oct)
 

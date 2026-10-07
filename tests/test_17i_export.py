@@ -194,7 +194,8 @@ def test_24_a_numbered_header_goes_out_and_a_missing_set_is_said(box, tmp_path, 
     monkeypatch.setattr(fb, "load", lambda task, root=None: (_ for _ in ()).throw(
         RuntimeError("gated")) if task == "hle_text_cais" else real(task, root))
     capsys.readouterr()
-    assert efr.main(["--run", str(sid), "--out", str(tmp_path / "raw2"), "--private"]) == 0
+    # 17j: and exits 1 — it exited 0, every run's log empty
+    assert efr.main(["--run", str(sid), "--out", str(tmp_path / "raw2"), "--private"]) == 1
     assert "no log: Humanity's Last Exam couldn't be loaded" in capsys.readouterr().out
 
 

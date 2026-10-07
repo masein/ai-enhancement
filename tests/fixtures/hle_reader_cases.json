@@ -1,0 +1,1395 @@
+{
+ "about": "Replies an HLE judge could send, with what a careful person reads ('want': any reading listed is acceptable; 'no grade' means the reply must not be graded). 'reads_on_0abb757' is what scripts/frontier_graders.py read at 0abb757. Invented text only: no benchmark question is in this file. The field texts some cases quote are the public HLE judge prompt's own words.",
+ "wrong_grade_on_0abb757": [
+  "r2-A10",
+  "r2-A11",
+  "r2-A12",
+  "r2-C10",
+  "r2-C15",
+  "r2-C21",
+  "r2-D1",
+  "r2-D2",
+  "r2-D4"
+ ],
+ "unread_on_0abb757": [
+  "r1-d2",
+  "r2-A5",
+  "r2-A8",
+  "r2-B5",
+  "r2-B6",
+  "r2-B7",
+  "r2-B9",
+  "r2-B16",
+  "r2-C2",
+  "r2-C3",
+  "r2-C11",
+  "r2-C12",
+  "r2-C20",
+  "r2-C22"
+ ],
+ "cases": [
+  {
+   "id": "r1-a1",
+   "what": "prompt-words example(yes) then real NO",
+   "reply": "{\"extracted_final_answer\": \"The final exact answer extracted from the [response].\", \"reasoning\": \"Explain why the extracted_final_answer is correct or incorrect based on [correct_answer]\", \"correct\": \"yes\", \"confidence\": \"Put 100 if there is no confidence score available.\"}\n{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-a2",
+   "what": "prompt-words example(yes) then real YES",
+   "reply": "{\"extracted_final_answer\": \"The final exact answer extracted from the [response].\", \"reasoning\": \"Explain why the extracted_final_answer is correct or incorrect based on [correct_answer]\", \"correct\": \"yes\", \"confidence\": \"Put 100 if there is no confidence score available.\"}\n{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"yes\", \"confidence\": 90}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-a3",
+   "what": "prompt-words example alone",
+   "reply": "{\"extracted_final_answer\": \"The final exact answer extracted from the [response].\", \"reasoning\": \"Explain why the extracted_final_answer is correct or incorrect based on [correct_answer]\", \"correct\": \"yes\", \"confidence\": \"Put 100 if there is no confidence score available.\"}",
+   "want": [
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-a4",
+   "what": "example with {response}/{correct_answer} placeholders, then real NO",
+   "reply": "{\"extracted_final_answer\": \"{response}\", \"reasoning\": \"{correct_answer}\", \"correct\": \"yes\"}\n{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no",
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-a5",
+   "what": "'<...>' placeholder example(yes), then real NO (object)",
+   "reply": "{\"extracted_final_answer\": \"<the final answer>\", \"reasoning\": \"<why>\", \"correct\": \"yes\", \"confidence\": 100}\n{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no",
+    "no grade"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-a6",
+   "what": "'<...>' placeholder example(yes) alone on its line, then real NO in LINE form",
+   "reply": "{\"extracted_final_answer\": \"<the final answer>\", \"reasoning\": \"<why>\", \"correct\": \"yes\", \"confidence\": 100}\nextracted_final_answer: 41\nreasoning: differs\ncorrect: no\nconfidence: 90",
+   "want": [
+    "no",
+    "no grade"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-a7",
+   "what": "'Format: '+placeholder example(yes) inline, then real NO in LINE form",
+   "reply": "Format: {\"extracted_final_answer\": \"<the final answer>\", \"reasoning\": \"<why>\", \"correct\": \"yes\", \"confidence\": 100}\nextracted_final_answer: 41\nreasoning: differs\ncorrect: no\nconfidence: 90",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-a8",
+   "what": "'<...>' placeholder example(yes) alone: nothing else",
+   "reply": "{\"extracted_final_answer\": \"<the final answer>\", \"reasoning\": \"<why>\", \"correct\": \"yes\", \"confidence\": 100}",
+   "want": [
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-b1",
+   "what": "real NO, reasoning 'There is no exact, final answer to extract from the response.'",
+   "reply": "{\"extracted_final_answer\": \"None\", \"reasoning\": \"There is no exact, final answer to extract from the response.\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-b2",
+   "what": "real YES, reasoning 'The final exact answer extracted from the response is 42, which matches the correct_answer.'",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"The final exact answer extracted from the response is 42, which matches the correct_answer.\", \"correct\": \"yes\", \"confidence\": 90}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-b3",
+   "what": "real NO, reasoning 'There are meaningful differences between [correct_answer] and the extracted_final_answer.'",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"There are meaningful differences between [correct_answer] and the extracted_final_answer.\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-b4",
+   "what": "real YES, reasoning '...is within a small margin of error for numerical problems.'",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"Within a small margin of error for numerical problems.\", \"correct\": \"yes\", \"confidence\": 90}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-b5",
+   "what": "real NO, extracted 'None', reasoning 'No exact, final answer to extract from the response'",
+   "reply": "{\"extracted_final_answer\": \"None\", \"reasoning\": \"No exact, final answer to extract from the response\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-b6",
+   "what": "b1 + judge quotes the response's own {\"correct\": \"yes\"} first",
+   "reply": "The response ends with {\"correct\": \"yes\"}.\n{\"extracted_final_answer\": \"None\", \"reasoning\": \"There is no exact, final answer to extract from the response.\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-b7",
+   "what": "real NO in line form, same reasoning (control)",
+   "reply": "extracted_final_answer: None\nreasoning: There is no exact, final answer to extract from the response.\ncorrect: no\nconfidence: 100",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-b8",
+   "what": "real YES, confidence as words 'Put 100 if there is no confidence score available' absent; reasoning 'There is no confidence score available.' + match",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"The answers match. There is no confidence score available.\", \"correct\": \"yes\", \"confidence\": 90}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-c1",
+   "what": "nested one line {'result': verdict yes}",
+   "reply": "{\"result\": {\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"yes\", \"confidence\": 90}}",
+   "want": [
+    "yes",
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-c2",
+   "what": "nested pretty, correct last field",
+   "reply": "{\n  \"judgement\": {\n    \"extracted_final_answer\": \"42\",\n    \"reasoning\": \"m\",\n    \"confidence\": 90,\n    \"correct\": \"no\"\n  }\n}",
+   "want": [
+    "no",
+    "no grade"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-c3",
+   "what": "outer NO, a field holds an object saying yes",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"no\", \"confidence\": 90, \"quoted\": {\"correct\": \"yes\"}}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-c4",
+   "what": "list of one verdict [ {...} ]",
+   "reply": "[{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"no\", \"confidence\": 90}]",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-c5",
+   "what": "verdict as a JSON string inside an object {'answer': '<json>'}",
+   "reply": "{\"answer\": \"{\\\"extracted_final_answer\\\": \\\"42\\\", \\\"reasoning\\\": \\\"matches\\\", \\\"correct\\\": \\\"no\\\", \\\"confidence\\\": 90}\"}",
+   "want": [
+    "no",
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-d1",
+   "what": "prose set {1, 2} then YES",
+   "reply": "The set {1, 2} matches.\n{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"yes\", \"confidence\": 90}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-d2",
+   "what": "prose with an open brace never closed, then NO",
+   "reply": "Let f(x) = { x^2 if x > 0, else 0.\n{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": false
+  },
+  {
+   "id": "r1-d3",
+   "what": "prose with a JSON object that isn't a verdict {\"a\": 1}, then NO",
+   "reply": "The key is {\"a\": 1} here.\n{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-d4",
+   "what": "LaTeX in prose \\frac{1}{2}, then YES",
+   "reply": "The value \\frac{1}{2} equals 0.5.\n{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"yes\", \"confidence\": 90}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-d5",
+   "what": "object whose reasoning has raw LaTeX backslashes (invalid JSON escapes), one line",
+   "reply": "{\"extracted_final_answer\": \"\\alpha = 2\", \"reasoning\": \"The response gives $\\alpha = 2$, the key $\\alpha=2$\", \"correct\": \"yes\", \"confidence\": 95}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-d6",
+   "what": "as d5, pretty over lines",
+   "reply": "{\n  \"extracted_final_answer\": \"\\alpha = 2\",\n  \"reasoning\": \"the key is \\(x\\)\",\n  \"correct\": \"no\",\n  \"confidence\": 95\n}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-d7",
+   "what": "object with a trailing comma (invalid JSON)",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"m\", \"correct\": \"yes\", \"confidence\": 90,}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-d8",
+   "what": "object with single quotes (python dict)",
+   "reply": "{'extracted_final_answer': '42', 'reasoning': 'm', 'correct': 'no', 'confidence': 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-d9",
+   "what": "prose says 'correct: yes' is expected of a match; object NO",
+   "reply": "A match would be marked correct: yes.\n{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-d10",
+   "what": "line 'Correct: yes' quoted from the RESPONSE then object NO",
+   "reply": "The response ends:\n> correct: yes\n{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no",
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-e1",
+   "what": "the \"correct\" field holds 'yes'",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"yes\", \"confidence\": 90}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-e2",
+   "what": "the \"correct\" field holds 'no'",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-e3",
+   "what": "the \"correct\" field holds True",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": true, \"confidence\": 90}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-e4",
+   "what": "the \"correct\" field holds False",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": false, \"confidence\": 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-e5",
+   "what": "the \"correct\" field holds 'Yes'",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"Yes\", \"confidence\": 90}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-e6",
+   "what": "the \"correct\" field holds 'NO'",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"NO\", \"confidence\": 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-e7",
+   "what": "the \"correct\" field holds 'yes.'",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"yes.\", \"confidence\": 90}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-e8",
+   "what": "the \"correct\" field holds 'true'",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"true\", \"confidence\": 90}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-e9",
+   "what": "the \"correct\" field holds 'False'",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"False\", \"confidence\": 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-e10",
+   "what": "the \"correct\" field holds ' yes '",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \" yes \", \"confidence\": 90}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-e11",
+   "what": "the \"correct\" field holds 'correct'",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"correct\", \"confidence\": 90}",
+   "want": [
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-e12",
+   "what": "the \"correct\" field holds 'y'",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"y\", \"confidence\": 90}",
+   "want": [
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-e13",
+   "what": "the \"correct\" field holds 1",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": 1, \"confidence\": 90}",
+   "want": [
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-e14",
+   "what": "the \"correct\" field holds 0",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": 0, \"confidence\": 90}",
+   "want": [
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-e15",
+   "what": "the \"correct\" field holds None",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": null, \"confidence\": 90}",
+   "want": [
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-e16",
+   "what": "the \"correct\" field holds 'yes/no'",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"yes/no\", \"confidence\": 90}",
+   "want": [
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-e17",
+   "what": "the \"correct\" field holds 'yes (within margin)'",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"yes (within margin)\", \"confidence\": 90}",
+   "want": [
+    "yes",
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-e18",
+   "what": "the \"correct\" field holds 'no, differs'",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"no, differs\", \"confidence\": 90}",
+   "want": [
+    "no",
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-f1",
+   "what": "two agree YES (different reasoning)",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"yes\", \"confidence\": 90}\n{\"extracted_final_answer\": \"42\", \"reasoning\": \"equal\", \"correct\": \"yes\", \"confidence\": 90}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-f2",
+   "what": "two agree NO",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"no\", \"confidence\": 90}\n{\"extracted_final_answer\": \"42\", \"reasoning\": \"x\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-f3",
+   "what": "two disagree yes,no",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"yes\", \"confidence\": 90}\n{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-f4",
+   "what": "two disagree no,yes",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"no\", \"confidence\": 90}\n{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"yes\", \"confidence\": 90}",
+   "want": [
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-f5",
+   "what": "three: yes, yes, no",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"yes\", \"confidence\": 90}{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"yes\", \"confidence\": 90}{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-f6",
+   "what": "draft NO then 'Final:' YES",
+   "reply": "Draft:\n{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"no\", \"confidence\": 90}\nOn reflection, final:\n{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"yes\", \"confidence\": 90}",
+   "want": [
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-g1",
+   "what": "cut mid-object",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\":",
+   "want": [
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-g2",
+   "what": "cut before 'correct', after an inline quoted {\"correct\": \"yes\"}",
+   "reply": "The format is {\"correct\": \"yes\"} for a match. My judgement: {\"extracted_final_answer\": \"41\", \"reasoning\": \"differs\", \"corr",
+   "want": [
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-g3",
+   "what": "prompt example then real object cut before its verdict",
+   "reply": "{\"extracted_final_answer\": \"The final exact answer extracted from the [response].\", \"reasoning\": \"Explain why the extracted_final_answer is correct or incorrect based on [correct_answer]\", \"correct\": \"yes\", \"confidence\": \"Put 100 if there is no confidence score available.\"}\n{\"extracted_final_answer\": \"41\", \"reasoning\": \"differs\", \"corr",
+   "want": [
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-g4",
+   "what": "real YES object, then a second object cut",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"yes\", \"confidence\": 90}\n{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"cor",
+   "want": [
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-g5",
+   "what": "line form cut after 'correct:'",
+   "reply": "extracted_final_answer: 42\nreasoning: m\ncorrect:",
+   "want": [
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-g6",
+   "what": "line form 'correct: yes' then cut confidence",
+   "reply": "extracted_final_answer: 42\nreasoning: m\ncorrect: yes\nconfid",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-g7",
+   "what": "empty",
+   "reply": "",
+   "want": [
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-g8",
+   "what": "whitespace",
+   "reply": " \n ",
+   "want": [
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-h1",
+   "what": "'correct: yes' twice then 'correct: no'",
+   "reply": "correct: yes\ncorrect: yes\ncorrect: no",
+   "want": [
+    "no grade",
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-h2",
+   "what": "'**correct:** no'",
+   "reply": "**extracted_final_answer:** 41\n**reasoning:** x\n**correct:** no\n**confidence:** 80",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r1-h3",
+   "what": "'correct: no' inside reasoning sentence only",
+   "reply": "reasoning: it would be wrong to mark this correct: no, it matches\ncorrect: yes",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-A1",
+   "what": "real NO, reasoning IS the prompt's whole reasoning text; other fields real",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"Explain why the extracted_final_answer is correct or incorrect based on [correct_answer], focusing only on if there are meaningful differences between [correct_answer] and the extracted_final_answer. Do not comment on any background to the problem, do not attempt to solve the problem, do not argue for any answer different than [correct_answer], focus only on whether the answers match.\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-A2",
+   "what": "real YES, reasoning = prompt's reasoning text's first sentence part",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"Explain why the extracted_final_answer is correct\", \"correct\": \"yes\", \"confidence\": 90}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-A3",
+   "what": "every field the prompt's text, correct no (an example)",
+   "reply": "{\"extracted_final_answer\": \"The final exact answer extracted from the [response]. Put the extracted answer as 'None' if there is no exact, final answer to extract from the response.\", \"reasoning\": \"Explain why the extracted_final_answer is correct or incorrect based on [correct_answer], focusing only on if there are meaningful differences between [correct_answer] and the extracted_final_answer. Do not comment on any background to the problem, do not attempt to solve the problem, do not argue for any answer different than [correct_answer], focus only on whether the answers match.\", \"correct\": \"no\", \"confidence\": \"The extracted confidence score between 0|\\\\%| and 100|\\\\%| from [response]. Put 100 if there is no confidence score available.\"}",
+   "want": [
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-A4",
+   "what": "every field the prompt's text but confidence 90 (a real number)",
+   "reply": "{\"extracted_final_answer\": \"The final exact answer extracted from the [response]. Put the extracted answer as 'None' if there is no exact, final answer to extract from the response.\", \"reasoning\": \"Explain why the extracted_final_answer is correct or incorrect based on [correct_answer], focusing only on if there are meaningful differences between [correct_answer] and the extracted_final_answer. Do not comment on any background to the problem, do not attempt to solve the problem, do not argue for any answer different than [correct_answer], focus only on whether the answers match.\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no",
+    "no grade"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-A5",
+   "what": "terse real verdict {correct:no, confidence:100}",
+   "reply": "{\"correct\": \"no\", \"confidence\": 100}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": false
+  },
+  {
+   "id": "r2-A6",
+   "what": "terse real verdict {correct:no}",
+   "reply": "{\"correct\": \"no\"}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-A7",
+   "what": "real NO: extracted '<div>', reasoning real, conf 100",
+   "reply": "{\"extracted_final_answer\": \"<div>\", \"reasoning\": \"The key is <span>.\", \"correct\": \"no\", \"confidence\": 100}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-A8",
+   "what": "real NO: extracted '[Verse]', reasoning '...' , conf 100",
+   "reply": "{\"extracted_final_answer\": \"[Verse]\", \"reasoning\": \"...\", \"correct\": \"no\", \"confidence\": 100}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": false
+  },
+  {
+   "id": "r2-A9",
+   "what": "real NO: extracted 'None', reasoning = prompt's first words, conf 100",
+   "reply": "{\"extracted_final_answer\": \"None\", \"reasoning\": \"Explain why the extracted_final_answer is incorrect\", \"correct\": \"no\", \"confidence\": 100}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-A10",
+   "what": "PRETTY placeholder example alone, correct LAST field",
+   "reply": "{\n  \"extracted_final_answer\": \"<the final answer>\",\n  \"reasoning\": \"<why>\",\n  \"confidence\": 100,\n  \"correct\": \"yes\"\n}",
+   "want": [
+    "no grade"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": false
+  },
+  {
+   "id": "r2-A11",
+   "what": "PRETTY prompt-words example alone, correct LAST",
+   "reply": "{\n  \"extracted_final_answer\": \"The final exact answer extracted from the [response]. Put the extracted answer as 'None' if there is no exact, final answer to extract from the response.\",\n  \"reasoning\": \"Explain why the extracted_final_answer is correct or incorrect based on [correct_answer], focusing only on if there are meaningful differences between [correct_answer] and the extracted_final_answer. Do not comment on any background to the problem, do not attempt to solve the problem, do not argue for any answer different than [correct_answer], focus only on whether the answers match.\",\n  \"confidence\": 100,\n  \"correct\": \"yes\"\n}",
+   "want": [
+    "no grade"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": false
+  },
+  {
+   "id": "r2-A12",
+   "what": "PRETTY example(yes, correct last) then prose 'The answer is wrong.'",
+   "reply": "{\n  \"extracted_final_answer\": \"<answer>\",\n  \"reasoning\": \"<why>\",\n  \"confidence\": \"<0-100>\",\n  \"correct\": \"yes\"\n}\nThe response is wrong.",
+   "want": [
+    "no grade"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": false
+  },
+  {
+   "id": "r2-A13",
+   "what": "one-line example(yes) then real NO pretty",
+   "reply": "{\"extracted_final_answer\": \"<answer>\", \"reasoning\": \"<why>\", \"correct\": \"yes\", \"confidence\": 100}\n{\n  \"extracted_final_answer\": \"42\",\n  \"reasoning\": \"matches\",\n  \"correct\": \"no\",\n  \"confidence\": 90\n}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-B1",
+   "what": "valid object + trailing whitespace/newlines",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"no\", \"confidence\": 90}  \n\n ",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-B2",
+   "what": "valid object in a ```json fence",
+   "reply": "```json\n{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"no\", \"confidence\": 90}\n```",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-B3",
+   "what": "valid object in a fence, pretty",
+   "reply": "```json\n{\n  \"extracted_final_answer\": \"42\",\n  \"reasoning\": \"matches\",\n  \"correct\": \"yes\",\n  \"confidence\": 90\n}\n```\n",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-B4",
+   "what": "valid object then prose after",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"no\", \"confidence\": 90}\nLet me know if you need anything else.",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-B5",
+   "what": "valid object then prose with an unclosed brace",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"no\", \"confidence\": 90}\nNote: the set {1, 2 is malformed in the response.",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": false
+  },
+  {
+   "id": "r2-B6",
+   "what": "prose with LaTeX \\left\\{ ... \\right. then valid object",
+   "reply": "The response gives f(x) = \\left\\{ x^2, x>0; 0 \\right. as its answer.\n{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": false
+  },
+  {
+   "id": "r2-B7",
+   "what": "LINE form, reasoning has \\left\\{ ... \\right.",
+   "reply": "extracted_final_answer: f(x) = \\left\\{ x^2 \\text{ if } x>0 \\right.\nreasoning: differs\ncorrect: no\nconfidence: 90",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": false
+  },
+  {
+   "id": "r2-B8",
+   "what": "LINE form, extracted answer is '{' (a brace asked for)",
+   "reply": "extracted_final_answer: {\nreasoning: the key is }\ncorrect: no\nconfidence: 90",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-B9",
+   "what": "LINE form, reasoning quotes code 'if (x) {'",
+   "reply": "extracted_final_answer: 3\nreasoning: the response's loop `for (i=0;i<3;i++) {` runs 3 times, as the key says\ncorrect: yes\nconfidence: 90",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": false
+  },
+  {
+   "id": "r2-B10",
+   "what": "valid object whose reasoning STRING holds an unclosed brace",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"the response wrote {1, 2 and stopped\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-B11",
+   "what": "valid object whose reasoning string holds }{ and quotes",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"it says \\\"} {\\\" and '{'\", \"correct\": \"yes\", \"confidence\": 90}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-B12",
+   "what": "valid object, pretty, key indented 44 spaces",
+   "reply": "{\n                                            \"extracted_final_answer\": \"{\", \n                                            \"reasoning\": \"m\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-B13",
+   "what": "object cut exactly before the closing brace",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"yes\", \"confidence\": 90",
+   "want": [
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-B14",
+   "what": "line form cut mid-reasoning (no correct line)",
+   "reply": "extracted_final_answer: 42\nreasoning: the answ",
+   "want": [
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-B15",
+   "what": "valid object, then '{' alone",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"yes\", \"confidence\": 90}\n{",
+   "want": [
+    "yes",
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-B16",
+   "what": "interval/set prose '{x | x > 0' before a line-form verdict",
+   "reply": "The response's set {x | x > 0 is the key's.\nextracted_final_answer: x>0\nreasoning: same\ncorrect: yes\nconfidence: 80",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": false
+  },
+  {
+   "id": "r2-C1",
+   "what": "raw \\nu (valid JSON escape \\n + u)",
+   "reply": "{\"extracted_final_answer\": \"\\nu = 2\", \"reasoning\": \"the key is \\nu=2\", \"correct\": \"yes\", \"confidence\": 95}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-C2",
+   "what": "raw \\uparrow (invalid \\u escape)",
+   "reply": "{\"extracted_final_answer\": \"|\\uparrow\\rangle\", \"reasoning\": \"the key is spin down\", \"correct\": \"no\", \"confidence\": 95}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": false
+  },
+  {
+   "id": "r2-C3",
+   "what": "raw \\underline, \\upsilon",
+   "reply": "{\"extracted_final_answer\": \"\\underline{7}\", \"reasoning\": \"key \\upsilon\", \"correct\": \"no\", \"confidence\": 95}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": false
+  },
+  {
+   "id": "r2-C4",
+   "what": "mixed: one field escaped right (\\\\alpha), one raw (\\gamma)",
+   "reply": "{\"extracted_final_answer\": \"\\\\alpha\", \"reasoning\": \"\\gamma differs\", \"correct\": \"no\", \"confidence\": 95}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-C5",
+   "what": "raw backslash before the closing quote: \"a \\\\\" LaTeX line break",
+   "reply": "{\"extracted_final_answer\": \"a \\\\\", \"reasoning\": \"m\", \"correct\": \"no\", \"confidence\": 95}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-C6",
+   "what": "raw LaTeX \\\" (umlaut) inside string",
+   "reply": "{\"extracted_final_answer\": \"M\\\"obius\", \"reasoning\": \"m\", \"correct\": \"yes\", \"confidence\": 95}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-C7",
+   "what": "raw single backslash right before closing quote of a value",
+   "reply": "{\"extracted_final_answer\": \"C:\\dir\\\", \"reasoning\": \"m\", \"correct\": \"no\", \"confidence\": 95}",
+   "want": [
+    "no",
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-C8",
+   "what": "reasoning string holds \"correct\": \"no\" escaped; verdict YES",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"a strict judge might write \\\"correct\\\": \\\"no\\\" here, but it matches\", \"correct\": \"yes\", \"confidence\": 90}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-C9",
+   "what": "reasoning string holds an escaped object {\"correct\": \"no\"}; verdict YES",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"the response printed {\\\"correct\\\": \\\"no\\\"} about itself, yet its answer matches\", \"correct\": \"yes\", \"confidence\": 90}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-C10",
+   "what": "UNESCAPED quoted object in reasoning says yes; verdict NO (invalid JSON)",
+   "reply": "{\"extracted_final_answer\": \"41\", \"reasoning\": \"The response printed {\"correct\": \"yes\"} about itself, but 41 differs\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no",
+    "no grade"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": false
+  },
+  {
+   "id": "r2-C11",
+   "what": "unescaped inner quotes in reasoning (invalid JSON), verdict NO",
+   "reply": "{\"extracted_final_answer\": \"41\", \"reasoning\": \"The response says \"41\" which differs\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": false
+  },
+  {
+   "id": "r2-C12",
+   "what": "single-quoted, apostrophe in reasoning",
+   "reply": "{'extracted_final_answer': '41', 'reasoning': 'the response's answer differs', 'correct': 'no', 'confidence': 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": false
+  },
+  {
+   "id": "r2-C13",
+   "what": "single-quoted, reasoning holds \"correct\": \"yes\" in double quotes; verdict NO",
+   "reply": "{'extracted_final_answer': '41', 'reasoning': 'it claims \"correct\": \"yes\" wrongly', 'correct': 'no', 'confidence': 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-C14",
+   "what": "single-quoted, reasoning holds an object {'correct': 'yes'} escaped; verdict NO",
+   "reply": "{'extracted_final_answer': '41', 'reasoning': 'it printed {\\'correct\\': \\'yes\\'} wrongly', 'correct': 'no', 'confidence': 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-C15",
+   "what": "\\u-broken outer (NO), reasoning quotes {'correct': 'yes'} in single quotes",
+   "reply": "{\"extracted_final_answer\": \"|\\uparrow>\", \"reasoning\": \"The response's own check says {'correct': 'yes'} but the state differs\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no",
+    "no grade"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": false
+  },
+  {
+   "id": "r2-C16",
+   "what": "trailing comma + raw LaTeX, verdict NO",
+   "reply": "{\"extracted_final_answer\": \"\\alpha\", \"reasoning\": \"key is \\beta\", \"correct\": \"no\", \"confidence\": 90,}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-C17",
+   "what": "trailing comma inside reasoning text ', }' only",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"the set {1, 2, } matches [1, 2, ]\", \"correct\": \"yes\", \"confidence\": 90}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-C18",
+   "what": "python literal True for correct, single quotes",
+   "reply": "{'extracted_final_answer': '42', 'reasoning': 'm', 'correct': True, 'confidence': 90}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-C19",
+   "what": "json true/false unquoted in single-quoted dict",
+   "reply": "{'extracted_final_answer': '42', 'reasoning': 'm', 'correct': false, 'confidence': 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-C20",
+   "what": "raw newline inside reasoning string, verdict NO, one object",
+   "reply": "{\"extracted_final_answer\": \"41\", \"reasoning\": \"First line.\nSecond line.\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": false
+  },
+  {
+   "id": "r2-C21",
+   "what": "raw newlines; reasoning quotes a line 'correct: yes'; verdict NO",
+   "reply": "{\"extracted_final_answer\": \"41\", \"reasoning\": \"The response ends:\ncorrect: yes\nbut 41 differs from 42\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no",
+    "no grade"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": false
+  },
+  {
+   "id": "r2-C22",
+   "what": "unquoted yes: {\"correct\": yes}",
+   "reply": "{\"extracted_final_answer\": \"42\", \"reasoning\": \"m\", \"correct\": yes, \"confidence\": 90}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": false
+  },
+  {
+   "id": "r2-C23",
+   "what": "duplicate key correct: yes then no",
+   "reply": "{\"correct\": \"yes\", \"extracted_final_answer\": \"42\", \"reasoning\": \"m\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no grade",
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-C24",
+   "what": "raw \\frac{1}{2} with braces in a string, single quotes inside",
+   "reply": "{\"extracted_final_answer\": \"\\frac{1}{2}\", \"reasoning\": \"it's \\frac{1}{2}, the key's\", \"correct\": \"yes\", \"confidence\": 90}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-C25",
+   "what": "raw LaTeX set \\{1,2\\} in string",
+   "reply": "{\"extracted_final_answer\": \"\\{1,2\\}\", \"reasoning\": \"same set\", \"correct\": \"yes\", \"confidence\": 90}",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-D1",
+   "what": "quoted {correct:yes} ALONE on a line (the response's), real NO inline after 'Judgement:'",
+   "reply": "The response ends with:\n{\"correct\": \"yes\"}\nMy judgement: {\"extracted_final_answer\": \"41\", \"reasoning\": \"differs\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no",
+    "no grade"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": false
+  },
+  {
+   "id": "r2-D2",
+   "what": "'> {correct: yes}' blockquote, real NO inline",
+   "reply": "The response wrote:\n> {\"correct\": \"yes\"}\nJudgement: {\"extracted_final_answer\": \"41\", \"reasoning\": \"differs\", \"correct\": \"no\", \"confidence\": 90} as required.",
+   "want": [
+    "no",
+    "no grade"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": false
+  },
+  {
+   "id": "r2-D3",
+   "what": "real NO alone, quoted yes inline (17i's wanted case)",
+   "reply": "The response ends with {\"correct\": \"yes\"}.\n{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-D4",
+   "what": "full-field quoted object alone (yes) from the response, real NO inline",
+   "reply": "The response itself answers:\n{\"extracted_final_answer\": \"42\", \"reasoning\": \"I am sure\", \"correct\": \"yes\", \"confidence\": 90}\nBut judged against the key: {\"extracted_final_answer\": \"41\", \"reasoning\": \"differs\", \"correct\": \"no\", \"confidence\": 90}.",
+   "want": [
+    "no",
+    "no grade"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": false
+  },
+  {
+   "id": "r2-D5",
+   "what": "line-form verdict NO, the response's object (yes) alone on a line quoted in reasoning",
+   "reply": "extracted_final_answer: 41\nreasoning: the response printed\n{\"correct\": \"yes\"}\nwhich is not the key\ncorrect: no\nconfidence: 90",
+   "want": [
+    "no",
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-D6",
+   "what": "line-form verdict NO; object (no) alone on a line too",
+   "reply": "extracted_final_answer: 41\nreasoning: differs\ncorrect: no\nconfidence: 90\n{\"extracted_final_answer\": \"42\", \"reasoning\": \"matches\", \"correct\": \"no\", \"confidence\": 90}",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-E1",
+   "what": "line form no",
+   "reply": "extracted_final_answer: 41\nreasoning: differs\ncorrect: no\nconfidence: 90",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-E2",
+   "what": "line form yes with markdown",
+   "reply": "**extracted_final_answer:** 42\n**reasoning:** same\n**correct:** yes\n**confidence:** 100%",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-E3",
+   "what": "line form, 'Correct: Yes.'",
+   "reply": "extracted_final_answer: 42\nreasoning: same\nCorrect: Yes.\nconfidence: 77",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-E4",
+   "what": "line form with \\r\\n",
+   "reply": "extracted_final_answer: 42\r\nreasoning: same\r\ncorrect: no\r\nconfidence: 77\r\n",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-E5",
+   "what": "line form, extracted is a JSON-ish answer {\"a\": 1}",
+   "reply": "extracted_final_answer: {\"a\": 1}\nreasoning: the key is {\"a\": 2}\ncorrect: no\nconfidence: 77",
+   "want": [
+    "no"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-E6",
+   "what": "line form, extracted answer is itself {\"correct\": \"yes\"}-like",
+   "reply": "extracted_final_answer: {\"correct\": \"yes\"}\nreasoning: key differs\ncorrect: no\nconfidence: 77",
+   "want": [
+    "no",
+    "no grade"
+   ],
+   "reads_on_0abb757": "no",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-E7",
+   "what": "line form 'correct: yes' with trailing explanation",
+   "reply": "extracted_final_answer: 42\nreasoning: same\ncorrect: yes (matches)\nconfidence: 77",
+   "want": [
+    "yes",
+    "no grade"
+   ],
+   "reads_on_0abb757": "no grade",
+   "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "r2-E8",
+   "what": "line form, reasoning has LaTeX \\frac{1}{2}",
+   "reply": "extracted_final_answer: \\frac{1}{2}\nreasoning: key \\frac{1}{2}\ncorrect: yes\nconfidence: 77",
+   "want": [
+    "yes"
+   ],
+   "reads_on_0abb757": "yes",
+   "as_wanted_on_0abb757": true
+  }
+ ]
+}

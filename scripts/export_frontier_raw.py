@@ -81,7 +81,7 @@ SETUP_TASK = {"version": es.TEXT, "task": es.NAME, "protocol": es.TEXT,
               "source": {"hf": es.NAME, "config": es.NAME, "split": es.NAME,
                          "revision": es.NAME, "gated": bool, "licence": es.TEXT},
               "epochs": int, "thinking": es.TEXT, "budget": int, "family": es.TEXT,
-              "sampling": {"*": float}, "where": es.TEXT, "file": es.NAME,
+              "sampling": {"*": float}, "where": es.WHERE, "file": es.NAME,
               "server": {"file": es.NAME, "size": int, "build": es.TEXT},
               "launch_setup": {"spec": [es.NAME], "drafts": bool},
               "shard": {"i": int, "n": int}}
@@ -96,7 +96,7 @@ SCORE = {"alias": es.NAME, "acc,none": float, "acc_stderr,none": float,
                       "answers": int, "ran_out": int, "unread": int, "errors": int,
                       "thinking_held": int, "ungraded": int, "unanswered": int,
                       "unanswered_ids": [es.NAME], "budget": int, "sampling": {"*": float},
-                      "family": es.TEXT, "where": es.TEXT, "thinking": es.TEXT,
+                      "family": es.TEXT, "where": es.WHERE, "thinking": es.TEXT,
                       "scored_by": es.TEXT, "code": {"score": float, "se": float},
                       "grader": {**GRADER, "topup": GRADER}, "graders": [GRADER],
                       "final": bool, "look": {"done": int, "waiting": int}, "runs": [int]}}
@@ -161,24 +161,24 @@ def brought(r: dict, t: str, rented: dict, reg: dict) -> tuple[set | None, str]:
 
 
 def export_run(sid: int, out: Path, public: bool | None = None,
-               publish: bool = True, questions: es.Questions | None = None,
-               say=print) -> Path:
+               publish: bool = True, questions=es.UNLOADED, say=print) -> Path:
     """a run's folder. Public only for a model the board knows as public, and
     only with `publish` (the typed yes); --private keeps it private. 17i: its
     log checked against every gated and private set (`questions`, loaded once
-    for an export of many runs)"""
+    for an export of many runs — 17j: None, one couldn't be, is never loaded
+    again for each run)"""
     import shutil
 
     from service import config
     from service import frontier as sf
-    if questions is None:
+    if questions is es.UNLOADED:
         questions = es.private_questions(say)
     r = run_of(sid)
     row = row_of(r)
     tasks = [t for t in fb.TASKS if t in set(json.loads(r.get("tasks") or "[]") or fb.TASKS)]
     rented = imf.rented_of(sid) or {}
     reg = imf.registry(row)
-    where = r.get("where_ran") or "this server"
+    where = es.where_of(r.get("where_ran") or "this server")     # 17j: from the list
     per_setup, scores, items, notes, left_launch = {}, {}, [], {}, 0
     for t in tasks:
         d = sf.task_dir(row, t)
@@ -299,7 +299,8 @@ def main(argv: list[str] | None = None) -> int:
     for sid in ids:
         print(export_run(sid, out, False if a.private else None, publish=publish, questions=qs))
     print(f"{len(ids)} run(s) under {out} — upload: docs/REMOTE-RUNS.md § Publishing the raw runs")
-    return 1 if why else 0
+    # 17j: a set that couldn't be loaded is a failure, not a quiet empty log
+    return 1 if why or qs is None else 0
 
 
 if __name__ == "__main__":
