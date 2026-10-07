@@ -19629,6 +19629,11 @@ function rentedLine() {
   const B = state.boxes || {};
   if (!(B.runs || []).length || !B.posted_at) return '';
   const next = B.next_at ? B.next_at * 1000 - Date.now() : null;
+  // 17j: a reading that is old says so, once — its rows' quiet is their own
+  // write against when they were read, never against now
+  if (B.stale_min) return el('p', { class: 'small warntext', 'data-rented-line': 'stale',
+    text: `Rented boxes read ${B.stale_min} min ago — the fetch may have stopped: start it `
+      + 'again (docs/REMOTE-RUNS.md G3–G4). The rows below are as it last read them' });
   return el('p', { class: 'small se', 'data-rented-line': '1',
     text: `Runs on rented GPUs, as frontier_fetch.py read them ${rel(B.posted_at)} ago`
       + (next == null ? '' : next > 0 ? ` · the next reading in about ${Math.max(1, Math.round(next / 60000))} min`

@@ -174,7 +174,7 @@ def test_9_a_box_destroyed_after_it_read_safe_ends_every(tmp_path, monkeypatch, 
 
     def sleep(s):
         rounds["n"] += 1
-        if rounds["n"] > 2:
+        if rounds["n"] > 3:
             raise AssertionError("--every never stopped")
     monkeypatch.setattr(ff.time, "sleep", sleep)
     key = tmp_path / "id"
@@ -183,7 +183,10 @@ def test_9_a_box_destroyed_after_it_read_safe_ends_every(tmp_path, monkeypatch, 
                     "--no-board", "--every", "1s", "1.1.1.1:41", "2.2.2.2:42"])
     out = capsys.readouterr().out
     assert code == 0, out                                   # 0adb522: --every never stopped
-    assert "1.1.1.1:41: read safe to destroy earlier, not reached now — destroyed: done" in out
+    # 17j: destroyed once it goes unreached for two rounds — one failed ssh isn't
+    assert "1.1.1.1:41: read safe to destroy earlier, not reached now — destroyed if" in out
+    assert "1.1.1.1:41: read safe to destroy earlier, not reached for 2 rounds — destroyed: " \
+           "done" in out
 
 
 # ---------------------------------------------------------------------------

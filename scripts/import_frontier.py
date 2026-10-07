@@ -305,6 +305,8 @@ def registered_here(b: dict, name: str, by: str, public_weights: bool = False) -
                            "name": gg.get("name") or "",
                            # 17i: where the box fetched it, for the export's typed-yes list
                            **({"source": str(gg["source"])[:300]} if gg.get("source") else {}),
+                           # 17j: and its size, to tell another file of the same name
+                           **({"size": gg["size"]} if isinstance(gg.get("size"), int) else {}),
                            **({"parts": gg["parts"]} if gg.get("parts") else {})},
            "rented_only": True, "answered": [], "by": by, "at": time.time(),
 
@@ -451,8 +453,9 @@ def checks(b: dict, rec: dict | None, file_sha: str = "") -> list[str]:
         return [str(e)]
     model = bundle.get("model") or ""
     if not rec:
-        return [f"{model or 'its model'} isn't registered on this board: add it under Add a "
-                "model ▸ Running on a server, and register its file on its page"]
+        return [f"{model or 'its model'} isn't registered on this board: give this import "
+                f"--register \"<its name>\" (a model run on rented GPUs only), or add it under "
+                "Add a model ▸ Running on a server and register its file on its page"]
     if served.is_openrouter(rec):
         return [f"{model} is a model from OpenRouter: a GGUF's answers can't go on its row"]
     out = []
@@ -935,10 +938,14 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
     shutil.rmtree(staging.parent, ignore_errors=True)
     line = " · ".join(words) or "; ".join(x for x in lines if "missing" in x) or "imported"
     of = f" · shard {shard[0]} of {shard[1]}" if shard else ""
-    sid = db.add(model, "instruct", SUITE, by,
-                 f"imported from a rented GPU ({gpu}){of}{f' · box {box}' if box else ''} · "
-                 f"{path.name}", thinking=on,
-                 tasks=tasks if len(tasks) < len(fb.TASKS) else None, status=status)
+    # 17j: the Runs row an earlier try of this bundle made before it was
+    # killed (a deploy during a round) — the retry made a second, done too
+    sid = _earlier_row(model, path.name, b["sha256"]) or db.add(
+        model, "instruct", SUITE, by,
+        f"imported from a rented GPU ({gpu}){of}{f' · box {box}' if box else ''} · "
+        f"{path.name}", thinking=on,
+        tasks=tasks if len(tasks) < len(fb.TASKS) else None, status=status)
+    db.update(sid, status=status)
     # 17f: the row says where it ran, and when on the box — its import's time
     # is when it was made here (created_at)
     ran = {k: _epoch(setup.get(k)) for k in ("started_at", "finished_at")}
@@ -975,6 +982,33 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
     say(f"the row {model}{' · thinking' if on else ''}: {line}")
     say(f"Runs #{sid}, its log the bundle's")
     return 0 if status == "done" else 1
+
+
+def _earlier_row(model: str, bundle: str, sha: str) -> int | None:
+    """17j: the Runs row a try of this bundle made, the import killed before
+    its registry was written: its note names the bundle, its log's first
+    line its sha256 — and no import on the row's registry claims it"""
+    from service import config, db
+    claimed = set()
+    for p in config.OUT_DIR.glob(f"*/{REGISTRY}") if config.OUT_DIR.is_dir() else []:
+        try:
+            claimed |= {x.get("sid") for x in json.loads(p.read_text(encoding="utf-8"))
+                        .get("imports") or [] if isinstance(x, dict)}
+        except (OSError, ValueError, AttributeError):
+            continue
+    for r in db.recent(500):
+        if r.get("hf_id") != model or r.get("suite") != SUITE or r["id"] in claimed \
+                or not str(r.get("note") or "").endswith(f"· {bundle}"):
+            continue
+        log = config.LOGS_DIR / f"service_{r['id']}_{model.replace('/', '__')}.log"
+        try:
+            with open(log, encoding="utf-8", errors="replace") as fh:
+                first = fh.readline()
+        except OSError:
+            continue
+        if f"(sha256 {sha[:16]})" in first:
+            return r["id"]
+    return None
 
 
 def keep_grades(src: Path, dst: Path, answers: dict) -> int:
@@ -1216,8 +1250,18 @@ def store_boxes(records) -> int:
         was = json.loads(boxes_path().read_text(encoding="utf-8")).get("boxes") or []
     except (OSError, ValueError, AttributeError):
         was = []
+    stamp = time.time()
     for x in (box_row(r) for r in (was if isinstance(was, list) else [])):
         if not x or (x["label"], x["model"], x["step"]) in now:
+            continue
+        # 17j: rows leave on write as on read — by when they were last seen —
+        # and a row an older fetch stored, with no box's name, is gone once
+        # any box was reached (three phone-build rows and BF16's abandoned
+        # step read "No contact" for a day after the deploy)
+        seen = _num(x.get("seen_at"))
+        if not seen or stamp - seen > (DONE_KEEP_S if x.get("safe") else GONE_KEEP_S):
+            continue
+        if not x.get("box_id") and reached:
             continue
         mine = asked is None or not x.get("box_id") or x.get("box_id") in asked
         if not mine:
@@ -1273,7 +1317,11 @@ def read_boxes(now: float | None = None) -> dict:
     posted = got.get("posted_at") if isinstance(got, dict) else None
     posted = posted if _num(posted) is not None else None
     every = _num(got.get("every")) if isinstance(got, dict) else None
-    return {"boxes": out, "posted_at": posted, "every": every,
+    # 17j: a reading older than three of its rounds (a quarter of an hour at
+    # least) says so, once: the fetch may have stopped
+    stale = round((now - posted) / 60) if posted and now - posted > max(
+        900.0, 3 * (every or 0)) else None
+    return {"boxes": out, "posted_at": posted, "every": every, "stale_min": stale,
             "next_at": posted + every if posted and every else None,
             "runs": rented_runs(out, now, posted)}
 
@@ -1305,7 +1353,9 @@ def _box_read(r: dict, now: float, fbx) -> dict | None:
     # writes no more, and read "not heard from for 600 min" on a box
     # still working
     at = _num(r.get("at"))
-    quiet = (now - at) if at and r.get("state") in ("asking", "starting") else None
+    # 17j: quiet by its own last write against when it was read — against now,
+    # every running row turned red when the fetch itself stopped
+    quiet = (seen - at) if at and r.get("state") in ("asking", "starting") else None
 
     def count(x: str | None) -> int | None:
         try:

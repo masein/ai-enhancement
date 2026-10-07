@@ -4953,6 +4953,45 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17j.3 — the boxes and the fetch (7 Oct)
+
+- **"Safe" has a time, and a box is destroyed after two rounds unreached**
+  (point 14, `frontier_fetch.read_safe`): a box that read safe, then got new
+  work, read "destroyed: done" on the first failed ssh, across restarts, and
+  a new box at the same address inherited it. Each entry keeps when it read
+  safe; it is forgotten when the box is reached and holds a step that isn't
+  home, or after two days, and a box is destroyed only when it goes two
+  rounds unreached.
+- **`--abandoned` says what matched nothing, and never hides a step still
+  writing** (15): after each round, a value that matched no step on the
+  boxes reached is named. An abandoned step that is still asking or starting
+  (written within the quiet time) keeps its box not safe, and its progress
+  line is printed with what to do.
+- **`--parity` compares the copy here** (16): a build given `--parity` with
+  no verdict is compared from `parity/<build>-box.jsonl` — a verdict from an
+  older fetch was lost on the upgrade, and `--parity` given after the box was
+  destroyed said nothing. The docs' fetch line keeps `--parity`.
+- **Two fetches at once merge** (17, `merge_write`): the verdicts and the
+  safe boxes are read, merged (the newer entry of each wins, a replaced one
+  kept as `{gone, at}`) and written under a lock.
+- **`--sha` for a model the board doesn't serve prints the line to type**
+  (18): with `--register`, every round, and the bundle is left home — every
+  round's import was refused with "add it under Add a model", and the line
+  stopped being printed. The import's refusal says `--register` too.
+- **Rows an older fetch stored leave once a box is reached** (19,
+  `store_boxes`): a row with no box id is gone when any box was reached, and
+  old rows (done and gone) age out on each write, not only on reading.
+- **Quiet is a step's own write against when it was read** (20, `_box_read`):
+  seven rows read "Stopped? No word for 71 min" when the fetch itself had
+  stopped. When the reading is old, the list says so once ("Rented boxes
+  read N min ago — the fetch may have stopped").
+- **Small ones** (21): a kill after the Runs row leaves one Runs row (the
+  import takes up its own earlier row, `_earlier_row`); registering again
+  keeps an import's sha256 by name only when the sizes agree
+  (`served._same_size`); the by-hand line pastes as it is (what the board
+  couldn't say is a line of its own); the docs say `--every 3m`.
+- Tests: `tests/test_17j_boxes.py`.
+
 ### Fix — a number field kept across a redraw (7 Oct)
 
 - **Build questions' count and AI models' monthly limit are text fields

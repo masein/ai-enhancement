@@ -1011,7 +1011,7 @@ nothing is badly off. A miss is reported with its interval, never adjusted.
 
 G5's 272 box-hours, the parity questions' 1, and for each box about 0.3 hours
 to start (the fetch, the load) and 0.5 hours from its last bundle to being
-destroyed (the fetch's `--every 15m`, then destroying it). The calibration
+destroyed (the fetch's `--every 3m`, then destroying it). The calibration
 (G6): GPQA alone, $9–34. Grading (stage 3, after a yes): MMLU-Pro is scored
 by code and adds nothing; SimpleQA Verified's and HLE's graders, and Epoch's
 model check on MATH and OTIS, are priced by the dry run on AI models from the
