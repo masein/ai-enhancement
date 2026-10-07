@@ -210,6 +210,8 @@ def test_24_free_words_dont_go_out_in_kept_lines(box, tmp_path, monkeypatch):  #
         sid, tmp_path,
         f"===== [{sid + 1}] imported a.tar.gz (sha256 0123456789abcdef) by masein: "
         "gpqa_diamond_epoch, run on a rented GPU (RTX 5090) =====",
+        f"===== [{sid + 2}] imported a b.tar.gz (sha256 0123456789abcdef) by masein: "
+        "gpqa_diamond_epoch, run on a rented GPU (RTX 5090) =====",
         "[frontier] GPQA Diamond couldn't be loaded. Nothing was asked "
         "(ConnectionError(judge-box refused the connection))",
         "[frontier] judge: ConnectionRefusedError at judge-box port 8000",

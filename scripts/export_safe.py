@@ -436,7 +436,7 @@ def accounts() -> list[str]:
 # in SCRUB_HOSTS: the judge's) and the server's own words after "counted
 # wrong". These lines go out without them; a tagged line that still holds an
 # exception's text is left out
-_BY_NAME = re.compile(r"^(===== \[\d+\] imported \S+ \(sha256 [0-9a-f]+\)) by [^:]{1,80}(: )")
+_BY_NAME = re.compile(r"^(===== \[\d+\] imported .+? \(sha256 [0-9a-f]+\)) by [^:]{1,80}(: )")
 _REASON = re.compile(
     r"^(\[frontier\] [\w-]+: question \S+, run \d+: the server failed on it twice"
     r"(?:, on \d+ separate runs)? — written as no answer, counted wrong) \(.*\)$")
