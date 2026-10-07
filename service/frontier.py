@@ -631,8 +631,18 @@ def _share(per: dict[str, list[float]], task: str, items: list[dict]) -> dict:
 _UNCLOSED = re.compile(r"(?s)^\s*<think>(.*)$")
 # 17c: an off row is scored with at most this share of its answers holding
 # thinking — each scored on what follows it, as scoring reads every reply —
-# and refused above it
-THINKING_OFF_SHARE = 0.01
+# and refused above it. 17j: a quarter, not 1%. On 8 Oct the UD-Q4_K_XL file's
+# Humanity's Last Exam run with thinking off was refused for 76 of 2,158
+# answers (3.5%): the server did as it was told, and on the hardest questions
+# the model opened a thinking block of its own. The share is to catch a server
+# that ignores the switch, and only more than a quarter says that
+THINKING_OFF_SHARE = 0.25
+
+
+def thought_words(n: int, of: int) -> str:
+    """17j: "76 of 2,158 thought anyway, 3.5%" — an off row's answers that
+    held thinking, on its score and its run"""
+    return f"{n:,} of {of:,} thought anyway, {n / of:.1%}" if of else f"{n:,} thought anyway"
 
 
 def thought(answer: str) -> bool:
@@ -662,8 +672,8 @@ def thinking_refused(task: str, thinking: str | None, answers: list[str]) -> str
                 "template that ignores the switch?): not scored")
     if thinking == "off" and n > THINKING_OFF_SHARE * len(answers):
         return (f"{label}: thinking was off, and {n:,} of its {len(answers):,} answers hold "
-                f"thinking — more than {THINKING_OFF_SHARE:.0%}: the server thought anyway: "
-                "not scored")
+                f"thinking ({n / len(answers):.1%}) — more than a quarter: the server ignored "
+                "the thinking switch: not scored")
     return ""
 
 
@@ -902,8 +912,9 @@ def words(task: str, sc: dict) -> str:
         bits.append(f"{sc['unanswered']} the server never answered, counted wrong "
                     f"({', '.join(ids[:5])}{' …' if len(ids) > 5 else ''})")
     if sc.get("thinking_held"):
-        bits.append(f"{sc['thinking_held']} thought though thinking was off (scored on what "
-                    "follows the thinking)")
+        # 17j: the share, as the run and the score's cell say it
+        bits.append(thought_words(sc["thinking_held"], sc.get("answers") or 0)
+                    + " (thinking off; scored on what follows the thinking)")
     if (sc.get("look") or {}).get("waiting"):
         bits.append(f"code's score: Epoch's model check not run on {sc['look']['waiting']:,}")
     if sc.get("final") is False:

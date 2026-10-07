@@ -118,7 +118,8 @@ def test_3_the_one_percent_rule_is_the_whole_benchmarks(box):  # noqa: F811
         files[name] = ("\n".join([json.dumps(r), *lines[1:]]) + "\n").encode()
     code, said = imported(rewrite(path, one_thinks))
     assert code == 0, said
-    assert any(f"1 of this shard's {N * RUNS // 2} answers hold thinking" in x
+    # 17j: with its share
+    assert any(f"this shard's 1 of {N * RUNS // 2} thought anyway" in x
                for x in said), said
 
 

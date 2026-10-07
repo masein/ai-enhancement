@@ -1803,6 +1803,11 @@ def frontier_how(d: dict | None) -> str | None:
     out, of = d.get("ran_out"), d.get("answers")
     counts = (f" · {out / of:.0%} ran out of room ({out:,} of {of:,}), counted wrong"
               if isinstance(out, int) and out and isinstance(of, int) and of else "")
+    # 17j: an off row's answers that thought anyway, and their share
+    held = d.get("thinking_held")
+    if isinstance(held, int) and held and isinstance(of, int) and of:
+        counts += (f" · {held:,} of {of:,} thought anyway, {held / of:.1%} (thinking off; scored "
+                   "on what follows the thinking)")
     counts += "".join(
         f" · {n:,} {w}" for n, w in ((d.get("unanswered"), "the server never answered, counted "
                                                            "wrong"),

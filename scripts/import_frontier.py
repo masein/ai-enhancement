@@ -526,11 +526,12 @@ def checks(b: dict, rec: dict | None, file_sha: str = "") -> list[str]:
             out.append(f"{t}: {len(bad):,} of its {len(lines):,} answer lines aren't answers — "
                        f"line {k} {w}")
             continue
-        # 17d: a shard's off answers that thought are counted, never refused
-        # here — the 1% rule is the whole benchmark's, once its shards merge
-        # (score_task); a thinking shard with none is refused at once
+        # 17d: a thinking shard with none is refused at once. 17j: and an off
+        # shard more than a quarter of whose answers thought — the switch
+        # ignored on that box; below it, its share is said and the whole
+        # benchmark's is judged once its shards merge (score_task)
         answers = [r["answer"] for r in lines]
-        why = sf.thinking_refused(t, "on" if on else "off", answers) if not shard or on else ""
+        why = sf.thinking_refused(t, "on" if on else "off", answers)
         if why:
             out.append(why)
         try:
@@ -820,9 +821,9 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             held = 0 if on else sum(1 for r in ans.values() if sf.thought(r.get("answer") or ""))
             if held:
                 # 17d: counted here, judged on the whole once its shards merge
-                lines.append(f"{t}: {held} of this shard's {len(ans):,} answers hold thinking, "
-                             f"though it was off — the 1% rule is the whole benchmark's, once "
-                             "its shards merge")
+                lines.append(f"{t}: this shard's {sf.thought_words(held, len(ans))} (thinking "
+                             "off; scored on what follows the thinking) — refused only above a "
+                             "quarter, the whole benchmark's once its shards merge")
             missing = [j for j in range(1, n + 1) if str(j) not in sh["have"]]
             if missing:
                 lines.append(f"{t}: shard{'s' if len(missing) > 1 else ''} "

@@ -4953,6 +4953,26 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17j.3, point 38 — a few that thought anyway (8 Oct)
+
+- **A thinking-off run is refused only when more than a quarter of its answers
+  think** (`frontier.THINKING_OFF_SHARE`, 1% before): on 8 Oct the
+  UD-Q4_K_XL file's Humanity's Last Exam run with thinking off was refused
+  for 76 of 2,158 answers (3.5%) — the server did as it was told, and on the
+  hardest questions the model opened a thinking block of its own. Each such
+  answer is scored on what follows its thinking, as scoring reads every
+  reply; the score's words, its cell and the run say the share ("76 of 2,158
+  thought anyway, 3.5%"). Above a quarter the switch was ignored, and the
+  refusal says so.
+- **The same for a shard** (`import_frontier.checks`): a shard more than a
+  quarter of whose answers think is refused; below, its line says its share,
+  and the whole benchmark is judged once its shards merge.
+- **A box whose bundle was refused for this reads safe to destroy**
+  (`frontier_fetch.one_box`, `THINK_REFUSED`): the file is home and kept, the
+  box has no other to give; its line says so, with the import to type, and
+  the import is tried again each round.
+- Tests: `tests/test_17j_thinking_share.py`.
+
 ### 17j.5 — the page (7 Oct)
 
 - **"This server" only on the run's own log** (point 28, `where_check`): a run

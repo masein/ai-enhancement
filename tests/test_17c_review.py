@@ -225,14 +225,14 @@ def test_5_6_thinking_as_scoring_reads_it_and_a_few_in_an_off_row_are_counted():
     assert sf.thought(closing_only) and fb.visible(closing_only) == "ANSWER: A"
     assert not sf.thought("<think>\n\n</think>\n\nANSWER: A")
     assert sf.thinking_refused(TASK, "on", [closing_only] * 10) == ""
-    # one in 12,032 with thinking: scored, and said; more than 1%: refused
+    # one in 12,032 with thinking: scored, and said; 17j: more than a quarter: refused
     plain = ["ANSWER: A"] * 199
     assert sf.thinking_refused(TASK, "off", [closing_only, *plain]) == ""
     assert sf.thinking_kept("off", [closing_only, *plain]) == 1
-    assert "more than 1%" in sf.thinking_refused(TASK, "off", [closing_only] * 3 + plain)
-    assert "1 thought though thinking was off (scored on what follows the thinking)" in \
-        sf.words(TASK, {"score": 0.5, "se": 0.1, "epochs": 1, "questions": 200,
-                        "thinking_held": 1})
+    assert "more than a quarter" in sf.thinking_refused(TASK, "off", [closing_only] * 70 + plain)
+    assert "1 of 200 thought anyway, 0.5% (thinking off; scored on what follows the thinking)" \
+        in sf.words(TASK, {"score": 0.5, "se": 0.1, "epochs": 1, "questions": 200,
+                           "answers": 200, "thinking_held": 1})
 
 
 def test_7_a_box_names_its_benchmarks_in_its_bundle(box):  # noqa: F811

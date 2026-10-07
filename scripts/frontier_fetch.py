@@ -56,6 +56,9 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 IMPORT = ["sudo", "docker", "compose", "exec", "-T", "bench", "python",
           "scripts/import_remote.py"]
+# 17j: an import refused for an off run's thinking share — the board's words,
+# before 17j (more than 1%) and since (more than a quarter)
+THINK_REFUSED = re.compile(r"thinking was off, and [\d,]+ of its [\d,]+ answers hold thinking")
 COMPARE = ["sudo", "docker", "compose", "exec", "-T", "bench", "python",
            "scripts/frontier_parity.py", "compare"]
 _BOX = re.compile(r"(?:(?P<user>[A-Za-z0-9._-]+)@)?(?P<host>[A-Za-z0-9.-]+):(?P<port>\d+)")
@@ -398,7 +401,16 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
         code, said = run([*IMPORT, str(here), "--by", a.by, "--file-sha256", shas[model]],
                          cwd=REPO, timeout=IMPORT_S)
         lines.append(f"  {here.name}: {words} · {summary(code, said)}")
-        if code != 0:
+        if code != 0 and THINK_REFUSED.search(said or ""):
+            # 17j: refused for its thinking share — the file is home and the
+            # box has no other to give: the box can go, said. The board tries
+            # it again each round, and it imports by hand once the board
+            # takes it
+            lines.append("    kept here, refused for its thinking share: the box isn't needed "
+                         "for it — it is tried again each round, or import it by hand: "
+                         + by_hand(here, a.by, True, model))
+            home[step] = "kept (thinking)"
+        elif code != 0:
             problems.append(f"{here.name}'s import refused")
             home[step] = "refused"
             failed = True
@@ -459,7 +471,7 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
     for d, p in sorted(started.items()):
         what = f"{build_of(d)} {Path(d).name}".strip()
         state = str((p or {}).get("state") or "")
-        if p is None and home.get(d) in ("imported", "by hand", "parity"):
+        if p is None and home.get(d) in ("imported", "by hand", "parity", "kept (thinking)"):
             continue                                # a bundle with no progress file, home
         if state != "whole":
             at = _int((p or {}).get("at"))
@@ -470,16 +482,20 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
                                else "")
                             + (f", but hasn't written for {quiet:,} min — stopped? paste its "
                                "line again" if quiet else ""))
-        elif home.get(d) not in ("imported", "by hand", "parity"):
+        elif home.get(d) not in ("imported", "by hand", "parity", "kept (thinking)"):
             problems.append(f"{what}'s file isn't home yet")
     safe = not problems
     by_h = sum(1 for v in home.values() if v == "by hand")
     # 17i: bundles alone — "1 imported" counted the parity file
     n_in = sum(1 for v in home.values() if v == "imported")
+    # 17j: and those refused for their thinking share, kept here
+    n_th = sum(1 for v in home.values() if v == "kept (thinking)")
+    rest = [f"{n_in} imported", *([f"{by_h} to import by hand"] if by_h else []),
+            *([f"{n_th} refused for its thinking share and kept here"] if n_th else [])]
     lines.insert(0, f"{who}: " + (
         ("done, safe to destroy — every step whole, every bundle here with the box's sha256 "
-         + ("and imported" if not by_h else
-            f"({n_in} imported, {by_h} to import by hand: the lines below)"))
+         + ("and imported" if not by_h and not n_th else
+            f"({', '.join(rest)}: the lines below)"))
         if safe else "NOT safe to destroy — " + "; ".join(problems))
         + (f" · abandoned: {', '.join(dropped)}" if dropped else ""))
     # 17f: each step as the board shows it on Runs — its label and progress,
