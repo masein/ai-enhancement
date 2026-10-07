@@ -271,12 +271,28 @@ the builds and the llama-server tarball are kept under).
 - `recompute.py`, which recomputes `scores.json` from `items.jsonl`;
 - a `README.md` with the protocol and the battery's sources and licences.
 
-**Public or private, by default.**
-- Public: a public Hugging Face model, DeviceMark's calibration models among them.
-- Private: a Qwen3.6 build, a setup served here, or a checkpoint.
-- `--private` keeps any run private. `--public` never makes one public that
-  the board doesn't know as public (17g): a build stays in `private/`,
-  whatever the flags, and the export says so.
+**Public or private** (17h).
+- Public only for a model whose page marks its weights public ("Mark its
+  weights public", under its size; an import's `--public-weights` sets the
+  same mark, and the page shows it and clears it). Nothing is public by its
+  name, and a Qwen3.6 build never is, marked or not. DeviceMark's calibration
+  models: mark them on their pages first.
+- Before anything goes to `public/`, the export lists the models it would
+  publish and waits for a typed `yes`; anything else keeps them in
+  `private/`. `--private` keeps every run private; `--public` does nothing.
+
+**What goes out** (17h): a list of what may, field by field
+(`scripts/export_safe.py`) — never the whole record, scrubbed. A launch's
+flags and environment by name (the context, slots, cache, attention, experts,
+template, reasoning and rope flags; `LLAMA_MOE_*`, `GGML_*`, `LLAMA_ARG_*`
+variables), never one that names a key; never the server's address, port or
+how it is served in words. The log holds only the runner's own lines in their
+fixed shapes (its headers, `[frontier]`, `[import]`, `[devicemark]`,
+`[service]`, a box's timed lines), never llama-server's start-up output and
+never one holding an address, a URL, a user@host or a key's name; a Frontier
+log never one quoting six words in a row of a gated question (no log at all
+when the questions can't be loaded to check). The README says how many lines
+and launch settings were left out. The scrub runs last, on what is left.
 
 **DeviceMark rows only.** Any other run is refused.
 

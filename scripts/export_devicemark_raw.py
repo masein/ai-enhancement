@@ -9,10 +9,11 @@ Face — as DeviceMark links every row of its board to its raw file
     python scripts/export_devicemark_raw.py --link 212 --unlink --by masein
 
 One folder a row, under --out (default $BENCH_ROOT/raw-export), in public/ or
-private/: public for a public Hugging Face model (DeviceMark's calibration
-models among them), private for an in-house build (Qwen3.6), a setup served
-here or a checkpoint; --public or --private decides instead. Upload is
-masein's step (docs/REMOTE-RUNS.md § Publishing the raw runs).
+private/. 17h: public only for a model whose page marks its weights public
+(DeviceMark's calibration models: mark them there), never an in-house build
+(Qwen3.6), and only after a typed yes to the list the export prints;
+--private keeps every row private. Upload is masein's step
+(docs/REMOTE-RUNS.md § Publishing the raw runs).
 
   items.jsonl    a line an item: the test and its key; the prompt as sent; the
                  reply and the thinking; the parsed answer and the dataset's,
@@ -92,17 +93,28 @@ _LOCAL_URL = re.compile(r"\b(https?://)(?!huggingface\.co\b)([A-Za-z0-9_-]+)(:\d
 # account the builds are kept under
 _PUBLIC_ADDR = re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])")
 _PORT = re.compile(r"(?i)(\b(?:ssh|scp|rsync)\b[^\n]*?\s-[pP]\s*)\d{2,5}\b")
-_USER_AT = re.compile(r"\b[a-z_][a-z0-9_-]{0,31}@(?=\[(?:host|address)\])")
+_USER_AT = re.compile(r"\b[a-z_][a-z0-9_-]{0,31}@(?=\[(?:host|address)\]|[\w-]+(?:\.[\w-]+)+)")
 _RENTED_HOST = re.compile(r"\b(?:[\w-]+\.)+(?:vast\.ai|runpod\.io|runpod\.net|lambdalabs\.com|"
-                          r"tensordock\.com|paperspace\.com)\b", re.I)
+                          r"tensordock\.com|paperspace\.com)\b|(?<=@)[\w-]+(?:\.[\w-]+)+", re.I)
 _FLAG_KEY = re.compile(r"(?i)(--(?:api[-_]?key|hf[-_]?token|token|key|password|secret)[=\s]+)"
                        r"(?!\[)[^\s\"']{4,}")
 _NAMED_KEY = re.compile(r"(?i)\b(x-token|submit_token|openrouter_api_key|hf_token|"
                         r"huggingface_hub_token)(\"?\s*[:=]\s*\"?)(?!\[)[^\s\"',}]{4,}")
 _INTERNAL_URL = re.compile(r"(?i)\b(https?://)(?:[\w-]+\.)+(?:internal|lan|local|localdomain|"
                            r"home|corp|intranet|private|docker)(?=[:/\s\"']|$)")
-_HF_ACCOUNT = re.compile(r"(?i)\b(hf://|huggingface\.co/(?:datasets/|models/)?)"
-                         r"(?!\[)([\w.-]+)/(?=[\w.-]*private|evalboard)")
+_HF_ACCOUNT = re.compile(r"(?i)(\bhf://|\bhuggingface\.co/(?:datasets/|models/)?|(?<![\w/])"
+                         r"datasets/|(?<!\w)-hf\s+)(?!\[)([\w.-]+)/"
+                         r"(?=[\w.-]*(?:private|evalboard))")
+# 17h: the rest of what 17g's scrub let through — any IPv6 address, a port
+# after an address or in -o Port=, -p before user@host with no ssh before it,
+# a URL's user:password@ and any dotted host but Hugging Face's
+_IPV6 = re.compile(r"(?<![\w:])(?=[0-9a-f:]*::|(?:[0-9a-f]{1,4}:){3})"
+                   r"[0-9a-f]{0,4}(?::[0-9a-f]{0,4}){2,7}(?![\w:])", re.I)
+_ADDR_PORT = re.compile(r"(\[(?:address|host)\]):\d{2,5}\b")
+_O_PORT = re.compile(r"(?i)(-o\s*Port\s*=?\s*)\d{2,5}")
+_P_USER = re.compile(r"(-p\s+)\d{2,5}(\s+[\w.-]+@)")
+_URL_USER = re.compile(r"(?i)\b(https?://)[^\s/@:]+(?::[^\s/@]*)?@")
+_ANY_HOST = re.compile(r"(?i)\b(https?://)(?!huggingface\.co\b|\[)([\w-]+(?:\.[\w-]+)+)")
 WHAT_THE_SCRUB_REMOVES = (
     "API keys and tokens: the environment's secrets by value, and anything key-shaped "
     "(hf_…, sk-…, sk-or-v1-…, gh?_…, AKIA…, xox?-…, AIza…, a key-shaped value assigned to "
@@ -113,8 +125,9 @@ WHAT_THE_SCRUB_REMOVES = (
     "URL's dotless host (http://gemma-vllm:8000)",
     "private addresses: tailnet and CGNAT 100.x, 10.x, 172.16–31.x, 192.168.x, 127.x, 169.254.x "
     "and the tailnet's IPv6 (fd7a:115c:a1e0::)",
-    "rented boxes: every IPv4 address, an ssh or scp port, the user before an address, and a "
-    "rented GPU host's name (*.vast.ai, *.runpod.io, …)",
+    "rented boxes: every IPv4 and IPv6 address, a port after an address or in an ssh line, "
+    "the user before an address or host, a URL's user and password, any URL's host but "
+    "Hugging Face's, and a rented GPU host's name (*.vast.ai, *.runpod.io, …)",
     "a key given as a flag (--api-key, --hf-token, --token …) or named x-token, SUBMIT_TOKEN, "
     "OPENROUTER_API_KEY or HF_TOKEN, whatever its value",
     "a URL's internal host (*.internal, *.lan, *.local, …), and the Hugging Face account a "
@@ -148,11 +161,17 @@ def scrub(text: str, env: dict | None = None, hosts: list[str] | None = None) ->
     text = _RENTED_HOST.sub("[host]", text)
     text = _INTERNAL_URL.sub(lambda m: f"{m.group(1)}[host]", text)
     text = _HF_ACCOUNT.sub(lambda m: f"{m.group(1)}[account]/", text)
+    text = _URL_USER.sub(lambda m: f"{m.group(1)}[user]@", text)
+    text = _ANY_HOST.sub(lambda m: f"{m.group(1)}[host]", text)
     text = _ADDR6.sub("[address]", text)
+    text = _IPV6.sub("[address]", text)
     text = _ADDR.sub("[address]", text)
     text = _PUBLIC_ADDR.sub("[address]", text)
     text = _PORT.sub(lambda m: f"{m.group(1)}[port]", text)
+    text = _O_PORT.sub(lambda m: f"{m.group(1)}[port]", text)
+    text = _P_USER.sub(lambda m: f"{m.group(1)}[port]{m.group(2)}", text)
     text = _USER_AT.sub("[user]@", text)
+    text = _ADDR_PORT.sub(lambda m: f"{m.group(1)}:[port]", text)
     return _LOCAL_URL.sub(lambda m: f"{m.group(1)}[host]{m.group(3) or ''}", text)
 
 
@@ -215,11 +234,38 @@ def model_of(row: Path) -> str:
 
 
 def public_by_default(row: Path, setup: dict) -> bool:
-    """public for a public Hugging Face model; private for an in-house build,
-    a setup served here, or a checkpoint"""
+    """17h: public only for a model whose page marks its weights public — a
+    name that looks public (teamacct/bonsai-2-27b) never is, and an in-house
+    build, a setup served here or a checkpoint never is, marked or not"""
+    import export_safe as es
     model = model_of(row)
-    return not (IN_HOUSE.search(model) or IN_HOUSE.search(setup.get("based_on") or "")
-                or model.startswith(("served/", "local/")) or setup.get("runtime") == "llama-server")
+    if IN_HOUSE.search(model) or IN_HOUSE.search(setup.get("based_on") or ""):
+        return False
+    return es.public(model)
+
+
+# 17h: the setup record as it may go out, field by field — its launch's flags
+# and environment by name (export_safe), never its address, its port or how
+# it is served in words
+SETUP = {"model": "name", "name": "text", "runtime": "text", "file": "name", "build": "scalar",
+         "ctx": int, "quant": "name", "phone": bool, "lookahead": bool, "mtp": bool,
+         "thinking": bool, "thinking_mode": "text", "battery": "text", "cap": int, "seed": int,
+         "revision": "name", "dtype": "name", "where": "text", "scoring": "text",
+         "reading": {"on": bool, "marks": ["text"], "opens": bool},
+         "props": {"build": "scalar", "n_ctx": int, "total_slots": int, "speculative": int},
+         "battery_hashes": {"*": "name"}, "runs": [int], "provisional": "text"}
+
+
+def setup_out(setup: dict) -> tuple[dict, int]:
+    """the setup that may go out, and how many launch flags or variables were
+    left out"""
+    import export_safe as es
+    out = es.pick(setup, SETUP) or {}
+    launch = setup.get("launch") if isinstance(setup.get("launch"), dict) else {}
+    fl, l1 = es.flags(launch.get("flags"))
+    ev, l2 = es.env(launch.get("env"))
+    out["launch"] = {"flags": fl, "env": ev}
+    return out, l1 + l2
 
 
 def runs_of(row: Path) -> list[dict]:
@@ -454,7 +500,7 @@ def refused(tasks) -> str:
 
 
 def export_row(row: Path, out: Path, public: bool | None = None, runs: list[dict] | None = None,
-               say=print) -> Path:
+               say=print, publish: bool = True) -> Path:
     """one row's folder, scrubbed, under out/public or out/private"""
     from service import config
     why = refused(dm.TASK.values())
@@ -477,22 +523,32 @@ def export_row(row: Path, out: Path, public: bool | None = None, runs: list[dict
     scores = scores_of(data, items)
     # 17g: never public for a model the board doesn't know as public, whatever
     # the flags — --private may still keep a public one private
-    pub = public_by_default(row, setup) and public is not False
+    pub = public_by_default(row, setup) and public is not False and publish
     dest = out / ("public" if pub else "private") / row.name
     if dest.exists():
         shutil.rmtree(dest)
     dest.mkdir(parents=True)
     runs = runs_of(row) if runs is None else runs
-    full_setup = {**setup, "model": model, "battery": dm.VERSION,
-                  "battery_hashes": dm.battery_hashes(items_src) if items_src else None,
-                  "runs": [r["id"] for r in runs]}
+    import export_safe as es
+    full_setup, left = setup_out({**setup, "model": model, "battery": dm.VERSION,
+                                  "battery_hashes": dm.battery_hashes(items_src)
+                                  if items_src else None,
+                                  "runs": [r["id"] for r in runs]})
+    # 17h: the runner's own lines only (DeviceMark's battery is public: no
+    # question is withheld here)
+    lines, out_ = es.log_lines(log_of(row, runs), es.Questions([]))
     files = {
         "items.jsonl": "".join(json.dumps(scrub_obj(i), ensure_ascii=False) + "\n" for i in items),
         "setup.json": json.dumps(scrub_obj(full_setup), indent=1, ensure_ascii=False),
         "scores.json": json.dumps(scores, indent=1),
-        "log.txt": scrub(log_of(row, runs)),
+        "log.txt": scrub("\n".join(lines) + "\n"),
         "recompute.py": RECOMPUTE,
-        "README.md": scrub(readme(model, thinking, scrub_obj(setup), scores, dm.battery()))}
+        "README.md": scrub(readme(model, thinking, full_setup, scores, dm.battery())
+                           + "\nWritten by a list of what may go out, field by field"
+                           + (f" ({left} launch flags or variables left out)" if left else "")
+                           + "; the log holds only the runner's own lines"
+                           + (": " + "; ".join(f"{n} left out ({w})" for w, n in out_.items())
+                              if out_ else "") + ".\n")}
     for name, text in files.items():
         (dest / name).write_text(text, encoding="utf-8")
     say(f"{row.name}: {len(items)} items · composite {100 * scores['composite']['value']:.1f} · "
@@ -525,9 +581,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--by", default="", help="your name, with --link")
     ap.add_argument("--out", type=Path, default=None,
                     help="where the folders go (default $BENCH_ROOT/raw-export)")
-    vis = ap.add_mutually_exclusive_group()
-    vis.add_argument("--public", action="store_true", help="public, whatever the default")
-    vis.add_argument("--private", action="store_true", help="private, whatever the default")
+    ap.add_argument("--private", action="store_true",
+                    help="every row private, even a model marked public")
+    ap.add_argument("--public", action="store_true",
+                    help="17h: no effect — a model is public when its page marks its weights "
+                         "public, and the export asks before it writes anything there")
     a = ap.parse_args(argv)
     from service import config, db
     db.init()
@@ -540,10 +598,17 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{row.name}: " + (f"raw → {got['url']}" if got else "no raw link"))
         return 0
     out = a.out or (config.BENCH_ROOT / "raw-export")
-    public = True if a.public else False if a.private else None
     rows = [row_of_run(a.run)[0]] if a.run else all_rows()
+    if a.public:
+        print("--public: no effect — a model is public when its page marks its weights public")
+    import export_safe as es
+    would = [] if a.private else [model_of(r) for r in rows if public_by_default(r, json.loads(
+        (r / dm.OUT_NAME).read_text(encoding="utf-8")).get("setup") or {})]
+    publish = es.confirm(would)
+    if would and not publish:
+        print("not published: those rows go to private/")
     for row in rows:
-        export_row(row, out, public)
+        export_row(row, out, False if a.private else None, publish=publish)
     print(f"{len(rows)} row(s) under {out} — upload: docs/REMOTE-RUNS.md § Publishing the raw runs")
     return 0
 

@@ -51,6 +51,7 @@ def row(board, monkeypatch):  # noqa: F811
 
 
 def test_a_row_exports_every_item_its_numbers_and_its_log(row, tmp_path):
+    db.public_set(QWEN, True, ME)               # 17h: public once its page marks it so
     dest = ex.export_row(row_of(QWEN), tmp_path / "out", say=lambda *_: None)
     assert dest == tmp_path / "out" / "public" / row_of(QWEN).name
     assert sorted(p.name for p in dest.iterdir()) == ["README.md", "items.jsonl", "log.txt",
@@ -108,10 +109,13 @@ def test_no_key_home_path_host_or_private_address_is_exported(row, tmp_path):
         m = LEAKS.search(text)
         assert not m, f"{f.name}: {text[max(0, m.start() - 40):m.end() + 40]!r}"
     log = (dest / "log.txt").read_text()
+    # 17h: the runner's own line goes, scrubbed; the others are left out, not scrubbed
     assert "cache at ~/benchmarks/results/full" in log
-    assert "http://[address]:8899/v1" in log and "http://[host]:8000/v1" in log
-    assert "Authorization: Bearer [key withheld]" in log
-    assert "--host [address]" in (dest / "setup.json").read_text()
+    assert "8899" not in log and "8000" not in log and "Bearer" not in log
+    assert "HF_TOKEN" not in log
+    setup = (dest / "setup.json").read_text()
+    assert "--host" not in setup and "server_flags" not in setup
+    assert "left out" in (dest / "README.md").read_text()
 
 
 def test_only_devicemark_rows_leave_the_server(board, tmp_path):  # noqa: F811
@@ -127,13 +131,19 @@ def test_only_devicemark_rows_leave_the_server(board, tmp_path):  # noqa: F811
 @pytest.mark.parametrize("model,setup,public", [
     ("Qwen/Qwen3.5-4B", {"runtime": "hf transformers (lm_eval)"}, True),
     ("google/gemma-4-E2B-it", {"runtime": "hf transformers (lm_eval)"}, True),
+    ("teamacct/bonsai-2-27b", {"runtime": "hf transformers (lm_eval)"}, True),
     ("teraformer/Qwen3.6-35B-A3B-k4-LDA", {"runtime": "hf transformers (lm_eval)"}, False),
     ("served/qwen36-phone-mtp", {"runtime": "llama-server", "based_on": "Qwen/Qwen3.6-35B-A3B"},
      False)])
-def test_public_for_public_models_and_private_for_in_house_builds(tmp_path, model, setup, public):
+def test_public_for_public_models_and_private_for_in_house_builds(svc, tmp_path, model,  # noqa: F811
+                                                                  setup, public):
     row = tmp_path / model.replace("/", "__")
     row.mkdir()
     (row / "model_meta.json").write_text(json.dumps({"model": model}))
+    # 17h: never by its name — public once its page marks it, and an in-house
+    # build never, marked or not
+    assert ex.public_by_default(row, setup) is False
+    db.public_set(model, True, ME)
     assert ex.public_by_default(row, setup) is public
 
 

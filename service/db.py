@@ -198,6 +198,11 @@ CREATE TABLE IF NOT EXISTS trained_from (
 -- active ones where they differ (a mixture of experts). The first source of a
 -- served model's or a GGUF file's size; the file's header and its base model
 -- come after (report_lm_eval.sizes)
+CREATE TABLE IF NOT EXISTS public_models (
+  model       TEXT PRIMARY KEY,
+  set_by      TEXT NOT NULL,
+  set_at      REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS model_sizes (
   model       TEXT PRIMARY KEY,
   total       REAL NOT NULL,
@@ -1033,6 +1038,30 @@ def trained_from_set(model: str, base: str, by: str) -> None:
         c.execute("INSERT INTO trained_from (model, base, set_by, set_at) VALUES (?,?,?,?) "
                   "ON CONFLICT(model) DO UPDATE SET base=excluded.base, set_by=excluded.set_by, "
                   "set_at=excluded.set_at", (model, base, by, time.time()))
+        c.commit()
+
+
+def public_all() -> dict[str, dict]:
+    """17h: the models whose weights the board was told are public — {model:
+    {by, at}}: the raw-run exports publish these, and nothing else"""
+    if not config.DB_PATH.exists():
+        return {}
+    try:
+        with closing(_conn()) as c:
+            rows = c.execute("SELECT model, set_by, set_at FROM public_models").fetchall()
+    except sqlite3.OperationalError:
+        return {}
+    return {m: {"by": by, "at": at} for m, by, at in rows}
+
+
+def public_set(model: str, on: bool, by: str) -> None:
+    with closing(_conn()) as c:
+        if on:
+            c.execute("INSERT INTO public_models (model, set_by, set_at) VALUES (?,?,?) "
+                      "ON CONFLICT(model) DO UPDATE SET set_by=excluded.set_by, "
+                      "set_at=excluded.set_at", (model, by, time.time()))
+        else:
+            c.execute("DELETE FROM public_models WHERE model=?", (model,))
         c.commit()
 
 

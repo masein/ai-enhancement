@@ -118,3 +118,29 @@ def test_13_the_poll_brings_the_boxes_list_up_to_date_on_its_own(live, page):
     page.evaluate("state.boxesAt = 0")                     # half a minute on
     page.wait_for_selector("[data-rented-box='A6|A6-1']", timeout=12000)  # 0adb522: never
     assert page.errors == []
+
+
+def test_19_a_models_page_shows_its_public_mark_and_clears_it(live, page):
+    """part 4, point 19: --public-weights given by mistake is seen on the
+    model's page, and cleared there; marking asks first"""
+    from service import db
+    db.public_set(SID, True, "masein")
+    import service.app as appmod
+    appmod._cache.update(key=None, payload=None, at=0.0)
+    page.set_viewport_size({"width": 1400, "height": 1000})
+    page.goto("about:blank")
+    page.goto(live["base"] + f"/#model={SID}")
+    set_name(page, "masein")
+    line = page.locator("[data-public-weights]")
+    line.wait_for()                                         # 0adb522: nothing shows it
+    assert line.get_attribute("data-public-weights") == "1"
+    assert line.inner_text().startswith("Public weights — marked by masein on ")
+    page.locator("[data-public-weights-toggle='clear']").click()
+    page.wait_for_selector("[data-public-weights='0']")
+    assert SID not in db.public_all()
+    # marking asks first, in the page
+    page.locator("[data-public-weights-toggle='set']").click()
+    page.locator("[data-public-weights-yes]").click()
+    page.wait_for_selector("[data-public-weights='1']")
+    assert SID in db.public_all()
+    assert page.errors == []
