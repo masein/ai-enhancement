@@ -441,9 +441,11 @@ def test_27_after_stop_or_at_the_limit_it_says_why_it_waits_and_carry_on_sends_t
     # the month's limit: said, and Carry on refused with it
     limit = "this month's AI spend has reached its limit"
     monkeypatch.setattr(ai_models, "over_limit", lambda: limit)
-    # 17c: at the limit Carry on can't send: said so, not "Carry on sends the rest"
-    assert {"why": limit, "carry": "Carry on waits until the limit is raised (AI models ▸ the "
-                                   "month's limit) or the month turns."} in page(svc)["waits"]
+    # 17c: at the limit Carry on can't send: said so, not "Carry on sends the rest".
+    # 17j: and nothing goes by itself once the limit is raised or the month turns
+    assert {"why": limit, "carry": "raise the limit on AI models, then Carry on: nothing is "
+                                   "sent by itself, not when the limit is raised nor when the "
+                                   "month turns."} in page(svc)["waits"]
     with pytest.raises(ValueError, match="its limit"):
         fgr.start("masein")
     monkeypatch.setattr(ai_models, "over_limit", lambda: "")

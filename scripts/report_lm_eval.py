@@ -24737,6 +24737,8 @@ function frontierGradingCard() {
         : 'Nothing waits for a grader: every Frontier answer on file is scored.' });
   const running = (G.running || []).length, stopped = !!G.stopped;
   const switching = rows.some(r => r.switch && !r.answers);
+  // 17j: rows whose batch still runs at the grader they left
+  const moving = (E.held || []).length > 0;
   const why = !G.has_key ? 'OpenRouter has no key on this server (OPENROUTER_API_KEY)'
     : E.over_limit || '';
   const cost = E.usd_known ? usd(E.usd) : `${usd(E.usd)} and the unpriced`;
@@ -24775,15 +24777,18 @@ function frontierGradingCard() {
     // 17i: a row whose replies are still on their way at the grader it left
     ...(E.held || []).map(h => el('p', { class: 'small se', 'data-frontier-held-row':
       `${h.task}|${h.row}`, text: h.words })),
-    LIVE && (E.answers || running || switching) ? el('div', { class: 'frm', 'data-frontier-run': held
-        ? 'held' : running ? 'running' : stopped ? 'stopped' : 'idle' },
-      // 17h: and a switch alone, nothing to send, has its Start too
-      E.answers || held || switching ? el('button', { class: 'primary', 'data-frontier-start': '1',
-        disabled: why || busy ? '' : null, title: why || null,
+    LIVE && (E.answers || running || switching || moving) ? el('div', { class: 'frm',
+        'data-frontier-run': held ? 'held' : running ? 'running' : stopped ? 'stopped' : 'idle' },
+      // 17h: and a switch alone, nothing to send, has its Start too. 17j: and
+      // rows another grader was chosen for while their batch runs — Start
+      // stops what the old one hasn't been sent (it was paid for all the rest)
+      E.answers || held || switching || moving ? el('button', { class: 'primary',
+        'data-frontier-start': '1', disabled: why || busy ? '' : null, title: why || null,
         text: busy === 'start' ? 'Sending…' : stopped || held
           ? 'Carry on' + (E.answers || H.answers ? `: about ${carryCost}` : '')
-          : 'Start grading' + (E.answers ? `: about ${cost}` : switching
-            ? ': nothing to send, the grades switched' : ''),
+          : 'Start grading' + (E.answers ? `: about ${cost}` : moving
+            ? ': nothing more to the grader it left, the rest to the one chosen now'
+            : switching ? ': nothing to send, the grades switched' : ''),
         onclick: () => frontierGradingAct('start') }) : '',
       (E.answers || held) && E.short ? el('button', { class: 'quiet', 'data-frontier-partial': '1',
         disabled: why || busy ? '' : null,
