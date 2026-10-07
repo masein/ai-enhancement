@@ -874,11 +874,21 @@ every reply used its grader's cap). "change ▾" picks another model; choosing
 one asks each of its providers one paid token first, counted in the month's
 spend. **Start grading** pins each grader and sends what waits, once however
 often it is pressed; Stop holds it, and the card then says why it waits —
-Stop, a run of refusals, the month's limit — beside **Carry on**. As grades
+Stop, a run of refusals, the month's limit — beside **Carry on**. 17j:
+stopped at the month's limit, nothing is sent when the limit is raised or the
+month turns: Carry on sends it. Once a grader has replied to
+a benchmark this month, the dry run prices its replies at what they cost, from
+the ledger, and says so. As grades
 land, each benchmark is scored again, and its cell says who graded it, with
 which prompt (MATH and OTIS: the code's number beside it). A reply that is
-empty, cut at its cap or not a grade is listed under the card, with a batch
-that failed and why, and the next Start asks it again. A score from two
+empty, cut off by its cap or not a grade is listed under the card, with a
+batch that failed and why, and the next Start asks it again — 17j: a whole
+reply that ended exactly at its cap is read, and a grade. Humanity's Last
+Exam's replies are read as a careful person reads them
+(`tests/fixtures/hle_reader_cases.json`, 134 replies, is the reader's test);
+one that could be read two ways is no grade. The card says whether HLE's
+grader answers in CAIS's JSON schema; one that doesn't may reply in prose,
+which can be asked again, and paid. A score from two
 graders or prompts names both and isn't final: choose one and grade again.
 
 Choosing another grader moves nothing: the dry run shows what Start would do
@@ -893,7 +903,10 @@ answer's try, never part of a run; a key's spend cap, the account's credit,
 a provider's own failure and an id the provider doesn't know never are.
 Stopped, then another grader chosen: the dry run prices what is held at the
 grader it goes to, and a row graded by two graders is finished by the one
-chosen now. When a benchmark's rows end up
+chosen now. 17j: chosen while a batch is out, the rows held at the grader
+they left have Start beside Stop — nothing more goes to the grader left, the
+rest to the one chosen now. A grader chosen back that left only no-grades
+asks those again, never the whole row. When a benchmark's rows end up
 scored by different graders (one build's first grader left too many
 ungraded, the other's didn't), both rows say so, and the card offers the
 other row's regrade by the grader chosen now, with its price, sent at the
