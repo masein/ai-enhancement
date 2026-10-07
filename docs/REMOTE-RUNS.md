@@ -819,13 +819,24 @@ python3 scripts/frontier_fetch.py --key ~/.ssh/id_ed25519 --sha served/Qwen3.6-3
 box's `A3-2`, stopped by hand: it is left out of its box's steps and of the
 plan's check (the box reads safe once the rest is whole and home, and a
 deleted step no longer reads "hasn't started"), its bundle isn't fetched,
-and the box's line says it every round. A box that read safe is remembered
-across a restart of the fetch (`safe-boxes.json` beside the bundles, by its
-board name, never its address), and forgotten as soon as it is reached and
-isn't safe (given another build). Each parity verdict keeps its box, its
-file's sha256 and when it was compared; it is printed only for a build on the
-command line (`--sha` or `--parity`), and a new parity file from the box
-replaces it. A parity step writes its progress as it asks ("parity 412 of
+and the box's line says it every round. 17j: a value that matched no step on
+the boxes reached is named after each round; an abandoned step still asking
+or starting (written within the last 45 minutes) keeps its box NOT safe, and
+its line says to stop it on the box or leave it out of `--abandoned`. A box
+that read safe is remembered across a restart of the fetch
+(`safe-boxes.json` beside the bundles, by its board name, never its address,
+17j: with when it read safe), forgotten as soon as it is reached and holds a
+step that isn't home (given another build), or after two days (a new box at
+the same address); a box that read safe is "destroyed: done" only after two
+rounds unreached — one failed ssh says it will be if the next round misses it
+too. Each parity verdict keeps its box, its file's sha256 and when it was
+compared; it is printed only for a build on the command line (`--sha` or
+`--parity`), and a new parity file from the box replaces it. 17j: a build
+given `--parity` with no verdict is compared from its copy here
+(`parity/<build>-box.jsonl`) — once the box is gone too. Two fetches at once
+(two panes) merge what they keep, never erase each other's. `--sha` for a
+model the board doesn't serve yet leaves its bundles home and prints the line
+to type, with `--register`, every round. A parity step writes its progress as it asks ("parity 412 of
 1,000"), so the board and the 45-minute check see it working.
 
 `--file-sha256` on every import of a build, with that build's sha256 from G0
