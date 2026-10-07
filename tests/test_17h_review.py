@@ -129,7 +129,7 @@ def test_8_g6s_own_folder_is_a_step_with_its_progress(tmp_path, monkeypatch, cap
          "dir": "/workspace/gemma-cal", "label": "", "model": "served/gemma-4-26b-a4b-bf16"}],
         steps=[])
     posted = []
-    monkeypatch.setattr(ff, "post_boxes", lambda steps, dest, asked=None: (
+    monkeypatch.setattr(ff, "post_boxes", lambda steps, dest, asked=None, reached=None: (
         posted.extend(steps), "posted")[1])
     ff.main(["--key", str(key), "--dest", str(tmp_path / "b" / "bundles"), "--sha", PHONE,
              "1.1.1.1:41"])

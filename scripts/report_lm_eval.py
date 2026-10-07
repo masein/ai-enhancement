@@ -2479,7 +2479,12 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
                     "howSet": frontier_setting((run.get("frontier") or {}).get(task)),
                     # 17f: where it ran, and the Runs rows it came from
                     "where": frontier_where((run.get("frontier") or {}).get(task)),
-                    "runs": ((run.get("frontier") or {}).get(task) or {}).get("runs") or []}
+                    "runs": ((run.get("frontier") or {}).get(task) or {}).get("runs") or [],
+                    # 17i: its shards imported and held, waiting for the rest
+                    **({"shardsHeld": str(((run.get("frontier") or {}).get(task) or {})
+                                          .get("shards_held"))[:300]}
+                       if ((run.get("frontier") or {}).get(task) or {}).get("shards_held")
+                       else {})}
                    if (run.get("frontier") or {}).get(task) else {}),
             }
             metric_used.setdefault(task, name)
@@ -12992,7 +12997,7 @@ function frHere(name) {
       return { v: c.v, se: c.se || null, tag: at + (c.how ? ' · ' + c.how : ''),
         set: 'howSet' in c ? (c.howSet == null ? null : at + ' · ' + c.howSet) : at,
         // 17f: where it ran, and the Runs rows it came from
-        where: c.where || '', runs: c.runs || [],
+        where: c.where || '', runs: c.runs || [], held: c.shardsHeld || '',
         // 17g: the rows beside it scored by another grader
         differs: c.graderDiffers || '' };
     } })),
@@ -13218,7 +13223,11 @@ function lbFrontier(ms) {
         b(hl, pct1(x.here.v)), el('div', { class: 'small se fr-tag', text: x.here.tag }),
         x.here.differs ? el('div', { class: 'small warntext', 'data-fr-grader-differs': r.m.id,
           text: x.here.differs }) : '',
-        x.here.where ? frWhere(x.here) : '');
+        x.here.where ? frWhere(x.here) : '',
+        // 17i: shards imported and held, waiting for the rest — the score is
+        // the answers here before
+        x.here.held ? el('div', { class: 'small warntext', 'data-fr-shards-held': r.m.id,
+          text: x.here.held }) : '');
     return el('td', { class: 'num tcell', 'data-fr-cell': c.key, 'data-fr-rep': r.m.id,
         'data-fr-setting': x.rep.setting, 'data-lead': rl ? '1' : null, style: tint, tabindex: '0',
         ...repAt,

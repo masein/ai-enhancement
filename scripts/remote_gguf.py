@@ -174,10 +174,7 @@ def split_parts(src: str) -> list[str]:
     return [src[:m.start()] + f"-{i:05d}-of-{n:05d}.gguf" for i in range(1, n + 1)]
 
 
-def split_sha(parts: list[tuple[str, str]]) -> str:
-    """a split GGUF's identity: the sha256 of its parts' names and sha256s, in
-    order — what the board registers for it (import_remote.py --register)"""
-    return hashlib.sha256("".join(f"{n} {h}\n" for n, h in parts).encode()).hexdigest()
+split_sha = rb.split_sha                # 17i: one definition, the import's too
 
 
 def sha256_cached(path: Path, state: dict, say, shared: Path | None = None) -> str:
@@ -633,20 +630,26 @@ def make_bundle(out: Path, served_as: str, thinking: bool, tasks: list[str], sta
     return path, done, incomplete
 
 
+_PROGRESS_LOCK = threading.Lock()
+
+
 def progress(out: Path, **fields) -> None:
     """17f: the step's progress file, its fields merged in, the time it was
-    last written with them"""
+    last written with them — 17i: one writer at a time (the parity step's
+    questions are asked side by side, and each writes its count)"""
     p = out / PROGRESS
     out.mkdir(parents=True, exist_ok=True)
-    try:
-        was = json.loads(p.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        was = {}
-    if not isinstance(was, dict):
-        was = {}
-    tmp = p.with_suffix(".part")
-    tmp.write_text(json.dumps({**was, **fields, "at": round(time.time())}), encoding="utf-8")
-    tmp.replace(p)
+    with _PROGRESS_LOCK:
+        try:
+            was = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            was = {}
+        if not isinstance(was, dict):
+            was = {}
+        tmp = p.with_suffix(".part")
+        tmp.write_text(json.dumps({**was, **fields, "at": round(time.time())}),
+                       encoding="utf-8")
+        tmp.replace(p)
 
 
 class Watch(threading.Thread):
@@ -980,9 +983,19 @@ def _main(argv: list[str] | None = None) -> int:
                      "speculative": seen.get("speculative"), "gpu": gpu.get("name")}
             # 17d: each question twice — the box's agreement with itself, beside
             # its agreement with the server
+            # 17i: its progress written as it goes — it read "starting" for its
+            # whole run, then "stopped? paste its line again" past 45 minutes
+            last = {"at": 0.0}
+
+            def asked(k: int, of: int) -> None:
+                say(f"parity {k} of {of}")
+                if k >= of or time.time() - last["at"] >= 10:
+                    progress(out, state="asking", line=f"parity {k:,} of {of:,}")
+                    last["at"] = time.time()
+            progress(out, state="asking", line=f"parity 0 of {a.n:,}",
+                     session_at=round(time.time()))
             try:
-                n = sf.parity_ask(rec, dest, lambda k, of: say(f"parity {k} of {of}"),
-                                  identity=ident, n=a.n, twice=True)
+                n = sf.parity_ask(rec, dest, asked, identity=ident, n=a.n, twice=True)
             except sv.ServerStopped as e:
                 # 17g: in words, where it was a traceback; parity has no
                 # resume — pasting the box's line asks it again

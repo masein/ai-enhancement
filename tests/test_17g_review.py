@@ -176,8 +176,10 @@ def test_2_the_fetch_and_the_list_say_why_a_step_stopped(tmp_path, monkeypatch, 
     assert f"A5 A5-1 · {MMLU} · thinking None · stopped · {why}" in out, out
     assert f"phone A5-1 is stopped: {why}" in out
     # the board keeps why, and the list says it
+    # 17i: with when the fetch saw it, as the fetch always sends — a row never
+    # seen has no age to leave the list by
     imf.store_boxes([{"label": "A5", "model": "served/phone", "step": "A5-1",
-                      "state": "stopped", "why": why}])
+                      "state": "stopped", "why": why, "seen_at": time.time()}])
     assert imf.read_boxes()["boxes"][0]["why"] == why
     src = Path(__file__).resolve().parents[1].joinpath("scripts", "report_lm_eval.py").read_text()
     assert "b.state === 'stopped' ? `stopped${b.why ? ': ' + b.why : ''}`" in src

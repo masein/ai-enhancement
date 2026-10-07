@@ -780,6 +780,45 @@ scp -i ~/.ssh/id_ed25519 -P <port> root@<host>:/workspace/<phone-build>/A5-1/fro
 sudo docker compose exec -T bench python scripts/import_remote.py ~/benchmarks/bundles/frontier-served__<phone-build>-thinking-on-mmlu-pro.tar.gz --by masein --file-sha256 <the phone file's sha256 from G0>
 ```
 
+**A GGUF in parts (17i): BF16.** `served/Qwen3.6-35B-A3B-BF16` is
+unsloth's BF16 file in two parts. The board registers a GGUF in parts by its
+**split identity** — the sha256 of its parts' names and sha256s, in order, as
+the box hashed them — never a part's own sha256 (the import refuses that, and
+says which part it is). The fetch reads the identity from the bundle and
+prints it on the bundle's by-hand line, each part's name and sha256 under it:
+
+```
+  frontier-served__Qwen3.6-35B-A3B-BF16-thinking-on-gpqa.tar.gz: copied — home; no --sha for served/Qwen3.6-35B-A3B-BF16: import it by hand: sudo docker compose exec -T bench python scripts/import_remote.py /home/masein/benchmarks/bundles/frontier-served__Qwen3.6-35B-A3B-BF16-thinking-on-gpqa.tar.gz --by masein --file-sha256 <the identity>
+      <the identity> is the split identity of its 2 parts, as the box hashed them — check each against Hugging Face before you import:
+        Qwen3.6-35B-A3B-BF16-00001-of-00002.gguf  <part 1's sha256>
+        Qwen3.6-35B-A3B-BF16-00002-of-00002.gguf  <part 2's sha256>
+      once checked, give the fetch --sha served/Qwen3.6-35B-A3B-BF16=<the identity> and it imports this build by itself
+```
+
+Check each part's sha256 against the file's page on Hugging Face (Files ▸
+the part ▸ its SHA256), then type the line once (with `--register "<its
+name>"` only when the line says the board doesn't serve the model yet — it is
+asked each round). The import checks that the parts make the identity given.
+From then on give the fetch the identity as the build's `--sha`, and it
+imports every later bundle of the build by itself:
+
+```bash
+python3 scripts/frontier_fetch.py --key ~/.ssh/id_ed25519 --sha served/Qwen3.6-35B-A3B-BF16=<the identity> --sha served/Qwen3.6-35B-A3B-Q4-original-k-8=<the Q4 file's sha256> --abandoned Qwen3.6-35B-A3B-BF16/A3-2 --every 3m <host 1>:<port 1> <host 2>:<port 2>
+```
+
+`--abandoned <build>/<step>` (one each) is a step given up on — the BF16
+box's `A3-2`, stopped by hand: it is left out of its box's steps and of the
+plan's check (the box reads safe once the rest is whole and home, and a
+deleted step no longer reads "hasn't started"), its bundle isn't fetched,
+and the box's line says it every round. A box that read safe is remembered
+across a restart of the fetch (`safe-boxes.json` beside the bundles, by its
+board name, never its address), and forgotten as soon as it is reached and
+isn't safe (given another build). Each parity verdict keeps its box, its
+file's sha256 and when it was compared; it is printed only for a build on the
+command line (`--sha` or `--parity`), and a new parity file from the box
+replaces it. A parity step writes its progress as it asks ("parity 412 of
+1,000"), so the board and the 45-minute check see it working.
+
 `--file-sha256` on every import of a build, with that build's sha256 from G0
 (the original build's bundles with the original file's). The board has no
 hash of either build's file today: the first import keeps the one given on

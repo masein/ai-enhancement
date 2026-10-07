@@ -354,9 +354,16 @@ def register(f: dict, by: str) -> dict:
         rec["same_as"] = old["same_as"]
     # 17d: and the sha256 an import was given for its file, while its server
     # still serves that file — saving its page dropped it
+    # 17i: or by the file's own name, as the import recorded it — a model
+    # imported from rented GPUs has its pin's size from the bundle (the
+    # files' bytes), never the server's count of its weights, so registering
+    # the same name later dropped the sha256 and its parts, and every import
+    # was refused until --file-sha256 was given again
     was = old.get("pin") or {}
-    if old.get("file_sha256") and (rec["pin"].get("file"), rec["pin"].get("size")) == (
-            was.get("file"), was.get("size")):
+    fs = old.get("file_sha256") or {}
+    if fs and ((rec["pin"].get("file"), rec["pin"].get("size")) == (
+            was.get("file"), was.get("size"))
+            or (fs.get("name") and rec["pin"].get("file") == fs.get("name"))):
         rec["file_sha256"] = old["file_sha256"]
     db.served_put(rec)
     write_meta(rec)
