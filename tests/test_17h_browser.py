@@ -144,3 +144,26 @@ def test_19_a_models_page_shows_its_public_mark_and_clears_it(live, page):
     page.wait_for_selector("[data-public-weights='1']")
     assert SID in db.public_all()
     assert page.errors == []
+
+
+def test_24_three_columns_cut_alike_keep_their_middles_and_twins_are_numbered(live, page):
+    """part 5, point 24: names that differ only in their middle, cut to a
+    narrow column, keep the middle; two names alike to the letter are
+    numbered — never a fixed 22 characters, never one label for two"""
+    page.goto("about:blank")
+    page.goto(live["base"] + "/#tab=models")
+    page.wait_for_selector("[data-lb-card]")
+    got = page.evaluate("""() => {
+      const fits = n => x => x.length <= n;
+      const mid = ['Qwen3.6-35B-A3B-k4LDA-phone', 'Qwen3.6-35B-A3B-k8LDA-phone',
+                   'Qwen3.6-35B-A3B-k16LDA-phone'];
+      const twins = ['Qwen3.6 build lookahead', 'Qwen3.6 build lookahead', 'Gemma 4 E2B'];
+      return [[...headNames(mid, fits(5)).values()], [...headNames(twins, fits(18)).values()],
+              [...headNames(mid, fits(40)).values()]];
+    }""")
+    # cut to the same end, they keep what differs between them
+    assert got[0] == ["…k4L…", "…k8L…", "…k16…"]            # 0adb522: one label, 22 long
+    assert got[1][:2] == ["Qwen3.6 build… #1", "Qwen3.6 build… #2"] and got[1][2] == "Gemma 4 E2B"
+    assert got[2] == ["Qwen3.6-35B-A3B-k4LDA-phone", "Qwen3.6-35B-A3B-k8LDA-phone",
+                      "Qwen3.6-35B-A3B-k16LDA-phone"]
+    assert page.errors == []

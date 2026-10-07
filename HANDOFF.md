@@ -4953,6 +4953,20 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17h.5 — the start-up fill and Compare (7 Oct)
+
+- **The start-up fill** (`db._backfill_where`, point 23): where an earlier
+  import ran, from each row's own record of its imports (the Frontier
+  registry and DeviceMark's `remote_imports.json`: the run, its GPU, its
+  box), never a run's note (a note typed like an import's became rented, a
+  line break kept "this server", "Tesla V100 (16 GB)" was cut); guarded — an
+  error in it never stops the board starting.
+- **Compare, three columns** (`headNames`, 24): names cut alike keep what
+  tells them apart among themselves, cut to the column (never a fixed 22
+  characters); names alike to the letter are numbered; the labels come back
+  in the names' order.
+- Tests: `tests/test_17h_review.py` (part 5), `tests/test_17h_browser.py`.
+
 ### 17h.4 — the export, by a list of what may go out (7 Oct)
 
 - **The approach changed** (`scripts/export_safe.py`): the exports write only

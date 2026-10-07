@@ -419,32 +419,43 @@ def init() -> None:
         c.execute("UPDATE submissions SET status='canceled', progress='canceled (the service "
                   "restarted while stopping it)' WHERE status='canceling'")
         _backfill_judge_batch(c)
-        _backfill_where(c)
+        try:
+            _backfill_where(c)
+        except Exception as e:                      # noqa: BLE001 — never stops the board starting
+            print(f"[service] where the earlier imports ran couldn't be filled in: {e!r}")
         c.commit()
-
-
-_IMPORTED = re.compile(r"^imported from a rented GPU \((?P<gpu>[^)]*)\)(?P<rest>.*)$")
 
 
 def _backfill_where(c: sqlite3.Connection) -> None:
     """17g: a run imported before 17f — and every DeviceMark import — says
-    where it ran, from its own record ("imported from a rented GPU (…) ·
-    box A3 · …"): they read "this server", and the rented filter hid them"""
-    rows = c.execute("SELECT id, note FROM submissions WHERE (where_ran IS NULL OR "
-                     "where_ran = '') AND note LIKE 'imported from a rented GPU (%'").fetchall()
-    if not rows:
-        return
+    where it ran. 17h: from each row's own record of its imports (the Frontier
+    registry and DeviceMark's remote_imports.json: the run's id, its GPU, its
+    box), never from a run's note — a note typed to read like an import's
+    became rented, one with a line break stayed "this server", and "Tesla V100
+    (16 GB)" was cut. Guarded: a repair never stops the board starting"""
     try:
         import import_frontier as imf
+        from service import devicemark as sdm
     except ImportError:                   # a frozen copy without the scripts beside it
         return
-    for sid, note in rows:
-        m = _IMPORTED.match(note or "")
-        if not m:
-            continue
-        box = re.search(r" · box (\S+)", m["rest"])
-        c.execute("UPDATE submissions SET where_ran=? WHERE id=?",
-                  (imf.where_words([m["gpu"]], [box[1]] if box else []), sid))
+    blank = {r[0] for r in c.execute(
+        "SELECT id FROM submissions WHERE where_ran IS NULL OR where_ran = ''").fetchall()}
+    if not blank or not config.OUT_DIR.is_dir():
+        return
+    for name in (imf.REGISTRY, sdm.REMOTE_NAME):
+        for f in sorted(config.OUT_DIR.glob(f"*/{name}")):
+            try:
+                reg = json.loads(f.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            for x in reg.get("imports") or [] if isinstance(reg, dict) else []:
+                sid = x.get("sid") if isinstance(x, dict) else None
+                if not isinstance(sid, int) or sid not in blank:
+                    continue
+                gpus = x.get("gpu_names") or [x.get("gpu") or ""]
+                box = x.get("box") if isinstance(x.get("box"), str) else ""
+                c.execute("UPDATE submissions SET where_ran=? WHERE id=?",
+                          (imf.where_words([str(g) for g in gpus], [box] if box else []), sid))
 
 
 _BATCH_IN_PROGRESS = re.compile(r"judge batch (\S+) submitted")
