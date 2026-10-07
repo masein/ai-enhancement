@@ -2137,15 +2137,22 @@ def frontier_boxes():
     return import_frontier.read_boxes()
 
 
+class FrontierStartIn(BaseModel):
+    by: str = ""
+    partial: bool = False
+
+
 @app.post("/api/frontier/grading/start")
-def frontier_grading_start(a: MmpByIn, x_token: str = Header(default="")):
+def frontier_grading_start(a: FrontierStartIn, x_token: str = Header(default="")):
     """masein's Start, after the dry run: each grader with answers to see
-    pinned, and what waits sent. Started again after a stop, it carries on"""
+    pinned, and what waits sent. Started again after a stop, it carries on.
+    17i: costing more than the month has left, it is refused unless `partial`
+    — started knowing it stops at the limit"""
     from . import frontier_grade
     _check_token(x_token)
     _name(a.by, "grading the Frontier benchmarks")
     try:
-        sent = frontier_grade.start(a.by.strip()[:80])
+        sent = frontier_grade.start(a.by.strip()[:80], partial=a.partial)
     except ValueError as e:
         raise HTTPException(409, str(e)) from None
     return {**sent, "page": _frontier_grading_page()}

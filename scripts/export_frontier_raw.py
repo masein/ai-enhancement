@@ -54,7 +54,7 @@ import frontier as fb  # noqa: E402
 import import_frontier as imf  # noqa: E402
 
 # the benchmarks whose answers may leave the server: their questions may be shown
-SHOWN = ("mmlupro_tiger", "simpleqa_epoch", "arc_agi2_public")
+SHOWN = es.FRONTIER_SHOWN
 
 
 def run_of(sid: int) -> dict:
@@ -121,14 +121,10 @@ def task_setup(t: dict) -> tuple[dict, int]:
 def known_public(r: dict) -> bool:
     """17h: a model the board was told is public (its page, or the import's
     --public-weights) — never by its name (teamacct/bonsai-2-27b read public),
-    never by a flag of the export's, and never an in-house build (a Qwen3.6
-    one), marked or not"""
-    from service import served
-    model = r["hf_id"]
-    based = (served.get(model) or {}).get("based_on") or "" if served.is_served(model) else ""
-    if dmx.IN_HOUSE.search(model) or dmx.IN_HOUSE.search(based):
-        return False
-    return es.public(model)
+    never by a flag of the export's. 17i: nor kept private by its name: the
+    mark and the typed yes decide (unsloth's Qwen3.6 files, unmodified, are
+    public, and masein marks them)"""
+    return es.public(r["hf_id"])
 
 
 def brought(r: dict, t: str, rented: dict, reg: dict) -> tuple[set | None, str]:
@@ -164,30 +160,19 @@ def brought(r: dict, t: str, rented: dict, reg: dict) -> tuple[set | None, str]:
     return {(q, e) for q in ids for e in range(fb.BENCH[t]["epochs"])}, ""
 
 
-def questions(tasks: list[str]) -> es.Questions | None:
-    """17h: the gated benchmarks' questions, every one — a log line quoting
-    any six words of one in a row is left out. None when one couldn't be
-    loaded: no log at all, rather than one unchecked"""
-    from service import config
-    texts = []
-    for t in tasks:
-        if t in SHOWN:
-            continue
-        try:
-            items = fb.load(t, config.BENCH_ROOT)
-        except Exception:                               # noqa: BLE001 — fail closed
-            return None
-        texts += [str(it[k]) for it in items for k in ("question", "problem", "prompt")
-                  if it.get(k)]
-    return es.Questions(texts)
-
-
 def export_run(sid: int, out: Path, public: bool | None = None,
-               publish: bool = True) -> Path:
+               publish: bool = True, questions: es.Questions | None = None,
+               say=print) -> Path:
     """a run's folder. Public only for a model the board knows as public, and
-    only with `publish` (the typed yes); --private keeps it private"""
+    only with `publish` (the typed yes); --private keeps it private. 17i: its
+    log checked against every gated and private set (`questions`, loaded once
+    for an export of many runs)"""
+    import shutil
+
     from service import config
     from service import frontier as sf
+    if questions is None:
+        questions = es.private_questions(say)
     r = run_of(sid)
     row = row_of(r)
     tasks = [t for t in fb.TASKS if t in set(json.loads(r.get("tasks") or "[]") or fb.TASKS)]
@@ -231,10 +216,13 @@ def export_run(sid: int, out: Path, public: bool | None = None,
              **({"box": es.pick(rented, BOX)} if rented else {})}
     pub = known_public(r) and public is not False and publish
     dest = out / ("public" if pub else "private") / f"{row.name}-frontier-run-{sid}"
-    dest.mkdir(parents=True, exist_ok=True)
+    if dest.exists():
+        shutil.rmtree(dest)                     # 17i: nothing of an earlier export left in it
+    dest.mkdir(parents=True)
+    es.twin(dest, say)
     log = config.LOGS_DIR / f"service_{sid}_{r['hf_id'].replace('/', '__')}.log"
     lines, left = es.log_lines(log.read_text(encoding="utf-8", errors="replace")
-                               if log.exists() else "", questions(tasks))
+                               if log.exists() else "", questions, models=[r["hf_id"]])
     (dest / "setup.json").write_text(es.dumps(dmx.scrub_obj(setup)), encoding="utf-8")
     (dest / "scores.json").write_text(es.dumps(dmx.scrub_obj(scores)), encoding="utf-8")
     (dest / "items.jsonl").write_text("".join(json.dumps(dmx.scrub_obj(x), ensure_ascii=False)
@@ -242,7 +230,9 @@ def export_run(sid: int, out: Path, public: bool | None = None,
     (dest / "log.txt").write_text(dmx.scrub("\n".join(lines) + ("\n" if lines else "")),
                                   encoding="utf-8")
     withheld = [fb.BENCH[t]["label"] for t in tasks if t not in SHOWN]
-    (dest / "README.md").write_text(
+    # 17i: through the same last step as every other file — a box's label
+    # takes any text, and "Where it ran" printed it unscrubbed
+    (dest / "README.md").write_text(dmx.scrub(
         f"# {r['hf_id']} · the Frontier benchmarks · run #{sid}\n\n"
         f"Where it ran: {where}.\n\n"
         + "".join(f"- {fb.BENCH[t]['label']}: {fb.BENCH[t]['protocol']} "
@@ -256,7 +246,7 @@ def export_run(sid: int, out: Path, public: bool | None = None,
         + (f" ({left_launch} launch flags or variables)" if left_launch else "") + ". "
         + "The log holds only the runner's own lines"
         + (": " + "; ".join(f"{n} left out ({w})" for w, n in left.items()) if left else "")
-        + ". Then scrubbed: " + "; ".join(dmx.WHAT_THE_SCRUB_REMOVES) + ".\n",
+        + ". Then scrubbed: " + "; ".join(dmx.WHAT_THE_SCRUB_REMOVES) + ".\n"),
         encoding="utf-8")
     return dest
 
@@ -282,22 +272,34 @@ def main(argv: list[str] | None = None) -> int:
                     help="17h: no effect — a model is public when its page marks its weights "
                          "public, and the export asks before it writes anything there")
     a = ap.parse_args(argv)
+    if a.public:
+        # 17i: refused, before anything is written — its "no effect" line was
+        # easy to miss above the paths
+        print("--public does nothing: a model is public when its page marks its weights "
+              "public, and the export asks before it writes there. Nothing was written; run "
+              "it again without --public")
+        return 2
     from service import config, db
     db.init()
     out = a.out or (config.BENCH_ROOT / "raw-export")
     ids = [a.run] if a.run else runs(a.rented)
-    if a.public:
-        print("--public: no effect — a model is public when its page marks its weights public")
-    # 17h: what would go to public/, listed, and a typed yes before any of it
+    # 17h: what would go to public/, listed, and a typed yes before any of it.
+    # 17i: never while the scrub lacks the server's hosts or the accounts
     would = [] if a.private else [db.get(sid)["hf_id"] for sid in ids
                                   if known_public(run_of(sid))]
-    publish = es.confirm(would)
-    if would and not publish:
+    why = es.refused_public() if would else ""
+    if why:
+        print(why)
+    publish = not why and es.confirm(would)
+    if would and not publish and not why:
         print("not published: those runs go to private/")
+    # 17i: the gated and private sets, loaded once — one that can't be is
+    # said here, not only in each README
+    qs = es.private_questions(print)
     for sid in ids:
-        print(export_run(sid, out, False if a.private else None, publish=publish))
+        print(export_run(sid, out, False if a.private else None, publish=publish, questions=qs))
     print(f"{len(ids)} run(s) under {out} — upload: docs/REMOTE-RUNS.md § Publishing the raw runs")
-    return 0
+    return 1 if why else 0
 
 
 if __name__ == "__main__":

@@ -4983,6 +4983,60 @@ Not before the demo: a new hidden set changes every Everyday score.
 - Tests: `tests/test_17i_runs_browser.py`; the older Runs tests read the
   merged rows (`test_17f_browser`, `test_17g_browser`, `test_17h_browser`).
 
+### 17i.4 — the page (7 Oct)
+
+- **Rows 0adb522 mislabelled** (`scripts/where_check.py`, point 25): a row's
+  "where it ran" from its own records — its import's record, else the first
+  line its import wrote in its log, else this server — for a row blank, cut
+  (its brackets unbalanced: "Tesla V100 (16 GB") or reading "rented GPU …"
+  with no import behind it (a note typed to read like an import's). Read-only
+  it lists them; `--fix` sets them; it runs against the live board before a
+  deploy (`sudo docker compose exec -T bench python - < scripts/where_check.py`),
+  and the board makes the same fix at start-up (`db._backfill_where`, every
+  row, not only blank ones).
+- **Compare** (`headNames`, 26): names cut alike that still read the same
+  (one word, no separator) are cut by their letters from where they first
+  differ, with a little of what they share before it when it fits, and
+  numbered if even that can't tell them apart.
+- Tests: `tests/test_17i_page.py`, `tests/test_17i_page_browser.py`.
+
+### 17i.3 — the export, before anyone runs it (7 Oct)
+
+- **Log lines in listed shapes** (`export_safe.LOG_SHAPES`, point 16): each a
+  fixed form with typed slots — a section header, a step's first line, the
+  file, build and GPU, a benchmark's questions, the server coming up, a
+  sha256 worked out, the memory check, the server's variables, progress (and
+  DeviceMark's task progress), the parity count and file, the run's end, a
+  benchmark not whole, no bundle, the bundle, DeviceMark's battery, shard,
+  GPU and first line, and the `[frontier]`, `[import]`, `[devicemark]` and
+  `[service]` lines. Nothing in a slot holds a "/" but the run's own model,
+  a step's folder on the box and a path on this server, so no shape carries
+  a repository ("fetching … from <account>/evalboard-private" went out after
+  its time); a `…-private` name or a `SCRUB_ACCOUNTS` account is left out
+  wherever it stands. A `[7]` in a header is no longer read as an address (24).
+- **The README** goes through the scrub like every other file (17).
+- **Every log against every gated and private set** (`private_questions`,
+  18): Frontier's gated and withheld benchmarks whatever the run asked, the
+  Everyday hidden half, the Knowledge exam's bank, Mobile-MMLU and
+  Mobile-MMLU-Pro — DeviceMark's logs too; a set that can't be loaded means
+  no log, said on the terminal (24) as well as in the README. The six-word
+  check reads `\uXXXX` escapes, URL-encoding, underscores and accents (22).
+- **Public or private by the mark and the typed yes alone** (19, 20): no
+  model is kept private by its name (unsloth's Qwen3.6 files are public);
+  the typed-yes list shows each model's file, sha256 (a split identity for a
+  GGUF in parts) and source (the import now records the bundle's
+  `gguf.source`); a run written to `private/` removes its `public/` twin and
+  says so; the model page's mark says what the export and the upload do.
+- **The environment by name** (21): a value only for a variable on
+  `ENV_VALUES`, every other allowed one "(set; its value withheld)"; `public/`
+  is refused while `SCRUB_HOSTS` or `SCRUB_ACCOUNTS` is empty (exit 1, all
+  private). **Flags** (23): `TAKES` and `SWITCHES` — a switch never carries
+  the next token out.
+- **Small ones** (24): `--public` is refused before anything is written
+  (exit 2); closed stdin is a "no", never a traceback.
+- Tests: `tests/test_17i_export.py`, `tests/test_17i_export_browser.py`.
+
+
 ### 17i.2 — the boxes and the fetch (7 Oct)
 
 - **`--abandoned <build>/<step>`** (`frontier_fetch.py`, point 7, repeatable):
@@ -5022,6 +5076,50 @@ Not before the demo: a new hidden set changes every Everyday score.
   a shard held after a whole run is said on its score (`shards_held`, kept
   when the score is made again) and in its cell.
 - Tests: `tests/test_17i_boxes.py`.
+
+### 17i.1 — grading, before any Start (7 Oct)
+
+- **HLE** (`frontier_graders._hle_object`, points 1–2): each field is
+  compared only with the judge prompt's own text for that field, whole and
+  from its start (`_template`); an example is an object every one of whose
+  fields is an example's (a placeholder, the prompt's words, a confidence
+  that isn't a number or is the prompt's 100) — a real verdict whose
+  reasoning echoes the prompt is read. A reply that ends cut is no grade,
+  whatever came before; a quoted `{"correct": "yes"}` beside a real verdict
+  never becomes the grade. Objects with raw LaTeX backslashes, a trailing
+  comma or single quotes are read (`_lenient`).
+- **A moved batch whose every reply was a refusal** ("failed") is closed at
+  Start as the poller closes it (`_close`, point 3): its answers went nowhere
+  and the dry run counted one more than Start sent — the rules test's
+  "flake" of seeds 96, 110 and 163.
+- **Each grader's no-grades are kept with their tries** (`_switch`, point 4):
+  another grader's go under its name in `kept`, and come back when it is
+  chosen again — chosen, changed and chosen back, a grader was paid six times
+  for one answer. A switch that only moves no-grades has its dry-run row
+  (`switch: "no-grades"`).
+- **Replies on their way at a switch** (point 5): a row whose moved batch
+  still has replies in flight is left as it is — the dry run says so
+  (`estimate()["held"]`), Start skips it (`held_rows`) — and the next Start
+  moves it once they land. A local batch stays pending while its worker
+  holds a request (`LocalOpenAI.status`, `busy`): a cancel writes every
+  request without a reply, those in flight too, and the batch was closed
+  under them, their paid replies never recorded. Start no longer waits 30 s.
+- **The month's limit** (point 6): the dry run says what is left, what Start
+  costs (the new answers and what the batches out still hold) and that it
+  would stop part-way (`estimate()["short"]`, `may_stop`); Start refuses it
+  in the same words before anything is sent, unless started with
+  `partial` — the card's "Start anyway — stops at the limit".
+- **The rules test** (`tests/test_17h_grading_rules.py`): two benchmarks
+  (SimpleQA and HLE), rows of 24 answers (one no-grade is a top-up, two a
+  regrade), rule 1 counted per grader across the whole sequence, rule 2 read
+  from the grades on disk, rule 3 the held count and price, rule 5 a grade
+  bought is kept, rule 6 the limit; Stop alone, Stop twice, a restart
+  mid-batch, the limit hit mid-batch and raised, replies slow to land across
+  a switch. Seeds 0 to RULES_SEQUENCES-1 and RULES_EXTRA more from
+  RULES_SEED (chosen at random and printed in pytest's header; set it to
+  rerun those).
+- Tests: `tests/test_17h_grading_rules.py`, `tests/test_17i_review.py`.
+
 
 ### 17h.5 — the start-up fill and Compare (7 Oct)
 

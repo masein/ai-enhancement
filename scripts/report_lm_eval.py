@@ -8164,8 +8164,15 @@ function publicLine(m) {
   };
   const asking = state.pubAsk === id;
   return el('p', { class: 'small', 'data-public-weights': mark ? '1' : '0' },
+    // 17i: what the mark does, in full — the export writes its raw runs to
+    // public/ once you type yes to its list, and the upload sends public/
     mark ? el('span', { class: 'warntext', text: `Public weights — marked by ${mark.by} on `
-      + `${new Date(mark.at * 1000).toISOString().slice(0, 10)}: its raw runs may be published. ` })
+      + `${new Date(mark.at * 1000).toISOString().slice(0, 10)}. The raw-run export writes its `
+      + 'runs to public/ once you type yes to the list it prints (its file, sha256 and source '
+      + 'on it), and the upload sends public/ to the public dataset for anyone to download: '
+      + 'the answers (but the gated benchmarks’ text), the scores, the setup and the runner’s '
+      + 'own log lines. Clear the mark before the export to keep them private; the next '
+      + 'export then removes their public/ folders. ' })
       : el('span', { class: 'se', text: 'Raw runs private: its weights aren’t marked public. ' }),
     mark ? el('button', { class: 'quiet small', 'data-public-weights-toggle': 'clear',
       text: 'Clear the mark', onclick: () => send(false) })
@@ -14699,6 +14706,32 @@ function headNames(names, fits) {
       const show = t => (a ? '…' : '') + t + (z ? '…' : '');
       while (mid.length > 1 && !fits(show(mid))) mid = mid.slice(0, -1);
       out[i] = show(mid);
+    });
+    // 17i: names of one word, no separator in them ("phonebuildalpha",
+    // "phonebuildbeta"), still read the same at 12 to 16 characters: by their
+    // letters, from where they first differ — and numbered if even that can't
+    // tell them apart
+    if (new Set(idx.map(i => out[i])).size === idx.length) continue;
+    const full = idx.map(i => clean(String(names[i])));
+    let p = 0, q = 0;
+    const least = Math.min(...full.map(t => t.length));
+    while (p < least - 1 && full.every(t => t[p] === full[0][p])) p++;
+    while (q < least - 1 - p && full.every(t => t[t.length - 1 - q] === full[0][full[0].length - 1 - q])) q++;
+    idx.forEach((i, n) => {
+      const t = full[n];
+      // a little of what they share before it, while it fits — then the letters that differ
+      let mid = t.slice(p, t.length - q), back = 0;
+      const show = (m, b) => (p - b > 0 ? '…' : '') + t.slice(p - b, p) + m + (q ? '…' : '');
+      while (mid.length > 1 && !fits(show(mid, 0))) mid = mid.slice(0, -1);
+      while (back < p && fits(show(mid, back + 1))) back++;
+      out[i] = show(mid, back);
+    });
+    if (new Set(idx.map(i => out[i])).size === idx.length) continue;
+    idx.forEach((i, n) => {
+      const num = ` #${n + 1}`;
+      let t = out[i];
+      while (t.length > 2 && !fits(t + num)) t = t.slice(0, -1);
+      out[i] = t + num;
     });
   }
   return out;
@@ -24605,7 +24638,7 @@ async function loadFrontierGrading() {
   if (was) was.replaceWith(frontierGradingCard());
   else render();
 }
-async function frontierGradingAct(what) {
+async function frontierGradingAct(what, partial) {
   const A = state.ai;
   if (!whoName()) { askName(); return; }
   // 17b: one press at a time — the button stays disabled while it is out
@@ -24613,7 +24646,9 @@ async function frontierGradingAct(what) {
   A.frgBusy = what;
   render();
   try {
-    const r = await post(`api/frontier/grading/${what}`, { by: whoName() });
+    // 17i: past what the month has left, only "Start anyway" sends — said first
+    const r = await post(`api/frontier/grading/${what}`,
+      { by: whoName(), ...(partial ? { partial: true } : {}) });
     A.frg = r.page;
     toast(what === 'stop' ? 'Grading stopped: what is in flight lands, nothing more is sent'
       : `Grading: ${(r.sent || []).reduce((a, x) => a + x.n, 0).toLocaleString('en')} answers `
@@ -24717,6 +24752,14 @@ function frontierGradingCard() {
       ` · this month ${usd(E.spent)} of ${usd(E.limit)} spent`) : '',
     G.key_warning && E.answers ? el('p', { class: 'warn small', 'data-frontier-key-warning': '1',
       text: G.key_warning }) : '',
+    // 17i: more than the month has left — what is left, what this costs, and
+    // that it stops part-way, before anything is sent
+    E.short ? el('p', { class: 'warn small', 'data-frontier-short': String(E.left),
+      text: E.short }) : E.may_stop ? el('p', { class: 'small warntext',
+      'data-frontier-may-stop': String(E.left), text: E.may_stop }) : '',
+    // 17i: a row whose replies are still on their way at the grader it left
+    ...(E.held || []).map(h => el('p', { class: 'small se', 'data-frontier-held-row':
+      `${h.task}|${h.row}`, text: h.words })),
     LIVE && (E.answers || running || switching) ? el('div', { class: 'frm', 'data-frontier-run': held
         ? 'held' : running ? 'running' : stopped ? 'stopped' : 'idle' },
       // 17h: and a switch alone, nothing to send, has its Start too
@@ -24727,6 +24770,10 @@ function frontierGradingCard() {
           : 'Start grading' + (E.answers ? `: about ${cost}` : switching
             ? ': nothing to send, the grades switched' : ''),
         onclick: () => frontierGradingAct('start') }) : '',
+      (E.answers || held) && E.short ? el('button', { class: 'quiet', 'data-frontier-partial': '1',
+        disabled: why || busy ? '' : null,
+        text: `Start anyway — stops at the limit, ${usd(E.left)} from now`,
+        onclick: () => frontierGradingAct('start', true) }) : '',
       running && !stopped ? el('button', { class: 'quiet', 'data-frontier-stop': '1',
         text: busy === 'stop' ? 'Stopping…' : 'Stop', disabled: busy ? '' : null,
         onclick: () => frontierGradingAct('stop') }) : '') : '',
