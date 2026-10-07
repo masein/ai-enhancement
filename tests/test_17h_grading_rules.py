@@ -236,11 +236,11 @@ def settle(w: World, timeout: float = 90.0) -> None:
     end, quiet, was = time.time() + timeout, 0, None
     while time.time() < end:
         llm_poller.tick()
-        time.sleep(0.1)
+        time.sleep(0.05)
         now = _progress()
         quiet = quiet + 1 if now == was else 0
         was = now
-        if quiet >= 5 and not any(fgr._working(b) and not w.hanging[b] for b, _ in now):
+        if quiet >= 4 and not any(fgr._working(b) and not w.hanging[b] for b, _ in now):
             if w.dead:
                 w.dead = False                  # the service is back: the poller takes up
                 w.log.append("  (the service starts again)")

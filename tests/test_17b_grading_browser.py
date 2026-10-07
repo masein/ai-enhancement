@@ -118,10 +118,10 @@ def test_start_pressed_sends_once_and_stop_then_carry_on(live, page, monkeypatch
     monkeypatch.setattr(fgr.GraderChat, "_complete", complete)
     real = fgr._start
 
-    def slow(by):
+    def slow(by, partial=False):
         presses.append(by)
         time.sleep(1.0)                     # pinning the graders: the request is out
-        return real(by)
+        return real(by, partial)
     monkeypatch.setattr(fgr, "_start", slow)
     go(page, live, "tab=ai", "[data-frontier-grading]:not([data-frontier-grading='loading'])")
     set_name(page, "masein")
