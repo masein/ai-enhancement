@@ -730,16 +730,23 @@ before anything is fetched. `--every 3m` does it all again every 3 minutes until
 box is done, and each time it sends the boxes' progress to the board (17i):
 each run on a rented GPU is a row of Runs ▸ All runs itself, with the same
 columns, status and progress bar as a run here — one row a model, benchmark
-and thinking setting, its boxes merged (Humanity's Last Exam on four boxes:
-"414 of 2,158 · 4 boxes", opening to a line a box). Its status in plain
-words: Running, Loading the model, Done, Stopped and why, "Stopped? No word
-for 52 min" for a step that stopped writing, "No contact for 3 h" for a box
-not reached; when this benchmark finishes on the row, and each box's own
-finish (its later steps included) on its line. The list says once when the
-fetch last read the boxes and when the next reading is due; a row says when
-it was last heard from only when it is behind the others. Once a step's
-bundle is imported its import's Runs row stands for it: never two rows for
-one run. The where filter's "rented GPUs" shows them. Only labels and
+and thinking setting, its boxes merged — 17j: one line, as a run here: the
+model by its board name, the count, its bar and when the step finishes side
+by side (Humanity's Last Exam on four boxes: "414 of 2,158 ▬ → Thu 00:51 · 4
+boxes ▸", opening to a line a box; one box has nothing to open), a step
+asking two benchmarks counting both ("GPQA Diamond 120 of 198 · OTIS Mock
+AIME 2024–2025 next"), sorted, paged and searched with the runs here by the
+words it shows. Its status as a run here spells it: running, loading the
+model, done, stopped and why, "stopped? no word for 52 min" for a step that
+stopped writing, "no contact for 3 h" for a box not reached (active, not
+running); each box's own finish (its later steps included) on its line, or,
+for one box, on its where line. A parity step done and a step given as
+`--abandoned` aren't rows: their box's line says "parity done" or "A3-2
+abandoned". The list says once when the boxes were read and when the next
+reading is due ("Rented boxes read 1 min ago · next in about 3 min"); a row
+says when it was last heard from only when it is behind the others. Once a
+step's bundle is imported its import's Runs row stands for it: never two
+rows for one run. The where filter's "rented GPUs" shows them. Only labels and
 progress go to the board, never a box's address; `--no-board` sends nothing (a
 fetch of some boxes leaves the others on the list as they were; a build's
 steps gone from a box the fetch reached leave at once; a row not seen for a

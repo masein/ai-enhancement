@@ -182,7 +182,7 @@ def test_2_the_fetch_and_the_list_say_why_a_step_stopped(tmp_path, monkeypatch, 
                       "state": "stopped", "why": why, "seen_at": time.time()}])
     assert imf.read_boxes()["boxes"][0]["why"] == why
     # 17i: and the run's row on Runs says it, in plain words
-    assert imf.read_boxes()["runs"][0]["status_words"] == f"Stopped: {why}"
+    assert imf.read_boxes()["runs"][0]["status_words"] == f"stopped: {why}"  # 17j: one spelling
 
 
 def test_2_a_failed_parity_step_says_so_last_and_a_paste_asks_it_again(tmp_path, monkeypatch,

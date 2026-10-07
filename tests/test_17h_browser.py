@@ -119,7 +119,8 @@ def test_13_the_poll_brings_the_boxes_list_up_to_date_on_its_own(live, page):
     page.evaluate("state.boxesAt = 0")                     # half a minute on
     # 0adb522: never. 17i: the second box merged into its run's row
     page.wait_for_function(f"(document.querySelector(\"{run}\") || {{}}).textContent"
-                           " === '6,000 of 24,064 · 2 boxes'", timeout=12000)
+                           " === '6,000 of 24,064'", timeout=12000)        # 17j: the boxes ▸
+    assert page.locator("[data-rented-open]").first.inner_text() == "2 boxes ▸"
     assert page.errors == []
 
 

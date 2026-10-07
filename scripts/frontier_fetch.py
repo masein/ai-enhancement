@@ -354,7 +354,15 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
         problems.append(f"{x} is given as --abandoned but is still {state} (written {ago} min "
                         "ago): stop it on the box, or leave it out of --abandoned")
     if not started and not writing:
-        return False, False, [f"{name}: no step has started yet — NOT safe to destroy"], [], True
+        # 17j: its abandoned steps said to the board all the same
+        return False, False, [f"{name}: no step has started yet — NOT safe to destroy"], [
+            {**{k: p.get(k) for k in ("model", "thinking", "tasks", "shard", "parity",
+                                      "started_at") if p.get(k) is not None},
+             "state": "abandoned", "line": "", "label": str(p.get("label") or Path(str(
+                 p.get("dir"))).name), "step": Path(str(p.get("dir"))).name,
+             "seen_at": time.time(), "reachable": True, "safe": False,
+             "box_id": box_id(name, dest)}
+            for p in progress if of(str(p.get("dir"))) in gone], True
     # each bundle: copied, then imported (or, with no --sha, home to import by hand)
     home: dict[str, str] = {}                       # a step's folder -> what became of its bundle
     for b in got["bundles"]:
@@ -476,13 +484,15 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
         + (f" · abandoned: {', '.join(dropped)}" if dropped else ""))
     # 17f: each step as the board shows it on Runs — its label and progress,
     # never the box's address. 17h: a step with no label (G6's) by its folder
+    # 17j: an abandoned step too, as abandoned — the board says so on its
+    # box's line and lists it no more (it read "No contact" for a day)
     steps = [{**{k: p.get(k) for k in ("model", "thinking", "tasks", "shard", "parity",
                                         "state", "line", "started_at", "sessions", "at", "why")
                  if p.get(k) is not None},
+              **({"state": "abandoned", "line": ""} if of(str(p.get("dir"))) in gone else {}),
               "label": str(p.get("label") or Path(str(p.get("dir"))).name),
               "step": Path(str(p.get("dir"))).name, "seen_at": now, "reachable": True,
-              "safe": safe, "box_id": bid} for p in progress
-             if of(str(p.get("dir"))) not in gone]
+              "safe": safe, "box_id": bid} for p in progress]
     return safe, failed, lines, steps, True
 
 

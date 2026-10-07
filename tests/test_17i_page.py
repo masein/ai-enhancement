@@ -40,6 +40,9 @@ def test_25_rows_0adb522_mislabelled_are_listed_and_set_right(svc, capsys):  # n
     (config.OUT_DIR / "served__y").mkdir(parents=True, exist_ok=True)
     (config.OUT_DIR / "served__y" / "remote_imports.json").write_text(json.dumps({"imports": [
         {"sid": two, "gpu": "NVIDIA GeForce RTX 5090"}]}))
+    # 17j: relabelled "this server" only with its own log here, not an import's
+    a_log(typed, "served/x", "[frontier] served/x · thinking off · gpqa_diamond_epoch · on this "
+          "server")
     a_log(failed, "served/x", f"===== [{failed}] imported y.tar.gz (sha256 0123456789abcdef) by "
           "masein: gpqa_diamond_epoch, run on a rented GPU (Tesla V100 (16 GB)) =====")
     # the one query, read-only, as masein runs it against the live board

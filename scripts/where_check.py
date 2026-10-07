@@ -13,7 +13,10 @@ What a row's records say, in order:
   run on a rented GPU (Tesla V100 (16 GB)) ====="): a failed import, never
   recorded as imported — for a row cut;
 - else nothing was imported: a row reading "rented GPU …" ran on this server
-  (''), its note typed to read like an import's.
+  (''), its note typed to read like an import's — 17j: only when its log is
+  here and isn't an import's. A row with no record and no log, or whose log
+  an import wrote but can't be read (a bundle's name with a space), keeps
+  what it reads: it was relabelled "this server".
 
 Read-only unless --fix. It uses only what the board's image has had since 17g,
 so it runs against the live board before a deploy, from the server's checkout:
@@ -31,8 +34,11 @@ import sqlite3
 import sys
 from pathlib import Path
 
-_HEADER = re.compile(r"^===== \[(?P<sid>\d+)\] imported \S+ \(sha256 [0-9a-f]+\) by .*?"
-                     r"run on a rented GPUs? \((?P<gpu>.*)\)(?P<rest>.*?) =====$")
+# 17j: a bundle's name may hold a space, and the header no longer names who
+# imported it
+_HEADER = re.compile(r"^===== \[(?P<sid>\d+)\] imported .+? \(sha256 [0-9a-f]+\)(?: by [^:]*)?: "
+                     r".*?run on a rented GPUs? \((?P<gpu>.*)\)(?P<rest>.*?) =====$")
+_IMPORTED = re.compile(r"^===== \[\d+\] imported ")
 _BOX = re.compile(r" · box (\S+)")
 
 
@@ -62,21 +68,24 @@ def records(out_dir: Path) -> dict[int, str]:
     return out
 
 
-def from_log(sid: int, hf_id: str, note: str, logs_dir: Path) -> str | None:
-    """a failed import's where, from the first line its import wrote — None
-    when its log isn't an import's"""
+def from_log(sid: int, hf_id: str, note: str, logs_dir: Path) -> tuple[str, str | None]:
+    """(what the run's log is — 'none' (no log here), 'import' or 'here' —
+    and, for an import's, its where from the first line it wrote, None when
+    that line can't be read)"""
     import import_frontier as imf
     p = logs_dir / f"service_{sid}_{(hf_id or '').replace('/', '__')}.log"
     try:
         with open(p, encoding="utf-8", errors="replace") as fh:
             first = next((x.rstrip("\n") for x in fh if x.strip()), "")
     except OSError:
-        return None
+        return "none", None
+    if not _IMPORTED.match(first):
+        return "here", None
     m = _HEADER.match(first)
     if not m or int(m["sid"]) != sid:
-        return None
+        return "import", None
     box = _BOX.search(note or "")
-    return imf.where_words([m["gpu"]], [box[1]] if box else [])
+    return "import", imf.where_words([m["gpu"]], [box[1]] if box else [])
 
 
 def wrong(c: sqlite3.Connection, out_dir: Path, logs_dir: Path) -> list[dict]:
@@ -93,13 +102,14 @@ def wrong(c: sqlite3.Connection, out_dir: Path, logs_dir: Path) -> list[dict]:
         elif not where:
             continue                                    # no import: this server, as it says
         else:
-            got = from_log(sid, hf_id, note, logs_dir)
-            if got is None:
+            log, got = from_log(sid, hf_id, note, logs_dir)
+            if log == "here":
+                # 17j: only a run whose own log is here and isn't an import's
                 if not where.startswith("rented GPU"):
                     continue
-                want, why = "", "nothing was imported: it ran on this server"
-            elif whole:
-                continue                                # a failed import's own words, whole
+                want, why = "", "nothing was imported and its log is this server's: it ran here"
+            elif got is None or whole:
+                continue        # no log, an import's it can't read, or its own words whole
             else:
                 want, why = got, "its import's log"
         if where != want:
