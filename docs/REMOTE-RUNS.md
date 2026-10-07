@@ -874,8 +874,13 @@ the model, with your name, and every later one is checked against it (a
 different one is refused). It checks the served model, the file's sha256, the launch
 against the one registered (routing and speculative decoding), each
 benchmark's protocol and dataset revision, the budget, sampling and thinking
-switch, every answer line, that thinking was on or off as asked, and that the
-answers cover their questions (a shard's: exactly its own, made with the same
+switch, every answer line, that thinking was on or off as asked (17j: a
+thinking-off benchmark, or shard, is refused only when more than a quarter of
+its answers think — the server ignored the switch; below that, the few that
+opened a thinking block of their own are scored on what follows it, and the
+score and the run say the share: "76 of 2,158 thought anyway, 3.5%"; a box
+whose bundle was refused for this reads safe to destroy, the bundle kept
+here), and that the answers cover their questions (a shard's: exactly its own, made with the same
 setup as its task's other shards). Each benchmark is scored apart first: a
 bundle that fails a check, or a task that can't be scored, leaves the row as
 it was, and isn't counted as imported: the same command imports it once
