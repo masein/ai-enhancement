@@ -961,12 +961,14 @@ def _apply(g: dict, d: Path, slot: str, pin: dict, meta: dict, items: dict,
                 continue                # the answer changed while out: graded again
             if res.error and res.error.startswith("cancelled"):
                 continue                # 17c: never sent: it waits for the next Start
-            why = (llm.plain_error(res.error) if res.error
-                   else f"the reply was cut at its cap of {cap or 'its'} tokens"
-                   if res.finish == "length" else "")
+            why = llm.plain_error(res.error) if res.error else ""
             got = None if why else fg.read(slot, res.text, items.get(qid) or {})
             if got is not None and got.get("ok") is None:
-                why = got["unread"]
+                # 17j: a reply that reached its cap is read all the same — a
+                # whole object that ended exactly at the cap was a paid try;
+                # one the cap cut off reads as no grade, and says the cap
+                why = (f"the reply was cut at its cap of {cap or 'its'} tokens"
+                       if res.finish == "length" else got["unread"])
             if why and res.error:
                 errors.append((key, why, res))          # 17f: counted once the batch is read
                 continue
@@ -1278,7 +1280,10 @@ def status() -> dict:
                          "suggested": g["suggested"], "owners": g["owners"],
                          "prompt": g["prompt_words"], "prompt_sha256": fg.prompt_sha(s),
                          "chosen": chosen(s), "now": grader(s),
-                         "ask": fg.ask(s, reasons(grader(s))),
+                         "ask": fg.ask(s, reasons(grader(s)), structured(grader(s))),
+                         # 17j: whether HLE's judge answers in CAIS's JSON schema
+                         # (structured outputs) — None when OpenRouter doesn't say
+                         **({"json_only": structured(grader(s))} if s == "hle" else {}),
                          "reasoning_words": g["reasoning_words"]}
                         for s, g in fg.GRADERS.items()],
             "estimate": est,
