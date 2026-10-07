@@ -303,6 +303,8 @@ def registered_here(b: dict, name: str, by: str, public_weights: bool = False) -
                    "ctx": srv.get("n_ctx"), "build": srv.get("build")},
            "file_sha256": {"sha256": gg.get("sha256"), "by": by, "at": time.time(),
                            "name": gg.get("name") or "",
+                           # 17i: where the box fetched it, for the export's typed-yes list
+                           **({"source": str(gg["source"])[:300]} if gg.get("source") else {}),
                            **({"parts": gg["parts"]} if gg.get("parts") else {})},
            "rented_only": True, "answered": [], "by": by, "at": time.time(),
 
@@ -671,7 +673,8 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             f"{(gg.get('name') or '')} pinned by the sha256 you gave, {file_sha[:16]}…")
     if file_sha and not registered_sha(rec):
         rec["file_sha256"] = {"sha256": file_sha, "by": by, "at": time.time(),
-                              "name": gg.get("name") or ""}
+                              "name": gg.get("name") or "",
+                              **({"source": str(gg["source"])[:300]} if gg.get("source") else {})}
         db.served_put(rec)
         say(f"{model}'s file is now registered by its sha256 {file_sha[:16]}…, as {by} gave it")
     srv = setup.get("server") or {}

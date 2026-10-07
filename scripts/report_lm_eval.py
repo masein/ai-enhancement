@@ -8156,8 +8156,15 @@ function publicLine(m) {
   };
   const asking = state.pubAsk === id;
   return el('p', { class: 'small', 'data-public-weights': mark ? '1' : '0' },
+    // 17i: what the mark does, in full — the export writes its raw runs to
+    // public/ once you type yes to its list, and the upload sends public/
     mark ? el('span', { class: 'warntext', text: `Public weights — marked by ${mark.by} on `
-      + `${new Date(mark.at * 1000).toISOString().slice(0, 10)}: its raw runs may be published. ` })
+      + `${new Date(mark.at * 1000).toISOString().slice(0, 10)}. The raw-run export writes its `
+      + 'runs to public/ once you type yes to the list it prints (its file, sha256 and source '
+      + 'on it), and the upload sends public/ to the public dataset for anyone to download: '
+      + 'the answers (but the gated benchmarks’ text), the scores, the setup and the runner’s '
+      + 'own log lines. Clear the mark before the export to keep them private; the next '
+      + 'export then removes their public/ folders. ' })
       : el('span', { class: 'se', text: 'Raw runs private: its weights aren’t marked public. ' }),
     mark ? el('button', { class: 'quiet small', 'data-public-weights-toggle': 'clear',
       text: 'Clear the mark', onclick: () => send(false) })
