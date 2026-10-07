@@ -97,3 +97,24 @@ def test_4_a_switch_with_nothing_to_send_has_its_start_and_says_what_it_leaves(l
     assert json.loads(fs[-1].read_text())["frontier"]["grader"]["version"] == GPT_V
     assert sf.read_grades(board)["items"]["0#0"]["by"] == GPT_V
     assert page.errors == []
+
+
+def test_13_the_poll_brings_the_boxes_list_up_to_date_on_its_own(live, page):
+    """part 2, point 13: the list is read again every half minute while it is
+    on the page — the poll redrew it only when a run on the board changed"""
+    import import_frontier as imf
+    now = time.time()
+    step = {"label": "A5", "model": "served/switch-box", "step": "A5-1", "thinking": "on",
+            "tasks": ["mmlupro_tiger"], "state": "asking", "at": now - 60, "seen_at": now,
+            "line": "MMLU-Pro 3,000 of 12,032 · 13.3 h left", "sessions": 1, "reachable": True,
+            "safe": False, "box_id": "a"}
+    imf.store_boxes({"steps": [step], "asked": ["a"]})
+    page.set_viewport_size({"width": 1400, "height": 1000})
+    page.goto("about:blank")
+    page.goto(live["base"] + "/#tab=runs")
+    page.wait_for_selector("[data-rented-box='A5|A5-1']")
+    imf.store_boxes({"steps": [step, {**step, "label": "A6", "step": "A6-1", "box_id": "b"}],
+                     "asked": ["a", "b"]})
+    page.evaluate("state.boxesAt = 0")                     # half a minute on
+    page.wait_for_selector("[data-rented-box='A6|A6-1']", timeout=12000)  # 0adb522: never
+    assert page.errors == []

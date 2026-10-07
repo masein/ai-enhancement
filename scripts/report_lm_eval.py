@@ -27142,6 +27142,10 @@ if (LIVE) {
     if (state.tab === 'pipeline' || (answering && state.model && state.mtab === 'improve')) loadReview();
     if (state.tab === 'exam') loadExam();
     if (answering && state.tab === 'ai') aiTick();       // 16c
+    // 17h: the rented boxes' list, every half minute while it is on the page —
+    // the poll redrew it only when a run on the board changed
+    if (answering && document.querySelector('[data-rented-wrap]')
+        && Date.now() - (state.boxesAt || 0) > 30000) loadBoxes();
     // 12h.2: a view someone else saved reaches this page within half a minute
     if (answering && state.tab === 'leaderboard' && Date.now() - VIEWS_AT > 30000) loadViews();
     // the Loop board and a topic page: without this nothing ever re-fetched

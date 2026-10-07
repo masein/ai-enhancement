@@ -4953,6 +4953,37 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17h.2 — the boxes and the fetch (7 Oct)
+
+- **A box's banner is never its listing** (point 25, `frontier_fetch.run`):
+  what a command printed is its stdout, and its stderr only when it failed;
+  ssh and scp run with `LogLevel=ERROR`. vast.ai's "… Have fun!" came on
+  stderr and every real box read "its listing couldn't be read".
+- **Every step on the box counts** (`one_box`): any folder holding a progress
+  file, a bundle or a parity file, planned or not, wherever it is
+  (`--out /workspace/run`, G6's `/workspace/gemma-cal`, a step started by
+  hand) — whole, home and imported, or the box is NOT safe; a step with no
+  label goes to the board by its folder.
+- **A box that read safe and isn't reached any more was destroyed**: done,
+  and `--every` ends.
+- **Parity verdicts on disk** (`parity/verdicts.json`): a fetch started again
+  says them and exits 1 after "Not the same"; `~` in `--parity` is expanded.
+- **No `--sha`**: "home, N to import by hand", never "and imported"; the
+  by-hand line says `--register` only for a model the board doesn't serve
+  (`import_remote.py --served`).
+- **The board's list**: a fetch's post names the boxes it asked (a keyed hash
+  of each address, the key beside the bundles); the others' steps stay as
+  they were; a step not reached for a day leaves; a line's numbers are read
+  only when they are numbers; the page reads the list every half minute.
+- **The box**: `--ask-written-off` runs a whole step again when it wrote
+  answers off (`written_off` in its progress); a step reruns only when this
+  run left it short (a start-up refusal clears `incomplete`); the memory
+  check reads what is free (`gpu_info` `memory_used_mib`); a step asking
+  that hasn't written for 45 minutes says so.
+- Docs: the memory table (1,775 MiB, 29,412 MiB), Plan B's bill
+  ($131–187), both scripts' help.
+- Tests: `tests/test_17h_review.py` (part 2), `tests/test_17h_browser.py`.
+
 ### 17h.1 — grading, by its rules (7 Oct)
 
 - **Tested by rules, not a bug at a time** (`tests/test_17h_grading_rules.py`):

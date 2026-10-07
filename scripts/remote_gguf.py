@@ -770,7 +770,7 @@ def _main(argv: list[str] | None = None) -> int:
     STEP["out"] = out
     progress(out, label=a.label or "", model=a.served_as, thinking=a.thinking,
              parity=bool(a.parity), tasks=[t for t in fb.TASKS if t in (a.only or [])],
-             state="starting", why="", line="")
+             state="starting", why="", line="", incomplete={})
     if not a.only and not a.parity:
         # 17d: a box names its benchmarks, thinking on or off — every one at
         # once is more context than a card holds, and asks ARC-AGI-2 with
@@ -784,7 +784,11 @@ def _main(argv: list[str] | None = None) -> int:
     # 17d: worked out from the GGUF's header, its cache type and this card;
     # the stated --max-context only when those can't be read
     ctx = fb.slot_context(tasks, thinking)
-    mem = rb.gpu_info().get("memory_mib")
+    # 17h: what is free on the card, not its total — 300 MiB in use by
+    # something else left 1,271 MiB where 1,570 was promised
+    card = rb.gpu_info()
+    in_use = int(card.get("memory_used_mib") or 0)
+    mem = (card["memory_mib"] - in_use) if card.get("memory_mib") else None
     fit, unread = kv_fit(a.gguf, shlex.split(a.flags), a.slots, ctx, mem)
     big = max(tasks, key=lambda t: fb.slot_context([t], thinking))
     # 17f: a step planned at 8 slots runs what the card holds, down to
@@ -888,7 +892,7 @@ def _main(argv: list[str] | None = None) -> int:
     progress(out, label=state.get("label") or "", model=a.served_as,
              thinking="on" if thinking else "off", tasks=tasks, shard=state["shard"],
              parity=bool(a.parity), started_at=state["started_at"], sessions=state["sessions"],
-             state="starting", line="")
+             state="starting", line="", incomplete={}, why="")
     gpu = rb.gpu_info()
     if shell_server_vars():
         say(f"not given to llama-server: {', '.join(shell_server_vars())}, set in this shell — "
@@ -910,7 +914,8 @@ def _main(argv: list[str] | None = None) -> int:
             f"about {fit['used'] / gb:.1f} GB for {a.slots} slots of {ctx:,} tokens "
             f"(the KV cache {fit['kv'] / gb:.1f} GB, {fit['types']}, "
             f"{fit['per_token'] / 1024:.1f} KB a token) with the {fit['file'] / gb:.1f} GB file "
-            f"on a {fit['card'] / gb:.1f} GB card: " + (
+            f"on a card with {fit['card'] / gb:.1f} GB free"
+            + (f" ({in_use:,} MiB in use before this step)" if in_use else "") + ": " + (
                 f"{int(fit['card'] - fit['used']) // mib:,} MiB spare" if fit["card"] >= fit["used"]
                 else f"{int(fit['used'] - fit['card']) // mib:,} MiB short")
             + f"; up to {fit['fit']} slot{'s' if fit['fit'] != 1 else ''} fit keeping "
@@ -1021,8 +1026,16 @@ def _main(argv: list[str] | None = None) -> int:
     sha = rb.sha256_file(path)
     say(f"bundle {path} · {path.stat().st_size / 1024 ** 2:.1f} MB · sha256 "
         f"{sha[:16]} · " + ", ".join(f"{t} ({x['answers']:,} answers)" for t, x in done.items()))
+    # 17h: how many answers were written off — a whole step with none isn't
+    # asked again by --ask-written-off
+    from service import config
+    from service import frontier as sf
+    row = config.OUT_DIR / (a.served_as.replace("/", "__") + ("__thinking" if thinking else ""))
+    off = sum(1 for t in done for r in sf.read_answers(sf.task_dir(row, t) / sf.ANSWERS).values()
+              if r.get("unanswered"))
     progress(out, state="stopped" if incomplete else "whole", incomplete=incomplete,
-             bundle={"name": path.name, "sha256": sha}, why=why if incomplete else "")
+             bundle={"name": path.name, "sha256": sha}, why=why if incomplete else "",
+             written_off=off)
     return 1 if incomplete else 0
 
 

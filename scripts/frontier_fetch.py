@@ -6,8 +6,9 @@ a time, without typing either.
     python3 scripts/frontier_fetch.py --key ~/.ssh/id_ed25519 \\
         --sha served/<phone-build>=<its sha256> \\
         --sha served/<original-build>=<its sha256> \\
-        --parity served/<phone-build>=/home/masein/benchmarks/parity/phone-server.jsonl \\
-        <host>:<port> <host>:<port> …
+        --parity served/<phone-build>=/home/masein/benchmarks/parity/phone-server-500.jsonl \\
+        --parity served/<original-build>=/home/masein/benchmarks/parity/orig-server-500.jsonl \\
+        --every 15m <host>:<port> <host>:<port> …
 
 Each box (root@ unless another user is given) is asked over SSH, once, for
 what it holds under /workspace — every bundle and parity file with its
@@ -96,22 +97,26 @@ print(json.dumps(out, default=str))
 def run(cmd: list[str], cwd: Path | None = None, timeout: float | None = None,
         stdin: str | None = None) -> tuple[int, str]:
     """(exit code, what it printed) — its output kept, not shown; 124 when
-    it ran out of time"""
+    it ran out of time. 17h: what it printed is its stdout, and its stderr
+    only when it failed — a box's banner ("Welcome to vast.ai … Have fun!")
+    and ssh's "Permanently added" come on stderr, and were read as the
+    listing"""
     try:
         p = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout,
                            input=stdin)
     except subprocess.TimeoutExpired:
         return 124, f"no answer within {int(timeout or 0)} s"
-    return p.returncode, (p.stdout or "") + (p.stderr or "")
+    return p.returncode, (p.stdout or "") + ((p.stderr or "") if p.returncode else "")
 
 
 def ssh_opts(key: str, port: str, scp: bool = False) -> list[str]:
     # a rented box is a new host each time: its key is taken on first contact,
     # as answering yes would. 17f: never a prompt, and a box that stops
     # answering is given up on
+    # 17h: and nothing but errors on stderr — no banner, no known-hosts line
     return ["-i", key, "-P" if scp else "-p", port, "-o", "StrictHostKeyChecking=accept-new",
             "-o", "BatchMode=yes", "-o", "ConnectTimeout=15", "-o", "ServerAliveInterval=15",
-            "-o", "ServerAliveCountMax=4"]
+            "-o", "ServerAliveCountMax=4", "-o", "LogLevel=ERROR"]
 
 
 def last(said: str, fallback: str) -> str:
@@ -136,7 +141,10 @@ def listing(box: re.Match, key: str) -> tuple[dict | None, str]:
     if code != 0:
         return None, last(said, f"ssh exit {code}")
     try:
-        return json.loads(said.strip().splitlines()[-1]), ""
+        got = json.loads(said.strip().splitlines()[-1])
+        if not isinstance(got, dict):
+            raise ValueError("not a listing")
+        return got, ""
     except (ValueError, IndexError):
         return None, f"its listing couldn't be read: {last(said, 'empty')[:120]}"
 
@@ -209,11 +217,31 @@ def progress_words(p: dict) -> str:
             + (f" · written {ago} min ago" if ago is not None else ""))
 
 
-def by_hand(here: Path, by: str) -> str:
-    """17g: a bundle of a model with no --sha (G6's calibration): its import, to
-    type — its first import registers the model"""
-    return (f"sudo docker compose exec -T bench python scripts/import_remote.py {here} --by {by} "
-            '--register "<its name>" --file-sha256 <its sha256>')
+def by_hand(here: Path, by: str, registered: bool | None) -> str:
+    """17g: a bundle of a model with no --sha: its import, to type. 17h: with
+    --register only for a model the board doesn't serve yet"""
+    reg = ('' if registered else ' --register "<its name>"' if registered is False
+           else ' (and --register "<its name>" if the board doesn\'t serve it yet)')
+    return (f"sudo docker compose exec -T bench python scripts/import_remote.py {here} --by {by}"
+            f" --file-sha256 <its sha256>" + reg)
+
+
+QUIET_S = 45 * 60                   # a step asking that hasn't written for this long says so
+
+
+def box_id(name: str, dest: Path) -> str:
+    """17h: a box's name on the board — never its address: a keyed hash of it,
+    the key kept beside the bundles. The board keeps the steps of the boxes a
+    fetch didn't ask as they were (fetching one box marked every other "not
+    reached")"""
+    import hmac
+    import secrets
+    f = dest.parent / ".box-key"
+    if not f.exists():
+        f.write_text(secrets.token_hex(16), encoding="utf-8")
+        f.chmod(0o600)
+    return hmac.new(f.read_text(encoding="utf-8").strip().encode(), name.encode(),
+                    hashlib.sha256).hexdigest()[:16]
 
 
 def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
@@ -223,7 +251,9 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
     one box listed, copied, imported and compared, its last line saying which.
     17g: done only when every step its plan gives each build started there
     is whole, and its bundle home with the box's sha256 and imported (or, for
-    a model with no --sha, home: imported by hand)"""
+    a model with no --sha, home: imported by hand). 17h: and every other step
+    on the box too, planned or not, wherever its folder (--out /workspace/run,
+    G6's /workspace/gemma-cal, a step started by hand)"""
     import frontier_box as fbx
     name = f"{box['host']}:{box['port']}"
     got, why = listing(box, key)
@@ -231,26 +261,32 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
         return False, True, [f"{name}: couldn't be asked — {why}. NOT safe to destroy"], []
     progress = [p for p in got.get("progress") or [] if isinstance(p, dict)]
     lines, problems, failed = [], [], False
-    # the steps this box started, by build: their folders, and what each wrote
-    started: dict[str, dict[str, dict]] = {}
+    # every step this box started — a folder holding a progress file, a
+    # bundle or a parity file, or one the plan's layout made — by its folder
+    started: dict[str, dict | None] = {}
     for d in got.get("steps") or []:
         if isinstance(d, dict) and d.get("build") and d.get("step"):
-            started.setdefault(str(d["build"]), {}).setdefault(str(d["step"]), {})
+            started.setdefault(f"/workspace/{d['build']}/{d['step']}", None)
+    for f in [*(got.get("bundles") or []), *(got.get("parity") or [])]:
+        started.setdefault(str(Path(f["path"]).parent), None)
     for p in progress:
-        parts = Path(str(p.get("dir"))).parts
-        if len(parts) >= 4:
-            started.setdefault(parts[-2], {})[parts[-1]] = p
-    labels = sorted({k.rsplit("-", 1)[0] for v in started.values() for k in v}
+        started[str(p.get("dir"))] = p
+
+    def build_of(d: str) -> str:
+        parts = Path(d).parts
+        return parts[-2] if len(parts) >= 4 else ""
+    labels = sorted({Path(d).name.rsplit("-", 1)[0] for d in started
+                     if fbx.planned(Path(d).name.rsplit("-", 1)[0])}
                     | {str(p["label"]) for p in progress if p.get("label")})
     who = f"{name} ({', '.join(labels) or 'no label'})"
     for p in progress:
         lines.append(f"  {progress_words(p)}")
-    if not got["bundles"] and not got["parity"] and not started:
+    if not started:
         return False, False, [f"{name}: no step has started yet — NOT safe to destroy"], []
     # each bundle: copied, then imported (or, with no --sha, home to import by hand)
     home: dict[str, str] = {}                       # a step's folder -> what became of its bundle
     for b in got["bundles"]:
-        step = "/".join(Path(b["path"]).parts[-3:-1])
+        step = str(Path(b["path"]).parent)
         ok, words = copy(box, key, b["path"], b["sha256"], dest)
         here = dest / Path(b["path"]).name
         if not ok:
@@ -262,7 +298,7 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
         model = model_of(here)
         if model not in shas:
             lines.append(f"  {here.name}: {words} — home; no --sha for {model or 'its model'}: "
-                         f"import it by hand: {by_hand(here, a.by)}")
+                         "import it by hand: " + by_hand(here, a.by, serves(model)))
             home[step] = "by hand"
             continue
         if seen.get(here.name) == b["sha256"]:
@@ -285,7 +321,7 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
         model = f"served/{build}"
         local = dest.parent / "parity" / f"{build}-box.jsonl"
         ok, words = copy(box, key, f["path"], f["sha256"], local.parent, name=local.name)
-        step = "/".join(parts[-3:-1])
+        step = str(Path(f["path"]).parent)
         if not ok:
             lines.append(f"  {build}'s parity file: {words}")
             problems.append("its parity file NOT copied")
@@ -304,40 +340,56 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
         else:
             lines.append(f"  {build}'s parity file is at {local} — give --parity "
                          f"{model}=<the server's file> to compare it")
-    # every planned step of every build started here: whole, and home
-    for build, steps in sorted(started.items()):
-        for label in sorted({k.rsplit("-", 1)[0] for k in steps}):
-            plan = fbx.planned(label) or sorted(k for k in steps if k.rsplit("-", 1)[0] == label)
-            for step in plan:
-                p = steps.get(step)
-                state = str((p or {}).get("state") or "")
-                if p is None:
+    # every planned step of every build started here has its folder
+    for build in sorted({build_of(d) for d in started if build_of(d)}):
+        for label in sorted({Path(d).name.rsplit("-", 1)[0] for d in started
+                             if build_of(d) == build}):
+            for step in fbx.planned(label):
+                if f"/workspace/{build}/{step}" not in started:
                     problems.append(f"{build} {step} hasn't started")
-                elif state != "whole":
-                    problems.append(f"{build} {step} is {state or 'starting'}"
-                                    + (f": {p['why']}" if p.get("why") and state == "stopped"
-                                       else ""))
-                elif home.get(f"{build}/{step}") not in ("imported", "by hand"):
-                    problems.append(f"{build} {step}'s file isn't home yet")
-    safe = not problems
-    lines.insert(0, f"{who}: " + ("done, safe to destroy — every step whole, every bundle here "
-                                  "with the box's sha256 and imported" if safe else
-                                  "NOT safe to destroy — " + "; ".join(problems)))
-    # 17f: each step as the board shows it on Runs — its label and progress,
-    # never the box's address
+    # and every step on the box, planned or not: whole, and its file home
     now = time.time()
-    steps = [{**{k: p.get(k) for k in ("label", "model", "thinking", "tasks", "shard", "parity",
+    for d, p in sorted(started.items()):
+        what = f"{build_of(d)} {Path(d).name}".strip()
+        state = str((p or {}).get("state") or "")
+        if p is None and home.get(d) in ("imported", "by hand"):
+            continue                                # a bundle with no progress file, home
+        if state != "whole":
+            at = _int((p or {}).get("at"))
+            quiet = round((now - at) / 60) if at and state in ("asking", "starting") \
+                and now - at > QUIET_S else 0
+            problems.append(f"{what} is {state or 'starting'}"
+                            + (f": {p['why']}" if p and p.get("why") and state == "stopped"
+                               else "")
+                            + (f", but hasn't written for {quiet:,} min — stopped? paste its "
+                               "line again" if quiet else ""))
+        elif home.get(d) not in ("imported", "by hand"):
+            problems.append(f"{what}'s file isn't home yet")
+    safe = not problems
+    by_h = sum(1 for v in home.values() if v == "by hand")
+    lines.insert(0, f"{who}: " + (
+        ("done, safe to destroy — every step whole, every bundle here with the box's sha256 "
+         + ("and imported" if not by_h else
+            f"({len(home) - by_h} imported, {by_h} to import by hand: the lines below)"))
+        if safe else "NOT safe to destroy — " + "; ".join(problems)))
+    # 17f: each step as the board shows it on Runs — its label and progress,
+    # never the box's address. 17h: a step with no label (G6's) by its folder
+    bid = box_id(name, dest)
+    steps = [{**{k: p.get(k) for k in ("model", "thinking", "tasks", "shard", "parity",
                                         "state", "line", "started_at", "sessions", "at", "why")
                  if p.get(k) is not None},
+              "label": str(p.get("label") or Path(str(p.get("dir"))).name),
               "step": Path(str(p.get("dir"))).name, "seen_at": now, "reachable": True,
-              "safe": safe} for p in progress]
+              "safe": safe, "box_id": bid} for p in progress]
     return safe, failed, lines, steps
 
 
-def post_boxes(steps: list[dict], dest: Path) -> str:
-    """17f: the boxes' steps to the board, for Runs' "On rented boxes" list"""
+def post_boxes(steps: list[dict], dest: Path, asked: list[str] | None = None) -> str:
+    """17f: the boxes' steps to the board, for Runs' "On rented boxes" list —
+    17h: with the boxes this fetch asked, by their board names"""
     path = dest.parent / "boxes.json"
-    path.write_text(json.dumps(steps), encoding="utf-8")
+    path.write_text(json.dumps({"steps": steps, "asked": sorted(asked or [])}
+                               if asked is not None else steps), encoding="utf-8")
     code, said = run([*IMPORT, "--boxes", str(path)], cwd=REPO, timeout=IMPORT_S)
     return ("the board's list of rented boxes: " + last(said, "updated") if code == 0 else
             "the board's list of rented boxes NOT updated — " + last(said, f"exit {code}"))
@@ -368,6 +420,23 @@ def keep_sudo(every: float = 120.0) -> None:
                       flush=True)
             said = not ok
     threading.Thread(target=refresh, daemon=True).start()
+
+
+_SERVED: dict = {}
+
+
+def serves(model: str) -> bool | None:
+    """17h: whether the board serves `model` — asked once, when a by-hand line
+    needs it (it says --register only for one the board doesn't). None when
+    the board can't be asked"""
+    if "ids" not in _SERVED:
+        code, said = run([*IMPORT, "--served"], cwd=REPO, timeout=IMPORT_S)
+        try:
+            got = json.loads(said.strip().splitlines()[-1]) if code == 0 else None
+        except (ValueError, IndexError):
+            got = None
+        _SERVED["ids"] = set(got) if isinstance(got, list) else None
+    return None if _SERVED["ids"] is None else model in _SERVED["ids"]
 
 
 def every_s(text: str) -> float:
@@ -412,10 +481,10 @@ def main(argv: list[str] | None = None) -> int:
         m = _PARITY.fullmatch(s.strip())
         if not m:
             ap.error(f"--parity {s!r}: served/<name>=<the server's parity file>")
-        parity[m["model"]] = m["path"]
         # 17g: checked now, as --key is — a wrong name was a traceback at the
-        # first compare
-        if not Path(m["path"]).expanduser().is_file():
+        # first compare. 17h: ~ read as the shell would, for the compare too
+        parity[m["model"]] = str(Path(m["path"]).expanduser())
+        if not Path(parity[m["model"]]).is_file():
             ap.error(f"--parity {s}: no such file ({m['path']})")
     key = str(Path(a.key).expanduser())
     if not Path(key).exists():
@@ -425,25 +494,47 @@ def main(argv: list[str] | None = None) -> int:
     (dest.parent / "parity").mkdir(parents=True, exist_ok=True)
     seen: dict[str, str] = {}
     known: dict[str, list[dict]] = {}
-    verdicts: dict[str, tuple[bool, str]] = {}
+    # 17h: each build's parity verdict kept on disk — a fetch started again
+    # after A3 was destroyed said nothing, and exited 0, after "Not the same"
+    vfile = dest.parent / "parity" / "verdicts.json"
+    try:
+        verdicts = {k: (bool(v[0]), str(v[1]))
+                    for k, v in json.loads(vfile.read_text(encoding="utf-8")).items()}
+    except (OSError, ValueError, TypeError, IndexError, AttributeError):
+        verdicts = {}
+    was_safe: set[str] = set()
     keep_sudo()
+    _SERVED.clear()
     while True:
         failed_any, done = False, []
         for box in boxes:
+            name = f"{box['host']}:{box['port']}"
             safe, failed, lines, steps = one_box(box, a, key, dest, shas, parity, seen,
                                                  verdicts)
+            if failed and not steps and name in was_safe:
+                # 17h: safe on an earlier round, not reached now: destroyed —
+                # done (--every ran for ever)
+                safe, failed = True, False
+                lines = [f"{name}: read safe to destroy earlier, not reached now — destroyed: "
+                         "done"]
+                known.pop(name, None)
             print("\n".join(lines), flush=True)
             failed_any |= failed
             done.append(safe)
-            name = f"{box['host']}:{box['port']}"
+            if safe:
+                was_safe.add(name)
             if steps:
                 known[name] = steps
             elif failed and name in known:
                 known[name] = [{**x, "reachable": False} for x in known[name]]
-        if a.board and known:
-            print(post_boxes([x for v in known.values() for x in v], dest), flush=True)
+        if a.board:
+            print(post_boxes([x for v in known.values() for x in v], dest,
+                             [box_id(f"{b['host']}:{b['port']}", dest) for b in boxes]),
+                  flush=True)
         # 17g: each build's parity verdict, a line of its own every round; one
         # that isn't the same, or couldn't be compared, is a failure
+        vfile.write_text(json.dumps({k: list(v) for k, v in verdicts.items()}),
+                         encoding="utf-8")
         for build, (same, first) in sorted(verdicts.items()):
             print(f"{build}'s parity: {first}", flush=True)
             failed_any |= not same

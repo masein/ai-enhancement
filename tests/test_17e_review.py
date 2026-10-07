@@ -274,7 +274,8 @@ def test_4_one_command_fetches_and_imports_every_box(tmp_path, monkeypatch, caps
     assert ("frontier-served__phone-thinking-on-hle-shard-1-of-2.tar.gz: copied · the row "
             "served/phone · thinking: HLE: shard 1 of 2 in") in out
     assert "9.9.9.9:4300: couldn't be asked — ssh: connect to host" in out
-    imports = [c for c in calls if c[0] == "sudo"]
+    # the imports (17h: the board is also asked which models it serves, and told the boxes)
+    imports = [c for c in calls if c[0] == "sudo" and "--file-sha256" in c]
     assert [c[c.index("--file-sha256") + 1] for c in imports] == [sha, "cd" * 32]
     ssh = next(c for c in calls if c[0] == "ssh")
     assert ssh[:5] == ["ssh", "-i", str(key), "-p", "4100"]
