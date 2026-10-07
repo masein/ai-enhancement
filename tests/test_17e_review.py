@@ -471,7 +471,7 @@ def test_13_a_reply_that_landed_beats_a_cancel_written_after_it(tmp_path):
 def test_14_16_start_pins_a_slot_new_to_the_work_and_counts_what_moved(gsvc, monkeypatch):  # noqa: F811
     fgr.save("simpleqa", GPT, "masein")
     moved = {"slot": "simpleqa", "batch_id": "local_aaaaaaaaaaaa", "task": "simpleqa_epoch",
-             "pin": {"id": GEMINI, "version": GEMINI_V}}
+             "row": "r", "pin": {"id": GEMINI, "version": GEMINI_V}}
     monkeypatch.setattr(fgr, "pending", lambda: [moved])
     monkeypatch.setattr(fgr, "_cancel_unsent", lambda p, why: ["a", "b", "c", "d", "e", "f"])
     monkeypatch.setattr(fgr, "_settle", lambda ids, timeout=None: True)
@@ -481,7 +481,7 @@ def test_14_16_start_pins_a_slot_new_to_the_work_and_counts_what_moved(gsvc, mon
     # and were recorded — what waits, and again once the new slot is pinned
     math = [{"slot": "math", "task": "math_l5_epoch", "model": "m", "items": [1]}]
     lists = iter([[], math, math])
-    monkeypatch.setattr(fgr, "waiting", lambda view=False: next(lists))
+    monkeypatch.setattr(fgr, "waiting", lambda view=False, hold=None: next(lists))
     sent = []
     monkeypatch.setattr(fgr, "_submit", lambda w, pin, by: sent.append((w["slot"], pin)) or "b1")
 

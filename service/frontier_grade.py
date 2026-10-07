@@ -187,7 +187,29 @@ def _cancelled(batch_id: str) -> set[str]:
             if r.get("cancelled") and ":" in c}
 
 
-def waiting(view: bool = False) -> list[dict]:
+def _busy(batch_id: str) -> bool:
+    """17i: a batch with replies still on their way — its worker holding its
+    lock now and a moment later (a stopped batch's worker, started by a tick,
+    ends at once)"""
+    if not _working(batch_id):
+        return False
+    time.sleep(0.2)
+    return _working(batch_id)
+
+
+def held_rows(moving: list[dict] | None = None) -> dict:
+    """17i: the rows a batch Start moves still has replies on their way for —
+    {(row, task): the grader they are at}: Start leaves them until the replies
+    land (they were paid, then the same answers paid again at the grader
+    chosen now), and the dry run says so"""
+    out = {}
+    for p in pending() if moving is None else moving:
+        if (moving is not None or _moving(p)) and _busy(p["batch_id"]):
+            out[(p["row"], p["task"])] = p["pin"].get("version") or p["pin"].get("id")
+    return out
+
+
+def waiting(view: bool = False, hold: dict | None = None) -> list[dict]:
     """every row's answers a grader is still to see, by benchmark — those out
     in a batch now left out (17c: but not those cancelled from it, unsent):
     [{slot, task, row, model, base, items}]. 17g: `view` — as Start would
@@ -199,6 +221,9 @@ def waiting(view: bool = False) -> list[dict]:
     # here, at the grader they go to (they were priced at the stopped one's)
     out = pending()
     moving = [p for p in out if view and _moving(p)]
+    if view and hold is None:
+        hold = held_rows(moving)
+    hold = hold or {}
     out_now = {(p["row"], p["task"], k) for p in out if p not in moving
                for k in set(p.get("keys") or []) - _cancelled(p["batch_id"])}
     got = []
@@ -208,6 +233,8 @@ def waiting(view: bool = False) -> list[dict]:
         now = chosen(slot) if view else None
         for row in sorted(root.glob(f"*/{t}_0shot/{sf.SUB}")) if root.is_dir() else []:
             d, row = row, row.parent.parent
+            if (row.name, t) in hold:
+                continue                    # 17i: its replies in flight land first
             seen, how, reused = None, "", 0
             if now:
                 seen = copy.deepcopy(sf.read_grades(d))
@@ -279,10 +306,70 @@ def reasons(g: dict) -> bool | None:
 def estimate() -> dict:
     """the dry run: each grader's answers, tokens and cost for what waits.
     Nothing is sent"""
+    hold = held_rows()
+    est = _estimate(waiting(view=True, hold=hold))
+    try:
+        est.update(over_limit=ai_models.over_limit(), limit=ai_models.limit(),
+                   spent=round(db.spend_this_month(), 2))
+    except Exception:                               # noqa: BLE001 — no database here
+        est.update(over_limit="", limit=None, spent=None)
+    est.update(_limit_words(est, held()))
+    if hold:
+        est["held"] = _held_words(hold)
+    return est
+
+
+def _held_words(hold: dict) -> list[dict]:
+    """17i: the rows Start leaves until their replies land, in words"""
+    return [{"row": row, "task": task, "label": fb.BENCH[task]["label"], "at": at,
+             "words": f"{fb.BENCH[task]['label']} of {row}: replies on their way at {at} — "
+                      "left as it is until they land, then the next Start moves it to the "
+                      "grader chosen now (those answers are never asked twice)"}
+            for (row, task), at in sorted(hold.items())]
+
+
+def _limit_words(est: dict, h: dict) -> dict:
+    """17i: the month's limit against what Start costs — the dry run's new
+    answers and what the batches out still hold (`h`, held()) — {left, short,
+    may_stop}: `short` when that is more than what is left (Start refuses it
+    unless asked to stop part-way), `may_stop` when only its most could"""
+    lim, spent = est.get("limit"), est.get("spent")
+    if lim is None or spent is None or not (est.get("answers") or h.get("answers")):
+        return {}
+    usd = float(est.get("usd") or 0) + float(h.get("usd") or 0)
+    left = max(0.0, round(float(lim) - float(spent), 2))
+    out: dict = {"left": left, "cost": round(usd, 4)}
+    if est.get("usd_known", True) and h.get("usd_known", True) and usd > left:
+        out["short"] = (f"This month's AI limit has ${left:,.2f} left (${float(spent):,.2f} of "
+                        f"${float(lim):,.2f} spent), and this grading costs about "
+                        f"${float(usd):,.2f}: it would stop part-way, at the limit, and carry "
+                        "on by itself when the limit is raised. Raise the limit on AI models "
+                        "first, or start it knowing it stops there.")
+    elif float(est.get("usd_max") or 0) + float(h.get("usd") or 0) > left:
+        most = float(est.get("usd_max") or 0) + float(h.get("usd") or 0)
+        out["may_stop"] = (f"This month's AI limit has ${left:,.2f} left: about ${usd:,.2f} "
+                           f"fits, but at its most (every reply at its cap, asked "
+                           f"{GRADE_TRIES} times) this could reach ${most:,.2f} and stop "
+                           "part-way.")
+    return out
+
+
+def _short(work: list[dict]) -> str:
+    """17i: Start's own check, before anything is sent — the words, or ''"""
+    est = _estimate(work)
+    try:
+        est.update(limit=ai_models.limit(), spent=round(db.spend_this_month(), 2))
+    except Exception:                               # noqa: BLE001 — no database here
+        return ""
+    return _limit_words(est, held()).get("short", "")
+
+
+def _estimate(ws: list[dict]) -> dict:
+    """the dry run's sums over what `waiting(view=True)` gave"""
     fb.set_root(config.BENCH_ROOT)
     per: dict[str, dict] = {}
     rows = []
-    for w in waiting(view=True):
+    for w in ws:
         slot = w["slot"]
         if not w["items"]:
             # 17g: nothing to send — the grades it gave before come back
@@ -334,15 +421,9 @@ def estimate() -> dict:
     for e in per.values():
         e["usd"], e["usd_max"] = round(e["usd"], 4), round(e["usd_max"], 4)
     total = round(sum(e["usd"] for e in per.values()), 4)
-    est = {"graders": per, "rows": rows, "answers": sum(e["answers"] for e in per.values()),
-           "usd": total, "usd_max": round(sum(e["usd_max"] for e in per.values()), 4),
-           "usd_known": all(e["usd_known"] for e in per.values())}
-    try:
-        est.update(over_limit=ai_models.over_limit(), limit=ai_models.limit(),
-                   spent=round(db.spend_this_month(), 2))
-    except Exception:                               # noqa: BLE001 — no database here
-        est.update(over_limit="", limit=None, spent=None)
-    return est
+    return {"graders": per, "rows": rows, "answers": sum(e["answers"] for e in per.values()),
+            "usd": total, "usd_max": round(sum(e["usd_max"] for e in per.values()), 4),
+            "usd_known": all(e["usd_known"] for e in per.values())}
 
 
 # ---------------------------------------------------------------------------
@@ -418,16 +499,16 @@ def _one_start():
             os.close(fd)
 
 
-def start(by: str) -> dict:
+def start(by: str, partial: bool = False) -> dict:
     """masein's Start, after the dry run: each grader with answers to see
     pinned, the stop lifted, and what waits sent. Started again, it carries on.
     17b: what waits is listed inside the lock — a second press finds the
     first one's batches out, and sends nothing twice"""
     with _one_start():
-        return _start(by)
+        return _start(by, partial)
 
 
-def _start(by: str) -> dict:
+def _start(by: str, partial: bool = False) -> dict:
     why = ai_models.over_limit() or ("" if ai_models.has_key() else
                                      "OpenRouter has no key on this server (OPENROUTER_API_KEY)")
     if why:
@@ -435,10 +516,20 @@ def _start(by: str) -> dict:
     # everything checked before anything changes — 17d: before the stop is
     # lifted too, so a refused Start leaves a stopped grading stopped
     moved = [(p, why) for p in pending() for why in [_moving(p)] if why]
+    # 17i: a moved batch with replies still on their way: its row waits for
+    # them, said — Start waited 30 s, then switched under them, and the same
+    # answers were paid again at the grader chosen now
+    hold = held_rows([p for p, _ in moved])
     # 17g: what waits as Start leaves it — the grader chosen now taking over
     # (its own grades back, a whole regrade, a top-up) — decided before
     # anything changes, done once the stop is lifted
-    work = [w for w in waiting(view=True) if w["items"]]
+    work = [w for w in waiting(view=True, hold=hold) if w["items"]]
+    # 17i: the month's limit — what this Start costs against what is left,
+    # before anything is sent
+    if not partial:
+        short = _short(work)
+        if short:
+            raise ValueError(short)
     pins = {}
     for slot in sorted({w["slot"] for w in work} | {p["slot"] for p, _ in moved}):
         pins[slot] = _pinned(slot, by)
@@ -453,15 +544,15 @@ def _start(by: str) -> dict:
     # is recorded now, before the grader chosen now takes over (recorded
     # later, it met that grader's grades of the same answers)
     cancelled = {p["batch_id"]: _cancel_unsent(p, why) for p, why in moved}
-    if moved:
-        _settle([p["batch_id"] for p, _ in moved])
-        for p, _ in moved:
+    for p, _ in moved:
+        if (p["row"], p["task"]) not in hold:
+            _settle([p["batch_id"]], timeout=5.0)
             _close(p["batch_id"])
     for slot in fg.GRADERS:
         pin = pins.get(slot) or chosen(slot)
         if pin:
-            _reset_tries(slot, pin)
-    work = waiting()
+            _reset_tries(slot, pin, hold)
+    work = waiting(hold=hold)
     skipped = []
     # 17e: a slot new to the work — another's batch landed with replies to ask
     # again while this waited — pinned now; one whose pin moved waits, said
@@ -473,9 +564,9 @@ def _start(by: str) -> dict:
             skipped.append(f"{fg.GRADERS[slot]['label']}: {drift}")
             continue
         pins[slot] = pin
-        _reset_tries(slot, pin)
+        _reset_tries(slot, pin, hold)
     if new_slots:
-        work = waiting()
+        work = waiting(hold=hold)
     work = [w for w in work if w["slot"] in pins]
     # 17e: moved are those still cancelled once the requests in flight landed
     # (Start said 6 when 4 moved: 2 were in flight, and landed)
@@ -494,7 +585,9 @@ def _start(by: str) -> dict:
         except llm.LLMError:
             pass
     return {"sent": sent, "pending": len(pending()), "moved": n_moved,
-            **({"skipped": skipped} if skipped else {})}
+            **({"skipped": skipped} if skipped else {}),
+            **({"held": [{"row": r, "task": t, "at": v} for (r, t), v in hold.items()]}
+               if hold else {})}
 
 
 SETTLE_S = 30.0                         # how long Start waits for requests in flight
@@ -505,7 +598,14 @@ def _close(batch_id: str) -> None:
     closed now — as the poller would at its next tick"""
     try:
         be = batch_backend(batch_id)
-        state, _ = be.status(batch_id)
+        state, detail = be.status(batch_id)
+        if state == "failed":
+            # 17i: every request refused — closed as the poller closes it,
+            # what landed recorded, its answers free for the grader now (they
+            # stayed "out", and the dry run counted one more than Start sent)
+            db.batch_finish(batch_id, "failed", detail)
+            failed(batch_id, detail)
+            return
         if state != "done":
             return
         finish(batch_id, be.fetch(batch_id))
@@ -586,7 +686,7 @@ def _permanent(res) -> bool:
     return kind == "answer"
 
 
-def _reset_tries(slot: str, pin: dict) -> None:
+def _reset_tries(slot: str, pin: dict, hold: dict | None = None) -> None:
     """17d: another grader or prompt asks again what an earlier one gave no
     grade — the tries count again from none, and its scores wait"""
     from . import served
@@ -594,6 +694,8 @@ def _reset_tries(slot: str, pin: dict) -> None:
     root = Path(config.OUT_DIR)
     task = fg.GRADERS[slot]["task"]
     for d in sorted(root.glob(f"*/{task}_0shot/{sf.SUB}")) if root.is_dir() else []:
+        if (d.parent.parent.name, task) in (hold or {}):
+            continue                        # 17i: its replies in flight land first
         with grades_lock(d):
             g = sf.read_grades(d)
             was = json.dumps(g, sort_keys=True)
@@ -723,15 +825,47 @@ def _switch(g: dict, version: str, sha: str) -> tuple[str, int]:
         how = "mixed"
     reused = 0
     if back and how in ("kept", "match"):
-        for part in ("items", "refused"):
-            g.setdefault(part, {}).update(back.get(part) or {})
+        g.setdefault("items", {}).update(back.get("items") or {})
         reused = len(back.get("items") or {})
-        kept.pop(_key(mine), None)
-    # 17d: another grader's no-grades asked again, from none
-    for x in (g.get("refused") or {}).values():
-        if int(x.get("tries") or 0) and _who(x) != mine:
-            x["tries"] = 0
+        back.pop("items", None)
+    # 17d: another grader's no-grades are asked again by the one chosen now,
+    # from none. 17i: kept under their grader's name with their tries, never
+    # zeroed — chosen, changed and chosen back, a grader was paid again for
+    # an answer it had failed three times; its own come back
+    ref = g.setdefault("refused", {})
+    moved = 0
+    for k, x in list(ref.items()):
+        if _who(x) != mine:
+            g.setdefault("kept", {}).setdefault(_key(_who(x)), {}).setdefault(
+                "refused", {})[k] = x
+            del ref[k]
+            moved += 1
+    items = g.get("items") or {}
+    own = (g.get("kept") or {}).get(_key(mine)) or {}
+    for k, x in list((own.get("refused") or {}).items()):
+        if k not in items and k not in ref:
+            ref[k] = x
+            del own["refused"][k]
+            moved += 1
+    if moved and not how:
+        # 17i: nothing to send, and still a change Start makes — the no-grades
+        # are this grader's now (its own back, with their tries): the dry
+        # run's row says what the score becomes
+        how = "no-grades"
+    for name in [n for n, v in (g.get("kept") or {}).items()
+                 if not any(v.get(part) for part in ("items", "refused"))]:
+        g["kept"].pop(name)
     return how, reused
+
+
+def _no_grade_by_other(g: dict, key: str, mine: tuple) -> dict:
+    """17i: another grader's no-grade of `key`, kept under its name — what a
+    top-up's grade comes after"""
+    for name, v in (g.get("kept") or {}).items():
+        x = (v.get("refused") or {}).get(key)
+        if x and _who(x) != mine and int(x.get("tries") or 0):
+            return x
+    return {}
 
 
 def _cancel_unsent(p: dict, why: str) -> list[str]:
@@ -843,7 +977,8 @@ def _apply(g: dict, d: Path, slot: str, pin: dict, meta: dict, items: dict,
                 g["refused"][key] = _refusal(g["refused"].get(key), why, rec, sent[key],
                                              counts=True, kind="unread")
                 continue
-            was = g["refused"].get(key) or {}
+            was = g["refused"].get(key) or _no_grade_by_other(
+                g, key, (rec["version"], rec["prompt_sha256"]))
             # 17e: a grade where another grader or prompt gave none says so —
             # a second grader's top-up (service/frontier.py graders_of)
             after = ({"after": {"by": was.get("by"), "prompt_sha256": was.get("prompt_sha256")}}
