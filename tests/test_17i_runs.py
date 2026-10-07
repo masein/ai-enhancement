@@ -29,10 +29,10 @@ def test_one_box_stopped_or_unreached_among_running_ones():
     r = one(box("A1"), box("A2", left_h=6), box("A3", state="stopped", why="llama-server died"),
             box("A4", reachable=False, heard=now - 3 * 3600))
     # still Running, counted with every box's last known count, the odd ones said
-    assert (r["status"], r["status_words"]) == ("running", "Running")
+    assert (r["status"], r["status_words"]) == ("running", "running")
     assert (r["n"], r["of"], r["boxes_n"]) == (400, 2160, 4)
-    assert r["attention"] == ["A3 · A3-1: Stopped: llama-server died",
-                              "A4 · A4-1: No contact for 3 h"]
+    assert r["attention"] == ["A3 · A3-1: stopped: llama-server died",
+                              "A4 · A4-1: no contact for 3 h"]
     # the benchmark's finish waits on the stopped and the unreached box: unknown
     assert r["finish"] is None and r["behind"]
     # every box running: the last of their finishes
@@ -42,12 +42,12 @@ def test_one_box_stopped_or_unreached_among_running_ones():
 
 def test_with_no_box_running():
     now = time.time()
-    assert one(box("A1", state="whole"), box("A2", state="whole"))["status_words"] == "Done"
+    assert one(box("A1", state="whole"), box("A2", state="whole"))["status_words"] == "done"
     assert one(box("A1", state="starting"), box("A2", state="stopped"))["status"] == "loading"
     r = one(box("A1", state="whole"), box("A2", reachable=False, heard=now - 7200))
-    assert r["status_words"] == "No contact for 2 h"
+    assert r["status_words"] == "no contact for 2 h"
     r = one(box("A1", state="whole"), box("A2", state="stopped", why="out of memory"),
             box("A3", reachable=False, heard=now - 7200))
-    assert r["status_words"] == "Stopped: out of memory"
+    assert r["status_words"] == "stopped: out of memory"
     r = one(box("A1", quiet_min=180, at=now - 3 * 3600))
-    assert r["status_words"] == "Stopped? No word for 3 h" and abs(r["heard"] - (now - 10800)) < 5
+    assert r["status_words"] == "stopped? no word for 3 h" and abs(r["heard"] - (now - 10800)) < 5

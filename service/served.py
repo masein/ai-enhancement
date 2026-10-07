@@ -53,6 +53,12 @@ LOGLIK_LINE = ("Multiple-choice benchmarks need the model loaded here; this one 
                "elsewhere.")
 CHANGED_LINE = ("The server now serves a different file than the one registered. Register it "
                 "again if that's intended.")
+# 17j: started again with another -c, the file the same — said as what it is,
+# and taken on the model's page ("Use the new window"), never by registering
+# it again with its key
+WINDOW_LINE = ("The server now runs it with a context window of {now:,} tokens, not the {was:,} "
+               "it was registered with: the file is the same. Use the new window on the model's "
+               "page if that's intended.")
 KEPT_FOR_NEXT = " · the answers it gave are kept: the next run asks only the rest"
 # 17: and the Frontier benchmarks (service/frontier.py), asked as chat messages too
 SUITES = ("everyday", "judged", "generative", "safety", "shared", "mobile", "devicemark",
@@ -698,7 +704,62 @@ def check_pin(rec: dict) -> str:
         now = pin_of(probe(rec["base_url"], rec.get("key", "")))
     except ValueError as e:
         return str(e)
-    return CHANGED_LINE if any(now.get(k) != rec["pin"].get(k) for k in PINNED) else ""
+    return pin_words(rec, now)
+
+
+def changed(why: str) -> bool:
+    """17j: a check_pin line that says the server is up with another pin — a
+    file or (alone) a window — not that it doesn't answer"""
+    return why == CHANGED_LINE or why.startswith(WINDOW_LINE.split("{", 1)[0])
+
+
+def pin_diff(rec: dict, now: dict) -> list[str]:
+    return [k for k in PINNED if now.get(k) != rec["pin"].get(k)]
+
+
+def pin_words(rec: dict, now: dict) -> str:
+    """'' when `now` is what was pinned; the window's own words when only the
+    context window differs (17j); else CHANGED_LINE"""
+    diff = pin_diff(rec, now)
+    if diff == ["ctx"] and isinstance(now.get("ctx"), int):
+        return WINDOW_LINE.format(now=now["ctx"], was=int(rec["pin"].get("ctx") or 0))
+    return CHANGED_LINE if diff else ""
+
+
+def live_window(rec: dict) -> int | None:
+    """17j: the context window its server runs it with now (llama-server's
+    /props), None when it doesn't say — the Playground's limit is this, not
+    the window pinned when it was registered"""
+    if is_openrouter(rec):
+        return None
+    try:
+        st, raw = _http("GET", root_of(rec["base_url"]) + "/props", rec.get("key", ""), timeout=5)
+        props = json.loads(raw) if st == 200 else {}
+    except Exception:                                       # noqa: BLE001 — it doesn't say
+        return None
+    n = (props.get("default_generation_settings") or {}).get("n_ctx") or props.get("n_ctx")
+    return n if isinstance(n, int) and not isinstance(n, bool) and n > 0 else None
+
+
+def use_new_window(model_id: str, by: str) -> dict:
+    """17j: the pin's context window set to the one its server runs it with
+    now — only when that is all that changed (the file, its size and the
+    build as pinned). Its key stays as it is, never asked for again"""
+    rec = get(model_id)
+    if not rec or is_openrouter(rec):
+        raise ValueError(f"{model_id} isn't a model registered on a server")
+    now = pin_of(probe(rec["base_url"], rec.get("key", "")))
+    diff = pin_diff(rec, now)
+    if diff != ["ctx"]:
+        raise ValueError(pin_words(rec, now) or "Its server runs it as registered: nothing to "
+                         "change")
+    was = rec["pin"].get("ctx")
+    rec["pin"] = {**rec["pin"], "ctx": now["ctx"]}
+    rec["window_changes"] = [*(rec.get("window_changes") or [])[-9:],
+                             {"from": was, "to": now["ctx"], "by": by, "at": time.time()}]
+    db.served_put(rec)
+    write_meta(rec)
+    return rec
 
 
 # 16.8: a run that meets a server that doesn't answer

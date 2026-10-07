@@ -1342,14 +1342,19 @@ def _box_read(r: dict, now: float, fbx) -> dict | None:
     m, nof = _LEFT.search(line), _NOF.search(line)
     left = _num(m["h"]) * 3600 if m and m["h"] and _num(m["h"]) is not None else \
         int(m["m"]) * 60 if m and m["m"] else None
-    later = 0.0
+    later = in_step = 0.0
+    benches = _benchmarks(r, line, fbx)
     if fbx is not None and left is not None:
         try:
             steps = fbx.box_of(r["label"])
             k = int(r["step"].rsplit("-", 1)[1]) if not r["step"].endswith("parity") else 0
             later = sum(fbx.hours(s) for s in steps[k:] if s[0] != "parity") * 3600
+            # 17j: and the step's own benchmarks after the one asked now
+            th, _, shard, slots = steps[k - 1] if k else (None, (), "", 8)
+            in_step = sum(fbx.hours((th, (b["task"],), shard, slots)) for b in benches
+                          if b["state"] == "next") * 3600 if th else 0.0
         except (SystemExit, ValueError, IndexError, KeyError, TypeError):
-            later = 0.0
+            later = in_step = 0.0
     # 17g: quiet only while it should be writing — a step whole or stopped
     # writes no more, and read "not heard from for 600 min" on a box
     # still working
@@ -1358,27 +1363,68 @@ def _box_read(r: dict, now: float, fbx) -> dict | None:
     # every running row turned red when the fetch itself stopped
     quiet = (seen - at) if at and r.get("state") in ("asking", "starting") else None
 
-    def count(x: str | None) -> int | None:
-        try:
-            return int(x.replace(",", "")) if x else None
-        except ValueError:
-            return None
     # 17i: two times, each named — when this benchmark finishes, and when the
     # box does, its later steps included ("Expected finish" was the box's,
-    # shown on a step's row)
+    # shown on a step's row). 17j: and when the step does, its benchmarks
+    # after this one included
     task_finish = ((at or now) + left) if left is not None else None
-    return {**r, "at": at, "seen_at": seen,
-            "n": count(nof["n"]) if nof else None, "of": count(nof["of"]) if nof else None,
-            "finish": task_finish + later if task_finish is not None else None,
-            "task_finish": task_finish,
-            "box_finish": task_finish + later if task_finish is not None else None,
+    step_finish = task_finish + in_step if task_finish is not None else None
+    # 17j: a step asking two benchmarks counts both — it showed the first's
+    # count and time only
+    known = [b for b in benches if b["of"] is not None]
+    whole = benches and len(known) == len(benches)
+    n = sum(b["n"] or 0 for b in benches) if whole else _count(nof["n"]) if nof else None
+    of = sum(b["of"] for b in benches) if whole else _count(nof["of"]) if nof else None
+    return {**r, "at": at, "seen_at": seen, "n": n, "of": of, "benchmarks": benches,
+            "finish": step_finish + later if step_finish is not None else None,
+            "task_finish": task_finish, "step_finish": step_finish,
+            "box_finish": step_finish + later if step_finish is not None else None,
             "heard": seen,
             "quiet_min": round(quiet / 60) if quiet and quiet > QUIET_S else None}
 
 
-# 17i: a step's state in plain words, as Runs says it
-STATE_WORDS = {"whole": "Done", "asking": "Running", "starting": "Loading the model",
-               "stopped": "Stopped"}
+def _count(x: str | None) -> int | None:
+    try:
+        return int(x.replace(",", "")) if x else None
+    except ValueError:
+        return None
+
+
+def _benchmarks(r: dict, line: str, fbx) -> list[dict]:
+    """17j: each benchmark a step asks, in the order it asks them: {task,
+    label, n, of, state} — 'now' for the one its line counts, 'done' for one
+    before it (or every one, once the step is whole), 'next' for one after.
+    A count the line doesn't give is the plan's (its answers, over the
+    shard's parts); None without the plan"""
+    tasks = [t for t in fb.TASKS if t in set(r.get("tasks") or [])]
+    sh = re.fullmatch(r"(\d+)/(\d+)", str(r.get("shard") or ""))
+    parts = int(sh[2]) if sh and int(sh[2]) > 0 else 1
+    out, now_k = [], None
+    for k, t in enumerate(tasks):
+        label = fb.BENCH[t]["label"]
+        m = re.search(rf"(?<![\w']){re.escape(label)}:? (?P<n>\d[\d,]{{0,15}}) of "
+                      rf"(?P<of>\d[\d,]{{0,15}})(?![\d,])", line)
+        est = round(fbx.ANSWERS[t] / parts) if fbx is not None and t in fbx.ANSWERS else None
+        out.append({"task": t, "label": label, "n": _count(m["n"]) if m else None,
+                    "of": _count(m["of"]) if m else est, "est": est})
+        if m and now_k is None:
+            now_k = k
+    whole = r.get("state") == "whole"
+    for k, b in enumerate(out):
+        b["state"] = ("done" if whole or (now_k is not None and k < now_k) else
+                      "now" if k == now_k else "next")
+        if b["state"] == "done" and b["n"] is None:
+            b["n"] = b["of"]                    # answered whole: its plan's count
+        elif b["state"] == "next":
+            b["n"] = 0
+        b.pop("est")
+    return out
+
+
+# 17i: a step's state in plain words, as Runs says it. 17j: spelt as a run
+# here is ("running", "done"), never "Running" beside "running"
+STATE_WORDS = {"whole": "done", "asking": "running", "starting": "loading the model",
+               "stopped": "stopped"}
 
 
 def _ago(seconds: float) -> str:
@@ -1390,15 +1436,17 @@ def step_status(b: dict, now: float) -> tuple[str, str]:
     """17i: (its key, its words) — running, loading, done, stopped (and why),
     quiet (asking, and no word for 45 minutes: stopped by hand, likely) or
     unreached (no contact since the fetch last reached it)"""
-    if b.get("reachable") is False:
-        return "unreached", f"No contact for {_ago(now - (b.get('heard') or now))}"
     st = b.get("state") or "starting"
+    if st == "abandoned":
+        return "abandoned", "abandoned"             # 17j: given as --abandoned to the fetch
+    if b.get("reachable") is False:
+        return "unreached", f"no contact for {_ago(now - (b.get('heard') or now))}"
     if st == "asking" and b.get("quiet_min"):
-        return "quiet", f"Stopped? No word for {_ago(b['quiet_min'] * 60)}"
+        return "quiet", f"stopped? no word for {_ago(b['quiet_min'] * 60)}"
     if st == "stopped":
-        return "stopped", "Stopped" + (f": {b['why']}" if b.get("why") else "")
+        return "stopped", "stopped" + (f": {b['why']}" if b.get("why") else "")
     key = {"whole": "done", "asking": "running", "starting": "loading"}.get(st, "loading")
-    return key, STATE_WORDS.get(st, "Loading the model")
+    return key, STATE_WORDS.get(st, "loading the model")
 
 
 def _imported(b: dict, regs: dict) -> bool:
@@ -1439,7 +1487,18 @@ def rented_runs(boxes: list[dict], now: float, posted: float | None) -> list[dic
     it (unknown) rather than leaving it out"""
     regs: dict = {}
     groups: dict = {}
+    # 17j: what a box's line says besides its run — a parity step done (it
+    # isn't a run: it was a row of its own) and a step abandoned (it read "No
+    # contact" for a day); neither is a row
+    notes: dict = {}
     for b in boxes:
+        box = str(b.get("label") or "")
+        if (b.get("state") == "abandoned"
+                or (b.get("parity") and step_status(b, now)[0] == "done")):
+            notes.setdefault(box, []).append(
+                "parity done" if b.get("parity") and b.get("state") != "abandoned"
+                else f"{b.get('step')} abandoned")
+            continue
         if b.get("parity"):
             key = (b.get("model"), "parity", "off")
         else:
@@ -1457,11 +1516,11 @@ def rented_runs(boxes: list[dict], now: float, posted: float | None) -> list[dic
         st = [step_status(b, now) for b in steps]
         keys = {k for k, _ in st}
         if keys == {"done"}:
-            status, words = "done", "Done"
+            status, words = "done", "done"
         elif "running" in keys:
-            status, words = "running", "Running"
+            status, words = "running", "running"
         elif "loading" in keys:
-            status, words = "loading", "Loading the model"
+            status, words = "loading", "loading the model"
         elif keys <= {"unreached", "done"}:
             status, words = "unreached", next(w for k, w in st if k == "unreached")
         else:
@@ -1469,11 +1528,26 @@ def rented_runs(boxes: list[dict], now: float, posted: float | None) -> list[dic
         counted = [b for b in steps if b.get("n") is not None and b.get("of")]
         n = sum(b["n"] for b in counted)
         of = sum(b["of"] for b in counted)
-        # the benchmark's finish: the last of its boxes', known only while
-        # every box not done is running with one
+        # 17j: each benchmark of the step, over its boxes — "GPQA Diamond 120
+        # of 198 · OTIS Mock AIME next" (the first one's count alone was shown)
+        benches: dict = {}
+        for b in steps:
+            for x in b.get("benchmarks") or []:
+                y = benches.setdefault(x["task"], {"task": x["task"], "label": x["label"],
+                                                   "n": 0, "of": 0, "states": set()})
+                y["n"] += x["n"] or 0
+                y["of"] = y["of"] + x["of"] if y["of"] is not None and x["of"] is not None \
+                    else None
+                y["states"].add(x["state"])
+        bench = [{**{k: v for k, v in y.items() if k != "states"},
+                  "state": "done" if y["states"] == {"done"} else "next" if y["states"] == {"next"}
+                  else "now"} for y in benches.values()]
+        # the step's finish (17j: all its benchmarks): the last of its boxes',
+        # known only while every box not done is running with one
         open_ = [(b, k) for b, (k, _) in zip(steps, st) if k != "done"]
-        finish = max((b.get("task_finish") or 0) for b, _ in open_) if open_ and all(
-            k == "running" and b.get("task_finish") for b, k in open_) else None
+        fin = [b.get("step_finish", b.get("task_finish")) for b, _ in open_]
+        finish = max(fin) if open_ and all(
+            k == "running" and f for (_, k), f in zip(open_, fin)) else None
         odd = [f"{b.get('label')} · {b.get('step')}: {w}" for b, (k, w) in zip(steps, st)
                if k not in ("running", "done", "loading") and status in ("running", "loading")]
         # heard: when the box last spoke — for a step gone quiet, its last
@@ -1485,18 +1559,25 @@ def rented_runs(boxes: list[dict], now: float, posted: float | None) -> list[dic
             k in ("unreached", "quiet") for k, _ in st)
         labels = sorted({str(b.get("label")) for b in steps if b.get("label")})
         started = sorted(str(b.get("started_at")) for b in steps if b.get("started_at"))
+        # 17j: a one-box run's line is its box's: what else the box did is said
+        # on it; a run on several says it on each box's line
+        mine = [x for lb in labels for x in notes.get(lb, [])] if len(labels) == 1 else []
         out.append({
             "id": f"rented:{model}|{tasks}|{thinking}", "hf_id": model, "tasks": tasks,
             "parity": tasks == "parity", "thinking": thinking, "status": status,
             "status_words": words, "n": n if counted else None, "of": of if counted else None,
+            "benchmarks": bench if len(bench) > 1 else [],
             "boxes_n": len(steps), "finish": finish, "attention": odd,
             "heard": heard, "behind": behind, "started_at": started[0] if started else None,
             "where": "rented GPU · " + (f"box {labels[0]}" if len(labels) == 1 else
-                                        f"boxes {', '.join(labels)}"),
+                                        f"boxes {', '.join(labels)}")
+                     + "".join(f" · {x}" for x in mine),
             "boxes": [{"label": b.get("label"), "step": b.get("step"), "status": k,
                        "words": w, "n": b.get("n"), "of": b.get("of"), "shard": b.get("shard"),
                        "task_finish": b.get("task_finish") if k == "running" else None,
+                       "step_finish": b.get("step_finish") if k == "running" else None,
                        "box_finish": b.get("box_finish") if k == "running" else None,
+                       "notes": notes.get(str(b.get("label") or ""), []),
                        "heard": h or None,
                        "behind": bool(posted and b.get("heard") and b["heard"] < posted - 60)
                        or k in ("unreached", "quiet")}

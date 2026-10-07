@@ -364,8 +364,13 @@ def board_models() -> list[dict]:
     from . import served
     for rec in db.served_all():
         why = "openrouter" if served.is_openrouter(rec) else ""
+        # 17j: the window its server runs it with now, not the one pinned
+        arch = served.archinfo(rec)
+        live = None if why else served_window(rec["id"])
+        if live:
+            arch = {**arch, "ctx": live}
         out.append({"id": rec["id"], "name": rec["name"], "kind": "instruct", "params": None,
-                    "archinfo": served.archinfo(rec), "source": "served", "served": True,
+                    "archinfo": arch, "source": "served", "served": True,
                     "phone": served.is_phone(rec), "chat": not why, "why_not": why})
     return out
 
@@ -798,8 +803,18 @@ def _check(mid: str) -> None:
     from . import served
     rec = served.get(mid)
     ok = bool(rec) and ping(rec)
+    # 17j: and the window it runs with now, for the Playground's limit
+    ctx = served.live_window(rec) if ok else None
     with _health_lock:
-        _health[mid] = {"ok": ok, "at": time.time(), "busy": False}
+        _health[mid] = {"ok": ok, "at": time.time(), "busy": False, "ctx": ctx}
+
+
+def served_window(mid: str) -> int | None:
+    """17j: the context window a served model's server last said it runs
+    with — None before it has said (the pinned one stands meanwhile)"""
+    served_up(mid)                                  # asked again when stale, in the background
+    with _health_lock:
+        return (_health.get(mid) or {}).get("ctx")
 
 
 def served_up(mid: str) -> bool | None:

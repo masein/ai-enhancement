@@ -4953,6 +4953,48 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17j.5 — the page (7 Oct)
+
+- **"This server" only on the run's own log** (point 28, `where_check`): a run
+  with no import record was relabelled "this server" when its log was missing
+  or its bundle's name held a space. Now only when its log is here and isn't
+  an import's; an import's header is read with a space in the name and
+  without "by <name>".
+- **A rented run is one line, as its neighbours** (29): the model by its board
+  name (no `served/…`, no instruct badge), the count, its bar and when the
+  step finishes side by side ("→ Thu 00:51"), "4 boxes ▸" only for more than
+  one box (one box's own finish on its where line), sorted and paged with the
+  other runs by the chosen column (by "#": when each started), no longer
+  pinned on top.
+- **A parity step done and an abandoned step aren't rows** (30, 31,
+  `rented_runs`): their box's line says "parity done" or "A3-2 abandoned";
+  the fetch posts an abandoned step as `abandoned` (it read "No contact" for a
+  day). A parity step still asking is a row: it is running.
+- **The search finds rented runs by the words they show** (32): the board
+  name, Frontier, the benchmarks, "thinking on/off", where and status.
+- **A step asking two benchmarks counts both** (33, `_benchmarks`): each
+  benchmark done, asked now or next ("GPQA Diamond 120 of 198 · OTIS Mock
+  AIME 2024–2025 next"), the plan's count for one the line doesn't give; the
+  step's finish counts the benchmarks after the one asked now.
+- **One spelling** (34): running, done, loading the model, stopped, "no
+  contact for 3 h" — as a run here. "No contact" is a status of its own,
+  under the filter "active", never "running". The top line: "Rented boxes
+  read 1 min ago · next in about 3 min".
+- **At 400 px the table fits** (35): under 640 px each row is a small grid —
+  the model and status, then the progress and actions; the number, the time,
+  the suite, who and the GPU give way.
+- **Copy works over http on the tailnet** (36, `copyText`): no secure
+  context, no `navigator.clipboard`: a hidden textarea and
+  `execCommand('copy')` in the click itself, for the Playground's copy, the
+  alarm's and every other; it says when even that didn't copy.
+- **A served model's window isn't its file** (37): the Playground's limit is
+  the window its server runs with now (`served.live_window`, read by the
+  background health check); a run refused for the window alone says so
+  (`WINDOW_LINE`), and the model's page offers "Use the new window"
+  (`POST /api/served/window`), which keeps the key it has.
+- Tests: `tests/test_17j_page.py`, `tests/test_17j_page_browser.py`,
+  `tests/test_17j_window.py`, `tests/test_17j_copy_window_browser.py`.
+
 ### 17j.4 — the export (7 Oct)
 
 - **The scrub's names worked out, said, and checked** (point 22,
@@ -4988,6 +5030,7 @@ Not before the demo: a new hidden set changes every Everyday score.
   token no longer passes as `CUDA_VISIBLE_DEVICES`; a run's `where` is
   picked from a list (`where_of`).
 - Tests: `tests/test_17j_export.py`, `tests/test_17j_export_browser.py`.
+
 
 ### 17j.3 — the boxes and the fetch (7 Oct)
 

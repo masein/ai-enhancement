@@ -291,7 +291,7 @@ def wait_for(sid: int, rec: dict, log_path: Path, what: str = "devicemark parity
     t0, said = time.time(), False
     while True:
         why = _served.check_pin(rec)
-        if not why or why == _served.CHANGED_LINE:
+        if not why or _served.changed(why):          # 17j: a window alone too
             return why
         if db.cancel_requested(sid):
             return "canceled"

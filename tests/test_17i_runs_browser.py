@@ -40,6 +40,10 @@ def runs_page(page, live):
     page.goto("about:blank")
     page.goto(live["base"] + "/#tab=runs")
     page.wait_for_selector("[data-queue-table]")
+    # 17j: a rented run pages with the rest, by when it started: these
+    # started this morning, under the day's runs here — found as a person
+    # finds them, by where they ran
+    where(page, "rented")
 
 
 def where(page, value):
@@ -77,8 +81,9 @@ def test_27_a_run_on_four_boxes_is_one_row_of_runs_and_its_import_replaces_it(li
     row = run_row(page, m, HLE)
     row.wait_for()                                       # 511854e: a table apart
     assert row.locator("td").count() == page.locator("[data-queue-table] thead th").count()
-    assert row.locator("[data-rented-count]").inner_text() == "414 of 2,158 · 4 boxes"
-    assert row.locator("[data-stage]").inner_text() == "Running"
+    assert row.locator("[data-rented-count]").inner_text() == "414 of 2,158"
+    assert row.locator("[data-rented-open]").inner_text() == "4 boxes ▸"   # 17j
+    assert row.locator("[data-stage]").inner_text() == "running"
     assert row.locator("[data-run-bar]").count() == 1
     assert row.locator("[data-run-where]").inner_text() == "rented GPU · boxes A1, A2, A3, A4"
     row.locator("[data-rented-open]").click()
@@ -102,7 +107,8 @@ def test_27_a_run_on_four_boxes_is_one_row_of_runs_and_its_import_replaces_it(li
     page.evaluate("state.boxesAt = 0; loadQueue()")
     sel = f"[data-rented-run='rented:{m}|{HLE}|on'] [data-rented-count]"
     page.wait_for_function(f"(document.querySelector(\"{sel}\") || {{}}).textContent"
-                           " === '311 of 1,618 · 3 boxes'", timeout=10000)
+                           " === '311 of 1,618'", timeout=10000)
+    assert run_row(page, m, HLE).locator("[data-rented-open]").inner_text() == "3 boxes ▾"  # open
     page.wait_for_selector(f"[data-queue-row='{sid}']")
     assert page.errors == []
 
@@ -122,10 +128,11 @@ def test_28_each_state_in_plain_words(live, page):
           {**step("served/w-bf16", "A3", "A3-2", line="Humanity's Last Exam 25 of 539 · "
                   "2.4 h left"), "at": now - 3 * 3600}])
     runs_page(page, live)
-    want = {"served/w-done": "Done", "served/w-run": "Running",
-            "served/w-load": "Loading the model",
-            "served/w-stop": "Stopped: llama-server didn't come up",
-            "served/w-gone": "No contact for 3 h", "served/w-bf16": "Stopped? No word for 3 h"}
+    # 17j: spelt as a run here is
+    want = {"served/w-done": "done", "served/w-run": "running",
+            "served/w-load": "loading the model",
+            "served/w-stop": "stopped: llama-server didn't come up",
+            "served/w-gone": "no contact for 3 h", "served/w-bf16": "stopped? no word for 3 h"}
     for m, words in want.items():
         chip = run_row(page, m, HLE).locator("[data-stage]")
         chip.wait_for()
@@ -152,12 +159,12 @@ def test_29_this_benchmarks_finish_and_its_boxs_are_two_times(live, page):
     box = page.evaluate("state.boxes.boxes.find(b => b.model === 'served/two-times')")
     assert abs(finish - (box["at"] + 2.4 * 3600)) < 5     # 511854e: the box's, later steps in
     assert box["box_finish"] > box["task_finish"] == finish
-    assert row.locator("[data-rented-finish]").inner_text().startswith("this benchmark finishes ")
-    row.locator("[data-rented-open]").click()
-    line = page.locator("[data-rented-box='A9|A9-1']")
-    line.wait_for()
-    assert line.locator("[data-box-task-finish]").inner_text().startswith(" · this benchmark ")
-    assert line.locator("[data-box-finish]").inner_text().startswith(" · its box ")
+    # 17j: beside the count; one box has nothing to open — its box's time on
+    # its where line
+    assert row.locator("[data-rented-finish]").inner_text().startswith("→ ")
+    assert row.locator("[data-rented-open]").count() == 0
+    assert row.locator("[data-run-where] [data-box-finish]").inner_text().startswith(
+        " · its box → ")
     assert page.errors == []
 
 
@@ -174,10 +181,10 @@ def test_30_the_list_says_when_it_was_read_and_a_row_only_when_it_is_behind(live
     line = page.locator("[data-rented-line]")
     line.wait_for()                                       # 511854e: "13m ago" on every row
     words = line.inner_text()
-    assert "as frontier_fetch.py read them" in words and "the next reading in about 3 min" in words
+    assert words.startswith("Rented boxes read ") and "next in about 3 min" in words   # 17j
     assert run_row(page, "served/fresh", HLE).locator("[data-rented-heard]").count() == 0
     late = run_row(page, "served/late", HLE).locator("[data-rented-heard]")
-    assert late.inner_text().startswith("last heard ")
+    assert late.inner_text().startswith("heard ")
     # the docs' fetch line reads every 3 minutes
     docs = (REPO / "docs" / "REMOTE-RUNS.md").read_text()
     g3 = next(x for x in docs.splitlines() if x.startswith("python3 scripts/frontier_fetch.py"))

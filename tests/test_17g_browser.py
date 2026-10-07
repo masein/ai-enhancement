@@ -175,7 +175,7 @@ def test_18_the_poll_redraws_the_boxes_list(live, page):
     # 17i: the second box merged into its run's row
     page.evaluate("state.boxesAt = 0; state.queueRedraw()")
     page.wait_for_function(f"(document.querySelector(\"{run}\") || {{}}).textContent"
-                           " === '6,000 of 24,064 · 2 boxes'", timeout=10000)
+                           " === '6,000 of 24,064'", timeout=10000)        # 17j: the boxes ▸
     assert page.errors == []
 
 

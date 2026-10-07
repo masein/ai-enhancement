@@ -78,6 +78,6 @@ def test_13_16_runs_says_where_each_ran_and_what_the_boxes_are_doing(live, page)
     a5.wait_for()
     assert "3,000 of 12,032" in a5.inner_text() and "MMLU-Pro" in a5.inner_text()
     a9 = page.locator("[data-rented-run='rented:served/board-box|hle_text_cais|off']")
-    assert a9.locator("[data-stage]").inner_text() == "Done"
+    assert a9.locator("[data-stage]").inner_text() == "done"        # 17j: one spelling
     assert "203.0.113" not in page.locator("[data-queue-table]").inner_text()
     assert page.errors == []

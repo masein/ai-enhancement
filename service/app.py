@@ -1063,6 +1063,47 @@ def served_up(id: str = ""):
             if up is False else chat.CHECKING + "."}
 
 
+@app.get("/api/served/pin")
+def served_pin(id: str = ""):
+    """17j: whether a served model's server still runs it as registered, for
+    its page — and, when only the context window differs (started again with
+    another -c), both windows, so the page offers "Use the new window"
+    rather than "a different file"""
+    rec = served.get(id)
+    if not rec:
+        raise HTTPException(404, f"{id} is not registered")
+    if served.is_openrouter(rec):
+        return {"id": id, "why": "", "window": None}
+    try:
+        now = served.pin_of(served.probe(rec["base_url"], rec.get("key", "")))
+    except ValueError as e:
+        return {"id": id, "why": str(e), "window": None, "down": True}
+    diff = served.pin_diff(rec, now)
+    return {"id": id, "why": served.pin_words(rec, now),
+            "window": {"now": now.get("ctx"), "was": rec["pin"].get("ctx")}
+            if diff == ["ctx"] else None}
+
+
+class WindowIn(BaseModel):
+    model: str
+    by: str = ""
+
+
+@app.post("/api/served/window")
+def served_window(a: WindowIn, x_token: str = Header(default="")):
+    """17j: Use the new window — the pin's context window set to the one its
+    server runs it with now, when that is all that changed. No key asked:
+    the one kept is used"""
+    _check_token(x_token)
+    _name(a.by, "taking a served model's new context window")
+    try:
+        rec = served.use_new_window(a.model.strip(), a.by.strip()[:80])
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    _cache.update(key=None, payload=None, at=0.0)
+    return {"model": served.public(rec)}
+
+
 # ---------------------------------------------------------------------------
 # 16b.1: Add a model ▸ On my computer — a .gguf file, or a model folder as a
 # .zip, in pieces that resume (service/uploads.py)
