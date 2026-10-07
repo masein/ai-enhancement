@@ -203,6 +203,14 @@ CREATE TABLE IF NOT EXISTS public_models (
   set_by      TEXT NOT NULL,
   set_at      REAL NOT NULL
 );
+-- 17j: the public file a model is, as its page gives it (a Hugging Face
+-- repository and a path), and what the board's check of it found
+CREATE TABLE IF NOT EXISTS public_files (
+  model       TEXT PRIMARY KEY,
+  data        TEXT NOT NULL,
+  set_by      TEXT NOT NULL,
+  set_at      REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS model_sizes (
   model       TEXT PRIMARY KEY,
   total       REAL NOT NULL,
@@ -1060,6 +1068,31 @@ def public_set(model: str, on: bool, by: str) -> None:
                       "set_at=excluded.set_at", (model, by, time.time()))
         else:
             c.execute("DELETE FROM public_models WHERE model=?", (model,))
+        c.commit()
+
+
+def public_files_all() -> dict[str, dict]:
+    """17j: {model: {repo, path, sha256, same, why, at, by}} — the public file
+    each model's page gave, and what the check found"""
+    if not config.DB_PATH.exists():
+        return {}
+    try:
+        with closing(_conn()) as c:
+            rows = c.execute("SELECT model, data, set_by FROM public_files").fetchall()
+    except sqlite3.OperationalError:
+        return {}
+    return {m: {**json.loads(d), "by": by} for m, d, by in rows}
+
+
+def public_file_set(model: str, rec: dict | None, by: str) -> None:
+    with closing(_conn()) as c:
+        if rec:
+            c.execute("INSERT INTO public_files (model, data, set_by, set_at) VALUES (?,?,?,?) "
+                      "ON CONFLICT(model) DO UPDATE SET data=excluded.data, "
+                      "set_by=excluded.set_by, set_at=excluded.set_at",
+                      (model, json.dumps(rec), by, time.time()))
+        else:
+            c.execute("DELETE FROM public_files WHERE model=?", (model,))
         c.commit()
 
 

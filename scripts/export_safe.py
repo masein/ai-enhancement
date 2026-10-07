@@ -31,10 +31,14 @@ the first."""
 
 from __future__ import annotations
 
+import base64
+import binascii
+import html
 import json
 import os
 import re
 import shlex
+import socket
 import sys
 import unicodedata
 from pathlib import Path
@@ -44,10 +48,43 @@ import urllib.parse
 # fields
 # ---------------------------------------------------------------------------
 
-TEXT, NAME, ANY, SCALAR = "text", "name", "any", "scalar"
+TEXT, NAME, ANY, SCALAR, WHERE = "text", "name", "any", "scalar", "where"
 _KEY = re.compile(r"[\w.,+@ -]{1,80}")
 _TEXT = re.compile(r"[\w .,:;()/+%·–—'’-]{0,200}", re.U)
 _NAME = re.compile(r"[\w.+@-]{1,160}(/[\w.+@-]{1,160}){0,2}")
+
+
+# 17j: where a run ran, picked from a list — "this server", or "rented GPU"
+# with the cards it knows by name and the boxes' plan labels (A3, A3-2). It
+# was scrubbed but free: a box's label took any text
+_GPU = re.compile(r"(?:(?:NVIDIA )?(?:GeForce )?RTX (?:PRO )?\d{4}(?: Ti| SUPER| D)?"
+                  r"(?: Ada Generation| Blackwell(?: Server Edition| Workstation Edition)?)?|"
+                  r"(?:NVIDIA )?RTX A\d{4}|(?:NVIDIA )?[ABHL]\d{2,3}S?(?: (?:PCIe|SXM\d?|NVL|"
+                  r"\d{2,3}GB(?: HBM\de?)?))*|(?:NVIDIA )?GH\d{3}|(?:Tesla )?(?:V100|T4|P100))")
+_LABEL = re.compile(r"[A-Z]{1,2}\d{1,3}(?:-\d{1,2})?")
+
+
+def where_of(text) -> str:
+    """17j: a run's where, as one of the forms on the list; anything else is
+    'rented GPU' (a run here is always 'this server')"""
+    t = str(text or "").strip()
+    if t == "this server" or not t:
+        return "this server"
+    parts = [x.strip() for x in t.split(" · ")]
+    if parts[0] != "rented GPU":
+        return "rented GPU"
+    out = ["rented GPU"]
+    for x in parts[1:]:
+        m = re.fullmatch(r"box(?:es)? (.+)", x)
+        if m:
+            labels = [y.strip() for y in m.group(1).split(",")]
+            if labels and all(_LABEL.fullmatch(y) for y in labels):
+                out.append(("boxes " if len(labels) > 1 else "box ") + ", ".join(labels))
+            continue
+        cards = [y.strip() for y in x.split(",")]
+        if cards and all(_GPU.fullmatch(re.sub(r"^\d{1,2} × ", "", y)) for y in cards):
+            out.append(", ".join(cards))
+    return " · ".join(out)
 
 
 def _ok_str(v: str, kind: str) -> bool:
@@ -82,6 +119,8 @@ def pick(obj, schema):
         if isinstance(obj, (bool, int, float)):
             return obj
         return obj if isinstance(obj, str) and _ok_str(obj, TEXT) else None
+    if schema == WHERE:
+        return where_of(obj) if isinstance(obj, str) else None
     if schema in (TEXT, NAME, ANY):
         return obj if isinstance(obj, str) and _ok_str(obj, schema) else None
     if schema is float:
@@ -130,6 +169,53 @@ ENV_VALUES = {"LLAMA_MOE_ROUTE_MODE", "LLAMA_MOE_ROUTE_LOOKAHEAD", "LLAMA_ARG_CT
               "CUDA_VISIBLE_DEVICES", "OMP_NUM_THREADS"}
 _SECRETISH = re.compile(r"KEY|TOKEN|SECRET|PASS|AUTH|CRED", re.I)
 
+# 17j: each value by its kind, not by its characters — a 23-character token
+# passed as CUDA_VISIBLE_DEVICES. A flag or variable with no kind here goes out
+# without its value
+_INT = r"-?\d{1,9}"
+_FLOAT = r"-?\d{1,9}(?:\.\d{1,9})?(?:e-?\d{1,3})?"
+_SWITCH = r"(?i:on|off|auto|true|false|enabled|disabled|[01])"
+_CACHE = r"f32|f16|bf16|q8_0|q4_0|q4_1|iq4_nl|q5_0|q5_1"
+_TENSORS = r"(?:blk|ffn|exps|attn|token_embd|output|shexp)"
+_OT_ONE = (rf"[\w.\\|()^$*+?\[\]-]{{0,60}}{_TENSORS}[\w.\\|()^$*+?\[\]-]{{0,60}}"
+           r"=(?:CPU|CUDA\d{1,2}|CUDA_Host)")
+KINDS = {
+    **{f: _INT for f in ("-c", "--ctx-size", "-np", "--parallel", "--n-cpu-moe", "-ncmoe",
+                         "-b", "--batch-size", "-ub", "--ubatch-size", "--reasoning-budget",
+                         "--yarn-orig-ctx", "--top-k", "--seed", "-t", "--threads", "-mg",
+                         "--main-gpu", "--draft-max", "--draft-min")},
+    **{f: _INT + "|all|auto" for f in ("-ngl", "--n-gpu-layers", "--gpu-layers")},
+    **{f: _FLOAT for f in ("--rope-scale", "--rope-freq-base", "--temp", "--top-p", "--min-p",
+                           "--draft-p-min", "--defrag-thold", "-dt")},
+    **{f: "on|off|auto" for f in ("-fa", "--flash-attn")},
+    **{f: _CACHE for f in ("-ctk", "--cache-type-k", "-ctv", "--cache-type-v")},
+    "--reasoning-format": "none|deepseek|deepseek-legacy|auto",
+    "--rope-scaling": "none|linear|yarn",
+    **{f: "none|layer|row" for f in ("-sm", "--split-mode")},
+    **{f: r"\d{1,3}(?:\.\d{1,3})?(?:,\d{1,3}(?:\.\d{1,3})?){0,15}" for f in ("-ts",
+                                                                          "--tensor-split")},
+    **{f: rf"{_OT_ONE}(?:,{_OT_ONE}){{0,7}}" for f in ("-ot", "--override-tensor")},
+    "LLAMA_MOE_ROUTE_MODE": "lookahead|default|off|none|topk|greedy|static",
+    **{v: _INT for v in ("LLAMA_MOE_ROUTE_LOOKAHEAD", "LLAMA_ARG_CTX_SIZE", "LLAMA_ARG_N_PARALLEL",
+                         "LLAMA_ARG_BATCH", "LLAMA_ARG_UBATCH", "LLAMA_ARG_THREADS",
+                         "LLAMA_ARG_N_CPU_MOE", "LLAMA_ARG_REASONING_BUDGET",
+                         "GGML_SCHED_MAX_COPIES", "OMP_NUM_THREADS")},
+    "LLAMA_ARG_N_GPU_LAYERS": _INT + "|all|auto",
+    "LLAMA_ARG_FLASH_ATTN": "on|off|auto",
+    **{v: _CACHE for v in ("LLAMA_ARG_CACHE_TYPE_K", "LLAMA_ARG_CACHE_TYPE_V")},
+    "LLAMA_ARG_REASONING_FORMAT": "none|deepseek|deepseek-legacy|auto",
+    **{v: _SWITCH for v in ("LLAMA_ARG_JINJA", "LLAMA_ARG_CPU_MOE", "GGML_CUDA_FORCE_CUBLAS",
+                            "GGML_CUDA_FORCE_MMQ", "GGML_CUDA_NO_PINNED",
+                            "GGML_CUDA_ENABLE_UNIFIED_MEMORY")},
+    "CUDA_VISIBLE_DEVICES": r"\d{1,2}(?:,\d{1,2}){0,15}",
+}
+
+
+def of_kind(name: str, value: str) -> bool:
+    """17j: a flag's or a variable's value is of its kind"""
+    k = KINDS.get(name)
+    return bool(k) and bool(re.fullmatch(rf"(?:{k})", value))
+
 
 def _argv(x) -> list[str]:
     if isinstance(x, list):
@@ -166,7 +252,8 @@ def flags(x) -> tuple[list[str], int]:
         looks = nxt is not None and (not nxt.startswith("-") or bool(_NUM.fullmatch(nxt)))
         takes = not eq and looks and name not in SWITCHES
         val = inline if eq else (nxt if takes else "")
-        if name in FLAGS and (not val or _plain(val)) and not (eq and name in SWITCHES):
+        if name in FLAGS and (not val or (_plain(val) and of_kind(name, val))) \
+                and not (eq and name in SWITCHES):
             out += [f"{name}={val}"] if eq else [name, *([val] if val else [])]
         else:
             left += 1
@@ -189,7 +276,7 @@ def env(x) -> tuple[dict, int]:
     for k, v in items:
         if not ENV_NAMES.fullmatch(k) or _SECRETISH.search(k):
             left += 1
-        elif k in ENV_VALUES and (not v or _plain(v)):
+        elif k in ENV_VALUES and (not v or (_plain(v) and of_kind(k, v))):
             out[k] = v
         else:
             out[k] = WITHHELD
@@ -266,6 +353,7 @@ def _norm(t: str) -> str:
     or non-Latin question — \n, \t, \"), URL-encoding read, words joined by
     underscores split, case and width folded. 17i: each of those let a quote
     through the six-word rule"""
+    t = html.unescape(t)                     # 17j: &nbsp; between its words, &#39;, &amp;
     t = re.sub(r"\\u([0-9a-fA-F]{4})", lambda m: chr(int(m.group(1), 16)), t)
     t = t.replace("\\n", " ").replace('\\"', '"').replace("\\t", " ")
     if re.search(r"%[0-9a-fA-F]{2}", t):
@@ -275,12 +363,31 @@ def _norm(t: str) -> str:
     return " ".join(re.findall(r"[^\W_]+", t))
 
 
+_B64 = re.compile(r"[A-Za-z0-9+/_-]{16,}={0,2}")
+
+
+def _decoded(line: str) -> list[str]:
+    """17j: the text a line's base64 runs hold, where it is text"""
+    out = []
+    for m in _B64.finditer(line):
+        raw = m.group(0)
+        for dec in (base64.b64decode, base64.urlsafe_b64decode):
+            try:
+                t = dec(raw + "=" * (-len(raw) % 4)).decode("utf-8")
+            except (binascii.Error, ValueError, UnicodeDecodeError):
+                continue
+            if t and sum(c.isprintable() or c.isspace() for c in t) >= 0.9 * len(t):
+                out.append(t)
+                break
+    return out
+
+
 class Questions:
-    """the gated and private sets' questions, as runs of six words — a line
-    quoting any six words of one in a row (its first line, its middle, a later
-    line, JSON-escaped, URL-encoded, joined by underscores) is one that
-    quotes it"""
-    N = 6
+    """the gated and private sets' questions, as runs of five words — a line
+    quoting any five words of one in a row (its first line, its middle, a later
+    line, JSON-escaped, URL-encoded, joined by underscores, 17j: with &nbsp;
+    between them, or in base64) is one that quotes it"""
+    N = 5
 
     def __init__(self, texts: list[str]):
         self.grams: set = set()
@@ -294,11 +401,14 @@ class Questions:
             self.grams.update(" ".join(w[i:i + self.N]) for i in range(len(w) - self.N + 1))
 
     def quotes(self, line: str) -> bool:
-        n = _norm(line)
-        w = n.split()
-        if any(" ".join(w[i:i + self.N]) in self.grams for i in range(len(w) - self.N + 1)):
-            return True
-        return any(s in n for s in self.short)
+        for text in (line, *_decoded(line)):
+            n = _norm(text)
+            w = n.split()
+            if any(" ".join(w[i:i + self.N]) in self.grams for i in range(len(w) - self.N + 1)):
+                return True
+            if any(s in n for s in self.short):
+                return True
+        return False
 
 
 def _slots(line: str, models: list[str]) -> str:
@@ -315,10 +425,43 @@ def _slots(line: str, models: list[str]) -> str:
 
 
 def accounts() -> list[str]:
-    """SCRUB_ACCOUNTS: the Hugging Face accounts a private repository is kept
-    under — a line naming one is left out, wherever it stands"""
-    return [a.strip() for a in os.environ.get("SCRUB_ACCOUNTS", "").split(",")
-            if len(a.strip()) >= 2]
+    """the Hugging Face accounts a private repository is kept under (17j:
+    SCRUB_ACCOUNTS and those the board worked out) — a line naming one is left
+    out, wherever it stands"""
+    return scrub_names()["accounts"]
+
+
+# 17j: free words in a kept line's slots carried things out — the importer's
+# name in every imported run's header, an exception's text (a host that isn't
+# in SCRUB_HOSTS: the judge's) and the server's own words after "counted
+# wrong". These lines go out without them; a tagged line that still holds an
+# exception's text is left out
+_BY_NAME = re.compile(r"^(===== \[\d+\] imported .+? \(sha256 [0-9a-f]+\)) by [^:]{1,80}(: )")
+_REASON = re.compile(
+    r"^(\[frontier\] [\w-]+: question \S+, run \d+: the server failed on it twice"
+    r"(?:, on \d+ separate runs)? — written as no answer, counted wrong) \(.*\)$")
+_ASKED = re.compile(r"^(\[frontier\] .*?Nothing was asked) \(.*\)$")
+_KEPT = re.compile(r"^(\[frontier\] .*? · the answers it gave are kept: the next run asks only "
+                   r"the rest) \(.*\)$")
+_STOPPED = re.compile(r"the server stopped answering \(.*\)(?=: \d[\d,]* question)")
+_RUN_END = re.compile(rf"^({_T} the run: (?:failed|canceled|stopped))(?: · .*)?$")
+_EXCEPTION = re.compile(r"\b\w*(?:Error|Exception|Exit|Interrupt|Refused|Timeout)\b|"
+                        r"Traceback|\bErrno\b|\bstatus code\b|Max retries|Errno|"
+                        r"HTTPConnectionPool|NewConnectionError|getaddrinfo|\bresolve\b")
+_TAGGED = re.compile(r"^\[(?:frontier|import|devicemark|service)\] ")
+
+
+def _free_words_out(line: str) -> tuple[str, bool]:
+    """(the line without its free words, whether it may go out at all)"""
+    s = _BY_NAME.sub(r"\1\2", line)
+    s = _REASON.sub(r"\1", s)
+    s = _ASKED.sub(r"\1", s)
+    s = _KEPT.sub(r"\1", s)
+    s = _STOPPED.sub("the server stopped answering", s)
+    s = _RUN_END.sub(r"\1", s)
+    if _TAGGED.match(s) and _EXCEPTION.search(s):
+        return s, False
+    return s, True
 
 
 def log_lines(text: str, questions: Questions | None,
@@ -331,7 +474,8 @@ def log_lines(text: str, questions: Questions | None,
         return [], {"no question list": len(lines)}
     acct = [re.compile(rf"(?<![\w-]){re.escape(a)}(?![\w-])", re.I) for a in accounts()]
     out, left = [], {"not in a shape on the list": 0, "an address, a key, a host or a "
-                     "repository": 0, "quotes a question": 0}
+                     "repository": 0, "quotes a question": 0,
+                     "an exception's or a server's own words": 0}
     in_server = False
     for line in lines:
         s = line.rstrip()
@@ -341,8 +485,11 @@ def log_lines(text: str, questions: Questions | None,
             if s and in_server:
                 left["not in a shape on the list"] += 1
             continue
+        s, free = _free_words_out(s)
         if _RISKY.search(s) or any(a.search(s) for a in acct):
             left["an address, a key, a host or a repository"] += 1
+        elif not free:
+            left["an exception's or a server's own words"] += 1
         elif not any(p.fullmatch(_slots(s, models or [])) for p in _SHAPES):
             left["not in a shape on the list"] += 1
         elif questions.quotes(s):
@@ -365,21 +512,27 @@ def private_questions(say=None) -> Questions | None:
     quoted an HLE question): Frontier's gated and withheld benchmarks, the
     Everyday tasks' hidden half, the Knowledge exam's bank, Mobile-MMLU and
     Mobile-MMLU-Pro. None — no log at all — when one couldn't be loaded,
-    said with `say` (it was said only in the README)"""
+    said with `say` (it was said only in the README). 17j: and how many
+    questions each set gave, said — one absent here gave none, and no word"""
     from service import config
     texts: list[str] = []
     missing: list[str] = []
+    gave: list[tuple[str, int]] = []
 
-    def take(rows) -> None:
+    def take(name: str, rows) -> None:
+        n = 0
         for r in rows or []:
-            if isinstance(r, dict):
-                texts.extend(str(r[k]) for k in _TEXT_FIELDS if isinstance(r.get(k), str))
+            got = [str(r[k]) for k in _TEXT_FIELDS if isinstance(r, dict)
+                   and isinstance(r.get(k), str)]
+            texts.extend(got)
+            n += bool(got)
+        gave.append((name, n))
     import frontier as fb
     for t in fb.TASKS:
         if t in FRONTIER_SHOWN:
             continue
         try:
-            take(fb.load(t, config.BENCH_ROOT))
+            take(fb.BENCH[t]["label"], fb.load(t, config.BENCH_ROOT))
         except Exception:                               # noqa: BLE001 — fail closed
             missing.append(fb.BENCH[t]["label"])
     loaders = []
@@ -404,15 +557,22 @@ def private_questions(say=None) -> Questions | None:
         pass
     for name, load in loaders:
         try:
-            take(load())
+            take(name, load())
         except Exception:                               # noqa: BLE001 — fail closed
             missing.append(name)
+    if say:
+        say("the logs are checked against: " + ", ".join(
+            f"{name} {n:,}" if n else f"{name} 0 (none on this server)" for name, n in gave))
     if missing:
         if say:
             say(f"no log: {', '.join(missing)} couldn't be loaded to check the log against "
-                "(each log line is checked against every gated and private set)")
+                "(each log line is checked against every gated and private set) — every run "
+                "is written without its log, and the export exits 1")
         return None
     return Questions(texts)
+
+
+UNLOADED = object()                     # 17j: the sets not loaded yet (None: one couldn't be)
 
 
 # ---------------------------------------------------------------------------
@@ -444,21 +604,147 @@ def file_of(model: str) -> dict:
     name = gp.get("name") or fs.get("name") or (rec.get("pin") or {}).get("file") or ""
     src = fs.get("source") or (f"{rec['gguf_path']} on this server" if rec.get("gguf_path")
                                else "")
+    from service import public_files as pf
+    public = pf.words(model, pf.get(model))
     return {k: v for k, v in (("file", name), ("sha256", sha), ("source", src),
-                              ("parts", len(fs.get("parts") or []))) if v}
+                              ("parts", len(fs.get("parts") or [])), ("public", public)) if v}
+
+
+# ---------------------------------------------------------------------------
+# 17j: the names the scrub removes — given, and worked out
+# ---------------------------------------------------------------------------
+
+NAME_MIN = 3
+_HOST_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)*")
+_ACCOUNT_NAME = re.compile(r"[A-Za-z0-9][\w.-]*")
+# a host the scrub takes when the board's own settings name it: one that
+# isn't a public name (a container's, the tailnet's, an internal one)
+_OWN_HOST = re.compile(r"(?i)[a-z0-9-]+|.+\.(?:internal|local|localdomain|lan|home|corp|"
+                       r"intranet|private|docker|ts\.net)")
+_NOT_HOSTS = {"localhost", "host.docker.internal"}
+_HF_REPO = re.compile(r"(?i)(?:\bhf://|\bhuggingface\.co/(?:models/|datasets/)?)"
+                      r"([A-Za-z0-9][\w.-]*)/([\w.-]+)")
+_names: dict = {}
+
+
+def _given(var: str, ok: re.Pattern, what: str) -> tuple[list[str], list[str]]:
+    """(the names an environment variable gives, what is wrong with it)"""
+    raw = os.environ.get(var, "")
+    names, bad = [], []
+    for v in (x.strip() for x in raw.split(",")):
+        if not v:
+            continue
+        if len(v) < NAME_MIN:
+            bad.append(f'{var}: "{v}" is too short to be {what}')
+        elif not ok.fullmatch(v):
+            bad.append(f'{var}: "{v}" isn\'t {what}')
+        else:
+            names.append(v)
+    if raw.strip() and not names and not bad:
+        bad.append(f'{var}: "{raw}" gives no name')
+    return names, bad
+
+
+def _host(url: str) -> str:
+    try:
+        h = urllib.parse.urlsplit(url if "//" in url else "//" + url).hostname or ""
+    except ValueError:
+        return ""
+    return h.lower()
+
+
+def _worked_out() -> tuple[list[str], list[str], list[str]]:
+    """(the hosts the board's own settings name, the names it was opened by,
+    the accounts of the repositories its models were fetched from but those
+    of a checked public file) — what the export needn't be told"""
+    hosts: set[str] = set()
+    urls = [v for k, v in os.environ.items() if k.endswith("_URL") and isinstance(v, str)]
+    seen: list[str] = []
+    accts: set[str] = set()
+    try:
+        from service import config, db
+        from service import public_files as pf
+        urls.append(config.LOCAL_BASE_URL)
+        recs = db.served_all() if config.DB_PATH.exists() else []
+        urls += [str(r.get("base_url") or "") for r in recs]
+        seen = pf.seen_hosts()
+        checked = {(x.get("repo") or "").lower() for m, x in db.public_files_all().items()
+                   if pf.still_same(m, x)}
+        for r in recs:
+            for acct, repo in _HF_REPO.findall(json.dumps(r)):
+                if f"{acct}/{repo}".lower().split("@")[0] not in checked:
+                    accts.add(acct)
+    except Exception:                                   # noqa: BLE001 — what was given alone
+        pass
+    for u in urls:
+        h = _host(u)
+        if h and h not in _NOT_HOSTS and _OWN_HOST.fullmatch(h) and not re.fullmatch(r"[\d.]+", h):
+            hosts.add(h)
+    return sorted(hosts), sorted(seen), sorted(accts)
+
+
+def scrub_names() -> dict:
+    """17j: {hosts, accounts, server, problems} — the hosts and accounts the
+    scrub removes: those given (SCRUB_HOSTS, SCRUB_ACCOUNTS) and those the
+    board works out (this container's name, the hosts its settings name, the
+    names it was opened by; the accounts of the repositories its models were
+    fetched from). `server`: this server's own names, given or seen — the
+    container's own name isn't one. `problems`: why public/ is refused"""
+    me = socket.gethostname() or ""
+    key = (os.environ.get("SCRUB_HOSTS"), os.environ.get("SCRUB_ACCOUNTS"), me,
+           os.environ.get("BENCH_ROOT"), _stamp())
+    if _names.get("key") == key:
+        return _names["value"]
+    hosts, bad_h = _given("SCRUB_HOSTS", _HOST_NAME, "a host's name")
+    accts, bad_a = _given("SCRUB_ACCOUNTS", _ACCOUNT_NAME, "an account's name")
+    own, seen, found = _worked_out()
+    server = [h for h in [*hosts, *seen] if h.lower() != me.lower()
+              and h.lower().split(".")[0] != me.lower()]
+    problems = [*bad_h, *bad_a]
+    if not server:
+        problems.append("this server's own name isn't known: give SCRUB_HOSTS=\"$(hostname)\" "
+                        "from the server's shell" + (f" (the container's own name, {me}, isn't "
+                                                     "it)" if me and me in hosts else ""))
+    all_accts = sorted({*accts, *found}, key=str.lower)
+    if not all_accts:
+        problems.append("SCRUB_ACCOUNTS is empty and no account was found in where the board's "
+                        "models were fetched from: give it the Hugging Face accounts the private "
+                        "repositories are kept under")
+    names = [x for h in [*hosts, *seen, *own, me] if h for x in (h, h.split(".")[0])]
+    out = {"hosts": sorted({h for h in names if len(h) >= NAME_MIN}, key=str.lower),
+           "accounts": [a for a in all_accts if len(a) >= 2],
+           "server": server, "problems": problems}
+    _names.update(key=key, value=out)
+    return out
+
+
+def _stamp() -> tuple:
+    """what the worked-out names depend on, cheaply: the database's and the
+    seen names' times"""
+    try:
+        from service import config
+        from service import public_files as pf
+        return tuple(x.stat().st_mtime_ns if x.exists() else 0
+                     for x in (config.DB_PATH, pf.seen_path()))
+    except Exception:                                   # noqa: BLE001
+        return ()
 
 
 def refused_public() -> str:
-    """17i: '' when public/ may be written; else why not — the scrub's names
-    for this server's hosts and the private repository's accounts must be
-    given, or a host or an account name reaches a public file"""
-    gone = [v for v in ("SCRUB_HOSTS", "SCRUB_ACCOUNTS") if not os.environ.get(v, "").strip()]
-    if not gone:
+    """17i: '' when public/ may be written; else why not. 17j: a value too
+    short to be a name, a container's name for the server's, or an account
+    no one gave and none found — each refuses, said"""
+    got = scrub_names()
+    if not got["problems"]:
         return ""
-    return (f"public/ refused: {' and '.join(gone)} {'is' if len(gone) == 1 else 'are'} empty — "
-            "give SCRUB_HOSTS the server's host names and SCRUB_ACCOUNTS the Hugging Face "
-            "accounts the private repositories are kept under (docs/REMOTE-RUNS.md § "
+    return ("public/ refused: " + "; ".join(got["problems"]) + " (docs/REMOTE-RUNS.md § "
             "Publishing the raw runs). Everything goes to private/")
+
+
+def will_remove() -> str:
+    got = scrub_names()
+    return (f"will remove: hosts {', '.join(got['hosts']) or 'none'}; "
+            f"accounts {', '.join(got['accounts']) or 'none'}")
 
 
 def confirm(models: list[str], ask=None, say=print) -> bool:
@@ -467,17 +753,26 @@ def confirm(models: list[str], ask=None, say=print) -> bool:
     public/. Closed stdin is a no, never a traceback"""
     if not models:
         return True
-    ask = ask or input
+    say(will_remove())                      # 17j: what the scrub takes, above the list
     say("These would go to public/, for anyone to download:")
     for m in sorted(set(models)):
         f = file_of(m)
         say(f"  {m}" + (f" — {f['file']}" if f.get("file") else " — no file recorded")
             + (f" ({f['parts']} parts)" if f.get("parts") else "")
             + (f", sha256 {f['sha256']}" if f.get("sha256") else ", no sha256 recorded")
-            + (f", from {f['source']}" if f.get("source") else ", its source not recorded"))
+            + (f", {f['public']}" if f.get("public") else
+               f", from {f['source']}" if f.get("source") else ", its source not recorded"))
+        if not f.get("public"):
+            # 17j: a team build marked public by mistake reads like a public one
+            say("    CHECK: not shown to be a public file — give its Hugging Face repository "
+                "and path on the model's page, where the board checks its sha256")
+    if ask is None and (sys.stdin is None or sys.stdin.closed):
+        say("")                             # 17j: closed stdin (<&-): a no, never a traceback
+        return False
+    ask = ask or input
     try:
         got = ask("Type yes to publish them (anything else keeps them in private/): ")
-    except (EOFError, OSError, ValueError, KeyboardInterrupt):
+    except (EOFError, OSError, ValueError, RuntimeError, KeyboardInterrupt):
         say("")                             # closed stdin: "I/O operation on closed file"
         got = ""
     return str(got).strip().lower() == "yes"

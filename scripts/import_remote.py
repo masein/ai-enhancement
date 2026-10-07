@@ -427,7 +427,8 @@ def import_devicemark(b: dict, path: Path, by: str, say=print) -> int:
                                                     []))
     log = config.LOGS_DIR / f"service_{sid}_{model.replace('/', '__')}.log"
     log.parent.mkdir(parents=True, exist_ok=True)
-    log.write_text(f"===== [{sid}] imported {path.name} (sha256 {b['sha256'][:16]}) by {by}: "
+    # 17j: no name in the header — it went out with every exported log
+    log.write_text(f"===== [{sid}] imported {path.name} (sha256 {b['sha256'][:16]}): "
                    f"{', '.join(tasks)}{of} {where} =====\n" + b["log"]
                    + "".join(f"\n[import] {x}" for x in lines) + f"\n[import] {line}\n",
                    encoding="utf-8")

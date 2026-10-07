@@ -264,9 +264,16 @@ sudo docker compose exec -T -e SCRUB_HOSTS="$(hostname)" -e SCRUB_ACCOUNTS=<your
 `SCRUB_HOSTS` gives the export the server's host name to remove: inside the
 container, the host name is the container's. `SCRUB_ACCOUNTS` (17g) gives
 the Hugging Face accounts to remove wherever they name a path (the account
-the builds and the llama-server tarball are kept under). 17i: with either
-empty, nothing goes to `public/` — the export says so, writes every run to
-`private/`, and exits 1.
+the builds and the llama-server tarball are kept under). 17j: the export
+works out the rest itself — the container's name, the hosts the board's
+settings name (the judge's, a served model's), the names a browser opened
+the board by, and the accounts of the repositories its models were fetched
+from (but a checked public file's) — and prints `will remove: hosts …;
+accounts …` above the list it asks a yes to. Nothing goes to `public/` (the
+export says why, writes every run to `private/`, and exits 1) when a value
+given is too short to be a name (`x`, `,`), when this server's own name isn't
+known (`SCRUB_HOSTS` empty or the container's own name, and no name seen),
+or when no account is given or found.
 
 **What it writes.** One folder a row, under `~/benchmarks/raw-export/public/` or `…/private/`:
 - `items.jsonl`, `setup.json`, `scores.json` and `log.txt`;
@@ -283,10 +290,17 @@ empty, nothing goes to `public/` — the export says so, writes every run to
   are public: mark them on their pages. Never mark an in-house build (a
   fine-tune, the phone build). DeviceMark's calibration models: mark them on
   their pages first.
+- 17j: the model's page records the public file it is — its Hugging Face
+  repository and path ("Give its public file", under the mark). The board
+  asks Hugging Face for it as anyone would (no token) and compares the sha256
+  Hugging Face publishes with the registered file's (each part's, for a GGUF
+  in parts); a model run by its Hugging Face id is checked as that
+  repository.
 - Before anything goes to `public/`, the export lists the models it would
   publish — each with its file, that file's sha256 (a GGUF in parts: its
-  split identity) and where it came from — and waits for a typed `yes`;
-  anything else (closed stdin too) keeps them in `private/`. `--private`
+  split identity) and "the same file as unsloth/…, checked", or, for any
+  other, `CHECK: not shown to be a public file` — and waits for a typed
+  `yes`; anything else (closed stdin too, `<&-`) keeps them in `private/`. `--private`
   keeps every run private; `--public` is refused, and nothing is written.
 - A run written to `private/` removes its `public/` folder from an earlier
   export, and says so: clear a mark, export again, and upload, and the public
@@ -296,7 +310,9 @@ empty, nothing goes to `public/` — the export says so, writes every run to
 (`scripts/export_safe.py`) — never the whole record, scrubbed. A launch's
 flags by name (the context, slots, cache, attention, experts, template,
 reasoning and rope flags; 17i: each known to take a value or not — a switch
-never carries the next word out), its variables by name (`LLAMA_MOE_*`,
+never carries the next word out; 17j: a value only of its flag's kind — a
+number, one of its words, a list of devices — never any other text), its
+variables by name (`LLAMA_MOE_*`,
 `GGML_*`, `LLAMA_ARG_*`) — 17i: with their values only for those on
 `ENV_VALUES` (the routing, context, slots, GPU layers, attention, cache
 types, batch, threads, experts on the CPU, reasoning, a few CUDA switches,
@@ -316,10 +332,15 @@ address, a URL, a user@host, a key's name or a private repository's name
 DeviceMark's, is checked against every gated and private set on the server
 — Frontier's gated and withheld benchmarks whatever the run asked, the
 Everyday tasks' hidden half, the Knowledge exam's bank, Mobile-MMLU and
-Mobile-MMLU-Pro — a line quoting six words in a row of a question is left
-out, read through JSON's `\uXXXX` escapes, URL-encoding and underscores; a
-set that can't be loaded means no log at all, said on the terminal and in
-the README. The README says how many lines and launch settings were left
+Mobile-MMLU-Pro — a line quoting five words in a row of a question (17j) is
+left out, read through JSON's `\uXXXX` escapes, URL-encoding, underscores,
+HTML's `&nbsp;` and base64; the sets are loaded once, and the export says how
+many questions each gave (one absent here: 0, said); a set that can't be
+loaded means no log at all, said on the terminal and in the README, and the
+export exits 1. 17j: a kept line goes out without its free words — an
+import's header without who imported it, a run's failure without its error,
+a question written off without the server's reason — and a tagged line that
+still holds an exception's text is left out. The README says how many lines and launch settings were left
 out. The scrub runs last, on what is left, the README too.
 
 **DeviceMark rows only.** Any other run is refused.

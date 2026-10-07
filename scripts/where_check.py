@@ -31,7 +31,8 @@ import sqlite3
 import sys
 from pathlib import Path
 
-_HEADER = re.compile(r"^===== \[(?P<sid>\d+)\] imported \S+ \(sha256 [0-9a-f]+\) by .*?"
+# 17j: an import's header no longer names who imported it ("by <name>")
+_HEADER = re.compile(r"^===== \[(?P<sid>\d+)\] imported \S+ \(sha256 [0-9a-f]+\)(?: by [^:]*)?: .*?"
                      r"run on a rented GPUs? \((?P<gpu>.*)\)(?P<rest>.*?) =====$")
 _BOX = re.compile(r" · box (\S+)")
 

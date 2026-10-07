@@ -137,6 +137,7 @@ WHAT_THE_SCRUB_REMOVES = (
 def scrub(text: str, env: dict | None = None, hosts: list[str] | None = None) -> str:
     """text fit to publish: no keys, no home paths, no host names, no private
     addresses"""
+    own = env is None                       # 17j: the names the export worked out, too
     env = os.environ if env is None else env
     text = rb.scrub(text, env)
     for p in _KEYS:
@@ -153,9 +154,12 @@ def scrub(text: str, env: dict | None = None, hosts: list[str] | None = None) ->
     for h in sorted({h for h in (hosts if hosts is not None else _hosts()) if len(h) >= 3},
                     key=len, reverse=True):
         text = re.sub(rf"(?<![\w-]){re.escape(h)}(?![\w-])", "[host]", text, flags=re.I)
-    # 17g: the Hugging Face accounts SCRUB_ACCOUNTS names, wherever they stand
+    # 17g: the Hugging Face accounts SCRUB_ACCOUNTS names, wherever they stand.
+    # 17j: and those the export worked out (where the models were fetched from)
+    import export_safe as es
     for acct in sorted({a.strip() for a in env.get("SCRUB_ACCOUNTS", "").split(",")
-                        if len(a.strip()) >= 2}, key=len, reverse=True):
+                        if len(a.strip()) >= 2} | set(es.accounts() if own else []),
+                       key=len, reverse=True):
         text = re.sub(rf"(?<![\w-]){re.escape(acct)}(?=/)", "[account]", text, flags=re.I)
     text = _TAILNET.sub("[host]", text)
     text = _RENTED_HOST.sub("[host]", text)
@@ -177,9 +181,13 @@ def scrub(text: str, env: dict | None = None, hosts: list[str] | None = None) ->
 
 def _hosts() -> list[str]:
     """this machine's name, and any SCRUB_HOSTS names (comma-separated): the
-    server's own, when the container's name isn't it"""
+    server's own, when the container's name isn't it. 17j: and the names the
+    export worked out — the hosts the board's settings name, the names it was
+    opened by"""
+    import export_safe as es
     names = [socket.gethostname() or ""] + os.environ.get("SCRUB_HOSTS", "").split(",")
-    return [x for n in names if n.strip() for x in (n.strip(), n.strip().split(".")[0])]
+    return [x for n in names if n.strip() for x in (n.strip(), n.strip().split(".")[0])] \
+        + es.scrub_names()["hosts"]
 
 
 def scrub_obj(obj, **kw):
@@ -497,7 +505,7 @@ def refused(tasks) -> str:
 
 
 def export_row(row: Path, out: Path, public: bool | None = None, runs: list[dict] | None = None,
-               say=print, publish: bool = True, questions=None) -> Path:
+               say=print, publish: bool = True, questions=...) -> Path:
     """one row's folder, scrubbed, under out/public or out/private — 17i: its
     log checked against every gated and private set (`questions`)"""
     from service import config
@@ -535,8 +543,8 @@ def export_row(row: Path, out: Path, public: bool | None = None, runs: list[dict
                                   "runs": [r["id"] for r in runs]})
     # 17h: the runner's own lines only. 17i: checked against every gated and
     # private set all the same — a log holds whatever the box ran
-    if questions is None:
-        questions = es.private_questions(say)
+    if questions is ... or questions is es.UNLOADED:
+        questions = es.private_questions(say)      # 17j: None, one couldn't be, never again
     lines, out_ = es.log_lines(log_of(row, runs), questions,
                                models=[model, *(r.get("hf_id") or "" for r in runs)])
     files = {
@@ -620,7 +628,7 @@ def main(argv: list[str] | None = None) -> int:
     for row in rows:
         export_row(row, out, False if a.private else None, publish=publish, questions=qs)
     print(f"{len(rows)} row(s) under {out} — upload: docs/REMOTE-RUNS.md § Publishing the raw runs")
-    return 1 if why else 0
+    return 1 if why or qs is None else 0                # 17j: a set not loaded is a failure
 
 
 if __name__ == "__main__":
