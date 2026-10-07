@@ -647,3 +647,15 @@ def label_domains(exam_root, topic: str, labels=DOMAIN_LABELS, both_halves: bool
             seen.setdefault(r["meta"]["domain"], set()).add(eb.half_of(r["qid"]))
         assert all(h == {"report", "diagnose"} for h in seen.values()), seen
     return p, was
+
+
+def pytest_configure(config):
+    """17i: the grading rules test runs seeds 0 to N-1 and some more from
+    RULES_SEED — chosen here once, before xdist's workers start (they inherit
+    it, and collect the same tests), unless set to run those again"""
+    import random
+    os.environ.setdefault("RULES_SEED", str(random.SystemRandom().randrange(1, 10**6)))
+
+
+def pytest_report_header(config):
+    return f"grading rules test: RULES_SEED={os.environ.get('RULES_SEED')}"

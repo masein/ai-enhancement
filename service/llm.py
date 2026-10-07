@@ -1044,9 +1044,30 @@ class LocalOpenAI(Backend):
             self._ensure_worker(batch_id)   # after a restart: resume, never re-run
             why = self.halted(batch_id)
             return "pending", (f"{detail} · {why}" if why else detail)
+        if any(r.get("cancelled") for r in got) and self.busy(batch_id):
+            # 17i: a cancel writes every request without a reply, those in
+            # flight too — the batch was closed under them, and their replies,
+            # paid for, landed in a closed batch and were never recorded
+            return "pending", f"{detail} · replies on their way"
         if failed and not any(not r.get("error") for r in got):
             return "failed", failed[0]["error"]
         return "done", detail
+
+    def busy(self, batch_id: str) -> bool:
+        """17i: a worker still holds this batch — a request of it in flight"""
+        p = self.dir / batch_id / "worker.lock"
+        if not p.exists():
+            return False
+        fd = os.open(p, os.O_RDWR)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return True
+        else:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            return False
+        finally:
+            os.close(fd)
 
     # -- 16c: what a batch did, a run of refusals, and a cancel ---------------
 

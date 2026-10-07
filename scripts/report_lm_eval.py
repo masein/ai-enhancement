@@ -24576,7 +24576,7 @@ async function loadFrontierGrading() {
   if (was) was.replaceWith(frontierGradingCard());
   else render();
 }
-async function frontierGradingAct(what) {
+async function frontierGradingAct(what, partial) {
   const A = state.ai;
   if (!whoName()) { askName(); return; }
   // 17b: one press at a time — the button stays disabled while it is out
@@ -24584,7 +24584,9 @@ async function frontierGradingAct(what) {
   A.frgBusy = what;
   render();
   try {
-    const r = await post(`api/frontier/grading/${what}`, { by: whoName() });
+    // 17i: past what the month has left, only "Start anyway" sends — said first
+    const r = await post(`api/frontier/grading/${what}`,
+      { by: whoName(), ...(partial ? { partial: true } : {}) });
     A.frg = r.page;
     toast(what === 'stop' ? 'Grading stopped: what is in flight lands, nothing more is sent'
       : `Grading: ${(r.sent || []).reduce((a, x) => a + x.n, 0).toLocaleString('en')} answers `
@@ -24688,6 +24690,14 @@ function frontierGradingCard() {
       ` · this month ${usd(E.spent)} of ${usd(E.limit)} spent`) : '',
     G.key_warning && E.answers ? el('p', { class: 'warn small', 'data-frontier-key-warning': '1',
       text: G.key_warning }) : '',
+    // 17i: more than the month has left — what is left, what this costs, and
+    // that it stops part-way, before anything is sent
+    E.short ? el('p', { class: 'warn small', 'data-frontier-short': String(E.left),
+      text: E.short }) : E.may_stop ? el('p', { class: 'small warntext',
+      'data-frontier-may-stop': String(E.left), text: E.may_stop }) : '',
+    // 17i: a row whose replies are still on their way at the grader it left
+    ...(E.held || []).map(h => el('p', { class: 'small se', 'data-frontier-held-row':
+      `${h.task}|${h.row}`, text: h.words })),
     LIVE && (E.answers || running || switching) ? el('div', { class: 'frm', 'data-frontier-run': held
         ? 'held' : running ? 'running' : stopped ? 'stopped' : 'idle' },
       // 17h: and a switch alone, nothing to send, has its Start too
@@ -24698,6 +24708,10 @@ function frontierGradingCard() {
           : 'Start grading' + (E.answers ? `: about ${cost}` : switching
             ? ': nothing to send, the grades switched' : ''),
         onclick: () => frontierGradingAct('start') }) : '',
+      (E.answers || held) && E.short ? el('button', { class: 'quiet', 'data-frontier-partial': '1',
+        disabled: why || busy ? '' : null,
+        text: `Start anyway — stops at the limit, ${usd(E.left)} from now`,
+        onclick: () => frontierGradingAct('start', true) }) : '',
       running && !stopped ? el('button', { class: 'quiet', 'data-frontier-stop': '1',
         text: busy === 'stop' ? 'Stopping…' : 'Stop', disabled: busy ? '' : null,
         onclick: () => frontierGradingAct('stop') }) : '') : '',

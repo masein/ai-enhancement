@@ -438,7 +438,13 @@ def test_21_requests_in_flight_land_before_start_sends_them_again(gsvc, monkeypa
         time.sleep(0.05)
     fgr.save("simpleqa", GEMINI, "masein")
     threading.Timer(1.0, gate.set).start()                   # they land a second later
-    fgr.start("masein")
+    # 17i: the row waits for them, said on the dry run — Start waited 30 s,
+    # then sent them again at the grader chosen now
+    assert [h["row"] for h in fgr.estimate().get("held") or []]
+    out = fgr.start("masein")
+    assert out.get("held")
+    drain()
+    fgr.start("masein")                                       # landed: the row moves now
     drain()
     keys = [c for _, c in seen if "algebra/" not in c]
     assert len(keys) == len(set(keys)) == 5                   # 0f7c943: the two asked twice

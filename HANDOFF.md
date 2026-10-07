@@ -5046,6 +5046,49 @@ Not before the demo: a new hidden set changes every Everyday score.
   when the score is made again) and in its cell.
 - Tests: `tests/test_17i_boxes.py`.
 
+### 17i.1 — grading, before any Start (7 Oct)
+
+- **HLE** (`frontier_graders._hle_object`, points 1–2): each field is
+  compared only with the judge prompt's own text for that field, whole and
+  from its start (`_template`); an example is an object every one of whose
+  fields is an example's (a placeholder, the prompt's words, a confidence
+  that isn't a number or is the prompt's 100) — a real verdict whose
+  reasoning echoes the prompt is read. A reply that ends cut is no grade,
+  whatever came before; a quoted `{"correct": "yes"}` beside a real verdict
+  never becomes the grade. Objects with raw LaTeX backslashes, a trailing
+  comma or single quotes are read (`_lenient`).
+- **A moved batch whose every reply was a refusal** ("failed") is closed at
+  Start as the poller closes it (`_close`, point 3): its answers went nowhere
+  and the dry run counted one more than Start sent — the rules test's
+  "flake" of seeds 96, 110 and 163.
+- **Each grader's no-grades are kept with their tries** (`_switch`, point 4):
+  another grader's go under its name in `kept`, and come back when it is
+  chosen again — chosen, changed and chosen back, a grader was paid six times
+  for one answer. A switch that only moves no-grades has its dry-run row
+  (`switch: "no-grades"`).
+- **Replies on their way at a switch** (point 5): a row whose moved batch
+  still has replies in flight is left as it is — the dry run says so
+  (`estimate()["held"]`), Start skips it (`held_rows`) — and the next Start
+  moves it once they land. A local batch stays pending while its worker
+  holds a request (`LocalOpenAI.status`, `busy`): a cancel writes every
+  request without a reply, those in flight too, and the batch was closed
+  under them, their paid replies never recorded. Start no longer waits 30 s.
+- **The month's limit** (point 6): the dry run says what is left, what Start
+  costs (the new answers and what the batches out still hold) and that it
+  would stop part-way (`estimate()["short"]`, `may_stop`); Start refuses it
+  in the same words before anything is sent, unless started with
+  `partial` — the card's "Start anyway — stops at the limit".
+- **The rules test** (`tests/test_17h_grading_rules.py`): two benchmarks
+  (SimpleQA and HLE), rows of 24 answers (one no-grade is a top-up, two a
+  regrade), rule 1 counted per grader across the whole sequence, rule 2 read
+  from the grades on disk, rule 3 the held count and price, rule 5 a grade
+  bought is kept, rule 6 the limit; Stop alone, Stop twice, a restart
+  mid-batch, the limit hit mid-batch and raised, replies slow to land across
+  a switch. Seeds 0 to RULES_SEQUENCES-1 and RULES_EXTRA more from
+  RULES_SEED (chosen at random and printed in pytest's header; set it to
+  rerun those).
+- Tests: `tests/test_17h_grading_rules.py`, `tests/test_17i_review.py`.
+
 
 ### 17h.5 — the start-up fill and Compare (7 Oct)
 
