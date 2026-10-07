@@ -24245,7 +24245,10 @@ async function aiTick() {
     A.page = page;
     if (key) A.mmp = key;
     if (frg) A.frg = frg;
-    if (state.tab === 'ai' && !aiEditing()) render();
+    // 17h: redrawn only when something changed — a redraw every tick took
+    // the card being used from under the person (and a test) using it
+    const sig = JSON.stringify([page, A.mmp, A.frg]);
+    if (sig !== A.tickSig && state.tab === 'ai' && !aiEditing()) { A.tickSig = sig; render(); }
   } catch (e) { /* netFail said so; the next tick asks again */ }
   finally { A.ticking = false; }
 }
