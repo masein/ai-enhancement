@@ -717,6 +717,10 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             more = len(new) - kept
             lines.append(f"{t}: {more:,} answer{'s' if more != 1 else ''} more than {what} "
                          f"holds, the grades of the {kept:,} unchanged kept")
+        elif how == "flags":
+            n = sum(1 for k, r in have.items() if _flags(new.get(k) or {}) != _flags(r))
+            lines.append(f"{t}: the same {len(new):,} answers as {what}, {n:,} with another "
+                         "finish or token count — taken from this bundle, every grade kept")
         elif how == "other" and have:
             # 17g: some answers differ — the rest keep their grades
             changed = sum(1 for k, r in have.items()
@@ -957,7 +961,8 @@ def keep_grades(src: Path, dst: Path, answers: dict) -> int:
 def compare_answers(have: dict, new: dict) -> str:
     """17f: a bundle's answers for a task against those here — 'same' (the
     same answers), 'more' (those here, unchanged, and more; or one written
-    off here, answered now), or 'other' (a different run: set aside)"""
+    off here, answered now), 'flags' (17h: the same answers, another finish
+    or token count), or 'other' (a different run: set aside)"""
     if not have:
         return "other"
     for k, r in have.items():
@@ -970,7 +975,18 @@ def compare_answers(have: dict, new: dict) -> str:
             return "other"
     changed = any((new[k].get("answer"), bool(new[k].get("unanswered")))
                   != (r.get("answer"), bool(r.get("unanswered"))) for k, r in have.items())
-    return "same" if len(new) == len(have) and not changed else "more"
+    if len(new) != len(have) or changed:
+        return "more"
+    # 17h: the same answers with another finish or token count (one that ran
+    # out of room said so, and the row kept the old flags): taken, the grades
+    # kept — each grade names its answer's text, which is the same
+    if any(_flags(new[k]) != _flags(r) for k, r in have.items()):
+        return "flags"
+    return "same"
+
+
+def _flags(r: dict) -> tuple:
+    return (r.get("finish"), r.get("tokens"))
 
 
 def _mark_where(row: Path, task: str, where: str, runs: list[int] | None = None) -> None:
