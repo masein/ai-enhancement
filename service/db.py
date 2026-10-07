@@ -432,30 +432,17 @@ def _backfill_where(c: sqlite3.Connection) -> None:
     registry and DeviceMark's remote_imports.json: the run's id, its GPU, its
     box), never from a run's note — a note typed to read like an import's
     became rented, one with a line break stayed "this server", and "Tesla V100
-    (16 GB)" was cut. Guarded: a repair never stops the board starting"""
+    (16 GB)" was cut. 17i: every row, not only blank ones — those 0adb522's
+    fill mislabelled stayed wrong (scripts/where_check.py, which also lists
+    them on a live board before a deploy). Guarded: a repair never stops the
+    board starting"""
     try:
-        import import_frontier as imf
-        from service import devicemark as sdm
+        import where_check
     except ImportError:                   # a frozen copy without the scripts beside it
         return
-    blank = {r[0] for r in c.execute(
-        "SELECT id FROM submissions WHERE where_ran IS NULL OR where_ran = ''").fetchall()}
-    if not blank or not config.OUT_DIR.is_dir():
-        return
-    for name in (imf.REGISTRY, sdm.REMOTE_NAME):
-        for f in sorted(config.OUT_DIR.glob(f"*/{name}")):
-            try:
-                reg = json.loads(f.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                continue
-            for x in reg.get("imports") or [] if isinstance(reg, dict) else []:
-                sid = x.get("sid") if isinstance(x, dict) else None
-                if not isinstance(sid, int) or sid not in blank:
-                    continue
-                gpus = x.get("gpu_names") or [x.get("gpu") or ""]
-                box = x.get("box") if isinstance(x.get("box"), str) else ""
-                c.execute("UPDATE submissions SET where_ran=? WHERE id=?",
-                          (imf.where_words([str(g) for g in gpus], [box] if box else []), sid))
+    for x in where_check.fix(c, config.OUT_DIR, config.LOGS_DIR):
+        print(f"[service] #{x['id']} ran on {x['should'] or 'this server'}, not "
+              f"{x['now'] or 'this server'} ({x['why']})")
 
 
 _BATCH_IN_PROGRESS = re.compile(r"judge batch (\S+) submitted")

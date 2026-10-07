@@ -14688,6 +14688,32 @@ function headNames(names, fits) {
       while (mid.length > 1 && !fits(show(mid))) mid = mid.slice(0, -1);
       out[i] = show(mid);
     });
+    // 17i: names of one word, no separator in them ("phonebuildalpha",
+    // "phonebuildbeta"), still read the same at 12 to 16 characters: by their
+    // letters, from where they first differ — and numbered if even that can't
+    // tell them apart
+    if (new Set(idx.map(i => out[i])).size === idx.length) continue;
+    const full = idx.map(i => clean(String(names[i])));
+    let p = 0, q = 0;
+    const least = Math.min(...full.map(t => t.length));
+    while (p < least - 1 && full.every(t => t[p] === full[0][p])) p++;
+    while (q < least - 1 - p && full.every(t => t[t.length - 1 - q] === full[0][full[0].length - 1 - q])) q++;
+    idx.forEach((i, n) => {
+      const t = full[n];
+      // a little of what they share before it, while it fits — then the letters that differ
+      let mid = t.slice(p, t.length - q), back = 0;
+      const show = (m, b) => (p - b > 0 ? '…' : '') + t.slice(p - b, p) + m + (q ? '…' : '');
+      while (mid.length > 1 && !fits(show(mid, 0))) mid = mid.slice(0, -1);
+      while (back < p && fits(show(mid, back + 1))) back++;
+      out[i] = show(mid, back);
+    });
+    if (new Set(idx.map(i => out[i])).size === idx.length) continue;
+    idx.forEach((i, n) => {
+      const num = ` #${n + 1}`;
+      let t = out[i];
+      while (t.length > 2 && !fits(t + num)) t = t.slice(0, -1);
+      out[i] = t + num;
+    });
   }
   return out;
 }

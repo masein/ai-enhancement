@@ -4953,6 +4953,23 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17i.4 — the page (7 Oct)
+
+- **Rows 0adb522 mislabelled** (`scripts/where_check.py`, point 25): a row's
+  "where it ran" from its own records — its import's record, else the first
+  line its import wrote in its log, else this server — for a row blank, cut
+  (its brackets unbalanced: "Tesla V100 (16 GB") or reading "rented GPU …"
+  with no import behind it (a note typed to read like an import's). Read-only
+  it lists them; `--fix` sets them; it runs against the live board before a
+  deploy (`sudo docker compose exec -T bench python - < scripts/where_check.py`),
+  and the board makes the same fix at start-up (`db._backfill_where`, every
+  row, not only blank ones).
+- **Compare** (`headNames`, 26): names cut alike that still read the same
+  (one word, no separator) are cut by their letters from where they first
+  differ, with a little of what they share before it when it fits, and
+  numbered if even that can't tell them apart.
+- Tests: `tests/test_17i_page.py`, `tests/test_17i_page_browser.py`.
+
 ### 17h.5 — the start-up fill and Compare (7 Oct)
 
 - **The start-up fill** (`db._backfill_where`, point 23): where an earlier
