@@ -840,13 +840,24 @@ python3 scripts/frontier_fetch.py --key ~/.ssh/id_ed25519 --sha served/Qwen3.6-3
 box's `A3-2`, stopped by hand: it is left out of its box's steps and of the
 plan's check (the box reads safe once the rest is whole and home, and a
 deleted step no longer reads "hasn't started"), its bundle isn't fetched,
-and the box's line says it every round. A box that read safe is remembered
-across a restart of the fetch (`safe-boxes.json` beside the bundles, by its
-board name, never its address), and forgotten as soon as it is reached and
-isn't safe (given another build). Each parity verdict keeps its box, its
-file's sha256 and when it was compared; it is printed only for a build on the
-command line (`--sha` or `--parity`), and a new parity file from the box
-replaces it. A parity step writes its progress as it asks ("parity 412 of
+and the box's line says it every round. 17j: a value that matched no step on
+the boxes reached is named after each round; an abandoned step still asking
+or starting (written within the last 45 minutes) keeps its box NOT safe, and
+its line says to stop it on the box or leave it out of `--abandoned`. A box
+that read safe is remembered across a restart of the fetch
+(`safe-boxes.json` beside the bundles, by its board name, never its address,
+17j: with when it read safe), forgotten as soon as it is reached and holds a
+step that isn't home (given another build), or after two days (a new box at
+the same address); a box that read safe is "destroyed: done" only after two
+rounds unreached — one failed ssh says it will be if the next round misses it
+too. Each parity verdict keeps its box, its file's sha256 and when it was
+compared; it is printed only for a build on the command line (`--sha` or
+`--parity`), and a new parity file from the box replaces it. 17j: a build
+given `--parity` with no verdict is compared from its copy here
+(`parity/<build>-box.jsonl`) — once the box is gone too. Two fetches at once
+(two panes) merge what they keep, never erase each other's. `--sha` for a
+model the board doesn't serve yet leaves its bundles home and prints the line
+to type, with `--register`, every round. A parity step writes its progress as it asks ("parity 412 of
 1,000"), so the board and the 45-minute check see it working.
 
 `--file-sha256` on every import of a build, with that build's sha256 from G0
@@ -884,11 +895,21 @@ every reply used its grader's cap). "change ▾" picks another model; choosing
 one asks each of its providers one paid token first, counted in the month's
 spend. **Start grading** pins each grader and sends what waits, once however
 often it is pressed; Stop holds it, and the card then says why it waits —
-Stop, a run of refusals, the month's limit — beside **Carry on**. As grades
+Stop, a run of refusals, the month's limit — beside **Carry on**. 17j:
+stopped at the month's limit, nothing is sent when the limit is raised or the
+month turns: Carry on sends it. Once a grader has replied to
+a benchmark this month, the dry run prices its replies at what they cost, from
+the ledger, and says so. As grades
 land, each benchmark is scored again, and its cell says who graded it, with
 which prompt (MATH and OTIS: the code's number beside it). A reply that is
-empty, cut at its cap or not a grade is listed under the card, with a batch
-that failed and why, and the next Start asks it again. A score from two
+empty, cut off by its cap or not a grade is listed under the card, with a
+batch that failed and why, and the next Start asks it again — 17j: a whole
+reply that ended exactly at its cap is read, and a grade. Humanity's Last
+Exam's replies are read as a careful person reads them
+(`tests/fixtures/hle_reader_cases.json`, 134 replies, is the reader's test);
+one that could be read two ways is no grade. The card says whether HLE's
+grader answers in CAIS's JSON schema; one that doesn't may reply in prose,
+which can be asked again, and paid. A score from two
 graders or prompts names both and isn't final: choose one and grade again.
 
 Choosing another grader moves nothing: the dry run shows what Start would do
@@ -903,7 +924,10 @@ answer's try, never part of a run; a key's spend cap, the account's credit,
 a provider's own failure and an id the provider doesn't know never are.
 Stopped, then another grader chosen: the dry run prices what is held at the
 grader it goes to, and a row graded by two graders is finished by the one
-chosen now. When a benchmark's rows end up
+chosen now. 17j: chosen while a batch is out, the rows held at the grader
+they left have Start beside Stop — nothing more goes to the grader left, the
+rest to the one chosen now. A grader chosen back that left only no-grades
+asks those again, never the whole row. When a benchmark's rows end up
 scored by different graders (one build's first grader left too many
 ungraded, the other's didn't), both rows say so, and the card offers the
 other row's regrade by the grader chosen now, with its price, sent at the
