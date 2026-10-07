@@ -363,11 +363,23 @@ def register(f: dict, by: str) -> dict:
     fs = old.get("file_sha256") or {}
     if fs and ((rec["pin"].get("file"), rec["pin"].get("size")) == (
             was.get("file"), was.get("size"))
-            or (fs.get("name") and rec["pin"].get("file") == fs.get("name"))):
+            or (fs.get("name") and rec["pin"].get("file") == fs.get("name")
+                and _same_size(rec["pin"].get("size"), fs.get("size") or was.get("size")))):
         rec["file_sha256"] = old["file_sha256"]
     db.served_put(rec)
     write_meta(rec)
     return public(rec)
+
+
+def _same_size(served: object, file: object) -> bool:
+    """17j: the size the server reports its weights at against the file's
+    bytes — within 3% (the file's own header besides): another file under the
+    same name kept the old sha256 by the name alone"""
+    try:
+        a, b = float(served), float(file)            # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return False
+    return a > 0 and b > 0 and abs(a - b) <= 0.03 * b
 
 
 def set_launch(served_id: str, flags: str, env: str, how: str | None = None,

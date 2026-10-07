@@ -234,7 +234,9 @@ def test_p2_2_3_a_failed_copy_says_not_copied_and_each_box_says_if_it_is_safe(tm
     assert (dest / b.name).read_bytes() == b"older" and not list(dest.glob("*.part"))
     assert "3.3.3.3:43: couldn't be asked — ssh: connect to host" in out
     # one box at a time: its import before the next box is asked
-    kinds = [c[0] if c[0] != "sudo" else "import" for c in calls if "--boxes" not in c]
+    # 17j: and the board asked once a round which models it serves (--served)
+    kinds = [c[0] if c[0] != "sudo" else "import" for c in calls
+             if "--boxes" not in c and "--served" not in c]
     assert kinds[:4] == ["ssh", "scp", "import", "ssh"]
     ssh = calls[0]
     for opt in ("BatchMode=yes", "ConnectTimeout=15", "ServerAliveInterval=15"):

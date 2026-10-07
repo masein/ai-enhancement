@@ -409,9 +409,10 @@ def test_7_a_bundle_with_no_sha_is_home_with_its_import_and_the_box_done(tmp_pat
     assert "1.1.1.1:41 (G6): done, safe to destroy" in out, out
     assert (f"{g.name}: copied — home; no --sha for served/gemma: import it by hand: sudo docker "
             f"compose exec -T bench python scripts/import_remote.py {dest / g.name} --by masein "
-            # 17h: --register only for a model the board doesn't serve (here it can't say)
-            '--file-sha256 <its sha256> (and --register "<its name>" if the board doesn\'t '
-            "serve it yet)") in out
+            # 17h: --register only for a model the board doesn't serve (here it can't say).
+            # 17j: said on a line of its own, so the line pastes as it is
+            "--file-sha256 <its sha256>\n      the board couldn't be asked whether it serves "
+            'served/gemma: add --register "<its name>" if it doesn\'t yet') in out
     # 17h: nothing imported (the board asked only which models it serves)
     assert not [c for c in calls if c[:8] == ff.IMPORT and "--served" not in c]
 
