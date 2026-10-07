@@ -24683,7 +24683,20 @@ function frontierGradingCard() {
         el('td', {}, el('b', { text: g.label }), el('div', { class: 'small se', text: g.does }),
           // 17b: its reasoning, set, and the cap sized for it
           g.ask ? el('div', { class: 'small se', 'data-frontier-grader-ask': g.slot,
-            text: `${g.reasoning_words} · at most ${n(g.ask.max_tokens)} tokens a reply` }) : ''),
+            text: `${g.reasoning_words} · at most ${n(g.ask.max_tokens)} tokens a reply` }) : '',
+          // 17j: HLE's judge — in CAIS's JSON schema, or in prose and lines,
+          // read as a person reads them, where a reply that can't be read is
+          // asked again, and paid
+          'json_only' in g ? (g.json_only
+            ? el('div', { class: 'small se', 'data-frontier-json-only': '1',
+                text: 'answers in CAIS’s JSON schema (structured outputs): read the same way '
+                  + 'every time' })
+            : el('div', { class: 'small warntext', 'data-frontier-json-only': '0',
+                text: (g.json_only === false ? 'doesn’t take a JSON schema'
+                  : 'OpenRouter doesn’t say whether it takes a JSON schema')
+                  + ': it answers in prose or lines, read as a person reads them — a reply '
+                  + `that can’t be read is asked again, and paid (up to ${G.tries || 3} times). `
+                  + 'A judge that takes the schema costs no such tries' })) : ''),
         el('td', {}, el('span', { 'data-frontier-grader-now': g.slot,
             text: String(now.name || now.id || '—').split(': ').pop() }),
           el('div', { class: 'small se', text: g.chosen
