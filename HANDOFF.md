@@ -4953,6 +4953,46 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17i.2 — the boxes and the fetch (7 Oct)
+
+- **`--abandoned <build>/<step>`** (`frontier_fetch.py`, point 7, repeatable):
+  a step given up on (the BF16 box's `A3-2`) is left out of its box's steps,
+  of the plan's check and of the board, its bundle not fetched, and said on
+  the box's line every round.
+- **"Safe" kept by box and forgotten** (8): a box that read safe is kept in
+  `safe-boxes.json` beside the bundles, by its board name (never its
+  address) — after a restart a destroyed box looped for ever — and forgotten
+  whenever it is reached and isn't safe (another build on it read "destroyed:
+  done" after one failed ssh).
+- **A GGUF in parts by hand** (9): the by-hand line gives the split identity
+  read from the bundle, each part's name and sha256 under it, and the `--sha`
+  that lets the fetch import the build by itself; `--register` is asked each
+  round; "N imported" counts bundles, never the parity file. The import
+  checks the parts make the identity (`split_problem`) and says when
+  `--file-sha256` is one part's. `split_sha` lives in `remote_bundle`.
+  `docs/REMOTE-RUNS.md` G3–G4 has BF16's line.
+- **A shard import killed part-way** (10): a shard the slot holds and the
+  registry doesn't is recorded on the next import, and its benchmark too
+  when the row already took the merged answers (`late`).
+- **The boxes list** (`import_frontier.box_row`, 11, 14): one guard for a
+  row on write and on read (only `BOX_FIELDS`, each of its type, strings
+  capped at 300 characters, a row read alone so one bad row never takes the
+  list down), rows leave by when they were last seen, whatever they say of
+  themselves, and a build's steps gone from a box the fetch reached leave at
+  once. The fetch posts a list whose first element names the boxes it asked
+  and reached: a board before 17i reads the steps and passes it by (17h's
+  dict marked every row "not reached" there).
+- **Parity** (12, 13): each verdict keeps its box, its file's sha256, the
+  server's file and when; it is printed only for a build on the command
+  line, and a new parity file replaces it. A parity step writes "parity 412
+  of 1,000" as it asks (one writer at a time: `remote_gguf.progress`).
+- **Small ones** (15): `memory.used` of `[N/A]` keeps the card's name and its
+  memory (`remote_bundle._mib`); registering a served model again keeps its
+  file's sha256 and parts when its server serves the file by the same name;
+  a shard held after a whole run is said on its score (`shards_held`, kept
+  when the score is made again) and in its cell.
+- Tests: `tests/test_17i_boxes.py`.
+
 ### 17h.5 — the start-up fill and Compare (7 Oct)
 
 - **The start-up fill** (`db._backfill_where`, point 23): where an earlier

@@ -406,6 +406,29 @@ def setup_problems(setup) -> list[str]:
     return out
 
 
+def split_problem(gg: dict, file_sha: str) -> str:
+    """17i: a GGUF in parts — '' when its parts make the split identity the
+    bundle gives (the import recorded the parts unchecked) and --file-sha256
+    isn't one part's own sha256 (refused with a line that didn't say so)"""
+    parts = gg.get("parts") if isinstance(gg, dict) else None
+    if not parts:
+        return ""
+    pairs = [(str(x.get("name") or ""), str(x.get("sha256") or "")) for x in parts
+             if isinstance(x, dict)]
+    ident = rb.split_sha(pairs)
+    if len(pairs) != len(parts) or ident != gg.get("sha256"):
+        return (f"its GGUF's {len(parts)} parts don't make the split identity the bundle gives "
+                f"({str(gg.get('sha256'))[:16]}…, its parts make {ident[:16]}…): the bundle "
+                "isn't as the box wrote it")
+    hit = next((n for n, h in pairs if h == file_sha), None)
+    if hit:
+        return (f"--file-sha256 {file_sha[:16]}… is the sha256 of one part, {hit}: a GGUF in "
+                f"{len(pairs)} parts is registered by its split identity, {ident} — the sha256 "
+                "of its parts' names and sha256s (frontier_fetch.py prints it, each part under "
+                "it)")
+    return ""
+
+
 def checks(b: dict, rec: dict | None, file_sha: str = "") -> list[str]:
     """every check the bundle fails, in words; [] when it may be imported"""
     from service import config, served
@@ -438,6 +461,9 @@ def checks(b: dict, rec: dict | None, file_sha: str = "") -> list[str]:
                    f"{'on' if on else 'off'}")
     have = registered_sha(rec)
     theirs = (setup.get("gguf") or {}).get("sha256") or ""
+    split = split_problem(setup.get("gguf") or {}, file_sha)
+    if split:
+        return [split]
     if file_sha and have and file_sha != have:
         out.append(f"--file-sha256 {file_sha[:16]}… isn't the file registered for {model} "
                    f"({have[:16]}…)")
@@ -670,8 +696,10 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
         say(f"{model} registered as {rec['name']}: a model run on rented GPUs only, its file "
             f"{(gg.get('name') or '')} pinned by the sha256 you gave, {file_sha[:16]}…")
     if file_sha and not registered_sha(rec):
+        # 17i: and its parts, checked against the identity (checks())
         rec["file_sha256"] = {"sha256": file_sha, "by": by, "at": time.time(),
-                              "name": gg.get("name") or ""}
+                              "name": gg.get("name") or "",
+                              **({"parts": gg["parts"]} if gg.get("parts") else {})}
         db.served_put(rec)
         say(f"{model}'s file is now registered by its sha256 {file_sha[:16]}…, as {by} gave it")
     srv = setup.get("server") or {}
@@ -684,6 +712,7 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
     shards = config.OUT_DIR.with_name("shards") / row_name
     staging = config.OUT_DIR.with_name("staging") / f"{row_name}-{stamp}" / row_name
     lines, ready, todo_shards, aside_shards = [], {}, {}, []
+    late: dict = {}                 # 17i: a task the row holds, its record lost to a kill
 
     def stage(t: str, answers: dict, task_setup: bytes, keep: Path | None = None) -> None:
         d = sf.task_dir(staging, t)
@@ -768,10 +797,18 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
                 sh = {}
             sh = {"n": n, "have": {**dict(sh.get("have") or {}), str(i): entry}}
             # 17f: the shard here already, the same answers: nothing to do —
-            # unless its shards are being set aside, or split another way
+            # unless its shards are being set aside, or split another way.
+            # 17i: or the registry doesn't list it — an import killed after
+            # its slot was written and before the registry (a deploy during
+            # a round): every retry said "nothing changed", and the shard was
+            # never recorded, the benchmark never scored
+            listed = str(i) in dict(((reg.get("shards") or {}).get(t) or {}).get("have") or {})
             if not resetting and against(t, ans, shards / t / f"{i}-of-{n}", tsetup,
                                          f"shard {i} of {n} here") == "same":
-                continue
+                if listed:
+                    continue
+                lines.append(f"{t}: shard {i} of {n} was here but not recorded — an import "
+                             "stopped part-way: recorded now")
             todo_shards[t] = (sh, b["files"][prefix + sf.ANSWERS], tsetup)
             lines.append(f"{t}: shard {i} of {n}, {len(ans):,} answers from a rented GPU ({gpu})")
             held = 0 if on else sum(1 for r in ans.values() if sf.thought(r.get("answer") or ""))
@@ -790,22 +827,27 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             for j in range(1, n + 1):
                 merged.update(ans if j == i else
                               sf.read_answers(shards / t / f"{j}-of-{n}" / sf.ANSWERS))
-            how = against(t, merged, sf.task_dir(row, t), tsetup, "the row")
-            if how == "same":
-                continue
-            # 17g: one changed answer in a remade shard kept no grade of either
-            stage(t, merged, tsetup, keep=sf.task_dir(row, t) if how != "setup" else None)
             parts = [sh["have"][str(j)] for j in range(1, n + 1)]
             # 17g: each box's cards, a box of two named twice
             cards: Counter = Counter()
             for x in parts:
                 cards |= Counter(x.get("gpu_names") or [x["gpu"]])
-            ready[t] = {**entry, "gpus": sorted(cards.elements()), "shards": n,
-                        "shard_bundles": [{"shard": j, **{k: x.get(k) for k in (
-                                               "gpu", "sha256", "bundle", "box")}}
-                                          for j, x in enumerate(parts, 1)],
-                        "boxes": sorted({x.get("box") for x in parts if x.get("box")}),
-                        "answers": len(merged)}
+            whole = {**entry, "gpus": sorted(cards.elements()), "shards": n,
+                     "shard_bundles": [{"shard": j, **{k: x.get(k) for k in (
+                                            "gpu", "sha256", "bundle", "box")}}
+                                       for j, x in enumerate(parts, 1)],
+                     "boxes": sorted({x.get("box") for x in parts if x.get("box")}),
+                     "answers": len(merged)}
+            how = against(t, merged, sf.task_dir(row, t), tsetup, "the row")
+            if how == "same":
+                if t not in (reg.get("tasks") or {}):
+                    # 17i: the row took them before the import was killed: its
+                    # record, as the import would have written it
+                    late[t] = whole
+                continue
+            # 17g: one changed answer in a remade shard kept no grade of either
+            stage(t, merged, tsetup, keep=sf.task_dir(row, t) if how != "setup" else None)
+            ready[t] = whole
             lines.append(f"{t}: every shard is in ({n} of {n}) · {len(merged):,} answers")
         else:
             how = against(t, ans, sf.task_dir(row, t), tsetup, "the row")
@@ -870,6 +912,8 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             (slot / sf.ANSWERS).write_bytes(raw)
             (slot / sf.SETUP).write_bytes(tsetup)
             reg.setdefault("shards", {})[t] = sh
+        for t, entry in late.items():
+            reg.setdefault("tasks", {})[t] = entry
         for t, entry in ready.items():
             was = sf.set_aside(row, t, "before-import")
             if was:
@@ -919,6 +963,10 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
         for t in ready:
             if scored.get(t):
                 _mark_where(row, t, *where_and_runs(row, t))
+        for t in late:
+            _mark_where(row, t, *where_and_runs(row, t))
+        for t in todo_shards:
+            _mark_held(row, t)
     for x in lines:
         say(x)
     say(f"the row {model}{' · thinking' if on else ''}: {line}")
@@ -1048,6 +1096,34 @@ def where_and_runs(row: Path, task: str) -> tuple[str, list[int]]:
     return where_words(x.get("gpus") or [x.get("gpu") or ""], x.get("boxes") or []), runs
 
 
+def shards_held(row: Path, task: str) -> str:
+    """17i: a benchmark's shards imported and held, waiting for the rest — in
+    words, for its score; '' when none wait. A shard imported after a whole
+    run was held with no sign on the board beyond its Runs line"""
+    sh = (registry(row).get("shards") or {}).get(task) or {}
+    have, n = dict(sh.get("have") or {}), sh.get("n")
+    if not have or not isinstance(n, int) or len(have) >= n:
+        return ""
+    got = sorted(int(k) for k in have if str(k).isdigit())
+    return (f"shard{'s' if len(got) > 1 else ''} {', '.join(map(str, got))} of {n} imported and "
+            f"held until the other {n - len(got)} {'is' if n - len(got) == 1 else 'are'} in — "
+            "this score is the answers here before")
+
+
+def _mark_held(row: Path, task: str) -> None:
+    """17i: the task's results say which of its shards wait"""
+    from service import frontier as sf
+    words = shards_held(row, task)
+    for f in sf.task_dir(row, task).glob("results_*.json"):
+        blob = json.loads(f.read_text(encoding="utf-8"))
+        fr = blob.setdefault("frontier", {})
+        if words:
+            fr["shards_held"] = words
+        else:
+            fr.pop("shards_held", None)
+        f.write_text(json.dumps(blob, indent=1), encoding="utf-8")
+
+
 def _epoch(stamp) -> float | None:
     """'2026-10-06T08:12:03Z' → seconds"""
     try:
@@ -1088,36 +1164,62 @@ def _fine(v, t) -> bool:
     return not isinstance(v, float) or math.isfinite(v)
 
 
+CAP = 300                               # 17i: a string kept on the list, at most
+
+
+def box_row(r) -> dict | None:
+    """17i: one step as the list keeps it — only BOX_FIELDS, each of its type,
+    strings cut to CAP (a 2 MB line was stored and served on every poll), a
+    list's items too; None unless it has its label, model and step. The one
+    guard, on write and on read: a stored row with a number for its step or a
+    list for its label was a 500 for every box, and failed the next post"""
+    if not isinstance(r, dict):
+        return None
+    x = {}
+    for k, t in BOX_FIELDS.items():
+        v = r.get(k)
+        if k not in r or not _fine(v, t):
+            continue
+        x[k] = v[:CAP] if isinstance(v, str) else [i[:CAP] for i in v[:50]] \
+            if isinstance(v, list) else v
+    return x if x.get("label") and x.get("model") and x.get("step") else None
+
+
 def store_boxes(records) -> int:
     """the fetch's last reading of each step, kept on the board: only the
     fields above, each of its type — anything else is dropped. 17g: a step
     the board had that this reading hasn't is kept as not reached (a box
     destroyed before it was done vanished), unless it was done — a box safe
     to destroy and gone was destroyed. 17h: only for the boxes this fetch
-    asked ({"steps", "asked"}: their board names) — the others' steps stay as
-    they were (fetching one box marked every other "not reached")"""
-    asked = None
+    asked — the others' steps stay as they were (fetching one box marked every
+    other "not reached"). 17i: a step gone from a box the fetch reached is
+    gone, at once; the fetch's reading is a list whose first element may say
+    which boxes it asked and reached (a board before 17i passes it by), or
+    17h's {"steps", "asked"}; a row the board kept is guarded as a new one"""
+    asked = reached = None
     if isinstance(records, dict):
         asked = {x for x in records.get("asked") or [] if isinstance(x, str)}
         records = records.get("steps")
-    keep = []
-    for r in records if isinstance(records, list) else []:
-        if not isinstance(r, dict):
-            continue
-        x = {k: r[k] for k, t in BOX_FIELDS.items() if k in r and _fine(r[k], t)}
-        if x.get("label") and x.get("model") and x.get("step"):
-            keep.append(x)
+    if isinstance(records, list) and records and isinstance(records[0], dict) \
+            and "asked" in records[0] and "label" not in records[0]:
+        head, records = records[0], records[1:]
+        asked = {x for x in head.get("asked") or [] if isinstance(x, str)}
+        reached = {x for x in head.get("reached") or [] if isinstance(x, str)}
+    keep = [x for x in (box_row(r) for r in records if isinstance(records, list)) if x] \
+        if isinstance(records, list) else []
     now = {(x["label"], x["model"], x["step"]) for x in keep}
     try:
         was = json.loads(boxes_path().read_text(encoding="utf-8")).get("boxes") or []
     except (OSError, ValueError, AttributeError):
         was = []
-    for x in was if isinstance(was, list) else []:
-        if not isinstance(x, dict) or (x.get("label"), x.get("model"), x.get("step")) in now:
+    for x in (box_row(r) for r in (was if isinstance(was, list) else [])):
+        if not x or (x["label"], x["model"], x["step"]) in now:
             continue
         mine = asked is None or not x.get("box_id") or x.get("box_id") in asked
         if not mine:
             keep.append(x)                          # another fetch's box: as it was
+        elif reached is not None and x.get("box_id") in reached:
+            continue                                # 17i: gone from a box reached: gone
         elif not x.get("safe"):
             keep.append({**x, "reachable": False})
     p = boxes_path()
@@ -1128,14 +1230,18 @@ def store_boxes(records) -> int:
     return len(keep)
 
 
-_LEFT = re.compile(r"(?:(?<![\d.])(?P<h>\d+(?:\.\d+)?) h|(?<![\d.])(?P<m>\d+) min) left")
-_NOF = re.compile(r"(?<![\d,])(?P<n>\d[\d,]*) of (?P<of>\d[\d,]*)")
+_LEFT = re.compile(r"(?:(?<![\d.])(?P<h>\d{1,6}(?:\.\d{1,6})?) h|(?<![\d.])(?P<m>\d{1,7}) min) left")
+_NOF = re.compile(r"(?<![\d,])(?P<n>\d[\d,]{0,15}) of (?P<of>\d[\d,]{0,15})(?![\d,])")
 
 
 def read_boxes(now: float | None = None) -> dict:
     """17f: the boxes for Runs — each step with what it asks, n of N, when it
     should finish (its benchmark's time left, and its box's later steps at
-    the plan's hours), and when it was last heard from"""
+    the plan's hours), and when it was last heard from. 17i: each row read
+    as it is written (box_row) and on its own — one that can't be read is
+    left out, never the list; and a row leaves by when it was last seen,
+    whatever it says of itself (a box taken off the fetch's command line read
+    as live a month on)"""
     now = time.time() if now is None else now
     try:
         got = json.loads(boxes_path().read_text(encoding="utf-8"))
@@ -1146,41 +1252,59 @@ def read_boxes(now: float | None = None) -> dict:
     except ImportError:                                   # the plan beside the script
         fbx = None
     out = []
-    for r in got.get("boxes") or [] if isinstance(got, dict) else []:
-        if not isinstance(r, dict):
+    for raw in got.get("boxes") or [] if isinstance(got, dict) else []:
+        try:
+            r = box_row(raw)
+            if r is None:
+                continue
+            row = _box_read(r, now, fbx)
+        except Exception:                               # noqa: BLE001 — that row, never the list
             continue
-        seen = _num(r.get("seen_at"))
-        if r.get("safe") and seen and now - seen > DONE_KEEP_S:
-            continue
-        if r.get("reachable") is False and seen and now - seen > GONE_KEEP_S:
-            continue
-        line = r.get("line") if isinstance(r.get("line"), str) else ""
-        # 17h: a line's numbers read only when they are numbers — "v 1.2.3 h
-        # left" or "pages , of , done" broke the list for every box
-        m, nof = _LEFT.search(line), _NOF.search(line)
-        left = _num(m["h"]) * 3600 if m and m["h"] and _num(m["h"]) is not None else \
-            int(m["m"]) * 60 if m and m["m"] else None
-        later = 0.0
-        if fbx is not None and left is not None:
-            try:
-                steps = fbx.box_of(r["label"])
-                k = int(r["step"].rsplit("-", 1)[1]) if not r["step"].endswith("parity") else 0
-                later = sum(fbx.hours(s) for s in steps[k:] if s[0] != "parity") * 3600
-            except (SystemExit, ValueError, IndexError, KeyError):
-                later = 0.0
-        heard = max(seen or 0.0, 0.0)
-        # 17g: quiet only while it should be writing — a step whole or stopped
-        # writes no more, and read "not heard from for 600 min" on a box
-        # still working
-        at = _num(r.get("at"))
-        quiet = (now - at) if at and r.get("state") in ("asking", "starting") else None
-        out.append({**r, "at": at, "seen_at": seen,
-                    "n": int(nof["n"].replace(",", "")) if nof else None,
-                    "of": int(nof["of"].replace(",", "")) if nof else None,
-                    "finish": ((at or now) + left + later) if left is not None else None,
-                    "heard": heard or None,
-                    "quiet_min": round(quiet / 60) if quiet and quiet > QUIET_S else None})
-    return {"boxes": out, "posted_at": got.get("posted_at")}
+        if row is not None:
+            out.append(row)
+    posted = got.get("posted_at") if isinstance(got, dict) else None
+    return {"boxes": out, "posted_at": posted if _num(posted) is not None else None}
+
+
+def _box_read(r: dict, now: float, fbx) -> dict | None:
+    seen = _num(r.get("seen_at"))
+    if not seen:
+        return None                                     # 17i: never seen: not on the list
+    if r.get("safe") and now - seen > DONE_KEEP_S:
+        return None
+    if now - seen > GONE_KEEP_S:
+        return None                                     # 17i: whatever "reachable" says
+    line = r.get("line") or ""
+    # 17h: a line's numbers read only when they are numbers — "v 1.2.3 h
+    # left" or "pages , of , done" broke the list for every box. 17i: and
+    # never more digits than a number has (three long runs of them did)
+    m, nof = _LEFT.search(line), _NOF.search(line)
+    left = _num(m["h"]) * 3600 if m and m["h"] and _num(m["h"]) is not None else \
+        int(m["m"]) * 60 if m and m["m"] else None
+    later = 0.0
+    if fbx is not None and left is not None:
+        try:
+            steps = fbx.box_of(r["label"])
+            k = int(r["step"].rsplit("-", 1)[1]) if not r["step"].endswith("parity") else 0
+            later = sum(fbx.hours(s) for s in steps[k:] if s[0] != "parity") * 3600
+        except (SystemExit, ValueError, IndexError, KeyError, TypeError):
+            later = 0.0
+    # 17g: quiet only while it should be writing — a step whole or stopped
+    # writes no more, and read "not heard from for 600 min" on a box
+    # still working
+    at = _num(r.get("at"))
+    quiet = (now - at) if at and r.get("state") in ("asking", "starting") else None
+
+    def count(x: str | None) -> int | None:
+        try:
+            return int(x.replace(",", "")) if x else None
+        except ValueError:
+            return None
+    return {**r, "at": at, "seen_at": seen,
+            "n": count(nof["n"]) if nof else None, "of": count(nof["of"]) if nof else None,
+            "finish": ((at or now) + left + later) if left is not None else None,
+            "heard": seen,
+            "quiet_min": round(quiet / 60) if quiet and quiet > QUIET_S else None}
 
 
 def _num(v) -> float | None:

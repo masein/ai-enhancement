@@ -164,6 +164,12 @@ def pin_differences(theirs: dict, ours: dict) -> list[str]:
             f"{ours.get(k) or 'none'}" for k in PINNED if theirs.get(k) != ours.get(k)]
 
 
+def split_sha(parts: list[tuple[str, str]]) -> str:
+    """a split GGUF's identity: the sha256 of its parts' names and sha256s, in
+    order — what the board registers for it (import_remote.py --register)"""
+    return hashlib.sha256("".join(f"{n} {h}\n" for n, h in parts).encode()).hexdigest()
+
+
 def gpu_info() -> dict:
     """the GPU's name, its driver and its memory, as nvidia-smi says — 17g:
     and every card's name, and how many (a box of two was named by its first);
@@ -175,12 +181,24 @@ def gpu_info() -> dict:
             timeout=30).stdout.splitlines() if x.strip()]
         name, driver, mib, *used = (x.strip() for x in lines[0].split(","))
         names = [x.split(",")[0].strip() for x in lines]
-        # 17h: and what is in use already — the memory check reads what is free
-        return {"name": name, "driver": driver, "memory_mib": int(float(mib)),
+        # 17h: and what is in use already — the memory check reads what is free.
+        # 17i: a card that says "[N/A]" for either keeps its name: the number
+        # alone is left out (it lost the GPU's name and the whole memory check)
+        return {"name": name, "driver": driver, "memory_mib": _mib(mib),
                 "count": len(names), "names": names,
-                **({"memory_used_mib": int(float(used[0]))} if used and used[0] else {})}
+                **({"memory_used_mib": _mib(used[0])} if used and _mib(used[0]) is not None
+                   else {})}
     except (OSError, IndexError, ValueError, subprocess.SubprocessError):
         return {"name": None, "driver": None, "memory_mib": None}
+
+
+def _mib(v: str) -> int | None:
+    """17i: nvidia-smi's MiB, or None for "[N/A]" and anything not a number"""
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return None
+    return int(x) if x == x and abs(x) != float("inf") else None
 
 
 def scrub(text: str, env: dict | None = None) -> str:
