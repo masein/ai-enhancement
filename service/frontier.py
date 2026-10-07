@@ -738,10 +738,15 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
     # 17g: where it ran and the Runs rows it came from, from the row's record
     # of its imports — grading scores again, and dropped what the import marked
     where, came = setup.get("where"), []
+    import import_frontier as imf
     if where and where != "this server":
-        import import_frontier as imf
         w, came = imf.where_and_runs(row, task)
         where = w or where
+    # 17i: shards imported and held, waiting for the rest — said on the score
+    try:
+        held_shards = imf.shards_held(row, task)
+    except Exception:                                   # noqa: BLE001 — a note, never the score
+        held_shards = ""
     detail = {"version": fb.VERSION, "protocol": spec["protocol"], "epochs": spec["epochs"],
               "questions": len(items), "answers": len(flat),
               "ran_out": ran_out, "unread": unread, "errors": errors,
@@ -752,6 +757,7 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
                   "unanswered_ids": never[:20]} if never else {}),
               "budget": setup.get("budget"), "sampling": setup.get("sampling"),
               "family": setup.get("family"), "where": where, **({"runs": came} if came else {}),
+              **({"shards_held": held_shards} if held_shards else {}),
               "thinking": setup.get("thinking"), "note": spec.get("note") or "",
               "scored_by": ("grader" if spec.get("grader") else "code, then Epoch's model check"
                             if spec.get("look") and not waiting and looked else "code"),

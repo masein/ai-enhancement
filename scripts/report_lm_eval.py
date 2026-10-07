@@ -2479,7 +2479,12 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
                     "howSet": frontier_setting((run.get("frontier") or {}).get(task)),
                     # 17f: where it ran, and the Runs rows it came from
                     "where": frontier_where((run.get("frontier") or {}).get(task)),
-                    "runs": ((run.get("frontier") or {}).get(task) or {}).get("runs") or []}
+                    "runs": ((run.get("frontier") or {}).get(task) or {}).get("runs") or [],
+                    # 17i: its shards imported and held, waiting for the rest
+                    **({"shardsHeld": str(((run.get("frontier") or {}).get(task) or {})
+                                          .get("shards_held"))[:300]}
+                       if ((run.get("frontier") or {}).get(task) or {}).get("shards_held")
+                       else {})}
                    if (run.get("frontier") or {}).get(task) else {}),
             }
             metric_used.setdefault(task, name)
@@ -8156,8 +8161,15 @@ function publicLine(m) {
   };
   const asking = state.pubAsk === id;
   return el('p', { class: 'small', 'data-public-weights': mark ? '1' : '0' },
+    // 17i: what the mark does, in full — the export writes its raw runs to
+    // public/ once you type yes to its list, and the upload sends public/
     mark ? el('span', { class: 'warntext', text: `Public weights — marked by ${mark.by} on `
-      + `${new Date(mark.at * 1000).toISOString().slice(0, 10)}: its raw runs may be published. ` })
+      + `${new Date(mark.at * 1000).toISOString().slice(0, 10)}. The raw-run export writes its `
+      + 'runs to public/ once you type yes to the list it prints (its file, sha256 and source '
+      + 'on it), and the upload sends public/ to the public dataset for anyone to download: '
+      + 'the answers (but the gated benchmarks’ text), the scores, the setup and the runner’s '
+      + 'own log lines. Clear the mark before the export to keep them private; the next '
+      + 'export then removes their public/ folders. ' })
       : el('span', { class: 'se', text: 'Raw runs private: its weights aren’t marked public. ' }),
     mark ? el('button', { class: 'quiet small', 'data-public-weights-toggle': 'clear',
       text: 'Clear the mark', onclick: () => send(false) })
@@ -12985,7 +12997,7 @@ function frHere(name) {
       return { v: c.v, se: c.se || null, tag: at + (c.how ? ' · ' + c.how : ''),
         set: 'howSet' in c ? (c.howSet == null ? null : at + ' · ' + c.howSet) : at,
         // 17f: where it ran, and the Runs rows it came from
-        where: c.where || '', runs: c.runs || [],
+        where: c.where || '', runs: c.runs || [], held: c.shardsHeld || '',
         // 17g: the rows beside it scored by another grader
         differs: c.graderDiffers || '' };
     } })),
@@ -13211,7 +13223,11 @@ function lbFrontier(ms) {
         b(hl, pct1(x.here.v)), el('div', { class: 'small se fr-tag', text: x.here.tag }),
         x.here.differs ? el('div', { class: 'small warntext', 'data-fr-grader-differs': r.m.id,
           text: x.here.differs }) : '',
-        x.here.where ? frWhere(x.here) : '');
+        x.here.where ? frWhere(x.here) : '',
+        // 17i: shards imported and held, waiting for the rest — the score is
+        // the answers here before
+        x.here.held ? el('div', { class: 'small warntext', 'data-fr-shards-held': r.m.id,
+          text: x.here.held }) : '');
     return el('td', { class: 'num tcell', 'data-fr-cell': c.key, 'data-fr-rep': r.m.id,
         'data-fr-setting': x.rep.setting, 'data-lead': rl ? '1' : null, style: tint, tabindex: '0',
         ...repAt,
@@ -14687,6 +14703,32 @@ function headNames(names, fits) {
       const show = t => (a ? '…' : '') + t + (z ? '…' : '');
       while (mid.length > 1 && !fits(show(mid))) mid = mid.slice(0, -1);
       out[i] = show(mid);
+    });
+    // 17i: names of one word, no separator in them ("phonebuildalpha",
+    // "phonebuildbeta"), still read the same at 12 to 16 characters: by their
+    // letters, from where they first differ — and numbered if even that can't
+    // tell them apart
+    if (new Set(idx.map(i => out[i])).size === idx.length) continue;
+    const full = idx.map(i => clean(String(names[i])));
+    let p = 0, q = 0;
+    const least = Math.min(...full.map(t => t.length));
+    while (p < least - 1 && full.every(t => t[p] === full[0][p])) p++;
+    while (q < least - 1 - p && full.every(t => t[t.length - 1 - q] === full[0][full[0].length - 1 - q])) q++;
+    idx.forEach((i, n) => {
+      const t = full[n];
+      // a little of what they share before it, while it fits — then the letters that differ
+      let mid = t.slice(p, t.length - q), back = 0;
+      const show = (m, b) => (p - b > 0 ? '…' : '') + t.slice(p - b, p) + m + (q ? '…' : '');
+      while (mid.length > 1 && !fits(show(mid, 0))) mid = mid.slice(0, -1);
+      while (back < p && fits(show(mid, back + 1))) back++;
+      out[i] = show(mid, back);
+    });
+    if (new Set(idx.map(i => out[i])).size === idx.length) continue;
+    idx.forEach((i, n) => {
+      const num = ` #${n + 1}`;
+      let t = out[i];
+      while (t.length > 2 && !fits(t + num)) t = t.slice(0, -1);
+      out[i] = t + num;
     });
   }
   return out;

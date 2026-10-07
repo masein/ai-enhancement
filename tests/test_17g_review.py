@@ -176,8 +176,10 @@ def test_2_the_fetch_and_the_list_say_why_a_step_stopped(tmp_path, monkeypatch, 
     assert f"A5 A5-1 · {MMLU} · thinking None · stopped · {why}" in out, out
     assert f"phone A5-1 is stopped: {why}" in out
     # the board keeps why, and the list says it
+    # 17i: with when the fetch saw it, as the fetch always sends — a row never
+    # seen has no age to leave the list by
     imf.store_boxes([{"label": "A5", "model": "served/phone", "step": "A5-1",
-                      "state": "stopped", "why": why}])
+                      "state": "stopped", "why": why, "seen_at": time.time()}])
     assert imf.read_boxes()["boxes"][0]["why"] == why
     src = Path(__file__).resolve().parents[1].joinpath("scripts", "report_lm_eval.py").read_text()
     assert "b.state === 'stopped' ? `stopped${b.why ? ': ' + b.why : ''}`" in src
@@ -787,8 +789,9 @@ def test_15_never_public_for_a_model_the_board_doesnt_know_as_public(box, tmp_pa
     import export_frontier_raw as efr
     sid = a3_imported(box)
     assert efr.export_run(sid, tmp_path / "raw", public=True).parent.name == "private"
-    assert efr.main(["--all", "--public", "--out", str(tmp_path / "all")]) == 0
-    assert "--public: no effect" in capsys.readouterr().out
+    # 17i: refused, before anything is written
+    assert efr.main(["--all", "--public", "--out", str(tmp_path / "all")]) == 2
+    assert "--public does nothing" in capsys.readouterr().out
     assert not (tmp_path / "all" / "public").exists()            # 308fcf3: the build, public
     # 17h: public only when the board's mark says so (its page, or --public-weights)
     assert not efr.known_public({"hf_id": "served/gemma-cal"})

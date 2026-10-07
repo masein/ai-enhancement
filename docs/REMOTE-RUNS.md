@@ -264,7 +264,9 @@ sudo docker compose exec -T -e SCRUB_HOSTS="$(hostname)" -e SCRUB_ACCOUNTS=<your
 `SCRUB_HOSTS` gives the export the server's host name to remove: inside the
 container, the host name is the container's. `SCRUB_ACCOUNTS` (17g) gives
 the Hugging Face accounts to remove wherever they name a path (the account
-the builds and the llama-server tarball are kept under).
+the builds and the llama-server tarball are kept under). 17i: with either
+empty, nothing goes to `public/` — the export says so, writes every run to
+`private/`, and exits 1.
 
 **What it writes.** One folder a row, under `~/benchmarks/raw-export/public/` or `…/private/`:
 - `items.jsonl`, `setup.json`, `scores.json` and `log.txt`;
@@ -275,24 +277,50 @@ the builds and the llama-server tarball are kept under).
 - Public only for a model whose page marks its weights public ("Mark its
   weights public", under its size; an import's `--public-weights` sets the
   same mark, and the page shows it and clears it). Nothing is public by its
-  name, and a Qwen3.6 build never is, marked or not. DeviceMark's calibration
-  models: mark them on their pages first.
+  name, and nothing is kept private by its name (17i): the mark and the
+  typed yes decide. Unsloth's Qwen3.6 files, unmodified
+  (`served/Qwen3.6-35B-A3B-BF16`, `served/Qwen3.6-35B-A3B-Q4-original-k-8`),
+  are public: mark them on their pages. Never mark an in-house build (a
+  fine-tune, the phone build). DeviceMark's calibration models: mark them on
+  their pages first.
 - Before anything goes to `public/`, the export lists the models it would
-  publish and waits for a typed `yes`; anything else keeps them in
-  `private/`. `--private` keeps every run private; `--public` does nothing.
+  publish — each with its file, that file's sha256 (a GGUF in parts: its
+  split identity) and where it came from — and waits for a typed `yes`;
+  anything else (closed stdin too) keeps them in `private/`. `--private`
+  keeps every run private; `--public` is refused, and nothing is written.
+- A run written to `private/` removes its `public/` folder from an earlier
+  export, and says so: clear a mark, export again, and upload, and the public
+  repository no longer gets it (delete it there by hand if it was uploaded).
 
 **What goes out** (17h): a list of what may, field by field
 (`scripts/export_safe.py`) — never the whole record, scrubbed. A launch's
-flags and environment by name (the context, slots, cache, attention, experts,
-template, reasoning and rope flags; `LLAMA_MOE_*`, `GGML_*`, `LLAMA_ARG_*`
-variables), never one that names a key; never the server's address, port or
-how it is served in words. The log holds only the runner's own lines in their
-fixed shapes (its headers, `[frontier]`, `[import]`, `[devicemark]`,
-`[service]`, a box's timed lines), never llama-server's start-up output and
-never one holding an address, a URL, a user@host or a key's name; a Frontier
-log never one quoting six words in a row of a gated question (no log at all
-when the questions can't be loaded to check). The README says how many lines
-and launch settings were left out. The scrub runs last, on what is left.
+flags by name (the context, slots, cache, attention, experts, template,
+reasoning and rope flags; 17i: each known to take a value or not — a switch
+never carries the next word out), its variables by name (`LLAMA_MOE_*`,
+`GGML_*`, `LLAMA_ARG_*`) — 17i: with their values only for those on
+`ENV_VALUES` (the routing, context, slots, GPU layers, attention, cache
+types, batch, threads, experts on the CPU, reasoning, a few CUDA switches,
+`CUDA_VISIBLE_DEVICES`, `OMP_NUM_THREADS`), every other one by its name
+alone, "(set; its value withheld)" — never one that names a key; never the
+server's address, port or how it is served in words. The log holds only the
+lines in one of `LOG_SHAPES` (17i: each a fixed form — a section header, a
+step's first line, the file and GPU, a benchmark's questions, the server
+coming up, the memory check, progress, the parity count, the run's end, the
+bundle, DeviceMark's battery, shard and GPU, and the service's, the
+import's and DeviceMark's own tagged lines), where nothing but the run's own
+model, a step's folder on the box and a path on this server may hold a "/":
+no shape carries a repository ("fetching … from <account>/evalboard-private"
+is left out). Never llama-server's start-up output, never a line holding an
+address, a URL, a user@host, a key's name or a private repository's name
+(`…-private`, an account in `SCRUB_ACCOUNTS`). 17i: every log, Frontier's and
+DeviceMark's, is checked against every gated and private set on the server
+— Frontier's gated and withheld benchmarks whatever the run asked, the
+Everyday tasks' hidden half, the Knowledge exam's bank, Mobile-MMLU and
+Mobile-MMLU-Pro — a line quoting six words in a row of a question is left
+out, read through JSON's `\uXXXX` escapes, URL-encoding and underscores; a
+set that can't be loaded means no log at all, said on the terminal and in
+the README. The README says how many lines and launch settings were left
+out. The scrub runs last, on what is left, the README too.
 
 **DeviceMark rows only.** Any other run is refused.
 
@@ -313,10 +341,8 @@ redistributed, MATH's problems are withheld, and an answer quotes its
 question. Each run exports what it brought (17g): a box's shard its own
 questions, this server's run nothing of a benchmark an import replaced (the
 README says which). `log.txt` withholds each line that quotes a hidden or
-gated question, as the board's log view does. Public only for a model the
-board knows as public: a public Hugging Face model, or a served one
-registered with `--public-weights` (G6's calibration); a build served here
-(the Qwen3.6 builds) goes to `private/` whatever the flags.
+gated question, as the board's log view does. Public only for a model whose
+page marks its weights public, as above, and after the typed yes.
 
 **The scrub.** Every file is scrubbed before it is written:
 - keys and tokens, by value and by shape;
@@ -753,6 +779,45 @@ scp -i ~/.ssh/id_ed25519 -P <port> root@<host>:/workspace/<phone-build>/A5-1/fro
 ```bash
 sudo docker compose exec -T bench python scripts/import_remote.py ~/benchmarks/bundles/frontier-served__<phone-build>-thinking-on-mmlu-pro.tar.gz --by masein --file-sha256 <the phone file's sha256 from G0>
 ```
+
+**A GGUF in parts (17i): BF16.** `served/Qwen3.6-35B-A3B-BF16` is
+unsloth's BF16 file in two parts. The board registers a GGUF in parts by its
+**split identity** — the sha256 of its parts' names and sha256s, in order, as
+the box hashed them — never a part's own sha256 (the import refuses that, and
+says which part it is). The fetch reads the identity from the bundle and
+prints it on the bundle's by-hand line, each part's name and sha256 under it:
+
+```
+  frontier-served__Qwen3.6-35B-A3B-BF16-thinking-on-gpqa.tar.gz: copied — home; no --sha for served/Qwen3.6-35B-A3B-BF16: import it by hand: sudo docker compose exec -T bench python scripts/import_remote.py /home/masein/benchmarks/bundles/frontier-served__Qwen3.6-35B-A3B-BF16-thinking-on-gpqa.tar.gz --by masein --file-sha256 <the identity>
+      <the identity> is the split identity of its 2 parts, as the box hashed them — check each against Hugging Face before you import:
+        Qwen3.6-35B-A3B-BF16-00001-of-00002.gguf  <part 1's sha256>
+        Qwen3.6-35B-A3B-BF16-00002-of-00002.gguf  <part 2's sha256>
+      once checked, give the fetch --sha served/Qwen3.6-35B-A3B-BF16=<the identity> and it imports this build by itself
+```
+
+Check each part's sha256 against the file's page on Hugging Face (Files ▸
+the part ▸ its SHA256), then type the line once (with `--register "<its
+name>"` only when the line says the board doesn't serve the model yet — it is
+asked each round). The import checks that the parts make the identity given.
+From then on give the fetch the identity as the build's `--sha`, and it
+imports every later bundle of the build by itself:
+
+```bash
+python3 scripts/frontier_fetch.py --key ~/.ssh/id_ed25519 --sha served/Qwen3.6-35B-A3B-BF16=<the identity> --sha served/Qwen3.6-35B-A3B-Q4-original-k-8=<the Q4 file's sha256> --abandoned Qwen3.6-35B-A3B-BF16/A3-2 --every 3m <host 1>:<port 1> <host 2>:<port 2>
+```
+
+`--abandoned <build>/<step>` (one each) is a step given up on — the BF16
+box's `A3-2`, stopped by hand: it is left out of its box's steps and of the
+plan's check (the box reads safe once the rest is whole and home, and a
+deleted step no longer reads "hasn't started"), its bundle isn't fetched,
+and the box's line says it every round. A box that read safe is remembered
+across a restart of the fetch (`safe-boxes.json` beside the bundles, by its
+board name, never its address), and forgotten as soon as it is reached and
+isn't safe (given another build). Each parity verdict keeps its box, its
+file's sha256 and when it was compared; it is printed only for a build on the
+command line (`--sha` or `--parity`), and a new parity file from the box
+replaces it. A parity step writes its progress as it asks ("parity 412 of
+1,000"), so the board and the 45-minute check see it working.
 
 `--file-sha256` on every import of a build, with that build's sha256 from G0
 (the original build's bundles with the original file's). The board has no

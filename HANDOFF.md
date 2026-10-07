@@ -4953,6 +4953,99 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17i.4 — the page (7 Oct)
+
+- **Rows 0adb522 mislabelled** (`scripts/where_check.py`, point 25): a row's
+  "where it ran" from its own records — its import's record, else the first
+  line its import wrote in its log, else this server — for a row blank, cut
+  (its brackets unbalanced: "Tesla V100 (16 GB") or reading "rented GPU …"
+  with no import behind it (a note typed to read like an import's). Read-only
+  it lists them; `--fix` sets them; it runs against the live board before a
+  deploy (`sudo docker compose exec -T bench python - < scripts/where_check.py`),
+  and the board makes the same fix at start-up (`db._backfill_where`, every
+  row, not only blank ones).
+- **Compare** (`headNames`, 26): names cut alike that still read the same
+  (one word, no separator) are cut by their letters from where they first
+  differ, with a little of what they share before it when it fits, and
+  numbered if even that can't tell them apart.
+- Tests: `tests/test_17i_page.py`, `tests/test_17i_page_browser.py`.
+
+### 17i.3 — the export, before anyone runs it (7 Oct)
+
+- **Log lines in listed shapes** (`export_safe.LOG_SHAPES`, point 16): each a
+  fixed form with typed slots — a section header, a step's first line, the
+  file, build and GPU, a benchmark's questions, the server coming up, a
+  sha256 worked out, the memory check, the server's variables, progress (and
+  DeviceMark's task progress), the parity count and file, the run's end, a
+  benchmark not whole, no bundle, the bundle, DeviceMark's battery, shard,
+  GPU and first line, and the `[frontier]`, `[import]`, `[devicemark]` and
+  `[service]` lines. Nothing in a slot holds a "/" but the run's own model,
+  a step's folder on the box and a path on this server, so no shape carries
+  a repository ("fetching … from <account>/evalboard-private" went out after
+  its time); a `…-private` name or a `SCRUB_ACCOUNTS` account is left out
+  wherever it stands. A `[7]` in a header is no longer read as an address (24).
+- **The README** goes through the scrub like every other file (17).
+- **Every log against every gated and private set** (`private_questions`,
+  18): Frontier's gated and withheld benchmarks whatever the run asked, the
+  Everyday hidden half, the Knowledge exam's bank, Mobile-MMLU and
+  Mobile-MMLU-Pro — DeviceMark's logs too; a set that can't be loaded means
+  no log, said on the terminal (24) as well as in the README. The six-word
+  check reads `\uXXXX` escapes, URL-encoding, underscores and accents (22).
+- **Public or private by the mark and the typed yes alone** (19, 20): no
+  model is kept private by its name (unsloth's Qwen3.6 files are public);
+  the typed-yes list shows each model's file, sha256 (a split identity for a
+  GGUF in parts) and source (the import now records the bundle's
+  `gguf.source`); a run written to `private/` removes its `public/` twin and
+  says so; the model page's mark says what the export and the upload do.
+- **The environment by name** (21): a value only for a variable on
+  `ENV_VALUES`, every other allowed one "(set; its value withheld)"; `public/`
+  is refused while `SCRUB_HOSTS` or `SCRUB_ACCOUNTS` is empty (exit 1, all
+  private). **Flags** (23): `TAKES` and `SWITCHES` — a switch never carries
+  the next token out.
+- **Small ones** (24): `--public` is refused before anything is written
+  (exit 2); closed stdin is a "no", never a traceback.
+- Tests: `tests/test_17i_export.py`, `tests/test_17i_export_browser.py`.
+
+### 17i.2 — the boxes and the fetch (7 Oct)
+
+- **`--abandoned <build>/<step>`** (`frontier_fetch.py`, point 7, repeatable):
+  a step given up on (the BF16 box's `A3-2`) is left out of its box's steps,
+  of the plan's check and of the board, its bundle not fetched, and said on
+  the box's line every round.
+- **"Safe" kept by box and forgotten** (8): a box that read safe is kept in
+  `safe-boxes.json` beside the bundles, by its board name (never its
+  address) — after a restart a destroyed box looped for ever — and forgotten
+  whenever it is reached and isn't safe (another build on it read "destroyed:
+  done" after one failed ssh).
+- **A GGUF in parts by hand** (9): the by-hand line gives the split identity
+  read from the bundle, each part's name and sha256 under it, and the `--sha`
+  that lets the fetch import the build by itself; `--register` is asked each
+  round; "N imported" counts bundles, never the parity file. The import
+  checks the parts make the identity (`split_problem`) and says when
+  `--file-sha256` is one part's. `split_sha` lives in `remote_bundle`.
+  `docs/REMOTE-RUNS.md` G3–G4 has BF16's line.
+- **A shard import killed part-way** (10): a shard the slot holds and the
+  registry doesn't is recorded on the next import, and its benchmark too
+  when the row already took the merged answers (`late`).
+- **The boxes list** (`import_frontier.box_row`, 11, 14): one guard for a
+  row on write and on read (only `BOX_FIELDS`, each of its type, strings
+  capped at 300 characters, a row read alone so one bad row never takes the
+  list down), rows leave by when they were last seen, whatever they say of
+  themselves, and a build's steps gone from a box the fetch reached leave at
+  once. The fetch posts a list whose first element names the boxes it asked
+  and reached: a board before 17i reads the steps and passes it by (17h's
+  dict marked every row "not reached" there).
+- **Parity** (12, 13): each verdict keeps its box, its file's sha256, the
+  server's file and when; it is printed only for a build on the command
+  line, and a new parity file replaces it. A parity step writes "parity 412
+  of 1,000" as it asks (one writer at a time: `remote_gguf.progress`).
+- **Small ones** (15): `memory.used` of `[N/A]` keeps the card's name and its
+  memory (`remote_bundle._mib`); registering a served model again keeps its
+  file's sha256 and parts when its server serves the file by the same name;
+  a shard held after a whole run is said on its score (`shards_held`, kept
+  when the score is made again) and in its cell.
+- Tests: `tests/test_17i_boxes.py`.
+
 ### 17i.1 — grading, before any Start (7 Oct)
 
 - **HLE** (`frontier_graders._hle_object`, points 1–2): each field is
@@ -4995,6 +5088,7 @@ Not before the demo: a new hidden set changes every Everyday score.
   RULES_SEED (chosen at random and printed in pytest's header; set it to
   rerun those).
 - Tests: `tests/test_17h_grading_rules.py`, `tests/test_17i_review.py`.
+
 
 ### 17h.5 — the start-up fill and Compare (7 Oct)
 
