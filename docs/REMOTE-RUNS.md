@@ -768,10 +768,16 @@ graders or prompts names both and isn't final: choose one and grade again.
 Choosing another grader moves nothing: the dry run shows what Start would do
 with it, and Start does it. Each grader's grades are kept under its own name
 — choosing one that graded a benchmark before uses what it graded, and the
-dry run says how many. A run of refusals anywhere in a Start (five of the same
-with no reply between them, whatever else sits between) stops it and counts
-nothing against the answers; a key's spend cap, the account's credit and a
-provider's own failure are never a try. When a benchmark's rows end up
+dry run says how many, and what Start leaves the score as (Start is there
+even when nothing is sent). A run of refusals anywhere in a Start (five of
+the same with no reply between them, whatever else sits between) stops it
+until Start, counting nothing; a reply that lands after the stop is kept. A
+refusal of the answer itself (too long for the grader, flagged) is that
+answer's try, never part of a run; a key's spend cap, the account's credit,
+a provider's own failure and an id the provider doesn't know never are.
+Stopped, then another grader chosen: the dry run prices what is held at the
+grader it goes to, and a row graded by two graders is finished by the one
+chosen now. When a benchmark's rows end up
 scored by different graders (one build's first grader left too many
 ungraded, the other's didn't), both rows say so, and the card offers the
 other row's regrade by the grader chosen now, with its price, sent at the

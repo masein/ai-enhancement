@@ -270,12 +270,16 @@ def _error_of(text: str) -> tuple[str, dict]:
     return _SECRET.sub("…", str(e.get("message") or "")).strip()[:200], meta
 
 
+_ABOUT_ANSWER = re.compile(r"context length|context window|maximum context|too long|too large|"
+                           r"too many tokens|prompt is too|flagged|moderation|content policy")
+
+
 def refusal(status: int | None, text: str) -> tuple[str, str]:
     """(kind, words): what OpenRouter said when it didn't answer, in plain
     words — from its status and its error body (16c). Kinds: limit (the key's
     own limit, or the account's credit), data (no provider takes a prompt it
     may not store — only when OpenRouter says so), key, rate, unreached,
-    down, refused"""
+    down, answer (17h: refused for what was sent: too long, flagged), refused"""
     msg, meta = _error_of(text)
     low = f"{msg} {json.dumps(meta)}".lower()
     if status is None:
@@ -289,6 +293,11 @@ def refusal(status: int | None, text: str) -> tuple[str, str]:
         return "limit", ("OpenRouter refused the key: it has reached its own spending limit, or "
                          "the account is out of credit. That is fixed on OpenRouter’s side: "
                          "raise the key’s limit or add credit there")
+    # 17h: refused for what was sent — too long, too many tokens, flagged —
+    # that answer's own try, never the grader's or the key's
+    if status == 413 or (status in (400, 403, 422)
+                         and _ABOUT_ANSWER.search(f"{low} {str(text).lower()}")):
+        return "answer", (f"OpenRouter refused it (HTTP {status})" + (f": {msg}" if msg else ""))
     if "data policy" in low or "data_collection" in low or "data collection" in low:
         return "data", "no provider running it takes a prompt it may not store or train on"
     if status == 401:

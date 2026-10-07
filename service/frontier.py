@@ -691,25 +691,21 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
     held = thinking_kept(thinking, [r["answer"] for r in flat])
     # 17c: the questions the server never answered, counted wrong and named
     never = sorted({q for q, rs in runs.items() for r in rs if r.get("unanswered")})
-    ungraded = sum(1 for r in flat if r.get("ungraded"))
-    waiting = sum(1 for r in flat if r["ok"] is None)
+    out = outcome(spec, flat, d)
+    ungraded, waiting = out["ungraded"], out["waiting"]
     ran_out = sum(1 for r in flat if r["ran_out"])
     unread = sum(1 for r in flat if r["read"] is None and not r["ran_out"]
                  and not r.get("unanswered"))
     errors = sum(1 for r in flat if r["error"])
-    if spec.get("grader") and waiting:
+    if out["state"] == "waiting":
         # 17d: answers asked again (another grader chosen) wait: the score made
         # without them is no longer the page's
         _unwrite(d, task)
         return {"waiting": waiting, "of": len(flat), "label": spec["label"]}
-    seen = sum(1 for r in flat if r["grade"] is not None or r.get("ungraded"))
-    if ungraded and ungraded > UNGRADED_SHARE * seen:
+    if out["state"] == "no score":
         _unwrite(d, task)
-        return {"no_score": (
-            f"{spec['label']}: its grader gave no grade on {ungraded:,} of the {seen:,} answers "
-            f"it was sent ({_pct(ungraded / seen)}, more than {UNGRADED_SHARE:.0%}) — it isn't "
-            "answering in its form: no score; choose another grader on AI models"),
-            "ungraded": ungraded, "of": seen, "label": spec["label"]}
+        return {"no_score": out["words"], "ungraded": ungraded, "of": out["seen"],
+                "label": spec["label"]}
     code = (None if spec.get("grader") else
             _share({q: [1.0 if r["code_ok"] else 0.0 for r in rs] for q, rs in runs.items()},
                    task, items))
@@ -734,7 +730,7 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
         setup = json.loads((d / SETUP).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         setup = {}
-    g, graders = graders_of(d, flat)
+    g, graders = out["grader"], out["graders"]
     looked = sum(1 for r in flat if r["grade"] is not None)
     # 17g: where it ran and the Runs rows it came from, from the row's record
     # of its imports — grading scores again, and dropped what the import marked
@@ -763,8 +759,7 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
               **({"graders": graders} if len(graders) > 1 and not (g or {}).get("topup")
                  else {}),
               # 17d: and a score with an answer its grader gave no grade isn't final
-              **({"final": False} if (len(graders) > 1 and not (g or {}).get("topup"))
-                 or ungraded else {}),
+              **({"final": False} if out["state"] == "not final" else {}),
               **({"look": {"done": looked, "waiting": waiting}} if spec.get("look") else {})}
     res = {"alias": task, "acc,none": page["score"], "acc_stderr,none": page["se"]}
     if spec.get("look") and code:
@@ -788,7 +783,45 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
     return {**page, **detail, "epochs": spec["epochs"]}
 
 
-def graders_of(d: Path, flat: list[dict]) -> tuple[dict | None, list[dict]]:
+def outcome(spec: dict, flat: list[dict], d: Path, known: dict | None = None) -> dict:
+    """17h: what a task's score is from its marks, decided once — score_task
+    writes it, the dry run says it before Start (`known`: the grades as Start
+    would leave them). {state: waiting | no score | not final | final,
+    words, waiting, ungraded, seen, grader, graders}"""
+    ungraded = sum(1 for r in flat if r.get("ungraded"))
+    waiting = sum(1 for r in flat if r["ok"] is None)
+    seen = sum(1 for r in flat if r["grade"] is not None or r.get("ungraded"))
+    g, graders = graders_of(d, flat, known)
+    base = {"waiting": waiting, "ungraded": ungraded, "seen": seen, "grader": g,
+            "graders": graders}
+    if spec.get("grader") and waiting:
+        return {**base, "state": "waiting", "words": f"{waiting:,} answers wait for a grade"}
+    if ungraded and ungraded > UNGRADED_SHARE * seen:
+        return {**base, "state": "no score", "words": (
+            f"{spec['label']}: its grader gave no grade on {ungraded:,} of the {seen:,} answers "
+            f"it was sent ({_pct(ungraded / seen)}, more than {UNGRADED_SHARE:.0%}) — it isn't "
+            "answering in its form: no score; choose another grader on AI models")}
+    if len(graders) > 1 and not (g or {}).get("topup"):
+        return {**base, "state": "not final",
+                "words": f"graded by {len(graders)} graders or prompts: not final"}
+    if ungraded:
+        return {**base, "state": "not final",
+                "words": f"{ungraded:,} its grader gave no grade: not final until another "
+                         "grader grades them"}
+    return {**base, "state": "final", "words": "final"}
+
+
+def state_of(row: Path, task: str, grades: dict | None = None) -> dict:
+    """17h: `outcome` for a row's task with these grades, nothing written"""
+    m = marks(row, task, grades=grades)
+    if m["missing"]:
+        return {"state": "waiting", "words": "its answers aren't all in"}
+    flat = [r for it in m["items"] for r in m["runs"][it["id"]]]
+    return outcome(fb.BENCH[task], flat, task_dir(row, task), grades)
+
+
+def graders_of(d: Path, flat: list[dict], known: dict | None = None
+               ) -> tuple[dict | None, list[dict]]:
     """17b: who graded the answers the score counts — (the one grader and
     prompt, or None; every one, each with how many it graded). A grade keeps
     its grader's version and its prompt's sha256. 17e: a second grader that
@@ -805,7 +838,8 @@ def graders_of(d: Path, flat: list[dict]) -> tuple[dict | None, list[dict]]:
             was = gr.get("after") or {}
             after.setdefault(k, set()).add((was.get("by"), was.get("prompt_sha256")))
     known = {(x.get("version"), x.get("prompt_sha256")): x
-             for x in read_grades(d).get("graders") or []}
+             for x in ((known if known is not None else read_grades(d)).get("graders")
+                       or [])}
     every = [{**known.get(k, {"version": k[0], "prompt_sha256": k[1]}), "n": n}
              for k, n in sorted(used.items(), key=lambda kv: -kv[1])]
     if len(every) == 1:

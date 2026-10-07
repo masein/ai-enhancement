@@ -189,29 +189,56 @@ def _json_objects(text: str) -> list[tuple[int, int, dict]]:
             i += 1
 
 
-# 17g: a template's value, not a grade's — an example object the judge wrote
-# before its own ("<the answer>", "...", "yes or no", "0-100")
-_PLACEHOLDER = re.compile(r"(?is)^\s*(?:\.{2,}|…|<[^<>]*>|\[[^\[\]]*\]|string|integer|number|"
-                          r"(?:yes|true)\s*(?:/|\||or)\s*(?:no|false)|(?:no|false)\s*(?:/|\||or)\s*"
-                          r"(?:yes|true)|\d+\s*(?:-|–|to)\s*\d+\s*%?)\s*$")
+def _norm(t: str) -> str:
+    return " ".join(re.sub(r"[^\w\s']", " ", str(t).lower()).split())
+
+
+_PHRASES: list[str] = []
+
+
+def _prompt_phrases() -> list[str]:
+    """17h: the HLE judge prompt's own words for each field — what an example
+    object copies from it. An example is told by these alone, never by what
+    an answer looks like (17g read "[0, 1]", "1939-1945" and "number" as
+    templates and threw real verdicts away)"""
+    if not _PHRASES:
+        for line in prompt_text("hle").splitlines():
+            m = re.match(r"\s*(extracted_final_answer|reasoning|correct|confidence)\s*:\s*(.+)",
+                         line)
+            if m:
+                _PHRASES.extend(x for x in (_norm(y) for y in re.split(r"(?<=[.!?])\s+",
+                                                                      m.group(2))) if len(x) >= 20)
+    return _PHRASES
+
+
+def _example(o: dict) -> bool:
+    """an object whose values are the prompt's own words for its fields"""
+    for v in o.values():
+        if not isinstance(v, str):
+            continue
+        n = _norm(v)
+        if len(n) >= 20 and any(n in ph or ph[:40] in n for ph in _prompt_phrases()):
+            return True
+    return False
 
 
 def _hle_object(text: str) -> tuple[str, dict | None]:
-    """17g: the reply's verdict object — ("grade", it), ("conflict", None)
-    when two say otherwise, or ("none", None). Objects quoted the same twice
-    are one; an example object (a template's values) is none; a "correct:"
-    line outside them that says the same is no conflict — one that says
-    otherwise is, unless every object is quoted inside a line (17e: the line
-    is then the verdict)"""
+    """17g: the reply's verdict object — ("grade", it), ("conflict", None),
+    or ("none", None). Objects quoted the same twice are one. 17h: an example
+    is an object holding the judge prompt's own words for a field; any other
+    two objects that disagree are no grade, never one chosen; a "correct:"
+    line outside them that says otherwise is a conflict, unless the object is
+    quoted inside a line (17e: the line is then the verdict)"""
+    import json
     objs = [(a, b, o) for a, b, o in _json_objects(text) if "correct" in o]
     real = [(a, b, o) for a, b, o in objs
-            if _yes_no(o.get("correct")) is not None
-            and not any(isinstance(v, str) and _PLACEHOLDER.match(v) for v in o.values())]
+            if _yes_no(o.get("correct")) is not None and not _example(o)]
     if not real:
         return "none", None
-    import json
     distinct = list({json.dumps(o, sort_keys=True): o for _, _, o in real}.values())
     verdicts = {_yes_no(o["correct"]) for o in distinct}
+    if len(verdicts) > 1:
+        return "conflict", None
     alone = [a for a, _, _ in real
              if not re.sub(r"[\s`*_>#-]|json", "", text[text.rfind("\n", 0, a) + 1:a])]
     outside, k = "", 0
@@ -221,7 +248,7 @@ def _hle_object(text: str) -> tuple[str, dict | None]:
     outside += text[k:]
     w = r"[\s*_`\"'#>-]*"
     said = {m.group(1).lower() for m in re.finditer(rf"(?im)^{w}correct{w}:{w}(yes|no)\b", outside)}
-    if len(verdicts) == 1 and said <= verdicts:
+    if said <= verdicts:
         return "grade", distinct[-1]
     return ("conflict", None) if alone else ("none", None)
 
