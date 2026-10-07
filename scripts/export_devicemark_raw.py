@@ -10,9 +10,9 @@ Face — as DeviceMark links every row of its board to its raw file
 
 One folder a row, under --out (default $BENCH_ROOT/raw-export), in public/ or
 private/. 17h: public only for a model whose page marks its weights public
-(DeviceMark's calibration models: mark them there), never an in-house build
-(Qwen3.6), and only after a typed yes to the list the export prints;
---private keeps every row private. Upload is masein's step
+(DeviceMark's calibration models: mark them there) — 17i: the mark decides,
+never the name — and only after a typed yes to the list the export prints,
+with SCRUB_HOSTS and SCRUB_ACCOUNTS given; --private keeps every row private. Upload is masein's step
 (docs/REMOTE-RUNS.md § Publishing the raw runs).
 
   items.jsonl    a line an item: the test and its key; the prompt as sent; the
@@ -235,13 +235,10 @@ def model_of(row: Path) -> str:
 
 def public_by_default(row: Path, setup: dict) -> bool:
     """17h: public only for a model whose page marks its weights public — a
-    name that looks public (teamacct/bonsai-2-27b) never is, and an in-house
-    build, a setup served here or a checkpoint never is, marked or not"""
+    name that looks public (teamacct/bonsai-2-27b) never is. 17i: nor is one
+    kept private by its name (Qwen3.6): the mark and the typed yes decide"""
     import export_safe as es
-    model = model_of(row)
-    if IN_HOUSE.search(model) or IN_HOUSE.search(setup.get("based_on") or ""):
-        return False
-    return es.public(model)
+    return es.public(model_of(row))
 
 
 # 17h: the setup record as it may go out, field by field — its launch's flags
@@ -500,8 +497,9 @@ def refused(tasks) -> str:
 
 
 def export_row(row: Path, out: Path, public: bool | None = None, runs: list[dict] | None = None,
-               say=print, publish: bool = True) -> Path:
-    """one row's folder, scrubbed, under out/public or out/private"""
+               say=print, publish: bool = True, questions=None) -> Path:
+    """one row's folder, scrubbed, under out/public or out/private — 17i: its
+    log checked against every gated and private set (`questions`)"""
     from service import config
     why = refused(dm.TASK.values())
     if why:
@@ -528,15 +526,19 @@ def export_row(row: Path, out: Path, public: bool | None = None, runs: list[dict
     if dest.exists():
         shutil.rmtree(dest)
     dest.mkdir(parents=True)
-    runs = runs_of(row) if runs is None else runs
     import export_safe as es
+    es.twin(dest, say)
+    runs = runs_of(row) if runs is None else runs
     full_setup, left = setup_out({**setup, "model": model, "battery": dm.VERSION,
                                   "battery_hashes": dm.battery_hashes(items_src)
                                   if items_src else None,
                                   "runs": [r["id"] for r in runs]})
-    # 17h: the runner's own lines only (DeviceMark's battery is public: no
-    # question is withheld here)
-    lines, out_ = es.log_lines(log_of(row, runs), es.Questions([]))
+    # 17h: the runner's own lines only. 17i: checked against every gated and
+    # private set all the same — a log holds whatever the box ran
+    if questions is None:
+        questions = es.private_questions(say)
+    lines, out_ = es.log_lines(log_of(row, runs), questions,
+                               models=[model, *(r.get("hf_id") or "" for r in runs)])
     files = {
         "items.jsonl": "".join(json.dumps(scrub_obj(i), ensure_ascii=False) + "\n" for i in items),
         "setup.json": json.dumps(scrub_obj(full_setup), indent=1, ensure_ascii=False),
@@ -587,6 +589,12 @@ def main(argv: list[str] | None = None) -> int:
                     help="17h: no effect — a model is public when its page marks its weights "
                          "public, and the export asks before it writes anything there")
     a = ap.parse_args(argv)
+    if a.public:
+        # 17i: refused, before anything is written
+        print("--public does nothing: a model is public when its page marks its weights "
+              "public, and the export asks before it writes there. Nothing was written; run "
+              "it again without --public")
+        return 2
     from service import config, db
     db.init()
     if a.link:
@@ -599,18 +607,20 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     out = a.out or (config.BENCH_ROOT / "raw-export")
     rows = [row_of_run(a.run)[0]] if a.run else all_rows()
-    if a.public:
-        print("--public: no effect — a model is public when its page marks its weights public")
     import export_safe as es
     would = [] if a.private else [model_of(r) for r in rows if public_by_default(r, json.loads(
         (r / dm.OUT_NAME).read_text(encoding="utf-8")).get("setup") or {})]
-    publish = es.confirm(would)
-    if would and not publish:
+    why = es.refused_public() if would else ""
+    if why:
+        print(why)
+    publish = not why and es.confirm(would)
+    if would and not publish and not why:
         print("not published: those rows go to private/")
+    qs = es.private_questions(print)
     for row in rows:
-        export_row(row, out, False if a.private else None, publish=publish)
+        export_row(row, out, False if a.private else None, publish=publish, questions=qs)
     print(f"{len(rows)} row(s) under {out} — upload: docs/REMOTE-RUNS.md § Publishing the raw runs")
-    return 0
+    return 1 if why else 0
 
 
 if __name__ == "__main__":

@@ -789,8 +789,9 @@ def test_15_never_public_for_a_model_the_board_doesnt_know_as_public(box, tmp_pa
     import export_frontier_raw as efr
     sid = a3_imported(box)
     assert efr.export_run(sid, tmp_path / "raw", public=True).parent.name == "private"
-    assert efr.main(["--all", "--public", "--out", str(tmp_path / "all")]) == 0
-    assert "--public: no effect" in capsys.readouterr().out
+    # 17i: refused, before anything is written
+    assert efr.main(["--all", "--public", "--out", str(tmp_path / "all")]) == 2
+    assert "--public does nothing" in capsys.readouterr().out
     assert not (tmp_path / "all" / "public").exists()            # 308fcf3: the build, public
     # 17h: public only when the board's mark says so (its page, or --public-weights)
     assert not efr.known_public({"hf_id": "served/gemma-cal"})

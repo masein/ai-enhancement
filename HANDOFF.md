@@ -4953,6 +4953,42 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17i.3 — the export, before anyone runs it (7 Oct)
+
+- **Log lines in listed shapes** (`export_safe.LOG_SHAPES`, point 16): each a
+  fixed form with typed slots — a section header, a step's first line, the
+  file, build and GPU, a benchmark's questions, the server coming up, a
+  sha256 worked out, the memory check, the server's variables, progress (and
+  DeviceMark's task progress), the parity count and file, the run's end, a
+  benchmark not whole, no bundle, the bundle, DeviceMark's battery, shard,
+  GPU and first line, and the `[frontier]`, `[import]`, `[devicemark]` and
+  `[service]` lines. Nothing in a slot holds a "/" but the run's own model,
+  a step's folder on the box and a path on this server, so no shape carries
+  a repository ("fetching … from <account>/evalboard-private" went out after
+  its time); a `…-private` name or a `SCRUB_ACCOUNTS` account is left out
+  wherever it stands. A `[7]` in a header is no longer read as an address (24).
+- **The README** goes through the scrub like every other file (17).
+- **Every log against every gated and private set** (`private_questions`,
+  18): Frontier's gated and withheld benchmarks whatever the run asked, the
+  Everyday hidden half, the Knowledge exam's bank, Mobile-MMLU and
+  Mobile-MMLU-Pro — DeviceMark's logs too; a set that can't be loaded means
+  no log, said on the terminal (24) as well as in the README. The six-word
+  check reads `\uXXXX` escapes, URL-encoding, underscores and accents (22).
+- **Public or private by the mark and the typed yes alone** (19, 20): no
+  model is kept private by its name (unsloth's Qwen3.6 files are public);
+  the typed-yes list shows each model's file, sha256 (a split identity for a
+  GGUF in parts) and source (the import now records the bundle's
+  `gguf.source`); a run written to `private/` removes its `public/` twin and
+  says so; the model page's mark says what the export and the upload do.
+- **The environment by name** (21): a value only for a variable on
+  `ENV_VALUES`, every other allowed one "(set; its value withheld)"; `public/`
+  is refused while `SCRUB_HOSTS` or `SCRUB_ACCOUNTS` is empty (exit 1, all
+  private). **Flags** (23): `TAKES` and `SWITCHES` — a switch never carries
+  the next token out.
+- **Small ones** (24): `--public` is refused before anything is written
+  (exit 2); closed stdin is a "no", never a traceback.
+- Tests: `tests/test_17i_export.py`, `tests/test_17i_export_browser.py`.
+
 ### 17i.2 — the boxes and the fetch (7 Oct)
 
 - **`--abandoned <build>/<step>`** (`frontier_fetch.py`, point 7, repeatable):
@@ -4992,6 +5028,7 @@ Not before the demo: a new hidden set changes every Everyday score.
   a shard held after a whole run is said on its score (`shards_held`, kept
   when the score is made again) and in its cell.
 - Tests: `tests/test_17i_boxes.py`.
+
 
 ### 17h.5 — the start-up fill and Compare (7 Oct)
 

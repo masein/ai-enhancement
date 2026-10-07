@@ -31,6 +31,15 @@ LEAKS = re.compile(r"(?i)/home/|\b100\.\d{1,3}\.\d{1,3}\.\d{1,3}\b|teraformer-bo
                    r"bearer\s+[A-Za-z0-9._\-]{12,}|\.ts\.net\b")
 
 
+@pytest.fixture(autouse=True)
+def no_gated_sets(monkeypatch):
+    """17i: each log is checked against every gated and private set on the
+    server; this world has none (its Frontier sets can't be loaded here, and
+    a set that can't be is no log at all)"""
+    import export_safe as es
+    monkeypatch.setattr(es, "private_questions", lambda say=None: es.Questions([]))
+
+
 @pytest.fixture
 def row(board, monkeypatch):  # noqa: F811
     monkeypatch.setattr(ex.socket, "gethostname", lambda: HOST)
@@ -140,11 +149,12 @@ def test_public_for_public_models_and_private_for_in_house_builds(svc, tmp_path,
     row = tmp_path / model.replace("/", "__")
     row.mkdir()
     (row / "model_meta.json").write_text(json.dumps({"model": model}))
-    # 17h: never by its name — public once its page marks it, and an in-house
-    # build never, marked or not
+    # 17h: never by its name — public once its page marks it. 17i: nor kept
+    # private by its name — the mark and the typed yes decide (unsloth's
+    # Qwen3.6 files are public, unmodified)
     assert ex.public_by_default(row, setup) is False
     db.public_set(model, True, ME)
-    assert ex.public_by_default(row, setup) is public
+    assert ex.public_by_default(row, setup) is True
 
 
 def test_the_raw_link_by_the_command_and_on_the_row(row, tmp_path):
