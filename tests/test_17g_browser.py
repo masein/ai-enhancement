@@ -168,11 +168,14 @@ def test_18_the_poll_redraws_the_boxes_list(live, page):
             "line": "MMLU-Pro 3,000 of 12,032 · 5.3 s an answer · 13.3 h left", "sessions": 1,
             "reachable": True, "safe": False}
     imf.store_boxes([step])
-    go(page, live, "tab=runs", "[data-rented-box='A5|A5-1']")
+    run = "[data-rented-run='rented:served/split-b|mmlupro_tiger|on'] [data-rented-count]"
+    go(page, live, "tab=runs", run)
     imf.store_boxes([step, {**step, "label": "A6", "step": "A6-1"}])
-    # the poll's redraw: the table — and, 17g, the list (308fcf3: only a full render)
+    # the poll's redraw: the table — and, 17g, the list (308fcf3: only a full render).
+    # 17i: the second box merged into its run's row
     page.evaluate("state.boxesAt = 0; state.queueRedraw()")
-    page.wait_for_selector("[data-rented-box='A6|A6-1']", timeout=10000)
+    page.wait_for_function(f"(document.querySelector(\"{run}\") || {{}}).textContent"
+                           " === '6,000 of 24,064 · 2 boxes'", timeout=10000)
     assert page.errors == []
 
 

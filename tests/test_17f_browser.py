@@ -73,11 +73,11 @@ def test_13_16_runs_says_where_each_ran_and_what_the_boxes_are_doing(live, page)
     page.locator("[role=listbox][aria-label='where filter'] [data-value='rented']").click()
     page.wait_for_function(f"!document.querySelector(\"[data-queue-row='{here}']\")")
     assert page.locator(f"[data-queue-row='{away}']").count() == 1
-    # what the boxes are doing
-    boxes = page.locator("[data-rented-boxes]")
-    boxes.wait_for()
-    a5 = page.locator("[data-rented-box='A5|A5-1']").inner_text()
-    assert "3,000 of 12,032" in a5 and "MMLU-Pro" in a5
-    assert "done, safe to destroy" in page.locator("[data-rented-box='A9|A9-2']").inner_text()
-    assert "203.0.113" not in boxes.inner_text()
+    # what the boxes are doing — 17i: as rows of the list itself
+    a5 = page.locator("[data-rented-run='rented:served/board-box|mmlupro_tiger|on']")
+    a5.wait_for()
+    assert "3,000 of 12,032" in a5.inner_text() and "MMLU-Pro" in a5.inner_text()
+    a9 = page.locator("[data-rented-run='rented:served/board-box|hle_text_cais|off']")
+    assert a9.locator("[data-stage]").inner_text() == "Done"
+    assert "203.0.113" not in page.locator("[data-queue-table]").inner_text()
     assert page.errors == []
