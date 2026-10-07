@@ -4953,6 +4953,34 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17h.1 — grading, by its rules (7 Oct)
+
+- **Tested by rules, not a bug at a time** (`tests/test_17h_grading_rules.py`):
+  random sequences of choose, grader behaviour (in form, out of form, every
+  request refused, answers too long, spend cap, provider error, down,
+  timeout), Start, Stop mid-batch, Carry on, a held batch moved to another
+  grader and the regrade offer — after every step: no grade bought twice, a
+  final score one grader's on every row or said, the dry run what Start
+  sends, a next step for every score not final; each sequence ends final by
+  one grader once the page's steps are taken.
+- **HLE** (`frontier_graders._hle_object`): an example is an object in the
+  judge prompt's own words for its fields, never one whose answer looks like
+  a template ("[0, 1]", "1939-1945", "number" are verdicts); objects that
+  disagree are no grade.
+- **A reply that lands after a stop is kept** (`llm.LocalOpenAI._work`); a
+  run of refusals waits for Start (`halt.json` `hold`).
+- **A refusal of the answer itself** (`ai_models.refusal` kind `answer`: too
+  long, flagged) is that answer's try and never part of a run; nothing else
+  is a try (`_permanent`).
+- **Stop, another grader, Carry on**: the dry run prices a batch Start moves
+  at the grader it goes to, with what it landed applied as Start records it
+  (`_apply`, `_close`); a row by two graders that aren't a top-up is
+  finished by the one chosen now (`_mixed`).
+- **Start when nothing waits**: a switch alone has its Start, and the dry run
+  says what Start leaves the score as (`frontier.outcome`, one rule for the
+  score and the dry run).
+- Tests: `tests/test_17h_grading_rules.py`, `tests/test_17h_browser.py`.
+
 ### 17g.4 — the dashboard and the export (6 Oct)
 
 - **The export publishes nothing the board withholds** (`export_frontier_raw`):

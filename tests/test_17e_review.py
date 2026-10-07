@@ -476,9 +476,10 @@ def test_14_16_start_pins_a_slot_new_to_the_work_and_counts_what_moved(gsvc, mon
     monkeypatch.setattr(fgr, "_settle", lambda ids, timeout=None: True)
     # 2 of the 6 were in flight, and landed
     monkeypatch.setattr(fgr, "_still_cancelled", lambda bid, ids: 4)
-    # 17g: the dry run's view, what waits once the stop is lifted, then once
-    # the requests in flight landed
-    lists = iter([[], [], [{"slot": "math", "task": "math_l5_epoch", "model": "m", "items": [1]}]])
+    # 17g: the dry run's view, then — 17h: once the requests in flight landed
+    # and were recorded — what waits, and again once the new slot is pinned
+    math = [{"slot": "math", "task": "math_l5_epoch", "model": "m", "items": [1]}]
+    lists = iter([[], math, math])
     monkeypatch.setattr(fgr, "waiting", lambda view=False: next(lists))
     sent = []
     monkeypatch.setattr(fgr, "_submit", lambda w, pin, by: sent.append((w["slot"], pin)) or "b1")

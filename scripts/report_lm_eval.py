@@ -24532,7 +24532,10 @@ function frontierGradingCard() {
           + 'the earlier grades are kept under their grader’s name, not mixed in' }) : '',
         // 17g: a grader chosen again: what it graded before comes back
         r.reused ? el('div', { class: 'small se', 'data-frontier-reused': String(r.reused),
-          text: `${n(r.reused)} grades it gave before are used again` }) : ''),
+          text: `${n(r.reused)} grades it gave before are used again` }) : '',
+        // 17h: nothing to send — what Start leaves the score as, said first
+        r.after ? el('div', { class: 'small ' + (r.after_state === 'final' ? 'se' : 'warntext'),
+          'data-frontier-after': r.after_state, text: `Start makes its score: ${r.after}` }) : ''),
       el('td', { text: r.model }), el('td', { class: 'num', text: n(r.answers) }),
       el('td', { class: 'num', text: r.usd == null ? 'once pinned' : usd(r.usd) }))))))
     : el('p', { class: 'small se', 'data-frontier-estimate': '0',
@@ -24541,6 +24544,7 @@ function frontierGradingCard() {
         + `${usd(H.usd)}, which Carry on sends.`
         : 'Nothing waits for a grader: every Frontier answer on file is scored.' });
   const running = (G.running || []).length, stopped = !!G.stopped;
+  const switching = rows.some(r => r.switch && !r.answers);
   const why = !G.has_key ? 'OpenRouter has no key on this server (OPENROUTER_API_KEY)'
     : E.over_limit || '';
   const cost = E.usd_known ? usd(E.usd) : `${usd(E.usd)} and the unpriced`;
@@ -24571,13 +24575,15 @@ function frontierGradingCard() {
       ` · this month ${usd(E.spent)} of ${usd(E.limit)} spent`) : '',
     G.key_warning && E.answers ? el('p', { class: 'warn small', 'data-frontier-key-warning': '1',
       text: G.key_warning }) : '',
-    LIVE && (E.answers || running) ? el('div', { class: 'frm', 'data-frontier-run': held
+    LIVE && (E.answers || running || switching) ? el('div', { class: 'frm', 'data-frontier-run': held
         ? 'held' : running ? 'running' : stopped ? 'stopped' : 'idle' },
-      E.answers || held ? el('button', { class: 'primary', 'data-frontier-start': '1',
+      // 17h: and a switch alone, nothing to send, has its Start too
+      E.answers || held || switching ? el('button', { class: 'primary', 'data-frontier-start': '1',
         disabled: why || busy ? '' : null, title: why || null,
         text: busy === 'start' ? 'Sending…' : stopped || held
           ? 'Carry on' + (E.answers || H.answers ? `: about ${carryCost}` : '')
-          : 'Start grading' + (E.answers ? `: about ${cost}` : ''),
+          : 'Start grading' + (E.answers ? `: about ${cost}` : switching
+            ? ': nothing to send, the grades switched' : ''),
         onclick: () => frontierGradingAct('start') }) : '',
       running && !stopped ? el('button', { class: 'quiet', 'data-frontier-stop': '1',
         text: busy === 'stop' ? 'Stopping…' : 'Stop', disabled: busy ? '' : null,
@@ -24606,7 +24612,7 @@ function frontierGradingCard() {
         + `${r.row.replace('__', '/')} not graded — ${r.words}`
         // 17c: asked again G.tries times, then ungraded for good, counted wrong
         + (r.ungraded ? ` · ${n(r.ungraded)} after ${G.tries} tries: ungraded, counted wrong`
-          : '')
+          + (r.form ? '' : ' — choose another grader above to grade them, then Start') : '')
         + (r.n - (r.ungraded || 0) ? ` — Start asks ${r.n - (r.ungraded || 0) === 1 ? 'it'
           : `${n(r.n - (r.ungraded || 0))} of them`} again.` : '.') })),
     // 17g: one benchmark, rows scored by different graders — said, and each

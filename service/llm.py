@@ -814,7 +814,7 @@ def _halted(d: Path, retry_s: float) -> str:
         h = json.loads((d / "halt.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return ""
-    if time.time() - float(h.get("at") or 0) >= retry_s:
+    if not h.get("hold") and time.time() - float(h.get("at") or 0) >= retry_s:
         return ""                           # it tries again; a new run of refusals stops it again
     return str(h.get("why") or "")
 
@@ -1066,9 +1066,12 @@ class LocalOpenAI(Backend):
                "Start again" if first else
                f"waiting: OpenRouter refused {n} requests in a row — {said}. It tries again in "
                f"{round(self.HALT_RETRY_S / 60)} minutes" + self.HALT_TAIL)
+        # 17h: a run of refusals waits for Start (the model changed, or the
+        # same asked again) — it took itself up after 10 minutes, and asked
+        # the same refusals again
         (self.dir / batch_id / "halt.json").write_text(json.dumps(
-            {"why": why, "status": rec.get("status"), "at": time.time(), "n": n}),
-            encoding="utf-8")
+            {"why": why, "status": rec.get("status"), "at": time.time(), "n": n,
+             **({"hold": True} if first else {})}), encoding="utf-8")
 
     def cancel(self, batch_id: str, custom_ids, why: str) -> int:
         """16c: questions of a batch that are no longer wanted — never sent;
@@ -1175,42 +1178,51 @@ class LocalOpenAI(Backend):
                         continue                    # cancelled: recorded by cancel()
                     rec = self._complete({**row, "batch_id": batch_id})
                     with write:
+                        kind = refusal_kind(rec) if rec.get("error") else ""
+                        if not rec.get("error"):
+                            # 17h: a reply that came is kept, a stop or not —
+                            # thrown away after a stop, it was bought again
+                            if not streak["halted"]:
+                                for r in first["held"]:     # a run a reply ended
+                                    put(r)
+                                first["held"], first["n"] = [], {}
+                                flush()
+                            put(rec)
+                            continue
+                        if kind == "answer":
+                            # 17h: refused for the answer itself (too long,
+                            # flagged): that answer's own try — never part of
+                            # a run that stops the batch
+                            put(rec)
+                            continue
+                        if streak["halted"]:
+                            continue                # asked again when it takes up again
                         # 16c review: only a refusal about the key — its limit,
                         # the key itself, or a rate limit that outlasted the
-                        # retries — pauses; one refused for its own content is
-                        # recorded as failed and the batch goes on
-                        kind = refusal_kind(rec) if rec.get("error") else ""
-                        if self.FIRST_REFUSALS and not (self.HALT_AFTER
-                                                        and kind in self.HALT_KINDS):
-                            if streak["halted"]:
-                                continue            # asked again when it takes up again
-                            if rec.get("error"):
-                                k = (rec.get("status"), kind)
-                                first["held"].append(rec)
-                                first["n"][k] = first["n"].get(k, 0) + 1
-                                if first["n"][k] >= self.FIRST_REFUSALS:
-                                    self._halt(batch_id, rec, first["n"][k], first=True)
-                                    first["held"], first["n"] = [], {}
-                                    streak["halted"] = True
-                                continue
-                            for r in first["held"]:
-                                put(r)
-                            first["held"], first["n"] = [], {}
+                        # retries — pauses after HALT_AFTER, and tries again
                         if self.HALT_AFTER and kind in self.HALT_KINDS:
-                            if streak["halted"]:
-                                continue            # asked again when it takes up again
-                            k = kind
-                            if streak["key"] != k:
+                            if streak["key"] != kind:
                                 flush()
-                                streak["key"] = k
+                                streak["key"] = kind
                             streak["held"].append(rec)
                             if len(streak["held"]) >= self.HALT_AFTER:
                                 self._halt(batch_id, rec, len(streak["held"]))
                                 streak["held"], streak["key"] = [], None
                                 streak["halted"] = True
                             continue
-                        if not streak["halted"]:
-                            flush()
+                        if self.FIRST_REFUSALS:
+                            # 17f/17g: a run of the same refusal, whatever
+                            # else that isn't a reply sits between, stops the
+                            # batch until Start; nothing counted
+                            k = (rec.get("status"), kind)
+                            first["held"].append(rec)
+                            first["n"][k] = first["n"].get(k, 0) + 1
+                            if first["n"][k] >= self.FIRST_REFUSALS:
+                                self._halt(batch_id, rec, first["n"][k], first=True)
+                                first["held"], first["n"] = [], {}
+                                streak["halted"] = True
+                            continue
+                        flush()
                         put(rec)
 
             pool = [threading.Thread(target=drain, name=f"llm-{batch_id}-{i}", daemon=True)

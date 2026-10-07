@@ -194,7 +194,12 @@ def waiting(view: bool = False) -> list[dict]:
     leave them with the grader chosen now (the dry run), each row saying what
     the switch does (`switch`: kept, regrade, match) and how many grades
     the grader gave before come back (`reused`)"""
-    out_now = {(p["row"], p["task"], k) for p in pending()
+    # 17h: in the dry run, a batch Start moves to the grader chosen now
+    # (stopped, then another chosen) holds nothing — its answers are priced
+    # here, at the grader they go to (they were priced at the stopped one's)
+    out = pending()
+    moving = [p for p in out if view and _moving(p)]
+    out_now = {(p["row"], p["task"], k) for p in out if p not in moving
                for k in set(p.get("keys") or []) - _cancelled(p["batch_id"])}
     got = []
     root = Path(config.OUT_DIR)
@@ -206,6 +211,10 @@ def waiting(view: bool = False) -> list[dict]:
             seen, how, reused = None, "", 0
             if now:
                 seen = copy.deepcopy(sf.read_grades(d))
+                # 17h: what a moved batch landed, recorded as Start records it
+                for p in moving:
+                    if p["row"] == row.name and p["task"] == t:
+                        _apply(seen, d, p["slot"], p["pin"], p, _items(t), _landed(p))
                 how, reused = _switch(seen, now.get("version") or now.get("id"),
                                       fg.prompt_sha(slot))
             try:
@@ -215,11 +224,41 @@ def waiting(view: bool = False) -> list[dict]:
             todo = [x for x in todo if (row.name, t, sf.gkey(x["id"], x["epoch"])) not in out_now]
             if todo or how:
                 mid, base = _model_of(row)
+                # 17h: nothing to send, the switch alone — what Start leaves the
+                # score as, said before it (a $0 Start could take a final away)
+                after = sf.state_of(row, t, seen) if how and not todo else None
                 got.append({"slot": slot, "task": t, "row": row.name, "model": mid,
                             "base": base, "items": todo,
                             **({"switch": how, "why": (seen or {}).get("regrade", {}).get("why")
-                                or "", "reused": reused} if how else {})})
+                                or "", "reused": reused} if how else {}),
+                            **({"after": after["words"], "after_state": after["state"]}
+                               if after else {})})
     return got
+
+
+def _items(task: str) -> dict:
+    return {it["id"]: it for it in fb.load(task, config.BENCH_ROOT)}
+
+
+def _landed(p: dict) -> dict:
+    """a batch's replies on disk, never its cancelled requests — as finish()
+    reads them"""
+    d = llm.batch_dir(p["batch_id"])
+    if d is None:
+        return {}
+    return {c: llm.Result(text=r.get("text") or "", error=r.get("error") or "",
+                          finish=r.get("finish_reason") or "", status=r.get("status"),
+                          kind=r.get("kind") or "")
+            for c, r in llm.LocalOpenAI._results(d).items() if not r.get("cancelled")}
+
+
+def _moving(p: dict) -> str:
+    """17c/17h: why Start moves a batch out to the grader pinned now — its
+    grader drifted on OpenRouter, or another was chosen since — '' if not"""
+    now = chosen(p["slot"]) or {}
+    return ai_models.drifted(p["pin"]) or (
+        "another grader was chosen" if now and now.get("version") != p["pin"].get("version")
+        else "")
 
 
 def _price(g: dict) -> tuple[float | None, float | None]:
@@ -249,7 +288,8 @@ def estimate() -> dict:
             # 17g: nothing to send — the grades it gave before come back
             rows.append({"slot": slot, "task": w["task"], "label": fb.BENCH[w["task"]]["label"],
                          "model": w["model"], "answers": 0, "usd": 0.0,
-                         "switch": w["switch"], "reused": w.get("reused") or 0})
+                         "switch": w["switch"], "reused": w.get("reused") or 0,
+                         "after": w.get("after") or "", "after_state": w.get("after_state")})
             continue
         g = grader(slot)
         items = {it["id"]: it for it in fb.load(w["task"], config.BENCH_ROOT)}
@@ -394,14 +434,7 @@ def _start(by: str) -> dict:
         raise ValueError(why)
     # everything checked before anything changes — 17d: before the stop is
     # lifted too, so a refused Start leaves a stopped grading stopped
-    moved = []
-    for p in pending():
-        now = chosen(p["slot"]) or {}
-        why = ai_models.drifted(p["pin"]) or (
-            "another grader was chosen" if now and now.get("version") != p["pin"].get("version")
-            else "")
-        if why:
-            moved.append((p, why))
+    moved = [(p, why) for p in pending() for why in [_moving(p)] if why]
     # 17g: what waits as Start leaves it — the grader chosen now taking over
     # (its own grades back, a whole regrade, a top-up) — decided before
     # anything changes, done once the stop is lifted
@@ -413,32 +446,37 @@ def _start(by: str) -> dict:
         if drift:
             raise ValueError(f"{fg.GRADERS[slot]['label']}: {drift}")
     (gdir() / "stopped.json").unlink(missing_ok=True)
+    # 17c: a batch out whose grader moved (OpenRouter repointed its id, or
+    # another was chosen since) sends nothing more: its unsent requests are
+    # cancelled, and go to the grader pinned now, with what waits. 17d: those
+    # in flight land first — they are never asked twice. 17h: and what landed
+    # is recorded now, before the grader chosen now takes over (recorded
+    # later, it met that grader's grades of the same answers)
+    cancelled = {p["batch_id"]: _cancel_unsent(p, why) for p, why in moved}
+    if moved:
+        _settle([p["batch_id"] for p, _ in moved])
+        for p, _ in moved:
+            _close(p["batch_id"])
     for slot in fg.GRADERS:
         pin = pins.get(slot) or chosen(slot)
         if pin:
             _reset_tries(slot, pin)
-    work = [w for w in waiting() if w["slot"] in pins]
-    # 17c: a batch out whose grader moved (OpenRouter repointed its id, or
-    # another was chosen since) sends nothing more: its unsent requests are
-    # cancelled, and go to the grader pinned now, with what waits. 17d: those
-    # in flight land first — they are never asked twice
-    cancelled = {p["batch_id"]: _cancel_unsent(p, why) for p, why in moved}
+    work = waiting()
     skipped = []
-    if moved:
-        _settle([p["batch_id"] for p, _ in moved])
+    # 17e: a slot new to the work — another's batch landed with replies to ask
+    # again while this waited — pinned now; one whose pin moved waits, said
+    new_slots = sorted({w["slot"] for w in work} - set(pins))
+    for slot in new_slots:
+        pin = _pinned(slot, by)
+        drift = ai_models.drifted(pin)
+        if drift:
+            skipped.append(f"{fg.GRADERS[slot]['label']}: {drift}")
+            continue
+        pins[slot] = pin
+        _reset_tries(slot, pin)
+    if new_slots:
         work = waiting()
-        # 17e: a slot new to the work — another's batch landed with replies
-        # to ask again while this waited — pinned now (it raised KeyError: a
-        # 500 after the stop was lifted); one whose pin moved waits, said
-        for slot in sorted({w["slot"] for w in work} - set(pins)):
-            pin = _pinned(slot, by)
-            drift = ai_models.drifted(pin)
-            if drift:
-                skipped.append(f"{fg.GRADERS[slot]['label']}: {drift}")
-                continue
-            pins[slot] = pin
-            _reset_tries(slot, pin)
-        work = [w for w in work if w["slot"] in pins]
+    work = [w for w in work if w["slot"] in pins]
     # 17e: moved are those still cancelled once the requests in flight landed
     # (Start said 6 when 4 moved: 2 were in flight, and landed)
     n_moved = sum(_still_cancelled(b, ids) for b, ids in cancelled.items())
@@ -460,6 +498,20 @@ def _start(by: str) -> dict:
 
 
 SETTLE_S = 30.0                         # how long Start waits for requests in flight
+
+
+def _close(batch_id: str) -> None:
+    """17h: a moved batch, every request answered or cancelled, recorded and
+    closed now — as the poller would at its next tick"""
+    try:
+        be = batch_backend(batch_id)
+        state, _ = be.status(batch_id)
+        if state != "done":
+            return
+        finish(batch_id, be.fetch(batch_id))
+        db.batch_finish(batch_id, "done", "")
+    except Exception as e:                              # noqa: BLE001 — the poller tries again
+        print(f"[frontier grading] {batch_id}: not closed at Start ({e!r}) — the poller will")
 
 
 def _working(batch_id: str) -> bool:
@@ -525,8 +577,13 @@ def _permanent(res) -> bool:
         status = int(m.group(1)) if m else None
     if status is None:
         return False
-    kind = kind or ai_models.refusal(status, error)[0]
-    return status in (400, 403, 413, 422) and kind == "refused"
+    # 17h: a refusal about the answer itself (too long, flagged) — its try;
+    # one about the grader (an id it doesn't know, a region), the key, the
+    # provider or the network never is. A kind kept as "refused" before 17h
+    # is read again from its words
+    if not kind or kind == "refused":
+        kind = ai_models.refusal(status, error)[0]
+    return kind == "answer"
 
 
 def _reset_tries(slot: str, pin: dict) -> None:
@@ -574,6 +631,24 @@ def _regrade(g: dict, version: str, sha: str) -> bool:
     _stash(g, mine)                             # 17g: each under its own name
     g["regrade"] = {"by": version, "prompt_sha256": sha, "at": time.time(),
                     "why": f"the first grader left {ungraded:,} of {seen:,} without a grade"}
+    return True
+
+
+def _mixed(g: dict, mine: tuple) -> bool:
+    """17h: grades on the row by more than one grader that aren't one grader
+    and its top-up (a second that graded only what the first gave no grade,
+    UNGRADED_SHARE of them at most) — never final as they are"""
+    items = g.get("items") or {}
+    who: dict = {}
+    for x in items.values():
+        who.setdefault(_who(x), []).append(x)
+    if len(who) < 2:
+        return False
+    if len(who) == 2:
+        (a, xa), (b, xb) = sorted(who.items(), key=lambda kv: -len(kv[1]))
+        top = all(_who(x.get("after") or {}) == a for x in xb)
+        if top and len(xb) <= sf.UNGRADED_SHARE * len(items):
+            return False
     return True
 
 
@@ -637,6 +712,15 @@ def _switch(g: dict, version: str, sha: str) -> tuple[str, int]:
         how = "kept"
     elif _regrade(g, version, sha):
         how = "regrade"
+    elif _mixed(g, mine):
+        # 17h: two graders behind the row that aren't a top-up (a stop, then
+        # another grader): the one chosen now grades every answer it didn't —
+        # the row was "not final", and no grader sent anything
+        _stash(g, mine)
+        g["regrade"] = {"by": version, "prompt_sha256": sha, "at": time.time(),
+                        "why": "its grades came from two graders: the one chosen now grades "
+                               "those it didn't"}
+        how = "mixed"
     reused = 0
     if back and how in ("kept", "match"):
         for part in ("items", "refused"):
@@ -711,6 +795,15 @@ def finish(batch_id: str, results: dict) -> int:
 def _record(d: Path, slot: str, pin: dict, meta: dict, items: dict, results: dict) -> int:
     """a batch's replies into grades.json, under its lock"""
     g = sf.read_grades(d)
+    n = _apply(g, d, slot, pin, meta, items, results)
+    _write_grades(d, g)
+    return n
+
+
+def _apply(g: dict, d: Path, slot: str, pin: dict, meta: dict, items: dict,
+           results: dict) -> int:
+    """17h: a batch's replies into the grades `g` — the dry run applies a
+    moved batch's landed replies to a copy, as Start then records them"""
     g.setdefault("items", {})
     g.setdefault("refused", {})
     rec = grader_record(slot, pin, meta.get("by", ""), meta.get("prompt_sha256") or "")
@@ -764,16 +857,12 @@ def _record(d: Path, slot: str, pin: dict, meta: dict, items: dict, results: dic
             g["refused"][key] = _refusal(g["refused"].get(key),
                                          f"its reply couldn't be read: {e!r}"[:300], rec,
                                          sent.get(key), counts=True, kind="unread")
-    # 17e: a refusal that never changes is a try. 17f: only where the same
-    # grader and prompt graded other answers of this benchmark — a refusal of
-    # every answer (a model id the provider doesn't know, a region it blocks)
-    # is the grader's, and burned every answer's three tries
-    mine = bool(n) or any((x.get("by"), x.get("prompt_sha256"))
-                          == (rec["version"], rec["prompt_sha256"]) for x in g["items"].values())
+    # 17e: a refusal that never changes is a try. 17h: only one about the
+    # answer itself — a grader's refusal of every answer (a model id the
+    # provider doesn't know) is no answer's, and stops the batch (llm)
     for key, why, res in errors:
         g["refused"][key] = _refusal(g["refused"].get(key), why, rec, sent[key],
-                                     counts=mine and _permanent(res), kind="error")
-    _write_grades(d, g)
+                                     counts=_permanent(res), kind="error")
     return n
 
 
@@ -911,6 +1000,8 @@ def held() -> dict:
     — what Carry on sends, beside the dry run's new answers"""
     n, usd, known = 0, 0.0, True
     for x in pending():
+        if _moving(x):
+            continue                        # 17h: the dry run prices it, at the grader now
         d = llm.batch_dir(x["batch_id"])
         if d is None:
             continue
