@@ -192,16 +192,61 @@ def _close_of(text: str, i: int) -> int | None:
     return None
 
 
+def _close_braces(text: str, i: int) -> int | None:
+    """17j: where the object opening at `i` closes, counting braces alone —
+    for one whose quotes can't be trusted (a quote left unescaped inside a
+    string, a quoted object inside its reasoning)"""
+    depth = 0
+    for j in range(i, len(text)):
+        if text[j] == "{":
+            depth += 1
+        elif text[j] == "}":
+            depth -= 1
+            if depth == 0:
+                return j + 1
+    return None
+
+
+def _in_strings(raw: str, fix) -> str:
+    """17j: `raw` with `fix` applied to each character inside a double-quoted
+    string — a raw newline there made the whole object unread"""
+    out, q, esc = [], False, False
+    for c in raw:
+        if q:
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                q = False
+            else:
+                c = fix(c)
+        elif c == '"':
+            q = True
+        out.append(c)
+    return "".join(out)
+
+
+def _mend(raw: str) -> str:
+    """17i: raw LaTeX backslashes ("\\alpha = 2") and trailing commas mended.
+    17j: and a backslash before a u that isn't four hex digits ("\\uparrow",
+    "\\underline"), a raw newline or tab inside a string, and a verdict left
+    unquoted ("correct": yes)"""
+    t = re.sub(r'\\(?![\\"/bfnrt]|u[0-9a-fA-F]{4})', r"\\\\", raw)
+    t = _in_strings(t, lambda c: {"\n": "\\n", "\t": "\\t", "\r": "\\r"}.get(c, c))
+    t = re.sub(r'("correct"\s*:\s*)(yes|no|true|false)\b', r'\1"\2"', t, flags=re.I)
+    return re.sub(r",\s*([}\]])", r"\1", t)
+
+
 def _lenient(raw: str):
-    """17i: an object as a person reads it — JSON, else with its raw LaTeX
-    backslashes ("\\alpha = 2") and trailing commas mended, else in single
-    quotes (a Python literal); None when none of these reads"""
+    """17i: an object as a person reads it — JSON, else mended (_mend), else
+    in single quotes (a Python literal); None when none of these reads"""
     import ast
     import json
-    for t in (raw, re.sub(r",\s*([}\]])", r"\1",
-                          re.sub(r'\\(?![\\"/bfnrtu])', r"\\\\", raw))):
+    for t in (raw, _mend(raw)):
         try:
-            return json.loads(t)
+            got = json.loads(t)
+            return got if isinstance(got, dict) else None
         except ValueError:
             continue
     try:
@@ -209,29 +254,70 @@ def _lenient(raw: str):
                                       lambda m: {"true": "True", "false": "False",
                                                  "null": "None"}[m.group(1)], raw))
         return got if isinstance(got, dict) else None
-    except (ValueError, SyntaxError, MemoryError, RecursionError):
+    except (ValueError, SyntaxError, MemoryError, RecursionError, TypeError):
         return None
 
 
-def _json_objects(text: str) -> tuple[list[tuple[int, int, dict]], bool]:
+FIELDS = ("extracted_final_answer", "reasoning", "correct", "confidence")
+# 17j: an object a verdict can be in opens with one of its fields' names — a
+# brace in prose, LaTeX ("\left\{ … \right.") or code ("for (…) {") is none
+_OPENS = re.compile(r"\{\s*([\"']?)(" + "|".join(FIELDS) + r")\1\s*:")
+_KEY_AT = re.compile(r"[{,]\s*([\"']?)(" + "|".join(FIELDS) + r")\1\s*:")
+AMBIGUOUS = "ambiguous"
+
+
+def _by_fields(raw: str):
+    """17j: an object that reads as nothing else, field by field, as a person
+    reads it — each field's value runs to the next field's name (an
+    apostrophe in a single-quoted object, a quote left unescaped inside a
+    string). AMBIGUOUS when a field is named twice (an object quoted inside
+    its reasoning): nothing in it is read; None when it holds no verdict"""
+    keys = list(_KEY_AT.finditer(raw))
+    names = [m.group(2) for m in keys]
+    if "correct" not in names:
+        return None
+    if len(set(names)) != len(names):
+        return AMBIGUOUS
+    end = raw.rstrip().rfind("}")
+    out = {}
+    for k, m in enumerate(keys):
+        stop = keys[k + 1].start() if k + 1 < len(keys) else end
+        v = raw[m.end():stop].strip()
+        if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
+            v = v[1:-1]
+        out[m.group(2)] = v
+    return out
+
+
+def _json_objects(text: str) -> tuple[list[tuple[int, int, object]], bool]:
     """17f: every object in the reply that stands alone — (start, end,
-    object), objects inside another one not counted. 17i: read as a person
-    reads it (_lenient); and whether the reply ends cut — an object opened
-    and never closed"""
-    out, i, cut = [], 0, False
+    object), objects inside another one never counted. 17i: read as a person
+    reads it (_lenient); and whether the reply ends cut. 17j: only an object
+    that opens with a verdict field's name is one — it is cut only when such
+    an object never closes; one whose quotes can't be trusted is read by its
+    braces and field by field, and nothing quoted inside it is read (it was
+    the verdict); the object is AMBIGUOUS when it can't be told apart"""
+    out, i = [], 0
     while True:
-        i = text.find("{", i)
-        if i < 0:
-            return out, cut
-        end = _close_of(text, i)
-        if end is None:
+        m = _OPENS.search(text, i)
+        if not m:
+            return out, False
+        a = m.start()
+        strict, loose = _close_of(text, a), _close_braces(text, a)
+        if strict is None and loose is None:
             return out, True
-        got = _lenient(text[i:end])
-        if isinstance(got, dict):
-            out.append((i, end, got))
-            i = end
-        else:
-            i += 1
+        got, b = None, None
+        for end in dict.fromkeys(x for x in (strict, loose) if x):
+            got = _lenient(text[a:end])
+            if isinstance(got, dict):
+                b = end
+                break
+        if b is None:
+            b = loose or strict
+            got = _by_fields(text[a:b])
+        if got is not None:
+            out.append((a, b, got))
+        i = b
 
 
 def _norm(t: str) -> str:
@@ -253,7 +339,9 @@ def _field_text(field: str) -> str:
     return _FIELDS.get(field, "")
 
 
-_PLACEHOLDER = re.compile(r"<[^<>]*[A-Za-z]{3,}[^<>]*>|\[[^\[\]]*[A-Za-z]{3,}[^\[\]]*\]|"
+# 17j: a placeholder in angle brackets, "..." — and in square brackets only
+# the prompt's own words ("[response]"): "[Verse]" is an answer
+_PLACEHOLDER = re.compile(r"<[^<>]*[A-Za-z]{3,}[^<>]*>|\[(?:response|correct_answer|question)\]|"
                           r"\.\.\.|…")
 
 
@@ -282,53 +370,68 @@ def _template(field: str, v) -> bool:
 def _example(o: dict) -> bool:
     """17i: an example object — every field but its verdict an example's
     value (_template); one real field makes it real. 17h took ANY field
-    holding ANY fragment of the prompt, and threw real verdicts away"""
+    holding ANY fragment of the prompt, and threw real verdicts away. 17j:
+    never one without its answer and its reasoning ({"correct": "no",
+    "confidence": 100} is a terse verdict)"""
+    if "extracted_final_answer" not in o or "reasoning" not in o:
+        return False
     rest = [(k, v) for k, v in o.items() if k != "correct"]
-    return bool(rest) and all(_template(k, v) for k, v in rest)
+    return all(_template(k, v) for k, v in rest)
 
 
-def _hle_object(text: str) -> tuple[str, dict | None]:
+_W = r"[\s*_`\"'#>-]*"
+
+
+def _hle_object(text: str) -> tuple[str, dict | None, str]:
     """17g: the reply's verdict object — ("grade", it), ("conflict", None),
-    or ("none", None). Objects quoted the same twice are one; an example
-    (_example) is none. 17i: a reply that ends cut is no grade, whatever came
-    before; an object alone on its line is the verdict before any quoted
-    inside a sentence; a reply in the prompt's line format (its own
-    "extracted_final_answer:" and "reasoning:" lines) has its verdict on its
-    "correct:" line, never in an object it quotes; objects that disagree are
-    no grade; a "correct:" line that says otherwise than the object is a
-    conflict, unless the object is quoted inside a line (17e)"""
+    or ("none", None) — and 17j: the reply's text outside its objects, where
+    a verdict in the prompt's line form is read. Objects quoted the same
+    twice are one; an example (_example) is none; a reply that ends cut, or
+    an object that can't be told apart (AMBIGUOUS), is no grade. Objects
+    that disagree are no grade — 17j: but an object alone on its line wins
+    over one inside a sentence that holds nothing but its verdict (the
+    response's own {"correct": "yes"}, quoted); a fuller one quoted inside a
+    sentence is a second verdict. A reply in the prompt's line form has its
+    verdict on its "correct:" line, never in an object it quotes inline; a
+    "correct:" line that says otherwise than the object is a conflict"""
     import json
     found, cut = _json_objects(text)
-    if cut:
-        return "conflict", None
+    outside, k = "", 0
+    for a, b, _ in found:
+        outside += text[k:a] + "\n"
+        k = max(k, b)
+    outside += text[k:]
+    if cut or any(o is AMBIGUOUS for _, _, o in found):
+        return "conflict", None, outside
     objs = [(a, b, o) for a, b, o in found if "correct" in o]
     real = [(a, b, o) for a, b, o in objs
             if _yes_no(o.get("correct")) is not None and not _example(o)]
+
     def by_itself(a: int, b: int) -> bool:
         """nothing but markup before it on its line, and after it"""
         end = text.find("\n", b)
         return not re.sub(r"[\s`*_>#-]|json", "", text[text.rfind("\n", 0, a) + 1:a]) \
             and not re.sub(r"[\s`*_.,;]", "", text[b:end if end >= 0 else len(text)])
     alone = [(a, b, o) for a, b, o in real if by_itself(a, b)]
-    outside, k = "", 0
-    for a, b, _ in sorted(objs):
-        outside += text[k:a] + "\n"
-        k = max(k, b)
-    outside += text[k:]
-    w = r"[\s*_`\"'#>-]*"
-    lines = bool(re.search(rf"(?im)^{w}(extracted_final_answer|reasoning){w}:", outside))
+    lines = bool(re.search(rf"(?im)^{_W}(extracted_final_answer|reasoning){_W}:", outside))
     pool = alone or ([] if lines else real)
     if not pool:
-        return "none", None
+        return "none", None, outside
+    v_alone = {_yes_no(o["correct"]) for _, _, o in alone}
+    others = [o for a, b, o in real if (a, b, o) not in alone
+              and _yes_no(o["correct"]) not in v_alone]
+    if alone and others and (len(v_alone) > 1 or any(set(o) - {"correct"} for o in others)):
+        return "conflict", None, outside
     distinct = list({json.dumps(o, sort_keys=True, default=str): o
                      for _, _, o in pool}.values())
     verdicts = {_yes_no(o["correct"]) for o in distinct}
     if len(verdicts) > 1:
-        return "conflict", None
-    said = {m.group(1).lower() for m in re.finditer(rf"(?im)^{w}correct{w}:{w}(yes|no)\b", outside)}
+        return "conflict", None, outside
+    said = {m.group(1).lower() for m in
+            re.finditer(rf"(?im)^{_W}correct{_W}:{_W}(yes|no)\b", outside)}
     if said <= verdicts:
-        return "grade", distinct[-1]
-    return ("conflict", None) if alone else ("none", None)
+        return "grade", distinct[-1], outside
+    return ("conflict", None, outside) if alone else ("none", None, outside)
 
 
 def _yes_no(v) -> str | None:
@@ -392,7 +495,7 @@ def read(slot: str, text: str, item: dict) -> dict:
         # 17g: two identical objects, an example before the real one, and an
         # object with a "Correct:" line after it are read; objects that say
         # otherwise are no grade
-        how, fields = _hle_object(t)
+        how, fields, outside = _hle_object(t)
         if how == "conflict":
             return unread(text, shown)
         if fields is not None:
@@ -402,10 +505,13 @@ def read(slot: str, text: str, item: dict) -> dict:
             return {"ok": ok, "words": ("the judge: correct" if ok else "the judge: incorrect")
                     + (f" · read as {ext[:60]}" if ext else ""), "said": said,
                     **({"confidence": int(conf.group(1))} if conf else {})}
-        w = r"[\s*_`\"'#>-]*"
-        m = _last(rf"(?im)^{w}correct{w}:{w}(yes|no)[\s*_`\"'.]*$", t)
-        conf = _last(rf"(?im)^{w}confidence{w}:{w}(\d{{1,3}})\s*%?[\s*_`\"'.]*$", t)
-        ext = _last(rf"(?im)^{w}extracted_final_answer{w}:\s*(.+)$", t)
+        # 17j: the line form read from the text outside every object — the
+        # "correct": "yes" line of an example printed over several lines,
+        # alone, was taken for the verdict
+        w = _W
+        m = _last(rf"(?im)^{w}correct{w}:{w}(yes|no)[\s*_`\"'.]*$", outside)
+        conf = _last(rf"(?im)^{w}confidence{w}:{w}(\d{{1,3}})\s*%?[\s*_`\"'.]*$", outside)
+        ext = _last(rf"(?im)^{w}extracted_final_answer{w}:\s*(.+)$", outside)
         if not m:
             return unread(text, shown)
         ok = m.group(1).lower() == "yes"

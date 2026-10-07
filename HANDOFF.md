@@ -4989,6 +4989,103 @@ Not before the demo: a new hidden set changes every Everyday score.
   picked from a list (`where_of`).
 - Tests: `tests/test_17j_export.py`, `tests/test_17j_export_browser.py`.
 
+### 17j.3 — the boxes and the fetch (7 Oct)
+
+- **"Safe" has a time, and a box is destroyed after two rounds unreached**
+  (point 14, `frontier_fetch.read_safe`): a box that read safe, then got new
+  work, read "destroyed: done" on the first failed ssh, across restarts, and
+  a new box at the same address inherited it. Each entry keeps when it read
+  safe; it is forgotten when the box is reached and holds a step that isn't
+  home, or after two days, and a box is destroyed only when it goes two
+  rounds unreached.
+- **`--abandoned` says what matched nothing, and never hides a step still
+  writing** (15): after each round, a value that matched no step on the
+  boxes reached is named. An abandoned step that is still asking or starting
+  (written within the quiet time) keeps its box not safe, and its progress
+  line is printed with what to do.
+- **`--parity` compares the copy here** (16): a build given `--parity` with
+  no verdict is compared from `parity/<build>-box.jsonl` — a verdict from an
+  older fetch was lost on the upgrade, and `--parity` given after the box was
+  destroyed said nothing. The docs' fetch line keeps `--parity`.
+- **Two fetches at once merge** (17, `merge_write`): the verdicts and the
+  safe boxes are read, merged (the newer entry of each wins, a replaced one
+  kept as `{gone, at}`) and written under a lock.
+- **`--sha` for a model the board doesn't serve prints the line to type**
+  (18): with `--register`, every round, and the bundle is left home — every
+  round's import was refused with "add it under Add a model", and the line
+  stopped being printed. The import's refusal says `--register` too.
+- **Rows an older fetch stored leave once a box is reached** (19,
+  `store_boxes`): a row with no box id is gone when any box was reached, and
+  old rows (done and gone) age out on each write, not only on reading.
+- **Quiet is a step's own write against when it was read** (20, `_box_read`):
+  seven rows read "Stopped? No word for 71 min" when the fetch itself had
+  stopped. When the reading is old, the list says so once ("Rented boxes
+  read N min ago — the fetch may have stopped").
+- **Small ones** (21): a kill after the Runs row leaves one Runs row (the
+  import takes up its own earlier row, `_earlier_row`); registering again
+  keeps an import's sha256 by name only when the sizes agree
+  (`served._same_size`); the by-hand line pastes as it is (what the board
+  couldn't say is a line of its own); the docs say `--every 3m`.
+- Tests: `tests/test_17j_boxes.py`.
+
+### 17j.2 — grading (7 Oct)
+
+- **Rows held at the grader they left have their Start** (point 9): another
+  grader chosen while a batch runs — the card offered Stop alone, and the
+  grader left was paid for all the rest. Start stops what it hasn't been
+  sent (the server's Start already cancelled it); the rows move once their
+  replies land.
+- **A grader's no-grades alone are no grades to bring back** (10,
+  `_switch`): chosen back, a grader that left only refusals (provider
+  errors, no tries) graded the whole row again — 62 paid for 30 answers.
+  It asks its own no-grades again, those alone.
+- **Stopped at the month's limit, it waits for a press** (11,
+  `GraderChat.at_wait`, `llm` worker): it took itself up when the limit was
+  raised, and when the month turned. Nothing is sent to a paid grader
+  without a press since the last stop; the card says so.
+- **The dry run prices replies as the ledger says they cost** (12,
+  `out_tokens`): once a grader has replied to a benchmark this month, the
+  mean of its replies' tokens out, not the assumption (HLE's 900); the dry
+  run says which (`out_from`).
+- **The rules test** (13): four benchmarks (SimpleQA, HLE, MATH, OTIS), HLE's
+  replies drawn from the reviewers' cases file, Carry on counted only for a
+  row it would send something of, no send without a press after the limit
+  is raised or the month turns, and points 9 to 11 as sequences with what
+  must hold at their end.
+- Tests: `tests/test_17h_grading_rules.py`, `tests/test_17j_grading.py`,
+  `tests/test_17j_browser.py`.
+
+### 17j.1 — the HLE reader, by its cases (7 Oct)
+
+- **The reviewers' 134 replies are the reader's test**
+  (`tests/fixtures/hle_reader_cases.json`, `tests/test_17j_hle_reader.py`):
+  every one reads as a careful person reads it; 23 didn't on 0abb757 (9 a
+  wrong grade, 14 unread). Plus 2,000 strict JSON replies whose strings hold
+  braces, quotes, backslashes and quoted verdicts, each read as its own.
+- **What a verdict object is** (`frontier_graders._json_objects`): only a
+  `{` that opens with one of the four fields' names — a brace in prose, LaTeX
+  (`\left\{ … \right.`) or code is never one, and never makes the reply
+  "cut"; a reply is cut only when such an object never closes. Nothing
+  inside an object is read on its own (a verdict quoted in its reasoning).
+- **Read as a person reads it** (`_lenient`, `_mend`, `_by_fields`): JSON;
+  else with `\u` that isn't four hex digits, raw backslashes, raw newlines in
+  a string, an unquoted `yes` and trailing commas mended; else a Python
+  literal; else field by field (an apostrophe in a single-quoted object, a
+  quote left unescaped) — and when a field is named twice, no grade.
+- **Which verdict** (`_hle_object`): an object alone on its line wins only
+  over one inside a sentence that holds nothing but `correct`; otherwise two
+  that disagree are no grade. The line form is read from the text outside
+  objects (a multi-line example's `"correct": "yes"` line was the verdict).
+  An example needs its answer and its reasoning; square brackets are a
+  placeholder only for the prompt's own words (`[response]`).
+- **A reply that reached its cap is read** (`frontier_grade._apply`): a
+  whole one is a grade; one the cap cut off is no grade, and says the cap.
+- **The card says whether HLE's judge takes CAIS's JSON schema**
+  (`status()["graders"][…]["json_only"]`), and warns when it doesn't: replies
+  in prose can be asked again, and paid.
+- Tests: `tests/test_17j_hle_reader.py`, `tests/test_17j_browser.py`.
+
+
 ### Fix — a number field kept across a redraw (7 Oct)
 
 - **Build questions' count and AI models' monthly limit are text fields

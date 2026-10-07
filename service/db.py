@@ -1304,6 +1304,20 @@ def spend_add(job: str, model: str, provider: str, tokens_in: int, tokens_out: i
         c.commit()
 
 
+def tokens_out_this_month(job: str, model: str, batch_ids: list[str]) -> tuple[float, int]:
+    """17j: (the mean tokens out, how many replies) of `model`'s replies for
+    `job` this month in these batches — what a grader's replies cost, read
+    from the ledger, not assumed"""
+    if not batch_ids:
+        return 0.0, 0
+    with closing(_conn()) as c:
+        marks = ",".join("?" * len(batch_ids))
+        row = c.execute(f"SELECT AVG(tokens_out), COUNT(*) FROM ai_spend WHERE at>=? AND job=? "
+                        f"AND model=? AND tokens_out>0 AND batch_id IN ({marks})",
+                        (_month_start(), job, model, *batch_ids)).fetchone()
+    return float(row[0] or 0.0), int(row[1] or 0)
+
+
 def spend_this_month() -> float:
     with closing(_conn()) as c:
         row = c.execute("SELECT COALESCE(SUM(usd), 0) FROM ai_spend WHERE at>=?",

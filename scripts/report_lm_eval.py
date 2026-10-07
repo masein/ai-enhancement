@@ -19686,6 +19686,11 @@ function rentedLine() {
   const B = state.boxes || {};
   if (!(B.runs || []).length || !B.posted_at) return '';
   const next = B.next_at ? B.next_at * 1000 - Date.now() : null;
+  // 17j: a reading that is old says so, once — its rows' quiet is their own
+  // write against when they were read, never against now
+  if (B.stale_min) return el('p', { class: 'small warntext', 'data-rented-line': 'stale',
+    text: `Rented boxes read ${B.stale_min} min ago — the fetch may have stopped: start it `
+      + 'again (docs/REMOTE-RUNS.md G3–G4). The rows below are as it last read them' });
   return el('p', { class: 'small se', 'data-rented-line': '1',
     text: `Runs on rented GPUs, as frontier_fetch.py read them ${rel(B.posted_at)} ago`
       + (next == null ? '' : next > 0 ? ` · the next reading in about ${Math.max(1, Math.round(next / 60000))} min`
@@ -24740,7 +24745,20 @@ function frontierGradingCard() {
         el('td', {}, el('b', { text: g.label }), el('div', { class: 'small se', text: g.does }),
           // 17b: its reasoning, set, and the cap sized for it
           g.ask ? el('div', { class: 'small se', 'data-frontier-grader-ask': g.slot,
-            text: `${g.reasoning_words} · at most ${n(g.ask.max_tokens)} tokens a reply` }) : ''),
+            text: `${g.reasoning_words} · at most ${n(g.ask.max_tokens)} tokens a reply` }) : '',
+          // 17j: HLE's judge — in CAIS's JSON schema, or in prose and lines,
+          // read as a person reads them, where a reply that can't be read is
+          // asked again, and paid
+          'json_only' in g ? (g.json_only
+            ? el('div', { class: 'small se', 'data-frontier-json-only': '1',
+                text: 'answers in CAIS’s JSON schema (structured outputs): read the same way '
+                  + 'every time' })
+            : el('div', { class: 'small warntext', 'data-frontier-json-only': '0',
+                text: (g.json_only === false ? 'doesn’t take a JSON schema'
+                  : 'OpenRouter doesn’t say whether it takes a JSON schema')
+                  + ': it answers in prose or lines, read as a person reads them — a reply '
+                  + `that can’t be read is asked again, and paid (up to ${G.tries || 3} times). `
+                  + 'A judge that takes the schema costs no such tries' })) : ''),
         el('td', {}, el('span', { 'data-frontier-grader-now': g.slot,
             text: String(now.name || now.id || '—').split(': ').pop() }),
           el('div', { class: 'small se', text: g.chosen
@@ -24781,6 +24799,8 @@ function frontierGradingCard() {
         : 'Nothing waits for a grader: every Frontier answer on file is scored.' });
   const running = (G.running || []).length, stopped = !!G.stopped;
   const switching = rows.some(r => r.switch && !r.answers);
+  // 17j: rows whose batch still runs at the grader they left
+  const moving = (E.held || []).length > 0;
   const why = !G.has_key ? 'OpenRouter has no key on this server (OPENROUTER_API_KEY)'
     : E.over_limit || '';
   const cost = E.usd_known ? usd(E.usd) : `${usd(E.usd)} and the unpriced`;
@@ -24819,15 +24839,18 @@ function frontierGradingCard() {
     // 17i: a row whose replies are still on their way at the grader it left
     ...(E.held || []).map(h => el('p', { class: 'small se', 'data-frontier-held-row':
       `${h.task}|${h.row}`, text: h.words })),
-    LIVE && (E.answers || running || switching) ? el('div', { class: 'frm', 'data-frontier-run': held
-        ? 'held' : running ? 'running' : stopped ? 'stopped' : 'idle' },
-      // 17h: and a switch alone, nothing to send, has its Start too
-      E.answers || held || switching ? el('button', { class: 'primary', 'data-frontier-start': '1',
-        disabled: why || busy ? '' : null, title: why || null,
+    LIVE && (E.answers || running || switching || moving) ? el('div', { class: 'frm',
+        'data-frontier-run': held ? 'held' : running ? 'running' : stopped ? 'stopped' : 'idle' },
+      // 17h: and a switch alone, nothing to send, has its Start too. 17j: and
+      // rows another grader was chosen for while their batch runs — Start
+      // stops what the old one hasn't been sent (it was paid for all the rest)
+      E.answers || held || switching || moving ? el('button', { class: 'primary',
+        'data-frontier-start': '1', disabled: why || busy ? '' : null, title: why || null,
         text: busy === 'start' ? 'Sending…' : stopped || held
           ? 'Carry on' + (E.answers || H.answers ? `: about ${carryCost}` : '')
-          : 'Start grading' + (E.answers ? `: about ${cost}` : switching
-            ? ': nothing to send, the grades switched' : ''),
+          : 'Start grading' + (E.answers ? `: about ${cost}` : moving
+            ? ': nothing more to the grader it left, the rest to the one chosen now'
+            : switching ? ': nothing to send, the grades switched' : ''),
         onclick: () => frontierGradingAct('start') }) : '',
       (E.answers || held) && E.short ? el('button', { class: 'quiet', 'data-frontier-partial': '1',
         disabled: why || busy ? '' : null,

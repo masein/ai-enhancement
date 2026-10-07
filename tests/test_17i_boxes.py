@@ -342,8 +342,10 @@ def test_15_registering_the_same_name_keeps_the_files_sha256_and_parts(svc):  # 
         rec = served.register({"name": "board box", "base_url": fake.base, "how": "x",
                                "thinking": "off"}, ME)
         # as an import from rented GPUs keeps it: the files' bytes as its size
-        db.served_put({**rec, "pin": {**rec["pin"], "size": 66_000_000_000},
+        # (17j: the same file's — kept by its name only when the sizes agree)
+        db.served_put({**rec, "pin": {**rec["pin"], "size": fake.size},
                        "file_sha256": {"sha256": IDENT, "by": "masein", "name": PARTS[0][0],
+                                       "size": fake.size + 4_000_000,
                                        "parts": [{"name": n, "sha256": h} for n, h in PARTS]}})
         served.register({"name": "board box", "base_url": fake.base, "how": "y",
                          "thinking": "off"}, ME)
@@ -404,7 +406,8 @@ def test_12_a_parity_verdict_is_its_files_and_shown_only_for_a_build_asked(
     code = main_of(ff, key, dest, "--sha", f"served/orig={'cd' * 32}", "1.1.1.1:41")
     out = capsys.readouterr().out
     assert "Not the same" not in out and code == 0, out
-    assert "orig" not in json.loads((dest.parent / "parity" / "verdicts.json").read_text())
+    # 17j: replaced — kept as a tombstone, so a second fetch's merge can't bring it back
+    assert json.loads((dest.parent / "parity" / "verdicts.json").read_text())["orig"]["gone"]
 
 
 # ---------------------------------------------------------------------------
