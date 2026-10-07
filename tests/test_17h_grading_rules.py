@@ -41,6 +41,7 @@ import os
 import threading
 import time
 from collections import Counter
+from pathlib import Path
 
 import pytest
 
@@ -52,9 +53,10 @@ from service import frontier as sf
 from service import frontier_grade as fgr
 from test_17_grading import ROW, svc, write  # noqa: F401 — svc is the fixture
 
-SQA, HLE = "simpleqa_epoch", "hle_text_cais"
-SLOT = {SQA: "simpleqa", HLE: "hle"}
-TASKS = (SQA, HLE)
+SQA, HLE, MATH, OTIS = "simpleqa_epoch", "hle_text_cais", "math_l5_epoch", "otis_aime_epoch"
+SLOT = {SQA: "simpleqa", HLE: "hle", MATH: "math", OTIS: "otis"}
+TASKS = (SQA, HLE, MATH, OTIS)
+SLOTS = tuple(SLOT.values())
 ROW2, SERVED2 = "served__orig-box", "served/orig-box"
 ROWS = (ROW, ROW2)
 GPT, GEMINI, O3, FRESH = ("openai/gpt-4.1", "google/gemini-2.5-flash", "openai/o3-mini",
@@ -67,9 +69,16 @@ N = int(os.environ.get("RULES_SEQUENCES") or 30)
 EXTRA = int(os.environ.get("RULES_EXTRA") or 10)
 BASE = int(os.environ.get("RULES_SEED") or 1)       # set at random by conftest, and printed
 STEPS = 10
-HLE_YES = json.dumps({"extracted_final_answer": "Key", "reasoning": "it matches the key",
-                      "correct": "yes", "confidence": 90})
 OUT_OF_FORM = "I would rather not say"
+# 17j: HLE's judge replies as the reviewers' cases do — a reply a person reads
+# as one verdict, or one a person reads as no grade (a paid try)
+_CASES = json.loads((Path(__file__).resolve().parent / "fixtures" / "hle_reader_cases.json")
+                    .read_text(encoding="utf-8"))["cases"]
+HLE_GRADES = [c["reply"] for c in _CASES if c["want"] in (["yes"], ["no"])]
+HLE_NO_GRADE = [c["reply"] for c in _CASES if c["want"] == ["no grade"]]
+# MATH and OTIS: two questions each, every answer one Epoch's model check sees
+# (the code marks MATH's wrong, and reads no integer in OTIS's)
+MATH_N, OTIS_N = 6, 2
 
 
 class Restart(Exception):
@@ -99,10 +108,18 @@ class World:
         self.gate.set()
         self.slow = 0                         # the next replies that hang until they land
         self.hanging: Counter = Counter()     # batch -> replies hanging now
+        self.by_grader: Counter = Counter()   # 17j: replies paid, by grader
+        self.by_batch: Counter = Counter()    # 17j: requests sent, by batch
+        self.slow_each = 0                    # 17j: each batch's first replies hang
+        self.hung: Counter = Counter()
 
     def _h(self, *parts) -> int:
         return int(hashlib.sha256(":".join(map(str, (self.seed, *parts))).encode())
                    .hexdigest()[:8], 16)
+
+    def out_of_form(self, slot: str, *parts) -> str:
+        return HLE_NO_GRADE[self._h(*parts) % len(HLE_NO_GRADE)] if slot == "hle" \
+            else OUT_OF_FORM
 
     def reply(self, model: str, slot: str, row: str, key: str) -> tuple[str, str, int | None]:
         n = self.attempt[(model, slot, row, key)]
@@ -110,9 +127,9 @@ class World:
         m = self.mode.get(model, "good")
         h = self._h(model, row, key, n) % 100
         if m == "flaky" and h < 40:
-            return OUT_OF_FORM, "", None
+            return self.out_of_form(slot, model, row, key, n), "", None
         if m == "stubborn" and self._h(model, slot, row, key) % 100 < 6:
-            return OUT_OF_FORM, "", None                # this answer, never in form
+            return self.out_of_form(slot, model, row, key), "", None   # never in form
         if m == "invalid":
             return "", (f'POST u: HTTP 400: {{"error": {{"message": "{model} is not a valid '
                         'model ID"}}'), 400
@@ -131,30 +148,55 @@ class World:
             return "", "POST u: HTTP 503: the provider is down", 503
         if m == "timeout":
             return "", "POST u: no response within 120 s", None
-        return ("A" if slot == "simpleqa" else HLE_YES), "", None
+        if slot == "hle":
+            return HLE_GRADES[self._h("hle", model, row, key) % len(HLE_GRADES)], "", None
+        if slot == "math":
+            return ("Yes", "No")[self._h("math", model, row, key) % 2], "", None
+        if slot == "otis":
+            return str(10 + self._h("otis", model, row, key) % 3), "", None
+        return "A", "", None
 
 
 def items(task: str) -> list[dict]:
     if task == SQA:
         return [{"id": str(k), "question": f"Invented fact {k}?", "answer": f"Answer {k}",
                  "subject": "x"} for k in range(ANSWERS + 1)]
+    if task == MATH:
+        return [{"id": f"algebra/{k}", "question": f"Invented problem {k}.",
+                 "answer": "\\frac{1}{2}", "subject": "Algebra"} for k in range(MATH_N)]
+    if task == OTIS:
+        return [{"id": f"o{k}", "question": f"Invented contest problem {k}.", "answer": str(11 + k)}
+                for k in range(OTIS_N)]
     return [{"id": f"h{k}", "question": f"Invented exam question {k}?", "answer": "Key",
              "subject": "x"} for k in range(ANSWERS + 1)]
+
+
+def answers(task: str) -> list[tuple]:
+    """a row's answers: SimpleQA's and HLE's, the last one ran out; MATH's
+    equivalent but marked wrong by code; OTIS's with no integer the code reads"""
+    if task == MATH:
+        return [(it["id"], "ANSWER: one half", "stop") for it in items(task)]
+    if task == OTIS:
+        return [(it["id"], "the answer is eleven, I think", "stop", e)
+                for it in items(task) for e in range(fb.BENCH[OTIS]["epochs"])]
+    return [(it["id"], f"I think {it['answer']}.", "stop" if k < ANSWERS else "length")
+            for k, it in enumerate(items(task))]
 
 
 @pytest.fixture
 def world(svc, monkeypatch):  # noqa: F811
     """two rows of SimpleQA and two of Humanity's Last Exam (24 answers each to
-    grade, one ran out), MATH taken away; four graders on OpenRouter's list;
-    the month's spend kept by the stand-in; the stand-in grader"""
+    grade, one ran out), and of MATH and OTIS (17j: Epoch's model check on
+    each); four graders on OpenRouter's list; the month's spend kept by the
+    stand-in; the stand-in grader"""
     monkeypatch.setitem(t17.GRADERS, FRESH, ("x-ai/grok-fresh-20261001", 0.5, 1.5))
     p = ai_models._cache_path()
     p.write_text(json.dumps({"at": time.time(), "models": [
         {"id": m, "name": m, "version": v, "price_in": pi, "price_out": po}
         for m, (v, pi, po) in t17.GRADERS.items()]}))
     import shutil
-    shutil.rmtree(sf.task_dir(config.OUT_DIR / ROW, "math_l5_epoch"))
-    data = {SQA: items(SQA), HLE: items(HLE), "math_l5_epoch": t17.math_items()}
+    shutil.rmtree(sf.task_dir(config.OUT_DIR / ROW, MATH))
+    data = {t: items(t) for t in TASKS}
     monkeypatch.setattr(fb, "_fetch", lambda task: data[task])
     db.served_put({"id": SERVED2, "name": "orig box", "base_url": "", "key": "", "how": "x",
                    "based_on": "Qwen/Qwen3.6-35B-A3B", "thinking": "auto",
@@ -164,9 +206,12 @@ def world(svc, monkeypatch):  # noqa: F811
     (row / "model_meta.json").write_text(json.dumps({"model": SERVED2}))
     for r in ROWS:
         for task in TASKS:
-            write(config.OUT_DIR / r, task, [
-                (it["id"], f"I think {it['answer']}.", "stop" if k < ANSWERS else "length")
-                for k, it in enumerate(items(task))])
+            d = sf.task_dir(config.OUT_DIR / r, task)
+            d.mkdir(parents=True, exist_ok=True)
+            (d / sf.ANSWERS).write_text("".join(json.dumps(
+                {"id": a[0], "epoch": a[3] if len(a) > 3 else 0, "answer": a[1], "finish": a[2]})
+                + "\n" for a in answers(task)))
+    key_of = {(t, it["id"]): it["answer"] for t in TASKS for it in items(t)}
     monkeypatch.setattr(config, "OPENROUTER_CONCURRENCY", 3)
     monkeypatch.setattr(fgr.GraderChat, "FIRST_REFUSALS", 3)
     monkeypatch.setattr(fgr, "SETTLE_S", 10.0)
@@ -183,6 +228,7 @@ def world(svc, monkeypatch):  # noqa: F811
         slot, task = meta["slot"], meta["task"]
         who = (meta["pin"]["version"], task, meta["row"], key)
         w.calls += 1
+        w.by_batch[req["batch_id"]] += 1
         if w.restart_at is not None and w.calls >= w.restart_at:
             w.restart_at, w.dead = None, True
             raise Restart()
@@ -190,7 +236,14 @@ def world(svc, monkeypatch):  # noqa: F811
         if w.stop_at is not None and w.calls == w.stop_at:
             fgr.stop("masein")                          # Stop, pressed mid-batch
         if text:
-            if w.slow > 0:                              # 17i: a reply slow to land
+            if w.slow_each and w.hung[req["batch_id"]] < w.slow_each:
+                w.hung[req["batch_id"]] += 1            # 17j: each batch's first, slow
+                w.hanging[req["batch_id"]] += 1
+                try:
+                    w.gate.wait(120)
+                finally:
+                    w.hanging[req["batch_id"]] -= 1
+            elif w.slow > 0:                            # 17i: a reply slow to land
                 w.slow -= 1
                 w.hanging[req["batch_id"]] += 1
                 try:
@@ -202,8 +255,11 @@ def world(svc, monkeypatch):  # noqa: F811
             pi, po = t17.GRADERS[self.model][1:]
             w.spent += (len(req["user"]) // fgr.CHARS_A_TOKEN * pi
                         + fgs.GRADERS[slot]["out_tokens"] * po) / 1e6
-            if fgs.read(slot, text, {"id": key, "answer": "Key"})["ok"] is not None:
+            qid = key.rsplit("#", 1)[0]
+            if fgs.read(slot, text, {"id": qid, "answer": key_of[(task, qid)]})["ok"] \
+                    is not None:
                 w.grades[who] += 1
+            w.by_grader[(self.model, slot)] += 1        # 17j: what each grader was paid
             return {"custom_id": req["custom_id"], "text": text, "error": "", "attempts": 1,
                     "finish_reason": "stop"}
         return {"custom_id": req["custom_id"], "text": "", "error": error, "status": status,
@@ -290,10 +346,12 @@ def offers(page: dict, row: str, task: str) -> list[str]:
     if any(r["model"] == model and r["slot"] == slot and (r["answers"] or r.get("switch"))
            for r in est.get("rows") or []):
         out.append("Start")
-    if (page.get("held") or {}).get("answers") or page.get("waits"):
+    # 17j: Carry on only for a row it would send something of — it counted for
+    # every row once anything was held anywhere
+    if any(p["row"] == row and p["task"] == task and fgr._unsent(p) for p in fgr.pending()):
         out.append("Carry on")
     if any(h["row"] == row and h["task"] == task for h in est.get("held") or []):
-        out.append("its replies on their way")
+        out.append("its replies on their way")          # 17j: and Start beside it
     # its batch running, replies on their way (the card's progress line): what
     # waits behind them shows once they land
     if any(r["model"] == model and r["task"] == task for r in page.get("running") or []) and \
@@ -346,6 +404,8 @@ def check(w: World, step: str) -> None:
         for r, f in rows.items():
             if final(f):
                 main, by = on_disk(r, task)
+                if not by and not fb.BENCH[task].get("grader"):
+                    continue        # 17j: MATH, OTIS: the code's score, Epoch's check to come
                 assert main, f"{r} {task}: final, graded on disk by {dict(by)}\n{where}"
                 assert main_grader(f) == main[0], \
                     f"{r} {task}: names {main_grader(f)}, graded by {main[0]}\n{where}"
@@ -444,7 +504,7 @@ def start(w: World, stop: int | None = None, restart: int | None = None,
 def act(w: World, rnd: int) -> str:
     h = w._h("act", rnd)
     pick = h % 100
-    slot = ("simpleqa", "hle")[(h >> 20) % 2]
+    slot = SLOTS[(h >> 20) % len(SLOTS)]
     if pick < 18:
         g = CHOOSE[(h >> 8) % len(CHOOSE)]
         return do(w, f"choose {slot} {g}")
@@ -465,8 +525,10 @@ def act(w: World, rnd: int) -> str:
         return do(w, "Stop twice")
     if pick < 85:
         return do(w, "the month's limit, nearly reached")
-    if pick < 89:
+    if pick < 87:
         return do(w, "the limit raised")
+    if pick < 89:
+        return do(w, "the month turns")
     if pick < 94:
         return do(w, "the slow replies land")
     page = fgr.status()
@@ -495,13 +557,28 @@ def do(w: World, what: str) -> str:
         settle(w)
     elif what == "the month's limit, nearly reached":
         w.limit = w.spent + 0.01                 # hit part-way through the next batch
-    elif what == "the limit raised":
-        w.limit = 1000.0
-        settle(w)                                # carries on by itself, as the card says
+    elif what in ("the limit raised", "the month turns"):
+        # 17j: nothing is sent to a paid grader without a press since the
+        # last stop — a batch stopped at the limit took itself up when the
+        # limit was raised, and when the month turned
+        settle(w)
+        before = Counter(w.by_batch)
+        if what == "the limit raised":
+            w.limit = 1000.0
+        else:
+            w.spent = 0.0
+        settle(w)
+        sent = {b: n - before[b] for b, n in w.by_batch.items() if n > before[b]}
+        assert not sent, f"sent with no press after {what}: {sent}\nseed {w.seed}\n" \
+            + "\n".join(w.log)
     elif what == "the slow replies land":
-        w.slow = 0
+        w.slow = w.slow_each = 0
         w.gate.set()
         settle(w)
+    elif what.startswith("Start, each batch's first ") and what.endswith(" slow"):
+        w.slow_each = int(what.split()[4])
+        w.gate.clear()
+        what += "" if start(w) == "sent" else " → refused"
     elif what == "Start anyway":
         what += " → " + start(w, partial=True)
     elif what.startswith("Start"):
@@ -608,6 +685,47 @@ def test_grading_keeps_its_rules_on_the_reviewers_sequences(world, name):
     for what in SCRIPTED[name]:
         w.log.append(do(w, what))
         check(w, what)
+    ends_final(w)
+
+
+# 17j: points 9 to 11, each with what must hold at its end
+POINTS = {
+    # 9: another grader chosen while a batch runs — the card offers Start
+    # (tests/test_17j_grading_browser.py), and once pressed, the grader it left
+    # is sent nothing more: it was paid for all the rest
+    "9: another grader chosen while a batch runs": (1, [
+        f"choose simpleqa {GPT}", "Start, each batch's first 3 slow", f"choose simpleqa {GEMINI}",
+        "Start", "the slow replies land"],
+        lambda w: w.by_grader[(GPT, "simpleqa")] <= 6),
+    # 10: a grader that left only no-grades (provider errors, no tries),
+    # chosen back, asks those again — never grades the whole row again
+    "10: a grader of no-grades alone, chosen back": (5, [
+        f"choose simpleqa {GPT}", f"{GPT} turns stubborn", "Start", "Start", "Start",
+        f"choose simpleqa {GEMINI}", f"{GEMINI} turns provider", "Start",
+        f"choose simpleqa {GPT}", "Start", f"choose simpleqa {GEMINI}", f"{GEMINI} turns good",
+        "Start"],
+        lambda w: w.by_grader[(GEMINI, "simpleqa")] <= 2),
+    # 11: stopped at the month's limit, nothing is sent when the limit is
+    # raised or the month turns, only when Carry on is pressed
+    "11: the limit raised, the month turned": (11, [
+        f"choose hle {O3}", "the month's limit, nearly reached", "Start anyway",
+        "the limit raised", "the month turns", "Start"],
+        lambda w: True),
+}
+
+
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
+@pytest.mark.parametrize("name", list(POINTS))
+def test_17j_points_9_to_11_as_sequences(world, name):
+    w = world
+    w.seed, steps, holds = POINTS[name]
+    for what in steps:
+        if what == "Start" and "9:" in name and w.slow_each:
+            # the card's Start, there for the rows held (the grader it left)
+            assert fgr.estimate().get("held"), "\n".join(w.log)
+        w.log.append(do(w, what))
+        check(w, what)
+    assert holds(w), f"{name}: paid by grader {dict(w.by_grader)}\n" + "\n".join(w.log)
     ends_final(w)
 
 

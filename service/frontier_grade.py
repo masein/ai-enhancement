@@ -61,6 +61,8 @@ import frontier_graders as fg  # noqa: E402
 KIND = "frgr"
 JOB = "grader"
 STOPPED = "stopped — Start carries on where it stopped"
+AT_LIMIT = ("stopped at this month's AI limit — nothing more is sent until you press Carry on, "
+            "whatever happens to the limit or the month: raise the limit on AI models first")
 CHARS_A_TOKEN = 4                      # the dry run's count of a prompt, before it is sent
 PROBE_WORDS = ("Choosing a grader asks each of its providers one token first, to check it "
                "keeps no prompt (a fraction of a cent each), counted in this month's spend.")
@@ -79,6 +81,21 @@ class GraderChat(llm.OpenRouterChat):
 
     def waiting(self) -> str:
         return STOPPED if stopped() else super().waiting()
+
+    def at_wait(self, batch_id: str, why: str) -> None:
+        """17j: stopped at the month's limit, it waits for a press — it took
+        itself up when the limit was raised, and when the month turned:
+        nothing is sent to a paid grader without a press since the last stop"""
+        if not ai_models.over_limit():
+            return
+        p = self.dir / batch_id / "halt.json"
+        try:
+            if json.loads(p.read_text(encoding="utf-8")).get("hold"):
+                return
+        except (OSError, ValueError):
+            pass
+        p.write_text(json.dumps({"why": AT_LIMIT, "at": time.time(), "hold": True, "n": 0,
+                                 "limit": True}), encoding="utf-8")
 
 
 def gdir() -> Path:
@@ -292,6 +309,30 @@ def _price(g: dict) -> tuple[float | None, float | None]:
     return g.get("price_in"), g.get("price_out")
 
 
+def out_tokens(slot: str, g: dict) -> tuple[int, str]:
+    """17j: the tokens a reply of this grader costs, and where the number came
+    from — once it has replied to this benchmark this month, what its replies
+    cost on the ledger (HLE's 900 was an assumption: at five times that, a
+    Start past the month's limit wasn't refused); else the assumption"""
+    base = fg.ask(slot, reasons(g), structured(g))["out_tokens"]
+    mid = g.get("id") or ""
+    bids = []
+    for f in sorted((gdir() / "batches").glob("*.json")) if mid else []:
+        try:
+            m = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if m.get("slot") == slot and (m.get("pin") or {}).get("id") == mid:
+            bids.append(f.stem)
+    try:
+        mean, n = db.tokens_out_this_month(JOB, mid, bids)
+    except Exception:                               # noqa: BLE001 — no database here
+        mean, n = 0.0, 0
+    if n:
+        return max(1, round(mean)), f"what its {n:,} replies this month cost"
+    return base, "assumed"
+
+
 def structured(g: dict) -> bool | None:
     """17f: whether the grader takes a JSON schema, as OpenRouter lists it"""
     m = _cached(g.get("id") or "") or {}
@@ -384,7 +425,8 @@ def _estimate(ws: list[dict]) -> dict:
         # 17b: what Start sends with each answer — its reasoning and its cap
         a = fg.ask(slot, reasons(g), structured(g))
         cap = min(a["max_tokens"], config.OPENROUTER_MAX_TOKENS)
-        tout = len(w["items"]) * a["out_tokens"]
+        each, each_from = out_tokens(slot, g)
+        tout = len(w["items"]) * each
         tmax = len(w["items"]) * cap
         pin, pout = _price(g)
         # prices are per million tokens, as OpenRouter's list gives them
@@ -399,6 +441,8 @@ def _estimate(ws: list[dict]) -> dict:
                                   "cap": cap, "reasoning": a["reasoning"],
                                   # 17f: JSON only, where the grader takes a schema
                                   "json_only": bool(a["schema"]),
+                                  # 17j: tokens a reply, and from what
+                                  "out_each": each, "out_from": each_from,
                                   "reasoning_words": fg.GRADERS[slot]["reasoning_words"]})
         e["answers"] += len(w["items"])
         e["tokens_in"] += tin
@@ -809,7 +853,9 @@ def _switch(g: dict, version: str, sha: str) -> tuple[str, int]:
         g["regrade"] = {"by": version, "prompt_sha256": sha, "at": time.time(),
                         "why": ask.get("why") or "asked so the rows compared share a grader"}
         how = "match"
-    elif back and not any(_who(x) == mine for x in active):
+    elif back.get("items") and not any(_who(x) == mine for x in active):
+        # 17j: its grades, never its no-grades alone — a grader that left only
+        # refusals (provider errors, no tries) graded the whole row again
         _stash(g, mine)
         how = "kept"
     elif _regrade(g, version, sha):
@@ -1110,8 +1156,9 @@ def waits() -> list[dict]:
                     "carry": CARRY})
     limit = ai_models.over_limit()
     if limit:
-        out.append({"why": limit, "carry": "Carry on waits until the limit is raised (AI "
-                                           "models ▸ the month's limit) or the month turns."})
+        out.append({"why": limit, "carry": "raise the limit on AI models, then Carry on: "
+                                           "nothing is sent by itself, not when the limit is "
+                                           "raised nor when the month turns."})
     if not ai_models.has_key():
         out.append({"why": "OpenRouter has no key on this server (OPENROUTER_API_KEY): the "
                            "batches out wait for it, their replies kept", "carry": ""})
@@ -1148,7 +1195,7 @@ def held() -> dict:
             continue
         pin = x.get("pin") or {}
         tin = sum(len(r.get("user") or "") for r in unsent) // CHARS_A_TOKEN
-        tout = len(unsent) * fg.ask(x["slot"], reasons(pin))["out_tokens"]
+        tout = len(unsent) * out_tokens(x["slot"], pin)[0]
         pi, po = _price(pin)
         n += len(unsent)
         if pi is None or po is None:
@@ -1196,10 +1243,9 @@ def _cost(slot: str, g: dict, task: str, todo: list[dict]) -> float | None:
     if pin is None or pout is None:
         return None
     items = {it["id"]: it for it in fb.load(task, config.BENCH_ROOT)}
-    a = fg.ask(slot, reasons(g), structured(g))
     tin = sum(len(fg.render(slot, items[x["id"]], x)) for x in todo
               if x["id"] in items) // CHARS_A_TOKEN
-    return round((tin * pin + len(todo) * a["out_tokens"] * pout) / 1e6, 4)
+    return round((tin * pin + len(todo) * out_tokens(slot, g)[0] * pout) / 1e6, 4)
 
 
 def mismatches() -> list[dict]:

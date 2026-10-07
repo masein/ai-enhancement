@@ -1188,8 +1188,13 @@ class LocalOpenAI(Backend):
             def drain() -> None:
                 while True:
                     # 12i.1: a paid backend may have to wait (its monthly
-                    # limit): what is left stays unanswered, the batch pending
-                    if self.waiting() or streak["halted"] or self.halted(batch_id):
+                    # limit): what is left stays unanswered, the batch pending.
+                    # 17j: and a backend may hold it there until a press
+                    why = self.waiting()
+                    if why:
+                        self.at_wait(batch_id, why)
+                        return
+                    if streak["halted"] or self.halted(batch_id):
                         return
                     try:
                         row = todo.get_nowait()
@@ -1263,6 +1268,10 @@ class LocalOpenAI(Backend):
     def waiting(self) -> str:
         """'' when requests may go out; the local server never waits"""
         return ""
+
+    def at_wait(self, batch_id: str, why: str) -> None:
+        """17j: a batch stopped by waiting() — a backend may hold it until a
+        press (frontier_grade.GraderChat at the month's limit)"""
 
     # 16c: a run of refusals about the key stops a batch — OpenRouter's (0:
     # never): its limit or credit, the key refused, or a lasting rate limit

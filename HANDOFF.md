@@ -4953,6 +4953,33 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17j.2 — grading (7 Oct)
+
+- **Rows held at the grader they left have their Start** (point 9): another
+  grader chosen while a batch runs — the card offered Stop alone, and the
+  grader left was paid for all the rest. Start stops what it hasn't been
+  sent (the server's Start already cancelled it); the rows move once their
+  replies land.
+- **A grader's no-grades alone are no grades to bring back** (10,
+  `_switch`): chosen back, a grader that left only refusals (provider
+  errors, no tries) graded the whole row again — 62 paid for 30 answers.
+  It asks its own no-grades again, those alone.
+- **Stopped at the month's limit, it waits for a press** (11,
+  `GraderChat.at_wait`, `llm` worker): it took itself up when the limit was
+  raised, and when the month turned. Nothing is sent to a paid grader
+  without a press since the last stop; the card says so.
+- **The dry run prices replies as the ledger says they cost** (12,
+  `out_tokens`): once a grader has replied to a benchmark this month, the
+  mean of its replies' tokens out, not the assumption (HLE's 900); the dry
+  run says which (`out_from`).
+- **The rules test** (13): four benchmarks (SimpleQA, HLE, MATH, OTIS), HLE's
+  replies drawn from the reviewers' cases file, Carry on counted only for a
+  row it would send something of, no send without a press after the limit
+  is raised or the month turns, and points 9 to 11 as sequences with what
+  must hold at their end.
+- Tests: `tests/test_17h_grading_rules.py`, `tests/test_17j_grading.py`,
+  `tests/test_17j_browser.py`.
+
 ### 17j.1 — the HLE reader, by its cases (7 Oct)
 
 - **The reviewers' 134 replies are the reader's test**
