@@ -129,7 +129,7 @@ def test_8_g6s_own_folder_is_a_step_with_its_progress(tmp_path, monkeypatch, cap
          "dir": "/workspace/gemma-cal", "label": "", "model": "served/gemma-4-26b-a4b-bf16"}],
         steps=[])
     posted = []
-    monkeypatch.setattr(ff, "post_boxes", lambda steps, dest, asked=None: (
+    monkeypatch.setattr(ff, "post_boxes", lambda steps, dest, asked=None, reached=None: (
         posted.extend(steps), "posted")[1])
     ff.main(["--key", str(key), "--dest", str(tmp_path / "b" / "bundles"), "--sha", PHONE,
              "1.1.1.1:41"])
@@ -412,8 +412,9 @@ def test_19_publishing_waits_for_a_typed_yes_to_the_list(box, tmp_path, monkeypa
     from service import db
     from test_17_gguf_box import SERVED
     sid = _export_world(box, monkeypatch)
-    in_house = dmx.IN_HOUSE
-    monkeypatch.setattr(dmx, "IN_HOUSE", re.compile(r"(?!x)x"))   # a build of a public model
+    # 17i: public/ only with the scrub's hosts and accounts given
+    monkeypatch.setenv("SCRUB_HOSTS", "board-host")
+    monkeypatch.setenv("SCRUB_ACCOUNTS", "teamacct")
     db.public_set(SERVED, True, "masein")
     asked = []
     monkeypatch.setattr(builtins, "input", lambda prompt="": (asked.append(prompt), "no")[1])
@@ -424,9 +425,8 @@ def test_19_publishing_waits_for_a_typed_yes_to_the_list(box, tmp_path, monkeypa
     monkeypatch.setattr(builtins, "input", lambda prompt="": "yes")
     assert efr.main(["--run", str(sid), "--out", str(tmp_path / "b")]) == 0
     assert (tmp_path / "b" / "public").exists()             # 0adb522: never, by the mark
-    # an in-house build: never, marked or not
-    monkeypatch.setattr(dmx, "IN_HOUSE", in_house)
-    assert not efr.known_public({"hf_id": SERVED})
+    # 17i: the mark decides, never the name — unsloth's Qwen3.6 files are public
+    assert efr.known_public({"hf_id": SERVED}) and dmx is not None
 
 
 def test_20_a_quote_of_a_gated_question_never_reaches_the_log(box, tmp_path, monkeypatch):  # noqa: F811
@@ -453,9 +453,9 @@ def test_20_a_quote_of_a_gated_question_never_reaches_the_log(box, tmp_path, mon
     real = fb.load
     monkeypatch.setattr(fb, "load", lambda task, root=None: (_ for _ in ()).throw(
         RuntimeError("gated")))
-    assert efr.questions(["gpqa_diamond_epoch"]) is None
+    assert efr.es.private_questions() is None               # 17i: every gated set, always
     monkeypatch.setattr(fb, "load", real)
-    monkeypatch.setattr(efr, "questions", lambda tasks: None)
+    monkeypatch.setattr(efr.es, "private_questions", lambda say=None: None)
     dest = efr.export_run(sid, tmp_path / "raw2")
     assert (dest / "log.txt").read_text() == ""
     assert "no question list" in (dest / "README.md").read_text()
