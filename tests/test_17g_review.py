@@ -181,8 +181,8 @@ def test_2_the_fetch_and_the_list_say_why_a_step_stopped(tmp_path, monkeypatch, 
     imf.store_boxes([{"label": "A5", "model": "served/phone", "step": "A5-1",
                       "state": "stopped", "why": why, "seen_at": time.time()}])
     assert imf.read_boxes()["boxes"][0]["why"] == why
-    src = Path(__file__).resolve().parents[1].joinpath("scripts", "report_lm_eval.py").read_text()
-    assert "b.state === 'stopped' ? `stopped${b.why ? ': ' + b.why : ''}`" in src
+    # 17i: and the run's row on Runs says it, in plain words
+    assert imf.read_boxes()["runs"][0]["status_words"] == f"Stopped: {why}"
 
 
 def test_2_a_failed_parity_step_says_so_last_and_a_paste_asks_it_again(tmp_path, monkeypatch,

@@ -8,7 +8,7 @@ a time, without typing either.
         --sha served/<original-build>=<its sha256> \\
         --parity served/<phone-build>=/home/masein/benchmarks/parity/phone-server-500.jsonl \\
         --parity served/<original-build>=/home/masein/benchmarks/parity/orig-server-500.jsonl \\
-        --every 15m <host>:<port> <host>:<port> …
+        --every 3m <host>:<port> <host>:<port> …
 
 Each box (root@ unless another user is given) is asked over SSH, once, for
 what it holds under /workspace — every bundle and parity file with its
@@ -29,7 +29,7 @@ sha256, and each step's progress (17f) — and nothing else.
   every bundle it holds here with the same sha256 and imported), or not, and
   why. The exit code is not 0 when a box couldn't be reached, a copy failed
   or an import was refused;
-- --every 15m does it again every 15 minutes until every box is done.
+- --every 3m does it again every 3 minutes until every box is done.
 
 Imported already is told by the answers (scripts/import_frontier.py): a
 bundle made again changes nothing. A bundle of a model with no --sha (G6's
@@ -456,7 +456,7 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
 
 
 def post_boxes(steps: list[dict], dest: Path, asked: list[str] | None = None,
-               reached: list[str] | None = None) -> str:
+               reached: list[str] | None = None, every: float = 0) -> str:
     """17f: the boxes' steps to the board, for Runs' "On rented boxes" list —
     17h: with the boxes this fetch asked, by their board names. 17i: and those
     it reached (a build's steps gone from a box reached are gone), as a list
@@ -464,8 +464,9 @@ def post_boxes(steps: list[dict], dest: Path, asked: list[str] | None = None,
     passes it by (17h's {"steps", "asked"} marked every row "not reached" on
     the board then deployed)"""
     path = dest.parent / "boxes.json"
-    head = [{"asked": sorted(asked or []), "reached": sorted(reached or [])}] \
-        if asked is not None else []
+    # 17i: and how often it reads them, so the board says when the next is due
+    head = [{"asked": sorted(asked or []), "reached": sorted(reached or []),
+             **({"every": every} if every else {})}] if asked is not None else []
     path.write_text(json.dumps([*head, *steps]), encoding="utf-8")
     code, said = run([*IMPORT, "--boxes", str(path)], cwd=REPO, timeout=IMPORT_S)
     return ("the board's list of rented boxes: " + last(said, "updated") if code == 0 else
@@ -559,7 +560,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-board", dest="board", action="store_false",
                     help="17f: don't send the boxes' progress to the board (Runs' list)")
     ap.add_argument("--every", type=every_s, default=0,
-                    help="17f: do it again every 15m (or 900s, 1h) until every box is done")
+                    help="17f: do it again every 3m (or 180s, 1h) until every box is done")
     ap.add_argument("--abandoned", action="append", default=[], metavar="BUILD/STEP",
                     help="17i: a step given up on, e.g. Qwen3.6-35B-A3B-BF16/A3-2 — left out of "
                          "its box's steps and plan, and said on its line (one each)")
@@ -653,7 +654,7 @@ def main(argv: list[str] | None = None) -> int:
         if a.board:
             print(post_boxes([x for v in known.values() for x in v], dest,
                              [box_id(f"{b['host']}:{b['port']}", dest) for b in boxes],
-                             reached), flush=True)
+                             reached, a.every), flush=True)
         # 17g: each build's parity verdict, a line of its own every round; one
         # that isn't the same, or couldn't be compared, is a failure. 17i: only
         # a build on this command line, with its box and when

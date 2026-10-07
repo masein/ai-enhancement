@@ -112,11 +112,14 @@ def test_13_the_poll_brings_the_boxes_list_up_to_date_on_its_own(live, page):
     page.set_viewport_size({"width": 1400, "height": 1000})
     page.goto("about:blank")
     page.goto(live["base"] + "/#tab=runs")
-    page.wait_for_selector("[data-rented-box='A5|A5-1']")
+    run = "[data-rented-run='rented:served/switch-box|mmlupro_tiger|on'] [data-rented-count]"
+    page.wait_for_selector(run)
     imf.store_boxes({"steps": [step, {**step, "label": "A6", "step": "A6-1", "box_id": "b"}],
                      "asked": ["a", "b"]})
     page.evaluate("state.boxesAt = 0")                     # half a minute on
-    page.wait_for_selector("[data-rented-box='A6|A6-1']", timeout=12000)  # 0adb522: never
+    # 0adb522: never. 17i: the second box merged into its run's row
+    page.wait_for_function(f"(document.querySelector(\"{run}\") || {{}}).textContent"
+                           " === '6,000 of 24,064 · 2 boxes'", timeout=12000)
     assert page.errors == []
 
 

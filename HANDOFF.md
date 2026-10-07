@@ -4953,6 +4953,36 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 17i.5 — the rented runs on the Runs page (7 Oct)
+
+- **A rented run is a row of Runs** (`import_frontier.rented_runs`,
+  `rentedRow`, point 27): no "On rented boxes" table; the same columns,
+  status chip and progress bar as a run here (a run here has the bar too,
+  while it runs). One row a model, benchmark and thinking setting, its boxes
+  merged ("414 of 2,158 · 4 boxes"), opening to a line a box. A step whose
+  bundle the row's registry shows imported leaves it: its import's Runs row
+  stands for it. The where filter's "rented GPUs" shows them, "this server"
+  hides them.
+- **Plain words** (28): Done, Running, Loading the model, Stopped and why,
+  "Stopped? No word for 3 h" for a step silent past 45 minutes (the BF16
+  box's A3-2 read as running at 25 of 539 with a finish time), "No contact for
+  3 h" for a box not reached. The merged row: Done when every box is; else
+  Running while any box asks; else Loading the model; else No contact when
+  the rest are unreached; else Stopped and why. A box stopped or unreached
+  among running ones is said on the row, and the benchmark's finish is left
+  unknown while one is.
+- **Two times, each named** (29): "this benchmark finishes" on the row (the
+  boxes' own time left), and on each box's line its benchmark's and its box's
+  (its later steps at the plan's hours).
+- **Updating** (30): the fetch posts its `--every`, and the list says once
+  when it was read and when the next reading is due; a row says "last heard"
+  only when it is behind the others. The docs' fetch line reads
+  `--every 3m`.
+- **Steps gone from a box the fetch reached** leave at once (31, with 17i.2's
+  point 11).
+- Tests: `tests/test_17i_runs_browser.py`; the older Runs tests read the
+  merged rows (`test_17f_browser`, `test_17g_browser`, `test_17h_browser`).
+
 ### 17i.2 — the boxes and the fetch (7 Oct)
 
 - **`--abandoned <build>/<step>`** (`frontier_fetch.py`, point 7, repeatable):

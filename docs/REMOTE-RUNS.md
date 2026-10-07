@@ -694,21 +694,30 @@ the boxes' are compared with them:
 
 ```bash
 cd ~/benchmarks/aienh
-python3 scripts/frontier_fetch.py --key ~/.ssh/id_ed25519 --sha served/<phone-build>=<the phone file's sha256 from G0> --sha served/<original-build>=<the original file's sha256 from G0> --parity served/<phone-build>=/home/masein/benchmarks/parity/phone-server-500.jsonl --parity served/<original-build>=/home/masein/benchmarks/parity/orig-server-500.jsonl --every 15m <host 1>:<port 1> <host 2>:<port 2> <host 3>:<port 3>
+python3 scripts/frontier_fetch.py --key ~/.ssh/id_ed25519 --sha served/<phone-build>=<the phone file's sha256 from G0> --sha served/<original-build>=<the original file's sha256 from G0> --parity served/<phone-build>=/home/masein/benchmarks/parity/phone-server-500.jsonl --parity served/<original-build>=/home/masein/benchmarks/parity/orig-server-500.jsonl --every 3m <host 1>:<port 1> <host 2>:<port 2> <host 3>:<port 3>
 ```
 
 It asks for your password once (`sudo`, for the container) and keeps it alive
 while it runs; if it lapses, one line says the next import waits for it. Run
 it in a tmux pane of its own. A `--parity` file that isn't there is refused
-before anything is fetched. `--every 15m` does it all again every 15 minutes until every
-box is done, and each time it sends the boxes' progress to the board: Runs ▸
-All runs opens with "On rented boxes", each step's box, model, what it asks,
-n of N, when it should finish and when it was last heard from (a box quiet
-for 45 minutes, or not reached at the last fetch, says so; one whose bundles
-are all home and imported reads "done, safe to destroy"). Only labels and
+before anything is fetched. `--every 3m` does it all again every 3 minutes until every
+box is done, and each time it sends the boxes' progress to the board (17i):
+each run on a rented GPU is a row of Runs ▸ All runs itself, with the same
+columns, status and progress bar as a run here — one row a model, benchmark
+and thinking setting, its boxes merged (Humanity's Last Exam on four boxes:
+"414 of 2,158 · 4 boxes", opening to a line a box). Its status in plain
+words: Running, Loading the model, Done, Stopped and why, "Stopped? No word
+for 52 min" for a step that stopped writing, "No contact for 3 h" for a box
+not reached; when this benchmark finishes on the row, and each box's own
+finish (its later steps included) on its line. The list says once when the
+fetch last read the boxes and when the next reading is due; a row says when
+it was last heard from only when it is behind the others. Once a step's
+bundle is imported its import's Runs row stands for it: never two rows for
+one run. The where filter's "rented GPUs" shows them. Only labels and
 progress go to the board, never a box's address; `--no-board` sends nothing (a
-fetch of some boxes leaves the others on the list as they were; a box not
-reached for a day leaves it). Each box's first line says whether it is
+fetch of some boxes leaves the others on the list as they were; a build's
+steps gone from a box the fetch reached leave at once; a row not seen for a
+day leaves it). Each box's first line says whether it is
 **safe to destroy**: every step its plan (G5) gives each build started there
 whole, every other step on the box too (17h: a step outside the plan's
 folders, `--out /workspace/run`, G6's `/workspace/gemma-cal`, one started by

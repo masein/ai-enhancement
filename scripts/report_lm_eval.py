@@ -4483,6 +4483,9 @@ td.evdtotal .evd-ranout { display:block; white-space:normal; text-align:right; }
 .upfill { height:100%; width:100%; background:var(--accent); transform:scaleX(0);
   transform-origin:left; transition:transform .2s; }
 .upstore { margin-top:12px; border-top:1px solid var(--border); padding-top:8px; }
+/* 17i: a run's bar in Runs, here and on a rented GPU alike */
+.runbar { height:5px; margin:4px 0 2px; max-width:220px; }
+.rented-box-lines { margin:0; padding-left:18px; }
 /* 16b.3: Use as an API's facts and keys */
 .apifacts { display:grid; grid-template-columns:max-content minmax(0, 1fr); gap:2px 10px; margin:6px 0; }
 .apifacts dd { margin:0; overflow-wrap:anywhere; }
@@ -19373,6 +19376,10 @@ function vQueue(part = { form: true, list: true }) {
     el('td', { class: 'small', 'data-watch': `q|${r.id}|progress`,
       text: r.error && r.progress && (r.error.includes(r.progress.trim())
         || r.progress.includes(r.error.trim())) ? '' : r.progress || '' },
+      // 17i: its bar, as a run on a rented GPU has one
+      r.status === 'running' ? (() => {
+        const m = /(\d[\d,]*)\s*(?:of|\/)\s*(\d[\d,]*)/.exec(r.progress || '');
+        return m ? runBar(+m[1].replace(/,/g, ''), +m[2].replace(/,/g, '')) : ''; })() : '',
       // the GPU half finishing is not the job finishing: the judge batch is
       // still out, and the row says how far it is
       r.judge && !r.judge_failed && r.suite !== 'everyday' ? el('div', { class: 'se',
@@ -19404,20 +19411,30 @@ function vQueue(part = { form: true, list: true }) {
     { key: 'gpu_seconds', label: 'gpu', num: true, defDir: -1 },
     { key: null,          label: '' },
   ];
+  // 17i: the runs on rented GPUs, as rows of the list — a status of their own
+  // read by the status filter as the list's are
+  const RENTED_AS = { running: 'running', loading: 'running', unreached: 'running',
+                      done: 'done', stopped: 'failed' };
+  const rentedRows = () => (((state.boxes || {}).runs) || []).map(x => ({ ...x, rented: true,
+    status: RENTED_AS[x.status] || x.status, rentedStatus: x.status,
+    note: `${x.tasks} ${x.where} ${x.status_words}` }));
   function qVisible() {
     const q = state.qQ.trim().toLowerCase();
-    const rows = allRuns().filter(r =>
+    const rows = [...rentedRows(), ...allRuns()].filter(r =>
       (state.qStatus === 'all'
         || (state.qStatus === 'active' ? ACTIVE_STATUS.has(r.status)
                                        : r.status === state.qStatus)) &&
       // 17f: where it ran
-      (state.qWhere === 'all' || (state.qWhere === 'rented') === !!r.where_ran) &&
+      (state.qWhere === 'all' || (state.qWhere === 'rented') === !!(r.where_ran || r.rented)) &&
       // 17g: "#12" is run 12 alone, never #120 too (a score's link to its runs)
       (!q || (/^#\d+$/.test(q) ? `#${r.id}` === q
         : `#${r.id} ${r.hf_id} ${r.submitter || ''} ${r.note || ''} ${r.status} `
           .toLowerCase().includes(q))));
     const c = QCOLS.find(x => x.key === state.qSort.key) || QCOLS[0];
     return rows.sort((a, b) => {
+      // 17i: the rented runs first, as the fetch read them
+      if (!!a.rented !== !!b.rented) return a.rented ? -1 : 1;
+      if (a.rented) return 0;
       const va = a[c.key], vb = b[c.key];
       if (va == null && vb == null) return 0;
       if (va == null) return 1; if (vb == null) return -1;
@@ -19448,9 +19465,10 @@ function vQueue(part = { form: true, list: true }) {
       openTest(); });
   // in place, same reason as everywhere: the 5s poll must never eat a keystroke
   function rebuildQueue() {
-    // 17g: the boxes' list with the table — the poll redraws only this
-    qBoxes.replaceChildren(rentedBoxes() || '');
-    const any = state.queue.length > 0;
+    // 17g: the boxes' list with the table — the poll redraws only this.
+    // 17i: one line now; the runs are rows of the table
+    qBoxes.replaceChildren(rentedLine() || '');
+    const any = state.queue.length > 0 || rentedRows().length > 0;
     qToolbar.style.display = any ? '' : 'none';
     qTableWrap.style.display = any ? '' : 'none';
     qEmpty.style.display = any ? 'none' : '';
@@ -19466,11 +19484,15 @@ function vQueue(part = { form: true, list: true }) {
             ? el('span', { class: 'dir', text: state.qSort.dir > 0 ? '▲' : '▼' }) : '')
       : el('th', { text: c.label }))));
     const rs = qVisible(), have = allRuns().length;
-    const total = Math.max(state.queueTotal || 0, have);
-    qCount.textContent = `${rs.length} of ${total}` + (have < total ? ` · the latest ${have}` : '');
+    // 17i: the runs on rented GPUs counted with the rest ("1 of 0")
+    const total = Math.max(state.queueTotal || 0, have) + rentedRows().length;
+    qCount.textContent = `${rs.length} of ${total}`
+      + (have + rentedRows().length < total ? ` · the latest ${have}` : '');
     // 12z A6: the older ones, a page at a time
-    qOlder.replaceChildren(have < total ? el('button', { class: 'secondary', 'data-queue-older': '1',
-      text: `Show ${Math.min(100, total - have)} older runs`, onclick: async e => {
+    qOlder.replaceChildren(have + rentedRows().length < total ? el('button', {
+      class: 'secondary', 'data-queue-older': '1',
+      text: `Show ${Math.min(100, total - have - rentedRows().length)} older runs`,
+      onclick: async e => {
         e.target.disabled = true;
         try {
           const oldest = Math.min(...allRuns().map(r => r.id));
@@ -19486,7 +19508,9 @@ function vQueue(part = { form: true, list: true }) {
     const was = snapWatch(qTbody);
     // 11i: a row whose Resubmit asks about its own model code opens a row
     // of its own under it — the box is too long for the action cell
-    qTbody.replaceChildren(...pg.rows.flatMap(r => state.qRc === r.id && ownCodeFailure(r)
+    qTbody.replaceChildren(...pg.rows.flatMap(r => r.rented
+      ? rentedRow({ ...r, status: r.rentedStatus }, QCOLS.length)
+      : state.qRc === r.id && ownCodeFailure(r)
       ? [qrow(r), el('tr', { class: 'owncode-tr', 'data-own-code-row': String(r.id) },
           el('td', { colspan: String(QCOLS.length) }, ownCodeResubmit(r)))]
       : [qrow(r)]));
@@ -19565,40 +19589,78 @@ function loadBoxes() {
   api('api/frontier/boxes').then(d => { state.boxes = d; (state.queueRedraw || render)(); })
     .catch(() => {});
 }
-function rentedBoxes() {
+// 17i: the list's one line about the rented boxes — when the fetch last read
+// them, and when the next reading is due (it said "13m ago" on every row)
+function rentedLine() {
   if (netReady() && (!state.boxesAt || Date.now() - state.boxesAt > 30000)) loadBoxes();
-  const B = ((state.boxes || {}).boxes || []);
-  if (!B.length) return '';
-  const when = t => (t ? new Date(t * 1000).toLocaleString('en-GB', { weekday: 'short',
-    hour: '2-digit', minute: '2-digit' }) : '—');
-  const row = b => el('tr', { 'data-rented-box': `${b.label}|${b.step}` },
-    el('td', { text: `${b.label} · ${b.step}` }), el('td', { text: b.model }),
-    el('td', { text: b.parity ? 'the parity questions'
-      : `${(b.tasks || []).map(t => (FB()[t] || {}).label || t).join(', ')} · thinking ${b.thinking}` }),
-    el('td', { class: 'num', text: b.n != null ? `${b.n.toLocaleString()} of ${b.of.toLocaleString()}`
-      : b.state === 'whole' ? 'whole' : '—' }),
-    // 17g: a step that stopped says so, and why — it read "starting" for ever
-    el('td', { class: b.state === 'stopped' && !b.safe ? 'warn' : '',
-      'data-box-stopped': b.state === 'stopped' ? '1' : null,
-      text: b.safe ? 'done, safe to destroy' : b.state === 'whole' ? 'whole'
-        : b.state === 'stopped' ? `stopped${b.why ? ': ' + b.why : ''}`
-        : b.finish ? when(b.finish) : '—' }),
-    el('td', { class: b.quiet_min || b.reachable === false ? 'warn' : '',
-      'data-box-heard': b.reachable === false ? 'unreached' : b.quiet_min ? 'quiet' : 'ok',
-      text: b.reachable === false ? `not reached at the last fetch (${rel(b.heard)} ago)`
-        : b.quiet_min ? `not heard from for ${b.quiet_min} min`
-        : b.heard ? rel(b.heard) + ' ago' : '—' }));
-  return el('details', { class: 'rented-boxes', open: state.boxesShut ? null : '',
-      'data-rented-boxes': String(B.length),
-      ontoggle: e => { state.boxesShut = !e.target.open; } },
-    el('summary', { text: `On rented boxes · ${B.length} step${B.length === 1 ? '' : 's'}` }),
-    el('table', { class: 'mmptab small' },
-      el('thead', {}, el('tr', {}, ['box', 'model', 'asking', 'answered', 'expected finish',
-        'last heard'].map(h => el('th', { text: h })))),
-      el('tbody', {}, B.map(row))),
-    el('p', { class: 'small se', text: 'As frontier_fetch.py last read them (--every 15m keeps '
-      + 'it current). A box is safe to destroy once every step its plan gives it is whole, '
-      + 'its file here and imported.' }));
+  const B = state.boxes || {};
+  if (!(B.runs || []).length || !B.posted_at) return '';
+  const next = B.next_at ? B.next_at * 1000 - Date.now() : null;
+  return el('p', { class: 'small se', 'data-rented-line': '1',
+    text: `Runs on rented GPUs, as frontier_fetch.py read them ${rel(B.posted_at)} ago`
+      + (next == null ? '' : next > 0 ? ` · the next reading in about ${Math.max(1, Math.round(next / 60000))} min`
+        : ' · the next reading is late') });
+}
+const rentedWhen = t => (t ? new Date(t * 1000).toLocaleString('en-GB', { weekday: 'short',
+  hour: '2-digit', minute: '2-digit' }) : '—');
+// 17i: a progress bar, for a run here and a run on a rented GPU alike
+function runBar(n, of) {
+  if (n == null || !of) return '';
+  const f = Math.max(0, Math.min(1, n / of));
+  return el('div', { class: 'upbar runbar', 'data-run-bar': String(Math.round(f * 1000) / 10) },
+    el('div', { class: 'upfill', style: `transform:scaleX(${f})` }));
+}
+const RENTED_CHIP = { done: 'done', stopped: 'failed', running: 'running', loading: 'running' };
+// 17i: a rented run is a row of Runs itself — the same columns, chip and bar
+function rentedRow(x, ncols) {
+  const label = x.parity ? 'the parity questions'
+    : String(x.tasks || '').split(',').map(t => (FB()[t] || {}).label || t).join(', ');
+  const count = x.n != null ? `${x.n.toLocaleString('en')} of ${x.of.toLocaleString('en')}` : '';
+  const open = !!(state.rentedOpen || {})[x.id];
+  const boxLine = b => el('li', { 'data-rented-box': `${b.label}|${b.step}`,
+      'data-box-status': b.status },
+    `${b.label} · ${b.step}` + (b.shard ? ` · shard ${b.shard}` : '') + ' · ',
+    el('span', { class: ['stopped', 'quiet', 'unreached'].includes(b.status) ? 'warntext' : '',
+      text: b.words }),
+    b.n != null ? ` · ${b.n.toLocaleString('en')} of ${b.of.toLocaleString('en')}` : '',
+    b.task_finish ? el('span', { 'data-box-task-finish': '1',
+      text: ` · this benchmark ${rentedWhen(b.task_finish)}` }) : '',
+    b.box_finish ? el('span', { 'data-box-finish': '1',
+      text: ` · its box ${rentedWhen(b.box_finish)}` }) : '',
+    b.behind && b.heard ? el('span', { class: 'warntext', 'data-box-heard': '1',
+      text: ` · last heard ${rel(b.heard)} ago` }) : '');
+  return [el('tr', { 'data-rented-run': x.id, 'data-queue-row': x.id },
+    el('td', { class: 'num se', text: '—', title: 'not on this server: a run on a rented GPU' }),
+    el('td', { class: 'small', style: 'white-space:nowrap', text: x.started_at
+      ? rel(Date.parse(x.started_at) / 1000) + ' ago' : '—' }),
+    el('td', {}, x.hf_id, el('span', { class: 'badge instruct', text: 'instruct' }),
+      el('div', { class: 'small se', style: 'line-height:1.2', 'data-run-where': x.id,
+        text: x.where })),
+    el('td', { class: 'small', text: `Frontier · ${label}`
+      + (x.parity ? '' : ` · thinking ${x.thinking || '?'}`) }),
+    el('td', { text: '—' }),
+    el('td', {}, el('span', { class: x.status === 'unreached' ? 'st st-muted'
+      : stClass(RENTED_CHIP[x.status] || x.status), 'data-stage': x.status,
+      text: x.status_words })),
+    el('td', { class: 'small' },
+      el('span', { 'data-rented-count': '1', text: [count,
+        `${x.boxes_n} box${x.boxes_n === 1 ? '' : 'es'}`].filter(Boolean).join(' · ') }),
+      // as a run here: its bar while it runs
+      x.status === 'running' ? runBar(x.n, x.of) : '',
+      x.finish ? el('div', { class: 'se', 'data-rented-finish': '1',
+        text: `this benchmark finishes ${rentedWhen(x.finish)}` }) : '',
+      ...(x.attention || []).map(w => el('div', { class: 'warntext', 'data-rented-attention': '1',
+        text: w })),
+      x.behind && x.heard ? el('div', { class: 'warntext', 'data-rented-heard': '1',
+        text: `last heard ${rel(x.heard)} ago` }) : '',
+      el('button', { class: 'quiet small', 'data-rented-open': x.id,
+        text: (open ? '▾ ' : '▸ ') + `a line a box`, onclick: () => {
+          state.rentedOpen = { ...(state.rentedOpen || {}), [x.id]: !open };
+          (state.queueRedraw || render)(); } })),
+    el('td', { class: 'num nowrap', text: '—' }), el('td', {})),
+    open ? el('tr', { class: 'rented-boxes-tr', 'data-rented-boxes': x.id },
+      el('td', { colspan: String(ncols) }, el('ul', { class: 'small rented-box-lines' },
+        x.boxes.map(boxLine)))) : null].filter(Boolean);
 }
 
 // ---------------------------------------------------------------------------
