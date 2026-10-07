@@ -14631,22 +14631,27 @@ function vCompare() {
 // says whether a text fits its column. Returns name -> what to show
 function headNames(names, fits) {
   const words = n => String(n).match(/[^\s\-_·/]+[\s\-_·/]*|^[\s\-_·/]+/g) || [String(n)];
-  const ws = names.map(words), out = new Map();
-  let k = 0, j = 0;
-  if (ws.length > 1) {
-    const least = Math.min(...ws.map(w => w.length));
-    while (k < least - 1 && ws.every(w => w[k] === ws[0][k])) k++;
-    while (j < least - 1 - k && ws.every(w => w[w.length - 1 - j] === ws[0][ws[0].length - 1 - j])) j++;
-  }
   const clean = t => t.replace(/^[\s\-_·/]+|[\s\-_·/]+$/g, '');
+  // the words a group of names all share at their front (k) and their end (j)
+  const shared = ws => {
+    let k = 0, j = 0;
+    if (ws.length > 1) {
+      const least = Math.min(...ws.map(w => w.length));
+      while (k < least - 1 && ws.every(w => w[k] === ws[0][k])) k++;
+      while (j < least - 1 - k && ws.every(w => w[w.length - 1 - j] === ws[0][ws[0].length - 1 - j])) j++;
+    }
+    return [k, j];
+  };
+  const ws = names.map(words);
+  const [k, j] = shared(ws);
   const lead = k ? '…' : '', tail = j ? '…' : '';
   // they differ at the front (two models): its front is kept; else its end
   const front = k === 0;
-  names.forEach((n, i) => {
-    if (fits(n)) { out.set(n, n); return; }
+  const out = names.map((n, i) => {
+    if (fits(n)) return n;
     const core = ws[i].slice(k, ws[i].length - j);
     const whole = lead + clean(core.join('')) + tail;
-    if (fits(whole)) { out.set(n, whole); return; }
+    if (fits(whole)) return whole;
     const make = t => (front ? lead + t + '…' : '…' + t + tail);
     let part = core.slice();
     while (part.length > 1 && !fits(make(clean(part.join('')))))
@@ -14654,12 +14659,36 @@ function headNames(names, fits) {
     let t = clean(part.join(''));
     // one word still too long: its letters, from the end that tells it apart
     while (t.length > 2 && !fits(make(t))) t = front ? t.slice(0, -1) : t.slice(1);
-    out.set(n, make(t));
+    return make(t);
   });
-  // two cut alike: their middles go instead, so each still tells itself apart
-  const seen = {};
-  for (const [n, l] of out) (seen[l] = seen[l] || []).push(n);
-  for (const ns of Object.values(seen)) if (ns.length > 1) ns.forEach(n => out.set(n, midTrunc(n, 22)));
+  // 17h: names cut alike keep what tells them apart among themselves — the
+  // part between what just they share, cut to the column (never a fixed 22
+  // characters from each end: three names differing in their middle read
+  // the same); names alike to the letter are numbered
+  const groups = {};
+  out.forEach((l, i) => (groups[l] = groups[l] || []).push(i));
+  for (const idx of Object.values(groups)) {
+    if (idx.length < 2) continue;
+    if (new Set(idx.map(i => names[i])).size === 1) {
+      idx.forEach((i, n) => {
+        let t = clean(String(names[i]));
+        const num = ` #${n + 1}`;
+        if (fits(t + num)) { out[i] = t + num; return; }
+        while (t.length > 2 && !fits(clean(t) + '…' + num)) t = t.slice(0, -1);
+        out[i] = clean(t) + '…' + num;
+      });
+      continue;
+    }
+    const gw = idx.map(i => ws[i]);
+    const [a, z] = shared(gw);
+    idx.forEach((i, n) => {
+      const w = gw[n];
+      let mid = clean(w.slice(a, w.length - z).join(''));
+      const show = t => (a ? '…' : '') + t + (z ? '…' : '');
+      while (mid.length > 1 && !fits(show(mid))) mid = mid.slice(0, -1);
+      out[i] = show(mid);
+    });
+  }
   return out;
 }
 // 17g: compare's headers cut to their columns as drawn — nothing cut while
@@ -14683,7 +14712,7 @@ function cmpFitHeads(table) {
   const lines = cs.whiteSpace === 'nowrap' ? 1 : 2;
   const fits = x => c.measureText(up ? x.toUpperCase() : x).width <= Math.max(40, room) * lines;
   const got = headNames(heads.map(h => h.dataset.name), fits);
-  heads.forEach(h => { h.textContent = got.get(h.dataset.name) || h.dataset.name; });
+  heads.forEach((h, i) => { h.textContent = got[i] || h.dataset.name; });
 }
 // ---- 12m.1: shapes, one method at a time ----
 // The radar takes one kind of measurement, draws only the axes at least two

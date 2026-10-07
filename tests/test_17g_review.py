@@ -824,11 +824,20 @@ def test_16_a_score_made_again_keeps_where_it_ran_and_its_runs(box):  # noqa: F8
 
 
 def test_17_earlier_imports_say_where_they_ran(svc):  # noqa: F811
+    import import_frontier as imf
+    from service import devicemark as sdm
     fr = db.add("served/x", "instruct", "frontier", "masein", "imported from a rented GPU "
                 "(NVIDIA GeForce RTX 4090) · shard 1 of 2 · box A2 · x.tar.gz", status="done")
     dm = db.add("google/gemma-3-1b-it", "instruct", "devicemark", "masein",
                 "imported from a rented GPU (NVIDIA GeForce RTX 4090) · y.tar.gz", status="done")
     here = db.add("served/x", "instruct", "frontier", "masein", "a board run", status="done")
+    # 17h: from each row's own record of its imports, never the note
+    for row, name, rec in (("served__x", imf.REGISTRY,
+                            {"sid": fr, "gpu": "NVIDIA GeForce RTX 4090", "box": "A2"}),
+                           ("google__gemma-3-1b-it", sdm.REMOTE_NAME,
+                            {"sid": dm, "gpu": "NVIDIA GeForce RTX 4090"})):
+        (config.OUT_DIR / row).mkdir(parents=True, exist_ok=True)
+        (config.OUT_DIR / row / name).write_text(json.dumps({"imports": [rec]}))
     db.init()
     assert db.get(fr)["where_ran"] == "rented GPU · RTX 4090 · box A2"
     assert db.get(dm)["where_ran"] == "rented GPU · RTX 4090"      # 308fcf3: "this server"

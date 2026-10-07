@@ -497,3 +497,28 @@ def test_22_two_runs_on_this_server_export_what_each_asked(box, tmp_path, monkey
         s, tmp_path / "raw") / "items.jsonl").read_text().splitlines())} for s in sids]
     assert got[0] and got[1] and not got[0] & got[1]         # 0adb522: the same items
     assert len(got[0] | got[1]) == N * RUNS
+
+
+# ---------------------------------------------------------------------------
+# part 5, 23: the start-up fill — from each row's record, guarded
+# ---------------------------------------------------------------------------
+
+def test_23_the_start_up_fill_reads_the_records_and_never_stops_the_board(svc, monkeypatch):  # noqa: F811
+    import import_frontier as imf
+    from service import config, db
+    typed = db.add("served/x", "instruct", "frontier", "masein",
+                   "imported from a rented GPU (my own words) · nothing imported", status="done")
+    broken = db.add("served/x", "instruct", "frontier", "masein",
+                    "imported from a rented GPU\n(Tesla V100 (16 GB)) · z.tar.gz", status="done")
+    (config.OUT_DIR / "served__x").mkdir(parents=True, exist_ok=True)
+    (config.OUT_DIR / "served__x" / imf.REGISTRY).write_text(json.dumps({"imports": [
+        {"sid": broken, "gpu": "Tesla V100 (16 GB)", "box": "B3"}]}))
+    db.init()
+    assert not db.get(typed)["where_ran"]                     # 0adb522: "rented GPU · my own…"
+    assert db.get(broken)["where_ran"] == "rented GPU · Tesla V100 (16 GB) · box B3"
+    # an error inside it: said, and the board starts
+    other = db.add("served/x", "instruct", "frontier", "masein", "n", status="done")
+    (config.OUT_DIR / "served__x" / imf.REGISTRY).write_text(json.dumps({"imports": [
+        {"sid": other, "gpu": "x"}]}))
+    monkeypatch.setattr(imf, "where_words", lambda *a: (_ for _ in ()).throw(RuntimeError("x")))
+    db.init()                                                 # 0adb522: raised
