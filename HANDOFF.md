@@ -4953,6 +4953,59 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 18b.2 — agent runs: before step A (8 Oct)
+
+- **`--check-reach` runs as the doc writes it** (point 4): it needs neither
+  `--as` nor `--oracle`; a test runs the doc's own line.
+- **The agent venv is a lock with hashes** (point 5,
+  `docs/agent-requirements.txt`): 103 packages, every one with its hashes,
+  compiled for Linux x86_64 and Python 3.12 with nothing published in the
+  14 days before 8 Oct — but Harbor 0.24.0 itself (5 Oct), the version this
+  was read and built against; installed with `pip install --require-hashes
+  --no-deps`. The runner refuses to start when any installed package
+  differs from the lock, naming them.
+- **The venv steps work on a stock server** (point 6, `docs/AGENT-RUNS.md`
+  § A): uv 0.12.18 installed from its release, checked against its
+  published sha256; `uv venv --python 3.12 --seed` (uv fetches Python 3.12
+  if the server has none; `--seed` puts pip in it); every step numbered, and
+  referred to by number.
+- **Verification has no network either** (point 7). Settled from Harbor
+  0.24.0 and the two datasets at their pins:
+  - SWE-bench Multilingual verifies in the agent's container; its `test.sh`
+    has uv fetch the parser's packages (swebench 4.1.0, datasets 2.16.1) and
+    a Python 3.11+ from the internet, on all 300 tasks. With no network every
+    task, the oracle's included, would read "not resolved". Three tasks' own
+    test commands also fetch (npm, composer, cargo);
+  - DeepSWE verifies in a separate container built from the task's `tests/`,
+    offline by its own design (every task: `network_mode = "no-network"`),
+    but Harbor gives that container none of the runner's compose files
+    (`extra_docker_compose: []`), so it ran with Harbor's egress sidecar
+    alone (DNS and ICMP allowed) and no process limit.
+  - The runner now asks each task from a copy (`agent-tasks/<benchmark>
+    +offline/`, `agent_run.offline_tasks`): a Multilingual copy's Dockerfile
+    runs the parser's own script header once at build time and sets
+    `UV_OFFLINE=1`; a task whose tests fetch runs those lines once at build
+    time in a throwaway copy of the repository, its tools told they are
+    offline; a DeepSWE copy gets `tests/docker-compose.yaml` with the agent's
+    limits (no network, 4,096 processes). Nothing of a task is in the repo:
+    the lines come from the task's own files. `--only fetching` asks the
+    tasks whose tests fetch; `--only a,b` names tasks.
+- **The container's check fails closed** (point 8): it must show it can try
+  a connection (bash's `/dev/tcp`, refused by the container's own loopback),
+  needs no `timeout`, and ends with DONE; the loopback must be the only
+  interface in `/sys/class/net`. It tries IPv6, names (DNS), Docker's bridge
+  gateway and DNS, the tailnet's DNS, ssh, the board, the model's server and
+  the relay's port on every address of the host.
+- **The docker group, said plainly** (point 9): § A step 5 gives masein the
+  choice — the docker group (root without a password for everything he
+  runs, until removed) or `sudo` on each runner command (root only while it
+  runs; files owned by root; the Runs row still says masein: `--by` takes
+  the name sudo was run by).
+- Tests: `tests/test_18b2_before_a.py`; `tests/test_18_reach.py` (Docker, in
+  CI) checks the fail-closed probe and refuses the container without the
+  override; `tests/test_18_agent.py` and `tests/test_18b1_containment.py`
+  read the probe's new lines.
+
 ### 18b.1 — agent runs: containment and counting (8 Oct)
 
 - **Nothing of the container's is written through or read** (point 1). The

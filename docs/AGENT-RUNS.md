@@ -15,7 +15,10 @@ SWE-bench Pro follows once both have run.
     command in with Harbor's exec.
   - The task's container has no network (`network_mode: none`), at most
     4,096 processes, and no address or key of the model. The agent checks
-    this from inside before the model is asked anything.
+    this from inside before the model is asked anything, and the check
+    fails closed: it must show it can try a connection at all, nothing may
+    answer (by IPv4, IPv6 or name), and the loopback must be its only
+    interface.
   - Harbor mounts three of the trial's folders into the container
     (`agent/`, `verifier/`, `artifacts/`), and the model's commands run
     there as root: anything in them may be a link, a FIFO or a device it
@@ -37,14 +40,30 @@ SWE-bench Pro follows once both have run.
     presence penalty, thinking on.
 - **Before the first task**, the runner refuses in one line, with what to do,
   if any of these fails:
-  - the pinned versions;
+  - the pinned versions, and every package in the venv as the lock
+    (`docs/agent-requirements.txt`, with hashes) has it;
   - Docker, as you without sudo;
   - 50 GB free where Docker keeps its images;
   - the board serving the model with the registered file;
   - a window of at least 131,072 tokens;
   - a tool call coming back through the relay.
 - **A pilot is fixed:** `--tasks 10` is the same ten every time, spread over
-  the benchmark's languages.
+  the benchmark's languages. `--only a,b` asks those tasks; `--only
+  fetching` the tasks whose own tests fetch packages.
+- **Verification has no network either:** it runs the model's code, and the
+  board takes writes from the tailnet without a key. The runner asks each
+  task from a copy of it (`agent-tasks/<benchmark>+offline/`) whose
+  verification needs none:
+  - SWE-bench Multilingual verifies in the agent's container, and its
+    `test.sh` has uv fetch the SWE-bench parser's packages and a Python
+    3.11+ from the internet. The copy's Dockerfile runs that script's header
+    once while the image is built, then tells uv it is offline. The few
+    tasks whose own test commands run a package manager have those commands
+    run once at build time, in a throwaway copy of the repository, and the
+    tools told they are offline;
+  - DeepSWE verifies in a separate container, offline by its own design;
+    Harbor gives it none of the runner's compose files, so the copy gives it
+    one: no network, the agent's limits.
 - **It carries on:**
   - a task with the model's result is never asked again, whatever the
     result: a failure is the model's result, and a later success never
@@ -84,42 +103,85 @@ SWE-bench Pro follows once both have run.
 
 ## A. No model (masein, on the server)
 
+Each step is numbered; a step that refers to another gives its number.
+
 1. Bring the checkout and the board up to date (the board shows agent runs
    from this build):
    ```bash
    cd ~/benchmarks/aienh && git pull origin main && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
    ```
-2. Make the agent venv. Harbor needs Python 3.12 or newer: if `python3
-   --version` says older, make the venv with `uv venv --python 3.12
-   ~/agent-venv` instead of the first command.
+2. Install uv 0.12.18 for your user, checked against its published
+   checksum. It must print `uv-x86_64-unknown-linux-gnu.tar.gz: OK`, then
+   `uv 0.12.18`:
    ```bash
-   python3 -m venv ~/agent-venv && ~/agent-venv/bin/pip install -q -r ~/benchmarks/aienh/docs/agent-requirements.txt
+   cd /tmp && curl -fsSLO https://github.com/astral-sh/uv/releases/download/0.12.18/uv-x86_64-unknown-linux-gnu.tar.gz && echo "89eadd7c76fc063887959510d5ba0ab1264dfd5f1143b925ddb73021a40acf16  uv-x86_64-unknown-linux-gnu.tar.gz" | sha256sum -c && tar xzf uv-x86_64-unknown-linux-gnu.tar.gz && mkdir -p ~/.local/bin && install -m 755 uv-x86_64-unknown-linux-gnu/uv ~/.local/bin/uv && ~/.local/bin/uv --version
    ```
-3. Let your user run Docker without sudo: Harbor runs `docker` as you. Then
-   log out and in again.
+3. Make the agent venv with Python 3.12 — uv fetches Python 3.12 if the
+   server has none — and pip in it (`--seed`):
    ```bash
-   sudo usermod -aG docker $USER
+   ~/.local/bin/uv venv --python 3.12 --seed ~/agent-venv
    ```
-4. See where Docker keeps images, the space there, and what Docker uses:
+4. Install the lock, every package checked against its hash. It must end
+   `Successfully installed …` with no error:
+   ```bash
+   ~/agent-venv/bin/pip install --require-hashes --no-deps -r ~/benchmarks/aienh/docs/agent-requirements.txt
+   ```
+5. **Docker for the runner: you choose.** Harbor runs `docker` as the user
+   who runs the runner, and whoever can run `docker` is root on this server
+   (a container can mount `/` and write anywhere). Both ways make the
+   runner, and every package it imports, root:
+   - **(a) The docker group.** Your account is root without a password from
+     then on, for everything you run — every package in every venv you use,
+     this one's 103 included, and any script you run. It stays until you
+     take it away (`sudo gpasswd -d $USER docker`). Then log out and in:
+     ```bash
+     sudo usermod -aG docker $USER
+     ```
+   - **(b) sudo, each time.** Nothing changes for your account: only the
+     runner is root, and only while it runs. Put `sudo` in front of
+     `~/agent-venv/bin/python` in steps 7–10 and in § B. What that changes:
+     the run's files under `$BENCH_ROOT/agent-runs/` and `agent-tasks/` are
+     owned by root (the board reads them as before); Harbor's cache is
+     under `/root/.cache`; the Runs row still says masein (the runner takes
+     the name sudo was run by; `--by masein` says it outright).
+6. See where Docker keeps images, the space there, and what Docker uses:
    ```bash
    sudo sh -c 'd=$(docker info -f "{{.DockerRootDir}}"); echo "$d"; df -h "$d"; docker system df'
    ```
-5. Check a task's container reaches nothing. It must end "reaches nothing
-   of: …":
+7. Check a task's container reaches nothing: the model's server, the board,
+   the relay and ssh on every address of this server (the tailnet's and
+   IPv6 among them) and on Docker's gateway, the LAN, Docker's DNS, the
+   tailnet's DNS, the internet over IPv4 and IPv6, any name. It must end
+   "… no host folder; at most 4,096 processes"; anything else is a refusal
+   that says what answered or what the check couldn't do:
    ```bash
    cd ~/benchmarks/aienh && ~/agent-venv/bin/python scripts/agent_run.py swebench-multilingual --check-reach
    ```
-6. Three Multilingual tasks with Harbor's oracle agent, which applies each
-   reference solution, no model. Each must read Resolved:
+8. The ten Multilingual tasks of step B, with Harbor's oracle agent, which
+   applies each reference solution: no model. Verification runs with no
+   network, as it will with the model; what it would have fetched (the
+   SWE-bench parser's packages and Python) is installed while each image
+   is built. Each must read Resolved. About 5–10 minutes a task:
    ```bash
-   cd ~/benchmarks/aienh && ~/agent-venv/bin/python scripts/agent_run.py swebench-multilingual --oracle --tasks 3
+   cd ~/benchmarks/aienh && ~/agent-venv/bin/python scripts/agent_run.py swebench-multilingual --oracle --tasks 10
    ```
-7. The same for DeepSWE. If a task errors with "Docker egress control was not
-   enabled", the kernel lacks nftables' `fib` rules: say so before going on.
+9. The Multilingual tasks whose own tests run a package manager — three at
+   this pin (npm, composer, cargo); the runner finds them in their tests and
+   names them. Their fetches run once while the image is built, and the
+   tools are told they are offline. Each should read Resolved; one that
+   doesn't can't be verified here without the network — say which:
    ```bash
-   cd ~/benchmarks/aienh && ~/agent-venv/bin/python scripts/agent_run.py deepswe --oracle --tasks 3
+   cd ~/benchmarks/aienh && ~/agent-venv/bin/python scripts/agent_run.py swebench-multilingual --oracle --only fetching
    ```
-8. Run step 4 again: the images are gone, and the disk is back.
+10. Three DeepSWE tasks. DeepSWE verifies in a separate container with no
+    network by its own design; the runner gives that container the same
+    limits as the agent's. If a task errors with "Docker egress control was
+    not enabled", the kernel lacks nftables' `fib` rules: say so before
+    going on:
+    ```bash
+    cd ~/benchmarks/aienh && ~/agent-venv/bin/python scripts/agent_run.py deepswe --oracle --tasks 3
+    ```
+11. Run step 6's command again: the images are gone, and the disk is back.
 
 ## B. With the model (masein, after A is reported)
 
@@ -155,7 +217,7 @@ SWE-bench Pro follows once both have run.
    ```
 5. Report from the run's last line and its page on the board:
    - minutes a task, tokens, how many resolved, any error;
-   - the disk used (step A4's command);
+   - the disk used (step A6's command);
    - the card's memory (step B2's command);
    - anything odd in the conversations: thinking typed as a command, the
      window outgrown, a command that hung.

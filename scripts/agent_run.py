@@ -42,6 +42,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -110,15 +111,41 @@ def run_dir(root: Path, name: str, model: str, attempts: int, oracle: bool) -> P
 # before the first task
 # ---------------------------------------------------------------------------
 
-def versions() -> dict:
-    """the pinned versions, as installed — {} for one that isn't"""
-    from importlib import metadata
+LOCK = REPO / "docs" / "agent-requirements.txt"
+
+
+def lock() -> dict[str, str]:
+    """the agent venv's lock: every package and its version (18b point 5)"""
     out = {}
+    try:
+        for line in LOCK.read_text().splitlines():
+            m = re.match(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s;\\]+)", line)
+            if m:
+                out[m.group(1).lower().replace("_", "-")] = m.group(2)
+    except OSError:
+        pass
+    return out
+
+
+def versions() -> dict:
+    """the pinned versions, as installed — {} for one that isn't — and every
+    locked package that differs from the lock"""
+    from importlib import metadata
+    out: dict = {}
     for pkg in ("harbor", "mini-swe-agent", "litellm"):
         try:
             out[pkg] = metadata.version(pkg)
         except metadata.PackageNotFoundError:
             out[pkg] = ""
+    off = []
+    for pkg, want in lock().items():
+        try:
+            got = metadata.version(pkg)
+        except metadata.PackageNotFoundError:
+            got = ""
+        if got != want:
+            off.append(f"{pkg} {got or 'missing'} (the lock: {want})")
+    out["off_lock"] = off
     return out
 
 
@@ -129,6 +156,11 @@ def check_versions(v: dict, oracle: bool) -> str:
     if not oracle and v.get("mini-swe-agent") != ab.MINI_VERSION:
         return (f"mini-swe-agent {v.get('mini-swe-agent') or 'isn’t installed'} — "
                 f"{ab.MINI_VERSION} is pinned (docs/AGENT-RUNS.md § A)")
+    off = v.get("off_lock") or []
+    if off:
+        return (f"{len(off)} package{'s' if len(off) != 1 else ''} in the agent venv differ from "
+                "its lock: " + "; ".join(off[:5]) + (" …" if len(off) > 5 else "")
+                + " — make the venv again from the lock (docs/AGENT-RUNS.md § A, steps 2–4)")
     return ""
 
 
@@ -136,9 +168,9 @@ def docker_root() -> tuple[str, str]:
     """(where Docker keeps its images, why not) — Docker as this user"""
     code, out = run(["docker", "info", "-f", "{{.DockerRootDir}}"], timeout=30)
     if code != 0:
-        return "", ("Docker doesn't answer this user without sudo — Harbor runs `docker` as "
-                    "you: add yourself to the docker group (docs/AGENT-RUNS.md § A) — "
-                    + out.strip()[-200:])
+        return "", ("Docker doesn't answer this user — Harbor runs `docker` as you: run "
+                    "this with sudo, or add yourself to the docker group (docs/AGENT-RUNS.md "
+                    "§ A, step 5: each makes the run root) — " + out.strip()[-200:])
     return out.strip().splitlines()[-1], ""
 
 
@@ -222,24 +254,40 @@ def tool_call_line(relay_url: str, model: str) -> str:
     return ""
 
 
-def reach_targets(board_port: int = 8899, llama: str = "") -> list[str]:
-    """what a task's container must never reach: the model's server, the
-    board, the host's addresses (the tailnet's among them), the LAN's
-    gateway, the internet"""
-    out = []
-    if llama:
-        m = re.match(r"https?://([^/:]+):?(\d+)?", llama)
-        if m:
-            out.append(f"{m.group(1)}:{m.group(2) or 80}")
+def tailnet_dns() -> str:
+    """the tailnet's own DNS address, the same on every tailnet — built here
+    so no tracked file holds a tailnet address (the mirror is public)"""
+    return ".".join(["100"] * 4)
+
+
+def reach_targets(board_port: int = 8899, llama: str = "", relay_port: int = 0) -> list[str]:
+    """what a task's container must never reach (18b point 8): the model's
+    server, the board, the relay and ssh on every address of this host —
+    IPv4 and IPv6, the tailnet's among them — and on Docker's bridge
+    gateway; the LAN's gateway; Docker's own DNS; the tailnet's DNS; the
+    internet over IPv4 and IPv6"""
+    llama_host, llama_port = "", 8090
+    m = re.match(r"https?://\[?([^/\]]+?)\]?(?::(\d+))?(?:/|$)", llama or "")
+    if m:
+        llama_host, llama_port = m.group(1), int(m.group(2) or 80)
+    ports = [board_port, llama_port, 22] + ([relay_port] if relay_port else [])
+    out = [f"{llama_host}:{llama_port}"] if llama_host else []
     code, addrs = run(["hostname", "-I"], timeout=10)
-    for a in addrs.split() if code == 0 else []:
-        if re.fullmatch(r"\d+\.\d+\.\d+\.\d+", a):
-            out.append(f"{a}:{board_port}")
+    hosts = [a for a in (addrs.split() if code == 0 else [])
+             if re.fullmatch(r"\d+\.\d+\.\d+\.\d+|[0-9a-fA-F:]+", a)]
+    code, gw = run(["docker", "network", "inspect", "bridge", "-f",
+                    "{{(index .IPAM.Config 0).Gateway}}"], timeout=30)
+    gw = gw.strip().splitlines()[-1] if code == 0 and gw.strip() else "172.17.0.1"
+    for h in [*hosts, gw, "host.docker.internal"]:
+        out += [f"{h}:{p}" for p in ports]
     code, route = run(["ip", "route", "show", "default"], timeout=10)
     m = re.search(r"via (\d+\.\d+\.\d+\.\d+)", route if code == 0 else "")
     if m:
         out.append(f"{m.group(1)}:80")
-    out += ["1.1.1.1:443", "8.8.8.8:53"]
+    out += ["127.0.0.11:53", f"{tailnet_dns()}:53", "1.1.1.1:443", "8.8.8.8:53",
+            "2606:4700:4700::1111:443", "2001:4860:4860::8888:53"]
+    if relay_port:
+        out.append(f"127.0.0.1:{relay_port}")
     return list(dict.fromkeys(out))
 
 
@@ -376,12 +424,109 @@ def write_json(p: Path, data: dict) -> None:
     tmp.replace(p)
 
 
+# the task's container — and DeepSWE's separate verifier's — no network at
+# all, a process limit
+OVERRIDE_YAML = "services:\n  main:\n    network_mode: none\n    pids_limit: 4096\n"
+
+
 def override(rdir: Path) -> Path:
-    """the task's container: no network at all, a process limit — merged
-    over every task's own compose by Harbor"""
+    """the task's container's limits, merged over every task's own compose
+    by Harbor"""
     p = rdir / "no-network.yaml"
-    p.write_text("services:\n  main:\n    network_mode: none\n    pids_limit: 4096\n")
+    p.write_text(OVERRIDE_YAML)
     return p
+
+
+# ---------------------------------------------------------------------------
+# 18b point 7: a copy of each task whose verification needs no network
+# ---------------------------------------------------------------------------
+
+OFFLINE_MARK = ("# --- added by evalboard's agent runner (18b): verification runs with no "
+                "network ---")
+
+
+def eval_part(test_sh: str) -> list[str]:
+    """the test commands of a SWE-bench task's test.sh: up to its parser"""
+    out = []
+    for line in test_sh.splitlines():
+        if line.strip() == "cd ..":
+            break
+        out.append(line)
+    return out
+
+
+def fetch_lines(test_sh: str) -> list[str]:
+    """its test commands that fetch packages"""
+    return [x.strip() for x in eval_part(test_sh) if ab.FETCHES.match(x)]
+
+
+def parser_head(test_sh: str) -> list[str]:
+    """the inline-script header of the verifier's parser (its Python and
+    packages), as test.sh writes it"""
+    m = re.search(r"(?ms)^# /// script\n.*?^# ///$", test_sh)
+    return m.group(0).splitlines() if m else []
+
+
+def dockerfile_additions(test_sh: str) -> list[str]:
+    """what a SWE-bench task's image gets so its verification needs no
+    network — '' parts left out"""
+    out = [OFFLINE_MARK]
+    head = parser_head(test_sh)
+    if head:
+        script = " ".join(shlex.quote(x) for x in [*head, "pass"])
+        out += ["# the verifier's parser's Python and packages, fetched now; uv offline after",
+                f"RUN cd / && printf '%s\\n' {script} > parser.py && uv run parser.py "
+                "&& rm -f parser.py",
+                "ENV UV_OFFLINE=1"]
+    lines = fetch_lines(test_sh)
+    if lines:
+        repo = next((m.group(1) for x in eval_part(test_sh)
+                     if (m := re.match(r"\s*cd\s+(/\S+)\s*$", x))), "/testbed")
+        tools = sorted({x.split()[0] for x in lines})
+        steps = " ; ".join(f"( {x} )" for x in lines) + (" ; ( cargo fetch )"
+                                                         if "cargo" in tools else "")
+        env = sorted({ab.OFFLINE_ENV[t] for t in tools if t in ab.OFFLINE_ENV})
+        out += ["# its tests' own package fetches, once, in a throwaway copy: the caches stay",
+                f"RUN cp -a {repo} /tmp/evalboard-warm && cd /tmp/evalboard-warm && {steps} ; "
+                "cd / && rm -rf /tmp/evalboard-warm",
+                *([f"ENV {' '.join(env)}"] if env else [])]
+    return out
+
+
+def task_test(task: Path) -> str:
+    try:
+        return (task / "tests" / "test.sh").read_text(errors="replace")
+    except OSError:
+        return ""
+
+
+def offline_tasks(root: Path, b: dict, tdir: Path, names: list[str]) -> tuple[Path, dict]:
+    """a copy of each task asked, made again each run: a SWE-bench task's
+    Dockerfile installs what its verification would fetch; a task verified
+    in a separate container (DeepSWE) gives that container the agent's
+    limits. The tasks as fetched stay as they are (their hash is the run's)"""
+    out = root / "agent-tasks" / (slug(b["dataset"]) + "+offline")
+    h = hashlib.sha256()
+    fetching = []
+    for name in names:
+        src, dst = tdir / name, out / name
+        if dst.exists():
+            shutil.rmtree(dst)
+        shutil.copytree(src, dst, symlinks=True)
+        test_sh = task_test(src)
+        toml = (src / "task.toml").read_text(errors="replace")
+        if re.search(r'(?m)^\s*environment_mode\s*=\s*"separate"', toml):
+            (dst / "tests" / "docker-compose.yaml").write_text(OVERRIDE_YAML)
+            added = OVERRIDE_YAML
+        else:
+            add = dockerfile_additions(test_sh)
+            with open(dst / "environment" / "Dockerfile", "a", encoding="utf-8") as fh:
+                fh.write("\n" + "\n".join(add) + "\n")
+            added = "\n".join(add)
+        if fetch_lines(test_sh):
+            fetching.append(name)
+        h.update(name.encode() + b"\0" + added.encode() + b"\0")
+    return out, {"sha256": h.hexdigest(), "fetching": fetching}
 
 
 def prompt_hash(config: str) -> str:
@@ -494,28 +639,33 @@ def main(argv: list[str] | None = None) -> int:
                     help="step A: Harbor's oracle agent applies each task's reference solution — "
                          "no model")
     ap.add_argument("--tasks", type=int, default=0, help="a pilot: this many, the same every time")
+    ap.add_argument("--only", default="", help="these tasks, by name, comma-separated; "
+                    "`fetching`: those whose own tests fetch packages")
     ap.add_argument("--attempts", type=int, default=1)
     ap.add_argument("--at-once", type=int, default=1, help="tasks at a time (default 1)")
     ap.add_argument("--every", type=float, default=EVERY_S, help="seconds between progress posts")
     ap.add_argument("--no-board", action="store_true", help="nothing goes to the board")
-    ap.add_argument("--by", default=os.environ.get("USER", ""), help="your name, on its Runs row")
+    ap.add_argument("--by", default=os.environ.get("SUDO_USER") or os.environ.get("USER", ""),
+                    help="your name, on its Runs row (under sudo: the user who ran sudo)")
     ap.add_argument("--check", action="store_true", help="the checks before the first task, only")
     ap.add_argument("--check-reach", action="store_true",
                     help="step A: a container as a task's tries the model's server, the board, "
                          "the host's addresses, the LAN and the internet — nothing may answer")
     a = ap.parse_args(argv)
-    if not a.oracle and not a.model.startswith("served/"):
-        ap.error("--as served/<model> (or --oracle for step A)")
     b = ab.bench(a.benchmark)
-    root = bench_root()
-    if a.check_reach:
+    if a.check_reach:                   # no model: step A (18b point 4)
+        root = bench_root()
         rdir = root / "agent-runs" / "reach-check"
         rdir.mkdir(parents=True, exist_ok=True)
         targets = reach_targets(llama=host_address("http://host.docker.internal:8090/v1"))
         why = check_reach(rdir, targets)
         say(f"refused — {why}" if why else "a task's container reaches nothing of: "
-            + ", ".join(targets) + "; no host folder; at most 4,096 processes")
+            + ", ".join(targets) + "; no name resolves; its only interface is the loopback; "
+            "no host folder; at most 4,096 processes")
         return 2 if why else 0
+    if not a.oracle and not a.model.startswith("served/"):
+        ap.error("--as served/<model> (or --oracle, or --check-reach, for step A)")
+    root = bench_root()
     # before the first task: each refusal one line, with what to do
     v = versions()
     why = check_versions(v, a.oracle)
@@ -533,6 +683,20 @@ def main(argv: list[str] | None = None) -> int:
     tdir, tasks_sha = fetch_tasks(root, b)
     langs = languages(tdir, b)
     picked = ab.pilot(langs, a.tasks) if a.tasks else sorted(langs)
+    if a.only == "fetching":            # the tasks whose own tests fetch packages
+        picked = [t for t in sorted(langs) if fetch_lines(task_test(tdir / t))]
+    elif a.only:
+        unknown = [t for t in a.only.split(",") if t and t not in langs]
+        if unknown:
+            say(f"refused — no such task in {b['label']}: {', '.join(unknown[:5])}")
+            return 2
+        picked = [t for t in a.only.split(",") if t]
+    # each asked task's copy whose verification needs no network (18b point 7)
+    tdir, offline = offline_tasks(root, b, tdir, picked)
+    if offline["fetching"]:
+        say(f"{len(offline['fetching'])} of these tasks fetch packages in their tests: those "
+            "fetches run once while the image is built, and the tools are told they are "
+            "offline — " + ", ".join(offline["fetching"]))
     relay = None
     if not a.oracle:
         import agent_relay
@@ -550,18 +714,26 @@ def main(argv: list[str] | None = None) -> int:
         if relay:
             relay.stop()
         return 0
-    started = read_json(rdir / "run.json").get("started_at") or time.time()
+    before = read_json(rdir / "run.json")
+    started = before.get("started_at") or time.time()
+    # the run's tasks: those asked before and these (a pilot grown, step A's
+    # oracle on more tasks), each kept with its result
+    every = [*(before.get("tasks") or []),
+             *[t for t in picked if t not in (before.get("tasks") or [])]]
     write_json(rdir / "run.json", {
         "benchmark": a.benchmark, "label": b["label"], "dataset": b["dataset"], "pin": b["pin"],
-        "tasks_sha256": tasks_sha, "tasks": picked, "of": b["tasks"], "attempts": a.attempts,
+        "tasks_sha256": tasks_sha, "tasks": every, "of": b["tasks"], "attempts": a.attempts,
         "at_once": a.at_once, "agent": "oracle" if a.oracle else b["agent"],
         "config": None if a.oracle else b["config"], "model": a.model or None,
         "versions": v, "sampling": None if a.oracle else {**ab.SAMPLING, "thinking": "on"},
         "window": info.get("window"), "file_sha256": info.get("file_sha256"),
         "build": info.get("build"), "flags": info.get("flags"), "where": "this server",
-        "docker_root": droot, "started_at": started, "by": a.by,
+        "docker_root": droot, "started_at": started, "by": a.by, "offline": offline,
+        "lock_sha256": hashlib.sha256(LOCK.read_bytes()).hexdigest() if LOCK.exists() else None,
         "prompt_sha256": None if a.oracle else prompt_hash(b["config"])})
-    reach = reach_targets(llama=host_address(info.get("base_url") or "")) if not a.oracle else []
+    reach = (reach_targets(llama=host_address(info.get("base_url") or ""),
+                           relay_port=relay.server.server_address[1] if relay else 0)
+             if not a.oracle else [])
     todo = [(t, k) for t in picked for k in range(1, a.attempts + 1)
             if state_of(rdir, t, k)[0] == "todo"]
     say(f"{b['label']}: {len(picked) * a.attempts - len(todo)} of {len(picked) * a.attempts} "
@@ -610,15 +782,15 @@ def main(argv: list[str] | None = None) -> int:
             proc = subprocess.Popen(cmd, cwd=rdir, env=env, stdout=log, stderr=subprocess.STDOUT)
             running[(t, k)] = (proc, images_of(tdir / t), log)
         if not a.no_board and time.time() - last_post >= a.every:
-            post(rdir, b, picked, a.attempts, started)
+            post(rdir, b, every, a.attempts, started)
             last_post = time.time()
         time.sleep(2)
     if relay:
         relay.stop()
-    p = progress(rdir, b, picked, a.attempts, started)
+    p = progress(rdir, b, every, a.attempts, started)
     say(f"{b['label']}: {p['line']}")
     if not a.no_board:
-        post(rdir, b, picked, a.attempts, started)
+        post(rdir, b, every, a.attempts, started)
         code, out = board(str(rdir))
         say(out.strip().splitlines()[-1] if out.strip() else f"import: exit {code}")
     return 1 if stop else 0

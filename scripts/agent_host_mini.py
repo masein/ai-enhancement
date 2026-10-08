@@ -82,25 +82,63 @@ CLEAN = ("kill -9 -1 2>/dev/null; "
          "rm -rf /logs/agent/* /logs/artifacts/* /logs/verifier/* 2>/dev/null; true")
 
 
+# names the container must not resolve: DNS answering is a way out
+REACH_NAMES = ("pypi.org", "github.com")
+
+
 def reach_script(targets: list[str]) -> str:
-    """a check run inside the container: one line a target that answered,
-    then the Docker socket and the process limit"""
-    lines = ["for t in " + " ".join(shlex.quote(t) for t in targets) + "; do",
-             '  h="${t%:*}"; p="${t##*:}"',
-             '  if timeout 3 bash -c "exec 3<>/dev/tcp/$h/$p" 2>/dev/null; then echo "REACHED $t"; fi',
-             "done",
-             "[ -e /var/run/docker.sock ] && echo 'REACHED docker.sock'",
-             "p=$(cat /sys/fs/cgroup/pids.max 2>/dev/null || cat /sys/fs/cgroup/pids/pids.max "
-             "2>/dev/null); echo \"PIDS ${p:-unknown}\""]
+    """a check run inside the container, which fails closed (18b point 8):
+    it says first that it can try a connection at all (bash's /dev/tcp
+    refused by the container's own loopback, `sleep` there to time it), then
+    one line a target that answered (IPv4 or IPv6, by address or name), a
+    name that resolved, the Docker socket, the network interfaces and the
+    process limit, and DONE last — a check that didn't get that far refuses"""
+    lines = [
+        "command -v sleep >/dev/null 2>&1 || echo 'PROBE missing sleep'",
+        "o=$(bash -c 'exec 3<>/dev/tcp/127.0.0.1/1' 2>&1)",
+        'case "$o" in *[Rr]efused*) echo "PROBE tcp-ok";; *) echo "PROBE no /dev/tcp: $o";; esac',
+        # a try, given 3 s, without relying on `timeout`
+        'try() { ( exec 3<>"/dev/tcp/$1/$2" ) 2>/dev/null & local p=$! i=0',
+        '  while kill -0 $p 2>/dev/null; do i=$((i+1)); [ $i -gt 3 ] && '
+        '{ kill -9 $p 2>/dev/null; return 124; }; sleep 1; done; wait $p; }',
+        "for t in " + " ".join(shlex.quote(t) for t in targets) + "; do",
+        '  h="${t%:*}"; p="${t##*:}"',
+        '  if try "$h" "$p"; then echo "REACHED $t"; fi',
+        "done",
+        "for n in " + " ".join(REACH_NAMES) + "; do",
+        '  getent hosts "$n" >/dev/null 2>&1 && echo "REACHED dns $n"',
+        '  try "$n" 443 && echo "REACHED $n:443"',
+        "done",
+        "[ -e /var/run/docker.sock ] && echo 'REACHED docker.sock'",
+        "echo \"NET $(ls /sys/class/net 2>/dev/null | tr '\\n' ' ')\"",
+        "p=$(cat /sys/fs/cgroup/pids.max 2>/dev/null || cat /sys/fs/cgroup/pids/pids.max "
+        "2>/dev/null); echo \"PIDS ${p:-unknown}\"",
+        "echo DONE"]
     return "\n".join(lines)
 
 
 def reach_verdict(output: str) -> str:
-    """'' when nothing answered and processes are limited; else why not"""
-    reached = [x.split(" ", 1)[1] for x in output.splitlines() if x.startswith("REACHED ")]
+    """'' only when the check ran to its end, could try a connection, nothing
+    answered, the only interface is the loopback and processes are limited;
+    else why not"""
+    lines = [x.strip() for x in output.splitlines()]
+    if "DONE" not in lines:
+        return "the container's check didn't run to its end: " + (output.strip()[-200:] or
+                                                                  "no output")
+    probe = [x.split(" ", 1)[1] for x in lines if x.startswith("PROBE ") and x != "PROBE tcp-ok"]
+    if probe or "PROBE tcp-ok" not in lines:
+        return "the container's check couldn't try a connection: " + ("; ".join(probe)
+                                                                      or "no word")
+    reached = [x.split(" ", 1)[1] for x in lines if x.startswith("REACHED ")]
     if reached:
         return "the task's container reached " + ", ".join(reached)
-    pids = next((x.split(" ", 1)[1] for x in output.splitlines() if x.startswith("PIDS ")), "")
+    net = next((x[4:].split() for x in lines if x.startswith("NET")), None)
+    if net is None or not net:
+        return "the container's network interfaces couldn't be read"
+    if set(net) != {"lo"}:
+        return "the task's container has a network interface: " + ", ".join(
+            x for x in net if x != "lo")
+    pids = next((x.split(" ", 1)[1] for x in lines if x.startswith("PIDS ")), "")
     if pids in ("", "max", "unknown"):
         return "the task's container has no process limit"
     return ""
@@ -286,7 +324,7 @@ class HostMini(BaseAgent):  # type: ignore[misc,valid-type]
 
         try:
             targets = [t for t in str(self.ours.get("reach") or "").split(",") if t]
-            probe = await environment.exec(reach_script(targets), timeout_sec=120)
+            probe = await environment.exec(reach_script(targets), timeout_sec=300)
             why = reach_verdict((probe.stdout or "") + (probe.stderr or ""))
             if why:
                 held["ours"] = f"ReachRefused: {why}"

@@ -82,6 +82,32 @@ BENCHES: dict[str, dict] = {
 }
 ORDER = ["swebench-multilingual", "deepswe"]
 
+# 18b point 7: verification runs with no network, as the agent does — it runs
+# the model's code. What a benchmark's verification would fetch is installed
+# while the task's image is built (network is there for a build), in a copy
+# of each task the runner makes (agent_run.offline_tasks):
+# - SWE-bench Multilingual verifies in the agent's container. Its test.sh
+#   runs `uv run parser.py`, whose inline dependencies (swebench, datasets
+#   and a Python ≥ 3.11) uv fetches from PyPI: the same script is run once at
+#   build time, then uv is told it is offline. A few tasks' own test commands
+#   run a package manager (npm, composer, cargo): those lines run once at
+#   build time in a throwaway copy of /testbed, filling the tools' caches,
+#   and the tools are told they are offline.
+# - DeepSWE verifies in a separate container built from the task's tests/
+#   (its "clean copy"), offline by its own design (every task says
+#   network_mode "no-network"); Harbor gives that container none of the
+#   runner's compose files, so the copy adds its own: no network, the same
+#   limits as the agent's.
+# A line run at build time is the task's own: nothing of a task is in this
+# repository.
+FETCHES = re.compile(r"^\s*((npm|pnpm) (i|install|ci)\b|yarn( install)?\s*$|composer (install|update)"
+                     r"\b|bundle install\b|cargo (update|fetch)\b|pip3? install\b|go (mod download|get)"
+                     r"\b|gem install\b)")
+OFFLINE_ENV = {"npm": "npm_config_offline=true", "pnpm": "npm_config_offline=true",
+               "yarn": "YARN_ENABLE_OFFLINE_MODE=1", "composer": "COMPOSER_DISABLE_NETWORK=1",
+               "cargo": "CARGO_NET_OFFLINE=true", "pip": "PIP_NO_INDEX=1",
+               "pip3": "PIP_NO_INDEX=1", "go": "GOFLAGS=-mod=mod GOPROXY=off"}
+
 # the words a task's result is said in, everywhere
 RESULT_WORDS = {"resolved": "Resolved", "unresolved": "Not resolved", "timeout": "Timed out",
                 "error": "Error (ours)"}

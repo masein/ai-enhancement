@@ -202,12 +202,13 @@ def test_a_command_past_its_limit_and_the_submission_line():
 
 def test_the_containers_check_and_the_tokens_from_the_trajectory():
     script = hm.reach_script(["172.17.0.1:8090", "1.1.1.1:443"])
-    assert "/dev/tcp/$h/$p" in script and "for t in 172.17.0.1:8090 1.1.1.1:443;" in script
-    assert hm.reach_verdict("PIDS 4096\n") == ""
-    assert hm.reach_verdict("REACHED 172.17.0.1:8090\nPIDS 4096") == \
+    assert '/dev/tcp/$1/$2' in script and "for t in 172.17.0.1:8090 1.1.1.1:443;" in script
+    ok = "PROBE tcp-ok\nNET lo\n{}\nDONE"
+    assert hm.reach_verdict(ok.format("PIDS 4096")) == ""
+    assert hm.reach_verdict(ok.format("REACHED 172.17.0.1:8090\nPIDS 4096")) == \
         "the task's container reached 172.17.0.1:8090"
-    assert hm.reach_verdict("REACHED docker.sock\nPIDS 4096").endswith("docker.sock")
-    assert hm.reach_verdict("PIDS max") == "the task's container has no process limit"
+    assert hm.reach_verdict(ok.format("REACHED docker.sock\nPIDS 4096")).endswith("docker.sock")
+    assert hm.reach_verdict(ok.format("PIDS max")) == "the task's container has no process limit"
     assert hm.usage_of(conversation()["messages"]) == (2800, 340, 2)
 
 
@@ -284,7 +285,7 @@ def test_each_refusal_before_the_first_task_in_one_line(server_world, capsys):
     w = server_world
     cases = [
         ("versions", {"harbor": "0.23.1", "mini-swe-agent": "2.4.6"}, "Harbor 0.23.1 — 0.24.0 is pinned"),
-        ("docker", (1, "permission denied"), "Docker doesn't answer this user without sudo"),
+        ("docker", (1, "permission denied"), "Docker doesn't answer this user"),
         ("free", 42.0, "has 42 GB free — 50 GB must stay free"),
         ("served", {"why": "The server now serves a different file than the one registered."},
          "a different file"),
