@@ -4491,6 +4491,19 @@ td.evdtotal .evd-ranout { display:block; white-space:normal; text-align:right; }
 /* 17i: a run's bar in Runs, here and on a rented GPU alike */
 .runbar { height:5px; margin:4px 0 2px; max-width:220px; }
 .rented-box-lines { margin:0; padding-left:18px; }
+/* 18: agent runs — a card's scores, a task's conversation */
+.agentscores { margin-top:10px; }
+.agentscores h4 { margin:0 0 4px; font-size:var(--fs-2); }
+.agentscores ul { margin:0; padding-left:18px; }
+.agentref { margin:4px 0 8px; }
+.agentref p { margin:0; }
+.agentrefnums { font-size:var(--fs-2); }
+.agentstep { border-top:1px solid var(--border); padding:8px 0; }
+.agentstep h4 { margin:0 0 4px; font-size:var(--fs-2); }
+.agentran, .agentout pre, pre.agentout, .agentthought pre, .agentpatch pre, .agentver pre {
+  white-space:pre-wrap; overflow-wrap:anywhere; max-height:480px; overflow:auto;
+  background:var(--surface-2, var(--plane)); padding:6px 8px; border-radius:var(--r-1, 6px);
+  font-size:var(--fs-1); }
 /* 17j: a rented run on one line, as its neighbours — the count, the bar and
    the finish side by side */
 .rented-prog { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
@@ -10377,6 +10390,10 @@ function viewHash(v) {
   if (v === 'build') return 'tab=build' + (state.qb.id ? '&draft=' + state.qb.id : '');
   // 12d.1: the chat open, so a reload lands on it
   if (v === 'playground') return 'tab=playground' + (state.pg.id ? '&chat=' + state.pg.id : '');
+  // 18: an agent run's page, and a task's, so a reload and a link land on it
+  if (v === 'queue' && (state.agentView || {}).key)
+    return 'tab=runs&agent=' + encodeURIComponent(state.agentView.key)
+      + (state.agentView.task ? '&task=' + encodeURIComponent(state.agentView.task) : '');
   // 12o.2: a benchmark's questions, and the models chosen
   if (place === 'benchmarks' && state.qx.task)
     return 'tab=benchmarks&q=' + encodeURIComponent(state.qx.task) + benchHash();
@@ -10418,6 +10435,14 @@ function viewOfHash(name, params) {
             tasks: 'tasks', exam: 'exam', everyday: 'everyday', ai: 'ai', build: 'build',
             playground: 'playground' }[n];
   if (n === 'ai') state.ai.mark = p.get('sub') === 'mark';
+  // 18: an agent run's page (#tab=runs&agent=<run>), a task's (&task=<id>)
+  if (n === 'runs' || n === 'queue') {
+    const key = p.get('agent') || null, task = p.get('task') || null;
+    const A = state.agentView = state.agentView || {};
+    if (A.key !== key) Object.assign(A, { data: null, err: '', only: false });
+    if (A.task !== task) Object.assign(A, { conv: null, convErr: '' });
+    Object.assign(A, { key, task });
+  }
   if (n === 'playground') {
     const id = p.get('chat') || null;
     if (id !== state.pg.id) Object.assign(state.pg, { id, chat: null, live: null });
@@ -19238,6 +19263,13 @@ function supersededBy(r) {
 }
 function queueActions(r) {
   const id = String(r.id);
+  // 18: an agent run is the host's runner's: its page, never Resubmit or Cancel
+  if (r.suite === 'agent') {
+    const key = agentKeyOf(r.id);
+    return actCell('q' + id, key ? el('a', { class: 'btn ghost', 'data-agent-row-open': key,
+      href: '#tab=runs&agent=' + encodeURIComponent(key), text: 'Open run ▸' }) : '',
+      [{ label: 'Copy id', act: 'copy-id', run: () => copyText(id, '#' + id) }]);
+  }
   // 11g: the log opens in the reader; the raw text is one item further down
   const log = { label: 'Log', act: 'log', run: () => openReader({ kind: 'log', id: id },
     `[data-row-menu="q${id}"]`) };
@@ -20820,7 +20852,175 @@ function openrouterCard(sf) {
 // the header's places: reached from the run counter and every "follow it →".
 // ---------------------------------------------------------------------------
 function vAllRuns() {
+  // 18: an agent run's page, and a task's conversation, from the address
+  if ((state.agentView || {}).key) return agentRunView();
   return vQueue({ list: true });
+}
+
+// ===========================================================================
+// 18: agent runs — the catalogue's Agent tasks, a run's page and a task's
+// conversation (docs/AGENT-RUNS.md). Everything is set as text, never HTML: a
+// conversation is a model's and a repository's words
+// ===========================================================================
+const AGENT_WORDS = { resolved: 'Resolved', unresolved: 'Not resolved', timeout: 'Timed out',
+  error: 'Error (ours)' };
+function agentCat() {
+  if (LIVE && netReady() && (!state.agentAt || Date.now() - state.agentAt > 60000)) {
+    state.agentAt = Date.now();
+    api('api/agent').then(d => { state.agentCat = d; render(); }).catch(() => {});
+  }
+  return state.agentCat || null;
+}
+function agentCards() {
+  const d = agentCat();
+  return d ? (d.benchmarks || []).map(b => ({ key: 'agent-' + b.key, agent: b })) : [];
+}
+// the run a Runs row stands for
+function agentKeyOf(sid) {
+  const d = agentCat() || {};
+  const r = (d.benchmarks || []).flatMap(b => b.runs || []).find(x => x.sid === sid)
+    || (d.oracle || []).find(x => x.sid === sid);
+  return r ? r.key : (state.agentKeys || {})[sid] || null;
+}
+function agentCard(c) {
+  const b = c.agent;
+  const fact = (k, label, v) => v ? [el('dt', { text: label }),
+    el('dd', { 'data-agent-fact': k }, v)] : [];
+  return el('article', { class: 'catcard', 'data-cat-card': c.key, 'data-agent-card': b.key,
+      id: 'cat-' + c.key },
+    el('h3', { text: b.label }),
+    el('p', { class: 'catline', text: b.line }),
+    el('dl', { class: 'catfacts' },
+      ...fact('tasks', 'Tasks', `${Number(b.tasks).toLocaleString('en')} · ${b.languages}`),
+      ...fact('marked', 'Marked by', b.marked),
+      ...fact('agent', 'The agent', b.agent),
+      ...fact('limits', 'A task', b.limits),
+      ...fact('run', 'A run here', 'days: one task at a time, on this server’s card'),
+      ...fact('by', 'Made by', catLink(b.url, b.by)),
+      ...fact('licence', 'Licence', b.licence),
+      ...fact('avg', 'In the Avg', 'never: an agent score is never averaged with '
+        + 'question-and-answer benchmarks')),
+    el('div', { class: 'agentscores', 'data-agent-ours': b.key },
+      el('h4', { text: 'Ours' }),
+      (b.runs || []).length ? el('ul', {}, b.runs.map(r => el('li', { 'data-agent-run': r.key },
+        el('span', { text: `${r.model} · ` }), el('b', { 'data-agent-words': r.key, text: r.words }),
+        ' ', el('a', { href: '#tab=runs&agent=' + encodeURIComponent(r.key),
+          'data-agent-open': r.key, text: 'Open run ▸' }))))
+        : el('p', { class: 'small se', text: 'Not run here yet.' })),
+    (b.published || []).length ? el('div', { class: 'agentscores', 'data-agent-published': b.key },
+      el('h4', { text: 'Published, for reference — never ranked with ours' }),
+      // one line a source: who ran them, on which agent, when; then the numbers
+      ...agentRefGroups(b.published).map(g => el('div', { class: 'agentref' },
+        el('p', { class: 'small se' }, el('span', { class: 'badge', text: 'reference' }),
+          ` ${g.ran_by} · ${g.agent} · published ${g.published} · read ${g.read} · `,
+          catLink(g.source, 'source')),
+        el('p', { class: 'agentrefnums' }, ...g.items.flatMap((x, i) => [i ? ' · ' : '',
+          el('span', { 'data-agent-ref': x.model },
+            `${x.model} `, el('b', { text: (x.pm != null ? `${x.score} ± ${x.pm}`
+              : Number(x.score).toFixed(1)) }))])))))
+      : '');
+}
+function agentRefGroups(xs) {
+  const out = [];
+  for (const x of xs) {
+    const k = [x.ran_by, x.agent, x.published, x.read, x.source].join('|');
+    let g = out.find(y => y.k === k);
+    if (!g) out.push(g = { k, ran_by: x.ran_by, agent: x.agent, published: x.published,
+      read: x.read, source: x.source, items: [] });
+    g.items.push(x);
+  }
+  return out;
+}
+// a run's page: its settings, each task's result, the failures in one click
+function agentRunView() {
+  const A = state.agentView;
+  if (!A.data && !A.busy && !A.err && netReady()) {
+    A.busy = true;
+    api('api/agent/run?key=' + encodeURIComponent(A.key))
+      .then(d => { A.data = d; (state.agentKeys = state.agentKeys || {})[d.sid] = d.key; })
+      .catch(e => { A.err = e.message; })
+      .finally(() => { A.busy = false; render(); });
+  }
+  if (A.task) return agentTaskView();
+  const back = el('a', { href: '#tab=runs', 'data-agent-back': '1', text: '← All runs' });
+  if (A.err) return [el('div', { class: 'card' }, back, el('p', { class: 'warn', text: A.err }))];
+  const d = A.data;
+  if (!d) return [el('div', { class: 'card' }, back, el('p', { class: 'se', text: 'Loading…' }))];
+  const S = d.settings || {};
+  const rows = (d.results || []).filter(r => !A.only || r.result !== 'resolved');
+  const fails = (d.results || []).filter(r => r.result !== 'resolved').length;
+  const n = v => (v == null ? '—' : Number(v).toLocaleString('en'));
+  const setting = [S.window ? `window ${n(S.window)} tokens` : '', S.sampling
+    ? `temperature ${S.sampling.temperature}, top_p ${S.sampling.top_p}, top_k ${S.sampling.top_k}`
+      + `, thinking ${S.sampling.thinking}` : '', S.agent || '', (S.versions || {}).harbor
+    ? `Harbor ${S.versions.harbor}` : '', S.build ? `llama.cpp ${S.build}` : '',
+  S.file_sha256 ? `file ${String(S.file_sha256).slice(0, 16)}…` : '', S.where || '']
+    .filter(Boolean).join(' · ');
+  return [el('div', { class: 'card', 'data-agent-page': d.key }, back,
+    el('h2', { text: `${d.label} · ${d.model}` }),
+    el('p', { 'data-agent-score': d.key }, el('b', { text: d.words })),
+    el('p', { class: 'small se', 'data-agent-settings': d.key, text: setting }),
+    el('div', { class: 'toolbar' },
+      el('button', { class: A.only ? 'quiet' : 'chip-btn on', 'data-agent-filter': 'all',
+        text: `All ${n((d.results || []).length)}`, onclick: () => { A.only = false; render(); } }),
+      el('button', { class: A.only ? 'chip-btn on' : 'quiet', 'data-agent-filter': 'failures',
+        text: `Failures ${n(fails)}`, onclick: () => { A.only = true; render(); } })),
+    el('div', { class: 'lb-wrap' }, el('table', { 'data-agent-tasks': d.key },
+      el('thead', {}, el('tr', {}, ['Task', 'Result', 'Steps', 'Tokens in', 'Tokens out', 'Minutes']
+        .map(h => el('th', { text: h })))),
+      el('tbody', {}, rows.map(r => el('tr', { 'data-agent-task': r.task,
+          'data-agent-result': r.result },
+        el('td', {}, el('a', { href: `#tab=runs&agent=${encodeURIComponent(d.key)}&task=`
+          + encodeURIComponent(r.task), text: r.task })),
+        el('td', {}, el('span', { class: 'st st-' + (r.result === 'resolved' ? 'done'
+          : r.result === 'error' ? 'muted' : 'failed'), text: AGENT_WORDS[r.result] || r.result }),
+          r.why ? el('div', { class: 'small se', text: r.why }) : ''),
+        el('td', { class: 'num', text: n(r.steps) }), el('td', { class: 'num', text: n(r.tokens_in) }),
+        el('td', { class: 'num', text: n(r.tokens_out) }),
+        el('td', { class: 'num', text: r.minutes == null ? '—' : String(r.minutes) })))))))];
+}
+const agentWords = t => { const n = t.split(/\s+/).filter(Boolean).length;
+  return `${n.toLocaleString('en')} word${n === 1 ? '' : 's'}`; };
+// a task's conversation: what it thought, what it ran, what came back (long
+// output folded), then its patch and the verifier's result
+function agentTaskView() {
+  const A = state.agentView;
+  if (!A.conv && !A.convBusy && !A.convErr && netReady()) {
+    A.convBusy = true;
+    api(`api/agent/task?key=${encodeURIComponent(A.key)}&task=${encodeURIComponent(A.task)}`)
+      .then(d => { A.conv = d; }).catch(e => { A.convErr = e.message; })
+      .finally(() => { A.convBusy = false; render(); });
+  }
+  const back = el('a', { href: '#tab=runs&agent=' + encodeURIComponent(A.key),
+    'data-agent-task-back': '1', text: '← The run’s tasks' });
+  if (A.convErr) return [el('div', { class: 'card' }, back, el('p', { class: 'warn', text: A.convErr }))];
+  const c = A.conv;
+  if (!c) return [el('div', { class: 'card' }, back, el('p', { class: 'se', text: 'Loading…' }))];
+  const long = t => t.length > 3000 || t.split('\n').length > 40;
+  const out = t => long(t)
+    ? el('details', { class: 'agentout' }, el('summary', { text: `What came back · `
+      + `${t.split('\n').length.toLocaleString('en')} lines` }), el('pre', { text: t }))
+    : el('pre', { class: 'agentout', text: t });
+  let k = 0;
+  return [el('div', { class: 'card', 'data-agent-conv': c.task }, back,
+    el('h2', { text: c.task }),
+    el('p', {}, el('b', { text: AGENT_WORDS[c.result.result] || c.result.result }),
+      c.result.why ? el('span', { class: 'se', text: ' — ' + c.result.why }) : ''),
+    ...(c.steps || []).map(st => st.exit != null
+      ? el('p', { class: 'small se', 'data-agent-exit': st.exit, text: `It stopped: ${st.exit}` })
+      : el('section', { class: 'agentstep', 'data-agent-step': String(++k) },
+        el('h4', { text: `Step ${k}` }),
+        st.thought ? el('details', { class: 'agentthought' }, el('summary', { text: 'What it '
+          + `thought · ${agentWords(st.thought)}` }),
+          el('pre', { 'data-agent-thought': String(k), text: st.thought })) : '',
+        st.said ? el('p', { 'data-agent-said': String(k), text: st.said }) : '',
+        ...(st.ran || []).map(cmd => el('pre', { class: 'agentran', 'data-agent-ran': String(k),
+          text: '$ ' + cmd })),
+        ...(st.came_back || []).map(out))),
+    el('details', { class: 'agentpatch', open: '' }, el('summary', { text: 'Its patch' }),
+      el('pre', { 'data-agent-patch': c.task, text: c.patch || '(none)' })),
+    el('details', { class: 'agentver' }, el('summary', { text: 'The verifier’s output' }),
+      el('pre', { 'data-agent-verifier': c.task, text: c.verifier || '(none)' })))];
 }
 
 // Test a model: the one filled button on every page. It opens today's Submit
@@ -21124,7 +21324,7 @@ const CAT_FRONTIER = {
       + 'category: the model card’s sampling, not temperature 0, and no random guess when '
       + 'nothing is read.' } };
 const CAT_SECTIONS = [['standard', 'Standard'], ['mobile', 'Mobile'], ['everyday', 'Everyday'],
-  ['frontier', 'Frontier'], ['exam', 'Knowledge exam']];
+  ['frontier', 'Frontier'], ['agent', 'Agent tasks'], ['exam', 'Knowledge exam']];
 
 // what the board measured of a benchmark: its questions (the most any run
 // was asked), the models with a score, and its run time here
@@ -21163,6 +21363,7 @@ function mmQuestions(counts, n) {
 }
 // one card — or a suite's, with its parts under it
 function catCard(c) {
+  if (c.agent) return agentCard(c);
   const fact = (k, label, v, extra = {}) => v ? [el('dt', { text: label }),
     el('dd', { 'data-cat-fact': k, ...extra }, v)] : [];
   const time = c.tasks ? catTime(c.tasks) : null;
@@ -21328,7 +21529,9 @@ function catCards() {
     by: 'this board’s team', licence: 'ours; the hidden half is never shown',
     qwords: 'its bank, on its page', avg: 'its own; never in the Avg',
     manage: () => navigate({ tab: 'exam', model: null, topic: null }) }] : [];
-  return { standard: std, mobile, everyday, frontier, exam };
+  // 18: the agent benchmarks, each with our runs and the published numbers
+  const agent = LIVE ? agentCards() : [];
+  return { standard: std, mobile, everyday, frontier, agent, exam };
 }
 function vCatalog() {
   const cards = catCards();
@@ -23489,12 +23692,16 @@ const SUITE_NAMES = { full: 'Standard', quick: 'Standard · quick', control: 'St
   judged: 'Knowledge exam', everyday: 'Everyday', generative: 'Standard · Instruction & maths',
   safety: 'Standard · Trust & safety', gguf: 'Standard · on the GGUF',
   shared: 'Frontier', mobile: 'Mobile · MobileAIBench',
-  devicemark: 'Mobile · DeviceMark', frontier: 'Frontier · as Epoch AI runs them' };
+  devicemark: 'Mobile · DeviceMark', frontier: 'Frontier · as Epoch AI runs them',
+  agent: 'Agent tasks' };
 // 12q: a devicemark run says its part: the battery, the pilot, the parity
 // check against the setup without MTP, or the speed test
 const DM_PARTS = { pilot: 'pilot (30 items)', parity: 'MTP parity', speed: 'speed test' };
 function suiteWords(r) {
   const w = SUITE_NAMES[r.suite] || r.suite;
+  // 18: "Agent tasks · SWE-bench Multilingual"
+  if (r.suite === 'agent') return [w, String(r.note || '').split(' · ')[0]].filter(Boolean)
+    .join(' · ');
   if (r.suite === 'devicemark')
     return [w, DM_PARTS[r.part], r.part === 'parity' && r.pair ? 'against ' + r.pair : '']
       .filter(Boolean).join(' · ');

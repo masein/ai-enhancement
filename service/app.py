@@ -2218,6 +2218,40 @@ def frontier_boxes():
     return import_frontier.read_boxes()
 
 
+# ---------------------------------------------------------------------------
+# 18: agent runs — the benchmarks' cards, a run's tasks, a task's conversation
+# (service/agent_runs.py). Read where the runner wrote them; in no export
+# ---------------------------------------------------------------------------
+
+@app.get("/api/agent")
+def agent_catalogue():
+    """18: each agent benchmark — what it is, our runs' scores (a part-run
+    says so), and the published numbers beside them as reference"""
+    from . import agent_runs
+    return agent_runs.catalogue()
+
+
+@app.get("/api/agent/run")
+def agent_run(key: str = ""):
+    """18: one agent run — its settings and each task's result"""
+    from . import agent_runs
+    got = agent_runs.run(key)
+    if got is None:
+        raise HTTPException(404, f"no agent run {key!r}")
+    return got
+
+
+@app.get("/api/agent/task")
+def agent_task(key: str = "", task: str = "", attempt: int = 1):
+    """18: a task's conversation, step by step, its patch and its verifier's
+    output"""
+    from . import agent_runs
+    got = agent_runs.task(key, task, attempt)
+    if got is None:
+        raise HTTPException(404, f"no task {task!r} in agent run {key!r}")
+    return got
+
+
 class FrontierStartIn(BaseModel):
     by: str = ""
     partial: bool = False

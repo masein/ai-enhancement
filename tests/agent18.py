@@ -1,0 +1,85 @@
+"""18's tests' world: invented tasks and Harbor trial folders, as Harbor 0.24.0
+and mini-swe-agent 2.4.6 write them — no benchmark's task, solution,
+verifier or trajectory is here, and nothing is fetched."""
+
+from __future__ import annotations
+
+import json
+import time
+from pathlib import Path
+
+LANGS = ["c", "go", "java", "javascript", "php", "ruby", "rust", "typescript"]
+MODEL = "served/invented-agent"
+
+
+def tasks_folder(d: Path, n: int = 40, how: str = "tags") -> list[str]:
+    """`n` invented tasks, their languages in their task.toml as each
+    benchmark says them"""
+    names = []
+    for i in range(n):
+        name = f"inv__repo{i % 8}-{1000 + i}"
+        t = d / name
+        (t / "environment").mkdir(parents=True, exist_ok=True)
+        lang = LANGS[i % len(LANGS)]
+        meta = (f'[metadata]\ntags = ["debugging", "swe-bench", "{lang}"]\n' if how == "tags"
+                else f'[metadata]\nlanguage = "{lang}"\n')
+        (t / "task.toml").write_text(meta + "[agent]\ntimeout_sec = 3000\n")
+        (t / "environment" / "Dockerfile").write_text(f"FROM invented/image-{i}:latest\n")
+        names.append(name)
+    return names
+
+
+def conversation(html: bool = False) -> dict:
+    """a trajectory as mini-swe-agent writes it — invented words"""
+    said = "<script>alert('x')</script> <b>bold</b>" if html else "I will look around."
+    return {"info": {"exit_status": "Submitted", "mini_version": "2.4.6"}, "messages": [
+        {"role": "system", "content": "invented system"},
+        {"role": "user", "content": "invented task: make the invented test pass"},
+        {"role": "assistant", "content": said, "reasoning_content": "thinking about <i>it</i>",
+         "tool_calls": [{"function": {"name": "bash", "arguments": json.dumps(
+             {"command": "ls -la && echo '<img src=x onerror=alert(1)>'"})}}],
+         "extra": {"response": {"usage": {"prompt_tokens": 1200, "completion_tokens": 300}}}},
+        {"role": "tool", "content": "<returncode>0</returncode>\n<output>\n" +
+         "\n".join(f"line {i} <tag>" for i in range(60)) + "\n</output>"},
+        {"role": "assistant", "content": "", "reasoning_content": "done",
+         "tool_calls": [{"function": {"name": "bash", "arguments": json.dumps(
+             {"command": "echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT"})}}],
+         "extra": {"response": {"usage": {"prompt_tokens": 1600, "completion_tokens": 40}}}},
+        {"role": "exit", "content": "", "extra": {"exit_status": "Submitted"}}]}
+
+
+def trial(rdir: Path, task: str, k: int = 1, stamp: int | None = None, result: str = "resolved",
+          exc: str = "", html: bool = False, minutes: float = 20.0) -> Path:
+    """one finished trial of a task's attempt, as Harbor leaves it"""
+    stamp = stamp or int(time.time() * 1000)
+    job = rdir / "jobs" / f"{task}__a{k}__{stamp}"
+    t = job / f"{task[:32]}__abc1234"
+    (t / "agent").mkdir(parents=True, exist_ok=True)
+    (t / "verifier").mkdir(parents=True, exist_ok=True)
+    start = "2026-10-08T10:00:00+00:00"
+    end = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(
+        time.mktime(time.strptime("2026-10-08T10:00:00", "%Y-%m-%dT%H:%M:%S")) + minutes * 60))
+    r = {"task_name": task, "trial_name": t.name, "started_at": start, "finished_at": end,
+         "agent_result": {"n_input_tokens": 2800, "n_output_tokens": 340,
+                          "metadata": {"steps": 2, "exit_status": "Submitted"}}}
+    if result in ("resolved", "unresolved"):
+        r["verifier_result"] = {"rewards": {"reward": 1.0 if result == "resolved" else 0.0}}
+    if exc:
+        r["exception_info"] = {"exception_type": exc, "exception_message": f"{exc} happened",
+                               "exception_traceback": "", "occurred_at": start}
+    (t / "result.json").write_text(json.dumps(r))
+    (t / "agent" / "mini-swe-agent.trajectory.json").write_text(json.dumps(conversation(html)))
+    (t / "agent" / "patch.diff").write_text("--- a/x.c\n+++ b/x.c\n@@ -1 +1 @@\n-<old>\n+<new>\n")
+    (t / "verifier" / "test-stdout.txt").write_text("invented test: PASSED <ok>\n")
+    return t
+
+
+def run_json(rdir: Path, tasks: list[str], bench: str = "swebench-multilingual",
+             model: str = MODEL, of: int = 300) -> None:
+    rdir.mkdir(parents=True, exist_ok=True)
+    (rdir / "run.json").write_text(json.dumps({
+        "benchmark": bench, "label": "SWE-bench Multilingual", "dataset": "x", "tasks": tasks,
+        "of": of, "attempts": 1, "at_once": 1, "model": model, "agent": "invented agent",
+        "sampling": {"temperature": 1.0, "top_p": 0.95, "top_k": 20, "thinking": "on"},
+        "window": 262144, "versions": {"harbor": "0.24.0"}, "where": "this server",
+        "started_at": time.time() - 3600, "by": "masein"}))

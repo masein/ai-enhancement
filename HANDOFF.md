@@ -4953,6 +4953,44 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 18 — agent runs: the pipeline and the board (8 Oct)
+
+- **The design note** (`docs/AGENT-RUNS-design.md`): masein's decisions of 8
+  Oct, and which set the published SWE-bench Pro numbers are on (V1's 731,
+  mini-swe-agent at 250 steps: Pro, when built, is that set).
+- **The runner** (`scripts/agent_run.py`, on the host in the agent venv,
+  `docs/agent-requirements.txt`): Harbor 0.24.0, one job a task; refuses
+  before the first task, in one line each (versions, Docker as the user, 50
+  GB free, the board's model and its registered file, a window of at least
+  131,072, a tool call through the relay); a pilot's tasks fixed and spread
+  over the languages (`agent_bench.pilot`); carries on after a kill; an
+  error of ours asked again three times at most; each task's image removed,
+  its digest kept; nothing pulled under 50 GB free; progress to a Runs row
+  every 3 minutes; the import at the end. `--oracle` (step A, no model) and
+  `--check-reach`.
+- **The agent on the host** (`scripts/agent_host_mini.py`, decision 1): a
+  Harbor external agent running mini-swe-agent's own loop and config
+  (Multilingual: `benchmarks/swebench.yaml`; DeepSWE: `mini.yaml`, as its
+  board), each command through Harbor's exec with its shell, time limit for
+  the whole group and the submission line; the container checked from
+  inside first; every process it left killed and any reward it wrote removed
+  before the verifier.
+- **The relay** (`scripts/agent_relay.py`): 127.0.0.1 only, the chat request
+  only, the server's key added, the run's sampling set (temperature 1.0,
+  top_p 0.95, top_k 20, no presence penalty, thinking on), the server's own
+  refusals passed back as they came.
+- **The board**: `scripts/import_agent.py` (the model's record for the run's
+  checks, the Runs row, the import); `service/agent_runs.py` and
+  `/api/agent`, `/api/agent/run`, `/api/agent/task`; Benchmarks ▸ Agent tasks
+  (a card each, our score with a part-run said, the published numbers from
+  `service/agent_published.json` beside it, as reference); an agent run's
+  page and a task's conversation, everything set as text. Agent rows are
+  never re-queued at start-up, never the worker's, and hold no GGUF job back.
+- **What masein runs:** `docs/AGENT-RUNS.md` §§ A and B. Nothing was run with
+  a model: B waits for A's report.
+- Tests: `tests/test_18_agent.py`, `tests/test_18_reach.py` (Docker, in CI),
+  `tests/test_18_page_browser.py`.
+
 ### 17j.3, point 38 — a few that thought anyway (8 Oct)
 
 - **A thinking-off run is refused only when more than a quarter of its answers
