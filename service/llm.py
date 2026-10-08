@@ -1085,14 +1085,19 @@ class LocalOpenAI(Backend):
         why = (f"waiting: {n} requests in a row were all refused — {said}. Nothing was counted "
                "against the answers: change what it refuses (the model, its provider), then "
                "Start again" if first else
+               f"waiting: OpenRouter refused {n} requests in a row — {said}. It waits for "
+               f"{self.HALT_PRESS}: nothing more is sent until then" if self.HALT_PRESS else
                f"waiting: OpenRouter refused {n} requests in a row — {said}. It tries again in "
                f"{round(self.HALT_RETRY_S / 60)} minutes" + self.HALT_TAIL)
         # 17h: a run of refusals waits for Start (the model changed, or the
         # same asked again) — it took itself up after 10 minutes, and asked
-        # the same refusals again
+        # the same refusals again. 18b: and a run about the key (its limit,
+        # its credit, a lasting rate limit) waits for its press too, where
+        # the batch has one: adding credit no longer starts spending again
+        # with nobody pressing anything
         (self.dir / batch_id / "halt.json").write_text(json.dumps(
             {"why": why, "status": rec.get("status"), "at": time.time(), "n": n,
-             **({"hold": True} if first else {})}), encoding="utf-8")
+             **({"hold": True} if first or self.HALT_PRESS else {})}), encoding="utf-8")
 
     def cancel(self, batch_id: str, custom_ids, why: str) -> int:
         """16c: questions of a batch that are no longer wanted — never sent;
@@ -1281,6 +1286,9 @@ class LocalOpenAI(Backend):
     HALT_KINDS = ("limit", "key", "rate")
     HALT_RETRY_S = 600
     HALT_TAIL = ""
+    # 18b: the press that takes a halted batch up again — '' where it has
+    # none (the judge's batches), which try again after HALT_RETRY_S
+    HALT_PRESS = ""
 
     @staticmethod
     def _transient(e: LLMError) -> bool:

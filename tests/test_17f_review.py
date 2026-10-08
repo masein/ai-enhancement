@@ -357,7 +357,7 @@ def test_p2_7_a_box_file_of_one_run_is_refused_in_words(tmp_path, capsys):
                               "server": {"flags": [], "env": {}}, "n": 500, "twice": False})):
         (tmp_path / name).write_text("".join(json.dumps(x) + "\n"
                                              for x in [{"parity_of": head}, *rows]))
-    assert fp.main(["compare", str(tmp_path / "s"), str(tmp_path / "b")]) == 1
+    assert fp.main(["compare", str(tmp_path / "s"), str(tmp_path / "b")]) == fp.DIFFERENT
     assert "the box's file holds one run of each question" in capsys.readouterr().out
 
 

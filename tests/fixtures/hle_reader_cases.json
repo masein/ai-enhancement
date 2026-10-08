@@ -1,5 +1,5 @@
 {
- "about": "Replies an HLE judge could send, with what a careful person reads ('want': any reading listed is acceptable; 'no grade' means the reply must not be graded). 'reads_on_0abb757' is what scripts/frontier_graders.py read at 0abb757. Invented text only: no benchmark question is in this file. The field texts some cases quote are the public HLE judge prompt's own words.",
+ "about": "Replies an HLE judge could send, with what a careful person reads ('want': any reading listed is acceptable; 'no grade' means the reply must not be graded). 'reads_on_0abb757' is what scripts/frontier_graders.py read at 0abb757. Invented text only: no benchmark question is in this file. The field texts some cases quote are the public HLE judge prompt's own words. 18b added eight cases (ids 18b-…): a line ending in '{' before a field line (point 20), and four rare shapes that read a wrong grade on 70df001, where two verdicts disagree (point 26).",
  "wrong_grade_on_0abb757": [
   "r2-A10",
   "r2-A11",
@@ -1390,6 +1390,78 @@
    ],
    "reads_on_0abb757": "yes",
    "as_wanted_on_0abb757": true
+  },
+  {
+   "id": "18b-20a",
+   "what": "line form, the extracted answer a lone {",
+   "reply": "extracted_final_answer: {\nreasoning: the set is empty\ncorrect: no\nconfidence: 80",
+   "want": [
+    "no"
+   ],
+   "added_in": "18b"
+  },
+  {
+   "id": "18b-20b",
+   "what": "line form, the extracted answer ends 'S = {'",
+   "reply": "extracted_final_answer: S = {\nreasoning: matches the set\ncorrect: yes\nconfidence: 90",
+   "want": [
+    "yes"
+   ],
+   "added_in": "18b"
+  },
+  {
+   "id": "18b-20c",
+   "what": "line form, a reasoning line ending 'if (x) {'",
+   "reply": "extracted_final_answer: 42\nreasoning: in code, if (x) {\ncorrect: yes\nconfidence: 70",
+   "want": [
+    "yes"
+   ],
+   "added_in": "18b"
+  },
+  {
+   "id": "18b-20d",
+   "what": "JSON with each name on the next line",
+   "reply": "{\n  \"extracted_final_answer\": \"41\",\n  \"reasoning\": \"r\",\n  \"correct\": \"no\",\n  \"confidence\": 9\n}",
+   "want": [
+    "no"
+   ],
+   "added_in": "18b"
+  },
+  {
+   "id": "18b-26a",
+   "what": "a prose verdict quoting the response's {\"correct\": \"yes\"}",
+   "reply": "The response ends with {\"correct\": \"yes\"}, but 41 is not 42: it is incorrect.",
+   "want": [
+    "no grade"
+   ],
+   "added_in": "18b"
+  },
+  {
+   "id": "18b-26b",
+   "what": "an outer object whose first key isn't a field name",
+   "reply": "{\"judgement\": {\"extracted_final_answer\": \"41\", \"correct\": \"yes\"}, \"correct\": \"no\"}",
+   "want": [
+    "no grade"
+   ],
+   "added_in": "18b"
+  },
+  {
+   "id": "18b-26c",
+   "what": "an unquoted {correct: yes} in prose",
+   "reply": "The response wrote {correct: yes} at its end, which does not hold here.",
+   "want": [
+    "no grade"
+   ],
+   "added_in": "18b"
+  },
+  {
+   "id": "18b-26d",
+   "what": "the response's '> correct: yes' quoted after the judge's own 'correct: no'",
+   "reply": "extracted_final_answer: 41\nreasoning: differs from 42\ncorrect: no\nconfidence: 80\nThe response itself ended:\n> correct: yes",
+   "want": [
+    "no grade"
+   ],
+   "added_in": "18b"
   }
  ]
 }

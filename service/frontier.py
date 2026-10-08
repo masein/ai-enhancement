@@ -629,7 +629,6 @@ def _share(per: dict[str, list[float]], task: str, items: list[dict]) -> dict:
     return fb.summary(per, task, groups)
 
 
-_UNCLOSED = re.compile(r"(?s)^\s*<think>(.*)$")
 # 17c: an off row is scored with at most this share of its answers holding
 # thinking — each scored on what follows it, as scoring reads every reply —
 # and refused above it. 17j: a quarter, not 1%. On 8 Oct the UD-Q4_K_XL file's
@@ -657,18 +656,30 @@ def thought_words(n: int, of: int) -> str:
     return f"{n:,} of {of:,} thought anyway, {n / of:.1%}" if of else f"{n:,} thought anyway"
 
 
+# 18b: above this share of an off row's answers thinking, its score isn't a
+# thinking-off score as others publish them — said; THINKING_OFF_SHARE (a
+# quarter) stays the refusal line
+NOT_COMPARABLE_SHARE = 0.05
+NOT_COMPARABLE = "not comparable with thinking-off numbers published elsewhere"
+
+
+def thought_note(n: int, of: int) -> str:
+    """the share with what it means: "76 of 2,158 thought anyway, 3.5%
+    (thinking off; scored on what follows the thinking)" — and above 5%, that
+    the score isn't comparable"""
+    return (thought_words(n, of) + " (thinking off; scored on what follows the thinking)"
+            + (f" — {NOT_COMPARABLE}" if of and n / of > NOT_COMPARABLE_SHARE else ""))
+
+
 def thought(answer: str) -> bool:
     """an answer that holds thinking — 17c: what scoring strips as thinking
     (fb.visible's pattern: everything up to the first </think>, the opening
     tag or not, as a template that opens <think> in the prompt leaves it),
     or a <think> never closed; an empty block, as a template told not to
     think writes, is none"""
-    a = answer or ""
-    m = fb._THINK.match(a)
-    if m:
-        return bool(re.sub(r"</?think>", "", m.group(0)).strip())
-    m = _UNCLOSED.match(a)
-    return bool(m and m.group(1).strip())
+    # 18b: every block, wherever it sits — one opened mid-reply was counted as
+    # ran out but never in the share
+    return bool(fb.thinking_of(answer or ""))
 
 
 def thinking_refused(task: str, thinking: str | None, answers: list[str]) -> str:
@@ -724,9 +735,10 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
     errors = sum(1 for r in flat if r["error"])
     if out["state"] == "waiting":
         # 17d: answers asked again (another grader chosen) wait: the score made
-        # without them is no longer the page's
+        # without them is no longer the page's. 18b: the share said here too
         _unwrite(d, task)
-        return {"waiting": waiting, "of": len(flat), "label": spec["label"]}
+        return {"waiting": waiting, "of": len(flat), "label": spec["label"],
+                **({"thinking_held": held, "answers": len(flat)} if held else {})}
     if out["state"] == "no score":
         _unwrite(d, task)
         return {"no_score": out["words"], "ungraded": ungraded, "of": out["seen"],
@@ -909,7 +921,8 @@ def words(task: str, sc: dict) -> str:
         return sc["no_score"]
     if sc.get("waiting") is not None and sc.get("score") is None:
         return (f"{spec['label']}: {sc['waiting']:,} answers wait for its grader (AI models ▸ "
-                "Start)")
+                "Start)" + (f" · {thought_note(sc['thinking_held'], sc.get('answers') or 0)}"
+                            if sc.get("thinking_held") else ""))
     bits = [f"{spec['label']} {100 * sc['score']:.1f}% ± {100 * sc['se']:.1f}",
             f"{sc['epochs']} run{'s' if sc['epochs'] != 1 else ''} of {sc['questions']:,}"]
     if sc.get("ran_out"):
@@ -925,8 +938,7 @@ def words(task: str, sc: dict) -> str:
                     f"({', '.join(ids[:5])}{' …' if len(ids) > 5 else ''})")
     if sc.get("thinking_held"):
         # 17j: the share, as the run and the score's cell say it
-        bits.append(thought_words(sc["thinking_held"], sc.get("answers") or 0)
-                    + " (thinking off; scored on what follows the thinking)")
+        bits.append(thought_note(sc["thinking_held"], sc.get("answers") or 0))
     if (sc.get("look") or {}).get("waiting"):
         bits.append(f"code's score: Epoch's model check not run on {sc['look']['waiting']:,}")
     if sc.get("final") is False:
