@@ -1,0 +1,4 @@
+# 18: the agent venv on the server (docs/AGENT-RUNS.md § A) — never the board's
+# image, never CI. scripts/agent_run.py refuses other versions.
+harbor==0.24.0
+mini-swe-agent==2.4.6

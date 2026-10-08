@@ -421,8 +421,11 @@ def init() -> None:
         # A worker that died mid-run leaves a phantom 'running' row; on startup no
         # run can be in flight (single process), so re-queue it. Per-task resume
         # means the re-run only repeats the task that was interrupted.
+        # 18: an agent run is the host's runner's (scripts/agent_run.py): it
+        # goes on whatever the board does
         c.execute("UPDATE submissions SET status='queued', progress='re-queued after restart' "
-                  "WHERE status IN ('preflight','waiting_gpu','waiting_lock','running')")
+                  "WHERE status IN ('preflight','waiting_gpu','waiting_lock','running') "
+                  "AND suite!='agent'")
         # a stop that was asked for and never finished (the process died) is done
         c.execute("UPDATE submissions SET status='canceled', progress='canceled (the service "
                   "restarted while stopping it)' WHERE status='canceling'")
@@ -525,7 +528,9 @@ def board_ahead(sid: int) -> int | None:
     """the oldest board run queued before GGUF job `sid` and not finished — a
     run of a model from OpenRouter isn't one: it doesn't use the GPU"""
     with closing(_conn()) as c:
-        row = c.execute(f"SELECT id FROM submissions WHERE suite!='gguf' AND NOT {_REMOTE} "
+        # 18: an agent run uses no board lane: it holds no GGUF job back
+        row = c.execute(f"SELECT id FROM submissions WHERE suite NOT IN ('gguf', 'agent') "
+                        f"AND NOT {_REMOTE} "
                         f"AND id<? AND status IN "
                         f"({','.join('?' * len(BOARD_UNFINISHED))}) ORDER BY id LIMIT 1",
                         (sid, *BOARD_UNFINISHED)).fetchone()
@@ -536,7 +541,7 @@ def gguf_ahead() -> tuple[int, int] | None:
     """(the oldest queued board run, the oldest GGUF job queued before it and
     not finished), or None when nothing holds that run back"""
     with closing(_conn()) as c:
-        row = c.execute(f"SELECT id FROM submissions WHERE status='queued' AND suite!='gguf' "
+        row = c.execute(f"SELECT id FROM submissions WHERE status='queued' AND suite NOT IN ('gguf', 'agent') "
                         f"AND NOT {_REMOTE} ORDER BY id LIMIT 1").fetchone()
         if not row:
             return None
@@ -556,7 +561,7 @@ def claim_next(gguf_first: bool = False, remote: bool = False) -> dict | None:
         return None
     with closing(_conn()) as c:
         # 12f.3: a GGUF job is the host's worker's, never this queue's
-        row = c.execute(f"SELECT id FROM submissions WHERE status='queued' AND suite!='gguf' "
+        row = c.execute(f"SELECT id FROM submissions WHERE status='queued' AND suite NOT IN ('gguf', 'agent') "
                         f"AND {'' if remote else 'NOT '}{_REMOTE} ORDER BY id LIMIT 1").fetchone()
         if not row:
             return None

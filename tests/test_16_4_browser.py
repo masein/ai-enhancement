@@ -51,10 +51,11 @@ def fact(card, k):
 @pytest.mark.parametrize("width", WIDTHS)
 def test_the_sections_and_a_card_a_benchmark(live, page, width):
     go(page, live, width=width)
+    page.wait_for_selector("[data-cat-section='agent']")          # 18: Agent tasks, once asked
     assert page.locator("[data-cat-section]").evaluate_all("xs => xs.map(x => x.dataset.catSection)") \
-        == ["standard", "mobile", "everyday", "frontier", "exam"]
+        == ["standard", "mobile", "everyday", "frontier", "agent", "exam"]
     assert page.locator("[data-cat-nav] [data-cat-jump]").all_inner_texts() == \
-        ["Standard", "Mobile", "Everyday", "Frontier", "Knowledge exam"]
+        ["Standard", "Mobile", "Everyday", "Frontier", "Agent tasks", "Knowledge exam"]
     std = page.locator("[data-cat-section='standard'] > .catgrid > [data-cat-card]")
     assert std.evaluate_all("xs => xs.map(x => x.dataset.catCard)")[:4] == \
         ["mmlu", "hellaswag", "winogrande", "piqa"]
