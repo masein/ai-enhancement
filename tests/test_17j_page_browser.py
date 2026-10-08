@@ -87,7 +87,7 @@ def test_29_a_rented_run_is_one_line_as_its_neighbours(live, page):
              ("[data-rented-count]", "[data-run-bar]", "[data-rented-finish]")]
     mids = [b["y"] + b["height"] / 2 for b in parts]
     assert max(mids) - min(mids) < 8, mids
-    assert hle.locator("[data-rented-finish]").inner_text().startswith("→ ")
+    assert hle.locator("[data-rented-finish]").inner_text().startswith("this part done ")  # 18b
     assert hle.locator("[data-rented-open]").inner_text() == "4 boxes ▸"
     one = run_row(page, "served/17j-k8", MMLU)
     assert one.locator("[data-rented-open]").count() == 0     # nothing to open

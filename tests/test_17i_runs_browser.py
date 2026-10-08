@@ -161,10 +161,11 @@ def test_29_this_benchmarks_finish_and_its_boxs_are_two_times(live, page):
     assert box["box_finish"] > box["task_finish"] == finish
     # 17j: beside the count; one box has nothing to open — its box's time on
     # its where line
-    assert row.locator("[data-rented-finish]").inner_text().startswith("→ ")
+    # 18b: in words — "this part done …", and the box's own beside it
+    assert row.locator("[data-rented-finish]").inner_text().startswith("this part done ")
     assert row.locator("[data-rented-open]").count() == 0
-    assert row.locator("[data-run-where] [data-box-finish]").inner_text().startswith(
-        " · its box → ")
+    assert row.locator("[data-run-where] [data-box-finish]").count() == 0      # 18b: no time
+    assert row.locator("[data-box-finish]").inner_text().startswith("box free ")
     assert page.errors == []
 
 
@@ -183,8 +184,10 @@ def test_30_the_list_says_when_it_was_read_and_a_row_only_when_it_is_behind(live
     words = line.inner_text()
     assert words.startswith("Rented boxes read ") and "next in about 3 min" in words   # 17j
     assert run_row(page, "served/fresh", HLE).locator("[data-rented-heard]").count() == 0
-    late = run_row(page, "served/late", HLE).locator("[data-rented-heard]")
-    assert late.inner_text().startswith("heard ")
+    # 18b: one wording, said once — the status says "no contact for 2 h"
+    late = run_row(page, "served/late", HLE)
+    assert late.locator("[data-rented-heard]").count() == 0
+    assert late.locator(".qc-status").inner_text().startswith("no contact for ")
     # the docs' fetch line reads every 3 minutes
     docs = (REPO / "docs" / "REMOTE-RUNS.md").read_text()
     g3 = next(x for x in docs.splitlines() if x.startswith("python3 scripts/frontier_fetch.py"))

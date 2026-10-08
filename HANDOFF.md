@@ -4953,6 +4953,32 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 18b.6 — 17j follow-ups: the page (8 Oct)
+
+- **At 400 px nothing prints over anything** (point 31): `td`'s 44 px height
+  held inside the phone grid; a cell now grows with what it holds. A
+  browser check at 400 and 1440, light and dark, with a rented run opened:
+  no two cells overlap, no cell holds more than it shows, no row runs into
+  the next.
+- **One model, one name** (point 32): a run here is named by `runName()`,
+  as its rented runs are, and Runs shows no instruct badge.
+- **Times in words** (point 33): the model cell has no time; a run's
+  progress says "this part done Fri 03:00", and "box free Fri 06:42" when
+  the box's own differs; a box's line reads "A1 · shard 1/4 · … · this part
+  done Thu 14:25 · box free Thu 18:06", without the step's id.
+- **Small ones** (point 34): the header's count adds the rented runs running
+  (the boxes' list is read every two minutes off Runs too); "no contact for
+  3 h" is the one wording, said once; "4 boxes ▸" stays on one line; a
+  rented run done on its box says "not imported yet"; a copy by hand gives
+  focus back to the button.
+- **The new window is checked** (point 35, `served.MIN_WINDOW`): only the
+  window the server says it runs (its own `n_ctx`, never the training
+  context it falls back to), a whole number of at least 4,096 tokens, the
+  board's smallest slot; anything else is said, and no button offered. The
+  button says a run of the model left part-way starts again from its first
+  question (its saved answers are kept under the old window).
+- Tests: `tests/test_18b6_page_browser.py` (screens
+  `tests/_screens/phase18b/runs-400-*.png`), `tests/test_18b6_window.py`.
 ### 18b.5 — 17j follow-ups: the export (8 Oct)
 
 - **`public/` only with both variables given** (point 27,
