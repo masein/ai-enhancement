@@ -2,8 +2,10 @@
 container started as Harbor starts one (its prebuilt compose file) with the
 runner's override merged over it tries the host's other ports, the tailnet's
 range, the internet and a host folder from inside, and the test fails if
-any answers. The same container without the override does reach the host:
-the check would see it. Needs Docker; pulls only a small bash image."""
+any answers or the check couldn't try (18b: it fails closed, and wants the
+loopback as the only interface). The same container without the override
+is refused, and on Linux reaches the host: the check sees it. Needs Docker;
+pulls only a small bash image."""
 
 from __future__ import annotations
 
@@ -73,9 +75,12 @@ def test_a_tasks_container_reaches_nothing_and_has_no_host_folder(tmp_path):
     base.write_text(BASE)
     out = probe(tmp_path, "agent18-reach", [base, ar.override(tmp_path)], script)
     assert hm.reach_verdict(out) == "", out                     # nothing answered
-    assert "PIDS 4096" in out, out
-    # without the override the same container reaches the host: the check sees it
+    assert "PIDS 4096" in out and "PROBE tcp-ok" in out and "NET lo" in out, out
+    # without the override the same container has a network: the check refuses
+    # it (18b: its interface), and on Linux sees the host's port answer
+    open_ = probe(tmp_path, "agent18-open", [base], script)
+    assert "has a network interface" in hm.reach_verdict(open_) or "reached" in \
+        hm.reach_verdict(open_), open_
     if platform.system() == "Linux":
-        open_ = probe(tmp_path, "agent18-open", [base], script)
         assert f"REACHED {gw}:{port}" in open_, open_
     srv.close()
