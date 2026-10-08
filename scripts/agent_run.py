@@ -19,9 +19,11 @@ Before the first task, each a line with what to do when it fails:
 Then the tasks, one Harbor job each, at most --at-once at a time:
 - a pilot's tasks are fixed: --tasks 10 is the same ten every time, spread
   over the benchmark's languages;
-- it carries on: a task with a result is never asked again; an error of
-  ours (Docker, the relay, the server down) is asked again, three times at
-  most; a run killed at any point continues with the same command;
+- it carries on: a task with the model's result is never asked again, a
+  failure included; an error of ours (Docker failing to pull, build or start
+  the task's container, the container reaching something, the model's server
+  failing its health check) is asked again, three times at most; a run
+  killed at any point continues with the same command;
 - each task's image is removed once no waiting task needs it, and nothing
   more is pulled when Docker's disk would fall under 50 GB free: the tasks
   running finish, and the run stops in one line;
@@ -309,7 +311,8 @@ def attempts_of(rdir: Path, task: str, k: int) -> list[dict]:
 
 def state_of(rdir: Path, task: str, k: int) -> tuple[str, int]:
     """('done' | 'todo' | 'given up', tries so far) — done once the model's
-    result is in; an error of ours is asked again, TRIES times at most"""
+    result is in, whatever it is (18b point 2: a failure of the model's is
+    never asked again); an error of ours is asked again, TRIES times at most"""
     tries = attempts_of(rdir, task, k)
     if any(t["result"] != "error" for t in tries):
         return "done", len(tries)
@@ -317,14 +320,19 @@ def state_of(rdir: Path, task: str, k: int) -> tuple[str, int]:
 
 
 def results(rdir: Path, tasks: list[str], attempts: int) -> list[dict]:
-    """the last trial of each task's attempts"""
+    """each task's attempt: the model's first result — or, while it has
+    only errors of ours, the last of them — with why it was asked again"""
     out = []
     for t in tasks:
         for k in range(1, attempts + 1):
             tries = attempts_of(rdir, t, k)
-            done = [x for x in tries if x["result"] != "error"]
-            if done or tries:
-                out.append({**(done or tries)[-1], "attempt": k, "tries": len(tries)})
+            if not tries:
+                continue
+            first = next((i for i, x in enumerate(tries) if x["result"] != "error"), None)
+            final = tries[first] if first is not None else tries[-1]
+            before = tries[:first] if first is not None else tries[:-1]
+            out.append({**final, "attempt": k, "tries": len(tries),
+                        "again": [x.get("why") or "an error of ours" for x in before]})
     return out
 
 
@@ -590,7 +598,11 @@ def main(argv: list[str] | None = None) -> int:
         while todo and len(running) < max(1, a.at_once) and not stop:
             t, k = todo.pop(0)
             leftovers(t)
-            job = f"{t}__a{k}__{int(time.time())}"
+            # a new job each time: Harbor resumes a job whose name it has
+            # seen, so a try asked again within the second would not run
+            job = f"{t}__a{k}__{int(time.time() * 1000)}"
+            while (rdir / "jobs" / job).exists():
+                job = f"{t}__a{k}__{int(job.rsplit('__', 1)[1]) + 1}"
             cmd = harbor_cmd(tdir / t, job, rdir, b, a, info.get("model") or "",
                              relay.url if relay else "", reach)
             env = {**os.environ, "PYTHONPATH": f"{HERE}:{os.environ.get('PYTHONPATH', '')}"}

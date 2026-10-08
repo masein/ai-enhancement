@@ -4,9 +4,12 @@ verifier or trajectory is here, and nothing is fetched."""
 
 from __future__ import annotations
 
+import calendar
 import json
 import time
 from pathlib import Path
+
+import agent_bench as ab
 
 LANGS = ["c", "go", "java", "javascript", "php", "ruby", "rust", "typescript"]
 MODEL = "served/invented-agent"
@@ -49,27 +52,39 @@ def conversation(html: bool = False) -> dict:
 
 
 def trial(rdir: Path, task: str, k: int = 1, stamp: int | None = None, result: str = "resolved",
-          exc: str = "", html: bool = False, minutes: float = 20.0) -> Path:
-    """one finished trial of a task's attempt, as Harbor leaves it"""
+          exc: str = "", html: bool = False, minutes: float = 20.0, exit_status: str = "Submitted",
+          started: bool = True, agent: str = "host-mini-swe-agent", ours: str = "",
+          message: str = "") -> Path:
+    """one finished trial of a task's attempt, as Harbor and the host agent
+    leave it: Harbor's result.json, the agent's own files in agent-host/
+    (never mounted), the verifier's output in verifier/ (mounted)"""
     stamp = stamp or int(time.time() * 1000)
     job = rdir / "jobs" / f"{task}__a{k}__{stamp}"
     t = job / f"{task[:32]}__abc1234"
-    (t / "agent").mkdir(parents=True, exist_ok=True)
-    (t / "verifier").mkdir(parents=True, exist_ok=True)
+    for d in ("agent", "verifier", ab.HOST_DIR):
+        (t / d).mkdir(parents=True, exist_ok=True)
     start = "2026-10-08T10:00:00+00:00"
+    # 18b: UTC both ways (time.mktime read it as local time: wrong in Asia/Dubai)
     end = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(
-        time.mktime(time.strptime("2026-10-08T10:00:00", "%Y-%m-%dT%H:%M:%S")) + minutes * 60))
+        calendar.timegm(time.strptime("2026-10-08T10:00:00", "%Y-%m-%dT%H:%M:%S")) + minutes * 60))
     r = {"task_name": task, "trial_name": t.name, "started_at": start, "finished_at": end,
+         "agent_info": {"name": agent},
+         "agent_execution": {"started_at": start} if started else None,
          "agent_result": {"n_input_tokens": 2800, "n_output_tokens": 340,
-                          "metadata": {"steps": 2, "exit_status": "Submitted"}}}
+                          "metadata": {"steps": 2, "exit_status": exit_status}}}
     if result in ("resolved", "unresolved"):
         r["verifier_result"] = {"rewards": {"reward": 1.0 if result == "resolved" else 0.0}}
     if exc:
-        r["exception_info"] = {"exception_type": exc, "exception_message": f"{exc} happened",
-                               "exception_traceback": "", "occurred_at": start}
+        r["exception_info"] = {"exception_type": exc, "exception_message":
+                               message or f"{exc} happened", "exception_traceback": "",
+                               "occurred_at": start}
     (t / "result.json").write_text(json.dumps(r))
-    (t / "agent" / "mini-swe-agent.trajectory.json").write_text(json.dumps(conversation(html)))
-    (t / "agent" / "patch.diff").write_text("--- a/x.c\n+++ b/x.c\n@@ -1 +1 @@\n-<old>\n+<new>\n")
+    host = t / ab.HOST_DIR
+    (host / ab.TRAJECTORY).write_text(json.dumps(conversation(html)))
+    (host / ab.PATCH).write_text("--- a/x.c\n+++ b/x.c\n@@ -1 +1 @@\n-<old>\n+<new>\n")
+    (host / ab.META).write_text(json.dumps({"exit_status": exit_status, "steps": 2,
+                                            "tokens_in": 2800, "tokens_out": 340,
+                                            "last_prompt": 1600, "ours": ours}))
     (t / "verifier" / "test-stdout.txt").write_text("invented test: PASSED <ok>\n")
     return t
 

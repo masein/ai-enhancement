@@ -48,7 +48,7 @@ def test_the_catalogue_has_agent_tasks_with_our_pilot_and_the_published_numbers(
     card = sec.locator("[data-agent-card='swebench-multilingual']")
     card.locator(f"[data-agent-run='{KEY}']").wait_for()
     words = card.locator(f"[data-agent-words='{KEY}']").inner_text()
-    assert words == "60.0% resolved ± 15.5 · 10 tasks · pilot: 10 of 300"
+    assert words == "60.0% resolved ± 15.5 (one standard error) · 10 tasks · pilot: 10 of 300"
     assert "never averaged" in card.locator("[data-agent-fact='avg']").inner_text()
     assert card.locator("[data-agent-ref='Qwen3.6-35B-A3B']").inner_text() == "Qwen3.6-35B-A3B 67.2"
     groups = card.locator(".agentref").all_inner_texts()

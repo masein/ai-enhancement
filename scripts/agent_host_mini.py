@@ -13,13 +13,17 @@ What it keeps of mini-swe-agent, so a run is the benchmark's agent:
   folder, its time limit (60 s / 30 s; the whole command group killed when
   it passes, as mini-swe-agent's local environment kills it), stderr merged
   into stdout, and the submission line;
-- its trajectory file, written after every step.
+- its trajectory file, written after every step — in the trial's own
+  agent-host/ folder, which no container mounts, never through a link
+  (18b point 1).
 
 Before the model is asked anything, the container is checked from inside:
 nothing answers on the targets the runner gives (the host's other ports, the
 tailnet, the LAN, the internet), no Docker socket, a process limit. After
-the agent stops, every process it left is killed and any reward file it
-wrote is removed, before the verifier runs.
+the agent stops — however it stops — every process it left is killed and
+everything in the folders Harbor mounts (/logs/agent, /logs/artifacts,
+/logs/verifier) is removed, before the verifier runs: no reward file of the
+model's, no link, FIFO or device for a host process to open.
 
 Harbor and mini-swe-agent are imported only on the server, in the agent
 venv; the adapter's logic is tested without them."""
@@ -28,11 +32,17 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import platform
 import shlex
+import sys
 import threading
 import time
 from pathlib import Path
+
+if str(Path(__file__).resolve().parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+import agent_bench as ab  # noqa: E402
 
 try:                                    # the agent venv; never on the Mac or in CI
     from harbor.agents.base import BaseAgent
@@ -58,6 +68,18 @@ class Stopped(Exception):
 
 class ReachRefused(Exception):
     """the task's container reached something it must not: not run"""
+
+
+class ServerDown(Exception):
+    """the model's server failed the relay's health check: an error of ours,
+    asked again — one bad reply is the model's"""
+
+
+DOWN = "relay_server_down"              # the relay's word for it, in its 503
+# what the folders Harbor mounts hold once the agent stops: nothing
+CLEAN = ("kill -9 -1 2>/dev/null; "
+         "find /logs/agent /logs/artifacts /logs/verifier -mindepth 1 -delete 2>/dev/null; "
+         "rm -rf /logs/agent/* /logs/artifacts/* /logs/verifier/* 2>/dev/null; true")
 
 
 def reach_script(targets: list[str]) -> str:
@@ -176,17 +198,37 @@ def prompt_sha(cfg: dict) -> str:
 
 
 def usage_of(messages: list[dict]) -> tuple[int, int, int]:
-    """(tokens in, tokens out, steps) from the trajectory's replies"""
+    """(tokens in, tokens out, steps) from the trajectory's replies — tokens
+    in adds up every step's whole prompt"""
     tin = tout = steps = 0
     for m in messages:
         if m.get("role") != "assistant":
             continue
-        resp = (m.get("extra") or {}).get("response") or {}
-        u = (resp.get("usage") or {}) if isinstance(resp, dict) else {}
+        u = _usage(m)
         tin += int(u.get("prompt_tokens") or 0)
         tout += int(u.get("completion_tokens") or 0)
         steps += 1
     return tin, tout, steps
+
+
+def _usage(m: dict) -> dict:
+    resp = (m.get("extra") or {}).get("response") or {}
+    return (resp.get("usage") or {}) if isinstance(resp, dict) else {}
+
+
+def last_prompt(messages: list[dict]) -> int | None:
+    """the last step's prompt, in tokens: how big the conversation grew"""
+    for m in reversed(messages):
+        if m.get("role") == "assistant" and _usage(m).get("prompt_tokens"):
+            return int(_usage(m)["prompt_tokens"])
+    return None
+
+
+def mini_classes():
+    """mini-swe-agent's loop and model, as installed in the agent venv"""
+    from minisweagent.agents.default import DefaultAgent
+    from minisweagent.models.litellm_model import LitellmModel
+    return DefaultAgent, LitellmModel
 
 
 class HostMini(BaseAgent):  # type: ignore[misc,valid-type]
@@ -213,69 +255,111 @@ class HostMini(BaseAgent):  # type: ignore[misc,valid-type]
     async def setup(self, environment) -> None:
         return None                     # nothing is installed in the task's container
 
-    async def run(self, instruction: str, environment, context) -> None:
-        from minisweagent.agents.default import DefaultAgent
-        from minisweagent.models.litellm_model import LitellmModel
+    def host_dir(self) -> Path:
+        """the agent's own files: in the trial's folder, never mounted"""
+        return Path(self.logs_dir).parent / ab.HOST_DIR
 
-        targets = [t for t in str(self.ours.get("reach") or "").split(",") if t]
-        probe = await environment.exec(reach_script(targets), timeout_sec=120)
-        why = reach_verdict((probe.stdout or "") + (probe.stderr or ""))
-        if why:
-            raise ReachRefused(why)
+    async def run(self, instruction: str, environment, context) -> None:
+        DefaultAgent, LitellmModel = mini_classes()
         cfg = load_config(str(self.ours.get("config") or "mini.yaml"))
-        ecfg = dict(cfg.get("environment") or {})
-        kind = "docker" if ecfg.get("environment_class") == "docker" else "local"
+        host = self.host_dir()
         stop = threading.Event()
-        env = HarborEnv(environment.exec, asyncio.get_running_loop(),
-                        cwd=str(self.ours.get("cwd") or ecfg.get("cwd") or ""),
-                        timeout=int(ecfg.get("timeout") or TIMEOUT_DEFAULT[kind]),
-                        interpreter=tuple(ecfg.get("interpreter") or
-                                          (("bash", "-c") if kind == "docker" else ("sh", "-c"))),
-                        env=ecfg.get("env") or {}, stop=stop, kind=kind)
-        mcfg = dict(cfg.get("model") or {})
-        mcfg.pop("model_class", None)
-        mcfg["model_name"] = self.model_name
-        mcfg["cost_tracking"] = "ignore_errors"
-        mcfg["model_kwargs"] = {**(mcfg.get("model_kwargs") or {}),
-                                "api_base": str(self.ours.get("relay")), "api_key": "relay",
-                                "timeout": 3600,
-                                "extra_headers": {"X-Agent-Trial": str(self.session_id or "")}}
-        class Model(LitellmModel):
-            def query(self, messages, **kw):        # Harbor's time limit: no more asking
-                if stop.is_set():
-                    raise Stopped("the agent's time is up")
-                return super().query(messages, **kw)
-        acfg = dict(cfg.get("agent") or {})
-        acfg.pop("mode", None)
-        if "cost_limit" in self.ours:
-            acfg["cost_limit"] = float(self.ours["cost_limit"])
-        traj = Path(self.logs_dir) / "mini-swe-agent.trajectory.json"
-        acfg["output_path"] = traj
-        agent = DefaultAgent(Model(**mcfg), env, **acfg)
+        held: dict = {"agent": None, "ours": ""}
 
         def fill() -> None:
-            tin, tout, steps = usage_of(agent.messages)
-            last = (agent.messages[-1].get("extra") or {}) if agent.messages else {}
+            """the counts, to Harbor and to our own meta.json — never read
+            back from a folder the container can write"""
+            agent = held["agent"]
+            msgs = list(agent.messages) if agent is not None else []
+            tin, tout, steps = usage_of(msgs)
+            last = (msgs[-1].get("extra") or {}) if msgs else {}
+            meta = {"exit_status": str(last.get("exit_status") or ""), "steps": steps,
+                    "tokens_in": tin, "tokens_out": tout, "last_prompt": last_prompt(msgs),
+                    "config": self.ours.get("config"), "prompt_sha256": prompt_sha(cfg),
+                    "submission_chars": len(str(last.get("submission") or "")),
+                    "ours": held["ours"]}
             context.n_input_tokens, context.n_output_tokens = tin, tout
-            context.metadata = {"exit_status": str(last.get("exit_status") or ""),
-                                "steps": steps, "config": self.ours.get("config"),
-                                "prompt_sha256": prompt_sha(cfg),
-                                "submission_chars": len(str(last.get("submission") or ""))}
+            # set, so Harbor never reads a usage file from the mounted folder
+            context.model_usage = {}
+            context.metadata = meta
+            ab.safe_write(host, ab.META, json.dumps(meta))
+
         try:
-            await asyncio.to_thread(agent.run, instruction)
-        except asyncio.CancelledError:
-            stop.set()                  # Harbor's time limit: the loop stops at its next command
-            fill()
-            raise
-        except Exception:               # noqa: BLE001 — Harbor records it; the counts are kept
-            fill()
-            raise
-        fill()
-        last = (agent.messages[-1].get("extra") or {}) if agent.messages else {}
-        (Path(self.logs_dir) / "patch.diff").write_text(str(last.get("submission") or ""))
-        # nothing the model left runs on, and nothing it wrote is a reward
-        await environment.exec("kill -9 -1 2>/dev/null; rm -f /logs/verifier/reward.txt "
-                               "/logs/verifier/reward.json; true", timeout_sec=60)
+            targets = [t for t in str(self.ours.get("reach") or "").split(",") if t]
+            probe = await environment.exec(reach_script(targets), timeout_sec=120)
+            why = reach_verdict((probe.stdout or "") + (probe.stderr or ""))
+            if why:
+                held["ours"] = f"ReachRefused: {why}"
+                raise ReachRefused(why)
+            ecfg = dict(cfg.get("environment") or {})
+            kind = "docker" if ecfg.get("environment_class") == "docker" else "local"
+            env = HarborEnv(environment.exec, asyncio.get_running_loop(),
+                            cwd=str(self.ours.get("cwd") or ecfg.get("cwd") or ""),
+                            timeout=int(ecfg.get("timeout") or TIMEOUT_DEFAULT[kind]),
+                            interpreter=tuple(ecfg.get("interpreter") or
+                                              (("bash", "-c") if kind == "docker"
+                                               else ("sh", "-c"))),
+                            env=ecfg.get("env") or {}, stop=stop, kind=kind)
+            mcfg = dict(cfg.get("model") or {})
+            mcfg.pop("model_class", None)
+            mcfg["model_name"] = self.model_name
+            mcfg["cost_tracking"] = "ignore_errors"
+            mcfg["model_kwargs"] = {**(mcfg.get("model_kwargs") or {}),
+                                    "api_base": str(self.ours.get("relay")), "api_key": "relay",
+                                    "timeout": 3600,
+                                    "extra_headers": {"X-Agent-Trial": str(self.session_id or "")}}
+
+            class Model(LitellmModel):
+                # mini-swe-agent asks again on most errors; never once the
+                # time is up, nor when the server is down
+                abort_exceptions = [*LitellmModel.abort_exceptions, Stopped, ServerDown]
+
+                def _query(self, messages, **kw):
+                    if stop.is_set():
+                        raise Stopped("the agent's time is up")
+                    try:
+                        return super()._query(messages, **kw)
+                    except Exception as e:      # noqa: BLE001 — only the relay's word is ours
+                        if DOWN in str(e):
+                            raise ServerDown(str(e)[:300]) from e
+                        raise
+
+            class Agent(DefaultAgent):
+                def save(self, path, *extra_dicts):     # never through a link
+                    data = self.serialize(*extra_dicts)
+                    if path:
+                        ab.safe_write(Path(path).parent, Path(path).name,
+                                      json.dumps(data, indent=2))
+                    return data
+            acfg = dict(cfg.get("agent") or {})
+            acfg.pop("mode", None)
+            if "cost_limit" in self.ours:
+                acfg["cost_limit"] = float(self.ours["cost_limit"])
+            acfg["output_path"] = host / ab.TRAJECTORY
+            agent = held["agent"] = Agent(Model(**mcfg), env, **acfg)
+            try:
+                await asyncio.to_thread(agent.run, instruction)
+            except asyncio.CancelledError:
+                stop.set()              # Harbor's time limit: the loop stops at its next step
+                raise
+            except ServerDown as e:
+                held["ours"] = f"ServerDown: {e}"
+                raise
+            last = (agent.messages[-1].get("extra") or {}) if agent.messages else {}
+            ab.safe_write(host, ab.PATCH, str(last.get("submission") or ""))
+        finally:
+            stop.set()
+            try:
+                fill()
+            except Exception:           # noqa: BLE001 — result.json keeps the counts too
+                pass
+            # however it stopped: nothing the model left runs on, and nothing
+            # it put in the mounted folders is there when the verifier runs
+            # or a host process looks
+            try:
+                await environment.exec(CLEAN, timeout_sec=120, user="root")
+            except Exception:           # noqa: BLE001 — Harbor records the agent's own error
+                pass
 
     def populate_context_post_run(self, context) -> None:
         return None
