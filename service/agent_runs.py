@@ -62,6 +62,7 @@ def summary(key: str) -> dict | None:
             "benchmark": run.get("benchmark"), "label": run.get("label"),
             "model": run.get("model") or "oracle", "oracle": not run.get("model"),
             "score": s["score"], "words": s["words"], "again": s.get("again") or "",
+            "left_out": s.get("left_out") or [],
             "line": (s.get("progress") or {}).get("line") or "",
             "settings": {k: run.get(k) for k in (
                 "dataset", "pin", "tasks_sha256", "attempts", "at_once", "agent", "config",
@@ -103,15 +104,26 @@ def task(key: str, name: str, attempt: int = 1) -> dict | None:
             **ab.conversation(d, hit["job"], hit["trial"])}
 
 
+def left_out(benchmark: str) -> list[str]:
+    """18c point 9: the tasks whose reference solution doesn't pass here, as
+    the benchmark's oracle run read them"""
+    import agent_run as ar
+    try:
+        return ar.oracle_states(Path(config.BENCH_ROOT), benchmark, [])["left_out"]
+    except OSError:
+        return []
+
+
 def catalogue() -> dict:
-    """the benchmarks' cards: what each is, our runs' scores, and the
-    published numbers beside them"""
+    """the benchmarks' cards: what each is, our runs' scores, the tasks left
+    out, and the published numbers beside them"""
     pub = published()
     rs = runs()
     return {"benchmarks": [
         {"key": k, **{f: ab.BENCHES[k][f] for f in (
             "label", "line", "marked", "by", "url", "licence", "tasks", "languages", "agent",
-            "limits")},
+            "limits", "not_comparable")},
+         "left_out": left_out(k),
          "runs": [r for r in rs if r["benchmark"] == k and not r["oracle"]],
          "published": [x for x in pub if x.get("benchmark") == k]}
         for k in ab.ORDER], "oracle": [r for r in rs if r["oracle"]],
@@ -126,18 +138,28 @@ BUSY_STALE_S = 15 * 60
 
 def busy() -> dict:
     """the served models an agent run holds now (18b point 15): {model:
-    {key, until, line}} — the Playground and the model's page say so"""
+    {key, until, line}} — the Playground and the model's page say so, and
+    (18c point 11) the board's queue holds its runs on that model. Read
+    light, from each run's registration, Runs row and last line: the worker
+    asks every few seconds"""
     out: dict = {}
-    for r in runs():
-        if r.get("oracle") or r.get("status") != "running":
+    for p in sorted(store().glob("*.json")) if store().is_dir() else []:
+        if p.name.endswith(".summary.json"):
             continue
-        d = _folder(r["key"])
-        prog = {}
+        d = _folder(p.stem)
+        if d is None:
+            continue
         try:
-            prog = json.loads((d / "progress.json").read_text()) if d else {}
+            reg = json.loads(p.read_text())
+            run = json.loads((d / "run.json").read_text())
+            prog = json.loads((d / "progress.json").read_text())
         except (OSError, ValueError):
-            prog = {}
-        if not prog or time.time() - float(prog.get("at") or 0) > BUSY_STALE_S:
             continue
-        out[r["model"]] = {"key": r["key"], "until": prog.get("until"), "line": r.get("line") or ""}
+        row = db.get(reg.get("sid")) if reg.get("sid") else None
+        if not run.get("model") or (row or {}).get("status") != "running":
+            continue
+        if time.time() - float(prog.get("at") or 0) > BUSY_STALE_S:
+            continue
+        out[run["model"]] = {"key": p.stem, "until": prog.get("until"),
+                             "line": str(prog.get("line") or "")}
     return out

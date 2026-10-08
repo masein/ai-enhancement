@@ -1,13 +1,15 @@
 # 18b: the agent venv on the server, every package with its hashes (docs/AGENT-RUNS.md
 # § A, steps 2–4) — never the board's image, never CI. Install it only with
-# `pip install --require-hashes --no-deps -r`; scripts/agent_run.py refuses to start when
-# an installed package differs from this file.
+# `uv pip install --require-hashes --no-deps -r` into a venv made with no seed:
+# pip itself is one of its packages (18c point 11). scripts/agent_run.py refuses to
+# start when an installed package differs from this file, when the venv holds a
+# package it doesn't, or when an installed file differs from its package's record.
 #
 # Made with uv 0.11.8 on 8 Oct 2026:
 #   uv pip compile agent.in --python-version 3.12 --python-platform x86_64-unknown-linux-gnu \
 #     --generate-hashes --exclude-newer 2026-09-24T00:00:00Z \
 #     --exclude-newer-package harbor=2026-10-06T00:00:00Z
-# from agent.in: harbor==0.24.0, mini-swe-agent==2.4.6. Nothing in it was published in the
+# from agent.in: harbor==0.24.0, mini-swe-agent==2.4.6, pip. Nothing in it was published in the
 # 14 days before 8 Oct but Harbor 0.24.0 itself (5 Oct): it is the version this pipeline
 # was read and built against. litellm 1.82.7 and 1.82.8 (reported backdoored, March 2026)
 # are not in it.
@@ -1389,6 +1391,10 @@ pathspec==1.1.1 \
     --hash=sha256:17db5ecd524104a120e173814c90367a96a98d07c45b2e10c2f3919fff91bf5a \
     --hash=sha256:a00ce642f577bf7f473932318056212bc4f8bfdf53128c78bbd5af0b9b20b189
     # via harbor, scantree
+pip==26.2.1 \
+    --hash=sha256:71138adf1f4ca900cdb7d289c21b7494329f2332b6d85f0e1c42108c0384ed3e \
+    --hash=sha256:f6ad667e89a1fe78046c8f13232b247200f5258d7828f3f7883d660878e0813f
+    # via -r agent.in
 platformdirs==4.11.12 \
     --hash=sha256:b1ba966ac76153d9985a0787ffab951e7c18416189873d4e4ddb2c8a04a0a254 \
     --hash=sha256:e8dc1cb58f1153fd7f61db1374317770baababec2480b37b8f01c6cc25b45267

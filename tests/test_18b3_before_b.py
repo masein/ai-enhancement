@@ -182,7 +182,8 @@ def test_the_disk_guard_frees_the_build_and_its_cache(server_world, monkeypatch,
     assert ar.main(["swebench-multilingual", "--as", MODEL, "--tasks", "2", "--no-board"]) == 0
     rm = [c for c in calls if c[:4] == ["docker", "image", "rm", "-f"]]
     assert len(rm) == 2 and set(rm[0][4:]) == {"img1", "img2"}       # never someone else's
-    assert calls.count(["docker", "builder", "prune", "-f"]) == 2     # 70df001: the cache stayed
+    # 18c: the cache its build made, by id (no host-wide prune) — 18c's tests
+    assert ["docker", "builder", "prune", "-f"] not in calls
 
 
 def test_the_guard_asks_before_each_start_with_what_a_task_took(server_world,  # noqa: F811
@@ -344,8 +345,8 @@ def test_the_task_container_drops_its_capabilities_and_privileges():
 # ---------------------------------------------------------------------------
 
 def test_step_b_gives_the_servers_own_lines():
-    b = DOC[DOC.index("## B."):DOC.index("**C.**")]
-    assert "pgrep -af llama-server" in b and "kill <PID>" in b
+    b = DOC[DOC.index("## B."):DOC.index("## C.")]
+    assert "sudo ss -ltnp 'sport = :8091'" in b and "kill <PID>" in b     # 18c: by its port
     assert 'CTX=262144 CPU_MOE="--n-cpu-moe 21" nohup ~/lda-serve.sh base 0 0 > ~/lda-orig.log ' \
            '2>&1 &' in b and "~/serve-base-la0-mtp0.log" in b
     assert 'CTX=131072 CPU_MOE="--n-cpu-moe 21" nohup ~/lda-serve.sh base 0 0' in b
