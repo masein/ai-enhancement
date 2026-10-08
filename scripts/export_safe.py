@@ -470,9 +470,23 @@ _EXCEPTION = re.compile(r"\b\w*(?:Error|Exception|Exit|Interrupt|Refused|Timeout
 _TAGGED = re.compile(r"^\[(?:frontier|import|devicemark|service)\] ")
 
 
+def _cut_unclosed(s: str) -> str:
+    """18c point 16: a line with a bracket never closed is cut where it
+    opens — what follows is a reason's start whose rest the join couldn't
+    find (a blank line, a tagged line below it): the server's words"""
+    opened: list[int] = []
+    for i, ch in enumerate(s):
+        if ch == "(":
+            opened.append(i)
+        elif ch == ")" and opened:
+            opened.pop()
+    return s[:opened[0]].rstrip() if opened else s
+
+
 def _free_words_out(line: str) -> tuple[str, bool]:
     """(the line without its free words, whether it may go out at all)"""
-    s = _BY_NAME.sub(r"\1\2", line)
+    s = _cut_unclosed(line) if "\n" not in line else line
+    s = _BY_NAME.sub(r"\1\2", s)
     s = _REASON.sub(r"\1", s)
     s = _ASKED.sub(r"\1", s)
     s = _KEPT.sub(r"\1", s)
@@ -731,6 +745,27 @@ def _worked_out() -> tuple[list[str], list[str]]:
     return sorted(hosts), sorted(accts)
 
 
+def undotted_names() -> list[str]:
+    """18c point 17: the board's settings' undotted host names (a container's,
+    gemma-judge) — never removed unless given in SCRUB_HOSTS (one word as a
+    name took "the" and "run" out of every line): said, so they can be"""
+    out: set[str] = set()
+    urls = [v for k, v in os.environ.items() if k.endswith("_URL") and isinstance(v, str)]
+    try:
+        from service import config, db
+        urls.append(config.LOCAL_BASE_URL)
+        urls += [str(r.get("base_url") or "") for r in
+                 (db.served_all() if config.DB_PATH.exists() else [])]
+    except Exception:                                   # noqa: BLE001 — what the environment says
+        pass
+    for u in urls:
+        h = _host(u)
+        if h and "." not in h and h not in _NOT_HOSTS and _OWN_HOST.fullmatch(h):
+            out.add(h)
+    given = {x.lower() for x in scrub_names()["hosts"]}
+    return sorted(x for x in out if x.lower() not in given)
+
+
 def scrub_names() -> dict:
     """{hosts, accounts, server, problems} — the hosts and accounts the scrub
     removes: those given (SCRUB_HOSTS, SCRUB_ACCOUNTS), and those the board
@@ -794,8 +829,11 @@ def refused_public() -> str:
 
 def will_remove() -> str:
     got = scrub_names()
+    left = undotted_names()
     return (f"will remove: hosts {', '.join(got['hosts']) or 'none'}; "
-            f"accounts {', '.join(got['accounts']) or 'none'}")
+            f"accounts {', '.join(got['accounts']) or 'none'}"
+            + (f"; NOT removed, the board's undotted names — add those you want removed to "
+               f"SCRUB_HOSTS: {', '.join(left)}" if left else ""))
 
 
 def confirm(models: list[str], ask=None, say=print) -> bool:

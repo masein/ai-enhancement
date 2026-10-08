@@ -485,7 +485,7 @@ def checks(b: dict, rec: dict | None, file_sha: str = "") -> list[str]:
     for d in launch_differs(rec, setup.get("server") or {}):
         out.append(f"its launch isn't the one registered for {model} — {d}. Run the box with "
                    f"that setup's own variables and flags (docs/REMOTE-RUNS.md G2)")
-    if setup.get("protocol") != fb.VERSION:
+    if setup.get("protocol") not in fb.ASKED_AS:          # 18c: frontier-1's asked the same
         out.append(f"the protocol: the bundle's {setup.get('protocol')}, this board's "
                    f"{fb.VERSION}")
     tasks = bundle.get("tasks") or {}
@@ -933,6 +933,15 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
         for t, entry in late.items():
             reg.setdefault("tasks", {})[t] = entry
         for t, entry in ready.items():
+            # 18c point 12: a score the row held replaced with another, said
+            before = sf.stored_score(sf.task_dir(row, t), t)
+            new = (scored.get(t) or {}).get("score")
+            if before and before[0] is not None and new is not None and \
+                    abs(before[0] - new) > 1e-9:
+                say(f"[frontier] {row_name} · {fb.BENCH[t]['label']}: score "
+                    f"{sf.score_words(before[0])} → {sf.score_words(new)}"
+                    + (f" (scored by {before[1]} before, {fb.VERSION} now)"
+                       if before[1] != fb.VERSION else ""))
             was = sf.set_aside(row, t, "before-import")
             if was:
                 lines.append(f"{t}: the answers here before are kept at {was}")
@@ -1623,8 +1632,11 @@ def imported_steps(model: str) -> dict:
     out = {}
     for thinking, suffix in (("on", "__thinking"), ("off", "")):
         reg = registry(config.OUT_DIR / (model.replace("/", "__") + suffix))
+        # 18c point 17: a shard is its number of its split ("2-of-3"): shard 2
+        # of a 3-way split is never plan step 2/2
         out[thinking] = {"tasks": sorted(reg.get("tasks") or {}),
-                         "shards": {t: sorted(int(i) for i in (v.get("have") or {}))
+                         "shards": {t: sorted(f"{int(i)}-of-{int(v.get('n') or 0)}"
+                                              for i in (v.get("have") or {}))
                                     for t, v in (reg.get("shards") or {}).items()
                                     if isinstance(v, dict)}}
     return out

@@ -54,7 +54,12 @@ import tarfile
 import urllib.request
 from pathlib import Path
 
-VERSION = "frontier-1"
+# 18c point 12: frontier-2 — how answers are read changed (18b: every thinking
+# block, wherever it sits, counts in the share, and one never closed, wherever
+# it opened, ran out). How they are asked didn't: frontier-1's answers and
+# bundles are taken as they are, and scored the frontier-2 way
+VERSION = "frontier-2"
+ASKED_AS = ("frontier-1", "frontier-2")
 LETTERS = "ABCD"
 HERE = Path(__file__).resolve().parent
 

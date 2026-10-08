@@ -138,12 +138,17 @@ def test_23_a_safe_box_from_before_a_restart_needs_30_minutes_unreached(tmp_path
     assert main_of(ff, key, dest, "1.1.1.1:41") == 1            # a restart
     assert main_of(ff, key, dest, "1.1.1.1:41") == 1            # 70df001: 0, "destroyed: done"
     out = capsys.readouterr().out
-    assert "destroyed once it has been unreached for 30 min. NOT safe to destroy yet" in out, out
+    # 18c point 15: each fetch counts its own misses — two restarts are one miss each
+    assert "destroyed if it isn't reached on the next round either. NOT safe to destroy " \
+           "yet" in out, out
+    # 18c point 15: a miss an earlier fetch recorded doesn't count in this one
+    # (that was one failed ssh after a restart reading a box "destroyed"):
+    # tests/test_18c3_grading_fetch_export.py has the rounds within one fetch
     e = json.loads((dest.parent / "safe-boxes.json").read_text())
     e[bid]["missed_since"] = time.time() - 31 * 60
     (dest.parent / "safe-boxes.json").write_text(json.dumps(e))
-    assert main_of(ff, key, dest, "1.1.1.1:41") == 0
-    assert "destroyed: done" in capsys.readouterr().out
+    assert main_of(ff, key, dest, "1.1.1.1:41") == 1
+    assert "destroyed: done" not in capsys.readouterr().out
 
 
 # ---------------------------------------------------------------------------
@@ -163,12 +168,12 @@ def test_24_a_halt_waits_for_start_and_never_lifts_by_itself(tmp_path):
         (be.dir / "or_1" / "halt.json").write_text(json.dumps(h))
         why = llm._halted(be.dir / "or_1", be.HALT_RETRY_S)
         assert why.endswith(f"It waits for {press}: nothing more is sent until then"), why
-    # the judge's batches have no press: they try again after 10 minutes, said
+    # 18c point 13: the judge's batches wait for Carry on too
     be = llm.OpenRouterChat.__new__(llm.OpenRouterChat)
     be.dir = tmp_path / "judge"
     (be.dir / "or_2").mkdir(parents=True)
     be._halt("or_2", {"error": "HTTP 402", "status": 402}, 20)
-    assert "It tries again in 10 minutes" in llm._halted(be.dir / "or_2", 600)
+    assert "It waits for Carry on" in llm._halted(be.dir / "or_2", 600)
 
 
 # ---------------------------------------------------------------------------
@@ -183,8 +188,11 @@ def test_25_a_step_that_ran_on_another_box_is_done(tmp_path, monkeypatch, capsys
     whole = progress_of("phone", "A8-2", "whole", tasks=[MMLU], bundle={"name": b.name})
 
     def listing(host, rnd):
-        return with_steps(listing_of({f"/workspace/phone/A8-2/{b.name}": b}, [whole]),
-                          [("phone", "A8-2")])
+        got = json.loads(with_steps(listing_of({f"/workspace/phone/A8-2/{b.name}": b}, [whole]),
+                                    [("phone", "A8-2")]))
+        # 18c point 17: the box's line has ended
+        got["lines"] = [{"box": "A8", "state": "ended", "build": "phone"}]
+        return json.dumps(got)
     ff, calls, key, state = world(tmp_path, monkeypatch, listing)
     monkeypatch.setattr(ff, "copy", lambda *a, **k: (True, "here already"))
     held = {"on": {"tasks": [], "shards": {}}, "off": {"tasks": [], "shards": {}}}
@@ -211,9 +219,10 @@ def test_25_the_board_says_what_it_holds_of_a_build(svc):  # noqa: F811
     row = config.OUT_DIR / "served__phone"
     row.mkdir(parents=True)
     (row / imf.REGISTRY).write_text(json.dumps({"imports": [], "tasks": {"mmlu_pro": {}},
-                                                "shards": {"hle_text_cais": {"have": {"2": {}}}}}))
+                                                "shards": {"hle_text_cais": {
+                                                    "n": 4, "have": {"2": {}}}}}))
     got = imf.imported_steps("served/phone")
-    assert got["off"] == {"tasks": ["mmlu_pro"], "shards": {"hle_text_cais": [2]}}
+    assert got["off"] == {"tasks": ["mmlu_pro"], "shards": {"hle_text_cais": ["2-of-4"]}}
     assert got["on"] == {"tasks": [], "shards": {}}
 
 

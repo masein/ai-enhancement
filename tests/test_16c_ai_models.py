@@ -188,8 +188,9 @@ def test_twenty_refusals_in_a_row_pause_a_batch_and_mark_none_failed(svc, monkey
     tl = llm.tally(bid)
     # 20 sent, all refused: the batch waits — nothing recorded failed
     assert len(chat.sent) == 20 and (tl["answered"], tl["failed"]) == (0, 0)
+    # 18c point 13: the judge's batches wait for Carry on too
     assert tl["halted"] == ("waiting: OpenRouter refused 20 requests in a row — " + LIMIT_WORDS
-                            + ". It tries again in 10 minutes")
+                            + ". It waits for Carry on: nothing more is sent until then")
     state_, detail = be.status(bid)
     assert state_ == "pending" and detail.endswith(tl["halted"])
     # fixed on OpenRouter's side: taken up again, and every one answered

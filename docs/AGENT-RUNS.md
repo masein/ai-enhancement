@@ -186,10 +186,24 @@ Each step is numbered; a step that refers to another gives its number.
 ~/agent-venv/bin/python scripts/agent_run.py …`. If you choose the docker
 group in step 5, the line is the same without `sudo`.
 
-1. Bring the checkout and the board up to date (the board shows agent runs
-   from this build):
+1. **Before the deploy**, on the board: Runs shows nothing running, and the
+   grading card (Benchmarks ▸ Frontier) is idle — no batch sending; press
+   Stop on one that is. Then bring the checkout up to date and build the new
+   image without starting it:
    ```bash
-   cd ~/benchmarks/aienh && git pull origin main && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
+   cd ~/benchmarks/aienh && git pull origin main && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose build
+   ```
+   Run the new code's read-only check against the board's files: which
+   stored Frontier scores the new thinking split (every thinking block
+   counts, wherever it sits; one never closed ran out) changes the next time
+   each is scored — counts per row and benchmark, never an answer's text,
+   nothing written. Report its lines:
+   ```bash
+   cd ~/benchmarks/aienh && sudo docker compose run --rm --no-deps bench python scripts/think_shift_check.py
+   ```
+   Then the deploy itself (the board shows agent runs from this build):
+   ```bash
+   cd ~/benchmarks/aienh && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d
    ```
 2. Install uv 0.12.18 for your user, checked against its published
    checksum. It must print `uv-x86_64-unknown-linux-gnu.tar.gz: OK`, then

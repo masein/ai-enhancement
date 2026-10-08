@@ -2602,7 +2602,13 @@ _JOB_OF_KIND = {"judge": "judge", "everyday": "judge", "safety": "judge", "simpl
 def _job_last_batches() -> dict[str, str]:
     """16c: each job's last batch on OpenRouter, in one line (llm.batch_line),
     when it failed, part or whole, or waits at a run of refusals"""
-    out: dict[str, str] = {}
+    return {j: x["line"] for j, x in _job_batches().items() if x["line"]}
+
+
+def _job_batches() -> dict[str, dict]:
+    """each job's last batch on OpenRouter: {line, id, halted} — 18c point 13:
+    a batch waiting at a run of refusals is the job's Carry on"""
+    out: dict[str, dict] = {}
     for r in db.batches_list(300):
         bid = r["batch_id"]
         if not str(bid).startswith("or_"):
@@ -2618,15 +2624,18 @@ def _job_last_batches() -> dict[str, str]:
             continue
         tl = llm.tally(bid)
         err = r.get("error") if r.get("status") == "failed" else ""
-        out[job] = (llm.batch_line(tl, err or "")
-                    if (tl or {}).get("failed") or err or (tl or {}).get("halted") else "")
-    return {j: line for j, line in out.items() if line}
+        out[job] = {"line": (llm.batch_line(tl, err or "") if (tl or {}).get("failed") or err
+                             or (tl or {}).get("halted") else ""),
+                    "id": bid, "halted": bool((tl or {}).get("halted"))
+                    and r.get("status") == "submitted"}
+    return out
 
 
 def _ai_page() -> dict:
     import judge as _judge
     jobs = []
-    last = _job_last_batches()
+    batches = _job_batches()
+    last = {j: x["line"] for j, x in batches.items() if x["line"]}
     for k, j in ai_models.JOBS.items():
         c = ai_models.choice(k)
         p, m, _ = llm.identity(j["role"])
@@ -2635,7 +2644,10 @@ def _ai_page() -> dict:
                      "chosen": c, "from": "page" if c else ("environment" if p else None),
                      "provider": p, "model": m, "now": ai_models.label(k),
                      "blocked": llm.blocked(j["role"]) if (c or p) else "",
-                     "last_batch": last.get(k, "")})
+                     "last_batch": last.get(k, ""),
+                     # 18c point 13: its batch waits at a run of refusals: Carry on
+                     "halted_batch": (batches.get(k) or {}).get("id")
+                     if (batches.get(k) or {}).get("halted") else None})
     ident = _judge.identity()
     return {"has_key": ai_models.has_key(), "jobs": jobs,
             "local": {"name": ai_models.local_name(ask=True), "model": ai_models.local_model()},
@@ -2742,6 +2754,27 @@ def ai_limit_set(a: AiLimitIn, x_token: str = Header(default="")):
     if not 0 <= a.usd <= 10000:
         raise HTTPException(422, "the monthly limit is between $0 and $10,000")
     db.ai_set("spend_limit", round(float(a.usd), 2), a.by.strip()[:80])
+    return _ai_page()
+
+
+class CarryOnIn(BaseModel):
+    batch_id: str
+    by: str
+
+
+@app.post("/api/ai/carry-on")
+def ai_carry_on(a: CarryOnIn, x_token: str = Header(default="")):
+    """18c point 13: a job's batch that waits at a run of refusals takes up
+    again — the press it waits for, recorded with who pressed it"""
+    _check_token(x_token)
+    if not a.by.strip():
+        raise HTTPException(422, "type your name first — it is recorded with the press")
+    if not any(x.get("id") == a.batch_id and x.get("halted") for x in _job_batches().values()):
+        raise HTTPException(409, "that batch isn't waiting for Carry on")
+    why = llm.carry_on(a.batch_id)
+    if why:
+        raise HTTPException(409, why)
+    print(f"[llm] {a.batch_id}: Carry on, by {a.by.strip()[:80]}")
     return _ai_page()
 
 

@@ -304,6 +304,18 @@ def main(argv: list[str] | None = None) -> int:
     steps = box_of(box)
     print(f"{box}: {len(steps)} step{'s' if len(steps) > 1 else ''}, about "
           f"{sum(hours(s) for s in steps):.1f} h at the pilot's paces", flush=True)
+    # 18c point 17: the line's own state, for the fetch — a step another box
+    # imported counts as done here only once this line has ended
+    mark = folder(a, box, 1, steps[0]).parent / f"{box}.line.json" if steps else None
+
+    def line_state(state: str) -> None:
+        if mark is not None:
+            try:
+                mark.parent.mkdir(parents=True, exist_ok=True)
+                mark.write_text(json.dumps({"box": box, "state": state, "at": time.time()}))
+            except OSError:
+                pass
+    line_state("running")
     ends = []
     for k, step in enumerate(steps, 1):
         out = folder(a, box, k, step)
@@ -335,6 +347,7 @@ def main(argv: list[str] | None = None) -> int:
                   f"{again} of {RUNS}", flush=True)
             code = subprocess.run(cmd).returncode
         ends.append((k, step, code, state_of(out).get("why") or ""))
+    line_state("ended")
     print()
     for k, step, code, why in ends:
         out = folder(a, box, k, step)
