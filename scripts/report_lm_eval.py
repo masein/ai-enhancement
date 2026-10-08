@@ -20935,9 +20935,20 @@ function agentCard(c) {
         el('span', { text: `${r.model} · ` }), el('b', { 'data-agent-words': r.key, text: r.words }),
         ' ', el('a', { href: '#tab=runs&agent=' + encodeURIComponent(r.key),
           'data-agent-open': r.key, text: 'Open run ▸' }))))
-        : el('p', { class: 'small se', text: 'Not run here yet.' })),
+        : el('p', { class: 'small se', text: 'Not run here yet.' }),
+      // 18c point 9: the tasks whose reference solution doesn't pass here
+      (b.left_out || []).length ? el('p', { class: 'small', 'data-agent-left-out': b.key,
+        title: b.left_out.join(', '), text: `${b.left_out.length} task`
+          + `${b.left_out.length === 1 ? '' : 's'} left out: their reference solution doesn’t `
+          + 'pass here' }) : ''),
     (b.published || []).length ? el('div', { class: 'agentscores', 'data-agent-published': b.key },
       el('h4', { text: 'Published, for reference — never ranked with ours' }),
+      // 18c points 9 and 10: what isn't comparable with ours
+      b.not_comparable ? el('p', { class: 'small se', 'data-agent-not-comparable': b.key,
+        text: b.not_comparable }) : '',
+      (b.left_out || []).length ? el('p', { class: 'small se', 'data-agent-ref-left-out': b.key,
+        text: `They count all ${Number(b.tasks).toLocaleString('en')} tasks; ours leaves out the `
+          + `${b.left_out.length} above.` }) : '',
       // one line a source: who ran them, on which agent, when; then the numbers
       ...agentRefGroups(b.published).map(g => el('div', { class: 'agentref' },
         el('p', { class: 'small se' }, el('span', { class: 'badge', text: 'reference' }),

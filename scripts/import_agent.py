@@ -3,6 +3,7 @@
 scripts/agent_run.py on the host (docs/AGENT-RUNS.md):
 
     python scripts/import_agent.py --served served/<model>     the model, for the run's checks
+    python scripts/import_agent.py --served-all                every model server's address
     python scripts/import_agent.py --progress <run folder>     the run's Runs row, kept up to date
     python scripts/import_agent.py <run folder>                the finished run, imported
 
@@ -57,6 +58,14 @@ def served(model: str) -> dict:
                 x for x in (rec.get("flags") or "", rec.get("env") or "") if x)}
 
 
+def served_all() -> list[dict]:
+    """every model server registered on the board: its id and address, never
+    its key (18c point 11: the reach check tries each one's port)"""
+    from service import served as sv
+    return [{"id": r.get("id"), "base_url": r.get("base_url") or ""}
+            for r in sv.all_public() if r and not sv.is_openrouter(r)]
+
+
 def store() -> Path:
     from service import config
     return Path(config.BENCH_ROOT) / "agent"
@@ -76,9 +85,16 @@ def summary(rdir: Path) -> dict:
     run = ar.read_json(rdir / "run.json")
     tasks = run.get("tasks") or []
     rs = ar.results(rdir, tasks, int(run.get("attempts") or 1))
-    s = ab.score(rs, int(run.get("of") or len(tasks)))
+    # 18c point 9: a task whose reference solution doesn't pass here (the
+    # oracle run's) is left out of a model's denominator, and said
+    left: list[str] = []
+    if run.get("model") and run.get("benchmark"):
+        left = ar.oracle_states(rdir.parent.parent, run["benchmark"], [])["left_out"]
+        rs = [r for r in rs if r["task"] not in left]
+    total = int(run.get("of") or len(tasks)) - len(left)
+    s = {**ab.score(rs, total), "left_out": len(left)}
     return {"key": rdir.name, "folder": str(rdir), "run": run, "results": rs, "score": s,
-            "words": ab.score_words(s, int(run.get("of") or len(tasks))),
+            "words": ab.score_words(s, total), "left_out": left,
             "again": ab.again_words(rs), "progress": ar.read_json(rdir / "progress.json")}
 
 
@@ -107,6 +123,7 @@ def main(argv: list[str] | None = None) -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("folder", nargs="?", type=Path)
     ap.add_argument("--served")
+    ap.add_argument("--served-all", action="store_true")
     ap.add_argument("--progress", type=Path)
     a = ap.parse_args(argv)
     # never db.init() here: it is the service's start-up, which puts the
@@ -114,6 +131,9 @@ def main(argv: list[str] | None = None) -> int:
     # only its own agent row
     if a.served:
         print(json.dumps(served(a.served)))
+        return 0
+    if a.served_all:
+        print(json.dumps(served_all()))
         return 0
     rdir = (a.progress or a.folder)
     if rdir is None or not (rdir / "run.json").exists():

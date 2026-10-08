@@ -417,6 +417,8 @@ def test_the_build_check_runs_in_a_build_with_no_network(tmp_path, monkeypatch, 
             return 0, ok if "network: none" in compose else open_
         if cmd[:3] == ["docker", "network", "inspect"]:
             return 0, "172.17.0.1\n"
+        if cmd[:len(ar.BOARD)] == ar.BOARD:                  # 18c.2: the board's servers
+            return 0, json.dumps([{"id": "served/x", "base_url": "http://172.17.0.1:8091/v1"}])
         return 0, ""
     monkeypatch.setattr(ar, "run", run)
     monkeypatch.setattr(ar, "check_reach", lambda rdir, targets: "")
@@ -516,7 +518,7 @@ def test_a_task_whose_clean_up_failed_is_an_error_of_ours_never_asked_again(tmp_
           "didn't run to its end (exit 1, files=2 processes=1): not verified")
     r = ab.read_trial(next((rd / "jobs").glob("*/*")))
     assert r["result"] == "error" and r["final"] is True
-    assert r["why"].endswith("not asked again: the model had run")
+    assert r["why"].endswith("after the agent ran: counted not resolved, never asked again")
     assert ar.state_of(rd, "inv__c-1", 1) == ("done", 1)                       # never again
     assert ab.score([r], 300)["errors"] == 1
 

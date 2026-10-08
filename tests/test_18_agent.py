@@ -252,6 +252,8 @@ def server_world(tmp_path, monkeypatch):
             w["board"].append(cmd[len(ar.BOARD):])
             if cmd[len(ar.BOARD)] == "--served":
                 return 0, json.dumps(w["served"])
+            if cmd[len(ar.BOARD)] == "--served-all":         # 18c: every server's address
+                return 0, json.dumps([{"id": MODEL, "base_url": w["served"].get("base_url")}])
             return 0, "Runs #1: ok"
         if cmd[:3] == ["docker", "network", "inspect"]:
             return 0, "172.17.0.1\n"
@@ -275,7 +277,8 @@ def server_world(tmp_path, monkeypatch):
                   dict(result="", exc="RuntimeError", started=False,
                        message="Docker compose command failed for environment x")
                   if out == "docker" else dict(result="", exc=out))
-            trial(rd, task, k, stamp=int(job.rsplit("__", 1)[1]) * 1000 + n, **kw)
+            # the job's own folder, as Harbor names it (18c: the runner counts its jobs)
+            trial(rd, task, k, stamp=int(job.rsplit("__", 1)[1]), **kw)
 
         def poll(self):
             return 0

@@ -332,10 +332,13 @@ def test_an_error_of_ours_is_asked_again_and_said_and_a_given_up_task_stays_coun
 
 def test_only_the_allow_list_is_ours(tmp_path):
     rd = tmp_path / "r"
+    # 18c point 5: Docker's failures come before the agent started (Harbor
+    # never began its phase); after it, they are ours but never asked again
     cases = [
         (dict(exc="ServerDown", ours="ServerDown: the model's server didn't answer"), "error"),
-        (dict(exc="EnvironmentStartTimeoutError"), "error"),
-        (dict(exc="RuntimeError", message="Docker compose command failed: pull"), "error"),
+        (dict(exc="EnvironmentStartTimeoutError", started=False), "error"),
+        (dict(exc="RuntimeError", message="Docker compose command failed: pull", started=False),
+         "error"),
         (dict(exc="ImagePullError", started=False), "error"),          # before the agent ran
         (dict(exc="APIConnectionError"), "unresolved"),               # one bad reply
         (dict(exc="ServiceUnavailableError"), "unresolved"),
