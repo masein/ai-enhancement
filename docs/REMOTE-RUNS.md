@@ -1105,3 +1105,147 @@ ARC-AGI-2; a smaller one is refused in words before anything is asked. Each
 import says how many of the answers that ran out end in a loop (the last
 passage repeating), and each cell shows the share that ran out, beside its
 score.
+
+# Speed tests: the cheapest box per answer (19)
+
+Which box runs our benchmarks for the fewest dollars per answer, measured the
+same way on each: `scripts/speed_test.py`, in the same runner image. It never
+posts to the board, never builds a bundle, and its numbers never reach the
+board's scores.
+
+**What it runs.** Each setting starts its engine, then sends Frontier's own
+requests (the same prompts, the model card's sampling, our budgets, the
+thinking switch said out loud, a seed a question) through one
+OpenAI-compatible streaming client, the same against llama-server and vLLM,
+in a fixed order:
+- a 3-minute warm-up of GPQA Diamond, thinking on, not counted;
+- 20 minutes of GPQA Diamond, thinking on, its 81,920-token budget (long
+  reasoning: the loop run's and HLE's shape);
+- 5 minutes of MMLU-Pro, thinking off, 5-shot (short answers, long prompts).
+
+Tokens are counted as they stream, so an answer still running when a window
+closes counts its part. One line a setting, also in
+`/workspace/speed/speed.json`: the box, the price given, the engine and its
+version, the file and its sha256, the setting; output tokens a second and
+answers an hour on each; MMLU-Pro's prompt tokens a second (and how many it
+read, the rest from the cache); **dollars per million output tokens** (on
+GPQA); the peak GPU memory; requests that waited, were cut or were refused
+for memory; MTP's acceptance; and a sanity score on the answers it finished.
+The sanity score isn't a result: a setting that scores far below our runs
+(under half) is broken, and its line says so.
+
+**Break-even with the 5090** ($0.50 an hour, 310–440 output tokens a second
+on the pilot, about $0.35–0.45 per million): 4× V100 at $0.65 needs more than
+about 410 tokens a second in total, an H100 SXM at $2.55 more than about
+1,600.
+
+**A shared cache pool.** llama-server's `--kv-unified` gives all slots one
+pool, as big as fits on the card (the pilot's measured slope, every slot's
+recurrent state, 1 GiB spare; a pool that doesn't start is tried 10%
+smaller, twice). When that pool fills, llama-server fails **every** request
+in flight ("Context size has been exceeded"): it has no preemption. So
+against a shared pool the client admits a request only while the pool has
+room for what is in flight, the new prompt and 2,048 tokens more — the
+request waits otherwise — and when the pool nears full it cuts the request
+admitted last and asks it again from its start once there is room: vLLM's
+preemption, done by the client. Both are counted on the line. Per-slot
+settings (each slot its own 83,968 tokens) never fill.
+
+**Several GPUs in one box:** one llama-server a GPU (`CUDA_VISIBLE_DEVICES`,
+its own port), the requests shared between them, one line. One model is
+never split across GPUs. vLLM's 2× H100 setting is tensor parallel 2.
+
+**vLLM, for BF16 only:** vLLM 0.30.0 (22 Sep 2026, the newest at least 14
+days old), every package pinned with its hashes
+(`scripts/speed_vllm_requirements.txt`, compiled with `--exclude-newer
+2026-09-24`), installed once on the box into its own venv; the official
+`Qwen/Qwen3.6-35B-A3B` weights at revision `995ad96eacd9` (71.9 GB); the
+cache in FP8 (BF16 if FP8 doesn't start; the line says which); our sampling
+and budgets; `--max-num-seqs` a setting. Its line says how many full-length
+answers (83,968 tokens) fit at once, from vLLM's own count. Its torch 2.13
+is built for **CUDA 13.0**: rent H100s whose max CUDA is 13.0 or newer. The
+Q4 GGUF is never run on vLLM: our Q4 numbers stay llama.cpp's.
+
+**V100 (sm_70):** our llama-server tarball is built for sm 80, 86, 89, 90 and
+120 (`scripts/build_llama_tarball.sh`'s default), so it doesn't run on a
+V100. A tarball that does is built from the fork's checkout on the server,
+where the fork is, with the V100's architecture added (about 15 minutes,
+nothing runs):
+
+```bash
+cd ~/benchmarks/aienh && LLAMA_CUDA_ARCHS="70;80;86;89;90;120" scripts/build_llama_tarball.sh ~/llama.cpp-teraformer ~/llama-server-cuda12.8-sm70.tar.gz
+```
+
+```bash
+hf upload <you>/evalboard-private ~/llama-server-cuda12.8-sm70.tar.gz llama-server-cuda12.8-sm70.tar.gz
+```
+
+Its last line gives its sha256. Without it, box (b) stops before the GGUF is
+fetched ("built for sm [80, 86, 89, 90, 120], not this GPU's sm 70").
+
+## S1. What to rent, and each box's line
+
+The template of step 2 (the runner image at the tag after this change), with
+the disk below. On each box, under tmux: `cd /app`, then the token, as in G2:
+
+```bash
+tmux new -s s
+```
+
+```bash
+cd /app
+```
+
+```bash
+read -rs HF_TOKEN && export HF_TOKEN
+```
+
+Then the box's one line. Before anything downloads, it prints the GPUs and
+their memory and the driver's CUDA, and stops with one line if the box isn't
+what was rented (a 16 GB V100, one GPU of the two, a driver too old). Each
+file is fetched once into `/workspace/files`; the settings run one after
+another. A setting that can't run says why and the next one runs.
+
+**(a) RTX 5090, $0.50 an hour** — 80 GB of disk, max CUDA 12.8+. Slots 8 (the
+pilot's flags, to check against its pace), 16 and 24 sharing one pool, then
+slots 8 with MTP (`--spec-type draft-mtp`; if our build doesn't run the
+file's MTP heads, its line says so). About 2 hours; it fetches about 24 GB
+(the GGUF, 22.9 GB; our tarball, under 1 GB; the questions):
+
+```bash
+python scripts/speed_test.py 5090 --price 0.50 --gguf hf://<you>/evalboard-private/<original-build-file>.gguf --server hf://<you>/evalboard-private/llama-server-cuda12.8.tar.gz
+```
+
+**(b) 4× V100 32 GB, $0.65 an hour** — needs the sm_70 tarball above; 80 GB
+of disk. Four servers × 4 slots, then × 6. About 1 hour; it fetches about
+24 GB:
+
+```bash
+python scripts/speed_test.py v100x4 --price 0.65 --gguf hf://<you>/evalboard-private/<original-build-file>.gguf --server hf://<you>/evalboard-private/llama-server-cuda12.8-sm70.tar.gz
+```
+
+**(c) H100 SXM, $2.55 an hour** — 150 GB of disk, max CUDA 13.0+. llama.cpp
+with the Q4 file at 32 and 64 slots sharing one pool, then vLLM BF16 at 32 and
+64 sequences. About 2 hours 15 minutes; it fetches about 100 GB (the GGUF,
+22.9 GB; vLLM, about 5 GB; the BF16 weights, 71.9 GB). An H100 NVL or PCIe
+runs the same line with its own `--price`:
+
+```bash
+python scripts/speed_test.py h100 --price 2.55 --gguf hf://<you>/evalboard-private/<original-build-file>.gguf --server hf://<you>/evalboard-private/llama-server-cuda12.8.tar.gz
+```
+
+**(d) optional: 2× H100 SXM or 2× H200** — 120 GB of disk, max CUDA 13.0+.
+vLLM BF16 with tensor parallel 2, at 64 and 128 sequences. About 70 minutes;
+it fetches about 77 GB:
+
+```bash
+python scripts/speed_test.py h100x2 --price 5.10
+```
+
+`--only 1,3` runs those settings alone; `--dry-run` checks the box and prints
+its plan. Copy `/workspace/speed/speed.json` off the box before destroying
+it:
+
+```bash
+scp -P <port> root@<host>:/workspace/speed/speed.json ~/speed-<box>.json
+```
