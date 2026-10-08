@@ -154,6 +154,8 @@ def setup_differs(old: dict, new: dict) -> list[str]:
             if any(old[k][p] != new[k].get(p) for p in old[k]
                    if p in new[k] and old[k][p] is not None and new[k][p] is not None):
                 out.append(k)
+        elif k == "version" and old.get(k) in fb.ASKED_AS and new.get(k) in fb.ASKED_AS:
+            continue                    # 18c: asked the same way; only the reading changed
         elif old.get(k) != new.get(k):
             out.append(k)
     return out
@@ -390,7 +392,7 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
                    "at": round(time.time(), 3)})
             log(f"[frontier] {task}: question {qid}, run {e}: the server failed on it twice"
                 + (f", on {n_runs} separate runs" if not _own(why) else "")
-                + f" — written as no answer, counted wrong ({why[:200]})")
+                + f" — written as no answer, counted wrong ({status_of(why)})")   # 18c point 16
         if kept:
             log(f"[frontier] {task}: {kept} question(s) the server failed on with an error that "
                 f"isn't theirs (a 5xx) — kept, and asked again by the next run; written off "
@@ -706,12 +708,27 @@ def thinking_kept(thinking: str | None, answers: list[str]) -> int:
     return sum(1 for a in answers if thought(a)) if thinking == "off" else 0
 
 
-def score_task(row: Path, task: str, rec: dict) -> dict | None:
+def stored_score(d: Path, task: str) -> tuple[float | None, str] | None:
+    """the score the task's results file holds now, and the version that
+    scored it; None when there is none"""
+    for p in sorted(d.glob("results_*.json"))[-1:]:
+        got = _read_json(p)
+        res = (got.get("results") or {}).get(task) or {}
+        return res.get("acc,none"), str((got.get("frontier") or {}).get("version") or "")
+    return None
+
+
+def score_words(x: float | None) -> str:
+    return "no score" if x is None else f"{100 * x:.1f}%"
+
+
+def score_task(row: Path, task: str, rec: dict, log=print) -> dict | None:
     """the task's score from its answers, written in lm_eval's layout — None
     while a question of a run is still unanswered. A graded benchmark is
     written once every answer is graded; until then {waiting: n}. One Epoch
     checks with a model is written with the code's score until the check is
-    done, and with both after: the page's is Epoch's way"""
+    done, and with both after: the page's is Epoch's way. 18c point 12: a
+    results file replaced with another score is said ("score X → Y")"""
     spec = fb.BENCH[task]
     m = marks(row, task)
     if m["missing"]:
@@ -761,8 +778,16 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
                      "acc": sum(1.0 for r in rs if r["ok"]) / len(rs),
                      "frontier": [{k2: v for k2, v in r.items() if k2 != "answer"} for r in rs]})
     stamp = time.strftime("%Y-%m-%dT%H-%M-%S.000000", time.gmtime())
+    before = stored_score(d, task)
     for old in [*d.glob("results_*.json"), *d.glob(f"samples_{task}_*.jsonl")]:
         old.unlink()
+    changed = before is not None and (before[0] is None) != (page["score"] is None) or (
+        before is not None and before[0] is not None and page["score"] is not None
+        and abs(before[0] - page["score"]) > 1e-9)
+    if changed:
+        log(f"[frontier] {Path(row).name} · {spec['label']}: score {score_words(before[0])} → "
+            f"{score_words(page['score'])}" + (f" (scored by {before[1]} before, {fb.VERSION} "
+                                               "now)" if before[1] != fb.VERSION else ""))
     try:
         setup = json.loads((d / SETUP).read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -782,6 +807,7 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
     except Exception:                                   # noqa: BLE001 — a note, never the score
         held_shards = ""
     detail = {"version": fb.VERSION, "protocol": spec["protocol"], "epochs": spec["epochs"],
+              **({"before": {"score": before[0], "version": before[1]}} if changed else {}),
               "questions": len(items), "answers": len(flat),
               "ran_out": ran_out, "unread": unread, "errors": errors,
               # 17c: an off row's few answers that thought anyway, scored
@@ -1031,7 +1057,7 @@ def run(sid: int, sub: dict, rec: dict, th: dict, row: Path, log_path: Path) -> 
         if not config.FRONTIER_SCORE_AFTER_RUN or sh:
             lines.append(f"{label}: {n:,} of {total:,} answered")
             continue
-        sc = score_task(row, task, rec)
+        sc = score_task(row, task, rec, log=log)
         lines.append(words(task, sc) if sc else f"{label}: {n:,} of {total:,} answered")
         if sc:
             log(f"[frontier] {words(task, sc)}")

@@ -810,13 +810,33 @@ def batch_dir(batch_id: str) -> Path | None:
 
 
 def _halted(d: Path, retry_s: float) -> str:
+    """why a batch waits at a run of refusals, '' when it doesn't. 18c points
+    13 and 14: every halt holds until its press — none lifts by itself after
+    `retry_s` any more (adding credit then started paid requests with nobody
+    pressing anything), a halt file written before holds existed (70df001's,
+    with no "hold") included"""
     try:
         h = json.loads((d / "halt.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return ""
-    if not h.get("hold") and time.time() - float(h.get("at") or 0) >= retry_s:
-        return ""                           # it tries again; a new run of refusals stops it again
-    return str(h.get("why") or "")
+    why = str(h.get("why") or "waiting: a run of refusals")
+    if not h.get("hold"):
+        why = re.sub(r"It tries again in \d+ minutes.*$",
+                     "It waits for Carry on: nothing more is sent until then", why)
+    return why
+
+
+def carry_on(batch_id: str) -> str:
+    """18c point 13: a halted batch takes up again (its Carry on): its halt
+    is lifted, and the poller's next tick sends what it hasn't. '' when done;
+    else why not"""
+    d = batch_dir(batch_id)
+    if d is None:
+        return "no such batch"
+    if not (d / "halt.json").exists():
+        return "it isn't waiting"
+    (d / "halt.json").unlink(missing_ok=True)
+    return ""
 
 
 def tally(batch_id: str, d: Path | None = None, retry_s: float | None = None) -> dict | None:
@@ -1086,18 +1106,17 @@ class LocalOpenAI(Backend):
                "against the answers: change what it refuses (the model, its provider), then "
                "Start again" if first else
                f"waiting: OpenRouter refused {n} requests in a row — {said}. It waits for "
-               f"{self.HALT_PRESS}: nothing more is sent until then" if self.HALT_PRESS else
-               f"waiting: OpenRouter refused {n} requests in a row — {said}. It tries again in "
-               f"{round(self.HALT_RETRY_S / 60)} minutes" + self.HALT_TAIL)
+               f"{self.HALT_PRESS or 'Carry on'}: nothing more is sent until then")
         # 17h: a run of refusals waits for Start (the model changed, or the
         # same asked again) — it took itself up after 10 minutes, and asked
         # the same refusals again. 18b: and a run about the key (its limit,
         # its credit, a lasting rate limit) waits for its press too, where
         # the batch has one: adding credit no longer starts spending again
         # with nobody pressing anything
+        # with nobody pressing anything. 18c: every batch's, the judge's too
         (self.dir / batch_id / "halt.json").write_text(json.dumps(
             {"why": why, "status": rec.get("status"), "at": time.time(), "n": n,
-             **({"hold": True} if first or self.HALT_PRESS else {})}), encoding="utf-8")
+             "hold": True}), encoding="utf-8")
 
     def cancel(self, batch_id: str, custom_ids, why: str) -> int:
         """16c: questions of a batch that are no longer wanted — never sent;
@@ -1286,8 +1305,9 @@ class LocalOpenAI(Backend):
     HALT_KINDS = ("limit", "key", "rate")
     HALT_RETRY_S = 600
     HALT_TAIL = ""
-    # 18b: the press that takes a halted batch up again — '' where it has
-    # none (the judge's batches), which try again after HALT_RETRY_S
+    # 18b: the press that takes a halted batch up again. 18c point 13: every
+    # batch has one — Carry on, on the AI models page, unless its card has
+    # its own (the grader's Start, the labeller's Carry on)
     HALT_PRESS = ""
 
     @staticmethod
@@ -1340,6 +1360,7 @@ class OpenRouterChat(LocalOpenAI):
     against the monthly limit; and at the limit, or when the pinned id has
     moved to another version, the batch waits with a plain message and sends
     nothing — it never falls back to another model."""
+    HALT_PRESS = "Carry on"             # 18c point 13: the judge's, the writers', the checker's
     name = "openrouter"
     prefix = "or"
     HALT_AFTER = 20

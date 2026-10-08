@@ -83,15 +83,22 @@ def test_14_a_safe_box_given_new_work_then_missed_once_is_not_destroyed(tmp_path
     assert main_of(ff, key, dest, "1.1.1.1:41") == 1           # 0abb757: 0, "destroyed: done"
     assert "destroyed if it isn't reached on the next round either" in capsys.readouterr().out
     # 18b: read safe before this fetch started: destroyed only once unreached
-    # for 30 minutes — two rounds one --every apart weren't enough
+    # for 30 minutes. 18c point 15: and only by misses this fetch counted —
+    # started again, its earlier misses don't count
     assert main_of(ff, key, dest, "1.1.1.1:41") == 1
-    assert "destroyed once it has been unreached for 30 min" in capsys.readouterr().out
-    e2 = json.loads((dest.parent / "safe-boxes.json").read_text())
-    for v in e2.values():
-        v["missed_since"] = time.time() - 31 * 60
-    (dest.parent / "safe-boxes.json").write_text(json.dumps(e2))
-    assert main_of(ff, key, dest, "1.1.1.1:41") == 0
-    assert "rounds — destroyed: done" in capsys.readouterr().out
+    assert "destroyed if it isn't reached on the next round either" in capsys.readouterr().out
+    # one fetch, a round every 20 minutes: destroyed once unreached 30 of them
+    real_time, real_sleep, clock = time.time, time.sleep, [time.time()]
+    monkeypatch.setattr(ff.time, "time", lambda: clock[0])
+    monkeypatch.setattr(ff.time, "sleep", lambda s: clock.__setitem__(0, clock[0] + 20 * 60))
+    try:
+        assert main_of(ff, key, dest, "--every", "20m", "1.1.1.1:41") == 0
+    finally:
+        monkeypatch.setattr(ff.time, "time", real_time)
+        monkeypatch.setattr(ff.time, "sleep", real_sleep)
+    out = capsys.readouterr().out
+    assert "destroyed once it has been unreached for 30 min" in out
+    assert "rounds — destroyed: done" in out
     # a box reached with a step not home is forgotten, whatever it read before
     (dest.parent / "safe-boxes.json").write_text(json.dumps(e))
     state["round"] = 0

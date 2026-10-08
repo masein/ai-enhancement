@@ -4953,6 +4953,37 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 18c.3 — grading, the fetch and the export (8 Oct)
+
+- **frontier-2** (point 12): `fb.VERSION` says how answers are read (every
+  thinking block counts; one never closed ran out); `fb.ASKED_AS` keeps
+  frontier-1's answers (not set aside) and bundles (imported) — they were
+  asked the same way. `score_task` says "score X → Y" (and the version
+  before) when it replaces a stored score, and keeps `before` in the
+  results; an import says it too. `scripts/think_shift_check.py`: the new
+  code's read-only check of the board's files — per row and benchmark, how
+  many answers read differently and the score before and after, never a
+  text, nothing written — run in step A1 from the new image before `up -d`
+  (`docker compose build`, then `run --rm --no-deps bench …`).
+- **Every halt holds** (points 13, 14): `OpenRouterChat.HALT_PRESS = "Carry
+  on"` (the judge's, the writers', the checker's); every halt file is
+  written with a hold, and one written without (70df001's) reads as held.
+  The AI models page shows Carry on beside a job's waiting batch
+  (`POST /api/ai/carry-on`, with who pressed it).
+- **A fetch counts its own misses** (point 15): misses an earlier fetch
+  recorded are reset at start; destroyed only after this fetch's rounds.
+- **The server's words** (point 16): the written-off line holds the status
+  alone; the export cuts any line where a bracket opens and never closes.
+- **Small ones** (point 17): a shard is "i-of-n" (`imported_steps`,
+  `imported_here`); a step imported from another box counts as done only
+  once the box's line has ended (`frontier_box.py` writes
+  `/workspace/<build>/<box>.line.json`, running then ended); `think_only`
+  sees "not imported — scoring it failed (…)"; a `{"correct": …}` object
+  alone is the verdict only when nothing but markup follows it; the
+  export's names line says the board's undotted names it doesn't remove.
+- Tests: `tests/test_18c3_grading_fetch_export.py`,
+  `tests/test_18c3_carry_on_browser.py` (screens `phase18c/carry-on-*`).
+
 ### 18c.1 — agent runs: before step A (8 Oct)
 
 - **Harbor from the venv** (point 1): the runner runs

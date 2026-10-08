@@ -513,7 +513,14 @@ def _hle_object(text: str) -> tuple[str, dict | None, str]:
         end = text.find("\n", b)
         return not re.sub(r"[\s`*_>#-]|json", "", text[text.rfind("\n", 0, a) + 1:a]) \
             and not re.sub(r"[\s`*_.,;]", "", text[b:end if end >= 0 else len(text)])
-    alone = [(a, b, o) for a, b, o in real if by_itself(a, b)]
+    # 18c point 17: an object holding nothing but its verdict is the judge's
+    # only when it ends the reply — {"correct": "yes"} on its line, then prose
+    # saying the answer is wrong, is the response's, quoted. (The judge's
+    # reasoning, then its verdict object last, stays its grade)
+    def last(b: int) -> bool:
+        return not re.sub(r"[\s`*_>#.,;:-]|json", "", text[b:])
+    alone = [(a, b, o) for a, b, o in real if by_itself(a, b)
+             and (set(o) - {"correct"} or last(b))]
     lines = bool(re.search(rf"(?im)^{_W}(extracted_final_answer|reasoning){_W}:", outside))
     # 18b: inside a sentence, an object that holds nothing but its verdict is
     # a quote (the response's own {"correct": "yes"}, or {correct: yes}) —
