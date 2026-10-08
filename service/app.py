@@ -1084,8 +1084,8 @@ def served_pin(id: str = ""):
     n = served.live_window(rec) if diff == ["ctx"] else now.get("ctx")
     ok = isinstance(n, int) and n >= served.MIN_WINDOW
     return {"id": id, "why": served.pin_words(rec, now) if ok or diff != ["ctx"] else
-            f"Its server says a context window of {n!r}: not a window the board takes (a whole "
-            f"number of at least {served.MIN_WINDOW:,} tokens).",
+            served.unusable_window(n if n is not None else now.get("ctx")).capitalize()
+            + f": the board takes a whole number of at least {served.MIN_WINDOW:,} tokens.",
             "window": {"now": n, "was": rec["pin"].get("ctx")} if diff == ["ctx"] and ok
             else None}
 

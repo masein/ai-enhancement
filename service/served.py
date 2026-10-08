@@ -707,6 +707,18 @@ def check_pin(rec: dict) -> str:
     return pin_words(rec, now)
 
 
+def unusable_window(said) -> str:
+    """18c point 22: a window the board can't take, in words — never "a
+    context window of None"; a number with its commas"""
+    if isinstance(said, int) and not isinstance(said, bool):
+        what = f"{said:,}"
+    elif said in (None, ""):
+        what = "nothing"
+    else:
+        what = repr(said)
+    return f"its server doesn't report a usable context window (it says {what})"
+
+
 def changed(why: str) -> bool:
     """17j: a check_pin line that says the server is up with another pin — a
     file or (alone) a window — not that it doesn't answer"""
@@ -763,9 +775,9 @@ def use_new_window(model_id: str, by: str) -> dict:
     # smallest slot — text, an empty value or 512 were taken
     n = live_window(rec)
     if n is None or n < MIN_WINDOW:
-        raise ValueError(f"its server says a context window of {n if n is not None else 'none'}: "
-                         f"the board takes a whole number of at least {MIN_WINDOW:,} tokens (its "
-                         "smallest slot) — nothing changed")
+        raise ValueError(unusable_window(n if n is not None else now.get("ctx"))
+                         + f": the board takes a whole number of at least {MIN_WINDOW:,} tokens "
+                         "(its smallest slot) — nothing changed")
     was = rec["pin"].get("ctx")
     rec["pin"] = {**rec["pin"], "ctx": n}
     rec["window_changes"] = [*(rec.get("window_changes") or [])[-9:],

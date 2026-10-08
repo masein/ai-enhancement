@@ -7767,11 +7767,13 @@ function servedPinNow(m) {
   const d = (got || {}).d;
   if (!d || !d.why || d.down) return '';
   return el('p', { class: 'small warntext', 'data-served-pin-now': d.window ? 'window' : 'changed' },
-    d.why + ' ',
+    // 18c point 22: on the model's own page, never "use it on the model's page"
+    (d.window ? d.why.replace(/ Use the new window on the model's page if that's intended\.$/, '')
+      : d.why) + ' ',
     // 18b: a run's saved answers are kept by the pin: said before the press
     d.window ? el('span', { class: 'small se', 'data-served-window-note': m.id,
-      text: 'A run of it stopped part-way then starts again from its first question (its '
-        + 'saved answers are kept under the window it was asked with). ' }) : '',
+      text: 'If you use it, a run of this model that stopped part-way starts again from its '
+        + 'first question. ' }) : '',
     d.window ? el('button', { class: 'small', 'data-served-use-window': m.id,
       text: 'Use the new window', onclick: async () => {
         if (!whoName()) { askName(); return; }
@@ -19273,6 +19275,13 @@ function supersededBy(r) {
   const later = allRuns().filter(same).sort((a, b) => a.id - b.id)[0];
   return later ? later.id : null;
 }
+// 18c point 22: a row's Copy id leaves focus on its ⋯ button, never the page
+async function copyBack(id) {
+  const btn = document.querySelector(`[data-row-menu="q${id}"]`);
+  await copyText(id, '#' + id);
+  const again = document.querySelector(`[data-row-menu="q${id}"]`) || btn;
+  if (again && again.isConnected && again.focus) again.focus();
+}
 function queueActions(r) {
   const id = String(r.id);
   // 18: an agent run is the host's runner's: its page, never Resubmit or Cancel
@@ -19280,7 +19289,7 @@ function queueActions(r) {
     const key = agentKeyOf(r.id);
     return actCell('q' + id, key ? el('a', { class: 'btn ghost', 'data-agent-row-open': key,
       href: '#tab=runs&agent=' + encodeURIComponent(key), text: 'Open run ▸' }) : '',
-      [{ label: 'Copy id', act: 'copy-id', run: () => copyText(id, '#' + id) }]);
+      [{ label: 'Copy id', act: 'copy-id', run: () => copyBack(id) }]);
   }
   // 11g: the log opens in the reader; the raw text is one item further down
   const log = { label: 'Log', act: 'log', run: () => openReader({ kind: 'log', id: id },
@@ -19290,7 +19299,7 @@ function queueActions(r) {
   // failed benchmarks alone: the queue's own Resubmit can't take it
   const resubmit = r.suite === 'gguf' ? null
     : { label: 'Resubmit', act: 'resubmit', run: () => queueResubmit(r) };
-  const copy = { label: 'Copy id', act: 'copy-id', run: () => copyText(id, '#' + id) };
+  const copy = { label: 'Copy id', act: 'copy-id', run: () => copyBack(id) };
   const page = DATA.models.some(m => m.id === r.hf_id)
     ? { label: 'Open model page', act: 'model', run: () => navigate({ model: r.hf_id, topic: null }) }
     : null;
@@ -19565,7 +19574,7 @@ function vQueue(part = { form: true, list: true }) {
         + (r.started_at ? `\nstarted ${absT(r.started_at)}` : '')
         + (r.finished_at ? `\nfinished ${absT(r.finished_at)}` : ''),
       text: r.created_at ? rel(r.created_at) + ' ago' : '—' }),
-    el('td', { title: (r.note || '') + (r.arch && r.arch.length > 2 ? (() => {
+    el('td', { title: r.hf_id + (r.note ? '\n' + r.note : '') + (r.arch && r.arch.length > 2 ? (() => {
         try { const a = JSON.parse(r.arch);
               return `\n${a.arch || ''} · hidden ${a.hidden ?? '—'} · layers ${a.layers ?? '—'} · vocab ${a.vocab ?? '—'}`; }
         catch { return ''; } })() : ''), class: 'qc-model', 'data-run-name': String(r.id) },
@@ -19874,7 +19883,7 @@ function rentedRow(x, ncols) {
     b.n != null ? ` · ${N(b.n)} of ${N(b.of)}` : '',
     b.step_finish ? el('span', { 'data-box-task-finish': '1',
       text: ` · this part done ${rentedWhen(b.step_finish)}` }) : '',
-    b.box_finish ? el('span', { 'data-box-finish': '1',
+    b.box_finish && b.box_finish !== b.step_finish ? el('span', { 'data-box-finish': '1',
       text: ` · box free ${rentedWhen(b.box_finish)}` }) : '',
     // 17j: what else its box did — a parity check done, a step abandoned
     (b.notes || []).length ? el('span', { 'data-box-notes': '1',
@@ -19903,13 +19912,16 @@ function rentedRow(x, ncols) {
       // as a run here: its bar while it runs, beside the count
       x.status === 'running' ? runBar(x.n, x.of) : '',
       x.finish ? el('span', { class: 'se', 'data-rented-finish': '1',
-        text: `this part done ${rentedWhen(x.finish)}` }) : '',
+        text: `${many ? 'this part done' : 'done about'} ${rentedWhen(x.finish)}` }) : '',
       !many && ((x.boxes || [])[0] || {}).box_finish && x.boxes[0].box_finish !== x.finish
         ? el('span', { class: 'se', 'data-box-finish': '1',
           text: `box free ${rentedWhen(x.boxes[0].box_finish)}` }) : '',
       // 18b: done on its box, its bundle not imported yet: no score, said
-      x.status === 'done' ? el('span', { class: 'se', 'data-rented-not-imported': '1',
-        text: 'not imported yet: the fetch imports it, or import it by hand' }) : '',
+      x.status === 'done' ? (x.import_refused
+        ? el('span', { class: 'warntext', 'data-rented-refused': '1',
+          text: `its import was refused: ${x.import_refused}` })
+        : el('span', { class: 'se', 'data-rented-not-imported': '1',
+          text: 'not imported yet: the fetch imports it, or import it by hand' })) : '',
       odd.length ? el('span', { class: 'warntext', 'data-rented-attention': String(odd.length),
         title: odd.join('\n'), text: odd.length === 1 ? odd[0] : `${odd.length} boxes need a look` })
         : '',
@@ -20932,7 +20944,9 @@ function agentCard(c) {
     el('div', { class: 'agentscores', 'data-agent-ours': b.key },
       el('h4', { text: 'Ours' }),
       (b.runs || []).length ? el('ul', {}, b.runs.map(r => el('li', { 'data-agent-run': r.key },
-        el('span', { text: `${r.model} · ` }), el('b', { 'data-agent-words': r.key, text: r.words }),
+        el('span', { title: r.model, 'data-agent-run-name': r.key,
+          text: `${r.oracle ? 'oracle' : runName({ hf_id: r.model, suite: 'agent' })} · ` }),
+        el('b', { 'data-agent-words': r.key, text: r.words }),
         ' ', el('a', { href: '#tab=runs&agent=' + encodeURIComponent(r.key),
           'data-agent-open': r.key, text: 'Open run ▸' }))))
         : el('p', { class: 'small se', text: 'Not run here yet.' })),
@@ -20967,20 +20981,32 @@ function agentRefGroups(xs) {
 // 18b: a served model an agent run holds — said on its page and in the
 // Playground: a reply there waits behind the agent's requests, and its waits
 // count against the agent's time limits
+// 18c point 19: asked once a minute from the poll on a model's page or the
+// Playground (and once when first needed), the page redrawn only when it changed
+function loadAgentBusy() {
+  state.agentBusyAt = Date.now();
+  api('api/agent/busy').then(d => {
+    const got = d.models || {};
+    if (JSON.stringify(got) !== JSON.stringify(state.agentBusy || {})) {
+      state.agentBusy = got;
+      render();
+    } else state.agentBusy = got;
+  }).catch(() => {});
+}
 function agentBusy() {
-  if (LIVE && netReady() && (!state.agentBusyAt || Date.now() - state.agentBusyAt > 60000)) {
-    state.agentBusyAt = Date.now();
-    api('api/agent/busy').then(d => { state.agentBusy = d.models || {}; render(); })
-      .catch(() => {});
-  }
+  if (LIVE && netReady() && !state.agentBusyAt) loadAgentBusy();
   return state.agentBusy || {};
 }
+// 18c point 22: an end more than six days out says its date
+const busyWhen = t => (t && t * 1000 - Date.now() > 6 * 86400000
+  ? new Date(t * 1000).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short',
+    hour: '2-digit', minute: '2-digit' }) : rentedWhen(t));
 function agentBusyLine(id, where) {
   const b = agentBusy()[id];
   if (!b) return '';
   return el('p', { class: 'warn small', 'data-agent-busy': id, 'data-agent-busy-where': where },
     `${where === 'playground' ? pgName(id) + ': b' : 'B'}usy with an agent run`
-      + (b.until ? ` until about ${rentedWhen(b.until)}` : '') + (where === 'playground'
+      + (b.until ? ` until about ${busyWhen(b.until)}` : '') + (where === 'playground'
       ? '. A reply here waits behind its requests, and slows the agent, whose tasks have time '
         + 'limits.' : '. The Playground and runs on this model wait behind it, and slow it.'),
     ' ', el('a', { href: '#tab=runs&agent=' + encodeURIComponent(b.key),
@@ -21012,7 +21038,8 @@ function agentRunView() {
   S.file_sha256 ? `file ${String(S.file_sha256).slice(0, 16)}…` : '', S.where || '']
     .filter(Boolean).join(' · ');
   return [el('div', { class: 'card', 'data-agent-page': d.key }, back,
-    el('h2', { text: `${d.label} · ${d.model}` }),
+    el('h2', { title: d.model, 'data-agent-page-name': d.key, text: `${d.label} · `
+      + (d.oracle ? 'oracle (no model)' : runName({ hf_id: d.model, suite: 'agent' })) }),
     el('p', { 'data-agent-score': d.key }, el('b', { text: d.words })),
     el('p', { class: 'small se', 'data-agent-tokens-note': d.key, text: 'Tokens in adds up every '
       + 'step’s whole prompt; the last prompt is how big the conversation grew.' }),
@@ -21037,13 +21064,31 @@ function agentRunView() {
           + encodeURIComponent(r.task), text: r.task })),
         el('td', {}, el('span', { class: 'st st-' + (r.result === 'resolved' ? 'done'
           : r.result === 'error' ? 'muted' : 'failed'), text: AGENT_WORDS[r.result] || r.result }),
-          r.why ? el('div', { class: 'small se', text: r.why }) : '',
-          (r.again || []).length ? el('div', { class: 'small se', 'data-agent-tries': r.task,
-            text: `asked ${r.tries} times: ${r.again.join('; ')}` }) : ''),
+          agentWhy(r) ? el('div', { class: 'small se', text: agentWhy(r) }) : '',
+          // 18c point 22: "asked 3 times, each: <its reason>" — the reason once
+          agentTries(r) ? el('div', { class: 'small se', 'data-agent-tries': r.task,
+            text: agentTries(r) }) : ''),
         el('td', { class: 'num', text: n(r.steps) }), el('td', { class: 'num', text: n(r.tokens_in) }),
         el('td', { class: 'num', 'data-agent-last-prompt': r.task, text: n(r.last_prompt) }),
         el('td', { class: 'num', text: n(r.tokens_out) }),
         el('td', { class: 'num', text: r.minutes == null ? '—' : String(r.minutes) })))))))];
+}
+// 18c point 22: a task asked again after errors of ours, said once —
+// "asked 3 times, each: <reason>", or what the model's result came after
+function agentEach(r) {
+  const again = r.again || [];
+  return r.result === 'error' && again.length && again.every(w => w === r.why);
+}
+function agentWhy(r) {
+  return agentEach(r) ? '' : (r.why || '');
+}
+function agentTries(r) {
+  const again = r.again || [];
+  if (!again.length) return '';
+  if (agentEach(r)) return `asked ${r.tries} times, each: ${r.why}`;
+  const kinds = [...new Set(again)];
+  const n = again.length === 1 ? 'once' : again.length === 2 ? 'twice' : `${again.length} times`;
+  return `asked ${r.tries} times: ${n} before, after ${kinds.join('; ')}`;
 }
 const agentWords = t => { const n = t.split(/\s+/).filter(Boolean).length;
   return `${n.toLocaleString('en')} word${n === 1 ? '' : 's'}`; };
@@ -21079,7 +21124,8 @@ function agentTaskView() {
         st.thought ? el('details', { class: 'agentthought' }, el('summary', { text: 'What it '
           + `thought · ${agentWords(st.thought)}` }),
           el('pre', { 'data-agent-thought': String(k), text: st.thought })) : '',
-        st.said ? el('p', { 'data-agent-said': String(k), text: st.said }) : '',
+        st.said ? el('p', { 'data-agent-said': String(k), text: st.said,
+          style: 'white-space:pre-wrap;overflow-wrap:anywhere' }) : '',
         ...(st.ran || []).map(cmd => el('pre', { class: 'agentran', 'data-agent-ran': String(k),
           text: '$ ' + cmd })),
         ...(st.came_back || []).map(out))),
@@ -21164,9 +21210,24 @@ function renderTestAct() {
 // It opens the running and queued runs with their progress, then the last
 // five that finished, each linking to its model; All runs → at the bottom.
 const RUNNING_ST = new Set(['preflight', 'waiting_gpu', 'waiting_lock', 'running', 'canceling']);
+function rentedRunningRuns() {
+  return (((state.boxes || {}).runs) || []).filter(x => ['running', 'loading'].includes(x.status));
+}
 function rentedRunning() {
-  return (((state.boxes || {}).runs) || []).filter(x => ['running', 'loading'].includes(x.status))
-    .length;
+  return rentedRunningRuns().length;
+}
+// 18c point 18: a running rented run in the header's list, as the count has it
+function rentedRunLine(x) {
+  const name = runName({ hf_id: x.hf_id, suite: 'frontier' });
+  const N = v => Number(v).toLocaleString('en');
+  return el('div', { class: 'runline', 'data-run-line': x.id, 'data-run-rented': x.id },
+    el('span', { class: stClass('running'), text: x.status === 'loading' ? 'loading' : 'running' }),
+    el('a', { href: '#tab=runs', class: 'runname', title: x.hf_id, text: name,
+      onclick: e => { e.preventDefault(); popClose();
+        navigate({ tab: 'queue', model: null, topic: null }); } }),
+    el('span', { class: 'small se runwhat', text: `Frontier · ${rentedLabel(x)} · rented GPU` }),
+    el('span', { class: 'small se runprog', text: x.n != null ? `${N(x.n)} of ${N(x.of)}`
+      : (x.status_words || '') }));
 }
 function runsNow() {
   const q = state.queue || [];
@@ -21199,12 +21260,14 @@ function runLine(r, attrs = {}) {
 }
 function runsList(full = false) {
   const { running, queued, done } = runsNow();
+  const rented = rentedRunningRuns();
   const all = el('a', { href: '#tab=runs', class: 'runs-all', 'data-all-runs-link': '1',
     text: 'All runs →', onclick: e => { e.preventDefault(); popClose();
       navigate({ tab: 'queue', model: null, topic: null }); } });
   return el('div', { class: full ? 'runslist full' : 'runslist', 'data-runs-list': '1' },
-    running.length || queued.length
-      ? [...running, ...queued].map(r => runLine(r))
+    running.length || queued.length || rented.length
+      ? [...running.map(r => runLine(r)), ...rented.map(rentedRunLine),
+        ...queued.map(r => runLine(r))]
       : el('p', { class: 'small', 'data-nothing-running': '1', text: 'Nothing running.' }),
     done.length ? [el('p', { class: 'small se runhead', text: 'Finished' }),
       ...done.map(r => runLine(r, { 'data-run-done': '1' }))] : '',
@@ -27811,6 +27874,9 @@ if (LIVE) {
     if (state.tab === 'pipeline' || (answering && state.model && state.mtab === 'improve')) loadReview();
     if (state.tab === 'exam') loadExam();
     if (answering && state.tab === 'ai') aiTick();       // 16c
+    // 18c point 19: whether an agent run holds a served model, once a minute
+    if (answering && (state.model || state.tab === 'playground')
+        && Date.now() - (state.agentBusyAt || 0) > 60000) loadAgentBusy();
     // 17h: the rented boxes' list, every half minute while it is on the page —
     // the poll redrew it only when a run on the board changed
     // 18b: and every two minutes elsewhere, for the header's count of runs

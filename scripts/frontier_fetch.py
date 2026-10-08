@@ -381,6 +381,7 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
             for p in progress if of(str(p.get("dir"))) in gone], True
     # each bundle: copied, then imported (or, with no --sha, home to import by hand)
     home: dict[str, str] = {}                       # a step's folder -> what became of its bundle
+    why_refused: dict[str, str] = {}                # 18c: and the board's words when it refused
     for b in got["bundles"]:
         step = str(Path(b["path"]).parent)
         if of(step) in gone:
@@ -426,6 +427,7 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
         elif code != 0:
             problems.append(f"{here.name}'s import refused")
             home[step] = "refused"
+            why_refused[step] = summary(code, said).removeprefix("refused — ")
             failed = True
         else:
             seen[here.name] = b["sha256"]
@@ -536,7 +538,10 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
               **({"state": "abandoned", "line": ""} if of(str(p.get("dir"))) in gone else {}),
               "label": str(p.get("label") or Path(str(p.get("dir"))).name),
               "step": Path(str(p.get("dir"))).name, "seen_at": now, "reachable": True,
-              "safe": safe, "box_id": bid} for p in progress]
+              "safe": safe, "box_id": bid,
+              # 18c point 22: a refused import, said on Runs ("not imported yet" it read)
+              **({"import_refused": why_refused[str(p.get("dir"))]}
+                 if str(p.get("dir")) in why_refused else {})} for p in progress]
     return safe, failed, lines, steps, True
 
 

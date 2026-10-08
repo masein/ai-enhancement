@@ -1510,9 +1510,9 @@ def rented_runs(boxes: list[dict], now: float, posted: float | None) -> list[dic
         box = str(b.get("label") or "")
         if (b.get("state") == "abandoned"
                 or (b.get("parity") and step_status(b, now)[0] == "done")):
-            notes.setdefault(box, []).append(
+            notes.setdefault(box, []).append(            # 18c: never a step's id
                 "parity done" if b.get("parity") and b.get("state") != "abandoned"
-                else f"{b.get('step')} abandoned")
+                else "a step abandoned")
             continue
         if b.get("parity"):
             key = (b.get("model"), "parity", "off")
@@ -1573,6 +1573,8 @@ def rented_runs(boxes: list[dict], now: float, posted: float | None) -> list[dic
         behind = bool(posted and heard and heard < posted - 60) or any(
             k in ("unreached", "quiet") for k, _ in st)
         labels = sorted({str(b.get("label")) for b in steps if b.get("label")})
+        # 18c point 22: a bundle the board refused, as the fetch said it
+        refused = next((str(b["import_refused"]) for b in steps if b.get("import_refused")), "")
         started = sorted(str(b.get("started_at")) for b in steps if b.get("started_at"))
         # 17j: a one-box run's line is its box's: what else the box did is said
         # on it; a run on several says it on each box's line
@@ -1583,6 +1585,7 @@ def rented_runs(boxes: list[dict], now: float, posted: float | None) -> list[dic
             "status_words": words, "n": n if counted else None, "of": of if counted else None,
             "benchmarks": bench if len(bench) > 1 else [],
             "boxes_n": len(steps), "finish": finish, "attention": odd,
+            **({"import_refused": refused[:300]} if refused else {}),
             "heard": heard, "behind": behind, "started_at": started[0] if started else None,
             "where": "rented GPU · " + (f"box {labels[0]}" if len(labels) == 1 else
                                         f"boxes {', '.join(labels)}")
