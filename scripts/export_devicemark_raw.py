@@ -38,6 +38,7 @@ the reasoning lab, Privacy Leakage and Mobile-MMLU-Pro never leave the server.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -504,6 +505,11 @@ def refused(tasks) -> str:
     return restrictions.stays_here(tasks)
 
 
+def es_risky(text: str) -> bool:
+    import export_safe as es
+    return bool(es._RISKY.search(text))
+
+
 def export_row(row: Path, out: Path, public: bool | None = None, runs: list[dict] | None = None,
                say=print, publish: bool = True, questions=...) -> Path:
     """one row's folder, scrubbed, under out/public or out/private — 17i: its
@@ -530,7 +536,12 @@ def export_row(row: Path, out: Path, public: bool | None = None, runs: list[dict
     # 17g: never public for a model the board doesn't know as public, whatever
     # the flags — --private may still keep a public one private
     pub = public_by_default(row, setup) and public is not False and publish
-    dest = out / ("public" if pub else "private") / row.name
+    # 18b: a row's name the scrub would change (a model named after an
+    # address) never names its folder
+    plain = row.name.replace("__", "/")             # the model's id, as the scrub reads it
+    name = row.name if scrub(plain) == plain and not es_risky(plain) else \
+        "devicemark-" + hashlib.sha256(row.name.encode()).hexdigest()[:12]
+    dest = out / ("public" if pub else "private") / name
     if dest.exists():
         shutil.rmtree(dest)
     dest.mkdir(parents=True)

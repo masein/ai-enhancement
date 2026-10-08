@@ -215,7 +215,9 @@ def export_run(sid: int, out: Path, public: bool | None = None,
              "where": where, "tasks": per_setup,
              **({"box": es.pick(rented, BOX)} if rented else {})}
     pub = known_public(r) and public is not False and publish
-    dest = out / ("public" if pub else "private") / f"{row.name}-frontier-run-{sid}"
+    # 18b: by its run's number — a model's name is the board's, and went out
+    # unscrubbed (served__<a tailnet address>-frontier-run-2)
+    dest = out / ("public" if pub else "private") / f"frontier-run-{sid}"
     if dest.exists():
         shutil.rmtree(dest)                     # 17i: nothing of an earlier export left in it
     dest.mkdir(parents=True)
@@ -246,7 +248,10 @@ def export_run(sid: int, out: Path, public: bool | None = None,
         + (f" ({left_launch} launch flags or variables)" if left_launch else "") + ". "
         + "The log holds only the runner's own lines"
         + (": " + "; ".join(f"{n} left out ({w})" for w, n in left.items()) if left else "")
-        + ". Then scrubbed: " + "; ".join(dmx.WHAT_THE_SCRUB_REMOVES) + ".\n"),
+        + ". ")
+        # 18b: the list of what the scrub removes is ours, and goes out as it
+        # is — scrubbed, it read "the tailnet's IPv6 ([address])"
+        + "Then scrubbed: " + "; ".join(dmx.WHAT_THE_SCRUB_REMOVES) + ".\n",
         encoding="utf-8")
     return dest
 
