@@ -4953,6 +4953,36 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 19 — speed tests: the cheapest box per answer (8 Oct)
+
+- `scripts/speed_test.py <box> --price … [--gguf … --server …]`, in the runner
+  image on a rented GPU (docs/REMOTE-RUNS.md § Speed tests). It checks the box
+  before anything downloads (GPU name, count, memory, the driver's CUDA),
+  fetches each file once into `/workspace/files`, then runs the box's settings
+  one after another. Never the board: no post, no bundle, no score.
+- The workload: Frontier's own requests (`frontier.prompt`, the card's
+  sampling, the budgets, the thinking switch, the seeds) through one
+  streaming client (`http.client`, SSE), the same for llama-server and vLLM:
+  3 minutes of GPQA warm-up, 20 of GPQA thinking on (81,920), 5 of MMLU-Pro
+  thinking off 5-shot. Tokens counted as they stream (vLLM's continuous
+  usage; llama-server's a token a chunk, made exact by its last usage).
+- One line a setting and `speed.json`: tokens/s, answers/h, MMLU-Pro prompt
+  tokens/s (read and cached), $ per million output tokens, peak memory,
+  waited/cut/refused, MTP acceptance, a sanity score (under half: broken).
+- A shared pool (`--kv-unified`): llama-server fails every request in flight
+  when it fills, so the client admits only what fits (in flight + the
+  prompt + 2,048) and cuts the request admitted last before it fills, asking
+  it again later. The pool is sized from the pilot's slope; one that doesn't
+  start is tried 10% smaller, twice.
+- Several GPUs: one llama-server a GPU, `CUDA_VISIBLE_DEVICES` and its own
+  port, one line. vLLM 0.30.0 (22 Sep) from `scripts/speed_vllm_requirements.txt`
+  (196 packages, hashed, `--exclude-newer 2026-09-24`, wheels only, Python
+  3.12 / glibc 2.35), BF16 weights at `995ad96eacd9`, FP8 cache (BF16 if FP8
+  doesn't start), its torch on CUDA 13.0.
+- V100: the tarball is built for sm 80–120, not 70; a V100 box stops before
+  the GGUF. The sm_70 build is `LLAMA_CUDA_ARCHS="70;80;86;89;90;120"
+  scripts/build_llama_tarball.sh …`, on the server where the fork is.
+- Tests: `tests/test_19_speed.py` (stand-in servers, invented questions).
 ### 18c.2 — agent runs: before the full run (8 Oct)
 
 - **Asked again only with evidence it came before the agent** (point 5,
