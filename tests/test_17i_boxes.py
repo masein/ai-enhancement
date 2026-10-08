@@ -153,9 +153,17 @@ def test_8_safe_is_forgotten_when_reached_and_not_and_kept_across_a_restart(
                     "1.1.1.1:41"]) == 0
     state["down"] = {"1.1.1.1"}
     capsys.readouterr()
+    # 18b: read safe before this fetch started: destroyed once unreached for
+    # 30 minutes, never on two rounds one --every apart — a clock that moves
+    # half of that a round
+    clock = {"t": time.time()}
+    monkeypatch.setattr(ff.time, "sleep", lambda s: clock.update(t=clock["t"] + 15.5 * 60))
+    monkeypatch.setattr(ff.time, "time", lambda: clock["t"])
     assert ff.main(["--key", str(key), "--dest", str(dest), "--sha", PHONE, "--no-board",
                     "--every", "1s", "1.1.1.1:41"]) == 0    # 511854e: loops for ever
-    assert "destroyed: done" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "destroyed once it has been unreached for 30 min" in out, out
+    assert "destroyed: done" in out
     assert "1.1.1.1" not in (dest.parent / "safe-boxes.json").read_text()
 
 
@@ -388,7 +396,7 @@ def test_12_a_parity_verdict_is_its_files_and_shown_only_for_a_build_asked(
                {"/workspace/orig/A3-parity/parity.jsonl": par})
     ff, calls, key = fetch_one(tmp_path, monkeypatch, {}, *listing,
                                steps=[("orig", "A3-parity")],
-                               compare=(1, "Not the same setup: 38.0% against 42.4%\n"))
+                               compare=(3, "Not the same setup: 38.0% against 42.4%\n"))
     assert main_of(ff, key, dest, "--parity", f"served/orig={server}", "1.1.1.1:41") == 1
     v = json.loads((dest.parent / "parity" / "verdicts.json").read_text())["orig"]
     assert v["file_sha256"] == hashlib.sha256(par.read_bytes()).hexdigest()

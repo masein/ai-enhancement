@@ -356,14 +356,14 @@ def _frontier_rows(task: str, d: Path) -> dict[str, dict]:
         waits = any(r["ok"] is None for r in rs)
         first = rs[0]
         text = first["answer"] or ""
-        think = text[:len(text) - len(fb.visible(text))].strip() if "</think>" in text else ""
+        think = fb.thinking_of(text)            # 18b: every block, wherever it sits
         n = len(rs)
         out[it["id"]] = {
             "q": shown["q"], "options": shown.get("options") or [],
             "subject": shown.get("subject") or "", "reference": shown.get("reference"),
             "context": shown.get("context"), "order": [shown.get("subject") or "", k],
             "res": {"ok": None if waits else right * 2 > n, "answer": fb.visible(text),
-                    "thinking": re.sub(r"</?think>", "", think).strip(),
+                    "thinking": think,
                     "verdict": fb.verdict(task, first) + (
                         f" · {right} of {n} runs right" if n > 1 else ""),
                     "score": None if waits else right / n,

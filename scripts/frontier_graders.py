@@ -143,8 +143,39 @@ def render(slot: str, item: dict, run: dict) -> str:
     raise KeyError(slot)
 
 
+def think_split(text: str) -> tuple[str, list[str], bool]:
+    """18b: (the text outside every thinking block, each block's thinking,
+    whether one never closed) — every block wherever it sits, not only one
+    at the start; a reply that begins inside its thinking (its template
+    opened <think> in the prompt: a </think> before any <think>) has that
+    first part as thinking; a block never closed runs to the end. Linear:
+    found by position, never by a pattern that backtracks"""
+    t = text or ""
+    thoughts: list[str] = []
+    c, o = t.find("</think>"), t.find("<think>")
+    if c >= 0 and (o < 0 or c < o):
+        thoughts.append(t[:c])
+        t = t[c + len("</think>"):]
+    out, i, unclosed = [], 0, False
+    while True:
+        o = t.find("<think>", i)
+        if o < 0:
+            out.append(t[i:])
+            break
+        out.append(t[i:o])
+        c = t.find("</think>", o + len("<think>"))
+        if c < 0:
+            thoughts.append(t[o + len("<think>"):])
+            unclosed = True
+            break
+        thoughts.append(t[o + len("<think>"):c])
+        i = c + len("</think>")
+    return "".join(out).replace("</think>", "").strip(), thoughts, unclosed
+
+
 def _visible(text: str) -> str:
-    return re.sub(r"(?s)^\s*(?:<think>)?.*?</think>", "", text or "", count=1).strip()
+    """the answer the grader is given: the text outside every thinking block"""
+    return think_split(text)[0]
 
 
 _SQA_WORDS = {"A": "correct", "B": "incorrect", "C": "not attempted"}
@@ -261,8 +292,17 @@ def _lenient(raw: str):
 FIELDS = ("extracted_final_answer", "reasoning", "correct", "confidence")
 # 17j: an object a verdict can be in opens with one of its fields' names — a
 # brace in prose, LaTeX ("\left\{ … \right.") or code ("for (…) {") is none
-_OPENS = re.compile(r"\{\s*([\"']?)(" + "|".join(FIELDS) + r")\1\s*:")
-_KEY_AT = re.compile(r"[{,]\s*([\"']?)(" + "|".join(FIELDS) + r")\1\s*:")
+# 18b: a name in quotes may follow on the next line; a bare name only on the
+# same line — "S = {" ending a line, then a "reasoning:" line, is no object
+_NAMES = "|".join(FIELDS)
+_OPENS = re.compile(r"\{(?:\s*([\"'])(" + _NAMES + r")\1\s*|[ \t]*()(" + _NAMES
+                    + r")[ \t]*):")
+_KEY_AT = re.compile(r"[{,](?:\s*([\"'])(" + _NAMES + r")\1\s*|[ \t]*()(" + _NAMES
+                     + r")[ \t]*):")
+
+
+def _name(m) -> str:
+    return m.group(2) or m.group(4)
 AMBIGUOUS = "ambiguous"
 
 
@@ -273,7 +313,7 @@ def _by_fields(raw: str):
     string). AMBIGUOUS when a field is named twice (an object quoted inside
     its reasoning): nothing in it is read; None when it holds no verdict"""
     keys = list(_KEY_AT.finditer(raw))
-    names = [m.group(2) for m in keys]
+    names = [_name(m) for m in keys]
     if "correct" not in names:
         return None
     if len(set(names)) != len(names):
@@ -285,7 +325,7 @@ def _by_fields(raw: str):
         v = raw[m.end():stop].strip()
         if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
             v = v[1:-1]
-        out[m.group(2)] = v
+        out[_name(m)] = v
     return out
 
 
@@ -320,6 +360,57 @@ def _json_objects(text: str) -> tuple[list[tuple[int, int, object]], bool]:
         i = b
 
 
+def _outer_verdicts(text: str, found: list) -> list:
+    """18b: an object around the verdict whose first key isn't a field's name
+    ({"judgement": {…}, "correct": "no"}) — whole JSON with "correct" at its
+    top. It is the verdict with every object inside it: one verdict, or
+    AMBIGUOUS when they disagree"""
+    import json
+    dec = json.JSONDecoder()
+    outer: list = []
+    for k, m in enumerate(re.finditer(r'\{\s*"', text)):
+        a = m.start()
+        if k > 200 or any(x <= a < y for x, y, _ in outer):
+            continue
+        try:
+            o, b = dec.raw_decode(text, a)
+        except ValueError:
+            continue
+        if isinstance(o, dict) and "correct" in o and next(iter(o)) not in FIELDS:
+            outer.append((a, b, o))
+    for x, y, o in outer:
+        inside = [f for f in found if x <= f[0] and f[1] <= y]
+        says = {_yes_no(o.get("correct"))} | {
+            _yes_no(f[2].get("correct")) for f in inside
+            if isinstance(f[2], dict) and "correct" in f[2]}
+        found = [f for f in found if f not in inside] + [(x, y, o if len(says) == 1
+                                                          else AMBIGUOUS)]
+    return sorted(found, key=lambda f: f[0])
+
+
+def _quoted(line: str) -> bool:
+    """18b: a line quoted in markdown (> …): the response's words, not the judge's"""
+    return line.lstrip().startswith(">")
+
+
+def whole_verdict(slot: str, text: str) -> bool:
+    """18b point 19: a reply that reached its cap is graded only when it is
+    one whole verdict object — nothing before or after it, nothing cut. A
+    reply in the line form, or cut mid-reasoning after a quoted "correct:
+    yes", is cut. The other graders read a lone grade: theirs stands"""
+    if slot != "hle":
+        return True
+    import json
+    t = re.sub(r"^```(?:json)?\s*|\s*```$", "", (text or "").strip()).strip()
+    if not t.startswith("{") or _close_of(t, 0) != len(t):
+        return False
+    try:
+        o = json.loads(t)
+    except ValueError:
+        o = _lenient(t) if _OPENS.match(t) else None
+    return isinstance(o, dict) and _yes_no(o.get("correct")) is not None
+
+
 def _norm(t: str) -> str:
     return " ".join(re.sub(r"[^\w\s']", " ", str(t).lower()).split())
 
@@ -341,8 +432,17 @@ def _field_text(field: str) -> str:
 
 # 17j: a placeholder in angle brackets, "..." — and in square brackets only
 # the prompt's own words ("[response]"): "[Verse]" is an answer
-_PLACEHOLDER = re.compile(r"<[^<>]*[A-Za-z]{3,}[^<>]*>|\[(?:response|correct_answer|question)\]|"
-                          r"\.\.\.|…")
+_PLACEHOLDER = re.compile(r"\[(?:response|correct_answer|question)\]|\.\.\.|…")
+# 18b: an angle-bracket placeholder found by its brackets first, then its
+# letters — the one pattern took 2.7 s on a 1,200-letter value
+_ANGLE = re.compile(r"<([^<>]*+)>")
+
+
+def _placeholder(v: str) -> bool:
+    if _PLACEHOLDER.fullmatch(v):
+        return True
+    m = _ANGLE.fullmatch(v)
+    return bool(m and re.search(r"[A-Za-z]{3}", m.group(1)))
 
 
 def _template(field: str, v) -> bool:
@@ -360,7 +460,7 @@ def _template(field: str, v) -> bool:
         return num is None or float(num.group(1)) == 100
     if not isinstance(v, str):
         return False
-    if _PLACEHOLDER.fullmatch(v.strip()):
+    if _placeholder(v.strip()):
         return True
     n = _norm(v)
     own = _field_text(field)
@@ -396,6 +496,7 @@ def _hle_object(text: str) -> tuple[str, dict | None, str]:
     "correct:" line that says otherwise than the object is a conflict"""
     import json
     found, cut = _json_objects(text)
+    found = _outer_verdicts(text, found)
     outside, k = "", 0
     for a, b, _ in found:
         outside += text[k:a] + "\n"
@@ -414,7 +515,10 @@ def _hle_object(text: str) -> tuple[str, dict | None, str]:
             and not re.sub(r"[\s`*_.,;]", "", text[b:end if end >= 0 else len(text)])
     alone = [(a, b, o) for a, b, o in real if by_itself(a, b)]
     lines = bool(re.search(rf"(?im)^{_W}(extracted_final_answer|reasoning){_W}:", outside))
-    pool = alone or ([] if lines else real)
+    # 18b: inside a sentence, an object that holds nothing but its verdict is
+    # a quote (the response's own {"correct": "yes"}, or {correct: yes}) —
+    # never the judge's verdict
+    pool = alone or ([] if lines else [x for x in real if set(x[2]) - {"correct"}])
     if not pool:
         return "none", None, outside
     v_alone = {_yes_no(o["correct"]) for _, _, o in alone}
@@ -428,7 +532,8 @@ def _hle_object(text: str) -> tuple[str, dict | None, str]:
     if len(verdicts) > 1:
         return "conflict", None, outside
     said = {m.group(1).lower() for m in
-            re.finditer(rf"(?im)^{_W}correct{_W}:{_W}(yes|no)\b", outside)}
+            re.finditer(rf"(?im)^{_W}correct{_W}:{_W}(yes|no)\b", outside)
+            if not _quoted(m.group(0))}
     if said <= verdicts:
         return "grade", distinct[-1], outside
     return ("conflict", None, outside) if alone else ("none", None, outside)
@@ -509,7 +614,15 @@ def read(slot: str, text: str, item: dict) -> dict:
         # "correct": "yes" line of an example printed over several lines,
         # alone, was taken for the verdict
         w = _W
-        m = _last(rf"(?im)^{w}correct{w}:{w}(yes|no)[\s*_`\"'.]*$", outside)
+        # 18b: a line quoted from the response (> correct: no) is not the
+        # judge's verdict — and one that says otherwise than the judge's is a
+        # second verdict: no grade. The judge's own last line stands (17d)
+        found = list(re.finditer(rf"(?im)^{w}correct{w}:{w}(yes|no)[\s*_`\"'.]*$", outside))
+        own = [x for x in found if not _quoted(x.group(0))]
+        m = own[-1] if own else None
+        if m and any(x.group(1).lower() != m.group(1).lower() for x in found
+                     if _quoted(x.group(0))):
+            return unread(text, shown)
         conf = _last(rf"(?im)^{w}confidence{w}:{w}(\d{{1,3}})\s*%?[\s*_`\"'.]*$", outside)
         ext = _last(rf"(?im)^{w}extracted_final_answer{w}:\s*(.+)$", outside)
         if not m:

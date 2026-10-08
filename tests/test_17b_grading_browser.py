@@ -137,12 +137,16 @@ def test_start_pressed_sends_once_and_stop_then_carry_on(live, page, monkeypatch
     assert presses == ["masein"]
     # the batch out, its first reply held: Stop, then the card says why it waits
     page.wait_for_selector("[data-frontier-stop]")
+    # 18b: while it sends, the card says to press Stop before a deploy
+    assert card.locator("[data-frontier-deploy]").inner_text().startswith(
+        "Press Stop before a deploy: the board restarting sends the requests in flight again")
     for _ in range(100):
         if asked:
             break
         time.sleep(0.05)
     card.locator("[data-frontier-stop]").click()
     page.wait_for_function("state.ai.frg && state.ai.frg.stopped")
+    assert card.locator("[data-frontier-deploy]").count() == 0     # stopped: nothing in flight
     gate.set()
     page.wait_for_selector("[data-frontier-waits]")
     assert "Stopped by masein: " in card.locator("[data-frontier-waits]").inner_text()

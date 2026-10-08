@@ -123,13 +123,13 @@ def test_2_each_side_says_what_answered_and_compare_refuses_another_setup(  # no
         assert fp.main(["compare", str(spath), str(bpath)]) == 0
         assert "compared by name" in capsys.readouterr().out
         # another file's sha256: refused
-        assert fp.main(["compare", str(spath), str(bpath), "--file-sha256", "0" * 64]) == 1
+        assert fp.main(["compare", str(spath), str(bpath), "--file-sha256", "0" * 64]) == fp.DIFFERENT
         assert "the box's file has sha256" in capsys.readouterr().out
         # the server registered with no routing: the box isn't the registered setup
         db.served_put({**rec, "env": ""})
         assert fp.main(["ask", "--as", SERVED, "--out", str(spath), "--n", "50"]) == 0
         capsys.readouterr()
-        assert fp.main(["compare", str(spath), str(bpath), "--file-sha256", box["sha"]]) == 1
+        assert fp.main(["compare", str(spath), str(bpath), "--file-sha256", box["sha"]]) == fp.DIFFERENT
         out = capsys.readouterr().out
         assert out.startswith("Not the same setup: routing: the box ran with "
                               "LLAMA_MOE_ROUTE_MODE=lookahead; served/lda-box is registered "
@@ -143,7 +143,7 @@ def test_2_each_side_says_what_answered_and_compare_refuses_another_setup(  # no
     finally:
         fake.close()
     # the two files given the wrong way round
-    assert fp.main(["compare", str(bpath), str(spath)]) == 1
+    assert fp.main(["compare", str(bpath), str(spath)]) == fp.DIFFERENT
     assert "give the server's, then the box's" in capsys.readouterr().out
 
 

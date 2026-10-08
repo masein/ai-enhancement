@@ -178,12 +178,12 @@ def main(argv: list[str] | None = None) -> int:
                             f"{bh.get('n')}: ask both with the same --n")
         if problems:
             print("Not the same setup: " + "; ".join(problems))
-            return 1
+            return DIFFERENT
         got = fb.parity_compare(srows, brows)
         print(got["words"])
         for n in notes:
             print(n)
-        return 0 if got["ok"] else 1
+        return 0 if got["ok"] else DIFFERENT
     from service import db, served
     from service import frontier as sf
     db.init()
@@ -203,6 +203,12 @@ def main(argv: list[str] | None = None) -> int:
     took = time.time() - t0
     print(f"\n{n} answers in {took / 60:.0f} min ({took / max(1, n):.1f} s an answer) · {a.out}")
     return 0
+
+
+# 18b point 22: compare's own exit codes — 0 the same, DIFFERENT not the same;
+# anything else (1: a file it couldn't read; the board's container down) is
+# no verdict, and the fetch asks again next round
+DIFFERENT = 3
 
 
 if __name__ == "__main__":

@@ -30,7 +30,9 @@ def test_the_cases_0abb757_got_wrong_are_the_files_own():
     """the file's two lists are its cases that 0abb757 read wrong — each is a
     case here, and reads as wanted now (the test above)"""
     ids = {c["id"] for c in CASES["cases"]}
-    assert len(CASES["cases"]) == 134
+    # the reviewers' 134, and 18b's eight (points 20 and 26) beside them
+    assert len([c for c in CASES["cases"] if not c.get("added_in")]) == 134
+    assert len([c for c in CASES["cases"] if c.get("added_in") == "18b"]) == 8
     for name in ("wrong_grade_on_0abb757", "unread_on_0abb757"):
         assert set(CASES[name]) <= ids, name
     assert len(CASES["wrong_grade_on_0abb757"]) == 9 and len(CASES["unread_on_0abb757"]) == 14
