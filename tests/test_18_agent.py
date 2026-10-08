@@ -314,6 +314,12 @@ def test_it_carries_on_after_a_kill_and_never_asks_a_finished_task_again(server_
     assert not any("k18" in x for x in cmd) and "k18" not in json.dumps(
         {k: v for k, v in (w["harbor"][-1]["env"] or {}).items() if k != "PATH"})
     assert any(x.startswith("relay=http://127.0.0.1:") for x in cmd)
+    run = ar.read_json(ar.run_dir(tmp_path, "swebench-multilingual", MODEL, 1, False) / "run.json")
+    for k in ("versions", "sampling", "window", "prompt_sha256", "file_sha256", "build", "flags",
+              "tasks_sha256"):
+        assert k in run, k                                          # what the run leaves
+    assert run["sampling"] == {"temperature": 1.0, "top_p": 0.95, "top_k": 20,
+                               "presence_penalty": 0.0, "thinking": "on"}
 
 
 def test_an_error_of_ours_is_asked_again_three_times_at_most(server_world, capsys):

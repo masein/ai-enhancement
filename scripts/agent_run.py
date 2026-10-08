@@ -376,6 +376,16 @@ def override(rdir: Path) -> Path:
     return p
 
 
+def prompt_hash(config: str) -> str:
+    """the agent's prompt — its config's system and instance templates — as
+    installed in the venv"""
+    try:
+        import agent_host_mini as hm
+        return hm.prompt_sha(hm.load_config(config))
+    except Exception as e:                              # noqa: BLE001 — said, never fatal
+        return f"unknown ({type(e).__name__})"
+
+
 def harbor_cmd(task: Path, job: str, rdir: Path, b: dict, a: argparse.Namespace,
                model: str, relay: str, reach: list[str]) -> list[str]:
     cmd = ["harbor", "run", "-p", str(task), "-k", "1", "-n", "1", "-o", str(rdir / "jobs"),
@@ -541,7 +551,8 @@ def main(argv: list[str] | None = None) -> int:
         "versions": v, "sampling": None if a.oracle else {**ab.SAMPLING, "thinking": "on"},
         "window": info.get("window"), "file_sha256": info.get("file_sha256"),
         "build": info.get("build"), "flags": info.get("flags"), "where": "this server",
-        "docker_root": droot, "started_at": started, "by": a.by})
+        "docker_root": droot, "started_at": started, "by": a.by,
+        "prompt_sha256": None if a.oracle else prompt_hash(b["config"])})
     reach = reach_targets(llama=host_address(info.get("base_url") or "")) if not a.oracle else []
     todo = [(t, k) for t in picked for k in range(1, a.attempts + 1)
             if state_of(rdir, t, k)[0] == "todo"]
