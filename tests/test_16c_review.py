@@ -136,9 +136,10 @@ def test_a_lasting_rate_limit_pauses_like_the_keys_limit(svc, monkeypatch):
     tl = llm.tally(bid)
     # each request tried with its back-off, then twenty in a row: paused, none failed
     assert len(chat.sent) == 20 * 4 and (tl["failed"], tl["answered"]) == (0, 0)
+    # 18c point 13: it waits for Carry on — it took itself up after 10 minutes
     assert tl["halted"] == ("waiting: OpenRouter refused 20 requests in a row — OpenRouter is "
-                            "limiting this key’s requests (HTTP 429). It tries again in 10 "
-                            "minutes")
+                            "limiting this key’s requests (HTTP 429). It waits for Carry on: "
+                            "nothing more is sent until then")
 
 
 # ---------------------------------------------------------------------------
