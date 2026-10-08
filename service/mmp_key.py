@@ -86,6 +86,7 @@ def set_scope(value: str, by: str) -> dict:
 class LabellerChat(llm.OpenRouterChat):
     """a labeller's batch: OpenRouter's, held while the run is stopped"""
     HALT_TAIL = ", or now with Carry on"
+    HALT_PRESS = "Carry on"             # 18b: a halt waits for it
 
     def waiting(self) -> str:
         return STOPPED if stopped() else super().waiting()

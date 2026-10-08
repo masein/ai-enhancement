@@ -59,6 +59,19 @@ IMPORT = ["sudo", "docker", "compose", "exec", "-T", "bench", "python",
 # 17j: an import refused for an off run's thinking share — the board's words,
 # before 17j (more than 1%) and since (more than a quarter)
 THINK_REFUSED = re.compile(r"thinking was off, and [\d,]+ of its [\d,]+ answers hold thinking")
+SAME, DIFFERENT = 0, 3                  # 18b: frontier_parity.py compare's verdicts
+UNREACHED_S = 30 * 60                   # 18b: a box read safe before this fetch: unreached this long
+
+
+def think_only(said: str) -> bool:
+    """18b: an import refused for its thinking share and nothing else — every
+    reason it gave ("refused — …" lines, "… — not imported" parts) is that"""
+    why = []
+    for line in (said or "").splitlines():
+        if line.startswith("refused — "):
+            why.append(line)
+        why += [x for x in line.split(" · ") if x.rstrip().endswith("— not imported")]
+    return bool(why) and all(THINK_REFUSED.search(x) for x in why)
 COMPARE = ["sudo", "docker", "compose", "exec", "-T", "bench", "python",
            "scripts/frontier_parity.py", "compare"]
 _BOX = re.compile(r"(?:(?P<user>[A-Za-z0-9._-]+)@)?(?P<host>[A-Za-z0-9.-]+):(?P<port>\d+)")
@@ -401,7 +414,7 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
         code, said = run([*IMPORT, str(here), "--by", a.by, "--file-sha256", shas[model]],
                          cwd=REPO, timeout=IMPORT_S)
         lines.append(f"  {here.name}: {words} · {summary(code, said)}")
-        if code != 0 and THINK_REFUSED.search(said or ""):
+        if code != 0 and think_only(said):
             # 17j: refused for its thinking share — the file is home and the
             # box has no other to give: the box can go, said. The board tries
             # it again each round, and it imports by hand once the board
@@ -451,10 +464,19 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
             first = next((x for x in said.splitlines() if x.strip()), f"exit {code}")
             # 17g: kept, said on a line of its own every round, and the exit
             # code says when a build isn't the same or couldn't be compared.
-            # 17i: with the box, the file's sha256 and when
-            verdicts[build] = {"same": code == 0 and first.startswith("The same"),
-                               "first": first, "box": bid, "file_sha256": f["sha256"],
-                               "server": parity[model], "at": time.time()}
+            # 17i: with the box, the file's sha256 and when. 18b: a verdict
+            # only when the compare ran — "service bench is not running" was
+            # kept as "not the same", every round
+            if code in (SAME, DIFFERENT):
+                verdicts[build] = {"same": code == SAME and first.startswith("The same"),
+                                   "first": first, "box": bid, "file_sha256": f["sha256"],
+                                   "server": parity[model], "at": time.time()}
+            else:
+                # its file is home: the box needn't wait for it — the round has
+                # failed all the same, and the compare is asked again
+                lines.append(f"  {build}'s parity compare didn't run ({first[:160]}) — asked "
+                             "again next round")
+                failed = True
         else:
             lines.append(f"  {build}'s parity file is at {local} — give --parity "
                          f"{model}=<the server's file> to compare it")
@@ -463,8 +485,14 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
     for build in sorted({build_of(d) for d in started if build_of(d)}):
         for label in sorted({Path(d).name.rsplit("-", 1)[0] for d in started
                              if build_of(d) == build}):
-            for step in fbx.planned(label):
+            for step, spec in fbx.steps_of(label):
                 if f"/workspace/{build}/{step}" not in started and f"{build}/{step}" not in gone:
+                    # 18b: a step whose answers the board holds ran elsewhere
+                    # (its box gone, the rest on this one): done, said
+                    if imported_here(a, f"served/{build}", spec):
+                        lines.append(f"  {build}/{step}: imported already from another box — "
+                                     "done")
+                        continue
                     problems.append(f"{build} {step} hasn't started")
     # and every step on the box, planned or not: whole, and its file home
     now = time.time()
@@ -510,6 +538,27 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
               "step": Path(str(p.get("dir"))).name, "seen_at": now, "reachable": True,
               "safe": safe, "box_id": bid} for p in progress]
     return safe, failed, lines, steps, True
+
+
+def imported_here(a: argparse.Namespace, model: str, spec: tuple) -> bool:
+    """18b point 25: whether the board holds a planned step's answers — every
+    benchmark of it whole, or its shard — asked once a round a build"""
+    thinking, tasks, shard = spec[0], spec[1], spec[2]
+    if thinking not in ("on", "off") or not tasks:
+        return False                                # the parity step: never imported
+    cache = getattr(a, "imported", None)
+    if cache is None:
+        cache = a.imported = {}
+    if model not in cache:
+        code, said = run([*IMPORT, "--imported", model], cwd=REPO, timeout=IMPORT_S)
+        try:
+            cache[model] = json.loads(said.strip().splitlines()[-1]) if code == 0 else {}
+        except (ValueError, IndexError):
+            cache[model] = {}
+    held = (cache.get(model) or {}).get(thinking) or {}
+    i = int(shard.split("/")[0]) if shard else None
+    return all(t in (held.get("tasks") or []) or (i is not None and i in (
+        (held.get("shards") or {}).get(t) or [])) for t in tasks)
 
 
 def post_boxes(steps: list[dict], dest: Path, asked: list[str] | None = None,
@@ -615,7 +664,10 @@ def read_safe(f: Path) -> dict:
     for k, v in (got.items() if isinstance(got, dict) else []):
         if isinstance(k, str) and isinstance(v, dict):
             out[k] = {"at": float(v.get("at") or 0), "missed": int(v.get("missed") or 0),
-                      **({"gone": True} if v.get("gone") else {})}
+                      **({"gone": True} if v.get("gone") else {}),
+                      # 18b: when it was first not reached, kept across a restart
+                      **({"missed_since": float(v["missed_since"])}
+                         if isinstance(v.get("missed_since"), (int, float)) else {})}
     return out
 
 
@@ -720,10 +772,12 @@ def main(argv: list[str] | None = None) -> int:
     a.abandoned_matched = set()
     keep_sudo()
     rounds = 0
+    began = time.time()
     while True:
         failed_any, done, reached = False, [], []
         rounds += 1
         now = time.time()
+        a.imported = {}                 # 18b: the board's imports, asked once a round
 
         def safe_entry(bid: str) -> dict | None:
             e = was_safe.get(bid)
@@ -740,14 +794,24 @@ def main(argv: list[str] | None = None) -> int:
             e = safe_entry(bid)
             if not got and e:
                 # 17h: safe on an earlier round, not reached now: destroyed —
-                # done (--every ran for ever). 17j: after two rounds unreached
+                # done (--every ran for ever). 17j: after two rounds unreached.
+                # 18b: and only a box read safe by this fetch, or unreached for
+                # UNREACHED_S — after a restart, a safe hours old and two
+                # rounds one --every apart read a box given new work destroyed
                 missed = e["missed"] + 1
-                was_safe[bid] = {**e, "missed": missed, "at": e["at"]}
-                if missed >= UNREACHED_ROUNDS:
+                since = e.get("missed_since") or now
+                was_safe[bid] = {**e, "missed": missed, "at": e["at"], "missed_since": since}
+                if missed >= UNREACHED_ROUNDS and (e["at"] >= began
+                                                   or now - since >= UNREACHED_S):
                     safe, failed = True, False
                     lines = [f"{name}: read safe to destroy earlier, not reached for {missed} "
                              "rounds — destroyed: done"]
                     known.pop(name, None)
+                elif missed >= UNREACHED_ROUNDS:
+                    lines = [f"{name}: read safe to destroy before this fetch started, not "
+                             f"reached for {round((now - since) / 60)} min — destroyed once it "
+                             f"has been unreached for {UNREACHED_S // 60} min. NOT safe to "
+                             "destroy yet"]
                 else:
                     lines = [f"{name}: read safe to destroy earlier, not reached now — "
                              "destroyed if it isn't reached on the next round either. "
@@ -782,9 +846,14 @@ def main(argv: list[str] | None = None) -> int:
                                   *(["--file-sha256", shas[model]] if model in shas else [])],
                                  cwd=REPO, timeout=IMPORT_S)
                 first = next((x for x in said.splitlines() if x.strip()), f"exit {code}")
-                verdicts[build] = {"same": code == 0 and first.startswith("The same"),
-                                   "first": first, "box": "the copy here",
-                                   "file_sha256": sha256(here), "server": server, "at": now}
+                if code in (SAME, DIFFERENT):           # 18b: only a compare that ran
+                    verdicts[build] = {"same": code == SAME and first.startswith("The same"),
+                                       "first": first, "box": "the copy here",
+                                       "file_sha256": sha256(here), "server": server, "at": now}
+                else:
+                    print(f"{build}'s parity compare didn't run ({first[:160]}) — asked again "
+                          "next round", flush=True)
+                    failed_any = True
         if a.board:
             print(post_boxes([x for v in known.values() for x in v], dest,
                              [box_id(f"{b['host']}:{b['port']}", dest) for b in boxes],

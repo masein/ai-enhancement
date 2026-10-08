@@ -235,7 +235,8 @@ def test_3_a_parity_file_that_isnt_there_is_refused_at_the_start(tmp_path, monke
 
 
 @pytest.mark.parametrize("compare,code", [
-    ((1, "Not the same setup: the box answers 38.0% right, the server 42.4%\n"), 1),
+    # 18b: "not the same" is compare's own exit code, 3
+    ((3, "Not the same setup: the box answers 38.0% right, the server 42.4%\n"), 1),
     ((2, "refused — the server's file isn't the server's parity file\n"), 1),
     ((0, "The same: the box answers 42.4% right (the mean of its two runs) …\n"), 0)])
 def test_3_each_builds_verdict_on_its_own_line_and_the_exit_says_it(tmp_path, monkeypatch,
@@ -259,7 +260,11 @@ def test_3_each_builds_verdict_on_its_own_line_and_the_exit_says_it(tmp_path, mo
     out = capsys.readouterr().out
     assert got == code, out
     first = compare[1].splitlines()[0]
-    assert re.search(rf"^phone's parity: {re.escape(first)}$", out, re.M), out
+    if compare[0] in (0, 3):
+        assert re.search(rf"^phone's parity: {re.escape(first)}$", out, re.M), out
+    else:                                   # 18b: a compare that didn't run is no verdict
+        assert f"phone's parity compare didn't run ({first}) — asked again next round" in out
+        assert "phone's parity: " not in out
 
 
 # ---------------------------------------------------------------------------

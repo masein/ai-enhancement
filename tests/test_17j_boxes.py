@@ -82,8 +82,16 @@ def test_14_a_safe_box_given_new_work_then_missed_once_is_not_destroyed(tmp_path
     # started again, the box not reached once: not destroyed yet, and not done
     assert main_of(ff, key, dest, "1.1.1.1:41") == 1           # 0abb757: 0, "destroyed: done"
     assert "destroyed if it isn't reached on the next round either" in capsys.readouterr().out
+    # 18b: read safe before this fetch started: destroyed only once unreached
+    # for 30 minutes — two rounds one --every apart weren't enough
+    assert main_of(ff, key, dest, "1.1.1.1:41") == 1
+    assert "destroyed once it has been unreached for 30 min" in capsys.readouterr().out
+    e2 = json.loads((dest.parent / "safe-boxes.json").read_text())
+    for v in e2.values():
+        v["missed_since"] = time.time() - 31 * 60
+    (dest.parent / "safe-boxes.json").write_text(json.dumps(e2))
     assert main_of(ff, key, dest, "1.1.1.1:41") == 0
-    assert "not reached for 2 rounds — destroyed: done" in capsys.readouterr().out
+    assert "rounds — destroyed: done" in capsys.readouterr().out
     # a box reached with a step not home is forgotten, whatever it read before
     (dest.parent / "safe-boxes.json").write_text(json.dumps(e))
     state["round"] = 0
@@ -121,8 +129,9 @@ def test_15_abandoned_names_what_matched_nothing_and_a_step_still_writing_isnt_h
 
 def test_16_parity_given_after_the_box_is_gone_compares_the_copy_here(tmp_path, monkeypatch,
                                                                         capsys):
+    # 18b: "not the same" is compare's own exit code (3); 1 is no verdict
     ff, calls, key, state = world(tmp_path, monkeypatch, lambda host, rnd: None,
-                                  compare=(1, "Not the same setup: 38.0% against 42.4%\n"))
+                                  compare=(3, "Not the same setup: 38.0% against 42.4%\n"))
     dest = tmp_path / "b" / "bundles"
     (dest.parent / "parity").mkdir(parents=True)
     (dest.parent / "parity" / "orig-box.jsonl").write_text('{"parity_of": {}}\n')

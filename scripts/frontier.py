@@ -593,17 +593,24 @@ _ANSWER_ANY = re.compile(r"(?i)ANSWER\s*:\s*([A-Za-z\d ,]+)(?:[^\w]|\n|$|\.)")
 
 
 def visible(text: str) -> str:
-    """the reply without its thinking"""
-    text = text or ""
-    if "</think>" not in text:
-        return text.strip()
-    return _THINK.sub("", text, count=1).strip()
+    """the reply without its thinking — 18b: the text outside every thinking
+    block, wherever it sits (a block opened after 200 characters, or after a
+    closed one, was scored from inside its thinking)"""
+    from frontier_graders import think_split
+    return think_split(text)[0]
+
+
+def thinking_of(text: str) -> str:
+    """18b: the reply's thinking, every block of it"""
+    from frontier_graders import think_split
+    return "\n\n".join(x.strip() for x in think_split(text)[1] if x.strip())
 
 
 def ran_out(text: str, finish: str | None) -> bool:
-    """the reply stopped at its budget: cut, or its thinking never closed"""
-    t = text or ""
-    return finish == "length" or ("<think>" in t[:200] and "</think>" not in t)
+    """the reply stopped at its budget: cut, or a thinking block never closed
+    (18b: wherever it opened)"""
+    from frontier_graders import think_split
+    return finish == "length" or think_split(text)[2]
 
 
 # 17e: an answer that ran out "ends in a loop" when the passage just before
