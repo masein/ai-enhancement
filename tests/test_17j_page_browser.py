@@ -117,7 +117,7 @@ def test_30_31_a_parity_step_done_and_an_abandoned_step_are_said_on_their_box(li
     assert page.locator("[data-rented-run^='rented:served/17j-lda|hle']").count() == 0
     # the abandoned step on its one-box run's line
     lda = run_row(page, "served/17j-lda", MMLU)
-    assert "A6-2 abandoned" in lda.locator("[data-run-where]").inner_text()
+    assert "a step abandoned" in lda.locator("[data-run-where]").inner_text()   # 18c: no id
     # the parity check on its box's line
     run_row(page, "served/17j-bf16", HLE).locator("[data-rented-open]").click()
     a3 = page.locator("[data-rented-box='A3|A3-2']")

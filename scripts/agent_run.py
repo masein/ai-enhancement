@@ -739,9 +739,11 @@ def progress(rdir: Path, b: dict, tasks: list[str], attempts: int, started: floa
     want = len(tasks) * attempts
     mins = [r["minutes"] for r in done if isinstance(r.get("minutes"), (int, float))]
     each = sum(mins) / len(mins) if mins else None
-    left = each * (want - len(done)) / max(1, int(read_json(rdir / "run.json").get("at_once")
-                                                      or 1)) if each else None
-    words = [f"{len(done)} of {want}",
+    left = each * (want - len(rs)) / max(1, int(read_json(rdir / "run.json").get("at_once")
+                                                    or 1)) if each else None
+    # 18c point 21: tasks attempted, errors of ours among them — the count the
+    # run's page and its score say ("pilot: 7 of 300"), never the model's alone
+    words = [f"{len(rs)} of {want}",
              f"{sum(1 for r in done if r['result'] == 'resolved')} resolved"]
     if each:
         words.append(f"{each:.0f} min a task")
@@ -752,7 +754,7 @@ def progress(rdir: Path, b: dict, tasks: list[str], attempts: int, started: floa
     errs = sum(1 for r in rs if r["result"] == "error")
     if errs:
         words.append(f"{errs} error{'s' if errs > 1 else ''} of ours")
-    return {"line": " · ".join(words), "done": len(done), "of": want, "of_bench": b["tasks"],
+    return {"line": " · ".join(words), "done": len(rs), "of": want, "of_bench": b["tasks"],
             "started_at": started, "at": time.time(), "minutes_each": each,
             "until": time.time() + 60 * left if left else None}
 

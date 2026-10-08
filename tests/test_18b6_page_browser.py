@@ -142,7 +142,8 @@ def test_35_the_window_button_says_a_run_left_part_way_starts_again(live, page):
         # a window the board can't take: no button, said
         srv.ctx = 512
         got = json.loads(json.dumps(appmod.served_pin(id=mid)))
-        assert got["window"] is None and "not a window the board takes" in got["why"]
+        assert got["window"] is None and ("doesn't report a usable context window (it says "
+                                          "512)") in got["why"]           # 18c: its words
         assert page.errors == []
     finally:
         srv.close()

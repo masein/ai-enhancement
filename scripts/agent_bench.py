@@ -462,17 +462,26 @@ def again_kind(why: str) -> str:
 
 
 def again_words(results: list[dict]) -> str:
-    """how many tasks were asked again after an error of ours, and why:
-    "2 tasks run again: Docker couldn't … ×2 · the model's server was down ×1" """
-    count: dict[str, int] = {}
+    """how many tasks were asked again after an error of ours, and why — 18c
+    point 22: per reason its tasks and its tries, never one mixed with the
+    other: "2 tasks asked again after an error of ours: Docker couldn't pull,
+    build or start its container (2 tasks, 3 tries)" """
+    tasks: dict[str, set] = {}
+    tries: dict[str, int] = {}
     for r in results:
         for w in r.get("again") or []:
-            count[again_kind(w)] = count.get(again_kind(w), 0) + 1
+            k = again_kind(w)
+            tasks.setdefault(k, set()).add((r.get("task"), r.get("attempt")))
+            tries[k] = tries.get(k, 0) + 1
     n = sum(1 for r in results if r.get("again"))
     if not n:
         return ""
-    return (f"{n} task{'s' if n != 1 else ''} run again after an error of ours: "
-            + " · ".join(f"{k} ×{v}" for k, v in sorted(count.items(), key=lambda x: -x[1])))
+
+    def nums(k: str) -> str:
+        t, x = len(tasks[k]), tries[k]
+        return f"{t} task{'s' if t != 1 else ''}, {x} tr{'ies' if x != 1 else 'y'}"
+    return (f"{n} task{'s' if n != 1 else ''} asked again after an error of ours: "
+            + " · ".join(f"{k} ({nums(k)})" for k in sorted(tries, key=lambda k: -tries[k])))
 
 
 def conversation(rdir: Path, job: str, trial: str) -> dict:

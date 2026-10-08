@@ -161,8 +161,9 @@ def test_29_this_benchmarks_finish_and_its_boxs_are_two_times(live, page):
     assert box["box_finish"] > box["task_finish"] == finish
     # 17j: beside the count; one box has nothing to open — its box's time on
     # its where line
-    # 18b: in words — "this part done …", and the box's own beside it
-    assert row.locator("[data-rented-finish]").inner_text().startswith("this part done ")
+    # 18b: in words — and the box's own beside it. 18c: a run on one box is
+    # done about then, not "this part"
+    assert row.locator("[data-rented-finish]").inner_text().startswith("done about ")
     assert row.locator("[data-rented-open]").count() == 0
     assert row.locator("[data-run-where] [data-box-finish]").count() == 0      # 18b: no time
     assert row.locator("[data-box-finish]").inner_text().startswith("box free ")

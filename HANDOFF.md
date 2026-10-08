@@ -4953,6 +4953,35 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 18c.4 — the page (8 Oct)
+
+- **The header's list** (point 18): the Runs pill's list holds the running
+  rented runs it counts (`rentedRunLine`), between the runs here and those
+  queued; never "Nothing running" while one goes.
+- **The busy notice on an open page** (point 19): `loadAgentBusy()` asked
+  once a minute from the poll on a model's page or the Playground, the page
+  redrawn only when the answer changed.
+- **The model's reply** (point 20): `[data-agent-said]` is `pre-wrap` and
+  wraps anywhere: its lines kept, a long word inside the card.
+- **One count** (point 21): `agent_run.progress()` counts the tasks
+  attempted, errors of ours among them, as the run's page and score do.
+- **Small ones** (point 22): the agent run page and the card name the model
+  by `runName()`, its id in the hover; a task asked again for one reason
+  says "asked 3 times, each: <reason>", and the run's summary counts tasks
+  and tries apart; a window the board can't take is "its server doesn't
+  report a usable context window (it says 1,024)"; a busy end more than six
+  days out says its date; Copy id gives focus back to its ⋯; a one-box
+  rented run reads "done about …", a box's "box free" isn't repeated when
+  it is the part's time, an abandoned step is "a step abandoned"; a refused
+  import is sent by the fetch (`import_refused`) and said on Runs; a run
+  here's full id in its model cell's hover; the window's line on the
+  model's own page drops "on the model's page", and its button says "If you
+  use it, a run of this model that stopped part-way starts again from its
+  first question."
+- Tests: `tests/test_18c4_page_browser.py` (400 and 1440 px, light and dark;
+  screens `phase18c/runs-*`, `busy-*`, `said-*`, `window-*`),
+  `tests/test_18c4_counts_words.py`.
+
 ### 18c.3 — grading, the fetch and the export (8 Oct)
 
 - **frontier-2** (point 12): `fb.VERSION` says how answers are read (every
