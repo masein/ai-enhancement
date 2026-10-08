@@ -70,7 +70,9 @@ def think_only(said: str) -> bool:
     for line in (said or "").splitlines():
         if line.startswith("refused — "):
             why.append(line)
-        why += [x for x in line.split(" · ") if x.rstrip().endswith("— not imported")]
+        # 18c point 17: every part that says it wasn't imported — "not imported —
+        # scoring it failed (…)" too, never hidden behind a thinking refusal
+        why += [x for x in line.split(" · ") if "not imported" in x]
     return bool(why) and all(THINK_REFUSED.search(x) for x in why)
 COMPARE = ["sudo", "docker", "compose", "exec", "-T", "bench", "python",
            "scripts/frontier_parity.py", "compare"]
@@ -106,6 +108,15 @@ for p in sorted(glob.glob("/workspace/**/progress.json", recursive=True)):
         continue
     if isinstance(got, dict):
         out["progress"].append({**got, "dir": os.path.dirname(p)})
+out["lines"] = []
+for p in sorted(glob.glob("/workspace/*/*.line.json")):
+    try:
+        with open(p) as f:
+            got = json.load(f)
+    except (OSError, ValueError):
+        continue
+    if isinstance(got, dict):
+        out["lines"].append({**got, "build": p.split("/")[2]})
 print(json.dumps(out, default=str))
 '''
 
@@ -324,6 +335,7 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
     # every step this box started — a folder holding a progress file, a
     # bundle or a parity file, or one the plan's layout made — by its folder
     started: dict[str, dict | None] = {}
+    got_lines = [x for x in got.get("lines") or [] if isinstance(x, dict)]
     for d in got.get("steps") or []:
         if isinstance(d, dict) and d.get("build") and d.get("step"):
             started.setdefault(f"/workspace/{d['build']}/{d['step']}", None)
@@ -488,8 +500,11 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
             for step, spec in fbx.steps_of(label):
                 if f"/workspace/{build}/{step}" not in started and f"{build}/{step}" not in gone:
                     # 18b: a step whose answers the board holds ran elsewhere
-                    # (its box gone, the rest on this one): done, said
-                    if imported_here(a, f"served/{build}", spec):
+                    # (its box gone, the rest on this one): done, said. 18c
+                    # point 17: only once this box's line has ended — between
+                    # two of its steps, the next hasn't started yet
+                    if imported_here(a, f"served/{build}", spec) and line_ended(
+                            got_lines, build, label):
                         lines.append(f"  {build}/{step}: imported already from another box — "
                                      "done")
                         continue
@@ -540,6 +555,14 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
     return safe, failed, lines, steps, True
 
 
+def line_ended(lines: list[dict], build: str, box: str) -> bool:
+    """18c point 17: the box's line (frontier_box.py) has run its last step for
+    this build — its <build>/<box>.line.json says "ended"; a box whose image
+    writes none never reads ended"""
+    return any(x.get("build") == build and str(x.get("box") or "").upper() == box.upper()
+               and x.get("state") == "ended" for x in lines or [])
+
+
 def imported_here(a: argparse.Namespace, model: str, spec: tuple) -> bool:
     """18b point 25: whether the board holds a planned step's answers — every
     benchmark of it whole, or its shard — asked once a round a build"""
@@ -556,8 +579,8 @@ def imported_here(a: argparse.Namespace, model: str, spec: tuple) -> bool:
         except (ValueError, IndexError):
             cache[model] = {}
     held = (cache.get(model) or {}).get(thinking) or {}
-    i = int(shard.split("/")[0]) if shard else None
-    return all(t in (held.get("tasks") or []) or (i is not None and i in (
+    part = "-of-".join(shard.split("/")) if shard else None     # 18c: "2-of-3", never "2"
+    return all(t in (held.get("tasks") or []) or (part is not None and part in (
         (held.get("shards") or {}).get(t) or [])) for t in tasks)
 
 
@@ -769,6 +792,12 @@ def main(argv: list[str] | None = None) -> int:
     # and forgotten after two days (a new box at the same address took it)
     sfile = dest.parent / "safe-boxes.json"
     was_safe = read_safe(sfile)
+    # 18c point 15: misses an earlier fetch counted don't count in this one —
+    # one failed ssh after a restart read a box missed before it "destroyed"
+    for bid_, e_ in list(was_safe.items()):
+        if not e_.get("gone"):
+            was_safe[bid_] = {**{k: v for k, v in e_.items() if k != "missed_since"},
+                              "missed": 0}
     a.abandoned_matched = set()
     keep_sudo()
     rounds = 0

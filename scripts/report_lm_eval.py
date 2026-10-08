@@ -24740,7 +24740,16 @@ function aiJobsTable(P) {
         : '',
       // 16c: its last batch on OpenRouter, when it failed or waits
       j.last_batch ? el('div', { class: 'small warntext', 'data-ai-last-batch': j.job,
-        text: 'Its last batch: ' + j.last_batch }) : ''),
+        text: 'Its last batch: ' + j.last_batch }) : '',
+      // 18c point 13: a batch waiting at a run of refusals waits for this press
+      j.halted_batch && LIVE ? el('button', { class: 'secondary', 'data-ai-carry-on': j.job,
+        style: 'white-space:nowrap',
+        text: 'Carry on', onclick: async e => {
+          e.target.disabled = true;
+          try { state.ai.page = await post('api/ai/carry-on', { batch_id: j.halted_batch,
+            by: whoName() }); }
+          catch (err) { toast('Refused. ' + err.message, { key: 'ai' }); }
+          render(); } }) : ''),
     el('td', { class: 'mono small aiprice', 'data-ai-price': j.job, text: aiPrice(j) }),
     el('td', { class: 'aiact' }, LIVE ? aiChange(j) : '')));
   return el('table', { class: 'aijobs', 'data-ai-jobs': '1' },

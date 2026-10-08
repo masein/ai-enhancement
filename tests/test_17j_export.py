@@ -98,8 +98,10 @@ def test_22_the_export_works_out_the_names_and_says_them_above_the_list(
     for name in ("board-host", ACCT, "wrongacct"):
         assert name in first, (name, first)
     # 18b: a dotless host from the settings is no name of the scrub's (only
-    # dotted ones are); its line stays out here for the account it names
-    assert "judge-box" not in first, first
+    # dotted ones are); its line stays out here for the account it names.
+    # 18c: said as NOT removed, so it can be added to SCRUB_HOSTS
+    removes, _, left = first.partition("; NOT removed")
+    assert "judge-box" not in removes and "judge-box" in left, first
     for f in (next((out / "public").iterdir())).iterdir():
         text = f.read_text()
         assert ACCT not in text and "judge-box" not in text, f.name
