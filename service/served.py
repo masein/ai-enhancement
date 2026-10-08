@@ -741,6 +741,11 @@ def live_window(rec: dict) -> int | None:
     return n if isinstance(n, int) and not isinstance(n, bool) and n > 0 else None
 
 
+# 18b: the smallest slot a run of the board's takes (a benchmark asked with
+# thinking off, 4,096 tokens): a window below it is no window to use
+MIN_WINDOW = 4096
+
+
 def use_new_window(model_id: str, by: str) -> dict:
     """17j: the pin's context window set to the one its server runs it with
     now — only when that is all that changed (the file, its size and the
@@ -753,10 +758,18 @@ def use_new_window(model_id: str, by: str) -> dict:
     if diff != ["ctx"]:
         raise ValueError(pin_words(rec, now) or "Its server runs it as registered: nothing to "
                          "change")
+    # 18b: the window its server says it runs (its own n_ctx, never the
+    # model's training context), a whole number of at least the board's
+    # smallest slot — text, an empty value or 512 were taken
+    n = live_window(rec)
+    if n is None or n < MIN_WINDOW:
+        raise ValueError(f"its server says a context window of {n if n is not None else 'none'}: "
+                         f"the board takes a whole number of at least {MIN_WINDOW:,} tokens (its "
+                         "smallest slot) — nothing changed")
     was = rec["pin"].get("ctx")
-    rec["pin"] = {**rec["pin"], "ctx": now["ctx"]}
+    rec["pin"] = {**rec["pin"], "ctx": n}
     rec["window_changes"] = [*(rec.get("window_changes") or [])[-9:],
-                             {"from": was, "to": now["ctx"], "by": by, "at": time.time()}]
+                             {"from": was, "to": n, "by": by, "at": time.time()}]
     db.served_put(rec)
     write_meta(rec)
     return rec
