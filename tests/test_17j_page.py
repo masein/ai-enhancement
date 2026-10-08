@@ -79,8 +79,8 @@ def test_30_31_a_parity_step_done_and_an_abandoned_step_are_no_rows(svc):  # noq
                   box("A3", "A3-2", line="Humanity's Last Exam 25 of 539 · 2 h left"),
                   box("A3", "A3-3", state="abandoned", tasks=(GPQA,)))
     assert [r["tasks"] for r in got] == [HLE], got              # 0abb757: three rows
-    assert got[0]["where"] == "rented GPU · box A3 · parity done · A3-3 abandoned"
-    assert got[0]["boxes"][0]["notes"] == ["parity done", "A3-3 abandoned"]
+    assert got[0]["where"] == "rented GPU · box A3 · parity done · a step abandoned"
+    assert got[0]["boxes"][0]["notes"] == ["parity done", "a step abandoned"]
     # a parity step still asking is a row: it is running
     got = runs_of(box("A3", "A3-1", tasks=(), parity=True, line="parity 412 of 1,000"))
     assert [r["parity"] for r in got] == [True]

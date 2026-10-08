@@ -144,7 +144,7 @@ def test_a_server_that_goes_down_stops_the_run_and_its_try_isnt_counted(  # noqa
     assert w["harbor"][0]["task"] == order[1] and len(w["harbor"]) == 4
     r = next(x for x in ar.results(rdir_of(), [order[1]], 1))
     assert r["result"] == "resolved" and r["again"][0].startswith(ab.DOWN_WORDS)
-    assert "the model's server went down ×1" in ab.again_words([r])
+    assert "the model's server went down (1 task, 1 try)" in ab.again_words([r])
 
 
 # ---------------------------------------------------------------------------

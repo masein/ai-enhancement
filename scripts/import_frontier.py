@@ -1191,7 +1191,8 @@ def _epoch(stamp) -> float | None:
 BOX_FIELDS = {"label": str, "model": str, "step": str, "thinking": str, "tasks": list,
               "shard": str, "parity": bool, "state": str, "line": str, "started_at": str,
               "sessions": int, "at": (int, float), "seen_at": (int, float), "reachable": bool,
-              "safe": bool, "why": str, "box_id": str}
+              "safe": bool, "why": str, "box_id": str,
+              "import_refused": str}            # 18c point 22: the board's words, said on Runs
 QUIET_S = 45 * 60                       # a box not heard from for this long says so
 # 17g: a step done (its box safe to destroy) leaves the list this long after
 # the fetch last saw it — thirty days on it still read "done, safe to destroy"
