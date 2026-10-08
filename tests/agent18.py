@@ -80,11 +80,12 @@ def trial(rdir: Path, task: str, k: int = 1, stamp: int | None = None, result: s
                                "occurred_at": start}
     (t / "result.json").write_text(json.dumps(r))
     host = t / ab.HOST_DIR
-    (host / ab.TRAJECTORY).write_text(json.dumps(conversation(html)))
-    (host / ab.PATCH).write_text("--- a/x.c\n+++ b/x.c\n@@ -1 +1 @@\n-<old>\n+<new>\n")
-    (host / ab.META).write_text(json.dumps({"exit_status": exit_status, "steps": 2,
-                                            "tokens_in": 2800, "tokens_out": 340,
-                                            "last_prompt": 1600, "ours": ours}))
+    if started:                         # 18c: an agent that never started wrote nothing
+        (host / ab.TRAJECTORY).write_text(json.dumps(conversation(html)))
+        (host / ab.PATCH).write_text("--- a/x.c\n+++ b/x.c\n@@ -1 +1 @@\n-<old>\n+<new>\n")
+        (host / ab.META).write_text(json.dumps({"exit_status": exit_status, "steps": 2,
+                                                "tokens_in": 2800, "tokens_out": 340,
+                                                "last_prompt": 1600, "ours": ours}))
     (t / "verifier" / "test-stdout.txt").write_text("invented test: PASSED <ok>\n")
     return t
 

@@ -83,6 +83,7 @@ class CleanupFailed(Exception):
 
 
 DOWN = "relay_server_down"              # the relay's word for it, in its 503
+SENT_WAIT_S = 120                       # a command sent just before the stop: its 60 s and more
 MOUNTED = "/logs/agent /logs/artifacts /logs/verifier"
 # what the container holds once the agent stops: no process but its own
 # sleep, nothing in the folders Harbor mounts — and it says so, with an exit
@@ -216,6 +217,16 @@ class HarborEnv:
         self.env = dict(env or {})
         self.stop = stop or threading.Event()
         self.kind = kind
+        # 18c point 11: the commands sent and not yet back; closed as one with
+        # the stop, so none starts after the clean-up's kill
+        self._lock = threading.Lock()
+        self.inflight: set = set()
+
+    def close(self) -> list:
+        """no command is sent from now on; those already sent, to wait for"""
+        with self._lock:
+            self.stop.set()
+            return list(self.inflight)
 
     def command(self, command: str, timeout: int) -> str:
         """the command as the container runs it: its shell, its time limit for
@@ -224,14 +235,17 @@ class HarborEnv:
                 f"{shlex.quote(command)} 2>&1")
 
     def execute(self, action: dict, cwd: str = "", *, timeout: int | None = None) -> dict:
-        if self.stop.is_set():
-            raise Stopped("the agent's time is up")
         command = action.get("command", "")
         t = int(timeout or self.timeout)
         t0 = time.time()
-        fut = asyncio.run_coroutine_threadsafe(
-            self._exec(self.command(command, t), cwd=(cwd or self.cwd or None),
-                       env=self.env or None, timeout_sec=t + 30), self.loop)
+        with self._lock:
+            if self.stop.is_set():
+                raise Stopped("the agent's time is up")
+            fut = asyncio.run_coroutine_threadsafe(
+                self._exec(self.command(command, t), cwd=(cwd or self.cwd or None),
+                           env=self.env or None, timeout_sec=t + 30), self.loop)
+            self.inflight.add(fut)
+        fut.add_done_callback(self.inflight.discard)
         try:
             r = fut.result()
             out = (getattr(r, "stdout", "") or "") + (getattr(r, "stderr", "") or "")
@@ -373,7 +387,7 @@ class HostMini(BaseAgent):  # type: ignore[misc,valid-type]
         cfg = load_config(str(self.ours.get("config") or "mini.yaml"))
         host = self.host_dir()
         stop = threading.Event()
-        held: dict = {"agent": None, "ours": "", "clean": None}
+        held: dict = {"agent": None, "ours": "", "clean": None, "env": None}
 
         def fill() -> None:
             """the counts, to Harbor and to our own meta.json — never read
@@ -410,6 +424,7 @@ class HostMini(BaseAgent):  # type: ignore[misc,valid-type]
                                               (("bash", "-c") if kind == "docker"
                                                else ("sh", "-c"))),
                             env=ecfg.get("env") or {}, stop=stop, kind=kind)
+            held["env"] = env
             mcfg = dict(cfg.get("model") or {})
             mcfg.pop("model_class", None)
             mcfg["model_name"] = self.model_name
@@ -472,6 +487,13 @@ class HostMini(BaseAgent):  # type: ignore[misc,valid-type]
             # or a host process looks. Harbor 0.24.0's exec is exec(command,
             # cwd=None, env=None, timeout_sec=None, user=None)
             # (environments/base.py): root, whoever the task's agent runs as
+            # 18c point 11: the exec path is closed first, and a command sent
+            # just before the stop is waited for — none starts after the kill
+            sent = held["env"].close() if held["env"] is not None else []
+            late = []
+            if sent:
+                _, late = await asyncio.wait([asyncio.wrap_future(f) for f in sent],
+                                             timeout=SENT_WAIT_S)
             try:
                 r = await environment.exec(CLEAN, timeout_sec=180, user="root")
                 code = getattr(r, "return_code", None)
@@ -479,6 +501,9 @@ class HostMini(BaseAgent):  # type: ignore[misc,valid-type]
                                     + (getattr(r, "stderr", "") or ""))
             except Exception as e:      # noqa: BLE001 — recorded, and the task isn't verified
                 code, why = None, f"{type(e).__name__}: {str(e)[:200]}"
+            if late and not why:
+                why = (f"{len(late)} command{'s' if len(late) > 1 else ''} sent before the stop "
+                       f"hadn't come back after {SENT_WAIT_S} s")
             held["clean"] = {"exit": code, "ok": not why, "why": why}
             try:
                 fill()
