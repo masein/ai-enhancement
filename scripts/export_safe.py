@@ -344,7 +344,11 @@ _RISKY = re.compile(r"https?://|\w@[\w.-]|\b(?:\d{1,3}\.){3}\d{1,3}\b|\[[0-9a-f]
                     r"\b(?:[0-9a-f]{1,4}:){3,7}[0-9a-f]{1,4}\b|[0-9a-f]{0,4}::[0-9a-f]{0,4}|"
                     r"api[-_]?key|\btoken\s*[:=]|access[-_ ]?token|hf_token|x-token|"
                     r"submit_token|bearer|secret|passw|authoriz|\bssh\b|\bscp\b|-o\s*port|"
-                    r"hf://|-hf\s|\bdatasets/[\w.-]+/|[\w.-]*-private\b", re.I)
+                    r"hf://|-hf\s|\bdatasets/[\w.-]+/|[\w.-]*-private\b|"
+                    # 18b: a 40-character hex key with no prefix (a sha256's 64
+                    # stand in their own slot); a home path URL-encoded
+                    r"(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])|%2F(?:home|Users|root)(?:%2F|\b)",
+                    re.I)
 _SECTION = re.compile(r"===== llama-server, as it started =====")
 
 
@@ -383,11 +387,13 @@ def _decoded(line: str) -> list[str]:
 
 
 class Questions:
-    """the gated and private sets' questions, as runs of five words — a line
-    quoting any five words of one in a row (its first line, its middle, a later
+    """the gated and private sets' questions, as runs of four words — a line
+    quoting any four words of one in a row (its first line, its middle, a later
     line, JSON-escaped, URL-encoded, joined by underscores, 17j: with &nbsp;
-    between them, or in base64) is one that quotes it"""
-    N = 5
+    between them, or in base64; 18b: four, not five, and with a filler word
+    between each) is one that quotes it. A line it catches wrongly is only
+    left out"""
+    N = 4
 
     def __init__(self, texts: list[str]):
         self.grams: set = set()
@@ -406,6 +412,12 @@ class Questions:
             w = n.split()
             if any(" ".join(w[i:i + self.N]) in self.grams for i in range(len(w) - self.N + 1)):
                 return True
+            # 18b: a filler word between each of its words
+            for k in (0, 1):
+                v = w[k::2]
+                if any(" ".join(v[i:i + self.N]) in self.grams
+                       for i in range(len(v) - self.N + 1)):
+                    return True
             if any(s in n for s in self.short):
                 return True
         return False
@@ -444,6 +456,13 @@ _ASKED = re.compile(r"^(\[frontier\] .*?Nothing was asked) \(.*\)$")
 _KEPT = re.compile(r"^(\[frontier\] .*? · the answers it gave are kept: the next run asks only "
                    r"the rest) \(.*\)$")
 _STOPPED = re.compile(r"the server stopped answering \(.*\)(?=: \d[\d,]* question)")
+# 18b: the stop reasons that held the server's words (a log written before
+# 18b): "refused a question: HTTP 400 <its words>", "failed on 6 questions,
+# asked … (HTTP 400 <its words>): stopped"
+_REFUSED_Q = re.compile(r"(the server refused a question)(?:: (?:(?! · ).)*)")
+_FAILED_ON = re.compile(r"(the server failed on (?:\d[\d,]* questions|every question it was "
+                        r"asked \(\d[\d,]*\)), asked its own way and without its chat parsing) "
+                        r"\([\s\S]*\)(?=: stopped)")
 _RUN_END = re.compile(rf"^({_T} the run: (?:failed|canceled|stopped))(?: · .*)?$")
 _EXCEPTION = re.compile(r"\b\w*(?:Error|Exception|Exit|Interrupt|Refused|Timeout)\b|"
                         r"Traceback|\bErrno\b|\bstatus code\b|Max retries|Errno|"
@@ -458,10 +477,39 @@ def _free_words_out(line: str) -> tuple[str, bool]:
     s = _ASKED.sub(r"\1", s)
     s = _KEPT.sub(r"\1", s)
     s = _STOPPED.sub("the server stopped answering", s)
+    s = _REFUSED_Q.sub(r"\1", s)
+    s = _FAILED_ON.sub(r"\1", s)
     s = _RUN_END.sub(r"\1", s)
-    if _TAGGED.match(s) and _EXCEPTION.search(s):
+    # 18b: on every line with a free slot — a section's header and the run's
+    # end too, not only a tagged line
+    if _EXCEPTION.search(s):
         return s, False
     return s, True
+
+
+# 18b: a line of the runner's own starts with one of these. A line below one
+# whose bracket is still open is the rest of it (a reason with a newline in
+# it — its first line went out): the two are read as one, out whole or left
+# out whole. A library's lines below a closed one stay lines of their own
+_STARTS = re.compile(rf"^(?:\[[a-z]+\] |===== |{_T} )")
+JOIN_MAX = 20                            # lines a reason may run to
+
+
+def _joined(lines: list[str]) -> list[str]:
+    out: list[str] = []
+    in_server, joined = False, 0
+    for line in lines:
+        s = line.rstrip()
+        if s.startswith("====="):
+            in_server = bool(_SECTION.search(s))
+        if (out and s and not in_server and not _STARTS.match(s) and joined < JOIN_MAX
+                and out[-1].count("(") > out[-1].count(")")):
+            out[-1] += "\n" + s
+            joined += 1
+        else:
+            out.append(s)
+            joined = 0
+    return out
 
 
 def log_lines(text: str, questions: Questions | None,
@@ -469,7 +517,7 @@ def log_lines(text: str, questions: Questions | None,
     """(the lines that may go out; counts of those left out and why). With
     `questions` None — a set couldn't be loaded — no line at all. `models`:
     the run's own model ids, the one slot a model's name may fill"""
-    lines = text.splitlines()
+    lines = _joined(text.splitlines())
     if questions is None:
         return [], {"no question list": len(lines)}
     acct = [re.compile(rf"(?<![\w-]){re.escape(a)}(?![\w-])", re.I) for a in accounts()]
@@ -653,13 +701,13 @@ def _host(url: str) -> str:
     return h.lower()
 
 
-def _worked_out() -> tuple[list[str], list[str], list[str]]:
-    """(the hosts the board's own settings name, the names it was opened by,
-    the accounts of the repositories its models were fetched from but those
-    of a checked public file) — what the export needn't be told"""
+def _worked_out() -> tuple[list[str], list[str]]:
+    """(the dotted hosts the board's own settings name, the accounts of the
+    repositories its models were fetched from but those of a checked public
+    file) — names that add to SCRUB_HOSTS and SCRUB_ACCOUNTS, never stand for
+    them. 18b: never a name from a request's Host header"""
     hosts: set[str] = set()
     urls = [v for k, v in os.environ.items() if k.endswith("_URL") and isinstance(v, str)]
-    seen: list[str] = []
     accts: set[str] = set()
     try:
         from service import config, db
@@ -667,7 +715,6 @@ def _worked_out() -> tuple[list[str], list[str], list[str]]:
         urls.append(config.LOCAL_BASE_URL)
         recs = db.served_all() if config.DB_PATH.exists() else []
         urls += [str(r.get("base_url") or "") for r in recs]
-        seen = pf.seen_hosts()
         checked = {(x.get("repo") or "").lower() for m, x in db.public_files_all().items()
                    if pf.still_same(m, x)}
         for r in recs:
@@ -678,18 +725,21 @@ def _worked_out() -> tuple[list[str], list[str], list[str]]:
         pass
     for u in urls:
         h = _host(u)
-        if h and h not in _NOT_HOSTS and _OWN_HOST.fullmatch(h) and not re.fullmatch(r"[\d.]+", h):
+        if h and h not in _NOT_HOSTS and _OWN_HOST.fullmatch(h) and not re.fullmatch(r"[\d.]+", h) \
+                and "." in h:
             hosts.add(h)
-    return sorted(hosts), sorted(seen), sorted(accts)
+    return sorted(hosts), sorted(accts)
 
 
 def scrub_names() -> dict:
-    """17j: {hosts, accounts, server, problems} — the hosts and accounts the
-    scrub removes: those given (SCRUB_HOSTS, SCRUB_ACCOUNTS) and those the
-    board works out (this container's name, the hosts its settings name, the
-    names it was opened by; the accounts of the repositories its models were
-    fetched from). `server`: this server's own names, given or seen — the
-    container's own name isn't one. `problems`: why public/ is refused"""
+    """{hosts, accounts, server, problems} — the hosts and accounts the scrub
+    removes: those given (SCRUB_HOSTS, SCRUB_ACCOUNTS), and those the board
+    works out (this container's name, the dotted hosts its settings name;
+    the accounts of the repositories its models were fetched from), which
+    only add to them. `server`: this server's own names, as given — the
+    container's own name isn't one. `problems`: why public/ is refused —
+    18b: unless both variables are given (with neither, one request with a
+    made-up Host header opened public/)"""
     me = socket.gethostname() or ""
     key = (os.environ.get("SCRUB_HOSTS"), os.environ.get("SCRUB_ACCOUNTS"), me,
            os.environ.get("BENCH_ROOT"), _stamp())
@@ -697,20 +747,24 @@ def scrub_names() -> dict:
         return _names["value"]
     hosts, bad_h = _given("SCRUB_HOSTS", _HOST_NAME, "a host's name")
     accts, bad_a = _given("SCRUB_ACCOUNTS", _ACCOUNT_NAME, "an account's name")
-    own, seen, found = _worked_out()
-    server = [h for h in [*hosts, *seen] if h.lower() != me.lower()
-              and h.lower().split(".")[0] != me.lower()]
+    own, found = _worked_out()
+    server = [h for h in hosts if h.lower() != me.lower() and h.lower().split(".")[0] != me.lower()]
     problems = [*bad_h, *bad_a]
-    if not server:
-        problems.append("this server's own name isn't known: give SCRUB_HOSTS=\"$(hostname)\" "
-                        "from the server's shell" + (f" (the container's own name, {me}, isn't "
-                                                     "it)" if me and me in hosts else ""))
+    if not hosts and not bad_h:
+        problems.append("SCRUB_HOSTS isn't given: give it this server's own name and the "
+                        "tailnet's name for it, SCRUB_HOSTS=\"$(hostname),<its tailnet name>\", "
+                        "from the server's shell — the names the board works out only add to it")
+    elif hosts and not server:
+        problems.append("this server's own name isn't in SCRUB_HOSTS: give SCRUB_HOSTS="
+                        "\"$(hostname)\" from the server's shell" + (
+                            f" (the container's own name, {me}, isn't it)"
+                            if me and me in hosts else ""))
+    if not accts and not bad_a:
+        problems.append("SCRUB_ACCOUNTS isn't given: give it the Hugging Face accounts the "
+                        "private repositories are kept under — the accounts the board works "
+                        "out only add to it")
     all_accts = sorted({*accts, *found}, key=str.lower)
-    if not all_accts:
-        problems.append("SCRUB_ACCOUNTS is empty and no account was found in where the board's "
-                        "models were fetched from: give it the Hugging Face accounts the private "
-                        "repositories are kept under")
-    names = [x for h in [*hosts, *seen, *own, me] if h for x in (h, h.split(".")[0])]
+    names = [x for h in [*hosts, *own, me] if h for x in (h, h.split(".")[0])]
     out = {"hosts": sorted({h for h in names if len(h) >= NAME_MIN}, key=str.lower),
            "accounts": [a for a in all_accts if len(a) >= 2],
            "server": server, "problems": problems}
@@ -719,13 +773,10 @@ def scrub_names() -> dict:
 
 
 def _stamp() -> tuple:
-    """what the worked-out names depend on, cheaply: the database's and the
-    seen names' times"""
+    """what the worked-out names depend on, cheaply: the database's time"""
     try:
         from service import config
-        from service import public_files as pf
-        return tuple(x.stat().st_mtime_ns if x.exists() else 0
-                     for x in (config.DB_PATH, pf.seen_path()))
+        return (config.DB_PATH.stat().st_mtime_ns if config.DB_PATH.exists() else 0,)
     except Exception:                                   # noqa: BLE001
         return ()
 

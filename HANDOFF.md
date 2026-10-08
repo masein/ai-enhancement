@@ -4953,6 +4953,38 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 18b.5 — 17j follow-ups: the export (8 Oct)
+
+- **`public/` only with both variables given** (point 27,
+  `export_safe.scrub_names`): `SCRUB_HOSTS` and `SCRUB_ACCOUNTS` must both be
+  given, and the server's own name be in `SCRUB_HOSTS`; the names the board
+  works out only add to them. With both unset, one request with `Host: bench`
+  opened `public/`, which then published the server's and the account's
+  names.
+- **No name from a request** (point 28): the board no longer keeps a
+  request's Host (`public_files.seen` and its file gone) — `the`, `run`,
+  `done`, `hle`, `sha256` became words scrubbed in every line, for good. The
+  names worked out are the machine's own and dotted hosts from the
+  configuration only.
+- **The server's own words never go out** (point 29): the three stop
+  reasons that quoted the server ("refused a question: …", "failed on N
+  questions … (…): stopped", "failed on every question …") and the log line
+  of a stop now say its status alone (`frontier.status_of`: "HTTP 400", or
+  "no answer within 600 s"); the export cuts those words from logs written
+  before, runs the exception check on every line with a free slot (a
+  section's header, the run's end), and reads a reason cut by a newline as
+  one line with its rest — out whole or left out whole.
+- **Small ones** (point 30): a Frontier run's folder is
+  `frontier-run-<number>` (a model named after a tailnet address named its
+  folder); a DeviceMark row whose name the scrub would change gets
+  `devicemark-<hash>`; the quote check takes four words in a row, and four
+  with a filler word between each (so base64 of four words too); a bare
+  40-character hex key and a URL-encoded home path are left out; the
+  README's list of what the scrub removes goes out as written. Not closed:
+  nothing beyond one filler word between each.
+- Tests: `tests/test_18b5_export.py`; the 17i/17j export tests read the new
+  refusals and the dotted-only names.
+
 ### 18b.3 — agent runs: before step B (8 Oct)
 
 - **Resolved only when it submitted** (point 10, done with 18b.1's

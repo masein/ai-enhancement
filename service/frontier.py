@@ -305,7 +305,7 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
         except ValueError as x:                 # the server refused this request outright
             with lock:
                 halt.append(served.ServerStopped(0, 0, str(x), refused=(
-                    f"the server refused a question: {x}")))
+                    f"the server refused a question ({status_of(x)})")))
             return
         if a.error:
             # 17b: no answer either way (its chat endpoint twice, then without
@@ -319,7 +319,8 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
                 if len(qs) > limit and not halt:
                     halt.append(served.ServerStopped(0, total, a.error.get("chat") or "", refused=(
                         f"the server failed on {len(qs)} questions, asked its own way and "
-                        f"without its chat parsing ({a.error.get('chat')}): stopped")))
+                        f"without its chat parsing ({status_of(a.error.get('chat'))}): "
+                        "stopped")))
             return
         line = {"id": it["id"], "epoch": e, "seed": seed, "answer": str(a),
                 "finish": getattr(a, "finish", None), "tokens": a.tokens,
@@ -362,7 +363,7 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
             why = next(iter(failed.values()))
             raise served.ServerStopped(count["n"], total, why, refused=(
                 f"the server failed on every question it was asked ({len(failed)}), asked its "
-                f"own way and without its chat parsing ({why}): stopped"))
+                f"own way and without its chat parsing ({status_of(why)}): stopped"))
         # 17d: before a question is written off, the server must still answer
         # one it answered before: a server that went down near the end of a
         # benchmark left its last questions as no answer for good
@@ -637,6 +638,17 @@ _UNCLOSED = re.compile(r"(?s)^\s*<think>(.*)$")
 # the model opened a thinking block of its own. The share is to catch a server
 # that ignores the switch, and only more than a quarter says that
 THINKING_OFF_SHARE = 0.25
+
+
+def status_of(why) -> str:
+    """18b: a server's refusal by its status, or our own words for a
+    timeout — never its own words, which went out with the exported log"""
+    t = str(why or "")
+    m = re.search(r"\bHTTP (\d{3})\b", t) or re.search(r"\b([45]\d\d)\b", t)
+    if m:
+        return f"HTTP {m.group(1)}"
+    m = re.search(r"no answer within \d+ s", t)
+    return m.group(0) if m else "no status given"
 
 
 def thought_words(n: int, of: int) -> str:
@@ -992,7 +1004,7 @@ def run(sid: int, sub: dict, rec: dict, th: dict, row: Path, log_path: Path) -> 
             line = (said if said.startswith(label) else f"{label}: {said}" if said else
                     f"{label}: the server stopped answering at {e.done:,} of {e.total:,}")
             line += served.KEPT_FOR_NEXT
-            log(f"[frontier] {line} ({e.why})")
+            log(f"[frontier] {line} ({status_of(e.why)})")
             return "failed", line
         if db.cancel_requested(sid):
             return "canceled", f"{label}: stopped at {n:,} of {total:,}; the answers are kept"

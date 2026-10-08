@@ -152,7 +152,7 @@ def test_21_public_is_refused_while_the_scrub_lacks_its_names(box, tmp_path, mon
     monkeypatch.setattr(builtins, "input", lambda prompt="": "yes")
     out = tmp_path / "raw"
     assert efr.main(["--run", str(sid), "--out", str(out)]) == 1      # 511854e: 0, public
-    assert "public/ refused: SCRUB_ACCOUNTS is empty" in capsys.readouterr().out
+    assert "public/ refused: SCRUB_ACCOUNTS isn't given" in capsys.readouterr().out
     assert not (out / "public").exists() and (out / "private").exists()
 
 

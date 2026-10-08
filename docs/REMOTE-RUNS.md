@@ -264,16 +264,22 @@ sudo docker compose exec -T -e SCRUB_HOSTS="$(hostname)" -e SCRUB_ACCOUNTS=<your
 `SCRUB_HOSTS` gives the export the server's host name to remove: inside the
 container, the host name is the container's. `SCRUB_ACCOUNTS` (17g) gives
 the Hugging Face accounts to remove wherever they name a path (the account
-the builds and the llama-server tarball are kept under). 17j: the export
-works out the rest itself — the container's name, the hosts the board's
-settings name (the judge's, a served model's), the names a browser opened
-the board by, and the accounts of the repositories its models were fetched
-from (but a checked public file's) — and prints `will remove: hosts …;
-accounts …` above the list it asks a yes to. Nothing goes to `public/` (the
-export says why, writes every run to `private/`, and exits 1) when a value
-given is too short to be a name (`x`, `,`), when this server's own name isn't
-known (`SCRUB_HOSTS` empty or the container's own name, and no name seen),
-or when no account is given or found.
+the builds and the llama-server tarball are kept under). **18b: both must
+be given** — give `SCRUB_HOSTS` the server's own name and the tailnet's
+name for it. The export adds what it works out itself — the container's
+name, the dotted hosts the board's settings name (the judge's, a served
+model's), and the accounts of the repositories its models were fetched from
+(but a checked public file's) — and prints `will remove: hosts …; accounts
+…` above the list it asks a yes to. It never takes a name from a request to
+the board (17j did: any Host header became a word scrubbed for good, and
+let `public/` open). Nothing goes to `public/` (the export says why, writes
+every run to `private/`, and exits 1) when either variable isn't given, when
+a value given is too short to be a name (`x`, `,`), or when this server's own
+name isn't in `SCRUB_HOSTS` (the container's own name isn't it).
+
+**Folder names** (18b): a Frontier run's folder is `frontier-run-<its Runs
+number>`; a DeviceMark row's is its row's name, unless the scrub would
+change it (a model named after an address): then `devicemark-<a hash>`.
 
 **What it writes.** One folder a row, under `~/benchmarks/raw-export/public/` or `…/private/`:
 - `items.jsonl`, `setup.json`, `scores.json` and `log.txt`;
