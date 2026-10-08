@@ -1,0 +1,21 @@
+{
+ "what": "18c: what a SWE-bench Multilingual task's image gets so its build and its verification need no network. scripts/agent_run.py fetches these once and checks each against its hash; every task's image installs them with Docker's build network off. Nothing here was published in the 14 days before 8 Oct 2026.",
+ "exclude_newer": "2026-09-24",
+ "python": {
+  "version": "3.11.16+20260901",
+  "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.11.16%2B20260901-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+  "sha256": "64427febea27864d136db46c8efe968eb6fa5ca2813ce1dca4bb95aec31cb2e4",
+  "from": "python-build-standalone's release 20260901 (1 Sep 2026), its SHA256SUMS"
+ },
+ "uv": {
+  "version": "0.7.13",
+  "url": "https://github.com/astral-sh/uv/releases/download/0.7.13/uv-x86_64-unknown-linux-musl.tar.gz",
+  "sha256": "560bb64e060354e45138d7dd47c8dd48a4f7a349af5520d29cd3c704e79f286c",
+  "from": "the uv every task's Dockerfile installs (its own line fetches astral.sh's installer for 0.7.13), its release's .sha256"
+ },
+ "packages": "agent-build-requirements.txt",
+ "parser": {"requires-python": ">=3.11", "dependencies": ["swebench==4.1.0", "datasets==2.16.1"]},
+ "wheels_for": {"python_version": "3.11", "abi": "cp311",
+                "platforms": ["manylinux_2_28_x86_64", "manylinux_2_17_x86_64", "manylinux2014_x86_64",
+                              "manylinux_2_5_x86_64", "manylinux1_x86_64", "linux_x86_64"]}
+}

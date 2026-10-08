@@ -49,7 +49,9 @@ SWE-bench Pro follows once both have run.
   if any of these fails:
   - the pinned versions, and every package in the venv as the lock
     (`docs/agent-requirements.txt`, with hashes) has it;
-  - Docker, as you without sudo;
+  - Harbor's command beside the venv's python (the runner runs it from
+    there, with the venv's `bin` first on each job's PATH);
+  - Docker, for the user running the runner (step A5);
   - 50 GB free where Docker keeps its images;
   - the board serving the model with the registered file;
   - a window of at least 131,072 tokens;
@@ -67,20 +69,44 @@ SWE-bench Pro follows once both have run.
 - **A pilot is fixed:** `--tasks 10` is the same ten every time, spread over
   the benchmark's languages. `--only a,b` asks those tasks; `--only
   fetching` the tasks whose own tests fetch packages.
-- **Verification has no network either:** it runs the model's code, and the
-  board takes writes from the tailnet without a key. The runner asks each
-  task from a copy of it (`agent-tasks/<benchmark>+offline/`) whose
-  verification needs none:
+- **Verification has no network either, and nor do the builds:** it runs
+  the model's code, and the board takes writes from the tailnet without a
+  key. The runner asks each task from a copy of it
+  (`agent-tasks/<benchmark>+offline/`) whose build and verification need
+  none:
   - SWE-bench Multilingual verifies in the agent's container, and its
     `test.sh` has uv fetch the SWE-bench parser's packages and a Python
-    3.11+ from the internet. The copy's Dockerfile runs that script's header
-    once while the image is built, then tells uv it is offline. The few
-    tasks whose own test commands run a package manager have those commands
-    run once at build time, in a throwaway copy of the repository, and the
-    tools told they are offline;
+    3.11+ from the internet. The runner fetches those once instead
+    (`$BENCH_ROOT/agent-build/`, named by the lock's hash), from
+    `docs/agent-build.json` and `docs/agent-build-requirements.txt`: the
+    task's own uv (0.7.13), a Python 3.11 and the parser's 78 packages,
+    nothing published in the 14 days before the lock's date, each file
+    checked against its hash, wheels only (no package's code runs on the
+    host). The copy's image takes them from its build folder and installs
+    them with Docker's build network **off**; the task's own uv installer
+    line is left out (the same uv comes from those files). The lock's date
+    and hash are in `run.json`, and a run's settings never change.
+  - The few tasks whose own test commands run a package manager (three at
+    this pin: npm, composer, cargo) have those commands run once at build
+    time, in a throwaway copy of the repository, with Docker's own network
+    and no package's own scripts (npm's `--ignore-scripts`, composer's
+    `--no-scripts --no-plugins`; cargo runs none to fetch), then the tools
+    are told they are offline. npm's is held to the lock's date
+    (`--before`); composer and cargo take the newest they're allowed, and
+    the runner names those tasks.
   - DeepSWE verifies in a separate container, offline by its own design;
     Harbor gives it none of the runner's compose files, so the copy gives it
-    one: no network, the agent's limits.
+    one: no network, the agent's limits. Its images are built from its own
+    Dockerfiles, which clone the repository and fetch its packages: Docker's
+    own network.
+  - Docker can't give a build "the package registries and nothing else"
+    here: a build has either no network or Docker's own, which reaches what
+    this host reaches (its own ports, the LAN, the tailnet). Step A7 says
+    what a build with Docker's own network reaches. To limit it to the
+    registries would take a build daemon of its own on an internal network
+    whose only way out is a proxy that lets only the registries through
+    (`docker buildx create --driver docker-container`, with Harbor's builds
+    sent to it), or firewall rules on the host for the builds' bridge.
 - **It carries on:**
   - a task with the model's result is never asked again, whatever the
     result: a failure is the model's result, and a later success never
@@ -130,6 +156,11 @@ SWE-bench Pro follows once both have run.
 
 Each step is numbered; a step that refers to another gives its number.
 
+**Every runner line is written in its sudo form**, with the agent venv's
+`bin` first on PATH: `sudo env PATH="$HOME/agent-venv/bin:$PATH"
+~/agent-venv/bin/python scripts/agent_run.py …`. If you choose the docker
+group in step 5, the line is the same without `sudo`.
+
 1. Bring the checkout and the board up to date (the board shows agent runs
    from this build):
    ```bash
@@ -141,8 +172,12 @@ Each step is numbered; a step that refers to another gives its number.
    ```bash
    cd /tmp && curl -fsSLO https://github.com/astral-sh/uv/releases/download/0.12.18/uv-x86_64-unknown-linux-gnu.tar.gz && echo "89eadd7c76fc063887959510d5ba0ab1264dfd5f1143b925ddb73021a40acf16  uv-x86_64-unknown-linux-gnu.tar.gz" | sha256sum -c && tar xzf uv-x86_64-unknown-linux-gnu.tar.gz && mkdir -p ~/.local/bin && install -m 755 uv-x86_64-unknown-linux-gnu/uv ~/.local/bin/uv && ~/.local/bin/uv --version
    ```
-3. Make the agent venv with Python 3.12 — uv fetches Python 3.12 if the
-   server has none — and pip in it (`--seed`):
+3. Move an existing agent venv aside (uv would reuse it), then make the
+   agent venv with Python 3.12 — uv fetches Python 3.12 if the server has
+   none — and pip in it (`--seed`):
+   ```bash
+   [ -e ~/agent-venv ] && mv ~/agent-venv ~/agent-venv.old.$(date +%s)
+   ```
    ```bash
    ~/.local/bin/uv venv --python 3.12 --seed ~/agent-venv
    ```
@@ -157,46 +192,53 @@ Each step is numbered; a step that refers to another gives its number.
    runner, and every package it imports, root:
    - **(a) The docker group.** Your account is root without a password from
      then on, for everything you run — every package in every venv you use,
-     this one's 103 included, and any script you run. It stays until you
-     take it away (`sudo gpasswd -d $USER docker`). Then log out and in:
+     this one's included, and any script you run. It stays until you take
+     it away (`sudo gpasswd -d $USER docker`). Then log out and in, and run
+     each runner line below without its `sudo`:
      ```bash
      sudo usermod -aG docker $USER
      ```
    - **(b) sudo, each time.** Nothing changes for your account: only the
-     runner is root, and only while it runs. Put `sudo` in front of
-     `~/agent-venv/bin/python` in steps 7–10 and in § B. What that changes:
-     the run's files under `$BENCH_ROOT/agent-runs/` and `agent-tasks/` are
-     owned by root (the board reads them as before); Harbor's cache is
-     under `/root/.cache`; the Runs row still says masein (the runner takes
-     the name sudo was run by; `--by masein` says it outright).
+     runner is root, and only while it runs. Each runner line below is
+     written this way. What that changes: the run's files are owned by root
+     (under `$BENCH_ROOT/agent-runs/`, `agent-tasks/` and `agent-build/`;
+     the board reads them as before); Harbor's and pip's caches are under
+     `/root/.cache`; the Runs row still says masein (the runner takes the
+     name sudo was run by; `--by masein` says it outright).
 6. See where Docker keeps images, the space there, and what Docker uses:
    ```bash
    sudo sh -c 'd=$(docker info -f "{{.DockerRootDir}}"); echo "$d"; df -h "$d"; docker system df'
    ```
-7. Check a task's container reaches nothing: the model's server, the board,
-   the relay and ssh on every address of this server (the tailnet's and
-   IPv6 among them) and on Docker's gateway, the LAN, Docker's DNS, the
-   tailnet's DNS, the internet over IPv4 and IPv6, any name. It must end
-   "… no host folder; at most 4,096 processes"; anything else is a refusal
-   that says what answered or what the check couldn't do:
+7. Check a task's container and a task's build reach nothing: the model's
+   server, the board, the relay and ssh on every address of this server
+   (the tailnet's and IPv6 among them) and on Docker's gateway, the LAN,
+   Docker's DNS, the tailnet's DNS, the internet over IPv4 and IPv6, any
+   name. Its first line must end "… no host folder; at most 4,096
+   processes", its second "… reaches none of them"; anything else is a
+   refusal that says what answered or what the check couldn't do. Its last
+   line says what a build with Docker's own network reaches (the few tasks
+   whose own tests fetch packages, and DeepSWE's builds): report it.
    ```bash
-   cd ~/benchmarks/aienh && ~/agent-venv/bin/python scripts/agent_run.py swebench-multilingual --check-reach
+   cd ~/benchmarks/aienh && sudo env PATH="$HOME/agent-venv/bin:$PATH" ~/agent-venv/bin/python scripts/agent_run.py swebench-multilingual --check-reach
    ```
 8. The ten Multilingual tasks of step B, with Harbor's oracle agent, which
-   applies each reference solution: no model. Verification runs with no
-   network, as it will with the model; what it would have fetched (the
-   SWE-bench parser's packages and Python) is installed while each image
-   is built. Each must read Resolved. About 5–10 minutes a task:
+   applies each reference solution: no model. The runner first fetches the
+   build's files once (uv, a Python and the parser's packages, about 130
+   MB, each checked against its hash) and says where they are; each image
+   is then built with no network, and verification runs with none, as it
+   will with the model. Each must read Resolved. About 5–10 minutes a task:
    ```bash
-   cd ~/benchmarks/aienh && ~/agent-venv/bin/python scripts/agent_run.py swebench-multilingual --oracle --tasks 10
+   cd ~/benchmarks/aienh && sudo env PATH="$HOME/agent-venv/bin:$PATH" ~/agent-venv/bin/python scripts/agent_run.py swebench-multilingual --oracle --tasks 10
    ```
 9. The Multilingual tasks whose own tests run a package manager — three at
    this pin (npm, composer, cargo); the runner finds them in their tests and
-   names them. Their fetches run once while the image is built, and the
-   tools are told they are offline. Each should read Resolved; one that
-   doesn't can't be verified here without the network — say which:
+   names them, and names those whose fetch can't be held to the lock's
+   date. Their fetches run once while the image is built, with Docker's own
+   network and no package's own scripts, and the tools are told they are
+   offline after. Each should read Resolved; one that doesn't can't be
+   verified here without the network — say which:
    ```bash
-   cd ~/benchmarks/aienh && ~/agent-venv/bin/python scripts/agent_run.py swebench-multilingual --oracle --only fetching
+   cd ~/benchmarks/aienh && sudo env PATH="$HOME/agent-venv/bin:$PATH" ~/agent-venv/bin/python scripts/agent_run.py swebench-multilingual --oracle --only fetching
    ```
 10. Three DeepSWE tasks. DeepSWE verifies in a separate container with no
     network by its own design; the runner gives that container the same
@@ -204,7 +246,7 @@ Each step is numbered; a step that refers to another gives its number.
     not enabled", the kernel lacks nftables' `fib` rules: say so before
     going on:
     ```bash
-    cd ~/benchmarks/aienh && ~/agent-venv/bin/python scripts/agent_run.py deepswe --oracle --tasks 3
+    cd ~/benchmarks/aienh && sudo env PATH="$HOME/agent-venv/bin:$PATH" ~/agent-venv/bin/python scripts/agent_run.py deepswe --oracle --tasks 3
     ```
 11. Run step 6's command again: the images are gone, and the disk is back.
 
@@ -259,14 +301,14 @@ model's page and the Playground say it is busy with an agent run.
    from its cache. It says the speeds it measured and what they make of
    300 tasks, and must end "ready — 10 task(s)":
    ```bash
-   cd ~/benchmarks/aienh && ~/agent-venv/bin/python scripts/agent_run.py swebench-multilingual --as served/Qwen3.6-35B-A3B-Q4-original-k-8 --tasks 10 --check
+   cd ~/benchmarks/aienh && sudo env PATH="$HOME/agent-venv/bin:$PATH" ~/agent-venv/bin/python scripts/agent_run.py swebench-multilingual --as served/Qwen3.6-35B-A3B-Q4-original-k-8 --tasks 10 --check
    ```
 6. Ten SWE-bench Multilingual tasks, one attempt, in tmux:
    ```bash
    tmux new -s agent
    ```
    ```bash
-   cd ~/benchmarks/aienh && ~/agent-venv/bin/python scripts/agent_run.py swebench-multilingual --as served/Qwen3.6-35B-A3B-Q4-original-k-8 --tasks 10
+   cd ~/benchmarks/aienh && sudo env PATH="$HOME/agent-venv/bin:$PATH" ~/agent-venv/bin/python scripts/agent_run.py swebench-multilingual --as served/Qwen3.6-35B-A3B-Q4-original-k-8 --tasks 10
    ```
 7. Report from the run's last line and its page on the board:
    - step 5's speeds and estimate;

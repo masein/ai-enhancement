@@ -98,3 +98,24 @@ def run_json(rdir: Path, tasks: list[str], bench: str = "swebench-multilingual",
         "sampling": {"temperature": 1.0, "top_p": 0.95, "top_k": 20, "thinking": "on"},
         "window": 262144, "versions": {"harbor": "0.24.0"}, "where": "this server",
         "started_at": time.time() - 3600, "by": "masein"}))
+
+
+INVENTED_PARSER = {"requires-python": ">=3.11",
+                   "dependencies": ["invented-parser==1.0", "invented-data==2.0"]}
+
+
+def build_world(root: Path, monkeypatch) -> tuple[Path, dict]:
+    """18c: the build's files, as the runner keeps them once fetched — an
+    invented Python, uv and two invented wheels; nothing is fetched"""
+    import agent_run as ar
+    d = root / "agent-build" / "0123456789abcdef"
+    (d / "wheels").mkdir(parents=True, exist_ok=True)
+    for name in ("python.tar.gz", "uv.tar.gz", "wheels/invented_parser-1.0-py3-none-any.whl",
+                 "wheels/invented_data-2.0-py3-none-any.whl"):
+        (d / name).write_bytes(b"invented " + name.encode())
+    info = {"sha256": "ab" * 32, "exclude_newer": "2026-09-24", "python": "3.11.16+20260901",
+            "uv": "0.7.13", "packages": 2}
+    monkeypatch.setattr(ar, "build_spec", lambda: {**json.loads(ar.BUILD.read_text()),
+                                                   "parser": INVENTED_PARSER})
+    monkeypatch.setattr(ar, "build_files", lambda r, today=None: (d, info, ""))
+    return d, info

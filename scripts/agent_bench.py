@@ -86,15 +86,18 @@ ORDER = ["swebench-multilingual", "deepswe"]
 
 # 18b point 7: verification runs with no network, as the agent does — it runs
 # the model's code. What a benchmark's verification would fetch is installed
-# while the task's image is built (network is there for a build), in a copy
-# of each task the runner makes (agent_run.offline_tasks):
+# while the task's image is built, in a copy of each task the runner makes
+# (agent_run.offline_tasks):
 # - SWE-bench Multilingual verifies in the agent's container. Its test.sh
 #   runs `uv run parser.py`, whose inline dependencies (swebench, datasets
-#   and a Python ≥ 3.11) uv fetches from PyPI: the same script is run once at
-#   build time, then uv is told it is offline. A few tasks' own test commands
-#   run a package manager (npm, composer, cargo): those lines run once at
-#   build time in a throwaway copy of /testbed, filling the tools' caches,
-#   and the tools are told they are offline.
+#   and a Python ≥ 3.11) uv fetches from PyPI. 18c point 2: the runner
+#   fetches them once (docs/agent-build.json: a lock 14 days old, each file
+#   checked against its hash), and the image installs them with Docker's
+#   build network off; uv is then told it is offline. A few tasks' own test
+#   commands run a package manager (npm, composer, cargo): those lines run
+#   once at build time in a throwaway copy of /testbed, with Docker's own
+#   network and no package's own scripts, filling the tools' caches, and
+#   the tools are told they are offline.
 # - DeepSWE verifies in a separate container built from the task's tests/
 #   (its "clean copy"), offline by its own design (every task says
 #   network_mode "no-network"); Harbor gives that container none of the
@@ -331,7 +334,13 @@ def read_trial(trial: Path) -> dict | None:
            "minutes": minutes(r.get("started_at"), r.get("finished_at")),
            "exit": exit_status, "why": ""}
     ours = ours_why(r, meta)
-    if ours:
+    if etype == "CleanupFailed":
+        # 18c point 3: never verified; the model had run, so it isn't asked
+        # again — an error of ours, counted not resolved
+        out.update(result="error", final=True,
+                   why=str(exc.get("exception_message") or "the clean-up after the agent didn't "
+                           "run to its end")[:240] + " — not asked again: the model had run")
+    elif ours:
         out.update(result="error", why=ours)
     elif etype == "AgentTimeoutError":
         out.update(result="timeout", why=str(exc.get("exception_message") or "")[:300])

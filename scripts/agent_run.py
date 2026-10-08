@@ -6,11 +6,17 @@ under tmux, as the fetch is:
     python3 scripts/agent_run.py <benchmark> --oracle [--tasks N]     (step A: no model)
 
 Run it with the agent venv's python (Harbor 0.24.0 and mini-swe-agent 2.4.6;
-docs/AGENT-RUNS.md § A). It never starts or stops a model server.
+docs/AGENT-RUNS.md § A): Harbor's command is the one beside it, and each
+job has the venv's bin first on its PATH. It never starts or stops a model
+server.
 
 Before the first task, each a line with what to do when it fails:
-- the pinned versions; Docker, without sudo; at least 50 GB free where Docker
-  keeps its images;
+- the pinned versions; Harbor's command beside this python; Docker for this
+  user (sudo, or the docker group); at least 50 GB free where Docker keeps
+  its images; for SWE-bench Multilingual, the build's files (uv, a Python
+  and the verifier's parser's packages, from a lock 14 days old), fetched
+  once and checked against their hashes — every image is built with no
+  network;
 - the model (not with --oracle): the board serves it, its server answers
   with the registered file, its window is at least 131,072 tokens (named in
   the refusal), and a chat request with the bash tool comes back as a tool
@@ -38,6 +44,7 @@ the llama.cpp build and flags (run.json), and each task's Harbor job."""
 from __future__ import annotations
 
 import argparse
+import datetime
 import hashlib
 import json
 import os
@@ -78,6 +85,36 @@ def say(*a) -> None:
     print(*a, flush=True)
 
 
+def venv_bin() -> Path:
+    """the agent venv's bin: beside this python, never resolved — a venv's
+    python is a link to the interpreter it was made from (18c point 1)"""
+    return Path(sys.executable).parent
+
+
+def harbor_path() -> Path:
+    """Harbor's command, as the agent venv installs it: running the venv's
+    python doesn't put its bin on PATH, and sudo resets PATH"""
+    return venv_bin() / "harbor"
+
+
+def harbor_line() -> str:
+    """'' when Harbor's command is beside this python"""
+    h = harbor_path()
+    if h.is_file() and os.access(h, os.X_OK):
+        return ""
+    return (f"Harbor's command isn't beside this python ({h}): run the runner with the agent "
+            "venv's python, ~/agent-venv/bin/python (docs/AGENT-RUNS.md § A)")
+
+
+def job_env() -> dict:
+    """a Harbor job's environment: the venv's bin first on PATH, so what
+    Harbor runs by name is the venv's too, and this folder on PYTHONPATH for
+    the host agent"""
+    path = os.environ.get("PATH", "")
+    return {**os.environ, "PATH": str(venv_bin()) + (os.pathsep + path if path else ""),
+            "PYTHONPATH": f"{HERE}:{os.environ.get('PYTHONPATH', '')}"}
+
+
 # ---------------------------------------------------------------------------
 # where things are
 # ---------------------------------------------------------------------------
@@ -113,7 +150,8 @@ def run_dir(root: Path, name: str, model: str, attempts: int, oracle: bool,
 
 # what a run is, which never changes once it started (18b point 12)
 SETTINGS = ("benchmark", "dataset", "pin", "tasks_sha256", "attempts", "agent", "config", "model",
-            "sampling", "window", "file_sha256", "build", "flags", "prompt_sha256", "lock_sha256")
+            "sampling", "window", "file_sha256", "build", "flags", "prompt_sha256", "lock_sha256",
+            "build_lock")
 
 
 def changed_settings(before: dict, now: dict) -> list[str]:
@@ -510,9 +548,9 @@ def fetch_tasks(root: Path, b: dict) -> tuple[Path, str]:
                      ["git", "-C", str(top), "fetch", "-q", "--depth", "1", b["git"], b["commit"]],
                      ["git", "-C", str(top), "checkout", "-q", "FETCH_HEAD"]]
         else:
-            steps = [["harbor", "download", b["dataset"], "-o", str(top), "--export"]]
+            steps = [[str(harbor_path()), "download", b["dataset"], "-o", str(top), "--export"]]
         for cmd in steps:
-            code, out = run(cmd, timeout=3600)
+            code, out = run(cmd, timeout=3600, env=job_env())
             if code != 0:
                 raise SystemExit(f"{b['label']}'s tasks couldn't be fetched — "
                                  f"{out.strip()[-300:]}")
@@ -560,7 +598,7 @@ def state_of(rdir: Path, task: str, k: int) -> tuple[str, int]:
     result is in, whatever it is (18b point 2: a failure of the model's is
     never asked again); an error of ours is asked again, TRIES times at most"""
     tries = attempts_of(rdir, task, k)
-    if any(t["result"] != "error" for t in tries):
+    if any(t["result"] != "error" or t.get("final") for t in tries):
         return "done", len(tries)
     return ("given up" if len(tries) >= TRIES else "todo"), len(tries)
 
@@ -648,8 +686,172 @@ def override(rdir: Path) -> Path:
 # 18b point 7: a copy of each task whose verification needs no network
 # ---------------------------------------------------------------------------
 
-OFFLINE_MARK = ("# --- added by evalboard's agent runner (18b): verification runs with no "
-                "network ---")
+OFFLINE_MARK = ("# --- added by evalboard's agent runner (18c): the build and verification run "
+                "with no network ---")
+
+
+# ---------------------------------------------------------------------------
+# 18c point 2: what a SWE-bench task's image gets — uv, a Python and the
+# verifier's parser's packages — fetched once by the runner from a lock 14
+# days old and checked against its hashes; the image is then built with
+# Docker's build network off
+# ---------------------------------------------------------------------------
+
+BUILD = REPO / "docs" / "agent-build.json"
+BUILD_DIR = "evalboard-offline"         # in a task's build context; /opt/<it> in its image
+FRESH_DAYS = 14                         # nothing newer than this goes into a build
+# a task's build with no network at all (its own compose file, merged by
+# Harbor over its build template)
+BUILD_NONE = "services:\n  main:\n    build:\n      network: none\n"
+
+
+def build_spec() -> dict:
+    try:
+        got = json.loads(BUILD.read_text())
+        return got if isinstance(got, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def norm(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def lock_hashes(text: str) -> dict[str, tuple[str, set[str]]]:
+    """a hashed lock: {package: (its version, its hashes)}"""
+    out: dict[str, tuple[str, set[str]]] = {}
+    name = ""
+    for line in text.splitlines():
+        m = re.match(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s;\\]+)", line)
+        if m:
+            name = norm(m.group(1))
+            out[name] = (m.group(2), set())
+        elif name and line.startswith(" "):
+            out[name][1].update(re.findall(r"--hash=sha256:([0-9a-f]{64})", line))
+    return out
+
+
+def file_sha(p: Path) -> str:
+    h = hashlib.sha256()
+    with open(p, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def fetch_url(url: str, dest: Path, sha: str) -> str:
+    """'' once `url` is at `dest` with the sha256 pinned; else why"""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(url, timeout=600) as r, open(dest, "wb") as fh:
+            shutil.copyfileobj(r, fh)
+    except Exception as e:                              # noqa: BLE001 — said in one line
+        return f"{url} couldn't be fetched: {e}"
+    got = file_sha(dest)
+    if got != sha:
+        dest.unlink(missing_ok=True)
+        return f"{url} isn't the file pinned (its sha256 {got[:16]}…, pinned {sha[:16]}…)"
+    return ""
+
+
+def check_build_dir(d: Path, spec: dict, lock: dict) -> str:
+    """'' when the folder holds the Python and uv pinned and one wheel the
+    lock pins for each of its packages — nothing else"""
+    for name in ("python", "uv"):
+        p = d / f"{name}.tar.gz"
+        if not p.is_file() or file_sha(p) != spec[name]["sha256"]:
+            return f"{name}.tar.gz isn't the file pinned"
+    seen = set()
+    for w in sorted((d / "wheels").iterdir()) if (d / "wheels").is_dir() else []:
+        parts = w.name.split("-")
+        pkg = norm(parts[0]) if w.name.endswith(".whl") and len(parts) >= 5 else ""
+        if pkg not in lock or parts[1] != lock[pkg][0] or pkg in seen:
+            return f"{w.name} isn't a wheel the lock pins"
+        if file_sha(w) not in lock[pkg][1]:
+            return f"{w.name} isn't the file the lock pins (its hash differs)"
+        seen.add(pkg)
+    if set(lock) - seen:
+        return "no wheel for " + ", ".join(sorted(set(lock) - seen)[:5])
+    extra = [p.name for p in d.iterdir()
+             if p.name not in ("python.tar.gz", "uv.tar.gz", "wheels", "fetched.json")]
+    return f"something else is there: {', '.join(extra[:5])}" if extra else ""
+
+
+def build_files(root: Path, today: datetime.date | None = None) -> tuple[Path | None, dict, str]:
+    """(the folder, what it is — for run.json, why not): the build's files,
+    fetched once for a lock (named by its hash) and checked every run; no
+    code of theirs runs here (wheels only, never a source package)"""
+    spec = build_spec()
+    try:
+        lock_path = BUILD.parent / spec["packages"]
+        lock_text = lock_path.read_text()
+        when = datetime.date.fromisoformat(spec["exclude_newer"])
+        pins = {n: (spec[n]["url"], spec[n]["sha256"], spec[n]["version"]) for n in ("python", "uv")}
+        wf = spec["wheels_for"]
+    except (KeyError, OSError, ValueError, TypeError) as e:
+        return None, {}, f"docs/agent-build.json can't be read ({type(e).__name__}: {e})"
+    age = ((today or datetime.date.today()) - when).days
+    if age < FRESH_DAYS:
+        return None, {}, (f"docs/agent-build.json's packages are only {age} days old (a lock of "
+                          f"{when}): nothing newer than {FRESH_DAYS} days goes into a build")
+    lock = lock_hashes(lock_text)
+    key = hashlib.sha256(BUILD.read_bytes() + b"\0" + lock_text.encode()).hexdigest()
+    info = {"sha256": key, "exclude_newer": spec["exclude_newer"], "python": pins["python"][2],
+            "uv": pins["uv"][2], "packages": len(lock)}
+    d = root / "agent-build" / key[:16]
+    if (d / "fetched.json").is_file():
+        why = check_build_dir(d, spec, lock)
+        return ((d, info, "") if not why else
+                (None, info, f"the build's files at {d} aren't as pinned ({why}): remove that "
+                             "folder, and the runner fetches them again"))
+    say(f"fetching the build's files once: Python {pins['python'][2]}, uv {pins['uv'][2]} and "
+        f"{len(lock)} packages (a lock of {when}), each checked against its hash")
+    tmp = d.with_name(d.name + ".part")
+    shutil.rmtree(tmp, ignore_errors=True)
+    (tmp / "wheels").mkdir(parents=True)
+    for name, (url, sha, _) in pins.items():
+        why = fetch_url(url, tmp / f"{name}.tar.gz", sha)
+        if why:
+            return None, info, why
+    code, out = run([sys.executable, "-m", "pip", "download", "--isolated",
+                     "--disable-pip-version-check", "--no-input", "--require-hashes", "--no-deps",
+                     "--only-binary=:all:", "--index-url", "https://pypi.org/simple",
+                     "--python-version", wf["python_version"], "--implementation", "cp",
+                     "--abi", wf["abi"], *[x for p in wf["platforms"] for x in ("--platform", p)],
+                     "-r", str(lock_path), "-d", str(tmp / "wheels")], timeout=3600)
+    if code != 0:
+        return None, info, f"the parser's packages couldn't be fetched — {out.strip()[-300:]}"
+    why = check_build_dir(tmp, spec, lock)
+    if why:
+        return None, info, f"the packages fetched aren't as pinned: {why}"
+    write_json(tmp / "fetched.json", {**info, "at": time.time()})
+    shutil.rmtree(d, ignore_errors=True)
+    tmp.rename(d)
+    return d, info, ""
+
+
+def link_build(build: Path, dest: Path) -> None:
+    """the build's files in a task's build context: linked, not copied"""
+    for p in [build / "python.tar.gz", build / "uv.tar.gz", *sorted((build / "wheels").iterdir())]:
+        q = dest / p.relative_to(build)
+        q.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            os.link(p, q)
+        except OSError:
+            shutil.copy2(p, q)
+
+
+def parser_spec(head: list[str]) -> dict:
+    """the inline header's Python and packages"""
+    text = "\n".join(x.lstrip("# ") for x in head)
+    py = re.search(r'requires-python\s*=\s*"([^"]*)"', text)
+    deps = re.search(r"dependencies\s*=\s*\[([^\]]*)\]", text)
+    return {"requires-python": py.group(1) if py else "",
+            "dependencies": re.findall(r'"([^"]+)"', deps.group(1)) if deps else []}
+
+
+# a task's own uv installer: the same uv comes from the build's files
+UV_INSTALLER = re.compile(r"(?m)^RUN\b[^\n]*astral\.sh/uv/[^\n]*$")
 
 
 def eval_part(test_sh: str) -> list[str]:
@@ -674,26 +876,58 @@ def parser_head(test_sh: str) -> list[str]:
     return m.group(0).splitlines() if m else []
 
 
-def dockerfile_additions(test_sh: str) -> list[str]:
-    """what a SWE-bench task's image gets so its verification needs no
-    network — '' parts left out"""
+def quiet_fetch(line: str, date: str) -> str:
+    """a fetch line of the task's own, as its build runs it: no package's own
+    scripts (so no fetched code runs while the build has a network), npm's
+    no newer than the lock's date; '' for a line that can't run that way"""
+    tool = line.split()[0]
+    simple = not re.search(r"[;&|<>`$()]", line)
+    if tool in ("npm", "pnpm", "yarn"):
+        return (f"export npm_config_ignore_scripts=true YARN_ENABLE_SCRIPTS=0 "
+                f"npm_config_before={date}; {line}")
+    if tool == "composer":
+        return f"{line} --no-scripts --no-plugins" if simple else ""
+    if tool in ("cargo", "go"):                 # a fetch runs no build script
+        return line
+    return ""                                   # pip, gem, bundle: building runs the package's code
+
+
+DATE_PINNED = ("npm",)                          # a fetch that takes a date: --before
+
+
+def dockerfile_additions(test_sh: str, build: dict | None = None) -> list[str]:
+    """what a SWE-bench task's image gets so its build and its verification
+    need no network — '' parts left out. `build`: the build's files (run.json's
+    build_lock)"""
     out = [OFFLINE_MARK]
+    build = build or {}
+    date = str(build.get("exclude_newer") or "")
     head = parser_head(test_sh)
     if head:
         script = " ".join(shlex.quote(x) for x in [*head, "pass"])
-        out += ["# the verifier's parser's Python and packages, fetched now; uv offline after",
+        out += [f"# uv {build.get('uv')}, Python {build.get('python')} and the verifier's "
+                f"parser's packages (a lock of {date}): fetched once by the runner, each checked "
+                "against its hash, installed here with no network",
+                f"COPY {BUILD_DIR} /opt/{BUILD_DIR}",
+                f"RUN tar xzf /opt/{BUILD_DIR}/uv.tar.gz -C /tmp && mkdir -p /root/.local/bin && "
+                "install -m 755 /tmp/uv-*/uv /root/.local/bin/uv && rm -rf /tmp/uv-* && "
+                "mkdir -p /opt/evalboard-python && tar xzf "
+                f"/opt/{BUILD_DIR}/python.tar.gz -C /opt/evalboard-python --strip-components=1",
+                "ENV UV_PYTHON=/opt/evalboard-python/bin/python3 UV_PYTHON_DOWNLOADS=never "
+                f"UV_OFFLINE=1 UV_NO_INDEX=1 UV_FIND_LINKS=/opt/{BUILD_DIR}/wheels",
                 f"RUN cd / && printf '%s\\n' {script} > parser.py && uv run parser.py "
-                "&& rm -f parser.py",
-                "ENV UV_OFFLINE=1"]
-    lines = fetch_lines(test_sh)
+                "&& rm -f parser.py"]
+    lines = [q for x in fetch_lines(test_sh) if (q := quiet_fetch(x, date))]
     if lines:
         repo = next((m.group(1) for x in eval_part(test_sh)
                      if (m := re.match(r"\s*cd\s+(/\S+)\s*$", x))), "/testbed")
-        tools = sorted({x.split()[0] for x in lines})
+        tools = sorted({x.split()[0] for x in fetch_lines(test_sh)})
         steps = " ; ".join(f"( {x} )" for x in lines) + (" ; ( cargo fetch )"
                                                          if "cargo" in tools else "")
-        env = sorted({ab.OFFLINE_ENV[t] for t in tools if t in ab.OFFLINE_ENV})
-        out += ["# its tests' own package fetches, once, in a throwaway copy: the caches stay",
+        env = sorted({ab.OFFLINE_ENV[t] for t in tools if t in ab.OFFLINE_ENV}
+                     | ({f"npm_config_before={date}"} if "npm" in tools and date else set()))
+        out += ["# its tests' own package fetches, once, in a throwaway copy, with no package's "
+                "own scripts run: the caches stay",
                 f"RUN cp -a {repo} /tmp/evalboard-warm && cd /tmp/evalboard-warm && {steps} ; "
                 "cd / && rm -rf /tmp/evalboard-warm",
                 *([f"ENV {' '.join(env)}"] if env else [])]
@@ -707,14 +941,24 @@ def task_test(task: Path) -> str:
         return ""
 
 
-def offline_tasks(root: Path, b: dict, tdir: Path, names: list[str]) -> tuple[Path, dict]:
+def needs_build_files(tdir: Path, names: list[str]) -> bool:
+    """a task among these whose verification runs the SWE-bench parser"""
+    return any(parser_head(task_test(tdir / n)) for n in names)
+
+
+def offline_tasks(root: Path, b: dict, tdir: Path, names: list[str], build: Path | None = None,
+                  info: dict | None = None) -> tuple[Path, dict]:
     """a copy of each task asked, made again each run: a SWE-bench task's
-    Dockerfile installs what its verification would fetch; a task verified
-    in a separate container (DeepSWE) gives that container the agent's
-    limits. The tasks as fetched stay as they are (their hash is the run's)"""
+    image gets what its verification would fetch from the build's files and
+    is built with no network; a task verified in a separate container
+    (DeepSWE) gives that container the agent's limits. The tasks as fetched
+    stay as they are (their hash is the run's). `refused`: tasks the copy
+    can't be made for, with why"""
     out = root / "agent-tasks" / (slug(b["dataset"]) + "+offline")
-    h = hashlib.sha256()
-    fetching = []
+    info = info or {}
+    want = build_spec().get("parser") or {}
+    h = hashlib.sha256((info.get("sha256") or "").encode())
+    fetching, unpinned, networked, refused = [], [], [], {}
     for name in names:
         src, dst = tdir / name, out / name
         if dst.exists():
@@ -725,15 +969,43 @@ def offline_tasks(root: Path, b: dict, tdir: Path, names: list[str]) -> tuple[Pa
         if re.search(r'(?m)^\s*environment_mode\s*=\s*"separate"', toml):
             (dst / "tests" / "docker-compose.yaml").write_text(OVERRIDE_YAML)
             added = OVERRIDE_YAML
+            networked.append(name)              # its own Dockerfile fetches what it builds
         else:
-            add = dockerfile_additions(test_sh)
-            with open(dst / "environment" / "Dockerfile", "a", encoding="utf-8") as fh:
-                fh.write("\n" + "\n".join(add) + "\n")
-            added = "\n".join(add)
-        if fetch_lines(test_sh):
+            head = parser_head(test_sh)
+            if (src / "environment" / "docker-compose.yaml").exists():
+                refused[name] = "it has its own environment/docker-compose.yaml"
+                continue
+            if head and parser_spec(head) != want:
+                refused[name] = "its verifier's parser asks other packages than the build's lock"
+                continue
+            if head and build is None:
+                refused[name] = "the build's files aren't fetched"
+                continue
+            if head:
+                link_build(build, dst / "environment" / BUILD_DIR)
+            add = dockerfile_additions(test_sh, info)
+            df = dst / "environment" / "Dockerfile"
+            text = UV_INSTALLER.sub(lambda m: "# left out by evalboard's agent runner (the same uv "
+                                    "comes from the build's files): " + m.group(0)[4:],
+                                    df.read_text(errors="replace")) if head else df.read_text(
+                                        errors="replace")
+            df.write_text(text.rstrip("\n") + "\n\n" + "\n".join(add) + "\n")
+            warm = [q for x in fetch_lines(test_sh) if (q := quiet_fetch(x, info.get(
+                "exclude_newer") or ""))]
+            if warm:
+                networked.append(name)          # its own fetch needs the registries
+            else:
+                (dst / "environment" / "docker-compose.yaml").write_text(BUILD_NONE)
+            added = "\n".join(add) + ("" if warm else BUILD_NONE)
+        lines = fetch_lines(test_sh)
+        if lines:
             fetching.append(name)
+            if {x.split()[0] for x in lines} - set(DATE_PINNED) or len(lines) != len(
+                    [x for x in lines if quiet_fetch(x, "")]):
+                unpinned.append(name)
         h.update(name.encode() + b"\0" + added.encode() + b"\0")
-    return out, {"sha256": h.hexdigest(), "fetching": fetching}
+    return out, {"sha256": h.hexdigest(), "fetching": fetching, "unpinned": unpinned,
+                 "build_network": networked, "refused": refused}
 
 
 def prompt_hash(config: str) -> str:
@@ -748,7 +1020,7 @@ def prompt_hash(config: str) -> str:
 
 def harbor_cmd(task: Path, job: str, rdir: Path, b: dict, a: argparse.Namespace,
                model: str, relay: str, reach: list[str]) -> list[str]:
-    cmd = ["harbor", "run", "-p", str(task), "-k", "1", "-n", "1", "-o", str(rdir / "jobs"),
+    cmd = [str(harbor_path()), "run", "-p", str(task), "-k", "1", "-n", "1", "-o", str(rdir / "jobs"),
            "--job-name", job, "--extra-docker-compose", str(override(rdir))]
     if a.oracle:
         return [*cmd, "-a", "oracle"]
@@ -790,6 +1062,42 @@ def check_reach(rdir: Path, targets: list[str]) -> str:
         return hm.reach_verdict(out)
     finally:
         run([*proj, "down", "-v", "--remove-orphans"], timeout=600)
+
+
+def build_probe(rdir: Path, script: str, network: str) -> tuple[int, str]:
+    """an image built as a task's is, through Docker Compose, with `script`
+    run in its build: (exit code, the build's output). network: "none", as
+    a SWE-bench task's copy builds, or "default", Docker's own (18c point 2)"""
+    ctx = rdir / f"build-check-{network}"
+    shutil.rmtree(ctx, ignore_errors=True)
+    ctx.mkdir(parents=True)
+    (ctx / "probe.sh").write_text(script)
+    (ctx / "Dockerfile").write_text(f"FROM {PROBE_IMAGE}\nCOPY probe.sh /probe.sh\n"
+                                    "RUN bash /probe.sh\n")
+    image = f"agent-build-check:{network}"
+    (ctx / "docker-compose.yaml").write_text(
+        "services:\n  main:\n    build:\n      context: .\n"
+        + ("      network: none\n" if network == "none" else "") + f"    image: {image}\n")
+    code, out = run(["docker", "compose", "-p", "agent-build-check", "-f",
+                     str(ctx / "docker-compose.yaml"), "build", "--no-cache"], timeout=900,
+                    env={**os.environ, "BUILDKIT_PROGRESS": "plain"})
+    run(["docker", "image", "rm", "-f", image], timeout=120)
+    # BuildKit's plain output: "#7 0.231 <the step's line>"
+    return code, "\n".join(re.sub(r"^#\d+ \d+(?:\.\d+)? ", "", x) for x in out.splitlines())
+
+
+def check_build_reach(rdir: Path, targets: list[str]) -> tuple[str, list[str]]:
+    """(why a build with no network reached something or couldn't check,
+    what a build with Docker's own network reaches) — the same targets as
+    the container's check"""
+    import agent_host_mini as hm
+    script = hm.reach_script(targets)
+    code, out = build_probe(rdir, script, "none")
+    why = (f"the build check didn't build — {out.strip()[-300:]}" if code != 0 else
+           hm.reach_verdict(out, "build"))
+    code2, out2 = build_probe(rdir, script, "default")
+    return why, (hm.reached(out2) if code2 == 0 else
+                 [f"(the check didn't build — {out2.strip()[-200:]})"])
 
 
 def remove_images(images: list[str], keep: set[str], rdir: Path | None = None) -> float:
@@ -886,13 +1194,21 @@ def main(argv: list[str] | None = None) -> int:
         say(f"refused — {why}" if why else "a task's container reaches nothing of: "
             + ", ".join(targets) + "; no name resolves; its only interface is the loopback; "
             "no host folder; at most 4,096 processes")
-        return 2 if why else 0
+        # 18c point 2: a task's image built with no network, as every SWE-bench
+        # copy's is; and what a build with Docker's own network reaches
+        bwhy, open_ = check_build_reach(rdir, targets)
+        say(f"refused — {bwhy}" if bwhy else "a task's build with no network (every SWE-bench "
+            "Multilingual image, but those whose own tests fetch packages) reaches none of them")
+        say("a build with Docker's own network (the few Multilingual tasks whose tests fetch "
+            "packages, and DeepSWE's) reaches " + (", ".join(open_) if open_ else "none of them")
+            + " — Docker can't limit a build to the package registries alone here")
+        return 2 if why or bwhy else 0
     if not a.oracle and not a.model.startswith("served/"):
         ap.error("--as served/<model> (or --oracle, or --check-reach, for step A)")
     root = bench_root()
     # before the first task: each refusal one line, with what to do
     v = versions()
-    why = check_versions(v, a.oracle)
+    why = check_versions(v, a.oracle) or harbor_line()
     droot, why2 = docker_root() if not why else ("", "")
     why = why or why2 or disk_line(droot)
     info: dict = {}
@@ -915,12 +1231,32 @@ def main(argv: list[str] | None = None) -> int:
             say(f"refused — no such task in {b['label']}: {', '.join(unknown[:5])}")
             return 2
         picked = [t for t in a.only.split(",") if t]
-    # each asked task's copy whose verification needs no network (18b point 7)
-    tdir, offline = offline_tasks(root, b, tdir, picked)
+    # what a SWE-bench image gets, fetched once and checked (18c point 2)
+    build, build_info = None, {}
+    if needs_build_files(tdir, picked):
+        build, build_info, why = build_files(root)
+        if why:
+            say(f"refused — {why}")
+            return 2
+    # each asked task's copy whose build and verification need no network
+    # (18b point 7, 18c point 2)
+    tdir, offline = offline_tasks(root, b, tdir, picked, build, build_info)
+    if offline["refused"]:
+        say("refused — the runner can't make these tasks' copies: " + "; ".join(
+            f"{t} ({w})" for t, w in list(offline["refused"].items())[:5]))
+        return 2
+    if build is not None:
+        say(f"the images are built with no network: uv {build_info['uv']}, Python "
+            f"{build_info['python']} and the parser's {build_info['packages']} packages come "
+            f"from {build} (a lock of {build_info['exclude_newer']}, each file checked)")
     if offline["fetching"]:
         say(f"{len(offline['fetching'])} of these tasks fetch packages in their tests: those "
-            "fetches run once while the image is built, and the tools are told they are "
-            "offline — " + ", ".join(offline["fetching"]))
+            "fetches run once while the image is built, with Docker's own network and no "
+            "package's scripts, and the tools are told they are offline after — "
+            + ", ".join(offline["fetching"]))
+    if offline["unpinned"]:
+        say("their own fetch can't be held to the lock's date (composer and cargo take the "
+            "newest they're allowed): " + ", ".join(offline["unpinned"]))
     # what this run is: its settings never change once it started (18b
     # point 12) — the window the model's server reports, its file and build
     now = {
@@ -933,7 +1269,7 @@ def main(argv: list[str] | None = None) -> int:
         "max_reply_tokens": None if a.oracle else MAX_REPLY,
         "window": info.get("window"), "file_sha256": info.get("file_sha256"),
         "build": info.get("build"), "flags": info.get("flags"), "where": "this server",
-        "docker_root": droot, "by": a.by, "offline": offline,
+        "docker_root": droot, "by": a.by, "offline": offline, "build_lock": build_info or None,
         "lock_sha256": hashlib.sha256(LOCK.read_bytes()).hexdigest() if LOCK.exists() else None,
         "prompt_sha256": None if a.oracle else prompt_hash(b["config"])}
     before = read_json(rdir / "run.json")
@@ -1037,9 +1373,16 @@ def main(argv: list[str] | None = None) -> int:
                 job = f"{t}__a{k}__{int(job.rsplit('__', 1)[1]) + 1}"
             cmd = harbor_cmd(tdir / t, job, rdir, b, a, info.get("model") or "",
                              relay.url if relay else "", reach)
-            env = {**os.environ, "PYTHONPATH": f"{HERE}:{os.environ.get('PYTHONPATH', '')}"}
             log = open(rdir / "jobs" / f"{job}.log", "w")
-            proc = subprocess.Popen(cmd, cwd=rdir, env=env, stdout=log, stderr=subprocess.STDOUT)
+            try:
+                proc = subprocess.Popen(cmd, cwd=rdir, env=job_env(), stdout=log,
+                                        stderr=subprocess.STDOUT)
+            except OSError as e:                # never a traceback: one line, and stop
+                log.close()
+                stop = f"Harbor couldn't be started ({e})"
+                say(f"stopping — {stop}; the tasks running finish")
+                todo = []
+                break
             running[(t, k)] = (proc, images_of(tdir / t), log)
             f = free_gb(droot)
             lowest[(t, k)] = (f, f)

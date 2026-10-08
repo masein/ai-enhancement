@@ -21,7 +21,7 @@ import agent_bench as ab
 import agent_host_mini as hm
 import agent_relay
 import agent_run as ar
-from agent18 import LANGS, MODEL, conversation, run_json, tasks_folder, trial
+from agent18 import LANGS, MODEL, build_world, conversation, run_json, tasks_folder, trial
 from fake_openai import FakeServer
 from test_12q_devicemark_runs import svc  # noqa: F401 — svc is the fixture
 
@@ -239,6 +239,8 @@ def server_world(tmp_path, monkeypatch):
              "build": "b6500", "flags": "--jinja"}, "tool": "", "board": [], "harbor": [],
          "outcome": lambda task, n: "resolved", "kill_at": None, "names": names}
     monkeypatch.setattr(ar, "versions", lambda: dict(w["versions"]))
+    monkeypatch.setattr(ar, "harbor_line", lambda: "")       # Harbor beside the venv's python
+    w["build"] = build_world(tmp_path, monkeypatch)
     monkeypatch.setattr(ar, "free_gb", lambda path: w["free"])
     monkeypatch.setattr(ar, "tool_call_line", lambda url, model: w["tool"])
     monkeypatch.setattr(ar.time, "sleep", lambda s: None)
@@ -257,7 +259,7 @@ def server_world(tmp_path, monkeypatch):
     monkeypatch.setattr(ar, "run", run)
 
     class Popen:
-        def __init__(self, cmd, cwd=None, env=None, stdout=None, stderr=None):
+        def __init__(self, cmd, cwd=None, env=None, stdout=None, stderr=None, **kw):
             task = Path(cmd[cmd.index("-p") + 1]).name
             job = cmd[cmd.index("--job-name") + 1]
             w["harbor"].append({"task": task, "cmd": cmd, "env": env})
@@ -419,5 +421,5 @@ def test_deepswe_s_tasks_are_fetched_at_their_commit(tmp_path, monkeypatch):
     assert d.name == "tasks" and len(list(d.glob("*/task.toml"))) == 4
     fetch = next(c for c in calls if "fetch" in c)
     assert fetch[-2:] == [b["git"], "0b9fabbb63b9104d678fe965e1632f2dd9eaa2ea"]
-    assert not any(c[0] == "harbor" for c in calls)
+    assert not any(c[0].endswith("harbor") for c in calls)
     assert ar.fetch_tasks(tmp_path, b) == (d, sha) and len(calls) == 3      # once

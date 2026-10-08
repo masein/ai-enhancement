@@ -74,7 +74,8 @@ class Env:
     async def exec(self, command, cwd=None, env=None, timeout_sec=None, user=None):
         self.calls.append({"command": command, "user": user})
         out = ("PROBE tcp-ok\nNET lo \nPIDS 4096\nCAPS 000000000000000b\nNNP 1\nDONE\n"
-               if "pids.max" in command else "")
+               if "pids.max" in command else
+               "CLEAN files=0 processes=0\n" if command == hm.CLEAN else "")
         return SimpleNamespace(stdout=out, stderr="", return_code=0)
 
 
