@@ -53,12 +53,24 @@ def _backup() -> None:
         traceback.print_exc()
 
 
+def _held() -> dict:
+    """18c point 11: the served models an agent run is using — the queue
+    holds their runs"""
+    try:
+        from . import agent_runs
+        return agent_runs.busy()
+    except Exception:                               # noqa: BLE001 — the queue goes on
+        traceback.print_exc()
+        return {}
+
+
 def once(remote: bool = False) -> bool:
     """one claim and its run, in the GPU lane or (12m.3) the lane of models
     from OpenRouter; False when nothing was queued for it"""
     sub = None
     try:
-        sub = db.claim_next(remote=True) if remote else db.claim_next(gguf_first=_gguf_first())
+        sub = db.claim_next(remote=True) if remote else db.claim_next(
+            gguf_first=_gguf_first(), held=_held())
         if sub is None:
             return False
         run_submission(sub)

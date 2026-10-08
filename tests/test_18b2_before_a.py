@@ -65,24 +65,26 @@ def test_the_lock_pins_every_package_with_its_hashes():
     for b in blocks:
         assert re.search(r"--hash=sha256:[0-9a-f]{64}", b), b.splitlines()[0]
     # the doc installs it only that way
-    assert "pip install --require-hashes --no-deps -r ~/benchmarks/aienh/docs/agent-" \
-           "requirements.txt" in DOC
+    assert "uv pip install --python ~/agent-venv/bin/python --require-hashes --no-deps -r " \
+           "~/benchmarks/aienh/docs/agent-requirements.txt" in DOC          # 18c: uv, no seed
 
 
 def test_the_runner_refuses_a_venv_that_differs_from_its_lock(monkeypatch):
-    from importlib import metadata
     lock = ar.lock()
     real = dict(lock)
     real["litellm"] = "1.82.8"                                  # one package moved on
     del real["openai"]                                          # one missing
-    monkeypatch.setattr(metadata, "version", lambda name: real[name] if name in real else (
-        _ for _ in ()).throw(metadata.PackageNotFoundError(name)))
+    from types import SimpleNamespace
+
+    def dists(have):                    # 18c: the venv's packages, as installed()
+        return {k: SimpleNamespace(version=v, files=[]) for k, v in have.items()}
+    monkeypatch.setattr(ar, "installed", lambda: dists(real))
     v = ar.versions()
     why = ar.check_versions(v, oracle=False)
-    assert why.startswith("2 packages in the agent venv differ from its lock: ")
+    assert why.startswith("the agent venv differs from its lock in 2 places: ")
     assert "litellm 1.82.8 (the lock: " in why and "openai missing (the lock: " in why
-    assert "make the venv again from the lock (docs/AGENT-RUNS.md § A, steps 2–4)" in why
-    monkeypatch.setattr(metadata, "version", lambda name: lock[name] if name in lock else "x")
+    assert "make the venv again from the lock (docs/AGENT-RUNS.md § A, steps 3–4)" in why
+    monkeypatch.setattr(ar, "installed", lambda: dists(lock))
     assert ar.check_versions(ar.versions(), oracle=False) == ""
 
 
@@ -101,7 +103,7 @@ def test_step_a_is_numbered_and_works_on_a_stock_server():
     steps = [int(m.group(1)) for m in re.finditer(r"(?m)^(\d+)\. ", a)]
     assert steps == list(range(1, len(steps) + 1)) and len(steps) >= 10
     assert "python3 -m venv" not in a                       # 70df001: needs python3-venv
-    assert "uv venv --python 3.12 --seed ~/agent-venv" in a   # pip in it
+    assert "uv venv --python 3.12 ~/agent-venv" in a          # 18c: pip from the lock
     # uv itself: a step of its own, checked against its published checksum
     assert re.search(r"releases/download/0\.12\.18/uv-x86_64-unknown-linux-gnu\.tar\.gz.*"
                      r"echo \"[0-9a-f]{64}  uv-x86_64-unknown-linux-gnu\.tar\.gz\" \| sha256sum -c",

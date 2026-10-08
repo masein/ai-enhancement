@@ -50,6 +50,9 @@ BENCHES: dict[str, dict] = {
         "agent": "mini-swe-agent 2.4.6, one bash tool, its SWE-bench config (250 steps, 60 s a "
                  "command) — the board's",
         "limits": "50 minutes a task for the agent, 50 for the tests",
+        # 18c point 10: what isn't comparable with the published numbers
+        "not_comparable": "A task that runs past its 50 minutes counts as not resolved here; "
+                          "the published runs had no such limit.",
         "language_from": "tags",
     },
     "deepswe": {
@@ -79,6 +82,7 @@ BENCHES: dict[str, dict] = {
                  "limit — as DeepSWE's board runs it (it pins 2026-05-21's commit, the same "
                  "prompts)",
         "limits": "3 hours a task for the agent, 30 minutes for the verifier",
+        "not_comparable": "",           # its board's own limits, which are ours
         "language_from": "metadata",
     },
 }
@@ -264,15 +268,27 @@ def safe_json(base: Path, rel: str, cap: int = READ_CAP) -> dict:
 # a task's result, from Harbor's trial folder
 # ---------------------------------------------------------------------------
 
-# An error of ours is asked again; everything else is the model's result
-# (18b point 2). Ours is an allow-list: Docker failing to pull, build or start
-# the task's container (before the agent ran, or Harbor's own Docker steps),
-# the task's container reaching something (ReachRefused), the model's server
-# failing its health check (ServerDown, said by the relay). The disk guard
-# stops the run before a task starts, so it leaves no trial.
-OURS_TYPES = ("ReachRefused", "ServerDown", "EnvironmentStartTimeoutError", "AddTestsDirError",
-              "DownloadVerifierDirError")
+# An error of ours is said and counted not resolved; everything else is the
+# model's result (18b point 2). 18c point 5: it is asked again only with
+# positive evidence that it came before the agent started — Harbor sets
+# result.json's agent_execution as the agent's phase begins, and the host
+# agent's own files (agent-host/) are written from its first step: both
+# missing — or the agent's own word that the task's container reached
+# something (ReachRefused, before the model is asked). Kinds:
+# - "before": asked again, three tries at most (Docker failing to pull,
+#   build or start the container; a reach; the run stopped while it ran);
+# - "down": the model's server failed the relay's health check (ServerDown):
+#   the run stops, the try isn't counted, a resume asks the task again from
+#   its start (18c point 6);
+# - "after": Harbor's or Docker's failure once the agent had run (copying the
+#   tests in, the clean-up, the teardown) or a job killed past its limits:
+#   counted not resolved, never asked again — the model had run, and a
+#   second sample would let a failure be replaced by a success.
+# The disk guard stops the run before a task starts, so it leaves no trial.
+OURS_TYPES = ("EnvironmentStartTimeoutError", "AddTestsDirError", "DownloadVerifierDirError",
+              "CleanupFailed")
 DOCKER_FAILED = "Docker compose command failed"
+STOPPED_TYPES = ("CancelledError", "KeyboardInterrupt")
 # the model's: not resolved, with why, as each benchmark counts them
 MODELS_WHY = {"ContextWindowExceededError": "the window was outgrown",
               "LimitsExceeded": "the step limit",
@@ -282,29 +298,51 @@ MODELS_WHY = {"ContextWindowExceededError": "the window was outgrown",
               "RewardFileNotFoundError": "the tests left no result",
               "RewardFileEmptyError": "the tests left an empty result",
               "VerifierOutputParseError": "the tests' result couldn't be read"}
+DOWN_WORDS = "the model's server went down: asked again from its start"
 
 
-def ours_why(r: dict, meta: dict) -> str:
-    """why a trial's failure is ours, '' when it is the model's"""
-    if meta.get("ours"):
-        return str(meta["ours"])[:300]
+def agent_ran(trial: Path) -> bool:
+    """the host agent's own files are there: it had started (its trajectory
+    is written from its first step, meta.json however it stops)"""
+    try:
+        return any((trial / HOST_DIR).iterdir())
+    except OSError:
+        return False
+
+
+def ours_of(r: dict, meta: dict, ran: bool) -> tuple[str, str]:
+    """(kind, why) of a trial's failure: kind "before", "down" or "after"
+    when it is ours, "" when it is the model's"""
     exc = r.get("exception_info") or {}
     etype = str(exc.get("exception_type") or "")
     msg = str(exc.get("exception_message") or "")
+    # the host agent's own two, by its word or by the exception it raised (a
+    # model's command can raise neither)
+    said = str(meta.get("ours") or "") or (f"{etype}: {msg}" if etype in (
+        "ServerDown", "ReachRefused") else "")
+    if said.startswith("ServerDown"):
+        return "down", said[:300]
+    if said.startswith("ReachRefused"):
+        return "before", said[:300]
     if not etype:
-        return ""
+        return "", ""
     started = (r.get("agent_execution") or {}).get("started_at")
-    if etype in OURS_TYPES or msg.startswith(DOCKER_FAILED) or not started:
-        return f"{etype}: {msg}"[:300]
-    return ""
+    if not started and not ran:
+        return "before", f"{etype}: {msg}"[:300]
+    if etype in STOPPED_TYPES:
+        return "before", "the run was stopped while it ran"
+    if etype in OURS_TYPES or msg.startswith(DOCKER_FAILED):
+        return "after", (f"{etype}: {msg}"[:240] + " — after the agent ran: counted not resolved, "
+                         "never asked again")
+    return "", ""
 
 
 def read_trial(trial: Path) -> dict | None:
     """one task's attempt, as the board keeps it — None while it runs (no
     result.json yet). result: resolved, unresolved or timeout (the model's),
-    or error (ours, with why). Resolved only when the agent submitted and the
-    verifier passed it (18b point 10): a working tree it never submitted is
-    not resolved, as mini-swe-agent's own numbers count it"""
+    or error (ours, with why and its kind). Resolved only when the agent
+    submitted and the verifier passed it (18b point 10): a working tree it
+    never submitted is not resolved, as mini-swe-agent's own numbers count it"""
     r = safe_json(trial, "result.json", 20_000_000)
     if not r:
         return None
@@ -333,15 +371,14 @@ def read_trial(trial: Path) -> dict | None:
            "last_prompt": meta.get("last_prompt"),
            "minutes": minutes(r.get("started_at"), r.get("finished_at")),
            "exit": exit_status, "why": ""}
-    ours = ours_why(r, meta)
-    if etype == "CleanupFailed":
-        # 18c point 3: never verified; the model had run, so it isn't asked
-        # again — an error of ours, counted not resolved
-        out.update(result="error", final=True,
-                   why=str(exc.get("exception_message") or "the clean-up after the agent didn't "
-                           "run to its end")[:240] + " — not asked again: the model had run")
-    elif ours:
-        out.update(result="error", why=ours)
+    kind, ours = ours_of(r, meta, agent_ran(trial))
+    if kind == "after" and reward is not None and etype != "CleanupFailed":
+        kind = ""                       # the teardown failed after the tests' result was in
+        etype = ""
+    if kind:
+        out.update(result="error", why=ours, ours=kind, final=kind == "after")
+        if kind == "down":
+            out["why"] = DOWN_WORDS + f" ({ours})"
     elif etype == "AgentTimeoutError":
         out.update(result="timeout", why=str(exc.get("exception_message") or "")[:300])
     elif etype:
@@ -358,6 +395,26 @@ def read_trial(trial: Path) -> dict | None:
                    + (f" ({MODELS_WHY.get(exit_status, exit_status)})" if exit_status else "")
                    + ": the tests passing on its working tree don't count")
     return out
+
+
+def no_result(job: Path, killed: dict | None) -> dict:
+    """a job that ended with no result.json (18c point 7): Harbor died, the
+    run was stopped hard, or the runner killed it past its limits. Asked
+    again (it counts toward the three tries) — unless it was killed for its
+    time after the agent had run, which is never asked again"""
+    ran = any(agent_ran(t) for t in job.iterdir() if t.is_dir()) if job.is_dir() else False
+    task = job.name.split("__a")[0]
+    if killed:
+        why = str(killed.get("why") or "it ran past its limits")
+        return {"task": task, "trial": "", "job": job.name, "result": "error", "exit": "",
+                "why": f"killed: {why}" + (" — after the agent ran: counted not resolved, never "
+                                           "asked again" if ran else ""),
+                "ours": "after" if ran else "before", "final": ran, "minutes": None,
+                "steps": None, "tokens_in": None, "tokens_out": None, "last_prompt": None}
+    return {"task": task, "trial": "", "job": job.name, "result": "error", "exit": "",
+            "why": "its job ended with no result (Harbor stopped before writing one)",
+            "ours": "before", "final": False, "minutes": None, "steps": None,
+            "tokens_in": None, "tokens_out": None, "last_prompt": None}
 
 
 def score(results: list[dict], total: int) -> dict:
@@ -384,14 +441,23 @@ def score_words(s: dict, total: int) -> str:
     if s.get("errors"):
         tail += (f" · {s['errors']} error{'s' if s['errors'] != 1 else ''} of ours, counted "
                  "not resolved")
+    if s.get("left_out"):
+        tail += (f" · {s['left_out']} task{'s' if s['left_out'] != 1 else ''} left out: "
+                 "their reference solution doesn't pass here")
     return head + tail
 
 
 def again_kind(why: str) -> str:
     """an error of ours, in a few words"""
+    if (why or "").startswith(DOWN_WORDS):
+        return "the model's server went down"
+    if (why or "").startswith(("killed:", "its job ended with no result")):
+        return "its job ended with no result"
+    if (why or "") == "the run was stopped while it ran":
+        return "the run was stopped while it ran"
     t = (why or "").split(":", 1)[0]
     return {"ReachRefused": "its container reached something",
-            "ServerDown": "the model's server was down"}.get(
+            "ServerDown": "the model's server went down"}.get(
         t, "Docker couldn't pull, build or start its container")
 
 

@@ -47,8 +47,10 @@ SWE-bench Pro follows once both have run.
   - it keeps each reply's tokens and what the server took from its cache.
 - **Before the first task**, the runner refuses in one line, with what to do,
   if any of these fails:
-  - the pinned versions, and every package in the venv as the lock
-    (`docs/agent-requirements.txt`, with hashes) has it;
+  - the pinned versions, and the venv exactly as the lock
+    (`docs/agent-requirements.txt`, with hashes) has it: every package of
+    it at its version, none it doesn't hold, and every installed file as
+    its package's record has it;
   - Harbor's command beside the venv's python (the runner runs it from
     there, with the venv's `bin` first on each job's PATH);
   - Docker, for the user running the runner (step A5);
@@ -57,15 +59,21 @@ SWE-bench Pro follows once both have run.
   - a window of at least 131,072 tokens;
   - a tool call coming back through the relay;
   - a run's folder started with other settings (its window, the model's
-    file, its build or flags, the sampling, the agent's prompt, the lock):
-    a run's settings never change, and its first are kept. `--run 2`
-    starts another run of the same model beside it.
+    file, its build or flags, the sampling, the agent's prompt, the lock,
+    the build's lock, the reply's cap, the container's limits, the runner's
+    commit and files): a run's settings never change, and its first are
+    kept. `--run 2` starts another run of the same model beside it;
+  - a full run (`--all`) before Harbor's oracle has run on every task (§ C).
 - **`--check`** also renders a three-step conversation with the server's own
   template (each step must render as it did before the next came, with its
   thinking, and the thinking open), sends two requests that extend one
   conversation as the agent sends them, and refuses when the second read
-  most of its prompt again rather than from the server's cache. It says
-  the speeds it measured and what they make of the whole benchmark.
+  more than a fifth of a long prompt again rather than from the server's
+  cache, or when the server doesn't say what it took from it. Its requests
+  have the agent's own budget (the relay's 32,768 tokens), so a long think
+  before the first tool call is no refusal. It says the speeds it measured
+  and what they make of the whole benchmark.
+- **Which tasks is always said:** `--tasks 10`, `--only a,b` or `--all`.
 - **A pilot is fixed:** `--tasks 10` is the same ten every time, spread over
   the benchmark's languages. `--only a,b` asks those tasks; `--only
   fetching` the tasks whose own tests fetch packages.
@@ -111,11 +119,24 @@ SWE-bench Pro follows once both have run.
   - a task with the model's result is never asked again, whatever the
     result: a failure is the model's result, and a later success never
     replaces it;
-  - an error of ours is asked again, three times at most. Ours is a short
-    list: Docker failing to pull, build or start the task's container; the
-    container reaching something; the model's server failing its health
-    check (the relay asks `/health` when the server doesn't answer). One bad
-    reply from a server that is up is the model's;
+  - an error of ours is asked again, three times at most, only with
+    positive evidence that it came before the agent started (Harbor never
+    began the agent's phase, and the agent wrote nothing): Docker failing
+    to pull, build or start the task's container; the container reaching
+    something (the agent's check, before the model is asked); the run
+    stopped while it ran. A failure of Harbor's or Docker's once the agent
+    had run (copying the tests in, the clean-up, the teardown) is an error
+    of ours that counts as not resolved and is never asked again: asking
+    again would let a failure be replaced by a success;
+  - the model's server failing the relay's health check (the relay asks
+    `/health` when the server doesn't answer) stops the run: nothing more
+    starts, that try isn't counted, and the same command, once the server
+    is back, asks the task again from its start — said on the run's page.
+    One bad reply from a server that is up is the model's;
+  - a Harbor job has a time limit: its agent's, verifier's and build's
+    limits plus 30 minutes. Past it, the runner kills it and removes its
+    containers, said on the run's page; a job that ends with no result
+    counts as a try;
   - every task asked is in the score's denominator: one given up after three
     errors of ours counts as not resolved, and the score says how many;
   - the run's page says how many tasks were asked again, and why;
@@ -123,11 +144,12 @@ SWE-bench Pro follows once both have run.
 - **The board's runs are left alone:** the runner's calls into the board
   (its checks, its line every 3 minutes, the import) touch only its own
   Runs row. Only the board's own start puts runs that were running back in
-  the queue.
+  the queue. While a run posts its line, the board's queue holds runs on
+  its model, each with a line saying why; runs on other models go on.
 - **Disk:** when a task ends, what Harbor built for it is removed (Harbor
-  removes it itself unless the job was killed), then Docker's build cache
-  that no image uses — the board's next deploy may rebuild a step it would
-  have taken from the cache. Its base image goes once no waiting task needs
+  removes it itself unless the job was killed), then the build cache its
+  build made, one record at a time — the rest of Docker's cache (the
+  board's deploy's) stays. Its base image goes once no waiting task needs
   it, its digest recorded first. What a task takes of Docker's disk at its
   peak is measured while it runs; before each task starts — before its pull
   and build — the runner asks for that much with 50 GB left over, and stops
@@ -141,7 +163,10 @@ SWE-bench Pro follows once both have run.
     end;
   - Benchmarks ▸ Agent tasks has a card each, with our score ("% resolved ±
     one standard error · N tasks"; a pilot says "pilot: 10 of 300") and the
-    published numbers beside it, as reference. A task counts as resolved
+    published numbers beside it, as reference — with what isn't comparable
+    (a Multilingual task past its 50 minutes is not resolved here; the
+    published runs had no such limit) and the tasks left out (their
+    reference solution doesn't pass here, § C). A task counts as resolved
     only when the agent submitted and the tests passed: a working tree it
     never submitted (the step limit, the window outgrown) is not resolved,
     as mini-swe-agent's own numbers count it;
@@ -174,17 +199,18 @@ group in step 5, the line is the same without `sudo`.
    ```
 3. Move an existing agent venv aside (uv would reuse it), then make the
    agent venv with Python 3.12 — uv fetches Python 3.12 if the server has
-   none — and pip in it (`--seed`):
+   none. No seed: pip comes from the lock in step 4, pinned and hashed like
+   every other package:
    ```bash
    [ -e ~/agent-venv ] && mv ~/agent-venv ~/agent-venv.old.$(date +%s)
    ```
    ```bash
-   ~/.local/bin/uv venv --python 3.12 --seed ~/agent-venv
+   ~/.local/bin/uv venv --python 3.12 ~/agent-venv
    ```
-4. Install the lock, every package checked against its hash. It must end
-   `Successfully installed …` with no error:
+4. Install the lock with uv, every package checked against its hash, pip
+   among them. It must end `Installed 104 packages …` with no error:
    ```bash
-   ~/agent-venv/bin/pip install --require-hashes --no-deps -r ~/benchmarks/aienh/docs/agent-requirements.txt
+   ~/.local/bin/uv pip install --python ~/agent-venv/bin/python --require-hashes --no-deps -r ~/benchmarks/aienh/docs/agent-requirements.txt
    ```
 5. **Docker for the runner: you choose.** Harbor runs `docker` as the user
    who runs the runner, and whoever can run `docker` is root on this server
@@ -261,32 +287,57 @@ group in step 5, the line is the same without `sudo`.
 - the window outgrown on more than 2 of the 10;
 - a command left running past its limit.
 
-The original's llama-server is the only server touched. Never the vLLM judge
-(`gemma-vllm`), never the phone build's server. While the run is on, the
-model's page and the Playground say it is busy with an agent run.
+The original's llama-server (port 8091) is the only server touched. Never
+the vLLM judge (`gemma-vllm`), never the phone build's server, never the
+other llama-servers (8090, 8092, 8094, 8096). While the run is on, the
+model's page and the Playground say it is busy with an agent run, and the
+board's queue holds runs on that model, each with a line saying why.
 
-1. Find the original's llama-server: the line whose model is the original
-   Q4 file, not the phone build's:
+0. Nothing else may use the original's server while the agent runs: one
+   slot, and a request from elsewhere throws the agent's cache away. On the
+   board, Runs must show nothing queued or running on
+   `served/Qwen3.6-35B-A3B-Q4-original-k-8`, and the Reasoning lab no loop
+   calibration (it uses the same server). Then nothing may be connected to
+   port 8091 — this must print only its header line:
    ```bash
-   pgrep -af llama-server
+   sudo ss -tnp 'dport = :8091'
    ```
-2. Stop it by its PID, the first number on that line (here `<PID>`), and
-   check it is gone:
+1. Find the original's llama-server by its port. Its PID is in the
+   `users:(("llama-server",pid=…` part of the line (here `<PID>`):
    ```bash
-   kill <PID> && sleep 5 && pgrep -af llama-server
+   sudo ss -ltnp 'sport = :8091'
+   ```
+2. Stop it by that PID, wait until 8091 is closed, and check the other
+   servers are still listening — the last command must print four
+   `LISTEN` lines, for 8090, 8092, 8094 and 8096:
+   ```bash
+   kill <PID>
+   ```
+   ```bash
+   while sudo ss -ltn 'sport = :8091' | grep -q LISTEN; do sleep 2; done; echo "8091 closed"
+   ```
+   ```bash
+   sudo ss -ltn '( sport = :8090 or sport = :8092 or sport = :8094 or sport = :8096 )'
    ```
 3. Start it again with a 262,144 window, the experts of 21 layers on the
    CPU. Its own log is `~/serve-base-la0-mtp0.log`:
    ```bash
    CTX=262144 CPU_MOE="--n-cpu-moe 21" nohup ~/lda-serve.sh base 0 0 > ~/lda-orig.log 2>&1 &
    ```
-4. When its log says it is listening, check the card's memory, with the
-   judge's beside it:
+4. When its log says it is listening, check the card's memory: each
+   process's, then the card's total, with the judge's beside it:
    ```bash
-   tail -n 5 ~/serve-base-la0-mtp0.log; nvidia-smi --query-gpu=memory.used,memory.total --format=csv
+   tail -n 5 ~/serve-base-la0-mtp0.log
+   ```
+   ```bash
+   nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
+   ```
+   ```bash
+   nvidia-smi --query-gpu=memory.used,memory.total --format=csv
    ```
    If it didn't fit (the log says it couldn't allocate, or the server
-   exited), do steps 1–2 again and start it with 131,072, the same line
+   exited), or less than about 1.5 GB of the card is free (total minus
+   used), do steps 1–2 again and start it with 131,072, the same line
    otherwise:
    ```bash
    CTX=131072 CPU_MOE="--n-cpu-moe 21" nohup ~/lda-serve.sh base 0 0 > ~/lda-orig.log 2>&1 &
@@ -298,7 +349,8 @@ model's page and the Playground say it is busy with an agent run.
    server's own template (each step must render as it did before the next
    came, with its thinking), then sends two requests that extend one
    conversation, as the agent sends them, and reads what the server took
-   from its cache. It says the speeds it measured and what they make of
+   from its cache: a second step that reads more than a fifth of its prompt
+   again is refused. It says the speeds it measured and what they make of
    300 tasks, and must end "ready — 10 task(s)":
    ```bash
    cd ~/benchmarks/aienh && sudo env PATH="$HOME/agent-venv/bin:$PATH" ~/agent-venv/bin/python scripts/agent_run.py swebench-multilingual --as served/Qwen3.6-35B-A3B-Q4-original-k-8 --tasks 10 --check
@@ -310,12 +362,19 @@ model's page and the Playground say it is busy with an agent run.
    ```bash
    cd ~/benchmarks/aienh && sudo env PATH="$HOME/agent-venv/bin:$PATH" ~/agent-venv/bin/python scripts/agent_run.py swebench-multilingual --as served/Qwen3.6-35B-A3B-Q4-original-k-8 --tasks 10
    ```
-7. Report from the run's last line and its page on the board:
+   If the model's server goes down, the run stops in one line: nothing more
+   starts, and that try isn't counted. Start the server again (step 3),
+   then run the same command: the task it was on is asked again from its
+   start, said on the run's page.
+7. Report from the run's last lines and its page on the board:
    - step 5's speeds and estimate;
    - minutes a task, tokens, the last prompt's size, how many resolved, any
      error;
+   - how many tasks timed out, and how many steps read more of their prompt
+     again than they took from the server's cache (the run's last lines
+     say both, from `relay-usage.jsonl`);
    - the disk used (step A6's command);
-   - the card's memory (step 4's command);
+   - the card's memory (step 4's two `nvidia-smi` commands);
    - anything odd in the conversations: thinking typed as a command, the
      window outgrown, a command that hung.
 8. Afterwards, the original back to its usual window: steps 1–2 again,
@@ -324,4 +383,23 @@ model's page and the Playground say it is busy with an agent run.
    CTX=65536 CPU_MOE="--n-cpu-moe 21" nohup ~/lda-serve.sh base 0 0 > ~/lda-orig.log 2>&1 &
    ```
 
-**C.** masein decides what runs next from B's time a task.
+## C. Before the full run (masein)
+
+1. Harbor's oracle on every task of both benchmarks. No network at
+   verification, and the capabilities the container drops, can make a
+   task's own reference solution fail here — likely among the 24 Maven and
+   Gradle tasks, and npm's. Those tasks are left out of every model run's
+   score and of its comparison with the published numbers, and the card
+   names them ("N tasks left out: their reference solution doesn't pass
+   here"). A full run (`--all`) is refused until the oracle has run on every
+   task. Each of these takes a day or more:
+   ```bash
+   cd ~/benchmarks/aienh && sudo env PATH="$HOME/agent-venv/bin:$PATH" ~/agent-venv/bin/python scripts/agent_run.py swebench-multilingual --oracle --all
+   ```
+   ```bash
+   cd ~/benchmarks/aienh && sudo env PATH="$HOME/agent-venv/bin:$PATH" ~/agent-venv/bin/python scripts/agent_run.py deepswe --oracle --all
+   ```
+2. masein decides what runs next from B's time a task. A run started after
+   a `git pull` that changed the runner, the lock, the container's limits or
+   the reply's cap is a run of its own (`--run 2`): the pilot's ten never
+   roll into it.

@@ -556,18 +556,32 @@ def gguf_ahead() -> tuple[int, int] | None:
     return (int(row[0]), int(g[0])) if g else None
 
 
-def claim_next(gguf_first: bool = False, remote: bool = False) -> dict | None:
+HELD_LINE = ("waiting: an agent run is using this model's server — it starts once that run "
+             "stops (its Runs row)")
+
+
+def claim_next(gguf_first: bool = False, remote: bool = False,
+               held: dict | None = None) -> dict | None:
     """Atomically move the oldest queued row to 'preflight' and return it.
     12f.5: with gguf_first (the GGUF worker is running), not while a GGUF job
     queued before it hasn't finished. 12m.3: `remote`, the lane of runs of
     models from OpenRouter — the GPU lane never takes one, and they take
-    nothing of its turn"""
+    nothing of its turn. 18c point 11: `held`, the models an agent run is
+    using — their runs wait, each with a line saying why; the rest go on"""
     if not remote and gguf_first and gguf_ahead():
         return None
+    held = held or {}
     with closing(_conn()) as c:
         # 12f.3: a GGUF job is the host's worker's, never this queue's
-        row = c.execute(f"SELECT id FROM submissions WHERE status='queued' AND suite NOT IN ('gguf', 'agent') "
-                        f"AND {'' if remote else 'NOT '}{_REMOTE} ORDER BY id LIMIT 1").fetchone()
+        rows = c.execute(f"SELECT id, hf_id, progress FROM submissions WHERE status='queued' AND "
+                         f"suite NOT IN ('gguf', 'agent') "
+                         f"AND {'' if remote else 'NOT '}{_REMOTE} ORDER BY id").fetchall()
+        for sid_, model, line in rows:
+            if model in held and line != HELD_LINE:
+                c.execute("UPDATE submissions SET progress=? WHERE id=? AND status='queued'",
+                          (HELD_LINE, sid_))
+        c.commit()
+        row = next((r for r in rows if r[1] not in held), None)
         if not row:
             return None
         sid = row[0]
