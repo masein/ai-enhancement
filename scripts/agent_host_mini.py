@@ -84,6 +84,13 @@ CLEAN = ("kill -9 -1 2>/dev/null; "
 
 # names the container must not resolve: DNS answering is a way out
 REACH_NAMES = ("pypi.org", "github.com")
+# the capabilities a task's container keeps: what Harbor's own steps need on
+# the folders it mounts (agent_run.OVERRIDE_YAML)
+CAP_NAMES = {0: "CHOWN", 1: "DAC_OVERRIDE", 2: "DAC_READ_SEARCH", 3: "FOWNER", 4: "FSETID",
+             5: "KILL", 6: "SETGID", 7: "SETUID", 8: "SETPCAP", 10: "NET_BIND_SERVICE",
+             12: "NET_ADMIN", 13: "NET_RAW", 18: "SYS_CHROOT", 19: "SYS_PTRACE",
+             21: "SYS_ADMIN", 27: "MKNOD", 29: "AUDIT_WRITE", 31: "SETFCAP"}
+CAPS_KEPT = (1 << 0) | (1 << 1) | (1 << 3)
 
 
 def reach_script(targets: list[str]) -> str:
@@ -111,6 +118,9 @@ def reach_script(targets: list[str]) -> str:
         "done",
         "[ -e /var/run/docker.sock ] && echo 'REACHED docker.sock'",
         "echo \"NET $(ls /sys/class/net 2>/dev/null | tr '\\n' ' ')\"",
+        # its capabilities and no-new-privileges, as the kernel has them
+        "while read -r k v _; do case $k in CapEff:) echo \"CAPS $v\";; "
+        "NoNewPrivs:) echo \"NNP $v\";; esac; done < /proc/self/status",
         "p=$(cat /sys/fs/cgroup/pids.max 2>/dev/null || cat /sys/fs/cgroup/pids/pids.max "
         "2>/dev/null); echo \"PIDS ${p:-unknown}\"",
         "echo DONE"]
@@ -141,6 +151,18 @@ def reach_verdict(output: str) -> str:
     pids = next((x.split(" ", 1)[1] for x in lines if x.startswith("PIDS ")), "")
     if pids in ("", "max", "unknown"):
         return "the task's container has no process limit"
+    caps = next((x.split(" ", 1)[1] for x in lines if x.startswith("CAPS ")), "")
+    try:
+        extra = int(caps, 16) & ~CAPS_KEPT
+    except ValueError:
+        return "the container's capabilities couldn't be read"
+    if extra:
+        names = [n for b, n in CAP_NAMES.items() if extra & (1 << b)]
+        return "the task's container keeps capabilities: " + ", ".join(
+            names + ([f"{extra & ~sum(1 << b for b in CAP_NAMES):#x}"]
+                     if extra & ~sum(1 << b for b in CAP_NAMES) else []))
+    if next((x.split(" ", 1)[1] for x in lines if x.startswith("NNP ")), "") != "1":
+        return "the task's container can gain privileges (no-new-privileges isn't set)"
     return ""
 
 
@@ -262,6 +284,20 @@ def last_prompt(messages: list[dict]) -> int | None:
     return None
 
 
+def abort_request(relay: str, trial: str) -> None:
+    """cut this trial's request in flight at the relay (18b point 11): the
+    agent's time is up, and the server stops a reply nobody waits for"""
+    if not relay or not trial:
+        return
+    import urllib.request
+    url = relay.rstrip("/").removesuffix("/v1") + "/v1/agent/abort"
+    req = urllib.request.Request(url, data=b"", method="POST", headers={"X-Agent-Trial": trial})
+    try:
+        urllib.request.urlopen(req, timeout=10).read()
+    except Exception:                   # noqa: BLE001 — the relay may be gone; nothing to cut
+        pass
+
+
 def mini_classes():
     """mini-swe-agent's loop and model, as installed in the agent venv"""
     from minisweagent.agents.default import DefaultAgent
@@ -358,6 +394,8 @@ class HostMini(BaseAgent):  # type: ignore[misc,valid-type]
                     try:
                         return super()._query(messages, **kw)
                     except Exception as e:      # noqa: BLE001 — only the relay's word is ours
+                        if stop.is_set():       # cut by the abort: never asked again
+                            raise Stopped("the agent's time is up") from e
                         if DOWN in str(e):
                             raise ServerDown(str(e)[:300]) from e
                         raise
@@ -387,6 +425,9 @@ class HostMini(BaseAgent):  # type: ignore[misc,valid-type]
             ab.safe_write(host, ab.PATCH, str(last.get("submission") or ""))
         finally:
             stop.set()
+            # a reply still being written for this trial is cut
+            await asyncio.to_thread(abort_request, str(self.ours.get("relay") or ""),
+                                    str(self.session_id or ""))
             try:
                 fill()
             except Exception:           # noqa: BLE001 — result.json keeps the counts too

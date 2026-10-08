@@ -7741,6 +7741,7 @@ function servedHead(m) {
       ? `Pinned to ${pinLine(s.pin)}, with no fallbacks. Every run checks it still is.`
       : 'Its server reported ' + pinLine(s.pin) + '. Every run checks it still does.' }),
     servedPinNow(m),
+    agentBusyLine(m.id, 'model'),
     servedLaunch(m),
     el('p', { class: 'small', 'data-served-loglik': m.id, text: SERVED_LINE }),
     servedCompare(m), servedSetups(m));
@@ -20917,7 +20918,11 @@ function agentCard(c) {
         el('p', { class: 'agentrefnums' }, ...g.items.flatMap((x, i) => [i ? ' · ' : '',
           el('span', { 'data-agent-ref': x.model },
             `${x.model} `, el('b', { text: (x.pm != null ? `${x.score} ± ${x.pm}`
-              : Number(x.score).toFixed(1)) }))])))))
+              : Number(x.score).toFixed(1)) }))])),
+        // 18b: what its "±" is — never the same as ours
+        g.items.some(x => x.pm != null) ? el('p', { class: 'small se', 'data-agent-pm': g.ran_by,
+          text: `± is a ${g.items.find(x => x.pm != null).pm_is || 'spread its source gives'}; `
+            + 'ours is one standard error' }) : '')))
       : '');
 }
 function agentRefGroups(xs) {
@@ -20930,6 +20935,28 @@ function agentRefGroups(xs) {
     g.items.push(x);
   }
   return out;
+}
+// 18b: a served model an agent run holds — said on its page and in the
+// Playground: a reply there waits behind the agent's requests, and its waits
+// count against the agent's time limits
+function agentBusy() {
+  if (LIVE && netReady() && (!state.agentBusyAt || Date.now() - state.agentBusyAt > 60000)) {
+    state.agentBusyAt = Date.now();
+    api('api/agent/busy').then(d => { state.agentBusy = d.models || {}; render(); })
+      .catch(() => {});
+  }
+  return state.agentBusy || {};
+}
+function agentBusyLine(id, where) {
+  const b = agentBusy()[id];
+  if (!b) return '';
+  return el('p', { class: 'warn small', 'data-agent-busy': id, 'data-agent-busy-where': where },
+    `${where === 'playground' ? pgName(id) + ': b' : 'B'}usy with an agent run`
+      + (b.until ? ` until about ${rentedWhen(b.until)}` : '') + (where === 'playground'
+      ? '. A reply here waits behind its requests, and slows the agent, whose tasks have time '
+        + 'limits.' : '. The Playground and runs on this model wait behind it, and slow it.'),
+    ' ', el('a', { href: '#tab=runs&agent=' + encodeURIComponent(b.key),
+      'data-agent-busy-open': id, text: 'Open run ▸' }));
 }
 // a run's page: its settings, each task's result, the failures in one click
 function agentRunView() {
@@ -20959,6 +20986,8 @@ function agentRunView() {
   return [el('div', { class: 'card', 'data-agent-page': d.key }, back,
     el('h2', { text: `${d.label} · ${d.model}` }),
     el('p', { 'data-agent-score': d.key }, el('b', { text: d.words })),
+    el('p', { class: 'small se', 'data-agent-tokens-note': d.key, text: 'Tokens in adds up every '
+      + 'step’s whole prompt; the last prompt is how big the conversation grew.' }),
     // 18b: a task asked again after an error of ours, said with why
     d.again ? el('p', { class: 'small', 'data-agent-again': d.key, text: d.again }) : '',
     el('p', { class: 'small se', 'data-agent-settings': d.key, text: setting }),
@@ -20968,8 +20997,12 @@ function agentRunView() {
       el('button', { class: A.only ? 'chip-btn on' : 'quiet', 'data-agent-filter': 'failures',
         text: `Failures ${n(fails)}`, onclick: () => { A.only = true; render(); } })),
     el('div', { class: 'lb-wrap' }, el('table', { 'data-agent-tasks': d.key },
-      el('thead', {}, el('tr', {}, ['Task', 'Result', 'Steps', 'Tokens in', 'Tokens out', 'Minutes']
-        .map(h => el('th', { text: h })))),
+      // 18b: tokens in adds up every step's whole prompt; the last prompt is
+      // how big the conversation grew
+      el('thead', {}, el('tr', {}, [['Task'], ['Result'], ['Steps'],
+        ['Tokens in', 'every step’s whole prompt, added up'], ['Last prompt',
+          'the last step’s prompt: how big the conversation grew'], ['Tokens out'], ['Minutes']]
+        .map(([h, t]) => el('th', { text: h, title: t || null, 'data-agent-col': h })))),
       el('tbody', {}, rows.map(r => el('tr', { 'data-agent-task': r.task,
           'data-agent-result': r.result },
         el('td', {}, el('a', { href: `#tab=runs&agent=${encodeURIComponent(d.key)}&task=`
@@ -20980,6 +21013,7 @@ function agentRunView() {
           (r.again || []).length ? el('div', { class: 'small se', 'data-agent-tries': r.task,
             text: `asked ${r.tries} times: ${r.again.join('; ')}` }) : ''),
         el('td', { class: 'num', text: n(r.steps) }), el('td', { class: 'num', text: n(r.tokens_in) }),
+        el('td', { class: 'num', 'data-agent-last-prompt': r.task, text: n(r.last_prompt) }),
         el('td', { class: 'num', text: n(r.tokens_out) }),
         el('td', { class: 'num', text: r.minutes == null ? '—' : String(r.minutes) })))))))];
 }
@@ -26622,6 +26656,8 @@ function pgInput(P, c, m, changed) {
         text: 'Paused: a run started. Your conversation is kept.' }) : '',
       el('p', { class: 'warn', 'data-pg-long': '1', hidden: long ? null : '',
         text: `Too long for this model: about ${fits.toLocaleString('en')} words fits.` }),
+      ...(c ? [c.model, c.model2] : [P.pick, P.pick2]).filter(Boolean)
+        .map(id => agentBusyLine(id, 'playground')),
       // its reason names it already, or it is named first (two models: which one)
       notNow.map(([id, x]) => x.state === 'checking'
         ? el('p', { class: 'small se', 'data-pg-checking': id,

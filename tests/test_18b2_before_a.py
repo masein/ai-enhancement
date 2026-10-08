@@ -109,7 +109,7 @@ def test_step_a_is_numbered_and_works_on_a_stock_server():
     numbers = set(steps) | {int(m.group(1)) for m in re.finditer(r"(?m)^(\d+)\. ", section("B"))}
     for m in re.finditer(r"steps? (?:A|B)?(\d+)", DOC):
         assert int(m.group(1)) in numbers, m.group(0)
-    assert "step 4's" not in DOC and "Run step 4" not in DOC
+    assert "Run step 4's command again" not in DOC            # 70df001: a list with no numbers
 
 
 # ---------------------------------------------------------------------------
@@ -212,7 +212,7 @@ def test_the_run_asks_the_copies_and_only_fetching_picks_its_tasks(  # noqa: F81
 # ---------------------------------------------------------------------------
 
 def test_the_containers_check_fails_closed():
-    ok = "PROBE tcp-ok\nNET lo \nPIDS 4096\nDONE\n"
+    ok = "PROBE tcp-ok\nNET lo \nPIDS 4096\nCAPS 000000000000000b\nNNP 1\nDONE\n"
     assert hm.reach_verdict(ok) == ""
     cases = {
         "PROBE tcp-ok\nNET lo \nPIDS 4096\n": "didn't run to its end",       # cut short
@@ -223,7 +223,8 @@ def test_the_containers_check_fails_closed():
         "PROBE tcp-ok\nNET eth0 lo \nPIDS 4096\nDONE": "has a network interface: eth0",
         "PROBE tcp-ok\nNET \nPIDS 4096\nDONE": "interfaces couldn't be read",
         "PROBE tcp-ok\nREACHED dns pypi.org\nNET lo\nPIDS 4096\nDONE": "reached dns pypi.org",
-        "PROBE tcp-ok\nNET lo\nPIDS max\nDONE": "no process limit"}
+        "PROBE tcp-ok\nNET lo\nPIDS max\nCAPS 0\nNNP 1\nDONE": "no process limit",
+        "PROBE tcp-ok\nNET lo\nPIDS 4096\nNNP 1\nDONE": "capabilities couldn't be read"}
     for out, words in cases.items():
         assert words in hm.reach_verdict(out), out
     script = hm.reach_script(["10.0.0.1:22", "2606:4700:4700::1111:443"])

@@ -203,7 +203,7 @@ def test_a_command_past_its_limit_and_the_submission_line():
 def test_the_containers_check_and_the_tokens_from_the_trajectory():
     script = hm.reach_script(["172.17.0.1:8090", "1.1.1.1:443"])
     assert '/dev/tcp/$1/$2' in script and "for t in 172.17.0.1:8090 1.1.1.1:443;" in script
-    ok = "PROBE tcp-ok\nNET lo\n{}\nDONE"
+    ok = "PROBE tcp-ok\nNET lo\nCAPS 000000000000000b\nNNP 1\n{}\nDONE"
     assert hm.reach_verdict(ok.format("PIDS 4096")) == ""
     assert hm.reach_verdict(ok.format("REACHED 172.17.0.1:8090\nPIDS 4096")) == \
         "the task's container reached 172.17.0.1:8090"
@@ -327,7 +327,7 @@ def test_it_carries_on_after_a_kill_and_never_asks_a_finished_task_again(server_
     for k in ("versions", "sampling", "window", "prompt_sha256", "file_sha256", "build", "flags",
               "tasks_sha256"):
         assert k in run, k                                          # what the run leaves
-    assert run["sampling"] == {"temperature": 1.0, "top_p": 0.95, "top_k": 20,
+    assert run["sampling"] == {"temperature": 1.0, "top_p": 0.95, "top_k": 20, "min_p": 0.0,
                                "presence_penalty": 0.0, "thinking": "on"}
 
 
@@ -358,8 +358,8 @@ def test_the_disk_guard_stops_before_the_next_pull_and_says_so(server_world, cap
     w["outcome"] = outcome
     assert ar.main(["swebench-multilingual", "--as", MODEL, "--tasks", "10", "--no-board"]) == 1
     out = capsys.readouterr().out
-    assert "stopping — Docker's disk (/var/lib/docker) has 52 GB free and the next image needs " \
-        "about 5 — 50 GB must stay free" in out, out
+    assert "stopping — Docker's disk (/var/lib/docker) has 52 GB free and the next task needs " \
+        "about 8 — 50 GB must stay free" in out, out
     assert len(w["harbor"]) == 2
 
 

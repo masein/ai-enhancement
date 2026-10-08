@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+import time
 from pathlib import Path
 
 from . import config, db
@@ -116,3 +117,27 @@ def catalogue() -> dict:
         for k in ab.ORDER], "oracle": [r for r in rs if r["oracle"]],
         "read": json.loads(PUBLISHED.read_text()).get("read")
         if PUBLISHED.exists() else None}
+
+
+# a running agent run whose last line is older than this has stopped posting:
+# its runner died, and the model isn't held
+BUSY_STALE_S = 15 * 60
+
+
+def busy() -> dict:
+    """the served models an agent run holds now (18b point 15): {model:
+    {key, until, line}} — the Playground and the model's page say so"""
+    out: dict = {}
+    for r in runs():
+        if r.get("oracle") or r.get("status") != "running":
+            continue
+        d = _folder(r["key"])
+        prog = {}
+        try:
+            prog = json.loads((d / "progress.json").read_text()) if d else {}
+        except (OSError, ValueError):
+            prog = {}
+        if not prog or time.time() - float(prog.get("at") or 0) > BUSY_STALE_S:
+            continue
+        out[r["model"]] = {"key": r["key"], "until": prog.get("until"), "line": r.get("line") or ""}
+    return out
