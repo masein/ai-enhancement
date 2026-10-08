@@ -79,7 +79,7 @@ def summary(rdir: Path) -> dict:
     s = ab.score(rs, int(run.get("of") or len(tasks)))
     return {"key": rdir.name, "folder": str(rdir), "run": run, "results": rs, "score": s,
             "words": ab.score_words(s, int(run.get("of") or len(tasks))),
-            "progress": ar.read_json(rdir / "progress.json")}
+            "again": ab.again_words(rs), "progress": ar.read_json(rdir / "progress.json")}
 
 
 def runs_row(rdir: Path, status: str, line: str) -> int:
@@ -109,8 +109,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--served")
     ap.add_argument("--progress", type=Path)
     a = ap.parse_args(argv)
-    from service import db
-    db.init()
+    # never db.init() here: it is the service's start-up, which puts the
+    # board's running runs back in the queue (18b point 3) — this touches
+    # only its own agent row
     if a.served:
         print(json.dumps(served(a.served)))
         return 0
@@ -127,7 +128,7 @@ def main(argv: list[str] | None = None) -> int:
     want = len(s["run"].get("tasks") or []) * int(s["run"].get("attempts") or 1)
     done = s["score"]["n"]
     status = "done" if done >= want else "failed"
-    line = s["words"] + ("" if status == "done" else f" · {want - done} without a result")
+    line = s["words"] + ("" if status == "done" else f" · {want - done} never asked")
     sid = runs_row(rdir, status, line)
     store().mkdir(parents=True, exist_ok=True)
     (store() / f"{rdir.name}.summary.json").write_text(json.dumps(s))

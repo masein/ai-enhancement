@@ -16,6 +16,18 @@ SWE-bench Pro follows once both have run.
   - The task's container has no network (`network_mode: none`), at most
     4,096 processes, and no address or key of the model. The agent checks
     this from inside before the model is asked anything.
+  - Harbor mounts three of the trial's folders into the container
+    (`agent/`, `verifier/`, `artifacts/`), and the model's commands run
+    there as root: anything in them may be a link, a FIFO or a device it
+    made. The agent's own files (its trajectory, the patch, its counts) go
+    in the trial's `agent-host/` folder instead, which no container mounts,
+    each written under a new name and renamed into place, never through a
+    link. However the agent stops, every process left in the container is
+    killed and the three mounted folders are emptied before the verifier
+    runs.
+  - The board reads a file only if it is a regular file with one link,
+    reached from the run's folder through real folders: never a link, a
+    FIFO, a device or a hard link, and at most 2 MB of it.
 - The agent reaches the model through the **relay**
   (`scripts/agent_relay.py`), in the runner's process:
   - it listens on 127.0.0.1 only and takes only the chat request;
@@ -34,10 +46,22 @@ SWE-bench Pro follows once both have run.
 - **A pilot is fixed:** `--tasks 10` is the same ten every time, spread over
   the benchmark's languages.
 - **It carries on:**
-  - a task with a result is never asked again;
-  - an error of ours (Docker, the relay, the server down) is asked again,
-    three times at most;
+  - a task with the model's result is never asked again, whatever the
+    result: a failure is the model's result, and a later success never
+    replaces it;
+  - an error of ours is asked again, three times at most. Ours is a short
+    list: Docker failing to pull, build or start the task's container; the
+    container reaching something; the model's server failing its health
+    check (the relay asks `/health` when the server doesn't answer). One bad
+    reply from a server that is up is the model's;
+  - every task asked is in the score's denominator: one given up after three
+    errors of ours counts as not resolved, and the score says how many;
+  - the run's page says how many tasks were asked again, and why;
   - after a kill, the same command goes on.
+- **The board's runs are left alone:** the runner's calls into the board
+  (its checks, its line every 3 minutes, the import) touch only its own
+  Runs row. Only the board's own start puts runs that were running back in
+  the queue.
 - **Disk:** each task's image is removed once no waiting task needs it, its
   digest recorded first. Nothing more is pulled when Docker's disk would fall
   under 50 GB free: the task running finishes, and the run stops in one line.
@@ -46,8 +70,11 @@ SWE-bench Pro follows once both have run.
     300 · 21 resolved · 28 min a task · about 5 days left"), imported at the
     end;
   - Benchmarks ▸ Agent tasks has a card each, with our score ("% resolved ±
-    its error · N tasks"; a pilot says "pilot: 10 of 300") and the published
-    numbers beside it, as reference;
+    one standard error · N tasks"; a pilot says "pilot: 10 of 300") and the
+    published numbers beside it, as reference. A task counts as resolved
+    only when the agent submitted and the tests passed: a working tree it
+    never submitted (the step limit, the window outgrown) is not resolved,
+    as mini-swe-agent's own numbers count it;
   - a run's page lists its tasks, with the failures one click away; a task
     opens to its conversation, step by step, then its patch and the
     verifier's output.

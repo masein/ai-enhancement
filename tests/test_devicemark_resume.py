@@ -5,7 +5,7 @@ on dm_math, and the re-queued run asked dm_ifeval again from its first item.
 A task whose saved answers cover every item the built task holds is done, as
 a task with lm_eval's results file is in every suite. No model runs: lm_eval
 is a stand-in that writes what it writes, and the restart is the service
-starting again (db.init re-queues the run that was running)."""
+starting again (db.init(startup=True) re-queues the run that was running)."""
 
 from __future__ import annotations
 
@@ -79,7 +79,7 @@ def test_a_restart_during_the_second_task_resumes_at_the_second_task(monkeypatch
     ifeval = row_dir(QWEN, thinking=True) / "dm_ifeval_0shot"
     assert len(dm.answered_keys(ifeval, "dm_ifeval")) == 300
     # the service starts again: the run that was running is queued again
-    db.init()
+    db.init(startup=True)
     assert (db.get(sid)["status"], db.get(sid)["progress"]) == ("queued",
                                                                 "re-queued after restart")
     second = lm_eval(monkeypatch, results=results)
@@ -102,7 +102,7 @@ def test_a_task_answered_only_in_part_is_asked_again(monkeypatch):
     with pytest.raises(Restart):
         runner.run_submission(db.get(sid))
     assert first == ["dm_ifeval", "dm_mmlu_pro"]
-    db.init()
+    db.init(startup=True)
     second = lm_eval(monkeypatch)
     runner.run_submission(db.get(sid))
     assert second == ["dm_ifeval", "dm_mmlu_pro", "dm_math"]   # 120 of 300 is not done

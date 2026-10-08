@@ -20959,6 +20959,8 @@ function agentRunView() {
   return [el('div', { class: 'card', 'data-agent-page': d.key }, back,
     el('h2', { text: `${d.label} · ${d.model}` }),
     el('p', { 'data-agent-score': d.key }, el('b', { text: d.words })),
+    // 18b: a task asked again after an error of ours, said with why
+    d.again ? el('p', { class: 'small', 'data-agent-again': d.key, text: d.again }) : '',
     el('p', { class: 'small se', 'data-agent-settings': d.key, text: setting }),
     el('div', { class: 'toolbar' },
       el('button', { class: A.only ? 'quiet' : 'chip-btn on', 'data-agent-filter': 'all',
@@ -20974,7 +20976,9 @@ function agentRunView() {
           + encodeURIComponent(r.task), text: r.task })),
         el('td', {}, el('span', { class: 'st st-' + (r.result === 'resolved' ? 'done'
           : r.result === 'error' ? 'muted' : 'failed'), text: AGENT_WORDS[r.result] || r.result }),
-          r.why ? el('div', { class: 'small se', text: r.why }) : ''),
+          r.why ? el('div', { class: 'small se', text: r.why }) : '',
+          (r.again || []).length ? el('div', { class: 'small se', 'data-agent-tries': r.task,
+            text: `asked ${r.tries} times: ${r.again.join('; ')}` }) : ''),
         el('td', { class: 'num', text: n(r.steps) }), el('td', { class: 'num', text: n(r.tokens_in) }),
         el('td', { class: 'num', text: n(r.tokens_out) }),
         el('td', { class: 'num', text: r.minutes == null ? '—' : String(r.minutes) })))))))];

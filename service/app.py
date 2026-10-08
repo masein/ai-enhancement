@@ -59,7 +59,7 @@ async def lifespan(_app: FastAPI):
     # looking — not on the first click that needs it, which is how an image
     # without eval_tasks/fr/ shipped and got as far as a person pressing a button
     startup.check_repo_files()
-    db.init()
+    db.init(startup=True)        # the one place runs that were running are queued again
     try:                         # records older code left wrong: once per database
         line = llm_poller.repair_once()
         if line:

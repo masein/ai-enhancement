@@ -4953,6 +4953,43 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 18b.1 — agent runs: containment and counting (8 Oct)
+
+- **Nothing of the container's is written through or read** (point 1). The
+  model's commands run as root in a container that has the trial's
+  `agent/`, `verifier/` and `artifacts/` folders mounted: anything in them
+  may be a link, a FIFO or a device. The host agent's own files (trajectory,
+  patch, `meta.json` with its counts and exit) go in the trial's
+  `agent-host/`, which no container mounts, through `agent_bench.safe_write`
+  (its folder made by us and never a link, a fresh name opened with
+  `O_NOFOLLOW`, renamed into place). However the agent stops — submitted,
+  raised, or Harbor's time limit — every process in the container is killed
+  and the three mounted folders are emptied (`agent_host_mini.CLEAN`, in
+  `finally`), and Harbor is given the counts so it never reads a usage file
+  from `agent/`. The board reads through `agent_bench.safe_read` only: a
+  regular file with one link, reached from the run's folder through real
+  folders, at most 2 MB.
+- **Ours is an allow-list** (point 2, `agent_bench.read_trial`): Docker
+  failing to pull, build or start the container (before the agent ran, or
+  Harbor's own Docker steps), `ReachRefused`, `ServerDown` (the relay's 503
+  when the server doesn't answer and its `/health` fails too). Everything
+  else is the model's: not resolved, with why (the tests' time limit, the
+  window outgrown, the server's 500 on a reply, …), never asked again, never
+  replaced by a later success. Every task asked is in the denominator; a
+  task given up after three errors of ours counts as not resolved, and the
+  score says how many. The run's page says how many tasks were asked again,
+  and why. Each try is its own Harbor job (a millisecond stamp: Harbor
+  resumes a job name it has seen).
+- **The runner's board calls leave the board's runs alone** (point 3):
+  `db.init()` is the schema only; `db.init(startup=True)`, called by the
+  service's start alone, puts runs that were running back in the queue.
+  `import_agent.py` no longer calls it — nor do the eight other scripts that
+  run through `docker compose exec` and called `db.init()` (the export, the
+  parity compare, the imports, the rented runs), which had the same effect.
+- Tests: `tests/test_18b1_containment.py`; `tests/test_18_agent.py` and
+  `tests/agent18.py` read the new trial layout and rules;
+  `tests/test_devicemark_resume.py` restarts with `startup=True`.
+
 ### 18 — agent runs: the pipeline and the board (8 Oct)
 
 - **The design note** (`docs/AGENT-RUNS-design.md`): masein's decisions of 8

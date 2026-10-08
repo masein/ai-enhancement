@@ -383,7 +383,11 @@ def _conn() -> sqlite3.Connection:
     return c
 
 
-def init() -> None:
+def init(startup: bool = False) -> None:
+    """the schema and its migrations — safe from any script. `startup=True`
+    is the service's own start, and only that: it also puts the runs that
+    were running back in the queue (18b point 3: a script that called this
+    every 3 minutes re-queued colleagues' running runs)"""
     with closing(_conn()) as c:
         c.executescript(SCHEMA)
         # migrations for databases created before a column existed — sqlite has no
@@ -418,17 +422,18 @@ def init() -> None:
                 c.execute(stmt)
             except sqlite3.OperationalError:
                 pass
-        # A worker that died mid-run leaves a phantom 'running' row; on startup no
-        # run can be in flight (single process), so re-queue it. Per-task resume
-        # means the re-run only repeats the task that was interrupted.
-        # 18: an agent run is the host's runner's (scripts/agent_run.py): it
-        # goes on whatever the board does
-        c.execute("UPDATE submissions SET status='queued', progress='re-queued after restart' "
-                  "WHERE status IN ('preflight','waiting_gpu','waiting_lock','running') "
-                  "AND suite!='agent'")
-        # a stop that was asked for and never finished (the process died) is done
-        c.execute("UPDATE submissions SET status='canceled', progress='canceled (the service "
-                  "restarted while stopping it)' WHERE status='canceling'")
+        if startup:
+            # A worker that died mid-run leaves a phantom 'running' row; on startup no
+            # run can be in flight (single process), so re-queue it. Per-task resume
+            # means the re-run only repeats the task that was interrupted.
+            # 18: an agent run is the host's runner's (scripts/agent_run.py): it
+            # goes on whatever the board does
+            c.execute("UPDATE submissions SET status='queued', progress='re-queued after "
+                      "restart' WHERE status IN ('preflight','waiting_gpu','waiting_lock',"
+                      "'running') AND suite!='agent'")
+            # a stop that was asked for and never finished (the process died) is done
+            c.execute("UPDATE submissions SET status='canceled', progress='canceled (the "
+                      "service restarted while stopping it)' WHERE status='canceling'")
         _backfill_judge_batch(c)
         try:
             _backfill_where(c)

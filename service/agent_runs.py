@@ -60,7 +60,7 @@ def summary(key: str) -> dict | None:
     return {"key": key, "sid": reg.get("sid"), "status": (row or {}).get("status") or "",
             "benchmark": run.get("benchmark"), "label": run.get("label"),
             "model": run.get("model") or "oracle", "oracle": not run.get("model"),
-            "score": s["score"], "words": s["words"],
+            "score": s["score"], "words": s["words"], "again": s.get("again") or "",
             "line": (s.get("progress") or {}).get("line") or "",
             "settings": {k: run.get(k) for k in (
                 "dataset", "pin", "tasks_sha256", "attempts", "at_once", "agent", "config",
@@ -95,10 +95,11 @@ def task(key: str, name: str, attempt: int = 1) -> dict | None:
                 if r.get("task") == name and int(r.get("attempt") or 1) == attempt), None)
     if not hit:
         return None
-    trial = d / "jobs" / hit["job"] / hit["trial"]
-    if not trial.is_dir():
+    if not (_KEY.fullmatch(hit.get("job") or "") and _KEY.fullmatch(hit.get("trial") or "")):
         return None
-    return {"task": name, "attempt": attempt, "result": hit, **ab.conversation(trial)}
+    # every file read from the run's folder down, never through a link
+    return {"task": name, "attempt": attempt, "result": hit,
+            **ab.conversation(d, hit["job"], hit["trial"])}
 
 
 def catalogue() -> dict:

@@ -6,6 +6,11 @@ request, and passes the server's answer back as it came: a window outgrown
 stays the server's own 400, which mini-swe-agent reads as the window outgrown.
 Each answer's tokens and seconds are written to a usage file, never the key.
 
+When the server can't be reached, the relay asks its /health: failing that
+too, the answer is a 503 that says `relay_server_down` — an error of ours,
+and the task is asked again (18b point 2). One bad reply from a server that
+is up is the model's.
+
 Standard library only: it runs inside scripts/agent_run.py on the server."""
 
 from __future__ import annotations
@@ -22,6 +27,7 @@ PATH = "/v1/chat/completions"
 MAX_BODY = 32 * 1024 * 1024          # a conversation of 262,144 tokens is a few MB
 UPSTREAM_TIMEOUT_S = 3600            # one reply of a long thought at ~85 tokens a second
 REFUSED = "only the chat request goes through this relay"
+DOWN = "relay_server_down"
 
 
 class Relay:
@@ -114,13 +120,32 @@ class Relay:
                 return r.status, r.read(), r.headers.get("Content-Type", "application/json"), \
                     time.time() - t0
         except urllib.error.HTTPError as e:
-            # the server's own refusal, as it gave it (a window outgrown is a 400)
+            # the server's own refusal, as it gave it (a window outgrown is a
+            # 400) — unless it says it can't serve and its health agrees
+            if e.code in (502, 503, 504) and not self.healthy():
+                why = f"the model's server answered HTTP {e.code} and its health check failed"
+                return 503, json.dumps({"error": {"message": why, "type": DOWN}}).encode(), \
+                    "application/json", time.time() - t0
             return e.code, e.read(), e.headers.get("Content-Type", "application/json"), \
                 time.time() - t0
         except (urllib.error.URLError, OSError) as e:
-            why = f"the model's server didn't answer the relay ({getattr(e, 'reason', e)})"
-            return 502, json.dumps({"error": {"message": why, "type": "relay_upstream"}}).encode(), \
+            down = not self.healthy()
+            why = (f"the model's server didn't answer the relay ({getattr(e, 'reason', e)})"
+                   + ("; its health check failed too" if down else ""))
+            return (503 if down else 502), json.dumps({"error": {
+                "message": why, "type": DOWN if down else "relay_upstream"}}).encode(), \
                 "application/json", time.time() - t0
+
+    def healthy(self) -> bool:
+        """llama-server's /health answers 200 when it can serve"""
+        root = self.upstream[:-3] if self.upstream.endswith("/v1") else self.upstream
+        req = urllib.request.Request(root + "/health",
+                                     headers={"Authorization": f"Bearer {self._key}"})
+        try:
+            with urllib.request.urlopen(req, timeout=10) as r:
+                return r.status == 200
+        except (urllib.error.URLError, OSError, ValueError):
+            return False
 
     def record(self, trial: str, status: int, raw: bytes, secs: float) -> None:
         """each answer's tokens and seconds, for the run's numbers"""
@@ -131,6 +156,7 @@ class Relay:
         except (ValueError, AttributeError):
             usage = {}
         line = {"at": round(time.time(), 3), "trial": trial[:200], "status": status,
+                **({"down": True} if status == 503 and DOWN.encode() in raw else {}),
                 "seconds": round(secs, 2), "prompt_tokens": usage.get("prompt_tokens"),
                 "completion_tokens": usage.get("completion_tokens")}
         with self._lock:

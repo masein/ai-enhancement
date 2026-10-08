@@ -53,8 +53,9 @@ def test_a_queued_job_cancels_and_a_running_one_is_asked_to_stop(svc):
     d = db.add("org/done", "auto", "quick", "omar", "")
     db.update(d, status="done")
     assert client.post(f"/api/submissions/{d}/cancel").status_code == 409
-    # a stop in flight when the service went down is simply done
-    db.init()
+    # a stop in flight when the service went down is simply done — at the
+    # service's own start (18b: never a script's db.init())
+    db.init(startup=True)
     assert db.get(r)["status"] == "canceled"
 
 

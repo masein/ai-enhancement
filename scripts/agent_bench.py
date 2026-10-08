@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import stat
+import threading
 from pathlib import Path
 
 HARBOR_VERSION = "0.24.0"
@@ -136,35 +139,153 @@ def pilot(tasks: dict[str, str], n: int) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# the trial's files: ours written where no container reaches, theirs read
+# without following anything they planted (18b point 1)
+# ---------------------------------------------------------------------------
+
+# Harbor bind-mounts a trial's agent/, verifier/ and artifacts/ folders into
+# the task's container, where the model's commands run as root: anything in
+# them may be a link, a FIFO or a device it made. The agent's own files go in
+# this folder of the trial's instead, which no container mounts.
+HOST_DIR = "agent-host"
+TRAJECTORY = "mini-swe-agent.trajectory.json"
+META = "meta.json"
+PATCH = "patch.diff"
+READ_CAP = 2_000_000                    # bytes of one file the board shows
+
+
+def safe_write(folder: Path, name: str, data: str | bytes) -> None:
+    """one of our files: its folder made by us and never a link, the file
+    written under a fresh name opened with O_NOFOLLOW, then renamed into
+    place (a rename replaces a link; it never writes through one)"""
+    if not name or name in (".", "..") or "/" in name:
+        raise ValueError(f"not a file name: {name!r}")
+    try:
+        os.mkdir(folder, 0o755)
+    except FileExistsError:
+        pass
+    st = os.lstat(folder)
+    if not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
+        raise OSError(f"{folder} isn't a folder of ours: not written")
+    dfd = os.open(folder, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        tmp = f".{name}.{os.getpid()}.{threading.get_ident()}.part"
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644,
+                     dir_fd=dfd)
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data.encode("utf-8") if isinstance(data, str) else data)
+        os.replace(tmp, name, src_dir_fd=dfd, dst_dir_fd=dfd)
+    finally:
+        os.close(dfd)
+
+
+def safe_read(base: Path, rel: str, cap: int = READ_CAP) -> str:
+    """a file for the board, '' unless it is a regular file with one link,
+    reached from `base` through real folders only (no link followed, no
+    '..'), so its real path is inside `base`; at most `cap` bytes. A FIFO, a
+    device, a link or a hard link is never opened as a file"""
+    parts = Path(rel).parts
+    if not parts or any(p in ("", ".", "..", "/") for p in parts):
+        return ""
+    flags = os.O_RDONLY | os.O_NOFOLLOW
+    try:
+        fd = os.open(base, flags | os.O_DIRECTORY)
+    except OSError:
+        return ""
+    try:
+        for p in parts[:-1]:
+            nxt = os.open(p, flags | os.O_DIRECTORY, dir_fd=fd)
+            os.close(fd)
+            fd = nxt
+        st = os.stat(parts[-1], dir_fd=fd, follow_symlinks=False)
+        if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
+            return ""
+        f = os.open(parts[-1], flags | os.O_NONBLOCK, dir_fd=fd)
+        try:
+            st = os.fstat(f)
+            if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
+                return ""
+            out, left = [], cap
+            while left > 0:
+                chunk = os.read(f, min(left, 1 << 20))
+                if not chunk:
+                    break
+                out.append(chunk)
+                left -= len(chunk)
+            return b"".join(out).decode("utf-8", errors="replace")
+        finally:
+            os.close(f)
+    except OSError:
+        return ""
+    finally:
+        os.close(fd)
+
+
+def safe_json(base: Path, rel: str, cap: int = READ_CAP) -> dict:
+    try:
+        got = json.loads(safe_read(base, rel, cap) or "{}")
+        return got if isinstance(got, dict) else {}
+    except ValueError:
+        return {}
+
+
+# ---------------------------------------------------------------------------
 # a task's result, from Harbor's trial folder
 # ---------------------------------------------------------------------------
 
-# what isn't the model's: run again, never counted
-OURS = ("DockerError", "DockerException", "EnvironmentStartTimeoutError",
-        "VerifierTimeoutError", "RelayDown", "ReachRefused", "DiskGuard", "RewardTampered",
-        "APIConnectionError", "ServiceUnavailableError", "InternalServerError",
-        "Timeout", "ConnectionError", "RuntimeError")
-# the model's: counted, as each benchmark counts them
-COUNTED_EXITS = {"ContextWindowExceededError": "the window was outgrown",
-                 "LimitsExceeded": "the step limit",
-                 "RepeatedFormatError": "three malformed replies in a row"}
+# An error of ours is asked again; everything else is the model's result
+# (18b point 2). Ours is an allow-list: Docker failing to pull, build or start
+# the task's container (before the agent ran, or Harbor's own Docker steps),
+# the task's container reaching something (ReachRefused), the model's server
+# failing its health check (ServerDown, said by the relay). The disk guard
+# stops the run before a task starts, so it leaves no trial.
+OURS_TYPES = ("ReachRefused", "ServerDown", "EnvironmentStartTimeoutError", "AddTestsDirError",
+              "DownloadVerifierDirError")
+DOCKER_FAILED = "Docker compose command failed"
+# the model's: not resolved, with why, as each benchmark counts them
+MODELS_WHY = {"ContextWindowExceededError": "the window was outgrown",
+              "LimitsExceeded": "the step limit",
+              "RepeatedFormatError": "three malformed replies in a row",
+              "VerifierTimeoutError": "the tests ran past their time limit",
+              "InternalServerError": "the server refused a reply (HTTP 500)",
+              "RewardFileNotFoundError": "the tests left no result",
+              "RewardFileEmptyError": "the tests left an empty result",
+              "VerifierOutputParseError": "the tests' result couldn't be read"}
+
+
+def ours_why(r: dict, meta: dict) -> str:
+    """why a trial's failure is ours, '' when it is the model's"""
+    if meta.get("ours"):
+        return str(meta["ours"])[:300]
+    exc = r.get("exception_info") or {}
+    etype = str(exc.get("exception_type") or "")
+    msg = str(exc.get("exception_message") or "")
+    if not etype:
+        return ""
+    started = (r.get("agent_execution") or {}).get("started_at")
+    if etype in OURS_TYPES or msg.startswith(DOCKER_FAILED) or not started:
+        return f"{etype}: {msg}"[:300]
+    return ""
 
 
 def read_trial(trial: Path) -> dict | None:
     """one task's attempt, as the board keeps it — None while it runs (no
-    result.json yet). result: resolved, unresolved, timeout or error (ours,
-    with why)"""
-    try:
-        r = json.loads((trial / "result.json").read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+    result.json yet). result: resolved, unresolved or timeout (the model's),
+    or error (ours, with why). Resolved only when the agent submitted and the
+    verifier passed it (18b point 10): a working tree it never submitted is
+    not resolved, as mini-swe-agent's own numbers count it"""
+    r = safe_json(trial, "result.json", 20_000_000)
+    if not r:
         return None
+    meta = safe_json(trial, f"{HOST_DIR}/{META}")
     exc = r.get("exception_info") or {}
     etype = str(exc.get("exception_type") or "")
     rewards = (r.get("verifier_result") or {}).get("rewards") or {}
     reward = rewards.get("reward", next(iter(rewards.values()), None)) if rewards else None
     ctx = r.get("agent_result") or {}
-    meta = ctx.get("metadata") or {}
-    exit_status = str(meta.get("exit_status") or "")
+    exit_status = str(meta.get("exit_status") or (ctx.get("metadata") or {}).get("exit_status")
+                      or "")
+    oracle = str((r.get("agent_info") or {}).get("name") or "") == "oracle"
 
     def minutes(a, b):
         from datetime import datetime
@@ -174,59 +295,97 @@ def read_trial(trial: Path) -> dict | None:
         except (TypeError, ValueError):
             return None
     out = {"task": r.get("task_name") or trial.name.split("__")[0],
-           "trial": trial.name, "steps": meta.get("steps"),
-           "tokens_in": ctx.get("n_input_tokens"), "tokens_out": ctx.get("n_output_tokens"),
+           "trial": trial.name,
+           "steps": meta.get("steps", (ctx.get("metadata") or {}).get("steps")),
+           "tokens_in": meta.get("tokens_in", ctx.get("n_input_tokens")),
+           "tokens_out": meta.get("tokens_out", ctx.get("n_output_tokens")),
+           "last_prompt": meta.get("last_prompt"),
            "minutes": minutes(r.get("started_at"), r.get("finished_at")),
            "exit": exit_status, "why": ""}
-    if etype == "AgentTimeoutError":
+    ours = ours_why(r, meta)
+    if ours:
+        out.update(result="error", why=ours)
+    elif etype == "AgentTimeoutError":
         out.update(result="timeout", why=str(exc.get("exception_message") or "")[:300])
-    elif etype or meta.get("ours"):
-        out.update(result="error", why=(f"{etype}: " if etype else "")
-                   + str(exc.get("exception_message") or meta.get("ours") or "")[:300])
+    elif etype:
+        out.update(result="unresolved", why=MODELS_WHY.get(etype) or MODELS_WHY.get(exit_status)
+                   or f"{etype}: {str(exc.get('exception_message') or '')[:240]}")
     elif reward is None:
-        out.update(result="error", why="the verifier gave no result")
+        out.update(result="unresolved", why="the verifier gave no result")
+    elif float(reward) < 1:
+        out.update(result="unresolved", why=MODELS_WHY.get(exit_status, ""))
+    elif oracle or exit_status == "Submitted":
+        out["result"] = "resolved"
     else:
-        out["result"] = "resolved" if float(reward) >= 1 else "unresolved"
-        if out["result"] == "unresolved" and exit_status in COUNTED_EXITS:
-            out["why"] = COUNTED_EXITS[exit_status]
+        out.update(result="unresolved", why="it never submitted"
+                   + (f" ({MODELS_WHY.get(exit_status, exit_status)})" if exit_status else "")
+                   + ": the tests passing on its working tree don't count")
     return out
 
 
 def score(results: list[dict], total: int) -> dict:
-    """% resolved ± its standard error over the tasks with a result of the
-    model's (an error of ours is no result), and whether it is a part-run"""
-    counted = [r for r in results if r["result"] in ("resolved", "unresolved", "timeout")]
-    n = len(counted)
-    k = sum(1 for r in counted if r["result"] == "resolved")
+    """% resolved ± one standard error over every task attempted (18b point
+    2: a task never leaves the denominator — an error of ours not yet asked
+    again counts as not resolved, and is said), and whether it is a part-run"""
+    n = len(results)
+    k = sum(1 for r in results if r["result"] == "resolved")
     p = k / n if n else 0.0
     se = (p * (1 - p) / n) ** 0.5 if n else 0.0
     return {"resolved": k, "n": n, "of": total, "score": round(100 * p, 1),
             "se": round(100 * se, 1), "part": n < total,
             "errors": sum(1 for r in results if r["result"] == "error"),
-            "timeouts": sum(1 for r in results if r["result"] == "timeout")}
+            "timeouts": sum(1 for r in results if r["result"] == "timeout"),
+            "again": sum(1 for r in results if r.get("again"))}
 
 
 def score_words(s: dict, total: int) -> str:
-    """"% resolved ± its error · N tasks"; a part-run says so"""
-    head = f"{s['score']:.1f}% resolved ± {s['se']:.1f} · {s['n']} task{'s' if s['n'] != 1 else ''}"
-    return head + (f" · pilot: {s['n']} of {total}" if s["part"] else "")
+    """"% resolved ± one standard error · N tasks"; a part-run says so, and
+    errors of ours counted as not resolved are said"""
+    head = (f"{s['score']:.1f}% resolved ± {s['se']:.1f} (one standard error) · {s['n']} "
+            f"task{'s' if s['n'] != 1 else ''}")
+    tail = f" · pilot: {s['n']} of {total}" if s["part"] else ""
+    if s.get("errors"):
+        tail += (f" · {s['errors']} error{'s' if s['errors'] != 1 else ''} of ours, counted "
+                 "not resolved")
+    return head + tail
 
 
-def conversation(trial: Path) -> dict:
+def again_kind(why: str) -> str:
+    """an error of ours, in a few words"""
+    t = (why or "").split(":", 1)[0]
+    return {"ReachRefused": "its container reached something",
+            "ServerDown": "the model's server was down"}.get(
+        t, "Docker couldn't pull, build or start its container")
+
+
+def again_words(results: list[dict]) -> str:
+    """how many tasks were asked again after an error of ours, and why:
+    "2 tasks run again: Docker couldn't … ×2 · the model's server was down ×1" """
+    count: dict[str, int] = {}
+    for r in results:
+        for w in r.get("again") or []:
+            count[again_kind(w)] = count.get(again_kind(w), 0) + 1
+    n = sum(1 for r in results if r.get("again"))
+    if not n:
+        return ""
+    return (f"{n} task{'s' if n != 1 else ''} run again after an error of ours: "
+            + " · ".join(f"{k} ×{v}" for k, v in sorted(count.items(), key=lambda x: -x[1])))
+
+
+def conversation(rdir: Path, job: str, trial: str) -> dict:
     """a finished task's conversation, step by step, for the board: what it
     thought, what it said, what it ran and what came back — from
-    mini-swe-agent's trajectory; then the patch and the verifier's output"""
-    def text(p: Path, cap: int = 2_000_000) -> str:
-        try:
-            return p.read_text(encoding="utf-8", errors="replace")[:cap]
-        except OSError:
-            return ""
+    mini-swe-agent's trajectory; then the patch and the verifier's output.
+    Every file is read through safe_read, from the run's folder down"""
+    t = f"jobs/{job}/{trial}"
     try:
-        data = json.loads((trial / "agent" / "mini-swe-agent.trajectory.json").read_text())
-    except (OSError, ValueError):
+        data = json.loads(safe_read(rdir, f"{t}/{HOST_DIR}/{TRAJECTORY}", 50_000_000) or "{}")
+    except ValueError:
         data = {}
     steps: list[dict] = []
-    for m in data.get("messages") or []:
+    for m in (data.get("messages") or []) if isinstance(data, dict) else []:
+        if not isinstance(m, dict):
+            continue
         role = m.get("role")
         if role == "assistant":
             cmds = []
@@ -242,6 +401,6 @@ def conversation(trial: Path) -> dict:
             steps[-1]["came_back"].append(str(m.get("content") or ""))
         elif role == "exit":
             steps.append({"exit": str((m.get("extra") or {}).get("exit_status") or "")})
-    return {"steps": steps, "patch": text(trial / "agent" / "patch.diff"),
-            "verifier": text(trial / "verifier" / "test-stdout.txt", 200_000)
-            + text(trial / "verifier" / "test-stderr.txt", 50_000)}
+    return {"steps": steps, "patch": safe_read(rdir, f"{t}/{HOST_DIR}/{PATCH}"),
+            "verifier": safe_read(rdir, f"{t}/verifier/test-stdout.txt", 200_000)
+            + safe_read(rdir, f"{t}/verifier/test-stderr.txt", 50_000)}

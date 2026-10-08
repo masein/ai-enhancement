@@ -46,20 +46,24 @@ def test_a_pilot_is_the_same_tasks_every_time_spread_over_the_languages(tmp_path
 
 def test_a_tasks_result_in_the_boards_words(tmp_path):
     rd = tmp_path / "r"
-    cases = {"inv__a-1": ("resolved", ""), "inv__a-2": ("unresolved", ""),
-             "inv__a-3": ("", "AgentTimeoutError"), "inv__a-4": ("", "DockerError"),
-             "inv__a-5": ("", "ReachRefused")}
-    for t, (res, exc) in cases.items():
-        trial(rd, t, result=res, exc=exc)
+    docker = "Docker compose command failed for environment x. Command: docker compose up"
+    cases = {"inv__a-1": dict(result="resolved"), "inv__a-2": dict(result="unresolved"),
+             "inv__a-3": dict(result="", exc="AgentTimeoutError"),
+             "inv__a-4": dict(result="", exc="RuntimeError", message=docker, started=False),
+             "inv__a-5": dict(result="", exc="ReachRefused", ours="ReachRefused: reached x")}
+    for t, kw in cases.items():
+        trial(rd, t, **kw)
     got = {t: ab.read_trial(next((rd / "jobs").glob(f"{t}__*/*"))) for t in cases}
     assert [got[t]["result"] for t in cases] == ["resolved", "unresolved", "timeout", "error",
                                                   "error"]
-    assert got["inv__a-4"]["why"].startswith("DockerError")
+    assert got["inv__a-4"]["why"].startswith("RuntimeError: Docker compose command failed")
     assert got["inv__a-1"]["tokens_out"] == 340 and got["inv__a-1"]["minutes"] == 20.0
     s = ab.score(list(got.values()), 300)
-    # an error of ours is no result: 1 of 3 counted, a part-run said
-    assert (s["resolved"], s["n"], s["errors"], s["part"]) == (1, 3, 2, True)
-    assert ab.score_words(s, 300).endswith(" · 3 tasks · pilot: 3 of 300")
+    # 18b: every task attempted is in the denominator, an error of ours as not
+    # resolved, and said
+    assert (s["resolved"], s["n"], s["errors"], s["part"]) == (1, 5, 2, True)
+    assert ab.score_words(s, 300) == ("20.0% resolved ± 17.9 (one standard error) · 5 tasks · "
+                                      "pilot: 5 of 300 · 2 errors of ours, counted not resolved")
     assert ab.RESULT_WORDS == {"resolved": "Resolved", "unresolved": "Not resolved",
                                "timeout": "Timed out", "error": "Error (ours)"}
 
@@ -209,7 +213,7 @@ def test_the_containers_check_and_the_tokens_from_the_trajectory():
 
 def test_the_conversation_as_the_board_reads_it(tmp_path):
     t = trial(tmp_path / "r", "inv__a-1", html=True)
-    c = ab.conversation(t)
+    c = ab.conversation(tmp_path / "r", t.parent.name, t.name)
     first = c["steps"][0]
     assert first["thought"] == "thinking about <i>it</i>" and first["ran"][0].startswith("ls -la")
     assert first["came_back"][0].count("\n") > 40                   # long: folded on the page
@@ -262,9 +266,13 @@ def server_world(tmp_path, monkeypatch):
             out = w["outcome"](task, n)
             rd = Path(cmd[cmd.index("-o") + 1]).parent
             k = int(job.split("__a")[1].split("__")[0])
-            trial(rd, task, k, stamp=int(job.rsplit("__", 1)[1]) * 1000 + n,
-                  result=out if out in ("resolved", "unresolved") else "",
-                  exc="" if out in ("resolved", "unresolved") else out)
+            # "docker": Docker failed before the agent ran (ours); an
+            # exception's name: raised while the model worked (the model's)
+            kw = (dict(result=out) if out in ("resolved", "unresolved") else
+                  dict(result="", exc="RuntimeError", started=False,
+                       message="Docker compose command failed for environment x")
+                  if out == "docker" else dict(result="", exc=out))
+            trial(rd, task, k, stamp=int(job.rsplit("__", 1)[1]) * 1000 + n, **kw)
 
         def poll(self):
             return 0
@@ -328,7 +336,7 @@ def test_an_error_of_ours_is_asked_again_three_times_at_most(server_world, capsy
 
     def outcome(task, n):
         first.append(task) if not first else None
-        return "DockerError" if task == first[0] else "resolved"
+        return "docker" if task == first[0] else "resolved"
     w["outcome"] = outcome
     assert ar.main(["swebench-multilingual", "--as", MODEL, "--tasks", "3", "--no-board"]) == 0
     tries = [h["task"] for h in w["harbor"] if h["task"] == first[0]]
@@ -381,11 +389,12 @@ def test_the_import_makes_one_runs_row_and_says_a_part_run(svc, monkeypatch):  #
     assert len(rows) == 1                                       # one row for the run
     r = rows[0]
     assert r["status"] == "done" and r["hf_id"] == MODEL and not r.get("where_ran")
-    assert r["progress"] == "60.0% resolved ± 15.5 · 10 tasks · pilot: 10 of 300"
+    assert r["progress"] == ("60.0% resolved ± 15.5 (one standard error) · 10 tasks · pilot: 10 "
+                             "of 300")
     # an agent row is the host's runner's: never re-queued, never the worker's,
     # never holding a GGUF job back
     db.update(r["id"], status="running")
-    db.init()
+    db.init(startup=True)
     assert db.get(r["id"])["status"] == "running"                  # 06ee7e8: re-queued
     db.update(r["id"], status="queued")
     nxt = db.claim_next()
