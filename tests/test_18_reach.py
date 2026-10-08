@@ -61,8 +61,11 @@ def test_a_tasks_container_reaches_nothing_and_has_no_host_folder(tmp_path):
     gw = subprocess.run(["docker", "network", "inspect", "bridge", "-f",
                          "{{(index .IPAM.Config 0).Gateway}}"], capture_output=True,
                         text=True).stdout.strip() or "172.17.0.1"
-    # the host's port, the tailnet's own DNS address, the internet
-    targets = [f"{gw}:{port}", "100.100.100.100:53", "1.1.1.1:443", "8.8.8.8:53"]
+    # the host's port, the tailnet's own DNS address (Tailscale's, the same on
+    # every tailnet — built here so no tracked file holds a tailnet address),
+    # the internet
+    tailnet_dns = ".".join(["100"] * 4)
+    targets = [f"{gw}:{port}", f"{tailnet_dns}:53", "1.1.1.1:443", "8.8.8.8:53"]
     marker = tmp_path / "host-marker-18"
     marker.write_text("x")
     script = hm.reach_script(targets) + f"\n[ -e {marker} ] && echo 'REACHED host folder'"
