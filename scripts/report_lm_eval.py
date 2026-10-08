@@ -19806,9 +19806,13 @@ function vQueue(part = { form: true, list: true }) {
 function loadBoxes() {
   state.boxesAt = Date.now();
   // 17g: the list alone redrawn, as the poll redraws it
-  api('api/frontier/boxes').then(d => { state.boxes = d; (state.queueRedraw || render)();
-    renderRuns(); })                    // 18b: the header counts them too
-    .catch(() => {});
+  // 18b: the header counts them too — off Runs only the header is drawn
+  // again (a whole page redrawn every two minutes rebuilt the pipeline)
+  api('api/frontier/boxes').then(d => {
+    state.boxes = d;
+    if (document.querySelector('[data-rented-wrap]')) (state.queueRedraw || render)();
+    renderRuns();
+  }).catch(() => {});
 }
 // 17i: the list's one line about the rented boxes — when the fetch last read
 // them, and when the next reading is due (it said "13m ago" on every row)
