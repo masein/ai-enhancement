@@ -23,7 +23,9 @@ tailnet, the LAN, the internet), no Docker socket, a process limit. After
 the agent stops — however it stops — every process it left is killed and
 everything in the folders Harbor mounts (/logs/agent, /logs/artifacts,
 /logs/verifier) is removed, before the verifier runs: no reward file of the
-model's, no link, FIFO or device for a host process to open.
+model's, no link, FIFO or device for a host process to open. The clean-up
+says what it left, with an exit code kept in meta.json; one that didn't run
+to its end keeps the task from being verified (18c point 3).
 
 Harbor and mini-swe-agent are imported only on the server, in the agent
 venv; the adapter's logic is tested without them."""
@@ -75,11 +77,36 @@ class ServerDown(Exception):
     asked again — one bad reply is the model's"""
 
 
+class CleanupFailed(Exception):
+    """the clean-up after the agent didn't run to its end: the task is not
+    verified (18c point 3)"""
+
+
 DOWN = "relay_server_down"              # the relay's word for it, in its 503
-# what the folders Harbor mounts hold once the agent stops: nothing
-CLEAN = ("kill -9 -1 2>/dev/null; "
-         "find /logs/agent /logs/artifacts /logs/verifier -mindepth 1 -delete 2>/dev/null; "
-         "rm -rf /logs/agent/* /logs/artifacts/* /logs/verifier/* 2>/dev/null; true")
+MOUNTED = "/logs/agent /logs/artifacts /logs/verifier"
+# what the container holds once the agent stops: no process but its own
+# sleep, nothing in the folders Harbor mounts — and it says so, with an exit
+# code: 0 only when both are true (a zombie is dead, and counts for nothing)
+CLEAN = "\n".join([
+    "kill -9 -1 2>/dev/null; sleep 1; kill -9 -1 2>/dev/null",
+    f"for d in {MOUNTED}; do find \"$d\" -mindepth 1 -delete 2>/dev/null; "
+    "rm -rf \"$d\"/* \"$d\"/.[!.]* 2>/dev/null; done",
+    # what is left, and what can't be read, counts: it fails closed
+    f"left=$(for d in {MOUNTED}; do [ -e \"$d\" ] && find \"$d\" -mindepth 1 2>&1; done | wc -l)",
+    "n=0; for p in /proc/[0-9]*; do i=${p#/proc/}; [ \"$i\" = 1 ] || [ \"$i\" = $$ ] && continue",
+    "  st=; while read -r k v _; do [ \"$k\" = State: ] && st=$v; done 2>/dev/null < \"$p/status\"",
+    "  [ -n \"$st\" ] && [ \"$st\" != Z ] && n=$((n+1)); done",
+    "echo \"CLEAN files=$left processes=$n\"",
+    "[ \"$left\" = 0 ] && [ \"$n\" = 0 ]"])
+
+
+def clean_verdict(code, output: str) -> str:
+    """'' when the clean-up ran to its end and left nothing; else what"""
+    said = next((x.strip() for x in reversed((output or "").splitlines())
+                 if x.strip().startswith("CLEAN ")), "")
+    if code == 0 and said == "CLEAN files=0 processes=0":
+        return ""
+    return f"exit {code}" + (f", {said[6:]}" if said else ", no word from it")
 
 
 # names the container must not resolve: DNS answering is a way out
@@ -127,21 +154,29 @@ def reach_script(targets: list[str]) -> str:
     return "\n".join(lines)
 
 
-def reach_verdict(output: str) -> str:
+def reached(output: str) -> list[str]:
+    """what answered, as the check says it"""
+    return [x.strip().split(" ", 1)[1] for x in output.splitlines()
+            if x.strip().startswith("REACHED ")]
+
+
+def reach_verdict(output: str, what: str = "container") -> str:
     """'' only when the check ran to its end, could try a connection, nothing
     answered, the only interface is the loopback and processes are limited;
-    else why not"""
+    else why not. what="build": a check run in an image's build (18c point
+    2), where only what answered counts"""
     lines = [x.strip() for x in output.splitlines()]
     if "DONE" not in lines:
-        return "the container's check didn't run to its end: " + (output.strip()[-200:] or
-                                                                  "no output")
+        return f"the {what}'s check didn't run to its end: " + (output.strip()[-200:] or
+                                                               "no output")
     probe = [x.split(" ", 1)[1] for x in lines if x.startswith("PROBE ") and x != "PROBE tcp-ok"]
     if probe or "PROBE tcp-ok" not in lines:
-        return "the container's check couldn't try a connection: " + ("; ".join(probe)
-                                                                      or "no word")
-    reached = [x.split(" ", 1)[1] for x in lines if x.startswith("REACHED ")]
-    if reached:
-        return "the task's container reached " + ", ".join(reached)
+        return f"the {what}'s check couldn't try a connection: " + ("; ".join(probe)
+                                                                   or "no word")
+    if reached(output):
+        return f"the task's {what} reached " + ", ".join(reached(output))
+    if what == "build":
+        return ""
     net = next((x[4:].split() for x in lines if x.startswith("NET")), None)
     if net is None or not net:
         return "the container's network interfaces couldn't be read"
@@ -338,7 +373,7 @@ class HostMini(BaseAgent):  # type: ignore[misc,valid-type]
         cfg = load_config(str(self.ours.get("config") or "mini.yaml"))
         host = self.host_dir()
         stop = threading.Event()
-        held: dict = {"agent": None, "ours": ""}
+        held: dict = {"agent": None, "ours": "", "clean": None}
 
         def fill() -> None:
             """the counts, to Harbor and to our own meta.json — never read
@@ -351,13 +386,14 @@ class HostMini(BaseAgent):  # type: ignore[misc,valid-type]
                     "tokens_in": tin, "tokens_out": tout, "last_prompt": last_prompt(msgs),
                     "config": self.ours.get("config"), "prompt_sha256": prompt_sha(cfg),
                     "submission_chars": len(str(last.get("submission") or "")),
-                    "ours": held["ours"]}
+                    "ours": held["ours"], "clean": held["clean"]}
             context.n_input_tokens, context.n_output_tokens = tin, tout
             # set, so Harbor never reads a usage file from the mounted folder
             context.model_usage = {}
             context.metadata = meta
             ab.safe_write(host, ab.META, json.dumps(meta))
 
+        failed: BaseException | None = None
         try:
             targets = [t for t in str(self.ours.get("reach") or "").split(",") if t]
             probe = await environment.exec(reach_script(targets), timeout_sec=300)
@@ -423,22 +459,38 @@ class HostMini(BaseAgent):  # type: ignore[misc,valid-type]
                 raise
             last = (agent.messages[-1].get("extra") or {}) if agent.messages else {}
             ab.safe_write(host, ab.PATCH, str(last.get("submission") or ""))
+        except BaseException as e:
+            failed = e
+            raise
         finally:
             stop.set()
             # a reply still being written for this trial is cut
             await asyncio.to_thread(abort_request, str(self.ours.get("relay") or ""),
                                     str(self.session_id or ""))
+            # however it stopped: nothing the model left runs on, and nothing
+            # it put in the mounted folders is there when the verifier runs
+            # or a host process looks. Harbor 0.24.0's exec is exec(command,
+            # cwd=None, env=None, timeout_sec=None, user=None)
+            # (environments/base.py): root, whoever the task's agent runs as
+            try:
+                r = await environment.exec(CLEAN, timeout_sec=180, user="root")
+                code = getattr(r, "return_code", None)
+                why = clean_verdict(code, (getattr(r, "stdout", "") or "")
+                                    + (getattr(r, "stderr", "") or ""))
+            except Exception as e:      # noqa: BLE001 — recorded, and the task isn't verified
+                code, why = None, f"{type(e).__name__}: {str(e)[:200]}"
+            held["clean"] = {"exit": code, "ok": not why, "why": why}
             try:
                 fill()
             except Exception:           # noqa: BLE001 — result.json keeps the counts too
                 pass
-            # however it stopped: nothing the model left runs on, and nothing
-            # it put in the mounted folders is there when the verifier runs
-            # or a host process looks
-            try:
-                await environment.exec(CLEAN, timeout_sec=120, user="root")
-            except Exception:           # noqa: BLE001 — Harbor records the agent's own error
-                pass
+            # 18c point 3: a task whose clean-up didn't run is never verified
+            # — Harbor verifies after a clean end or the agent's time limit
+            # (the cancel), never after another exception, which stays the
+            # one said
+            if why and (failed is None or isinstance(failed, asyncio.CancelledError)):
+                raise CleanupFailed(f"the clean-up after the agent didn't run to its end "
+                                    f"({why}): not verified")
 
     def populate_context_post_run(self, context) -> None:
         return None

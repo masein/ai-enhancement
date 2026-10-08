@@ -19,7 +19,7 @@ import pytest
 import agent_bench as ab
 import agent_host_mini as hm
 import agent_run as ar
-from agent18 import MODEL, tasks_folder
+from agent18 import MODEL, build_world, tasks_folder
 from test_18_agent import server_world  # noqa: F401 — server_world is the fixture
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -41,6 +41,7 @@ def test_the_docs_check_reach_line_runs(server_world, monkeypatch, capsys):  # n
     seen = {}
     monkeypatch.setattr(ar, "check_reach", lambda rdir, targets: seen.setdefault("t", targets)
                         and "")
+    monkeypatch.setattr(ar, "check_build_reach", lambda rdir, targets: ("", []))   # 18c
     assert ar.main(argv) == 0                                    # 70df001: argparse, exit 2
     out = capsys.readouterr().out
     assert out.startswith("a task's container reaches nothing of: ")
@@ -153,12 +154,13 @@ def invented_tasks(d: Path) -> list[str]:
     return names
 
 
-def test_a_tasks_copy_installs_what_its_verification_would_fetch(tmp_path):
+def test_a_tasks_copy_installs_what_its_verification_would_fetch(tmp_path, monkeypatch):
     src = tmp_path / "src"
     names = invented_tasks(src)
     before = {n: (src / n / "environment" / "Dockerfile").read_text() for n in names}
     b = ab.BENCHES["swebench-multilingual"]
-    out, info = ar.offline_tasks(tmp_path, b, src, names)
+    build, binfo = build_world(tmp_path, monkeypatch)             # 18c: fetched once
+    out, info = ar.offline_tasks(tmp_path, b, src, names, build, binfo)
     assert out.name.endswith("+offline")
     for n in names:                                             # the fetched tasks untouched
         assert (src / n / "environment" / "Dockerfile").read_text() == before[n]
@@ -168,12 +170,15 @@ def test_a_tasks_copy_installs_what_its_verification_would_fetch(tmp_path):
     run = next(x for x in plain.splitlines() if "uv run parser.py" in x)
     assert "'# dependencies = [\"invented-parser==1.0\", \"invented-data==2.0\"]'" in run
     assert "'# requires-python = \">=3.11\"'" in run and run.startswith("RUN cd / && ")
-    assert "ENV UV_OFFLINE=1" in plain and "evalboard-warm" not in plain
-    # a task whose tests fetch: those lines, in a throwaway copy; the tool offline
+    assert " UV_OFFLINE=1 " in plain and "evalboard-warm" not in plain
+    # a task whose tests fetch: those lines, in a throwaway copy, no package's
+    # scripts run (18c); the tool offline
     npm = (out / names[1] / "environment" / "Dockerfile").read_text()
     assert ("RUN cp -a /testbed /tmp/evalboard-warm && cd /tmp/evalboard-warm && "
-            "( npm install ) ; cd / && rm -rf /tmp/evalboard-warm") in npm
-    assert "ENV npm_config_offline=true" in npm
+            "( export npm_config_ignore_scripts=true YARN_ENABLE_SCRIPTS=0 "
+            "npm_config_before=2026-09-24; npm install ) ; cd / && rm -rf "
+            "/tmp/evalboard-warm") in npm
+    assert "ENV npm_config_before=2026-09-24 npm_config_offline=true" in npm
     cargo = (out / names[2] / "environment" / "Dockerfile").read_text()
     assert "( cargo update x@1.0 --precise 0.9 2>/dev/null || true ) ; ( cargo fetch )" in cargo
     assert "ENV CARGO_NET_OFFLINE=true" in cargo
@@ -184,7 +189,7 @@ def test_a_tasks_copy_installs_what_its_verification_would_fetch(tmp_path):
     assert (sep / "Dockerfile").read_text() == "FROM invented/verifier:1\n"
     assert info["fetching"] == names[1:3] and len(info["sha256"]) == 64
     # made again each run, the same
-    assert ar.offline_tasks(tmp_path, b, src, names)[1] == info
+    assert ar.offline_tasks(tmp_path, b, src, names, build, binfo)[1] == info
 
 
 def test_the_run_asks_the_copies_and_only_fetching_picks_its_tasks(  # noqa: F811

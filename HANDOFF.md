@@ -4953,6 +4953,50 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 18c.1 — agent runs: before step A (8 Oct)
+
+- **Harbor from the venv** (point 1): the runner runs
+  `Path(sys.executable).with_name("harbor")` — the venv's python is a link,
+  never resolved — and gives each job the venv's `bin` first on PATH;
+  without Harbor beside it, it refuses in one line, and a Harbor that can't
+  be started stops the run in one line, never a traceback. Every runner line
+  in `docs/AGENT-RUNS.md` is in its sudo form, `sudo env
+  PATH="$HOME/agent-venv/bin:$PATH" ~/agent-venv/bin/python …`; the docker
+  group's is the same line without `sudo`.
+- **The build's files, once** (point 2): `docs/agent-build.json` pins uv
+  0.7.13 (the tasks' own) and Python 3.11.16 (python-build-standalone,
+  1 Sep) by sha256, and `docs/agent-build-requirements.txt` the parser's 78
+  packages with hashes (`--exclude-newer 2026-09-24`). The runner fetches
+  them once into `$BENCH_ROOT/agent-build/<lock hash>/` (pip download,
+  wheels only, `--require-hashes --isolated`), checks every file every run,
+  refuses a lock younger than 14 days, and records the lock's hash and date
+  in `run.json` (a setting: a resume with another is refused). Each
+  Multilingual copy links them into its build folder, leaves out the task's
+  own uv installer line, installs them offline and is built with
+  `build: network: none` (its own `environment/docker-compose.yaml`; a task
+  that has one, or whose parser asks other packages, is refused). The three
+  tasks whose own tests fetch keep Docker's own build network for that line,
+  run with no package's scripts (npm `--ignore-scripts`, composer
+  `--no-scripts --no-plugins`); npm's is held to the lock's date
+  (`npm_config_before`), composer's and cargo's can't be and are named.
+  Checked on the Mac: an amd64 image built this way with no network ran the
+  parser's imports offline (Python 3.11.16, 78 packages). `--check-reach`
+  also builds an image with no network and runs the reach check in its
+  build (nothing may answer), and says what a build with Docker's own
+  network reaches — Docker can't hold a build to the registries alone here.
+- **A clean-up that didn't run** (point 3): Harbor 0.24.0's `exec` takes
+  `user` (`exec(command, cwd, env, timeout_sec, user)`, environments/base.py).
+  The clean-up now says what it left and fails closed (`CLEAN files=N
+  processes=M`, exit 0 only for 0 and 0; a folder it can't read counts);
+  its exit and words are in `meta.json`. One that didn't run to its end
+  raises `CleanupFailed` where Harbor would otherwise verify (a clean end,
+  the time limit's cancel), so the task is never verified: an error of
+  ours, counted not resolved, never asked again (the model had run).
+- **A3** (point 4) moves an existing `~/agent-venv` aside first.
+- Tests: `tests/test_18c1_before_a.py` — the docs' A8 and A10 lines run in
+  bash against a venv laid out as uv makes it (stand-ins for Harbor, pip's
+  download, Docker, git and sudo), with sudo's own PATH and without.
+
 ### 18b.6 — 17j follow-ups: the page (8 Oct)
 
 - **At 400 px nothing prints over anything** (point 31): `td`'s 44 px height
