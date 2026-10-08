@@ -22,8 +22,10 @@ MINI_VERSION = "2.4.6"
 MIN_WINDOW = 131_072
 WANT_WINDOW = 262_144
 # decision 5: Qwen's own settings for its SWE-bench numbers; no presence penalty
-# (it punishes code for repeating its own names)
-SAMPLING = {"temperature": 1.0, "top_p": 0.95, "top_k": 20, "presence_penalty": 0.0}
+# (it punishes code for repeating its own names); min_p 0, Qwen's own too
+# (llama-server's default is 0.05: 18b point 16)
+SAMPLING = {"temperature": 1.0, "top_p": 0.95, "top_k": 20, "min_p": 0.0,
+            "presence_penalty": 0.0}
 # 50 GB free at Docker's root before anything more is pulled
 DISK_FLOOR_GB = 50.0
 

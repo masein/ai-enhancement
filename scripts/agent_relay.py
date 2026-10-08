@@ -11,14 +11,24 @@ too, the answer is a 503 that says `relay_server_down` — an error of ours,
 and the task is asked again (18b point 2). One bad reply from a server that
 is up is the model's.
 
+A reply is capped at MAX_REPLY_TOKENS (18b point 11), which fits the
+smallest window a run takes. When a task's time is up, its agent asks
+`POST /v1/agent/abort` (with its trial's header): the request it has in
+flight is cut, and llama-server stops writing a reply nobody waits for.
+Each answer's usage line keeps the server's `timings` (cache_n, prompt_n):
+how much of the prompt it took from its cache (18b point 14).
+
 Standard library only: it runs inside scripts/agent_run.py on the server."""
 
 from __future__ import annotations
 
+import http.client
 import json
+import socket
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -28,6 +38,12 @@ MAX_BODY = 32 * 1024 * 1024          # a conversation of 262,144 tokens is a few
 UPSTREAM_TIMEOUT_S = 3600            # one reply of a long thought at ~85 tokens a second
 REFUSED = "only the chat request goes through this relay"
 DOWN = "relay_server_down"
+ABORT = "/v1/agent/abort"            # a trial's request in flight, cut (from 127.0.0.1 only)
+ABORTED = "relay_aborted"
+# the longest reply: Qwen's own output length for most tasks, and well inside
+# the smallest window a run takes (131,072)
+MAX_REPLY_TOKENS = 32_768
+TIMINGS = ("cache_n", "prompt_n", "prompt_ms", "predicted_n", "predicted_ms")
 
 
 class Relay:
@@ -42,6 +58,8 @@ class Relay:
         self.max_body = max_body
         self.timeout = timeout
         self._lock = threading.Lock()
+        self._inflight: dict[str, set] = {}      # trial → its connections to the server
+        self.records: list[dict] = []            # the last answers' usage lines
         relay = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -71,6 +89,10 @@ class Relay:
             def do_POST(self):
                 if self.client_address[0] not in ("127.0.0.1", "::1"):
                     return self._refuse()
+                if self.path.split("?", 1)[0] == ABORT:
+                    n = relay.abort(self.headers.get("X-Agent-Trial", ""))
+                    self.close_connection = True
+                    return self._send(200, json.dumps({"aborted": n}).encode())
                 if self.path.split("?", 1)[0] != PATH:
                     return self._refuse()
                 try:
@@ -86,8 +108,9 @@ class Relay:
                 if not isinstance(body, dict) or not isinstance(body.get("messages"), list):
                     return self._send(400, json.dumps({"error": {"message": "no messages"}})
                                       .encode())
-                status, raw, ctype, secs = relay.forward(body)
-                relay.record(self.headers.get("X-Agent-Trial", ""), status, raw, secs)
+                trial = self.headers.get("X-Agent-Trial", "")
+                status, raw, ctype, secs = relay.forward(body, trial)
+                relay.record(trial, status, raw, secs)
                 self._send(status, raw, ctype)
 
         self.server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
@@ -106,35 +129,65 @@ class Relay:
         self.server.shutdown()
         self.server.server_close()
 
-    def forward(self, body: dict) -> tuple[int, bytes, str, float]:
-        """the request, with the run's sampling, to the server with its key"""
+    def forward(self, body: dict, trial: str = "") -> tuple[int, bytes, str, float]:
+        """the request, with the run's sampling and the reply's cap, to the
+        server with its key — on a connection the trial's abort can cut"""
         body = {**body, **self.sampling, "stream": False}
         body.pop("stream_options", None)
-        req = urllib.request.Request(self.upstream + "/chat/completions",
-                                     data=json.dumps(body).encode(), method="POST",
-                                     headers={"Content-Type": "application/json",
-                                              "Authorization": f"Bearer {self._key}"})
+        asked = body.get("max_tokens")
+        body["max_tokens"] = (min(int(asked), MAX_REPLY_TOKENS)
+                              if isinstance(asked, int) and asked > 0 else MAX_REPLY_TOKENS)
+        body.pop("max_completion_tokens", None)
+        u = urllib.parse.urlsplit(self.upstream + "/chat/completions")
+        conn = (http.client.HTTPSConnection if u.scheme == "https" else http.client.HTTPConnection)(
+            u.hostname, u.port, timeout=self.timeout)
+        with self._lock:
+            self._inflight.setdefault(trial, set()).add(conn)
         t0 = time.time()
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as r:
-                return r.status, r.read(), r.headers.get("Content-Type", "application/json"), \
-                    time.time() - t0
-        except urllib.error.HTTPError as e:
-            # the server's own refusal, as it gave it (a window outgrown is a
-            # 400) — unless it says it can't serve and its health agrees
-            if e.code in (502, 503, 504) and not self.healthy():
-                why = f"the model's server answered HTTP {e.code} and its health check failed"
+            conn.request("POST", u.path, body=json.dumps(body).encode(),
+                         headers={"Content-Type": "application/json",
+                                  "Authorization": f"Bearer {self._key}"})
+            r = conn.getresponse()
+            raw = r.read()
+            ctype = r.getheader("Content-Type", "application/json")
+            if r.status in (502, 503, 504) and not self.healthy():
+                # it says it can't serve, and its health agrees
+                why = f"the model's server answered HTTP {r.status} and its health check failed"
                 return 503, json.dumps({"error": {"message": why, "type": DOWN}}).encode(), \
                     "application/json", time.time() - t0
-            return e.code, e.read(), e.headers.get("Content-Type", "application/json"), \
-                time.time() - t0
-        except (urllib.error.URLError, OSError) as e:
+            # the server's own answer or refusal, as it gave it (a window
+            # outgrown is a 400)
+            return r.status, raw, ctype, time.time() - t0
+        except (OSError, http.client.HTTPException) as e:
+            if getattr(conn, "aborted", False):
+                why = "the agent's time was up: its request was cut"
+                return 499, json.dumps({"error": {"message": why, "type": ABORTED}}).encode(), \
+                    "application/json", time.time() - t0
             down = not self.healthy()
-            why = (f"the model's server didn't answer the relay ({getattr(e, 'reason', e)})"
+            why = (f"the model's server didn't answer the relay ({e})"
                    + ("; its health check failed too" if down else ""))
             return (503 if down else 502), json.dumps({"error": {
                 "message": why, "type": DOWN if down else "relay_upstream"}}).encode(), \
                 "application/json", time.time() - t0
+        finally:
+            with self._lock:
+                self._inflight.get(trial, set()).discard(conn)
+            conn.close()
+
+    def abort(self, trial: str) -> int:
+        """cut the trial's requests in flight: the server sees the
+        connection close and stops its reply. How many were cut"""
+        with self._lock:
+            conns = list(self._inflight.get(trial, set()))
+        for c in conns:
+            c.aborted = True
+            try:
+                if c.sock is not None:
+                    c.sock.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+        return len(conns)
 
     def healthy(self) -> bool:
         """llama-server's /health answers 200 when it can serve"""
@@ -148,18 +201,25 @@ class Relay:
             return False
 
     def record(self, trial: str, status: int, raw: bytes, secs: float) -> None:
-        """each answer's tokens and seconds, for the run's numbers"""
-        if self.usage is None:
-            return
+        """each answer's tokens, seconds and the server's timings, for the
+        run's numbers and the cache check"""
         try:
             usage = (json.loads(raw).get("usage") or {}) if status == 200 else {}
         except (ValueError, AttributeError):
             usage = {}
+        try:
+            timings = (json.loads(raw).get("timings") or {}) if status == 200 else {}
+        except (ValueError, AttributeError):
+            timings = {}
         line = {"at": round(time.time(), 3), "trial": trial[:200], "status": status,
                 **({"down": True} if status == 503 and DOWN.encode() in raw else {}),
                 "seconds": round(secs, 2), "prompt_tokens": usage.get("prompt_tokens"),
-                "completion_tokens": usage.get("completion_tokens")}
+                "completion_tokens": usage.get("completion_tokens"),
+                **{k: timings[k] for k in TIMINGS if isinstance(timings, dict) and k in timings}}
         with self._lock:
+            self.records = [*self.records[-199:], line]
+            if self.usage is None:
+                return
             self.usage.parent.mkdir(parents=True, exist_ok=True)
             with open(self.usage, "a", encoding="utf-8") as fh:
                 fh.write(json.dumps(line) + "\n")

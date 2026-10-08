@@ -2231,6 +2231,13 @@ def agent_catalogue():
     return agent_runs.catalogue()
 
 
+@app.get("/api/agent/busy")
+def agent_busy():
+    """18b: the served models an agent run holds now, and until about when"""
+    from . import agent_runs
+    return {"models": agent_runs.busy()}
+
+
 @app.get("/api/agent/run")
 def agent_run(key: str = ""):
     """18: one agent run — its settings and each task's result"""

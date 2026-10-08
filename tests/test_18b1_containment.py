@@ -73,7 +73,8 @@ class Env:
 
     async def exec(self, command, cwd=None, env=None, timeout_sec=None, user=None):
         self.calls.append({"command": command, "user": user})
-        out = "PROBE tcp-ok\nNET lo \nPIDS 4096\nDONE\n" if "pids.max" in command else ""
+        out = ("PROBE tcp-ok\nNET lo \nPIDS 4096\nCAPS 000000000000000b\nNNP 1\nDONE\n"
+               if "pids.max" in command else "")
         return SimpleNamespace(stdout=out, stderr="", return_code=0)
 
 
@@ -212,7 +213,8 @@ def test_a_reach_refused_is_ours_and_said(tmp_path, monkeypatch):
         async def exec(self, command, cwd=None, env=None, timeout_sec=None, user=None):
             self.calls.append({"command": command, "user": user})
             return SimpleNamespace(stdout="PROBE tcp-ok\nREACHED 1.1.1.1:443\nNET lo\nPIDS 4096"
-                                   "\nDONE\n", stderr="", return_code=0)
+                                   "\nCAPS 000000000000000b\nNNP 1\nDONE\n", stderr="",
+                                   return_code=0)
     env = Reaching()
     with pytest.raises(hm.ReachRefused):
         asyncio.run(agent.run("x", env, SimpleNamespace()))

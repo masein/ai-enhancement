@@ -76,6 +76,8 @@ def test_a_tasks_container_reaches_nothing_and_has_no_host_folder(tmp_path):
     out = probe(tmp_path, "agent18-reach", [base, ar.override(tmp_path)], script)
     assert hm.reach_verdict(out) == "", out                     # nothing answered
     assert "PIDS 4096" in out and "PROBE tcp-ok" in out and "NET lo" in out, out
+    # 18b point 16: the capabilities Harbor needs and no more; no new privileges
+    assert "CAPS 000000000000000b" in out and "NNP 1" in out, out
     # without the override the same container has a network: the check refuses
     # it (18b: its interface), and on Linux sees the host's port answer
     open_ = probe(tmp_path, "agent18-open", [base], script)

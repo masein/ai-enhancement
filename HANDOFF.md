@@ -4953,6 +4953,63 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 18b.3 — agent runs: before step B (8 Oct)
+
+- **Resolved only when it submitted** (point 10, done with 18b.1's
+  `read_trial`): a working tree it never submitted (the step limit, the
+  window outgrown) is not resolved, as mini-swe-agent's numbers count it;
+  the oracle, which submits nothing, is read by its reward.
+- **The time limit cuts the request in flight** (point 11): the agent's
+  `finally` (18b.1) now also asks the relay's `POST /v1/agent/abort` for its
+  trial, which shuts the connection to llama-server — the server stops a
+  reply nobody waits for, and mini-swe-agent is never let ask again. The
+  relay caps a reply at 32,768 tokens (`MAX_REPLY_TOKENS`, Qwen's own output
+  length for most tasks, inside the 131,072 minimum).
+- **A resume carries on only what didn't change** (point 12): a run's
+  folder started with another window, file, build, flags, sampling, prompt
+  or lock is refused, naming each change; `run.json` keeps its first
+  settings and only its task list grows; `--run 2` starts another run of the
+  same model beside it.
+- **The disk guard frees what it counts** (point 13). From Harbor's source
+  and a run here: Harbor's own `down --rmi local` (its default) removes the
+  image it built when a trial ends, but a killed job leaves it, and Docker's
+  build cache stays. After each task the runner removes what Compose built
+  for the task's projects and prunes the build cache no image uses (the
+  board's next deploy may rebuild a cached step). What a task takes at its
+  peak is measured while it runs, and asked for before each task starts.
+- **`--check` reads the template and the cache** (points 14, 16): it renders
+  a three-step conversation with `/apply-template` (each step as it was
+  before the next came, every step's thinking kept, the thinking open), then
+  sends two requests that extend one conversation, through the relay, with
+  mini-swe-agent's own model class, and refuses when the second read most of
+  its prompt again (llama-server's `timings`: `cache_n`, `prompt_n`). It says
+  the measured speeds and what they make of the benchmark: "about X–Y days
+  for 300 tasks", its assumptions said.
+- **Busy with an agent run** (point 15, `/api/agent/busy`): while a run posts
+  its line, the model's page and the Playground say the model is busy until
+  about when, with the run's link.
+- **Hardened** (point 16): the task's container and DeepSWE's separate
+  verifier: `no-new-privileges`, `cap_drop: ALL`, back only CHOWN,
+  DAC_OVERRIDE and FOWNER (Harbor chmods and chowns the mounted folders as
+  root); the container's check refuses any other capability or a missing
+  no-new-privileges. `min_p` 0 in the sampling. Harbor 0.24.0's oracle ran
+  an invented task here under these limits: the offline copy read 1.0, the
+  task as fetched 0.0 (its parser couldn't fetch).
+- **Step B's server lines** (point 17, `docs/AGENT-RUNS.md` § B): the
+  original's llama-server stopped by its PID from `pgrep -af llama-server`
+  (never the judge, never the phone build), started with `CTX=262144
+  CPU_MOE="--n-cpu-moe 21" nohup ~/lda-serve.sh base 0 0 > ~/lda-orig.log
+  2>&1 &`, 131,072 if it doesn't fit, back to 65,536 afterwards. Nothing to
+  press on the board: the runner takes the window alone.
+- **Small ones** (point 18): a pilot counts the tasks asked, errors included
+  (18b.1); each "±" says what it is (ours one standard error, DeepSWE's a 95%
+  interval over 4 runs); the run's page says tokens in adds up every step's
+  prompt and shows the last prompt's size; the test helper is UTC (18b.1);
+  the runner never prints a board line that could hold the key.
+- Tests: `tests/test_18b3_before_b.py`, `tests/test_18b3_page_browser.py`
+  (screens in `tests/_screens/phase18b/`); `tests/test_18_reach.py` checks
+  the capabilities and no-new-privileges in Docker.
+
 ### 18b.2 — agent runs: before step A (8 Oct)
 
 - **`--check-reach` runs as the doc writes it** (point 4): it needs neither

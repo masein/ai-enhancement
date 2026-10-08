@@ -14,11 +14,14 @@ SWE-bench Pro follows once both have run.
     loop and config, run **beside** the task's container. It sends each
     command in with Harbor's exec.
   - The task's container has no network (`network_mode: none`), at most
-    4,096 processes, and no address or key of the model. The agent checks
+    4,096 processes, no new privileges, every capability dropped but the
+    three Harbor's own steps need on the folders it mounts (CHOWN,
+    DAC_OVERRIDE, FOWNER; Docker's others come back only for a task that
+    proves it needs one), and no address or key of the model. The agent checks
     this from inside before the model is asked anything, and the check
     fails closed: it must show it can try a connection at all, nothing may
-    answer (by IPv4, IPv6 or name), and the loopback must be its only
-    interface.
+    answer (by IPv4, IPv6 or name), the loopback must be its only
+    interface, and its capabilities and no-new-privileges must be as set.
   - Harbor mounts three of the trial's folders into the container
     (`agent/`, `verifier/`, `artifacts/`), and the model's commands run
     there as root: anything in them may be a link, a FIFO or a device it
@@ -26,8 +29,9 @@ SWE-bench Pro follows once both have run.
     in the trial's `agent-host/` folder instead, which no container mounts,
     each written under a new name and renamed into place, never through a
     link. However the agent stops, every process left in the container is
-    killed and the three mounted folders are emptied before the verifier
-    runs.
+    killed, the request it had in flight is cut at the relay (the server
+    stops a reply nobody waits for), and the three mounted folders are
+    emptied before the verifier runs.
   - The board reads a file only if it is a regular file with one link,
     reached from the run's folder through real folders: never a link, a
     FIFO, a device or a hard link, and at most 2 MB of it.
@@ -36,8 +40,11 @@ SWE-bench Pro follows once both have run.
   - it listens on 127.0.0.1 only and takes only the chat request;
   - it adds the server's key (read from the board's record, never written
     anywhere);
-  - it sets the run's sampling: temperature 1.0, top_p 0.95, top_k 20, no
-    presence penalty, thinking on.
+  - it sets the run's sampling: temperature 1.0, top_p 0.95, top_k 20,
+    min_p 0, no presence penalty, thinking on;
+  - it caps a reply at 32,768 tokens (Qwen's own output length for most
+    tasks), inside the smallest window a run takes;
+  - it keeps each reply's tokens and what the server took from its cache.
 - **Before the first task**, the runner refuses in one line, with what to do,
   if any of these fails:
   - the pinned versions, and every package in the venv as the lock
@@ -46,7 +53,17 @@ SWE-bench Pro follows once both have run.
   - 50 GB free where Docker keeps its images;
   - the board serving the model with the registered file;
   - a window of at least 131,072 tokens;
-  - a tool call coming back through the relay.
+  - a tool call coming back through the relay;
+  - a run's folder started with other settings (its window, the model's
+    file, its build or flags, the sampling, the agent's prompt, the lock):
+    a run's settings never change, and its first are kept. `--run 2`
+    starts another run of the same model beside it.
+- **`--check`** also renders a three-step conversation with the server's own
+  template (each step must render as it did before the next came, with its
+  thinking, and the thinking open), sends two requests that extend one
+  conversation as the agent sends them, and refuses when the second read
+  most of its prompt again rather than from the server's cache. It says
+  the speeds it measured and what they make of the whole benchmark.
 - **A pilot is fixed:** `--tasks 10` is the same ten every time, spread over
   the benchmark's languages. `--only a,b` asks those tasks; `--only
   fetching` the tasks whose own tests fetch packages.
@@ -81,10 +98,18 @@ SWE-bench Pro follows once both have run.
   (its checks, its line every 3 minutes, the import) touch only its own
   Runs row. Only the board's own start puts runs that were running back in
   the queue.
-- **Disk:** each task's image is removed once no waiting task needs it, its
-  digest recorded first. Nothing more is pulled when Docker's disk would fall
-  under 50 GB free: the task running finishes, and the run stops in one line.
+- **Disk:** when a task ends, what Harbor built for it is removed (Harbor
+  removes it itself unless the job was killed), then Docker's build cache
+  that no image uses — the board's next deploy may rebuild a step it would
+  have taken from the cache. Its base image goes once no waiting task needs
+  it, its digest recorded first. What a task takes of Docker's disk at its
+  peak is measured while it runs; before each task starts — before its pull
+  and build — the runner asks for that much with 50 GB left over, and stops
+  in one line when it isn't there: the tasks running finish.
 - **On the board:**
+  - while it runs, the model's page and the Playground say the model is
+    busy with an agent run, until about when: a reply there waits behind
+    the agent's requests and slows it;
   - the run is a Runs row, "this server", its line every 3 minutes ("37 of
     300 · 21 resolved · 28 min a task · about 5 days left"), imported at the
     end;
@@ -186,40 +211,75 @@ Each step is numbered; a step that refers to another gives its number.
 ## B. With the model (masein, after A is reported)
 
 **What counts as broken.** Stop and report if any of these happens:
+- `--check` refuses (step 5): the template, the cache, a tool call;
 - fewer than 3 of the 10 resolved;
 - any error of ours;
 - a task's container reaching anything;
-- no tool call coming back;
 - thinking typed as a command;
 - the window outgrown on more than 2 of the 10;
 - a command left running past its limit.
 
-1. Start the original with a 262,144 window. If the card can't hold it beside
-   the judge, start it with the largest that fits, at least 131,072.
+The original's llama-server is the only server touched. Never the vLLM judge
+(`gemma-vllm`), never the phone build's server. While the run is on, the
+model's page and the Playground say it is busy with an agent run.
+
+1. Find the original's llama-server: the line whose model is the original
+   Q4 file, not the phone build's:
    ```bash
-   CTX=262144 ~/lda-serve.sh
+   pgrep -af llama-server
    ```
-2. On the model's page, press "Use the new window" (17j). Then check the
-   card's memory, with the judge's beside it:
+2. Stop it by its PID, the first number on that line (here `<PID>`), and
+   check it is gone:
    ```bash
-   nvidia-smi --query-gpu=memory.used,memory.total --format=csv
+   kill <PID> && sleep 5 && pgrep -af llama-server
    ```
-3. The checks only, nothing asked. It must end "ready — 10 task(s)":
+3. Start it again with a 262,144 window, the experts of 21 layers on the
+   CPU. Its own log is `~/serve-base-la0-mtp0.log`:
+   ```bash
+   CTX=262144 CPU_MOE="--n-cpu-moe 21" nohup ~/lda-serve.sh base 0 0 > ~/lda-orig.log 2>&1 &
+   ```
+4. When its log says it is listening, check the card's memory, with the
+   judge's beside it:
+   ```bash
+   tail -n 5 ~/serve-base-la0-mtp0.log; nvidia-smi --query-gpu=memory.used,memory.total --format=csv
+   ```
+   If it didn't fit (the log says it couldn't allocate, or the server
+   exited), do steps 1–2 again and start it with 131,072, the same line
+   otherwise:
+   ```bash
+   CTX=131072 CPU_MOE="--n-cpu-moe 21" nohup ~/lda-serve.sh base 0 0 > ~/lda-orig.log 2>&1 &
+   ```
+   Nothing to press on the board: the runner takes a change of the window
+   alone, and the run records the window the server reports.
+5. The checks only. Besides the versions, Docker, the disk, the model and a
+   tool call, `--check` renders a three-step conversation with the
+   server's own template (each step must render as it did before the next
+   came, with its thinking), then sends two requests that extend one
+   conversation, as the agent sends them, and reads what the server took
+   from its cache. It says the speeds it measured and what they make of
+   300 tasks, and must end "ready — 10 task(s)":
    ```bash
    cd ~/benchmarks/aienh && ~/agent-venv/bin/python scripts/agent_run.py swebench-multilingual --as served/Qwen3.6-35B-A3B-Q4-original-k-8 --tasks 10 --check
    ```
-4. Ten SWE-bench Multilingual tasks, one attempt, in tmux:
+6. Ten SWE-bench Multilingual tasks, one attempt, in tmux:
    ```bash
    tmux new -s agent
    ```
    ```bash
    cd ~/benchmarks/aienh && ~/agent-venv/bin/python scripts/agent_run.py swebench-multilingual --as served/Qwen3.6-35B-A3B-Q4-original-k-8 --tasks 10
    ```
-5. Report from the run's last line and its page on the board:
-   - minutes a task, tokens, how many resolved, any error;
+7. Report from the run's last line and its page on the board:
+   - step 5's speeds and estimate;
+   - minutes a task, tokens, the last prompt's size, how many resolved, any
+     error;
    - the disk used (step A6's command);
-   - the card's memory (step B2's command);
+   - the card's memory (step 4's command);
    - anything odd in the conversations: thinking typed as a command, the
      window outgrown, a command that hung.
+8. Afterwards, the original back to its usual window: steps 1–2 again,
+   then:
+   ```bash
+   CTX=65536 CPU_MOE="--n-cpu-moe 21" nohup ~/lda-serve.sh base 0 0 > ~/lda-orig.log 2>&1 &
+   ```
 
 **C.** masein decides what runs next from B's time a task.
