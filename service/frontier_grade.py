@@ -77,6 +77,7 @@ class GraderChat(llm.OpenRouterChat):
     """a grader's batch: OpenRouter's, held while the grading is stopped —
     17f: and stopped, its refusal said, when its first replies all refuse"""
     HALT_TAIL = ", or now with Start"
+    HALT_PRESS = "Start"                # 18b: a halt waits for it, like every other stop
     FIRST_REFUSALS = 5
 
     def waiting(self) -> str:
@@ -383,9 +384,9 @@ def _limit_words(est: dict, h: dict) -> dict:
     if est.get("usd_known", True) and h.get("usd_known", True) and usd > left:
         out["short"] = (f"This month's AI limit has ${left:,.2f} left (${float(spent):,.2f} of "
                         f"${float(lim):,.2f} spent), and this grading costs about "
-                        f"${float(usd):,.2f}: it would stop part-way, at the limit, and carry "
-                        "on by itself when the limit is raised. Raise the limit on AI models "
-                        "first, or start it knowing it stops there.")
+                        f"${float(usd):,.2f}: it would stop part-way, at the limit, and wait "
+                        "there for Start. Raise the limit on AI models first, or start it "
+                        "knowing it stops there.")
     elif float(est.get("usd_max") or 0) + float(h.get("usd") or 0) > left:
         most = float(est.get("usd_max") or 0) + float(h.get("usd") or 0)
         out["may_stop"] = (f"This month's AI limit has ${left:,.2f} left: about ${usd:,.2f} "
@@ -1009,6 +1010,12 @@ def _apply(g: dict, d: Path, slot: str, pin: dict, meta: dict, items: dict,
                 continue                # 17c: never sent: it waits for the next Start
             why = llm.plain_error(res.error) if res.error else ""
             got = None if why else fg.read(slot, res.text, items.get(qid) or {})
+            if got is not None and res.finish == "length" and not fg.whole_verdict(slot,
+                                                                                  res.text):
+                # 18b: a reply that reached its cap is graded only when it is
+                # one whole verdict object (17j point 7) — cut mid-reasoning
+                # after a quoted "correct: yes" line, it is cut, never a grade
+                got = {"ok": None, "unread": ""}
             if got is not None and got.get("ok") is None:
                 # 17j: a reply that reached its cap is read all the same — a
                 # whole object that ended exactly at the cap was a paid try;

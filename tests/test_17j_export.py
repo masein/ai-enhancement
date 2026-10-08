@@ -74,7 +74,7 @@ def test_22_the_containers_own_name_isnt_the_servers(box, tmp_path, monkeypatch,
     monkeypatch.setattr(builtins, "input", lambda prompt="": "yes")
     assert efr.main(["--run", str(sid), "--out", str(tmp_path / "raw")]) == 1   # 0abb757: 0
     said = capsys.readouterr().out
-    assert "this server's own name isn't known" in said and "c0ffee123456" in said, said
+    assert "this server's own name isn't in SCRUB_HOSTS" in said and "c0ffee123456" in said, said
 
 
 def test_22_the_export_works_out_the_names_and_says_them_above_the_list(
@@ -95,8 +95,11 @@ def test_22_the_export_works_out_the_names_and_says_them_above_the_list(
     said = capsys.readouterr().out
     first = next(x for x in said.splitlines() if x.startswith("will remove: "))   # 0abb757: none
     assert said.index(first) < said.index("These would go to public/")
-    for name in ("board-host", "judge-box", ACCT, "wrongacct"):
+    for name in ("board-host", ACCT, "wrongacct"):
         assert name in first, (name, first)
+    # 18b: a dotless host from the settings is no name of the scrub's (only
+    # dotted ones are); its line stays out here for the account it names
+    assert "judge-box" not in first, first
     for f in (next((out / "public").iterdir())).iterdir():
         text = f.read_text()
         assert ACCT not in text and "judge-box" not in text, f.name

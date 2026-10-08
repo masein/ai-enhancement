@@ -857,15 +857,26 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             ready[t] = whole
             lines.append(f"{t}: every shard is in ({n} of {n}) · {len(merged):,} answers")
         else:
+            whole = {**entry, "gpus": gpu_names(setup),
+                     "boxes": [entry["box"]] if entry["box"] else []}
             how = against(t, ans, sf.task_dir(row, t), tsetup, "the row")
             if how == "same":
+                if t not in (reg.get("tasks") or {}):
+                    # 18b: the row took them before the import was killed — its
+                    # answers moved, its registry never written: recorded now
+                    late[t] = whole
+                    lines.append(f"{t}: its answers were here, not recorded — an import "
+                                 "stopped part-way: recorded now")
                 continue
             stage(t, ans, tsetup, keep=sf.task_dir(row, t) if how != "setup" else None)
-            ready[t] = {**entry, "gpus": gpu_names(setup),
-                        "boxes": [entry["box"]] if entry["box"] else []}
+            ready[t] = whole
             lines.append(f"{t}: {len(ans):,} answers from a rented GPU ({gpu})")
+            held = 0 if on else sum(1 for r in ans.values() if sf.thought(r.get("answer") or ""))
+            if held:
+                # 18b: said on a whole benchmark's import too, graded or not
+                lines.append(f"{t}: {sf.thought_note(held, len(ans))}")
 
-    if not ready and not todo_shards and not aside_shards:
+    if not ready and not todo_shards and not aside_shards and not late:
         # 17f: every task's answers are here already: a bundle made again
         # changes nothing, and adds no run
         shutil.rmtree(staging.parent, ignore_errors=True)
@@ -933,6 +944,9 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
                 words.append(sf.words(t, scored[t]))
         if ready:
             write_meta(row, rec, on)
+        if late and not words:
+            words.append(f"recorded: {', '.join(fb.BENCH[t]['label'] for t in late)} — its "
+                         "answers were here already")
     else:
         words.append("nothing was imported; the row is as it was, and the bundle can be "
                      "imported again")
@@ -1594,6 +1608,22 @@ def _num(v) -> float | None:
     except (TypeError, ValueError):
         return None
     return x if math.isfinite(x) else None
+
+
+def imported_steps(model: str) -> dict:
+    """18b point 25: what the board holds of a served model's rented runs,
+    for the fetch — {"on"|"off": {"tasks": [whole tasks], "shards": {task:
+    [shard numbers]}}} — a planned step whose answers are here is done,
+    wherever it ran"""
+    from service import config
+    out = {}
+    for thinking, suffix in (("on", "__thinking"), ("off", "")):
+        reg = registry(config.OUT_DIR / (model.replace("/", "__") + suffix))
+        out[thinking] = {"tasks": sorted(reg.get("tasks") or {}),
+                         "shards": {t: sorted(int(i) for i in (v.get("have") or {}))
+                                    for t, v in (reg.get("shards") or {}).items()
+                                    if isinstance(v, dict)}}
+    return out
 
 
 def rented_of(sid: int) -> dict | None:

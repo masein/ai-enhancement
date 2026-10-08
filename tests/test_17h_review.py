@@ -206,7 +206,7 @@ def test_10_12_the_parity_verdict_outlives_the_fetch_and_tilde_reaches_the_compa
     ff, calls, key = fetch_one(
         tmp_path, monkeypatch, {}, [progress_of("phone", "A3-parity", "whole", parity=True)],
         {"/workspace/phone/A3-parity/parity.jsonl": par}, steps=[("phone", "A3-parity")],
-        compare=(1, "Not the same setup: the box answers 38.0% right, the server 42.4%\n"))
+        compare=(3, "Not the same setup: the box answers 38.0% right, the server 42.4%\n"))
     assert main_of(ff, key, dest, "--parity", "served/phone=~/phone-server-500.jsonl",
                    "1.1.1.1:41") == 1
     compare = next(c for c in calls if c[:9] == ff.COMPARE)

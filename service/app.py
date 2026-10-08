@@ -105,8 +105,8 @@ async def _stamp_build(request: Request, call_next):
     response = await call_next(request)
     if request.url.path.startswith("/api/"):
         response.headers["X-Evalboard-Build"] = BUILD
-    # 17j: the names this server is opened by, for the raw-run export's scrub
-    public_files.seen(request.headers.get("host", ""))
+    # 18b: a request's Host is no longer kept for the export's scrub: any name
+    # sent became a word scrubbed for good, and opened public/
     return response
 
 

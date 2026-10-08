@@ -274,7 +274,7 @@ def test_6_the_parity_check_compares_the_server_and_the_box(box, monkeypatch, sv
     assert fb.parity_compare(other, box_lines)["ok"] is False
     # 17c: compare refuses these two — the server's answered as another model
     # (tests/test_17c_review.py has the pair that compares)
-    assert fp.main(["compare", str(out), str(box["root"] / "parity" / "parity.jsonl")]) == 1
+    assert fp.main(["compare", str(out), str(box["root"] / "parity" / "parity.jsonl")]) == fp.DIFFERENT
 
 
 # ---------------------------------------------------------------------------

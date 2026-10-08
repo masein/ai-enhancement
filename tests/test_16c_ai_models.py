@@ -221,7 +221,9 @@ def test_a_labellers_batch_paused_by_refusals_says_so_and_carry_on_takes_it_up(
         if lines and all("refused 5 requests in a row" in x for x in lines):
             break
         time.sleep(0.05)
-    assert lines and all(x.endswith(", or now with Carry on") for x in lines), lines
+    # 18b: it waits for Carry on — it took itself up after 10 minutes
+    assert lines and all(x.endswith("It waits for Carry on: nothing more is sent until then")
+                         for x in lines), lines
     assert all(x.startswith("0 of 12 · ") for x in lines)
     # Carry on: taken up again
     state["refuse"] = False

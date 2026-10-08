@@ -522,7 +522,7 @@ def test_28_parity_compares_the_files_by_sha256_and_sizes_only_like_with_like(tm
     # compared. 17e: but written before 17d, asked again
     s, b = files({"name": name, "size": 22_843_343_360, "sha256": ""},
                  {"name": name, "size": 22_854_339_808, "sha256": sha}, "old")
-    assert fp.main(["compare", s, b, "--file-sha256", sha]) == 1
+    assert fp.main(["compare", s, b, "--file-sha256", sha]) == fp.DIFFERENT
     out = capsys.readouterr().out
     assert "the server's and the box's files were written before 17d" in out
     assert "22,843,343,360" not in out
@@ -530,13 +530,13 @@ def test_28_parity_compares_the_files_by_sha256_and_sizes_only_like_with_like(tm
     s, b = files({"name": name, "weights": 22_843_343_360, "sha256": ""},
                  {"name": name, "size": 22_854_339_808, "sha256": sha,
                   "weights": 22_843_343_360}, "new")
-    assert fp.main(["compare", s, b, "--file-sha256", "cd" * 32]) == 1
+    assert fp.main(["compare", s, b, "--file-sha256", "cd" * 32]) == fp.DIFFERENT
     assert "the box's file has sha256" in capsys.readouterr().out
     # weights on both sides that differ: refused
     s, b = files({"name": name, "weights": 22_843_343_360, "sha256": ""},
                  {"name": name, "size": 22_854_339_808, "sha256": sha,
                   "weights": 21_000_000_000}, "other")
-    assert fp.main(["compare", s, b, "--file-sha256", sha]) == 1
+    assert fp.main(["compare", s, b, "--file-sha256", sha]) == fp.DIFFERENT
     assert "llama-server counts the server's weights as 22,843,343,360 bytes" in \
         capsys.readouterr().out
 
@@ -616,6 +616,6 @@ def test_29_parity_is_decided_on_accuracy_over_n_questions(svc, monkeypatch, tmp
         assert bh["n"] == 30 and bh["twice"] and all("answer2" in r for r in brows)
     finally:
         fake.close()
-    assert fp.main(["compare", str(out), str(box_file)]) == 1
+    assert fp.main(["compare", str(out), str(box_file)]) == fp.DIFFERENT
     assert "the server was asked 20 questions and the box 30: ask both with the same --n" \
         in capsys.readouterr().out

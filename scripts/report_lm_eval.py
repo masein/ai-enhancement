@@ -1807,7 +1807,10 @@ def frontier_how(d: dict | None) -> str | None:
     held = d.get("thinking_held")
     if isinstance(held, int) and held and isinstance(of, int) and of:
         counts += (f" · {held:,} of {of:,} thought anyway, {held / of:.1%} (thinking off; scored "
-                   "on what follows the thinking)")
+                   "on what follows the thinking)"
+                   # 18b: above 5%, not a thinking-off score as others publish them
+                   + (" — not comparable with thinking-off numbers published elsewhere"
+                      if held / of > 0.05 else ""))
     counts += "".join(
         f" · {n:,} {w}" for n, w in ((d.get("unanswered"), "the server never answered, counted "
                                                            "wrong"),
@@ -25250,6 +25253,11 @@ function frontierGradingCard() {
     running ? el('div', { class: 'small', 'data-frontier-running': String(running) },
       ...G.running.map(r => el('p', { class: 'small', 'data-frontier-progress': `${r.slot}|${r.model}`,
         text: `${labelOf(r.slot)} · ${r.model}: ${r.progress || `${n(r.n)} sent`}` }))) : '',
+    // 18b: a restart of the board sends the requests in flight again (at
+    // most eight, each paid): said while a batch sends
+    running && !stopped ? el('p', { class: 'small warntext', 'data-frontier-deploy': '1',
+      text: 'Press Stop before a deploy: the board restarting sends the requests in flight '
+        + 'again (up to 8), and each is paid.' }) : '',
     // 17b: a batch that failed, whole or in part, says why
     ...(G.last || []).map(r => el('p', { class: 'small warntext',
       'data-frontier-last': r.slot, text: r.line })),

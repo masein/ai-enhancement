@@ -4979,6 +4979,89 @@ Not before the demo: a new hidden set changes every Everyday score.
   question (its saved answers are kept under the old window).
 - Tests: `tests/test_18b6_page_browser.py` (screens
   `tests/_screens/phase18b/runs-400-*.png`), `tests/test_18b6_window.py`.
+### 18b.5 — 17j follow-ups: the export (8 Oct)
+
+- **`public/` only with both variables given** (point 27,
+  `export_safe.scrub_names`): `SCRUB_HOSTS` and `SCRUB_ACCOUNTS` must both be
+  given, and the server's own name be in `SCRUB_HOSTS`; the names the board
+  works out only add to them. With both unset, one request with `Host: bench`
+  opened `public/`, which then published the server's and the account's
+  names.
+- **No name from a request** (point 28): the board no longer keeps a
+  request's Host (`public_files.seen` and its file gone) — `the`, `run`,
+  `done`, `hle`, `sha256` became words scrubbed in every line, for good. The
+  names worked out are the machine's own and dotted hosts from the
+  configuration only.
+- **The server's own words never go out** (point 29): the three stop
+  reasons that quoted the server ("refused a question: …", "failed on N
+  questions … (…): stopped", "failed on every question …") and the log line
+  of a stop now say its status alone (`frontier.status_of`: "HTTP 400", or
+  "no answer within 600 s"); the export cuts those words from logs written
+  before, runs the exception check on every line with a free slot (a
+  section's header, the run's end), and reads a reason cut by a newline as
+  one line with its rest — out whole or left out whole.
+- **Small ones** (point 30): a Frontier run's folder is
+  `frontier-run-<number>` (a model named after a tailnet address named its
+  folder); a DeviceMark row whose name the scrub would change gets
+  `devicemark-<hash>`; the quote check takes four words in a row, and four
+  with a filler word between each (so base64 of four words too); a bare
+  40-character hex key and a URL-encoded home path are left out; the
+  README's list of what the scrub removes goes out as written. Not closed:
+  nothing beyond one filler word between each.
+- Tests: `tests/test_18b5_export.py`; the 17i/17j export tests read the new
+  refusals and the dotted-only names.
+### 18b.4 — 17j follow-ups: grading and the fetch (8 Oct)
+
+- **A cut reply is graded only when it is one whole verdict object**
+  (point 19, `frontier_graders.whole_verdict`): a reply that reached its cap
+  in the line form, cut mid-reasoning after a quoted "correct: yes", is cut —
+  no grade, and says the cap. A whole JSON object at the cap is still read.
+- **A line ending in `{` opens no object** (point 20): `_OPENS` and `_KEY_AT`
+  take a bare field name on the same line only (a quoted one may follow on
+  the next, as JSON prints it). "S = {" then a "reasoning:" line was read as
+  a cut object: three paid tries, then counted wrong.
+- **The thinking share on a graded run** (point 21): an off row's share is
+  in the waiting words ("1,9xx answers wait for its grader · 76 of 2,158
+  thought anyway, 3.5% …") and on a whole benchmark's import line; above 5%
+  the score says "not comparable with thinking-off numbers published
+  elsewhere" (`frontier.thought_note`; the page's cell too). A quarter stays
+  the refusal line.
+- **A parity compare that couldn't run is no verdict** (point 22):
+  `frontier_parity.py compare` exits 0 the same, 3 not the same; anything
+  else (the board's container down, a file it can't read) is said, fails the
+  round, and is asked again next round.
+- **A box is destroyed only when read safe by this fetch, or unreached for
+  30 minutes** (point 23): after a restart, a safe hours old and two rounds
+  one `--every` apart no longer read a box given new work "destroyed: done".
+- **A halt waits for its press** (point 24): a grading batch halted by a
+  run of key, limit or rate refusals waits for Start (the labeller's for
+  Carry on) — it took itself up after 10 minutes, so adding credit restarted
+  spending with nobody pressing. The judge's batches have no press of their
+  own: they still try again after 10 minutes, as before.
+- **A step that ran on another box is done** (point 25,
+  `import_remote.py --imported`): the fetch asks the board once a round what
+  it holds of a build; a planned step whose answers are imported counts as
+  done, said, wherever it ran — no `--abandoned` needed.
+- **Small ones** (point 26):
+  - the reader's four rare wrong grades — a prose verdict quoting the
+    response's object, an outer object whose first key isn't a field, an
+    unquoted `{correct: yes}` in prose, the response's `> correct: …` line
+    after the judge's — are no grade (an object holding nothing but its
+    verdict inside a sentence is a quote; an outer object and the verdicts
+    inside it must agree; a quoted line that says otherwise than the judge's
+    is a second verdict);
+  - `THINK_REFUSED` reads a box safe only when the thinking share is the
+    import's sole reason (`frontier_fetch.think_only`);
+  - Start's refusal at the limit says it waits there for Start;
+  - a whole benchmark's import killed between moving its answers and writing
+    its registry is recorded when the bundle comes again;
+  - scoring reads only the text outside every thinking block, wherever it
+    sits; the share counts each (`frontier_graders.think_split`, linear);
+  - the placeholder test finds brackets first, then letters (1,200 letters
+    took 2.7 s);
+  - the grading card says "Press Stop before a deploy" while a batch sends.
+- Tests: `tests/test_18b4_grading_fetch.py`, `tests/test_18b4_import_kill.py`;
+  eight shapes added to `tests/fixtures/hle_reader_cases.json`.
 
 ### 18b.3 — agent runs: before step B (8 Oct)
 

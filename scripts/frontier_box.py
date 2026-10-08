@@ -189,6 +189,13 @@ def folder(a: argparse.Namespace, box: str, k: int, step: Step) -> Path:
     return Path(a.root) / build / step_name(box, k, step)
 
 
+def steps_of(box: str) -> list[tuple[str, Step]]:
+    """18b: each step folder a box's line makes, with its step"""
+    plan = PLANS.get(box[:1].upper()) or {}
+    return [(step_name(box.upper(), k, st), st)
+            for k, st in enumerate(plan.get(box.upper()) or [], 1)]
+
+
 def planned(box: str) -> list[str]:
     """17g: every step folder a box's line makes for a build, in order — the
     fetch calls a box safe to destroy only when each is whole and home"""

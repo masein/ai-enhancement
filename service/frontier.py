@@ -305,7 +305,7 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
         except ValueError as x:                 # the server refused this request outright
             with lock:
                 halt.append(served.ServerStopped(0, 0, str(x), refused=(
-                    f"the server refused a question: {x}")))
+                    f"the server refused a question ({status_of(x)})")))
             return
         if a.error:
             # 17b: no answer either way (its chat endpoint twice, then without
@@ -319,7 +319,8 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
                 if len(qs) > limit and not halt:
                     halt.append(served.ServerStopped(0, total, a.error.get("chat") or "", refused=(
                         f"the server failed on {len(qs)} questions, asked its own way and "
-                        f"without its chat parsing ({a.error.get('chat')}): stopped")))
+                        f"without its chat parsing ({status_of(a.error.get('chat'))}): "
+                        "stopped")))
             return
         line = {"id": it["id"], "epoch": e, "seed": seed, "answer": str(a),
                 "finish": getattr(a, "finish", None), "tokens": a.tokens,
@@ -362,7 +363,7 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
             why = next(iter(failed.values()))
             raise served.ServerStopped(count["n"], total, why, refused=(
                 f"the server failed on every question it was asked ({len(failed)}), asked its "
-                f"own way and without its chat parsing ({why}): stopped"))
+                f"own way and without its chat parsing ({status_of(why)}): stopped"))
         # 17d: before a question is written off, the server must still answer
         # one it answered before: a server that went down near the end of a
         # benchmark left its last questions as no answer for good
@@ -628,7 +629,6 @@ def _share(per: dict[str, list[float]], task: str, items: list[dict]) -> dict:
     return fb.summary(per, task, groups)
 
 
-_UNCLOSED = re.compile(r"(?s)^\s*<think>(.*)$")
 # 17c: an off row is scored with at most this share of its answers holding
 # thinking — each scored on what follows it, as scoring reads every reply —
 # and refused above it. 17j: a quarter, not 1%. On 8 Oct the UD-Q4_K_XL file's
@@ -639,10 +639,36 @@ _UNCLOSED = re.compile(r"(?s)^\s*<think>(.*)$")
 THINKING_OFF_SHARE = 0.25
 
 
+def status_of(why) -> str:
+    """18b: a server's refusal by its status, or our own words for a
+    timeout — never its own words, which went out with the exported log"""
+    t = str(why or "")
+    m = re.search(r"\bHTTP (\d{3})\b", t) or re.search(r"\b([45]\d\d)\b", t)
+    if m:
+        return f"HTTP {m.group(1)}"
+    m = re.search(r"no answer within \d+ s", t)
+    return m.group(0) if m else "no status given"
+
+
 def thought_words(n: int, of: int) -> str:
     """17j: "76 of 2,158 thought anyway, 3.5%" — an off row's answers that
     held thinking, on its score and its run"""
     return f"{n:,} of {of:,} thought anyway, {n / of:.1%}" if of else f"{n:,} thought anyway"
+
+
+# 18b: above this share of an off row's answers thinking, its score isn't a
+# thinking-off score as others publish them — said; THINKING_OFF_SHARE (a
+# quarter) stays the refusal line
+NOT_COMPARABLE_SHARE = 0.05
+NOT_COMPARABLE = "not comparable with thinking-off numbers published elsewhere"
+
+
+def thought_note(n: int, of: int) -> str:
+    """the share with what it means: "76 of 2,158 thought anyway, 3.5%
+    (thinking off; scored on what follows the thinking)" — and above 5%, that
+    the score isn't comparable"""
+    return (thought_words(n, of) + " (thinking off; scored on what follows the thinking)"
+            + (f" — {NOT_COMPARABLE}" if of and n / of > NOT_COMPARABLE_SHARE else ""))
 
 
 def thought(answer: str) -> bool:
@@ -651,12 +677,9 @@ def thought(answer: str) -> bool:
     tag or not, as a template that opens <think> in the prompt leaves it),
     or a <think> never closed; an empty block, as a template told not to
     think writes, is none"""
-    a = answer or ""
-    m = fb._THINK.match(a)
-    if m:
-        return bool(re.sub(r"</?think>", "", m.group(0)).strip())
-    m = _UNCLOSED.match(a)
-    return bool(m and m.group(1).strip())
+    # 18b: every block, wherever it sits — one opened mid-reply was counted as
+    # ran out but never in the share
+    return bool(fb.thinking_of(answer or ""))
 
 
 def thinking_refused(task: str, thinking: str | None, answers: list[str]) -> str:
@@ -712,9 +735,10 @@ def score_task(row: Path, task: str, rec: dict) -> dict | None:
     errors = sum(1 for r in flat if r["error"])
     if out["state"] == "waiting":
         # 17d: answers asked again (another grader chosen) wait: the score made
-        # without them is no longer the page's
+        # without them is no longer the page's. 18b: the share said here too
         _unwrite(d, task)
-        return {"waiting": waiting, "of": len(flat), "label": spec["label"]}
+        return {"waiting": waiting, "of": len(flat), "label": spec["label"],
+                **({"thinking_held": held, "answers": len(flat)} if held else {})}
     if out["state"] == "no score":
         _unwrite(d, task)
         return {"no_score": out["words"], "ungraded": ungraded, "of": out["seen"],
@@ -897,7 +921,8 @@ def words(task: str, sc: dict) -> str:
         return sc["no_score"]
     if sc.get("waiting") is not None and sc.get("score") is None:
         return (f"{spec['label']}: {sc['waiting']:,} answers wait for its grader (AI models ▸ "
-                "Start)")
+                "Start)" + (f" · {thought_note(sc['thinking_held'], sc.get('answers') or 0)}"
+                            if sc.get("thinking_held") else ""))
     bits = [f"{spec['label']} {100 * sc['score']:.1f}% ± {100 * sc['se']:.1f}",
             f"{sc['epochs']} run{'s' if sc['epochs'] != 1 else ''} of {sc['questions']:,}"]
     if sc.get("ran_out"):
@@ -913,8 +938,7 @@ def words(task: str, sc: dict) -> str:
                     f"({', '.join(ids[:5])}{' …' if len(ids) > 5 else ''})")
     if sc.get("thinking_held"):
         # 17j: the share, as the run and the score's cell say it
-        bits.append(thought_words(sc["thinking_held"], sc.get("answers") or 0)
-                    + " (thinking off; scored on what follows the thinking)")
+        bits.append(thought_note(sc["thinking_held"], sc.get("answers") or 0))
     if (sc.get("look") or {}).get("waiting"):
         bits.append(f"code's score: Epoch's model check not run on {sc['look']['waiting']:,}")
     if sc.get("final") is False:
@@ -992,7 +1016,7 @@ def run(sid: int, sub: dict, rec: dict, th: dict, row: Path, log_path: Path) -> 
             line = (said if said.startswith(label) else f"{label}: {said}" if said else
                     f"{label}: the server stopped answering at {e.done:,} of {e.total:,}")
             line += served.KEPT_FOR_NEXT
-            log(f"[frontier] {line} ({e.why})")
+            log(f"[frontier] {line} ({status_of(e.why)})")
             return "failed", line
         if db.cancel_requested(sid):
             return "canceled", f"{label}: stopped at {n:,} of {total:,}; the answers are kept"
