@@ -4953,6 +4953,62 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 18c.2 — agent runs: before the full run (8 Oct)
+
+- **Asked again only with evidence it came before the agent** (point 5,
+  `agent_bench.ours_of`): Harbor never began the agent's phase
+  (`agent_execution`) and the agent wrote nothing in `agent-host/`, or the
+  agent's own `ReachRefused`, or the run was stopped. Harbor's or Docker's
+  failures once the agent had run (copying tests in, the clean-up, the
+  teardown) are errors of ours, counted not resolved and never asked again
+  (`final`); a teardown after the tests' result was in leaves the result.
+- **A server that goes down** (point 6): `ServerDown` stops the run — no
+  task starts, the tasks running finish, exit 1 with a line; the try isn't
+  counted, and the same command asks the task again from its start, said on
+  the run's page ("the model's server went down: asked again from its
+  start").
+- **Jobs** (point 7): every job started (its `.log`) is a try; one with no
+  `result.json` counts toward the three (`agent_bench.no_result`); a job
+  still running has a `jobs/<job>.running` mark (cleared at start). A job
+  past its agent's, verifier's and build's limits plus 30 minutes
+  (`job_limit`, from its task.toml) is killed, its containers removed, a
+  `.killed` note written and said; after the agent ran, never asked again.
+- **Settings** (point 8): the reply's cap, the container's override
+  (`override_sha256`), the runner's commit (`git -c safe.directory`, as
+  root too) and its files' hash join `SETTINGS`.
+- **The oracle on every task** (point 9): `--all`; a run must say which
+  tasks (`--tasks`, `--only`, `--all`). `oracle_states` reads the oracle
+  run: tasks it read not resolved are left out of a model run (said), of
+  the board's score and denominator ("pilot: 3 of 299 · 1 task left out:
+  their reference solution doesn't pass here") and named on the card; a
+  model run with `--all` is refused until the oracle has run on every task.
+- **Not comparable** (point 10): Multilingual's card says a task past its
+  50 minutes is not resolved here and the published runs had no such limit.
+- **Small ones** (point 11):
+  - the cache check refuses a fifth of a long prompt read again; a server
+    with no `timings.cache_n` is refused with how to tell an old llama.cpp
+    (`/props`'s `build_info`) from a server that isn't one; the checks ask
+    with the agent's own budget (32,768);
+  - `--check-reach` takes every model server's port from the board
+    (`import_agent.py --served-all`, no keys), never 8090 by default;
+  - a DeepSWE task with its own `tests/docker-compose.yaml` is refused;
+  - the venv is held to its lock: nothing extra installed, every file as
+    its RECORD has it; pip 26.2.1 is in the lock, and A3/A4 make the venv
+    with no seed and install with `uv pip install --require-hashes`;
+  - the build cache is pruned by the records a task's build made
+    (`docker system df -v`, one `--filter id=` a prune): the board's stay;
+  - the board's queue holds runs on a model an agent run is using, each
+    with `db.HELD_LINE`; runs on other models go on;
+  - the exec path is closed with the stop, and a command already sent is
+    waited for (up to 120 s) before the clean-up kills; one still out fails
+    the clean-up.
+- Steps: B0 (nothing queued, no loop calibration, nothing on 8091), B1–B2
+  by port 8091 with 8090/8092/8094/8096 checked, B4's two `nvidia-smi`
+  queries and the 1.5 GB rule, B7's timed-out and read-again counts (the
+  run's last line, `usage_words`), § C: the oracle on every task first.
+- Tests: `tests/test_18c2_before_the_run.py`, `tests/test_18c2_card_browser.py`
+  (screens `tests/_screens/phase18c/card-*.png`).
+
 ### 18c.1 — agent runs: before step A (8 Oct)
 
 - **Harbor from the venv** (point 1): the runner runs
