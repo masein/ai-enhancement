@@ -165,7 +165,7 @@ def test_24_the_small_ones(tmp_path):
                                              sp.MMLU: {"right": 0, "of": 0}}}})
     assert "peak" not in line                                   # 0b58df7: "peak " and nothing
     src = (ROOT / "scripts" / "speed_test.py").read_text()
-    assert 'rb.scrub(f"the weights couldn\'t be fetched' in src
+    assert "the weights couldn't be fetched: \" + rb.scrub(str(e))[:300]" in src   # 18e: whole
 
 
 def test_24_admission_for_a_shared_pool_on_the_box_is_said():
