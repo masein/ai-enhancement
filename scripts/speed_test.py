@@ -79,6 +79,13 @@ VLLM_CUDA = (13, 0)                     # its torch 2.13.0 is built for CUDA 13.
 BF16 = {"repo": "Qwen/Qwen3.6-35B-A3B", "revision": "995ad96eacd98c81ed38be0c5b274b04031597b0",
         "size_gb": 71.9}
 LLAMA_CUDA = (12, 8)                    # our tarball's CUDA (scripts/build_llama_tarball.sh)
+VLLM_START_S = 1200                     # 18d point 24: vLLM up within 20 minutes, or said
+# 18d point 24: a start that failed for memory — the only failure a smaller
+# pool is tried for
+OOM = re.compile(r"(?i)out of memory|cudaMalloc|failed to allocate|unable to allocate|"
+                 r"not enough memory|ggml_backend_cuda_buffer_type_alloc_buffer")
+# 18d point 22: what a slot of a shared pool must hold — one thinking answer
+SHARED_SLOT_MIN = SLOT_CTX
 
 # the boxes: what each must be before anything downloads, and its settings in
 # order. A setting: engine llama (slots, shared, mtp) or vllm (seqs, tp)
@@ -159,8 +166,17 @@ def box_line(cards: list[dict], cuda: tuple[int, int] | None) -> str:
             + (f", CUDA {cuda[0]}.{cuda[1]}" if cuda else ", the driver's CUDA unknown"))
 
 
-def check_box(plan: dict, cards: list[dict], cuda: tuple[int, int] | None) -> str:
-    """'' when the box is what the plan rents; else why, in one line"""
+def cuda_of(settings: list[dict]) -> tuple[int, int]:
+    """18d point 23: the CUDA the settings asked need — llama.cpp's 12.8,
+    vLLM's 13.0 — the box's for none of them"""
+    return max(VLLM_CUDA if s["engine"] == "vllm" else LLAMA_CUDA for s in settings)
+
+
+def check_box(plan: dict, cards: list[dict], cuda: tuple[int, int] | None,
+              settings: list[dict] | None = None) -> str:
+    """'' when the box is what the plan rents, for the settings asked; else
+    why, in one line"""
+    plan = {**plan, "cuda": cuda_of(settings or plan["settings"])}
     fit = [c for c in cards if re.search(plan["gpu"], c["name"], re.I)
            and c["mib"] >= plan["min_mib"]]
     if len(fit) < plan["count"]:
@@ -235,6 +251,8 @@ class Ask(threading.Thread):
         self.timings: dict = {}
         self.error = ""
         self.cut = ""                   # why the client cut it
+        self.again = False              # 18d point 24: cut to be asked again
+        self.counted: dict[str, int] = {}   # the tokens it put on each window
         self.conn: http.client.HTTPConnection | None = None
 
     def used(self) -> int:
@@ -264,12 +282,26 @@ class Ask(threading.Thread):
                 if not line:
                     break
                 line = line.strip()
+                # 18d point 20: an error the server sends mid-stream is the
+                # request's — counted, never a finished answer
+                if line.startswith(b"error:"):
+                    self.error = "the server said mid-stream: " + line[6:].strip()[:300].decode(
+                        errors="replace")
+                    break
                 if not line.startswith(b"data:"):
                     continue
                 data = line[5:].strip()
                 if data == b"[DONE]":
                     break
-                self.chunk(json.loads(data))
+                c = json.loads(data)
+                if isinstance(c, dict) and c.get("error"):
+                    e = c["error"]
+                    self.error = "the server said mid-stream: " + str(
+                        e.get("message") if isinstance(e, dict) else e)[:300]
+                    break
+                self.chunk(c)
+            if not self.error and not self.cut and self.finish is None:
+                self.error = "the stream ended with no finish"
         except (OSError, http.client.HTTPException, ValueError) as e:
             if not self.cut:
                 self.error = f"{type(e).__name__}: {e}"
@@ -325,7 +357,10 @@ class Endpoint:
         every slot is busy; 'memory' when the shared pool hasn't the room"""
         if len(self.flight) >= self.slots:
             return "slot"
-        if self.pool and (sum(a.used() for a in self.flight) + prompt + NEW_ROOM
+        # 18d point 24: the room a new request needs grows with the slots
+        # (each of those in flight takes a step at a time)
+        room = max(NEW_ROOM, STEP_ROOM * self.slots)
+        if self.pool and (sum(a.used() for a in self.flight) + prompt + room
                           > self.pool * POOL_FILL):
             return "memory"
         return ""
@@ -341,8 +376,12 @@ class Test:
 
     def __init__(self, endpoints: list[Endpoint], items: dict[str, list[dict]], model: str,
                  warmup: float = WARMUP_S, gpqa: float = GPQA_S, mmlu: float = MMLU_S,
-                 clock=time.monotonic):
+                 clock=time.monotonic, dead=None):
         self.endpoints, self.items, self.model = endpoints, items, model
+        # 18d point 21: '' while every engine runs; else why the setting ends
+        self.dead = dead or (lambda: "")
+        self.stopped = ""
+        self.error_words = ""
         self.windows = [("warm-up", GPQA, warmup), ("gpqa", GPQA, gpqa), ("mmlu", MMLU, mmlu)]
         self.clock = clock
         self.lock = threading.Lock()
@@ -367,6 +406,7 @@ class Test:
         with self.lock:
             if ask.task == (MMLU if self.phase == "mmlu" else GPQA):
                 self.tokens[self.phase] += n
+                ask.counted[self.phase] = ask.counted.get(self.phase, 0) + n
             over = ask.server.overflowing()
         if over:
             self.preempt(ask.server)
@@ -381,6 +421,7 @@ class Test:
             if victim.cut:
                 return
             self.cut += 1
+            victim.again = True
             self.again[victim.task].insert(0, victim.job)
         victim.stop("the shared pool was nearly full")
 
@@ -390,12 +431,18 @@ class Test:
                 ask.server.flight.remove(ask)
             phase = self.phase
             if ask.cut:
+                # 18d point 24: a request cut to be asked again from its start
+                # made nothing the window keeps — its tokens come off
+                if ask.again:
+                    for ph, n in ask.counted.items():
+                        self.tokens[ph] -= n
                 return
             if ask.error:
                 if re.search(r"(?i)context|kv cache|memory|exceed", ask.error):
                     self.refused += 1
                 else:
                     self.errors += 1
+                    self.error_words = self.error_words or ask.error
                 return
             exact = ask.usage.get("completion_tokens") if ask.usage else None
             if isinstance(exact, int) and exact > ask.tokens and \
@@ -463,9 +510,14 @@ class Test:
             end += secs
             if name == "mmlu":
                 self.cut_all("the GPQA window closed")
-            while self.clock() < end:
+            while self.clock() < end and not self.stopped:
+                self.stopped = self.dead()
+                if self.stopped:
+                    break
                 self.fill(task)
                 time.sleep(tick)
+            if self.stopped:
+                break
         self.cut_all("the run's windows closed")
         return self.result()
 
@@ -486,6 +538,7 @@ class Test:
             sanity[task] = {"right": sum(a["ok"] for a in got), "of": len(got)}
         return {"gpqa": g, "mmlu": m, "waited": self.waited, "cut": self.cut,
                 "refused": self.refused, "errors": self.errors, "sanity": sanity,
+                "stopped": self.stopped, "error_words": self.error_words,
                 "mtp_acceptance": (self.drafts["accepted"] / self.drafts["n"]
                                    if self.drafts["n"] else None)}
 
@@ -512,9 +565,14 @@ def line_of(rec: dict) -> str:
              f"{m['prompt_s']:,.0f} prompt tokens/s ({m['prompt_read_s']:,.0f} read, the rest "
              "from the cache)",
              (f"${usd:.2f} per million output tokens" if usd else "no output: no price"),
-             "peak " + ", ".join(f"{x:,} MiB" for x in rec.get("peak_mib") or []) or "peak ?",
+             # 18d point 24: the peak only when it was read
+             *(["peak " + ", ".join(f"{x:,} MiB" for x in rec["peak_mib"])]
+               if rec.get("peak_mib") else []),
              f"{r['waited']} waited for memory, {r['cut']} cut and asked again, "
-             f"{r['refused']} refused"]
+             f"{r['refused']} refused, {r.get('errors', 0)} errors"
+             + (f" (the first: {r['error_words'][:160]})" if r.get("error_words") else "")]
+    if r.get("stopped"):
+        words.insert(0, f"STOPPED EARLY — {r['stopped']}; the numbers are this far only")
     if r.get("mtp_acceptance") is not None:
         words.append(f"MTP accepted {r['mtp_acceptance']:.0%} of its drafts")
     elif rec.get("mtp"):
@@ -608,7 +666,8 @@ def vllm_argv(venv: Path, weights: Path, port: int, setting: dict, kv: str) -> l
             "--max-num-seqs", str(setting["seqs"]), "--tensor-parallel-size", str(setting["tp"]),
             "--gpu-memory-utilization", "0.92", "--kv-cache-dtype", kv,
             "--reasoning-parser", "qwen3", "--limit-mm-per-prompt", '{"image": 0, "video": 0}',
-            "--seed", "0"]
+            # 18d point 24: the cached share of each prompt in its usage
+            "--enable-prompt-tokens-details", "--seed", "0"]
 
 
 def vllm_fits(log: str) -> dict:
@@ -618,6 +677,28 @@ def vllm_fits(log: str) -> dict:
     conc = re.findall(r"Maximum concurrency for ([\d,]+) tokens per request:\s*([\d.]+)x", log)
     return {"kv_tokens": int(tok[-1].replace(",", "")) if tok else None,
             "full_length_at_once": float(conc[-1][1]) if conc else None}
+
+
+def slot_context(base: str) -> int | None:
+    """18d point 22: the context each slot of a llama-server holds, as its
+    /props says; None when it doesn't"""
+    import remote_gguf as rg
+    st, raw = rg._get(base.removesuffix("/v1") + "/props")
+    try:
+        got = (json.loads(raw).get("default_generation_settings") or {}).get("n_ctx") \
+            if st == 200 else None
+    except (ValueError, AttributeError):
+        return None
+    return got if isinstance(got, int) and got > 0 else None
+
+
+def dead_of(procs: list) -> str:
+    """18d point 21: '' while every engine runs; else which stopped, its
+    exit and its last log lines"""
+    for p in procs:
+        if p.p is not None and p.p.poll() is not None:
+            return f"its engine stopped (exit {p.p.returncode}): {p.tail(8)}"
+    return ""
 
 
 class Proc:
@@ -694,7 +775,8 @@ def fetch_bf16(files: Path) -> tuple[Path | None, str]:
         snapshot_download(BF16["repo"], revision=BF16["revision"], local_dir=str(dest),
                           token=os.environ.get("HF_TOKEN") or None)
     except Exception as e:                              # noqa: BLE001 — said in one line
-        return None, f"the weights couldn't be fetched: {str(e)[:300]}"
+        import remote_bundle as rb                      # 18d point 24: never a token's value
+        return None, rb.scrub(f"the weights couldn't be fetched: {str(e)[:300]}")
     (dest / ".fetched").write_text(BF16["revision"])
     return dest, ""
 
@@ -743,7 +825,7 @@ def main(argv: list[str] | None = None) -> int:
     # the box, before anything downloads
     cards, cuda = gpus(), driver_cuda()
     say(f"this box: {box_line(cards, cuda)}")
-    why = check_box(plan, cards, cuda)
+    why = check_box(plan, cards, cuda, settings)
     if why:
         say(f"stopping — {why}. Nothing was fetched")
         return 2
@@ -801,13 +883,24 @@ def main(argv: list[str] | None = None) -> int:
                                  a.out / f"{a.box}-{n}-gpu{card['index']}.log",
                                  f"http://127.0.0.1:{port}/v1")
                         err = p.start(1800)
-                        if not err or not s.get("shared"):
+                        # 18d point 24: only a failure of memory is a pool too big
+                        if not err or not s.get("shared") or not OOM.search(err):
                             break
                         pool = int(pool * 0.9)          # a pool that didn't fit: 10% smaller
                         say(f"the pool didn't fit ({err[:160]}): {pool:,} tokens next")
                     if err:
                         raise RuntimeError(f"llama-server on GPU {card['index']}: {err}")
                     procs.append(p)
+                    # 18d point 22: a shared pool every slot can draw on — a
+                    # build that splits it (pool ÷ slots) stops answers short
+                    if s.get("shared"):
+                        got = slot_context(p.base)
+                        if got is None or got < SHARED_SLOT_MIN:
+                            raise RuntimeError(
+                                ("its /props doesn't say a slot's context" if got is None else
+                                 f"each slot holds {got:,} tokens, not the pool's {pool:,}")
+                                + f": a shared setting needs {SHARED_SLOT_MIN:,} a slot — this "
+                                "build splits the pool despite --kv-unified")
                     eps.append(Endpoint(p.base, s["slots"], pool or None, str(card["index"])))
                 rec["setting"] += (f" (a pool of {eps[0].pool:,} tokens a GPU)" if s.get("shared")
                                    else f" ({SLOT_CTX:,} tokens a slot)")
@@ -830,7 +923,7 @@ def main(argv: list[str] | None = None) -> int:
                     p = Proc(vllm_argv(vllm_venv, weights, 8100, s, kv),
                              {**env, "CUDA_VISIBLE_DEVICES": devices},
                              a.out / f"{a.box}-{n}-vllm.log", "http://127.0.0.1:8100/v1")
-                    err = p.start(3600)
+                    err = p.start(VLLM_START_S)
                     if not err:
                         break
                     say(f"vLLM didn't start with the cache in {kv} ({err[:200]})")
@@ -846,7 +939,8 @@ def main(argv: list[str] | None = None) -> int:
                 eps.append(Endpoint(p.base, s["seqs"], None, devices))
             peak = Peak()
             peak.start()
-            test = Test(eps, items, "qwen", a.warmup, a.gpqa, a.mmlu)
+            test = Test(eps, items, "qwen", a.warmup, a.gpqa, a.mmlu,
+                        dead=lambda: dead_of(procs))
             rec["result"] = test.go()
             rec["peak_mib"] = peak.values()
             keep(a.out, rec)
