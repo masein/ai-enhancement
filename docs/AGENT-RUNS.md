@@ -292,18 +292,16 @@ group in step 5, the line is the same without `sudo`.
    ```bash
    sudo docker network inspect bridge --format '{{range .Containers}}{{.Name}} {{end}}'
    ```
-   Then the three rules, in this order:
+   Then the three rules: the runner prints them, one line each (their
+   addresses aren't written here — the private ranges, the tailnet's and
+   Tailscale's own resolver: the public mirror keeps every tailnet address
+   out). Run each line it prints, in its order:
    ```bash
-   sudo iptables -I INPUT -i docker0 -j DROP
-   ```
-   ```bash
-   sudo iptables -I DOCKER-USER -i docker0 -d 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10,169.254.0.0/16 -j DROP
-   ```
-   ```bash
-   sudo iptables -I DOCKER-USER -i docker0 -d 100.100.100.100 -p udp --dport 53 -j ACCEPT
+   cd ~/benchmarks/aienh && sudo env PATH="$HOME/agent-venv/bin:$PATH" ~/agent-venv/bin/python scripts/agent_run.py deepswe --firewall-lines
    ```
    Then step 7 again: its last line must list no address of this server,
-   no LAN gateway and no tailnet address but `100.100.100.100:53`. **A
+   no LAN gateway and no tailnet address but Tailscale's resolver on port
+   53. **A
    reboot loses the rules.** This shows whether they are in place — the
    INPUT rule, then the five DROPs (one a range) and the ACCEPT:
    ```bash
