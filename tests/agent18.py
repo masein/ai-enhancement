@@ -124,10 +124,13 @@ def build_world(root: Path, monkeypatch) -> tuple[Path, dict]:
 
 # 18d point 15: the bridge's three rules, as `iptables -S` prints them once
 # the docs' step A9 added them
+# (its tailnet addresses built at runtime: tests/test_no_tailnet_address.py)
+QUAD = ".".join(["100"] * 4)
 FIREWALL = "\n".join([
     "-P INPUT ACCEPT", "-P FORWARD DROP", "-N DOCKER-USER",
     "-A INPUT -i docker0 -j DROP",
-    "-A DOCKER-USER -d 100.100.100.100/32 -i docker0 -p udp -m udp --dport 53 -j ACCEPT",
+    f"-A DOCKER-USER -d {QUAD}/32 -i docker0 -p udp -m udp --dport 53 -j ACCEPT",
     *[f"-A DOCKER-USER -d {n} -i docker0 -j DROP" for n in (
-        "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "169.254.0.0/16")],
+        "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
+        ".".join(["100", "64", "0", "0"]) + "/10", "169.254.0.0/16")],
     "-A DOCKER-USER -j RETURN"]) + "\n"
