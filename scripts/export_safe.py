@@ -514,25 +514,54 @@ def _free_words_out(line: str) -> tuple[str, bool]:
 # out whole. A library's lines below a closed one stay lines of their own
 _STARTS = re.compile(rf"^(?:\[[a-z]+\] |===== |{_T} )")
 JOIN_MAX = 20                            # lines a reason may run to
+# 18e point 10: where a stop reason written before 18b opened on the server's
+# own words, and how far they may run: service/served.py's _said() kept 400
+# characters of them, after "HTTP 400: " (WORDS_MAX leaves room). A reason
+# that holds only its status (18b on: "(HTTP 400)") opened on none, nor does
+# "Nothing was asked (…)", an error's repr: one line, whatever it held
+_WORDS_AT = re.compile(r"(?:— written as no answer, counted wrong|asks only the rest|the server "
+                       r"stopped answering|without its chat parsing) \(|the server refused a "
+                       r"question: ")
+_STATUS_ONLY = re.compile(r"(?:HTTP \d{3}|no answer within \d+ s|no status given)\)")
+WORDS_MAX = 480
+
+
+def _words_left(s: str) -> int:
+    """18e point 10: how many characters of a server's words may still follow
+    this line — the rest of a reason that opened on them, its last on the
+    line; 0 when it opened on none, or on its status alone"""
+    m = None
+    for m in _WORDS_AT.finditer(s):
+        pass
+    if not m or _STATUS_ONLY.match(s, m.end()):
+        return 0
+    return max(0, WORDS_MAX - (len(s) - m.end()))
 
 
 def _joined(lines: list[str]) -> list[str]:
     out: list[str] = []
-    in_server, joined = False, 0
+    in_server, joined, left = False, 0, 0
     for line in lines:
         s = line.rstrip()
         if s.startswith("====="):
             in_server = bool(_SECTION.search(s))
+        rest = out and s and not in_server and not s.startswith("=====") and joined < JOIN_MAX
         # 18d point 8: a line below an open bracket is its rest even when it
         # looks like the runner's own ("[frontier] …" in a server's words) —
-        # never a section's header
-        if (out and s and not in_server and not s.startswith("=====") and joined < JOIN_MAX
-                and out[-1].count("(") > out[-1].count(")")):
+        # never a section's header. 18e point 10: and one that fits in what
+        # is left of the server's words of a reason above, though that closed
+        # its bracket on its first line ("(HTTP 400: A)", then "\n[frontier]
+        # …"): it can't be told from their rest, so it stays in; and one that
+        # closes a bracket it never opened, which a reason's own bracket ended
+        if rest and (out[-1].count("(") > out[-1].count(")") or len(s) < left
+                     or s.count(")") > s.count("(")):
             out[-1] += "\n" + s
             joined += 1
+            left -= len(s) + 1
         else:
             out.append(s)
             joined = 0
+            left = _words_left(s) if not in_server else 0
     return out
 
 

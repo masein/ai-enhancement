@@ -2627,9 +2627,11 @@ def _job_of(r: dict) -> str | None:
 def _halted_batches() -> list[dict]:
     """18d point 5: every batch on OpenRouter that waits for Carry on — each
     one, not each job's newest only (a job's older batch halted stayed
-    without one), and the judge test's: [{id, job, what, line}], newest first"""
+    without one), and the judge test's: [{id, job, what, line}], newest first.
+    18e point 9: of every batch still out, however many came after it — the
+    newest 300 only left an older halted batch with no button, held for good"""
     out = []
-    for r in db.batches_list(300):
+    for r in reversed(db.batches_pending()):
         bid = r["batch_id"]
         if not str(bid).startswith("or_") or r.get("status") != "submitted" \
                 or r["kind"] in _OWN_CARD:

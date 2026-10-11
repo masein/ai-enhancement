@@ -47,7 +47,7 @@ def served(model: str) -> dict:
     why = sv.check_pin(rec)
     if why and not sv.changed(why):
         return {"why": why}                             # its server doesn't answer
-    if why and why.startswith(sv.WINDOW_LINE.split("{", 1)[0]):
+    if why and sv.window_only(why):
         why = ""                                        # the window alone: the runner checks it
     pin = rec.get("pin") or {}
     fs, gp = rec.get("file_sha256") or {}, rec.get("gguf_pin") or {}
