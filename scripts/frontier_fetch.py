@@ -76,7 +76,9 @@ def think_only(said: str) -> bool:
     return bool(why) and all(THINK_REFUSED.search(x) for x in why)
 COMPARE = ["sudo", "docker", "compose", "exec", "-T", "bench", "python",
            "scripts/frontier_parity.py", "compare"]
-_BOX = re.compile(r"(?:(?P<user>[A-Za-z0-9._-]+)@)?(?P<host>[A-Za-z0-9.-]+):(?P<port>\d+)")
+# 18e point 1: and the labels a box runs, one after another (=L1,L2)
+_BOX = re.compile(r"(?:(?P<user>[A-Za-z0-9._-]+)@)?(?P<host>[A-Za-z0-9.-]+):(?P<port>\d+)"
+                  r"(?:=(?P<labels>[A-Za-z]{1,2}\d{1,3}(?:,[A-Za-z]{1,2}\d{1,3})*))?")
 _SHA = re.compile(r"(?P<model>served/[A-Za-z0-9._-]+)=(?P<sha>[0-9a-fA-F]{64})")
 _PARITY = re.compile(r"(?P<model>served/[A-Za-z0-9._-]+)=(?P<path>\S+)")
 LIST_S, COPY_S, IMPORT_S = 120, 1800, 900
@@ -375,7 +377,13 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
     labels = sorted({Path(d).name.rsplit("-", 1)[0] for d in started
                      if fbx.planned(Path(d).name.rsplit("-", 1)[0])}
                     | {str(p["label"]) for p in progress if p.get("label")})
-    who = f"{name} ({', '.join(labels) or 'no label'})"
+    # 18e point 1: the labels this box was given to run, one after another
+    # (host:port=L1,L2) — a label not started yet left no trace, and between
+    # two of them the box read safe on the first alone
+    given = [x.upper() for x in (box["labels"] or "").split(",") if x]
+    waiting = [x for x in given if x not in {lb.upper() for lb in labels}]
+    who = f"{name} ({', '.join(labels) or 'no label'}" + (
+        f"; {', '.join(waiting)} not started" if waiting else "") + ")"
     for p in progress:
         if of(str(p.get("dir"))) not in gone or of(str(p.get("dir"))) in {w[0] for w in writing}:
             lines.append(f"  {progress_words(p)}")
@@ -502,7 +510,7 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
     # 17i: but one abandoned
     for build in sorted({build_of(d) for d in started if build_of(d)}):
         for label in sorted({Path(d).name.rsplit("-", 1)[0] for d in started
-                             if build_of(d) == build}):
+                             if build_of(d) == build} | set(given)):
             for step, spec in fbx.steps_of(label):
                 if f"/workspace/{build}/{step}" not in started and f"{build}/{step}" not in gone:
                     # 18b: a step whose answers the board holds ran elsewhere
@@ -514,7 +522,17 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
                         lines.append(f"  {build}/{step}: imported already from another box — "
                                      "done")
                         continue
-                    problems.append(f"{build} {step} hasn't started")
+                    problems.append(f"{build} {step} hasn't started"
+                                    + (" (its label given for this box)" if label in given
+                                       and label in waiting else ""))
+    # 18e point 1: a box line that hasn't ended (still running, or queued —
+    # a later label's, the next image writes them at its start) isn't done
+    for x in got_lines:
+        lab = str(x.get("box") or "").upper()
+        if str(x.get("state") or "") != "ended" and x.get("build") \
+                and not any(f"{x['build']}/{st}" in gone for st, _ in fbx.steps_of(lab)):
+            problems.append(f"{x['build']} {str(x.get('box') or '?').upper()}'s line is "
+                            f"{x.get('state') or 'not ended'}")
     # and every step on the box, planned or not: whole, and its file home
     now = time.time()
     for d, p in sorted(started.items()):
@@ -733,7 +751,10 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("boxes", nargs="+", help="each box as <host>:<port> (root@ unless "
-                                              "<user>@ is given), as vast.ai's SSH line says")
+                                              "<user>@ is given), as vast.ai's SSH line says — "
+                                              "18e: and =L1,L2, the labels it runs one after "
+                                              "another: safe only once every one is whole and "
+                                              "imported")
     ap.add_argument("--key", required=True, help="your SSH key, e.g. ~/.ssh/id_ed25519")
     ap.add_argument("--sha", action="append", default=[],
                     help="served/<name>=<sha256>: a build's file, as G0 gave it (one each)")
@@ -759,7 +780,12 @@ def main(argv: list[str] | None = None) -> int:
     for b in a.boxes:
         m = _BOX.fullmatch(b.strip())
         if not m:
-            ap.error(f"{b!r}: give a box as <host>:<port>, e.g. 203.0.113.7:41022")
+            ap.error(f"{b!r}: give a box as <host>:<port>, e.g. 203.0.113.7:41022, and the "
+                     "labels it runs after = (203.0.113.7:41022=L1,L2)")
+        import frontier_box as fbx
+        bad = [x for x in (m["labels"] or "").split(",") if x and not fbx.planned(x)]
+        if bad:
+            ap.error(f"{b!r}: {', '.join(bad)} isn't a box of any plan")
         boxes.append(m)
     shas = {}
     for s in a.sha:

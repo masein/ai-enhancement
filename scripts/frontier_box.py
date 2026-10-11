@@ -370,7 +370,11 @@ def listing(plan: str) -> list[str]:
 def parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("box", nargs="?", help="the box: A1 … A9, B1 … B15 (G5)")
+    ap.add_argument("box", nargs="?", help="the box: A1 … A9, B1 … B15 (G5), L1 … L21")
+    ap.add_argument("then", nargs="*", help="18e point 1: more labels, run one after another "
+                                            "on this box (L1 L2): each later one's line is "
+                                            "written \"queued\" at the start, so the fetch "
+                                            "never reads the box done between them")
     ap.add_argument("--list", choices=sorted(PLANS), help="print a plan and stop")
     ap.add_argument("--as", dest="served_as", default="", help="served/<name>, the build's")
     ap.add_argument("--gguf", default="")
@@ -410,28 +414,44 @@ def main(argv: list[str] | None = None) -> int:
                  + (" (or --server-dir)" if "--server" in missing else ""))
     if a.server and a.server_dir:
         ap.error("--server or --server-dir, not both")
-    box = a.box.upper()
-    steps = box_of(box)
+    boxes = [x.upper() for x in [a.box, *(a.then or [])]]
+    for box in boxes:
+        box_of(box)                     # a label of no plan: refused before anything
     # 20: the card first — the plan's build runs on its cards alone
-    why = gpu_refused(box)
-    if why:
-        raise SystemExit(why)
+    for box in dict.fromkeys(boxes):
+        why = gpu_refused(box)
+        if why:
+            raise SystemExit(why)
+    # 18e point 1: every label after the first is queued from the start
+    for box in boxes[1:]:
+        line_state(a, box, "queued")
+    codes = [run_box(a, box) for box in boxes]
+    return 0 if all(c == 0 for c in codes) else 1
+
+
+def line_state(a: argparse.Namespace, box: str, state: str) -> None:
+    """18c point 17: a box line's own state, for the fetch — a step another
+    box imported counts as done here only once this line has ended. 18e: and
+    "queued" for a label waiting its turn on the box"""
+    steps = box_of(box)
+    if not steps:
+        return
+    mark = folder(a, box, 1, steps[0]).parent / f"{box}.line.json"
+    try:
+        mark.parent.mkdir(parents=True, exist_ok=True)
+        mark.write_text(json.dumps({"box": box, "state": state, "at": time.time()}))
+    except OSError:
+        pass
+
+
+def run_box(a: argparse.Namespace, box: str) -> int:
+    """one label's steps, one after the other: 0 when every one is whole"""
+    steps = box_of(box)
     print(f"{box}: {len(steps)} step{'s' if len(steps) > 1 else ''}, about "
           f"{sum(hours(s) for s in steps):.1f} h at the pilot's paces", flush=True)
     if runtime_of(a, box):
         print(fb.runtime_words(runtime_of(a, box)), flush=True)
-    # 18c point 17: the line's own state, for the fetch — a step another box
-    # imported counts as done here only once this line has ended
-    mark = folder(a, box, 1, steps[0]).parent / f"{box}.line.json" if steps else None
-
-    def line_state(state: str) -> None:
-        if mark is not None:
-            try:
-                mark.parent.mkdir(parents=True, exist_ok=True)
-                mark.write_text(json.dumps({"box": box, "state": state, "at": time.time()}))
-            except OSError:
-                pass
-    line_state("running")
+    line_state(a, box, "running")
     ends = []
     for k, step in enumerate(steps, 1):
         out = folder(a, box, k, step)
@@ -463,7 +483,7 @@ def main(argv: list[str] | None = None) -> int:
                   f"{again} of {RUNS}", flush=True)
             code = subprocess.run(cmd).returncode
         ends.append((k, step, code, state_of(out).get("why") or ""))
-    line_state("ended")
+    line_state(a, box, "ended")
     print()
     for k, step, code, why in ends:
         out = folder(a, box, k, step)
@@ -475,7 +495,6 @@ def main(argv: list[str] | None = None) -> int:
                if step[0] == "parity" else " — paste the same line again to carry on")),
             flush=True)
     return 0 if all(code == 0 for _, _, code, _ in ends) else 1
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
