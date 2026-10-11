@@ -19,12 +19,24 @@
 # Docker on this machine (sudo docker when plain docker isn't allowed), and no
 # GPU: nothing is run, only compiled. It fails, saying why, when git can't
 # read the checkout or the build doesn't know its commit.
+#
+# 20: llama-server's web page is left out (-DLLAMA_BUILD_UI=OFF
+# -DLLAMA_USE_PREBUILT_UI=OFF): a box asks its API only, and a branch whose
+# prebuilt page lacks a file (loading.html) failed the build. LLAMA_WEB_UI=1
+# builds it as llama.cpp does. LLAMA_CMAKE_ARGS: more cmake arguments, as
+# typed. LLAMA_CUDA_ARCHS: the architectures (120 alone: the RTX 5090 and the
+# RTX PRO 6000). All three are recorded in VERSION:
+#
+#     LLAMA_CUDA_ARCHS=120 scripts/build_llama_tarball.sh ~/llama.cpp-lda llama-server-lda.tar.gz
 set -euo pipefail
 
 src="${1:?usage: build_llama_tarball.sh <llama.cpp checkout> <out.tar.gz>}"
 out="${2:?usage: build_llama_tarball.sh <llama.cpp checkout> <out.tar.gz>}"
 image="${LLAMA_BUILD_IMAGE:-nvidia/cuda:12.8.1-devel-ubuntu22.04}"
 archs="${LLAMA_CUDA_ARCHS:-80;86;89;90;120}"
+web_args="-DLLAMA_BUILD_UI=OFF -DLLAMA_USE_PREBUILT_UI=OFF"
+[ "${LLAMA_WEB_UI:-0}" = "1" ] && web_args=""
+extra="$(printf '%s %s' "$web_args" "${LLAMA_CMAKE_ARGS:-}" | sed 's/^ *//; s/ *$//')"
 
 src="$(cd "$src" && pwd)"
 [ -f "$src/CMakeLists.txt" ] || { echo "$src isn't a llama.cpp checkout" >&2; exit 1; }
@@ -47,7 +59,7 @@ fi
 # 17b: the server's docker needs sudo; this one, when plain docker isn't allowed
 DOCKER="${DOCKER:-docker}"
 if ! $DOCKER info >/dev/null 2>&1; then DOCKER="sudo docker"; fi
-echo "building llama-server at ${commit:0:12} for sm ${archs} in ${image} ($DOCKER)" >&2
+echo "building llama-server at ${commit:0:12} for sm ${archs} in ${image} ($DOCKER)${extra:+ with $extra}" >&2
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -64,7 +76,7 @@ git config --global --add safe.directory '*'
 # and a rented box's could die of "Illegal instruction"
 cmake -S . -B build-tarball -DGGML_CUDA=ON -DBUILD_SHARED_LIBS=ON -DLLAMA_CURL=OFF \
       -DGGML_NATIVE=OFF -DCMAKE_EXE_LINKER_FLAGS=-Wl,--allow-shlib-undefined \
-      -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES="$ARCHS" >/dev/null
+      -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES="$ARCHS" $EXTRA >/dev/null
 cmake --build build-tarball --target llama-server -j"$(nproc)"
 info=$(find build-tarball -name build-info.cpp -print -quit)
 if [ -z "$info" ] || grep -q 'LLAMA_COMMIT = "unknown"' "$info" || grep -q 'LLAMA_BUILD_NUMBER = 0;' "$info"; then
@@ -100,13 +112,15 @@ nvcc --version | tail -1 > /out/llama/.cuda
 # 17c: llama.cpp's licence travels with it
 cp /build/LICENSE /out/llama/LICENSE
 IN
-$DOCKER run --rm -v "$src":/src:ro -v "$work":/out -e ARCHS="$archs" "$image" bash /out/build.sh
+$DOCKER run --rm -v "$src":/src:ro -v "$work":/out -e ARCHS="$archs" -e EXTRA="$extra" "$image" bash /out/build.sh
 $DOCKER run --rm -v "$work":/out "$image" chown -R "$(id -u):$(id -g)" /out
 {
   echo "commit $commit"
   echo "uncommitted_changes $([ -z "$changes" ] && echo no || echo yes)"
   sed -e 's/^.*LLAMA_BUILD_NUMBER = \([0-9]*\);.*/build \1/' -e 's/^.*LLAMA_COMMIT = "\([^"]*\)";.*/build_commit \1/' "$work/build-info"
   echo "cuda_archs $archs"
+  echo "cmake_args ${extra:-none}"
+  echo "web_ui $([ -z "$web_args" ] && echo yes || echo no)"
   echo "image $image"
   echo "cuda $(cat "$work/llama/.cuda")"
   echo "built $(date -u +%Y-%m-%dT%H:%M:%SZ)"

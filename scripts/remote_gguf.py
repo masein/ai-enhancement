@@ -42,6 +42,15 @@ box shares (--files; a folder "files" beside --out), so the full run after
 the parity check fetches and hashes nothing again. The parity file opens
 with what answered: the file's name, size and sha256, and the launch.
 
+20: --server-dir runs a llama.cpp build directory already on the box (the
+team's lda branch, built there or copied in) in place of a tarball: its
+bin/llama-server, with its own folders on LD_LIBRARY_PATH, refused in one
+line when it isn't there or doesn't run on this box and card. The bundle
+records its --version, the binary's sha256 and its libraries', and the
+commit and branch of a .git near it. --runtime lda-2610 sets a named
+runtime's environment, its server's flags and the sampling every request
+carries (scripts/frontier.py RUNTIMES), each said on the step's line.
+
 The token is typed, never on the command line (where the shell's history
 would keep it):
 
@@ -232,6 +241,270 @@ def unpack_server(tarball: Path, into: Path) -> dict:
     return {"bin": exe, "libs": libs, "root": root, "tarball_sha256": sha}
 
 
+def server_dir(path: str) -> dict:
+    """20: a llama.cpp build directory on this box (--server-dir), as the team
+    builds or copies it: its bin/llama-server, run with the folders holding
+    its shared libraries on LD_LIBRARY_PATH — {bin, libs, root, lib_files,
+    libs_sha256}. Refused in one line when llama-server isn't there"""
+    root = Path(path).expanduser().resolve()
+    exe = next((c for c in (root / "bin" / "llama-server", root / "llama-server")
+                if c.is_file()), None)
+    if exe is None:
+        raise SystemExit(f"--server-dir {path}: no bin/llama-server there — give the llama.cpp "
+                         "build directory, the one holding bin/llama-server and its libraries")
+    if not os.access(exe, os.X_OK):
+        raise SystemExit(f"--server-dir {path}: {exe.relative_to(root)} isn't executable "
+                         f"(chmod +x {exe})")
+    dirs = [exe.parent, *(d for d in (root / "lib", root / "lib64") if d.is_dir())]
+    files: dict[str, str] = {}
+    for d in dirs:
+        for p in sorted(d.glob("*.so*")):
+            real = p.resolve()
+            if real.is_file() and p.name not in files:
+                files[p.name] = rb.sha256_file(real)
+    if not files:
+        raise SystemExit(f"--server-dir {path}: no shared library (*.so) beside "
+                         f"{exe.relative_to(root)} or in lib/ — copy the whole build directory")
+    # one identity for the binary and its libraries: the server's code is in
+    # them as much as in the binary
+    ident = hashlib.sha256("".join(f"{n} {h}\n" for n, h in
+                                   [("llama-server", rb.sha256_file(exe)), *sorted(files.items())])
+                           .encode()).hexdigest()
+    # CUDA's runtime and cuBLAS: the build's own when it carries them, else the
+    # runner image's (torch's CUDA 12.8 packages), after the build's folders
+    cuda = [] if any(n.startswith(("libcudart.so", "libcublas.so")) for n in files) \
+        else cuda_lib_dirs()
+    return {"bin": exe, "libs": [str(d) for d in dirs] + cuda, "root": root, "lib_files": files,
+            "libs_sha256": ident, "cuda_libs": cuda}
+
+
+def cuda_lib_dirs() -> list[str]:
+    """20: the folders of CUDA's runtime and cuBLAS that come with torch in the
+    runner image (its nvidia packages), [] where there are none"""
+    import importlib.util
+    out = []
+    for mod in ("nvidia.cuda_runtime", "nvidia.cublas"):
+        try:
+            spec = importlib.util.find_spec(mod)
+        except (ImportError, ValueError):
+            spec = None
+        for loc in (spec.submodule_search_locations or []) if spec else []:
+            if (Path(loc) / "lib").is_dir():
+                out.append(str(Path(loc) / "lib"))
+    return out
+
+
+def git_files(d: Path) -> dict | None:
+    """the commit and branch a checkout's .git says, read from its files —
+    the runner image has no git"""
+    g = d / ".git"
+    try:
+        if g.is_file():                     # a worktree: "gitdir: <path>"
+            g = (d / g.read_text(encoding="utf-8").split(":", 1)[1].strip()).resolve()
+        head = (g / "HEAD").read_text(encoding="utf-8").strip()
+    except (OSError, IndexError):
+        return None
+    if not head.startswith("ref: "):
+        return {"commit": head or None, "branch": "HEAD"}
+    ref = head[5:].strip()
+    commit = None
+    try:
+        commit = (g / ref).read_text(encoding="utf-8").strip()
+    except OSError:
+        try:
+            for ln in (g / "packed-refs").read_text(encoding="utf-8").splitlines():
+                if ln.endswith(" " + ref):
+                    commit = ln.split()[0]
+        except OSError:
+            pass
+    return {"commit": commit, "branch": ref.removeprefix("refs/heads/")}
+
+
+def git_of(root: Path) -> dict | None:
+    """20: the build's commit and branch, when a .git is near its directory
+    (it, or up to three folders above): {commit, branch, dirty, where} —
+    dirty None when git isn't installed to tell"""
+    for d in (root, *list(root.parents)[:3]):
+        if not (d / ".git").exists():
+            continue
+
+        def git(*args: str) -> str | None:
+            try:
+                r = subprocess.run(["git", "-c", "safe.directory=*", "-C", str(d), *args],
+                                   capture_output=True, text=True, timeout=30)
+            except (OSError, subprocess.SubprocessError):
+                return None
+            return r.stdout.strip() if r.returncode == 0 else None
+        commit = git("rev-parse", "HEAD")
+        if commit is None:
+            got = git_files(d) or {"commit": None, "branch": None}
+            return {**got, "dirty": None, "where": str(d)}
+        return {"commit": commit, "branch": git("rev-parse", "--abbrev-ref", "HEAD"),
+                "dirty": bool(git("status", "--porcelain", "--untracked-files=no")),
+                "where": str(d)}
+    return None
+
+
+def compute_cap() -> int | None:
+    """the first card's CUDA compute capability as a number: 12.0 is 120"""
+    try:
+        out = subprocess.run(["nvidia-smi", "--query-gpu=compute_cap",
+                              "--format=csv,noheader"], capture_output=True, text=True,
+                             timeout=30).stdout.split()
+        major, _, minor = out[0].partition(".")
+        return int(major) * 10 + int(minor or 0)
+    except (OSError, IndexError, ValueError, subprocess.SubprocessError):
+        return None
+
+
+def version_file(root: Path) -> dict:
+    """a build packed as build_llama_tarball.sh packs one: its VERSION file's
+    lines (commit, uncommitted_changes, build, cuda_archs, …), {} when none"""
+    try:
+        text = (root / "VERSION").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return {}
+    out = {}
+    for ln in text.splitlines():
+        k, _, v = ln.strip().partition(" ")
+        if re.fullmatch(r"[a-z_]{1,40}", k) and v:
+            out[k] = v.strip()[:200]
+    return out
+
+
+def cuda_archs(root: Path) -> list[str] | None:
+    """the CUDA architectures the build was configured for (its
+    CMakeCache.txt, or a packed build's VERSION), None when neither says"""
+    try:
+        text = (root / "CMakeCache.txt").read_text(encoding="utf-8", errors="replace")
+        m = re.search(r"(?m)^CMAKE_CUDA_ARCHITECTURES:[A-Z]+=(.*)$", text)
+        got = m.group(1) if m else ""
+    except OSError:
+        got = version_file(root).get("cuda_archs") or ""
+    return [x for x in re.split(r"[;,\s]+", got) if x] or None
+
+
+def archs_run_on(archs: list[str], cap: int) -> bool | None:
+    """True when code built for `archs` runs on a card of compute capability
+    `cap` — its own code, or PTX from an older one the driver compiles; None
+    when the list can't tell (native, all)"""
+    ok = False
+    for a in archs:
+        m = re.fullmatch(r"(\d+)([af]?)(?:-(real|virtual))?", a.strip())
+        if not m:
+            return None
+        n, special, kind = int(m[1]), m[2], m[3]
+        if n == cap and kind != "virtual":
+            ok = True
+        if not special and kind != "real" and n <= cap:
+            ok = True
+    return ok
+
+
+def check_runs_here(srv: dict, env: dict, say) -> dict:
+    """20: --server-dir's llama-server runs on this box and this card — its
+    --version answers, it lists a CUDA device, and the architectures it was
+    built for (its CMakeCache.txt) hold this card's. Refused in one line;
+    {version, devices, cuda_archs, compute_cap} when it does"""
+    exe, where = srv["bin"], srv["root"]
+
+    def first_line(text: str) -> str:
+        lines = [x.strip() for x in text.splitlines() if x.strip()]
+        bad = next((x for x in lines if re.search(r"(?i)error|cannot|failed|not found|"
+                                                  r"insufficient|no cuda", x)), None)
+        return rb.scrub(bad or (lines[0] if lines else "it printed nothing"))[:300]
+    try:
+        r = subprocess.run([str(exe), "--version"], capture_output=True, text=True, timeout=60,
+                           env=env)
+    except (OSError, subprocess.SubprocessError) as e:
+        raise SystemExit(f"--server-dir {where}: llama-server doesn't run here: {e}") from None
+    text = (r.stdout + r.stderr).strip()
+    if r.returncode != 0 or not re.search(r"version:\s*\d+", text):
+        raise SystemExit(f"--server-dir {where}: llama-server doesn't run here (exit "
+                         f"{r.returncode}): {first_line(text)}")
+    devices = None
+    try:
+        r = subprocess.run([str(exe), "--list-devices"], capture_output=True, text=True,
+                           timeout=120, env=env)
+        listed = (r.stdout + r.stderr)
+        devices = re.findall(r"(?m)^\s*(CUDA\d+):\s*(.+?)\s*$", listed)
+        if not devices and re.search(r"(?i)available devices", listed):
+            raise SystemExit(f"--server-dir {where}: llama-server sees no CUDA device on this "
+                             f"box — {first_line(listed)}: a build without CUDA, or a driver "
+                             "older than the CUDA it was built with")
+        if not devices and r.returncode != 0 and not re.search(r"(?i)invalid argument|unknown "
+                                                               r"argument|usage", listed):
+            raise SystemExit(f"--server-dir {where}: llama-server can't list this box's devices "
+                             f"(exit {r.returncode}): {first_line(listed)}")
+    except (OSError, subprocess.SubprocessError):
+        devices = None
+    cap, archs = compute_cap(), cuda_archs(where)
+    if cap and archs:
+        fits = archs_run_on(archs, cap)
+        if fits is False:
+            raise SystemExit(f"--server-dir {where}: built for CUDA architectures "
+                             f"{';'.join(archs)} (its CMakeCache.txt), and this card is "
+                             f"{cap // 10}.{cap % 10} (sm_{cap}): it won't run here — build "
+                             f"with -DCMAKE_CUDA_ARCHITECTURES={cap} (docs/STEP4000-RUN.md)")
+    say(f"--server-dir {where}: llama-server runs here"
+        + (f" · sees {', '.join(f'{d} {n}' for d, n in devices)}" if devices else "")
+        + (f" · built for {';'.join(archs)}" if archs else
+           " · its CUDA architectures not said (no CMakeCache.txt or VERSION): checked when it "
+           "loads")
+        + (f", this card sm_{cap}" if cap else ""))
+    return {"devices": [f"{d}: {n}" for d, n in devices or []], "cuda_archs": archs,
+            "compute_cap": cap}
+
+
+def parse_pins(given: list[str]) -> dict[str, str]:
+    """20: --pin NAME=SHA256 — a file this box fetches or is given, by its
+    name, and the sha256 it must have"""
+    out = {}
+    for x in given or []:
+        name, _, sha = x.partition("=")
+        if not name or "/" in name or not re.fullmatch(r"[0-9a-f]{64}", sha.strip().lower()):
+            raise SystemExit(f"--pin {x!r}: NAME=SHA256, a file's name and its 64-hex sha256")
+        out[name.strip()] = sha.strip().lower()
+    return out
+
+
+def pin_refused(name: str, sha: str, pins: dict) -> str:
+    """'' when `name` has no pin or its sha256 is the pinned one; else why"""
+    want = pins.get(name)
+    if not want or want == sha:
+        return ""
+    return (f"{name} here has sha256 {sha[:16]}…, not the {want[:16]}… pinned for it (--pin): "
+            "another file under that name — nothing was asked")
+
+
+def build_reads(srv: dict, names: list[str]) -> list[str]:
+    """20: the variables of `names` that llama-server and its libraries never
+    mention — a runtime's variable a build doesn't read does nothing, and the
+    run would say it ran with it. Its own libraries first (the lda branch's
+    LOOKAHEAD_MOE_ROUTER_NORM is in libllama.so)"""
+    files = [Path(srv["bin"])]
+    own = [Path(d) for d in srv["libs"] if Path(d).is_relative_to(Path(srv["root"]))]
+    libs = sorted({p.resolve() for d in own for p in d.glob("*.so*") if p.is_file()},
+                  key=lambda p: (not p.name.startswith("libllama"), p.stat().st_size))
+    left = list(names)
+    for f in [*files, *libs]:
+        if not left:
+            break
+        try:
+            with open(f, "rb") as fh:
+                tail = b""
+                while left:
+                    chunk = fh.read(8 * 1024 ** 2)
+                    if not chunk:
+                        break
+                    blob = tail + chunk
+                    left = [n for n in left if n.encode() not in blob]
+                    tail = blob[-256:]
+        except OSError:
+            continue
+    return left
+
+
 # ---------------------------------------------------------------------------
 # llama-server
 # ---------------------------------------------------------------------------
@@ -253,7 +526,8 @@ def own_flags(flags: list[str]) -> list[str]:
 # 17c: llama-server's own variables reach it from --env only, so every one it
 # gets is recorded and pinned — one exported in the box's shell reached it
 # unrecorded, and a resume mixed two setups
-SERVER_VARS = ("LLAMA_", "GGML_")
+# 20: and the lda runtime's LOOKAHEAD_*, which changes its routing
+SERVER_VARS = ("LLAMA_", "GGML_", "LOOKAHEAD_")
 
 
 # 17c: what G1's table fits beside the 23 GB file on a 32 GB card, the KV
@@ -534,7 +808,8 @@ def startup_log(path: Path, limit: int = 400) -> str:
 # ---------------------------------------------------------------------------
 
 def register_here(served_as: str, name: str, based_on: str, base: str, thinking: bool,
-                  how: str, flags: list[str] | None = None, env: dict | None = None) -> dict:
+                  how: str, flags: list[str] | None = None, env: dict | None = None,
+                  runtime: str | None = None) -> dict:
     """the served model, in this box's own database, as the board keeps one —
     17b: with the launch it was given, which each task's setup records"""
     from service import db, served
@@ -545,7 +820,9 @@ def register_here(served_as: str, name: str, based_on: str, base: str, thinking:
            "pin": served.pin_of(p), "answered": p["answered"], "by": "remote_gguf.py",
            "at": time.time(), "flags": shlex.join(flags or []),
            "env": " ".join(f"{k}={v}" for k, v in sorted((env or {}).items())),
-           "speculative": p.get("speculative")}
+           "speculative": p.get("speculative"),
+           # 20: its runtime, whose sampling each request carries
+           **({"runtime": runtime} if runtime else {})}
     db.served_put(rec)
     served.write_meta(rec)
     return rec
@@ -603,6 +880,7 @@ def make_bundle(out: Path, served_as: str, thinking: bool, tasks: list[str], sta
                   "switch": s.get("chat_template_kwargs"),
                   **(done.get(t) or {}), **({"incomplete": True} if t in incomplete else {})}
     setup = {"suite": SUITE, "protocol": fb.VERSION, "served_as": served_as,
+             **({"runtime": rec["runtime"]} if rec.get("runtime") else {}),
              "based_on": rec.get("based_on") or "", "thinking": "on" if thinking else "off",
              "gguf": gguf, "server": server, "tasks": per, "gpu": rb.gpu_info(),
              "where": WHERE, "runner": "service/runner.py → service/frontier.py, called directly",
@@ -714,8 +992,18 @@ def _main(argv: list[str] | None = None) -> int:
                          "(served/<name>): its registered file must be this GGUF")
     ap.add_argument("--gguf", required=True, help="hf://<org>/<repo>[@<rev>]/<file>.gguf, or a "
                                                   "path on this box")
-    ap.add_argument("--server", required=True,
-                    help="the llama-server tarball (build_llama_tarball.sh): hf://… or a path")
+    src = ap.add_mutually_exclusive_group(required=True)
+    src.add_argument("--server",
+                     help="the llama-server tarball (build_llama_tarball.sh): hf://… or a path")
+    src.add_argument("--server-dir",
+                     help="20: a llama.cpp build directory on this box (its bin/llama-server "
+                          "and libraries), run as it is")
+    ap.add_argument("--pin", action="append", default=[],
+                    help="20: NAME=SHA256 — the sha256 a file of that name must have (the "
+                         "GGUF, each of its parts, the tarball); another is refused")
+    ap.add_argument("--runtime", choices=sorted(fb.RUNTIMES),
+                    help="20: a named runtime — its environment, its server's flags and the "
+                         "sampling each request carries (scripts/frontier.py RUNTIMES)")
     ap.add_argument("--based-on", default="", help="the model it is a GGUF of, as the board "
                                                    "registers it (Qwen/Qwen3.6-35B-A3B): it "
                                                    "picks the model card's sampling")
@@ -768,6 +1056,29 @@ def _main(argv: list[str] | None = None) -> int:
     if own_flags(flags):
         ap.error(f"--flags: {', '.join(own_flags(flags))} are set by this script")
     extra_env = parse_env(a.env)
+    pins = parse_pins(a.pin)
+    if a.runtime:
+        # 20: the runtime's environment and flags, nothing typed beside them
+        # that would change what it is
+        rt = fb.RUNTIMES[a.runtime]
+        if a.thinking not in rt["thinking"]:
+            ap.error(f"--runtime {a.runtime} asks thinking {' or '.join(rt['thinking'])} only")
+        if a.parity:
+            ap.error(f"--runtime {a.runtime}: no parity questions (they ask thinking off)")
+        names = {f.split("=", 1)[0] for f in flags}
+        theirs = {x for x in fb.runtime_flags(a.runtime) if x.startswith("-")} | {
+            "-fa", "--cache-type-k", "--cache-type-v", "--sampling-seq", "--samplers"}
+        refused = sorted(n for n in names if fb.RUNTIME_REFUSES.match(n) or n in theirs)
+        if refused:
+            ap.error(f"--flags: {', '.join(refused)} — runtime {a.runtime} sets the cache, "
+                     "flash attention and the sampling, and runs no speculative decoding, no "
+                     "reasoning budget and no --moe-stream")
+        clash = sorted(k for k in extra_env if k in rt["env"] or re.match(
+            r"^LLAMA_ARG_\w*(DRAFT|SPEC|REASONING|SAMPL|TEMP|TOP_|MIN_P|PENALTY|REPEAT)", k))
+        if clash:
+            ap.error(f"--env: {', '.join(clash)} — runtime {a.runtime} sets its own")
+        extra_env = {**rt["env"], **extra_env}
+        flags = fb.runtime_flags(a.runtime) + flags
     out = Path(a.out).resolve()
     thinking = a.thinking == "on"
     STEP["out"] = out
@@ -792,7 +1103,7 @@ def _main(argv: list[str] | None = None) -> int:
     card = rb.gpu_info()
     in_use = int(card.get("memory_used_mib") or 0)
     mem = (card["memory_mib"] - in_use) if card.get("memory_mib") else None
-    fit, unread = kv_fit(a.gguf, shlex.split(a.flags), a.slots, ctx, mem)
+    fit, unread = kv_fit(a.gguf, flags, a.slots, ctx, mem)
     big = max(tasks, key=lambda t: fb.slot_context([t], thinking))
     # 17f: a step planned at 8 slots runs what the card holds, down to
     # --min-slots, and says so (HLE's 86,016 with thinking on: 7 on a 5090)
@@ -800,7 +1111,7 @@ def _main(argv: list[str] | None = None) -> int:
     if fit and a.min_slots and a.min_slots <= fit["fit"] < a.slots and not a.slots_fit:
         dropped = (a.slots, fit)
         a.slots = fit["fit"]
-        fit, unread = kv_fit(a.gguf, shlex.split(a.flags), a.slots, ctx, mem)
+        fit, unread = kv_fit(a.gguf, flags, a.slots, ctx, mem)
     if fit and fit["fit"] < a.slots and not a.slots_fit:
         gb = 1024 ** 3
         raise SystemExit(
@@ -849,6 +1160,10 @@ def _main(argv: list[str] | None = None) -> int:
     paths = [fetch(src, files, say) for src in split_parts(a.gguf)]
     gguf_path = paths[0]
     shas = [sha256_cached(x, state, say, files / "sha256.json") for x in paths]
+    for x, h in zip(paths, shas):                      # 20: a pinned file is that file
+        why = pin_refused(x.name, h, pins)
+        if why:
+            raise SystemExit(why)
     sha = shas[0] if len(paths) == 1 else split_sha(
         [(x.name, h) for x, h in zip(paths, shas)])
     # 17c: pinned once an answer is written — a first launch that failed (a
@@ -861,12 +1176,48 @@ def _main(argv: list[str] | None = None) -> int:
             "source": a.gguf if a.gguf.startswith("hf://") else "a path on the box",
             **({"parts": [{"name": x.name, "sha256": h, "size": x.stat().st_size}
                           for x, h in zip(paths, shas)]} if len(paths) > 1 else {})}
-    tb = fetch(a.server, files, say)
-    srv = unpack_server(tb, out / "server")
-    env = server_env(srv, extra_env)
+    if a.server_dir:
+        # 20: the team's build directory, run as it is — checked to run on this
+        # box and card before anything else
+        srv = server_dir(a.server_dir)
+        env = server_env(srv, extra_env)
+        ran = check_runs_here(srv, env, say)
+    else:
+        tb = fetch(a.server, files, say)
+        srv = unpack_server(tb, out / "server")
+        why = pin_refused(tb.name, srv["tarball_sha256"], pins)
+        if why:
+            raise SystemExit(why)
+        env = server_env(srv, extra_env)
+        ran = None
+        # 20: a tarball built for some cards only (its VERSION's cuda_archs:
+        # the lda tarball's is 120) is refused on another, before it loads
+        archs, cap = cuda_archs(srv["bin"].parent.parent), compute_cap()
+        if archs and cap and archs_run_on(archs, cap) is False:
+            raise SystemExit(f"{tb.name} is built for CUDA architectures {';'.join(archs)} (its "
+                             f"VERSION), and this card is sm_{cap}: it won't run here — rent "
+                             "a card it was built for. Nothing was asked")
+    if a.runtime:
+        # 20: the runtime's variables are read by this build, or it isn't the
+        # build the runtime is for
+        unread = build_reads(srv, list(fb.RUNTIMES[a.runtime]["env"]))
+        if unread:
+            raise SystemExit(f"runtime {a.runtime} sets {', '.join(unread)}, and this build "
+                             "(llama-server and its libraries) never reads it: not the "
+                             "build the runtime is for? Nothing was asked")
     ver = version_of(srv["bin"], env)
     server = {"version": ver["text"], "build": ver["build"], "commit": ver["commit"],
-              "binary_sha256": rb.sha256_file(srv["bin"]), "tarball_sha256": srv["tarball_sha256"],
+              "binary_sha256": rb.sha256_file(srv["bin"]),
+              "tarball_sha256": srv.get("tarball_sha256"),
+              **({"libs_sha256": srv["libs_sha256"],
+                  "dir": {"path": str(srv["root"]), "libs": srv["lib_files"],
+                          "git": git_of(srv["root"]),
+                          "cuda_libs": ("the runner image's (torch's nvidia packages)"
+                                        if srv["cuda_libs"] else "the build's own, or the box's"),
+                          **({"version_file": version_file(srv["root"])}
+                             if version_file(srv["root"]) else {}),
+                          **(ran or {})}} if a.server_dir else {}),
+              **({"runtime": a.runtime} if a.runtime else {}),
               "flags": flags, "env": extra_env, "slots": a.slots, "slot_context": ctx,
               "argv": ["llama-server", "-m", gguf["name"], "--host", "127.0.0.1", "--port",
                        str(a.port), "-c", str(ctx * a.slots), "-np", str(a.slots), "-ngl", "99",
@@ -874,7 +1225,10 @@ def _main(argv: list[str] | None = None) -> int:
     # 17b: one build, one launch in this --out: a resume with another binary,
     # other flags or another environment would mix two setups' answers
     setup = {"binary_sha256": server["binary_sha256"], "commit": ver["commit"],
-             "build": ver["build"], "flags": flags, "env": extra_env}
+             "build": ver["build"], "flags": flags, "env": extra_env,
+             # 20: a build directory's libraries, and the runtime, pinned too
+             **({"libs_sha256": server["libs_sha256"]} if a.server_dir else {}),
+             **({"runtime": a.runtime} if a.runtime else {})}
     if pinned and state.get("setup") and state["setup"] != setup:
         was = state["setup"]
         diff = [k for k in setup if setup[k] != was.get(k)]
@@ -932,6 +1286,19 @@ def _main(argv: list[str] | None = None) -> int:
     say(f"{gguf['name']} · {gguf['size'] / 1e9:.1f} GB · sha256 {sha[:16]} · llama.cpp "
         f"{ver['build'] or '?'} ({ver['commit'] or '?'}) · GPU {gpu.get('name') or 'unknown'} · "
         f"{a.slots} slots of {ctx:,} tokens")
+    if a.server_dir:
+        g = server["dir"]["git"]
+        say(f"the build: {server['dir']['path']} · llama-server sha256 "
+            f"{server['binary_sha256'][:16]} · with its {len(srv['lib_files'])} libraries "
+            f"{srv['libs_sha256'][:16]} · "
+            + (f"git {g['branch'] or '?'} at {(g['commit'] or '?')[:12]}"
+               + (" (with changes not committed)" if g.get("dirty") else "")
+               if g else f"its VERSION file: commit "
+               f"{server['dir']['version_file'].get('commit', '?')[:12]}"
+               if server["dir"].get("version_file") else "no .git near it, and no VERSION"))
+    if a.runtime:
+        # 20: the runtime's every value said, the repeat penalty among them
+        say(fb.runtime_words(a.runtime))
 
     # the questions, fetched before the GPU is spent: a gated set needs HF_TOKEN
     from service import config
@@ -968,7 +1335,7 @@ def _main(argv: list[str] | None = None) -> int:
         rec = register_here(a.served_as, a.served_as.split("/", 1)[1], a.based_on,
                             srv_proc.base, thinking,
                             f"llama.cpp {ver['build'] or '?'} on {gpu.get('name') or 'a GPU'}: "
-                            + " ".join(server["argv"]), flags, extra_env)
+                            + " ".join(server["argv"]), flags, extra_env, a.runtime)
         if a.parity:
             from service import frontier as sf
             dest = out / "parity.jsonl"

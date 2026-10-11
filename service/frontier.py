@@ -86,6 +86,11 @@ def settings(rec: dict, task: str, on: bool) -> dict:
     spec = fb.BENCH[task]
     s = {"max_tokens": spec["budget"]["on" if on else "off"],
          **fb.sampling(family_of(rec), on)}
+    # 20: a model served with a named runtime is asked with its sampling, in
+    # each request as well as the server's defaults (min-p among them)
+    rt = fb.RUNTIMES.get(rec.get("runtime") or "")
+    if rt:
+        s.update(rt["sampling"])
     if not served.is_openrouter(rec):
         s["chat_template_kwargs"] = {"enable_thinking": bool(on)}
     return s
@@ -110,6 +115,7 @@ def _setup(rec: dict, task: str, on: bool, s: dict) -> dict:
         "budget": s["max_tokens"], "family": family_of(rec) or "server defaults",
         "sampling": {k: v for k, v in s.items() if k not in ("max_tokens",
                                                             "chat_template_kwargs")},
+        **({"runtime": rec["runtime"]} if rec.get("runtime") else {}),
         "where": _where(), "file": pin.get("file") or "",
         # 17b: what its server serves, and how it was launched
         "server": {"file": pin.get("file") or "", "size": pin.get("size"),
