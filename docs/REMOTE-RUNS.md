@@ -1265,6 +1265,23 @@ sha256 and identity on `served/Qwen3.6-35B-A3B-Q4-original-k-8`'s and
    fetched), then prints the runtime's every value, the file and the build
    (each checked against its pin), the memory, then asks. The last lines say how each step ended; if the box
    stops, paste the same line again.
+
+   **Two labels on one box**, one after the other. On image `9310719` (the
+   boxes running now), one line in a loop — L2 starts when L1 ends:
+
+   ```bash
+   for b in L1 L2; do python scripts/frontier_box.py $b --as served/step4000-lda-2610 --gguf hf://<you>/evalboard-private/step4000.gguf --server hf://<you>/evalboard-private/llama-server-lda-a4a76a7.tar.gz; done
+   ```
+
+   On an image after 18e, the labels in one line — each later label's line
+   file reads "queued" from the start, so the fetch never reads the box done
+   between them:
+
+   ```bash
+   python scripts/frontier_box.py L1 L2 --as served/step4000-lda-2610 --gguf hf://<you>/evalboard-private/step4000.gguf --server hf://<you>/evalboard-private/llama-server-lda-a4a76a7.tar.gz
+   ```
+
+   Either way, give the fetch the box's labels (L3: `<host>:<port>=L1,L2`).
 5. Once every step reads whole, the scores by code, and each file's sha256
    as the box hashed it:
 
@@ -1278,7 +1295,9 @@ sha256 and identity on `served/Qwen3.6-35B-A3B-Q4-original-k-8`'s and
    4: 198 of its 792 …) · 12 ran out of room (6.1%), 9 of them ending in a
    loop". MATH and OTIS are the code's score, the board's before Epoch's
    model check; HLE and SimpleQA show their answers, ran out and loops only.
-6. Destroy the box once the fetch says it is safe to destroy (L3).
+6. Destroy the box once the fetch says it is safe to destroy (L3), the box
+   given with every label it runs (`<host>:<port>=L1,L2`): between two labels
+   a box given without them reads safe on the first alone.
 
 **The three models side by side**, on any box once their bundles are in the
 private repository (L4; the questions are fetched into
@@ -1293,11 +1312,21 @@ loop, and each model's difference from the first question by question.
 
 ## L3. Fetch and import, from the server (once 18d is deployed)
 
-The fetch of G3–G4, with the three models' sha256 from L0 and every box:
+The fetch of G3–G4, with the three models' sha256 from L0 and every box,
+**each with the labels it runs** after `=` (18e: a box that runs two, one
+after the other, read "safe to destroy" in the seconds between them when
+given alone):
 
 ```bash
-cd ~/benchmarks/aienh && python3 scripts/frontier_fetch.py --key ~/.ssh/id_ed25519 --sha served/step4000-lda-2610=630c408a3836f82afa1f79629b06d9390d3f736f6140791baa42e180a640565e --sha served/Qwen3.6-35B-A3B-Q4-lda-2610=55983c5a75a1ab969824077b3bb3de4146e82a9234072b48ad4e8f92ad3fe9f1 --sha served/Qwen3.6-35B-A3B-BF16-lda-2610=f391f702c4ad97282bf9a9babb494f2639322ff7d17ae28f54237fe00e715ca2 --every 3m <host 1>:<port 1> <host 2>:<port 2>
+cd ~/benchmarks/aienh && python3 scripts/frontier_fetch.py --key ~/.ssh/id_ed25519 --sha served/step4000-lda-2610=630c408a3836f82afa1f79629b06d9390d3f736f6140791baa42e180a640565e --sha served/Qwen3.6-35B-A3B-Q4-lda-2610=55983c5a75a1ab969824077b3bb3de4146e82a9234072b48ad4e8f92ad3fe9f1 --sha served/Qwen3.6-35B-A3B-BF16-lda-2610=f391f702c4ad97282bf9a9babb494f2639322ff7d17ae28f54237fe00e715ca2 --every 3m <host 1>:<port 1>=L1,L2 <host 2>:<port 2>=L3,L4 <host 3>:<port 3>=L5
 ```
+
+A box is safe to destroy only once every label given for it is whole and
+imported; its first line names the labels it found and those not started
+yet ("203.0.113.7:41022 (L1; L2 not started): NOT safe to destroy — …"), and
+any of its box lines not "ended" keeps it not safe. A label of no plan is
+refused before anything is fetched. A box given without `=` reads its labels
+from what it holds, as before.
 
 The board doesn't serve the three models yet, so each one's first bundle
 comes home and the fetch prints the line to import it by hand, every round,
