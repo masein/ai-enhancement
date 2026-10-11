@@ -35,6 +35,8 @@ def test_the_cases_0abb757_got_wrong_are_the_files_own():
     assert len([c for c in CASES["cases"] if c.get("added_in") == "18b"]) == 8
     # 18d point 3: six more, the lone verdict's
     assert len([c for c in CASES["cases"] if c.get("added_in") == "18d"]) == 6
+    # 18e point 4: six more, a '>' before the verdict (an arrow, a quote)
+    assert len([c for c in CASES["cases"] if c.get("added_in") == "18e"]) == 6
     for name in ("wrong_grade_on_0abb757", "unread_on_0abb757"):
         assert set(CASES[name]) <= ids, name
     assert len(CASES["wrong_grade_on_0abb757"]) == 9 and len(CASES["unread_on_0abb757"]) == 14

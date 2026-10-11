@@ -230,10 +230,10 @@ def test_6_the_check_says_what_scoring_will_write(svc, capsys):  # noqa: F811
     out = capsys.readouterr().out
     lines = out.strip().splitlines()
     math = next(x for x in lines if "MATH Level 5" in x)
-    assert math.startswith(f"{ROW} · MATH Level 5: stored 50.0% → 25.0%"), math   # 0b58df7: 50%
+    assert math.startswith(f"MOVES {ROW} · MATH Level 5: stored 50.0% → 25.0%"), math  # 0b58df7: 50%
     assert "2 answers wait for Epoch's model check, paid at the next Start" in math
-    assert next(x for x in lines if "SimpleQA" in x) == f"{ROW} · SimpleQA Verified: stored " \
-        "50.0% · stays"                                        # every row, moving or not
+    assert next(x for x in lines if "SimpleQA" in x) == f"STAYS {ROW} · SimpleQA Verified: " \
+        "stored 50.0%"                                         # every row, moving or not
     assert lines[-1] == ("1 of 2 stored Frontier scores change the next time they are scored "
                          f"({fb.VERSION}); 2 answers wait for Epoch's model check, paid at the "
                          "next Start; nothing was written")

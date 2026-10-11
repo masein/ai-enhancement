@@ -1000,6 +1000,14 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             shutil.move(str(sf.task_dir(staging, t)), str(dest))
             if before:
                 sf.set_before(dest, t, before)
+            elif shown and shown.get("score") is not None and new is None \
+                    and not list(dest.glob("results_*.json")):
+                # 18e point 2: its answers wait for a grader — the score the
+                # page showed kept, and said; the landing grade says what
+                # replaced it ("X → Y", and "was" on the cell)
+                (dest / sf.REPLACED).write_text(json.dumps(shown), encoding="utf-8")
+                lines.append(f"{t}: its score {sf.score_words(shown['score'])} is withdrawn "
+                             "until the new answers' grades land, which say what replaced it")
             reg.setdefault("tasks", {})[t] = entry
             if scored.get(t):
                 words.append(sf.words(t, scored[t]))
