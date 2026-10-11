@@ -35,8 +35,11 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import math
+import os
 import platform
 import shlex
+import stat
 import sys
 import threading
 import time
@@ -519,3 +522,98 @@ class HostMini(BaseAgent):  # type: ignore[misc,valid-type]
 
     def populate_context_post_run(self, context) -> None:
         return None
+
+
+# ---------------------------------------------------------------------------
+# 18d point 14: the reward file, read on the host
+# ---------------------------------------------------------------------------
+
+# Harbor reads a task's reward.json, else reward.txt, on the host after
+# test.sh ran the model's code — following links, with no cap: a reward.json
+# linked to a host file quoted its first value into result.json and the job's
+# log, and a sparse 150 GB reward.txt could get Harbor killed for memory. Read
+# here instead: no link followed, a regular file with one link, 64 bytes at
+# most; anything else reads as empty. Patched when this module is imported —
+# in Harbor's process, for every verifier (DeepSWE's own too)
+REWARD_CAP = 64
+# the one reward file a benchmark writes, when it writes one only (SWE-bench
+# Multilingual: reward.txt) — the other is never read
+REWARD_ONLY = "EVALBOARD_REWARD_FILE"
+
+
+def safe_read(directory: Path, name: str, cap: int = REWARD_CAP) -> str:
+    """the file `name` in `directory` — '' when it isn't a regular file with
+    one link and at most `cap` bytes: a link (never followed), a FIFO or a
+    device (never waited on), a hard link, a larger file"""
+    if "/" in name or name in ("", ".", ".."):
+        return ""
+    try:
+        dfd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    except OSError:
+        return ""
+    try:
+        fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dfd)
+    except OSError:
+        return ""
+    finally:
+        os.close(dfd)
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1 or st.st_size > cap:
+            return ""
+        data = os.read(fd, cap + 1)
+        return "" if len(data) > cap else data.decode("utf-8", "replace")
+    finally:
+        os.close(fd)
+
+
+def _reward(raw: str, path) -> float:
+    """one reward from its text — refused without quoting it"""
+    from harbor.verifier import verifier as hv
+    try:
+        value = float(raw)
+    except (ValueError, TypeError) as e:
+        raise hv.VerifierOutputParseError(f"Failed to parse the reward in {path}") from e
+    if not math.isfinite(value):
+        raise hv.VerifierOutputParseError(f"Non-finite reward in {path}")
+    return value
+
+
+def patch_reward_reading() -> bool:
+    """Harbor's Verifier reads its reward files through safe_read; False
+    where Harbor isn't installed (the Mac, CI)"""
+    try:
+        from harbor.verifier import verifier as hv
+    except Exception:                                   # noqa: BLE001 — not in Harbor's process
+        return False
+
+    def text(self) -> dict:
+        path = self.trial_paths.reward_text_path
+        raw = safe_read(Path(path).parent, Path(path).name)
+        if not raw.strip():
+            raise hv.RewardFileEmptyError(f"Reward file is empty at {path}, or not a plain file")
+        return {"reward": _reward(raw.strip(), path)}
+
+    def as_json(self) -> dict:
+        if os.environ.get(REWARD_ONLY) == "reward.txt":
+            return text(self)           # Multilingual's: a reward.json is never read
+        path = self.trial_paths.reward_json_path
+        raw = safe_read(Path(path).parent, Path(path).name)
+        if not raw.strip():
+            raise hv.RewardFileEmptyError(f"Reward file is empty at {path}, or not a plain file")
+        try:
+            rewards = json.loads(raw)
+        except (ValueError, TypeError) as e:
+            raise hv.VerifierOutputParseError(f"Failed to parse rewards from {path}") from e
+        values = rewards.values() if isinstance(rewards, dict) else [rewards]
+        for v in values:
+            if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
+                raise hv.VerifierOutputParseError(f"A reward in {path} isn't a finite number")
+        return rewards
+
+    hv.Verifier._parse_reward_text = text
+    hv.Verifier._parse_reward_json = as_json
+    return True
+
+
+patch_reward_reading()

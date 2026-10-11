@@ -65,6 +65,7 @@ import agent_bench as ab  # noqa: E402
 BOARD = ["docker", "compose", "exec", "-T", "bench", "python", "scripts/import_agent.py"]
 MAX_REPLY = 32_768                      # the relay's cap on a reply (agent_relay.MAX_REPLY_TOKENS)
 TRIES = 3                               # an error of ours is asked again this many times
+DOWN_TRIES = 2                          # 18d point 18: the server down on a task, given up after
 EVERY_S = 180
 
 
@@ -106,13 +107,17 @@ def harbor_line() -> str:
             "venv's python, ~/agent-venv/bin/python (docs/AGENT-RUNS.md § A)")
 
 
-def job_env() -> dict:
+def job_env(b: dict | None = None) -> dict:
     """a Harbor job's environment: the venv's bin first on PATH, so what
     Harbor runs by name is the venv's too, and this folder on PYTHONPATH for
-    the host agent"""
+    the host agent — 18d point 14: and the one reward file a benchmark
+    writes, when it writes one only (agent_host_mini.REWARD_ONLY)"""
     path = os.environ.get("PATH", "")
-    return {**os.environ, "PATH": str(venv_bin()) + (os.pathsep + path if path else ""),
-            "PYTHONPATH": f"{HERE}:{os.environ.get('PYTHONPATH', '')}"}
+    env = {k: v for k, v in os.environ.items() if k != "EVALBOARD_REWARD_FILE"}
+    return {**env, "PATH": str(venv_bin()) + (os.pathsep + path if path else ""),
+            "PYTHONPATH": f"{HERE}:{os.environ.get('PYTHONPATH', '')}",
+            **({"EVALBOARD_REWARD_FILE": b["reward_file"]} if (b or {}).get("reward_file")
+               else {})}
 
 
 # ---------------------------------------------------------------------------
@@ -150,11 +155,13 @@ def run_dir(root: Path, name: str, model: str, attempts: int, oracle: bool,
 
 # what a run is, which never changes once it started (18b point 12): 18c
 # point 8 adds the reply's cap, the container's override and the runner's
-# own commit and files — a `git pull` that changes how a task is run or
-# verified starts another run (--run N+1), never rolls a pilot into it
+# own files — a `git pull` that changes how a task is run or verified starts
+# another run (--run N+1), never rolls a pilot into it. 18d point 10: the
+# runner's files, not its commit — any pull (a board deploy) changed the
+# commit, refused every resume, and locked the oracle and the full run out
 SETTINGS = ("benchmark", "dataset", "pin", "tasks_sha256", "attempts", "agent", "config", "model",
             "sampling", "window", "file_sha256", "build", "flags", "prompt_sha256", "lock_sha256",
-            "build_lock", "max_reply_tokens", "override_sha256", "runner_commit", "runner_sha256")
+            "build_lock", "max_reply_tokens", "override_sha256", "runner_sha256")
 RUNNER_FILES = ("agent_run.py", "agent_bench.py", "agent_host_mini.py", "agent_relay.py")
 
 
@@ -499,8 +506,11 @@ def mini_ask(relay_url: str, model: str, messages: list[dict], trial: str) -> di
 
 
 CACHE_TRIAL = "check-cache"
-LONG_PROMPT = 2048                      # tokens: a prompt the 20% rule holds to
-REREAD_SHARE = 0.2
+# 18d point 17: the second step must take from the cache at least this share
+# of the first request's whole prompt — 18c's "a fifth of the second's
+# prompt read again" refused a healthy server whose first reply was long (its
+# thinking, 2k tokens, never cached, read 25% again of a 6–9k conversation)
+REUSE_SHARE = 0.8
 
 
 def cache_line(relay, model: str, config: str, ask=None, first=None) -> tuple[str, dict]:
@@ -536,15 +546,16 @@ def cache_line(relay, model: str, config: str, ask=None, first=None) -> tuple[st
     if out_n and out_ms:
         speeds["decode"] = 1000 * out_n / out_ms
     whole = int(b["cache_n"]) + int(b["prompt_n"])
-    speeds.update(reread=int(b["prompt_n"]), whole=whole)
-    # 18c point 11: a long prompt more than a fifth read again is refused too,
-    # not only one read again whole — the step adds a few hundred tokens
-    if whole and int(b["prompt_n"]) > (REREAD_SHARE * whole if whole >= LONG_PROMPT
-                                       else whole / 2):
-        return (f"the second step read {int(b['prompt_n']):,} of its {whole:,} prompt tokens "
-                "again: the server didn't reuse its cache — each step would read most of the "
-                "conversation again (50–150k tokens, with the experts on the CPU), and most "
-                "tasks would hit the 50-minute limit"), speeds
+    first = int(a.get("prompt_n") or 0) + int(a.get("cache_n") or 0)
+    speeds.update(reread=int(b["prompt_n"]), whole=whole, reused=int(b["cache_n"]), first=first)
+    # 18d point 17: what the second step took from the cache, against the
+    # first request's whole prompt — the part both share
+    if first and int(b["cache_n"]) < REUSE_SHARE * first:
+        return (f"the second step took {int(b['cache_n']):,} tokens from the server's cache, "
+                f"under {REUSE_SHARE:.0%} of the first request's {first:,}: the server didn't "
+                "reuse its cache — each step would read most of the conversation again "
+                "(50–150k tokens, with the experts on the CPU), and most tasks would hit the "
+                "50-minute limit"), speeds
     return "", speeds
 
 
@@ -697,6 +708,10 @@ def state_of(rdir: Path, task: str, k: int) -> tuple[str, int]:
     if any(t["result"] != "error" or t.get("final") for t in tries):
         return "done", len(tries)
     counted = [t for t in tries if t.get("ours") != "down"]
+    # 18d point 18: and the server going down on it twice gives it up too —
+    # never counted, it was asked for ever
+    if sum(1 for t in tries if t.get("ours") == "down") >= DOWN_TRIES:
+        return "given up", len(counted)
     return ("given up" if len(counted) >= TRIES else "todo"), len(counted)
 
 
@@ -709,7 +724,10 @@ def results(rdir: Path, tasks: list[str], attempts: int) -> list[dict]:
             tries = attempts_of(rdir, t, k)
             if not tries:
                 continue
-            first = next((i for i, x in enumerate(tries) if x["result"] != "error"), None)
+            # 18d point 13: the first result that stands — the model's, or an
+            # error of ours that is final; a try after it never counts
+            first = next((i for i, x in enumerate(tries)
+                          if x["result"] != "error" or x.get("final")), None)
             final = tries[first] if first is not None else tries[-1]
             before = tries[:first] if first is not None else tries[:-1]
             out.append({**final, "attempt": k, "tries": len(tries),
@@ -717,18 +735,40 @@ def results(rdir: Path, tasks: list[str], attempts: int) -> list[dict]:
     return out
 
 
+def oracle_dirs(root: Path, benchmark: str) -> list[Path]:
+    """18d point 10: every oracle run of a benchmark, in order — run 1, then
+    --run 2, 3… beside it"""
+    base = run_dir(root, benchmark, "", 1, True)
+    more = [p for p in base.parent.glob(base.name + "-*")
+            if p.is_dir() and p.name[len(base.name) + 1:].isdigit()]
+    return ([base] if base.is_dir() else []) + sorted(
+        more, key=lambda p: int(p.name.rsplit("-", 1)[1]))
+
+
 def oracle_states(root: Path, benchmark: str, tasks: list[str]) -> dict:
-    """what Harbor's oracle run of a benchmark says of its tasks (18c point
-    9): left_out — its reference solution read not resolved here (no network
-    at verification, the dropped capabilities), so a model run leaves it out
-    of its denominator and the comparison; unknown — no result of the
-    oracle's yet (never asked, or only errors of ours)"""
-    rdir = run_dir(root, benchmark, "", 1, True)
-    tasks = tasks or list(read_json(rdir / "run.json").get("tasks") or [])
-    rs = {r["task"]: r for r in results(rdir, tasks, 1)} if rdir.is_dir() else {}
-    left = sorted(t for t, r in rs.items() if r["result"] in ("unresolved", "timeout"))
-    known = {t for t, r in rs.items() if r["result"] != "error" or r.get("final")}
-    return {"left_out": left, "unknown": sorted(set(tasks) - known)}
+    """what Harbor's oracle runs of a benchmark say of its tasks (18c point
+    9), each task's latest result across every oracle run (18d point 10: run
+    1 alone was read, and a run 2 after a pull was never). left_out — never
+    in a model run's denominator: `failing`, its reference solution read not
+    resolved here (no network at verification, the dropped capabilities);
+    `unverified` (18d point 11), it couldn't be checked here — given up after
+    three errors of ours, or an error of ours after the oracle ran. unknown
+    — no result yet (never asked, or asked again later)"""
+    dirs = oracle_dirs(root, benchmark)
+    tasks = tasks or sorted({t for d in dirs for t in read_json(d / "run.json").get("tasks")
+                             or []})
+    latest: dict[str, str] = {}
+    for d in dirs:
+        for r in results(d, tasks, 1):
+            t = r["task"]
+            if r["result"] != "error":
+                latest[t] = r["result"]
+            elif r.get("final") or state_of(d, t, 1)[0] == "given up":
+                latest[t] = "unverified"
+    failing = sorted(t for t, x in latest.items() if x in ("unresolved", "timeout"))
+    unverified = sorted(t for t, x in latest.items() if x == "unverified")
+    return {"left_out": sorted(failing + unverified), "failing": failing,
+            "unverified": unverified, "unknown": sorted(set(tasks) - set(latest))}
 
 
 def progress(rdir: Path, b: dict, tasks: list[str], attempts: int, started: float) -> dict:
@@ -1199,6 +1239,63 @@ def build_probe(rdir: Path, script: str, network: str) -> tuple[int, str]:
     return code, "\n".join(re.sub(r"^#\d+ \d+(?:\.\d+)? ", "", x) for x in out.splitlines())
 
 
+# 18d point 15: what a build on Docker's default bridge (DeepSWE's, and the
+# three Multilingual tasks whose tests fetch) may reach — the internet, and
+# the tailnet's DNS; never this server (the board's keyless writes, the model
+# servers), the LAN or the tailnet. Three rules (docs/AGENT-RUNS.md step 9),
+# lost on a reboot: every DeepSWE line refuses while one is missing
+BRIDGE = "docker0"
+# written in parts: the mirror's guard keeps every address of the tailnet's
+# range out of tracked files (tests/test_no_tailnet_address.py) — these two are
+# Tailscale's own, the same on every tailnet: its range, and its resolver
+TAILNET_RANGE = ".".join(["100", "64", "0", "0"]) + "/10"
+TAILNET_DNS = ".".join(["100"] * 4)
+PRIVATE = ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", TAILNET_RANGE, "169.254.0.0/16")
+FIREWALL_LINES = (
+    f"sudo iptables -I INPUT -i {BRIDGE} -j DROP",
+    f"sudo iptables -I DOCKER-USER -i {BRIDGE} -d {','.join(PRIVATE)} -j DROP",
+    f"sudo iptables -I DOCKER-USER -i {BRIDGE} -d {TAILNET_DNS} -p udp --dport 53 -j ACCEPT")
+
+
+def firewall_missing() -> str:
+    """'' when the bridge's three rules are in place; else which aren't, or
+    why they couldn't be read — in one line"""
+    code, out = run(["iptables", "-S"], timeout=30)
+    if code != 0:
+        code, out = run(["sudo", "-n", "iptables", "-S"], timeout=30)
+    if code != 0:
+        return ("the firewall's rules couldn't be read (iptables -S needs root): run this line "
+                "in its sudo form")
+    rules = [ln.split() for ln in out.splitlines() if ln.startswith("-A ")]
+
+    def has(chain: str, want: dict) -> bool:
+        for r in rules:
+            if r[1] != chain:
+                continue
+            opts = {r[i]: r[i + 1] for i in range(2, len(r) - 1) if r[i].startswith("-")}
+            if all(cidr(opts.get(k, "")) == cidr(v) if k == "-d" else opts.get(k) == v
+                   for k, v in want.items()):
+                return True
+        return False
+
+    def cidr(x: str) -> str:
+        return x if "/" in x or not x else x + "/32"
+    missing = []
+    if not has("INPUT", {"-i": BRIDGE, "-j": "DROP"}):
+        missing.append(f"INPUT from {BRIDGE}")
+    gaps = [n for n in PRIVATE if not has("DOCKER-USER", {"-i": BRIDGE, "-d": n, "-j": "DROP"})]
+    if gaps:
+        missing.append("DOCKER-USER to " + ", ".join(gaps))
+    if not has("DOCKER-USER", {"-i": BRIDGE, "-d": TAILNET_DNS, "-p": "udp", "--dport": "53",
+                               "-j": "ACCEPT"}):
+        missing.append(f"the tailnet's DNS ({TAILNET_DNS}:53)")
+    if missing:
+        return ("the firewall rules for Docker's default bridge aren't in place ("
+                + "; ".join(missing) + "): a build there would reach this server, the LAN and "
+                "the tailnet — add them (docs/AGENT-RUNS.md step A9; a reboot loses them)")
+    return ""
+
+
 def check_build_reach(rdir: Path, targets: list[str]) -> tuple[str, list[str]]:
     """(why a build with no network reached something or couldn't check,
     what a build with Docker's own network reaches) — the same targets as
@@ -1232,15 +1329,21 @@ def remove_images(images: list[str], keep: set[str], rdir: Path | None = None) -
     return big
 
 
+_CACHE_SAID: list[bool] = []
+
+
 def cache_ids() -> set[str] | None:
-    """the records Docker's build cache holds now; None when it can't say"""
+    """the records Docker's build cache holds now; None when it can't say —
+    18d point 18: an id in use read without the "*" Docker puts after it"""
     code, out = run(["docker", "system", "df", "-v", "--format", "{{json .BuildCache}}"],
                     timeout=300)
     try:
         got = json.loads(out.strip().splitlines()[-1]) if code == 0 and out.strip() else None
     except (ValueError, IndexError):
+        got = None
+    if code != 0 or not isinstance(got, list):
         return None
-    return {str(r.get("ID")) for r in got or [] if isinstance(r, dict)} if code == 0 else None
+    return {str(r.get("ID")).rstrip("*") for r in got if isinstance(r, dict) and r.get("ID")}
 
 
 def prune_since(before: set[str] | None) -> int:
@@ -1269,7 +1372,7 @@ def remove_built(task: str, cache: set[str] | None = None) -> None:
     the cache of a removed image until it is pruned"""
     code, out = run(["docker", "image", "ls", "--filter", "label=com.docker.compose.project",
                      "--format", '{{.ID}} {{.Label "com.docker.compose.project"}}'], timeout=60)
-    head = project_of(task[:32]) + "__"
+    head = trial_head(task)
     ids = sorted({x.split()[0] for x in out.splitlines() if code == 0 and len(x.split()) == 2
                   and x.split()[1].startswith(head)})
     if ids:
@@ -1296,6 +1399,13 @@ def job_limit(task: Path) -> float:
     return agent + float(ver.get("timeout_sec") or 600) + builds * build + collect + 1800
 
 
+def trial_head(task: str) -> str:
+    """18d point 18: how a task's trials' Docker projects begin — Harbor
+    names a trial <task[:32] without a trailing - or _>__<id>
+    (models/trial/config.py generate_trial_name)"""
+    return project_of(task[:32].rstrip("_-")) + "__"
+
+
 def project_of(name: str) -> str:
     """Harbor's Docker project name for a trial (its _sanitize…)"""
     name = name.lower()
@@ -1309,7 +1419,7 @@ def leftovers(task: str) -> None:
     again: Harbor names a trial's project <task[:32]>__<id>__env"""
     code, out = run(["docker", "ps", "-a", "--format",
                      '{{.ID}} {{.Label "com.docker.compose.project"}}'], timeout=60)
-    head = project_of(task[:32]) + "__"
+    head = trial_head(task)
     ids = [x.split()[0] for x in out.splitlines() if code == 0 and len(x.split()) == 2
            and x.split()[1].startswith(head)]
     if ids:
@@ -1346,11 +1456,18 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--by", default=os.environ.get("SUDO_USER") or os.environ.get("USER", ""),
                     help="your name, on its Runs row (under sudo: the user who ran sudo)")
     ap.add_argument("--check", action="store_true", help="the checks before the first task, only")
+    ap.add_argument("--firewall-lines", action="store_true",
+                    help="18d point 15: print the three firewall rules for Docker's default "
+                         "bridge (step A9), and the line that shows them — nothing changed")
     ap.add_argument("--check-reach", action="store_true",
                     help="step A: a container as a task's tries the model's server, the board, "
                          "the host's addresses, the LAN and the internet — nothing may answer")
     a = ap.parse_args(argv)
     b = ab.bench(a.benchmark)
+    if a.firewall_lines:                # printed, never run: masein runs each
+        for line in FIREWALL_LINES:
+            print(line)
+        return 0
     if a.check_reach:                   # no model: step A (18b point 4)
         root = bench_root()
         rdir = root / "agent-runs" / "reach-check"
@@ -1383,6 +1500,13 @@ def main(argv: list[str] | None = None) -> int:
         ap.error("say which tasks: --tasks N (a pilot, the same every time), --only a,b, or --all")
     if not a.oracle and not a.model.startswith("served/"):
         ap.error("--as served/<model> (or --oracle, or --check-reach, for step A)")
+    # 18d point 15: DeepSWE builds on Docker's default bridge — only behind
+    # the firewall's rules
+    if b.get("bridge_builds"):
+        why = firewall_missing()
+        if why:
+            say(f"refused — {why}")
+            return 2
     root = bench_root()
     # before the first task: each refusal one line, with what to do
     v = versions()
@@ -1398,6 +1522,10 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     rdir = run_dir(root, a.benchmark, a.model, a.attempts, a.oracle, a.run)
     rdir.mkdir(parents=True, exist_ok=True)
+    try:
+        rdir.chmod(0o700)               # 18d point 14: its logs are its owner's alone
+    except OSError:
+        pass
     tdir, tasks_sha = fetch_tasks(root, b)
     langs = languages(tdir, b)
     picked = ab.pilot(langs, a.tasks) if a.tasks else sorted(langs)
@@ -1419,12 +1547,20 @@ def main(argv: list[str] | None = None) -> int:
                 f"{len(langs)} tasks: run it on every task first (--oracle --all), so the tasks "
                 "whose reference solution doesn't pass here are known and left out")
             return 2
-        out_ = [t for t in picked if t in oracle["left_out"]]
+        out_ = [t for t in picked if t in oracle["failing"]]
         if out_:
             say(f"{len(out_)} of these tasks {'is' if len(out_) == 1 else 'are'} left out: "
                 "their reference solution doesn't "
                 f"pass here (the oracle run) — {', '.join(out_)}")
-            picked = [t for t in picked if t not in oracle["left_out"]]
+        # 18d point 11: and those the oracle couldn't check here, by name —
+        # given up, or an error of ours after it ran: never asked again, they
+        # blocked --all for ever
+        unv = [t for t in picked if t in oracle["unverified"]]
+        if unv:
+            say(f"{len(unv)} of these tasks {'is' if len(unv) == 1 else 'are'} left out: they "
+                "couldn't be checked here (the oracle run's errors of ours; --oracle --run N+1 "
+                f"--only them asks them again) — {', '.join(unv)}")
+        picked = [t for t in picked if t not in oracle["left_out"]]
     # what a SWE-bench image gets, fetched once and checked (18c point 2)
     build, build_info = None, {}
     if needs_build_files(tdir, picked):
@@ -1448,6 +1584,13 @@ def main(argv: list[str] | None = None) -> int:
             "fetches run once while the image is built, with Docker's own network and no "
             "package's scripts, and the tools are told they are offline after — "
             + ", ".join(offline["fetching"]))
+    # 18d point 15: the tasks whose own tests fetch build on Docker's default
+    # bridge too — only behind the firewall's rules
+    if offline["fetching"] and not b.get("bridge_builds"):
+        why = firewall_missing()
+        if why:
+            say(f"refused — {why}")
+            return 2
     if offline["unpinned"]:
         say("their own fetch can't be held to the lock's date (composer and cargo take the "
             "newest they're allowed): " + ", ".join(offline["unpinned"]))
@@ -1501,6 +1644,19 @@ def main(argv: list[str] | None = None) -> int:
         if relay:
             relay.stop()
         return 0
+    # 18d point 16: one runner a run — a second deleted the first's .running
+    # marks, then removed its live containers as leftovers
+    import fcntl
+    held = open(rdir / "run.lock", "a")
+    try:
+        fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        held.close()
+        if relay:
+            relay.stop()
+        say(f"refused — another runner is on this run ({rdir.name}): its run.lock is held. "
+            "`pgrep -af scripts/agent_run.py` shows it; let it finish or stop it first")
+        return 2
     # the run's tasks: those asked before and these (a pilot grown, step A's
     # oracle on more tasks), each kept with its result; its first settings kept
     every = [*(before.get("tasks") or []),
@@ -1565,7 +1721,9 @@ def main(argv: list[str] | None = None) -> int:
                 ab.RESULT_WORDS.get(last.get("result", ""), "no result")
                 + (f" ({last.get('why')})" if last.get("result") == "error" else "")
                 if state == "done" else f"an error of ours ({last.get('why') or 'no result'}) — "
-                + ("asked again" if state == "todo" else f"given up after {tries}")))
+                + ("asked again" if state == "todo" else
+                   f"given up: the model's server went down on it {DOWN_TRIES} times"
+                   if last.get("ours") == "down" else f"given up after {tries}")))
             if last.get("ours") == "down" and not stop:
                 # 18c point 6: the model's server went down — nothing more
                 # starts; the try isn't counted, and a resume asks it again
@@ -1594,10 +1752,15 @@ def main(argv: list[str] | None = None) -> int:
             cmd = harbor_cmd(tdir / t, job, rdir, b, a, info.get("model") or "",
                              relay.url if relay else "", reach)
             cache = cache_ids()                 # what Docker's build cache held before it
+            if cache is None and not _CACHE_SAID:   # 18d point 18: said once a run
+                _CACHE_SAID.append(True)
+                say("Docker's build cache couldn't be listed (docker system df -v): what the "
+                    "tasks' builds leave in it isn't pruned this run — `docker builder prune` "
+                    "after it")
             (rdir / "jobs" / f"{job}.running").write_text(str(os.getpid()))
             log = open(rdir / "jobs" / f"{job}.log", "w")
             try:
-                proc = subprocess.Popen(cmd, cwd=rdir, env=job_env(), stdout=log,
+                proc = subprocess.Popen(cmd, cwd=rdir, env=job_env(b), stdout=log,
                                         stderr=subprocess.STDOUT)
             except OSError as e:                # never a traceback: one line, and stop
                 log.close()

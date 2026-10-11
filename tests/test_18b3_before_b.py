@@ -251,8 +251,9 @@ def test_check_reads_what_the_server_took_from_its_cache(reused):
         assert words.startswith("it read 167 prompt tokens a second and wrote 80: about ")
         assert "days for 300 tasks, one at a time" in words
     else:
-        assert why.startswith("the second step read 6,800 of its 6,800 prompt tokens again: the "
-                              "server didn't reuse its cache")
+        # 18d point 17: by what it took, against the first request's prompt
+        assert why.startswith("the second step took 0 tokens from the server's cache, under 80% "
+                              "of the first request's 6,000: the server didn't reuse its cache")
 
 
 def test_check_refuses_a_template_that_rerenders_drops_thinking_or_closes_it():

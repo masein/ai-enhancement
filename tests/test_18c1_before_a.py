@@ -29,7 +29,7 @@ import pytest
 import agent_bench as ab
 import agent_host_mini as hm
 import agent_run as ar
-from agent18 import INVENTED_PARSER, build_world, tasks_folder, trial
+from agent18 import FIREWALL, INVENTED_PARSER, build_world, tasks_folder, trial
 from test_18b1_containment import Env, host_agent, submitted
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -157,7 +157,9 @@ def venv_world(tmp_path: Path) -> dict:
     harbor.write_text(HARBOR.format(python=venv / "bin" / "python"))
     sysbin = tmp_path / "sys"
     sysbin.mkdir()
-    for name, text in (("docker", DOCKER), ("git", GIT), ("sudo", SUDO)):
+    # 18d point 15: the bridge's rules in place (step A9), as iptables shows them
+    iptables = "#!/bin/sh\ncat <<'RULES'\n" + FIREWALL + "RULES\n"
+    for name, text in (("docker", DOCKER), ("git", GIT), ("sudo", SUDO), ("iptables", iptables)):
         (sysbin / name).write_text(text)
     for p in (harbor, *sysbin.iterdir()):
         p.chmod(0o755)
