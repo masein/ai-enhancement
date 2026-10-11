@@ -77,6 +77,10 @@ class FakeServer:
         self.reasoning_tokens = None             # a function: completion_tokens_details
         self.provider = ""                       # the provider a reply names
         self.finish = None                       # 12q: a function: a reply's finish_reason
+        # 18d: an error sent mid-stream after so many pieces, as llama-server
+        # sends one — ("error", n): an "error:" line; ("data", n): a data
+        # chunk holding "error"; None: none
+        self.stream_error: tuple[str, int] | None = None
         self.completions: list[dict] = []        # 12q: every /completion body, as sent
         self.decode_tok_s = 42.0                 # 12q: /completion's timings say this
         self.raw_reply = None                    # 12q: a recorded reply, sent as it is
@@ -246,9 +250,15 @@ class FakeServer:
                 pieces = [("reasoning_content", w) for w in re.findall(r"\S+\s*", think or "")]
                 pieces += [("content", w) for w in re.findall(r"\S+\s*|\s+", content)]
                 yield chunk({"role": "assistant", "content": None})
-                for k, w in pieces:
+                for i, (k, w) in enumerate(pieces):
                     if await request.is_disconnected():
                         self.hung_up += 1
+                        return
+                    if self.stream_error and i == self.stream_error[1]:
+                        err = {"code": 500, "message": "an internal error occurred",
+                               "type": "server"}
+                        yield (f"error: {json.dumps(err)}\n\n" if self.stream_error[0] == "error"
+                               else "data: " + json.dumps({"error": err}) + "\n\n")
                         return
                     yield chunk({k: w})
                     await asyncio.sleep(self.stream_delay_s)

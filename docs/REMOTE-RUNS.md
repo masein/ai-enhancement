@@ -1471,14 +1471,15 @@ python scripts/speed_test.py 5090 --price 0.50 --gguf hf://<you>/evalboard-priva
 ```
 
 **(b) 4× V100 32 GB, $0.65 an hour** — needs the sm_70 tarball above; 80 GB
-of disk. Four servers × 4 slots, then × 6. About 1 hour; it fetches about
+of disk, max CUDA 12.8+. Four servers × 4 slots, then × 6. About 1 hour; it fetches about
 24 GB:
 
 ```bash
 python scripts/speed_test.py v100x4 --price 0.65 --gguf hf://<you>/evalboard-private/<original-build-file>.gguf --server hf://<you>/evalboard-private/llama-server-cuda12.8-sm70.tar.gz
 ```
 
-**(c) H100 SXM, $2.55 an hour** — 150 GB of disk, max CUDA 13.0+. llama.cpp
+**(c) H100 SXM, $2.55 an hour** — 150 GB of disk, max CUDA 13.0+ (its vLLM
+settings; `--only 1,2`, llama.cpp alone, needs 12.8+). llama.cpp
 with the Q4 file at 32 and 64 slots sharing one pool, then vLLM BF16 at 32 and
 64 sequences. About 2 hours 15 minutes; it fetches about 100 GB (the GGUF,
 22.9 GB; vLLM, about 5 GB; the BF16 weights, 71.9 GB). An H100 NVL or PCIe
@@ -1496,8 +1497,27 @@ it fetches about 77 GB:
 python scripts/speed_test.py h100x2 --price 5.10
 ```
 
-`--only 1,3` runs those settings alone; `--dry-run` checks the box and prints
-its plan. Copy `/workspace/speed/speed.json` off the box before destroying
+`--only 1,3` runs those settings alone, the box checked for those settings'
+CUDA (llama.cpp's 12.8, vLLM's 13.0); `--dry-run` checks the box and prints
+its plan.
+
+18d: an error the server sends mid-stream is the request's, counted and
+named on the line, never an answer; an engine that exits ends its setting at
+once, the line starting "STOPPED EARLY" with its last log lines; a shared
+setting whose slots hold less than one answer (83,968 tokens, read from
+`/props` after the start) is refused, since a build that splits the pool
+despite `--kv-unified` stops answers short.
+
+**Admission control in the box runner.** Our runs on rented boxes
+(`remote_gguf.py`, `frontier_box.py`) give each slot its own context, never
+a shared pool, so they need none today. Before any real run uses a shared
+pool, the board's asking (`service/frontier.ask_task`, through
+`service/served.ask`) would need what this test's client does: a count of
+each request's tokens in flight (its prompt and what it has streamed), a
+request admitted only when the pool has room for it and a step of each one
+in flight, the request admitted last cut and asked again from its start
+before the pool fills (its answer's tokens dropped), and a refusal for
+memory counted apart from an error. Copy `/workspace/speed/speed.json` off the box before destroying
 it:
 
 ```bash
