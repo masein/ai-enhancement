@@ -1084,7 +1084,8 @@ def served_pin(id: str = ""):
     n = served.live_window(rec) if diff == ["ctx"] else now.get("ctx")
     ok = isinstance(n, int) and n >= served.MIN_WINDOW
     return {"id": id, "why": served.pin_words(rec, now) if ok or diff != ["ctx"] else
-            served.unusable_window(n if n is not None else now.get("ctx")).capitalize()
+            # 18d point 26: the server's own n_ctx — "nothing" when it gives none
+            served.unusable_window(n if diff == ["ctx"] else now.get("ctx")).capitalize()
             + f": the board takes a whole number of at least {served.MIN_WINDOW:,} tokens.",
             "window": {"now": n, "was": rec["pin"].get("ctx")} if diff == ["ctx"] and ok
             else None}

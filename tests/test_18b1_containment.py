@@ -327,7 +327,7 @@ def test_an_error_of_ours_is_asked_again_and_said_and_a_given_up_task_stays_coun
     assert ab.score_words(s, 300).endswith("· 1 error of ours, counted not resolved")
     assert ab.again_words(list(rs.values())) == (                 # 18c: tasks, then tries
         "2 tasks asked again after an error of ours: Docker couldn't pull, build or start its "
-        "container (2 tasks, 3 tries)")
+        "container (2 tasks, 4 tries)")       # 18d point 27: every try one ended, as the rows
 
 
 def test_only_the_allow_list_is_ours(tmp_path):

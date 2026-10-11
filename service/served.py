@@ -775,7 +775,9 @@ def use_new_window(model_id: str, by: str) -> dict:
     # smallest slot — text, an empty value or 512 were taken
     n = live_window(rec)
     if n is None or n < MIN_WINDOW:
-        raise ValueError(unusable_window(n if n is not None else now.get("ctx"))
+        # 18d point 26: what the server says of its window — "nothing" when
+        # its n_ctx is 0 or missing, never the model's training context
+        raise ValueError(unusable_window(n)
                          + f": the board takes a whole number of at least {MIN_WINDOW:,} tokens "
                          "(its smallest slot) — nothing changed")
     was = rec["pin"].get("ctx")
