@@ -1389,6 +1389,34 @@ class OpenRouterChat(LocalOpenAI):
         from . import ai_models
         return ai_models.over_limit() or ai_models.drifted(self.pin)
 
+    # 18d point 4: what a batch stopped at the month's limit, or at a pinned
+    # model that moved, says while it holds
+    AT_LIMIT = ("stopped at this month's AI limit — nothing more is sent until you press "
+                "Carry on, whatever happens to the limit or the month: raise the limit on AI "
+                "models first")
+    AT_DRIFT = ("stopped: its pinned model moved to another version — nothing more is sent "
+                "until you press Carry on")
+
+    def at_wait(self, batch_id: str, why: str) -> None:
+        """18d point 4: every paid batch, stopped at the month's limit or at a
+        pinned model that moved, holds until a press — 17j's hold was the
+        grader's alone: a judge batch stopped at the limit sent 5 requests once
+        the month turned, with nobody pressing anything. A batch already
+        holding keeps its own words"""
+        from . import ai_models
+        limit = ai_models.over_limit()
+        if not limit and not ai_models.drifted(self.pin):
+            return
+        p = self.dir / batch_id / "halt.json"
+        try:
+            if json.loads(p.read_text(encoding="utf-8")).get("hold"):
+                return
+        except (OSError, ValueError):
+            pass
+        p.write_text(json.dumps({"why": self.AT_LIMIT if limit else self.AT_DRIFT,
+                                 "at": time.time(), "hold": True, "n": 0,
+                                 "limit": bool(limit)}), encoding="utf-8")
+
     def status(self, batch_id: str) -> tuple[str, str]:
         state, detail = super().status(batch_id)
         why = self.waiting() if state == "pending" else ""

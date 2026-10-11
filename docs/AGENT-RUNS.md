@@ -193,11 +193,24 @@ group in step 5, the line is the same without `sudo`.
    ```bash
    cd ~/benchmarks/aienh && git pull origin main && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose build
    ```
-   Run the new code's read-only check against the board's files: which
-   stored Frontier scores the new thinking split (every thinking block
-   counts, wherever it sits; one never closed ran out) changes the next time
-   each is scored — counts per row and benchmark, never an answer's text,
-   nothing written. Report its lines:
+   Save every stored Frontier score as it is now (each results and samples
+   file of every row's Frontier benchmarks, in one tarball in your home), and
+   count them — the last number it prints:
+   ```bash
+   cd ~/benchmarks/results/full && sudo find . -path '*_0shot/frontier/*' \( -name 'results_*.json' -o -name 'samples_*.jsonl' \) -print0 | sudo tar --null -czf ~/frontier-scores-$(date +%Y%m%d-%H%M).tar.gz -T - && sudo find . -path '*_0shot/frontier/results_*.json' | wc -l
+   ```
+   Run the new code's read-only check against the board's files: each row
+   and benchmark with a stored score, what it holds and what scoring will
+   write the next time (a re-import, a grading batch landing, a grader
+   switched at Start) — "stays", "→ <the new score>", "no score written" or
+   "would be refused"; how many answers read differently; an off row's
+   thinking share; and how many answers wait for Epoch's model check, paid at
+   the next Start. Counts only, never an answer's text, nothing written. Its
+   last line's "of M" must be close to the number above (a row whose answers
+   aren't all in is counted, and said). It exits 1, naming the folder, when
+   it finds no Frontier results. Report its lines; if a line shows a score
+   the page presents moving ("→", "no score written", "would be refused"),
+   send me those lines and wait before the deploy:
    ```bash
    cd ~/benchmarks/aienh && sudo docker compose run --rm --no-deps bench python scripts/think_shift_check.py
    ```

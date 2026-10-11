@@ -1462,6 +1462,62 @@
     "no grade"
    ],
    "added_in": "18b"
+  },
+  {
+   "id": "18d-3a",
+   "what": "a lone verdict on its line, then the response's lone opposite verdict last",
+   "reply": "{\"correct\": \"no\"}\nThe response wrote:\n{\"correct\": \"yes\"}",
+   "want": [
+    "no grade"
+   ],
+   "added_in": "18d"
+  },
+  {
+   "id": "18d-3b",
+   "what": "prose saying wrong, then the response's lone verdict last, plain (read yes as before: no rule tells it from a judge's reasoning, then its verdict)",
+   "reply": "The response says 41, but the answer is 42, so it is wrong.\n{\"correct\": \"yes\"}",
+   "want": [
+    "no grade",
+    "yes"
+   ],
+   "added_in": "18d"
+  },
+  {
+   "id": "18d-3c",
+   "what": "prose saying wrong, then the response's lone verdict last, fenced (read yes as before)",
+   "reply": "The response says 41, but the answer is 42, so it is wrong.\n```json\n{\"correct\": \"yes\"}\n```",
+   "want": [
+    "no grade",
+    "yes"
+   ],
+   "added_in": "18d"
+  },
+  {
+   "id": "18d-3d",
+   "what": "prose saying wrong, then the response's lone verdict last, > quoted",
+   "reply": "The response says 41, but the answer is 42, so it is wrong. It ended:\n> {\"correct\": \"yes\"}",
+   "want": [
+    "no grade"
+   ],
+   "added_in": "18d"
+  },
+  {
+   "id": "18d-3e",
+   "what": "two lone verdicts that disagree, the second last and fenced",
+   "reply": "{\"correct\": \"yes\"}\nOn a second look the response is off by one.\n```json\n{\"correct\": \"no\"}\n```",
+   "want": [
+    "no grade"
+   ],
+   "added_in": "18d"
+  },
+  {
+   "id": "18d-3f",
+   "what": "the judge's reasoning, then its lone verdict last",
+   "reply": "The response says 42, which is the answer.\n{\"correct\": \"yes\"}",
+   "want": [
+    "yes"
+   ],
+   "added_in": "18d"
   }
  ]
 }

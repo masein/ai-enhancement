@@ -1833,6 +1833,24 @@ def frontier_how(d: dict | None) -> str | None:
     return "by code" + counts
 
 
+def frontier_was(d: dict | None) -> str:
+    """18d point 2: the score this one replaced, on its cell — "was 21.5 until
+    11 Oct, re-read with frontier-2"; '' when it replaced none"""
+    b = (d or {}).get("before")
+    if not isinstance(b, dict) or "score" not in b:
+        return ""
+    sc = b.get("score")
+    out = "was " + ("no score" if not isinstance(sc, (int, float)) else f"{100 * sc:.1f}")
+    if isinstance(b.get("until"), (int, float)):
+        t = _dt.datetime.fromtimestamp(b["until"])
+        out += f" until {t.day} {t.strftime('%b')}"
+    if b.get("why"):
+        out += f", {b['why']}"
+    elif b.get("version"):
+        out += f", scored by {b['version']}"          # 18c's: the version alone
+    return out
+
+
 def frontier_where(d: dict | None) -> str:
     """17f: where a Frontier score was run, as Runs says it — 'this server', or
     'rented GPU · RTX 5090 · boxes A1, A2' (an import's, older ones 'run on a
@@ -2492,7 +2510,10 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
                     **({"shardsHeld": str(((run.get("frontier") or {}).get(task) or {})
                                           .get("shards_held"))[:300]}
                        if ((run.get("frontier") or {}).get(task) or {}).get("shards_held")
-                       else {})}
+                       else {}),
+                    # 18d point 2: the score it replaced, and why
+                    **({"was": frontier_was((run.get("frontier") or {}).get(task))}
+                       if frontier_was((run.get("frontier") or {}).get(task)) else {})}
                    if (run.get("frontier") or {}).get(task) else {}),
             }
             metric_used.setdefault(task, name)
@@ -4512,6 +4533,11 @@ td.evdtotal .evd-ranout { display:block; white-space:normal; text-align:right; }
 .rented-prog { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 .rented-prog .runbar { flex:1 1 30px; min-width:30px; max-width:140px; margin:0; }
 .rented-prog [data-rented-open] { padding:0 4px; white-space:nowrap; }   /* 18b: wrapped at 1440 */
+/* 18d point 9: the count, the bar and the finish one group, never split — a
+   wider font in CI put the finish 31 px below the bar; on a phone it wraps */
+.rented-main { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+.rented-main .runbar { flex:0 0 80px; width:80px; min-width:30px; margin:0; }
+@media (max-width: 600px) { .rented-main { flex-wrap:wrap; white-space:normal; } }
 /* 17j: at a phone's width, the Runs table fits: the model, its status and its
    progress stay; the number, the time, the suite, who and the GPU give way */
 @media (max-width: 640px) {
@@ -13150,7 +13176,7 @@ function frHere(name) {
       return { v: c.v, se: c.se || null, tag: at + (c.how ? ' · ' + c.how : ''),
         set: 'howSet' in c ? (c.howSet == null ? null : at + ' · ' + c.howSet) : at,
         // 17f: where it ran, and the Runs rows it came from
-        where: c.where || '', runs: c.runs || [], held: c.shardsHeld || '',
+        where: c.where || '', runs: c.runs || [], held: c.shardsHeld || '', was: c.was || '',
         // 17g: the rows beside it scored by another grader
         differs: c.graderDiffers || '' };
     } })),
@@ -13372,6 +13398,7 @@ function lbFrontier(ms) {
           'data-lead': hl ? '1' : null, style: tint, tabindex: '0', ...hereAt,
           'data-tip': JSON.stringify([`${pct1(x.here.v)}`
             + (x.here.se ? ` ± ${pct1(x.here.se)}` : ''), `${r.m.name} · ${c.name}`, x.here.tag,
+            ...(x.here.was ? [x.here.was] : []),
             'ranked only with the cells measured the same way here'])},
         b(hl, pct1(x.here.v)), el('div', { class: 'small se fr-tag', text: x.here.tag }),
         x.here.differs ? el('div', { class: 'small warntext', 'data-fr-grader-differs': r.m.id,
@@ -13380,7 +13407,10 @@ function lbFrontier(ms) {
         // 17i: shards imported and held, waiting for the rest — the score is
         // the answers here before
         x.here.held ? el('div', { class: 'small warntext', 'data-fr-shards-held': r.m.id,
-          text: x.here.held }) : '');
+          text: x.here.held }) : '',
+        // 18d point 2: a score that changed says what it was, where it is
+        x.here.was ? el('div', { class: 'small se', 'data-fr-was': r.m.id,
+          text: x.here.was }) : '');
     return el('td', { class: 'num tcell', 'data-fr-cell': c.key, 'data-fr-rep': r.m.id,
         'data-fr-setting': x.rep.setting, 'data-lead': rl ? '1' : null, style: tint, tabindex: '0',
         ...repAt,
@@ -19908,11 +19938,13 @@ function rentedRow(x, ncols) {
       : stClass(RENTED_CHIP[x.status] || x.status), 'data-stage': x.status,
       text: x.status_words })),
     el('td', { class: 'small qc-progress' }, el('div', { class: 'rented-prog' },
-      el('span', { 'data-rented-count': '1', text: count }),
-      // as a run here: its bar while it runs, beside the count
-      x.status === 'running' ? runBar(x.n, x.of) : '',
-      x.finish ? el('span', { class: 'se', 'data-rented-finish': '1',
-        text: `${many ? 'this part done' : 'done about'} ${rentedWhen(x.finish)}` }) : '',
+      // 18d point 9: one group, as a run here's count, bar and finish are
+      el('span', { class: 'rented-main' },
+        el('span', { 'data-rented-count': '1', text: count }),
+        // as a run here: its bar while it runs, beside the count
+        x.status === 'running' ? runBar(x.n, x.of) : '',
+        x.finish ? el('span', { class: 'se', 'data-rented-finish': '1',
+          text: `${many ? 'this part done' : 'done about'} ${rentedWhen(x.finish)}` }) : ''),
       !many && ((x.boxes || [])[0] || {}).box_finish && x.boxes[0].box_finish !== x.finish
         ? el('span', { class: 'se', 'data-box-finish': '1',
           text: `box free ${rentedWhen(x.boxes[0].box_finish)}` }) : '',
@@ -24791,6 +24823,23 @@ function aiChange(j) {
   }, { key: 'ai-' + j.job, menu: false });
 }
 
+// 18d point 5: a waiting batch's Carry on — each one, the job's older ones and
+// the judge test's too, its line beside it when the job has more than one
+function aiHalted(list, job) {
+  if (!LIVE || !list.length) return [];
+  return list.map(x => el('div', { class: 'aihalt', 'data-ai-halted': x.id },
+    el('button', { class: 'secondary', 'data-ai-carry-on': job || x.id,
+      'data-ai-carry-on-batch': x.id, style: 'white-space:nowrap',
+      text: 'Carry on', onclick: async e => {
+        e.target.disabled = true;
+        try { state.ai.page = await post('api/ai/carry-on', { batch_id: x.id,
+          by: whoName() }); }
+        catch (err) { toast('Refused. ' + err.message, { key: 'ai' }); }
+        render(); } }),
+    list.length > 1 || x.what ? el('span', { class: 'small se',
+      text: ' ' + [x.what, x.line].filter(Boolean).join(' · ') }) : ''));
+}
+
 function aiJobsTable(P) {
   const rows = P.jobs.map(j => el('tr', { 'data-ai-job': j.job },
     el('td', {}, el('b', { text: j.label }), el('div', { class: 'small se', text: j.does })),
@@ -24804,15 +24853,9 @@ function aiJobsTable(P) {
       // 16c: its last batch on OpenRouter, when it failed or waits
       j.last_batch ? el('div', { class: 'small warntext', 'data-ai-last-batch': j.job,
         text: 'Its last batch: ' + j.last_batch }) : '',
-      // 18c point 13: a batch waiting at a run of refusals waits for this press
-      j.halted_batch && LIVE ? el('button', { class: 'secondary', 'data-ai-carry-on': j.job,
-        style: 'white-space:nowrap',
-        text: 'Carry on', onclick: async e => {
-          e.target.disabled = true;
-          try { state.ai.page = await post('api/ai/carry-on', { batch_id: j.halted_batch,
-            by: whoName() }); }
-          catch (err) { toast('Refused. ' + err.message, { key: 'ai' }); }
-          render(); } }) : ''),
+      // 18c point 13: a batch waiting at a run of refusals waits for this press.
+      // 18d point 5: each of the job's batches that waits, its own button
+      ...aiHalted(j.halted_batches || (j.halted_batch ? [{ id: j.halted_batch }] : []), j.job)),
     el('td', { class: 'mono small aiprice', 'data-ai-price': j.job, text: aiPrice(j) }),
     el('td', { class: 'aiact' }, LIVE ? aiChange(j) : '')));
   return el('table', { class: 'aijobs', 'data-ai-jobs': '1' },
@@ -24905,7 +24948,11 @@ function vAiModels() {
       ...(P.warnings || []).map(w => el('p', { class: 'warn', 'data-ai-warning': w.job,
         text: w.text })),
       A.confirm ? aiRejudgeBox() : '',
-      aiJobsTable(P)),
+      aiJobsTable(P),
+      // 18d point 5: a waiting batch of no job in the table, its Carry on here
+      (P.halted_other || []).length ? el('div', { 'data-ai-halted-other': '1' },
+        el('p', { class: 'small warntext', text: 'Waiting for Carry on:' }),
+        ...aiHalted(P.halted_other, '')) : ''),
     mmpKeyCard(), frontierGradingCard(), judgeTestCard(), outsideCard()];
 }
 

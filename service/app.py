@@ -2605,6 +2605,42 @@ def _job_last_batches() -> dict[str, str]:
     return {j: x["line"] for j, x in _job_batches().items() if x["line"]}
 
 
+# 18d point 5: the batches whose card has its own press — the grader's
+# (Start, on its Frontier card) and the labeller's (Carry on, on Mobile-MMLU's)
+_OWN_CARD = {"frgr", "mmpk"}
+# what a batch with no job of its own is, on the AI models page
+_KIND_WORDS = {"judge_test": "the judge test"}
+
+
+def _job_of(r: dict) -> str | None:
+    """the AI models job a batch is one of — the judge test's is the judge's"""
+    if r["kind"] == "qb":
+        try:
+            return json.loads((builder._batches_dir() / f"{r['batch_id']}.json")
+                              .read_text(encoding="utf-8")).get("job")
+        except (OSError, ValueError):
+            return None
+    return _JOB_OF_KIND.get(r["kind"]) or ("judge" if r["kind"] == "judge_test" else None)
+
+
+def _halted_batches() -> list[dict]:
+    """18d point 5: every batch on OpenRouter that waits for Carry on — each
+    one, not each job's newest only (a job's older batch halted stayed
+    without one), and the judge test's: [{id, job, what, line}], newest first"""
+    out = []
+    for r in db.batches_list(300):
+        bid = r["batch_id"]
+        if not str(bid).startswith("or_") or r.get("status") != "submitted" \
+                or r["kind"] in _OWN_CARD:
+            continue
+        tl = llm.tally(bid)
+        if not (tl or {}).get("halted"):
+            continue
+        out.append({"id": bid, "job": _job_of(r), "what": _KIND_WORDS.get(r["kind"], ""),
+                    "line": llm.batch_line(tl, ""), "at": r.get("created_at")})
+    return out
+
+
 def _job_batches() -> dict[str, dict]:
     """each job's last batch on OpenRouter: {line, id, halted} — 18c point 13:
     a batch waiting at a run of refusals is the job's Carry on"""
@@ -2613,13 +2649,7 @@ def _job_batches() -> dict[str, dict]:
         bid = r["batch_id"]
         if not str(bid).startswith("or_"):
             continue
-        job = _JOB_OF_KIND.get(r["kind"])
-        if r["kind"] == "qb":
-            try:
-                job = json.loads((builder._batches_dir() / f"{bid}.json")
-                                 .read_text(encoding="utf-8")).get("job")
-            except (OSError, ValueError):
-                job = None
+        job = _job_of(r) if r["kind"] != "judge_test" else None
         if not job or job in out:
             continue
         tl = llm.tally(bid)
@@ -2636,6 +2666,7 @@ def _ai_page() -> dict:
     jobs = []
     batches = _job_batches()
     last = {j: x["line"] for j, x in batches.items() if x["line"]}
+    halted = _halted_batches()
     for k, j in ai_models.JOBS.items():
         c = ai_models.choice(k)
         p, m, _ = llm.identity(j["role"])
@@ -2645,9 +2676,10 @@ def _ai_page() -> dict:
                      "provider": p, "model": m, "now": ai_models.label(k),
                      "blocked": llm.blocked(j["role"]) if (c or p) else "",
                      "last_batch": last.get(k, ""),
-                     # 18c point 13: its batch waits at a run of refusals: Carry on
-                     "halted_batch": (batches.get(k) or {}).get("id")
-                     if (batches.get(k) or {}).get("halted") else None})
+                     # 18c point 13: its batch waits at a run of refusals: Carry on.
+                     # 18d point 5: each of its batches that waits, its own
+                     "halted_batches": [x for x in halted if x["job"] == k],
+                     "halted_batch": next((x["id"] for x in halted if x["job"] == k), None)})
     ident = _judge.identity()
     return {"has_key": ai_models.has_key(), "jobs": jobs,
             "local": {"name": ai_models.local_name(ask=True), "model": ai_models.local_model()},
@@ -2656,6 +2688,8 @@ def _ai_page() -> dict:
                       # 16c: what the OpenRouter key may still spend, as it last said
                       "key": ai_models.key_allowance()},
             "warnings": ai_models.warnings(_improving()),
+            # 18d point 5: a waiting batch no job on the page names, with its Carry on
+            "halted_other": [x for x in halted if x["job"] not in ai_models.JOBS],
             "judge": {"id": ident["id"], "version": _judge.version(ident)}}
 
 
@@ -2769,7 +2803,7 @@ def ai_carry_on(a: CarryOnIn, x_token: str = Header(default="")):
     _check_token(x_token)
     if not a.by.strip():
         raise HTTPException(422, "type your name first — it is recorded with the press")
-    if not any(x.get("id") == a.batch_id and x.get("halted") for x in _job_batches().values()):
+    if not any(x["id"] == a.batch_id for x in _halted_batches()):
         raise HTTPException(409, "that batch isn't waiting for Carry on")
     why = llm.carry_on(a.batch_id)
     if why:

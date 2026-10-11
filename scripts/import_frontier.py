@@ -933,21 +933,31 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
         for t, entry in late.items():
             reg.setdefault("tasks", {})[t] = entry
         for t, entry in ready.items():
-            # 18c point 12: a score the row held replaced with another, said
-            before = sf.stored_score(sf.task_dir(row, t), t)
+            # 18c point 12: a score the row held replaced with another, said —
+            # 18d point 2: among the import's lines (its Runs row's log, the
+            # fetch's summary), and kept on the new results, which the score's
+            # cell shows. The score the page showed: its results', or the one
+            # kept while answers waited for a grade
+            shown = sf.presented(sf.task_dir(row, t), t)
             new = (scored.get(t) or {}).get("score")
-            if before and before[0] is not None and new is not None and \
-                    abs(before[0] - new) > 1e-9:
-                say(f"[frontier] {row_name} · {fb.BENCH[t]['label']}: score "
-                    f"{sf.score_words(before[0])} → {sf.score_words(new)}"
-                    + (f" (scored by {before[1]} before, {fb.VERSION} now)"
-                       if before[1] != fb.VERSION else ""))
+            before = None
+            if shown and shown.get("score") is not None and new is not None and \
+                    abs(shown["score"] - new) > 1e-9:
+                why = sf.change_why(shown, str(((scored.get(t) or {}).get("grader") or {})
+                                               .get("version") or ""))
+                if why == "scored again":
+                    why = "imported from a rented GPU"
+                lines.append(sf.change_line(row, t, shown, new, why))
+                before = {"score": shown["score"], "version": shown.get("version") or "",
+                          "since": shown.get("at"), "until": time.time(), "why": why}
             was = sf.set_aside(row, t, "before-import")
             if was:
                 lines.append(f"{t}: the answers here before are kept at {was}")
             dest = sf.task_dir(row, t)
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(sf.task_dir(staging, t)), str(dest))
+            if before:
+                sf.set_before(dest, t, before)
             reg.setdefault("tasks", {})[t] = entry
             if scored.get(t):
                 words.append(sf.words(t, scored[t]))
