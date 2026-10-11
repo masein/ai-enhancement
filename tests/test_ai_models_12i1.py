@@ -189,8 +189,12 @@ def test_at_the_spend_limit_jobs_wait_and_the_page_says_why(svc, fake):
     state, detail = be.status(bid)
     assert state == "pending" and detail.endswith(why)
     assert fake.chat == []                                       # nothing went out
-    # a higher limit, and it goes
+    # a higher limit: 18d point 4 — it holds until a press, never goes by itself
     client.post("/api/ai/limit", json={"usd": 20, "by": "masein"})
+    time.sleep(0.5)
+    assert be.status(bid)[0] == "pending" and fake.chat == []
+    assert "Carry on" in be.halted(bid)
+    assert llm.carry_on(bid) == ""                               # the press: it goes
     assert wait_done(be, bid)[0] == "done" and len(fake.chat) == 1
 
 
