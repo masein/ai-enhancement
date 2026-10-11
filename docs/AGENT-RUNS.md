@@ -202,17 +202,23 @@ group in step 5, the line is the same without `sudo`.
    Run the new code's read-only check against the board's files: each row
    and benchmark with a stored score, what it holds and what scoring will
    write the next time (a re-import, a grading batch landing, a grader
-   switched at Start) — "stays", "→ <the new score>", "no score written" or
-   "would be refused"; how many answers read differently; an off row's
+   switched at Start); how many answers read differently; an off row's
    thinking share; and how many answers wait for Epoch's model check, paid at
-   the next Start. Counts only, never an answer's text, nothing written. Its
-   last line's "of M" must be close to the number above (a row whose answers
-   aren't all in is counted, and said). It exits 1, naming the folder, when
-   it finds no Frontier results. Report its lines; if a line shows a score
-   the page presents moving ("→", "no score written", "would be refused"),
-   send me those lines and wait before the deploy:
+   the next Start. Counts only, never an answer's text, nothing written. Each
+   line's first word says what it is: `MOVES` (another number), `NO SCORE`
+   (none written where one shows), `REFUSED`, `UNREAD` (the check couldn't
+   read that row), or `STAYS` and `NOT SCORED` for the rest. Its last line's
+   "of M" must be close to the number above (a row whose answers aren't all
+   in is counted, and said). It exits 1, naming the folder, when it read no
+   stored score at all. Report its lines; if any line starts `MOVES`,
+   `NO SCORE`, `REFUSED` or `UNREAD` (the second command lists them),
+   send me those lines and wait before the deploy — a "→" inside a `STAYS`
+   line is a count, not a move:
    ```bash
-   cd ~/benchmarks/aienh && sudo docker compose run --rm --no-deps bench python scripts/think_shift_check.py
+   cd ~/benchmarks/aienh && sudo docker compose run --rm --no-deps bench python scripts/think_shift_check.py | tee ~/think-shift-check.txt
+   ```
+   ```bash
+   grep -E '^(MOVES|NO SCORE|REFUSED|UNREAD) ' ~/think-shift-check.txt
    ```
    Then the deploy itself (the board shows agent runs from this build):
    ```bash

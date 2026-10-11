@@ -744,7 +744,9 @@ def stored_detail(d: Path, task: str) -> dict | None:
         return {"score": res.get("acc,none"), "version": str(fr.get("version") or ""),
                 "at": got.get("date"), "grader": str((fr.get("grader") or {}).get("version")
                                                      or ""),
-                "before": fr.get("before") if isinstance(fr.get("before"), dict) else None}
+                "before": fr.get("before") if isinstance(fr.get("before"), dict) else None,
+                # 18e point 3: answers it left to Epoch's model check
+                "look_waiting": int(((fr.get("look") or {}).get("waiting")) or 0)}
     return None
 
 
@@ -795,9 +797,14 @@ def runs_note(row: Path, task: str, line: str) -> int | None:
         came = imf.where_and_runs(Path(row), task)[1]
     except Exception:                                   # noqa: BLE001 — the latest run, then
         came = []
-    sid = max(came) if came else next(
-        (r["id"] for r in db.recent(500) if r.get("hf_id") == model
-         and r.get("suite") == "frontier" and bool(r.get("thinking")) == on), None)
+    try:
+        sid = max(came) if came else next(
+            (r["id"] for r in db.recent(500) if r.get("hf_id") == model
+             and r.get("suite") == "frontier" and bool(r.get("thinking")) == on), None)
+    except Exception as e:                              # noqa: BLE001 — 18e point 5: never the score's
+        print(f"[frontier] {Path(row).name} · {task}: the change couldn't be written to its "
+              f"Runs row ({type(e).__name__}: {str(e)[:120]}): {line}")
+        return None
     if sid is None:
         return None
     try:
@@ -899,13 +906,26 @@ def score_task(row: Path, task: str, rec: dict, log=print, runs_log: bool = True
                      "frontier": [{k2: v for k2, v in r.items() if k2 != "answer"} for r in rs]})
     stamp = time.strftime("%Y-%m-%dT%H-%M-%S.000000", time.gmtime())
     was = presented(d, task)
-    for old in [*d.glob("results_*.json"), *d.glob(f"samples_{task}_*.jsonl")]:
-        old.unlink()
+    # 18e point 5: the old results go only once the new are written — a
+    # failure between (a locked database) left no score and none kept
+    olds = [*d.glob("results_*.json"), *d.glob(f"samples_{task}_*.jsonl")]
     changed = was is not None and (was["score"] is None) != (page["score"] is None) or (
         was is not None and was["score"] is not None and page["score"] is not None
         and abs(was["score"] - page["score"]) > 1e-9)
     before = None
-    if changed:
+    # 18e point 3: Epoch's first model check of a score the code gave isn't a
+    # replacement — said once in Runs, never a "was" on the cell
+    first_check = bool(changed and spec.get("look") and (was or {}).get("look_waiting")
+                       and not out["waiting"])
+    if first_check:
+        line = (f"[frontier] {Path(row).name} · {spec['label']}: Epoch's model check: "
+                f"{score_words(was['score'])} → {score_words(page['score'])}")
+        log(line)
+        if runs_log:
+            runs_note(row, task, line)
+        if isinstance(was.get("before"), dict):
+            before = was["before"]      # an earlier replacement, while it stands
+    elif changed:
         why = change_why(was, str((out["grader"] or {}).get("version") or ""))
         line = change_line(row, task, was, page["score"], why)
         log(line)
@@ -976,6 +996,10 @@ def score_task(row: Path, task: str, rec: dict, log=print, runs_log: bool = True
         indent=1), encoding="utf-8")
     (d / f"samples_{task}_{stamp}.jsonl").write_text(
         "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
+    new = {d / f"results_{stamp}.json", d / f"samples_{task}_{stamp}.jsonl"}
+    for old in olds:
+        if old not in new:
+            old.unlink(missing_ok=True)
     (d / REPLACED).unlink(missing_ok=True)
     return {**page, **detail, "epochs": spec["epochs"]}
 

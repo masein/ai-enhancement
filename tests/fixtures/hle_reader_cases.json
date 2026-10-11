@@ -1,5 +1,5 @@
 {
- "about": "Replies an HLE judge could send, with what a careful person reads ('want': any reading listed is acceptable; 'no grade' means the reply must not be graded). 'reads_on_0abb757' is what scripts/frontier_graders.py read at 0abb757. Invented text only: no benchmark question is in this file. The field texts some cases quote are the public HLE judge prompt's own words. 18b added eight cases (ids 18b-…): a line ending in '{' before a field line (point 20), and four rare shapes that read a wrong grade on 70df001, where two verdicts disagree (point 26).",
+ "about": "Replies an HLE judge could send, with what a careful person reads ('want': any reading listed is acceptable; 'no grade' means the reply must not be graded). 'reads_on_0abb757' is what scripts/frontier_graders.py read at 0abb757. Invented text only: no benchmark question is in this file. The field texts some cases quote are the public HLE judge prompt's own words. 18b added eight cases (ids 18b-…): a line ending in '{' before a field line (point 20), and four rare shapes that read a wrong grade on 70df001, where two verdicts disagree (point 26). 18e added six (ids 18e-…): a '>' before a verdict is a quote only at the start of its line, so an arrow ('->', '=>') before the judge's verdict keeps it, and a quoted verdict that disagrees still makes a conflict (point 4).",
  "wrong_grade_on_0abb757": [
   "r2-A10",
   "r2-A11",
@@ -1518,6 +1518,62 @@
     "yes"
    ],
    "added_in": "18d"
+  },
+  {
+   "id": "18e-4a",
+   "what": "the judge's whole verdict after an arrow, 'Verdict -> {…}', and nothing else",
+   "reply": "Verdict -> {\"extracted_final_answer\": \"41\", \"reasoning\": \"it differs\", \"correct\": \"yes\", \"confidence\": 80}",
+   "want": [
+    "yes"
+   ],
+   "added_in": "18e"
+  },
+  {
+   "id": "18e-4b",
+   "what": "the judge's whole verdict after an arrow, then the response's lone opposite verdict on its line",
+   "reply": "Verdict -> {\"extracted_final_answer\": \"41\", \"reasoning\": \"it differs\", \"correct\": \"yes\", \"confidence\": 80}\nThe response wrote:\n{\"correct\": \"no\"}",
+   "want": [
+    "no grade",
+    "yes"
+   ],
+   "added_in": "18e"
+  },
+  {
+   "id": "18e-4c",
+   "what": "the judge's whole verdict after '=>', then the response's lone opposite verdict on its line",
+   "reply": "Final => {\"extracted_final_answer\": \"41\", \"reasoning\": \"it differs\", \"correct\": \"no\", \"confidence\": 80}\nThe response wrote:\n{\"correct\": \"yes\"}",
+   "want": [
+    "no grade",
+    "no"
+   ],
+   "added_in": "18e"
+  },
+  {
+   "id": "18e-4d",
+   "what": "the response's lone verdict inside a sentence, then the judge's whole verdict after an arrow",
+   "reply": "The response wrote {\"correct\": \"no\"} in its text.\nVerdict -> {\"extracted_final_answer\": \"41\", \"reasoning\": \"it differs\", \"correct\": \"yes\", \"confidence\": 80}",
+   "want": [
+    "yes"
+   ],
+   "added_in": "18e"
+  },
+  {
+   "id": "18e-4e",
+   "what": "the judge's whole verdict, then the response's opposite verdict quoted with '>' at the start of its line (a quoted verdict still counts toward a conflict)",
+   "reply": "{\"extracted_final_answer\": \"41\", \"reasoning\": \"it differs\", \"correct\": \"yes\", \"confidence\": 80}\nThe response ended:\n> {\"correct\": \"no\"}",
+   "want": [
+    "no grade"
+   ],
+   "added_in": "18e"
+  },
+  {
+   "id": "18e-4f",
+   "what": "the judge's whole verdict fenced, then the response's opposite verdict quoted with '>' at the start of its line",
+   "reply": "```json\n{\"extracted_final_answer\": \"41\", \"reasoning\": \"it differs\", \"correct\": \"no\", \"confidence\": 80}\n```\nThe response ended:\n> {\"correct\": \"yes\"}",
+   "want": [
+    "no grade"
+   ],
+   "added_in": "18e"
   }
  ]
 }

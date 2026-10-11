@@ -19,12 +19,18 @@ grader, a refusal when more than a quarter of an off row's answers think),
 how many answers read differently, an off row's thinking share, and how many
 answers wait for Epoch's model check, paid at the next Start:
 
-    served__x__thinking · MATH Level 5: stored 50.0% → 25.0% · 12 answers wait for
+    MOVES served__x__thinking · MATH Level 5: stored 50.0% → 25.0% · 12 answers wait for
       Epoch's model check, paid at the next Start
 
 and a last line: how many stored scores change, of how many (close to the
 count of results files the deploy step saved). A folder with no Frontier
-results exits 1, naming it."""
+results exits 1, naming it.
+
+18e point 6: each line's first word says whether the page's score moves —
+MOVES (another number), NO SCORE (none written where one shows), REFUSED,
+or UNREAD (the check couldn't read the row) for the lines to send before the
+deploy; STAYS and NOT SCORED (not every question answered) for the rest. A
+check that read no stored score at all exits 1, answer folders or not."""
 
 from __future__ import annotations
 
@@ -114,11 +120,27 @@ def moved(c: dict) -> bool:
         and abs(c["score_now"] - c["score_before"]) > 1e-9
 
 
+# 18e point 6: the first words of a line whose shown score moves — the
+# deploy step (docs/AGENT-RUNS.md § A, step 1) keys on them
+MOVING = ("MOVES", "NO SCORE", "REFUSED", "UNREAD")
+
+
+def first_word(c: dict) -> str:
+    """18e point 6: what the line is, in its first word"""
+    if c.get("skipped"):
+        return "NOT SCORED"
+    if not moved(c):
+        return "STAYS"
+    return {"refused": "REFUSED", "waiting": "NO SCORE", "no score": "NO SCORE"}.get(
+        c["state"], "MOVES")
+
+
 def line(row: str, label: str, c: dict) -> str:
     """18d point 6: every row with a stored score — what it holds and what
-    scoring will write, whether it moves or not"""
+    scoring will write, whether it moves or not. 18e point 6: led by its
+    first word (first_word), so "→" in a count is never read as a move"""
     from service import frontier as sf
-    words = [f"{row} · {label}: stored {sf.score_words(c['score_before'])}"]
+    words = [f"{first_word(c)} {row} · {label}: stored {sf.score_words(c['score_before'])}"]
     if c.get("skipped"):
         return words[0] + f" · {c['skipped']}: not scored again yet"
     if c["state"] == "refused":
@@ -127,8 +149,6 @@ def line(row: str, label: str, c: dict) -> str:
         words.append(f"no score written: {c['why']}")
     elif moved(c):
         words[0] += f" → {sf.score_words(c['score_now'])}"
-    else:
-        words.append("stays")
     if c["read"]:
         parts = [f"{c['ran_out']:,} now ran out" if c["ran_out"] else "",
                  f"{c['right_wrong']:,} right → wrong" if c["right_wrong"] else "",
@@ -157,14 +177,16 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{root}: no Frontier results here — is this the board's results folder "
               "(OUT_ROOT)? Nothing was checked")
         return 1
-    seen = changed = look = 0
+    seen = changed = look = unread = 0
     for task, spec in fb.BENCH.items():
         for d in sorted(root.glob(f"*/{task}_0shot/{sf.SUB}")):
             row = d.parent.parent
             try:
                 c = check_task(row, task)
             except Exception as e:                      # noqa: BLE001 — one row's, said
-                print(f"{row.name} · {spec['label']}: couldn't be read ({type(e).__name__})")
+                print(f"UNREAD {row.name} · {spec['label']}: couldn't be read "
+                      f"({type(e).__name__})")
+                unread += 1
                 continue
             if c is None:
                 continue
@@ -174,7 +196,12 @@ def main(argv: list[str] | None = None) -> int:
             print(line(row.name, spec["label"], c))
     print(f"{changed:,} of {seen:,} stored Frontier scores change the next time they are scored "
           f"({fb.VERSION}); {look:,} answers wait for Epoch's model check, paid at the next "
-          "Start; nothing was written")
+          "Start" + (f"; {unread:,} couldn't be read" if unread else "") + "; nothing was written")
+    # 18e point 6: answer folders with no stored score among them are a check
+    # of nothing — said, and not a pass
+    if not seen:
+        print(f"{root}: no stored Frontier score was read — nothing was checked")
+        return 1
     return 0
 
 

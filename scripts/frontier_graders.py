@@ -515,14 +515,17 @@ def _hle_object(text: str) -> tuple[str, dict | None, str]:
             and not re.sub(r"[\s`*_.,;]", "", text[b:end if end >= 0 else len(text)])
 
     def quoted(a: int) -> bool:
-        """18d point 3: a '>' before it on its line — a quote, never the verdict"""
-        return ">" in text[text.rfind("\n", 0, a) + 1:a]
+        """18d point 3: a quote, never the verdict — 18e point 4: a markdown
+        quote alone, its line starting with '>' (an arrow before a verdict,
+        "Verdict -> {…}", "=>", isn't one)"""
+        return bool(re.match(r"\s*>", text[text.rfind("\n", 0, a) + 1:a]))
     # 18c point 17: an object holding nothing but its verdict is the judge's
     # only when it ends the reply — {"correct": "yes"} on its line, then prose
     # saying the answer is wrong, is the response's, quoted. (The judge's
     # reasoning, then its verdict object last, stays its grade)
     def last(b: int) -> bool:
         return not re.sub(r"[\s`*_>#.,;:-]|json", "", text[b:])
+    quotes = [x for x in real if quoted(x[0])]
     real = [x for x in real if not quoted(x[0])]
     alone = [(a, b, o) for a, b, o in real if by_itself(a, b)
              and (set(o) - {"correct"} or last(b))]
@@ -534,18 +537,22 @@ def _hle_object(text: str) -> tuple[str, dict | None, str]:
     if not pool:
         return "none", None, outside
     v_alone = {_yes_no(o["correct"]) for _, _, o in alone}
-    others = [(a, b, o) for a, b, o in real if (a, b, o) not in alone
+    others = [(a, b, o) for a, b, o in [*real, *quotes] if (a, b, o) not in alone
               and _yes_no(o["correct"]) not in v_alone]
     # 18d point 3: and a lone object on its line that doesn't end the reply
     # still counts against one that does — {"correct": "no"}, "The response
-    # wrote:", {"correct": "yes"} was read yes; before 18c it was no grade
-    if alone and others and (len(v_alone) > 1 or any(set(o) - {"correct"} or by_itself(a, b)
-                                                     for a, b, o in others)):
+    # wrote:", {"correct": "yes"} was read yes; before 18c it was no grade.
+    # 18e point 4: a quoted one too — never the verdict, still a conflict
+    if alone and others and (len(v_alone) > 1 or any(
+            set(o) - {"correct"} or by_itself(a, b) or quoted(a) for a, b, o in others)):
         return "conflict", None, outside
     distinct = list({json.dumps(o, sort_keys=True, default=str): o
                      for _, _, o in pool}.values())
     verdicts = {_yes_no(o["correct"]) for o in distinct}
     if len(verdicts) > 1:
+        return "conflict", None, outside
+    # 18e point 4: a quoted verdict that says otherwise still makes a conflict
+    if any(_yes_no(o["correct"]) not in verdicts for _, _, o in quotes):
         return "conflict", None, outside
     said = {m.group(1).lower() for m in
             re.finditer(rf"(?im)^{_W}correct{_W}:{_W}(yes|no)\b", outside)
