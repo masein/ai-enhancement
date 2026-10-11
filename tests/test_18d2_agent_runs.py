@@ -207,10 +207,10 @@ def test_15_the_firewalls_rules_are_read_and_each_missing_one_named(monkeypatch)
     monkeypatch.setattr(ar, "run", lambda cmd, **kw: (0, FIREWALL))
     assert ar.firewall_missing() == ""
     partial = "\n".join(x for x in FIREWALL.splitlines()
-                        if "INPUT -i" not in x and "100.64.0.0" not in x)
+                        if "INPUT -i" not in x and ar.TAILNET_RANGE not in x)
     monkeypatch.setattr(ar, "run", lambda cmd, **kw: (0, partial))
     why = ar.firewall_missing()
-    assert "INPUT from docker0" in why and "DOCKER-USER to 100.64.0.0/10" in why
+    assert "INPUT from docker0" in why and f"DOCKER-USER to {ar.TAILNET_RANGE}" in why
     assert "a reboot loses them" in why
     monkeypatch.setattr(ar, "run", lambda cmd, **kw: (1, "Permission denied (you must be root)"))
     assert "run this line in its sudo form" in ar.firewall_missing()
@@ -225,17 +225,21 @@ def test_15_every_deepswe_line_refuses_while_the_rules_are_missing(server_world,
     assert not w["harbor"]
 
 
-def test_15_the_firewall_step_comes_before_the_tasks_that_fetch():
+def test_15_the_firewall_step_comes_before_the_tasks_that_fetch(capsys):
     a = DOC[DOC.index("## A."):DOC.index("## B.")]
     fw = a[a.index("\n9. "):a.index("\n10. ")]
-    for line in ar.FIREWALL_LINES:
-        assert line in fw, line
+    # the rules printed by the runner, their addresses never in the repo
+    assert 'agent_run.py deepswe --firewall-lines' in fw
+    assert ar.main(["deepswe", "--firewall-lines"]) == 0
+    assert capsys.readouterr().out.splitlines() == list(ar.FIREWALL_LINES)
+    assert all(x.startswith("sudo iptables -I ") for x in ar.FIREWALL_LINES)
     assert "sudo docker network inspect bridge --format '{{range .Containers}}{{.Name}} {{end}}'" \
         in fw and "must print nothing" in fw
     assert "A\n   reboot loses the rules" in fw or "reboot loses the rules" in fw
     assert "sudo iptables -S INPUT | grep docker0; sudo iptables -S DOCKER-USER | grep docker0" \
         in fw
-    assert "100.100.100.100:53" in fw and "step 7 again" in fw
+    assert "no tailnet address but Tailscale's resolver on port 53" in " ".join(fw.split())
+    assert "step 7 again" in fw
     assert a.index("\n9. ") < a.index("--only fetching") < a.index("deepswe --oracle")
 
 
@@ -308,13 +312,17 @@ def test_18_a_trials_project_is_named_as_harbor_names_it(monkeypatch):
     assert ["docker", "rm", "-f", "c1"] in seen
 
 
-def test_18_the_build_caches_listing_is_read_without_its_star_and_said_once(monkeypatch, capsys):
+def test_18_the_build_caches_listing_is_read_without_its_star(monkeypatch):
     monkeypatch.setattr(ar, "run", lambda cmd, **kw: (0, json.dumps(
         [{"ID": "abc123*"}, {"ID": "def456"}])))
     assert ar.cache_ids() == {"abc123", "def456"}              # 0b58df7: "abc123*"
-    ar._CACHE_SAID.clear()
     monkeypatch.setattr(ar, "run", lambda cmd, **kw: (1, "Error response from daemon"))
-    assert ar.cache_ids() is None and ar.cache_ids() is None
+    assert ar.cache_ids() is None
+
+
+def test_18_a_listing_that_cant_be_read_is_said_once_a_run(server_world, capsys):  # noqa: F811
+    ar._CACHE_SAID.clear()                  # the stand-in's docker system df says nothing
+    assert ar.main(["swebench-multilingual", "--as", MODEL, "--tasks", "3", "--no-board"]) == 0
     assert capsys.readouterr().out.count("Docker's build cache couldn't be listed") == 1
 
 

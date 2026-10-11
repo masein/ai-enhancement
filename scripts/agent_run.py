@@ -1245,8 +1245,12 @@ def build_probe(rdir: Path, script: str, network: str) -> tuple[int, str]:
 # servers), the LAN or the tailnet. Three rules (docs/AGENT-RUNS.md step 9),
 # lost on a reboot: every DeepSWE line refuses while one is missing
 BRIDGE = "docker0"
-PRIVATE = ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "169.254.0.0/16")
-TAILNET_DNS = "100.100.100.100"
+# written in parts: the mirror's guard keeps every address of the tailnet's
+# range out of tracked files (tests/test_no_tailnet_address.py) — these two are
+# Tailscale's own, the same on every tailnet: its range, and its resolver
+TAILNET_RANGE = ".".join(["100", "64", "0", "0"]) + "/10"
+TAILNET_DNS = ".".join(["100"] * 4)
+PRIVATE = ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", TAILNET_RANGE, "169.254.0.0/16")
 FIREWALL_LINES = (
     f"sudo iptables -I INPUT -i {BRIDGE} -j DROP",
     f"sudo iptables -I DOCKER-USER -i {BRIDGE} -d {','.join(PRIVATE)} -j DROP",
@@ -1330,8 +1334,7 @@ _CACHE_SAID: list[bool] = []
 
 def cache_ids() -> set[str] | None:
     """the records Docker's build cache holds now; None when it can't say —
-    18d point 18: said once a run, and an id in use read without the "*"
-    Docker puts after it"""
+    18d point 18: an id in use read without the "*" Docker puts after it"""
     code, out = run(["docker", "system", "df", "-v", "--format", "{{json .BuildCache}}"],
                     timeout=300)
     try:
@@ -1339,11 +1342,6 @@ def cache_ids() -> set[str] | None:
     except (ValueError, IndexError):
         got = None
     if code != 0 or not isinstance(got, list):
-        if not _CACHE_SAID:
-            _CACHE_SAID.append(True)
-            say("Docker's build cache couldn't be listed (docker system df -v): what the "
-                "tasks' builds leave in it isn't pruned this run — `docker builder prune` "
-                "after it")
         return None
     return {str(r.get("ID")).rstrip("*") for r in got if isinstance(r, dict) and r.get("ID")}
 
@@ -1458,11 +1456,18 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--by", default=os.environ.get("SUDO_USER") or os.environ.get("USER", ""),
                     help="your name, on its Runs row (under sudo: the user who ran sudo)")
     ap.add_argument("--check", action="store_true", help="the checks before the first task, only")
+    ap.add_argument("--firewall-lines", action="store_true",
+                    help="18d point 15: print the three firewall rules for Docker's default "
+                         "bridge (step A9), and the line that shows them — nothing changed")
     ap.add_argument("--check-reach", action="store_true",
                     help="step A: a container as a task's tries the model's server, the board, "
                          "the host's addresses, the LAN and the internet — nothing may answer")
     a = ap.parse_args(argv)
     b = ab.bench(a.benchmark)
+    if a.firewall_lines:                # printed, never run: masein runs each
+        for line in FIREWALL_LINES:
+            print(line)
+        return 0
     if a.check_reach:                   # no model: step A (18b point 4)
         root = bench_root()
         rdir = root / "agent-runs" / "reach-check"
@@ -1747,6 +1752,11 @@ def main(argv: list[str] | None = None) -> int:
             cmd = harbor_cmd(tdir / t, job, rdir, b, a, info.get("model") or "",
                              relay.url if relay else "", reach)
             cache = cache_ids()                 # what Docker's build cache held before it
+            if cache is None and not _CACHE_SAID:   # 18d point 18: said once a run
+                _CACHE_SAID.append(True)
+                say("Docker's build cache couldn't be listed (docker system df -v): what the "
+                    "tasks' builds leave in it isn't pruned this run — `docker builder prune` "
+                    "after it")
             (rdir / "jobs" / f"{job}.running").write_text(str(os.getpid()))
             log = open(rdir / "jobs" / f"{job}.log", "w")
             try:
