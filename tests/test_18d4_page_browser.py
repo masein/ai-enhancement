@@ -38,8 +38,14 @@ def test_25_the_headers_list_keeps_each_name_whole(live, page, scheme):
             assert ln.locator(".runwhat").inner_text() == "rented GPU"
         here = lst.locator(".runline:not([data-run-rented])").first
         w = here.locator(".runname").evaluate(
-            "e => [e.getBoundingClientRect().width, e.scrollWidth]")
-        assert w[0] > 20 and w[0] + 1 >= w[1], w
+            "e => [e.getBoundingClientRect().width, e.scrollWidth, getComputedStyle(e).textOverflow]")
+        # 18e point 7: whole where it fits; one longer than the room (this one,
+        # with CI's fonts, at 400 px) cut with an ellipsis, its description
+        # given way first
+        assert w[0] > 20 and (w[0] + 1 >= w[1] or w[2] == "ellipsis"), w
+        if w[0] + 1 < w[1]:
+            assert here.locator(".runwhat").evaluate(
+                "e => e.getBoundingClientRect().width") < 1, (width, w)
         assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
         SCREENS.mkdir(parents=True, exist_ok=True)
         steady_shot(lst, SCREENS / f"header-list-{width}-{scheme}.png")
