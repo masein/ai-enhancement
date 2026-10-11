@@ -16,7 +16,7 @@ request (and /apply-template) answers with; FAKE_LLAMA_THINK=never answers
 without thinking whatever it is told. 20: --list-devices lists one CUDA card,
 or none with CUDA's own error when FAKE_LLAMA_DEVICES=none;
 FAKE_LLAMA_BROKEN=1 fails as a binary missing a library does, before
-anything."""
+anything. 18e: FAKE_LLAMA_DRAFTS=1 has its /slots say they draft tokens."""
 
 from __future__ import annotations
 
@@ -103,7 +103,8 @@ def main() -> int:
                                         "chat_template": "{# a fake template #}",
                                         "default_generation_settings": {"n_ctx": ctx // slots}})
             if self.path == "/slots":
-                return self._send(200, [{"id": i, "speculative": False} for i in range(slots)])
+                drafts = os.environ.get("FAKE_LLAMA_DRAFTS") == "1"
+                return self._send(200, [{"id": i, "speculative": drafts} for i in range(slots)])
             return self._send(404, {"error": {"message": "not found"}})
 
         def do_POST(self):

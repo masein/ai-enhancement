@@ -156,16 +156,34 @@ def fetch(src: str, into: Path, say) -> Path:
         if not p.is_file():
             raise SystemExit(f"{src}: no such file on this box, and not hf://<org>/<repo>/<path>")
         return p
-    from huggingface_hub import hf_hub_download
+    import huggingface_hub as hh
     kind = "dataset" if m["type"] == "datasets/" else "model"
-    say(f"fetching {m['path']} from {m['repo']}" + (f" at {m['rev']}" if m["rev"] else ""))
+    # 18e point 19: the commit the file comes from, said — the revision given
+    # (or main) read once, and the file fetched at that commit
+    commit = repo_commit(hh, m["repo"], kind, m["rev"])
+    say(f"fetching {m['path']} from {m['repo']}" + (f" at {m['rev']}" if m["rev"] else "")
+        + (f": commit {commit}" if commit else ": its commit not said")
+        + ("" if m["rev"] else f" — give @{commit} to fetch this one again" if commit else ""))
     try:
-        got = hf_hub_download(m["repo"], m["path"], repo_type=kind, revision=m["rev"],
-                              token=os.environ.get("HF_TOKEN") or None, local_dir=str(into))
+        got = hh.hf_hub_download(m["repo"], m["path"], repo_type=kind,
+                                 revision=commit or m["rev"],
+                                 token=os.environ.get("HF_TOKEN") or None, local_dir=str(into))
     except Exception as e:                          # noqa: BLE001 — said in one line
         raise SystemExit(rb.scrub(f"{src} could not be fetched: {e}. A private repo needs "
                                   "HF_TOKEN set on this box (typed here, never stored)")) from None
     return Path(got).resolve()
+
+
+def repo_commit(hh, repo: str, kind: str, rev: str | None) -> str:
+    """18e point 19: the commit `rev` (main when none) is at in `repo` — ''
+    when Hugging Face's client can't say"""
+    try:
+        info = hh.HfApi(token=os.environ.get("HF_TOKEN") or None).repo_info(
+            repo, repo_type=kind, revision=rev or None)
+        sha = str(getattr(info, "sha", "") or "")
+    except Exception:                                   # noqa: BLE001 — said as not said
+        return ""
+    return sha if re.fullmatch(r"[0-9a-f]{40}", sha) else ""
 
 
 _SPLIT = re.compile(r"-(\d{5})-of-(\d{5})\.gguf$")
@@ -401,12 +419,14 @@ def archs_run_on(archs: list[str], cap: int) -> bool | None:
     return ok
 
 
-def check_runs_here(srv: dict, env: dict, say) -> dict:
+def check_runs_here(srv: dict, env: dict, say, what: str = "") -> dict:
     """20: --server-dir's llama-server runs on this box and this card — its
     --version answers, it lists a CUDA device, and the architectures it was
     built for (its CMakeCache.txt) hold this card's. Refused in one line;
-    {version, devices, cuda_archs, compute_cap} when it does"""
+    {version, devices, cuda_archs, compute_cap} when it does. 18e point 18: a
+    tarball's too, named by `what` (its file)"""
     exe, where = srv["bin"], srv["root"]
+    what = what or f"--server-dir {where}"
 
     def first_line(text: str) -> str:
         lines = [x.strip() for x in text.splitlines() if x.strip()]
@@ -417,10 +437,10 @@ def check_runs_here(srv: dict, env: dict, say) -> dict:
         r = subprocess.run([str(exe), "--version"], capture_output=True, text=True, timeout=60,
                            env=env)
     except (OSError, subprocess.SubprocessError) as e:
-        raise SystemExit(f"--server-dir {where}: llama-server doesn't run here: {e}") from None
+        raise SystemExit(f"{what}: llama-server doesn't run here: {e}") from None
     text = (r.stdout + r.stderr).strip()
     if r.returncode != 0 or not re.search(r"version:\s*\d+", text):
-        raise SystemExit(f"--server-dir {where}: llama-server doesn't run here (exit "
+        raise SystemExit(f"{what}: llama-server doesn't run here (exit "
                          f"{r.returncode}): {first_line(text)}")
     devices = None
     try:
@@ -429,12 +449,12 @@ def check_runs_here(srv: dict, env: dict, say) -> dict:
         listed = (r.stdout + r.stderr)
         devices = re.findall(r"(?m)^\s*(CUDA\d+):\s*(.+?)\s*$", listed)
         if not devices and re.search(r"(?i)available devices", listed):
-            raise SystemExit(f"--server-dir {where}: llama-server sees no CUDA device on this "
+            raise SystemExit(f"{what}: llama-server sees no CUDA device on this "
                              f"box — {first_line(listed)}: a build without CUDA, or a driver "
                              "older than the CUDA it was built with")
         if not devices and r.returncode != 0 and not re.search(r"(?i)invalid argument|unknown "
                                                                r"argument|usage", listed):
-            raise SystemExit(f"--server-dir {where}: llama-server can't list this box's devices "
+            raise SystemExit(f"{what}: llama-server can't list this box's devices "
                              f"(exit {r.returncode}): {first_line(listed)}")
     except (OSError, subprocess.SubprocessError):
         devices = None
@@ -442,11 +462,11 @@ def check_runs_here(srv: dict, env: dict, say) -> dict:
     if cap and archs:
         fits = archs_run_on(archs, cap)
         if fits is False:
-            raise SystemExit(f"--server-dir {where}: built for CUDA architectures "
+            raise SystemExit(f"{what}: built for CUDA architectures "
                              f"{';'.join(archs)} (its CMakeCache.txt), and this card is "
                              f"{cap // 10}.{cap % 10} (sm_{cap}): it won't run here — build "
                              f"with -DCMAKE_CUDA_ARCHITECTURES={cap} (docs/STEP4000-RUN.md)")
-    say(f"--server-dir {where}: llama-server runs here"
+    say(f"{what}: llama-server runs here"
         + (f" · sees {', '.join(f'{d} {n}' for d, n in devices)}" if devices else "")
         + (f" · built for {';'.join(archs)}" if archs else
            " · its CUDA architectures not said (no CMakeCache.txt or VERSION): checked when it "
@@ -1031,6 +1051,10 @@ def _main(argv: list[str] | None = None) -> int:
     ap.add_argument("--slots-fit", action="store_true",
                     help="17e: these --slots fit on this card — the memory check's estimate is "
                          "printed, and not held to")
+    ap.add_argument("--max-slots", type=int, default=0,
+                    help="18e point 21: run more than --slots, up to this many, when the "
+                         "memory check confirms they fit this card (an RTX PRO 6000 holds 25 of "
+                         "BF16's at HLE's context) — never on --max-context alone")
     ap.add_argument("--port", type=int, default=8090)
     ap.add_argument("--load-timeout", type=float, default=3600)
     ap.add_argument("--by", default="remote", help="who ran it, for the run's record")
@@ -1112,6 +1136,13 @@ def _main(argv: list[str] | None = None) -> int:
         dropped = (a.slots, fit)
         a.slots = fit["fit"]
         fit, unread = kv_fit(a.gguf, flags, a.slots, ctx, mem)
+    # 18e point 21: --slots only lowered; more run when the memory check, from
+    # the GGUF's header and this card, confirms they fit
+    raised = None
+    if fit and a.max_slots > a.slots and fit["fit"] > a.slots and not a.parity:
+        raised = (a.slots, fit)
+        a.slots = min(fit["fit"], a.max_slots)
+        fit, unread = kv_fit(a.gguf, flags, a.slots, ctx, mem)
     if fit and fit["fit"] < a.slots and not a.slots_fit:
         gb = 1024 ** 3
         raise SystemExit(
@@ -1157,6 +1188,40 @@ def _main(argv: list[str] | None = None) -> int:
     # full run's — so the 23 GB file is fetched and hashed once
     files = Path(a.files).resolve() if a.files else out.parent / "files"
     files.mkdir(parents=True, exist_ok=True)
+    # 18e point 18: the server first — fetched, unpacked, pinned and run here
+    # before the GGUF's tens of GB are fetched (a tarball for other cards was
+    # found after the download)
+    if a.server_dir:
+        # 20: the team's build directory, run as it is — checked to run on this
+        # box and card before anything else
+        srv = server_dir(a.server_dir)
+        env = server_env(srv, extra_env)
+        ran = check_runs_here(srv, env, say)
+    else:
+        tb = fetch(a.server, files, say)
+        srv = unpack_server(tb, out / "server")
+        why = pin_refused(tb.name, srv["tarball_sha256"], pins)
+        if why:
+            raise SystemExit(why)
+        env = server_env(srv, extra_env)
+        # 20: a tarball built for some cards only (its VERSION's cuda_archs:
+        # the lda tarball's is 120) is refused on another, before it loads
+        archs, cap = cuda_archs(srv["bin"].parent.parent), compute_cap()
+        if archs and cap and archs_run_on(archs, cap) is False:
+            raise SystemExit(f"{tb.name} is built for CUDA architectures {';'.join(archs)} (its "
+                             f"VERSION), and this card is sm_{cap}: it won't run here — rent "
+                             "a card it was built for. Nothing was asked")
+        # 18e point 18: and run here, as a build directory is — its version,
+        # this box's card
+        ran = check_runs_here(srv, env, say, what=tb.name)
+    if a.runtime:
+        # 20: the runtime's variables are read by this build, or it isn't the
+        # build the runtime is for
+        unset = build_reads(srv, list(fb.RUNTIMES[a.runtime]["env"]))
+        if unset:
+            raise SystemExit(f"runtime {a.runtime} sets {', '.join(unset)}, and this build "
+                             "(llama-server and its libraries) never reads it: not the "
+                             "build the runtime is for? Nothing was asked")
     paths = [fetch(src, files, say) for src in split_parts(a.gguf)]
     gguf_path = paths[0]
     shas = [sha256_cached(x, state, say, files / "sha256.json") for x in paths]
@@ -1176,35 +1241,6 @@ def _main(argv: list[str] | None = None) -> int:
             "source": a.gguf if a.gguf.startswith("hf://") else "a path on the box",
             **({"parts": [{"name": x.name, "sha256": h, "size": x.stat().st_size}
                           for x, h in zip(paths, shas)]} if len(paths) > 1 else {})}
-    if a.server_dir:
-        # 20: the team's build directory, run as it is — checked to run on this
-        # box and card before anything else
-        srv = server_dir(a.server_dir)
-        env = server_env(srv, extra_env)
-        ran = check_runs_here(srv, env, say)
-    else:
-        tb = fetch(a.server, files, say)
-        srv = unpack_server(tb, out / "server")
-        why = pin_refused(tb.name, srv["tarball_sha256"], pins)
-        if why:
-            raise SystemExit(why)
-        env = server_env(srv, extra_env)
-        ran = None
-        # 20: a tarball built for some cards only (its VERSION's cuda_archs:
-        # the lda tarball's is 120) is refused on another, before it loads
-        archs, cap = cuda_archs(srv["bin"].parent.parent), compute_cap()
-        if archs and cap and archs_run_on(archs, cap) is False:
-            raise SystemExit(f"{tb.name} is built for CUDA architectures {';'.join(archs)} (its "
-                             f"VERSION), and this card is sm_{cap}: it won't run here — rent "
-                             "a card it was built for. Nothing was asked")
-    if a.runtime:
-        # 20: the runtime's variables are read by this build, or it isn't the
-        # build the runtime is for
-        unread = build_reads(srv, list(fb.RUNTIMES[a.runtime]["env"]))
-        if unread:
-            raise SystemExit(f"runtime {a.runtime} sets {', '.join(unread)}, and this build "
-                             "(llama-server and its libraries) never reads it: not the "
-                             "build the runtime is for? Nothing was asked")
     ver = version_of(srv["bin"], env)
     server = {"version": ver["text"], "build": ver["build"], "commit": ver["commit"],
               "binary_sha256": rb.sha256_file(srv["bin"]),
@@ -1261,6 +1297,10 @@ def _main(argv: list[str] | None = None) -> int:
         server["kv_estimate"] = {k: fit[k] for k in ("used", "kv", "per_token", "file", "card",
                                                      "fit", "types")}
         mib = 1024 ** 2
+        if raised:
+            say(f"{raised[0]} slots asked, and up to {raised[1]['fit']} of {ctx:,} tokens fit "
+                f"this card keeping {ROOM // mib:,} MiB spare: {a.slots} run (--max-slots "
+                f"{a.max_slots})")
         if dropped:
             was, big_fit = dropped
             say(f"{was} slots of {ctx:,} tokens would leave "
@@ -1332,6 +1372,13 @@ def _main(argv: list[str] | None = None) -> int:
             seen = {}
         if seen.get("speculative") is not None:
             server["speculative"] = bool(seen["speculative"])
+        # 18e point 17: a runtime asks without a draft — a server whose slots
+        # draft tokens (a draft head the GGUF carries, a draft model) is
+        # refused here, before a question, not at the import
+        if a.runtime and seen.get("speculative"):
+            raise SystemExit(f"runtime {a.runtime} runs no speculative decoding, and this "
+                             "server's slots say they draft tokens (its /slots): a GGUF with a "
+                             "draft head, or a launch with a draft model? Nothing was asked")
         rec = register_here(a.served_as, a.served_as.split("/", 1)[1], a.based_on,
                             srv_proc.base, thinking,
                             f"llama.cpp {ver['build'] or '?'} on {gpu.get('name') or 'a GPU'}: "

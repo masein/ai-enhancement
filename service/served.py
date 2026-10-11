@@ -379,11 +379,16 @@ def register(f: dict, by: str) -> dict:
     # was refused until --file-sha256 was given again
     was = old.get("pin") or {}
     fs = old.get("file_sha256") or {}
-    if fs and ((rec["pin"].get("file"), rec["pin"].get("size")) == (
-            was.get("file"), was.get("size"))
-            or (fs.get("name") and rec["pin"].get("file") == fs.get("name")
-                and _same_size(rec["pin"].get("size"), fs.get("size") or was.get("size")))):
+    same = (rec["pin"].get("file"), rec["pin"].get("size")) == (was.get("file"), was.get("size"))
+    if fs and (same or (fs.get("name") and rec["pin"].get("file") == fs.get("name")
+                        and _same_size(rec["pin"].get("size"),
+                                       fs.get("size") or was.get("size")))):
         rec["file_sha256"] = old["file_sha256"]
+    # 18e point 20: and its runtime (20: the sampling every request carries),
+    # while its server serves the same file — saving a rented model's page
+    # dropped it, as 17i found for the sha256
+    if old.get("runtime") and (same or "file_sha256" in rec):
+        rec["runtime"] = old["runtime"]
     db.served_put(rec)
     write_meta(rec)
     return public(rec)

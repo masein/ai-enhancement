@@ -1207,7 +1207,7 @@ before anything is asked):
 
 | Model | `--gguf` | sha256 (the board's `--file-sha256`) |
 |---|---|---|
-| step4000 | `hf://<you>/evalboard-private/step4000.gguf` | `630c408a3836f82afa1f79629b06d9390d3f736f6140791baa42e180a640565e` |
+| step4000 | `hf://<you>/evalboard-private@<commit>/step4000.gguf` | `630c408a3836f82afa1f79629b06d9390d3f736f6140791baa42e180a640565e` |
 | Q4 | `hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF@5bc3e238d916f48a861bac2f8a1990a0e9b7e98d/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf` | `55983c5a75a1ab969824077b3bb3de4146e82a9234072b48ad4e8f92ad3fe9f1` |
 | BF16 | `hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF@5bc3e238d916f48a861bac2f8a1990a0e9b7e98d/BF16/Qwen3.6-35B-A3B-BF16-00001-of-00002.gguf` | the split identity `f391f702c4ad97282bf9a9babb494f2639322ff7d17ae28f54237fe00e715ca2` (part 1 `a172dfea…44a2`, part 2 `b90b4d07…5161`) |
 
@@ -1215,6 +1215,13 @@ Q4's and BF16's are unsloth's public files as Hugging Face publishes them at
 that revision, the files the earlier rows registered: check they are the
 sha256 and identity on `served/Qwen3.6-35B-A3B-Q4-original-k-8`'s and
 `served/Qwen3.6-35B-A3B-BF16`'s pages before the first import.
+
+`<commit>` is the private repository's commit that holds step4000.gguf and
+the tarball (its page on Hugging Face, Files and versions ▸ History), so a
+later upload never changes what a box fetches. On an image after 18e each
+box prints the commit every file came from ("fetching step4000.gguf from
+<you>/evalboard-private: commit …"); a line given no revision says the one
+to give.
 
 ## L2. One box, end to end
 
@@ -1246,19 +1253,22 @@ sha256 and identity on `served/Qwen3.6-35B-A3B-Q4-original-k-8`'s and
 4. The box's line. For step4000, box L13:
 
    ```bash
-   python scripts/frontier_box.py L13 --as served/step4000-lda-2610 --gguf hf://<you>/evalboard-private/step4000.gguf --server hf://<you>/evalboard-private/llama-server-lda-a4a76a7.tar.gz
+   python scripts/frontier_box.py L13 --as served/step4000-lda-2610 --gguf hf://<you>/evalboard-private@<commit>/step4000.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-lda-a4a76a7.tar.gz
    ```
 
    Q4, the same box label with its file:
 
    ```bash
-   python scripts/frontier_box.py L13 --as served/Qwen3.6-35B-A3B-Q4-lda-2610 --gguf hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF@5bc3e238d916f48a861bac2f8a1990a0e9b7e98d/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf --server hf://<you>/evalboard-private/llama-server-lda-a4a76a7.tar.gz
+   python scripts/frontier_box.py L13 --as served/Qwen3.6-35B-A3B-Q4-lda-2610 --gguf hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF@5bc3e238d916f48a861bac2f8a1990a0e9b7e98d/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-lda-a4a76a7.tar.gz
    ```
 
-   BF16, on an RTX PRO 6000, the first part of its file (the box fetches both):
+   BF16, on an RTX PRO 6000, the first part of its file (the box fetches both).
+   On an image after 18e, add `--max-slots 25`: each step runs as many slots
+   as the box's memory check confirms fit, up to 25, where the plan asks 8
+   or fewer:
 
    ```bash
-   python scripts/frontier_box.py L13 --as served/Qwen3.6-35B-A3B-BF16-lda-2610 --gguf hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF@5bc3e238d916f48a861bac2f8a1990a0e9b7e98d/BF16/Qwen3.6-35B-A3B-BF16-00001-of-00002.gguf --server hf://<you>/evalboard-private/llama-server-lda-a4a76a7.tar.gz
+   python scripts/frontier_box.py L13 --as served/Qwen3.6-35B-A3B-BF16-lda-2610 --gguf hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF@5bc3e238d916f48a861bac2f8a1990a0e9b7e98d/BF16/Qwen3.6-35B-A3B-BF16-00001-of-00002.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-lda-a4a76a7.tar.gz
    ```
 
    It checks the card first (an RTX 5090 or an RTX PRO 6000, or nothing is
@@ -1270,7 +1280,7 @@ sha256 and identity on `served/Qwen3.6-35B-A3B-Q4-original-k-8`'s and
    boxes running now), one line in a loop — L2 starts when L1 ends:
 
    ```bash
-   for b in L1 L2; do python scripts/frontier_box.py $b --as served/step4000-lda-2610 --gguf hf://<you>/evalboard-private/step4000.gguf --server hf://<you>/evalboard-private/llama-server-lda-a4a76a7.tar.gz; done
+   for b in L1 L2; do python scripts/frontier_box.py $b --as served/step4000-lda-2610 --gguf hf://<you>/evalboard-private@<commit>/step4000.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-lda-a4a76a7.tar.gz; done
    ```
 
    On an image after 18e, the labels in one line — each later label's line
@@ -1278,7 +1288,7 @@ sha256 and identity on `served/Qwen3.6-35B-A3B-Q4-original-k-8`'s and
    between them:
 
    ```bash
-   python scripts/frontier_box.py L1 L2 --as served/step4000-lda-2610 --gguf hf://<you>/evalboard-private/step4000.gguf --server hf://<you>/evalboard-private/llama-server-lda-a4a76a7.tar.gz
+   python scripts/frontier_box.py L1 L2 --as served/step4000-lda-2610 --gguf hf://<you>/evalboard-private@<commit>/step4000.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-lda-a4a76a7.tar.gz
    ```
 
    Either way, give the fetch the box's labels (L3: `<host>:<port>=L1,L2`).
@@ -1291,10 +1301,12 @@ sha256 and identity on `served/Qwen3.6-35B-A3B-Q4-original-k-8`'s and
 
    (For Q4 or BF16, its own folder: `/workspace/Qwen3.6-35B-A3B-Q4-lda-2610`
    or `/workspace/Qwen3.6-35B-A3B-BF16-lda-2610`.) A line a benchmark:
-   "GPQA Diamond · step4000-lda-2610: 61.6% ± 3.1 · 198 answers (shards 1 of
-   4: 198 of its 792 …) · 12 ran out of room (6.1%), 9 of them ending in a
-   loop". MATH and OTIS are the code's score, the board's before Epoch's
-   model check; HLE and SimpleQA show their answers, ran out and loops only.
+   "GPQA Diamond · step4000-lda-2610: 61.6% ± 3.1 · 792 answers · 12 ran out
+   of room (1.5%), 9 of them ending in a loop"; a benchmark with only some of
+   its shards in says which, after its answers ("200 answers (shards 1 of 4:
+   50 of its 198 questions)"). MATH and OTIS are the code's score, the
+   board's before Epoch's model check, and say so; HLE and SimpleQA read
+   "graded on the board later", with their answers, ran out and loops.
 6. Destroy the box once the fetch says it is safe to destroy (L3), the box
    given with every label it runs (`<host>:<port>=L1,L2`): between two labels
    a box given without them reads safe on the first alone.

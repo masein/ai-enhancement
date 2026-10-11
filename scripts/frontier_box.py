@@ -325,6 +325,8 @@ def argv_of(box: str, k: int, step: Step, a: argparse.Namespace) -> list[str]:
         out += ["--pin", pin]
     if getattr(a, "slots_fit", False):
         out += ["--slots-fit"]
+    if getattr(a, "max_slots", 0) and th != "parity":   # 18e point 21: more, where they fit
+        out += ["--max-slots", str(a.max_slots)]
     if a.env:
         out += ["--env", a.env]
     if a.ask_written_off:
@@ -393,6 +395,10 @@ def parser() -> argparse.ArgumentParser:
                     help="17f: each step asks again what earlier runs wrote off as no answer")
     ap.add_argument("--slots", type=int, default=0,
                     help="17g: at most this many slots a step (what a refusal advises)")
+    ap.add_argument("--max-slots", type=int, default=0,
+                    help="18e point 21: each step runs more slots than planned, up to this "
+                         "many, where the box's memory check confirms they fit (25 on an RTX "
+                         "PRO 6000 with BF16)")
     ap.add_argument("--slots-fit", action="store_true",
                     help="17g: the slots given fit this card — the memory check's estimate is "
                          "printed, and not held to")
