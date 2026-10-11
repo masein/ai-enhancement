@@ -776,7 +776,9 @@ def fetch_bf16(files: Path) -> tuple[Path | None, str]:
                           token=os.environ.get("HF_TOKEN") or None)
     except Exception as e:                              # noqa: BLE001 — said in one line
         import remote_bundle as rb                      # 18d point 24: never a token's value
-        return None, rb.scrub(f"the weights couldn't be fetched: {str(e)[:300]}")
+        # 18e point 23: scrubbed whole, then cut — a cut first left a token's
+        # start the scrub couldn't match
+        return None, "the weights couldn't be fetched: " + rb.scrub(str(e))[:300]
     (dest / ".fetched").write_text(BF16["revision"])
     return dest, ""
 
@@ -945,6 +947,8 @@ def main(argv: list[str] | None = None) -> int:
             rec["peak_mib"] = peak.values()
             keep(a.out, rec)
             say(line_of(rec))
+            if (rec["result"] or {}).get("stopped"):
+                worst = 1               # 18e point 24: a setting STOPPED EARLY isn't a pass
         except RuntimeError as e:
             worst = 1
             say(f"{s['name']}: not run — {e}")
