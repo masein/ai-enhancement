@@ -482,7 +482,11 @@ def again_words(results: list[dict]) -> str:
     tasks: dict[str, set] = {}
     tries: dict[str, int] = {}
     for r in results:
-        for w in r.get("again") or []:
+        # 18d point 27: every try an error of ours ended — the last one too,
+        # when the task ended in it — as the row's "asked 3 times" counts them
+        ended = ([r["why"]] if r.get("again") and r.get("result") == "error" and r.get("why")
+                 else [])
+        for w in [*(r.get("again") or []), *ended]:
             k = again_kind(w)
             tasks.setdefault(k, set()).add((r.get("task"), r.get("attempt")))
             tries[k] = tries.get(k, 0) + 1

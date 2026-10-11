@@ -4953,6 +4953,87 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 18d.4 — the page (11 Oct)
+
+- **The header's list** (point 25): a run's name never shrinks below its own
+  width (`.runline`'s grid, `minmax(max-content, 1fr)`); the description gives
+  way, cut with an ellipsis, and a rented line's is "rented GPU".
+- **"it says nothing"** (point 26): a window the board can't take quotes the
+  server's own `n_ctx`, never the model's training context from the probe.
+- **One count of tries** (point 27): `again_words` counts every try an error
+  of ours ended, the last one too, as the row's "asked 3 times" does.
+- Tests: `tests/test_18d4_page.py`, `tests/test_18d4_page_browser.py`.
+
+### 18d.3 — the speed test (11 Oct)
+
+- **An error mid-stream** (`error:` or a chunk holding `error`) is the
+  request's, counted and named on the line; a stream with no finish too.
+- **A dead engine** ends its setting at once (`dead_of`), the line starting
+  "STOPPED EARLY" with its last log lines.
+- **A shared setting's slot context** read from `/props` after the start;
+  under 83,968 refused (`slot_context`, `SHARED_SLOT_MIN`).
+- **CUDA per setting** (`cuda_of`): llama.cpp's 12.8, vLLM's 13.0.
+- Small ones: a preempted request's tokens come off; the room a new request
+  needs is at least 64 × slots; vLLM's start 20 minutes, with
+  `--enable-prompt-tokens-details`; a pool tried smaller only after a memory
+  failure (`OOM`); no empty "peak"; the download's error scrubbed. What
+  admission on the box would take is in `docs/REMOTE-RUNS.md`.
+- Tests: `tests/test_18d3_speed.py`; the stand-in server can send an error
+  mid-stream (`stream_error`).
+
+### 18d.2 — agent runs (11 Oct)
+
+- **A pull locks nothing** (point 10): `runner_commit` out of `SETTINGS`
+  (`runner_sha256` stays); `oracle_states` reads each task's latest result
+  across every oracle run (`oracle_dirs`).
+- **An oracle task it couldn't check** (point 11) — given up, or an error of
+  ours after it ran — is `unverified`, left out by name, and never blocks
+  `--all`; `--oracle --run N+1 --only` asks it again.
+- **Final after the agent ran** (points 12–13): a job with no result, or a
+  stop (CancelledError, KeyboardInterrupt); `results()` takes the first
+  standing result, never a try after a final one.
+- **The reward file** (point 14): `agent_host_mini.patch_reward_reading`
+  replaces Harbor's `Verifier._parse_reward_text/_json` on import —
+  `safe_read` follows no link, reads a regular file with one link and 64
+  bytes at most, and never quotes a value; Multilingual reads `reward.txt`
+  alone (`EVALBOARD_REWARD_FILE`); the run folder is `0700`.
+- **The default bridge's firewall** (point 15): `firewall_missing` reads
+  `iptables -S`; every DeepSWE line, and a Multilingual line asking a task
+  that fetches, refuses while a rule is missing (step A9 adds them).
+- **One runner a run** (point 16): `flock` on `<run>/run.lock`.
+- **The cache check** (point 17): the second step's `cache_n` against 80% of
+  the first request's whole prompt (`REUSE_SHARE`).
+- Small ones: the server down twice gives a task up (`DOWN_TRIES`); Harbor's
+  trial names (`trial_head`); the build cache's listing read without its `*`,
+  said once when unreadable.
+- Docs: A9 (the firewall), A10–A12 renumbered, B0, B5, B6, C1.
+- Tests: `tests/test_18d2_agent_runs.py`; the fixtures' `FIREWALL`.
+
+### 18d.1 — scores and spending (11 Oct)
+
+- **A score taken away is kept** (point 1): `_unwrite` writes `replaced.json`;
+  the next score written compares against it (`presented`), says the change
+  with its reason (`change_why`: re-read with a version, graded again by a
+  grader, scored again), and keeps `before` on its results.
+- **Said where the score is** (point 2): in the Runs row's log
+  (`runs_note`), the import's lines, the fetch's summary, and the Frontier
+  cell ("was 21.5 until 11 Oct, re-read with frontier-2": `frontier_was`).
+- **The lone verdict** (point 3): one on its line that isn't last still
+  counts against one that is; a `>`-quoted one is never the verdict; six
+  cases in the fixture.
+- **Every paid batch holds at the limit** (point 4): the hold moved into
+  `OpenRouterChat.at_wait` (the limit, or a pinned model that moved).
+- **Carry on for every halted batch** (point 5), the judge test's too
+  (`_halted_batches`).
+- **The deploy check** (point 6) reads as scoring writes (`score_plan`,
+  shared with `score_task`): every row, "stays" or "→", the answers waiting
+  for Epoch's paid check, an off row's thinking share from 0, a refusal said;
+  an empty folder exits 1. **The scores saved first** (point 7, step A1).
+- **The export** (point 8): reasons cut to their line's end, a joined
+  entry's rest never out, undotted names with underscores listed.
+- Point 9 came with 20.
+- Tests: `tests/test_18d1_scores_spending.py`.
+
 ### 20 — step4000 against Q4 and BF16 (11 Oct)
 
 - **The main path is G2's** (the server came back mid-phase): the `lda` build as a
