@@ -17,8 +17,9 @@ its binary and the GGUF, and the build's commit, never the files themselves.
 
 Built with our script (in the evalboard repository) from your checkout of the
 `lda` branch, in CUDA's own image (Docker, no GPU; about 15 minutes). It packs
-`llama-server`, its libraries and CUDA's runtime and cuBLAS, for the A100 to
-the RTX 5090 and the RTX PRO 6000; its last line gives its size and sha256:
+`llama-server`, its libraries and CUDA's runtime and cuBLAS, built for sm_120
+alone (`LLAMA_CUDA_ARCHS=120`): the RTX 5090 and the RTX PRO 6000, no other
+card. Its last line gives its size and sha256:
 
 ```bash
 LLAMA_CUDA_ARCHS=120 scripts/build_llama_tarball.sh ~/llama.cpp-lda llama-server-lda-<commit>.tar.gz
@@ -128,10 +129,12 @@ cd /workspace/llama.cpp && cmake -S . -B build -DGGML_CUDA=ON -DBUILD_SHARED_LIB
 
 The build directory is then `/workspace/llama.cpp/build`.
 
-**Check it runs on the box** (it prints its version, then the card):
+**Check it runs on the box** (it prints its version, then the card). CUDA's
+runtime and cuBLAS come from torch's NVIDIA packages in the runner image, as
+the box's own run finds them:
 
 ```bash
-LD_LIBRARY_PATH=/workspace/lda-build/bin /workspace/lda-build/bin/llama-server --version
+LD_LIBRARY_PATH="/workspace/lda-build/bin:$(python -c 'import nvidia.cuda_runtime as a, nvidia.cublas as b; print(":".join(p + "/lib" for m in (a, b) for p in m.__path__))')" /workspace/lda-build/bin/llama-server --version
 ```
 
 The box's own run checks the same before anything else, and refuses in one
