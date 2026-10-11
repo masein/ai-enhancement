@@ -513,12 +513,17 @@ def _hle_object(text: str) -> tuple[str, dict | None, str]:
         end = text.find("\n", b)
         return not re.sub(r"[\s`*_>#-]|json", "", text[text.rfind("\n", 0, a) + 1:a]) \
             and not re.sub(r"[\s`*_.,;]", "", text[b:end if end >= 0 else len(text)])
+
+    def quoted(a: int) -> bool:
+        """18d point 3: a '>' before it on its line — a quote, never the verdict"""
+        return ">" in text[text.rfind("\n", 0, a) + 1:a]
     # 18c point 17: an object holding nothing but its verdict is the judge's
     # only when it ends the reply — {"correct": "yes"} on its line, then prose
     # saying the answer is wrong, is the response's, quoted. (The judge's
     # reasoning, then its verdict object last, stays its grade)
     def last(b: int) -> bool:
         return not re.sub(r"[\s`*_>#.,;:-]|json", "", text[b:])
+    real = [x for x in real if not quoted(x[0])]
     alone = [(a, b, o) for a, b, o in real if by_itself(a, b)
              and (set(o) - {"correct"} or last(b))]
     lines = bool(re.search(rf"(?im)^{_W}(extracted_final_answer|reasoning){_W}:", outside))
@@ -529,9 +534,13 @@ def _hle_object(text: str) -> tuple[str, dict | None, str]:
     if not pool:
         return "none", None, outside
     v_alone = {_yes_no(o["correct"]) for _, _, o in alone}
-    others = [o for a, b, o in real if (a, b, o) not in alone
+    others = [(a, b, o) for a, b, o in real if (a, b, o) not in alone
               and _yes_no(o["correct"]) not in v_alone]
-    if alone and others and (len(v_alone) > 1 or any(set(o) - {"correct"} for o in others)):
+    # 18d point 3: and a lone object on its line that doesn't end the reply
+    # still counts against one that does — {"correct": "no"}, "The response
+    # wrote:", {"correct": "yes"} was read yes; before 18c it was no grade
+    if alone and others and (len(v_alone) > 1 or any(set(o) - {"correct"} or by_itself(a, b)
+                                                     for a, b, o in others)):
         return "conflict", None, outside
     distinct = list({json.dumps(o, sort_keys=True, default=str): o
                      for _, _, o in pool}.values())

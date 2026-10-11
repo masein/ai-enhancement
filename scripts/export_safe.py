@@ -451,12 +451,14 @@ def accounts() -> list[str]:
 # wrong". These lines go out without them; a tagged line that still holds an
 # exception's text is left out
 _BY_NAME = re.compile(r"^(===== \[\d+\] imported .+? \(sha256 [0-9a-f]+\)) by [^:]{1,80}(: )")
+# 18d point 8: each cut from " (" to the end of its line, whatever follows the
+# bracket that closes — "(HTTP 400: A) LEAK" sent "LEAK" out
 _REASON = re.compile(
     r"^(\[frontier\] [\w-]+: question \S+, run \d+: the server failed on it twice"
-    r"(?:, on \d+ separate runs)? — written as no answer, counted wrong) \(.*\)$")
-_ASKED = re.compile(r"^(\[frontier\] .*?Nothing was asked) \(.*\)$")
+    r"(?:, on \d+ separate runs)? — written as no answer, counted wrong) \(.*$")
+_ASKED = re.compile(r"^(\[frontier\] .*?Nothing was asked) \(.*$")
 _KEPT = re.compile(r"^(\[frontier\] .*? · the answers it gave are kept: the next run asks only "
-                   r"the rest) \(.*\)$")
+                   r"the rest) \(.*$")
 _STOPPED = re.compile(r"the server stopped answering \(.*\)(?=: \d[\d,]* question)")
 # 18b: the stop reasons that held the server's words (a log written before
 # 18b): "refused a question: HTTP 400 <its words>", "failed on 6 questions,
@@ -486,8 +488,11 @@ def _cut_unclosed(s: str) -> str:
 
 
 def _free_words_out(line: str) -> tuple[str, bool]:
-    """(the line without its free words, whether it may go out at all)"""
-    s = _cut_unclosed(line) if "\n" not in line else line
+    """(the line without its free words, whether it may go out at all) — 18d
+    point 8: a joined entry (a reason with a newline in it) is its first line
+    only, cut as one: the lines below are the reason's rest, the server's
+    words — a "\n[frontier] …" in a reason went out as a tagged line"""
+    s = _cut_unclosed(line.split("\n", 1)[0])
     s = _BY_NAME.sub(r"\1\2", s)
     s = _REASON.sub(r"\1", s)
     s = _ASKED.sub(r"\1", s)
@@ -518,7 +523,10 @@ def _joined(lines: list[str]) -> list[str]:
         s = line.rstrip()
         if s.startswith("====="):
             in_server = bool(_SECTION.search(s))
-        if (out and s and not in_server and not _STARTS.match(s) and joined < JOIN_MAX
+        # 18d point 8: a line below an open bracket is its rest even when it
+        # looks like the runner's own ("[frontier] …" in a server's words) —
+        # never a section's header
+        if (out and s and not in_server and not s.startswith("=====") and joined < JOIN_MAX
                 and out[-1].count("(") > out[-1].count(")")):
             out[-1] += "\n" + s
             joined += 1
@@ -679,11 +687,12 @@ def file_of(model: str) -> dict:
 # ---------------------------------------------------------------------------
 
 NAME_MIN = 3
-_HOST_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)*")
+# 18d point 8: with an underscore too (vllm_gemma, a container's name)
+_HOST_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]+)*")
 _ACCOUNT_NAME = re.compile(r"[A-Za-z0-9][\w.-]*")
 # a host the scrub takes when the board's own settings name it: one that
 # isn't a public name (a container's, the tailnet's, an internal one)
-_OWN_HOST = re.compile(r"(?i)[a-z0-9-]+|.+\.(?:internal|local|localdomain|lan|home|corp|"
+_OWN_HOST = re.compile(r"(?i)[a-z0-9_-]+|.+\.(?:internal|local|localdomain|lan|home|corp|"
                        r"intranet|private|docker|ts\.net)")
 _NOT_HOSTS = {"localhost", "host.docker.internal"}
 _HF_REPO = re.compile(r"(?i)(?:\bhf://|\bhuggingface\.co/(?:models/|datasets/)?)"

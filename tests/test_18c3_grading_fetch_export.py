@@ -56,9 +56,11 @@ def test_12_a_replaced_score_is_said(svc):  # noqa: F811
     assert said == []                                          # the first score: nothing replaced
     write(row, MATH, answers(late=1))
     got = sf.score_task(row, MATH, rec(), log=said.append)
+    # 18d point 2: with why it changed
     assert got["score"] == 0.75 and said == [
-        f"[frontier] {ROW} · MATH Level 5: score 100.0% → 75.0%"]   # d94f7f6: silent
-    assert got["before"] == {"score": 1.0, "version": "frontier-2"}
+        f"[frontier] {ROW} · MATH Level 5: score 100.0% → 75.0% (scored again)"]   # d94f7f6: silent
+    assert {k: got["before"][k] for k in ("score", "version", "why")} == {
+        "score": 1.0, "version": "frontier-2", "why": "scored again"}
     # scored the frontier-1 way before: said too
     d = sf.task_dir(row, MATH)
     p = next(d.glob("results_*.json"))
@@ -68,8 +70,8 @@ def test_12_a_replaced_score_is_said(svc):  # noqa: F811
     p.write_text(json.dumps(r))
     said.clear()
     sf.score_task(row, MATH, rec(), log=said.append)
-    assert said == [f"[frontier] {ROW} · MATH Level 5: score 100.0% → 75.0% (scored by "
-                    "frontier-1 before, frontier-2 now)"]
+    assert said == [f"[frontier] {ROW} · MATH Level 5: score 100.0% → 75.0% (re-read with "
+                    "frontier-2)"]
     said.clear()
     sf.score_task(row, MATH, rec(), log=said.append)           # the same again: nothing said
     assert said == []
@@ -96,10 +98,12 @@ def test_12_the_deploys_check_counts_without_text_and_writes_nothing(svc, capsys
     before = {p: (p.stat().st_mtime_ns, p.read_bytes()) for p in row.rglob("*") if p.is_file()}
     assert tsc.main([]) == 0
     out = capsys.readouterr().out
-    assert f"{ROW} · MATH Level 5: 1 of 4 answers read differently (1 now ran out, 1 right → " \
-           "wrong) · score 100.0% → 75.0%" in out, out
+    # 18d point 6: every row, what it holds and what scoring writes
+    assert f"{ROW} · MATH Level 5: stored 100.0% → 75.0% · 1 of 4 answers read differently (1 " \
+           "now ran out, 1 right → wrong)" in out, out
     assert out.rstrip().endswith("1 of 1 stored Frontier scores change the next time they are "
-                                 "scored (frontier-2); nothing was written")
+                                 "scored (frontier-2); 0 answers wait for Epoch's model check, "
+                                 "paid at the next Start; nothing was written")
     for text in ("frac", "Working it out", "let me check"):
         assert text not in out                                 # never an answer's text
     after = {p: (p.stat().st_mtime_ns, p.read_bytes()) for p in row.rglob("*") if p.is_file()}

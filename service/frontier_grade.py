@@ -80,23 +80,12 @@ class GraderChat(llm.OpenRouterChat):
     HALT_PRESS = "Start"                # 18b: a halt waits for it, like every other stop
     FIRST_REFUSALS = 5
 
+    # 17j: stopped at the month's limit, it waits for a press — 18d point 4:
+    # as every paid batch does now (llm.OpenRouterChat.at_wait)
+    AT_LIMIT = AT_LIMIT
+
     def waiting(self) -> str:
         return STOPPED if stopped() else super().waiting()
-
-    def at_wait(self, batch_id: str, why: str) -> None:
-        """17j: stopped at the month's limit, it waits for a press — it took
-        itself up when the limit was raised, and when the month turned:
-        nothing is sent to a paid grader without a press since the last stop"""
-        if not ai_models.over_limit():
-            return
-        p = self.dir / batch_id / "halt.json"
-        try:
-            if json.loads(p.read_text(encoding="utf-8")).get("hold"):
-                return
-        except (OSError, ValueError):
-            pass
-        p.write_text(json.dumps({"why": AT_LIMIT, "at": time.time(), "hold": True, "n": 0,
-                                 "limit": True}), encoding="utf-8")
 
 
 def gdir() -> Path:

@@ -728,29 +728,148 @@ def score_words(x: float | None) -> str:
     return "no score" if x is None else f"{100 * x:.1f}%"
 
 
-def score_task(row: Path, task: str, rec: dict, log=print) -> dict | None:
-    """the task's score from its answers, written in lm_eval's layout — None
-    while a question of a run is still unanswered. A graded benchmark is
-    written once every answer is graded; until then {waiting: n}. One Epoch
-    checks with a model is written with the code's score until the check is
-    done, and with both after: the page's is Epoch's way. 18c point 12: a
-    results file replaced with another score is said ("score X → Y")"""
+# 18d point 1: the score a task's results held when they were taken away
+# (its answers waiting for a grade, or no score) — kept beside its answers
+# until the next score is written, which says what it replaced
+REPLACED = "replaced.json"
+
+
+def stored_detail(d: Path, task: str) -> dict | None:
+    """18d: the score the task's results file holds now — {score, version, at,
+    grader, before} — None when there is none"""
+    for p in sorted(d.glob("results_*.json"))[-1:]:
+        got = _read_json(p)
+        res = (got.get("results") or {}).get(task) or {}
+        fr = got.get("frontier") or {}
+        return {"score": res.get("acc,none"), "version": str(fr.get("version") or ""),
+                "at": got.get("date"), "grader": str((fr.get("grader") or {}).get("version")
+                                                     or ""),
+                "before": fr.get("before") if isinstance(fr.get("before"), dict) else None}
+    return None
+
+
+def presented(d: Path, task: str) -> dict | None:
+    """18d point 1: the score the page last showed for a task — its results
+    file's, else the one kept when its results were taken away"""
+    got = stored_detail(d, task)
+    if got is not None:
+        return got
+    kept = _read_json(Path(d) / REPLACED)
+    return kept if "score" in kept else None
+
+
+def change_why(was: dict, grader: str) -> str:
+    """18d point 2: why a score changed, in words — read again by another
+    version, graded again by another grader, or scored again"""
+    if was.get("version") and was["version"] != fb.VERSION:
+        return f"re-read with {fb.VERSION}"
+    if was.get("grader") and grader and was["grader"] != grader:
+        return f"graded again by {grader}"
+    return "scored again"
+
+
+def change_line(row: Path, task: str, was: dict, now: float | None, why: str) -> str:
+    """"[frontier] <row> · GPQA Diamond: score 21.5% → 25.0% (re-read with frontier-2)" """
+    return (f"[frontier] {Path(row).name} · {fb.BENCH[task]['label']}: score "
+            f"{score_words(was.get('score'))} → {score_words(now)} ({why})")
+
+
+def set_before(d: Path, task: str, before: dict) -> None:
+    """18d point 2: the score a task's results replaced, written into them —
+    the import scores in its staging folder, then moves the results here"""
+    for p in sorted(Path(d).glob("results_*.json"))[-1:]:
+        got = _read_json(p)
+        if got:
+            got.setdefault("frontier", {})["before"] = before
+            p.write_text(json.dumps(got, indent=1), encoding="utf-8")
+
+
+def runs_note(row: Path, task: str, line: str) -> int | None:
+    """18d point 2: a score's change written into the log of the Runs row its
+    answers came from — the import's, or the latest run of the row here — so
+    Runs shows it, not docker's logs only. That row's id, None when none"""
+    on = Path(row).name.endswith("__thinking")
+    model = Path(row).name.removesuffix("__thinking").replace("__", "/", 1)
+    try:
+        import import_frontier as imf
+        came = imf.where_and_runs(Path(row), task)[1]
+    except Exception:                                   # noqa: BLE001 — the latest run, then
+        came = []
+    sid = max(came) if came else next(
+        (r["id"] for r in db.recent(500) if r.get("hf_id") == model
+         and r.get("suite") == "frontier" and bool(r.get("thinking")) == on), None)
+    if sid is None:
+        return None
+    try:
+        log = Path(config.LOGS_DIR) / f"service_{sid}_{model.replace('/', '__')}.log"
+        with open(log, "a", encoding="utf-8") as fh:
+            fh.write(f"\n[score] {time.strftime('%Y-%m-%d %H:%M')} {line}\n")
+    except OSError:
+        return None
+    return sid
+
+
+def score_plan(row: Path, task: str, m: dict | None = None) -> dict | None:
+    """18d point 6: what score_task writes for a task's answers and grades as
+    they stand, worked out once — score_task writes it, the deploy's check
+    (scripts/think_shift_check.py) says it. None while a question is
+    unanswered; else {state: refused | waiting | no score | not final |
+    final, why, page, code, out, flat, held, look}: `page` the score written,
+    the code's while answers wait for Epoch's model check, None when nothing
+    is; `look` the answers that wait for that check, paid at the next Start"""
     spec = fb.BENCH[task]
-    m = marks(row, task)
+    m = m if m is not None else marks(row, task)
     if m["missing"]:
         return None
     items, runs = m["items"], m["runs"]
     d = task_dir(row, task)
     flat = [r for it in items for r in runs[it["id"]]]
-    # 17b: the server did what was asked — thinking on, or off
     thinking = _read_json(d / SETUP).get("thinking")
     why = thinking_refused(task, thinking, [r["answer"] for r in flat])
-    if why:
-        return {"refused": why}
     held = thinking_kept(thinking, [r["answer"] for r in flat])
+    base = {"m": m, "flat": flat, "held": held, "thinking": thinking,
+            "look": sum(1 for r in flat if r["ok"] is None) if spec.get("look") else 0}
+    if why:
+        return {**base, "state": "refused", "why": why, "page": None, "code": None, "out": None}
+    out = outcome(spec, flat, d)
+    if out["state"] in ("waiting", "no score"):
+        return {**base, "state": out["state"], "why": out["words"], "page": None, "code": None,
+                "out": out}
+    code = (None if spec.get("grader") else
+            _share({q: [1.0 if r["code_ok"] else 0.0 for r in rs] for q, rs in runs.items()},
+                   task, items))
+    page = (code if out["waiting"] else
+            _share({q: [1.0 if r["ok"] else 0.0 for r in rs] for q, rs in runs.items()},
+                   task, items))
+    return {**base, "state": out["state"], "why": out["words"], "page": page, "code": code,
+            "out": out}
+
+
+def score_task(row: Path, task: str, rec: dict, log=print, runs_log: bool = True
+               ) -> dict | None:
+    """the task's score from its answers, written in lm_eval's layout — None
+    while a question of a run is still unanswered. A graded benchmark is
+    written once every answer is graded; until then {waiting: n}. One Epoch
+    checks with a model is written with the code's score until the check is
+    done, and with both after: the page's is Epoch's way. 18c point 12: a
+    results file replaced with another score is said ("score X → Y"). 18d
+    points 1–2: and one taken away while answers wait — kept (REPLACED) and
+    said when the next is written; the line goes into the Runs row's log
+    (`runs_log`: unless `log` is that log already) and the results keep the
+    earlier score, which the score's cell shows"""
+    spec = fb.BENCH[task]
+    plan = score_plan(row, task)
+    if plan is None:
+        return None
+    m, flat, held = plan["m"], plan["flat"], plan["held"]
+    items, runs = m["items"], m["runs"]
+    d = task_dir(row, task)
+    # 17b: the server did what was asked — thinking on, or off
+    if plan["state"] == "refused":
+        return {"refused": plan["why"]}
     # 17c: the questions the server never answered, counted wrong and named
     never = sorted({q for q, rs in runs.items() for r in rs if r.get("unanswered")})
-    out = outcome(spec, flat, d)
+    out = plan["out"]
     ungraded, waiting = out["ungraded"], out["waiting"]
     ran_out = sum(1 for r in flat if r["ran_out"])
     unread = sum(1 for r in flat if r["read"] is None and not r["ran_out"]
@@ -766,12 +885,7 @@ def score_task(row: Path, task: str, rec: dict, log=print) -> dict | None:
         _unwrite(d, task)
         return {"no_score": out["words"], "ungraded": ungraded, "of": out["seen"],
                 "label": spec["label"]}
-    code = (None if spec.get("grader") else
-            _share({q: [1.0 if r["code_ok"] else 0.0 for r in rs] for q, rs in runs.items()},
-                   task, items))
-    page = (code if waiting else
-            _share({q: [1.0 if r["ok"] else 0.0 for r in rs] for q, rs in runs.items()},
-                   task, items))
+    code, page = plan["code"], plan["page"]
     rows = []
     for k, it in enumerate(items):
         rs = runs[it["id"]]
@@ -784,16 +898,23 @@ def score_task(row: Path, task: str, rec: dict, log=print) -> dict | None:
                      "acc": sum(1.0 for r in rs if r["ok"]) / len(rs),
                      "frontier": [{k2: v for k2, v in r.items() if k2 != "answer"} for r in rs]})
     stamp = time.strftime("%Y-%m-%dT%H-%M-%S.000000", time.gmtime())
-    before = stored_score(d, task)
+    was = presented(d, task)
     for old in [*d.glob("results_*.json"), *d.glob(f"samples_{task}_*.jsonl")]:
         old.unlink()
-    changed = before is not None and (before[0] is None) != (page["score"] is None) or (
-        before is not None and before[0] is not None and page["score"] is not None
-        and abs(before[0] - page["score"]) > 1e-9)
+    changed = was is not None and (was["score"] is None) != (page["score"] is None) or (
+        was is not None and was["score"] is not None and page["score"] is not None
+        and abs(was["score"] - page["score"]) > 1e-9)
+    before = None
     if changed:
-        log(f"[frontier] {Path(row).name} · {spec['label']}: score {score_words(before[0])} → "
-            f"{score_words(page['score'])}" + (f" (scored by {before[1]} before, {fb.VERSION} "
-                                               "now)" if before[1] != fb.VERSION else ""))
+        why = change_why(was, str((out["grader"] or {}).get("version") or ""))
+        line = change_line(row, task, was, page["score"], why)
+        log(line)
+        if runs_log:
+            runs_note(row, task, line)
+        before = {"score": was["score"], "version": was.get("version") or "",
+                  "since": was.get("at"), "until": time.time(), "why": why}
+    elif was is not None and isinstance(was.get("before"), dict):
+        before = was["before"]          # the change it last made, while it stands
     try:
         setup = json.loads((d / SETUP).read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -813,7 +934,7 @@ def score_task(row: Path, task: str, rec: dict, log=print) -> dict | None:
     except Exception:                                   # noqa: BLE001 — a note, never the score
         held_shards = ""
     detail = {"version": fb.VERSION, "protocol": spec["protocol"], "epochs": spec["epochs"],
-              **({"before": {"score": before[0], "version": before[1]}} if changed else {}),
+              **({"before": before} if before else {}),
               "questions": len(items), "answers": len(flat),
               "ran_out": ran_out, "unread": unread, "errors": errors,
               # 17c: an off row's few answers that thought anyway, scored
@@ -855,6 +976,7 @@ def score_task(row: Path, task: str, rec: dict, log=print) -> dict | None:
         indent=1), encoding="utf-8")
     (d / f"samples_{task}_{stamp}.jsonl").write_text(
         "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
+    (d / REPLACED).unlink(missing_ok=True)
     return {**page, **detail, "epochs": spec["epochs"]}
 
 
@@ -937,7 +1059,12 @@ def _pct(x: float) -> str:
 
 
 def _unwrite(d: Path, task: str) -> None:
-    """a task's written score taken away (its answers and grades stay)"""
+    """a task's written score taken away (its answers and grades stay) — 18d
+    point 1: the score it held kept beside them (REPLACED), the first one
+    taken away, so the next score written says what the page showed"""
+    was = stored_detail(d, task)
+    if was is not None and not (d / REPLACED).exists():
+        (d / REPLACED).write_text(json.dumps(was), encoding="utf-8")
     for old in [*d.glob("results_*.json"), *d.glob(f"samples_{task}_*.jsonl")]:
         old.unlink()
 
@@ -1063,7 +1190,7 @@ def run(sid: int, sub: dict, rec: dict, th: dict, row: Path, log_path: Path) -> 
         if not config.FRONTIER_SCORE_AFTER_RUN or sh:
             lines.append(f"{label}: {n:,} of {total:,} answered")
             continue
-        sc = score_task(row, task, rec, log=log)
+        sc = score_task(row, task, rec, log=log, runs_log=False)
         lines.append(words(task, sc) if sc else f"{label}: {n:,} of {total:,} answered")
         if sc:
             log(f"[frontier] {words(task, sc)}")

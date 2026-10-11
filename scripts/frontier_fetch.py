@@ -229,11 +229,15 @@ def gguf_of(path: Path) -> dict:
 
 
 def summary(code: int, said: str) -> str:
-    """one line of import_remote.py's: its row's line, or why it refused"""
+    """one line of import_remote.py's: its row's line, or why it refused — 18d
+    point 2: with every score it changed ("score 21.5% → 25.0%")"""
     lines = [x.strip() for x in said.splitlines() if x.strip()]
     if code == 0:
-        return next((x for x in lines if x.startswith(("the row ", "imported already"))),
-                    lines[-1] if lines else "imported")
+        changes = [x.removeprefix("[frontier] ") for x in lines
+                   if re.match(r"^\[frontier\] .*: score .+ → .+", x)]
+        return "; ".join([next((x for x in lines if x.startswith(("the row ",
+                                                                  "imported already"))),
+                                lines[-1] if lines else "imported"), *changes])
     refused = [x for x in lines if x.startswith("refused")]
     return "; ".join(refused) if refused else (lines[-1] if lines else f"exit {code}")
 
