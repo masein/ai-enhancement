@@ -160,13 +160,17 @@ def test_2_3_each_plan_runs_every_benchmark_once_one_line_a_box():
                                                                or fbx.ARC not in tasks)
                 # every step fits the card as the box checks it
                 assert fb.slot_context(list(tasks), th == "on") * slots <= rg.MAX_CONTEXT
-        want = {("on", t) for t in fb.TASKS} | {("off", t) for t in fb.TASKS if t != fbx.ARC}
+        # 20: plan L asks thinking on only, and has no parity step (the
+        # server it compares with is out of reach)
+        on_only = name == "L"
+        want = {("on", t) for t in fb.TASKS} | (set() if on_only else {
+            ("off", t) for t in fb.TASKS if t != fbx.ARC})
         assert set(have) == want, name
         assert all(have[k] == set(range(1, of[k] + 1)) for k in have), name
-        assert parity == 1, name                       # 17f: one box a build asks it first
+        assert parity == (0 if on_only else 1), name   # 17f: one box a build asks it first
     longest = {p: max(sum(fbx.hours(s) for s in st) for st in b.values())
                for p, b in fbx.PLANS.items()}
-    assert longest["A"] <= 18 and longest["B"] <= 10.5
+    assert longest["A"] <= 18 and longest["B"] <= 10.5 and longest["L"] <= 6.0
     assert len(fbx.PLANS["A"]) == 9 and len(fbx.PLANS["B"]) == 15
     # ARC-AGI-2's answers are its test grids', not its tasks'
     assert fbx.ANSWERS[fbx.ARC] == 334

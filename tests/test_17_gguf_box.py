@@ -499,8 +499,8 @@ def test_the_docs_commands_are_the_scripts_and_paste_whole():
         "served/<phone-build>=" in sec
     assert f"import_remote.py ~/benchmarks/bundles/{name} --by masein" in sec
     # 17d: and every import names a bundle a box command here writes (G6 named
-    # the old one)
-    for m in re.finditer(r"import_remote\.py ~/benchmarks/bundles/(\S+)", sec):
+    # the old one) — 20: a bundle; L4's import a build's folder of them
+    for m in re.finditer(r"import_remote\.py ~/benchmarks/bundles/(\S+\.tar\.gz)", sec):
         assert any(m.group(1) == rb.bundle_name(
             "frontier", a.served_as, a.thinking == "on",
             parts=[fbm.BENCH[t]["short"] for t in fb.TASKS if t in a.only]) for a in args

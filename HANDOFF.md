@@ -4953,8 +4953,13 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
-### 20 — step4000 against Q4 and BF16, the server out of reach (11 Oct)
+### 20 — step4000 against Q4 and BF16 (11 Oct)
 
+- **The main path is G2's** (the server came back mid-phase): the `lda` build as a
+  tarball (`build_llama_tarball.sh`) and step4000's GGUF in the private
+  repository, `--server hf://…` and `--gguf hf://…`, the bundles home through
+  the fetch once 18d is deployed (`docs/REMOTE-RUNS.md` L0–L3). The upload
+  and the box's own scores stay (L4), and `--server-dir` is the fallback (L5).
 - **`remote_gguf.py --server-dir <dir>`**, in place of `--server`: a llama.cpp
   build directory on the box (the team's `lda` branch), its `bin/llama-server`
   run with its own folders on `LD_LIBRARY_PATH` and, when it carries no CUDA
@@ -4997,8 +5002,8 @@ Not before the demo: a new hidden set changes every Everyday score.
   as this board defines it) and imports the rest onto it. The import refuses
   a runtime this board doesn't know, one the box didn't run as defined, or a
   bundle whose runtime isn't its model's (`runtime_problem`).
-- Docs: `docs/STEP4000-RUN.md` (the team's), `docs/REMOTE-RUNS.md` § step4000
-  (L1–L4: plan L, one box end to end, onto the Mac, into the board).
+- Docs: `docs/STEP4000-RUN.md` (the team's: the tarball and the GGUF into the
+  private repository; the fallback), `docs/REMOTE-RUNS.md` § step4000 (L0–L5).
 - Tests: `tests/test_20_step4000.py`; the stand-in llama-server answers
   `--list-devices` and can fail as a binary missing a library.
 

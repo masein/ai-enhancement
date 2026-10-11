@@ -255,6 +255,44 @@ def test_plan_L_is_thinking_on_every_benchmark_whole_and_no_box_over_6_hours(): 
     assert fx.listing("L")[-1].startswith("21 boxes a build · 114.1 box-hours")
 
 
+def test_the_runtime_from_a_tarball_as_any_build(box, monkeypatch, tmp_path):  # noqa: F811
+    """the main path: the lda tarball fetched as G2's, the runtime by name"""
+    launched = tmp_path / "launched.jsonl"
+    monkeypatch.setenv("FAKE_LLAMA_ARGV", str(launched))
+    keep = {k: getattr(config, k) for k in [*rg.ENV, "OUT_DIR"]}
+    lock, env = runner.LOCK, {v: os.environ.get(v) for v in rg.ENV.values()}
+    try:
+        assert rg.main(["--as", STEP, "--gguf", str(box["gguf"]), "--server", str(box["tarball"]),
+                        "--based-on", "Qwen/Qwen3.6-35B-A3B", "--thinking", "on", "--slots", "3",
+                        "--port", str(free_port()), "--load-timeout", "60", "--runtime", RT,
+                        "--only", TASK, "--out", str(box["root"] / "tb")]) == 0
+    finally:
+        for k, v in keep.items():
+            setattr(config, k, v)
+        runner.LOCK = lock
+        for k, v in env.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+    srv = rb.read(bundle_at(box, "tb"))["setup"]["server"]
+    assert srv["runtime"] == RT and srv["flags"] == fb.runtime_flags(RT)
+    assert srv["tarball_sha256"] == rb.sha256_file(box["tarball"]) and "dir" not in srv
+    assert json.loads(launched.read_text().splitlines()[-1])["env"][
+        "LOOKAHEAD_MOE_ROUTER_NORM"] == "1"
+    assert all(r["min_p"] == 0.0 and r["repeat_last_n"] == 64 for r in requests(box))
+
+
+def test_a_plan_L_line_runs_the_runtime_from_the_tarball():
+    a = fx.parser().parse_args(["L13", "--as", STEP,
+                                "--gguf", "hf://me/evalboard-private/step4000.gguf",
+                                "--server", "hf://me/evalboard-private/llama-server-lda-2610.tar.gz"])
+    argv = fx.argv_of("L13", 1, fx.box_of("L13")[0], a)
+    assert argv[argv.index("--runtime") + 1] == RT and "--server-dir" not in argv
+    assert argv[argv.index("--server") + 1].endswith("llama-server-lda-2610.tar.gz")
+    assert argv[argv.index("--flags") + 1] == ""
+
+
 def test_a_plan_L_line_runs_the_runtime_and_the_build_directory():
     a = fx.parser().parse_args(["L13", "--as", STEP, "--gguf", "/workspace/s/step4000.gguf",
                                 "--server-dir", "/workspace/llama.cpp/build"])

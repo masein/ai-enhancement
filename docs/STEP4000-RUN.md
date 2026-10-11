@@ -7,13 +7,52 @@ step4000. The runtime is your `lda` branch's llama-server with
 0.95, min-p 0.0, presence penalty 1.5, repeat penalty 1.0, repeat-last-n 64),
 no reasoning budget and no speculative decoding.
 
-masein rents each box on vast.ai and adds your public key to it. You put two
-things on it: your **build** (on every box, all three models) and, on the
-step4000 boxes, **the GGUF**. Then you tell masein the two paths, and he takes
-your key off the box before he types anything of his. Nothing else of ours is
-shared, and nothing of yours leaves the box: the results hold answers and logs,
-the sha256 of your binary, libraries and GGUF, and your build's commit and
-branch, never the files themselves.
+**The main path: two files in masein's private Hugging Face repository.**
+Your build as a llama-server tarball, and step4000's GGUF. Every box fetches
+both from there; nobody needs to log in to a box. Nothing of yours goes
+anywhere else: the results hold answers and logs, the sha256 of the tarball,
+its binary and the GGUF, and the build's commit, never the files themselves.
+
+### The tarball
+
+Built with our script (in the evalboard repository) from your checkout of the
+`lda` branch, in CUDA's own image (Docker, no GPU; about 15 minutes). It packs
+`llama-server`, its libraries and CUDA's runtime and cuBLAS, for the A100 to
+the RTX 5090 and the RTX PRO 6000; its last line gives its size and sha256:
+
+```bash
+scripts/build_llama_tarball.sh ~/llama.cpp-lda llama-server-lda-2610.tar.gz
+```
+
+It stops, saying why, when git can't read the checkout or the build doesn't
+know its commit; changes not committed are recorded in its VERSION file.
+
+### Into the repository
+
+With a token that can write to it (masein's repository: he uploads them, or
+gives you access):
+
+```bash
+hf upload <masein>/evalboard-private llama-server-lda-2610.tar.gz llama-server-lda-2610.tar.gz
+```
+
+```bash
+hf upload <masein>/evalboard-private step4000.gguf step4000.gguf
+```
+
+A GGUF in parts: each part under its own name (`…-00001-of-0000N.gguf`), all
+of them. It must fit a 32 GB card with room for 8 slots of 86,016 tokens:
+about the size of the UD-Q4_K_XL file (23 GB) at most. Every box of the three
+models runs the same tarball: the board never merges results made with two
+builds.
+
+# The fallback: your build on a box
+
+Only if the tarball can't be had. masein rents each box on vast.ai and adds
+your public key to it. You put two things on it: your **build** (on every box,
+all three models) and, on the step4000 boxes, **the GGUF**. Then you tell
+masein the two paths, and he takes your key off the box before he types
+anything of his.
 
 ## 1. Send masein your public key
 

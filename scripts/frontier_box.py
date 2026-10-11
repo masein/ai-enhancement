@@ -30,11 +30,15 @@ paces (one RTX 5090, the phone build, 6 Oct) under the token limits of 6 Oct.
 
 20: plan L — step4000 against Q4 and BF16, the lda runtime, thinking on only,
 no box over about 6 hours on a 5090 at those paces. Its boxes run the
-runtime of PLAN_RUNTIME (--runtime lda-2610: no one types its values), and
-take the team's build directory as --server-dir in place of a tarball:
+runtime of PLAN_RUNTIME (--runtime lda-2610: no one types its values), from
+the lda branch's tarball as any build's:
 
-    python scripts/frontier_box.py L3 --as served/step4000-lda-2610 \
-        --gguf /workspace/step4000/step4000.gguf --server-dir /workspace/llama.cpp/build
+    python scripts/frontier_box.py L3 --as served/step4000-lda-2610 \\
+        --gguf hf://<you>/evalboard-private/step4000.gguf \\
+        --server hf://<you>/evalboard-private/llama-server-lda-2610.tar.gz
+
+--server-dir, in place of --server, is the fallback: a build directory the
+team put on the box (docs/STEP4000-RUN.md).
 """
 
 from __future__ import annotations
