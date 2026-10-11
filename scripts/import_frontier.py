@@ -13,7 +13,8 @@ The checks. It refuses the bundle, saying which check failed, when:
   sha256 the person importing gives (--file-sha256, kept on the model with
   their name);
 - 17b: its launch isn't the one registered for that model. Compared: the
-  routing environment (every LLAMA_MOE_* variable: lookahead or not) and
+  routing environment (every LLAMA_MOE_* variable: lookahead or not; 20: and
+  LOOKAHEAD_MOE_*) and
   speculative decoding (--spec-type, --draft-*, a draft model; and a server
   registered as drafting tokens). Free to differ, as they change where the
   model runs and not what it computes: memory and offload (-ngl, --cpu-moe,
@@ -77,7 +78,9 @@ _ID = re.compile(r"^served/[A-Za-z0-9._-]+$")
 # 17c: a value quoted or bare — a bare one without the full stop that ends a
 # sentence ("…LOOKAHEAD=1.")
 _ENV_TOKEN = re.compile(r"\b([A-Z][A-Z0-9_]*)=(?:\"([^\"]*)\"|'([^']*)'|([A-Za-z0-9_.:/+-]+))")
-ROUTING_ENV = "LLAMA_MOE_"
+# 20: and the lda runtime's router norm (LOOKAHEAD_MOE_ROUTER_NORM), which
+# changes expert routing too
+ROUTING_ENV = ("LLAMA_MOE_", "LOOKAHEAD_MOE_")
 # 17c: speculative decoding under every spelling llama-server takes — a draft
 # model fetched from Hugging Face (-hfd, --hf-repo-draft, …) too
 _SPEC = re.compile(r"^(--spec-[a-z-]+|--draft[a-z-]*|-md|--model-draft|-ngld|--gpu-layers-draft"
@@ -234,7 +237,10 @@ def shard_setup(server: dict) -> dict:
     """17b: what every shard of a task must share"""
     return {"binary_sha256": server.get("binary_sha256"), "commit": server.get("commit"),
             "build": server.get("build"), "flags": list(server.get("flags") or []),
-            "env": dict(server.get("env") or {})}
+            "env": dict(server.get("env") or {}),
+            # 20: a build directory's libraries too (--server-dir): the server's
+            # code is in them as much as in its binary
+            **({"libs_sha256": server["libs_sha256"]} if server.get("libs_sha256") else {})}
 
 
 # ---------------------------------------------------------------------------
@@ -311,7 +317,11 @@ def registered_here(b: dict, name: str, by: str, public_weights: bool = False) -
            "rented_only": True, "answered": [], "by": by, "at": time.time(),
 
            "flags": " ".join(srv.get("flags") or []),
-           "env": " ".join(f"{k}={v}" for k, v in (srv.get("env") or {}).items())}
+           "env": " ".join(f"{k}={v}" for k, v in (srv.get("env") or {}).items()),
+           # 20: the runtime it was asked with, as this board defines it
+           **({"runtime": setup["runtime"]} if setup.get("runtime") in fb.RUNTIMES else {})}
+    if rec.get("runtime"):
+        rec["how"] += f" · {fb.runtime_words(rec['runtime'])}"
     db.served_put(rec)
     served.write_meta(rec)
     if public_weights:
@@ -350,6 +360,7 @@ _SETUP_TYPES = {
     # anything moves (a box given as a number was a crash after the answers
     # had moved)
     "box": str, "sessions": int, "started_at": str, "finished_at": str, "image": str,
+    "runtime": str,                         # 20
 }
 
 
@@ -485,6 +496,9 @@ def checks(b: dict, rec: dict | None, file_sha: str = "") -> list[str]:
     for d in launch_differs(rec, setup.get("server") or {}):
         out.append(f"its launch isn't the one registered for {model} — {d}. Run the box with "
                    f"that setup's own variables and flags (docs/REMOTE-RUNS.md G2)")
+    rt = runtime_problem(setup, rec)                    # 20
+    if rt:
+        out.append(rt)
     if setup.get("protocol") not in fb.ASKED_AS:          # 18c: frontier-1's asked the same
         out.append(f"the protocol: the bundle's {setup.get('protocol')}, this board's "
                    f"{fb.VERSION}")
@@ -608,7 +622,35 @@ def _would_be(b: dict, file_sha: str) -> dict:
             setup.get("based_on") or "", "pin": {"file": gg.get("name"), "model": gg.get("name")},
             "file_sha256": {"sha256": file_sha},
             "flags": " ".join(srv.get("flags") or []),
-            "env": " ".join(f"{k}={v}" for k, v in (srv.get("env") or {}).items())}
+            "env": " ".join(f"{k}={v}" for k, v in (srv.get("env") or {}).items()),
+            **({"runtime": setup["runtime"]} if setup.get("runtime") in fb.RUNTIMES else {})}
+
+
+def runtime_problem(setup: dict, rec: dict) -> str:
+    """20: '' when the bundle was asked with the runtime its model is
+    registered with (or neither names one); else why not, in words. A
+    runtime this board doesn't know, or one whose environment and flags the
+    box didn't run with, is refused"""
+    got, want = setup.get("runtime") or "", rec.get("runtime") or ""
+    if got and got not in fb.RUNTIMES:
+        return (f"its runtime {got!r} isn't one this board knows ({', '.join(fb.RUNTIMES)}): "
+                "deploy the board the box's image was built from, then import again")
+    if got != want:
+        return (f"it was asked with {('runtime ' + got) if got else 'no named runtime'}; "
+                f"{rec.get('id')} is registered with {('runtime ' + want) if want else 'none'} "
+                "— a runtime's rows never mix with another's")
+    if got:
+        rt, srv = fb.RUNTIMES[got], setup.get("server") or {}
+        env = srv.get("env") if isinstance(srv.get("env"), dict) else {}
+        flags = [str(x) for x in srv.get("flags") or []]
+        miss = [f"{k}={v}" for k, v in rt["env"].items() if env.get(k) != v]
+        want_flags = fb.runtime_flags(got)
+        if flags[:len(want_flags)] != want_flags:
+            miss.append("its flags " + " ".join(want_flags))
+        if miss:
+            return (f"its box didn't run runtime {got} as this board defines it: "
+                    + "; ".join(miss) + " — the box's image and this board differ")
+    return ""
 
 
 def registry(row: Path) -> dict:

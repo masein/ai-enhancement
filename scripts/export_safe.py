@@ -148,13 +148,14 @@ TAKES = {"-c", "--ctx-size", "-np", "--parallel", "-ngl", "--n-gpu-layers", "--g
          "--rope-freq-base", "--yarn-orig-ctx", "--temp", "--top-p", "--top-k", "--min-p",
          "--seed", "-t", "--threads", "--split-mode", "-sm", "-ts", "--tensor-split", "-mg",
          "--main-gpu", "--draft-max", "--draft-min", "--draft-p-min", "--spec-replace",
-         "-ot", "--override-tensor", "--defrag-thold", "-dt"}
+         "-ot", "--override-tensor", "--defrag-thold", "-dt", "--presence-penalty",
+         "--repeat-penalty", "--repeat-last-n"}
 SWITCHES = {"--cpu-moe", "--jinja", "--no-jinja", "--no-mmap", "--mlock", "--swa-full",
             "--no-kv-offload", "--cont-batching", "--kv-unified", "-kvu", "--no-warmup"}
 FLAGS = TAKES | SWITCHES
 _VALUE = re.compile(r"[A-Za-z0-9_.,:=+*|^$\\-]{1,64}")
 ENV_NAMES = re.compile(r"(LLAMA_MOE_[A-Z0-9_]+|LLAMA_ARG_[A-Z0-9_]+|GGML_[A-Z0-9_]+|"
-                       r"CUDA_VISIBLE_DEVICES|OMP_NUM_THREADS)")
+                       r"CUDA_VISIBLE_DEVICES|OMP_NUM_THREADS|LOOKAHEAD_MOE_ROUTER_NORM)")
 # 17i: the variables whose values may go out, one by one — how the model was
 # asked (its routing, its context, its slots, its cache, its kernels); every
 # other allowed name goes out as a name alone, its value withheld (LLAMA_ARG_
@@ -166,7 +167,7 @@ ENV_VALUES = {"LLAMA_MOE_ROUTE_MODE", "LLAMA_MOE_ROUTE_LOOKAHEAD", "LLAMA_ARG_CT
               "LLAMA_ARG_CPU_MOE", "LLAMA_ARG_REASONING_BUDGET", "LLAMA_ARG_REASONING_FORMAT",
               "GGML_CUDA_FORCE_CUBLAS", "GGML_CUDA_FORCE_MMQ", "GGML_CUDA_NO_PINNED",
               "GGML_CUDA_ENABLE_UNIFIED_MEMORY", "GGML_SCHED_MAX_COPIES",
-              "CUDA_VISIBLE_DEVICES", "OMP_NUM_THREADS"}
+              "CUDA_VISIBLE_DEVICES", "OMP_NUM_THREADS", "LOOKAHEAD_MOE_ROUTER_NORM"}
 _SECRETISH = re.compile(r"KEY|TOKEN|SECRET|PASS|AUTH|CRED", re.I)
 
 # 17j: each value by its kind, not by its characters — a 23-character token
@@ -183,10 +184,11 @@ KINDS = {
     **{f: _INT for f in ("-c", "--ctx-size", "-np", "--parallel", "--n-cpu-moe", "-ncmoe",
                          "-b", "--batch-size", "-ub", "--ubatch-size", "--reasoning-budget",
                          "--yarn-orig-ctx", "--top-k", "--seed", "-t", "--threads", "-mg",
-                         "--main-gpu", "--draft-max", "--draft-min")},
+                         "--main-gpu", "--draft-max", "--draft-min", "--repeat-last-n")},
     **{f: _INT + "|all|auto" for f in ("-ngl", "--n-gpu-layers", "--gpu-layers")},
     **{f: _FLOAT for f in ("--rope-scale", "--rope-freq-base", "--temp", "--top-p", "--min-p",
-                           "--draft-p-min", "--defrag-thold", "-dt")},
+                           "--draft-p-min", "--defrag-thold", "-dt", "--presence-penalty",
+                           "--repeat-penalty")},
     **{f: "on|off|auto" for f in ("-fa", "--flash-attn")},
     **{f: _CACHE for f in ("-ctk", "--cache-type-k", "-ctv", "--cache-type-v")},
     "--reasoning-format": "none|deepseek|deepseek-legacy|auto",
@@ -206,7 +208,7 @@ KINDS = {
     "LLAMA_ARG_REASONING_FORMAT": "none|deepseek|deepseek-legacy|auto",
     **{v: _SWITCH for v in ("LLAMA_ARG_JINJA", "LLAMA_ARG_CPU_MOE", "GGML_CUDA_FORCE_CUBLAS",
                             "GGML_CUDA_FORCE_MMQ", "GGML_CUDA_NO_PINNED",
-                            "GGML_CUDA_ENABLE_UNIFIED_MEMORY")},
+                            "GGML_CUDA_ENABLE_UNIFIED_MEMORY", "LOOKAHEAD_MOE_ROUTER_NORM")},
     "CUDA_VISIBLE_DEVICES": r"\d{1,2}(?:,\d{1,2}){0,15}",
 }
 
