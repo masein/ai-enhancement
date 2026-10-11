@@ -1106,6 +1106,219 @@ import says how many of the answers that ran out end in a loop (the last
 passage repeating), and each cell shows the share that ran out, beside its
 score.
 
+# step4000 against Q4 and BF16, with the server out of reach (20)
+
+The phone model's team asks for the full Frontier set, thinking on, on three
+models with one runtime: **Q4** (the UD-Q4_K_XL file run before), **BF16**
+(the same model, full precision) and **step4000** (their new checkpoint, a
+GGUF they put on the boxes). Their question: does step4000 loop less?
+
+The server is out of reach, so nothing here touches it: every box runs on its
+own, scores what it can by code, and uploads its bundles to the private
+repository; the board imports them once it is back (and after 18d is
+deployed). HLE and SimpleQA are graded there, later, with your yes.
+
+**The runtime, `lda-2610`** (`scripts/frontier.py` RUNTIMES), the same for
+all three: the team's `lda` build (`--server-dir`, docs/STEP4000-RUN.md),
+`LOOKAHEAD_MOE_ROUTER_NORM=1`, the server's sampling and each request's
+(temperature 1.0, top-k 20, top-p 0.95, **min-p 0.0**, presence penalty 1.5,
+repeat penalty 1.0, repeat-last-n 64), `-ctk q8_0 -ctv q8_0 --flash-attn on`,
+no reasoning budget, no speculative decoding, no `--moe-stream`, our token
+limits (81,920 on the hard benchmarks). Plan L's boxes run it without typing
+it, and each step's line says every value. The repeat penalty is one value
+(`LDA_REPEAT_PENALTY`): change it before the first box answers, never after
+(a step that answered refuses another runtime; the import never mixes them).
+
+**The three served ids**, new rows that never mix with the earlier ones:
+
+| Model | `--as` | Its board name |
+|---|---|---|
+| Q4 | `served/Qwen3.6-35B-A3B-Q4-lda-2610` | Qwen3.6-35B-A3B Q4 (lda runtime) |
+| BF16 | `served/Qwen3.6-35B-A3B-BF16-lda-2610` | Qwen3.6-35B-A3B BF16 (lda runtime) |
+| step4000 | `served/step4000-lda-2610` | step4000 (lda runtime) |
+
+## L1. Plan L
+
+`python scripts/frontier_box.py --list L` prints it. Thinking on only, 21
+boxes a model, no box over about 6 hours on a 5090 at the pilot's paces:
+
+| Box | Its steps | about (5090) |
+|---|---|---|
+| L1–L9 | Humanity's Last Exam, shard 1/9 … 9/9 | 5.5 h each |
+| L10–L12 | MMLU-Pro, shard 1/3 … 3/3 | 5.9 h each |
+| L13–L16 | MATH Level 5 and GPQA Diamond, shard 1/4 … 4/4 | 5.4 h each |
+| L17 | OTIS Mock AIME, shard 1/3; then SimpleQA Verified | 5.2 h |
+| L18–L19 | OTIS Mock AIME, shard 2/3, 3/3 | 4.2 h each |
+| L20–L21 | ARC-AGI-2, shard 1/2, 2/2 (5 slots) | 5.8 h each |
+
+114.1 box-hours a model at those paces. They are the pilot's (the phone
+build, which routes 4 experts a token, at ±25%); a file routing 8 runs
+longer, by how much isn't measured. Q4 and step4000 run on an **RTX 5090**.
+
+**BF16 runs on an RTX PRO 6000 (96 GB), the same plan.** Its pace isn't
+measured: it reads about three times the bytes a token, so take about twice
+the hours (8–12 h a box). Its 70 GB file holds HLE's 8 slots with room to
+spare. Cutting it finer only shortens the wait, at the same box-hours plus
+each box's start: say if you want that.
+
+## L2. One box, end to end
+
+**Once:** a Hugging Face token that can read the gated sets (GPQA, OTIS, HLE:
+G0) and **write** to `<you>/evalboard-private` (fine-grained: "read access to
+contents of all public gated repos you can access", and write on that one
+repository). It is typed on each box, never stored.
+
+1. Rent on vast.ai with the template of step 2: image
+   `ghcr.io/masein/evalboard-runner:<this phase's tag>`, **Disk 100 GB** (BF16:
+   200 GB); an **RTX 5090**, max CUDA 12.8 or newer, inet down ≥ 1,000 Mbps
+   (BF16: an **RTX PRO 6000**, 96 GB).
+2. Log in with vast.ai's SSH line:
+
+   ```bash
+   ssh -p <port> root@<host>
+   ```
+
+3. Give the team the box: their public key, then send them the SSH line.
+
+   ```bash
+   echo '<the team's .pub line>' >> ~/.ssh/authorized_keys
+   ```
+
+4. Wait until they say where the build and the GGUF are (step4000 boxes; a
+   Q4 or BF16 box needs the build only). Check both are there:
+
+   ```bash
+   ls -la /workspace/lda-build/bin/llama-server /workspace/step4000/
+   ```
+
+5. Take their key off, and check nobody else is logged in (`who` shows only
+   you):
+
+   ```bash
+   grep -vF '<the last word of the team's .pub line>' ~/.ssh/authorized_keys > /tmp/keys && cat /tmp/keys > ~/.ssh/authorized_keys && rm /tmp/keys && who
+   ```
+
+6. A tmux session, the app's folder, and the token (typed; nothing shows):
+
+   ```bash
+   tmux new -s f
+   ```
+
+   ```bash
+   cd /app
+   ```
+
+   ```bash
+   read -rs HF_TOKEN && export HF_TOKEN
+   ```
+
+7. The box's line. For step4000, box L13:
+
+   ```bash
+   python scripts/frontier_box.py L13 --as served/step4000-lda-2610 --gguf /workspace/step4000/<its file>.gguf --server-dir /workspace/lda-build
+   ```
+
+   Q4, the same box label with its file:
+
+   ```bash
+   python scripts/frontier_box.py L13 --as served/Qwen3.6-35B-A3B-Q4-lda-2610 --gguf <the Q4 file's hf:// path, as its earlier boxes had it> --server-dir /workspace/lda-build
+   ```
+
+   BF16, the first part of its file:
+
+   ```bash
+   python scripts/frontier_box.py L13 --as served/Qwen3.6-35B-A3B-BF16-lda-2610 --gguf <the BF16 file's first part, as its earlier boxes had it> --server-dir /workspace/lda-build
+   ```
+
+   It first checks the build runs here (its version, the card it sees, the
+   architectures it was built for), then prints the runtime's every value
+   and the build (its sha256, its libraries', its commit and branch), then
+   asks. The last lines say how each step ended; if the box stops, paste the
+   same line again.
+8. Once every step reads whole, the scores by code, and each file's sha256
+   as the box hashed it (step4000's, for the import, comes from here):
+
+   ```bash
+   python scripts/score_bundle.py /workspace/step4000-lda-2610
+   ```
+
+   (For Q4 or BF16, its own folder: `/workspace/Qwen3.6-35B-A3B-Q4-lda-2610`
+   or `/workspace/Qwen3.6-35B-A3B-BF16-lda-2610`.) A line a benchmark:
+   "GPQA Diamond · step4000-lda-2610: 61.6% ± 3.1 · 198 answers (shards 1 of
+   4: 198 of its 792 …) · 12 ran out of room (6.1%), 9 of them ending in a
+   loop". MATH and OTIS are the code's score, the board's before Epoch's
+   model check; HLE and SimpleQA show their answers, ran out and loops only.
+9. Upload the box's bundles and progress files to the private repository:
+
+   ```bash
+   python scripts/box_upload.py --to hf://<you>/evalboard-private/runs/step4000-2610 --root /workspace
+   ```
+
+   It refuses a repository that isn't private. Its last line must read "N of N
+   files in <you>/evalboard-private as they are here".
+10. Destroy the box.
+
+**The three models side by side**, on any box once their boxes have uploaded
+(the questions are fetched into `/workspace/files/questions` the first time):
+
+```bash
+python scripts/score_bundle.py --from hf://<you>/evalboard-private/runs/step4000-2610 --only gpqa
+```
+
+Each benchmark's three lines, then a table: % right, answers, ran out, in a
+loop, and each model's difference from the first question by question.
+
+## L3. Onto your Mac
+
+A venv for the Hugging Face CLI, once:
+
+```bash
+python3 -m venv ~/hf-venv && ~/hf-venv/bin/pip install huggingface_hub==1.33.0
+```
+
+Then, with a token that can read the repository:
+
+```bash
+read -rs HF_TOKEN && export HF_TOKEN
+```
+
+```bash
+~/hf-venv/bin/hf download <you>/evalboard-private --include "runs/step4000-2610/*" --local-dir ~/step4000-2610
+```
+
+## L4. Into the board, once it is back (after 18d is deployed)
+
+The same download on the server, into the bundles' folder:
+
+```bash
+HF_HOME="$(sed -n 's/^HF_HOME=//p' ~/benchmarks/aienh/.env)" hf download <you>/evalboard-private --include "runs/step4000-2610/*" --local-dir ~/benchmarks/bundles/step4000-2610
+```
+
+Then each model's folder in one line: the first bundle registers it (its
+name, the runtime from the bundle, its file by the sha256 you give), the rest
+go onto it, each with its own lines and a count at the end. step4000's sha256
+is the one `score_bundle.py` printed on its box; Q4's is the UD-Q4_K_XL file's,
+registered on `served/Qwen3.6-35B-A3B-Q4-original-k-8`'s page (check that
+`score_bundle.py` printed the same); BF16's is the split identity it printed,
+each part checked against Hugging Face first (G3–G4):
+
+```bash
+cd ~/benchmarks/aienh && sudo docker compose exec -T bench python scripts/import_remote.py ~/benchmarks/bundles/step4000-2610/runs/step4000-2610/step4000-lda-2610 --by masein --register "step4000 (lda runtime)" --file-sha256 <step4000's sha256>
+```
+
+```bash
+cd ~/benchmarks/aienh && sudo docker compose exec -T bench python scripts/import_remote.py ~/benchmarks/bundles/step4000-2610/runs/step4000-2610/Qwen3.6-35B-A3B-Q4-lda-2610 --by masein --register "Qwen3.6-35B-A3B Q4 (lda runtime)" --file-sha256 <the Q4 file's sha256>
+```
+
+```bash
+cd ~/benchmarks/aienh && sudo docker compose exec -T bench python scripts/import_remote.py ~/benchmarks/bundles/step4000-2610/runs/step4000-2610/Qwen3.6-35B-A3B-BF16-lda-2610 --by masein --register "Qwen3.6-35B-A3B BF16 (lda runtime)" --file-sha256 <BF16's split identity>
+```
+
+A shard waits for the others; the folder brings them all. Each import checks
+the runtime as this board defines it (its variable, its flags, each
+request's sampling) and refuses one asked another way. HLE and SimpleQA then
+wait for their graders (AI models ▸ Start, with your yes).
+
 # Speed tests: the cheapest box per answer (19)
 
 Which box runs our benchmarks for the fewest dollars per answer, measured the

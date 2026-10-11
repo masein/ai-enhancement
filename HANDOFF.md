@@ -4953,6 +4953,55 @@ Not before the demo: a new hidden set changes every Everyday score.
   still the last stage, what compose builds. CI's image job (dispatched with
   `build_image`) builds both and prints their sizes.
 
+### 20 — step4000 against Q4 and BF16, the server out of reach (11 Oct)
+
+- **`remote_gguf.py --server-dir <dir>`**, in place of `--server`: a llama.cpp
+  build directory on the box (the team's `lda` branch), its `bin/llama-server`
+  run with its own folders on `LD_LIBRARY_PATH` and, when it carries no CUDA
+  runtime or cuBLAS of its own, the runner image's (torch's nvidia packages,
+  `cuda_lib_dirs`). Refused in one line when it isn't there, can't load a
+  library, sees no CUDA card, or its CMakeCache.txt (or a packed build's
+  VERSION) says other cards (`check_runs_here`, `archs_run_on`). Recorded:
+  its `--version`, the binary's and every library's sha256 and one identity
+  for them (`libs_sha256`, pinned for a resume and across a task's shards),
+  the commit and branch of a `.git` near it (read from its files when git
+  isn't installed: `git_files`), the devices and architectures.
+- **A named runtime** (`frontier.RUNTIMES`, `--runtime lda-2610`): its
+  environment (`LOOKAHEAD_MOE_ROUTER_NORM=1`), the server's flags (q8_0
+  cache, flash attention, the sampling as defaults) and the sampling every
+  request carries (`service/frontier.settings` reads the served record's
+  `runtime`: min-p 0.0 among them, which the board never sent). Thinking on
+  only; no speculative decoding, reasoning budget or `--moe-stream`, and no
+  flag or variable that would change it, typed beside it. The repeat penalty
+  is `LDA_REPEAT_PENALTY`, said on each step's line. `LOOKAHEAD_MOE_*` is
+  routing to the import (`ROUTING_ENV`), not passed from the shell, and goes
+  out in an export with its value, as do the new sampling flags.
+- **Plan L** (`frontier_box.PLANS["L"]`, `PLAN_RUNTIME`): thinking on only,
+  21 boxes a model, none over about 6 h on a 5090 at the pilot's paces (HLE
+  ninths, MMLU-Pro thirds, MATH with GPQA quarters, OTIS thirds with
+  SimpleQA, ARC-AGI-2 halves); its boxes run the runtime without typing it
+  and take `--server-dir`.
+- **`scripts/score_bundle.py`**: a box's bundles scored where they are, by
+  the board's own `marks()` and `summary()` on a temporary copy — % right ±
+  SE, answers, ran out, ending in a loop — for the code-scored five; HLE and
+  SimpleQA their counts only; shards of a model merged, two or three models
+  side by side with the paired difference; each file's sha256 as its box
+  hashed it; `--from hf://…` fetches the bundles first. Nothing written in
+  the board's folders, its config put back.
+- **`scripts/box_upload.py`**: a box's bundles (only the one its progress file
+  records, with that sha256) and progress files to the private repository
+  under `runs/step4000-2610/<build>/<step>/`, one commit, each file checked
+  there after; a repository that isn't private is refused.
+- **`import_remote.py` takes several bundles or a folder**: each in turn;
+  `--register` registers the model on its first (with the bundle's runtime,
+  as this board defines it) and imports the rest onto it. The import refuses
+  a runtime this board doesn't know, one the box didn't run as defined, or a
+  bundle whose runtime isn't its model's (`runtime_problem`).
+- Docs: `docs/STEP4000-RUN.md` (the team's), `docs/REMOTE-RUNS.md` § step4000
+  (L1–L4: plan L, one box end to end, onto the Mac, into the board).
+- Tests: `tests/test_20_step4000.py`; the stand-in llama-server answers
+  `--list-devices` and can fail as a binary missing a library.
+
 ### 18c.4 — the page (8 Oct)
 
 - **The header's list** (point 18): the Runs pill's list holds the running

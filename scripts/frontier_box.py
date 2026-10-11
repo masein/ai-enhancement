@@ -27,6 +27,14 @@ bundle again (the import tells its answers are the same: nothing changes).
 
 --list A (or B) prints a plan: each box's steps and its hours, at the pilot's
 paces (one RTX 5090, the phone build, 6 Oct) under the token limits of 6 Oct.
+
+20: plan L — step4000 against Q4 and BF16, the lda runtime, thinking on only,
+no box over about 6 hours on a 5090 at those paces. Its boxes run the
+runtime of PLAN_RUNTIME (--runtime lda-2610: no one types its values), and
+take the team's build directory as --server-dir in place of a tarball:
+
+    python scripts/frontier_box.py L3 --as served/step4000-lda-2610 \
+        --gguf /workspace/step4000/step4000.gguf --server-dir /workspace/llama.cpp/build
 """
 
 from __future__ import annotations
@@ -112,7 +120,24 @@ PLANS: dict[str, dict[str, list[Step]]] = {
         "B14": [("on", (ARC,), "2/2", 5), ("off", (HLE,), "2/2", 8)],
         "B15": [("on", (GPQA,), "", 8)],
     },
+    # 20: step4000 against Q4 and BF16 — thinking on only, every box under
+    # about 6 hours on a 5090 at the pilot's paces: HLE in ninths, MMLU-Pro in
+    # thirds, MATH Level 5 with GPQA Diamond in quarters, OTIS in thirds (the
+    # first with SimpleQA), ARC-AGI-2 in halves at 5 slots. No parity step:
+    # the server is out of reach, and asks with another runtime
+    "L": {
+        **{f"L{i}": [("on", (HLE,), f"{i}/9", 8)] for i in range(1, 10)},
+        **{f"L{9 + i}": [("on", (MMLU,), f"{i}/3", 8)] for i in range(1, 4)},
+        **{f"L{12 + i}": [("on", (MATH, GPQA), f"{i}/4", 8)] for i in range(1, 5)},
+        "L17": [("on", (OTIS,), "1/3", 8), ("on", (SQA,), "", 8)],
+        "L18": [("on", (OTIS,), "2/3", 8)],
+        "L19": [("on", (OTIS,), "3/3", 8)],
+        "L20": [("on", (ARC,), "1/2", 5)],
+        "L21": [("on", (ARC,), "2/2", 5)],
+    },
 }
+# 20: the runtime a plan's boxes run, unless the line names another
+PLAN_RUNTIME = {"L": "lda-2610"}
 
 
 def box_of(name: str) -> list[Step]:
@@ -233,8 +258,13 @@ def argv_of(box: str, k: int, step: Step, a: argparse.Namespace) -> list[str]:
     if getattr(a, "slots", 0):                      # 17g: the line's own --slots, a cap
         slots = min(slots, a.slots)
     out = [sys.executable, str(HERE / "remote_gguf.py"), "--as", a.served_as, "--gguf", a.gguf,
-           "--server", a.server, "--based-on", a.based_on, "--label", box,
-           "--files", str(Path(a.root) / "files"), "--flags", a.flags]
+           *(["--server-dir", a.server_dir] if getattr(a, "server_dir", "") else
+             ["--server", a.server]),
+           "--based-on", a.based_on, "--label", box,
+           "--files", str(Path(a.root) / "files"), "--flags", flags_of(a, box)]
+    rt = runtime_of(a, box)
+    if rt:
+        out += ["--runtime", rt]
     if getattr(a, "slots_fit", False):
         out += ["--slots-fit"]
     if a.env:
@@ -252,6 +282,19 @@ def argv_of(box: str, k: int, step: Step, a: argparse.Namespace) -> list[str]:
     if shard:
         out += ["--shard", shard]
     return out + ["--out", str(folder(a, box, k, step))]
+
+
+def runtime_of(a: argparse.Namespace, box: str) -> str:
+    """20: the runtime a box's steps run: the line's, else its plan's"""
+    return getattr(a, "runtime", "") or PLAN_RUNTIME.get(box[:1].upper(), "")
+
+
+def flags_of(a: argparse.Namespace, box: str) -> str:
+    """the box's llama-server flags: the line's; else ours (FLAGS), or none
+    beside a runtime, which sets its own"""
+    if getattr(a, "flags", None) is not None:
+        return a.flags
+    return "" if runtime_of(a, box) else FLAGS
 
 
 def listing(plan: str) -> list[str]:
@@ -274,8 +317,14 @@ def parser() -> argparse.ArgumentParser:
     ap.add_argument("--as", dest="served_as", default="", help="served/<name>, the build's")
     ap.add_argument("--gguf", default="")
     ap.add_argument("--server", default="")
+    ap.add_argument("--server-dir", default="",
+                    help="20: a llama.cpp build directory on the box, in place of --server")
+    ap.add_argument("--runtime", default="", choices=["", *sorted(fb.RUNTIMES)],
+                    help="20: a named runtime (plan L's boxes run "
+                         f"{PLAN_RUNTIME.get('L')} without it)")
     ap.add_argument("--based-on", default=BASED_ON)
-    ap.add_argument("--flags", default=FLAGS, help=f"llama-server's flags (default: {FLAGS})")
+    ap.add_argument("--flags", default=None,
+                    help=f"llama-server's flags (default: {FLAGS}; none beside a runtime)")
     ap.add_argument("--env", default="", help="the build's llama-server environment, if any")
     ap.add_argument("--root", default="/workspace", help="where the build's folder goes")
     ap.add_argument("--ask-written-off", action="store_true",
@@ -297,13 +346,18 @@ def main(argv: list[str] | None = None) -> int:
     if not a.box:
         ap.error("give the box (A1 … B15), or --list A")
     missing = [n for n, v in (("--as", a.served_as), ("--gguf", a.gguf),
-                              ("--server", a.server)) if not v]
+                              ("--server", a.server or a.server_dir)) if not v]
     if missing:
-        ap.error(f"{', '.join(missing)}: the build's, as G2 gives them")
+        ap.error(f"{', '.join(missing)}: the build's, as G2 gives them"
+                 + (" (or --server-dir)" if "--server" in missing else ""))
+    if a.server and a.server_dir:
+        ap.error("--server or --server-dir, not both")
     box = a.box.upper()
     steps = box_of(box)
     print(f"{box}: {len(steps)} step{'s' if len(steps) > 1 else ''}, about "
           f"{sum(hours(s) for s in steps):.1f} h at the pilot's paces", flush=True)
+    if runtime_of(a, box):
+        print(fb.runtime_words(runtime_of(a, box)), flush=True)
     # 18c point 17: the line's own state, for the fetch — a step another box
     # imported counts as done here only once this line has ended
     mark = folder(a, box, 1, steps[0]).parent / f"{box}.line.json" if steps else None

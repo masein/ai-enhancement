@@ -985,7 +985,8 @@ def ask_raw(rec: dict, text: str, s: dict) -> "Answer":
     # 17b: with the same sampling as the chat request (a model with no preset
     # sends none: the server's own), never the temperature alone
     sampling = {k: s[k] for k in ("temperature", "top_p", "top_k", "min_p", "presence_penalty",
-                                  "repeat_penalty", "seed") if s.get(k) is not None}
+                                  "repeat_penalty", "repeat_last_n", "seed")
+                if s.get(k) is not None}
     reply = _post(root + "/completion", key, {
         "prompt": prompt, "n_predict": s["max_tokens"], **sampling,
         "stop": list(s.get("stop") or []), "cache_prompt": False, "stream": False},

@@ -43,6 +43,12 @@ order, as one run would have written them, and the row is scored as above.
 The shards come in any order; a shard imported twice changes nothing; a newer
 bundle of the same shard replaces it, the earlier one kept under
 results/earlier/. Every shard of a task has the same n.
+
+20: several bundles, or a folder of them — a build's boxes' uploads, fetched
+from the private repository (scripts/box_upload.py) — each imported in turn,
+its own lines under its name, and a last line counting them. With
+--register and --file-sha256 they must all be one model's: the first
+registers it, the rest go onto it.
 """
 
 from __future__ import annotations
@@ -447,7 +453,9 @@ def import_devicemark(b: dict, path: Path, by: str, say=print) -> int:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("bundle", nargs="?", type=Path)
+    ap.add_argument("bundle", nargs="*", type=Path,
+                    help="a bundle — 20: or several, or a folder of them (a box's upload, "
+                         "fetched from the private repository), each imported in turn")
     ap.add_argument("--by", default="", help="your name, for the Runs list")
     ap.add_argument("--battery", action="store_true",
                     help="this server's battery hashes, for remote_run.py --battery")
@@ -510,8 +518,49 @@ def main(argv: list[str] | None = None) -> int:
         ap.error("--file-sha256: 64 hex digits")
     if a.public_weights and not a.register.strip():
         ap.error("--public-weights: with --register, when the model is registered")
-    return import_bundle(a.bundle, a.by.strip()[:80], file_sha=sha, register=a.register.strip(),
-                         aside=a.set_aside_shards, public_weights=a.public_weights)
+    paths = bundles_of(a.bundle)
+    if not paths:
+        ap.error("no bundle (*.tar.gz) in what was given")
+    if len(paths) == 1:
+        return import_bundle(paths[0], a.by.strip()[:80], file_sha=sha,
+                             register=a.register.strip(), aside=a.set_aside_shards,
+                             public_weights=a.public_weights)
+    # 20: several — one model's when --register or --file-sha256 is given
+    # (they name one file); the model registered by the first, the rest
+    # imported onto it
+    models = sorted({model_of_name(p.name) for p in paths})
+    if (a.register.strip() or sha) and len(models) > 1:
+        ap.error(f"--register and --file-sha256 name one build's file, and these bundles are "
+                 f"of {len(models)} models ({', '.join(models)}): give one build's folder")
+    codes, register = [], a.register.strip()
+    for k, p in enumerate(paths, 1):
+        print(f"\n[{k} of {len(paths)}] {p}", flush=True)
+        if register:
+            from service import served
+            if served.is_served(model_of_name(p.name)) and served.get(model_of_name(p.name)):
+                register = ""
+        codes.append(import_bundle(p, a.by.strip()[:80], file_sha=sha, register=register,
+                                   aside=a.set_aside_shards, public_weights=a.public_weights))
+    refused = sum(1 for c in codes if c == REFUSED)
+    print(f"\n{len(paths)} bundles: {len(paths) - sum(1 for c in codes if c)} imported or the "
+          f"same as before, {refused} refused, {sum(1 for c in codes if c and c != REFUSED)} "
+          "not done — each one's lines above")
+    return REFUSED if refused else max(codes)
+
+
+def bundles_of(given: list[Path]) -> list[Path]:
+    """20: the bundles given, a folder's every *.tar.gz in order"""
+    out: list[Path] = []
+    for p in given:
+        out += sorted(p.rglob("*.tar.gz")) if p.is_dir() else [p]
+    return out
+
+
+def model_of_name(name: str) -> str:
+    """the served model a Frontier bundle's file name says (bundle_name's
+    "frontier-served__<name>-thinking-…"); the name itself when it isn't one"""
+    m = re.match(r"^frontier-(served)__(.+?)-thinking-(?:on|off)", name)
+    return f"{m[1]}/{m[2]}" if m else name
 
 
 if __name__ == "__main__":

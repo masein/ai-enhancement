@@ -13,7 +13,10 @@ box that is stopped does; FAKE_LLAMA_LOAD_S is how long it "loads" before
 to (what was launched, not what was recorded); FAKE_LLAMA_MODEL_PATH the file
 its /props names instead of -m's; FAKE_LLAMA_STATUS a status every chat
 request (and /apply-template) answers with; FAKE_LLAMA_THINK=never answers
-without thinking whatever it is told."""
+without thinking whatever it is told. 20: --list-devices lists one CUDA card,
+or none with CUDA's own error when FAKE_LLAMA_DEVICES=none;
+FAKE_LLAMA_BROKEN=1 fails as a binary missing a library does, before
+anything."""
 
 from __future__ import annotations
 
@@ -37,14 +40,27 @@ def arg(argv: list[str], *names: str, default: str = "") -> str:
 
 def main() -> int:
     argv = sys.argv[1:]
+    if os.environ.get("FAKE_LLAMA_BROKEN"):
+        print("llama-server: error while loading shared libraries: libcudart.so.12: cannot "
+              "open shared object file: No such file or directory", file=sys.stderr)
+        return 127
     if "--version" in argv:
         print(VERSION, file=sys.stderr)
         return 0
+    if "--list-devices" in argv:
+        if os.environ.get("FAKE_LLAMA_DEVICES") == "none":
+            print("ggml_cuda_init: failed to initialize CUDA: CUDA driver version is "
+                  "insufficient for CUDA runtime version", file=sys.stderr)
+            print("Available devices:")
+        else:
+            print("Available devices:\n  CUDA0: NVIDIA GeForce RTX 5090 (32109 MiB, 31588 MiB "
+                  "free)")
+        return 0
     if os.environ.get("FAKE_LLAMA_ARGV"):
         with open(os.environ["FAKE_LLAMA_ARGV"], "a", encoding="utf-8") as fh:
-            fh.write(json.dumps({"argv": argv, "env": {k: v for k, v in os.environ.items()
-                                                       if k.startswith(("LLAMA_", "GGML_"))}})
-                     + "\n")
+            fh.write(json.dumps({"argv": argv, "env": {
+                k: v for k, v in os.environ.items()
+                if k.startswith(("LLAMA_", "GGML_", "LOOKAHEAD_"))}}) + "\n")
     model = arg(argv, "-m", "--model")
     shown = os.environ.get("FAKE_LLAMA_MODEL_PATH") or model
     status = int(os.environ.get("FAKE_LLAMA_STATUS") or 200)
