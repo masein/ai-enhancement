@@ -5298,17 +5298,24 @@ button.who { font-weight:600; font-family:var(--font-sans); font-size:var(--fs-1
 #testAct button { min-height:32px; white-space:nowrap; font-size:var(--fs-1); padding:4px 14px; }
 .runspop { width:min(460px, calc(100vw - 24px)); }
 .runslist { display:flex; flex-direction:column; gap:2px; }
-/* 18d point 25: the name never shrinks below its own width — the
-   description gives way, cut with an ellipsis (a rented line's took the whole
-   row: 0 px of name on 3 of 4 at 400 px) */
-.runline { display:grid; grid-template-columns:auto minmax(max-content, 1fr) minmax(0, auto);
+/* 18d point 25: the name keeps its own width while it fits — the description
+   gives way first (a rented line's took the whole row: 0 px of name on 3 of 4
+   at 400 px). 18e point 7: a longer name is cut with an ellipsis inside the
+   popover (765 px of names spilt into 374), and a rented line keeps room for
+   "rented GPU" (it was 0 px) */
+.runline { display:grid; grid-template-columns:auto minmax(0, max-content) minmax(0, 1fr);
   gap:4px 10px; align-items:baseline; padding:6px 4px; border-radius:var(--r-1);
   font-size:var(--fs-2); }
-.runline .runname { font-weight:600; white-space:nowrap; }
+.runline[data-run-rented] { grid-template-columns:auto minmax(0, max-content)
+  minmax(min(11ch, 30%), 1fr); }
+.runline .runname { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  min-width:0; }
 .runline .runwhat { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
 .runline .runprog { grid-column:1 / -1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.runslist.full .runline { grid-template-columns:auto minmax(max-content, 1fr) minmax(0, auto)
+.runslist.full .runline { grid-template-columns:auto minmax(0, max-content) minmax(0, 1fr)
   minmax(0, 2fr); }
+.runslist.full .runline[data-run-rented] { grid-template-columns:auto minmax(0, max-content)
+  minmax(min(11ch, 30%), 1fr) minmax(0, 2fr); }
 .runslist.full .runline .runprog { grid-column:auto; }
 .runslist .runhead { margin:8px 4px 2px; }
 .runs-all { display:block; margin:8px 4px 2px; font-weight:600; }
@@ -21272,7 +21279,9 @@ function rentedRunLine(x) {
   const N = v => Number(v).toLocaleString('en');
   return el('div', { class: 'runline', 'data-run-line': x.id, 'data-run-rented': x.id },
     el('span', { class: stClass('running'), text: x.status === 'loading' ? 'loading' : 'running' }),
-    el('a', { href: '#tab=runs', class: 'runname', title: x.hf_id, text: name,
+    // 18e point 7: its whole name in the hover, where a long one is cut
+    el('a', { href: '#tab=runs', class: 'runname', title: name === x.hf_id ? name
+      : `${name} (${x.hf_id})`, text: name,
       onclick: e => { e.preventDefault(); popClose();
         navigate({ tab: 'queue', model: null, topic: null }); } }),
     // 18d point 25: where it runs; what it asks is on its row in Runs
@@ -21297,14 +21306,15 @@ function runLine(r, attrs = {}) {
   return el('div', { class: 'runline', 'data-run-line': String(r.id), ...attrs },
     el('span', { class: stClass(st.cls), text: st.text }),
     onBoard ? el('a', { href: '#model=' + encodeURIComponent(r.hf_id), class: 'runname', text: name,
-        'data-run-model': id,
+        'data-run-model': id, title: name,
         onclick: e => { e.preventDefault(); popClose();
           if (r.suite === 'gguf') {
             (state.mblk[id] = state.mblk[id] || {}).gguf = true;
             state.after = { scroll: '[data-kind-block="gguf"]' };
           }
           navigate({ model: id, topic: null, ...(r.suite === 'gguf' ? { mtab: 'scores' } : {}) }); } })
-      : el('span', { class: 'runname', title: r.hf_id, text: name }),
+      : el('span', { class: 'runname', title: name === r.hf_id ? name : `${name} (${r.hf_id})`,
+        text: name }),
     el('span', { class: 'small se runwhat', text: suiteWords(r) }),
     el('span', { class: 'small se runprog', title: r.progress || '',
       text: RUNNING_ST.has(r.status) || r.status === 'done' ? (r.progress || '')

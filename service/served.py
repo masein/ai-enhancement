@@ -59,6 +59,11 @@ CHANGED_LINE = ("The server now serves a different file than the one registered.
 WINDOW_LINE = ("The server now runs it with a context window of {now:,} tokens, not the {was:,} "
                "it was registered with: the file is the same. Use the new window on the model's "
                "page if that's intended.")
+# 18e point 8: and one whose server no longer says its window (its /props
+# gives no n_ctx) — said so, never the model's training context in its place
+WINDOW_UNSAID = ("The server now runs it with a context window it doesn't report (it says "
+                 "nothing), not the {was:,} it was registered with: the file is the same. Start "
+                 "it with its -c again.")
 KEPT_FOR_NEXT = " · the answers it gave are kept: the next run asks only the rest"
 # 17: and the Frontier benchmarks (service/frontier.py), asked as chat messages too
 SUITES = ("everyday", "judged", "generative", "safety", "shared", "mobile", "devicemark",
@@ -73,8 +78,11 @@ SPEND_JOB = "tests"
 
 
 class ServerStopped(Exception):
-    """the server stopped answering (or refused) at `done` of `total`"""
+    """the server stopped answering (or refused) at `done` of `total`. 18e
+    point 10: a reason is one line — a server's words with a newline in them
+    ("…)\n[frontier] …") wrote a second line that read as the runner's own"""
     def __init__(self, done: int, total: int, why: str = "", refused: str = ""):
+        why, refused = (" ".join(str(x or "").split("\n")) for x in (why, refused))
         super().__init__(refused or f"the server stopped answering at {done} of {total}")
         self.done, self.total, self.why, self.task = done, total, why, ""
         self.refused = refused
@@ -223,8 +231,11 @@ def probe(base: str, key: str = "") -> dict:
         raise ValueError(f"{base} serves no model")
     first = data[0]
     meta = first.get("meta") or {}
+    # 18e point 8: the window is the server's own n_ctx (/props) or none —
+    # never the model's training context, which a refusal quoted as the
+    # window when /props said nothing
     out = {"model": str(first.get("id") or ""), "file": "", "size": meta.get("size"),
-           "ctx": meta.get("n_ctx_train"), "build": "", "answered": ["models"]}
+           "ctx": None, "build": "", "answered": ["models"]}
     root = root_of(base)
     try:
         st, raw = _http("GET", root + "/props", key, timeout=5)
@@ -232,8 +243,9 @@ def probe(base: str, key: str = "") -> dict:
             props = json.loads(raw)
             out["answered"].append("props")
             out["file"] = str(props.get("model_path") or "").rsplit("/", 1)[-1]
-            out["ctx"] = ((props.get("default_generation_settings") or {}).get("n_ctx")
-                          or props.get("n_ctx") or out["ctx"])
+            n = ((props.get("default_generation_settings") or {}).get("n_ctx")
+                 or props.get("n_ctx"))
+            out["ctx"] = n if isinstance(n, int) and not isinstance(n, bool) and n > 0 else None
             out["build"] = str(props.get("build_info") or props.get("build") or "")
     except Exception:                                       # noqa: BLE001 — optional
         pass
@@ -719,10 +731,17 @@ def unusable_window(said) -> str:
     return f"its server doesn't report a usable context window (it says {what})"
 
 
+def window_only(why: str) -> bool:
+    """17j: a check_pin line about the window alone — another, or (18e point 8)
+    none said"""
+    return why.startswith(WINDOW_LINE.split("{", 1)[0]) or why.startswith(
+        WINDOW_UNSAID.split("{", 1)[0])
+
+
 def changed(why: str) -> bool:
     """17j: a check_pin line that says the server is up with another pin — a
     file or (alone) a window — not that it doesn't answer"""
-    return why == CHANGED_LINE or why.startswith(WINDOW_LINE.split("{", 1)[0])
+    return why == CHANGED_LINE or window_only(why)
 
 
 def pin_diff(rec: dict, now: dict) -> list[str]:
@@ -735,6 +754,8 @@ def pin_words(rec: dict, now: dict) -> str:
     diff = pin_diff(rec, now)
     if diff == ["ctx"] and isinstance(now.get("ctx"), int):
         return WINDOW_LINE.format(now=now["ctx"], was=int(rec["pin"].get("ctx") or 0))
+    if diff == ["ctx"]:
+        return WINDOW_UNSAID.format(was=int(rec["pin"].get("ctx") or 0))
     return CHANGED_LINE if diff else ""
 
 

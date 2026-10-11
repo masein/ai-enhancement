@@ -378,8 +378,8 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
         if failed and not still_answers(rec, task, path, s, failed):
             why = next(iter(failed.values()))
             raise served.ServerStopped(count["n"], total, why, refused=(
-                f"the server stopped answering ({why}): {len(failed)} question(s) it failed on "
-                "are asked again by the next run, nothing written for them"))
+                f"the server stopped answering ({status_of(why)}): {len(failed)} question(s) it "
+                "failed on are asked again by the next run, nothing written for them"))
         # 17f: written off only when the refusal is the question's own (a 4xx —
         # too long for its context — or no answer within the timeout), or
         # when it failed on WRITE_OFF_RUNS separate runs. A 5xx on real

@@ -105,9 +105,10 @@ def test_29_the_servers_words_never_go_out(box, tmp_path, monkeypatch):  # noqa:
         assert word not in text, (word, text)                    # 70df001: each went out
     assert ("[frontier] GPQA Diamond: the server refused a question · the answers it gave are "
             "kept: the next run asks only the rest\n") in text, text
-    assert ("[frontier] GPQA Diamond: the server failed on 6 questions, asked its own way and "
-            "without its chat parsing: stopped · the answers it gave are kept: the next run asks "
-            "only the rest\n") in text, text
+    # 18e point 10: the second line starts within the first's words (their
+    # cap, 400 characters) and fits in them: it can't be told from their
+    # rest, so it stays in — a reason's rest went out as a tagged line
+    assert "the server failed on 6 questions" not in text, text
 
 
 def test_29_a_stop_reason_holds_the_servers_status_alone():
