@@ -1106,6 +1106,260 @@ import says how many of the answers that ran out end in a loop (the last
 passage repeating), and each cell shows the share that ran out, beside its
 score.
 
+# step4000 against Q4 and BF16 (20)
+
+The phone model's team asks for the full Frontier set, thinking on, on three
+models with one runtime: **Q4** (the UD-Q4_K_XL file run before), **BF16**
+(the same model, full precision) and **step4000** (their new checkpoint).
+Their question: does step4000 loop less?
+
+The boxes run as G2's do: the llama-server **tarball** and the **GGUF** from
+the private repository (`--server hf://…`, `--gguf hf://…`), and the bundles
+come home through the fetch (G3–G4) once 18d is deployed. Each box also
+scores what it can by code (`score_bundle.py`), and can upload its bundles to
+the private repository itself (L4). HLE and SimpleQA are graded on the board,
+later, with your yes.
+
+**The runtime, `lda-2610`** (`scripts/frontier.py` RUNTIMES), the same for
+all three: llama.cpp from the team's `lda` branch,
+`LOOKAHEAD_MOE_ROUTER_NORM=1`, the server's sampling and each request's
+(temperature 1.0, top-k 20, top-p 0.95, **min-p 0.0**, presence penalty 1.5,
+repeat penalty 1.0, repeat-last-n 64), `-ctk q8_0 -ctv q8_0 --flash-attn on`,
+no reasoning budget, no speculative decoding, no `--moe-stream`, our token
+limits (81,920 on the hard benchmarks). Plan L's boxes run it without typing
+it, and each step's line says every value. The repeat penalty is 1.0, as in
+the team's command (11 Oct): the presence penalty of 1.5 does the work.
+
+**The three served ids**, new rows that never mix with the earlier ones:
+
+| Model | `--as` | Its board name |
+|---|---|---|
+| Q4 | `served/Qwen3.6-35B-A3B-Q4-lda-2610` | Qwen3.6-35B-A3B Q4 (lda runtime) |
+| BF16 | `served/Qwen3.6-35B-A3B-BF16-lda-2610` | Qwen3.6-35B-A3B BF16 (lda runtime) |
+| step4000 | `served/step4000-lda-2610` | step4000 (lda runtime) |
+
+## L0. The tarball and step4000's file
+
+**Built (11 Oct):** `llama-server-lda-a4a76a7.tar.gz`, in the private
+repository, 896 MB, sha256
+`5b538290644d67139c6c996fdaa3e04cce82fd0b343cce66a4ff234648afb618` — from
+`teraformer/lda-2026-09-22` at `a4a76a751` (build 9954), CUDA 12.8, for
+**sm_120 alone** (the RTX 5090 and the RTX PRO 6000), with no web page (the
+API only: the branch's prebuilt page lacks `loading.html`). The router norm,
+`LOOKAHEAD_MOE_ROUTER_NORM`, is read in its `libllama.so`; each step checks
+the build reads it before anything is asked.
+
+**step4000's GGUF:** `step4000.gguf` in the same repository, 13,592,481,632
+bytes, sha256 `630c408a3836f82afa1f79629b06d9390d3f736f6140791baa42e180a640565e`
+— pinned for `served/step4000-lda-2610`.
+
+Plan L's box line pins both by name (`frontier_box.PLAN_PINS`): a file of
+that name with another sha256 is refused before anything is asked. It checks
+the card first, and refuses anything but an RTX 5090 or an RTX PRO 6000 in
+one line, before anything is fetched.
+
+The next tarball, the same way (`LLAMA_CMAKE_ARGS` for more cmake arguments;
+the web page is off unless `LLAMA_WEB_UI=1`; all three in its VERSION):
+
+```bash
+LLAMA_CUDA_ARCHS=120 ~/benchmarks/aienh/scripts/build_llama_tarball.sh <the lda branch's checkout> ~/llama-server-lda-<commit>.tar.gz
+```
+
+```bash
+hf upload <you>/evalboard-private ~/llama-server-lda-<commit>.tar.gz llama-server-lda-<commit>.tar.gz
+```
+
+Every box of the three models runs one tarball: shards made with another
+build never merge. The other two files' sha256, for the fetch: Q4's is the
+UD-Q4_K_XL file's, registered on `served/Qwen3.6-35B-A3B-Q4-original-k-8`'s
+page; BF16's is the split identity G3–G4 describes (each part's sha256 on
+Hugging Face).
+
+## L1. Plan L
+
+`python scripts/frontier_box.py --list L` prints it. Thinking on only, 21
+boxes a model, no box over about 6 hours on a 5090 at the pilot's paces:
+
+| Box | Its steps | about (5090) |
+|---|---|---|
+| L1–L9 | Humanity's Last Exam, shard 1/9 … 9/9 | 5.5 h each |
+| L10–L12 | MMLU-Pro, shard 1/3 … 3/3 | 5.9 h each |
+| L13–L16 | MATH Level 5 and GPQA Diamond, shard 1/4 … 4/4 | 5.4 h each |
+| L17 | OTIS Mock AIME, shard 1/3; then SimpleQA Verified | 5.2 h |
+| L18–L19 | OTIS Mock AIME, shard 2/3, 3/3 | 4.2 h each |
+| L20–L21 | ARC-AGI-2, shard 1/2, 2/2 (5 slots) | 5.8 h each |
+
+114.1 box-hours a model at those paces. They are the pilot's (the phone
+build, which routes 4 experts a token, at ±25%); a file routing 8 runs
+longer, by how much isn't measured. Q4 and step4000 run on an **RTX 5090**.
+
+**BF16 runs the whole plan L on an RTX PRO 6000 (96 GB)**, nothing cut: the
+BF16 file the earlier BF16 rows ran, in two parts (69.9 GB), on the lda
+tarball. Its pace isn't measured; it reads about three times the bytes a
+token, so take 1.5–2.5 times the hours: 8–15 h a box, about 12 h at twice.
+Its file holds HLE's 8 slots with room to spare. Cutting it finer doesn't
+bring the last box in sooner than renting its 21 boxes at once does: the
+same box-hours, each box's start on top.
+
+**The files, each pinned on plan L's boxes by its sha256**
+(`frontier_box.PLAN_PINS`; a file of that name with another sha256 is refused
+before anything is asked):
+
+| Model | `--gguf` | sha256 (the board's `--file-sha256`) |
+|---|---|---|
+| step4000 | `hf://<you>/evalboard-private/step4000.gguf` | `630c408a3836f82afa1f79629b06d9390d3f736f6140791baa42e180a640565e` |
+| Q4 | `hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF@5bc3e238d916f48a861bac2f8a1990a0e9b7e98d/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf` | `55983c5a75a1ab969824077b3bb3de4146e82a9234072b48ad4e8f92ad3fe9f1` |
+| BF16 | `hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF@5bc3e238d916f48a861bac2f8a1990a0e9b7e98d/BF16/Qwen3.6-35B-A3B-BF16-00001-of-00002.gguf` | the split identity `f391f702c4ad97282bf9a9babb494f2639322ff7d17ae28f54237fe00e715ca2` (part 1 `a172dfea…44a2`, part 2 `b90b4d07…5161`) |
+
+Q4's and BF16's are unsloth's public files as Hugging Face publishes them at
+that revision, the files the earlier rows registered: check they are the
+sha256 and identity on `served/Qwen3.6-35B-A3B-Q4-original-k-8`'s and
+`served/Qwen3.6-35B-A3B-BF16`'s pages before the first import.
+
+## L2. One box, end to end
+
+1. Rent on vast.ai with the template of step 2: image
+   `ghcr.io/masein/evalboard-runner:<this phase's tag>`, **Disk 100 GB** (BF16:
+   200 GB); an **RTX 5090**, max CUDA 12.8 or newer, inet down ≥ 1,000 Mbps
+   (BF16: an **RTX PRO 6000**, 96 GB).
+2. Log in with vast.ai's SSH line:
+
+   ```bash
+   ssh -p <port> root@<host>
+   ```
+
+3. A tmux session, the app's folder, and the read token (G0's: the gated sets
+   and the private repository; typed, nothing shows):
+
+   ```bash
+   tmux new -s f
+   ```
+
+   ```bash
+   cd /app
+   ```
+
+   ```bash
+   read -rs HF_TOKEN && export HF_TOKEN
+   ```
+
+4. The box's line. For step4000, box L13:
+
+   ```bash
+   python scripts/frontier_box.py L13 --as served/step4000-lda-2610 --gguf hf://<you>/evalboard-private/step4000.gguf --server hf://<you>/evalboard-private/llama-server-lda-a4a76a7.tar.gz
+   ```
+
+   Q4, the same box label with its file:
+
+   ```bash
+   python scripts/frontier_box.py L13 --as served/Qwen3.6-35B-A3B-Q4-lda-2610 --gguf hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF@5bc3e238d916f48a861bac2f8a1990a0e9b7e98d/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf --server hf://<you>/evalboard-private/llama-server-lda-a4a76a7.tar.gz
+   ```
+
+   BF16, on an RTX PRO 6000, the first part of its file (the box fetches both):
+
+   ```bash
+   python scripts/frontier_box.py L13 --as served/Qwen3.6-35B-A3B-BF16-lda-2610 --gguf hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF@5bc3e238d916f48a861bac2f8a1990a0e9b7e98d/BF16/Qwen3.6-35B-A3B-BF16-00001-of-00002.gguf --server hf://<you>/evalboard-private/llama-server-lda-a4a76a7.tar.gz
+   ```
+
+   It checks the card first (an RTX 5090 or an RTX PRO 6000, or nothing is
+   fetched), then prints the runtime's every value, the file and the build
+   (each checked against its pin), the memory, then asks. The last lines say how each step ended; if the box
+   stops, paste the same line again.
+5. Once every step reads whole, the scores by code, and each file's sha256
+   as the box hashed it:
+
+   ```bash
+   python scripts/score_bundle.py /workspace/step4000-lda-2610
+   ```
+
+   (For Q4 or BF16, its own folder: `/workspace/Qwen3.6-35B-A3B-Q4-lda-2610`
+   or `/workspace/Qwen3.6-35B-A3B-BF16-lda-2610`.) A line a benchmark:
+   "GPQA Diamond · step4000-lda-2610: 61.6% ± 3.1 · 198 answers (shards 1 of
+   4: 198 of its 792 …) · 12 ran out of room (6.1%), 9 of them ending in a
+   loop". MATH and OTIS are the code's score, the board's before Epoch's
+   model check; HLE and SimpleQA show their answers, ran out and loops only.
+6. Destroy the box once the fetch says it is safe to destroy (L3).
+
+**The three models side by side**, on any box once their bundles are in the
+private repository (L4; the questions are fetched into
+`/workspace/files/questions` the first time):
+
+```bash
+python scripts/score_bundle.py --from hf://<you>/evalboard-private/runs/step4000-2610 --only gpqa
+```
+
+Each benchmark's three lines, then a table: % right, answers, ran out, in a
+loop, and each model's difference from the first question by question.
+
+## L3. Fetch and import, from the server (once 18d is deployed)
+
+The fetch of G3–G4, with the three models' sha256 from L0 and every box:
+
+```bash
+cd ~/benchmarks/aienh && python3 scripts/frontier_fetch.py --key ~/.ssh/id_ed25519 --sha served/step4000-lda-2610=630c408a3836f82afa1f79629b06d9390d3f736f6140791baa42e180a640565e --sha served/Qwen3.6-35B-A3B-Q4-lda-2610=55983c5a75a1ab969824077b3bb3de4146e82a9234072b48ad4e8f92ad3fe9f1 --sha served/Qwen3.6-35B-A3B-BF16-lda-2610=f391f702c4ad97282bf9a9babb494f2639322ff7d17ae28f54237fe00e715ca2 --every 3m <host 1>:<port 1> <host 2>:<port 2>
+```
+
+The board doesn't serve the three models yet, so each one's first bundle
+comes home and the fetch prints the line to import it by hand, every round,
+with `--register`. Type it once a model, with its board name; the import
+registers it with the bundle's runtime, as this board defines it, and the
+file by the sha256 you give. For step4000:
+
+```bash
+cd ~/benchmarks/aienh && sudo docker compose exec -T bench python scripts/import_remote.py ~/benchmarks/bundles/<the bundle the fetch names> --by masein --register "step4000 (lda runtime)" --file-sha256 630c408a3836f82afa1f79629b06d9390d3f736f6140791baa42e180a640565e
+```
+
+The same with "Qwen3.6-35B-A3B Q4 (lda runtime)" and
+`55983c5a75a1ab969824077b3bb3de4146e82a9234072b48ad4e8f92ad3fe9f1`, and
+"Qwen3.6-35B-A3B BF16 (lda runtime)" and its identity
+`f391f702c4ad97282bf9a9babb494f2639322ff7d17ae28f54237fe00e715ca2`. From then on the fetch imports each model's
+bundles by itself, and says when a box is safe to destroy (plan L's steps,
+by the box's label). Each import checks the runtime as this board defines it
+(its variable, its flags, each request's sampling) and refuses one asked
+another way.
+
+## L4. Without the fetch: the private repository
+
+A box's bundles and progress files, uploaded from the box (a token that can
+write to the repository, typed as in L2):
+
+```bash
+python scripts/box_upload.py --to hf://<you>/evalboard-private/runs/step4000-2610 --root /workspace
+```
+
+It refuses a repository that isn't private; its last line must read "N of N
+files in <you>/evalboard-private as they are here". On the server, the same
+files, then a model's folder in one line (the first bundle registers it, the
+rest go onto it):
+
+```bash
+HF_HOME="$(sed -n 's/^HF_HOME=//p' ~/benchmarks/aienh/.env)" hf download <you>/evalboard-private --include "runs/step4000-2610/*" --local-dir ~/benchmarks/bundles/step4000-2610
+```
+
+```bash
+cd ~/benchmarks/aienh && sudo docker compose exec -T bench python scripts/import_remote.py ~/benchmarks/bundles/step4000-2610/runs/step4000-2610/step4000-lda-2610 --by masein --register "step4000 (lda runtime)" --file-sha256 630c408a3836f82afa1f79629b06d9390d3f736f6140791baa42e180a640565e
+```
+
+On your Mac, a venv for the Hugging Face CLI once, then the download:
+
+```bash
+python3 -m venv ~/hf-venv && ~/hf-venv/bin/pip install huggingface_hub==1.33.0
+```
+
+```bash
+~/hf-venv/bin/hf download <you>/evalboard-private --include "runs/step4000-2610/*" --local-dir ~/step4000-2610
+```
+
+## L5. The fallback: the team's build directory on the box
+
+If the tarball can't be had, the team puts a build directory on the box
+(docs/STEP4000-RUN.md, "The fallback"), and the box's line takes
+`--server-dir /workspace/lda-build` in place of `--server …`. It checks the
+build runs on this box and card before anything else (its version, the card
+it sees, the architectures it was built for) and records the binary's and
+each library's sha256 and its commit. Every box of a model must run the same
+build directory, as with the tarball.
+
 # Speed tests: the cheapest box per answer (19)
 
 Which box runs our benchmarks for the fewest dollars per answer, measured the

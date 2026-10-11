@@ -233,6 +233,66 @@ def sampling(fam: str, on: bool) -> dict:
     return dict((PRESETS.get(fam) or {}).get("on" if on else "off") or {})
 
 
+# 20: a named runtime — one llama.cpp build's way of serving, as one name, so
+# nobody types it on a box: its environment, its server's flags (the sampling
+# as the server's defaults, the KV cache, flash attention) and the sampling
+# every request carries as well (min-p too: the board never sent it, so the
+# server's 0.05 applied). A box's bundle records every flag and value; the
+# import checks a bundle's sampling against the runtime its model is
+# registered with. Each runtime asks thinking on only, with no reasoning
+# budget and no speculative decoding, at the Frontier token limits above.
+# The repeat penalty is 1.0, as in the team's command (masein, 11 Oct): the
+# presence penalty of 1.5 does the work. Said on each step's line; another
+# value would be another runtime, under another name (the import never mixes
+# the two)
+LDA_REPEAT_PENALTY = 1.0
+RUNTIMES = {
+    "lda-2610": {
+        "words": "the team's lda branch: router norm on, no reasoning budget, no speculative "
+                 "decoding, thinking on",
+        "env": {"LOOKAHEAD_MOE_ROUTER_NORM": "1"},
+        "thinking": ("on",),
+        "sampling": {"temperature": 1.0, "top_k": 20, "top_p": 0.95, "min_p": 0.0,
+                     "presence_penalty": 1.5, "repeat_penalty": LDA_REPEAT_PENALTY,
+                     "repeat_last_n": 64},
+        "flags": ["-ctk", "q8_0", "-ctv", "q8_0", "--flash-attn", "on"],
+    },
+}
+# the server's flag for each sampling value
+SAMPLING_FLAGS = {"temperature": "--temp", "top_k": "--top-k", "top_p": "--top-p",
+                  "min_p": "--min-p", "presence_penalty": "--presence-penalty",
+                  "repeat_penalty": "--repeat-penalty", "repeat_last_n": "--repeat-last-n"}
+# what a runtime's server is never given: speculative decoding, a reasoning
+# budget, and --moe-stream (it saves memory only, and every model fits its card)
+RUNTIME_REFUSES = re.compile(r"^(--spec-[a-z-]+|--draft[a-z-]*|-md|--model-draft|-hfd|"
+                             r"--hf-repo-draft|--reasoning-budget|--moe-stream)$")
+
+
+def runtime_flags(name: str) -> list[str]:
+    """a runtime's llama-server flags: its cache and attention, then its
+    sampling as the server's defaults"""
+    rt = RUNTIMES[name]
+    out = list(rt["flags"])
+    for k, v in rt["sampling"].items():
+        out += [SAMPLING_FLAGS[k], str(v)]
+    return out
+
+
+SAMPLING_WORDS = {"temperature": "temperature", "top_k": "top-k", "top_p": "top-p",
+                  "min_p": "min-p", "presence_penalty": "presence penalty",
+                  "repeat_penalty": "repeat penalty", "repeat_last_n": "repeat last-n"}
+
+
+def runtime_words(name: str) -> str:
+    """"runtime lda-2610 (…): LOOKAHEAD_MOE_ROUTER_NORM=1 · temperature 1.0,
+    top-k 20, …, repeat penalty 1.0, repeat last-n 64 · -ctk q8_0 …" — a
+    step's line says it"""
+    rt = RUNTIMES[name]
+    env = " ".join(f"{k}={v}" for k, v in rt["env"].items())
+    samp = ", ".join(f"{SAMPLING_WORDS[k]} {v}" for k, v in rt["sampling"].items())
+    return f"runtime {name} ({rt['words']}): {env} · {samp} · " + " ".join(rt["flags"])
+
+
 def slot_context(tasks: list[str], on: bool) -> int:
     """the context one llama-server slot needs for the longest of `tasks`:
     its budget and its prompt's room"""
