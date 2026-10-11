@@ -258,7 +258,7 @@ def server_world(tmp_path, monkeypatch):
             return 0, "Runs #1: ok"
         if cmd[:3] == ["docker", "network", "inspect"]:
             return 0, "172.17.0.1\n"
-        if cmd[:2] == ["iptables", "-S"]:               # 18d point 15: the bridge's rules
+        if cmd[:5] == ["iptables", "-t", "raw", "-S", "PREROUTING"]:   # 18e point 11
             return 0, w.get("firewall", FIREWALL)
         return 0, ""
     monkeypatch.setattr(ar, "run", run)

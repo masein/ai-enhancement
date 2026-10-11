@@ -207,10 +207,10 @@ def test_15_the_firewalls_rules_are_read_and_each_missing_one_named(monkeypatch)
     monkeypatch.setattr(ar, "run", lambda cmd, **kw: (0, FIREWALL))
     assert ar.firewall_missing() == ""
     partial = "\n".join(x for x in FIREWALL.splitlines()
-                        if "INPUT -i" not in x and ar.TAILNET_RANGE not in x)
+                        if "LOCAL" not in x and ar.TAILNET_RANGE not in x)
     monkeypatch.setattr(ar, "run", lambda cmd, **kw: (0, partial))
     why = ar.firewall_missing()
-    assert "INPUT from docker0" in why and f"DOCKER-USER to {ar.TAILNET_RANGE}" in why
+    assert "this server's own addresses from docker0" in why and f"to {ar.TAILNET_RANGE}" in why
     assert "a reboot loses them" in why
     monkeypatch.setattr(ar, "run", lambda cmd, **kw: (1, "Permission denied (you must be root)"))
     assert "run this line in its sudo form" in ar.firewall_missing()
@@ -231,13 +231,12 @@ def test_15_the_firewall_step_comes_before_the_tasks_that_fetch(capsys):
     # the rules printed by the runner, their addresses never in the repo
     assert 'agent_run.py deepswe --firewall-lines' in fw
     assert ar.main(["deepswe", "--firewall-lines"]) == 0
-    assert capsys.readouterr().out.splitlines() == list(ar.FIREWALL_LINES)
-    assert all(x.startswith("sudo iptables -I ") for x in ar.FIREWALL_LINES)
+    assert capsys.readouterr().out.splitlines()[:3] == list(ar.FIREWALL_LINES)
+    assert all(x.startswith("sudo iptables -t raw -I PREROUTING ") for x in ar.FIREWALL_LINES)
     assert "sudo docker network inspect bridge --format '{{range .Containers}}{{.Name}} {{end}}'" \
         in fw and "must print nothing" in fw
     assert "A\n   reboot loses the rules" in fw or "reboot loses the rules" in fw
-    assert "sudo iptables -S INPUT | grep docker0; sudo iptables -S DOCKER-USER | grep docker0" \
-        in fw
+    assert "sudo iptables -t raw -S PREROUTING" in fw
     assert "no tailnet address but Tailscale's resolver on port 53" in " ".join(fw.split())
     assert "step 7 again" in fw
     assert a.index("\n9. ") < a.index("--only fetching") < a.index("deepswe --oracle")
@@ -341,4 +340,5 @@ def test_19_steps_b0_b5_b6_and_c1():
     assert b6.index("pgrep -af scripts/agent_run.py") < b6.index("tmux new -s agent")
     assert "before any\n   resume" in b6 or "before any resume" in b6
     c = DOC[DOC.index("## C."):]
-    assert "A `git pull` between A and C is fine" in c
+    # 18e point 13: a pull that changed the runner refuses run 1's --all; --run 2 asks the rest
+    assert "between A and C that changed one refuses `--oracle --all`" in " ".join(c.split())

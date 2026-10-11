@@ -124,6 +124,18 @@ CAP_NAMES = {0: "CHOWN", 1: "DAC_OVERRIDE", 2: "DAC_READ_SEARCH", 3: "FOWNER", 4
 CAPS_KEPT = (1 << 0) | (1 << 1) | (1 << 3)
 
 
+# 18e point 11: one machine on the tailnet, given at run time as $PEER in
+# the environment of a `docker exec` (never in a file): an answer or a
+# refusal both mean it is reachable — its ports aren't known
+PEER_SCRIPT = "\n".join([
+    'if [ -n "${PEER:-}" ]; then',
+    '  o=$( ( exec 3<>"/dev/tcp/$PEER/22" && echo OPEN ) 2>&1 & p=$! i=0',
+    '    while kill -0 $p 2>/dev/null; do i=$((i+1)); [ $i -gt 3 ] && '
+    '{ kill -9 $p 2>/dev/null; echo TIMEOUT; break; }; sleep 1; done; wait $p 2>/dev/null )',
+    '  case "$o" in *OPEN*|*[Rr]efused*) echo "REACHED a tailnet peer";; esac',
+    "fi"])
+
+
 def reach_script(targets: list[str]) -> str:
     """a check run inside the container, which fails closed (18b point 8):
     it says first that it can try a connection at all (bash's /dev/tcp
@@ -143,6 +155,7 @@ def reach_script(targets: list[str]) -> str:
         '  h="${t%:*}"; p="${t##*:}"',
         '  if try "$h" "$p"; then echo "REACHED $t"; fi',
         "done",
+        PEER_SCRIPT,
         "for n in " + " ".join(REACH_NAMES) + "; do",
         '  getent hosts "$n" >/dev/null 2>&1 && echo "REACHED dns $n"',
         '  try "$n" 443 && echo "REACHED $n:443"',
@@ -552,6 +565,11 @@ def safe_read(directory: Path, name: str, cap: int = REWARD_CAP) -> str:
     except OSError:
         return ""
     try:
+        # 18e point 16: looked at before it is opened — a device is never
+        # opened at all — and the file opened must be the one looked at
+        seen = os.stat(name, dir_fd=dfd, follow_symlinks=False)
+        if not stat.S_ISREG(seen.st_mode) or seen.st_nlink != 1 or seen.st_size > cap:
+            return ""
         fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dfd)
     except OSError:
         return ""
@@ -559,7 +577,8 @@ def safe_read(directory: Path, name: str, cap: int = REWARD_CAP) -> str:
         os.close(dfd)
     try:
         st = os.fstat(fd)
-        if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1 or st.st_size > cap:
+        if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1 or st.st_size > cap \
+                or (st.st_dev, st.st_ino) != (seen.st_dev, seen.st_ino):
             return ""
         data = os.read(fd, cap + 1)
         return "" if len(data) > cap else data.decode("utf-8", "replace")
@@ -572,8 +591,9 @@ def _reward(raw: str, path) -> float:
     from harbor.verifier import verifier as hv
     try:
         value = float(raw)
-    except (ValueError, TypeError) as e:
-        raise hv.VerifierOutputParseError(f"Failed to parse the reward in {path}") from e
+    except (ValueError, TypeError):
+        # 18e point 16: from None — float()'s own error quotes the file's text
+        raise hv.VerifierOutputParseError(f"Failed to parse the reward in {path}") from None
     if not math.isfinite(value):
         raise hv.VerifierOutputParseError(f"Non-finite reward in {path}")
     return value
@@ -603,8 +623,8 @@ def patch_reward_reading() -> bool:
             raise hv.RewardFileEmptyError(f"Reward file is empty at {path}, or not a plain file")
         try:
             rewards = json.loads(raw)
-        except (ValueError, TypeError) as e:
-            raise hv.VerifierOutputParseError(f"Failed to parse rewards from {path}") from e
+        except (ValueError, TypeError):
+            raise hv.VerifierOutputParseError(f"Failed to parse rewards from {path}") from None
         values = rewards.values() if isinstance(rewards, dict) else [rewards]
         for v in values:
             if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):

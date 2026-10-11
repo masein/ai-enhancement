@@ -88,11 +88,16 @@ def summary(rdir: Path) -> dict:
     # 18c point 9: a task whose reference solution doesn't pass here (the
     # oracle run's) is left out of a model's denominator, and said
     left: list[str] = []
+    unchecked = 0
     if run.get("model") and run.get("benchmark"):
-        left = ar.oracle_states(rdir.parent.parent, run["benchmark"], [])["left_out"]
+        now = ar.oracle_states(rdir.parent.parent, run["benchmark"], [])
+        # 18e point 13: the list the run started with, kept in its run.json —
+        # an oracle run after it never changes its score
+        left = run["left_out"] if isinstance(run.get("left_out"), list) else now["left_out"]
+        unchecked = sum(1 for t in left if t in now["unverified"])
         rs = [r for r in rs if r["task"] not in left]
     total = int(run.get("of") or len(tasks)) - len(left)
-    s = {**ab.score(rs, total), "left_out": len(left)}
+    s = {**ab.score(rs, total), "left_out": len(left), "unchecked": unchecked}
     return {"key": rdir.name, "folder": str(rdir), "run": run, "results": rs, "score": s,
             "words": ab.score_words(s, total), "left_out": left,
             "again": ab.again_words(rs), "progress": ar.read_json(rdir / "progress.json")}
