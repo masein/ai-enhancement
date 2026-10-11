@@ -1127,9 +1127,8 @@ all three: llama.cpp from the team's `lda` branch,
 repeat penalty 1.0, repeat-last-n 64), `-ctk q8_0 -ctv q8_0 --flash-attn on`,
 no reasoning budget, no speculative decoding, no `--moe-stream`, our token
 limits (81,920 on the hard benchmarks). Plan L's boxes run it without typing
-it, and each step's line says every value. The repeat penalty is one value
-(`LDA_REPEAT_PENALTY`): change it before the first box answers, never after
-(a step that answered refuses another runtime; the import never mixes them).
+it, and each step's line says every value. The repeat penalty is 1.0, as in
+the team's command (11 Oct): the presence penalty of 1.5 does the work.
 
 **The three served ids**, new rows that never mix with the earlier ones:
 
@@ -1194,11 +1193,28 @@ boxes a model, no box over about 6 hours on a 5090 at the pilot's paces:
 build, which routes 4 experts a token, at ±25%); a file routing 8 runs
 longer, by how much isn't measured. Q4 and step4000 run on an **RTX 5090**.
 
-**BF16 runs on an RTX PRO 6000 (96 GB), the same plan.** Its pace isn't
-measured: it reads about three times the bytes a token, so take about twice
-the hours (8–12 h a box). Its 70 GB file holds HLE's 8 slots with room to
-spare. Cutting it finer only shortens the wait, at the same box-hours plus
-each box's start: say if you want that.
+**BF16 runs the whole plan L on an RTX PRO 6000 (96 GB)**, nothing cut: the
+BF16 file the earlier BF16 rows ran, in two parts (69.9 GB), on the lda
+tarball. Its pace isn't measured; it reads about three times the bytes a
+token, so take 1.5–2.5 times the hours: 8–15 h a box, about 12 h at twice.
+Its file holds HLE's 8 slots with room to spare. Cutting it finer doesn't
+bring the last box in sooner than renting its 21 boxes at once does: the
+same box-hours, each box's start on top.
+
+**The files, each pinned on plan L's boxes by its sha256**
+(`frontier_box.PLAN_PINS`; a file of that name with another sha256 is refused
+before anything is asked):
+
+| Model | `--gguf` | sha256 (the board's `--file-sha256`) |
+|---|---|---|
+| step4000 | `hf://<you>/evalboard-private/step4000.gguf` | `630c408a3836f82afa1f79629b06d9390d3f736f6140791baa42e180a640565e` |
+| Q4 | `hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF@5bc3e238d916f48a861bac2f8a1990a0e9b7e98d/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf` | `55983c5a75a1ab969824077b3bb3de4146e82a9234072b48ad4e8f92ad3fe9f1` |
+| BF16 | `hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF@5bc3e238d916f48a861bac2f8a1990a0e9b7e98d/BF16/Qwen3.6-35B-A3B-BF16-00001-of-00002.gguf` | the split identity `f391f702c4ad97282bf9a9babb494f2639322ff7d17ae28f54237fe00e715ca2` (part 1 `a172dfea…44a2`, part 2 `b90b4d07…5161`) |
+
+Q4's and BF16's are unsloth's public files as Hugging Face publishes them at
+that revision, the files the earlier rows registered: check they are the
+sha256 and identity on `served/Qwen3.6-35B-A3B-Q4-original-k-8`'s and
+`served/Qwen3.6-35B-A3B-BF16`'s pages before the first import.
 
 ## L2. One box, end to end
 
@@ -1236,13 +1252,13 @@ each box's start: say if you want that.
    Q4, the same box label with its file:
 
    ```bash
-   python scripts/frontier_box.py L13 --as served/Qwen3.6-35B-A3B-Q4-lda-2610 --gguf <the Q4 file's hf:// path, as its earlier boxes had it> --server hf://<you>/evalboard-private/llama-server-lda-a4a76a7.tar.gz
+   python scripts/frontier_box.py L13 --as served/Qwen3.6-35B-A3B-Q4-lda-2610 --gguf hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF@5bc3e238d916f48a861bac2f8a1990a0e9b7e98d/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf --server hf://<you>/evalboard-private/llama-server-lda-a4a76a7.tar.gz
    ```
 
-   BF16, the first part of its file:
+   BF16, on an RTX PRO 6000, the first part of its file (the box fetches both):
 
    ```bash
-   python scripts/frontier_box.py L13 --as served/Qwen3.6-35B-A3B-BF16-lda-2610 --gguf <the BF16 file's first part, as its earlier boxes had it> --server hf://<you>/evalboard-private/llama-server-lda-a4a76a7.tar.gz
+   python scripts/frontier_box.py L13 --as served/Qwen3.6-35B-A3B-BF16-lda-2610 --gguf hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF@5bc3e238d916f48a861bac2f8a1990a0e9b7e98d/BF16/Qwen3.6-35B-A3B-BF16-00001-of-00002.gguf --server hf://<you>/evalboard-private/llama-server-lda-a4a76a7.tar.gz
    ```
 
    It checks the card first (an RTX 5090 or an RTX PRO 6000, or nothing is
@@ -1280,7 +1296,7 @@ loop, and each model's difference from the first question by question.
 The fetch of G3–G4, with the three models' sha256 from L0 and every box:
 
 ```bash
-cd ~/benchmarks/aienh && python3 scripts/frontier_fetch.py --key ~/.ssh/id_ed25519 --sha served/step4000-lda-2610=630c408a3836f82afa1f79629b06d9390d3f736f6140791baa42e180a640565e --sha served/Qwen3.6-35B-A3B-Q4-lda-2610=<the Q4 file's sha256> --sha served/Qwen3.6-35B-A3B-BF16-lda-2610=<BF16's split identity> --every 3m <host 1>:<port 1> <host 2>:<port 2>
+cd ~/benchmarks/aienh && python3 scripts/frontier_fetch.py --key ~/.ssh/id_ed25519 --sha served/step4000-lda-2610=630c408a3836f82afa1f79629b06d9390d3f736f6140791baa42e180a640565e --sha served/Qwen3.6-35B-A3B-Q4-lda-2610=55983c5a75a1ab969824077b3bb3de4146e82a9234072b48ad4e8f92ad3fe9f1 --sha served/Qwen3.6-35B-A3B-BF16-lda-2610=f391f702c4ad97282bf9a9babb494f2639322ff7d17ae28f54237fe00e715ca2 --every 3m <host 1>:<port 1> <host 2>:<port 2>
 ```
 
 The board doesn't serve the three models yet, so each one's first bundle
@@ -1293,8 +1309,10 @@ file by the sha256 you give. For step4000:
 cd ~/benchmarks/aienh && sudo docker compose exec -T bench python scripts/import_remote.py ~/benchmarks/bundles/<the bundle the fetch names> --by masein --register "step4000 (lda runtime)" --file-sha256 630c408a3836f82afa1f79629b06d9390d3f736f6140791baa42e180a640565e
 ```
 
-The same with "Qwen3.6-35B-A3B Q4 (lda runtime)" and "Qwen3.6-35B-A3B BF16
-(lda runtime)" and their sha256. From then on the fetch imports each model's
+The same with "Qwen3.6-35B-A3B Q4 (lda runtime)" and
+`55983c5a75a1ab969824077b3bb3de4146e82a9234072b48ad4e8f92ad3fe9f1`, and
+"Qwen3.6-35B-A3B BF16 (lda runtime)" and its identity
+`f391f702c4ad97282bf9a9babb494f2639322ff7d17ae28f54237fe00e715ca2`. From then on the fetch imports each model's
 bundles by itself, and says when a box is safe to destroy (plan L's steps,
 by the box's label). Each import checks the runtime as this board defines it
 (its variable, its flags, each request's sampling) and refuses one asked

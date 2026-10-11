@@ -148,11 +148,20 @@ PLAN_RUNTIME = {"L": "lda-2610"}
 PLAN_GPUS = {"L": ("RTX 5090", "RTX PRO 6000")}
 # 20: the files a plan's boxes run, by name, and the sha256 each must have:
 # the lda tarball (teraformer/lda-2026-09-22 at a4a76a751, build 9954, sm_120,
-# CUDA 12.8, no web page) and step4000's GGUF (13,592,481,632 bytes)
+# CUDA 12.8, no web page), step4000's GGUF (13,592,481,632 bytes), and the
+# Q4 and BF16 files the earlier rows ran — unsloth/Qwen3.6-35B-A3B-MTP-GGUF at
+# 5bc3e238d916, as Hugging Face publishes them (BF16 in two parts: its split
+# identity f391f702c4ad97282bf9a9babb494f2639322ff7d17ae28f54237fe00e715ca2)
 PLAN_PINS = {"L": {
     "llama-server-lda-a4a76a7.tar.gz":
         "5b538290644d67139c6c996fdaa3e04cce82fd0b343cce66a4ff234648afb618",
-    "step4000.gguf": "630c408a3836f82afa1f79629b06d9390d3f736f6140791baa42e180a640565e"}}
+    "step4000.gguf": "630c408a3836f82afa1f79629b06d9390d3f736f6140791baa42e180a640565e",
+    "Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf":
+        "55983c5a75a1ab969824077b3bb3de4146e82a9234072b48ad4e8f92ad3fe9f1",
+    "Qwen3.6-35B-A3B-BF16-00001-of-00002.gguf":
+        "a172dfea1fe8bb29132ea2f250c74cdc7d619d518d3f072d3816e31a69ce44a2",
+    "Qwen3.6-35B-A3B-BF16-00002-of-00002.gguf":
+        "b90b4d07e1be4967aec932e2501e7476ec5f44de772c7eb082d6e9c3ac105161"}}
 
 
 def gpu_refused(box: str, info: dict | None = None) -> str:
@@ -178,8 +187,11 @@ def gpu_refused(box: str, info: dict | None = None) -> str:
 
 def pins_of(a: argparse.Namespace, box: str) -> list[str]:
     """20: --pin NAME=SHA256 for each file the line gives that its plan pins"""
+    import remote_gguf as rg
     pins = PLAN_PINS.get(box[:1].upper()) or {}
-    given = [a.gguf, *([] if getattr(a, "server_dir", "") else [a.server])]
+    # a GGUF in parts: each part's, as the box fetches and hashes each
+    given = [*(rg.split_parts(a.gguf) if a.gguf else []),
+             *([] if getattr(a, "server_dir", "") else [a.server])]
     return [f"{n}={pins[n]}" for n in sorted({str(x).rsplit("/", 1)[-1] for x in given if x})
             if n in pins]
 

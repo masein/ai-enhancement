@@ -241,9 +241,10 @@ def sampling(fam: str, on: bool) -> dict:
 # import checks a bundle's sampling against the runtime its model is
 # registered with. Each runtime asks thinking on only, with no reasoning
 # budget and no speculative decoding, at the Frontier token limits above.
-# The repeat penalty is one value, said on each step's line: change it before
-# any box answers — a value changed after is another runtime, under another
-# name (the import never mixes the two)
+# The repeat penalty is 1.0, as in the team's command (masein, 11 Oct): the
+# presence penalty of 1.5 does the work. Said on each step's line; another
+# value would be another runtime, under another name (the import never mixes
+# the two)
 LDA_REPEAT_PENALTY = 1.0
 RUNTIMES = {
     "lda-2610": {

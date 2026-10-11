@@ -4985,7 +4985,7 @@ Not before the demo: a new hidden set changes every Everyday score.
   `runtime`: min-p 0.0 among them, which the board never sent). Thinking on
   only; no speculative decoding, reasoning budget or `--moe-stream`, and no
   flag or variable that would change it, typed beside it. The repeat penalty
-  is `LDA_REPEAT_PENALTY`, said on each step's line. `LOOKAHEAD_MOE_*` is
+  is `LDA_REPEAT_PENALTY`, 1.0 as in the team's command, said on each step's line. `LOOKAHEAD_MOE_*` is
   routing to the import (`ROUTING_ENV`), not passed from the shell, and goes
   out in an export with its value, as do the new sampling flags.
 - **Plan L** (`frontier_box.PLANS["L"]`, `PLAN_RUNTIME`): thinking on only,

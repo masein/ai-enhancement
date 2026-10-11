@@ -412,13 +412,23 @@ def test_a_plan_L_line_runs_the_runtime_from_the_tarball_its_files_pinned():
                     "5b538290644d67139c6c996fdaa3e04cce82fd0b343cce66a4ff234648afb618",
                     "step4000.gguf="
                     "630c408a3836f82afa1f79629b06d9390d3f736f6140791baa42e180a640565e"]
-    # a file of another name (the Q4's) has no pin
-    a = fx.parser().parse_args(["L13", "--as", "served/Qwen3.6-35B-A3B-Q4-lda-2610",
-                                "--gguf", "hf://me/p/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf",
+    # BF16 in two parts: each part pinned, as the box hashes each
+    a = fx.parser().parse_args(["L13", "--as", "served/Qwen3.6-35B-A3B-BF16-lda-2610",
+                                "--gguf", "hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF@5bc3e238/BF16/"
+                                          "Qwen3.6-35B-A3B-BF16-00001-of-00002.gguf",
                                 "--server", "hf://me/p/llama-server-lda-a4a76a7.tar.gz"])
     argv = fx.argv_of("L13", 1, fx.box_of("L13")[0], a)
-    assert [argv[k + 1].split("=")[0] for k, x in enumerate(argv) if x == "--pin"] == [
-        "llama-server-lda-a4a76a7.tar.gz"]
+    pins = dict(argv[k + 1].split("=") for k, x in enumerate(argv) if x == "--pin")
+    assert set(pins) == {"llama-server-lda-a4a76a7.tar.gz",
+                         "Qwen3.6-35B-A3B-BF16-00001-of-00002.gguf",
+                         "Qwen3.6-35B-A3B-BF16-00002-of-00002.gguf"}
+    # their split identity is the one the earlier BF16 rows registered
+    assert rb.split_sha([(n, pins[n]) for n in sorted(pins) if n.endswith(".gguf")]) == \
+        "f391f702c4ad97282bf9a9babb494f2639322ff7d17ae28f54237fe00e715ca2"
+    # a file no plan pins: none
+    a = fx.parser().parse_args(["L13", "--as", "served/x", "--gguf", "hf://me/p/other.gguf",
+                                "--server", "hf://me/p/llama-server-other.tar.gz"])
+    assert "--pin" not in fx.argv_of("L13", 1, fx.box_of("L13")[0], a)
 
 
 def test_a_plan_L_line_runs_the_runtime_and_the_build_directory():
