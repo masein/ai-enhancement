@@ -63,7 +63,7 @@ def test_the_card_names_the_tasks_left_out_and_what_isnt_comparable(live, page, 
         left = card.locator("[data-agent-left-out='swebench-multilingual']")
         left.wait_for()
         assert left.inner_text() == ("1 task left out: their reference solution doesn’t pass "
-                                     "here")                               # d94f7f6: none
+                                     "here, or it couldn’t be checked here")   # d94f7f6: none
         assert left.get_attribute("title") == NAMES[1]
         assert card.locator("[data-agent-not-comparable]").inner_text() == (
             "A task that runs past its 50 minutes counts as not resolved here; the published "

@@ -20986,7 +20986,8 @@ function agentCard(c) {
       (b.left_out || []).length ? el('p', { class: 'small', 'data-agent-left-out': b.key,
         title: b.left_out.join(', '), text: `${b.left_out.length} task`
           + `${b.left_out.length === 1 ? '' : 's'} left out: their reference solution doesn’t `
-          + 'pass here' }) : ''),
+          // 18d point 11: or the oracle couldn't check them here
+          + 'pass here, or it couldn’t be checked here' }) : ''),
     (b.published || []).length ? el('div', { class: 'agentscores', 'data-agent-published': b.key },
       el('h4', { text: 'Published, for reference — never ranked with ours' }),
       // 18c points 9 and 10: what isn't comparable with ours

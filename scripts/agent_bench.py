@@ -33,6 +33,9 @@ BENCHES: dict[str, dict] = {
     "swebench-multilingual": {
         "label": "SWE-bench Multilingual",
         "dataset": "swebench_multilingual@1.0",
+        # 18d point 14: its test.sh writes reward.txt alone — a reward.json
+        # is never read
+        "reward_file": "reward.txt",
         "pin": "laude-institute/harbor-datasets@61366953049fd63a7dff54f67193bf39f5d1cde6",
         "tasks": 300,
         "languages": "C, C++, Go, Java, JavaScript/TypeScript, PHP, Ruby and Rust",
@@ -56,6 +59,9 @@ BENCHES: dict[str, dict] = {
         "language_from": "tags",
     },
     "deepswe": {
+        # 18d point 15: its builds use Docker's default bridge (git clone,
+        # go mod download): its lines refuse until the firewall rules are in
+        "bridge_builds": True,
         "label": "DeepSWE 1.1",
         # Harbor's Hub shows no revision to pin: its tasks at a commit of
         # their repository (26 Aug 2026: the 10,800 s agent limit)
@@ -329,8 +335,12 @@ def ours_of(r: dict, meta: dict, ran: bool) -> tuple[str, str]:
     started = (r.get("agent_execution") or {}).get("started_at")
     if not started and not ran:
         return "before", f"{etype}: {msg}"[:300]
+    # 18d point 13: a stop is before only when the agent hadn't started (that
+    # case returned above); once it ran, a stop is final like any error of
+    # ours after it — four of them, then successes, scored 100%
     if etype in STOPPED_TYPES:
-        return "before", "the run was stopped while it ran"
+        return "after", ("the run was stopped while it ran — after the agent ran: counted not "
+                         "resolved, never asked again")
     if etype in OURS_TYPES or msg.startswith(DOCKER_FAILED):
         return "after", (f"{etype}: {msg}"[:240] + " — after the agent ran: counted not resolved, "
                          "never asked again")
@@ -411,9 +421,12 @@ def no_result(job: Path, killed: dict | None) -> dict:
                                            "asked again" if ran else ""),
                 "ours": "after" if ran else "before", "final": ran, "minutes": None,
                 "steps": None, "tokens_in": None, "tokens_out": None, "last_prompt": None}
+    # 18d point 12: after the agent ran, as the killed one is — final
     return {"task": task, "trial": "", "job": job.name, "result": "error", "exit": "",
-            "why": "its job ended with no result (Harbor stopped before writing one)",
-            "ours": "before", "final": False, "minutes": None, "steps": None,
+            "why": "its job ended with no result (Harbor stopped before writing one)"
+                   + (" — after the agent ran: counted not resolved, never asked again"
+                      if ran else ""),
+            "ours": "after" if ran else "before", "final": ran, "minutes": None, "steps": None,
             "tokens_in": None, "tokens_out": None, "last_prompt": None}
 
 

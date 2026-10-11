@@ -99,7 +99,9 @@ def test_only_evidence_of_before_asks_again(tmp_path):
         "inv__e-3": (dict(exc="RuntimeError", started=False, message="Docker compose command "
                           "failed: cp"), "after"),
         "inv__e-4": (dict(exc="ServerDown"), "down"),
-        "inv__e-5": (dict(exc="KeyboardInterrupt"), "before"),     # the run was stopped
+        # 18d point 13: a stop once the agent ran is final; before it, asked again
+        "inv__e-5": (dict(exc="KeyboardInterrupt"), "after"),
+        "inv__e-9": (dict(exc="KeyboardInterrupt", started=False), "before"),
         "inv__e-6": (dict(exc="CleanupFailed", message="the clean-up …: not verified"), "after")}
     for task, (kw, want) in cases.items():
         t = trial(rd, task, result="", **kw)
@@ -239,18 +241,18 @@ def test_a_jobs_limit_is_its_tasks_own_plus_30_minutes(tmp_path):
 
 def test_a_resume_refuses_another_runner_cap_or_override(server_world, monkeypatch,  # noqa: F811
                                                         capsys):
-    for k in ("max_reply_tokens", "override_sha256", "runner_commit", "runner_sha256",
-              "build_lock"):
+    for k in ("max_reply_tokens", "override_sha256", "runner_sha256", "build_lock"):
         assert k in ar.SETTINGS
+    assert "runner_commit" not in ar.SETTINGS                 # 18d point 10: the files, not it
     monkeypatch.setattr(ar, "runner_commit", lambda: "a" * 40)
     assert ar.main(["swebench-multilingual", "--as", MODEL, "--tasks", "2", "--no-board"]) == 0
     run = json.loads((rdir_of() / "run.json").read_text())
     assert run["runner_commit"] == "a" * 40 and run["max_reply_tokens"] == 32_768
     assert len(run["override_sha256"]) == 64 and len(run["runner_sha256"]) == 64
-    monkeypatch.setattr(ar, "runner_commit", lambda: "b" * 40)        # a git pull
+    monkeypatch.setattr(ar, "runner_sha", lambda: "b" * 64)            # a pull that changed it
     assert ar.main(["swebench-multilingual", "--as", MODEL, "--tasks", "10", "--no-board"]) == 2
     out = capsys.readouterr().out
-    assert "refused — this run was started with other settings (runner_commit aaaa" in out
+    assert "refused — this run was started with other settings (runner_sha256 " in out
     assert "add --run 2" in out                               # d94f7f6: rolled into it
     before = {"max_reply_tokens": 32_768, "override_sha256": "x"}
     assert len(ar.changed_settings(before, {"max_reply_tokens": 16_384, "override_sha256": "y"})) \
@@ -349,15 +351,17 @@ class Relay:
                         {"trial": ar.CACHE_TRIAL, "status": 200, **second}]
 
 
-def test_the_cache_check_refuses_a_fifth_of_a_long_prompt_read_again():
+def test_the_cache_check_refuses_a_second_step_that_took_little_from_the_cache():
+    # 18d point 17: against the first request's whole prompt (5,000 here), not
+    # the second's — 18c's fifth refused a healthy server with a long reply
     ask = lambda *a, **k: {"role": "assistant", "tool_calls": [{"id": "c1"}]}  # noqa: E731
+    why, _ = ar.cache_line(Relay({"prompt_n": 2100, "cache_n": 3900}), "m", "x", ask=ask, first=[])
+    assert why.startswith("the second step took 3,900 tokens from the server's cache, under 80% "
+                          "of the first request's 5,000")
     why, _ = ar.cache_line(Relay({"prompt_n": 1300, "cache_n": 4700}), "m", "x", ask=ask, first=[])
-    assert why.startswith("the second step read 1,300 of its 6,000 prompt tokens again")
-    # d94f7f6: only past half
+    assert why == ""
     why, _ = ar.cache_line(Relay({"prompt_n": 800, "cache_n": 5200}), "m", "x", ask=ask, first=[])
     assert why == ""
-    why, _ = ar.cache_line(Relay({"prompt_n": 400, "cache_n": 600}), "m", "x", ask=ask, first=[])
-    assert why == ""                                           # a short prompt: past half only
     why, _ = ar.cache_line(Relay({"prompt_n": 40}), "m", "x", ask=ask, first=[])
     assert "no `timings.cache_n`" in why and "build_info" in why and "llama-server" in why
 
@@ -544,8 +548,9 @@ def test_step_b_finds_the_server_by_its_port_and_checks_the_others():
     b = DOC[DOC.index("## B."):DOC.index("## C.")]
     steps = {int(x.split(".")[0]) for x in b.splitlines() if x[:1].isdigit() and ". " in x[:4]}
     assert steps == set(range(0, 9))
-    assert "sudo ss -tnp 'dport = :8091'" in b and "loop" in b and "calibration" in b   # B0
-    assert "sudo ss -ltnp 'sport = :8091'" in b and "pgrep" not in b                    # B1
+    assert "sudo ss -tn state established '( sport = :8091 )'" in b and "loop" in b \
+        and "calibration" in b                                                          # B0
+    assert "sudo ss -ltnp 'sport = :8091'" in b                                         # B1
     assert ("while sudo ss -ltn 'sport = :8091' | grep -q LISTEN; do sleep 2; done; echo "
             "\"8091 closed\"") in b                                                     # B2
     assert "sudo ss -ltn '( sport = :8090 or sport = :8092 or sport = :8094 or sport = :8096 )'" \
@@ -555,5 +560,6 @@ def test_step_b_finds_the_server_by_its_port_and_checks_the_others():
     assert "timed out" in b and "relay-usage.jsonl" in b                                # B7
     c = DOC[DOC.index("## C."):]
     assert c.count("--oracle --all") >= 2
-    for line in (x for x in b.splitlines() + c.splitlines() if "agent_run.py" in x):
+    for line in (x for x in b.splitlines() + c.splitlines() if "agent_run.py" in x
+                 and "pgrep" not in x):                       # 18d point 19: the check, not a run
         assert 'sudo env PATH="$HOME/agent-venv/bin:$PATH" ~/agent-venv/bin/python' in line

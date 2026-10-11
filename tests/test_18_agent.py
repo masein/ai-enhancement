@@ -21,7 +21,8 @@ import agent_bench as ab
 import agent_host_mini as hm
 import agent_relay
 import agent_run as ar
-from agent18 import LANGS, MODEL, build_world, conversation, run_json, tasks_folder, trial
+from agent18 import (FIREWALL, LANGS, MODEL, build_world, conversation, run_json,
+                     tasks_folder, trial)
 from fake_openai import FakeServer
 from test_12q_devicemark_runs import svc  # noqa: F401 — svc is the fixture
 
@@ -257,6 +258,8 @@ def server_world(tmp_path, monkeypatch):
             return 0, "Runs #1: ok"
         if cmd[:3] == ["docker", "network", "inspect"]:
             return 0, "172.17.0.1\n"
+        if cmd[:2] == ["iptables", "-S"]:               # 18d point 15: the bridge's rules
+            return 0, w.get("firewall", FIREWALL)
         return 0, ""
     monkeypatch.setattr(ar, "run", run)
 

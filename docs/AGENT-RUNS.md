@@ -283,7 +283,35 @@ group in step 5, the line is the same without `sudo`.
    ```bash
    cd ~/benchmarks/aienh && sudo env PATH="$HOME/agent-venv/bin:$PATH" ~/agent-venv/bin/python scripts/agent_run.py swebench-multilingual --oracle --tasks 10
    ```
-9. The Multilingual tasks whose own tests run a package manager — three at
+9. **The firewall for Docker's default bridge.** DeepSWE's builds, and the
+   three Multilingual tasks whose own tests fetch packages, build on Docker's
+   default bridge (`docker0`), which reaches this server (the board's
+   keyless writes, the model servers), the LAN and the tailnet. Three rules
+   keep it to the internet and the tailnet's DNS. First, nothing else may
+   use that bridge — this must print nothing:
+   ```bash
+   sudo docker network inspect bridge --format '{{range .Containers}}{{.Name}} {{end}}'
+   ```
+   Then the three rules, in this order:
+   ```bash
+   sudo iptables -I INPUT -i docker0 -j DROP
+   ```
+   ```bash
+   sudo iptables -I DOCKER-USER -i docker0 -d 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10,169.254.0.0/16 -j DROP
+   ```
+   ```bash
+   sudo iptables -I DOCKER-USER -i docker0 -d 100.100.100.100 -p udp --dport 53 -j ACCEPT
+   ```
+   Then step 7 again: its last line must list no address of this server,
+   no LAN gateway and no tailnet address but `100.100.100.100:53`. **A
+   reboot loses the rules.** This shows whether they are in place — the
+   INPUT rule, then the five DROPs (one a range) and the ACCEPT:
+   ```bash
+   sudo iptables -S INPUT | grep docker0; sudo iptables -S DOCKER-USER | grep docker0
+   ```
+   Every DeepSWE line, and a Multilingual line asking a task whose tests
+   fetch, refuses while one is missing, saying which, and how to add it.
+10. The Multilingual tasks whose own tests run a package manager — three at
    this pin (npm, composer, cargo); the runner finds them in their tests and
    names them, and names those whose fetch can't be held to the lock's
    date. Their fetches run once while the image is built, with Docker's own
@@ -293,7 +321,7 @@ group in step 5, the line is the same without `sudo`.
    ```bash
    cd ~/benchmarks/aienh && sudo env PATH="$HOME/agent-venv/bin:$PATH" ~/agent-venv/bin/python scripts/agent_run.py swebench-multilingual --oracle --only fetching
    ```
-10. Three DeepSWE tasks. DeepSWE verifies in a separate container with no
+11. Three DeepSWE tasks. DeepSWE verifies in a separate container with no
     network by its own design; the runner gives that container the same
     limits as the agent's. If a task errors with "Docker egress control was
     not enabled", the kernel lacks nftables' `fib` rules: say so before
@@ -301,7 +329,7 @@ group in step 5, the line is the same without `sudo`.
     ```bash
     cd ~/benchmarks/aienh && sudo env PATH="$HOME/agent-venv/bin:$PATH" ~/agent-venv/bin/python scripts/agent_run.py deepswe --oracle --tasks 3
     ```
-11. Run step 6's command again: the images are gone, and the disk is back.
+12. Run step 6's command again: the images are gone, and the disk is back.
 
 ## B. With the model (masein, after A is reported)
 
@@ -325,9 +353,10 @@ board's queue holds runs on that model, each with a line saying why.
    board, Runs must show nothing queued or running on
    `served/Qwen3.6-35B-A3B-Q4-original-k-8`, and the Reasoning lab no loop
    calibration (it uses the same server). Then nothing may be connected to
-   port 8091 — this must print only its header line:
+   port 8091 — this must print only its header line (the server's side of
+   every connection, the board's container's among them):
    ```bash
-   sudo ss -tnp 'dport = :8091'
+   sudo ss -tn state established '( sport = :8091 )'
    ```
 1. Find the original's llama-server by its port. Its PID is in the
    `users:(("llama-server",pid=…` part of the line (here `<PID>`):
@@ -378,11 +407,17 @@ board's queue holds runs on that model, each with a line saying why.
    conversation, as the agent sends them, and reads what the server took
    from its cache: a second step that reads more than a fifth of its prompt
    again is refused. It says the speeds it measured and what they make of
-   300 tasks, and must end "ready — 10 task(s)":
+   300 tasks. Its last line must start "ready — N task(s)", N being 10
+   less the tasks step A8's oracle left out (said above it):
    ```bash
    cd ~/benchmarks/aienh && sudo env PATH="$HOME/agent-venv/bin:$PATH" ~/agent-venv/bin/python scripts/agent_run.py swebench-multilingual --as served/Qwen3.6-35B-A3B-Q4-original-k-8 --tasks 10 --check
    ```
-6. Ten SWE-bench Multilingual tasks, one attempt, in tmux:
+6. Ten SWE-bench Multilingual tasks, one attempt, in tmux. First, no other
+   runner may be running — this must print nothing (here, and before any
+   resume):
+   ```bash
+   pgrep -af scripts/agent_run.py
+   ```
    ```bash
    tmux new -s agent
    ```
@@ -418,8 +453,13 @@ board's queue holds runs on that model, each with a line saying why.
    Gradle tasks, and npm's. Those tasks are left out of every model run's
    score and of its comparison with the published numbers, and the card
    names them ("N tasks left out: their reference solution doesn't pass
-   here"). A full run (`--all`) is refused until the oracle has run on every
-   task. Each of these takes a day or more:
+   here, or it couldn't be checked here"). A full run (`--all`) is refused
+   until the oracle has run on every task; a task the oracle couldn't check
+   (three errors of ours, or one after it ran) is left out by name, and
+   `--oracle --run 2 --only <it>` asks it again — the latest result of
+   every oracle run counts. A `git pull` between A and C is fine: a run's
+   settings hold its runner's files, not the checkout's commit. Each of
+   these takes a day or more:
    ```bash
    cd ~/benchmarks/aienh && sudo env PATH="$HOME/agent-venv/bin:$PATH" ~/agent-venv/bin/python scripts/agent_run.py swebench-multilingual --oracle --all
    ```
