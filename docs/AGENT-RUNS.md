@@ -67,9 +67,9 @@ SWE-bench Pro follows once both have run.
 - **`--check`** also renders a three-step conversation with the server's own
   template (each step must render as it did before the next came, with its
   thinking, and the thinking open), sends two requests that extend one
-  conversation as the agent sends them, and refuses when the second read
-  more than a fifth of a long prompt again rather than from the server's
-  cache, or when the server doesn't say what it took from it. Its requests
+  conversation as the agent sends them, and refuses when the second took
+  less than 80% of the first request's prompt from the server's cache, or
+  when the server doesn't say what it took from it. Its requests
   have the agent's own budget (the relay's 32,768 tokens), so a long think
   before the first tool call is no refusal. It says the speeds it measured
   and what they make of the whole benchmark.
@@ -124,10 +124,12 @@ SWE-bench Pro follows once both have run.
     began the agent's phase, and the agent wrote nothing): Docker failing
     to pull, build or start the task's container; the container reaching
     something (the agent's check, before the model is asked); the run
-    stopped while it ran. A failure of Harbor's or Docker's once the agent
-    had run (copying the tests in, the clean-up, the teardown) is an error
-    of ours that counts as not resolved and is never asked again: asking
-    again would let a failure be replaced by a success;
+    stopped before the agent started. A failure of Harbor's or Docker's
+    once the agent had run (copying the tests in, the clean-up, the
+    teardown), and the run stopped while the agent ran, is an error of ours
+    that counts as not resolved and is never asked again: asking again
+    would let a failure be replaced by a success. The run's page names each
+    kind;
   - the model's server failing the relay's health check (the relay asks
     `/health` when the server doesn't answer) stops the run: nothing more
     starts, that try isn't counted, and the same command, once the server
@@ -140,7 +142,12 @@ SWE-bench Pro follows once both have run.
   - every task asked is in the score's denominator: one given up after three
     errors of ours counts as not resolved, and the score says how many;
   - the run's page says how many tasks were asked again, and why;
-  - after a kill, the same command goes on.
+  - **stopping costs the tasks in flight.** Ctrl-C or a kill stops every
+    task running then (one, or up to N with `--at-once N`): a task whose
+    agent had started counts as not resolved and is never asked again; one
+    whose agent hadn't started is asked again. The same command goes on
+    with the rest. Stop a run only when you must, and say how many tasks
+    were in flight.
 - **The board's runs are left alone:** the runner's calls into the board
   (its checks, its line every 3 minutes, the import) touch only its own
   Runs row. Only the board's own start puts runs that were running back in
@@ -293,28 +300,36 @@ group in step 5, the line is the same without `sudo`.
    three Multilingual tasks whose own tests fetch packages, build on Docker's
    default bridge (`docker0`), which reaches this server (the board's
    keyless writes, the model servers), the LAN and the tailnet. Three rules
-   keep it to the internet and the tailnet's DNS. First, nothing else may
-   use that bridge — this must print nothing:
+   keep it to the internet and the tailnet's DNS. They go in the raw table,
+   before anything routes a packet: in INPUT and DOCKER-USER, tailscaled's
+   own forwarding rule (put back first on each of its starts) let the
+   bridge's packets past them. First, nothing else may use that bridge —
+   this must print nothing:
    ```bash
    sudo docker network inspect bridge --format '{{range .Containers}}{{.Name}} {{end}}'
    ```
    Then the three rules: the runner prints them, one line each (their
    addresses aren't written here — the private ranges, the tailnet's and
    Tailscale's own resolver: the public mirror keeps every tailnet address
-   out). Run each line it prints, in its order:
+   out), and last the line that shows them. Run each line it prints, in its
+   order (rules added at this step before 18e, in INPUT and DOCKER-USER, can
+   stay):
    ```bash
    cd ~/benchmarks/aienh && sudo env PATH="$HOME/agent-venv/bin:$PATH" ~/agent-venv/bin/python scripts/agent_run.py deepswe --firewall-lines
    ```
    Then step 7 again: its last line must list no address of this server,
-   no LAN gateway and no tailnet address but Tailscale's resolver on port
-   53. **A
-   reboot loses the rules.** This shows whether they are in place — the
-   INPUT rule, then the five DROPs (one a range) and the ACCEPT:
+   no LAN gateway, no tailnet address but Tailscale's resolver on port 53,
+   and not "a tailnet peer" — step 7 tries one machine on the tailnet that
+   is online, read from `tailscale status` as it runs and never written
+   down. **A reboot loses the rules.** This shows whether they are in place
+   and first — the ACCEPT, then the six DROPs (five ranges and this
+   server's own addresses), before any other rule:
    ```bash
-   sudo iptables -S INPUT | grep docker0; sudo iptables -S DOCKER-USER | grep docker0
+   sudo iptables -t raw -S PREROUTING
    ```
    Every DeepSWE line, and a Multilingual line asking a task whose tests
-   fetch, refuses while one is missing, saying which, and how to add it.
+   fetch, refuses while one is missing or another rule comes before them,
+   saying which, and how to add them.
 10. The Multilingual tasks whose own tests run a package manager — three at
    this pin (npm, composer, cargo); the runner finds them in their tests and
    names them, and names those whose fetch can't be held to the lock's
@@ -409,8 +424,8 @@ board's queue holds runs on that model, each with a line saying why.
    server's own template (each step must render as it did before the next
    came, with its thinking), then sends two requests that extend one
    conversation, as the agent sends them, and reads what the server took
-   from its cache: a second step that reads more than a fifth of its prompt
-   again is refused. It says the speeds it measured and what they make of
+   from its cache: a second step that took less than 80% of the first
+   request's prompt from the cache is refused. It says the speeds it measured and what they make of
    300 tasks. Its last line must start "ready — N task(s)", N being 10
    less the tasks step A8's oracle left out (said above it):
    ```bash
@@ -460,16 +475,23 @@ board's queue holds runs on that model, each with a line saying why.
    here, or it couldn't be checked here"). A full run (`--all`) is refused
    until the oracle has run on every task; a task the oracle couldn't check
    (three errors of ours, or one after it ran) is left out by name, and
-   `--oracle --run 2 --only <it>` asks it again — the latest result of
-   every oracle run counts. A `git pull` between A and C is fine: a run's
-   settings hold its runner's files, not the checkout's commit. Each of
-   these takes a day or more:
+   `--oracle --run 2 --only <it>` asks it again. A task's latest real
+   result (resolved, unresolved, timeout) across every oracle run counts; a
+   later "couldn't be checked" never replaces one. A model run keeps the
+   list of tasks left out that it started with, so a later oracle run never
+   changes its score. A run's settings hold its runner's four files: a `git
+   pull` between A and C that changed one refuses `--oracle --all` on
+   step A8's run. Then give `--run 2`: it asks only the tasks no other
+   oracle run has a result for, and says how many it skips. Each of these
+   takes a day or more:
    ```bash
    cd ~/benchmarks/aienh && sudo env PATH="$HOME/agent-venv/bin:$PATH" ~/agent-venv/bin/python scripts/agent_run.py swebench-multilingual --oracle --all
    ```
    ```bash
    cd ~/benchmarks/aienh && sudo env PATH="$HOME/agent-venv/bin:$PATH" ~/agent-venv/bin/python scripts/agent_run.py deepswe --oracle --all
    ```
+   If one refuses because the runner's files changed, run it again with
+   `--run 2` added at the end.
 2. masein decides what runs next from B's time a task. A run started after
    a `git pull` that changed the runner, the lock, the container's limits or
    the reply's cap is a run of its own (`--run 2`): the pilot's ten never

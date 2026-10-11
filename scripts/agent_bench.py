@@ -305,6 +305,14 @@ MODELS_WHY = {"ContextWindowExceededError": "the window was outgrown",
               "RewardFileEmptyError": "the tests left an empty result",
               "VerifierOutputParseError": "the tests' result couldn't be read"}
 DOWN_WORDS = "the model's server went down: asked again from its start"
+AFTER_WORDS = " — after the agent ran"
+# 18e point 15: Harbor's failures once the agent had run, each in its words
+AFTER_KINDS = {"AddTestsDirError": "Harbor couldn't copy the tests in after the agent ran",
+               "CleanupFailed": "Harbor's clean-up failed after the agent ran",
+               "DownloadVerifierDirError": "Harbor couldn't fetch the tests' output after the "
+                                           "agent ran",
+               "EnvironmentStartTimeoutError": "the container took too long to start again "
+                                               "after the agent ran"}
 
 
 def agent_ran(trial: Path) -> bool:
@@ -339,10 +347,10 @@ def ours_of(r: dict, meta: dict, ran: bool) -> tuple[str, str]:
     # case returned above); once it ran, a stop is final like any error of
     # ours after it — four of them, then successes, scored 100%
     if etype in STOPPED_TYPES:
-        return "after", ("the run was stopped while it ran — after the agent ran: counted not "
+        return "after", ("the run was stopped while it ran" + AFTER_WORDS + ": counted not "
                          "resolved, never asked again")
     if etype in OURS_TYPES or msg.startswith(DOCKER_FAILED):
-        return "after", (f"{etype}: {msg}"[:240] + " — after the agent ran: counted not resolved, "
+        return "after", (f"{etype}: {msg}"[:240] + AFTER_WORDS + ": counted not resolved, "
                          "never asked again")
     return "", ""
 
@@ -455,20 +463,34 @@ def score_words(s: dict, total: int) -> str:
         tail += (f" · {s['errors']} error{'s' if s['errors'] != 1 else ''} of ours, counted "
                  "not resolved")
     if s.get("left_out"):
-        tail += (f" · {s['left_out']} task{'s' if s['left_out'] != 1 else ''} left out: "
-                 "their reference solution doesn't pass here")
+        # 18e point 16: those the oracle couldn't check here said as such
+        n, u = s["left_out"], min(int(s.get("unchecked") or 0), s["left_out"])
+        why = ("their reference solution doesn't pass here" if not u else
+               "the oracle couldn't check them here" if u == n else
+               f"{n - u} whose reference solution doesn't pass here, {u} the oracle couldn't "
+               "check here")
+        tail += f" · {n} task{'s' if n != 1 else ''} left out: {why}"
     return head + tail
 
 
 def again_kind(why: str) -> str:
-    """an error of ours, in a few words"""
-    if (why or "").startswith(DOWN_WORDS):
+    """an error of ours, in a few words — 18e point 15: a stop, and a failure
+    after the agent ran, each its own (both read "Docker couldn't pull, build
+    or start its container")"""
+    w = why or ""
+    after = AFTER_WORDS in w
+    if w.startswith(DOWN_WORDS):
         return "the model's server went down"
-    if (why or "").startswith(("killed:", "its job ended with no result")):
-        return "its job ended with no result"
-    if (why or "") == "the run was stopped while it ran":
-        return "the run was stopped while it ran"
-    t = (why or "").split(":", 1)[0]
+    t = w.split(":", 1)[0]
+    if w.startswith("the run was stopped") or t in STOPPED_TYPES:
+        return ("the run was stopped after the agent ran" if after else
+                "the run was stopped before the agent started")
+    if w.startswith(("killed:", "its job ended with no result")):
+        return "its job ended with no result" + (" after the agent ran" if after else "")
+    if after:
+        return AFTER_KINDS.get(t, "Docker failed after the agent ran" if w.startswith(
+            DOCKER_FAILED) or DOCKER_FAILED in w else f"{t or 'an error of ours'} after the "
+            "agent ran")
     return {"ReachRefused": "its container reached something",
             "ServerDown": "the model's server went down"}.get(
         t, "Docker couldn't pull, build or start its container")

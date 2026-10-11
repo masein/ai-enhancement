@@ -39,9 +39,9 @@ def test_the_docs_check_reach_line_runs(server_world, monkeypatch, capsys):  # n
     line = doc_line("--check-reach")
     argv = shlex.split(line.split("scripts/agent_run.py", 1)[1])
     seen = {}
-    monkeypatch.setattr(ar, "check_reach", lambda rdir, targets: seen.setdefault("t", targets)
+    monkeypatch.setattr(ar, "check_reach", lambda rdir, targets, peer="": seen.setdefault("t", targets)
                         and "")
-    monkeypatch.setattr(ar, "check_build_reach", lambda rdir, targets: ("", []))   # 18c
+    monkeypatch.setattr(ar, "check_build_reach", lambda rdir, targets, peer="": ("", []))   # 18c
     assert ar.main(argv) == 0                                    # 70df001: argparse, exit 2
     out = capsys.readouterr().out
     assert out.startswith("a task's container reaches nothing of: ")

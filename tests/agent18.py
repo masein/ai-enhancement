@@ -122,15 +122,16 @@ def build_world(root: Path, monkeypatch) -> tuple[Path, dict]:
     return d, info
 
 
-# 18d point 15: the bridge's three rules, as `iptables -S` prints them once
-# the docs' step A9 added them
+# 18d point 15: the bridge's three rules, as iptables prints them once the
+# docs' step A9 added them — 18e point 11: in the raw table's PREROUTING
+# (`iptables -t raw -S PREROUTING`), first, with Docker's own after them
 # (its tailnet addresses built at runtime: tests/test_no_tailnet_address.py)
 QUAD = ".".join(["100"] * 4)
 FIREWALL = "\n".join([
-    "-P INPUT ACCEPT", "-P FORWARD DROP", "-N DOCKER-USER",
-    "-A INPUT -i docker0 -j DROP",
-    f"-A DOCKER-USER -d {QUAD}/32 -i docker0 -p udp -m udp --dport 53 -j ACCEPT",
-    *[f"-A DOCKER-USER -d {n} -i docker0 -j DROP" for n in (
+    "-P PREROUTING ACCEPT",
+    f"-A PREROUTING -d {QUAD}/32 -i docker0 -p udp -m udp --dport 53 -j ACCEPT",
+    *[f"-A PREROUTING -d {n} -i docker0 -j DROP" for n in (
         "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
         ".".join(["100", "64", "0", "0"]) + "/10", "169.254.0.0/16")],
-    "-A DOCKER-USER -j RETURN"]) + "\n"
+    "-A PREROUTING -i docker0 -m addrtype --dst-type LOCAL -j DROP",
+    "-A PREROUTING -d 172.17.0.2/32 ! -i docker0 -j DROP"]) + "\n"

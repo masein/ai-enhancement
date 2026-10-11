@@ -753,7 +753,10 @@ def oracle_states(root: Path, benchmark: str, tasks: list[str]) -> dict:
     resolved here (no network at verification, the dropped capabilities);
     `unverified` (18d point 11), it couldn't be checked here — given up after
     three errors of ours, or an error of ours after the oracle ran. unknown
-    — no result yet (never asked, or asked again later)"""
+    — no result yet (never asked, or asked again later). 18e point 13: only
+    a real result (resolved, unresolved, timeout) replaces an earlier one — a
+    later run's "couldn't be checked" left a task resolved in run 1 out, and
+    changed a finished model run's score"""
     dirs = oracle_dirs(root, benchmark)
     tasks = tasks or sorted({t for d in dirs for t in read_json(d / "run.json").get("tasks")
                              or []})
@@ -763,12 +766,26 @@ def oracle_states(root: Path, benchmark: str, tasks: list[str]) -> dict:
             t = r["task"]
             if r["result"] != "error":
                 latest[t] = r["result"]
-            elif r.get("final") or state_of(d, t, 1)[0] == "given up":
+            elif latest.get(t, "unverified") == "unverified" and (
+                    r.get("final") or state_of(d, t, 1)[0] == "given up"):
                 latest[t] = "unverified"
     failing = sorted(t for t, x in latest.items() if x in ("unresolved", "timeout"))
     unverified = sorted(t for t, x in latest.items() if x == "unverified")
     return {"left_out": sorted(failing + unverified), "failing": failing,
             "unverified": unverified, "unknown": sorted(set(tasks) - set(latest))}
+
+
+def oracle_answered(root: Path, benchmark: str, but: Path) -> set[str]:
+    """18e point 13: the tasks an oracle run other than `but` gave a real
+    result (resolved, unresolved, timeout) — never asked again by a later
+    oracle run's --all"""
+    out: set[str] = set()
+    for d in oracle_dirs(root, benchmark):
+        if d.resolve() == Path(but).resolve():
+            continue
+        out |= {r["task"] for r in results(d, read_json(d / "run.json").get("tasks") or [], 1)
+                if r["result"] != "error"}
+    return out
 
 
 def progress(rdir: Path, b: dict, tasks: list[str], attempts: int, started: float) -> dict:
@@ -1194,10 +1211,28 @@ def image_gb(img: str) -> float:
 PROBE_IMAGE = "bash:5.2"
 
 
-def check_reach(rdir: Path, targets: list[str]) -> str:
+def tailnet_peer() -> str:
+    """18e point 11: one other machine on the tailnet that is online, by its
+    tailnet address — read from `tailscale status --json` at run time, and
+    never written to a file; '' when there is none"""
+    code, out = run(["tailscale", "status", "--json"], timeout=30)
+    try:
+        st = json.loads(out) if code == 0 else {}
+    except ValueError:
+        st = {}
+    for peer in ((st or {}).get("Peer") or {}).values() if isinstance(st, dict) else []:
+        if isinstance(peer, dict) and peer.get("Online"):
+            for ip in peer.get("TailscaleIPs") or []:
+                if re.fullmatch(r"\d+\.\d+\.\d+\.\d+", str(ip)):
+                    return str(ip)
+    return ""
+
+
+def check_reach(rdir: Path, targets: list[str], peer: str = "") -> str:
     """a container started as Harbor starts a task's, with the override:
     '' when nothing answers from inside it and no host folder is there;
-    else what did"""
+    else what did. 18e point 11: and `peer`, a tailnet machine, given in its
+    environment"""
     import agent_host_mini as hm
     marker = rdir / "reach-marker"
     marker.write_text("x")
@@ -1211,7 +1246,8 @@ def check_reach(rdir: Path, targets: list[str]) -> str:
         return f"the check's container didn't start — {out.strip()[-300:]}"
     try:
         script = hm.reach_script(targets) + f"\n[ -e {marker} ] && echo 'REACHED host folder'"
-        code, out = run([*proj, "exec", "-T", "main", "bash", "-c", script], timeout=600)
+        code, out = run([*proj, "exec", "-T", *(["-e", f"PEER={peer}"] if peer else []), "main",
+                         "bash", "-c", script], timeout=600)
         return hm.reach_verdict(out)
     finally:
         run([*proj, "down", "-v", "--remove-orphans"], timeout=600)
@@ -1242,8 +1278,13 @@ def build_probe(rdir: Path, script: str, network: str) -> tuple[int, str]:
 # 18d point 15: what a build on Docker's default bridge (DeepSWE's, and the
 # three Multilingual tasks whose tests fetch) may reach — the internet, and
 # the tailnet's DNS; never this server (the board's keyless writes, the model
-# servers), the LAN or the tailnet. Three rules (docs/AGENT-RUNS.md step 9),
-# lost on a reboot: every DeepSWE line refuses while one is missing
+# servers), the LAN or the tailnet. 18e point 11: in the raw table, before
+# anything routes a packet — in INPUT and DOCKER-USER, tailscaled's own
+# `-j ts-forward` (re-inserted at FORWARD 1 on each start, ending in
+# `-o tailscale0 -j ACCEPT`) or an earlier `-i docker0 -j ACCEPT` let the
+# bridge's packets past rules that were in place. Three lines (docs/AGENT-
+# RUNS.md step A9), lost on a reboot: every DeepSWE line refuses while one is
+# missing, or while another rule comes before them
 BRIDGE = "docker0"
 # written in parts: the mirror's guard keeps every address of the tailnet's
 # range out of tracked files (tests/test_no_tailnet_address.py) — these two are
@@ -1251,52 +1292,88 @@ BRIDGE = "docker0"
 TAILNET_RANGE = ".".join(["100", "64", "0", "0"]) + "/10"
 TAILNET_DNS = ".".join(["100"] * 4)
 PRIVATE = ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", TAILNET_RANGE, "169.254.0.0/16")
+# each inserted first, in this order: the resolver's ACCEPT ends first
 FIREWALL_LINES = (
-    f"sudo iptables -I INPUT -i {BRIDGE} -j DROP",
-    f"sudo iptables -I DOCKER-USER -i {BRIDGE} -d {','.join(PRIVATE)} -j DROP",
-    f"sudo iptables -I DOCKER-USER -i {BRIDGE} -d {TAILNET_DNS} -p udp --dport 53 -j ACCEPT")
+    f"sudo iptables -t raw -I PREROUTING -i {BRIDGE} -m addrtype --dst-type LOCAL -j DROP",
+    f"sudo iptables -t raw -I PREROUTING -i {BRIDGE} -d {','.join(PRIVATE)} -j DROP",
+    f"sudo iptables -t raw -I PREROUTING -i {BRIDGE} -d {TAILNET_DNS} -p udp --dport 53 "
+    "-j ACCEPT")
+FIREWALL_CHECK = "sudo iptables -t raw -S PREROUTING"
+
+
+def _rule(line: str) -> tuple[dict, set]:
+    """one `iptables -S` line: ({option: value}, the options negated)"""
+    toks, opts, neg, i = line.split()[2:], {}, set(), 0
+    while i < len(toks):
+        if toks[i] == "!" and i + 1 < len(toks):
+            neg.add(toks[i + 1])
+            i += 1
+            continue
+        if i + 1 < len(toks) and not toks[i + 1].startswith("-"):
+            opts[toks[i]], i = toks[i + 1], i + 2
+        else:
+            opts[toks[i]], i = "", i + 1
+    return opts, neg
 
 
 def firewall_missing() -> str:
-    """'' when the bridge's three rules are in place; else which aren't, or
-    why they couldn't be read — in one line"""
-    code, out = run(["iptables", "-S"], timeout=30)
+    """'' when the bridge's rules are in place, first in the raw table's
+    PREROUTING; else which aren't, or what comes before them, or why they
+    couldn't be read — in one line"""
+    cmd = ["iptables", "-t", "raw", "-S", "PREROUTING"]
+    code, out = run(cmd, timeout=30)
     if code != 0:
-        code, out = run(["sudo", "-n", "iptables", "-S"], timeout=30)
+        code, out = run(["sudo", "-n", *cmd], timeout=30)
     if code != 0:
-        return ("the firewall's rules couldn't be read (iptables -S needs root): run this line "
-                "in its sudo form")
-    rules = [ln.split() for ln in out.splitlines() if ln.startswith("-A ")]
-
-    def has(chain: str, want: dict) -> bool:
-        for r in rules:
-            if r[1] != chain:
-                continue
-            opts = {r[i]: r[i + 1] for i in range(2, len(r) - 1) if r[i].startswith("-")}
-            if all(cidr(opts.get(k, "")) == cidr(v) if k == "-d" else opts.get(k) == v
-                   for k, v in want.items()):
-                return True
-        return False
+        return ("the firewall's rules couldn't be read (iptables -t raw -S PREROUTING needs "
+                "root): run this line in its sudo form")
+    rules = [_rule(ln) for ln in out.splitlines() if ln.startswith("-A PREROUTING ")]
 
     def cidr(x: str) -> str:
         return x if "/" in x or not x else x + "/32"
+
+    def at(want: dict) -> int | None:
+        for k, (o, neg) in enumerate(rules):
+            if "-i" not in neg and all(
+                    cidr(o.get(x, "")) == cidr(v) if x == "-d" else o.get(x) == v
+                    for x, v in want.items()):
+                return k
+        return None
+    dns = at({"-i": BRIDGE, "-d": TAILNET_DNS, "-p": "udp", "--dport": "53", "-j": "ACCEPT"})
+    drops = {n: at({"-i": BRIDGE, "-d": n, "-j": "DROP"}) for n in PRIVATE}
+    local = at({"-i": BRIDGE, "--dst-type": "LOCAL", "-j": "DROP"})
     missing = []
-    if not has("INPUT", {"-i": BRIDGE, "-j": "DROP"}):
-        missing.append(f"INPUT from {BRIDGE}")
-    gaps = [n for n in PRIVATE if not has("DOCKER-USER", {"-i": BRIDGE, "-d": n, "-j": "DROP"})]
+    if local is None:
+        missing.append(f"this server's own addresses from {BRIDGE}")
+    gaps = [n for n, k in drops.items() if k is None]
     if gaps:
-        missing.append("DOCKER-USER to " + ", ".join(gaps))
-    if not has("DOCKER-USER", {"-i": BRIDGE, "-d": TAILNET_DNS, "-p": "udp", "--dport": "53",
-                               "-j": "ACCEPT"}):
+        missing.append("to " + ", ".join(gaps))
+    if dns is None:
         missing.append(f"the tailnet's DNS ({TAILNET_DNS}:53)")
     if missing:
         return ("the firewall rules for Docker's default bridge aren't in place ("
                 + "; ".join(missing) + "): a build there would reach this server, the LAN and "
                 "the tailnet — add them (docs/AGENT-RUNS.md step A9; a reboot loses them)")
+    ours = {dns, local, *drops.values()}
+    if dns > drops[TAILNET_RANGE]:
+        return (f"the tailnet's DNS ({TAILNET_DNS}:53) comes after the tailnet's DROP in the "
+                "raw table: the bridge's builds can't resolve a name — add the rules again "
+                "(docs/AGENT-RUNS.md step A9)")
+    # a rule before the last of them that could take the bridge's packets
+    # elsewhere: anything but a DROP, unless it is for another interface
+    for k in range(max(ours)):
+        o, neg = rules[k]
+        if k in ours or o.get("-j") == "DROP" or ("-i" in o and (
+                o["-i"] != BRIDGE or "-i" in neg)):
+            continue
+        return ("another rule comes before the bridge's in the raw table's PREROUTING (rule "
+                f"{k + 1}, -j {o.get('-j') or o.get('-g') or 'nothing'}): it could let the "
+                "bridge's packets past them — add them again so they come first "
+                "(docs/AGENT-RUNS.md step A9)")
     return ""
 
 
-def check_build_reach(rdir: Path, targets: list[str]) -> tuple[str, list[str]]:
+def check_build_reach(rdir: Path, targets: list[str], peer: str = "") -> tuple[str, list[str]]:
     """(why a build with no network reached something or couldn't check,
     what a build with Docker's own network reaches) — the same targets as
     the container's check"""
@@ -1308,8 +1385,34 @@ def check_build_reach(rdir: Path, targets: list[str]) -> tuple[str, list[str]]:
            hm.reach_verdict(out, "build"))
     code2, out2 = build_probe(rdir, script, "default")
     prune_since(before)
-    return why, (hm.reached(out2) if code2 == 0 else
-                 [f"(the check didn't build — {out2.strip()[-200:]})"])
+    open_ = (hm.reached(out2) if code2 == 0 else
+             [f"(the check didn't build — {out2.strip()[-200:]})"])
+    # 18e point 11: and a tailnet machine from Docker's default bridge, where
+    # those builds run — given to a `docker exec`, whose environment Docker
+    # keeps nowhere (a build's arguments stay in its build history)
+    if peer:
+        got = bridge_reaches(peer)
+        open_ += (["a tailnet peer"] if got else [] if got is not None else
+                  ["(the tailnet check didn't start a container on the bridge)"])
+    return why, open_
+
+
+def bridge_reaches(peer: str) -> bool | None:
+    """18e point 11: whether a container on Docker's default bridge reaches
+    `peer`; None when the check couldn't start"""
+    import agent_host_mini as hm
+    name = "agent-bridge-check"
+    run(["docker", "rm", "-f", name], timeout=120)
+    code, _ = run(["docker", "run", "-d", "--rm", "--name", name, "--network", "bridge",
+                   PROBE_IMAGE, "sleep", "600"], timeout=600)
+    if code != 0:
+        return None
+    try:
+        code, out = run(["docker", "exec", "-e", f"PEER={peer}", name, "bash", "-c",
+                         hm.PEER_SCRIPT], timeout=120)
+        return "REACHED a tailnet peer" in out if code == 0 else None
+    finally:
+        run(["docker", "rm", "-f", name], timeout=120)
 
 
 def remove_images(images: list[str], keep: set[str], rdir: Path | None = None) -> float:
@@ -1341,6 +1444,10 @@ def cache_ids() -> set[str] | None:
         got = json.loads(out.strip().splitlines()[-1]) if code == 0 and out.strip() else None
     except (ValueError, IndexError):
         got = None
+    # 18e point 16: Docker says `null` for an empty cache (after a prune) —
+    # nothing in it, not a list it couldn't give
+    if code == 0 and out.strip().splitlines()[-1:] == ["null"]:
+        return set()
     if code != 0 or not isinstance(got, list):
         return None
     return {str(r.get("ID")).rstrip("*") for r in got if isinstance(r, dict) and r.get("ID")}
@@ -1467,6 +1574,9 @@ def main(argv: list[str] | None = None) -> int:
     if a.firewall_lines:                # printed, never run: masein runs each
         for line in FIREWALL_LINES:
             print(line)
+        # 18e point 11: and the line that shows them, as its help says
+        print("# then this shows them, before any other rule: the ACCEPT, then the DROPs")
+        print(FIREWALL_CHECK)
         return 0
     if a.check_reach:                   # no model: step A (18b point 4)
         root = bench_root()
@@ -1483,13 +1593,18 @@ def main(argv: list[str] | None = None) -> int:
             say(f"refused — {why}: the board must be up (step A1)")
             return 2
         targets = reach_targets(llama=urls)
-        why = check_reach(rdir, targets)
+        # 18e point 11: and a machine on the tailnet — the bridge's builds
+        # would reach one past a rule out of order
+        peer = tailnet_peer()
+        why = check_reach(rdir, targets, peer)
         say(f"refused — {why}" if why else "a task's container reaches nothing of: "
-            + ", ".join(targets) + "; no name resolves; its only interface is the loopback; "
-            "no host folder; at most 4,096 processes")
+            + ", ".join(targets) + (", a tailnet peer" if peer else "")
+            + "; no name resolves; its only interface is the loopback; no host folder; at most "
+            "4,096 processes" + ("" if peer else " · no other machine on the tailnet was online "
+                                 "to try (tailscale status)"))
         # 18c point 2: a task's image built with no network, as every SWE-bench
         # copy's is; and what a build with Docker's own network reaches
-        bwhy, open_ = check_build_reach(rdir, targets)
+        bwhy, open_ = check_build_reach(rdir, targets, peer)
         say(f"refused — {bwhy}" if bwhy else "a task's build with no network (every SWE-bench "
             "Multilingual image, but those whose own tests fetch packages) reaches none of them")
         say("a build with Docker's own network (the few Multilingual tasks whose tests fetch "
@@ -1526,6 +1641,20 @@ def main(argv: list[str] | None = None) -> int:
         rdir.chmod(0o700)               # 18d point 14: its logs are its owner's alone
     except OSError:
         pass
+    # 18d point 16: one runner a run — a second deleted the first's .running
+    # marks, then removed its live containers as leftovers. 18e point 12:
+    # taken before anything is fetched or copied, --check too — a second was
+    # refused only after it had replaced the live job's task copies
+    import fcntl
+    held = open(rdir / "run.lock", "a")
+    try:
+        fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        held.close()
+        say(f"refused — another runner is on this run ({rdir.name}): its run.lock is held. "
+            "`pgrep -af scripts/agent_run.py` shows it; let it finish or stop it first")
+        return 2
+    began = read_json(rdir / "run.json")
     tdir, tasks_sha = fetch_tasks(root, b)
     langs = languages(tdir, b)
     picked = ab.pilot(langs, a.tasks) if a.tasks else sorted(langs)
@@ -1540,6 +1669,7 @@ def main(argv: list[str] | None = None) -> int:
     # 18c point 9: the tasks whose reference solution doesn't pass here (the
     # oracle run's) are left out of a model run, said; the full run waits
     # for the oracle on every task
+    left: list[str] | None = None
     if not a.oracle:
         oracle = oracle_states(root, a.benchmark, sorted(langs))
         if a.all and oracle["unknown"]:
@@ -1547,7 +1677,16 @@ def main(argv: list[str] | None = None) -> int:
                 f"{len(langs)} tasks: run it on every task first (--oracle --all), so the tasks "
                 "whose reference solution doesn't pass here are known and left out")
             return 2
-        out_ = [t for t in picked if t in oracle["failing"]]
+        # 18e point 13: a run keeps the list it started with (run.json's
+        # left_out) — an oracle run after it changed a finished run's score
+        left = began["left_out"] if isinstance(began.get("left_out"), list) \
+            else oracle["left_out"]
+        if isinstance(began.get("left_out"), list) and sorted(left) != oracle["left_out"]:
+            say(f"the oracle's list of tasks left out has changed since this run started "
+                f"({len(left)} then, {len(oracle['left_out'])} now): this run keeps the "
+                f"{len(left)} it started with — start a run beside it (--run {a.run + 1}) for "
+                "the new list")
+        out_ = [t for t in picked if t in left and t not in oracle["unverified"]]
         if out_:
             say(f"{len(out_)} of these tasks {'is' if len(out_) == 1 else 'are'} left out: "
                 "their reference solution doesn't "
@@ -1555,12 +1694,22 @@ def main(argv: list[str] | None = None) -> int:
         # 18d point 11: and those the oracle couldn't check here, by name —
         # given up, or an error of ours after it ran: never asked again, they
         # blocked --all for ever
-        unv = [t for t in picked if t in oracle["unverified"]]
+        unv = [t for t in picked if t in left and t in oracle["unverified"]]
         if unv:
             say(f"{len(unv)} of these tasks {'is' if len(unv) == 1 else 'are'} left out: they "
                 "couldn't be checked here (the oracle run's errors of ours; --oracle --run N+1 "
                 f"--only them asks them again) — {', '.join(unv)}")
-        picked = [t for t in picked if t not in oracle["left_out"]]
+        picked = [t for t in picked if t not in left]
+    # 18e point 13: a later oracle run over every task asks only those no
+    # other oracle run gave a result — after a pull that changed the runner
+    # (run 1 refuses its new files), --run 2 --all isn't every task again
+    if a.oracle and a.all and a.run > 1:
+        had = oracle_answered(root, a.benchmark, rdir)
+        skip = [t for t in picked if t in had]
+        if skip:
+            say(f"{len(skip)} of these tasks have a result from another oracle run: not asked "
+                "again here (--only names one to ask it again)")
+            picked = [t for t in picked if t not in had]
     # what a SWE-bench image gets, fetched once and checked (18c point 2)
     build, build_info = None, {}
     if needs_build_files(tdir, picked):
@@ -1644,26 +1793,14 @@ def main(argv: list[str] | None = None) -> int:
         if relay:
             relay.stop()
         return 0
-    # 18d point 16: one runner a run — a second deleted the first's .running
-    # marks, then removed its live containers as leftovers
-    import fcntl
-    held = open(rdir / "run.lock", "a")
-    try:
-        fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
-        held.close()
-        if relay:
-            relay.stop()
-        say(f"refused — another runner is on this run ({rdir.name}): its run.lock is held. "
-            "`pgrep -af scripts/agent_run.py` shows it; let it finish or stop it first")
-        return 2
     # the run's tasks: those asked before and these (a pilot grown, step A's
     # oracle on more tasks), each kept with its result; its first settings kept
     every = [*(before.get("tasks") or []),
              *[t for t in picked if t not in (before.get("tasks") or [])]]
     started = before.get("started_at") or time.time()
     write_json(rdir / "run.json", {**now, **{k: x for k, x in before.items() if k in SETTINGS},
-                                   "tasks": every, "started_at": started})
+                                   "tasks": every, "started_at": started,
+                                   **({"left_out": sorted(left)} if left is not None else {})})
     reach = (reach_targets(llama=[host_address(info.get("base_url") or ""), *served_urls()[0]],
                            relay_port=relay.server.server_address[1] if relay else 0)
              if not a.oracle else [])

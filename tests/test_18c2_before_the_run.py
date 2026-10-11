@@ -411,9 +411,9 @@ def test_the_reach_check_takes_each_servers_port_from_the_board(  # noqa: F811
         return real_run(cmd, cwd=cwd, timeout=timeout, env=env)
     monkeypatch.setattr(ar, "run", run)
     seen = {}
-    monkeypatch.setattr(ar, "check_reach", lambda rdir, targets: seen.setdefault("t", targets)
+    monkeypatch.setattr(ar, "check_reach", lambda rdir, targets, peer="": seen.setdefault("t", targets)
                         and "")
-    monkeypatch.setattr(ar, "check_build_reach", lambda rdir, targets: ("", []))
+    monkeypatch.setattr(ar, "check_build_reach", lambda rdir, targets, peer="": ("", []))
     assert ar.main(["swebench-multilingual", "--check-reach"]) == 0
     t = seen["t"]
     assert "172.17.0.1:8091" in t and "172.17.0.1:8094" in t

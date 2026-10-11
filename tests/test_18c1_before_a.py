@@ -423,7 +423,7 @@ def test_the_build_check_runs_in_a_build_with_no_network(tmp_path, monkeypatch, 
             return 0, json.dumps([{"id": "served/x", "base_url": "http://172.17.0.1:8091/v1"}])
         return 0, ""
     monkeypatch.setattr(ar, "run", run)
-    monkeypatch.setattr(ar, "check_reach", lambda rdir, targets: "")
+    monkeypatch.setattr(ar, "check_reach", lambda rdir, targets, peer="": "")
     monkeypatch.setenv("BENCH_ROOT", str(tmp_path))
     assert ar.main(["swebench-multilingual", "--check-reach"]) == 0
     out = capsys.readouterr().out.splitlines()
