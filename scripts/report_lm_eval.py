@@ -4512,6 +4512,11 @@ td.evdtotal .evd-ranout { display:block; white-space:normal; text-align:right; }
 .rented-prog { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 .rented-prog .runbar { flex:1 1 30px; min-width:30px; max-width:140px; margin:0; }
 .rented-prog [data-rented-open] { padding:0 4px; white-space:nowrap; }   /* 18b: wrapped at 1440 */
+/* 18d point 9: the count, the bar and the finish one group, never split — a
+   wider font in CI put the finish 31 px below the bar; on a phone it wraps */
+.rented-main { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+.rented-main .runbar { flex:0 0 80px; width:80px; min-width:30px; margin:0; }
+@media (max-width: 600px) { .rented-main { flex-wrap:wrap; white-space:normal; } }
 /* 17j: at a phone's width, the Runs table fits: the model, its status and its
    progress stay; the number, the time, the suite, who and the GPU give way */
 @media (max-width: 640px) {
@@ -19908,11 +19913,13 @@ function rentedRow(x, ncols) {
       : stClass(RENTED_CHIP[x.status] || x.status), 'data-stage': x.status,
       text: x.status_words })),
     el('td', { class: 'small qc-progress' }, el('div', { class: 'rented-prog' },
-      el('span', { 'data-rented-count': '1', text: count }),
-      // as a run here: its bar while it runs, beside the count
-      x.status === 'running' ? runBar(x.n, x.of) : '',
-      x.finish ? el('span', { class: 'se', 'data-rented-finish': '1',
-        text: `${many ? 'this part done' : 'done about'} ${rentedWhen(x.finish)}` }) : '',
+      // 18d point 9: one group, as a run here's count, bar and finish are
+      el('span', { class: 'rented-main' },
+        el('span', { 'data-rented-count': '1', text: count }),
+        // as a run here: its bar while it runs, beside the count
+        x.status === 'running' ? runBar(x.n, x.of) : '',
+        x.finish ? el('span', { class: 'se', 'data-rented-finish': '1',
+          text: `${many ? 'this part done' : 'done about'} ${rentedWhen(x.finish)}` }) : ''),
       !many && ((x.boxes || [])[0] || {}).box_finish && x.boxes[0].box_finish !== x.finish
         ? el('span', { class: 'se', 'data-box-finish': '1',
           text: `box free ${rentedWhen(x.boxes[0].box_finish)}` }) : '',

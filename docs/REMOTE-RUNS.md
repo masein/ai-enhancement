@@ -1139,28 +1139,39 @@ it, and each step's line says every value. The repeat penalty is one value
 | BF16 | `served/Qwen3.6-35B-A3B-BF16-lda-2610` | Qwen3.6-35B-A3B BF16 (lda runtime) |
 | step4000 | `served/step4000-lda-2610` | step4000 (lda runtime) |
 
-## L0. The tarball and step4000's file, once
+## L0. The tarball and step4000's file
 
-The `lda` build as a tarball, as G0 builds one, from a checkout of the `lda`
-branch (Docker, no GPU; about 15 minutes; its last line gives its sha256):
+**Built (11 Oct):** `llama-server-lda-a4a76a7.tar.gz`, in the private
+repository, 896 MB, sha256
+`5b538290644d67139c6c996fdaa3e04cce82fd0b343cce66a4ff234648afb618` — from
+`teraformer/lda-2026-09-22` at `a4a76a751` (build 9954), CUDA 12.8, for
+**sm_120 alone** (the RTX 5090 and the RTX PRO 6000), with no web page (the
+API only: the branch's prebuilt page lacks `loading.html`). The router norm,
+`LOOKAHEAD_MOE_ROUTER_NORM`, is read in its `libllama.so`; each step checks
+the build reads it before anything is asked.
+
+**step4000's GGUF:** `step4000.gguf` in the same repository, 13,592,481,632
+bytes, sha256 `630c408a3836f82afa1f79629b06d9390d3f736f6140791baa42e180a640565e`
+— pinned for `served/step4000-lda-2610`.
+
+Plan L's box line pins both by name (`frontier_box.PLAN_PINS`): a file of
+that name with another sha256 is refused before anything is asked. It checks
+the card first, and refuses anything but an RTX 5090 or an RTX PRO 6000 in
+one line, before anything is fetched.
+
+The next tarball, the same way (`LLAMA_CMAKE_ARGS` for more cmake arguments;
+the web page is off unless `LLAMA_WEB_UI=1`; all three in its VERSION):
 
 ```bash
-~/benchmarks/aienh/scripts/build_llama_tarball.sh <the lda branch's checkout> ~/llama-server-lda-2610.tar.gz
-```
-
-Into the private repository, beside step4000's GGUF:
-
-```bash
-hf upload <you>/evalboard-private ~/llama-server-lda-2610.tar.gz llama-server-lda-2610.tar.gz
+LLAMA_CUDA_ARCHS=120 ~/benchmarks/aienh/scripts/build_llama_tarball.sh <the lda branch's checkout> ~/llama-server-lda-<commit>.tar.gz
 ```
 
 ```bash
-hf upload <you>/evalboard-private <step4000's file>.gguf step4000.gguf
+hf upload <you>/evalboard-private ~/llama-server-lda-<commit>.tar.gz llama-server-lda-<commit>.tar.gz
 ```
 
-Every box of the three models runs this one tarball: shards made with
-another build never merge. The files' sha256, for the fetch: step4000's from
-its page on Hugging Face (Files ▸ the file ▸ its SHA256); Q4's is the
+Every box of the three models runs one tarball: shards made with another
+build never merge. The other two files' sha256, for the fetch: Q4's is the
 UD-Q4_K_XL file's, registered on `served/Qwen3.6-35B-A3B-Q4-original-k-8`'s
 page; BF16's is the split identity G3–G4 describes (each part's sha256 on
 Hugging Face).
@@ -1219,23 +1230,24 @@ each box's start: say if you want that.
 4. The box's line. For step4000, box L13:
 
    ```bash
-   python scripts/frontier_box.py L13 --as served/step4000-lda-2610 --gguf hf://<you>/evalboard-private/step4000.gguf --server hf://<you>/evalboard-private/llama-server-lda-2610.tar.gz
+   python scripts/frontier_box.py L13 --as served/step4000-lda-2610 --gguf hf://<you>/evalboard-private/step4000.gguf --server hf://<you>/evalboard-private/llama-server-lda-a4a76a7.tar.gz
    ```
 
    Q4, the same box label with its file:
 
    ```bash
-   python scripts/frontier_box.py L13 --as served/Qwen3.6-35B-A3B-Q4-lda-2610 --gguf <the Q4 file's hf:// path, as its earlier boxes had it> --server hf://<you>/evalboard-private/llama-server-lda-2610.tar.gz
+   python scripts/frontier_box.py L13 --as served/Qwen3.6-35B-A3B-Q4-lda-2610 --gguf <the Q4 file's hf:// path, as its earlier boxes had it> --server hf://<you>/evalboard-private/llama-server-lda-a4a76a7.tar.gz
    ```
 
    BF16, the first part of its file:
 
    ```bash
-   python scripts/frontier_box.py L13 --as served/Qwen3.6-35B-A3B-BF16-lda-2610 --gguf <the BF16 file's first part, as its earlier boxes had it> --server hf://<you>/evalboard-private/llama-server-lda-2610.tar.gz
+   python scripts/frontier_box.py L13 --as served/Qwen3.6-35B-A3B-BF16-lda-2610 --gguf <the BF16 file's first part, as its earlier boxes had it> --server hf://<you>/evalboard-private/llama-server-lda-a4a76a7.tar.gz
    ```
 
-   It prints the runtime's every value, then the file, the build and the
-   memory, then asks. The last lines say how each step ended; if the box
+   It checks the card first (an RTX 5090 or an RTX PRO 6000, or nothing is
+   fetched), then prints the runtime's every value, the file and the build
+   (each checked against its pin), the memory, then asks. The last lines say how each step ended; if the box
    stops, paste the same line again.
 5. Once every step reads whole, the scores by code, and each file's sha256
    as the box hashed it:
@@ -1268,7 +1280,7 @@ loop, and each model's difference from the first question by question.
 The fetch of G3–G4, with the three models' sha256 from L0 and every box:
 
 ```bash
-cd ~/benchmarks/aienh && python3 scripts/frontier_fetch.py --key ~/.ssh/id_ed25519 --sha served/step4000-lda-2610=<step4000's sha256> --sha served/Qwen3.6-35B-A3B-Q4-lda-2610=<the Q4 file's sha256> --sha served/Qwen3.6-35B-A3B-BF16-lda-2610=<BF16's split identity> --every 3m <host 1>:<port 1> <host 2>:<port 2>
+cd ~/benchmarks/aienh && python3 scripts/frontier_fetch.py --key ~/.ssh/id_ed25519 --sha served/step4000-lda-2610=630c408a3836f82afa1f79629b06d9390d3f736f6140791baa42e180a640565e --sha served/Qwen3.6-35B-A3B-Q4-lda-2610=<the Q4 file's sha256> --sha served/Qwen3.6-35B-A3B-BF16-lda-2610=<BF16's split identity> --every 3m <host 1>:<port 1> <host 2>:<port 2>
 ```
 
 The board doesn't serve the three models yet, so each one's first bundle
@@ -1278,7 +1290,7 @@ registers it with the bundle's runtime, as this board defines it, and the
 file by the sha256 you give. For step4000:
 
 ```bash
-cd ~/benchmarks/aienh && sudo docker compose exec -T bench python scripts/import_remote.py ~/benchmarks/bundles/<the bundle the fetch names> --by masein --register "step4000 (lda runtime)" --file-sha256 <step4000's sha256>
+cd ~/benchmarks/aienh && sudo docker compose exec -T bench python scripts/import_remote.py ~/benchmarks/bundles/<the bundle the fetch names> --by masein --register "step4000 (lda runtime)" --file-sha256 630c408a3836f82afa1f79629b06d9390d3f736f6140791baa42e180a640565e
 ```
 
 The same with "Qwen3.6-35B-A3B Q4 (lda runtime)" and "Qwen3.6-35B-A3B BF16
@@ -1307,7 +1319,7 @@ HF_HOME="$(sed -n 's/^HF_HOME=//p' ~/benchmarks/aienh/.env)" hf download <you>/e
 ```
 
 ```bash
-cd ~/benchmarks/aienh && sudo docker compose exec -T bench python scripts/import_remote.py ~/benchmarks/bundles/step4000-2610/runs/step4000-2610/step4000-lda-2610 --by masein --register "step4000 (lda runtime)" --file-sha256 <step4000's sha256>
+cd ~/benchmarks/aienh && sudo docker compose exec -T bench python scripts/import_remote.py ~/benchmarks/bundles/step4000-2610/runs/step4000-2610/step4000-lda-2610 --by masein --register "step4000 (lda runtime)" --file-sha256 630c408a3836f82afa1f79629b06d9390d3f736f6140791baa42e180a640565e
 ```
 
 On your Mac, a venv for the Hugging Face CLI once, then the download:

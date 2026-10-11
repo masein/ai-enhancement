@@ -456,6 +456,55 @@ def check_runs_here(srv: dict, env: dict, say) -> dict:
             "compute_cap": cap}
 
 
+def parse_pins(given: list[str]) -> dict[str, str]:
+    """20: --pin NAME=SHA256 — a file this box fetches or is given, by its
+    name, and the sha256 it must have"""
+    out = {}
+    for x in given or []:
+        name, _, sha = x.partition("=")
+        if not name or "/" in name or not re.fullmatch(r"[0-9a-f]{64}", sha.strip().lower()):
+            raise SystemExit(f"--pin {x!r}: NAME=SHA256, a file's name and its 64-hex sha256")
+        out[name.strip()] = sha.strip().lower()
+    return out
+
+
+def pin_refused(name: str, sha: str, pins: dict) -> str:
+    """'' when `name` has no pin or its sha256 is the pinned one; else why"""
+    want = pins.get(name)
+    if not want or want == sha:
+        return ""
+    return (f"{name} here has sha256 {sha[:16]}…, not the {want[:16]}… pinned for it (--pin): "
+            "another file under that name — nothing was asked")
+
+
+def build_reads(srv: dict, names: list[str]) -> list[str]:
+    """20: the variables of `names` that llama-server and its libraries never
+    mention — a runtime's variable a build doesn't read does nothing, and the
+    run would say it ran with it. Its own libraries first (the lda branch's
+    LOOKAHEAD_MOE_ROUTER_NORM is in libllama.so)"""
+    files = [Path(srv["bin"])]
+    own = [Path(d) for d in srv["libs"] if Path(d).is_relative_to(Path(srv["root"]))]
+    libs = sorted({p.resolve() for d in own for p in d.glob("*.so*") if p.is_file()},
+                  key=lambda p: (not p.name.startswith("libllama"), p.stat().st_size))
+    left = list(names)
+    for f in [*files, *libs]:
+        if not left:
+            break
+        try:
+            with open(f, "rb") as fh:
+                tail = b""
+                while left:
+                    chunk = fh.read(8 * 1024 ** 2)
+                    if not chunk:
+                        break
+                    blob = tail + chunk
+                    left = [n for n in left if n.encode() not in blob]
+                    tail = blob[-256:]
+        except OSError:
+            continue
+    return left
+
+
 # ---------------------------------------------------------------------------
 # llama-server
 # ---------------------------------------------------------------------------
@@ -949,6 +998,9 @@ def _main(argv: list[str] | None = None) -> int:
     src.add_argument("--server-dir",
                      help="20: a llama.cpp build directory on this box (its bin/llama-server "
                           "and libraries), run as it is")
+    ap.add_argument("--pin", action="append", default=[],
+                    help="20: NAME=SHA256 — the sha256 a file of that name must have (the "
+                         "GGUF, each of its parts, the tarball); another is refused")
     ap.add_argument("--runtime", choices=sorted(fb.RUNTIMES),
                     help="20: a named runtime — its environment, its server's flags and the "
                          "sampling each request carries (scripts/frontier.py RUNTIMES)")
@@ -1004,6 +1056,7 @@ def _main(argv: list[str] | None = None) -> int:
     if own_flags(flags):
         ap.error(f"--flags: {', '.join(own_flags(flags))} are set by this script")
     extra_env = parse_env(a.env)
+    pins = parse_pins(a.pin)
     if a.runtime:
         # 20: the runtime's environment and flags, nothing typed beside them
         # that would change what it is
@@ -1107,6 +1160,10 @@ def _main(argv: list[str] | None = None) -> int:
     paths = [fetch(src, files, say) for src in split_parts(a.gguf)]
     gguf_path = paths[0]
     shas = [sha256_cached(x, state, say, files / "sha256.json") for x in paths]
+    for x, h in zip(paths, shas):                      # 20: a pinned file is that file
+        why = pin_refused(x.name, h, pins)
+        if why:
+            raise SystemExit(why)
     sha = shas[0] if len(paths) == 1 else split_sha(
         [(x.name, h) for x, h in zip(paths, shas)])
     # 17c: pinned once an answer is written — a first launch that failed (a
@@ -1128,8 +1185,26 @@ def _main(argv: list[str] | None = None) -> int:
     else:
         tb = fetch(a.server, files, say)
         srv = unpack_server(tb, out / "server")
+        why = pin_refused(tb.name, srv["tarball_sha256"], pins)
+        if why:
+            raise SystemExit(why)
         env = server_env(srv, extra_env)
         ran = None
+        # 20: a tarball built for some cards only (its VERSION's cuda_archs:
+        # the lda tarball's is 120) is refused on another, before it loads
+        archs, cap = cuda_archs(srv["bin"].parent.parent), compute_cap()
+        if archs and cap and archs_run_on(archs, cap) is False:
+            raise SystemExit(f"{tb.name} is built for CUDA architectures {';'.join(archs)} (its "
+                             f"VERSION), and this card is sm_{cap}: it won't run here — rent "
+                             "a card it was built for. Nothing was asked")
+    if a.runtime:
+        # 20: the runtime's variables are read by this build, or it isn't the
+        # build the runtime is for
+        unread = build_reads(srv, list(fb.RUNTIMES[a.runtime]["env"]))
+        if unread:
+            raise SystemExit(f"runtime {a.runtime} sets {', '.join(unread)}, and this build "
+                             "(llama-server and its libraries) never reads it: not the "
+                             "build the runtime is for? Nothing was asked")
     ver = version_of(srv["bin"], env)
     server = {"version": ver["text"], "build": ver["build"], "commit": ver["commit"],
               "binary_sha256": rb.sha256_file(srv["bin"]),

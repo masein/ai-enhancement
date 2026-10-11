@@ -35,7 +35,7 @@ the lda branch's tarball as any build's:
 
     python scripts/frontier_box.py L3 --as served/step4000-lda-2610 \\
         --gguf hf://<you>/evalboard-private/step4000.gguf \\
-        --server hf://<you>/evalboard-private/llama-server-lda-2610.tar.gz
+        --server hf://<you>/evalboard-private/llama-server-lda-a4a76a7.tar.gz
 
 --server-dir, in place of --server, is the fallback: a build directory the
 team put on the box (docs/STEP4000-RUN.md).
@@ -142,6 +142,46 @@ PLANS: dict[str, dict[str, list[Step]]] = {
 }
 # 20: the runtime a plan's boxes run, unless the line names another
 PLAN_RUNTIME = {"L": "lda-2610"}
+# 20: the cards a plan's build runs on — the lda tarball is built for sm_120
+# alone (the RTX 5090 and the RTX PRO 6000): a box line on any other card is
+# refused before anything is fetched
+PLAN_GPUS = {"L": ("RTX 5090", "RTX PRO 6000")}
+# 20: the files a plan's boxes run, by name, and the sha256 each must have:
+# the lda tarball (teraformer/lda-2026-09-22 at a4a76a751, build 9954, sm_120,
+# CUDA 12.8, no web page) and step4000's GGUF (13,592,481,632 bytes)
+PLAN_PINS = {"L": {
+    "llama-server-lda-a4a76a7.tar.gz":
+        "5b538290644d67139c6c996fdaa3e04cce82fd0b343cce66a4ff234648afb618",
+    "step4000.gguf": "630c408a3836f82afa1f79629b06d9390d3f736f6140791baa42e180a640565e"}}
+
+
+def gpu_refused(box: str, info: dict | None = None) -> str:
+    """20: '' when this box's every card is one its plan's build runs on;
+    else why not, in one line"""
+    want = PLAN_GPUS.get(box[:1].upper())
+    if not want:
+        return ""
+    if info is None:
+        import remote_bundle as rb
+        info = rb.gpu_info()
+    names = info.get("names") or ([info["name"]] if info.get("name") else [])
+    cards = " or an ".join(want)
+    if not names:
+        return (f"{box}: no GPU could be read here (nvidia-smi) — plan {box[:1].upper()} runs "
+                f"on an {cards} only. Nothing was fetched")
+    bad = sorted({n for n in names if not any(w in n for w in want)})
+    if bad:
+        return (f"{box}: this box has {', '.join(bad)} — plan {box[:1].upper()} runs on an "
+                f"{cards} only (its lda build is for sm_120 alone). Nothing was fetched")
+    return ""
+
+
+def pins_of(a: argparse.Namespace, box: str) -> list[str]:
+    """20: --pin NAME=SHA256 for each file the line gives that its plan pins"""
+    pins = PLAN_PINS.get(box[:1].upper()) or {}
+    given = [a.gguf, *([] if getattr(a, "server_dir", "") else [a.server])]
+    return [f"{n}={pins[n]}" for n in sorted({str(x).rsplit("/", 1)[-1] for x in given if x})
+            if n in pins]
 
 
 def box_of(name: str) -> list[Step]:
@@ -269,6 +309,8 @@ def argv_of(box: str, k: int, step: Step, a: argparse.Namespace) -> list[str]:
     rt = runtime_of(a, box)
     if rt:
         out += ["--runtime", rt]
+    for pin in pins_of(a, box):
+        out += ["--pin", pin]
     if getattr(a, "slots_fit", False):
         out += ["--slots-fit"]
     if a.env:
@@ -358,6 +400,10 @@ def main(argv: list[str] | None = None) -> int:
         ap.error("--server or --server-dir, not both")
     box = a.box.upper()
     steps = box_of(box)
+    # 20: the card first — the plan's build runs on its cards alone
+    why = gpu_refused(box)
+    if why:
+        raise SystemExit(why)
     print(f"{box}: {len(steps)} step{'s' if len(steps) > 1 else ''}, about "
           f"{sum(hours(s) for s in steps):.1f} h at the pilot's paces", flush=True)
     if runtime_of(a, box):

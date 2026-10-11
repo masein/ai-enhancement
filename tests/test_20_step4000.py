@@ -51,7 +51,8 @@ def build_dir(root: Path, archs: str | None = "120") -> Path:
     exe.write_bytes((FIX / "fake_llama_server.py").read_bytes())
     exe.chmod(0o755)
     (d / "bin" / "libggml-cuda.so").write_bytes(b"\x7fELF not really")
-    (d / "bin" / "libllama.so").write_bytes(b"\x7fELF not really either")
+    # the lda branch reads its router norm in libllama.so
+    (d / "bin" / "libllama.so").write_bytes(b"\x7fELF not really either LOOKAHEAD_MOE_ROUTER_NORM")
     if archs is not None:
         (d / "CMakeCache.txt").write_text(f"CMAKE_CUDA_ARCHITECTURES:STRING={archs}\n")
     g = root / "llama.cpp" / ".git"
@@ -88,6 +89,47 @@ def bundle_at(b: dict, out: str, served_as: str = STEP,
               shard: tuple[int, int] | None = None) -> Path:
     return b["root"] / out / rb.bundle_name("frontier", served_as, True, shard,
                                             parts=[fb.BENCH[TASK]["short"]])
+
+
+def lda_tarball(root: Path, archs: str = "120", reads: bool = True) -> Path:
+    """the lda build packed as build_llama_tarball.sh packs one: bin/, lib/
+    with libllama.so (that reads the router norm), VERSION"""
+    import io
+    import tarfile
+    tb = root / "llama-server-lda-a4a76a7.tar.gz"
+    with tarfile.open(tb, "w:gz") as tar:
+        def add(name: str, data: bytes, mode: int = 0o644) -> None:
+            ti = tarfile.TarInfo(name)
+            ti.size, ti.mode = len(data), mode
+            tar.addfile(ti, io.BytesIO(data))
+        add("llama/bin/llama-server", (FIX / "fake_llama_server.py").read_bytes(), 0o755)
+        add("llama/lib/libllama.so", b"\x7fELF " + (b"LOOKAHEAD_MOE_ROUTER_NORM" if reads
+                                                    else b"nothing of it"))
+        add("llama/lib/libggml-cuda.so", b"\x7fELF not really")
+        add("llama/VERSION", f"commit a4a76a7\nbuild 9954\ncuda_archs {archs}\n"
+                             "cmake_args -DLLAMA_BUILD_UI=OFF -DLLAMA_USE_PREBUILT_UI=OFF\n"
+                             .encode())
+    return tb
+
+
+def run_tb(b: dict, out: str, tb: Path, *more: str, served_as: str = STEP) -> int:
+    """remote_gguf.py from a tarball with the runtime — the server's config put back after"""
+    keep = {k: getattr(config, k) for k in [*rg.ENV, "OUT_DIR"]}
+    lock, env = runner.LOCK, {v: os.environ.get(v) for v in rg.ENV.values()}
+    try:
+        return rg.main(["--as", served_as, "--gguf", str(b["gguf"]), "--server", str(tb),
+                        "--based-on", "Qwen/Qwen3.6-35B-A3B", "--thinking", "on", "--slots", "3",
+                        "--port", str(free_port()), "--load-timeout", "60", "--runtime", RT,
+                        "--only", TASK, "--out", str(b["root"] / out), *more])
+    finally:
+        for k, v in keep.items():
+            setattr(config, k, v)
+        runner.LOCK = lock
+        for k, v in env.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
 
 
 @pytest.fixture
@@ -142,7 +184,7 @@ def test_a_build_directory_runs_with_the_runtime_and_is_recorded(box, card, monk
     # nothing of the build in the bundle
     assert not any(n.endswith(".so") or "llama-server" == n.rsplit("/", 1)[-1] for n in b["files"])
     # a library rebuilt under answers already given: refused, not mixed
-    (build / "bin" / "libllama.so").write_bytes(b"rebuilt")
+    (build / "bin" / "libllama.so").write_bytes(b"rebuilt, LOOKAHEAD_MOE_ROUTER_NORM")
     with pytest.raises(SystemExit, match="libs_sha256"):
         run_dir(box, "run", build)
 
@@ -255,42 +297,128 @@ def test_plan_L_is_thinking_on_every_benchmark_whole_and_no_box_over_6_hours(): 
     assert fx.listing("L")[-1].startswith("21 boxes a build · 114.1 box-hours")
 
 
-def test_the_runtime_from_a_tarball_as_any_build(box, monkeypatch, tmp_path):  # noqa: F811
-    """the main path: the lda tarball fetched as G2's, the runtime by name"""
+def test_the_runtime_from_a_tarball_as_any_build(box, card, monkeypatch, tmp_path):  # noqa: F811
+    """the main path: the lda tarball fetched as G2's, the runtime by name,
+    each file pinned by its sha256"""
     launched = tmp_path / "launched.jsonl"
     monkeypatch.setenv("FAKE_LLAMA_ARGV", str(launched))
-    keep = {k: getattr(config, k) for k in [*rg.ENV, "OUT_DIR"]}
-    lock, env = runner.LOCK, {v: os.environ.get(v) for v in rg.ENV.values()}
-    try:
-        assert rg.main(["--as", STEP, "--gguf", str(box["gguf"]), "--server", str(box["tarball"]),
-                        "--based-on", "Qwen/Qwen3.6-35B-A3B", "--thinking", "on", "--slots", "3",
-                        "--port", str(free_port()), "--load-timeout", "60", "--runtime", RT,
-                        "--only", TASK, "--out", str(box["root"] / "tb")]) == 0
-    finally:
-        for k, v in keep.items():
-            setattr(config, k, v)
-        runner.LOCK = lock
-        for k, v in env.items():
-            if v is None:
-                os.environ.pop(k, None)
-            else:
-                os.environ[k] = v
+    tb = lda_tarball(tmp_path)
+    pins = ["--pin", f"{tb.name}={rb.sha256_file(tb)}",
+            "--pin", f"{box['gguf'].name}={box['sha']}"]
+    assert run_tb(box, "tb", tb, *pins) == 0
     srv = rb.read(bundle_at(box, "tb"))["setup"]["server"]
     assert srv["runtime"] == RT and srv["flags"] == fb.runtime_flags(RT)
-    assert srv["tarball_sha256"] == rb.sha256_file(box["tarball"]) and "dir" not in srv
+    assert srv["tarball_sha256"] == rb.sha256_file(tb) and "dir" not in srv
     assert json.loads(launched.read_text().splitlines()[-1])["env"][
         "LOOKAHEAD_MOE_ROUTER_NORM"] == "1"
     assert all(r["min_p"] == 0.0 and r["repeat_last_n"] == 64 for r in requests(box))
 
 
-def test_a_plan_L_line_runs_the_runtime_from_the_tarball():
+def test_a_file_that_isnt_the_pinned_one_is_refused(box, card, tmp_path):  # noqa: F811
+    tb = lda_tarball(tmp_path)
+    with pytest.raises(SystemExit, match=f"{tb.name} here has sha256 .*not the 000000"):
+        run_tb(box, "p1", tb, "--pin", f"{tb.name}={'0' * 64}")
+    with pytest.raises(SystemExit, match=f"{box['gguf'].name} here has sha256"):
+        run_tb(box, "p2", tb, "--pin", f"{box['gguf'].name}={'1' * 64}")
+    with pytest.raises(SystemExit, match="NAME=SHA256"):
+        run_tb(box, "p3", tb, "--pin", "step4000.gguf=abc")
+    assert not requests(box)                        # nothing was asked
+
+
+def test_a_build_that_doesnt_read_the_runtimes_variable_is_refused(box, card, tmp_path):  # noqa: F811
+    tb = lda_tarball(tmp_path, reads=False)
+    with pytest.raises(SystemExit, match="sets LOOKAHEAD_MOE_ROUTER_NORM, and this build .* "
+                                         "never reads it"):
+        run_tb(box, "nr", tb)
+    assert not requests(box)
+
+
+def test_a_tarball_for_other_cards_is_refused_before_it_loads(box, card, tmp_path):  # noqa: F811
+    tb = lda_tarball(tmp_path, archs="86-real;89-real")
+    with pytest.raises(SystemExit, match="built for CUDA architectures 86-real;89-real .* sm_120"):
+        run_tb(box, "ar", tb)
+    assert not requests(box)
+
+
+def test_plan_L_checks_the_card_first(monkeypatch, capsys):
+    ok = {"name": "NVIDIA GeForce RTX 5090", "names": ["NVIDIA GeForce RTX 5090"]}
+    pro = {"name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+           "names": ["NVIDIA RTX PRO 6000 Blackwell Server Edition"]}
+    assert fx.gpu_refused("L3", ok) == "" and fx.gpu_refused("L3", pro) == ""
+    assert "RTX 4090 — plan L runs on an RTX 5090 or an RTX PRO 6000 only" in fx.gpu_refused(
+        "L3", {"names": ["NVIDIA GeForce RTX 4090"]})
+    assert "H100" in fx.gpu_refused("L3", {"names": ["NVIDIA GeForce RTX 5090",
+                                                     "NVIDIA H100 80GB HBM3"]})
+    assert "no GPU could be read" in fx.gpu_refused("L3", {"name": None})
+    assert fx.gpu_refused("A3", {"names": ["NVIDIA GeForce RTX 4090"]}) == ""   # plan A: any
+    # the box line on another card: one line, before anything is fetched or run
+    import remote_bundle
+    monkeypatch.setattr(remote_bundle, "gpu_info", lambda: {"names": ["NVIDIA A100-SXM4-80GB"]})
+    monkeypatch.setattr(fx.subprocess, "run", lambda *a, **k: pytest.fail("a step ran"))
+    with pytest.raises(SystemExit) as e:
+        fx.main(["L3", "--as", STEP, "--gguf", "hf://me/p/step4000.gguf",
+                 "--server", "hf://me/p/llama-server-lda-a4a76a7.tar.gz"])
+    assert "this box has NVIDIA A100-SXM4-80GB — plan L runs on an RTX 5090 or an RTX PRO " \
+           "6000 only" in str(e.value.code)
+
+
+def test_the_build_script_takes_cmake_args_and_leaves_the_web_page_out(tmp_path):
+    import subprocess
+    import tarfile
+    from test_17c_board_six import CONTAINER
+    src = tmp_path / "llama.cpp"
+    src.mkdir()
+    (src / "CMakeLists.txt").write_text("project(x)\n")
+    git = ["git", "-C", str(src), "-c", "user.email=t@t", "-c", "user.name=t"]
+    subprocess.run([*git, "init", "-q"], check=True)
+    subprocess.run([*git, "add", "CMakeLists.txt"], check=True)
+    subprocess.run([*git, "commit", "-qm", "x"], check=True)
+    stub = tmp_path / "docker"
+    log = tmp_path / "docker.log"
+    stub.write_text(CONTAINER.replace("#!/bin/sh\n", f'#!/bin/sh\necho "$*" >> {log}\n', 1))
+    stub.chmod(0o755)
+
+    def build(**env) -> str:
+        out = tmp_path / "t.tar.gz"
+        r = subprocess.run(["bash", str(FIX.parents[1] / "scripts" / "build_llama_tarball.sh"),
+                            str(src), str(out)], capture_output=True, text=True,
+                           env={**os.environ, "DOCKER": str(stub), **env})
+        assert r.returncode == 0, r.stderr[-800:]
+        with tarfile.open(out) as tar:
+            return tar.extractfile("llama/VERSION").read().decode()
+    v = build(LLAMA_CUDA_ARCHS="120", LLAMA_CMAKE_ARGS="-DGGML_CUDA_FA_ALL_QUANTS=ON")
+    assert "cuda_archs 120" in v and "web_ui no" in v
+    assert "cmake_args -DLLAMA_BUILD_UI=OFF -DLLAMA_USE_PREBUILT_UI=OFF " \
+           "-DGGML_CUDA_FA_ALL_QUANTS=ON" in v
+    assert "EXTRA=-DLLAMA_BUILD_UI=OFF -DLLAMA_USE_PREBUILT_UI=OFF -DGGML_CUDA_FA_ALL_QUANTS=ON" \
+        in log.read_text()
+    v = build(LLAMA_WEB_UI="1")
+    assert "web_ui yes" in v and "cmake_args none" in v
+    script = (FIX.parents[1] / "scripts" / "build_llama_tarball.sh").read_text()
+    assert '-DCMAKE_CUDA_ARCHITECTURES="$ARCHS" $EXTRA >/dev/null' in script
+
+
+def test_a_plan_L_line_runs_the_runtime_from_the_tarball_its_files_pinned():
     a = fx.parser().parse_args(["L13", "--as", STEP,
                                 "--gguf", "hf://me/evalboard-private/step4000.gguf",
-                                "--server", "hf://me/evalboard-private/llama-server-lda-2610.tar.gz"])
+                                "--server", "hf://me/evalboard-private/"
+                                            "llama-server-lda-a4a76a7.tar.gz"])
     argv = fx.argv_of("L13", 1, fx.box_of("L13")[0], a)
     assert argv[argv.index("--runtime") + 1] == RT and "--server-dir" not in argv
-    assert argv[argv.index("--server") + 1].endswith("llama-server-lda-2610.tar.gz")
+    assert argv[argv.index("--server") + 1].endswith("llama-server-lda-a4a76a7.tar.gz")
     assert argv[argv.index("--flags") + 1] == ""
+    pins = [argv[k + 1] for k, x in enumerate(argv) if x == "--pin"]
+    assert pins == ["llama-server-lda-a4a76a7.tar.gz="
+                    "5b538290644d67139c6c996fdaa3e04cce82fd0b343cce66a4ff234648afb618",
+                    "step4000.gguf="
+                    "630c408a3836f82afa1f79629b06d9390d3f736f6140791baa42e180a640565e"]
+    # a file of another name (the Q4's) has no pin
+    a = fx.parser().parse_args(["L13", "--as", "served/Qwen3.6-35B-A3B-Q4-lda-2610",
+                                "--gguf", "hf://me/p/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf",
+                                "--server", "hf://me/p/llama-server-lda-a4a76a7.tar.gz"])
+    argv = fx.argv_of("L13", 1, fx.box_of("L13")[0], a)
+    assert [argv[k + 1].split("=")[0] for k, x in enumerate(argv) if x == "--pin"] == [
+        "llama-server-lda-a4a76a7.tar.gz"]
 
 
 def test_a_plan_L_line_runs_the_runtime_and_the_build_directory():

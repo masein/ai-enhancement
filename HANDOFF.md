@@ -4960,6 +4960,13 @@ Not before the demo: a new hidden set changes every Everyday score.
   repository, `--server hf://…` and `--gguf hf://…`, the bundles home through
   the fetch once 18d is deployed (`docs/REMOTE-RUNS.md` L0–L3). The upload
   and the box's own scores stay (L4), and `--server-dir` is the fallback (L5).
+- **The lda tarball** (`llama-server-lda-a4a76a7.tar.gz`, sm_120 alone, no web page)
+  and step4000's GGUF are pinned by sha256 in plan L (`frontier_box.PLAN_PINS`,
+  `remote_gguf.py --pin NAME=SHA256`); a plan L line checks the card first and
+  refuses anything but an RTX 5090 or an RTX PRO 6000 (`PLAN_GPUS`); a step refuses a
+  build that never reads its runtime's variable (`build_reads`) and a tarball
+  built for other cards (its VERSION's `cuda_archs`). `build_llama_tarball.sh`
+  takes `LLAMA_CMAKE_ARGS` and leaves the web page out unless `LLAMA_WEB_UI=1`.
 - **`remote_gguf.py --server-dir <dir>`**, in place of `--server`: a llama.cpp
   build directory on the box (the team's `lda` branch), its `bin/llama-server`
   run with its own folders on `LD_LIBRARY_PATH` and, when it carries no CUDA

@@ -21,11 +21,17 @@ Built with our script (in the evalboard repository) from your checkout of the
 the RTX 5090 and the RTX PRO 6000; its last line gives its size and sha256:
 
 ```bash
-scripts/build_llama_tarball.sh ~/llama.cpp-lda llama-server-lda-2610.tar.gz
+LLAMA_CUDA_ARCHS=120 scripts/build_llama_tarball.sh ~/llama.cpp-lda llama-server-lda-<commit>.tar.gz
 ```
 
-It stops, saying why, when git can't read the checkout or the build doesn't
-know its commit; changes not committed are recorded in its VERSION file.
+`LLAMA_CUDA_ARCHS=120`: the RTX 5090 and the RTX PRO 6000 alone, and a much
+smaller build. llama-server's web page is left out (the boxes ask its API;
+`LLAMA_WEB_UI=1` builds it), and `LLAMA_CMAKE_ARGS` takes more cmake
+arguments, as typed; VERSION records all three. It stops, saying why, when
+git can't read the checkout or the build doesn't know its commit; changes not
+committed are recorded in its VERSION file. (The first, 11 Oct:
+`llama-server-lda-a4a76a7.tar.gz`, from `teraformer/lda-2026-09-22` at
+`a4a76a751`.)
 
 ### Into the repository
 
@@ -33,7 +39,7 @@ With a token that can write to it (masein's repository: he uploads them, or
 gives you access):
 
 ```bash
-hf upload <masein>/evalboard-private llama-server-lda-2610.tar.gz llama-server-lda-2610.tar.gz
+hf upload <masein>/evalboard-private llama-server-lda-<commit>.tar.gz llama-server-lda-<commit>.tar.gz
 ```
 
 ```bash
