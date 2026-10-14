@@ -478,3 +478,12 @@ def test_the_worker_is_woken_after_scoring_and_import():
     imp = (ROOT / "scripts" / "import_frontier.py").read_text(encoding="utf-8")
     body = imp[imp.index("def import_bundle("):imp.index("def _earlier_row(")]
     assert "report_stats.wake_quietly()" in body
+
+
+def test_with_no_report_answers_stored_nothing_is_woken(svc, monkeypatch):
+    """an import or a scoring on a board with none of a report's answers
+    starts no worker: there is nothing to work out"""
+    monkeypatch.setattr(config, "REPORT_STATS_SPAWN", True)
+    started = []
+    monkeypatch.setattr(report_stats, "spawn", lambda: started.append(1))
+    assert report_stats.jobs() == [] and report_stats.wake() is False and started == []

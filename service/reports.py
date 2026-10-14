@@ -752,7 +752,8 @@ def jobs(rid: str, rep: dict) -> list:
                 out.append(rs.Job(_tok_slot(d, b["task"]), rs.identity(f),
                                   f"thinking tokens, {o['label']} · {b['label']}",
                                   lambda f=f: token_stats_of(f)))
-    if (rep.get("loops") or {}).get("examples"):
+    # the loop examples, once either model has answers stored
+    if (rep.get("loops") or {}).get("examples") and any(_loop_files(rep)[1:]):
         out.append(rs.Job("loops|" + rid, _loops_key(rep), f"loop examples, {rid}",
                           lambda: loops_of(rep)))
     return out
