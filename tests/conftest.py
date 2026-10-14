@@ -147,7 +147,10 @@ def make_service(root: Path, monkeypatch, *, llm_provider: str = "fake", tree: b
                       "EXAM_REPORT_MANIFEST": root / "no-exam-report-manifest.json",
                       # 16c: a test that sets a key and forgets the fake reaches nothing
                       # outside: the page asks the key's allowance in the background
-                      "OPENROUTER_BASE_URL": "http://127.0.0.1:9/api/v1"}.items():
+                      "OPENROUTER_BASE_URL": "http://127.0.0.1:9/api/v1",
+                      # 21c: the reports' stats worker is started by the tests that
+                      # mean to (the live server's start it as the board does)
+                      "REPORT_STATS_SPAWN": False}.items():
         monkeypatch.setattr(config, name, val)
     from service import ai_models
     ai_models._KEY.update(got=None, at=0.0, asking=False, why="")

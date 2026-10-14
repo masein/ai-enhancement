@@ -1062,6 +1062,10 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             _mark_where(row, t, *where_and_runs(row, t))
         for t in todo_shards:
             _mark_held(row, t)
+        # 21c: the reports' stats read the answers just imported: worked out
+        # again by a process of their own, never in this import's way
+        from service import report_stats
+        report_stats.wake_quietly()
     for x in lines:
         say(x)
     say(f"the row {model}{' · thinking' if on else ''}: {line}")

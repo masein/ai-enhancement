@@ -1693,6 +1693,51 @@ def reports_one(rid: str):
     return got
 
 
+# 21c: a report's page as it is — masein's published page, unchanged, in a
+# shell of ours, with its runtime, its theme and d3 from this server alone;
+# its four datasets live, from the tables 21's view reads
+@app.get("/api/reports/{rid}/datasets")
+def reports_page_info(rid: str):
+    from . import report_page
+    try:
+        return report_page.info(rid, results_payload())
+    except KeyError as e:
+        raise HTTPException(404, str(e).strip("'\"")) from None
+
+
+@app.get("/api/reports/{rid}/datasets/{did}")
+def reports_page_dataset(rid: str, did: str):
+    """one dataset, its rows as the page reads them; 202 while its stats are
+    being worked out for the first time"""
+    from . import report_page
+    try:
+        return report_page.dataset(rid, did, results_payload() if did != "others" else None)
+    except KeyError as e:
+        raise HTTPException(404, str(e).strip("'\"")) from None
+    except report_page.Working as e:
+        return JSONResponse({"working": True, "words": str(e)}, status_code=202)
+
+
+@app.get("/reports/static/{name}")
+def reports_page_asset(name: str):
+    from . import report_page
+    got = report_page.asset(name)
+    if got is None:
+        raise HTTPException(404, f"no {name!r} here")
+    return FileResponse(got[0], media_type=got[1],
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/reports/{rid}/page", response_class=HTMLResponse)
+def reports_page(rid: str):
+    from . import report_page
+    got = report_page.shell(rid)
+    if got is None:
+        raise HTTPException(404, f"no page for report {rid!r}")
+    return HTMLResponse(got, headers={"Content-Security-Policy": report_page.CSP,
+                                      "Cache-Control": "no-cache"})
+
+
 class ReportedImportIn(BaseModel):
     by: str = ""
 

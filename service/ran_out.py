@@ -16,13 +16,13 @@ board never shows (fb.unlisted: GPQA Diamond, as its authors ask; HLE, as its
 authors ask; MATH, its competitions' disputed copyright) stays withheld here
 too, with its right answer, and any line of the thinking that quotes it.
 
-Every number comes from the stored answers, worked out in a thread of their
-own and kept until a file they read changes. Nothing here starts a run, an
-import or a grading batch."""
+Every number comes from the stored answers, worked out by the stats worker
+(21c, service/report_stats.py) and kept: a page reads what is kept, and opens
+one answer at the place in its file the worker noted. Nothing here starts a
+run, an import or a grading batch."""
 
 from __future__ import annotations
 
-import json
 import re
 import statistics
 import sys
@@ -185,23 +185,14 @@ def first_right(task: str, item: dict | None, text: str) -> int | None:
 # the answers that ran out, a model's — kept until a file they read changes
 # ---------------------------------------------------------------------------
 
-def _runs(f: Path | None) -> dict[tuple[str, int], dict]:
-    """a samples file's runs, by (question, run): ok, ran out, read, text"""
-    out: dict = {}
-    if f is None:
-        return out
-    for line in f.read_text(encoding="utf-8", errors="replace").splitlines():
-        try:
-            row = json.loads(line)
-        except ValueError:
-            continue
-        qid = str((row.get("doc") or {}).get("id") or row.get("doc_id"))
-        resps = row.get("resps") or []
-        for k, run in enumerate(row.get("frontier") or []):
-            e = int(run.get("epoch", k) or 0)
-            out[(qid, e)] = {**run, "answer": (resps[k][0] if k < len(resps) and resps[k] else "")
-                             or "", "read": run.get("read")}
-    return out
+def _run(row: dict, k: int, run: dict) -> dict:
+    resps = row.get("resps") or []
+    return {**run, "answer": (resps[k][0] if k < len(resps) and resps[k] else "") or "",
+            "read": run.get("read")}
+
+
+def _qid(row: dict) -> str:
+    return str((row.get("doc") or {}).get("id") or row.get("doc_id"))
 
 
 def _items(task: str) -> dict[str, dict]:
@@ -216,57 +207,127 @@ def _subject(task: str, item: dict | None) -> str:
     return str(item.get("category") or item.get("subject") or "")
 
 
-def rows_of(rep: dict, label: str, task: str) -> dict:
-    """the answers `label` ran out of room on in one benchmark, each beside
-    the same question's run of the model it is compared with: {rows, answers,
-    hidden}. Kept until a samples file it read changes"""
-    from . import reports
+def _slot(rep: dict, label: str, task: str) -> str:
+    # the flag is part of the slot: a list kept for a report that shows the
+    # hidden half is never read for one that doesn't
+    return "|".join(["ranout", str(rep.get("id")), "all" if rep.get("show_hidden") is True
+                     else "shown", label, task])
+
+
+def _files(rep: dict, label: str, task: str) -> tuple[Path | None, Path | None]:
     by = {o["label"]: o for o in rep["ours"]}
     me = samples(by[label]["row"], task)
     other = samples(by[rep["against"]]["row"], task) if rep.get("against") in by else None
+    return me, other
+
+
+def _key(me: Path | None, other: Path | None, task: str) -> str:
+    """the files a list reads: the two models' answers and the questions"""
+    from . import report_stats as rs
+    from . import reports
+    return "|".join([rs.identity(me), rs.identity(other),
+                     rs.identity(reports.items_file(task))])
+
+
+def jobs(rep: dict) -> list:
+    """21c: a ran-out report's lists for the stats worker, a model's benchmark each"""
+    from . import report_stats as rs
+    out = []
+    for lbl in [o["label"] for o in rep["ours"] if o.get("pick")]:
+        for b in rep["benchmarks"]:
+            me, other = _files(rep, lbl, b["task"])
+            if me is not None:
+                out.append(rs.Job(_slot(rep, lbl, b["task"]), _key(me, other, b["task"]),
+                                  f"ran out, {lbl} · {b['label']}",
+                                  lambda lbl=lbl, t=b["task"]: work_out(rep, lbl, t)))
+    return out
+
+
+def rows_of(rep: dict, label: str, task: str) -> dict:
+    """the answers `label` ran out of room on in one benchmark, each beside
+    the same question's run of the model it is compared with: {rows, answers,
+    hidden} — worked out now unless kept for these very files"""
+    from . import report_stats as rs
+    me, other = _files(rep, label, task)
     if me is None:
         return {"rows": [], "answers": 0, "hidden": 0}
-    key = "|".join(["ranout", task, str(bool(rep.get("show_hidden") is True)),
-                    *(reports._key(f, "") if f else "-" for f in (me, other))])
-    got = reports._cache_get(key)
-    if got is not None:
+    key, slot = _key(me, other, task), _slot(rep, label, task)
+    e = rs.kept(slot)
+    if e and e.get("key") == key and "value" in e:
+        return _shown(rep, e["value"])
+    got = work_out(rep, label, task)
+    rs.keep(slot, key, got)
+    return _shown(rep, got)
+
+
+def _shown(rep: dict, got: dict) -> dict:
+    """belt and braces: a report without the flag never lists the hidden half"""
+    if rep.get("show_hidden") is True:
         return got
+    return {**got, "rows": [r for r in got["rows"] if r.get("half") != "hidden"]}
+
+
+def work_out(rep: dict, label: str, task: str) -> dict:
+    """rows_of, worked out: each samples file read a row at a time — the
+    answer's text kept only while its line is read — and where each answer's
+    line starts, so one is opened without reading the file again"""
+    from . import reports
     _scripts()
     import frontier as fb
+    me, other = _files(rep, label, task)
+    if me is None:
+        return {"rows": [], "answers": 0, "hidden": 0}
     items = _items(task)
-    mine, theirs = _runs(me), _runs(other)
     gone = withheld(task)
-    rows, hidden = [], 0
-    for (qid, e), r in sorted(mine.items(), key=lambda kv: (kv[0][0], kv[0][1])):
-        if not r.get("ran_out"):
-            continue
-        if not shows(rep, task, qid):
-            hidden += 1
-            continue
-        it = items.get(qid)
-        text = r["answer"]
-        line, n = top_line(text)
-        at = first_right(task, it, text)
-        tok = r.get("tokens") if isinstance(r.get("tokens"), int) else None
-        o = theirs.get((qid, e)) or theirs.get((qid, 0))
-        right = None if gone or not it else right_words(task, it)
-        rows.append({
-            "task": task, "id": qid, "epoch": e, "subject": _subject(task, it),
-            "half": "shown" if reports.shown_half(task, qid) else "hidden",
-            "q": None if gone or not it else str(it.get("question") or "")[:LIST_Q],
-            "withheld": gone, "right": right if right is None else str(right)[:LIST_Q],
-            "chars": len(text), "tokens": tok, "waits": waits(text),
-            "line": scrub(line, it)[:200] if gone else line[:200], "line_n": n,
-            "had": at is not None if task in ("mmlupro_tiger", "gpqa_diamond_epoch",
-                                              "math_l5_epoch", "otis_aime_epoch") else None,
-            "at_token": int(round(tok * at / len(text))) if at is not None and tok and text
-            else None,
-            "against": None if o is None else {
-                "ok": o.get("ok"), "ran_out": bool(o.get("ran_out")),
-                "chars": len(o.get("answer") or ""), "verdict": fb.verdict(task, o)}})
-    got = {"rows": rows, "answers": len(mine), "hidden": hidden}
-    reports._cache_put(key, got)
-    return got
+    seen: dict[tuple[str, int], object] = {}
+    for off, row in reports.jsonl(me):
+        qid = _qid(row)
+        for k, run in enumerate(row.get("frontier") or []):
+            e = int(run.get("epoch", k) or 0)
+            if not run.get("ran_out"):
+                seen[(qid, e)] = None
+                continue
+            if not shows(rep, task, qid):
+                seen[(qid, e)] = "hidden"
+                continue
+            r = _run(row, k, run)
+            it = items.get(qid)
+            text = r["answer"]
+            line, n = top_line(text)
+            at = first_right(task, it, text)
+            tok = r.get("tokens") if isinstance(r.get("tokens"), int) else None
+            right = None if gone or not it else right_words(task, it)
+            seen[(qid, e)] = {
+                "task": task, "id": qid, "epoch": e, "subject": _subject(task, it),
+                "half": "shown" if reports.shown_half(task, qid) else "hidden",
+                "q": None if gone or not it else str(it.get("question") or "")[:LIST_Q],
+                "withheld": gone, "right": right if right is None else str(right)[:LIST_Q],
+                "chars": len(text), "tokens": tok, "waits": waits(text),
+                "line": scrub(line, it)[:200] if gone else line[:200], "line_n": n,
+                "had": at is not None if task in ("mmlupro_tiger", "gpqa_diamond_epoch",
+                                                  "math_l5_epoch", "otis_aime_epoch") else None,
+                "at_token": int(round(tok * at / len(text))) if at is not None and tok and text
+                else None,
+                "against": None, "_at": [off, k]}
+    rows = [v for v in seen.values() if isinstance(v, dict)]
+    want = {r["id"] for r in rows}
+    theirs: dict[tuple[str, int], dict] = {}
+    if other is not None and want:
+        for off, row in reports.jsonl(other):
+            qid = _qid(row)
+            if qid not in want:
+                continue
+            for k, run in enumerate(row.get("frontier") or []):
+                o = _run(row, k, run)
+                theirs[(qid, int(run.get("epoch", k) or 0))] = {
+                    "ok": o.get("ok"), "ran_out": bool(o.get("ran_out")),
+                    "chars": len(o.get("answer") or ""), "verdict": fb.verdict(task, o),
+                    "_at": [off, k]}
+    for r in rows:
+        r["against"] = theirs.get((r["id"], r["epoch"])) or theirs.get((r["id"], 0))
+    rows.sort(key=lambda r: (r["id"], r["epoch"]))
+    return {"rows": rows, "answers": len(seen),
+            "hidden": sum(1 for v in seen.values() if v == "hidden")}
 
 
 def samples(mid: str, task: str) -> Path | None:
@@ -306,41 +367,74 @@ def summary(rep: dict, label: str, per: dict[str, dict]) -> list[dict]:
     return out
 
 
+def _public(r: dict) -> dict:
+    """a row as the page gets it: without where its answers sit in their files"""
+    out = {k: v for k, v in r.items() if not k.startswith("_")}
+    if isinstance(out.get("against"), dict):
+        out["against"] = {k: v for k, v in out["against"].items() if not k.startswith("_")}
+    return out
+
+
 def report(rep: dict, compute: bool = False) -> dict:
-    """the report: each picked model's summary and its list; worked out in a
-    thread of its own unless `compute`"""
+    """the report: each picked model's summary and its list — worked out now
+    with `compute`, else as the stats worker kept them"""
+    from . import report_stats as rs
     from . import reports
     picks = [o["label"] for o in rep["ours"] if o.get("pick")]
-    if not compute:
-        jobs = [(lbl, b["task"]) for lbl in picks for b in rep["benchmarks"]]
-        todo = [j for j in jobs if not _cached(rep, *j)]
-        work = reports.ensure_jobs([lambda j=j: rows_of(rep, *j) for j in todo]) if todo else {}
-    else:
-        work = {}
-    models = {}
+    models, ats = {}, []
     for lbl in picks:
-        per = {b["task"]: (rows_of(rep, lbl, b["task"]) if compute else _cached(rep, lbl, b["task"]))
-               for b in rep["benchmarks"]}
+        per = {}
+        for b in rep["benchmarks"]:
+            if compute:
+                rows_of(rep, lbl, b["task"])
+            per[b["task"]] = _cached(rep, lbl, b["task"])
+            e = rs.kept(_slot(rep, lbl, b["task"]))
+            if e and "value" in e:
+                ats.append(e["at"])
         models[lbl] = {"summary": summary(rep, lbl, {k: v for k, v in per.items() if v}),
-                       "rows": [r for v in per.values() if v for r in v["rows"]],
+                       "rows": [_public(r) for v in per.values() if v for r in v["rows"]],
                        "pending": [b["label"] for b in rep["benchmarks"] if not per[b["task"]]]}
     return {"id": rep["id"], "kind": "ran_out", "title": rep.get("title") or rep["id"],
             "what": rep.get("what") or "", "warning": WARNING, "howRead": HOW_READ,
             "insightOnly": True, "showHidden": rep.get("show_hidden") is True,
             "decided": rep.get("decided") or "", "picks": picks, "against": rep.get("against"),
-            "benchmarks": rep["benchmarks"], "models": models, "working": work}
+            "benchmarks": rep["benchmarks"], "models": models,
+            "working": {} if compute else rs.working(jobs(rep)),
+            "statsAt": reports.stats_at(ats)}
 
 
 def _cached(rep: dict, label: str, task: str) -> dict | None:
-    from . import reports
-    by = {o["label"]: o for o in rep["ours"]}
-    me = samples(by[label]["row"], task)
+    """the list as kept — shown until the new one is in when the answers
+    changed since; None when never worked out"""
+    from . import report_stats as rs
+    me, _ = _files(rep, label, task)
     if me is None:
         return {"rows": [], "answers": 0, "hidden": 0}
-    other = samples(by[rep["against"]]["row"], task) if rep.get("against") in by else None
-    key = "|".join(["ranout", task, str(bool(rep.get("show_hidden") is True)),
-                    *(reports._key(f, "") if f else "-" for f in (me, other))])
-    return reports._cache_get(key)
+    e = rs.kept(_slot(rep, label, task))
+    return _shown(rep, e["value"]) if e and "value" in e else None
+
+
+def _find(f: Path | None, qid: str, epoch: int, at: list | None) -> dict | None:
+    """one run of a question: at the place the worker noted when the file is
+    the one it read, else looked for, the lines holding the question's id
+    alone parsed"""
+    from . import reports
+    if f is None:
+        return None
+    if at:
+        row = reports.row_at(f, int(at[0]))
+        if row is not None and _qid(row) == str(qid):
+            runs = row.get("frontier") or []
+            k = int(at[1])
+            if k < len(runs):
+                return _run(row, k, runs[k])
+    for _, row in reports.jsonl(f, f'"{qid}"'.encode()):
+        if _qid(row) != str(qid):
+            continue
+        for k, run in enumerate(row.get("frontier") or []):
+            if int(run.get("epoch", k) or 0) == int(epoch):
+                return _run(row, k, run)
+    return None
 
 
 class Refused(PermissionError):
@@ -359,15 +453,23 @@ def one(rep: dict, label: str, task: str, qid: str, epoch: int) -> dict:
         raise KeyError("no such model or benchmark in this report")
     if not shows(rep, task, qid):
         raise Refused(f"question {qid} is in the hidden half: this report doesn't show it")
-    r = _runs(samples(by[label]["row"], task)).get((str(qid), int(epoch)))
+    from . import report_stats as rs
+    me, other = _files(rep, label, task)
+    # 21c: where the worker found it, when these are the files it read
+    e = rs.kept(_slot(rep, label, task))
+    fresh = e and e.get("key") == _key(me, other, task) and "value" in e
+    hit = next((x for x in e["value"]["rows"] if x["id"] == str(qid)
+                and x["epoch"] == int(epoch)), None) if fresh else None
+    r = _find(me, str(qid), int(epoch), (hit or {}).get("_at"))
     if r is None or not r.get("ran_out"):
         raise KeyError(f"{label} didn't run out of room on question {qid}, run {epoch}")
     it = _items(task).get(str(qid))
     gone = withheld(task)
     o = None
     if rep.get("against") in by:
-        theirs = _runs(samples(by[rep["against"]]["row"], task))
-        o = theirs.get((str(qid), int(epoch))) or theirs.get((str(qid), 0))
+        o = _find(other, str(qid), int(epoch), ((hit or {}).get("against") or {}).get("_at"))
+        if o is None and int(epoch):
+            o = _find(other, str(qid), 0, None)
     text = r["answer"]
     at = first_right(task, it, text)
     shown = fb.shown(task, it) if it and not gone else None

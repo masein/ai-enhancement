@@ -375,6 +375,11 @@ REPORTED_MAKERS = [m.strip() for m in os.environ.get("REPORTED_MAKERS",
                    if m.strip()]
 REPORTED_PER_MAKER = int(os.environ.get("REPORTED_PER_MAKER", "10"))
 REPORTED_DAILY = os.environ.get("REPORTED_DAILY", "1") == "1"
+# 21c: the reports' stats (thinking tokens, loop examples, ran-out lists) are
+# worked out by a process of their own (service/report_stats.py), started after
+# an import or a scoring and by a page that finds them stale. 0: never started
+# (the tests that don't mean to start it; `python -m service.report_stats` by hand)
+REPORT_STATS_SPAWN = os.environ.get("REPORT_STATS_SPAWN", "1") != "0"
 # 12n.1: the board's owner — the one name that may open an Everyday group's
 # hidden half (every opening logged) and edit a hidden question. Names are
 # typed, as everywhere on this board: the tailnet is the boundary
