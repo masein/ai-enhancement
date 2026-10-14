@@ -5591,7 +5591,8 @@ table.rp tr.rp-group td { background:var(--plane); font-weight:600; text-align:l
 .rp-cards a { overflow-wrap:anywhere; }
 @media (max-width:720px) {
   .rp-dots { grid-template-columns:minmax(0, 7rem) minmax(0, 1fr) 5.5rem; }
-  table.rp th:first-child, table.rp td:first-child { max-width:8.5rem; } }
+  table.rp th:first-child, table.rp td:first-child { max-width:8.5rem; }
+  table.rp td:first-child .rp-sub, table.rp td:first-child .rp-status { min-width:0; } }
 @media print { .filters, .tabs, button { display:none !important; }
   .view { display:block !important; } body { background:#fff; } }
 """

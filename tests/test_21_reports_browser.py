@@ -132,6 +132,9 @@ def test_the_list_and_the_report_open_and_the_picker_moves_the_tiles(live, page,
     assert ours.locator("[data-rp-status='step4000']").inner_text() == "Complete"
     assert "61.6 ± 3.1" in ours.locator("[data-rp-row='step4000']").inner_text()
     assert ours.locator("[data-rp-row='step1000'] td.dash").count() == 2
+    # a note under a name wraps inside its column, never cut at its edge
+    note = ours.locator("[data-rp-row='Q4, earlier run'] td").first
+    assert note.evaluate("e => e.scrollWidth <= e.clientWidth + 1")
     # sources, each with its own time; Epoch's credit
     fresh = page.locator("[data-report-fresh]").inner_text()
     assert "Our scores: as of the last import, " in fresh and "Epoch AI: imported " in fresh
