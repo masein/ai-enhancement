@@ -1,0 +1,67 @@
+{
+ "id": "ran-out-of-room",
+ "kind": "ran_out",
+ "title": "Where step4000 runs out of room",
+ "what": "Every answer where step4000 hit its token limit before it answered — and step1000, which runs out even more often: where the loop happens, what it looks like, and whether the model already had the right answer before it looped.",
+ "insight_only": true,
+ "show_hidden": true,
+ "decided": "masein, 14 Oct 2026",
+ "ours": [
+  {
+   "label": "step4000",
+   "row": "served/step4000-lda-2610 · thinking",
+   "colour": 0,
+   "pick": true
+  },
+  {
+   "label": "step1000",
+   "row": "served/step1000-lda-2610 · thinking",
+   "colour": 4,
+   "pick": true
+  },
+  {
+   "label": "Q4 (UD-Q4_K_XL)",
+   "row": "served/Qwen3.6-35B-A3B-Q4-lda-2610 · thinking",
+   "colour": 1,
+   "pick": false
+  }
+ ],
+ "against": "Q4 (UD-Q4_K_XL)",
+ "benchmarks": [
+  {
+   "key": "gpqa",
+   "task": "gpqa_diamond_epoch",
+   "label": "GPQA Diamond"
+  },
+  {
+   "key": "hle",
+   "task": "hle_text_cais",
+   "label": "HLE"
+  },
+  {
+   "key": "otis",
+   "task": "otis_aime_epoch",
+   "label": "OTIS Mock AIME"
+  },
+  {
+   "key": "math",
+   "task": "math_l5_epoch",
+   "label": "MATH Level 5"
+  },
+  {
+   "key": "mmlupro",
+   "task": "mmlupro_tiger",
+   "label": "MMLU-Pro"
+  },
+  {
+   "key": "simpleqa",
+   "task": "simpleqa_epoch",
+   "label": "SimpleQA Verified"
+  },
+  {
+   "key": "arc",
+   "task": "arc_agi2_public",
+   "label": "ARC-AGI-2"
+  }
+ ]
+}

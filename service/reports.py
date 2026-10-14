@@ -637,6 +637,12 @@ def ensure(rep: dict, rows: list[dict]) -> dict:
                 jobs.append(lambda d=d, t=b["task"]: token_stats(d, t))
     if any(x.get("pending") for x in loops(rep, rows, compute=False)):
         jobs.append(lambda: loops(rep, rows))
+    return ensure_jobs(jobs)
+
+
+def ensure_jobs(jobs: list) -> dict:
+    """21b: jobs worked out in the one thread the reports share — started when
+    none runs; {todo, done} while it runs"""
     th = _work["thread"]
     if jobs and not (th and th.is_alive()):
         _work.update(todo=len(jobs), done=0)
@@ -684,6 +690,19 @@ def report(rid: str, payload: dict | None = None, compute: bool = False) -> dict
         from . import app
         payload = app.results_payload()
     rows = our_rows(rep, payload.get("cells") or {})
+    if rep.get("kind") == "ran_out":
+        # 21b: the answers our models ran out of room on (service/ran_out.py),
+        # each benchmark's count beside the board's own
+        from . import ran_out
+        got = ran_out.report(rep, compute=compute)
+        board = {r["label"]: {b["key"]: r["cells"][b["key"]].get("ranOut")
+                              for b in rep["benchmarks"]} for r in rows}
+        for lbl, m in got["models"].items():
+            for x in m["summary"]:
+                x["board"] = board.get(lbl, {}).get(x["key"])
+        src = ours_changed(rows)
+        return {**got, "sources": {"ours": {"at": src, "words": f"as of the last import, "
+                                            f"{when(src)}" if src else "nothing imported yet"}}}
     theirs = their_rows(rep)
     work = {} if compute else ensure(rep, rows)
     stats = {r["label"]: {b["task"]: token_stats(Path(r["dir"]), b["task"], compute=compute)
@@ -707,7 +726,16 @@ def report(rid: str, payload: dict | None = None, compute: bool = False) -> dict
                   "against": (rep.get("loops") or {}).get("against"),
                   "examples": loops(rep, rows, compute=compute)},
         "working": work, "sources": _sources(rep, rows, theirs), "notes": NOTES,
-        "reference": rep.get("reference")}
+        "reference": rep.get("reference"),
+        # 21b: where a model's ran-out answers are listed, report by report
+        "ranOut": ran_out_links()}
+
+
+def ran_out_links() -> list[dict]:
+    """21b: each ran-out report and the models it lists — the scorecard's
+    ran-out chart and loop examples link to it"""
+    return [{"id": rid, "models": [o["label"] for o in rep["ours"] if o.get("pick")]}
+            for rid, rep in files().items() if rep.get("kind") == "ran_out"]
 
 
 def listing(payload: dict | None = None) -> list[dict]:
@@ -719,6 +747,13 @@ def listing(payload: dict | None = None) -> list[dict]:
     out = []
     for rid, rep in files().items():
         rows = our_rows(rep, payload.get("cells") or {})
+        if rep.get("kind") == "ran_out":
+            last = ours_changed(rows)
+            out.append({"id": rid, "title": rep.get("title") or rid, "what": rep.get("what") or "",
+                        "ours": [r["label"] for r in rows if r["pick"]], "others": 0,
+                        "against": rep.get("against"), "insight": True,
+                        "changed": when(last) if last else "", "changed_at": last})
+            continue
         src = _sources(rep, rows, their_rows(rep))
         last = max([x for x in (src["ours"]["at"], src["epoch"]["at"], src["cards"]["at"])
                     if x] or [0]) or None
