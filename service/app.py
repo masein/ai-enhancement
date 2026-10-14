@@ -1667,6 +1667,23 @@ def reports_list():
     return {"reports": reports.listing(results_payload())}
 
 
+@app.get("/api/reports/{rid}/answer")
+def reports_answer(rid: str, model: str, task: str, id: str, epoch: int = 0):
+    """21b: one answer of a ran-out report, opened — its thinking in full, read
+    only now (they run to 80,000 tokens); a question the report doesn't show
+    is refused"""
+    from . import ran_out, reports
+    rep = reports.files().get(rid)
+    if rep is None or rep.get("kind") != "ran_out":
+        raise HTTPException(404, f"no report {rid!r} of answers that ran out")
+    try:
+        return ran_out.one(rep, model, task, id, epoch)
+    except ran_out.Refused as e:
+        raise HTTPException(403, str(e)) from None
+    except KeyError as e:
+        raise HTTPException(404, str(e).strip("'\"")) from None
+
+
 @app.get("/api/reports/{rid}")
 def reports_one(rid: str):
     from . import reports

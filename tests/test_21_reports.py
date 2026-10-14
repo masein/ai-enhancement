@@ -379,9 +379,10 @@ def test_the_endpoints_read_and_start_nothing(svc, monkeypatch):
         raise AssertionError("a report starts nothing")
     monkeypatch.setattr(db, "add", no)
     monkeypatch.setattr(reported, "import_epoch", no)
-    got = svc.get("/api/reports").json()["reports"]
-    assert [r["id"] for r in got] == ["step-checkpoints"]
-    assert got[0]["ours"][0] == "step4000" and got[0]["others"] == 41
+    got = {r["id"]: r for r in svc.get("/api/reports").json()["reports"]}
+    assert sorted(got) == ["ran-out-of-room", "step-checkpoints"]          # 21b: a second
+    sc = got["step-checkpoints"]
+    assert sc["ours"][0] == "step4000" and sc["others"] == 41
     r = svc.get("/api/reports/step-checkpoints").json()
     assert r["picks"][0] == "step4000" and "Q4, earlier run" not in r["picks"]
     assert r["sources"]["epoch"]["words"].startswith("imported ")

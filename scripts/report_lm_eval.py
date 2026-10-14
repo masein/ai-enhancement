@@ -5596,6 +5596,40 @@ table.rp tr.rp-group td { background:var(--plane); font-weight:600; text-align:l
   .rp-dots { grid-template-columns:minmax(0, 7rem) minmax(0, 1fr) 5.5rem; }
   table.rp th:first-child, table.rp td:first-child { max-width:8.5rem; }
   table.rp td:first-child .rp-sub, table.rp td:first-child .rp-status { min-width:0; } }
+/* ---- 21b: the report of answers that ran out — insight only ---- */
+.ro-warn { border:1px solid var(--warning); background:color-mix(in srgb, var(--warning) 12%,
+  var(--surface-1)); color:var(--text-primary); border-radius:var(--r-1); padding:var(--sp-2)
+  var(--sp-3); margin:var(--sp-3) 0; font-size:var(--fs-2); line-height:1.45; }
+.ro-warn b { font-weight:700; }
+.ro-badge { margin-left:8px; font-size:var(--fs-1); vertical-align:middle;
+  border:1px solid var(--warning); color:var(--warning-text); border-radius:999px;
+  padding:1px 8px; font-weight:600; }
+.ro-filters { display:flex; flex-wrap:wrap; gap:8px 16px; margin:var(--sp-2) 0; }
+.ro-filters select { max-width:100%; }
+.ro-rows { display:grid; gap:6px; }
+.ro-row { display:grid; grid-template-columns:minmax(0, 3fr) minmax(0, 2fr); gap:6px 16px;
+  padding:var(--sp-2) var(--sp-3); border:1px solid var(--border); border-radius:var(--r-1);
+  cursor:pointer; min-width:0; }
+.ro-row:hover, .ro-row:focus-visible { border-color:var(--accent); }
+.ro-qline, .ro-facts { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.ro-qtext { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+  overflow:hidden; overflow-wrap:anywhere; }
+.ro-line { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ro-subjects { display:grid; gap:var(--sp-3); margin-top:var(--sp-3);
+  grid-template-columns:repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
+.ro-subjects h3 { font-size:var(--fs-2); margin:0 0 4px; }
+.ro-subj { columns:2; column-gap:var(--sp-4); padding-left:1rem; margin:0; font-size:var(--fs-1); }
+.ro-think { white-space:pre-wrap; overflow-wrap:anywhere; font-family:var(--font-mono);
+  font-size:var(--fs-1); background:var(--plane); border-radius:var(--r-1); padding:var(--sp-3);
+  max-height:70vh; overflow:auto; margin:var(--sp-2) 0 0; }
+.ro-q p { overflow-wrap:anywhere; }
+.ro-opts { font-size:var(--fs-2); padding-left:1.4rem; }
+mark.ro-rep { background:color-mix(in srgb, var(--warning) 22%, transparent); color:inherit; }
+mark.ro-first { background:color-mix(in srgb, var(--good) 30%, transparent); color:inherit;
+  outline:1px solid var(--good); }
+.ro-legend { display:flex; gap:8px; margin-top:var(--sp-2); }
+@media (max-width:720px) { .ro-row { grid-template-columns:minmax(0, 1fr); }
+  .ro-subj { columns:1; } }
 @media print { .filters, .tabs, button { display:none !important; }
   .view { display:block !important; } body { background:#fff; } }
 """
@@ -10522,8 +10556,14 @@ function viewHash(v) {
   // 12d.1: the chat open, so a reload lands on it
   if (v === 'playground') return 'tab=playground' + (state.pg.id ? '&chat=' + state.pg.id : '');
   // 21: a report, so a reload and a link land on it
-  if (v === 'reports') return 'tab=reports' + (RPS().id ? '&report='
-    + encodeURIComponent(RPS().id) : '');
+  if (v === 'reports') {
+    const R = RPS(), ro = R.id && R.ro && R.ro[R.id];
+    // 21b: a ran-out report's model, benchmark and opened question
+    return 'tab=reports' + (R.id ? '&report=' + encodeURIComponent(R.id) : '')
+      + (ro && ro.pick ? '&model=' + encodeURIComponent(ro.pick) : '')
+      + (ro && ro.bench ? '&bench=' + encodeURIComponent(ro.bench) : '')
+      + (ro && ro.open ? '&open=' + encodeURIComponent(ro.open) : '');
+  }
   // 18: an agent run's page, and a task's, so a reload and a link land on it
   if (v === 'queue' && (state.agentView || {}).key)
     return 'tab=runs&agent=' + encodeURIComponent(state.agentView.key)
@@ -10568,7 +10608,14 @@ function viewOfHash(name, params) {
             submit: 'queue', data: 'provenance', provenance: 'provenance', help: 'help',
             tasks: 'tasks', exam: 'exam', everyday: 'everyday', ai: 'ai', build: 'build',
             playground: 'playground', reports: 'reports' }[n];
-  if (n === 'reports') RPS().id = p.get('report') || null;
+  if (n === 'reports') {
+    RPS().id = p.get('report') || null;
+    if (RPS().id && (p.get('model') || p.get('bench') || p.get('open') || (RPS().ro || {})[RPS().id])) {
+      const S = roState(RPS().id);
+      Object.assign(S, { pick: p.get('model') || S.pick, bench: p.get('bench') || '',
+        open: p.get('open') || null });
+    }
+  }
   if (n === 'ai') state.ai.mark = p.get('sub') === 'mark';
   // 18: an agent run's page (#tab=runs&agent=<run>), a task's (&task=<id>)
   if (n === 'runs' || n === 'queue') {
@@ -10732,7 +10779,8 @@ window.addEventListener('hashchange', () => {
 try { history.scrollRestoration = 'manual'; } catch (e) { /* an old browser */ }
 const viewKey = () => state.model ? 'model:' + state.model
   : state.topic ? 'topic:' + state.topic : 'tab:' + state.tab
-    + (state.tab === 'reports' ? ':' + (RPS().id || '') : '');
+    + (state.tab === 'reports' ? ':' + (RPS().id || '') + ':'
+      + (((RPS().ro || {})[RPS().id] || {}).open || '') : '');
 let _lastView = null, _restore = null, _navigated = false, _saveT = null;
 function saveScroll() {
   try { history.replaceState({ ...(history.state || {}), y: Math.round(scrollY) }, ''); }
@@ -27182,7 +27230,8 @@ function vReports() {
         class: 'rp-cardlink', href: '#tab=reports&report=' + encodeURIComponent(r.id),
         'data-report-card': r.id,
         onclick: e => { e.preventDefault(); rpOpen(r.id); } },
-      el('h3', { text: r.title }),
+      el('h3', {}, r.title, r.insight ? el('span', { class: 'badge ro-badge',
+        'data-report-insight': r.id, text: 'Insight only' }) : ''),
       el('p', { text: r.what }),
       el('p', { class: 'small', 'data-report-models': r.id,
         text: 'Ours: ' + r.ours.join(', ') + (r.others ? ` · against ${r.others} other models`
@@ -27275,6 +27324,8 @@ function vReport(id) {
   if (!d) return [back, el('div', { class: 'card' },
     R.err ? el('p', { class: 'warn', text: 'The report couldn’t be read: ' + R.err })
       : skeleton(6, { 'data-loading': 'report' }))];
+  // 21b: a report of the answers that ran out of room
+  if (d.kind === 'ran_out') return vRanOut(id, d, back);
   const benches = d.benchmarks, compared = benches.filter(b => b.compare);
   const pick = R.pick[id] && d.picks.includes(R.pick[id]) ? R.pick[id] : d.picks[0];
   const st = d.standing[pick];
@@ -27377,9 +27428,16 @@ function vReport(id) {
         ...benches.map(b => el('th', { text: b.label })))),
       el('tbody', {}, d.ours.map(m => el('tr', {}, rpName(m), ...benches.map(b => {
         const c = m.cells[b.key];
+        // 21b: a model's ran-out answers are listed in a report of their own
+        const to = (d.ranOut || []).find(x => x.models.includes(m.label));
+        const pct = c && c.answers ? (100 * (c.ranOut || 0) / c.answers).toFixed(1) + '%' : '';
         return c && c.v != null && c.answers ? el('td', { class: 'num',
-            title: `${c.ranOut || 0} of ${c.answers}`,
-            text: (100 * (c.ranOut || 0) / c.answers).toFixed(1) + '%' })
+            title: `${c.ranOut || 0} of ${c.answers}` },
+            to && c.ranOut ? el('a', { href: `#tab=reports&report=${encodeURIComponent(to.id)}`
+                + `&model=${encodeURIComponent(m.label)}&bench=${b.key}`,
+              'data-ro-link': `${m.label}|${b.key}`, text: pct,
+              onclick: e => { e.preventDefault(); Object.assign(roState(to.id), { pick: m.label,
+                bench: b.key, subject: '', open: null }); rpOpen(to.id); } }) : pct)
           : el('td', { class: 'dash', text: '—' });
       })))))));
   // 4. thinking tokens
@@ -27434,6 +27492,17 @@ function vReport(id) {
         'data-rp-loop': x.id },
       el('h3', { text: 'Question ' + x.id }),
       el('p', { text: x.note }),
+      // 21b: the whole answer, in the report of answers that ran out
+      (() => {
+        const to = (d.ranOut || []).find(r => r.models.includes(L.first));
+        const key = `${L.task}:${x.id}:0`;
+        return to && !x.refused ? el('p', { class: 'small' }, el('a', {
+          href: `#tab=reports&report=${encodeURIComponent(to.id)}&model=`
+            + `${encodeURIComponent(L.first)}&open=${encodeURIComponent(key)}`,
+          'data-ro-open-link': x.id, text: 'Read the whole answer ▸',
+          onclick: e => { e.preventDefault(); Object.assign(roState(to.id), { pick: L.first,
+            bench: '', subject: '', open: key }); rpOpen(to.id); } })) : '';
+      })(),
       x.refused ? el('p', { class: 'warn', 'data-rp-refused': x.id, text: x.refused })
         : x.pending ? el('p', { class: 'small se', text: 'Worked out from the stored answers…' })
         : [x.against ? el('p', { class: 'small', text: `${L.against}: `
@@ -27479,6 +27548,202 @@ function vReport(id) {
       : '');
   return [back, head, ours, stand, byBench, tok, loops, every, notes];
 }
+// ---------------------------------------------------------------------------
+// 21b: a report of the answers our models ran out of room on — for insight
+// only, never for training: the warning stands above the report and above
+// every question, and can't be closed. No export: one question at a time
+// ---------------------------------------------------------------------------
+function roWarn(text) {
+  const cut = text.indexOf('. ');
+  return el('div', { class: 'ro-warn', role: 'note', 'data-ro-warning': '1' },
+    el('b', { text: text.slice(0, cut + 1) }), ' ' + text.slice(cut + 2));
+}
+const roKey = r => `${r.task}:${r.id}:${r.epoch}`;
+const roN = v => v == null ? '—' : Number(v).toLocaleString('en');
+function roState(id) {
+  const R = RPS();
+  R.ro = R.ro || {};
+  return (R.ro[id] = R.ro[id] || { pick: null, bench: '', subject: '', sort: 'chars', open: null,
+    ans: {}, asked: {}, err: {} });
+}
+async function roLoad(id, d, pick, key) {
+  const S = roState(id);
+  if (S.asked[key]) return;
+  S.asked[key] = true;
+  const [task, qid, epoch] = key.split(':');
+  try {
+    S.ans[key] = await api(`api/reports/${encodeURIComponent(id)}/answer?model=`
+      + `${encodeURIComponent(pick)}&task=${encodeURIComponent(task)}&id=${encodeURIComponent(qid)}`
+      + `&epoch=${encodeURIComponent(epoch)}`);
+    S.err[key] = '';
+  } catch (e) { S.err[key] = e.message; }
+  S.asked[key] = false;
+  if (state.tab === 'reports') render();
+}
+function roOpen(id, key) {
+  const S = roState(id);
+  S.open = key;
+  navigate({ tab: 'reports', model: null, topic: null });
+}
+// the thinking in full: its repeated lines marked, and where the right
+// answer first came
+function roThinking(a) {
+  const rep = new Set(a.repeated || []);
+  const pre = el('pre', { class: 'ro-think', 'data-ro-thinking': '1' });
+  let at = 0;
+  const mark = a.first_right;
+  for (const line of a.thinking.split('\n')) {
+    const end = at + line.length + 1;
+    if (mark != null && mark >= at && mark < end) {
+      const k = mark - at;
+      pre.append(line.slice(0, k), el('mark', { class: 'ro-first', 'data-ro-first': '1',
+        title: 'the right answer, first stated here' + (a.first_right_token != null
+          ? ` (about token ${roN(a.first_right_token)})` : '') }, line.slice(k) || ' '), '\n');
+    } else if (rep.has(line.trim())) {
+      pre.append(el('mark', { class: 'ro-rep', title: 'a line it repeated' }, line), '\n');
+    } else pre.append(line + '\n');
+    at = end;
+  }
+  return pre;
+}
+function roOpened(id, d, pick, key) {
+  const S = roState(id), a = S.ans[key];
+  if (!a && !S.err[key] && netReady()) roLoad(id, d, pick, key);
+  const back = el('a', { class: 'small backlink', href: '#', 'data-ro-back': '1',
+    text: '← The list', onclick: e => { e.preventDefault(); S.open = null;
+      navigate({ tab: 'reports', model: null, topic: null }); } });
+  if (S.err[key]) return el('div', { class: 'card', 'data-ro-open': key }, back,
+    roWarn(d.warning), el('p', { class: 'warn', 'data-ro-refused': '1', text: S.err[key] }));
+  if (!a) return el('div', { class: 'card', 'data-ro-open': key }, back, roWarn(d.warning),
+    skeleton(6, { 'data-loading': 'ro-answer' }));
+  const label = (d.benchmarks.find(b => b.task === a.task) || {}).label || a.task;
+  return el('div', { class: 'card', 'data-ro-open': key }, back,
+    roWarn(a.warning),
+    el('h2', { text: `${label} · question ${a.id}` + (a.epoch ? `, run ${a.epoch + 1}` : '') }),
+    a.subject ? el('p', { class: 'small se', text: a.subject }) : '',
+    a.withheld ? el('p', { class: 'small', 'data-ro-withheld': '1', text: 'Question text '
+        + 'withheld: ' + a.withheld + '. Its thinking is shown with each line that quotes it '
+        + 'withheld.' })
+      : a.question ? el('div', { class: 'ro-q', 'data-ro-question': '1' },
+        el('p', { text: a.question.q }),
+        a.question.options.length ? el('ol', { class: 'ro-opts', type: 'A' },
+          a.question.options.map(o => el('li', { text: String(o) }))) : '') : '',
+    a.right ? el('p', { class: 'small', 'data-ro-right': '1', text: 'Right answer: '
+      + (a.right.letter ? `(${a.right.letter}) ${a.right.text}` : a.right.answer) }) : '',
+    a.against ? el('details', { class: 'ro-against' },
+      el('summary', { text: `${a.against.label}: ${a.against.verdict} · `
+        + `${roN(a.against.chars)} characters` }),
+      el('pre', { class: 'ro-think', text: a.against.answer || '(nothing after its thinking)' }))
+      : '',
+    el('p', { class: 'small', 'data-ro-stats': '1', text: `${pick}: ${roN(a.chars)} characters`
+      + (a.tokens != null ? `, ${roN(a.tokens)} tokens` : '') + `, “Wait” ${a.waits} times · `
+      + (a.had ? 'had the right answer before it ran out'
+        + (a.first_right_token != null ? `, first at about token ${roN(a.first_right_token)}`
+          : '') : 'never stated the right answer clearly') }),
+    el('div', { class: 'ro-legend small se' },
+      el('mark', { class: 'ro-rep', text: 'a line it repeated' }), ' ',
+      el('mark', { class: 'ro-first', text: 'the right answer, first stated' })),
+    roThinking(a));
+}
+function vRanOut(id, d, back) {
+  const S = roState(id);
+  const pick = S.pick && d.picks.includes(S.pick) ? S.pick : d.picks[0];
+  const m = d.models[pick] || { summary: [], rows: [], pending: [] };
+  const head = el('div', { class: 'card', 'data-report': id },
+    el('h2', {}, d.title, ' ', el('span', { class: 'badge ro-badge', text: 'Insight only' })),
+    el('p', { class: 'sub', text: d.what }),
+    roWarn(d.warning),
+    d.showHidden ? el('p', { class: 'small se', 'data-ro-both-halves': '1', text: 'Both halves: '
+      + `${d.decided} decided that this report shows every answer that ran out, the hidden `
+      + 'half’s too. The rest of the board stays blind to the hidden half.' }) : '',
+    el('div', { class: 'rp-fresh' }, el('span', { text: 'Our answers: '
+      + ((d.sources || {}).ours || {}).words }), el('span', { text: `Compared with ${d.against} `
+      + 'on the same questions' })),
+    el('div', { class: 'rp-picker', role: 'radiogroup', 'aria-label': 'our model',
+        'data-ro-picker': '1' },
+      d.picks.map(p => el('button', { class: 'chip-btn' + (p === pick ? ' on' : ''),
+        role: 'radio', 'aria-checked': String(p === pick), 'data-ro-pick': p, text: p,
+        onclick: () => { S.pick = p; S.open = null; render(); } }))));
+  if (S.open) return [back, head, roOpened(id, d, pick, S.open)];
+  // the top: a benchmark a line
+  const top = el('div', { class: 'card', 'data-ro-top': '1' },
+    el('h2', { text: `By benchmark: ${pick}` }),
+    d.working && d.working.todo ? el('p', { class: 'small se', 'data-rp-working': '1',
+      text: `Worked out from the stored answers: ${d.working.done} of ${d.working.todo} done…` })
+      : '',
+    el('div', { class: 'rp-scroll' }, el('table', { class: 'rp', 'data-ro-summary': '1' },
+      el('thead', {}, el('tr', {}, ['Benchmark', 'Ran out', `${d.against}: right`, 'wrong',
+        'also ran out', 'Had the right answer', 'Median “Wait”', 'Top line, median']
+        .map(h => el('th', { text: h })))),
+      el('tbody', {}, m.summary.map(x => el('tr', { 'data-ro-bench': x.key },
+        el('td', {}, x.label, el('span', { class: 'rp-sub', text: x.hidden && !d.showHidden
+          ? `${x.hidden} in the hidden half, not shown` : '' })),
+        el('td', { class: 'num', title: x.board != null ? `the board counts ${x.board}` : '',
+          text: x.n ? `${roN(x.n)} (${(100 * x.share).toFixed(1)}%)` : '0' }),
+        el('td', { class: 'num', text: roN(x.against.right) }),
+        el('td', { class: 'num', text: roN(x.against.wrong) }),
+        el('td', { class: 'num', text: roN(x.against.ran_out) }),
+        el('td', { class: 'num', text: x.had == null ? 'not read'
+          : `${roN(x.had)} of ${roN(x.read)}` + (x.had_token != null
+            ? ` · token ${roN(x.had_token)}` : '') }),
+        el('td', { class: 'num', text: x.waits == null ? '—' : String(x.waits) }),
+        el('td', { class: 'num', text: x.line_n == null ? '—' : String(x.line_n) })))))),
+    el('p', { class: 'small se', 'data-ro-how': '1', text: d.howRead }),
+    m.pending.length ? el('p', { class: 'small se', text: 'Still being worked out: '
+      + m.pending.join(', ') }) : '',
+    el('div', { class: 'ro-subjects' }, m.summary.filter(x => x.subjects.length).map(x =>
+      el('div', { 'data-ro-subjects': x.key },
+        el('h3', { text: x.label + (x.key === 'hle' ? ' by category' : ' by subject') }),
+        el('ul', { class: 'ro-subj' }, x.subjects.map(s => el('li', {},
+          el('a', { href: '#', text: s.subject, onclick: e => { e.preventDefault();
+            S.bench = x.key; S.subject = s.subject; render(); } }), ` ${s.n}`)))))));
+  // the list
+  const benches = d.benchmarks.filter(b => m.summary.some(x => x.key === b.key && x.listed));
+  const bt = (d.benchmarks.find(b => b.key === S.bench) || {}).task;
+  const pool = m.rows.filter(r => !bt || r.task === bt);
+  const subjects = [...new Set(pool.map(r => r.subject).filter(Boolean))].sort();
+  if (S.subject && !subjects.includes(S.subject)) S.subject = '';
+  const rows = pool.filter(r => !S.subject || r.subject === S.subject)
+    .sort((p, q) => S.sort === 'waits' ? q.waits - p.waits : q.chars - p.chars);
+  const sel = (attr, value, opts, on) => el('select', { [attr]: '1', onchange: e => on(e.target.value) },
+    opts.map(([v, t]) => el('option', { value: v, text: t, ...(v === value ? { selected: '' } : {}) })));
+  const list = el('div', { class: 'card', 'data-ro-list': '1' },
+    el('h2', { text: 'Every answer that ran out' }),
+    roWarn(d.warning),
+    el('div', { class: 'ro-filters' },
+      el('label', { class: 'small' }, 'Benchmark ', sel('data-ro-filter-bench', S.bench,
+        [['', 'All'], ...benches.map(b => [b.key, b.label])], v => { S.bench = v; S.subject = '';
+          render(); })),
+      el('label', { class: 'small' }, 'Subject ', sel('data-ro-filter-subject', S.subject,
+        [['', 'All'], ...subjects.map(s => [s, s])], v => { S.subject = v; render(); })),
+      el('label', { class: 'small' }, 'Sort ', sel('data-ro-sort', S.sort,
+        [['chars', 'Longest first'], ['waits', 'Most “Wait” first']],
+        v => { S.sort = v; render(); }))),
+    el('p', { class: 'small se', 'data-ro-count': '1', text: `${rows.length} of ${m.rows.length}`
+      + ' answers' }),
+    el('div', { class: 'ro-rows' }, rows.slice(0, 300).map(r => el('div', { class: 'ro-row',
+        'data-ro-row': roKey(r), onclick: () => roOpen(id, roKey(r)) },
+      el('div', { class: 'ro-qline' },
+        el('span', { class: 'small se', text: `${(d.benchmarks.find(b => b.task === r.task)
+          || {}).label} · ${r.id}${r.subject ? ' · ' + r.subject : ''}`
+          + (r.half === 'hidden' ? ' · hidden half' : '') }),
+        r.q != null ? el('span', { class: 'ro-qtext', text: r.q })
+          : el('span', { class: 'ro-qtext se', text: 'Question text withheld' }),
+        r.right ? el('span', { class: 'small', text: 'Right: ' + r.right }) : ''),
+      el('div', { class: 'ro-facts small' },
+        el('span', { text: r.against ? `${d.against}: ${r.against.verdict}, `
+          + `${roN(r.against.chars)} chars` : `${d.against}: no answer stored` }),
+        el('span', { text: `${pick}: ${roN(r.chars)} chars, “Wait” ${r.waits}×` }),
+        r.line ? el('span', { class: 'ro-line', title: r.line,
+          text: `×${r.line_n} “${r.line}”` }) : '',
+        el('span', { 'data-ro-had': String(r.had), text: r.had == null ? 'right answer: not read'
+          : r.had ? `had the right answer` + (r.at_token != null ? ` at token ${roN(r.at_token)}`
+            : '') : 'never stated the right answer' }))))),
+    rows.length > 300 ? el('p', { class: 'small se', text: `The first 300 of ${rows.length}: `
+      + 'choose a benchmark or a subject for the rest.' }) : '');
+  return [back, head, top, list];
+}
+
 function benchLabel(benches, task) {
   return (benches.find(b => b.task === task) || { label: task }).label;
 }
