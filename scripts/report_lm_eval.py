@@ -3679,8 +3679,11 @@ input[type=search]:focus { outline:2px solid var(--accent-soft); border-color:va
   align-self:stretch; align-items:stretch; flex:1 1 auto; min-width:0; }
 .tabs::-webkit-scrollbar { display:none; }
 .tabs .morewrap { display:flex; align-items:stretch; }
-.tabs button { border:0; background:none; border-radius:0; padding:8px 13px;
+/* 21: six places — each a little narrower, so the strip never scrolls at
+   1280px and up */
+.tabs button { border:0; background:none; border-radius:0; padding:8px 8px;
   color:var(--text-secondary); white-space:nowrap; }
+@media (max-width:1366px) { .tabs { gap:0; } .tabs button { padding:8px 6px; } }
 .tabs button:hover { color:var(--text-primary); }
 .tabs button[aria-selected="true"] { color:var(--text-primary); font-weight:600; }
 .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }

@@ -186,6 +186,9 @@ COPY eval_tasks/mobile_mmlu/ eval_tasks/mobile_mmlu/
 # 12q: DeviceMark's battery (ids only), its source ids and its prompts —
 # devicemark.load_items reads the questions for them from the pinned datasets
 COPY eval_tasks/devicemark/ eval_tasks/devicemark/
+# 21: the reports (one file each): the Reports place reads them, and the
+# daily Epoch import keeps every version they name
+COPY eval_tasks/reports/ eval_tasks/reports/
 COPY FRIENDS.md ./
 
 # the same check the service runs at startup, at BUILD time: an image missing
