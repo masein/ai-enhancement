@@ -233,9 +233,9 @@ def test_model_topic_and_reader_addresses_are_unchanged(live, page):
 def test_the_header_holds_four_places_and_no_more_menu(live, page):
     home(page, live["base"])
     tabs = page.locator("#tabs [role=tab]")
-    # 12d.1: Playground, between Models and Improve
+    # 12d.1: Playground, between Models and Improve. 21: Reports, after Benchmarks
     assert [t.text_content() for t in tabs.all()] == ["Home", "Models", "Playground", "Improve",
-                                                      "Benchmarks"]
+                                                      "Benchmarks", "Reports"]
     assert page.locator("#moreBtn, [data-tab='more'], #barMore, #themeBtn").count() == 0
     bar = page.locator("#bar")
     assert bar.locator("button.primary").count() == 1

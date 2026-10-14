@@ -1,0 +1,30 @@
+Model version,Accuracy,Release date,Organization,Country,Training compute (FLOP),Training compute notes,Name,Accuracy Standard Error,Calibration Error,Notes,id
+gpt-6-astra_unknown,0.5479999999999999,2026-09-03,OpenAI,United States of America,1.0001e+27,"per OpenAI and affiliates (e.g. Nvidia), 6 Astra was trained on at least 100,000 GB200s in Abilene, Texas (so 100,000 in ""Hardware quantity"" is a lower bound/underestimate).
+
+This suggests around 1e27 FLOP (corresponding to ~100k GB200s over 90 days at 25% FP8 MFU). See more detailed estimate in this notebook, yielding a CI of ~[5e26, 2e27] FLOP.
+https://colab.research.google.com/drive/1DRlugIQs-_zoV66AJT1gQg6I1-NX7NqN ",GPT 6 Astra,0.0194,39.0,,recbv6dU38s3cvqyO
+gemini-3.8-flash_unknown,0.44520000000000004,2026-09-02,Google DeepMind,United States of America,,,Gemini 3.8 Flash,0.0196,51.0,,recIqVer2D18rE192
+gpt-5-mini-2025-08-07_unknown,0.19440000000000002,2025-08-07,OpenAI,United States of America,,,gpt-5-mini-2025-08-07,0.015500000000000002,65.0,,reczvkyjanol6Vn9f
+o4-mini-2025-04-16_high,0.1808,2025-04-16,OpenAI,United States of America,,"We can’t make a precise estimate, but seems unlikely to exceed 10^25 FLOP. We think active parameter count is 10-30B. This would require >55T tokens to reach 10^25 FLOP at the large size, i.e. well beyond 10x overtraining relative to Chinchilla.",o4-mini (high) (April 2025),0.0151,57.0,,recGUVrntyz0xRSWS
+gemini-2.5-flash-preview-04-17,0.1208,2025-04-17,Google DeepMind,United States of America,,,Gemini 2.5 Flash (April 2025),0.0128,80.0,,recLRKaQqj6097BJl
+gemini-3.1-flash-lite,0.0864,2026-03-03,Google,United States of America,,,gemini-3.1-flash-lite-preview,0.011000000000000001,83.0,,recsvNt37Kyyg9qCI
+claude-3-7-sonnet-20250219_unknown,0.0804,2025-02-24,Anthropic,United States of America,3.35e+25,https://docs.google.com/spreadsheets/d/10bhwdVrfHI8tysVIz62ZxtvQ30L-HojYvmU18_b-WIM/edit?gid=0#gid=0,Claude 3.7 Sonnet (Thinking),0.010700000000000001,80.0,,recSaAOoaHzSl2qT2
+o1-2024-12-17_unknown,0.0796,2024-12-17,OpenAI,United States of America,,,o1 (December 2024),0.0106,83.0,,recg1cdjMzYHVdlNz
+Llama-4-Maverick-17B-128E-Instruct,0.056799999999999996,2025-04-05,Meta AI,United States of America,2.244000000001e+24,"22T training tokens per model card:
+
+https://github.com/meta-llama/llama-models/blob/main/models/llama4/MODEL_CARD.md   
+
+Maverick was trained using co-distillation from Llama 4 Behemoth. It isn't 100% clear that all 22T tokens used distillation, but we assume this for the time being.
+
+Estimating training compute from parameters and tokens:
+Compute = 6 FLOP per token per parameter * 17B active parameters * 22T tokens = 2.244e24 FLOP
+(Implying mean throughput was 262 TFLOPS/GPU, or 13.2% MFU in FP8)
+
+
+The model card also states that Llama 4 Maverick used 2.38M H100-hours.
+The blog post gives a figure of 390 TFLOPS/GPU, but this may have been the utilization rate for Behemoth, or all of the models together. Using this utilization, we have:
+Compute = 390 TFLOP/s * 2.38 million hours = 3.342e24 FLOP
+(This value is higher than the compute implied by parameters and tokens, and suggests utilization may have been lower for Maverick than for Behemoth.)",Llama 4 Maverick,0.0091,83.0,,recS0T6kjQeFZjFzH
+gpt-4.1-2025-04-14,0.054000000000000006,2025-04-14,OpenAI,United States of America,,Flagship model from a leading developer in mid-2025; very likely it used >1e25 FLOP.,GPT-4.1,0.0089,89.0,,recXkRBDMBFxIp3rr
+mistral-medium-2505,0.0452,2025-05-07,Mistral AI,France,,"Benchmarks match with models like GPT-4o, Mistral's previous largest runs were ~1e25 FLOP scale, so plausibly they might have trained Medium with this much compute.",Mistral Medium 3,0.008100000000000001,77.0,,rec84Eh6Y4FPpn9zg
+claude-3-5-sonnet-20241022,0.0408,2024-10-22,Anthropic,United States of America,,,Claude 3.5 Sonnet (October 2024),0.0078000000000000005,84.0,,recRcZwfwiWXVED57

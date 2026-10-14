@@ -1,0 +1,48 @@
+model_version,model_group,date,display_name,organization,country,accessibility,training_compute_flop
+claude-3-5-sonnet-20241022,Claude 3.5 Sonnet (October 2024),2024-10-22,Claude 3.5 Sonnet (Oct 2024),Anthropic,United States of America,API access,
+claude-3-7-sonnet-20250219_64K,Claude 3.7 Sonnet,2025-02-24,Claude 3.7 Sonnet (64k thinking),Anthropic,United States of America,API access,3.35e+25
+claude-3-7-sonnet-20250219_unknown,Claude 3.7 Sonnet,2025-02-24,Claude 3.7 Sonnet (unknown thinking),Anthropic,United States of America,API access,3.35e+25
+claude-haiku-4-5-20251001_32K,Claude Haiku 4.5,2025-10-15,,Anthropic,United States of America,API access,
+claude-opus-5-5_max,Claude Opus 5.5,2026-09-22,Claude Opus 5.5 (max),Anthropic,United States of America,API access,
+DeepSeek-R1,DeepSeek-R1,2025-01-20,,DeepSeek,China,Open weights (unrestricted),3.5e+24
+DeepSeek-R1-0528,DeepSeek-R1 (May 2025),2025-05-28,DeepSeek-R1 (May 2025),DeepSeek,China,Open weights (unrestricted),4.020010000000001e+24
+DeepSeek-V3-0324,DeepSeek-V3 (Mar 2025),2025-03-24,DeepSeek-V3 (Mar 2025),DeepSeek,China,Open weights (restricted use),3.3e+24
+deepseek-v4-pro_max,DeepSeek-V4-Pro,2026-04-24,DeepSeek v4 Pro (max),DeepSeek,China,Open weights (unrestricted),9.702e+24
+gemini-2.0-flash-001,Gemini 2.0 Flash (Feb 2025),2025-02-05,Gemini 2.0 Flash (Feb 2025),"Google DeepMind,Google",United States of America,API access,
+gemini-2.5-flash-preview-04-17,Gemini 2.5 Flash (Apr 2025),2025-04-17,Gemini 2.5 Flash Preview (Apr 2025),Google DeepMind,United States of America,API access,
+gemini-3.1-flash-lite,Gemini 3.1 Flash-Lite,2026-03-03,Gemini 3.1 Flash-Lite,Google,United States of America,API access,
+gemini-3.1-flash-lite_high,Gemini 3.1 Flash-Lite,2026-03-03,Gemini 3.1 Flash-Lite,Google,United States of America,API access,
+gemini-3.5-flash-lite_high,Gemini 3.5 Flash-Lite,2026-07-21,Gemini 3.5 Flash-Lite,Google DeepMind,United States of America,API access,
+gemini-3.8-flash_high,Gemini 3.8 Flash,2026-09-02,Gemini 3.8 Flash (high),Google DeepMind,United States of America,API access,
+gemini-3.8-flash_unknown,Gemini 3.8 Flash,2026-09-02,Gemini 3.8 Flash (unknown),Google DeepMind,United States of America,API access,
+gemma-3-27b-it,Gemma 3 27B,2025-03-12,,Google DeepMind,United States of America,Open weights (restricted use),2.268e+24
+gemma-4-26b-a4b-it_minimal,Gemma 4 26B A4B,2026-04-02,Gemma 4 26B A4B,Google DeepMind,United States of America,Open weights (unrestricted),
+gemma-4-31b-it_minimal,Gemma 4 31B IT,2026-04-02,Gemma 4 31B IT,Google DeepMind,United States of America,Open weights (restricted use),
+gpt-4.1-2025-04-14,GPT-4.1,2025-04-14,GPT-4.1,OpenAI,United States of America,API access,
+gpt-4o-2024-08-06,GPT-4o (Aug 2024),2024-08-06,GPT-4o (Aug 2024),OpenAI,United States of America,API access,
+gpt-5-mini-2025-08-07_high,GPT-5 mini,2025-08-07,GPT-5 mini (high),OpenAI,United States of America,API access,
+gpt-5-mini-2025-08-07_unknown,GPT-5 mini,2025-08-07,GPT-5 mini (unknown thinking),OpenAI,United States of America,API access,
+gpt-5-nano-2025-08-07_high,GPT-5 nano,2025-08-07,GPT-5 nano (high),OpenAI,United States of America,API access,
+gpt-5.5-instant,GPT-5.5 Instant,2026-05-05,GPT-5.5 Instant,OpenAI,United States of America,API access,
+gpt-6-astra_max,GPT-6 Astra,2026-09-03,GPT-6 Astra (max),OpenAI,United States of America,API access,1.0001e+27
+gpt-6-astra_unknown,GPT-6 Astra,2026-09-03,GPT-6 Astra (unknown thinking),OpenAI,United States of America,API access,1.0001e+27
+gpt-oss-20b_medium,gpt-oss-20b,2025-08-05,,OpenAI,United States of America,Open weights (unrestricted),5.49e+23
+grok-3-mini-beta_high,Grok-3 mini,2025-04-09,,xAI,United States of America,API access,
+Llama-3.3-70B-Instruct,Llama 3.3 70B,2024-12-06,,Meta AI,United States of America,Open weights (restricted use),6.8649768e+24
+Llama-4-Maverick-17B-128E-Instruct,Llama 4 Maverick,2025-04-05,Llama 4 Maverick,Meta AI,United States of America,Open weights (restricted use),2.244000000001e+24
+Llama-4-Maverick-17B-128E-Instruct-FP8,Llama 4 Maverick,2025-04-05,Llama 4 Maverick (FP8),Meta AI,United States of America,Open weights (restricted use),2.244000000001e+24
+mistral-medium-2505,Mistral Medium 3,2025-05-07,,Mistral AI,France,API access,
+o1-2024-12-17_high,o1,2024-12-17,o1 (high),OpenAI,United States of America,API access,
+o1-2024-12-17_unknown,o1,2024-12-17,o1 (unknown thinking),OpenAI,United States of America,API access,
+o3-mini-2025-01-31_high,o3-mini,2025-01-31,o3-mini (high),OpenAI,United States of America,API access,
+o4-mini-2025-04-16_high,o4-mini,2025-04-16,o4-mini (high),OpenAI,United States of America,API access,
+openai/gpt-oss-120b_high,gpt-oss-120b,2025-08-05,,OpenAI,United States of America,Open weights (unrestricted),4.94e+24
+phi-4,Phi-4,2024-12-12,,Microsoft Research,United States of America,Open weights (unrestricted),9.3202015e+23
+qwen3-8b,Qwen3-8B,2025-04-28,,Alibaba,China,Open weights (unrestricted),1.7712e+24
+Qwen3-30B-A3B,Qwen3-30B-A3B,2025-04-28,,Alibaba,China,Open weights (unrestricted),6.48e+23
+qwen3-30b-a3b-thinking-2507,Qwen3-30B-A3B-Thinking (Jul 2025),2025-07-30,,Alibaba,China,Open weights (unrestricted),6.48e+23
+Qwen3-32B,Qwen3-32B,2025-04-28,,Alibaba,China,Open weights (unrestricted),7.0848e+24
+Qwen3-235B-A22B-Thinking-2507,Qwen3-235B-A22B-Thinking (Jul 2025),2025-07-25,,Alibaba,China,Open weights (unrestricted),4.752e+24
+qwen3.5-35b-a3b,Qwen3.5-35B-A3B,2026-02-24,,Alibaba,China,Open weights (unrestricted),
+qwen3.6-35b-a3b,Qwen 3.6 35B-A3B,2026-04-14,Qwen3.6 35B-A3B,Alibaba,China,Open weights (unrestricted),
+QwQ-32B,QwQ-32B,2025-03-05,,Alibaba,China,Open weights (unrestricted),3.51e+24
