@@ -210,8 +210,6 @@ def spawn() -> subprocess.Popen:
     d.mkdir(parents=True, exist_ok=True)
     cmd = [sys.executable, "-m", "service.report_stats", "--bench-root", str(config.BENCH_ROOT),
            "--out-dir", str(config.OUT_DIR), "--reports-dir", str(reports.REPORTS_DIR)]
-    if shutil.which("ionice"):
-        cmd = ["ionice", "-c", "3", *cmd]           # idle disk priority, where there is one
     env = {**os.environ, "PYTHONPATH": os.pathsep.join(
         x for x in (str(REPO), str(REPO / "scripts"), os.environ.get("PYTHONPATH", "")) if x)}
     log = d / "stats.log"
@@ -325,6 +323,12 @@ def main(argv: list[str] | None = None) -> int:
         os.nice(19)
     except (OSError, AttributeError):
         pass
+    # the idle disk priority, where the system gives it — the work goes on
+    # without it where it doesn't
+    if shutil.which("ionice"):
+        subprocess.run(["ionice", "-c", "3", "-p", str(os.getpid())], capture_output=True,
+                       check=False)
+    print(f"[report-stats] working, pid {os.getpid()}", flush=True)
     got = work(again=a.again, say=lambda s: print(s, flush=True))
     return 1 if got.get("failed") else 0
 
