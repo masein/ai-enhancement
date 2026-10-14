@@ -15,8 +15,9 @@ page asks:
 - Epoch AI's, from the daily import (12m.2), only at the versions the file
   names;
 - a card's, from its entry, with the card's link;
-- the thinking tokens and the loop examples, worked out here from the stored
-  answers, kept until a file they read changes (the next import or scoring).
+- the thinking tokens and the loop examples, worked out from the stored
+  answers by the stats worker (21c, service/report_stats.py) after each
+  import or scoring, and kept: a page reads what is kept, never computing.
 
 Never an Artificial Analysis number: a report is shareable. Never the hidden
 half: a loop example from it is refused. Nothing here starts a run, an import
@@ -30,7 +31,6 @@ import math
 import re
 import statistics
 import sys
-import threading
 from collections import Counter
 from pathlib import Path
 
@@ -319,6 +319,19 @@ def card_entries(rep: dict, scores: list[dict] | None = None) -> list[dict]:
 # where we stand: the sums
 # ---------------------------------------------------------------------------
 
+def fixed(x: float, digits: int = 1) -> float:
+    """x as JavaScript's toFixed rounds it, the way the pages show it: the
+    exact binary value, a tie away from zero (Python's round takes a tie to
+    even)"""
+    from decimal import ROUND_HALF_UP, Decimal
+    return float(Decimal(x).quantize(Decimal(1).scaleb(-digits), rounding=ROUND_HALF_UP))
+
+
+def points(x: float | None) -> float | None:
+    """a share in points, as shown: 0.74213 -> 74.2"""
+    return None if x is None else fixed(100 * x)
+
+
 def band(se_a: float | None, se_b: float | None) -> float:
     """"level": a gap no more than 2·√(se_ours² + se_theirs²) — a number
     without a standard error (a card's) counts it as 0"""
@@ -326,13 +339,22 @@ def band(se_a: float | None, se_b: float | None) -> float:
 
 
 def verdict(ours: dict, theirs: dict) -> str | None:
-    """"higher", "lower" or "level" — ours against theirs; None without both"""
+    """"higher", "lower" or "level" — ours against theirs; None without both.
+    21c: worked out from the numbers as shown, in points, as the published
+    page works it out — the gap is the difference of the two shown scores"""
     if ours.get("v") is None or theirs.get("v") is None:
         return None
-    gap = ours["v"] - theirs["v"]
-    if abs(gap) <= band(ours.get("se"), theirs.get("se")) + 1e-12:
+    a, t = points(ours["v"]), points(theirs["v"])
+    if abs(a - t) <= 2 * math.sqrt(points(ours.get("se") or 0) ** 2
+                                   + points(theirs.get("se") or 0) ** 2):
         return "level"
-    return "higher" if gap > 0 else "lower"
+    return "higher" if a > t else "lower"
+
+
+def gap(ours: dict, theirs: dict) -> float:
+    """ours minus theirs, as a share, from the shown numbers to a tenth of a
+    point (JavaScript's Math.round, as the published page)"""
+    return math.floor((points(ours["v"]) - points(theirs["v"])) * 10 + 0.5) / 10 / 100
 
 
 def standing(pick: dict, models: list[dict], benches: list[dict]) -> dict:
@@ -365,7 +387,7 @@ def standing(pick: dict, models: list[dict], benches: list[dict]) -> dict:
             if v is None:
                 diffs[b["key"]] = None
                 continue
-            diffs[b["key"]] = {"d": mine["v"] - c["v"], "state": v, "ours": mine["v"],
+            diffs[b["key"]] = {"d": gap(mine, c), "state": v, "ours": mine["v"],
                                "theirs": c["v"], "band": band(mine.get("se"), c.get("se"))}
             hi += v == "higher"
             lo += v == "lower"
@@ -382,41 +404,9 @@ def standing(pick: dict, models: list[dict], benches: list[dict]) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# thinking tokens, from the stored answers
+# thinking tokens, from the stored answers — 21c: worked out by the stats
+# worker (service/report_stats.py) and kept; a page reads what is kept
 # ---------------------------------------------------------------------------
-
-_tok_lock = threading.Lock()
-_tok_mem: dict[str, dict] = {}
-_work = {"thread": None, "todo": 0, "done": 0}
-
-
-def _cache_file() -> Path:
-    return Path(config.BENCH_ROOT) / "reports" / "token-stats.json"
-
-
-def _cache_get(key: str) -> dict | None:
-    with _tok_lock:
-        if not _tok_mem:
-            try:
-                _tok_mem.update(json.loads(_cache_file().read_text(encoding="utf-8")))
-            except (OSError, ValueError):
-                pass
-            _tok_mem.setdefault("_", {})
-        return _tok_mem.get(key)
-
-
-def _cache_put(key: str, value: dict) -> None:
-    with _tok_lock:
-        _tok_mem[key] = value
-        f = _cache_file()
-        try:
-            f.parent.mkdir(parents=True, exist_ok=True)
-            tmp = f.with_suffix(".part")
-            tmp.write_text(json.dumps(_tok_mem), encoding="utf-8")
-            tmp.replace(f)
-        except OSError:
-            pass
-
 
 def samples_file(d: Path, task: str) -> Path | None:
     from . import frontier as sf
@@ -424,9 +414,33 @@ def samples_file(d: Path, task: str) -> Path | None:
     return got[-1] if got else None
 
 
-def _key(f: Path, what: str) -> str:
-    st = f.stat()
-    return f"{what}|{f}|{st.st_mtime_ns}|{st.st_size}"
+def jsonl(f: Path, needle: bytes = b""):
+    """a JSON-lines file a row at a time, with the byte where each starts —
+    read as it goes, never whole (21c: a benchmark's answers run to hundreds
+    of megabytes); `needle`: only the lines holding it are parsed"""
+    at = 0
+    with open(f, "rb") as fh:
+        for raw in fh:
+            start, at = at, at + len(raw)
+            if needle and needle not in raw:
+                continue
+            try:
+                row = json.loads(raw.decode("utf-8", errors="replace"))
+            except ValueError:
+                continue
+            if isinstance(row, dict):
+                yield start, row
+
+
+def row_at(f: Path, offset: int) -> dict | None:
+    """the row starting at `offset`"""
+    try:
+        with open(f, "rb") as fh:
+            fh.seek(offset)
+            row = json.loads(fh.readline().decode("utf-8", errors="replace"))
+    except (OSError, ValueError):
+        return None
+    return row if isinstance(row, dict) else None
 
 
 def p90(xs: list[int]) -> int:
@@ -446,17 +460,25 @@ def think_share(text: str) -> float:
     return sum(len(x) for x in think_split(text)[1]) / len(text)
 
 
+def _int(t) -> bool:
+    return isinstance(t, int) and not isinstance(t, bool)
+
+
 def stats_of(runs: list[tuple[int | None, bool, bool | None, str]]) -> dict:
     """one row's benchmark: runs of (output tokens, ran out, right, answer).
     Output tokens are llama-server's own count; thinking tokens that count
     times the thinking part's share of the answer's characters. Right and
     wrong leave out the answers that ran out of room"""
-    toks = [t for t, _, _, _ in runs if isinstance(t, int) and not isinstance(t, bool)]
-    shares = [think_share(a) for t, _, _, a in runs
-              if isinstance(t, int) and not isinstance(t, bool)]
+    return _stats([(t, out, ok, think_share(a) if _int(t) else None) for t, out, ok, a in runs])
+
+
+def _stats(runs: list[tuple[int | None, bool, bool | None, float | None]]) -> dict:
+    """stats_of, each answer already its thinking share"""
+    toks = [t for t, _, _, _ in runs if _int(t)]
+    shares = [s for t, _, _, s in runs if _int(t)]
     thinks = [t * s for t, s in zip(toks, shares)]
-    right = [t for t, out, ok, _ in runs if isinstance(t, int) and not out and ok is True]
-    wrong = [t for t, out, ok, _ in runs if isinstance(t, int) and not out and ok is False]
+    right = [t for t, out, ok, _ in runs if _int(t) and not out and ok is True]
+    wrong = [t for t, out, ok, _ in runs if _int(t) and not out and ok is False]
 
     def r(x):
         return int(round(x)) if x is not None else None
@@ -472,29 +494,54 @@ def stats_of(runs: list[tuple[int | None, bool, bool | None, str]]) -> dict:
             "wrong_n": len(wrong), "wrong_mean": r(statistics.fmean(wrong)) if wrong else None}
 
 
-def token_stats(d: Path, task: str, compute: bool = True) -> dict | None:
-    """a row's benchmark's token stats from its scored samples, kept until
-    that file changes (the next import or scoring); None when it has none,
-    or (compute False) when they aren't worked out yet"""
-    f = samples_file(d, task)
-    if f is None:
-        return None
-    key = _key(f, "tokens")
-    got = _cache_get(key)
-    if got is not None or not compute:
-        return got
+def token_stats_of(f: Path) -> dict:
+    """a samples file's token stats, read a row at a time"""
     runs = []
-    for line in f.read_text(encoding="utf-8", errors="replace").splitlines():
-        try:
-            row = json.loads(line)
-        except ValueError:
-            continue
+    for _, row in jsonl(f):
         resps = row.get("resps") or []
         for k, run in enumerate(row.get("frontier") or []):
             text = (resps[k][0] if k < len(resps) and resps[k] else "") or ""
-            runs.append((run.get("tokens"), bool(run.get("ran_out")), run.get("ok"), text))
-    got = {"src": "samples", **stats_of(runs)}
-    _cache_put(key, got)
+            t = run.get("tokens")
+            runs.append((t, bool(run.get("ran_out")), run.get("ok"),
+                         think_share(text) if _int(t) else None))
+    return {"src": "samples", **_stats(runs)}
+
+
+def _tok_slot(d: Path, task: str) -> str:
+    return f"tokens|{d}|{task}"
+
+
+def token_kept(d: Path, task: str) -> dict | None:
+    """{stats, at, fresh} as kept — `fresh` False when the answers changed
+    since (shown until the new ones are in); None when never worked out"""
+    from . import report_stats as rs
+    f = samples_file(d, task)
+    if f is None:
+        return None
+    e = rs.kept(_tok_slot(d, task))
+    if not e or "value" not in e:
+        return None
+    return {"stats": e["value"], "at": e["at"], "fresh": e["key"] == rs.identity(f)}
+
+
+def token_stats(d: Path, task: str, compute: bool = True) -> dict | None:
+    """a row's benchmark's token stats from its scored samples: compute, work
+    them out now unless kept for these very answers (the worker, the tests,
+    scripts/report_token_stats.py); else what is kept. None when the row has
+    no stored answers, or (compute False) nothing is kept"""
+    from . import report_stats as rs
+    f = samples_file(d, task)
+    if f is None:
+        return None
+    if not compute:
+        k = token_kept(d, task)
+        return k["stats"] if k else None
+    key, slot = rs.identity(f), _tok_slot(d, task)
+    e = rs.kept(slot)
+    if e and e.get("key") == key and "value" in e:
+        return e["value"]
+    got = token_stats_of(f)
+    rs.keep(slot, key, got)
     return got
 
 
@@ -540,65 +587,146 @@ def shown_half(task: str, qid: str) -> bool:
     return questions.half_of(task, str(qid), {}) == "diagnose"
 
 
-def _run_of(f: Path, qid: str) -> dict | None:
-    """a question's first run in a samples file: its answer, how it was read"""
-    for line in f.read_text(encoding="utf-8", errors="replace").splitlines():
-        if f'"{qid}"' not in line:
-            continue
-        try:
-            row = json.loads(line)
-        except ValueError:
-            continue
-        if str((row.get("doc") or {}).get("id")) != str(qid):
-            continue
-        runs, resps = row.get("frontier") or [], row.get("resps") or []
-        if not runs:
-            return None
-        return {**runs[0], "answer": (resps[0][0] if resps and resps[0] else "") or "",
-                "read": (row.get("filtered_resps") or [None])[0]}
-    return None
+def _first_run(row: dict) -> dict | None:
+    runs, resps = row.get("frontier") or [], row.get("resps") or []
+    if not runs:
+        return None
+    return {**runs[0], "answer": (resps[0][0] if resps and resps[0] else "") or "",
+            "read": (row.get("filtered_resps") or [None])[0]}
 
 
-def loop_example(task: str, qid: str, first: Path | None, against: Path | None) -> dict:
-    """one example: the other model's length and how its answer was read;
-    ours's length, its "Wait"s, its most repeated line, and its thinking
-    shortly before it ran out"""
-    if not shown_half(task, qid):
-        raise Hidden(f"question {qid} is in the hidden half: the reader never shows it")
-    _scripts()
-    import frontier as fb
-    out: dict = {"id": str(qid)}
-    if against is not None:
-        a = _run_of(against, qid)
-        if a:
-            out["against"] = {"chars": len(a["answer"]), "verdict": fb.verdict(task, a),
-                              "ok": a.get("ok")}
-    if first is not None:
-        r = _run_of(first, qid)
-        if r:
-            think = fb.thinking_of(r["answer"])
-            lines = [x.strip() for x in think.splitlines() if len(x.strip()) >= 8]
-            top = Counter(lines).most_common(1)
-            end = think[-750:-150] if len(think) > 900 else think[-600:]
-            # from a line's start, or a word's
-            cut = end.find("\n", 0, 200)
-            end = end[cut + 1:] if cut >= 0 else end[end.find(" ") + 1:] if " " in end[:40] \
-                else end
-            out["first"] = {"chars": len(r["answer"]), "verdict": fb.verdict(task, r),
-                            "ran_out": bool(r.get("ran_out")), "ok": r.get("ok"),
-                            "waits": len(re.findall(r"\bWait\b", r["answer"])),
-                            "line": top[0][0][:200] if top else "",
-                            "line_n": top[0][1] if top else 0, "excerpt": end.strip()}
+def _runs_by_id(f: Path | None, ids: list[str]) -> dict[str, dict]:
+    """each question's first run in a samples file, for these questions: its
+    answer, how it was read — the file read once"""
+    out: dict[str, dict] = {}
+    if f is None or not ids:
+        return out
+    want = set(ids)
+    for _, row in jsonl(f):
+        qid = str((row.get("doc") or {}).get("id"))
+        if qid in want and qid not in out:
+            r = _first_run(row)
+            if r is not None:
+                out[qid] = r
     return out
 
 
-def loops(rep: dict, rows: list[dict], compute: bool = True) -> list[dict]:
-    """the file's loop examples, worked out from the stored answers"""
+def _run_of(f: Path, qid: str) -> dict | None:
+    """a question's first run in a samples file"""
+    for _, row in jsonl(f, f'"{qid}"'.encode()):
+        if str((row.get("doc") or {}).get("id")) == str(qid):
+            return _first_run(row)
+    return None
+
+
+def _example(task: str, qid: str, r: dict | None, a: dict | None,
+             item: dict | None = None) -> dict:
+    """one example from its two runs: the other model's length and how its
+    answer was read; ours's length, its "Wait"s, its most repeated line, and
+    its thinking shortly before it ran out — and (21c) the question as the
+    board shows it, for the full page"""
+    _scripts()
+    import frontier as fb
+    out: dict = {"id": str(qid)}
+    if a:
+        out["against"] = {"chars": len(a["answer"]), "verdict": fb.verdict(task, a),
+                          "ok": a.get("ok")}
+    if r:
+        think = fb.thinking_of(r["answer"])
+        lines = [x.strip() for x in think.splitlines() if len(x.strip()) >= 8]
+        top = Counter(lines).most_common(1)
+        end = think[-750:-150] if len(think) > 900 else think[-600:]
+        # from a line's start, or a word's
+        cut = end.find("\n", 0, 200)
+        end = end[cut + 1:] if cut >= 0 else end[end.find(" ") + 1:] if " " in end[:40] \
+            else end
+        out["first"] = {"chars": len(r["answer"]), "verdict": fb.verdict(task, r),
+                        "ran_out": bool(r.get("ran_out")), "ok": r.get("ok"),
+                        "waits": len(re.findall(r"\bWait\b", r["answer"])),
+                        "line": top[0][0][:200] if top else "",
+                        "line_n": top[0][1] if top else 0, "excerpt": end.strip()}
+    if item:
+        from . import ran_out
+        gone = fb.unlisted(task)
+        right = {} if gone else ran_out.right_of(task, item)
+        out["item"] = {"subject": ran_out._subject(task, item),
+                       "question": gone or str(item.get("question") or ""),
+                       "right": right.get("letter") or right.get("answer") or "",
+                       "right_text": right.get("text") or "", "withheld": gone}
+        if gone and out.get("first"):
+            out["first"]["excerpt"] = ran_out.scrub(out["first"]["excerpt"], item)
+            out["first"]["line"] = ran_out.scrub(out["first"]["line"], item)
+    return out
+
+
+def loop_example(task: str, qid: str, first: Path | None, against: Path | None) -> dict:
+    """one example, worked out from the two samples files"""
+    if not shown_half(task, qid):
+        raise Hidden(f"question {qid} is in the hidden half: the reader never shows it")
+    return _example(task, qid, _run_of(first, qid) if first is not None else None,
+                    _run_of(against, qid) if against is not None else None)
+
+
+def _loop_files(rep: dict) -> tuple[str, Path | None, Path | None]:
     lp = rep.get("loops") or {}
     task = lp.get("task") or "mmlupro_tiger"
-    by = {r["label"]: Path(r["dir"]) for r in rows}
+    by = {o["label"]: row_dir(o["row"]) for o in rep["ours"]}
     first = samples_file(by[lp["first"]], task) if lp.get("first") in by else None
     against = samples_file(by[lp["against"]], task) if lp.get("against") in by else None
+    return task, first, against
+
+
+def items_file(task: str) -> Path:
+    """where this machine keeps a benchmark's questions"""
+    _scripts()
+    import frontier as fb
+    return fb._cache(config.BENCH_ROOT, task)
+
+
+def _loops_key(rep: dict) -> str:
+    """the files the loop examples read: the two models' answers and the
+    questions"""
+    from . import report_stats as rs
+    task, first, against = _loop_files(rep)
+    ids = [str(ex["id"]) for ex in (rep.get("loops") or {}).get("examples") or []]
+    return "|".join([task, rs.identity(first), rs.identity(against),
+                     rs.identity(items_file(task)), ",".join(ids)])
+
+
+def loops_of(rep: dict) -> list[dict]:
+    """the file's loop examples, worked out: each samples file read once, the
+    hidden half refused"""
+    _scripts()
+    import frontier as fb
+    task, first, against = _loop_files(rep)
+    ids = [str(ex["id"]) for ex in (rep.get("loops") or {}).get("examples") or []]
+    shown = [i for i in ids if shown_half(task, i)]
+    mine, theirs = _runs_by_id(first, shown), _runs_by_id(against, shown)
+    items = {str(it["id"]): it for it in (fb.cached(task, config.BENCH_ROOT) or [])
+             if str(it.get("id")) in set(shown)} if shown else {}
+    return [_example(task, i, mine.get(i), theirs.get(i), items.get(i)) if i in shown
+            else {"id": i, "refused": True} for i in ids]
+
+
+def loops(rep: dict, rows: list[dict] | None = None, compute: bool = True) -> list[dict]:
+    """the file's loop examples: worked out now (compute), else as kept — a
+    question from the hidden half refused either way"""
+    from . import report_stats as rs
+    lp = rep.get("loops") or {}
+    task = lp.get("task") or "mmlupro_tiger"
+    slot = "loops|" + str(rep.get("id"))
+    got = None
+    if compute:
+        key = _loops_key(rep)
+        e = rs.kept(slot)
+        got = e["value"] if e and e.get("key") == key and "value" in e else None
+        if got is None:
+            got = loops_of(rep)
+            rs.keep(slot, key, got)
+    else:
+        e = rs.kept(slot)
+        got = e["value"] if e and "value" in e else None
+    by = {str(x.get("id")): x for x in got or []}
     out = []
     for ex in lp.get("examples") or []:
         base = {"id": str(ex["id"]), "note": ex.get("note") or ""}
@@ -606,51 +734,28 @@ def loops(rep: dict, rows: list[dict], compute: bool = True) -> list[dict]:
             out.append({**base, "refused": f"question {ex['id']} is in the hidden half: the "
                                            "reader never shows it"})
             continue
-        key = "|".join(["loop", str(ex["id"]),
-                        *(_key(f, "") if f else "-" for f in (first, against))])
-        got = _cache_get(key)
-        if got is None and compute:
-            got = loop_example(task, ex["id"], first, against)
-            _cache_put(key, got)
-        out.append({**base, **(got or {"pending": True})})
+        x = by.get(str(ex["id"]))
+        out.append({**base, **x} if x and not x.get("refused") else {**base, "pending": True})
     return out
 
 
-def _work_on(jobs: list) -> None:
-    for fn in jobs:
-        try:
-            fn()
-        except Exception as e:                          # noqa: BLE001 — one job's, said
-            print(f"[reports] a stat couldn't be worked out: {type(e).__name__}: {e}")
-        _work["done"] += 1
-
-
-def ensure(rep: dict, rows: list[dict]) -> dict:
-    """the token stats and loop examples not worked out yet, in one thread
-    of their own; {todo, done} while it runs"""
-    jobs = []
-    for r in rows:
-        d = Path(r["dir"])
+def jobs(rid: str, rep: dict) -> list:
+    """21c: a scorecard's stats for the worker — each row's benchmark's token
+    stats, and the loop examples"""
+    from . import report_stats as rs
+    out = []
+    for o in rep["ours"]:
+        d = row_dir(o["row"])
         for b in rep["benchmarks"]:
             f = samples_file(d, b["task"])
-            if f is not None and _cache_get(_key(f, "tokens")) is None:
-                jobs.append(lambda d=d, t=b["task"]: token_stats(d, t))
-    if any(x.get("pending") for x in loops(rep, rows, compute=False)):
-        jobs.append(lambda: loops(rep, rows))
-    return ensure_jobs(jobs)
-
-
-def ensure_jobs(jobs: list) -> dict:
-    """21b: jobs worked out in the one thread the reports share — started when
-    none runs; {todo, done} while it runs"""
-    th = _work["thread"]
-    if jobs and not (th and th.is_alive()):
-        _work.update(todo=len(jobs), done=0)
-        _work["thread"] = threading.Thread(target=_work_on, args=(jobs,), name="report-stats",
-                                           daemon=True)
-        _work["thread"].start()
-    th = _work["thread"]
-    return {"todo": _work["todo"], "done": _work["done"]} if th and th.is_alive() else {}
+            if f is not None:
+                out.append(rs.Job(_tok_slot(d, b["task"]), rs.identity(f),
+                                  f"thinking tokens, {o['label']} · {b['label']}",
+                                  lambda f=f: token_stats_of(f)))
+    if (rep.get("loops") or {}).get("examples"):
+        out.append(rs.Job("loops|" + rid, _loops_key(rep), f"loop examples, {rid}",
+                          lambda: loops_of(rep)))
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -681,8 +786,8 @@ def db_row_time(rid) -> float | None:
 
 def report(rid: str, payload: dict | None = None, compute: bool = False) -> dict | None:
     """one report, every number from the board's tables. compute: work the
-    token stats and loop examples out now (the tests); the page has them
-    worked out in a thread of their own"""
+    token stats and loop examples out now (the tests, the scripts); a page
+    reads what the stats worker kept (21c), never computing"""
     rep = files().get(rid)
     if rep is None:
         return None
@@ -704,10 +809,12 @@ def report(rid: str, payload: dict | None = None, compute: bool = False) -> dict
         return {**got, "sources": {"ours": {"at": src, "words": f"as of the last import, "
                                             f"{when(src)}" if src else "nothing imported yet"}}}
     theirs = their_rows(rep)
-    work = {} if compute else ensure(rep, rows)
-    stats = {r["label"]: {b["task"]: token_stats(Path(r["dir"]), b["task"], compute=compute)
-                          for b in rep["benchmarks"]} for r in rows}
-    stats = {k: {t: s for t, s in v.items() if s} for k, v in stats.items()}
+    if compute:
+        for r in rows:
+            for b in rep["benchmarks"]:
+                token_stats(Path(r["dir"]), b["task"])
+        loops(rep, rows)
+    stats, kept_at = kept_stats(rep, rows)
     for t in theirs:
         for c in t["cells"].values():
             if c.get("entered"):
@@ -724,11 +831,57 @@ def report(rid: str, payload: dict | None = None, compute: bool = False) -> dict
         "loops": {"task": (rep.get("loops") or {}).get("task"),
                   "first": (rep.get("loops") or {}).get("first"),
                   "against": (rep.get("loops") or {}).get("against"),
-                  "examples": loops(rep, rows, compute=compute)},
-        "working": work, "sources": _sources(rep, rows, theirs), "notes": NOTES,
+                  "examples": loops(rep, rows, compute=False)},
+        "working": {} if compute else stats_working(rid, rep),
+        "statsAt": stats_at(kept_at),
+        "sources": _sources(rep, rows, theirs), "notes": NOTES,
         "reference": rep.get("reference"),
         # 21b: where a model's ran-out answers are listed, report by report
-        "ranOut": ran_out_links()}
+        "ranOut": ran_out_links(),
+        # 21c: the page as masein publishes it, served here
+        "page": page_url(rid, rep)}
+
+
+def page_url(rid: str, rep: dict) -> str:
+    """21c: where a report's full page is, relative to the board — '' when it
+    has none"""
+    from urllib.parse import quote
+
+    from . import report_page
+    return f"reports/{quote(rid)}/page" if report_page.page_of(rep) else ""
+
+
+def kept_stats(rep: dict, rows: list[dict]) -> tuple[dict, list[float]]:
+    """21c: the token stats as kept, a row's benchmark each — {label: {task:
+    stats}} — and when each was worked out (the loop examples' too)"""
+    from . import report_stats as rs
+    stats: dict = {}
+    ats: list[float] = []
+    for r in rows:
+        for b in rep["benchmarks"]:
+            k = token_kept(Path(r["dir"]), b["task"])
+            if k:
+                stats.setdefault(r["label"], {})[b["task"]] = k["stats"]
+                ats.append(k["at"])
+        stats.setdefault(r["label"], {})
+    e = rs.kept("loops|" + str(rep.get("id")))
+    if e and "value" in e:
+        ats.append(e["at"])
+    return stats, ats
+
+
+def stats_working(rid: str, rep: dict) -> dict:
+    """21c: how far the stats worker is with this report's — {} when every
+    one is worked out for the answers stored now"""
+    from . import report_stats as rs
+    return rs.working(jobs(rid, rep))
+
+
+def stats_at(ats: list[float]) -> dict:
+    """when the kept stats were worked out: the newest, in words"""
+    if not ats:
+        return {"at": None, "words": ""}
+    return {"at": max(ats), "words": f"worked out {when(max(ats))}"}
 
 
 def ran_out_links() -> list[dict]:
@@ -760,5 +913,6 @@ def listing(payload: dict | None = None) -> list[dict]:
         out.append({"id": rid, "title": rep.get("title") or rid, "what": rep.get("what") or "",
                     "ours": [r["label"] for r in rows],
                     "others": len(rep.get("theirs") or []),
-                    "changed": when(last) if last else "", "changed_at": last})
+                    "changed": when(last) if last else "", "changed_at": last,
+                    "page": page_url(rid, rep)})
     return out

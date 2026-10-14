@@ -1,0 +1,79 @@
+/* 21c: the theme tokens a report's published page reads, light and dark. The
+   viewer's setting is followed, and the board's own (localStorage
+   "bench-theme": light, dark, dim) where it is set. Fonts: the board's own
+   sans, and the system's serif — nothing is loaded from anywhere. Contrast,
+   light: ink 15.9:1 on the panel, muted 4.5:1, ok 5.3:1, bad 6.6:1; dark,
+   from the board's dark palette: ink 14.8:1, muted 4.8:1, ok 5.2:1, bad
+   5.8:1. */
+:root {
+  color-scheme: light;
+  --font-anthropic-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-anthropic-serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia,
+    Cambria, "Times New Roman", serif;
+  --color-fg: #222; --color-fg-muted: #767676; --color-bg: #f7f7f5; --color-panel: #fff;
+  --color-border-line: #e2e2e2; --color-ok: #1f7a4d; --color-bad: #b3261e;
+  --cds-chart-muted: #bbbbb7; --cds-chart-grid: #ececea; --cds-chart-axis: #c4c4c0;
+  --cds-chart-status-critical: #c0392b;
+  --cds-text-secondary: #555; --cds-surface-popover: #fff;
+  --cds-shadow-popover: 0 4px 16px rgba(0, 0, 0, 0.12); --cds-border: #d8d8d4;
+  --cds-gap-xs: 4px; --cds-gap-sm: 8px; --cds-gap-md: 16px; --cds-gap-lg: 24px;
+  --cds-pad-xs: 4px; --cds-pad-sm: 8px; --cds-pad-md: 12px; --cds-pad-lg: 20px;
+  --cds-radius: 8px;
+  --cds-font-size-caption: 12.5px; --cds-font-size-body: 14px; --cds-font-size-heading: 17px;
+  --cds-font-size-title: 28px; --cds-font-weight-medium: 500; --cds-dur-slow: 300ms;
+  --dash-skeleton: rgba(0, 0, 0, 0.07); --dash-link: #2f54eb;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --color-fg: #ededeb; --color-fg-muted: #898781; --color-bg: #0d0d0d; --color-panel: #1a1a19;
+    --color-border-line: #30302e; --color-ok: #0ca30c; --color-bad: #ef6b6b;
+    --cds-chart-muted: #6b6a66; --cds-chart-grid: #2c2c2a; --cds-chart-axis: #4a4a47;
+    --cds-chart-status-critical: #e66767;
+    --cds-text-secondary: #c3c2b7; --cds-surface-popover: #242423;
+    --cds-shadow-popover: 0 4px 16px rgba(0, 0, 0, 0.5); --cds-border: #3a3a37;
+    --dash-skeleton: rgba(255, 255, 255, 0.08); --dash-link: #7c9bff;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-fg: #ededeb; --color-fg-muted: #898781; --color-bg: #0d0d0d; --color-panel: #1a1a19;
+  --color-border-line: #30302e; --color-ok: #0ca30c; --color-bad: #ef6b6b;
+  --cds-chart-muted: #6b6a66; --cds-chart-grid: #2c2c2a; --cds-chart-axis: #4a4a47;
+  --cds-chart-status-critical: #e66767;
+  --cds-text-secondary: #c3c2b7; --cds-surface-popover: #242423;
+  --cds-shadow-popover: 0 4px 16px rgba(0, 0, 0, 0.5); --cds-border: #3a3a37;
+  --dash-skeleton: rgba(255, 255, 255, 0.08); --dash-link: #7c9bff;
+}
+/* the board's dim: slate blue-grey */
+:root[data-theme="dim"] {
+  color-scheme: dark;
+  --color-fg: #e6edf3; --color-fg-muted: #8b98a8; --color-bg: #141a26; --color-panel: #1c2333;
+  --color-border-line: #2b3546; --color-ok: #3fb950; --color-bad: #ef6b6b;
+  --cds-chart-muted: #5d6a7c; --cds-chart-grid: #2b3546; --cds-chart-axis: #3a465a;
+  --cds-chart-status-critical: #e66767;
+  --cds-text-secondary: #b6c2d1; --cds-surface-popover: #232c3f;
+  --cds-shadow-popover: 0 4px 16px rgba(0, 0, 0, 0.45); --cds-border: #3a465a;
+  --dash-skeleton: rgba(230, 237, 243, 0.08); --dash-link: #7c9bff;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--color-bg); color: var(--color-fg);
+  font-family: var(--font-anthropic-sans); font-size: var(--cds-font-size-body); line-height: 1.4; }
+/* the shell: a way back to the board, and when each source last changed */
+.dash-shell { max-width: 72rem; margin: 0 auto; padding: var(--cds-gap-md) 16px 0;
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--cds-gap-xs) var(--cds-gap-md);
+  font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.dash-shell a { color: var(--dash-link); text-decoration: none; }
+.dash-shell a:hover { text-decoration: underline; }
+.dash-shell-fresh { margin: 0; display: flex; flex-wrap: wrap; gap: 2px var(--cds-gap-md);
+  min-width: 0; }
+.dash-shell-fresh span { overflow-wrap: anywhere; }
+#dash-root { padding: var(--cds-gap-lg) 16px 48px; min-width: 0; }
+/* the page's placeholder until its data arrives */
+.dash-skeleton { color: transparent !important; background: var(--dash-skeleton);
+  border-radius: 4px; animation: dash-pulse 1.6s ease-in-out infinite; }
+span.dash-skeleton { display: inline-block; min-width: 1.6em; line-height: 1.1; }
+div.dash-skeleton:empty { min-height: 6rem; }
+@keyframes dash-pulse { 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) { .dash-skeleton { animation: none; } }

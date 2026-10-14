@@ -1,6 +1,18 @@
 {
  "id": "step-checkpoints",
  "title": "Step checkpoints vs popular models",
+ "page": {
+  "file": "pages/step-checkpoints.html",
+  "params": {
+   "pick": "step4000"
+  },
+  "datasets": [
+   "ours",
+   "others",
+   "tokens",
+   "loops"
+  ]
+ },
  "what": "Where the team's step checkpoints (and the Q4, BF16 and Q2 baselines, all on the lda runtime) stand against popular models on the benchmarks those models report.",
  "ours": [
   {
@@ -38,7 +50,8 @@
    "row": "served/Qwen3.6-35B-A3B-Q4-original-k-8 · thinking",
    "colour": null,
    "pick": false,
-   "note": "the same Q4 file on Qwen's own sampling settings, 7–8 Oct, for reference"
+   "note": "the same Q4 file on Qwen's own sampling settings, 7–8 Oct, for reference",
+   "page_status": "7–8 Oct, Qwen's card settings"
   }
  ],
  "reference": "Q4 (UD-Q4_K_XL)",

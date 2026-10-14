@@ -1,0 +1,803 @@
+<style>
+#dash-root { --sc-our: var(--color-panel); }
+.sc-wrap { max-width: 72rem; margin-inline: auto; display: flex; flex-direction: column; gap: var(--cds-gap-lg); font-family: var(--font-anthropic-sans); }
+.sc-head h1 { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); margin: 0; text-wrap: balance; }
+.sc-take { font-size: var(--cds-font-size-heading); margin: var(--cds-gap-sm) 0 0; max-width: 48rem; line-height: 1.45; }
+.sc-take b { font-weight: 600; }
+.sc-sub { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); margin: var(--cds-gap-xs) 0 0; }
+.sc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: var(--cds-gap-md); }
+.sc-card { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); min-width: 0; }
+.sc-card h2 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); margin: 0; }
+.sc-note { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); margin: var(--cds-gap-xs) 0 var(--cds-gap-md); line-height: 1.4; }
+.sc-scroll { overflow-x: auto; }
+.sc-table { border-collapse: collapse; width: 100%; font-size: var(--cds-font-size-body); font-variant-numeric: tabular-nums; }
+.sc-table th, .sc-table td { padding: var(--cds-pad-xs) var(--cds-pad-sm); text-align: right; white-space: nowrap; border-bottom: 1px solid var(--color-border-line); }
+.sc-table th { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-weight: var(--cds-font-weight-medium); vertical-align: bottom; }
+.sc-table th:first-child, .sc-table td:first-child, .sc-table .sc-left { text-align: left; }
+.sc-table td.sc-muted { color: var(--color-fg-muted); }
+.sc-table tr.sc-ours td { font-weight: 600; }
+.sc-table tr.sc-ours td:first-child { box-shadow: inset 3px 0 0 var(--cds-chart-status-critical); }
+.sc-table tr.sc-ours.sc-q4 td:first-child { box-shadow: inset 3px 0 0 var(--color-ok); }
+.sc-dag::after { content: "†"; color: var(--color-fg-muted); font-weight: 400; }
+.sc-table td.sc-src { white-space: normal; min-width: 13rem; font-size: var(--cds-font-size-caption); }
+.sc-scroll.sc-tall { max-height: min(78vh, 48rem); overflow: auto; overscroll-behavior: contain; }
+.sc-tall thead { position: sticky; top: 0; z-index: 2; }
+.sc-tall table { border-collapse: separate; border-spacing: 0; }
+.sc-tall thead th, .sc-tall thead td { background: var(--color-panel); border-bottom: 0; box-shadow: inset 0 -1px 0 var(--color-border-line); }
+.sc-tall thead tr.sc-ref td { background: color-mix(in srgb, var(--color-fg) 6%, var(--color-panel)); color: var(--color-fg); font-weight: 600; box-shadow: inset 0 -2px 0 var(--color-border-line); }
+.sc-tall thead tr.sc-ref td.sc-muted { color: var(--color-fg-muted); font-weight: 400; }
+.sc-tall tbody td:first-child, .sc-tall thead th:first-child, .sc-tall thead td:first-child { position: sticky; left: 0; z-index: 1; }
+.sc-tall tbody td:first-child { background: var(--color-panel); }
+.sc-ref .sc-ref-k { font-weight: 400; color: var(--color-fg-muted); }
+.sc-status { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); text-align: left !important; }
+.sc-legend { display: flex; flex-wrap: wrap; gap: var(--cds-gap-sm) var(--cds-gap-md); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); margin-bottom: var(--cds-gap-sm); }
+.sc-legend span { display: inline-flex; align-items: center; gap: var(--cds-gap-xs); }
+.sc-legend i { width: 0.625rem; height: 0.625rem; border-radius: 50%; display: inline-block; }
+.sc-chart { position: relative; min-height: 18rem; }
+.sc-tip { position: absolute; pointer-events: none; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); border-radius: var(--cds-radius); box-shadow: var(--cds-shadow-popover); padding: var(--cds-pad-xs) var(--cds-pad-sm); font-size: var(--cds-font-size-caption); white-space: nowrap; z-index: 2; }
+.sc-tip .sc-tip-h { color: var(--cds-text-secondary); }
+.sc-fail { display: flex; align-items: center; justify-content: center; gap: var(--cds-gap-xs); min-height: 6rem; color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+.sc-fail::before { content: ""; width: 0.375rem; height: 0.375rem; border-radius: 50%; background: var(--color-bad); }
+.sc-loops { display: grid; gap: var(--cds-gap-md); grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); }
+.sc-loop { border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-md); display: flex; flex-direction: column; gap: var(--cds-gap-sm); min-width: 0; background: var(--color-bg); }
+.sc-loop-h { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); text-transform: capitalize; }
+.sc-loop-q { margin: 0; font-size: var(--cds-font-size-body); line-height: 1.45; overflow-wrap: anywhere; }
+.sc-loop-r { margin: 0; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); overflow-wrap: anywhere; }
+.sc-stats { display: grid; grid-template-columns: 1fr 1fr; gap: var(--cds-gap-sm); }
+.sc-stat { border-top: 1px solid var(--color-border-line); padding-top: var(--cds-pad-xs); min-width: 0; }
+.sc-stat .sc-k { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.sc-stat .sc-v { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-heading); font-variant-numeric: tabular-nums; }
+.sc-stat .sc-u { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.sc-stat.sc-bad .sc-v { color: var(--color-bad); }
+.sc-stat.sc-good .sc-v { color: var(--color-ok); }
+.sc-rep { margin: 0; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); overflow-wrap: anywhere; }
+.sc-rep code, .sc-ex { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+.sc-what { margin: 0; font-size: var(--cds-font-size-body); }
+.sc-ex { margin: 0; font-size: var(--cds-font-size-caption); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 15rem; overflow: auto; background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-sm); color: var(--color-fg); }
+.sc-ex::after { content: " …"; color: var(--color-fg-muted); }
+.sc-stand-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: var(--cds-gap-sm) var(--cds-gap-md); }
+.sc-stand-top > div:first-child { flex: 1 1 24rem; min-width: 0; }
+.sc-picks { display: flex; flex-wrap: wrap; gap: var(--cds-gap-xs); min-height: 2rem; min-width: 12rem; }
+.sc-pick { font: inherit; font-size: var(--cds-font-size-caption); display: inline-flex; align-items: center; gap: var(--cds-gap-xs); padding: var(--cds-pad-xs) var(--cds-pad-sm); border: 1px solid var(--color-border-line); border-radius: 999px; background: var(--color-bg); color: var(--color-fg); cursor: pointer; }
+.sc-pick:hover { border-color: var(--color-fg-muted); }
+.sc-pick[aria-pressed=true] { border-color: var(--color-fg); box-shadow: inset 0 0 0 1px var(--color-fg); }
+.sc-pick i { width: 0.5rem; height: 0.5rem; border-radius: 50%; display: inline-block; }
+.sc-stand-line { margin: 0 0 var(--cds-gap-md); font-size: var(--cds-font-size-body); line-height: 1.5; max-width: 52rem; }
+.sc-wrap .sc-stand-line b, .sc-wrap .sc-tile b { font-weight: 600; }
+.sc-wrap .sc-hi { color: var(--color-ok); }
+.sc-wrap .sc-lo { color: var(--color-bad); }
+.sc-gap-top { margin-top: var(--cds-gap-sm); }
+.sc-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--cds-gap-sm); min-height: 9.5rem; }
+@media (max-width: 56rem) { .sc-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 32rem) { .sc-tiles { grid-template-columns: minmax(0, 1fr); } }
+.sc-tile { position: relative; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-sm) var(--cds-pad-md); background: var(--color-bg); min-width: 0; display: flex; flex-direction: column; gap: var(--cds-gap-xs); }
+.sc-tile-h { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.sc-tile-v { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.sc-tile-v .sc-u { font-family: var(--font-anthropic-sans); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); margin-left: 0.125rem; }
+.sc-tile-c { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
+.sc-strip { position: relative; height: 3.625rem; }
+.sc-strip svg { display: block; overflow: visible; }
+.sc-key { display: flex; flex-wrap: wrap; gap: var(--cds-gap-xs) var(--cds-gap-md); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); margin: var(--cds-gap-sm) 0 var(--cds-gap-md); }
+.sc-key span { display: inline-flex; align-items: center; gap: var(--cds-gap-xs); }
+.sc-key i { width: 0.5rem; height: 0.5rem; border-radius: 50%; display: inline-block; }
+.sc-key i.sc-rule { width: 2px; height: 0.875rem; border-radius: 1px; background: var(--color-fg); }
+.sc-vs td.sc-above { color: var(--color-ok); background: color-mix(in srgb, var(--color-ok) 10%, transparent); }
+.sc-vs td.sc-below { color: var(--color-bad); background: color-mix(in srgb, var(--color-bad) 8%, transparent); }
+.sc-vs td.sc-level { color: var(--color-fg-muted); }
+.sc-vs td.sc-level::before { content: "≈ "; }
+.sc-vs tr.sc-first-pop td { border-top: 2px solid var(--color-border-line); }
+.sc-vs tr.sc-ourrow td:first-child { font-weight: 600; }
+.sc-notes { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); line-height: 1.5; }
+.sc-notes p { margin: 0 0 var(--cds-gap-xs); }
+[data-dash-source-state=empty] { color: transparent; }
+[data-dash-source-state=refreshing] { opacity: .5; transition: opacity var(--cds-dur-slow); }
+</style>
+
+<div class="sc-wrap">
+  <header class="sc-head" id="top">
+    <h1>Step checkpoints frontier scorecard</h1>
+    <p class="sc-take" id="takeaway">step4000 scores below Q4 on <b><span class="dash-skeleton" data-source="takeaway" data-field="behind" data-row="0">—</span> of <span class="dash-skeleton" data-source="takeaway" data-field="both" data-row="0">—</span></b> benchmarks finished so far, and runs out of room more often on <b><span class="dash-skeleton" data-source="takeaway" data-field="more_out" data-row="0">—</span></b> of them.</p>
+    <p class="sc-sub">Thinking on, every model on the same lda runtime: router norm on, no thinking cap, no speculative decoding. Run on rented GPUs and graded on the evalboard. Updated as runs land.</p>
+  </header>
+
+  <section class="sc-card" id="ours-table">
+    <h2>Our runs</h2>
+    <p class="sc-note">Score in percent. A dash means that benchmark hasn't finished for this model yet. "Q4, earlier run" is the same Q4 file on Qwen's own sampling settings, for reference.</p>
+    <div class="sc-scroll">
+      <table class="sc-table" data-source="ours_wide" data-row-key="model">
+        <thead><tr>
+          <th data-field="model">Model</th>
+          <th data-field="status" class="sc-left">Status</th>
+          <th data-field="gpqa">GPQA Diamond</th>
+          <th data-field="hle">HLE</th>
+          <th data-field="otis">OTIS Mock AIME</th>
+          <th data-field="math">MATH Level 5</th>
+          <th data-field="mmlupro">MMLU-Pro</th>
+          <th data-field="simpleqa">SimpleQA Verified</th>
+          <th data-field="arc">ARC-AGI-2</th>
+        </tr></thead>
+        <tbody id="ours-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="sc-card" id="stands">
+    <div class="sc-stand-top">
+      <div>
+        <h2>Where it stands against popular models</h2>
+        <p class="sc-note">Pick one of our runs. Each benchmark shows every other model's score as a dot and ours as the line. Green means ours is higher, red means lower, grey means the gap is inside the measuring noise (two standard errors). The six benchmarks other models report; ARC-AGI-2 is left out.</p>
+      </div>
+      <div class="sc-picks" id="stand-picks" role="group" aria-label="Our model" data-source="stand_sum"></div>
+    </div>
+    <p class="sc-stand-line" id="stand-line"><span class="dash-skeleton">—</span></p>
+    <div class="sc-tiles" id="stand-tiles" data-source="stand_sum others"></div>
+    <div class="sc-key">
+      <span><i class="sc-rule"></i>Our model</span>
+      <span><i style="background: var(--color-ok)"></i>Other model, ours higher</span>
+      <span><i style="background: var(--cds-chart-muted)"></i>Within noise</span>
+      <span><i style="background: var(--color-bad)"></i>Other model, ours lower</span>
+    </div>
+    <p class="sc-note">Model by model: ours minus theirs, in points. The last two columns count benchmarks: on how many of them ours scores higher than that model, and on how many lower. A gap inside the noise counts in neither. Hover a cell for both scores.</p>
+    <div class="sc-scroll sc-tall">
+      <table class="sc-table sc-vs" id="stand-table" data-source="stand" data-row-key="pick,vs">
+        <thead><tr>
+          <th data-field="vs">Model</th>
+          <th data-field="gpqa">GPQA Diamond</th>
+          <th data-field="hle">HLE</th>
+          <th data-field="otis">OTIS Mock AIME</th>
+          <th data-field="math">MATH Level 5</th>
+          <th data-field="simpleqa">SimpleQA Verified</th>
+          <th data-field="mmlupro">MMLU-Pro</th>
+          <th data-field="above">Ours higher on</th>
+          <th data-field="below">Ours lower on</th>
+          <th data-field="source" class="sc-left">Their source</th>
+        </tr>
+        <tr class="sc-ref" id="stand-ref"></tr></thead>
+        <tbody id="stand-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="sc-grid">
+    <section class="sc-card" id="scores-chart">
+      <h2>Score by benchmark</h2>
+      <p class="sc-note">Each dot is a model's score; the whisker is one standard error either side.</p>
+      <div class="sc-legend" id="legend-scores" data-source="ours"></div>
+      <div class="sc-chart dash-skeleton" id="chart-scores" data-source="ours"></div>
+    </section>
+    <section class="sc-card" id="loops-chart">
+      <h2>Ran out of room</h2>
+      <p class="sc-note">Share of answers that hit the token limit before finishing, counted wrong. This is where the thinking loop shows.</p>
+      <div class="sc-legend" id="legend-loops" data-source="ours"></div>
+      <div class="sc-chart dash-skeleton" id="chart-loops" data-source="ours"></div>
+    </section>
+  </div>
+
+  <section class="sc-card" id="tokens">
+    <h2>How long each model thinks</h2>
+    <p class="sc-stand-line sc-gap-top" id="tok-line">step4000 thinks <b><span class="dash-skeleton" data-source="tok_take" data-field="gpqa_x" data-row="0">—</span>×</b> as long as Q4 on GPQA Diamond and <b><span class="dash-skeleton" data-source="tok_take" data-field="mmlupro_x" data-row="0">—</span>×</b> on MMLU-Pro, per answer on average. Over the <span class="dash-skeleton" data-source="tok_take" data-field="benches" data-row="0">—</span> benchmarks both have finished, it wrote <b><span class="dash-skeleton" data-source="tok_take" data-field="s_total_m" data-row="0">—</span> million</b> output tokens to Q4's <b><span class="dash-skeleton" data-source="tok_take" data-field="q_total_m" data-row="0">—</span> million</b>.</p>
+    <p class="sc-note">Average thinking tokens per answer, by benchmark. Hover a dot for the median.</p>
+    <div class="sc-legend" id="legend-tok" data-source="tokens"></div>
+    <div class="sc-chart dash-skeleton" id="chart-tok" data-source="tokens"></div>
+    <p class="sc-note">In detail, in tokens. "Avg when right" and "avg when wrong" are the whole output (thinking and answer) and leave out answers that hit the limit; a dash means those answers are still waiting for grading.</p>
+    <div class="sc-scroll sc-tall">
+      <table class="sc-table sc-tok" data-source="tokens" data-row-key="model,bench">
+        <thead><tr>
+          <th data-field="benchmark">Benchmark</th>
+          <th data-field="model" class="sc-left">Model</th>
+          <th data-field="answers">Answers</th>
+          <th data-field="think_mean">Avg thinking</th>
+          <th data-field="think_med">Median thinking</th>
+          <th data-field="tok_p90">90th pct output</th>
+          <th data-field="right_mean">Avg when right</th>
+          <th data-field="wrong_mean">Avg when wrong</th>
+          <th data-field="ran_out">Hit limit</th>
+          <th data-field="tok_sum">Total output</th>
+        </tr></thead>
+        <tbody id="tok-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="sc-card" id="loops">
+    <h2>What running out of room looks like</h2>
+    <p class="sc-note">MMLU-Pro questions where Q4 answered right after a short think, and step4000 kept thinking until it hit the token limit. The excerpts are step4000's own thinking, shortly before it ran out.</p>
+    <div class="sc-loops dash-skeleton" id="loops-list" data-source="loops"></div>
+  </section>
+
+  <section class="sc-card" id="compare">
+    <h2>Against other models</h2>
+    <p class="sc-note">Sorted by GPQA Diamond. Our rows are bold: step4000 marked red, Q4 green. GPQA Diamond, OTIS Mock AIME, MATH Level 5 and SimpleQA Verified from Epoch AI were run with the same protocols as ours; HLE and MMLU-Pro come from labs' model cards (or Epoch's collection of them) and use each lab's own setup.</p>
+    <div class="sc-scroll sc-tall">
+      <table class="sc-table" data-source="compare" data-row-key="model">
+        <thead><tr>
+          <th data-field="model">Model</th>
+          <th data-field="maker" class="sc-left">Maker</th>
+          <th data-field="gpqa">GPQA Diamond</th>
+          <th data-field="hle">HLE</th>
+          <th data-field="otis">OTIS Mock AIME</th>
+          <th data-field="math">MATH Level 5</th>
+          <th data-field="simpleqa">SimpleQA Verified</th>
+          <th data-field="mmlupro">MMLU-Pro</th>
+          <th data-field="source" class="sc-left">Source</th>
+        </tr></thead>
+        <tbody id="compare-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="sc-card sc-notes" id="notes">
+    <h2>How to read this</h2>
+    <p>Our scores follow Epoch AI's protocols for GPQA Diamond, OTIS Mock AIME, MATH Level 5 and SimpleQA Verified. HLE is the text-only set, judged by o3-mini with CAIS's prompt; SimpleQA is graded by gpt-4.1 with Google's prompt. MATH Level 5 and OTIS include Epoch's model check where it has run.</p>
+    <p>† HLE collected by Epoch AI from another source (usually the lab), not Epoch's own run. HLE is without tools everywhere; labs don't all say which question set they used.</p>
+    <p>"Within noise" in the stand-off: the gap between the two scores is no more than two standard errors, ours and theirs combined. Epoch AI gives an error for its own runs; lab and model-card figures come without one and use each lab's own setup, so a small gap to them says little.</p>
+    <p>Tokens: each answer's output tokens are llama-server's own count, thinking and answer together. Thinking tokens are that count times the thinking part's share of the answer's characters, because the server doesn't count the two apart; thinking is 91–99% of the output on every benchmark. The limit per answer is 32,768 tokens on MMLU-Pro and SimpleQA, 65,536 on MATH Level 5 and 81,920 on the rest.</p>
+    <p>ARC-AGI-2 is left out of the comparison: published ARC-AGI-2 numbers are on ARC Prize's held-back set, while ours is the public set. Epoch AI hasn't run MATH Level 5 on the newest models, so that column holds older ones only. Each model is shown at its highest reasoning setting Epoch ran, except gpt-oss-20b, whose medium setting scored higher than its high one.</p>
+    <p>Data: Epoch AI Benchmarking Hub, CC BY 4.0, checked 14 Oct 2026; HLE and MMLU-Pro from the DeepSeek-R1-0528, DeepSeek-V4-Pro, Qwen3.6-35B-A3B, Qwen3.5-35B-A3B, Qwen3-30B-A3B-Thinking-2507 and Qwen3-235B-A22B-Thinking-2507 model cards. For gpt-oss-120b, o4-mini and GPT-5 mini, the HLE or MMLU-Pro figure is the one Qwen's cards report for them.</p>
+  </section>
+</div>
+
+<script>
+(function () {
+  const BENCH = [["gpqa","GPQA Diamond"],["hle","HLE"],["otis","OTIS Mock AIME"],["math","MATH Level 5"],["mmlupro","MMLU-Pro"],["simpleqa","SimpleQA Verified"],["arc","ARC-AGI-2"]];
+  const MODELS = ["step4000","step1000","Q4 (UD-Q4_K_XL)","BF16","Q2 (UD-Q2_K_XL)","Q4, earlier run"];
+  const COLOR_AT = { "step4000": 0, "Q4 (UD-Q4_K_XL)": 1, "BF16": 2, "Q2 (UD-Q2_K_XL)": 3, "step1000": 4 };
+
+  dash.calc("ours_wide", {
+    inputs: ["ours"],
+    title: "Our scores, a row a model",
+    description: "Each of our models' scores, one column a benchmark, from the run results.",
+    fn: (ours) => {
+      const by = {};
+      for (const r of ours) {
+        if (!by[r.model]) by[r.model] = { model: r.model, order: r.order, status: r.status };
+        by[r.model][r.bench] = r.score;
+      }
+      return Object.values(by).sort((a, b) => a.order - b.order)
+        .map((m) => ({ model: m.model, status: m.status, gpqa: m.gpqa, hle: m.hle, otis: m.otis, math: m.math, mmlupro: m.mmlupro, simpleqa: m.simpleqa, arc: m.arc }));
+    }
+  });
+
+  dash.calc("compare", {
+    inputs: ["ours", "others"],
+    title: "Ours beside other models",
+    description: "Our lda-runtime models with a score, added to the other models' published scores, sorted by GPQA Diamond.",
+    fn: (ours, others) => {
+      const keep = ["step4000", "step1000", "Q4 (UD-Q4_K_XL)", "BF16", "Q2 (UD-Q2_K_XL)"];
+      const by = {};
+      for (const r of ours) {
+        if (!keep.includes(r.model)) continue;
+        if (!by[r.model]) by[r.model] = { model: r.model, maker: "Ours, lda runtime", hle_src: "", source: "Our runs", ours: true };
+        by[r.model][r.bench] = r.score;
+      }
+      const mine = Object.values(by).filter((m) => ["gpqa", "hle", "otis", "math", "simpleqa", "mmlupro"].some((k) => m[k] != null));
+      const rows = mine.concat(others.map((o) => Object.assign({}, o, { ours: false })));
+      return rows.map((r) => ({ model: r.model, maker: r.maker, gpqa: r.gpqa == null ? null : r.gpqa, hle: r.hle == null ? null : r.hle, hle_src: r.hle_src || "", otis: r.otis == null ? null : r.otis, math: r.math == null ? null : r.math, simpleqa: r.simpleqa == null ? null : r.simpleqa, mmlupro: r.mmlupro == null ? null : r.mmlupro, source: r.source, ours: r.ours }))
+        .sort((a, b) => (b.gpqa == null ? -1 : b.gpqa) - (a.gpqa == null ? -1 : a.gpqa));
+    }
+  });
+
+  dash.calc("takeaway", {
+    inputs: ["ours"],
+    title: "step4000 against Q4",
+    description: "How many finished benchmarks step4000 scores below Q4 on, and runs out of room more often on.",
+    fn: (ours) => {
+      const s = {}, q = {};
+      for (const r of ours) {
+        if (r.model === "step4000") s[r.bench] = r;
+        if (r.model === "Q4 (UD-Q4_K_XL)") q[r.bench] = r;
+      }
+      let both = 0, behind = 0, more_out = 0;
+      for (const k of Object.keys(s)) {
+        if (s[k].score == null || !q[k] || q[k].score == null) continue;
+        both += 1;
+        if (s[k].score < q[k].score) behind += 1;
+        if (s[k].ran_out_pct > q[k].ran_out_pct) more_out += 1;
+      }
+      return [{ both: both, behind: behind, more_out: more_out }];
+    }
+  });
+
+  dash.calc("stand", {
+    inputs: ["ours", "others"],
+    title: "Ours against each model",
+    description: "For each of our lda-runtime models and each other model: ours minus theirs on the six shared benchmarks, and whether the gap is more than two standard errors (ours and theirs combined, where theirs is given).",
+    fn: (ours, others) => {
+      const picks = ["step4000", "step1000", "Q4 (UD-Q4_K_XL)", "BF16", "Q2 (UD-Q2_K_XL)"];
+      const benches = ["gpqa", "hle", "otis", "math", "simpleqa", "mmlupro"];
+      const mine = {};
+      for (const r of ours) if (picks.includes(r.model) && r.score != null) (mine[r.model] = mine[r.model] || {})[r.bench] = r;
+      const rows = [];
+      for (const p of Object.keys(mine)) {
+        const rivals = Object.keys(mine).filter((q) => q !== p)
+          .map((q) => ({ name: q, maker: "Ours, lda runtime", source: "Our run", group: "ours", score: (k) => (mine[q][k] ? mine[q][k].score : null), se: (k) => (mine[q][k] ? mine[q][k].se : 0) }))
+          .concat(others.map((o) => ({ name: o.model, maker: o.maker, source: o.source, group: "popular", score: (k) => o[k], se: (k) => o[k + "_se"] || 0 })));
+        for (const v of rivals) {
+          const row = { pick: p, vs: v.name, group: v.group, maker: v.maker, source: v.source, above: 0, level: 0, below: 0 };
+          for (const k of benches) {
+            const a = mine[p][k], t = v.score(k);
+            row[k] = null; row[k + "_state"] = "";
+            if (!a || t == null) continue;
+            const band = 2 * Math.sqrt(a.se ** 2 + v.se(k) ** 2);
+            const state = Math.abs(a.score - t) <= band ? "level" : (a.score > t ? "above" : "below");
+            row[k] = Math.round((a.score - t) * 10) / 10;
+            row[k + "_state"] = state;
+            row[state] += 1;
+          }
+          if (row.above + row.level + row.below > 0) rows.push(row);
+        }
+      }
+      return rows;
+    }
+  });
+
+  dash.calc("stand_sum", {
+    inputs: ["stand", "ours"],
+    title: "How many each is above",
+    description: "For each of our models and shared benchmark: its score, and how many other models it is higher than, level with (within two standard errors) or lower than; bench 'all' adds up the six.",
+    fn: (stand, ours) => {
+      const names = { gpqa: "GPQA Diamond", hle: "HLE", otis: "OTIS Mock AIME", math: "MATH Level 5", simpleqa: "SimpleQA Verified", mmlupro: "MMLU-Pro" };
+      const out = [];
+      for (const p of [...new Set(stand.map((r) => r.pick))]) {
+        const pop = stand.filter((r) => r.pick === p && r.group === "popular");
+        const all = { pick: p, bench: "all", benchmark: "All six", score: null, se: null, above: 0, level: 0, below: 0, of: 0 };
+        for (const k of Object.keys(names)) {
+          const s = ours.find((r) => r.model === p && r.bench === k);
+          const c = { pick: p, bench: k, benchmark: names[k], score: s ? s.score : null, se: s ? s.se : null, above: 0, level: 0, below: 0, of: 0 };
+          for (const r of pop) if (r[k + "_state"]) { c[r[k + "_state"]] += 1; c.of += 1; }
+          for (const f of ["above", "level", "below", "of"]) all[f] += c[f];
+          out.push(c);
+        }
+        out.push(all);
+      }
+      return out;
+    }
+  });
+
+  dash.calc("tok_take", {
+    inputs: ["tokens"],
+    title: "step4000's thinking against Q4's",
+    description: "step4000's average thinking tokens per answer divided by Q4's, on GPQA Diamond and MMLU-Pro; and each one's output tokens over the benchmarks both finished, in millions.",
+    fn: (tokens) => {
+      const s = {}, q = {};
+      for (const r of tokens) {
+        if (r.model === "step4000") s[r.bench] = r;
+        if (r.model === "Q4 (UD-Q4_K_XL)") q[r.bench] = r;
+      }
+      const x = (k) => (s[k] && q[k] ? Math.round((s[k].think_mean / q[k].think_mean) * 10) / 10 : null);
+      const both = Object.keys(s).filter((k) => q[k]);
+      const total = (m) => Math.round(both.reduce((a, k) => a + m[k].tok_sum, 0) / 1e5) / 10;
+      return [{ gpqa_x: x("gpqa"), mmlupro_x: x("mmlupro"), benches: both.length, s_total_m: total(s), q_total_m: total(q) }];
+    }
+  });
+
+  const f1 = d3.format(".1f");
+  const sgn = d3.format("+.1f");
+  const comma = d3.format(",");
+  const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
+  const enc = (s) => encodeURIComponent(String(s));
+  const SHARED = [["gpqa", "GPQA Diamond"], ["hle", "HLE"], ["otis", "OTIS Mock AIME"], ["math", "MATH Level 5"], ["simpleqa", "SimpleQA Verified"], ["mmlupro", "MMLU-Pro"]];
+  const STATE_FILL = { above: "var(--color-ok)", level: "var(--cds-chart-muted)", below: "var(--color-bad)" };
+  const STATE_WORD = { above: "ours higher", level: "within noise", below: "ours lower" };
+  const fmt = (v) => (v == null || Number.isNaN(v) ? "—" : f1(v));
+  const color = (m) => {
+    const i = MODELS.indexOf(m);
+    return m in COLOR_AT ? dash.colors[COLOR_AT[m]] : "var(--cds-chart-muted)";
+  };
+
+  function fill(el, list) {
+    el.replaceChildren();
+    for (const t of list) el.appendChild(t);
+  }
+
+  function failLine(el, text) {
+    const d = document.createElement("div");
+    d.className = "sc-fail";
+    d.textContent = text;
+    fill(el, [d]);
+  }
+
+  function legend(el, models) {
+    el.replaceChildren();
+    for (const m of models) {
+      const s = document.createElement("span");
+      const i = document.createElement("i");
+      i.style.background = color(m);
+      s.appendChild(i);
+      s.appendChild(document.createTextNode(m));
+      el.appendChild(s);
+    }
+  }
+
+  function dotPlot(el, rows, opt) {
+    el.replaceChildren();
+    const models = MODELS.filter((m) => rows.some((r) => r.model === m && r[opt.key] != null));
+    const W = Math.max(280, el.clientWidth || 600);
+    const svg = d3.select(el).append("svg").attr("width", "100%");
+    const probe = svg.append("text").attr("font-size", 12).style("font-family", "var(--font-anthropic-sans)");
+    let labelW = 0;
+    for (const [, label] of BENCH) { probe.text(label); labelW = Math.max(labelW, probe.node().getComputedTextLength()); }
+    probe.remove();
+    const m = { t: 22, r: 16, b: 8, l: Math.ceil(labelW) + 14 };
+    const sub = 11, band = Math.max(1, models.length) * sub + 12;
+    const H = m.t + BENCH.length * band + m.b;
+    svg.attr("viewBox", `0 0 ${W} ${H}`);
+    const max = opt.max(rows);
+    const x = d3.scaleLinear([0, max], [m.l, W - m.r]);
+    const ticks = x.ticks(Math.max(2, Math.floor((W - m.l) / 70)));
+    const g = svg.append("g");
+    g.selectAll("line.grid").data(ticks).join("line")
+      .attr("x1", (d) => x(d)).attr("x2", (d) => x(d)).attr("y1", m.t - 4).attr("y2", H - m.b)
+      .style("stroke", "var(--cds-chart-grid)").attr("stroke-width", 1);
+    g.selectAll("text.tick").data(ticks).join("text")
+      .attr("x", (d) => x(d)).attr("y", m.t - 9).attr("text-anchor", "middle").attr("font-size", 11)
+      .style("fill", "var(--color-fg-muted)").style("font-family", "var(--font-anthropic-sans)")
+      .text((d) => opt.tick(d));
+    BENCH.forEach(([key, label], bi) => {
+      const y0 = m.t + bi * band;
+      g.append("text").attr("x", m.l - 10).attr("y", y0 + band / 2).attr("dy", "0.35em").attr("text-anchor", "end")
+        .attr("font-size", 12).style("fill", "var(--color-fg)").style("font-family", "var(--font-anthropic-sans)").text(label);
+      if (bi > 0) g.append("line").attr("x1", m.l).attr("x2", W - m.r).attr("y1", y0).attr("y2", y0).style("stroke", "var(--cds-chart-grid)");
+      models.forEach((mod, mi) => {
+        const r = rows.find((d) => d.model === mod && d.bench === key);
+        if (!r || r[opt.key] == null) return;
+        const cy = y0 + 6 + mi * sub + sub / 2;
+        const v = r[opt.key];
+        if (opt.err && r[opt.err] != null) {
+          g.append("line").attr("x1", x(Math.max(0, v - r[opt.err]))).attr("x2", x(Math.min(max, v + r[opt.err])))
+            .attr("y1", cy).attr("y2", cy).style("stroke", color(mod)).attr("stroke-width", 2).attr("stroke-linecap", "round").attr("opacity", 0.55);
+        }
+        g.append("circle").attr("cx", x(v)).attr("cy", cy).attr("r", 4.5).style("fill", color(mod))
+          .style("stroke", "var(--color-panel)").attr("stroke-width", 1.5)
+          .on("mouseenter", (ev) => tip(el, ev, label, mod, opt.text(r)))
+          .on("mousemove", (ev) => tip(el, ev, label, mod, opt.text(r)))
+          .on("mouseleave", () => { const t = el.querySelector(".sc-tip"); if (t) t.remove(); });
+      });
+    });
+    el.style.minHeight = H + "px";
+    return models;
+  }
+
+  function tip(el, ev, head, model, text) {
+    let t = el.querySelector(".sc-tip");
+    if (!t) { t = document.createElement("div"); t.className = "sc-tip"; el.appendChild(t); }
+    t.replaceChildren();
+    const h = document.createElement("div"); h.className = "sc-tip-h"; h.textContent = head;
+    const l = document.createElement("div");
+    const sw = document.createElement("i");
+    sw.style.cssText = "display:inline-block;width:.5rem;height:.5rem;border-radius:50%;margin-right:.35rem;background:" + color(model);
+    l.appendChild(sw); l.appendChild(document.createTextNode(model + ": " + text));
+    t.appendChild(h); t.appendChild(l);
+    const box = el.getBoundingClientRect();
+    let left = ev.clientX - box.left + 12, top = ev.clientY - box.top + 12;
+    const tw = t.offsetWidth || 180;
+    if (left + tw > box.width) left = Math.max(0, ev.clientX - box.left - tw - 12);
+    t.style.left = left + "px"; t.style.top = top + "px";
+  }
+
+  function tipLines(el, ev, head, lines) {
+    let t = el.querySelector(".sc-tip");
+    if (!t) { t = document.createElement("div"); t.className = "sc-tip"; el.appendChild(t); }
+    t.replaceChildren();
+    const h = document.createElement("div"); h.className = "sc-tip-h"; h.textContent = head;
+    t.appendChild(h);
+    for (const [sw, text] of lines) {
+      const l = document.createElement("div");
+      if (sw) {
+        const i = document.createElement("i");
+        i.style.cssText = "display:inline-block;width:.5rem;height:.5rem;border-radius:50%;margin-right:.35rem;background:" + sw;
+        l.appendChild(i);
+      }
+      l.appendChild(document.createTextNode(text));
+      t.appendChild(l);
+    }
+    const box = el.getBoundingClientRect();
+    const tw = t.offsetWidth || 180;
+    let left = ev.clientX - box.left + 12;
+    if (left + tw > box.width) left = Math.max(-box.left + 8, ev.clientX - box.left - tw - 12);
+    t.style.left = left + "px"; t.style.top = (ev.clientY - box.top + 12) + "px";
+  }
+
+  function strip(holder, pick, k, ourScore, rows, othersBy) {
+    holder.replaceChildren();
+    const W = Math.max(160, holder.clientWidth || 200), H = 58, axisY = 44, mid = 22;
+    const x = d3.scaleLinear([0, 100], [8, W - 12]);
+    const svg = d3.select(holder).append("svg").attr("width", W).attr("height", H);
+    svg.append("line").attr("x1", x(0)).attr("x2", x(100)).attr("y1", axisY).attr("y2", axisY).style("stroke", "var(--cds-chart-axis)");
+    for (const v of [0, 50, 100]) {
+      svg.append("text").attr("x", x(v)).attr("y", H - 2).attr("text-anchor", "middle").attr("font-size", 10)
+        .style("fill", "var(--color-fg-muted)").style("font-family", "var(--font-anthropic-sans)").text(v);
+    }
+    const pts = [];
+    for (const r of rows) {
+      const o = othersBy[r.vs];
+      if (!o || o[k] == null) continue;
+      pts.push({ name: r.vs, theirs: o[k], gap: r[k], state: r[k + "_state"] || "level", cx: x(o[k]) });
+    }
+    pts.sort((a, b) => a.cx - b.cx);
+    const placed = [];
+    for (const p of pts) {
+      p.lv = 0;
+      for (const lv of [0, -1, 1, -2, 2]) {
+        if (!placed.some((q) => q.lv === lv && Math.abs(q.cx - p.cx) < 8)) { p.lv = lv; break; }
+        p.lv = lv;
+      }
+      placed.push(p);
+    }
+    if (ourScore != null) {
+      svg.append("line").attr("x1", x(ourScore)).attr("x2", x(ourScore)).attr("y1", 2).attr("y2", axisY)
+        .style("stroke", "var(--color-fg)").attr("stroke-width", 2).attr("stroke-linecap", "round");
+    }
+    for (const p of pts) {
+      const fill = ourScore == null ? "var(--cds-chart-muted)" : STATE_FILL[p.state];
+      const c = svg.append("circle").attr("cx", p.cx).attr("cy", mid + p.lv * 7).attr("r", 3.5)
+        .style("fill", fill).style("stroke", "var(--color-bg)").attr("stroke-width", 1.5);
+      const lines = [[fill, p.name + ": " + f1(p.theirs)]];
+      if (ourScore != null) lines.push([null, pick + ": " + f1(ourScore) + " (" + sgn(p.gap) + ", " + STATE_WORD[p.state] + ")"]);
+      svg.append("circle").attr("cx", p.cx).attr("cy", mid + p.lv * 7).attr("r", 7).style("fill", "transparent")
+        .on("mouseenter", (ev) => { c.attr("r", 5); tipLines(holder, ev, SHARED.find((b) => b[0] === k)[1], lines); })
+        .on("mousemove", (ev) => tipLines(holder, ev, SHARED.find((b) => b[0] === k)[1], lines))
+        .on("mouseleave", () => { c.attr("r", 3.5); const t = holder.querySelector(".sc-tip"); if (t) t.remove(); });
+    }
+  }
+
+  function drawStands() {
+    const sum = dash.data("stand_sum"), st = dash.data("stand"), oth = dash.data("others"), ou = dash.data("ours");
+    const picksEl = document.getElementById("stand-picks"), line = document.getElementById("stand-line");
+    const tiles = document.getElementById("stand-tiles"), body = document.getElementById("stand-body");
+    if (sum.status === "error" || st.status === "error" || oth.status === "error" || ou.status === "error") {
+      picksEl.replaceChildren(); line.textContent = ""; tiles.classList.remove("dash-skeleton");
+      failLine(tiles, "Failed to load"); fill(body, [row([["Failed to load", "sc-muted"]])]);
+      return;
+    }
+    if (sum.status !== "ok" || st.status !== "ok" || oth.status !== "ok" || ou.status !== "ok") {
+      picksEl.replaceChildren(); tiles.replaceChildren(); tiles.classList.add("dash-skeleton"); body.replaceChildren();
+      return;
+    }
+    tiles.classList.remove("dash-skeleton");
+    const picks = MODELS.filter((m) => sum.data.some((r) => r.pick === m && r.bench === "all" && r.of > 0));
+    let pick = dash.params().pick;
+    if (!picks.includes(pick)) pick = picks[0];
+    picksEl.replaceChildren();
+    for (const m of picks) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "sc-pick"; b.setAttribute("aria-pressed", String(m === pick));
+      const i = document.createElement("i"); i.style.background = color(m);
+      b.appendChild(i); b.appendChild(document.createTextNode(m));
+      b.addEventListener("click", () => dash.setParams({ pick: m }));
+      picksEl.appendChild(b);
+    }
+    const all = sum.data.find((r) => r.pick === pick && r.bench === "all");
+    const mark = (tag, cls, field, bench, text) => {
+      const e = document.createElement(tag); if (cls) e.className = cls;
+      e.dataset.source = "stand_sum"; e.dataset.field = field; e.dataset.where = "pick=" + enc(pick) + "&bench=" + bench;
+      e.textContent = text; return e;
+    };
+    line.replaceChildren();
+    if (all) {
+      line.append(pick + " is higher than ", mark("b", "sc-hi", "above", "all", String(all.above)),
+        " and lower than ", mark("b", "sc-lo", "below", "all", String(all.below)),
+        " of the ", mark("b", null, "of", "all", String(all.of)),
+        " popular-model scores it can be set against, and level (inside the noise) with ", mark("b", null, "level", "all", String(all.level)), ".");
+      const left = SHARED.filter(([k]) => { const c = sum.data.find((r) => r.pick === pick && r.bench === k); return !c || c.score == null; });
+      if (left.length) line.append(" Not finished yet: " + left.map((b) => b[1]).join(", ") + ".");
+    }
+    const othersBy = {};
+    for (const o of oth.data) othersBy[o.model] = o;
+    const popRows = st.data.filter((r) => r.pick === pick && r.group === "popular");
+    tiles.replaceChildren();
+    const later = [];
+    for (const [k, label] of SHARED) {
+      const c = sum.data.find((r) => r.pick === pick && r.bench === k);
+      const t = document.createElement("div"); t.className = "sc-tile"; t.id = "stand-" + k;
+      const h = document.createElement("div"); h.className = "sc-tile-h"; h.textContent = label; t.appendChild(h);
+      const v = document.createElement("div"); v.className = "sc-tile-v";
+      v.appendChild(mark("span", null, "score", k, c && c.score != null ? f1(c.score) : "—"));
+      if (c && c.score != null) { const u = document.createElement("span"); u.className = "sc-u"; u.textContent = "%"; v.appendChild(u); }
+      t.appendChild(v);
+      const cap = document.createElement("div"); cap.className = "sc-tile-c";
+      if (c && c.score != null) {
+        cap.append("Higher than ", mark("b", "sc-hi", "above", k, String(c.above)), " · lower than ",
+          mark("b", "sc-lo", "below", k, String(c.below)), " · level ", mark("b", null, "level", k, String(c.level)));
+      } else cap.textContent = "Not finished yet";
+      t.appendChild(cap);
+      const s = document.createElement("div"); s.className = "sc-strip";
+      t.appendChild(s);
+      tiles.appendChild(t);
+      later.push(() => strip(s, pick, k, c ? c.score : null, popRows, othersBy));
+    }
+    for (const draw of later) draw();
+    const ourBy = {};
+    for (const r of ou.data) (ourBy[r.model] = ourBy[r.model] || {})[r.bench] = r.score;
+    const mineBy = ourBy[pick] || {};
+    const list = st.data.filter((r) => r.pick === pick).sort((a, b) =>
+      (a.group === b.group ? 0 : a.group === "ours" ? -1 : 1)
+      || (a.gpqa == null) - (b.gpqa == null) || (a.gpqa ?? 0) - (b.gpqa ?? 0) || a.vs.localeCompare(b.vs));
+    let firstPop = true;
+    fill(body, list.map((r) => {
+      const tr = document.createElement("tr");
+      tr.dataset.key = enc(r.pick) + "," + enc(r.vs);
+      if (r.group === "ours") tr.classList.add("sc-ourrow");
+      if (r.group === "popular" && firstPop) { tr.classList.add("sc-first-pop"); firstPop = false; }
+      const theirs = (k) => (r.group === "ours" ? (ourBy[r.vs] || {})[k] : (othersBy[r.vs] || {})[k]);
+      const td = (text, cls, title) => { const d = document.createElement("td"); d.textContent = text; if (cls) d.className = cls; if (title) d.title = title; tr.appendChild(d); };
+      td(r.vs);
+      for (const [k] of SHARED) {
+        if (r[k] == null) td("—", "sc-muted");
+        else td(sgn(r[k]), "sc-" + r[k + "_state"], r.vs + ": " + f1(theirs(k)) + " · " + pick + ": " + f1(mineBy[k]));
+      }
+      td(String(r.above), r.above ? "sc-hi" : "sc-muted"); td(String(r.below), r.below ? "sc-lo" : "sc-muted");
+      td(r.source, "sc-left sc-muted sc-src");
+      return tr;
+    }));
+    const ref = document.getElementById("stand-ref");
+    ref.replaceChildren();
+    const rc = (cls, ...kids) => { const d = document.createElement("td"); if (cls) d.className = cls; d.append(...kids); ref.appendChild(d); return d; };
+    const k0 = document.createElement("span"); k0.className = "sc-ref-k"; k0.textContent = " scores";
+    rc("", pick, k0);
+    for (const [k] of SHARED) {
+      const c = sum.data.find((r) => r.pick === pick && r.bench === k);
+      if (c && c.score != null) rc("", mark("span", null, "score", k, f1(c.score)));
+      else rc("sc-muted", "—");
+    }
+    rc("sc-hi", mark("span", null, "above", "all", String(all ? all.above : 0)));
+    rc("sc-lo", mark("span", null, "below", "all", String(all ? all.below : 0)));
+    rc("sc-left sc-muted", "totals, of " + (all ? all.of : 0) + " head-to-heads");
+  }
+
+  function row(cells, cls) {
+    const tr = document.createElement("tr");
+    if (cls) tr.className = cls;
+    for (const [text, c] of cells) {
+      const td = document.createElement("td");
+      td.textContent = text;
+      if (c) td.className = c;
+      tr.appendChild(td);
+    }
+    return tr;
+  }
+
+  dash.onData(() => {
+    const ours = dash.data("ours");
+    const wide = dash.data("ours_wide");
+    const cmp = dash.data("compare");
+    const tk = dash.data("takeaway");
+
+    document.querySelectorAll("#takeaway [data-source=takeaway]").forEach((s) => {
+      if (tk.status === "ok" && tk.data[0]) { s.textContent = String(tk.data[0][s.dataset.field]); s.classList.remove("dash-skeleton"); }
+      else { s.textContent = "—"; if (tk.status === "error") s.classList.remove("dash-skeleton"); }
+    });
+
+    const ob = document.getElementById("ours-body");
+    if (wide.status === "ok") {
+      fill(ob, wide.data.map((r) => row(
+        [[r.model], [r.status, "sc-status"]].concat(BENCH.map(([k]) => [fmt(r[k]), r[k] == null ? "sc-muted" : ""])),
+        r.model === "step4000" ? "sc-ours" : (r.model === "Q4 (UD-Q4_K_XL)" ? "sc-ours sc-q4" : ""))));
+    } else if (wide.status === "error") {
+      fill(ob, [row([["Failed to load", "sc-muted"]])]);
+    } else ob.replaceChildren();
+
+    drawStands();
+
+    const cs = document.getElementById("chart-scores"), cl = document.getElementById("chart-loops");
+    if (ours.status === "ok") {
+      cs.classList.remove("dash-skeleton"); cl.classList.remove("dash-skeleton");
+      const ms = dotPlot(cs, ours.data, {
+        key: "score", err: "se", max: () => 100, tick: (d) => d,
+        text: (r) => fmt(r.score) + " ± " + fmt(r.se)
+      });
+      legend(document.getElementById("legend-scores"), ms);
+      const ml = dotPlot(cl, ours.data, {
+        key: "ran_out_pct", err: null,
+        max: (rows) => Math.max(5, Math.ceil(d3.max(rows, (r) => r.ran_out_pct || 0) / 5) * 5),
+        tick: (d) => d + "%",
+        text: (r) => fmt(r.ran_out_pct) + "% (" + d3.format(",")(r.ran_out_n) + " of " + d3.format(",")(r.answers) + ")"
+      });
+      legend(document.getElementById("legend-loops"), ml);
+    } else if (ours.status === "error") {
+      cs.classList.remove("dash-skeleton"); cl.classList.remove("dash-skeleton");
+      failLine(cs, "Failed to load"); failLine(cl, "Failed to load");
+    } else { cs.replaceChildren(); cl.replaceChildren(); }
+
+    const tok = dash.data("tokens"), tt = dash.data("tok_take");
+    document.querySelectorAll("#tok-line [data-source=tok_take]").forEach((s) => {
+      if (tt.status === "ok" && tt.data[0] && tt.data[0][s.dataset.field] != null) {
+        const v = tt.data[0][s.dataset.field];
+        s.textContent = s.dataset.field === "benches" ? String(v) : f1(v);
+        s.classList.remove("dash-skeleton");
+      } else { s.textContent = "—"; if (tt.status === "error") s.classList.remove("dash-skeleton"); }
+    });
+    const ct = document.getElementById("chart-tok"), tb = document.getElementById("tok-body");
+    if (tok.status === "ok") {
+      ct.classList.remove("dash-skeleton");
+      const mt = dotPlot(ct, tok.data, {
+        key: "think_mean", err: null,
+        max: (rows) => Math.ceil(d3.max(rows, (r) => r.think_mean || 0) / 10000) * 10000,
+        tick: (d) => (d === 0 ? "0" : d / 1000 + "k"),
+        text: (r) => comma(r.think_mean) + " thinking tokens on average, median " + comma(r.think_med)
+      });
+      legend(document.getElementById("legend-tok"), mt);
+      const list = tok.data.slice().sort((a, b) => a.bench_order - b.bench_order || a.order - b.order);
+      let prev = null;
+      fill(tb, list.map((r) => {
+        const tr = document.createElement("tr");
+        tr.dataset.key = enc(r.model) + "," + enc(r.bench);
+        if (prev !== null && prev !== r.bench) tr.classList.add("sc-first-pop");
+        if (r.model === "step4000") tr.classList.add("sc-ourrow");
+        const td = (text, cls) => { const d = document.createElement("td"); d.textContent = text; if (cls) d.className = cls; tr.appendChild(d); };
+        td(r.benchmark, prev === r.bench ? "sc-muted" : "");
+        td(r.model, "sc-left");
+        td(comma(r.answers));
+        td(comma(r.think_mean)); td(comma(r.think_med)); td(comma(r.tok_p90));
+        td(r.right_mean == null ? "—" : comma(r.right_mean), r.right_mean == null ? "sc-muted" : "");
+        td(r.wrong_mean == null ? "—" : comma(r.wrong_mean), r.wrong_mean == null ? "sc-muted" : "");
+        td(comma(r.ran_out));
+        td(compact.format(r.tok_sum));
+        prev = r.bench;
+        return tr;
+      }));
+    } else if (tok.status === "error") {
+      ct.classList.remove("dash-skeleton");
+      failLine(ct, "Failed to load");
+      fill(tb, [row([["Failed to load", "sc-muted"]])]);
+    } else { ct.replaceChildren(); tb.replaceChildren(); }
+
+    const lp = dash.data("loops");
+    const ll = document.getElementById("loops-list");
+    if (lp.status === "ok") {
+      ll.classList.remove("dash-skeleton");
+      const comma = d3.format(",");
+      const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+      const markd = (e, field, id) => { e.dataset.source = "loops"; e.dataset.field = field; e.dataset.where = "id=" + encodeURIComponent(id); return e; };
+      const stat = (cls, key, field, id, value, unit) => {
+        const d = mk("div", "sc-stat " + cls);
+        d.appendChild(mk("div", "sc-k", key));
+        d.appendChild(markd(mk("div", "sc-v", value), field, id));
+        d.appendChild(mk("div", "sc-u", unit));
+        return d;
+      };
+      fill(ll, lp.data.slice().sort((a, b) => a.order - b.order).map((r) => {
+        const c = mk("article", "sc-loop");
+        c.appendChild(mk("div", "sc-loop-h", r.benchmark + " · " + r.subject));
+        c.appendChild(mk("p", "sc-loop-q", r.question));
+        c.appendChild(mk("p", "sc-loop-r", "Right answer: " + r.right + ", " + r.right_text));
+        const st = mk("div", "sc-stats");
+        st.appendChild(stat("sc-good", "Q4 thought for", "q4_chars", r.id, comma(r.q4_chars), "characters, then answered " + r.q4_verdict.replace("read as ", "")));
+        st.appendChild(stat("sc-bad", "step4000 thought for", "s_chars", r.id, comma(r.s_chars), "characters, then ran out of room"));
+        c.appendChild(st);
+        const rep = mk("p", "sc-rep");
+        rep.appendChild(document.createTextNode("“Wait” "));
+        rep.appendChild(markd(mk("b", null, comma(r.waits)), "waits", r.id));
+        rep.appendChild(document.createTextNode(" times · its most repeated line, "));
+        rep.appendChild(markd(mk("b", null, comma(r.top_count)), "top_count", r.id));
+        rep.appendChild(document.createTextNode(" times: "));
+        rep.appendChild(mk("code", null, r.top_line));
+        c.appendChild(rep);
+        c.appendChild(mk("p", "sc-what", r.what));
+        c.appendChild(mk("pre", "sc-ex", r.excerpt));
+        return c;
+      }));
+    } else if (lp.status === "error") {
+      ll.classList.remove("dash-skeleton");
+      failLine(ll, "Failed to load");
+    } else ll.replaceChildren();
+
+    const cb = document.getElementById("compare-body");
+    if (cmp.status === "ok") {
+      fill(cb, cmp.data.map((r) => {
+        const tr = row([[r.model], [r.maker, "sc-left"], [fmt(r.gpqa), r.gpqa == null ? "sc-muted" : ""],
+          [fmt(r.hle), (r.hle == null ? "sc-muted" : "") + (r.hle_src === "other" ? " sc-dag" : "")],
+          [fmt(r.otis), r.otis == null ? "sc-muted" : ""], [fmt(r.math), r.math == null ? "sc-muted" : ""], [fmt(r.simpleqa), r.simpleqa == null ? "sc-muted" : ""],
+          [fmt(r.mmlupro), r.mmlupro == null ? "sc-muted" : ""], [r.source, "sc-left sc-muted sc-src"]],
+          r.ours ? (r.model === "Q4 (UD-Q4_K_XL)" ? "sc-ours sc-q4" : "sc-ours") : "");
+        return tr;
+      }));
+    } else if (cmp.status === "error") {
+      fill(cb, [row([["Failed to load", "sc-muted"]])]);
+    } else cb.replaceChildren();
+  });
+
+  const named = document.getElementById(location.hash.slice(1));
+  if (named) { named.scrollIntoView(); dash.setLink(named.id); }
+})();
+</script>

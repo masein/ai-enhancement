@@ -17,8 +17,8 @@ the page opens:
   Those rows are read by the report and never shown on Outside data.
 - **Model cards:** entered through the board's card entry, each with its
   card's link and date (below).
-- **Thinking tokens and loop examples:** worked out from the stored answers in
-  a thread of their own, and kept until a file they read changes.
+- **Thinking tokens and loop examples:** worked out from the stored answers by
+  the stats worker (below), and kept.
 
 No Artificial Analysis number is read: a report must stay shareable. A loop
 example from the hidden half is refused. A report never starts a run, an
@@ -40,7 +40,63 @@ import or a grading batch.
     them, and its setting;
   - `check_14oct`, the values Epoch's data had on 14 Oct, used by the tests;
 - `loops`: the MMLU-Pro questions of the loop examples, each with a note;
-- `reference`: the model the token line compares against.
+- `reference`: the model the token line compares against;
+- `page`: the full page (below), its file in `eval_tasks/reports/pages/`, its
+  starting pick and its datasets; and on a reference row, `page_status`, the
+  status the page shows for it ("7–8 Oct, Qwen's card settings").
+
+## The full page
+
+The scorecard as masein publishes it is at `/reports/step-checkpoints/page`.
+"Open the full page" on the report's card in Reports, and in its report, opens
+it in a tab of its own. 21's report, in the board's own style, stays as it is.
+
+- **The page:** `eval_tasks/reports/pages/step-checkpoints.html`, exactly as
+  published. When the published page changes, replace the file whole; any fix
+  goes in the runtime or the shell, never in the page.
+- **Its runtime:** `service/static/reports/dash.js` gives the page what it was
+  written for (`dash.data`, `dash.calc`, `dash.onData`, the params, the link,
+  the colours). `theme.css` holds the theme tokens, light and dark; the page
+  follows the viewer's setting and the board's own. d3 7.9.0 is kept beside
+  them (ISC licence, `LICENSE-d3.txt`). Nothing is fetched from another host:
+  the page's Content-Security-Policy says so to the browser too.
+- **Its four datasets,** live, at `/api/reports/step-checkpoints/datasets/<id>`,
+  built from the tables 21's report reads and rounded as it rounds:
+  - `ours`: a row per model and benchmark, with its status;
+  - `others`: every other model, with where its numbers come from;
+  - `tokens`: the token stats;
+  - `loops`: the loop examples, from the shown half, with the file's notes.
+- **The header line** says when each source last changed.
+
+The page works out where each model stands from the numbers as shown, to a
+tenth of a point, and 21's report now does the same. Both show the same gap and
+the same verdict in every head-to-head cell. Two things differ by design:
+
+- the page sets ours against our lda-runtime runs and the popular models;
+  21's report sets it against "Q4, earlier run" too;
+- the page's summary line counts the popular models only.
+
+## The stats worker
+
+The token stats, the loop examples and the ran-out lists are worked out by a
+process of their own (`python -m service.report_stats`):
+
+- it runs at the lowest CPU and disk priority, one at a time;
+- it starts after each import or scoring, and when a page finds something not
+  worked out yet;
+- each stat is kept in `BENCH_ROOT/reports/stats.json`, with the files it read
+  and when it was worked out.
+
+A request only reads what is kept. A stat whose answers changed since is shown
+with its time until the new one is in. A first open, before any is kept, says
+"Working these out, back in a minute." The worker's lines are in
+`BENCH_ROOT/reports/stats.log`.
+
+To time it on the server, working every stat out again:
+
+```bash
+cd ~/benchmarks/aienh && time sudo docker compose exec -T bench python -m service.report_stats --again
+```
 
 ## The card numbers
 

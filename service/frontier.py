@@ -1001,6 +1001,11 @@ def score_task(row: Path, task: str, rec: dict, log=print, runs_log: bool = True
         if old not in new:
             old.unlink(missing_ok=True)
     (d / REPLACED).unlink(missing_ok=True)
+    # 21c: a report's stats read these answers — worked out again, by a
+    # process of their own (a staging copy is no row of the board's yet)
+    if Path(row).parent.resolve() == Path(config.OUT_DIR).resolve():
+        from . import report_stats
+        report_stats.wake_quietly()
     return {**page, **detail, "epochs": spec["epochs"]}
 
 

@@ -5526,10 +5526,16 @@ button.secondary { background:var(--surface-1); }
 /* ---- 21: Reports — the list of reports, and each report at its own link ---- */
 .rp-list { display:grid; gap:var(--sp-3); margin-top:var(--sp-3);
   grid-template-columns:repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
-.rp-cardlink { display:block; padding:var(--sp-4); border:1px solid var(--border);
-  border-radius:var(--r-2); background:var(--surface-1); color:var(--text-primary);
-  text-decoration:none; min-width:0; }
-.rp-cardlink:hover, .rp-cardlink:focus-visible { border-color:var(--accent); }
+/* 21c: a card holds the report's link, and its full page beside it */
+.rp-card { display:flex; flex-direction:column; gap:var(--sp-3); padding:var(--sp-4);
+  border:1px solid var(--border); border-radius:var(--r-2); background:var(--surface-1);
+  min-width:0; }
+.rp-card:hover, .rp-card:focus-within { border-color:var(--accent); }
+.rp-cardlink { display:block; color:var(--text-primary); text-decoration:none; min-width:0; }
+.rp-card-acts { display:flex; flex-wrap:wrap; gap:var(--sp-2); margin-top:var(--sp-2); }
+.rp-card .rp-card-acts { margin-top:0; }
+a.btn.rp-pagelink { display:inline-flex; align-items:center; min-height:32px; padding:0 12px;
+  border-radius:var(--r-1); text-decoration:none; font-size:var(--fs-1); font-weight:600; }
 .rp-cardlink h3 { margin:0 0 4px; font-size:var(--fs-3); color:var(--accent); }
 .rp-cardlink p { margin:4px 0 0; font-size:var(--fs-2); color:var(--text-secondary); }
 .rp-fresh { display:flex; flex-wrap:wrap; gap:4px 16px; font-size:var(--fs-1);
@@ -27226,7 +27232,8 @@ function vReports() {
     el('p', { class: 'sub', text: 'Reports built from the board’s own tables, live: our scores '
       + 'as runs are imported and graded, Epoch AI’s from the daily import, model-card numbers '
       + 'as they were entered. Each opens at its own link.' }),
-    R.list.length ? el('div', { class: 'rp-list' }, R.list.map(r => el('a', {
+    R.list.length ? el('div', { class: 'rp-list' }, R.list.map(r => el('div', {
+        class: 'rp-card' }, el('a', {
         class: 'rp-cardlink', href: '#tab=reports&report=' + encodeURIComponent(r.id),
         'data-report-card': r.id,
         onclick: e => { e.preventDefault(); rpOpen(r.id); } },
@@ -27237,9 +27244,28 @@ function vReports() {
         text: 'Ours: ' + r.ours.join(', ') + (r.others ? ` · against ${r.others} other models`
           : '') }),
       el('p', { class: 'small se', 'data-report-changed': r.id,
-        text: r.changed ? 'Numbers last changed ' + r.changed : 'No numbers yet' }))))
+        text: r.changed ? 'Numbers last changed ' + r.changed : 'No numbers yet' })),
+      // 21c: the page as masein publishes it, served by the board, in a tab of its own
+      r.page ? el('div', { class: 'rp-card-acts' }, rpPageLink(r.id, r.page)) : '')))
       : el('p', { class: 'small', text: 'No reports yet: a report is a file in '
         + 'eval_tasks/reports/.' }))];
+}
+// 21c: a report's full page — the one masein publishes, served by the board
+function rpPageLink(id, href) {
+  return el('a', { class: 'btn ghost rp-pagelink', href, target: '_blank', rel: 'noopener',
+    'data-report-page': id, text: 'Open the full page ↗',
+    title: 'The scorecard as it is published, in a tab of its own' });
+}
+// 21c: the stats are worked out by a process of their own — how far it is,
+// and on a first open, before any is kept, when to look again
+function rpWorking(d) {
+  const w = d.working || {}, at = (d.statsAt || {}).words || '';
+  if (!w.todo) return at ? el('p', { class: 'small se', 'data-rp-stats-at': '1',
+    text: at[0].toUpperCase() + at.slice(1) + ', from the stored answers.' }) : '';
+  return el('p', { class: 'small se', 'data-rp-working': w.first ? 'first' : '1',
+    text: w.first ? 'Working these out, back in a minute.'
+      : `The newest answers are being worked out (${w.done} of ${w.todo})`
+        + (at ? `; these were ${at}.` : '.') });
 }
 // a cell of ours: "61.6 ± 3.1", its answers and how many ran out beneath; a
 // dash and why for a benchmark that isn't finished
@@ -27341,7 +27367,8 @@ function vReport(id) {
       el('span', { 'data-fresh': 'cards', text: 'Model cards: each with the date it was '
         + 'entered' }),
       el('a', { href: S.epoch.url, target: '_blank', rel: 'noopener', 'data-credit': 'epoch',
-        text: S.epoch.credit })));
+        text: S.epoch.credit })),
+    d.page ? el('div', { class: 'rp-card-acts' }, rpPageLink(id, d.page)) : '');
   // 1. our runs
   const ours = el('div', { class: 'card', 'data-report-section': 'ours' },
     el('h2', { text: 'Our runs' }),
@@ -27447,9 +27474,7 @@ function vReport(id) {
     el('h2', { text: 'Thinking tokens' }),
     d.tokenLine ? el('p', { class: 'rp-line', 'data-rp-token-line': '1', text: d.tokenLine })
       : '',
-    d.working && d.working.todo ? el('p', { class: 'small se', 'data-rp-working': '1',
-      text: `Worked out from the stored answers: ${d.working.done} of ${d.working.todo} done…` })
-      : '',
+    rpWorking(d),
     el('p', { class: 'small se', text: 'Output tokens are llama-server’s own count. Thinking '
       + 'tokens are that count times the thinking part’s share of the answer’s characters. '
       + 'Right and wrong leave out the answers that ran out of room. Limits: '
@@ -27504,7 +27529,8 @@ function vReport(id) {
             bench: '', subject: '', open: key }); rpOpen(to.id); } })) : '';
       })(),
       x.refused ? el('p', { class: 'warn', 'data-rp-refused': x.id, text: x.refused })
-        : x.pending ? el('p', { class: 'small se', text: 'Worked out from the stored answers…' })
+        : x.pending ? el('p', { class: 'small se', text: d.working && d.working.first
+          ? 'Working these out, back in a minute.' : 'Worked out from the stored answers…' })
         : [x.against ? el('p', { class: 'small', text: `${L.against}: `
             + `${Number(x.against.chars).toLocaleString('en')} characters, ${x.against.verdict}` })
             : el('p', { class: 'small se', text: `${L.against}: no stored answer.` }),
@@ -27668,9 +27694,7 @@ function vRanOut(id, d, back) {
   // the top: a benchmark a line
   const top = el('div', { class: 'card', 'data-ro-top': '1' },
     el('h2', { text: `By benchmark: ${pick}` }),
-    d.working && d.working.todo ? el('p', { class: 'small se', 'data-rp-working': '1',
-      text: `Worked out from the stored answers: ${d.working.done} of ${d.working.todo} done…` })
-      : '',
+    rpWorking(d),
     el('div', { class: 'rp-scroll' }, el('table', { class: 'rp', 'data-ro-summary': '1' },
       el('thead', {}, el('tr', {}, ['Benchmark', 'Ran out', `${d.against}: right`, 'wrong',
         'also ran out', 'Had the right answer', 'Median “Wait”', 'Top line, median']
