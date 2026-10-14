@@ -25,6 +25,8 @@ eval_tasks/*
 !eval_tasks/mobile_mmlu_pro
 !eval_tasks/mobile_mmlu
 !eval_tasks/devicemark
+# 21: the reports, each a file — the Reports place and the daily import read them
+!eval_tasks/reports
 logs/
 artifacts/
 service.sqlite3*

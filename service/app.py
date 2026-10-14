@@ -1655,6 +1655,27 @@ def reported_view():
     return reported.view()
 
 
+# ---------------------------------------------------------------------------
+# 21: Reports — each a file in eval_tasks/reports/, every number from the
+# board's tables (service/reports.py). Read only: nothing here starts a run,
+# an import or a grading batch
+# ---------------------------------------------------------------------------
+
+@app.get("/api/reports")
+def reports_list():
+    from . import reports
+    return {"reports": reports.listing(results_payload())}
+
+
+@app.get("/api/reports/{rid}")
+def reports_one(rid: str):
+    from . import reports
+    got = reports.report(rid, results_payload())
+    if got is None:
+        raise HTTPException(404, f"no report {rid!r}")
+    return got
+
+
 class ReportedImportIn(BaseModel):
     by: str = ""
 

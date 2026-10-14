@@ -2513,7 +2513,13 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
                        else {}),
                     # 18d point 2: the score it replaced, and why
                     **({"was": frontier_was((run.get("frontier") or {}).get(task))}
-                       if frontier_was((run.get("frontier") or {}).get(task)) else {})}
+                       if frontier_was((run.get("frontier") or {}).get(task)) else {}),
+                    # 21: its answers and how many ran out of room, as counted
+                    # for its line — a report reads them from here
+                    "answers": ((run.get("frontier") or {}).get(task) or {}).get("answers"),
+                    "ranOut": ((run.get("frontier") or {}).get(task) or {}).get("ran_out"),
+                    **({"final": False} if ((run.get("frontier") or {}).get(task) or {})
+                       .get("final") is False else {})}
                    if (run.get("frontier") or {}).get(task) else {}),
             }
             metric_used.setdefault(task, name)
@@ -3673,8 +3679,11 @@ input[type=search]:focus { outline:2px solid var(--accent-soft); border-color:va
   align-self:stretch; align-items:stretch; flex:1 1 auto; min-width:0; }
 .tabs::-webkit-scrollbar { display:none; }
 .tabs .morewrap { display:flex; align-items:stretch; }
-.tabs button { border:0; background:none; border-radius:0; padding:8px 13px;
+/* 21: six places — each a little narrower, so the strip never scrolls at
+   1280px and up */
+.tabs button { border:0; background:none; border-radius:0; padding:8px 8px;
   color:var(--text-secondary); white-space:nowrap; }
+@media (max-width:1366px) { .tabs { gap:0; } .tabs button { padding:8px 6px; } }
 .tabs button:hover { color:var(--text-primary); }
 .tabs button[aria-selected="true"] { color:var(--text-primary); font-weight:600; }
 .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
@@ -5514,6 +5523,79 @@ button.secondary { background:var(--surface-1); }
   background-size:200% 100%; animation:sk 2.4s ease-in-out infinite; }
 @keyframes sk { from { background-position:200% 0; } to { background-position:-200% 0; } }
 @media (prefers-reduced-motion: reduce) { .sk-row { animation:none; } }
+/* ---- 21: Reports — the list of reports, and each report at its own link ---- */
+.rp-list { display:grid; gap:var(--sp-3); margin-top:var(--sp-3);
+  grid-template-columns:repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
+.rp-cardlink { display:block; padding:var(--sp-4); border:1px solid var(--border);
+  border-radius:var(--r-2); background:var(--surface-1); color:var(--text-primary);
+  text-decoration:none; min-width:0; }
+.rp-cardlink:hover, .rp-cardlink:focus-visible { border-color:var(--accent); }
+.rp-cardlink h3 { margin:0 0 4px; font-size:var(--fs-3); color:var(--accent); }
+.rp-cardlink p { margin:4px 0 0; font-size:var(--fs-2); color:var(--text-secondary); }
+.rp-fresh { display:flex; flex-wrap:wrap; gap:4px 16px; font-size:var(--fs-1);
+  color:var(--text-secondary); margin:var(--sp-2) 0 0; }
+.rp-scroll { overflow:auto; max-width:100%; margin-top:var(--sp-2); }
+.rp-scroll.tall { max-height:70vh; }
+table.rp { border-collapse:separate; border-spacing:0; font-size:var(--fs-1); min-width:100%; }
+table.rp th, table.rp td { padding:6px 8px; text-align:right; border-bottom:1px solid var(--border);
+  white-space:nowrap; background:var(--surface-1); vertical-align:top; }
+table.rp td .rp-sub { white-space:normal; }
+table.rp th:first-child, table.rp td:first-child { text-align:left; position:sticky; left:0;
+  z-index:1; max-width:15rem; overflow:hidden; text-overflow:ellipsis; }
+table.rp td:first-child .rp-sub, table.rp td:first-child .rp-status { min-width:10rem; }
+table.rp thead th { position:sticky; top:0; z-index:2; color:var(--text-secondary); font-weight:600;
+  height:30px; box-sizing:border-box; }
+table.rp thead th:first-child { z-index:3; }
+table.rp tr.rp-ref td { position:sticky; top:30px; z-index:2; font-weight:600;
+  background:var(--plane); }
+table.rp tr.rp-ref td:first-child { z-index:3; }
+table.rp td.num { font-family:var(--font-mono); }
+table.rp td.dash { color:var(--muted); }
+table.rp tr.rp-group td { background:var(--plane); font-weight:600; text-align:left; }
+.rp-ours { font-weight:700; }
+.rp-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px;
+  vertical-align:middle; }
+.rp-sub { display:block; font-size:10px; color:var(--muted); font-family:var(--font-sans);
+  font-weight:400; }
+.rp-status { display:block; font-size:var(--fs-1); color:var(--text-secondary); font-weight:400;
+  white-space:normal; }
+.rp-picker { display:flex; flex-wrap:wrap; gap:6px; margin:var(--sp-2) 0; }
+.rp-line { font-size:var(--fs-3); margin:var(--sp-2) 0 var(--sp-3); }
+.rp-tiles { display:grid; gap:var(--sp-3);
+  grid-template-columns:repeat(auto-fill, minmax(min(100%, 250px), 1fr)); }
+.rp-tile { border:1px solid var(--border); border-radius:var(--r-2); padding:var(--sp-3);
+  min-width:0; }
+.rp-tile h3 { margin:0; font-size:var(--fs-2); }
+.rp-big { font-family:var(--font-mono); font-size:var(--fs-4); }
+.rp-strip { width:100%; height:46px; display:block; margin-top:6px; overflow:visible; }
+.rp-legend { display:flex; flex-wrap:wrap; gap:4px 14px; font-size:var(--fs-1);
+  color:var(--text-secondary); margin:var(--sp-2) 0; }
+.st-higher { color:var(--success-text); } .st-lower { color:var(--critical-text); }
+.st-level { color:var(--muted); }
+.rp-benches { display:grid; gap:var(--sp-4) var(--sp-5);
+  grid-template-columns:repeat(auto-fill, minmax(min(100%, 420px), 1fr)); }
+.rp-bench { min-width:0; }
+.rp-bench h3 { font-size:var(--fs-2); margin:0 0 6px; }
+.rp-dots { display:grid; grid-template-columns:minmax(0, 11rem) minmax(0, 1fr) 6.5rem;
+  gap:2px 8px; align-items:center; font-size:var(--fs-1); }
+.rp-dots .nm { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rp-dots .v { font-family:var(--font-mono); text-align:right; white-space:nowrap; }
+.rp-dots svg { width:100%; height:14px; display:block; }
+.rp-loops { display:grid; gap:var(--sp-3); }
+.rp-loop { border:1px solid var(--border); border-radius:var(--r-2); padding:var(--sp-3);
+  min-width:0; }
+.rp-loop h3 { margin:0 0 4px; font-size:var(--fs-2); }
+.rp-loop p { margin:4px 0; font-size:var(--fs-2); overflow-wrap:anywhere; }
+.rp-excerpt { white-space:pre-wrap; overflow-wrap:anywhere; font-family:var(--font-mono);
+  font-size:var(--fs-1); background:var(--plane); border-radius:var(--r-1); padding:var(--sp-2);
+  max-height:12rem; overflow:auto; margin:6px 0 0; }
+.rp-notes { padding-left:1.2rem; }
+.rp-notes li { margin:0 0 6px; }
+.rp-cards a { overflow-wrap:anywhere; }
+@media (max-width:720px) {
+  .rp-dots { grid-template-columns:minmax(0, 7rem) minmax(0, 1fr) 5.5rem; }
+  table.rp th:first-child, table.rp td:first-child { max-width:8.5rem; }
+  table.rp td:first-child .rp-sub, table.rp td:first-child .rp-status { min-width:0; } }
 @media print { .filters, .tabs, button { display:none !important; }
   .view { display:block !important; } body { background:#fff; } }
 """
@@ -10439,6 +10521,9 @@ function viewHash(v) {
   if (v === 'build') return 'tab=build' + (state.qb.id ? '&draft=' + state.qb.id : '');
   // 12d.1: the chat open, so a reload lands on it
   if (v === 'playground') return 'tab=playground' + (state.pg.id ? '&chat=' + state.pg.id : '');
+  // 21: a report, so a reload and a link land on it
+  if (v === 'reports') return 'tab=reports' + (RPS().id ? '&report='
+    + encodeURIComponent(RPS().id) : '');
   // 18: an agent run's page, and a task's, so a reload and a link land on it
   if (v === 'queue' && (state.agentView || {}).key)
     return 'tab=runs&agent=' + encodeURIComponent(state.agentView.key)
@@ -10482,7 +10567,8 @@ function viewOfHash(name, params) {
             review: 'pipeline', training: 'training', runs: 'queue', queue: 'queue',
             submit: 'queue', data: 'provenance', provenance: 'provenance', help: 'help',
             tasks: 'tasks', exam: 'exam', everyday: 'everyday', ai: 'ai', build: 'build',
-            playground: 'playground' }[n];
+            playground: 'playground', reports: 'reports' }[n];
+  if (n === 'reports') RPS().id = p.get('report') || null;
   if (n === 'ai') state.ai.mark = p.get('sub') === 'mark';
   // 18: an agent run's page (#tab=runs&agent=<run>), a task's (&task=<id>)
   if (n === 'runs' || n === 'queue') {
@@ -10584,7 +10670,8 @@ function routeFromHash() {
   if (location.hash.slice(1) !== want) history.replaceState(history.state, '', '#' + want);
 }
 
-const PLACE_WORDS = ['home', 'models', 'playground', 'improve', 'benchmarks', 'runs', 'data', 'help'];
+const PLACE_WORDS = ['home', 'models', 'playground', 'improve', 'benchmarks', 'reports', 'runs',
+  'data', 'help'];
 
 // slug ↔ topic, from the same map the payload carries (exam_law ↔ law)
 function topicOfSlug(slug) {
@@ -10644,7 +10731,8 @@ window.addEventListener('hashchange', () => {
 // navigation starts at 0 unless a button aimed it at a section.
 try { history.scrollRestoration = 'manual'; } catch (e) { /* an old browser */ }
 const viewKey = () => state.model ? 'model:' + state.model
-  : state.topic ? 'topic:' + state.topic : 'tab:' + state.tab;
+  : state.topic ? 'topic:' + state.topic : 'tab:' + state.tab
+    + (state.tab === 'reports' ? ':' + (RPS().id || '') : '');
 let _lastView = null, _restore = null, _navigated = false, _saveT = null;
 function saveScroll() {
   try { history.replaceState({ ...(history.state || {}), y: Math.round(scrollY) }, ''); }
@@ -10711,6 +10799,9 @@ function hashWords(h) {
     : ['exam', 'everyday'].includes(p.get('sub')) ? 'Benchmarks · ' + SUB_WORDS[p.get('sub')]
     : 'Benchmarks';
   if (tab === 'improve') return 'Improve' + (SUB_WORDS[p.get('sub')] ? ' · ' + SUB_WORDS[p.get('sub')] : '');
+  // 21: a report by its title, once it is in
+  if (tab === 'reports') return p.get('report') ? 'Reports · ' + ((RPS().data[p.get('report')]
+    || {}).title || p.get('report')) : 'Reports';
   const v = (Object.entries(PAGE_SLUG).find(([, slug]) => slug === tab) || [tab])[0];
   return (TABS.find(([id]) => id === v) || [, 'Home'])[1];
 }
@@ -27032,6 +27123,366 @@ async function pgStop() {
     if (!L.over) try { await post(`api/playground/streams/${L.id}/stop`, {}); } catch (e) { /* it ends anyway */ }
 }
 // ---------- shell ----------
+// ---------------------------------------------------------------------------
+// 21: Reports — a place of its own, after Benchmarks. Its first screen lists
+// the reports (eval_tasks/reports/, a file each); a report opens at its own
+// link (#tab=reports&report=<id>), and Back returns to the list. Every number
+// is the server's (/api/reports), read from the board's own tables when the
+// page asks: never typed into the page, never Artificial Analysis's
+// ---------------------------------------------------------------------------
+const RPS = () => (state.reports = state.reports || { id: null, list: null, data: {},
+  err: '', pick: {}, asked: {}, at: {} });
+const rpNum = (v, d = 1) => v == null ? '—' : (100 * v).toFixed(d);
+const rpPts = v => v == null ? '—' : (v >= 0 ? '+' : '−') + Math.abs(100 * v).toFixed(1);
+const rpColour = m => m && m.colour != null ? `var(--s${(m.colour % 8) + 1})` : 'var(--muted)';
+const RP_STATE_WORDS = { higher: 'ours higher', lower: 'ours lower', level: 'level' };
+const RP_STATE_FILL = { higher: 'var(--good)', lower: 'var(--critical)', level: 'var(--muted)' };
+function rpOpen(id) {
+  RPS().id = id || null;
+  navigate({ tab: 'reports', model: null, topic: null });
+}
+async function loadReports() {
+  const R = RPS();
+  if (R.asked.list) return;
+  R.asked.list = true;
+  try { R.list = (await api('api/reports')).reports || []; R.err = ''; }
+  catch (e) { R.err = e.message; }
+  R.asked.list = false;
+  if (state.tab === 'reports') render();
+}
+async function loadReport(id) {
+  const R = RPS();
+  if (R.asked[id]) return;
+  R.asked[id] = true;
+  try { R.data[id] = await api('api/reports/' + encodeURIComponent(id)); R.err = ''; }
+  catch (e) { R.err = e.message; }
+  R.asked[id] = false;
+  R.at[id] = Date.now();
+  if (state.tab === 'reports' && R.id === id) render();
+  // the token stats are worked out on the server in a thread of their own:
+  // asked again until they are in; and the numbers again every minute
+  const d = R.data[id];
+  clearTimeout(R.timer);
+  R.timer = setTimeout(() => { if (state.tab === 'reports' && R.id === id) loadReport(id); },
+    d && d.working && d.working.todo ? 5000 : 60000);
+}
+function vReports() {
+  const R = RPS();
+  if (R.id) return vReport(R.id);
+  if (!R.list && netReady()) loadReports();
+  if (!R.list) return [el('div', { class: 'card' }, el('h2', { text: 'Reports' }),
+    R.err ? el('p', { class: 'warn', text: 'The reports couldn’t be read: ' + R.err })
+      : skeleton(3, { 'data-loading': 'reports' }))];
+  return [el('div', { class: 'card', 'data-reports-list': '1' },
+    el('h2', { text: 'Reports' }),
+    el('p', { class: 'sub', text: 'Reports built from the board’s own tables, live: our scores '
+      + 'as runs are imported and graded, Epoch AI’s from the daily import, model-card numbers '
+      + 'as they were entered. Each opens at its own link.' }),
+    R.list.length ? el('div', { class: 'rp-list' }, R.list.map(r => el('a', {
+        class: 'rp-cardlink', href: '#tab=reports&report=' + encodeURIComponent(r.id),
+        'data-report-card': r.id,
+        onclick: e => { e.preventDefault(); rpOpen(r.id); } },
+      el('h3', { text: r.title }),
+      el('p', { text: r.what }),
+      el('p', { class: 'small', 'data-report-models': r.id,
+        text: 'Ours: ' + r.ours.join(', ') + (r.others ? ` · against ${r.others} other models`
+          : '') }),
+      el('p', { class: 'small se', 'data-report-changed': r.id,
+        text: r.changed ? 'Numbers last changed ' + r.changed : 'No numbers yet' }))))
+      : el('p', { class: 'small', text: 'No reports yet: a report is a file in '
+        + 'eval_tasks/reports/.' }))];
+}
+// a cell of ours: "61.6 ± 3.1", its answers and how many ran out beneath; a
+// dash and why for a benchmark that isn't finished
+function rpOurCell(c) {
+  if (!c || c.v == null)
+    return el('td', { class: 'dash', title: (c && c.why) || 'not in yet', text: '—' });
+  return el('td', { class: 'num', title: c.how || '' },
+    `${rpNum(c.v)} ± ${rpNum(c.se)}`,
+    el('span', { class: 'rp-sub', text: (c.answers != null ? Number(c.answers).toLocaleString('en')
+      + ' answers' : '') + (c.ranOut ? ` · ${Number(c.ranOut).toLocaleString('en')} ran out`
+      : '') }));
+}
+// a cell of theirs: Epoch's own run with its error; HLE from Epoch's
+// collection marked †; a card's number with its link beside it
+function rpTheirCell(c) {
+  if (!c || c.v == null)
+    return el('td', { class: 'dash', title: c && c.why ? c.why : '', text: '—' });
+  const tip = c.src === 'card' ? `${c.card}: ${c.setting}${c.entered_at ? ` · entered `
+      + `${c.entered_at}${c.by ? ' by ' + c.by : ''}` : ''}`
+    : c.src === 'epoch_external' ? `Epoch AI, ${c.setting} (not Epoch’s own run)`
+    : 'Epoch AI’s own run';
+  return el('td', { class: 'num', title: tip },
+    rpNum(c.v) + (c.se ? ` ± ${rpNum(c.se)}` : '') + (c.dagger ? '†' : ''),
+    c.src === 'card' ? el('span', { class: 'rp-sub' }, el('a', { href: c.url, target: '_blank',
+      rel: 'noopener', 'data-card-link': '1', text: 'card' })) : '');
+}
+function rpName(m) {
+  return el('td', { class: m.ours ? 'rp-ours' : '', title: m.label },
+    m.ours ? el('span', { class: 'rp-dot', style: `background:${rpColour(m)}` }) : '', m.label);
+}
+// a benchmark's range on its charts: every score and its error in it,
+// rounded out to tens — the 0–100 line bunched MMLU-Pro's 40 models into 10
+function rpDomain(cells) {
+  const vs = cells.filter(c => c && c.v != null).flatMap(c => [c.v - (c.se || 0),
+    c.v + (c.se || 0)]);
+  if (!vs.length) return [0, 1];
+  let lo = Math.max(0, Math.floor((Math.min(...vs) - 0.01) * 10) / 10);
+  let hi = Math.min(1, Math.ceil((Math.max(...vs) + 0.01) * 10) / 10);
+  if (hi - lo < 0.2) { lo = Math.max(0, hi - 0.2); hi = Math.min(1, lo + 0.2); }
+  return [lo, hi];
+}
+// 5.2: a benchmark's strip: every other model a dot, coloured by how ours
+// stands against it; ours a line
+function rpStrip(t, dom) {
+  const W = 300, H = 46, [lo, hi] = dom || [0, 1];
+  const x = v => 6 + (W - 12) * Math.max(0, Math.min(1, (v - lo) / (hi - lo)));
+  const svg = el('svg:svg', { class: 'rp-strip', viewBox: `0 0 ${W} ${H}`,
+    preserveAspectRatio: 'none', role: 'img', 'aria-label': `${t.label}: ours ${rpNum(t.v)}, `
+      + `${t.dots.length} others` });
+  svg.append(el('svg:line', { x1: x(0), x2: x(1), y1: H - 10, y2: H - 10,
+    stroke: 'var(--axis)', 'stroke-width': 1 }));
+  for (const tick of [lo, (lo + hi) / 2, hi])
+    svg.append(el('svg:text', { x: x(tick), y: H - 1, 'font-size': 8, 'text-anchor': 'middle',
+      fill: 'var(--muted)', text: String(Math.round(tick * 100)) }));
+  t.dots.forEach((d, i) => svg.append(el('svg:circle', { cx: x(d.v), cy: 8 + (i % 4) * 6, r: 3.2,
+      fill: RP_STATE_FILL[d.state] || 'var(--muted)', 'fill-opacity': d.ours ? 1 : 0.75,
+      stroke: d.ours ? 'var(--text-primary)' : 'none', 'stroke-width': 0.8 },
+    el('svg:title', { text: `${d.label}: ${rpNum(d.v)}${d.se ? ' ± ' + rpNum(d.se) : ''}`
+      + `${d.dagger ? '†' : ''}${d.card ? ' (card)' : ''} · ${RP_STATE_WORDS[d.state] || ''}` }))));
+  if (t.v != null)
+    svg.append(el('svg:line', { x1: x(t.v), x2: x(t.v), y1: 2, y2: H - 10,
+      stroke: 'var(--accent)', 'stroke-width': 2 }));
+  return svg;
+}
+// 5.3: one model's score on a benchmark, a dot with a whisker of ±1 error
+function rpDotSvg(v, se, colour, dom) {
+  const W = 200, [lo, hi] = dom || [0, 1];
+  const x = u => 4 + (W - 8) * Math.max(0, Math.min(1, (u - lo) / (hi - lo)));
+  const svg = el('svg:svg', { viewBox: `0 0 ${W} 14`, preserveAspectRatio: 'none',
+    'aria-hidden': 'true' });
+  svg.append(el('svg:line', { x1: x(0), x2: x(1), y1: 7, y2: 7, stroke: 'var(--grid)' }));
+  if (se) svg.append(el('svg:line', { x1: x(v - se), x2: x(v + se), y1: 7, y2: 7,
+    stroke: colour, 'stroke-width': 2 }));
+  svg.append(el('svg:circle', { cx: x(v), cy: 7, r: 3.5, fill: colour }));
+  return svg;
+}
+function vReport(id) {
+  const R = RPS(), d = R.data[id];
+  if (!d && netReady()) loadReport(id);
+  const back = el('a', { class: 'small backlink', href: '#tab=reports', 'data-reports-back': '1',
+    text: '← Reports', onclick: e => { e.preventDefault(); rpOpen(null); } });
+  if (!d) return [back, el('div', { class: 'card' },
+    R.err ? el('p', { class: 'warn', text: 'The report couldn’t be read: ' + R.err })
+      : skeleton(6, { 'data-loading': 'report' }))];
+  const benches = d.benchmarks, compared = benches.filter(b => b.compare);
+  const pick = R.pick[id] && d.picks.includes(R.pick[id]) ? R.pick[id] : d.picks[0];
+  const st = d.standing[pick];
+  const all = [...d.ours, ...d.theirs];
+  const dom = Object.fromEntries(benches.map(b => [b.key, rpDomain(all.map(m => m.cells[b.key]))]));
+  const S = d.sources;
+  const head = el('div', { class: 'card', 'data-report': id },
+    el('h2', { text: d.title }),
+    el('p', { class: 'sub', text: d.what }),
+    el('div', { class: 'rp-fresh', 'data-report-fresh': '1' },
+      el('span', { 'data-fresh': 'ours', text: 'Our scores: ' + S.ours.words }),
+      el('span', { 'data-fresh': 'epoch', text: 'Epoch AI: ' + S.epoch.words }),
+      el('span', { 'data-fresh': 'cards', text: 'Model cards: each with the date it was '
+        + 'entered' }),
+      el('a', { href: S.epoch.url, target: '_blank', rel: 'noopener', 'data-credit': 'epoch',
+        text: S.epoch.credit })));
+  // 1. our runs
+  const ours = el('div', { class: 'card', 'data-report-section': 'ours' },
+    el('h2', { text: 'Our runs' }),
+    el('div', { class: 'rp-scroll' }, el('table', { class: 'rp', 'data-rp-ours': '1' },
+      el('thead', {}, el('tr', {}, el('th', { text: 'Model' }),
+        ...benches.map(b => el('th', { text: b.label, title: b.compare ? '' : b.why })))),
+      el('tbody', {}, d.ours.map(m => el('tr', { 'data-rp-row': m.label },
+        el('td', { class: 'rp-ours', title: m.row },
+          el('span', { class: 'rp-dot', style: `background:${rpColour(m)}` }), m.label,
+          el('span', { class: 'rp-status', 'data-rp-status': m.label, text: m.status }),
+          m.note ? el('span', { class: 'rp-sub', text: m.note }) : ''),
+        ...benches.map(b => rpOurCell(m.cells[b.key]))))))));
+  // 2. where we stand
+  const stand = el('div', { class: 'card', 'data-report-section': 'stand' },
+    el('h2', { text: 'Where we stand' }),
+    el('div', { class: 'rp-picker', role: 'radiogroup', 'aria-label': 'our model',
+        'data-rp-picker': '1' },
+      d.picks.map(p => el('button', { class: 'chip-btn' + (p === pick ? ' on' : ''),
+        role: 'radio', 'aria-checked': String(p === pick), 'data-rp-pick': p, text: p,
+        onclick: () => { R.pick[id] = p; render(); } }))),
+    el('p', { class: 'rp-line', 'data-rp-summary': '1', text: st.line }),
+    el('div', { class: 'rp-legend' },
+      ['higher', 'lower', 'level'].map(k => el('span', { class: 'st-' + k },
+        el('span', { class: 'rp-dot', style: `background:${RP_STATE_FILL[k]}` }),
+        RP_STATE_WORDS[k])),
+      el('span', { text: '— ' + pick + ', a line' })),
+    el('div', { class: 'rp-tiles', 'data-rp-tiles': '1' }, st.tiles.map(t => el('div', {
+        class: 'rp-tile', 'data-rp-tile': t.key },
+      el('h3', { text: t.label }),
+      el('div', { class: 'rp-big', text: t.v == null ? '—' : `${rpNum(t.v)} ± ${rpNum(t.se)}` }),
+      el('div', { class: 'small se', text: (() => {
+        const n = k => t.dots.filter(x => x.state === k).length;
+        return `higher than ${n('higher')} · lower than ${n('lower')} · level with ${n('level')}`;
+      })() }),
+      rpStrip(t, dom[t.key])))),
+    el('h3', { text: 'Head to head', style: 'margin-top:var(--sp-4)' }),
+    el('p', { class: 'small se', text: `${pick} minus each other model, in points; then on how `
+      + 'many benchmarks ours is higher and on how many lower — a level gap counts in neither. '
+      + 'Hover a cell for both scores.' }),
+    el('div', { class: 'rp-scroll tall', 'data-rp-h2h-scroll': '1' },
+      el('table', { class: 'rp', 'data-rp-h2h': '1' },
+        el('thead', {}, el('tr', {}, el('th', { text: 'Model' }),
+          ...compared.map(b => el('th', { text: b.label })),
+          el('th', { text: 'Higher' }), el('th', { text: 'Lower' }))),
+        el('tbody', {},
+          el('tr', { class: 'rp-ref', 'data-rp-ref': '1' }, el('td', { text: pick }),
+            ...compared.map(b => el('td', { class: 'num', text: rpNum(st.reference[b.key]) })),
+            el('td', { text: '' }), el('td', { text: '' })),
+          st.rows.map(r => el('tr', { 'data-rp-h2h-row': r.label },
+            el('td', { class: r.ours ? 'rp-ours' : '', title: r.label, text: r.label }),
+            ...compared.map(b => {
+              const x = r.diffs[b.key];
+              return x ? el('td', { class: 'num st-' + x.state, title: `${pick} ${rpNum(x.ours)}`
+                  + ` · ${r.label} ${rpNum(x.theirs)} · ${RP_STATE_WORDS[x.state]}`,
+                text: rpPts(x.d) }) : el('td', { class: 'dash', text: '—' });
+            }),
+            el('td', { class: 'num', text: String(r.higher) }),
+            el('td', { class: 'num', text: String(r.lower) })))))));
+  // 3. scores by benchmark
+  const byBench = el('div', { class: 'card', 'data-report-section': 'scores' },
+    el('h2', { text: 'Scores by benchmark' }),
+    el('p', { class: 'small se', text: 'A dot per model, its whisker ±1 standard error (Epoch '
+      + 'AI’s own runs and ours have one; lab and card figures don’t). † from Epoch AI’s '
+      + 'collection of other sources.' }),
+    el('div', { class: 'rp-benches' }, benches.map(b => {
+      const rows = all.filter(m => (m.cells[b.key] || {}).v != null)
+        .sort((p, q) => q.cells[b.key].v - p.cells[b.key].v);
+      return el('div', { class: 'rp-bench', 'data-rp-bench': b.key },
+        el('h3', { text: b.label + (b.compare ? '' : ' (ours only — never compared)') },
+          el('span', { class: 'rp-sub', text: `the line from ${Math.round(dom[b.key][0] * 100)} `
+            + `to ${Math.round(dom[b.key][1] * 100)}` })),
+        rows.length ? el('div', { class: 'rp-dots' }, rows.flatMap(m => {
+          const c = m.cells[b.key];
+          return [el('span', { class: 'nm' + (m.ours ? ' rp-ours' : ''), title: m.label,
+              text: m.label }),
+            rpDotSvg(c.v, c.se, m.ours ? rpColour(m) : 'var(--muted)', dom[b.key]),
+            el('span', { class: 'v', text: rpNum(c.v) + (c.se ? ' ± ' + rpNum(c.se) : '')
+              + (c.dagger ? '†' : '') })];
+        })) : el('p', { class: 'small se', text: 'No scores yet.' }));
+    })),
+    el('h3', { text: 'Ran out of room', style: 'margin-top:var(--sp-4)' }),
+    el('div', { class: 'rp-scroll' }, el('table', { class: 'rp', 'data-rp-ranout': '1' },
+      el('thead', {}, el('tr', {}, el('th', { text: 'Model' }),
+        ...benches.map(b => el('th', { text: b.label })))),
+      el('tbody', {}, d.ours.map(m => el('tr', {}, rpName(m), ...benches.map(b => {
+        const c = m.cells[b.key];
+        return c && c.v != null && c.answers ? el('td', { class: 'num',
+            title: `${c.ranOut || 0} of ${c.answers}`,
+            text: (100 * (c.ranOut || 0) / c.answers).toFixed(1) + '%' })
+          : el('td', { class: 'dash', text: '—' });
+      })))))));
+  // 4. thinking tokens
+  const T = d.tokens, lim = d.tokenLimits;
+  const limit = task => lim[task] || lim.others;
+  const tok = el('div', { class: 'card', 'data-report-section': 'tokens' },
+    el('h2', { text: 'Thinking tokens' }),
+    d.tokenLine ? el('p', { class: 'rp-line', 'data-rp-token-line': '1', text: d.tokenLine })
+      : '',
+    d.working && d.working.todo ? el('p', { class: 'small se', 'data-rp-working': '1',
+      text: `Worked out from the stored answers: ${d.working.done} of ${d.working.todo} done…` })
+      : '',
+    el('p', { class: 'small se', text: 'Output tokens are llama-server’s own count. Thinking '
+      + 'tokens are that count times the thinking part’s share of the answer’s characters. '
+      + 'Right and wrong leave out the answers that ran out of room. Limits: '
+      + benches.map(b => `${b.label} ${Number(limit(b.task)).toLocaleString('en')}`).join(', ')
+      + '.' }),
+    el('div', { class: 'rp-scroll tall' }, el('table', { class: 'rp', 'data-rp-tokens': '1' },
+      el('thead', {}, el('tr', {}, ['Benchmark', 'Answers', 'Thinking mean', 'Thinking median',
+        'Output p90', 'Right (mean)', 'Wrong (mean)', 'Ran out', 'Output total']
+        .map(h => el('th', { text: h })))),
+      el('tbody', {}, d.ours.flatMap(m => {
+        const s = T[m.label] || {};
+        const rows = benches.filter(b => s[b.task]);
+        const N = v => v == null ? '—' : Number(v).toLocaleString('en');
+        return [el('tr', { class: 'rp-group' }, el('td', { colspan: 9 },
+            el('span', { class: 'rp-dot', style: `background:${rpColour(m)}` }), m.label)),
+          ...(rows.length ? rows.map(b => {
+            const x = s[b.task];
+            return el('tr', { 'data-rp-tok': `${m.label}|${b.task}` },
+              el('td', { text: b.label }), el('td', { class: 'num', text: N(x.n) }),
+              el('td', { class: 'num', text: N(x.think_mean) }),
+              el('td', { class: 'num', text: N(x.think_med) }),
+              el('td', { class: 'num', text: N(x.tok_p90) }),
+              el('td', { class: 'num', text: N(x.right_mean) + (x.right_n ? ` (${N(x.right_n)})`
+                : '') }),
+              el('td', { class: 'num', text: N(x.wrong_mean) + (x.wrong_n ? ` (${N(x.wrong_n)})`
+                : '') }),
+              el('td', { class: 'num', text: N(x.ran_out) }),
+              el('td', { class: 'num', text: x.tok_sum >= 1e6 ? (x.tok_sum / 1e6).toFixed(1)
+                + 'M' : N(x.tok_sum) }));
+          }) : [el('tr', {}, el('td', { class: 'dash', colspan: 9,
+            text: 'No stored answers worked out yet.' }))])];
+      })))));
+  // 5. loop examples
+  const L = d.loops;
+  const loops = el('div', { class: 'card', 'data-report-section': 'loops' },
+    el('h2', { text: 'Loop examples' }),
+    el('p', { class: 'small se', text: `${L.first}’s thinking loop on ${benchLabel(benches, L.task)}`
+      + `, beside ${L.against}: questions from the shown half only.` }),
+    el('div', { class: 'rp-loops' }, L.examples.map(x => el('div', { class: 'rp-loop',
+        'data-rp-loop': x.id },
+      el('h3', { text: 'Question ' + x.id }),
+      el('p', { text: x.note }),
+      x.refused ? el('p', { class: 'warn', 'data-rp-refused': x.id, text: x.refused })
+        : x.pending ? el('p', { class: 'small se', text: 'Worked out from the stored answers…' })
+        : [x.against ? el('p', { class: 'small', text: `${L.against}: `
+            + `${Number(x.against.chars).toLocaleString('en')} characters, ${x.against.verdict}` })
+            : el('p', { class: 'small se', text: `${L.against}: no stored answer.` }),
+          x.first ? [el('p', { class: 'small', text: `${L.first}: `
+              + `${Number(x.first.chars).toLocaleString('en')} characters, “Wait” `
+              + `${x.first.waits} times, ${x.first.verdict}` }),
+            x.first.line ? el('p', { class: 'small', text: `Its most repeated line, `
+              + `${x.first.line_n} times: “${x.first.line}”` }) : '',
+            el('pre', { class: 'rp-excerpt', text: x.first.excerpt })]
+            : el('p', { class: 'small se', text: `${L.first}: no stored answer.` })]))));
+  // 6. every model, by GPQA Diamond
+  const g = benches[0].key;
+  const every = el('div', { class: 'card', 'data-report-section': 'every' },
+    el('h2', { text: 'Every model' }),
+    el('p', { class: 'small se', text: `Sorted by ${benches[0].label}; ours in bold. † from `
+      + 'Epoch AI’s collection of other sources; “card” links the model card a number came '
+      + 'from.' }),
+    el('div', { class: 'rp-scroll tall' }, el('table', { class: 'rp', 'data-rp-every': '1' },
+      el('thead', {}, el('tr', {}, el('th', { text: 'Model' }),
+        ...benches.map(b => el('th', { text: b.label })))),
+      el('tbody', {}, [...all].sort((p, q) => ((q.cells[g] || {}).v ?? -1)
+          - ((p.cells[g] || {}).v ?? -1))
+        .map(m => el('tr', {}, rpName(m), ...benches.map(b => m.ours ? rpOurCell(m.cells[b.key])
+          : rpTheirCell(m.cells[b.key]))))))));
+  // 7. how to read this
+  const cards = [];
+  for (const t of d.theirs) for (const [k, c] of Object.entries(t.cells))
+    if (c.src === 'card' && c.url && !cards.some(x => x.url === c.url))
+      cards.push({ url: c.url, card: c.card, at: c.entered_at, by: c.by, v: c.v });
+  const notes = el('div', { class: 'card', 'data-report-section': 'notes' },
+    el('h2', { text: 'How to read this' }),
+    el('ul', { class: 'rp-notes' }, d.notes.map(n => el('li', { text: n }))),
+    el('p', { class: 'small' }, el('a', { href: S.epoch.url, target: '_blank', rel: 'noopener',
+      text: S.epoch.credit }), ` · imported ${S.epoch.words.replace(/^imported /, '')}.`),
+    cards.length ? el('div', { class: 'rp-cards', 'data-rp-cards': '1' },
+      el('p', { class: 'small', text: 'Model cards, each number entered through the board’s '
+        + 'card entry:' }),
+      el('ul', { class: 'rp-notes small' }, cards.map(c => el('li', {},
+        el('a', { href: c.url, target: '_blank', rel: 'noopener', text: c.card }),
+        c.at ? ` · entered ${c.at}${c.by ? ' by ' + c.by : ''}` : ' · not entered yet'))))
+      : '');
+  return [back, head, ours, stand, byBench, tok, loops, every, notes];
+}
+function benchLabel(benches, task) {
+  return (benches.find(b => b.task === task) || { label: task }).label;
+}
+
 // 12b: five places, organised around what people come to do. A table, a
 // reader or a dialog keeps its code and changes container: the views below
 // are the old tabs under their old ids, so every call that opens one still
@@ -27056,12 +27507,15 @@ const TABS = [
   // 12d.1: a place of its own, between Models and Improve — live only: a
   // frozen page has no model to talk to
   ...(LIVE ? [['playground', 'Playground', vPlayground]] : []),
+  // 21: Reports, after Benchmarks — live only: every number is the server's
+  ...(LIVE ? [['reports', 'Reports', vReports]] : []),
 ];
 // Playground joins in 12d, between Models and Improve
 const PLACES = [['home', 'Home', ['overview']], ['models', 'Models', ['leaderboard']],
   ['playground', 'Playground', ['playground']],
   ['improve', 'Improve', ['pipeline', 'training']],
-  ['benchmarks', 'Benchmarks', ['tasks', 'exam', 'everyday']]]
+  ['benchmarks', 'Benchmarks', ['tasks', 'exam', 'everyday']],
+  ['reports', 'Reports', ['reports']]]
   .map(([id, label, views]) => [id, label, views.filter(v => TABS.some(t => t[0] === v))])
   .filter(p => p[2].length);
 const placeOf = v => (PLACES.find(p => p[2].includes(v)) || [])[0] || null;
@@ -27071,7 +27525,7 @@ const SUB_SLUG = { pipeline: 'model', training: 'training',
                    tasks: 'standard', exam: 'exam', everyday: 'everyday' };
 const PAGE_SLUG = { overview: 'home', leaderboard: 'models', queue: 'runs',
                     provenance: 'data', help: 'help', ai: 'ai', build: 'build',
-                    playground: 'playground' };
+                    playground: 'playground', reports: 'reports' };
 
 // Old hashes keep working (§8): a link someone pasted into a message last
 // month still lands, and the address bar then shows where it lives now.

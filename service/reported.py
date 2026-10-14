@@ -57,6 +57,9 @@ SOURCES = {
               "(arXiv:2406.10290)", "licence": "", "url": "https://arxiv.org/abs/2406.10290"},
 }
 PAPER_FILE = Path(__file__).resolve().parent.parent / "eval_tasks" / "mobileaibench" / "paper.json"
+# 21: the reports (service/reports.py), each a file here — the Epoch versions
+# they name are kept by every import
+REPORTS_DIR = Path(__file__).resolve().parent.parent / "eval_tasks" / "reports"
 NO_AA_KEY = ("Artificial Analysis: no key yet — add ARTIFICIAL_ANALYSIS_API_KEY to the "
              "server's .env, then Import now")
 
@@ -240,6 +243,26 @@ def import_aa(fetch=None, board: list[str] | None = None) -> dict:
 EFFORT = ["promax", "max", "xhigh", "high", "medium", "low", "minimal", "", "none", "unknown"]
 
 
+def report_versions() -> set[str]:
+    """21: every Epoch AI version a report names — its own runs, and HLE from
+    Epoch's collection — which each import keeps, whatever the maker limit
+    or the reasoning effort"""
+    out: set[str] = set()
+    for f in sorted(REPORTS_DIR.glob("*.json")) if REPORTS_DIR.is_dir() else []:
+        try:
+            rep = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        for t in rep.get("theirs") or []:
+            if not isinstance(t, dict):
+                continue
+            if t.get("epoch_version"):
+                out.add(str(t["epoch_version"]))
+            out |= {str(c["version"]) for c in t.values() if isinstance(c, dict)
+                    and c.get("from") == "epoch_external" and c.get("version")}
+    return out
+
+
 def _num(v) -> float | None:
     try:
         x = float(str(v).strip().rstrip("%"))
@@ -248,25 +271,36 @@ def _num(v) -> float | None:
     return x if x == x else None                     # not NaN
 
 
-def import_epoch(fetch=None, board: list[str] | None = None) -> dict:
+def import_epoch(fetch=None, board: list[str] | None = None,
+                 named: set[str] | None = None) -> dict:
     """Epoch AI's Benchmarking Hub: its benchmark table names each benchmark's
     file, score column and scale; the model table each version's model,
     maker and release date. Their own runs are "Epoch AI's own run"; a row
     from another source (a technical report, a leaderboard) keeps it — its
     shots and its name — in the setting, so it is never one row with theirs.
-    A superseded benchmark is left out"""
+    A superseded benchmark is left out. 21: a version a report names
+    (report_versions) is kept, outside the maker limit or below the model's
+    highest effort too — marked report_only, it is read by its report and
+    never shown as a row of Outside data's"""
     board = board_ids() if board is None else board
+    named = report_versions() if named is None else named
     blob = (fetch or _fetch)(config.EPOCH_URL)
     sha, same = _begin("epoch", blob)
-    if same:
-        db.reported_import_checked(same["id"])
-        return {"source": "epoch", "status": "unchanged", "line": _line("epoch", same)}
     z = zipfile.ZipFile(io.BytesIO(blob))
     files = {Path(n).name: n for n in z.namelist() if n.endswith(".csv")}
 
     def read(name: str) -> list[dict]:
         with z.open(files[name]) as fh:
             return list(csv.DictReader(io.TextIOWrapper(fh, encoding="utf-8", newline="")))
+    # 21: the same file is only checked — unless it holds a version a report
+    # names that its last import didn't keep (an import before the report)
+    if same:
+        held = {r.get("version") for r in db.reported_scores() if r.get("source") == "epoch"}
+        here = {(r.get("Model version") or "").strip() for f in files
+                if f != "model_metadata.csv" for r in read(f)} if named - held else set()
+        if not (named - held) & here:
+            db.reported_import_checked(same["id"])
+            return {"source": "epoch", "status": "unchanged", "line": _line("epoch", same)}
     meta = {r["model_version"]: r for r in read("model_metadata.csv") if r.get("model_version")}
     rows = []
     for b in read("benchmark_metadata.csv"):
@@ -289,7 +323,8 @@ def import_epoch(fetch=None, board: list[str] | None = None) -> dict:
                 "key": key(group, maker), "name": group, "maker": maker, "version": mv,
                 "effort": tail if tail in EFFORT else "",
                 "released": (m.get("date") or r.get("Release date") or "").strip(),
-                "benchmark": b["benchmark"].strip(), "unit": "share", "value": v * scale,
+                "benchmark": b["benchmark"].strip(), "file": f, "unit": "share",
+                "value": v * scale,
                 # their own runs' standard error: a Δ between two is z-tested
                 "se": (_num(r.get("stderr")) or 0) * scale or None,
                 "setting": (f"from {r.get('Source', '').strip() or 'another source'}"
@@ -305,15 +340,20 @@ def import_epoch(fetch=None, board: list[str] | None = None) -> dict:
             continue
         if r["key"] not in best or EFFORT.index(r["effort"]) < EFFORT.index(best[r["key"]]):
             best[r["key"]] = r["effort"]
-    kept = []
+    kept, extra = [], []
     for r in rows:
         want = best.get(r["key"])
         if r["setting"] == "Epoch AI's own run" and r["effort"] != want:
+            if r["version"] in named:
+                extra.append(r)
             continue
         if want:
             r["name"] = f"{r['name']} ({want})"
         kept.append(r)
-    return _store("epoch", sha, keep(kept, board=board))
+    chosen = keep(kept, board=board)
+    ids = {id(r) for r in chosen}
+    extra += [r for r in kept if id(r) not in ids and r["version"] in named]
+    return _store("epoch", sha, chosen + [{**r, "report_only": True} for r in extra])
 
 
 def import_paper(fetch=None, board: list[str] | None = None) -> dict:
@@ -434,6 +474,8 @@ def view(board: list[str] | None = None) -> dict:
     al = aliases()
     scores, models = [], {}
     for r in db.reported_scores():
+        if r.get("report_only"):
+            continue                # 21: kept for a report, never a row here
         k = canon(r["key"])
         mid = resolve(k, board, al)
         here = mid in (board or [])

@@ -56,7 +56,7 @@ def test_the_header_reads_home_models_playground_improve_benchmarks(live, page):
     page.set_viewport_size({"width": 1400, "height": 900})
     page.goto(live["base"] + "/#tab=home")
     tabs = page.locator("#tabs [role=tab]").all_inner_texts()
-    assert tabs == ["Home", "Models", "Playground", "Improve", "Benchmarks"]
+    assert tabs == ["Home", "Models", "Playground", "Improve", "Benchmarks", "Reports"]   # 21
     page.locator("#tabs [data-tab='playground']").click()
     page.wait_for_selector("[data-pg]")
     assert page.evaluate("location.hash") == "#tab=playground"

@@ -1,0 +1,1210 @@
+{
+ "id": "step-checkpoints",
+ "title": "Step checkpoints vs popular models",
+ "what": "Where the team's step checkpoints (and the Q4, BF16 and Q2 baselines, all on the lda runtime) stand against popular models on the benchmarks those models report.",
+ "ours": [
+  {
+   "label": "step4000",
+   "row": "served/step4000-lda-2610 · thinking",
+   "colour": 0,
+   "pick": true
+  },
+  {
+   "label": "step1000",
+   "row": "served/step1000-lda-2610 · thinking",
+   "colour": 4,
+   "pick": true
+  },
+  {
+   "label": "Q4 (UD-Q4_K_XL)",
+   "row": "served/Qwen3.6-35B-A3B-Q4-lda-2610 · thinking",
+   "colour": 1,
+   "pick": true
+  },
+  {
+   "label": "BF16",
+   "row": "served/Qwen3.6-35B-A3B-BF16-lda-2610 · thinking",
+   "colour": 2,
+   "pick": true
+  },
+  {
+   "label": "Q2 (UD-Q2_K_XL)",
+   "row": "served/Qwen3.6-35B-A3B-Q2-lda-2610 · thinking",
+   "colour": 3,
+   "pick": true
+  },
+  {
+   "label": "Q4, earlier run",
+   "row": "served/Qwen3.6-35B-A3B-Q4-original-k-8 · thinking",
+   "colour": null,
+   "pick": false,
+   "note": "the same Q4 file on Qwen's own sampling settings, 7–8 Oct, for reference"
+  }
+ ],
+ "reference": "Q4 (UD-Q4_K_XL)",
+ "benchmarks": [
+  {
+   "key": "gpqa",
+   "task": "gpqa_diamond_epoch",
+   "label": "GPQA Diamond",
+   "epoch": "GPQA diamond",
+   "compare": true
+  },
+  {
+   "key": "hle",
+   "task": "hle_text_cais",
+   "label": "HLE",
+   "epoch": "Humanity's Last Exam (external)",
+   "compare": true
+  },
+  {
+   "key": "otis",
+   "task": "otis_aime_epoch",
+   "label": "OTIS Mock AIME",
+   "epoch": "OTIS Mock AIME 2024-2025",
+   "compare": true
+  },
+  {
+   "key": "math",
+   "task": "math_l5_epoch",
+   "label": "MATH Level 5",
+   "epoch": "MATH level 5",
+   "compare": true
+  },
+  {
+   "key": "mmlupro",
+   "task": "mmlupro_tiger",
+   "label": "MMLU-Pro",
+   "epoch": null,
+   "compare": true
+  },
+  {
+   "key": "simpleqa",
+   "task": "simpleqa_epoch",
+   "label": "SimpleQA Verified",
+   "epoch": "SimpleQA Verified",
+   "compare": true
+  },
+  {
+   "key": "arc",
+   "task": "arc_agi2_public",
+   "label": "ARC-AGI-2",
+   "epoch": null,
+   "compare": false,
+   "why": "published ARC-AGI-2 numbers are on ARC Prize's held-back set; ours is the public set"
+  }
+ ],
+ "token_limits": {
+  "mmlupro_tiger": 32768,
+  "simpleqa_epoch": 32768,
+  "math_l5_epoch": 65536,
+  "others": 81920
+ },
+ "loops": {
+  "task": "mmlupro_tiger",
+  "first": "step4000",
+  "against": "Q4 (UD-Q4_K_XL)",
+  "examples": [
+   {
+    "id": "486",
+    "note": "Wrote down the right answer, E, early, then kept re-checking other readings of the question until the limit cut off its reply."
+   },
+   {
+    "id": "10707",
+    "note": "Never settled: re-listed the same options over and over and leaned toward a wrong one (E)."
+   },
+   {
+    "id": "11648",
+    "note": "Found 7 bits quickly, then swung between two options (I and H) without deciding."
+   }
+  ]
+ },
+ "theirs": [
+  {
+   "label": "GPT-6 Astra (max)",
+   "maker": "OpenAI",
+   "size": null,
+   "group": "ceiling",
+   "epoch_version": "gpt-6-astra_max",
+   "hle": {
+    "from": "epoch_external",
+    "version": "gpt-6-astra_unknown",
+    "value_14oct": 54.8
+   },
+   "check_14oct": {
+    "gpqa": [
+     95.8,
+     1.4
+    ],
+    "otis": [
+     100.0,
+     0.0
+    ],
+    "simpleqa": [
+     75.6,
+     1.4
+    ]
+   }
+  },
+  {
+   "label": "Claude Opus 5.5 (max)",
+   "maker": "Anthropic",
+   "size": null,
+   "group": "ceiling",
+   "epoch_version": "claude-opus-5-5_max",
+   "check_14oct": {
+    "gpqa": [
+     90.6,
+     1.9
+    ],
+    "otis": [
+     100.0,
+     0.0
+    ],
+    "simpleqa": [
+     72.2,
+     1.4
+    ]
+   }
+  },
+  {
+   "label": "Gemini 3.8 Flash (high)",
+   "maker": "Google",
+   "size": null,
+   "group": "ceiling",
+   "epoch_version": "gemini-3.8-flash_high",
+   "hle": {
+    "from": "epoch_external",
+    "version": "gemini-3.8-flash_unknown",
+    "value_14oct": 44.5
+   },
+   "check_14oct": {
+    "gpqa": [
+     95.4,
+     1.4
+    ],
+    "otis": [
+     98.9,
+     0.9
+    ],
+    "simpleqa": [
+     69.7,
+     1.5
+    ]
+   }
+  },
+  {
+   "label": "DeepSeek-V4-Pro (max)",
+   "maker": "DeepSeek",
+   "size": "1.6T / 49B",
+   "group": "ceiling",
+   "epoch_version": "deepseek-v4-pro_max",
+   "hle": {
+    "from": "card",
+    "value": 37.7,
+    "card": "DeepSeek-V4-Pro model card",
+    "model": "DeepSeek-V4-Pro Max",
+    "maker": "DeepSeek",
+    "benchmark": "HLE (Pass@1)",
+    "setting": "Max reasoning (the card's V4-Pro Max column), no tools",
+    "url": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/blob/b5968e9190ef611bbf34a7229255be88a0e937c1/README.md",
+    "date": "2026-06-22"
+   },
+   "mmlupro": {
+    "from": "card",
+    "value": 87.5,
+    "card": "DeepSeek-V4-Pro model card",
+    "model": "DeepSeek-V4-Pro Max",
+    "maker": "DeepSeek",
+    "benchmark": "MMLU-Pro (EM)",
+    "setting": "Max reasoning (the card's V4-Pro Max column)",
+    "url": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/blob/b5968e9190ef611bbf34a7229255be88a0e937c1/README.md",
+    "date": "2026-06-22"
+   },
+   "check_14oct": {
+    "gpqa": [
+     89.6,
+     1.7
+    ],
+    "otis": [
+     96.7,
+     2.0
+    ],
+    "simpleqa": [
+     47.0,
+     1.6
+    ]
+   }
+  },
+  {
+   "label": "GPT-5.5 Instant",
+   "maker": "OpenAI",
+   "size": null,
+   "group": "near",
+   "epoch_version": "gpt-5.5-instant",
+   "check_14oct": {
+    "gpqa": [
+     82.5,
+     2.3
+    ],
+    "otis": [
+     68.1,
+     6.2
+    ]
+   }
+  },
+  {
+   "label": "Gemini 3.5 Flash-Lite (high)",
+   "maker": "Google",
+   "size": null,
+   "group": "near",
+   "epoch_version": "gemini-3.5-flash-lite_high",
+   "check_14oct": {
+    "gpqa": [
+     83.3,
+     2.7
+    ],
+    "otis": [
+     71.1,
+     6.8
+    ]
+   }
+  },
+  {
+   "label": "Gemini 3.1 Flash-Lite (high)",
+   "maker": "Google",
+   "size": null,
+   "group": "near",
+   "epoch_version": "gemini-3.1-flash-lite_high",
+   "hle": {
+    "from": "epoch_external",
+    "version": "gemini-3.1-flash-lite",
+    "value_14oct": 8.6
+   },
+   "check_14oct": {
+    "gpqa": [
+     81.8,
+     2.7
+    ],
+    "otis": [
+     80.0,
+     6.0
+    ]
+   }
+  },
+  {
+   "label": "Gemma 4 31B IT (minimal)",
+   "maker": "Google (open)",
+   "size": "31B",
+   "group": "near",
+   "epoch_version": "gemma-4-31b-it_minimal",
+   "check_14oct": {
+    "gpqa": [
+     75.8,
+     3.1
+    ],
+    "otis": [
+     73.3,
+     6.7
+    ]
+   }
+  },
+  {
+   "label": "Gemma 4 26B A4B (minimal)",
+   "maker": "Google (open)",
+   "size": "26B / 4B",
+   "group": "near",
+   "epoch_version": "gemma-4-26b-a4b-it_minimal",
+   "check_14oct": {
+    "gpqa": [
+     73.2,
+     3.2
+    ],
+    "otis": [
+     82.2,
+     5.8
+    ]
+   }
+  },
+  {
+   "label": "Qwen3.6-35B-A3B, Qwen's report",
+   "maker": "Alibaba",
+   "size": "35B / 3B",
+   "group": "near",
+   "epoch_version": null,
+   "hle": {
+    "from": "card",
+    "value": 21.4,
+    "card": "Qwen3.6-35B-A3B model card",
+    "model": "Qwen3.6-35B-A3B",
+    "maker": "Qwen",
+    "benchmark": "HLE",
+    "setting": "thinking, as the card reports it",
+    "url": "https://huggingface.co/Qwen/Qwen3.6-35B-A3B/blob/995ad96eacd98c81ed38be0c5b274b04031597b0/README.md",
+    "date": "2026-04-24"
+   },
+   "mmlupro": {
+    "from": "card",
+    "value": 85.2,
+    "card": "Qwen3.6-35B-A3B model card",
+    "model": "Qwen3.6-35B-A3B",
+    "maker": "Qwen",
+    "benchmark": "MMLU-Pro",
+    "setting": "thinking, as the card reports it",
+    "url": "https://huggingface.co/Qwen/Qwen3.6-35B-A3B/blob/995ad96eacd98c81ed38be0c5b274b04031597b0/README.md",
+    "date": "2026-04-24"
+   },
+   "gpqa": {
+    "from": "card",
+    "value": 86.0,
+    "card": "Qwen3.6-35B-A3B model card",
+    "model": "Qwen3.6-35B-A3B",
+    "maker": "Qwen",
+    "benchmark": "GPQA",
+    "setting": "thinking, as the card reports it",
+    "url": "https://huggingface.co/Qwen/Qwen3.6-35B-A3B/blob/995ad96eacd98c81ed38be0c5b274b04031597b0/README.md",
+    "date": "2026-04-24"
+   },
+   "check_14oct": {}
+  },
+  {
+   "label": "Qwen3.6-35B-A3B, Epoch's run",
+   "maker": "Alibaba",
+   "size": "35B / 3B",
+   "group": "near",
+   "epoch_version": "qwen3.6-35b-a3b",
+   "check_14oct": {
+    "gpqa": [
+     83.8,
+     2.6
+    ],
+    "otis": [
+     86.7,
+     5.1
+    ]
+   }
+  },
+  {
+   "label": "Qwen3.5-35B-A3B",
+   "maker": "Alibaba",
+   "size": null,
+   "group": "near",
+   "epoch_version": "qwen3.5-35b-a3b",
+   "hle": {
+    "from": "card",
+    "value": 22.4,
+    "card": "Qwen3.5-35B-A3B model card",
+    "model": "Qwen3.5-35B-A3B",
+    "maker": "Qwen",
+    "benchmark": "HLE w/ CoT",
+    "setting": "thinking, as the card reports it",
+    "url": "https://huggingface.co/Qwen/Qwen3.5-35B-A3B/blob/59d61f3ce65a6d9863b86d2e96597125219dc754/README.md",
+    "date": "2026-04-24"
+   },
+   "mmlupro": {
+    "from": "card",
+    "value": 85.3,
+    "card": "Qwen3.5-35B-A3B model card",
+    "model": "Qwen3.5-35B-A3B",
+    "maker": "Qwen",
+    "benchmark": "MMLU-Pro",
+    "setting": "thinking, as the card reports it",
+    "url": "https://huggingface.co/Qwen/Qwen3.5-35B-A3B/blob/59d61f3ce65a6d9863b86d2e96597125219dc754/README.md",
+    "date": "2026-04-24"
+   },
+   "check_14oct": {
+    "gpqa": [
+     83.5,
+     2.2
+    ],
+    "otis": [
+     54.4,
+     6.2
+    ]
+   }
+  },
+  {
+   "label": "Qwen3-235B-A22B-Thinking-2507",
+   "maker": "Alibaba",
+   "size": null,
+   "group": "near",
+   "epoch_version": "Qwen3-235B-A22B-Thinking-2507",
+   "hle": {
+    "from": "card",
+    "value": 18.2,
+    "card": "Qwen3-235B-A22B-Thinking-2507 model card",
+    "model": "Qwen3-235B-A22B-Thinking-2507",
+    "maker": "Qwen",
+    "benchmark": "HLE",
+    "setting": "the text-only subset (the card's #)",
+    "url": "https://huggingface.co/Qwen/Qwen3-235B-A22B-Thinking-2507/blob/6cbffae6d8e28b986a6b17bd36f42f9fa0f1f0a5/README.md",
+    "date": "2025-08-17"
+   },
+   "mmlupro": {
+    "from": "card",
+    "value": 84.4,
+    "card": "Qwen3-235B-A22B-Thinking-2507 model card",
+    "model": "Qwen3-235B-A22B-Thinking-2507",
+    "maker": "Qwen",
+    "benchmark": "MMLU-Pro",
+    "setting": "thinking, as the card reports it",
+    "url": "https://huggingface.co/Qwen/Qwen3-235B-A22B-Thinking-2507/blob/6cbffae6d8e28b986a6b17bd36f42f9fa0f1f0a5/README.md",
+    "date": "2025-08-17"
+   },
+   "check_14oct": {
+    "gpqa": [
+     80.1,
+     2.6
+    ],
+    "otis": [
+     86.7,
+     5.1
+    ],
+    "simpleqa": [
+     40.4,
+     1.6
+    ]
+   }
+  },
+  {
+   "label": "Qwen3-30B-A3B-Thinking-2507",
+   "maker": "Alibaba",
+   "size": null,
+   "group": "near",
+   "epoch_version": "qwen3-30b-a3b-thinking-2507",
+   "mmlupro": {
+    "from": "card",
+    "value": 80.9,
+    "card": "Qwen3-30B-A3B-Thinking-2507 model card",
+    "model": "Qwen3-30B-A3B-Thinking-2507",
+    "maker": "Qwen",
+    "benchmark": "MMLU-Pro",
+    "setting": "thinking, as the card reports it",
+    "url": "https://huggingface.co/Qwen/Qwen3-30B-A3B-Thinking-2507/blob/144afc2f379b542fdd4e85a1fcd5e1f79112d95d/README.md",
+    "date": "2025-08-17"
+   },
+   "check_14oct": {
+    "gpqa": [
+     70.1,
+     2.8
+    ],
+    "otis": [
+     70.3,
+     6.0
+    ]
+   }
+  },
+  {
+   "label": "Qwen3-30B-A3B (thinking)",
+   "maker": "Alibaba",
+   "size": null,
+   "group": "near",
+   "epoch_version": "Qwen3-30B-A3B",
+   "mmlupro": {
+    "from": "card",
+    "value": 78.5,
+    "card": "Qwen3-30B-A3B-Thinking-2507 model card",
+    "model": "Qwen3-30B-A3B Thinking",
+    "maker": "Qwen",
+    "benchmark": "MMLU-Pro",
+    "setting": "thinking, in the card's comparison table",
+    "url": "https://huggingface.co/Qwen/Qwen3-30B-A3B-Thinking-2507/blob/144afc2f379b542fdd4e85a1fcd5e1f79112d95d/README.md",
+    "date": "2025-08-17"
+   },
+   "check_14oct": {
+    "gpqa": [
+     61.7,
+     3.0
+    ],
+    "otis": [
+     62.8,
+     6.2
+    ]
+   }
+  },
+  {
+   "label": "Qwen3-32B (thinking)",
+   "maker": "Alibaba",
+   "size": null,
+   "group": "near",
+   "epoch_version": "Qwen3-32B",
+   "check_14oct": {
+    "gpqa": [
+     65.7,
+     2.8
+    ],
+    "otis": [
+     66.9,
+     6.0
+    ]
+   }
+  },
+  {
+   "label": "QwQ-32B",
+   "maker": "Alibaba",
+   "size": null,
+   "group": "near",
+   "epoch_version": "QwQ-32B",
+   "check_14oct": {
+    "gpqa": [
+     65.3,
+     2.8
+    ],
+    "otis": [
+     59.2,
+     6.3
+    ]
+   }
+  },
+  {
+   "label": "Qwen3-8B (thinking)",
+   "maker": "Alibaba",
+   "size": null,
+   "group": "near",
+   "epoch_version": "qwen3-8b",
+   "check_14oct": {
+    "gpqa": [
+     56.8,
+     2.9
+    ],
+    "otis": [
+     56.1,
+     6.5
+    ]
+   }
+  },
+  {
+   "label": "DeepSeek-R1-0528",
+   "maker": "DeepSeek",
+   "size": null,
+   "group": "near",
+   "epoch_version": "DeepSeek-R1-0528",
+   "hle": {
+    "from": "card",
+    "value": 17.7,
+    "card": "DeepSeek-R1-0528 model card",
+    "model": "DeepSeek-R1-0528",
+    "maker": "DeepSeek",
+    "benchmark": "Humanity's Last Exam (Pass@1)",
+    "setting": "the text-only prompts, as the card says",
+    "url": "https://huggingface.co/deepseek-ai/DeepSeek-R1-0528/blob/4236a6af538feda4548eca9ab308586007567f52/README.md",
+    "date": "2025-05-29"
+   },
+   "mmlupro": {
+    "from": "card",
+    "value": 85.0,
+    "card": "DeepSeek-R1-0528 model card",
+    "model": "DeepSeek-R1-0528",
+    "maker": "DeepSeek",
+    "benchmark": "MMLU-Pro (EM)",
+    "setting": "as the card reports it",
+    "url": "https://huggingface.co/deepseek-ai/DeepSeek-R1-0528/blob/4236a6af538feda4548eca9ab308586007567f52/README.md",
+    "date": "2025-05-29"
+   },
+   "check_14oct": {
+    "gpqa": [
+     76.3,
+     2.4
+    ],
+    "otis": [
+     66.4,
+     4.9
+    ],
+    "math": [
+     96.6,
+     0.4
+    ]
+   }
+  },
+  {
+   "label": "DeepSeek-R1",
+   "maker": "DeepSeek",
+   "size": null,
+   "group": "near",
+   "epoch_version": "DeepSeek-R1",
+   "hle": {
+    "from": "card",
+    "value": 8.5,
+    "card": "DeepSeek-R1-0528 model card",
+    "model": "DeepSeek-R1",
+    "maker": "DeepSeek",
+    "benchmark": "Humanity's Last Exam (Pass@1)",
+    "setting": "the text-only prompts, in the card's comparison table",
+    "url": "https://huggingface.co/deepseek-ai/DeepSeek-R1-0528/blob/4236a6af538feda4548eca9ab308586007567f52/README.md",
+    "date": "2025-05-29"
+   },
+   "mmlupro": {
+    "from": "card",
+    "value": 84.0,
+    "card": "DeepSeek-R1-0528 model card",
+    "model": "DeepSeek-R1",
+    "maker": "DeepSeek",
+    "benchmark": "MMLU-Pro (EM)",
+    "setting": "in the card's comparison table",
+    "url": "https://huggingface.co/deepseek-ai/DeepSeek-R1-0528/blob/4236a6af538feda4548eca9ab308586007567f52/README.md",
+    "date": "2025-05-29"
+   },
+   "check_14oct": {
+    "gpqa": [
+     71.7,
+     3.1
+    ],
+    "otis": [
+     53.3,
+     7.5
+    ],
+    "math": [
+     93.1,
+     0.7
+    ]
+   }
+  },
+  {
+   "label": "DeepSeek-V3-0324",
+   "maker": "DeepSeek",
+   "size": null,
+   "group": "near",
+   "epoch_version": "DeepSeek-V3-0324",
+   "check_14oct": {
+    "gpqa": [
+     67.6,
+     2.7
+    ],
+    "otis": [
+     37.8,
+     6.2
+    ],
+    "math": [
+     75.5,
+     0.9
+    ]
+   }
+  },
+  {
+   "label": "gpt-oss-120b (high)",
+   "maker": "OpenAI",
+   "size": null,
+   "group": "near",
+   "epoch_version": "openai/gpt-oss-120b_high",
+   "hle": {
+    "from": "card",
+    "value": 14.9,
+    "card": "Qwen3.5-35B-A3B model card",
+    "model": "GPT-OSS-120B",
+    "maker": "OpenAI",
+    "benchmark": "HLE w/ CoT",
+    "setting": "in the card's comparison table; its reasoning effort isn't stated there",
+    "url": "https://huggingface.co/Qwen/Qwen3.5-35B-A3B/blob/59d61f3ce65a6d9863b86d2e96597125219dc754/README.md",
+    "date": "2026-04-24"
+   },
+   "mmlupro": {
+    "from": "card",
+    "value": 80.8,
+    "card": "Qwen3.5-35B-A3B model card",
+    "model": "GPT-OSS-120B",
+    "maker": "OpenAI",
+    "benchmark": "MMLU-Pro",
+    "setting": "in the card's comparison table; its reasoning effort isn't stated there",
+    "url": "https://huggingface.co/Qwen/Qwen3.5-35B-A3B/blob/59d61f3ce65a6d9863b86d2e96597125219dc754/README.md",
+    "date": "2026-04-24"
+   },
+   "check_14oct": {
+    "gpqa": [
+     75.8,
+     2.7
+    ],
+    "otis": [
+     88.9,
+     4.5
+    ]
+   }
+  },
+  {
+   "label": "gpt-oss-20b (medium)",
+   "maker": "OpenAI",
+   "size": null,
+   "group": "near",
+   "epoch_version": "gpt-oss-20b_medium",
+   "check_14oct": {
+    "gpqa": [
+     60.8,
+     2.5
+    ],
+    "otis": [
+     65.3,
+     5.9
+    ]
+   }
+  },
+  {
+   "label": "o4-mini (high)",
+   "maker": "OpenAI",
+   "size": null,
+   "group": "near",
+   "epoch_version": "o4-mini-2025-04-16_high",
+   "hle": {
+    "from": "epoch_external",
+    "version": "o4-mini-2025-04-16_high",
+    "value_14oct": 18.1
+   },
+   "mmlupro": {
+    "from": "card",
+    "value": 81.9,
+    "card": "Qwen3-235B-A22B-Thinking-2507 model card",
+    "model": "o4-mini",
+    "maker": "OpenAI",
+    "benchmark": "MMLU-Pro",
+    "setting": "in the card's comparison table, at medium reasoning effort (its footnote)",
+    "url": "https://huggingface.co/Qwen/Qwen3-235B-A22B-Thinking-2507/blob/6cbffae6d8e28b986a6b17bd36f42f9fa0f1f0a5/README.md",
+    "date": "2025-08-17"
+   },
+   "check_14oct": {
+    "gpqa": [
+     79.6,
+     2.4
+    ],
+    "otis": [
+     81.7,
+     4.7
+    ],
+    "math": [
+     97.8,
+     0.3
+    ],
+    "simpleqa": [
+     18.8,
+     1.2
+    ]
+   }
+  },
+  {
+   "label": "o3-mini (high)",
+   "maker": "OpenAI",
+   "size": null,
+   "group": "near",
+   "epoch_version": "o3-mini-2025-01-31_high",
+   "check_14oct": {
+    "gpqa": [
+     77.0,
+     2.6
+    ],
+    "otis": [
+     76.9,
+     5.2
+    ],
+    "math": [
+     96.5,
+     0.4
+    ],
+    "simpleqa": [
+     15.3,
+     1.1
+    ]
+   }
+  },
+  {
+   "label": "o1 (high)",
+   "maker": "OpenAI",
+   "size": null,
+   "group": "near",
+   "epoch_version": "o1-2024-12-17_high",
+   "hle": {
+    "from": "epoch_external",
+    "version": "o1-2024-12-17_unknown",
+    "value_14oct": 8.0
+   },
+   "check_14oct": {
+    "gpqa": [
+     76.8,
+     3.0
+    ],
+    "otis": [
+     73.3,
+     6.7
+    ],
+    "math": [
+     94.7,
+     0.6
+    ],
+    "simpleqa": [
+     41.1,
+     1.6
+    ]
+   }
+  },
+  {
+   "label": "GPT-5 mini (high)",
+   "maker": "OpenAI",
+   "size": null,
+   "group": "near",
+   "epoch_version": "gpt-5-mini-2025-08-07_high",
+   "hle": {
+    "from": "epoch_external",
+    "version": "gpt-5-mini-2025-08-07_unknown",
+    "value_14oct": 19.4
+   },
+   "mmlupro": {
+    "from": "card",
+    "value": 83.7,
+    "card": "Qwen3.5-35B-A3B model card",
+    "model": "GPT-5-mini 2025-08-07",
+    "maker": "OpenAI",
+    "benchmark": "MMLU-Pro",
+    "setting": "in the card's comparison table; its reasoning effort isn't stated there",
+    "url": "https://huggingface.co/Qwen/Qwen3.5-35B-A3B/blob/59d61f3ce65a6d9863b86d2e96597125219dc754/README.md",
+    "date": "2026-04-24"
+   },
+   "check_14oct": {
+    "gpqa": [
+     75.0,
+     2.3
+    ],
+    "otis": [
+     86.7,
+     4.3
+    ],
+    "math": [
+     97.8,
+     0.3
+    ],
+    "simpleqa": [
+     21.6,
+     1.3
+    ]
+   }
+  },
+  {
+   "label": "GPT-5 nano (high)",
+   "maker": "OpenAI",
+   "size": null,
+   "group": "near",
+   "epoch_version": "gpt-5-nano-2025-08-07_high",
+   "check_14oct": {
+    "gpqa": [
+     69.4,
+     2.8
+    ],
+    "otis": [
+     81.1,
+     4.6
+    ],
+    "math": [
+     94.9,
+     0.5
+    ],
+    "simpleqa": [
+     11.7,
+     1.0
+    ]
+   }
+  },
+  {
+   "label": "GPT-4.1",
+   "maker": "OpenAI",
+   "size": null,
+   "group": "near",
+   "epoch_version": "gpt-4.1-2025-04-14",
+   "hle": {
+    "from": "epoch_external",
+    "version": "gpt-4.1-2025-04-14",
+    "value_14oct": 5.4
+   },
+   "check_14oct": {
+    "gpqa": [
+     66.9,
+     2.8
+    ],
+    "otis": [
+     38.3,
+     6.3
+    ],
+    "math": [
+     83.0,
+     0.8
+    ],
+    "simpleqa": [
+     31.1,
+     1.5
+    ]
+   }
+  },
+  {
+   "label": "GPT-4o (Aug 2024)",
+   "maker": "OpenAI",
+   "size": null,
+   "group": "near",
+   "epoch_version": "gpt-4o-2024-08-06",
+   "check_14oct": {
+    "gpqa": [
+     49.2,
+     2.6
+    ],
+    "otis": [
+     6.4,
+     2.6
+    ],
+    "math": [
+     53.3,
+     1.1
+    ],
+    "simpleqa": [
+     26.0,
+     1.4
+    ]
+   }
+  },
+  {
+   "label": "Claude 3.7 Sonnet (64K thinking)",
+   "maker": "Anthropic",
+   "size": null,
+   "group": "near",
+   "epoch_version": "claude-3-7-sonnet-20250219_64K",
+   "hle": {
+    "from": "epoch_external",
+    "version": "claude-3-7-sonnet-20250219_unknown",
+    "value_14oct": 8.0
+   },
+   "check_14oct": {
+    "gpqa": [
+     79.7,
+     2.7
+    ],
+    "otis": [
+     57.8,
+     7.4
+    ],
+    "math": [
+     91.2,
+     0.8
+    ]
+   }
+  },
+  {
+   "label": "Claude Haiku 4.5 (32K thinking)",
+   "maker": "Anthropic",
+   "size": null,
+   "group": "near",
+   "epoch_version": "claude-haiku-4-5-20251001_32K",
+   "check_14oct": {
+    "gpqa": [
+     71.2,
+     3.2
+    ],
+    "otis": [
+     66.7,
+     7.1
+    ],
+    "math": [
+     96.4,
+     0.5
+    ],
+    "simpleqa": [
+     12.6,
+     1.0
+    ]
+   }
+  },
+  {
+   "label": "Claude 3.5 Sonnet (Oct 2024)",
+   "maker": "Anthropic",
+   "size": null,
+   "group": "near",
+   "epoch_version": "claude-3-5-sonnet-20241022",
+   "hle": {
+    "from": "epoch_external",
+    "version": "claude-3-5-sonnet-20241022",
+    "value_14oct": 4.1
+   },
+   "check_14oct": {
+    "gpqa": [
+     55.3,
+     2.8
+    ],
+    "otis": [
+     8.5,
+     2.6
+    ],
+    "math": [
+     56.9,
+     1.1
+    ]
+   }
+  },
+  {
+   "label": "Gemini 2.5 Flash (Apr preview)",
+   "maker": "Google",
+   "size": null,
+   "group": "near",
+   "epoch_version": "gemini-2.5-flash-preview-04-17",
+   "hle": {
+    "from": "epoch_external",
+    "version": "gemini-2.5-flash-preview-04-17",
+    "value_14oct": 12.1
+   },
+   "check_14oct": {
+    "otis": [
+     73.1,
+     5.5
+    ]
+   }
+  },
+  {
+   "label": "Gemini 2.0 Flash",
+   "maker": "Google",
+   "size": null,
+   "group": "near",
+   "epoch_version": "gemini-2.0-flash-001",
+   "check_14oct": {
+    "gpqa": [
+     64.1,
+     2.7
+    ],
+    "otis": [
+     31.1,
+     6.3
+    ],
+    "math": [
+     82.2,
+     0.9
+    ]
+   }
+  },
+  {
+   "label": "Gemma 3 27B",
+   "maker": "Google (open)",
+   "size": "27B",
+   "group": "near",
+   "epoch_version": "gemma-3-27b-it",
+   "check_14oct": {
+    "gpqa": [
+     47.7,
+     2.7
+    ],
+    "otis": [
+     22.5,
+     5.3
+    ],
+    "math": [
+     74.0,
+     1.1
+    ]
+   }
+  },
+  {
+   "label": "Grok 3 mini (high)",
+   "maker": "xAI",
+   "size": null,
+   "group": "near",
+   "epoch_version": "grok-3-mini-beta_high",
+   "check_14oct": {
+    "gpqa": [
+     75.5,
+     2.8
+    ],
+    "otis": [
+     77.8,
+     6.3
+    ],
+    "math": [
+     88.1,
+     0.9
+    ]
+   }
+  },
+  {
+   "label": "Llama 4 Maverick",
+   "maker": "Meta",
+   "size": null,
+   "group": "near",
+   "epoch_version": "Llama-4-Maverick-17B-128E-Instruct-FP8",
+   "hle": {
+    "from": "epoch_external",
+    "version": "Llama-4-Maverick-17B-128E-Instruct",
+    "value_14oct": 5.7
+   },
+   "check_14oct": {
+    "gpqa": [
+     67.0,
+     2.8
+    ],
+    "otis": [
+     20.6,
+     4.9
+    ],
+    "math": [
+     73.0,
+     1.1
+    ]
+   }
+  },
+  {
+   "label": "Llama 3.3 70B",
+   "maker": "Meta",
+   "size": null,
+   "group": "near",
+   "epoch_version": "Llama-3.3-70B-Instruct",
+   "check_14oct": {
+    "gpqa": [
+     47.4,
+     2.9
+    ],
+    "otis": [
+     5.1,
+     2.4
+    ],
+    "math": [
+     41.6,
+     1.2
+    ]
+   }
+  },
+  {
+   "label": "Mistral Medium 3",
+   "maker": "Mistral AI",
+   "size": null,
+   "group": "near",
+   "epoch_version": "mistral-medium-2505",
+   "hle": {
+    "from": "epoch_external",
+    "version": "mistral-medium-2505",
+    "value_14oct": 4.5
+   },
+   "check_14oct": {
+    "gpqa": [
+     59.5,
+     2.8
+    ],
+    "otis": [
+     32.2,
+     6.0
+    ],
+    "math": [
+     81.6,
+     0.9
+    ]
+   }
+  },
+  {
+   "label": "Phi-4",
+   "maker": "Microsoft",
+   "size": "14B",
+   "group": "near",
+   "epoch_version": "phi-4",
+   "check_14oct": {
+    "gpqa": [
+     56.1,
+     2.6
+    ],
+    "otis": [
+     13.8,
+     3.7
+    ],
+    "math": [
+     64.9,
+     1.1
+    ]
+   }
+  }
+ ],
+ "epoch_checked": "2026-10-14"
+}

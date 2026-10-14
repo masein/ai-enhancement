@@ -1,0 +1,54 @@
+Model version,mean_score,Best score (across scorers),Release date,Organization,Country,Training compute (FLOP),Training compute notes,stderr,Log viewer,Logs,Started at,id
+gpt-5-mini-2025-08-07_high,0.9784743202416919,0.9784743202416919,2025-08-07,OpenAI,United States of America,,,0.003369422414145465,,https://epoch-benchmarks-production-private.s3.us-east-2.amazonaws.com/inspect_ai_logs/5duoiNDccsgaW7UVt6feYX.eval,2025-10-30T10:00:02.998Z,5duoiNDccsgaW7UVt6feYX
+claude-haiku-4-5-20251001_32K,0.9636087945413192,0.9636087945413192,2025-10-15,Anthropic,United States of America,,,0.00515811348923114,,https://epoch-benchmarks-production-private.s3.us-east-2.amazonaws.com/inspect_ai_logs/Qwci6JAG4DUWqA9eSHThDJ.eval,2025-10-22T13:37:59.284Z,Qwci6JAG4DUWqA9eSHThDJ
+gpt-5-nano-2025-08-07_high,0.9490181268882175,0.9490181268882175,2025-08-07,OpenAI,United States of America,,,0.004848851575113763,,https://epoch-benchmarks-production-private.s3.us-east-2.amazonaws.com/inspect_ai_logs/TYQuXJw9H8NRjSovr5VoBn.eval,2025-08-20T11:28:52.016Z,TYQuXJw9H8NRjSovr5VoBn
+DeepSeek-R1-0528,0.9663897280966768,0.9663897280966768,2025-05-28,DeepSeek,China,4.020010000000001e+24,"Estimates by Ege Erdil in Gradient Updates:
+https://epoch.ai/gradient-updates/what-went-into-training-deepseek-r1
+""A dataset size of 14.8 trillion tokens is reasonable and in line with other models of this scale. Assuming that’s valid, the pretraining of this model would have required 6 * (37 billion) * (14.8 trillion) = 3e24 FLOP. If we assume DeepSeek’s training cluster consists of H800s with the PCIe form factor, then each should be capable of 1.5e15 FP8 per second, and the implied model FLOP utilization (MFU) of DeepSeek v3’s 55 day training run ends up being around 23%.""
+
+6 FLOP/token/param * 14.8T tokens * 37B active params = 3.29e24 FLOP (pretraining)
+1.2e23 FLOP (post-training)
+6.1e23 FLOP (fine-tuning)
+
+Total compute: 3.29e24 + 1.2e23 + 6.1e23 = 4.02e24",0.0042156161735636515,,https://epoch-benchmarks-production-private.s3.us-east-2.amazonaws.com/inspect_ai_logs/2wd9khVKiBzsAMUquz2R5s.eval,2025-05-29T14:09:30.970Z,2wd9khVKiBzsAMUquz2R5s
+mistral-medium-2505,0.8162764350453172,0.8162764350453172,2025-05-07,Mistral AI,France,,"Benchmarks match with models like GPT-4o, Mistral's previous largest runs were ~1e25 FLOP scale, so plausibly they might have trained Medium with this much compute.",0.00899565165100951,,https://epoch-benchmarks-production-private.s3.us-east-2.amazonaws.com/inspect_ai_logs/LNUnvvrDra89Vhdc9bzdCy.eval,2025-05-07T17:32:19.064Z,LNUnvvrDra89Vhdc9bzdCy
+o4-mini-2025-04-16_high,0.978285498489426,0.978285498489426,2025-04-16,OpenAI,United States of America,,"We can’t make a precise estimate, but seems unlikely to exceed 10^25 FLOP. We think active parameter count is 10-30B. This would require >55T tokens to reach 10^25 FLOP at the large size, i.e. well beyond 10x overtraining relative to Chinchilla.",0.0033204985518619605,,https://epoch-benchmarks-production-private.s3.us-east-2.amazonaws.com/inspect_ai_logs/727ixGKZ7A7G8LmavE2ScL.eval,2025-04-16T18:17:08.504Z,727ixGKZ7A7G8LmavE2ScL
+gpt-4.1-2025-04-14,0.8300604229607251,0.8300604229607251,2025-04-14,OpenAI,United States of America,,Flagship model from a leading developer in mid-2025; very likely it used >1e25 FLOP.,0.008490146044318322,,https://epoch-benchmarks-production-private.s3.us-east-2.amazonaws.com/inspect_ai_logs/YyJXPVXJjN5EnLfYjfCTrQ.eval,2025-04-14T22:22:31.727Z,YyJXPVXJjN5EnLfYjfCTrQ
+grok-3-mini-beta_high,0.8806646525679759,0.8806646525679759,2025-04-09,xAI,United States of America,,,0.008912712785411623,,https://epoch-benchmarks-production-private.s3.us-east-2.amazonaws.com/inspect_ai_logs/HMm8XaDBr4CQdMFddasEWb.eval,2025-04-10T18:02:30.275Z,HMm8XaDBr4CQdMFddasEWb
+Llama-4-Maverick-17B-128E-Instruct-FP8,0.7301737160120846,0.7301737160120846,2025-04-05,Meta AI,United States of America,2.244000000001e+24,"22T training tokens per model card:
+
+https://github.com/meta-llama/llama-models/blob/main/models/llama4/MODEL_CARD.md   
+
+Maverick was trained using co-distillation from Llama 4 Behemoth. It isn't 100% clear that all 22T tokens used distillation, but we assume this for the time being.
+
+Estimating training compute from parameters and tokens:
+Compute = 6 FLOP per token per parameter * 17B active parameters * 22T tokens = 2.244e24 FLOP
+(Implying mean throughput was 262 TFLOPS/GPU, or 13.2% MFU in FP8)
+
+
+The model card also states that Llama 4 Maverick used 2.38M H100-hours.
+The blog post gives a figure of 390 TFLOPS/GPU, but this may have been the utilization rate for Behemoth, or all of the models together. Using this utilization, we have:
+Compute = 390 TFLOP/s * 2.38 million hours = 3.342e24 FLOP
+(This value is higher than the compute implied by parameters and tokens, and suggests utilization may have been lower for Maverick than for Behemoth.)",0.01083573699636281,,https://epoch-benchmarks-production-private.s3.us-east-2.amazonaws.com/inspect_ai_logs/HkjCosgMFq5QXB2CyTyU7r.eval,2025-04-08T09:46:43.408Z,HkjCosgMFq5QXB2CyTyU7r
+DeepSeek-V3-0324,0.75547583081571,0.75547583081571,2025-03-24,DeepSeek,China,3.3e+24,"6 × 37B × 14.8T = 3.29e24 pretraining FLOPs, 1e22 posttrainining FLOPs - see doc below
+
+https://docs.google.com/document/d/1C4zBvHh4UNnzaorwQSdG61zQJsBV9X3i3A70NeelxHY/edit?usp=sharing",0.008603173106577204,,https://epoch-benchmarks-production-private.s3.us-east-2.amazonaws.com/inspect_ai_logs/YFyn28VJ6m2hfop3KGRkBs.eval,2025-04-01T14:52:18.473Z,YFyn28VJ6m2hfop3KGRkBs
+claude-3-7-sonnet-20250219_64K,0.9116314199395771,0.9116314199395771,2025-02-24,Anthropic,United States of America,3.35e+25,https://docs.google.com/spreadsheets/d/10bhwdVrfHI8tysVIz62ZxtvQ30L-HojYvmU18_b-WIM/edit?gid=0#gid=0,0.007803306377082018,,https://epoch-benchmarks-production-private.s3.us-east-2.amazonaws.com/inspect_ai_logs/epCyFNTf6vyUi5Dby7GeTq.eval,2025-03-13T21:33:10.936Z,epCyFNTf6vyUi5Dby7GeTq
+gemma-3-27b-it,0.740370090634441,0.740370090634441,2025-03-12,Google DeepMind,United States of America,2.268e+24,6ND =  6 * 27B parameters * 14T training tokens = 2.268 × 10^24 FLOP,0.011195857525727288,,https://epoch-benchmarks-production-private.s3.us-east-2.amazonaws.com/inspect_ai_logs/amrtN7UjAtuyEmv5DaGshP.eval,2025-03-13T05:52:35.397Z,amrtN7UjAtuyEmv5DaGshP
+o1-2024-12-17_high,0.947129909365559,0.947129909365559,2024-12-17,OpenAI,United States of America,,,0.006152192005965586,,https://epoch-benchmarks-production-private.s3.us-east-2.amazonaws.com/inspect_ai_logs/jVXtRkTBDnqH8p4sjVUbgN.eval,2025-02-13T17:12:08.885Z,jVXtRkTBDnqH8p4sjVUbgN
+o3-mini-2025-01-31_high,0.9648791540785498,0.9648791540785498,2025-01-31,OpenAI,United States of America,,"We can’t make a precise estimate, but seems unlikely to exceed 10^25 FLOP. We think active parameter count is 10-30B. This would require >55T tokens to reach 10^25 FLOP at the large size, i.e. well beyond 10x overtraining relative to Chinchilla.",0.004265263461984669,,https://epoch-benchmarks-production-private.s3.us-east-2.amazonaws.com/inspect_ai_logs/3VDhPT5WvzjJZkRc36Kuvi.eval,2025-02-13T17:07:49.918Z,3VDhPT5WvzjJZkRc36Kuvi
+gemini-2.0-flash-001,0.8216578549848943,0.8216578549848943,2025-02-05,"Google DeepMind,Google",United States of America,,"""We used Trillium TPUs to train the new Gemini 2.0, Google’s most capable AI model yet"" according to https://cloud.google.com/blog/products/compute/trillium-tpu-is-ga",0.008734081505176936,,https://epoch-benchmarks-production-private.s3.us-east-2.amazonaws.com/inspect_ai_logs/SqwGZz2UfTmbvPiw2rq3LH.eval,2025-02-06T15:51:21.031Z,SqwGZz2UfTmbvPiw2rq3LH
+DeepSeek-R1,0.9305135951661632,0.9305135951661632,2025-01-20,DeepSeek,China,3.5e+24,"3.29e24 + 1.8e23 = 3.47e24, round to 3.5e24 due to lack of sigfigs",0.006990872160031429,,https://epoch-benchmarks-production-private.s3.us-east-2.amazonaws.com/inspect_ai_logs/XVqLs2khGFSNwEbHJTEgRU.eval,2025-01-31T23:48:19.611Z,XVqLs2khGFSNwEbHJTEgRU
+phi-4,0.6493580060422961,0.6493580060422961,2024-12-12,Microsoft Research,United States of America,9.3202015e+23,"6ND = 6* 14*10^9 parameters * 10*10^12 tokens = 8.4e+23 FLOP
+
+989500000000000 FLOP / sec [assumed bf16 precision] * 1920 GPUs * 504 hours * 3600 sec / hour * 0.3 [assumed utilization] = 1.0341209e+24 FLOP
+
+geometric mean
+sqrt(8.4e+23 * 1.0341209e+24) = 9.3202015e+23",0.010656871384084826,,https://epoch-benchmarks-production-private.s3.us-east-2.amazonaws.com/inspect_ai_logs/PnvmfAHVxH9oXfcdcUeUZ3.eval,2025-01-31T23:48:19.147Z,PnvmfAHVxH9oXfcdcUeUZ3
+claude-3-5-sonnet-20241022,0.5694864048338368,0.5694864048338368,2024-10-22,Anthropic,United States of America,,,0.011091284283577038,,https://epoch-benchmarks-production-private.s3.us-east-2.amazonaws.com/inspect_ai_logs/AjroyuZECXLtMTwnzaMHtX.eval,2025-01-27T00:00:00.000Z,AjroyuZECXLtMTwnzaMHtX
+gpt-4o-2024-08-06,0.5327605740181269,0.5327605740181269,2024-08-06,OpenAI,United States of America,,Training compute estimated to be 3.8e25 FLOP from benchmark scores. https://colab.research.google.com/drive/1r3pUMhB7Kh0Gls9eG-v_XefWrye9fVQR?usp=sharing,0.01122129021441016,,https://epoch-benchmarks-production-private.s3.us-east-2.amazonaws.com/inspect_ai_logs/ZQgz8AGm4KHin9MFupLu58.eval,2025-01-27T00:00:00.000Z,ZQgz8AGm4KHin9MFupLu58
+Llama-3.3-70B-Instruct,0.41597432024169184,0.41597432024169184,2024-12-06,Meta AI,United States of America,6.8649768e+24,"6ND = 6 FLOP / parameter / token * 70*10^9 parameters * 15*10^12 tokens = 6.3e+24 FLOP
+
+7000000 GPU-hours * 3600 sec / hour * 989500000000000 FLOP / second * 0.3 [assumed utilization]= 7.48062e+24 FLOP
+
+sqrt(7.48062e+24*6.3e+24) = 6.8649768e+24",0.011816670264886683,,https://epoch-benchmarks-production-private.s3.us-east-2.amazonaws.com/inspect_ai_logs/DeaDxFfiQtCTdnZPH7Awaf.eval,2025-01-27T00:00:00.000Z,DeaDxFfiQtCTdnZPH7Awaf
