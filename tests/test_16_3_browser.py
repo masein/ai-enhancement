@@ -3,8 +3,8 @@
 - **Row 1:** which tests — Standard · Mobile · Everyday · Frontier (and the
   Knowledge exam while it has results) — and Table or Chart.
 - **Row 2:** Group ▾ in place of the twelve chips, each group with how many
-  benchmarks it holds; Models ▾; Filters ▾ (Size, Source, Type, Tested; More:
-  Status, Scale) with its count; one Columns ▾ in place of two, keeping both
+  benchmarks it holds; Models ▾; When ▾ (21d, Tested before); Filters ▾
+  (Size, Source, Type; More: Status, Scale) with its count; one Columns ▾ in place of two, keeping both
   jobs; and the saved views.
 - **Row 3:** a chip for each filter on, Clear all, "9 of 56 models".
 - **Mobile:** All (a headline a suite), DeviceMark (its Chart the On-device
@@ -317,11 +317,12 @@ def test_source_type_and_row_3(live, page):
 
 def test_tested_last_7_days_between_two_dates_and_no_date_said(live, page):
     go(page, live)
-    page.locator("[data-filters]").click()
-    page.locator("#pill-tested").click()
-    page.locator("#pop-tested [data-choice='7d']").click()
+    # 21d: When ▾ sits beside Group and Models, no longer inside Filters ▾
+    page.locator("[data-pickers] #pill-when").click()
+    page.locator("#pop-when [data-choice='7d']").click()
     page.wait_for_selector("[data-on='tested']")
-    assert page.locator("[data-on='tested']").inner_text().startswith("Tested: last 7 days")
+    assert page.locator("[data-on='tested']").inner_text().startswith(
+        "When: tested in the last 7 days")
     kept = page.evaluate("lbFilter(DATA.models).map(m => m.id)")
     assert GOOD in kept                                     # tested yesterday, by a run
     week = page.evaluate("Date.now() - 7 * 864e5")
@@ -337,10 +338,10 @@ def test_tested_last_7_days_between_two_dates_and_no_date_said(live, page):
     shot(page.locator("[data-lb-card]"), "tested-7d-1400.png")
     # between two dates: one model's own day
     day = page.evaluate(f"testedDay(DATA.models.find(m => m.id === {json.dumps(SKEWED)}))")
-    page.locator("#pill-tested").click()
-    page.locator("#pop-tested [data-tested-from]").fill(day)
-    page.locator("#pop-tested [data-tested-to]").fill(day)
-    page.locator("#pop-tested [data-tested-apply]").click()
+    page.locator("#pill-when").click()
+    page.locator("#pop-when [data-when-from]").fill(day)
+    page.locator("#pop-when [data-when-to]").fill(day)
+    page.locator("#pop-when [data-when-apply]").click()
     page.wait_for_function(f"lbS().tested.startsWith({json.dumps(day + '..' + day)})")
     assert SKEWED in page.evaluate("lbFilter(DATA.models).map(m => m.id)")
     assert f"tested={day}..{day}" in page.evaluate("location.hash")

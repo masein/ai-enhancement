@@ -479,9 +479,18 @@ def results_payload() -> dict:
     # 16.3: each model's latest finished run of any kind, for Models' Tested —
     # from the runs table, so a run whose files didn't move the tree counts too
     done = db.last_done(judged=config.KNOWLEDGE_EXAM)
+    # 21d: and when each was first submitted, for When ▸ added (a thinking
+    # row's submissions are its model's)
+    added = db.first_added()
     for m in _cache["payload"]["models"]:
         if done.get(m["id"]):
             m["testedAt"] = done[m["id"]]
+        a = added.get(m["id"]) or added.get(m["id"].removesuffix(" · thinking"))
+        if a:
+            m["addedAt"] = a
+    # 21d: Models ▸ Latest — the report it reads, its picked rows, its benchmarks
+    from . import reports
+    _cache["payload"]["glance"] = reports.glance_meta()
     _cache["at"] = now
     return _cache["payload"]
 
@@ -1664,7 +1673,8 @@ def reported_view():
 @app.get("/api/reports")
 def reports_list():
     from . import reports
-    return {"reports": reports.listing(results_payload())}
+    # 21d: the cards need no board numbers — the payload is never built for them
+    return {"reports": reports.listing()}
 
 
 @app.get("/api/reports/{rid}/answer")
