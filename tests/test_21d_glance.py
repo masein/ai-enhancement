@@ -142,18 +142,27 @@ def test_added_is_the_first_submission(svc):
     assert abs(m["addedAt"] - added[mid]) < 1e-6
 
 
-def test_a_loop_examples_length_is_the_whole_output(svc):
-    """the page's "thought for N characters": every character the model wrote
-    — its thinking, the think tags and its reply"""
+def test_a_loop_examples_length_is_its_thinking_alone(svc):
+    """21d.1: the page's "thought for N characters" — the thinking alone, not
+    the whole output (on the server, Q4 on 486: 6,485 of 7,247), for both
+    models; the report's own view says the same"""
+    import frontier as fb
     world()
     reports.loops(REPORT)
-    f = reports.samples_file(reports.row_dir(SPEC["Q4 (UD-Q4_K_XL)"]["row"]), "mmlupro_tiger")
-    whole = {}
-    for _, row in reports.jsonl(f):
-        whole[str(row["doc"]["id"])] = len(row["resps"][0][0])
+    thought = {}
+    for label in ("Q4 (UD-Q4_K_XL)", "step4000"):
+        f = reports.samples_file(reports.row_dir(SPEC[label]["row"]), "mmlupro_tiger")
+        for _, row in reports.jsonl(f):
+            a = row["resps"][0][0]
+            thought[(label, str(row["doc"]["id"]))] = (len(fb.thinking_of(a)), len(a))
     got = {x["id"]: x for x in svc.get("/api/reports/step-checkpoints/datasets/loops").json()}
     for it in ITEMS:
-        assert got[it["id"]]["q4_chars"] == whole[it["id"]], it["id"]
+        q4, s4 = thought[("Q4 (UD-Q4_K_XL)", it["id"])], thought[("step4000", it["id"])]
+        assert got[it["id"]]["q4_chars"] == q4[0] < q4[1], it["id"]       # less than the whole
+        assert got[it["id"]]["s_chars"] == s4[0] < s4[1], it["id"]
+    ex = {x["id"]: x for x in svc.get("/api/reports/step-checkpoints").json()["loops"]["examples"]}
+    assert ex["486"]["against"]["thought"] == thought[("Q4 (UD-Q4_K_XL)", "486")][0]
+    assert ex["486"]["against"]["chars"] == thought[("Q4 (UD-Q4_K_XL)", "486")][1]
 
 
 def test_stats_kept_under_21cs_counting_are_worked_out_again(svc):

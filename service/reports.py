@@ -714,9 +714,12 @@ def _example(task: str, qid: str, r: dict | None, a: dict | None,
     _scripts()
     import frontier as fb
     out: dict = {"id": str(qid)}
+    # 21d.1: how long each thought — its thinking alone, as the page's "thought
+    # for N characters" says (Q4 on 486: 6,485, of 7,247 whole); its whole
+    # output beside it
     if a:
-        out["against"] = {"chars": len(a["answer"]), "verdict": fb.verdict(task, a),
-                          "ok": a.get("ok")}
+        out["against"] = {"chars": len(a["answer"]), "thought": len(fb.thinking_of(a["answer"])),
+                          "verdict": fb.verdict(task, a), "ok": a.get("ok")}
     if r:
         think = fb.thinking_of(r["answer"])
         lines = [x.strip() for x in think.splitlines() if len(x.strip()) >= 8]
@@ -726,7 +729,8 @@ def _example(task: str, qid: str, r: dict | None, a: dict | None,
         cut = end.find("\n", 0, 200)
         end = end[cut + 1:] if cut >= 0 else end[end.find(" ") + 1:] if " " in end[:40] \
             else end
-        out["first"] = {"chars": len(r["answer"]), "verdict": fb.verdict(task, r),
+        out["first"] = {"chars": len(r["answer"]), "thought": len(think),
+                        "verdict": fb.verdict(task, r),
                         "ran_out": bool(r.get("ran_out")), "ok": r.get("ok"),
                         "waits": len(re.findall(r"\bWait\b", r["answer"])),
                         "line": top[0][0][:200] if top else "",
@@ -775,7 +779,9 @@ def _loops_key(rep: dict) -> str:
     from . import report_stats as rs
     task, first, against = _loop_files(rep)
     ids = [str(ex["id"]) for ex in (rep.get("loops") or {}).get("examples") or []]
-    return "|".join([task, rs.identity(first), rs.identity(against),
+    # 21d.1: "thought" — examples kept before they counted the thinking alone
+    # are worked out again
+    return "|".join(["thought", task, rs.identity(first), rs.identity(against),
                      rs.identity(items_file(task)), ",".join(ids)])
 
 

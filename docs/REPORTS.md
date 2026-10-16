@@ -84,8 +84,9 @@ Standard.
   - each answer's thinking tokens are rounded before they are averaged.
   A benchmark whose answers are in but not scored yet is read from its
   answers, as `tokens.py` reads it.
-- **A loop example's length** is the whole output: the thinking, its tags and
-  the reply.
+- **A loop example's length** is its thinking alone, as the page's "thought for
+  N characters" says (21d.1): Q4's answer to MMLU-Pro 486 is 7,247 characters
+  whole, 6,485 of thinking and 742 of reply.
 
 ## The full page
 

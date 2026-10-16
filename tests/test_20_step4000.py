@@ -29,6 +29,7 @@ import import_remote as ir
 import remote_bundle as rb
 import remote_gguf as rg
 import score_bundle as sb
+from conftest import needs_git
 from service import config, runner, served
 from service import frontier as sf
 from test_12q_devicemark_runs import svc  # noqa: F401 — svc is the fixture
@@ -362,6 +363,7 @@ def test_plan_L_checks_the_card_first(monkeypatch, capsys):
            "6000 only" in str(e.value.code)
 
 
+@needs_git
 def test_the_build_script_takes_cmake_args_and_leaves_the_web_page_out(tmp_path):
     import subprocess
     import tarfile

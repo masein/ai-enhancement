@@ -212,6 +212,12 @@ def test_the_reports_numbers_say_what_they_are(live, page, width, scheme):
     arc = page.locator("[data-rp-row='step4000'] td").nth(7).locator("[data-rp-asked]")
     assert arc.inner_text() == "167 tasks × 2 · 3 answers ran out"
     assert "792 answers" not in page.locator("[data-rp-ours]").inner_text()
+    # 21d.1: a loop example's length is its thinking, as the page says it
+    page.wait_for_selector("[data-rp-loop='486'] [data-rp-thought='against']", timeout=30000)
+    assert page.locator("[data-rp-loop='486'] [data-rp-thought='against']").inner_text() \
+        .startswith("Q4 (UD-Q4_K_XL) thought for ")
+    assert page.locator("[data-rp-loop='486'] [data-rp-thought='first']").inner_text() \
+        .startswith("step4000 thought for ")
     assert page.locator("[data-rp-score-legend]").inner_text().startswith(
         "Score: the average over every answer, in percent. ±: its standard error")
     # the token table: the page's names, each with its definition

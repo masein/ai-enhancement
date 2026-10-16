@@ -187,7 +187,9 @@ def loops(rep: dict, examples: list[dict]) -> list[dict]:
                     "question": it.get("question") or "", "right": it.get("right") or "",
                     "right_text": it.get("right_text") or "",
                     "q4_verdict": a.get("verdict") or "no stored answer",
-                    "q4_chars": a.get("chars") or 0, "s_chars": f["chars"], "waits": f["waits"],
+                    # 21d.1: "thought for N characters": the thinking alone
+                    "q4_chars": a.get("thought", a.get("chars")) or 0,
+                    "s_chars": f.get("thought", f["chars"]), "waits": f["waits"],
                     "top_line": f["line"], "top_count": f["line_n"], "excerpt": f["excerpt"],
                     "what": x.get("note") or "", "order": k + 1, "benchmark": label,
                     "s_verdict": f["verdict"]})

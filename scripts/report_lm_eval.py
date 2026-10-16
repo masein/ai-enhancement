@@ -27738,11 +27738,13 @@ function vReport(id) {
       x.refused ? el('p', { class: 'warn', 'data-rp-refused': x.id, text: x.refused })
         : x.pending ? el('p', { class: 'small se', text: d.working && d.working.first
           ? 'Working these out, back in a minute.' : 'Worked out from the stored answers…' })
-        : [x.against ? el('p', { class: 'small', text: `${L.against}: `
-            + `${Number(x.against.chars).toLocaleString('en')} characters, ${x.against.verdict}` })
+        // 21d.1: how long each thought — its thinking alone, as the page says
+        : [x.against ? el('p', { class: 'small', 'data-rp-thought': 'against', text: `${L.against}`
+            + ` thought for ${rpN(x.against.thought ?? x.against.chars)} characters, `
+            + x.against.verdict })
             : el('p', { class: 'small se', text: `${L.against}: no stored answer.` }),
-          x.first ? [el('p', { class: 'small', text: `${L.first}: `
-              + `${Number(x.first.chars).toLocaleString('en')} characters, “Wait” `
+          x.first ? [el('p', { class: 'small', 'data-rp-thought': 'first', text: `${L.first}`
+              + ` thought for ${rpN(x.first.thought ?? x.first.chars)} characters, “Wait” `
               + `${x.first.waits} times, ${x.first.verdict}` }),
             x.first.line ? el('p', { class: 'small', text: `Its most repeated line, `
               + `${x.first.line_n} times: “${x.first.line}”` }) : '',

@@ -13,6 +13,7 @@ import subprocess
 from pathlib import Path
 
 import check_runner_image as cri
+from conftest import needs_checkout
 
 REPO = Path(__file__).resolve().parents[1]
 WORKFLOW = REPO / ".github" / "workflows" / "runner-image.yml"
@@ -38,6 +39,7 @@ def image_of(stage: str) -> list[str]:
     return out
 
 
+@needs_checkout
 def test_the_runner_image_from_this_checkout_holds_nothing_that_stays():
     files = image_of("runner")
     assert copies("runner") == ["scripts/", "service/", "eval_tasks/devicemark/"]
@@ -45,6 +47,7 @@ def test_the_runner_image_from_this_checkout_holds_nothing_that_stays():
     assert cri.problems(files) == []
 
 
+@needs_checkout
 def test_the_boards_image_would_never_be_pushed():
     found = cri.problems(image_of("board"))
     for words in ("the Knowledge exam's banks and the judge's rubrics (eval_tasks/fr)",
@@ -83,6 +86,7 @@ def test_each_thing_that_stays_on_the_server_is_named():
                                 "the listing is empty"]
 
 
+@needs_checkout
 def test_the_command_exits_1_and_names_them(tmp_path, capsys):
     listing = tmp_path / "files.txt"
     listing.write_text("\n".join(image_of("runner")) + "\n")

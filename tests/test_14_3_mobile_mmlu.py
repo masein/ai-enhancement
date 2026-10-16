@@ -22,7 +22,7 @@ import pytest
 
 import fetch_data
 import mobile_mmlu as mmp
-from conftest import make_service
+from conftest import make_service, needs_checkout
 from service import ai_models, config, contamination, db, llm, llm_poller, mmp_key, runner, served
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "mmp_invented.csv"
@@ -104,6 +104,7 @@ def test_the_file_is_pinned_by_revision_and_hash_and_never_committed():
     assert m["licence"] == "CC BY-ND 4.0" and "CC BY-NC-ND 4.0" in m["full_set"]
 
 
+@needs_checkout
 def test_no_mobile_mmlu_pro_text_is_in_the_repo_outside_the_invented_rows():
     tracked = subprocess.run(["git", "ls-files", "-z"], cwd=REPO, capture_output=True,
                              check=True).stdout.decode().split("\0")

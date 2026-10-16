@@ -34,6 +34,34 @@ from make_fixture import HIDDEN_FIXTURE, HIDDEN_FIXTURE_MANIFEST, sit_hidden  # 
 from service import config as _config  # noqa: E402
 
 
+# 21d.1: deploy step 3 runs the tests inside the board's image, from the
+# commit streamed out with `git archive` — no .git, and no git in the image.
+# A test that reads what git tracks, or drives git, says so and is skipped
+# there; CI and a checkout run it
+def _git_checkout() -> bool:
+    import shutil
+    import subprocess
+    if not shutil.which("git"):
+        return False
+    try:
+        got = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--is-inside-work-tree"],
+                             capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return got.returncode == 0 and got.stdout.strip() == "true"
+
+
+def _has_git() -> bool:
+    import shutil
+    return shutil.which("git") is not None
+
+
+needs_checkout = pytest.mark.skipif(not _git_checkout(), reason="reads what git tracks, and "
+                                    "this copy is no git checkout (deploy step 3's git archive)")
+needs_git = pytest.mark.skipif(not _has_git(), reason="drives git, which this image hasn't "
+                               "(deploy step 3)")
+
+
 @pytest.fixture(scope="session", autouse=True)
 def invented_question_sets():
     """17c: scripts/frontier.py checks each benchmark's question count on every
