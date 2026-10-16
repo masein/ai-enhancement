@@ -21,6 +21,7 @@ import fetch_data
 import mobile_mmlu as mmp
 from service import config, contamination
 from test_14_3_mobile_mmlu import _Resp, put_invented
+from conftest import needs_checkout
 
 REPO = Path(__file__).resolve().parent.parent
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "mmf_invented"
@@ -95,6 +96,7 @@ def test_pros_wording_now_says_what_was_decided():
     assert "a company can't use" not in mmp.__doc__ and "masein decided" in mmp.__doc__
 
 
+@needs_checkout
 def test_none_of_the_full_sets_files_is_in_the_repo():
     tracked = subprocess.run(["git", "ls-files", "-z"], cwd=REPO, capture_output=True,
                              check=True).stdout.decode().split("\0")

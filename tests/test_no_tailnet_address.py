@@ -14,6 +14,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import needs_checkout
+
 REPO = Path(__file__).resolve().parent.parent
 # an address, not the range's name: Tailscale's IPv6 prefix written out alone
 # (fd7a:115c:a1e0::, as the raw export's scrubber describes it) is public knowledge
@@ -27,6 +29,7 @@ def tracked() -> list[Path]:
     return [REPO / n for n in out if n]
 
 
+@needs_checkout
 def test_no_tracked_file_holds_a_tailnet_address():
     found = []
     for p in tracked():

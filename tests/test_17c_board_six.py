@@ -20,10 +20,12 @@ import tarfile
 from pathlib import Path
 
 import report_lm_eval as report
+from conftest import needs_git
 
 REPO = Path(__file__).resolve().parents[1]
 
 
+@needs_git
 def test_1_the_tarball_script_reads_a_tree_with_many_untracked_files(tmp_path):
     """the server's checkout: exit 141, no output, before the first line"""
     src = tmp_path / "llama.cpp"
@@ -108,6 +110,7 @@ exit 0
 """
 
 
+@needs_git
 def test_8_9_the_tarball_carries_its_licences_and_modes_arent_changes(tmp_path):
     src = tmp_path / "llama.cpp"
     src.mkdir()

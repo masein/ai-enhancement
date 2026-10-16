@@ -19,7 +19,7 @@ import pytest
 
 import fetch_data
 import mobileaibench as mab
-from conftest import make_service
+from conftest import make_service, needs_checkout
 from service import config, contamination, db, llm, reported, runner, served
 from test_14_1_mab_text import fake_gpu, sit
 
@@ -64,6 +64,7 @@ def svc(tmp_path, monkeypatch, invented):
 ENRON_ADDRESS = re.compile(rb"[a-z0-9._%+-]+@" + re.escape(b"enron") + rb"\.com\b", re.I)
 
 
+@needs_checkout
 def test_no_committed_file_holds_an_enron_address():
     files = subprocess.run(["git", "ls-files"], cwd=REPO, capture_output=True, text=True,
                            check=True).stdout.split()
