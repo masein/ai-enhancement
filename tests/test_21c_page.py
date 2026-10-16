@@ -139,7 +139,7 @@ def world(keep_stats: bool = True) -> None:
         if keep_stats:
             # the 14 Oct stats (~/tokens.py, equal to 21's on the same answers),
             # kept as the stats worker keeps them, for the files stored now
-            report_stats.keep(reports._tok_slot(d, s["task"]), report_stats.identity(f),
+            report_stats.keep(reports._tok_slot(d, s["task"]), reports._tok_key(f),
                               {k: v for k, v in s.items() if k not in ("row", "task")})
     # step1000's MATH Level 5: every answer in, not scored yet
     from service import frontier as sf
@@ -196,6 +196,9 @@ def test_every_other_model_equals_the_published_row(svc):
     got = get(svc, "others")
     assert len(got) == 41 == len(OTHERS)
     for g, w in zip(got, OTHERS):
+        if w["model"] == "o4-mini (high)":
+            # 21d: its MMLU-Pro is the card's at medium effort, and says so
+            w = {**w, "source": "Epoch AI; MMLU-Pro: Qwen card (medium effort)"}
         assert g == w, {k: (g.get(k), v) for k, v in w.items() if g.get(k) != v}
 
 
@@ -225,18 +228,20 @@ def test_the_finished_models_token_rows_equal_the_published_ones(svc):
 
 
 def test_one_token_row_worked_out_by_the_worker_from_stored_answers(svc):
-    """the stats the page reads are the worker's: BF16's GPQA Diamond, its
-    answers built to match the 14 Oct row (21's builder), worked out by the
-    worker's own code and read back as the published row"""
-    from test_21_reports import GPQA, LAYOUT, build
+    """the stats the page reads are the worker's: BF16's GPQA Diamond worked
+    out by the worker from stored answers, read back in the page's columns as
+    ~/tokens.py counts them on the same answers (21d)"""
+    import token_answers as ta
     world(keep_stats=False)
-    d = config.OUT_DIR / GPQA["row"]
-    runs = build(LAYOUT["gpqa"], GPQA)
-    samples(d, GPQA["task"], [(f"q{k}", out, ok, a, t) for k, (t, out, ok, a) in enumerate(runs)])
+    ta.write(config.OUT_DIR)
+    want = ta.tokens_py(config.RESULTS_ROOT)[(
+        "served__Qwen3.6-35B-A3B-BF16-lda-2610__thinking", "gpqa_diamond_epoch")]
     got = report_stats.work(say=lambda s: None)
     assert got["done"] and not got["failed"]
     row = next(r for r in get(svc, "tokens") if (r["model"], r["bench"]) == ("BF16", "gpqa"))
-    assert row == next(r for r in TOKENS if (r["model"], r["bench"]) == ("BF16", "gpqa"))
+    assert row["answers"] == want["n"]
+    assert {k: row[k] for k in report_page.TOKEN_FIELDS} == {
+        k: want[k] for k in report_page.TOKEN_FIELDS}
 
 
 def test_the_loop_examples_from_the_shown_half_with_the_files_notes(svc):

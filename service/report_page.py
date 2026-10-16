@@ -105,32 +105,7 @@ def ours(rep: dict, rows: list[dict]) -> list[dict]:
     return out
 
 
-def _card_word(card: str) -> str:
-    """"DeepSeek-V4-Pro model card" -> "DeepSeek"; "Qwen3.5-35B-A3B model card" -> "Qwen" """
-    m = re.match(r"[A-Za-z]+", card or "")
-    return m.group(0) if m else (card or "model")
-
-
-def source(benches: list[dict], cells: dict) -> str:
-    """where a model's numbers come from, in words: "Epoch AI", "Epoch AI;
-    HLE, MMLU-Pro: DeepSeek card", or "Qwen's model card" when every one is a
-    card's"""
-    cards: dict[str, list[str]] = {}
-    epoch = False
-    for b in benches:
-        c = cells.get(b["key"]) or {}
-        if c.get("v") is None:
-            continue
-        if c.get("src") == "card":
-            cards.setdefault(_card_word(c.get("card") or ""), []).append(b["label"])
-        else:
-            epoch = True
-    if not cards:
-        return "Epoch AI"
-    if not epoch and len(cards) == 1:
-        return f"{next(iter(cards))}'s model card"
-    said = "; ".join(f"{', '.join(labels)}: {word} card" for word, labels in cards.items())
-    return f"Epoch AI; {said}" if epoch else said
+source = reports.source_words      # where a model's numbers come from, in words
 
 
 def others(rep: dict, theirs: list[dict]) -> list[dict]:
@@ -166,7 +141,7 @@ def others(rep: dict, theirs: list[dict]) -> list[dict]:
                                       if c.get("src") == "card" else "")
         for b in rest:
             row[b["key"]] = v(b["key"])
-        row["source"] = source(benches, cells)
+        row["source"] = t.get("source") or source(benches, cells)
         out.append(row)
     return out
 

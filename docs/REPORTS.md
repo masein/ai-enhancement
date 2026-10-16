@@ -43,7 +43,49 @@ import or a grading batch.
 - `reference`: the model the token line compares against;
 - `page`: the full page (below), its file in `eval_tasks/reports/pages/`, its
   starting pick and its datasets; and on a reference row, `page_status`, the
-  status the page shows for it ("7–8 Oct, Qwen's card settings").
+  status the page shows for it ("7–8 Oct, Qwen's card settings");
+- `glance: true` on the popular models Models ▸ Latest shows, and
+  `glance_benchmarks`, its benchmarks (below);
+- on a card cell, `note`: a word the cell's source says with it ("medium
+  effort" on o4-mini's MMLU-Pro).
+
+## Models ▸ Latest
+
+Models opens on Latest when the link names no other view. It is one table:
+the report's picked rows (step4000, step1000, Q4, BF16, Q2) and the popular
+models marked `glance: true`, on the report's `glance_benchmarks` (GPQA
+Diamond, OTIS Mock AIME, MMLU-Pro, HLE).
+
+- Every number is read from the report, so the two always agree.
+- Our rows are bold; each published row says where it is from, a model card
+  with its link.
+- It is sorted by the first benchmark, with no rank and no average: published
+  numbers are never ranked or averaged with ours.
+
+Change the models by editing `glance` in the report file. Latest is shown
+only while one of the picked rows has a score; until then Models opens on
+Standard.
+
+## What the numbers mean
+
+- **A score** is the average over every answer, in percent. Its line says how
+  many questions and how many times each is asked: GPQA Diamond 198 × 4, OTIS
+  Mock AIME 45 × 8, ARC-AGI-2 167 tasks × 2, the rest once.
+- **±** is its standard error: how far the score could move with a different
+  draw of questions of the same kind.
+- **The token columns** are named as the published page names them, and their
+  definitions are the page's own words, read from its file.
+- **The thinking tokens** are counted exactly as `~/tokens.py` counts them
+  (its copy is `tests/fixtures/tokens_py/tokens.py`, and the tests hold the
+  board to it):
+  - an answer's thinking share leaves the think tags out;
+  - think_share is all the thinking characters over all the characters;
+  - the median and p90 are the values at n/2 and 0.9·n of the sorted list;
+  - each answer's thinking tokens are rounded before they are averaged.
+  A benchmark whose answers are in but not scored yet is read from its
+  answers, as `tokens.py` reads it.
+- **A loop example's length** is the whole output: the thinking, its tags and
+  the reply.
 
 ## The full page
 

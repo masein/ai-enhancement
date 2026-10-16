@@ -5598,6 +5598,37 @@ table.rp tr.rp-group td { background:var(--plane); font-weight:600; text-align:l
 .rp-notes { padding-left:1.2rem; }
 .rp-notes li { margin:0 0 6px; }
 .rp-cards a { overflow-wrap:anywhere; }
+/* 21d: the token table's long names wrap, its "?" beside the last word */
+table.rp[data-rp-tokens] thead th { white-space:normal; vertical-align:bottom; min-width:5rem;
+  max-width:8.5rem; line-height:1.25; }
+table.rp[data-rp-tokens] thead th:first-child { min-width:0; }
+/* 21d: "198 questions × 4 · 3 answers ran out" wraps between its parts only */
+.rp-sub .nw { white-space:nowrap; }
+/* 21d: a token column's "?" and its definition; the definitions under the table */
+.rp-q { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px;
+  min-height:16px; margin-left:4px; padding:0; border-radius:50%; border:1px solid var(--border);
+  background:var(--surface-1); color:var(--text-secondary); font-size:10px; font-weight:700;
+  line-height:1; cursor:help; vertical-align:middle; }
+.rp-q:hover, .rp-q[aria-expanded="true"] { border-color:var(--accent); color:var(--accent); }
+.rp-qpop { max-width:min(320px, calc(100vw - 32px)); padding:var(--sp-2) var(--sp-3);
+  white-space:normal; font-weight:400; text-align:left; }
+.rp-qpop p { margin:4px 0 0; font-size:var(--fs-1); color:var(--text-secondary); line-height:1.45; }
+.rp-defs { display:grid; grid-template-columns:minmax(9rem, max-content) 1fr; gap:4px 16px;
+  margin:var(--sp-3) 0 0; font-size:var(--fs-1); color:var(--text-secondary); line-height:1.45; }
+.rp-defs dt { color:var(--text-primary); font-weight:600; }
+.rp-defs dd { margin:0; min-width:0; }
+@media (max-width:560px) { .rp-defs { grid-template-columns:1fr; }
+  .rp-defs dd { margin-bottom:4px; } }
+/* 21d: Models ▸ Latest — the report's numbers in one table, its source beside each row */
+table.rp.latest td.src { text-align:left; white-space:normal; min-width:12rem; max-width:22rem;
+  font-size:var(--fs-1); color:var(--text-secondary); font-weight:400; }
+table.rp.latest td.src.rp-ours { color:var(--text-primary); }
+table.rp.latest th.src { text-align:left; }
+/* 21d: When ▾ — which date, then when */
+.whenby { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px;
+  padding:4px 8px 8px; border-bottom:1px solid var(--border); margin-bottom:4px; }
+.whenby .segbtn { display:inline-flex; gap:4px; }
+.whenby [data-when-what] { flex-basis:100%; }
 @media (max-width:720px) {
   .rp-dots { grid-template-columns:minmax(0, 7rem) minmax(0, 1fr) 5.5rem; }
   table.rp th:first-child, table.rp td:first-child { max-width:8.5rem; }
@@ -11540,8 +11571,21 @@ const LIVE_CHIPS = ['frontier', 'devicemark'];
 const MOBILE_CHIPS = ['mobileall', 'devicemark', 'mobile', 'mmlu'];
 // the kinds of test, named the same and in the same order everywhere.
 // 12f.2b: #tab=models&view=phone is Models with the phone builds chosen
-const MODELS_VIEWS = { standard: 'Standard', mobile: 'Mobile', everyday: 'Everyday',
-  frontier: 'Frontier', exam: 'Knowledge exam' };
+const MODELS_VIEWS = { latest: 'Latest', standard: 'Standard', mobile: 'Mobile',
+  everyday: 'Everyday', frontier: 'Frontier', exam: 'Knowledge exam' };
+// 21d: Latest — what we're working on now, at first glance: the report's
+// picked rows (our step checkpoints, the original model) and the popular
+// models it marks "glance", on its four benchmarks, every number the report's.
+// Live only; the view Models opens on while any of those rows has a score
+const glance = () => (LIVE && DATA && DATA.glance) || null;
+function latestOn() {
+  const g = glance();
+  return !!g && (g.rows || []).some(id => (g.tasks || []).some(t => {
+    const c = cell(t, id);
+    return !!c && c.v != null;
+  }));
+}
+const lbDefaultTest = () => latestOn() ? 'latest' : 'standard';
 // each one's Group ▾: [its name in the address, its words, its chip]
 const LB_GROUPS = {
   standard: [['all', 'All', 'all'], ['knowledge', 'Knowledge', 'knowledge'],
@@ -11560,7 +11604,7 @@ const examOn = () => !!(DATA && DATA.examOn);
 // the views a table is drawn in: Standard's (its chip says which tests: Mobile
 // and Frontier are chips of it), the exam's and Everyday's
 function modelsViews() {
-  const out = ['standard'];
+  const out = latestOn() ? ['latest', 'standard'] : ['standard'];
   if (examOn() && DATA.models.some(m => Object.keys((m.judge || {}).tasks || {})
     .some(t => t.startsWith('exam_'))))
     out.push('exam');
@@ -11575,7 +11619,7 @@ function lbTests() {
 }
 // which of Row 1's choices a state is, and which of its groups
 function lbTest(L = lbS()) {
-  if (['everyday', 'exam', 'compare'].includes(L.view)) return L.view;
+  if (['everyday', 'exam', 'compare', 'latest'].includes(L.view)) return L.view;
   if (L.chip === 'frontier') return 'frontier';
   return MOBILE_CHIPS.includes(L.chip) ? 'mobile' : 'standard';
 }
@@ -11593,7 +11637,7 @@ function lbWhere(L = lbS()) {
 // its last group
 function lbChoice(test, group) {
   const L = lbS();
-  if (test === 'everyday' || test === 'exam')
+  if (test === 'everyday' || test === 'exam' || test === 'latest')
     return { view: test, chip: test === 'exam' ? 'judged' : L.chip === 'judged' ? 'all' : L.chip,
       cols: null };
   if (test === 'frontier') return { view: 'standard', chip: 'frontier', cols: null };
@@ -11620,8 +11664,8 @@ function lbRemember(patch) {
   if (L.view === 'compare') return;
   const key = lbViewKey(L);
   try {
-    localStorage.setItem('bench-models-last', JSON.stringify({ test: lbTest(L), group: lbGroup(L),
-      show: L.show }));
+    localStorage.setItem('bench-models-last', JSON.stringify({ v: 2, test: lbTest(L),
+      group: lbGroup(L), show: L.show }));
     if ('show' in patch) {
       const by = JSON.parse(localStorage.getItem('bench-lb-show') || '{}') || {};
       by[key] = L.show;
@@ -11638,8 +11682,11 @@ function lbRemembered() {
   // before 16.3: the view alone
   if (!v) try { const old = localStorage.getItem('bench-models-view');
     if (old) v = { test: old }; } catch (e) { /* private */ }
-  if (!v || !lbTests().includes(v.test)) return {};
-  return { ...lbChoice(v.test, v.group || 'all'), show: v.show === 'chart' ? 'chart' : 'table' };
+  // 21d: one remembered before Latest was Standard because Models opened on
+  // it: Models opens on its first view instead
+  if (!v || v.v !== 2 || !lbTests().includes(v.test)) return { autoView: true };
+  return { ...lbChoice(v.test, v.group || 'all'), show: v.show === 'chart' ? 'chart' : 'table',
+    autoView: false };
 }
 // the model facts the Models tab carried: columns, off until asked for.
 // 16.3: Columns ▸ Model details — family, type, size (on until hidden),
@@ -12038,19 +12085,28 @@ function testedVal(t) {
   const span = t.span === 'range' ? `${t.from}..${t.to}` : t.span;
   return span === 'any' ? 'any' : span + (t.none ? ',' + TESTED_NONE : '');
 }
-// a model's tested date as the viewer's own day, "2026-09-28", or null
-function testedDay(m) {
-  const ms = testedMs(m);
+// 21d: When ▸ which date — "tested", a model's latest finished run (16.3's
+// Tested), or "added", its first submission to the board
+const LB_DATES = [['tested', 'Tested', 'its latest finished run'],
+  ['added', 'Added', 'its first submission to the board']];
+function addedMs(m) {
+  const b = m.dmHome ? (DATA.models.find(x => x.id === m.dmHome) || m) : m;
+  return b.addedAt ? b.addedAt * 1000 : null;
+}
+const whenMs = (m, by = lbS().date) => by === 'added' ? addedMs(m) : testedMs(m);
+// a model's date as the viewer's own day, "2026-09-28", or null
+function testedDay(m, by = 'tested') {
+  const ms = whenMs(m, by);
   if (ms == null) return null;
   const d = new Date(ms);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-`
     + String(d.getDate()).padStart(2, '0');
 }
-function testedOk(t, m) {
+function testedOk(t, m, by = 'tested') {
   if (t.span === 'any') return true;
-  const ms = testedMs(m);
+  const ms = whenMs(m, by);
   if (ms == null) return t.none;
-  if (t.span === 'range') { const d = testedDay(m); return d >= t.from && d <= t.to; }
+  if (t.span === 'range') { const d = testedDay(m, by); return d >= t.from && d <= t.to; }
   return ms >= Date.now() - (t.span === '7d' ? 7 : 30) * 864e5;
 }
 function testedWords(t) {
@@ -12062,7 +12118,9 @@ function testedWords(t) {
   return (LB_TESTED.find(([k]) => k === t.span) || [, 'Any time'])[1];
 }
 // what the address and Filters ▾ hold, and their defaults (a plain link stays plain)
-const LB_DEFAULTS = { size: 'all', source: 'all', type: 'all', tested: 'any', status: 'all' };
+const LB_DEFAULTS = { size: 'all', source: 'all', type: 'all', tested: 'any', status: 'all',
+  // 21d: When's date: tested, or added ("date=added")
+  date: 'tested' };
 
 // everything the Leaderboard remembers lives here, not in the DOM: a render
 // every five seconds rebuilds the DOM, and an opened row must survive it
@@ -12076,6 +12134,8 @@ function lbS() {
     } catch (e) { /* private mode: the defaults */ }
     state.lb = { ...LB_DEFAULTS, open: [], models: null, cols: null, tint, howto, shown: {},
                  focus: null, weak: null, radarSrc: 'tasks', view: 'standard', chip: 'all',
+                 // 21d: no view named yet — Latest, where it has rows
+                 autoView: true,
                  // 16.3: Table or Chart, and each test's last group
                  show: 'table', groupBy: {},
                  // 12m.1: the compared models, the shape's source, the ticked rows,
@@ -12094,7 +12154,8 @@ function lbHash() {
     return 'view=compare' + ((L.cmp || []).length ? '&m=' + L.cmp.map(encodeURIComponent).join(',') : '');
   // 16.3: "view=mobile&group=devicemark&show=chart&size=xx&tested=7d"
   const test = lbTest(L), g = lbGroup(L);
-  if (test !== 'standard') out.push('view=' + test);
+  // 21d: the view Models opens on (Latest, where it has rows) is left out
+  if (!L.autoView && test !== lbDefaultTest()) out.push('view=' + test);
   if (LB_GROUPS[test] && g !== 'all') out.push('group=' + g);
   if (L.show === 'chart') out.push('show=chart');
   for (const k of Object.keys(LB_DEFAULTS))
@@ -12123,6 +12184,9 @@ function lbFromHash(rest) {
   // "chip=devicemark" Mobile ▸ DeviceMark and "chip=ondevice" its Chart,
   // "chip=frontier" Frontier, "chip=math" Standard ▸ Math
   let test = view === 'compare' || Object.keys(MODELS_VIEWS).includes(view) ? view : 'standard';
+  // 21d: a link naming no view opens on Latest where it has rows (decided
+  // when the board's data is in)
+  L.autoView = !view && !chip;
   let group = p.get('group') || 'all';
   if (LB_OLD_CHIPS[chip]) [test, group] = LB_OLD_CHIPS[chip];
   else if (LB_GROUPS.standard.some(([g]) => g === chip)) [test, group] = ['standard', chip];
@@ -12138,6 +12202,7 @@ function lbFromHash(rest) {
   const type = p.get('type') || kind;
   L.type = LB_TYPES.some(([v]) => v === type) ? type : 'all';
   L.tested = testedVal(testedSel(p.get('tested')));
+  L.date = p.get('date') === 'added' ? 'added' : 'tested';
   L.size = sizeVal(sizeSel(p.get('size')));
   L.status = LB_STATUS.some(([v]) => v === p.get('status')) ? p.get('status') : 'all';
   // 12h.2: the chosen benchmarks and models; a name this board does not know
@@ -12818,13 +12883,13 @@ function lbFilter(ms, opts = {}) {
   // 16.1: a missing size is never hidden silently (lbSizeHidden says so)
   const sel = opts.anySize ? [] : sizeSel(L.size);
   const sizeOk = m => sizeOkFor(sel, m);
-  // 16.3: Source and Type, where Kind mixed the two; Tested, the latest finished run's date
+  // 16.3: Source and Type, where Kind mixed the two; When (21d), the date chosen
   const src = opts.anySource ? [] : sourceSel(L.source);
   const tested = opts.anyDate ? { span: 'any' } : testedSel(L.tested);
   return ms.filter(m =>
     (!src.length || src.includes(sourceOf(m)))
     && (L.type === 'all' || m.kind === L.type)
-    && testedOk(tested, m)
+    && testedOk(tested, m, L.date)
     && sizeOk(m)
     && (L.status === 'all'
         || (L.status === 'ranked' && officialAvg(m) != null)
@@ -12974,6 +13039,8 @@ function modelsHead(badge) {
 // 16.3: where a view has no chart, why — the Chart button says it
 function lbChartWhy(L = lbS()) {
   const t = lbTest(L);
+  if (t === 'latest') return 'Latest is one table: its numbers come from our runs, Epoch AI and '
+    + 'model cards, and are never ranked together';
   if (t === 'everyday') return 'Everyday has no chart: each group is a count of questions passed, '
     + 'each of its own size';
   if (t === 'exam') return 'The Knowledge exam has no chart';
@@ -15172,6 +15239,14 @@ function vLeaderboard(ms) {
   repLoad();
   // 12m.1: Compare is a view of Models, reached by choosing models, not a switch
   if (L.view === 'compare') return vCompare();
+  // 21d: no view named: Latest, while it has rows
+  if (L.autoView && DATA) {
+    L.autoView = false;
+    if (latestOn()) Object.assign(L, lbChoice('latest'));
+    const want = hashFor();
+    if (location.hash.slice(1) !== want) history.replaceState(history.state, '', '#' + want);
+  }
+  if (L.view === 'latest' && modelsViews().includes('latest')) return lbLatest(ms);
   if (!modelsViews().includes(L.view)) {
     Object.assign(L, lbChoice('standard', 'all'));
     // 16.5: the address too (an exam view while the exam is switched off)
@@ -15334,7 +15409,7 @@ function vLeaderboard(ms) {
   if (!custom && !lbAll.some(m => visCols.some(c => c.gguf && val(m, c) != null)))
     visCols = visCols.filter(c => !c.gguf);
   const lbPg = paged('leaderboard', lbAll, JSON.stringify([state.sort, state.q, state.kind,
-    state.src, state.avgMode, L.view, L.chip, L.source, L.type, L.tested, L.size, L.status,
+    state.src, state.avgMode, L.view, L.chip, L.source, L.type, L.tested, L.date, L.size, L.status,
     L.models, L.cols]));
   const rows = lbPg.rows.flatMap(m => [m, ...((state.lbDupOpen || {})[m.id] ? dupsOf[m.id] || [] : [])]);
   // the leaders are bold whatever the Tint switch says; Tint only adds the wash
@@ -15950,7 +16025,6 @@ function lbToolbar(ms, cols, shown, nHidden, counts = null) {
   const filters = el('div', { class: 'pills' },
     sizePill(ms), sourcePill(ms),
     pillMenu('type', 'Type', LB_TYPES, L.type, v => lbSet({ type: v })),
-    testedPill(ms),
     el('div', { class: 'fmore', 'data-filters-more': '1' },
       el('span', { class: 'small se', text: 'More' }),
       pillMenu('status', 'Status', LB_STATUS, L.status, v => lbSet({ status: v })),
@@ -15969,7 +16043,8 @@ function lbToolbar(ms, cols, shown, nHidden, counts = null) {
   return el('div', { class: 'lbbar narrow' },
     el('div', { class: 'chiprow', 'data-lb-row2': '1' },
       el('div', { class: 'pickers', 'data-pickers': '1' },
-        LB_GROUPS[test] ? lbGroupPill(test) : '', lbModelsPill(ms), toggle,
+        // 21d: When ▾ in view, beside Group and Models
+        LB_GROUPS[test] ? lbGroupPill(test) : '', lbModelsPill(ms), whenPill(ms), toggle,
         colsHere ? lbColumnsPill(cols, shown, nHidden) : '',
         // 16.4: the Chart's Highlight ▾, Benchmarks ▸ Standard's before
         L.show === 'chart' && !lbChartWhy(L) && !(L.chip === 'devicemark' && !L.cols)
@@ -15988,7 +16063,7 @@ function lbToolbar(ms, cols, shown, nHidden, counts = null) {
 // how many filters are on, for "Filters · 2"
 function lbFiltersOn() {
   const L = lbS();
-  return [L.size !== 'all', L.source !== 'all', L.type !== 'all', L.tested !== 'any',
+  return [L.size !== 'all', L.source !== 'all', L.type !== 'all',
     L.status !== 'all', state.avgMode === 'raw'].filter(Boolean).length;
 }
 // 16.3: Row 3 — a chip for each filter on (and the models chosen), Clear all,
@@ -16018,8 +16093,8 @@ function lbActiveRow(ms, counts = null) {
   if (src.length) on.push(['source', 'Source: ' + src.map(sourceWords).join(', '), { source: 'all' }]);
   if (L.type !== 'all') on.push(['type', 'Type: ' + L.type, { type: 'all' }]);
   const t = testedSel(L.tested);
-  if (t.span !== 'any') on.push(['tested', 'Tested: ' + (t.span === 'range' ? testedWords(t)
-    : lc(testedWords(t))) + (t.none ? ', and no date' : ''), { tested: 'any' }]);
+  if (t.span !== 'any') on.push(['tested', 'When: ' + whenWords(t, L.date)
+    + (t.none ? ', and no date' : ''), { tested: 'any', date: 'tested' }]);
   if (L.status !== 'all') on.push(['status', 'Status: ' + L.status, { status: 'all' }]);
   if (state.avgMode === 'raw') on.push(['scale', 'Scale: raw accuracy', null]);
   const chosen = (L.models || []).filter(id => !id.startsWith('reported/')).length;
@@ -16105,13 +16180,22 @@ function sourcePill(ms) {
       text: `${t} (${pool.filter(m => sourceOf(m) === v).length})`,
       onclick: () => { popClose(true); toggle(v); } }))), { key: 'source' });
 }
-// 16.3: Tested — the date of a model's latest finished run: Any time, the
-// last 7 or 30 days, or between two dates; "No test date (n)" while a row has none
-function testedPill(ms) {
-  const L = lbS(), t = testedSel(L.tested);
-  const none = lbFilter(ms, { anyDate: true }).filter(m => testedMs(m) == null).length;
-  const btn = el('button', { class: 'pill' + (t.span !== 'any' ? ' on' : ''), id: 'pill-tested',
-    'data-pill': 'tested', 'data-value': L.tested, text: `Tested: ${testedWords(t)} ▾` });
+// 21d: When — in view beside Group and Models, where Tested hid in Filters:
+// Any time, the last 7 or 30 days, or between two dates; of which date, the
+// latest finished run's (tested) or the first submission's (added); "No date
+// (n)" while a row has none
+function whenWords(t, by) {
+  if (t.span === 'any') return 'any time';
+  const w = by === 'added' ? 'added' : 'tested';
+  return t.span === 'range' ? `${w} ${testedWords(t)}` : `${w} in the ${lc1(testedWords(t))}`;
+}
+const lc1 = w => w.charAt(0).toLowerCase() + w.slice(1);
+function whenPill(ms) {
+  const L = lbS(), t = testedSel(L.tested), by = L.date;
+  const none = lbFilter(ms, { anyDate: true }).filter(m => whenMs(m, by) == null).length;
+  const btn = el('button', { class: 'pill' + (t.span !== 'any' ? ' on' : ''), id: 'pill-when',
+    'data-pill': 'when', 'data-value': L.tested, 'data-when-by': by,
+    text: `When: ${whenWords(t, by)} ▾` });
   return popover(btn, () => {
     const D = state.lbRange = { from: t.from || '', to: t.to || '', ...(state.lbRange || {}) };
     const apply = () => {
@@ -16120,34 +16204,43 @@ function testedPill(ms) {
       lbSet({ tested: testedVal({ span: 'range', from: D.from <= D.to ? D.from : D.to,
         to: D.from <= D.to ? D.to : D.from, none: t.none }) });
     };
-    return el('div', { class: 'moremenu', id: 'pop-tested', 'aria-label': 'tested' },
+    return el('div', { class: 'moremenu', id: 'pop-when', 'aria-label': 'when' },
+      el('div', { class: 'whenby', role: 'radiogroup', 'aria-label': 'which date' },
+        el('span', { class: 'small se', text: 'Which date' }),
+        el('div', { class: 'segbtn' }, LB_DATES.map(([v, w, what]) => el('button', {
+          class: 'chip-btn' + (by === v ? ' on' : ''), role: 'radio', 'data-when-date': v,
+          'aria-checked': String(by === v), title: `${w}: ${what}`, text: w,
+          onclick: () => { popClose(true); lbSet({ date: v }); } }))),
+        el('span', { class: 'small se', 'data-when-what': by,
+          text: (LB_DATES.find(([v]) => v === by) || LB_DATES[0])[2] })),
       LB_TESTED.map(([v, w]) => el('button', { role: 'menuitemradio', 'data-choice': v,
         'aria-checked': String(t.span === v), text: w,
         onclick: () => { popClose(true); lbSet({ tested: testedVal({ span: v, none: t.none }) }); } })),
-      el('div', { class: 'trange', 'data-tested-range': '1', role: 'group',
+      el('div', { class: 'trange', 'data-when-range': '1', role: 'group',
           'aria-label': 'between two dates' },
         el('span', { class: 'small', text: 'Between two dates' }),
-        el('input', { type: 'date', 'aria-label': 'from', 'data-tested-from': '1', value: D.from,
+        el('input', { type: 'date', 'aria-label': 'from', 'data-when-from': '1', value: D.from,
           oninput: e => { D.from = e.target.value; } }),
-        el('input', { type: 'date', 'aria-label': 'to', 'data-tested-to': '1', value: D.to,
+        el('input', { type: 'date', 'aria-label': 'to', 'data-when-to': '1', value: D.to,
           oninput: e => { D.to = e.target.value; },
           onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); apply(); } } }),
-        el('button', { class: 'quiet', 'data-tested-apply': '1', text: 'Apply', onclick: apply })),
+        el('button', { class: 'quiet', 'data-when-apply': '1', text: 'Apply', onclick: apply })),
       none && t.span !== 'any' ? el('button', { role: 'menuitemcheckbox', 'data-choice': TESTED_NONE,
-        'aria-checked': String(t.none), text: `No test date (${none})`,
+        'aria-checked': String(t.none), text: `No date (${none})`,
         onclick: () => { popClose(true); lbSet({ tested: testedVal({ ...t, none: !t.none }) }); } })
         : '');
-  }, { key: 'tested', menu: false });
+  }, { key: 'when', menu: false });
 }
 // 16.3: a date filter never hides a row silently either: "4 models have no
 // test date and are hidden · show them"
 function lbTestedHidden(ms) {
-  const t = testedSel(lbS().tested);
+  const t = testedSel(lbS().tested), by = lbS().date;
   if (t.span === 'any' || t.none) return '';
-  const n = lbFilter(ms, { anyDate: true }).filter(m => testedMs(m) == null).length;
+  const n = lbFilter(ms, { anyDate: true }).filter(m => whenMs(m, by) == null).length;
   if (!n) return '';
   return el('p', { class: 'small', 'data-tested-hidden': String(n) },
-    `${n} model${n === 1 ? ' has' : 's have'} no test date and ${n === 1 ? 'is' : 'are'} hidden · `,
+    `${n} model${n === 1 ? ' has' : 's have'} no ${by === 'added' ? 'date added' : 'test date'}`
+    + ` and ${n === 1 ? 'is' : 'are'} hidden · `,
     el('button', { class: 'quiet', 'data-tested-show': '1', text: 'show them',
       onclick: () => lbSet({ tested: testedVal({ ...t, none: true }) }) }));
 }
@@ -27250,6 +27343,94 @@ function vReports() {
       : el('p', { class: 'small', text: 'No reports yet: a report is a file in '
         + 'eval_tasks/reports/.' }))];
 }
+// 21d: the token table's columns, named as the published page names them,
+// each with the page's definition it carries (by its term there)
+const RP_TOK_COLS = [['Benchmark', null], ['Answers', 'Answers'],
+  ['Average thinking', 'Average and median thinking'],
+  ['Median thinking', 'Average and median thinking'], ['Output p90', 'Output p90'],
+  ['Average output, right', 'Average output, right and wrong'],
+  ['Average output, wrong', 'Average output, right and wrong'], ['Ran out', 'Ran out'],
+  ['Output total', 'Output total']];
+// a header's "?": its definition on hover, and on a tap
+function rpQ(h, def) {
+  const key = 'rpq-' + h.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  return popover(el('button', { class: 'rp-q', type: 'button', 'data-rp-q': h, title: def,
+      'aria-label': `What “${h}” means`, text: '?' }),
+    () => el('div', { class: 'moremenu rp-qpop', id: 'pop-' + key, role: 'note' },
+      el('b', { text: h }), el('p', { text: def })), { key, menu: false });
+}
+// ---------------------------------------------------------------------------
+// 21d: Models ▸ Latest — one table: the report's picked rows and the popular
+// models it marks "glance", on its four benchmarks, read from the report
+// itself (/api/reports/<id>) so the two always agree. Sorted by the first of
+// them; no rank and no average — what others report is never ranked or
+// averaged with ours (12m.2) — and each published row says where it is from
+// ---------------------------------------------------------------------------
+async function latestLoad(id) {
+  const R = RPS(), k = 'latest:' + id;
+  if (R.asked[k]) return;
+  R.asked[k] = true;
+  try { R.data[id] = await api('api/reports/' + encodeURIComponent(id)); R.latestErr = ''; }
+  catch (e) { R.latestErr = e.message; }
+  R.asked[k] = false;
+  R.latestAt = Date.now();
+  if (state.tab === 'leaderboard' && lbS().view === 'latest') render();
+}
+function lbLatest(ms) {
+  const g = glance(), R = RPS(), d = R.data[g.report], L = lbS();
+  // read again a minute on, as the report's own view is
+  if ((!d || Date.now() - (R.latestAt || 0) > 60000) && netReady()) latestLoad(g.report);
+  const bar = el('div', { class: 'lbbar narrow' },
+    el('div', { class: 'chiprow', 'data-lb-row2': '1' },
+      el('div', { class: 'pickers', 'data-pickers': '1' }, whenPill(ms))));
+  const card = el('div', { class: 'card', 'data-lb-card': '1', 'data-latest': g.report },
+    ...modelsHead(), bar);
+  if (!d) {
+    card.append(R.latestErr ? el('p', { class: 'warn', text: 'The report couldn’t be read: '
+      + R.latestErr }) : skeleton(5, { 'data-loading': 'latest' }));
+    return [card];
+  }
+  const benches = (d.glance.benchmarks || []).map(k => d.benchmarks.find(b => b.key === k))
+    .filter(Boolean);
+  const first = (benches[0] || {}).key;
+  // When ▾ keeps our rows of its dates; a published row has none of ours
+  const t = testedSel(L.tested);
+  const mine = d.ours.filter(r => r.pick).filter(r => {
+    if (t.span === 'any') return true;
+    const m = DATA.models.find(x => x.id === r.row);
+    return m ? testedOk(t, m, L.date) : t.none;
+  });
+  const rows = [...mine, ...d.theirs.filter(r => r.glance)].sort((p, q) =>
+    (((q.cells[first] || {}).v) ?? -1) - (((p.cells[first] || {}).v) ?? -1));
+  const at = (d.sources.ours || {}).when;
+  const from = el('p', { class: 'small se', 'data-latest-from': g.report },
+    `From the ${d.id} report · as of ${at || 'no import yet'} · `,
+    el('a', { href: '#tab=reports&report=' + encodeURIComponent(d.id),
+      'data-latest-open': d.id, text: 'Open the report ▸',
+      onclick: e => { e.preventDefault(); rpOpen(d.id); } }));
+  const table = el('div', { class: 'rp-scroll', 'data-latest-scroll': '1' },
+    el('table', { class: 'rp latest', 'data-latest-table': '1' },
+      el('thead', {}, el('tr', {}, el('th', { text: 'Model' }),
+        ...benches.map(b => el('th', { 'data-latest-col': b.key, text: b.label })),
+        el('th', { class: 'src', text: 'Source' }))),
+      el('tbody', {}, rows.map(m => el('tr', { 'data-latest-row': m.label,
+          'data-latest-ours': String(!!m.ours) },
+        rpName(m),
+        ...benches.map(b => m.ours ? rpOurCell(m.cells[b.key], b, true)
+          : rpTheirCell(m.cells[b.key])),
+        el('td', { class: 'src' + (m.ours ? ' rp-ours' : ''), 'data-latest-source': '1',
+          text: m.ours ? `Our run · ${m.status}` : m.source || 'Epoch AI' }))))));
+  card.append(from, table,
+    el('p', { class: 'small se', 'data-latest-legend': '1', text: RP_SCORE_LEGEND
+      + ' † HLE from Epoch AI’s collection of other sources. A model card’s number has no ±; '
+      + '“card” links the card it is from. Published numbers are never ranked or averaged '
+      + 'with ours.' }),
+    t.span !== 'any' && mine.length < d.ours.filter(r => r.pick).length
+      ? el('p', { class: 'small se', 'data-latest-when': '1', text: `When ▾ keeps `
+        + `${mine.length} of our ${d.ours.filter(r => r.pick).length} runs; the published `
+        + 'models are always shown.' }) : '');
+  return [card];
+}
 // 21c: a report's full page — the one masein publishes, served by the board
 function rpPageLink(id, href) {
   return el('a', { class: 'btn ghost rp-pagelink', href, target: '_blank', rel: 'noopener',
@@ -27267,16 +27448,35 @@ function rpWorking(d) {
       : `The newest answers are being worked out (${w.done} of ${w.todo})`
         + (at ? `; these were ${at}.` : '.') });
 }
-// a cell of ours: "61.6 ± 3.1", its answers and how many ran out beneath; a
-// dash and why for a benchmark that isn't finished
-function rpOurCell(c) {
+// 21d: what a score is, in words, under every table of scores
+const RP_SCORE_LEGEND = 'Score: the average over every answer, in percent. ±: its standard error '
+  + '— how far the score could move with a different draw of questions of the same kind. It comes '
+  + 'from one run, from the number of questions and the score. Two scores closer than about two '
+  + 'standard errors are level.';
+const rpN = v => Number(v).toLocaleString('en');
+// 21d: how many questions, asked how many times — "198 questions × 4",
+// "167 tasks × 2" — never "792 answers"
+function rpAsked(n, b) {
+  if (n == null) return '';
+  const k = (b && b.epochs) || 1, unit = (b && b.unit) || 'questions', q = Math.round(n / k);
+  if (k === 1) return `${rpN(n)} ${n === 1 ? unit.replace(/s$/, '') : unit}`;
+  return q * k === n ? `${rpN(q)} ${q === 1 ? unit.replace(/s$/, '') : unit} × ${k}`
+    : `${rpN(n)} answer${n === 1 ? '' : 's'}`;
+}
+// a cell of ours: "61.6 ± 3.1", how many questions and how many answers ran
+// out beneath (each part kept on one line); a dash and why for a benchmark
+// that isn't finished. `compact` (Latest): the score alone, the rest on hover
+function rpOurCell(c, b, compact = false) {
   if (!c || c.v == null)
     return el('td', { class: 'dash', title: (c && c.why) || 'not in yet', text: '—' });
+  const parts = [rpAsked(c.answers, b), c.ranOut ? `${rpN(c.ranOut)} answer`
+    + `${c.ranOut === 1 ? '' : 's'} ran out` : ''].filter(Boolean);
+  if (compact) return el('td', { class: 'num', title: parts.join(' · '),
+    text: `${rpNum(c.v)} ± ${rpNum(c.se)}` });
   return el('td', { class: 'num', title: c.how || '' },
     `${rpNum(c.v)} ± ${rpNum(c.se)}`,
-    el('span', { class: 'rp-sub', text: (c.answers != null ? Number(c.answers).toLocaleString('en')
-      + ' answers' : '') + (c.ranOut ? ` · ${Number(c.ranOut).toLocaleString('en')} ran out`
-      : '') }));
+    el('span', { class: 'rp-sub', 'data-rp-asked': '1' }, parts.flatMap((x, i) =>
+      [i ? ' · ' : '', el('span', { class: 'nw', text: x })])));
 }
 // a cell of theirs: Epoch's own run with its error; HLE from Epoch's
 // collection marked †; a card's number with its link beside it
@@ -27290,7 +27490,9 @@ function rpTheirCell(c) {
   return el('td', { class: 'num', title: tip },
     rpNum(c.v) + (c.se ? ` ± ${rpNum(c.se)}` : '') + (c.dagger ? '†' : ''),
     c.src === 'card' ? el('span', { class: 'rp-sub' }, el('a', { href: c.url, target: '_blank',
-      rel: 'noopener', 'data-card-link': '1', text: 'card' })) : '');
+      rel: 'noopener', 'data-card-link': '1', text: 'card' }),
+      // 21d: what the file says of the number ("medium effort")
+      c.note ? el('span', { 'data-card-note': '1', text: ' · ' + c.note }) : '') : '');
 }
 function rpName(m) {
   return el('td', { class: m.ours ? 'rp-ours' : '', title: m.label },
@@ -27380,7 +27582,8 @@ function vReport(id) {
           el('span', { class: 'rp-dot', style: `background:${rpColour(m)}` }), m.label,
           el('span', { class: 'rp-status', 'data-rp-status': m.label, text: m.status }),
           m.note ? el('span', { class: 'rp-sub', text: m.note }) : ''),
-        ...benches.map(b => rpOurCell(m.cells[b.key]))))))));
+        ...benches.map(b => rpOurCell(m.cells[b.key], b))))))),
+    el('p', { class: 'small se', 'data-rp-score-legend': '1', text: RP_SCORE_LEGEND }));
   // 2. where we stand
   const stand = el('div', { class: 'card', 'data-report-section': 'stand' },
     el('h2', { text: 'Where we stand' }),
@@ -27481,9 +27684,10 @@ function vReport(id) {
       + benches.map(b => `${b.label} ${Number(limit(b.task)).toLocaleString('en')}`).join(', ')
       + '.' }),
     el('div', { class: 'rp-scroll tall' }, el('table', { class: 'rp', 'data-rp-tokens': '1' },
-      el('thead', {}, el('tr', {}, ['Benchmark', 'Answers', 'Thinking mean', 'Thinking median',
-        'Output p90', 'Right (mean)', 'Wrong (mean)', 'Ran out', 'Output total']
-        .map(h => el('th', { text: h })))),
+      el('thead', {}, el('tr', {}, RP_TOK_COLS.map(([h, dt]) => {
+        const def = (d.tokenDefs || []).find(x => x[0] === dt);
+        return el('th', { 'data-rp-tok-col': h }, h, def ? rpQ(h, def[1]) : '');
+      }))),
       el('tbody', {}, d.ours.flatMap(m => {
         const s = T[m.label] || {};
         const rows = benches.filter(b => s[b.task]);
@@ -27506,7 +27710,10 @@ function vReport(id) {
                 + 'M' : N(x.tok_sum) }));
           }) : [el('tr', {}, el('td', { class: 'dash', colspan: 9,
             text: 'No stored answers worked out yet.' }))])];
-      })))));
+      })))),
+    // 21d: what each column means, in the published page's own words
+    (d.tokenDefs || []).length ? el('dl', { class: 'rp-defs', 'data-rp-tok-defs': '1' },
+      d.tokenDefs.flatMap(([dt, dd]) => [el('dt', { text: dt }), el('dd', { text: dd })])) : '');
   // 5. loop examples
   const L = d.loops;
   const loops = el('div', { class: 'card', 'data-report-section': 'loops' },
@@ -27553,8 +27760,9 @@ function vReport(id) {
         ...benches.map(b => el('th', { text: b.label })))),
       el('tbody', {}, [...all].sort((p, q) => ((q.cells[g] || {}).v ?? -1)
           - ((p.cells[g] || {}).v ?? -1))
-        .map(m => el('tr', {}, rpName(m), ...benches.map(b => m.ours ? rpOurCell(m.cells[b.key])
-          : rpTheirCell(m.cells[b.key]))))))));
+        .map(m => el('tr', {}, rpName(m), ...benches.map(b => m.ours
+          ? rpOurCell(m.cells[b.key], b) : rpTheirCell(m.cells[b.key]))))))),
+    el('p', { class: 'small se', text: RP_SCORE_LEGEND }));
   // 7. how to read this
   const cards = [];
   for (const t of d.theirs) for (const [k, c] of Object.entries(t.cells))
@@ -27702,8 +27910,11 @@ function vRanOut(id, d, back) {
       el('tbody', {}, m.summary.map(x => el('tr', { 'data-ro-bench': x.key },
         el('td', {}, x.label, el('span', { class: 'rp-sub', text: x.hidden && !d.showHidden
           ? `${x.hidden} in the hidden half, not shown` : '' })),
-        el('td', { class: 'num', title: x.board != null ? `the board counts ${x.board}` : '',
-          text: x.n ? `${roN(x.n)} (${(100 * x.share).toFixed(1)}%)` : '0' }),
+        el('td', { class: 'num', title: x.board != null ? `the board counts ${x.board}` : '' },
+          x.n ? `${roN(x.n)} (${(100 * x.share).toFixed(1)}%)` : '0',
+          // 21d: of how many — "198 questions × 4", as the scorecard says it
+          x.answers ? el('span', { class: 'rp-sub', 'data-ro-asked': x.key, text: 'answers, of '
+            + rpAsked(x.answers, d.benchmarks.find(b => b.key === x.key)) }) : ''),
         el('td', { class: 'num', text: roN(x.against.right) }),
         el('td', { class: 'num', text: roN(x.against.wrong) }),
         el('td', { class: 'num', text: roN(x.against.ran_out) }),
@@ -27744,7 +27955,7 @@ function vRanOut(id, d, back) {
         [['chars', 'Longest first'], ['waits', 'Most “Wait” first']],
         v => { S.sort = v; render(); }))),
     el('p', { class: 'small se', 'data-ro-count': '1', text: `${rows.length} of ${m.rows.length}`
-      + ' answers' }),
+      + ' answers that ran out' }),
     el('div', { class: 'ro-rows' }, rows.slice(0, 300).map(r => el('div', { class: 'ro-row',
         'data-ro-row': roKey(r), onclick: () => roOpen(id, roKey(r)) },
       el('div', { class: 'ro-qline' },

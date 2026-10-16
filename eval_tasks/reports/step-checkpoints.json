@@ -55,6 +55,12 @@
   }
  ],
  "reference": "Q4 (UD-Q4_K_XL)",
+ "glance_benchmarks": [
+  "gpqa",
+  "otis",
+  "mmlupro",
+  "hle"
+ ],
  "benchmarks": [
   {
    "key": "gpqa",
@@ -135,6 +141,7 @@
  "theirs": [
   {
    "label": "GPT-6 Astra (max)",
+   "glance": true,
    "maker": "OpenAI",
    "size": null,
    "group": "ceiling",
@@ -208,6 +215,7 @@
   },
   {
    "label": "DeepSeek-V4-Pro (max)",
+   "glance": true,
    "maker": "DeepSeek",
    "size": "1.6T / 49B",
    "group": "ceiling",
@@ -341,6 +349,7 @@
   },
   {
    "label": "Qwen3.6-35B-A3B, Qwen's report",
+   "glance": true,
    "maker": "Alibaba",
    "size": "35B / 3B",
    "group": "near",
@@ -399,6 +408,7 @@
   },
   {
    "label": "Qwen3.5-35B-A3B",
+   "glance": true,
    "maker": "Alibaba",
    "size": null,
    "group": "near",
@@ -588,6 +598,7 @@
   },
   {
    "label": "DeepSeek-R1-0528",
+   "glance": true,
    "maker": "DeepSeek",
    "size": null,
    "group": "near",
@@ -695,6 +706,7 @@
   },
   {
    "label": "gpt-oss-120b (high)",
+   "glance": true,
    "maker": "OpenAI",
    "size": null,
    "group": "near",
@@ -751,6 +763,7 @@
   },
   {
    "label": "o4-mini (high)",
+   "glance": true,
    "maker": "OpenAI",
    "size": null,
    "group": "near",
@@ -768,6 +781,7 @@
     "maker": "OpenAI",
     "benchmark": "MMLU-Pro",
     "setting": "in the card's comparison table, at medium reasoning effort (its footnote)",
+    "note": "medium effort",
     "url": "https://huggingface.co/Qwen/Qwen3-235B-A22B-Thinking-2507/blob/6cbffae6d8e28b986a6b17bd36f42f9fa0f1f0a5/README.md",
     "date": "2025-08-17"
    },
@@ -847,6 +861,7 @@
   },
   {
    "label": "GPT-5 mini (high)",
+   "glance": true,
    "maker": "OpenAI",
    "size": null,
    "group": "near",

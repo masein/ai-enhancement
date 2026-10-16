@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """21: a report's thinking-token stats as the board works them out
-(service/reports.py, from each row's scored samples), one JSON line a row and
+(service/reports.py, from each row's scored samples, else its answers; 21d:
+counted as ~/tokens.py counts them), one JSON line a row and
 benchmark — and, given --against, each line set beside the same row and
 benchmark of another file in that shape (masein's ~/tokens.py output):
 "same", or the fields that differ. Read-only; it works the stats out where

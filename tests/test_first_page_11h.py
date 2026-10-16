@@ -196,8 +196,10 @@ def test_on_a_phone_the_filters_are_one_button_and_the_table_starts_near_the_top
         # the table scrolls sideways on a phone, so its scroll buttons take one
         # 26px line above it (the sideways-scroll fix); the fold of the
         # filters, which this guards, saves far more than that. 16.3: Row 1 —
-        # five kinds of test, and Table or Chart — wraps on a phone, as asked
-        assert gap <= 370, gap
+        # five kinds of test, and Table or Chart — wraps on a phone, as asked.
+        # 21d: Row 2 holds When ▾ too, in view as asked: with CI's fonts it
+        # takes a third short line there (370.5); with others it fits in two
+        assert gap <= 380, gap
         assert page.locator("#pill-size").count() == 0            # folded away
         # 16.3: Row 1 wraps inside the screen; nothing scrolls sideways
         rights = page.evaluate("""() => [...document.querySelectorAll('[data-lb-row1] .chip-btn')]
@@ -208,11 +210,13 @@ def test_on_a_phone_the_filters_are_one_button_and_the_table_starts_near_the_top
         btn.click()
         sheet = page.locator("[data-filter-sheet]")
         sheet.wait_for()
-        for pill in ("#pill-size", "#pill-source", "#pill-type", "#pill-tested", "#pill-status",
+        for pill in ("#pill-size", "#pill-source", "#pill-type", "#pill-status",
                      "#pill-scale"):
             assert sheet.locator(pill).count() == 1, pill
-        # 16.3: Group ▾, Models ▾ and Columns ▾ sit beside Filters, not in it
-        for pill in ("#pill-group", "#pill-models", "#pill-columns"):
+        # 16.3: Group ▾, Models ▾ and Columns ▾ sit beside Filters, not in it;
+        # 21d: and When ▾
+        assert sheet.locator("#pill-when").count() == 0
+        for pill in ("#pill-group", "#pill-models", "#pill-when", "#pill-columns"):
             assert page.locator("[data-pickers] " + pill).count() == 1, pill
         shot(page, "11h-4-filters-400-light.png")
         sheet.locator("#pill-type").click()

@@ -91,6 +91,10 @@
 .sc-notes p { margin: 0 0 var(--cds-gap-xs); }
 [data-dash-source-state=empty] { color: transparent; }
 [data-dash-source-state=refreshing] { opacity: .5; transition: opacity var(--cds-dur-slow); }
+.sc-defs { display: grid; grid-template-columns: minmax(9rem, max-content) 1fr; gap: var(--cds-gap-xs) var(--cds-gap-md); margin: var(--cds-gap-sm) 0 0; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); line-height: 1.45; }
+.sc-defs dt { color: var(--color-fg); font-weight: var(--cds-font-weight-medium); }
+.sc-defs dd { margin: 0; min-width: 0; }
+@media (max-width: 560px) { .sc-defs { grid-template-columns: 1fr; } .sc-defs dd { margin-bottom: var(--cds-gap-xs); } }
 </style>
 
 <div class="sc-wrap">
@@ -102,7 +106,7 @@
 
   <section class="sc-card" id="ours-table">
     <h2>Our runs</h2>
-    <p class="sc-note">Score in percent. A dash means that benchmark hasn't finished for this model yet. "Q4, earlier run" is the same Q4 file on Qwen's own sampling settings, for reference.</p>
+    <p class="sc-note">Score in percent: the share of answers graded right, averaged over every answer. Some benchmarks ask each question more than once: GPQA Diamond 198 questions × 4, OTIS Mock AIME 45 × 8, ARC-AGI-2 167 tasks × 2 attempts; the rest once each. A dash means that benchmark hasn't finished for this model yet. "Q4, earlier run" is the same Q4 file on Qwen's own sampling settings, for reference.</p>
     <div class="sc-scroll">
       <table class="sc-table" data-source="ours_wide" data-row-key="model">
         <thead><tr>
@@ -161,7 +165,7 @@
   <div class="sc-grid">
     <section class="sc-card" id="scores-chart">
       <h2>Score by benchmark</h2>
-      <p class="sc-note">Each dot is a model's score; the whisker is one standard error either side.</p>
+      <p class="sc-note">Each dot is a model's average score. The whisker is one standard error either side: how far the score could move with a different draw of questions of the same kind. It comes from one run, from the number of questions and the score. Two scores closer than about two standard errors are level.</p>
       <div class="sc-legend" id="legend-scores" data-source="ours"></div>
       <div class="sc-chart dash-skeleton" id="chart-scores" data-source="ours"></div>
     </section>
@@ -179,24 +183,32 @@
     <p class="sc-note">Average thinking tokens per answer, by benchmark. Hover a dot for the median.</p>
     <div class="sc-legend" id="legend-tok" data-source="tokens"></div>
     <div class="sc-chart dash-skeleton" id="chart-tok" data-source="tokens"></div>
-    <p class="sc-note">In detail, in tokens. "Avg when right" and "avg when wrong" are the whole output (thinking and answer) and leave out answers that hit the limit; a dash means those answers are still waiting for grading.</p>
+    <p class="sc-note">In detail, in tokens. What each column means is under the table.</p>
     <div class="sc-scroll sc-tall">
       <table class="sc-table sc-tok" data-source="tokens" data-row-key="model,bench">
         <thead><tr>
           <th data-field="benchmark">Benchmark</th>
           <th data-field="model" class="sc-left">Model</th>
           <th data-field="answers">Answers</th>
-          <th data-field="think_mean">Avg thinking</th>
+          <th data-field="think_mean">Average thinking</th>
           <th data-field="think_med">Median thinking</th>
-          <th data-field="tok_p90">90th pct output</th>
-          <th data-field="right_mean">Avg when right</th>
-          <th data-field="wrong_mean">Avg when wrong</th>
-          <th data-field="ran_out">Hit limit</th>
-          <th data-field="tok_sum">Total output</th>
+          <th data-field="tok_p90">Output p90</th>
+          <th data-field="right_mean">Average output, right</th>
+          <th data-field="wrong_mean">Average output, wrong</th>
+          <th data-field="ran_out">Ran out</th>
+          <th data-field="tok_sum">Output total</th>
         </tr></thead>
         <tbody id="tok-body"></tbody>
       </table>
     </div>
+    <dl class="sc-defs">
+      <dt>Answers</dt><dd>Questions × the times each is asked: GPQA Diamond 198 × 4, OTIS Mock AIME 45 × 8, ARC-AGI-2 167 × 2; the rest once each.</dd>
+      <dt>Average and median thinking</dt><dd>Thinking tokens per answer. Half the answers think less than the median, half more.</dd>
+      <dt>Output p90</dt><dd>9 in 10 answers are this long or shorter, thinking and answer together, answers that ran out included. When it equals the limit, more than 1 in 10 answers ran out.</dd>
+      <dt>Average output, right and wrong</dt><dd>The average length of the answers graded right, and of those graded wrong, among answers that finished. An answer that runs out is always exactly the limit long and counted wrong, so it is left out of both and counted under "Ran out". A dash means those answers are still waiting for grading.</dd>
+      <dt>Ran out</dt><dd>Answers that hit the token limit before finishing: 32,768 tokens on MMLU-Pro and SimpleQA, 65,536 on MATH Level 5, 81,920 on the rest.</dd>
+      <dt>Output total</dt><dd>Every token the model wrote on that benchmark, thinking and answers, all answers included: roughly the GPU time the run cost.</dd>
+    </dl>
   </section>
 
   <section class="sc-card" id="loops">

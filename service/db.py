@@ -664,6 +664,14 @@ def last_done(judged: bool = True) -> dict[str, float]:
     return {h: float(t) for h, t in rows if h and t}
 
 
+def first_added() -> dict[str, float]:
+    """21d: when each model was first submitted to the board, of any kind and
+    whatever came of it — {hf_id: created_at}, for Models' When ▸ added"""
+    with closing(_conn()) as c:
+        rows = c.execute("SELECT hf_id, MIN(created_at) FROM submissions GROUP BY hf_id").fetchall()
+    return {h: float(t) for h, t in rows if h and t}
+
+
 def count_submissions() -> int:
     """12z A6: every run there is, for the Runs list's count"""
     with closing(_conn()) as c:

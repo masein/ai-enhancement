@@ -392,15 +392,16 @@ def test_models_is_one_table_and_a_row_opens_the_model_page(live, page):
         ["all", "knowledge", "commonsense", "reasoning", "math", "trust", "instruction", "lm"]
     page.keyboard.press("Escape")
     assert page.locator("[data-chip]").count() == 0
-    # Row 2: Group, Models, Filters, Columns; Size, Source, Type, Tested and
-    # More (Status, Scale) in Filters ▾
-    assert page.locator("[data-pickers]").inner_text().split("\n")[:4] == \
-        ["Group: All ▾", "Models: all ▾", "Filters ▾", "Columns ▾"]
+    # Row 2: Group, Models, When (21d: in view, Tested before), Filters,
+    # Columns; Size, Source, Type and More (Status, Scale) in Filters ▾
+    assert page.locator("[data-pickers]").inner_text().split("\n")[:5] == \
+        ["Group: All ▾", "Models: all ▾", "When: any time ▾", "Filters ▾", "Columns ▾"]
     assert page.locator(".lbbar > .pills").count() == 0
     page.locator("[data-filters]").click()
     sheet = page.locator("[data-filter-sheet]")
-    for pill in ("Size", "Source", "Type", "Tested", "Status", "Scale"):
+    for pill in ("Size", "Source", "Type", "Status", "Scale"):
         assert pill in sheet.text_content(), pill
+    assert "Tested" not in sheet.text_content()                   # 21d: When ▾, in view
     # no row expands: a click on a row is the model page
     assert page.locator("[data-open-row], [data-lb-detail]").count() == 0
     page.locator("[data-filters-done]").click()

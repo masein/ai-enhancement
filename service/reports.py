@@ -68,17 +68,33 @@ def _scripts() -> None:
 # the files
 # ---------------------------------------------------------------------------
 
+_files_memo: dict = {"stamp": None, "out": {}}
+
+
 def files() -> dict[str, dict]:
-    """every report file, by its id — one that can't be read is left out"""
+    """every report file, by its id — one that can't be read is left out.
+    21d: read again only when one of them changed (Models reads them on every
+    poll)"""
+    fs = sorted(REPORTS_DIR.glob("*.json")) if REPORTS_DIR.is_dir() else []
+    stamp = []
+    for f in fs:
+        try:
+            st = f.stat()
+        except OSError:
+            continue
+        stamp.append((str(f), st.st_mtime_ns, st.st_size))
+    if stamp == _files_memo["stamp"]:
+        return {k: json.loads(json.dumps(v)) for k, v in _files_memo["out"].items()}
     out = {}
-    for f in sorted(REPORTS_DIR.glob("*.json")) if REPORTS_DIR.is_dir() else []:
+    for f in fs:
         try:
             rep = json.loads(f.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
         if isinstance(rep, dict) and rep.get("id") and isinstance(rep.get("ours"), list):
             out[str(rep["id"])] = rep
-    return out
+    _files_memo.update(stamp=stamp, out=out)
+    return {k: json.loads(json.dumps(v)) for k, v in out.items()}
 
 
 def row_dir(mid: str) -> Path:
@@ -275,7 +291,9 @@ def their_rows(rep: dict, scores: list[dict] | None = None) -> list[dict]:
                     cell = {"v": c["value"], "se": None, "src": "card", "url": c["url"],
                             "card": spec.get("card") or "", "setting": c.get("setting") or "",
                             "date": c.get("date") or "", "by": c.get("by") or "",
-                            "entered": c.get("id")}
+                            "entered": c.get("id"),
+                            # 21d: what the file says of the number ("medium effort")
+                            "note": spec.get("note") or ""}
                 else:
                     cell = {"v": None, "src": "card", "missing": True, "url": spec.get("url"),
                             "card": spec.get("card") or "",
@@ -295,8 +313,49 @@ def their_rows(rep: dict, scores: list[dict] | None = None) -> list[dict]:
         out.append({"id": "theirs:" + t["label"], "label": t["label"], "ours": False,
                     "maker": t.get("maker") or "", "size": t.get("size"),
                     "group": t.get("group") or "", "version": t.get("epoch_version"),
-                    "cells": per})
+                    "cells": per,
+                    # 21d: where its numbers come from, in words; and whether
+                    # Models ▸ Latest sets it beside ours
+                    "source": source_words([b for b in rep["benchmarks"] if b.get("compare")],
+                                           per),
+                    "glance": t.get("glance") is True})
     return out
+
+
+def _card_word(card: str) -> str:
+    """"DeepSeek-V4-Pro model card" -> "DeepSeek"; "Qwen3.5-35B-A3B model card" -> "Qwen" """
+    m = re.match(r"[A-Za-z]+", card or "")
+    return m.group(0) if m else (card or "model")
+
+
+def source_words(benches: list[dict], cells: dict) -> str:
+    """where a model's numbers come from, in words: "Epoch AI", "Epoch AI;
+    HLE, MMLU-Pro: DeepSeek card", "Qwen's model card" when every one is a
+    card's — and the file's note on a card's number, in brackets after its
+    card: MMLU-Pro: Qwen card (medium effort)"""
+    cards: dict[str, list[str]] = {}
+    notes: dict[str, list[str]] = {}
+    epoch = False
+    for b in benches:
+        c = cells.get(b["key"]) or {}
+        if c.get("v") is None:
+            continue
+        if c.get("src") == "card":
+            w = _card_word(c.get("card") or "")
+            cards.setdefault(w, []).append(b["label"])
+            if c.get("note") and c["note"] not in notes.get(w, []):
+                notes.setdefault(w, []).append(c["note"])
+        else:
+            epoch = True
+    if not cards:
+        return "Epoch AI"
+    said = {w: f"{w} card" + (f" ({', '.join(notes[w])})" if notes.get(w) else "")
+            for w in cards}
+    if not epoch and len(cards) == 1:
+        w = next(iter(cards))
+        return f"{w}'s model card" + (f" ({', '.join(notes[w])})" if notes.get(w) else "")
+    line = "; ".join(f"{', '.join(labels)}: {said[w]}" for w, labels in cards.items())
+    return f"Epoch AI; {line}" if epoch else line
 
 
 def card_entries(rep: dict, scores: list[dict] | None = None) -> list[dict]:
@@ -443,100 +502,127 @@ def row_at(f: Path, offset: int) -> dict | None:
     return row if isinstance(row, dict) else None
 
 
-def p90(xs: list[int]) -> int:
-    """the 90th percentile, nearest rank: the smallest value with 90% of them
-    at or below it"""
-    s = sorted(xs)
-    return s[max(0, math.ceil(0.9 * len(s)) - 1)]
+# 21d: the token stats are ~/tokens.py's, field by field (masein's script,
+# tests/fixtures/tokens_py/tokens.py): 21c's differed from it four ways —
+# think_share was each answer's share averaged, not the thinking characters
+# over all characters; an answer's share counted its <think> tags; a median
+# was the two middle values' mean and p90 the nearest rank, not the value at
+# int(p·n) of the sorted list; and an answer's thinking tokens were averaged
+# before rounding, not rounded one by one. Where a row's benchmark has no
+# scored samples yet, its answers are read, as tokens.py reads them
+
+def quantile(v: list[int], p: float) -> int | None:
+    """tokens.py's q(): the value at int(p·n) of the sorted values (the upper
+    middle one for a median of an even count)"""
+    v = sorted(v)
+    return v[min(len(v) - 1, int(p * len(v)))] if v else None
 
 
-def think_share(text: str) -> float:
-    """the thinking part's share of an answer's characters — every thinking
-    block, wherever it sits"""
+def token_stats_from(recs: list[tuple[str, object, object, object]]) -> dict:
+    """tokens.py's stats of (answer, output tokens, finish, right) a run each:
+    an answer ran out when it stopped at the limit or its thinking never
+    closed; its thinking tokens are its output tokens times its thinking's
+    share of its characters (the tags left out), rounded; right and wrong
+    leave out the answers that ran out"""
     _scripts()
     from frontier_graders import think_split
-    if not text:
-        return 0.0
-    return sum(len(x) for x in think_split(text)[1]) / len(text)
+    tok, think, right, wrong, out_n = [], [], [], [], 0
+    tc = ac = 0
+    for text, n, fin, ok in recs:
+        outside, thoughts, unclosed = think_split(text or "")
+        th, an = sum(len(x) for x in thoughts), len(outside)
+        cut = fin == "length" or unclosed
+        out_n += cut
+        if not isinstance(n, int):
+            continue
+        tc += th
+        ac += an
+        tok.append(n)
+        think.append(round(n * th / (th + an)) if th + an else 0)
+        if not cut and ok is True:
+            right.append(n)
+        elif not cut and ok is False:
+            wrong.append(n)
 
-
-def _int(t) -> bool:
-    return isinstance(t, int) and not isinstance(t, bool)
-
-
-def stats_of(runs: list[tuple[int | None, bool, bool | None, str]]) -> dict:
-    """one row's benchmark: runs of (output tokens, ran out, right, answer).
-    Output tokens are llama-server's own count; thinking tokens that count
-    times the thinking part's share of the answer's characters. Right and
-    wrong leave out the answers that ran out of room"""
-    return _stats([(t, out, ok, think_share(a) if _int(t) else None) for t, out, ok, a in runs])
-
-
-def _stats(runs: list[tuple[int | None, bool, bool | None, float | None]]) -> dict:
-    """stats_of, each answer already its thinking share"""
-    toks = [t for t, _, _, _ in runs if _int(t)]
-    shares = [s for t, _, _, s in runs if _int(t)]
-    thinks = [t * s for t, s in zip(toks, shares)]
-    right = [t for t, out, ok, _ in runs if _int(t) and not out and ok is True]
-    wrong = [t for t, out, ok, _ in runs if _int(t) and not out and ok is False]
-
-    def r(x):
-        return int(round(x)) if x is not None else None
-    return {"n": len(runs), "n_tok": len(toks), "ran_out": sum(1 for _, o, _, _ in runs if o),
-            "tok_mean": r(statistics.fmean(toks)) if toks else None,
-            "tok_med": r(statistics.median(toks)) if toks else None,
-            "tok_p90": p90(toks) if toks else None, "tok_max": max(toks) if toks else None,
-            "tok_sum": sum(toks),
-            "think_mean": r(statistics.fmean(thinks)) if thinks else None,
-            "think_med": r(statistics.median(thinks)) if thinks else None,
-            "think_share": round(statistics.fmean(shares), 3) if shares else None,
-            "right_n": len(right), "right_mean": r(statistics.fmean(right)) if right else None,
-            "wrong_n": len(wrong), "wrong_mean": r(statistics.fmean(wrong)) if wrong else None}
+    def mean(v):
+        return round(statistics.mean(v)) if v else None
+    return {"n": len(recs), "n_tok": len(tok), "ran_out": out_n, "tok_mean": mean(tok),
+            "tok_med": quantile(tok, .5), "tok_p90": quantile(tok, .9),
+            "tok_max": max(tok) if tok else None, "tok_sum": sum(tok), "think_mean": mean(think),
+            "think_med": quantile(think, .5),
+            "think_share": round(tc / (tc + ac), 3) if tc + ac else None,
+            "right_n": len(right), "right_mean": mean(right),
+            "wrong_n": len(wrong), "wrong_mean": mean(wrong)}
 
 
 def token_stats_of(f: Path) -> dict:
-    """a samples file's token stats, read a row at a time"""
-    runs = []
+    """a samples file's token stats, read a row at a time; an answers file's
+    (a benchmark not scored yet) when that is what `f` is"""
+    from . import frontier as sf
+    recs = []
+    if f.name == sf.ANSWERS:
+        for _, r in jsonl(f):
+            if not r.get("error"):
+                recs.append((r.get("answer") or "", r.get("tokens"), r.get("finish"), None))
+        return {"src": "answers", **token_stats_from(recs)}
     for _, row in jsonl(f):
-        resps = row.get("resps") or []
-        for k, run in enumerate(row.get("frontier") or []):
-            text = (resps[k][0] if k < len(resps) and resps[k] else "") or ""
-            t = run.get("tokens")
-            runs.append((t, bool(run.get("ran_out")), run.get("ok"),
-                         think_share(text) if _int(t) else None))
-    return {"src": "samples", **_stats(runs)}
+        for resp, r in zip(row.get("resps") or [], row.get("frontier") or []):
+            recs.append(((resp[0] if resp else "") or "", r.get("tokens"), r.get("finish"),
+                         r.get("ok")))
+    return {"src": "samples", **token_stats_from(recs)}
+
+
+def stats_file(d: Path, task: str) -> Path | None:
+    """what a row's benchmark's token stats read: its scored samples, else
+    (all its answers in, not scored yet) its answers"""
+    from . import frontier as sf
+    f = samples_file(d, task)
+    if f is not None:
+        return f
+    a = sf.task_dir(d, task) / sf.ANSWERS
+    return a if a.is_file() else None
 
 
 def _tok_slot(d: Path, task: str) -> str:
     return f"tokens|{d}|{task}"
 
 
+# 21d: the way of counting is part of what a kept stat was worked out from:
+# stats kept under 21c's counting are stale, and worked out again
+TOKENS_WAY = "tokens.py"
+
+
+def _tok_key(f: Path) -> str:
+    from . import report_stats as rs
+    return f"{TOKENS_WAY}|{rs.identity(f)}"
+
+
 def token_kept(d: Path, task: str) -> dict | None:
     """{stats, at, fresh} as kept — `fresh` False when the answers changed
     since (shown until the new ones are in); None when never worked out"""
     from . import report_stats as rs
-    f = samples_file(d, task)
+    f = stats_file(d, task)
     if f is None:
         return None
     e = rs.kept(_tok_slot(d, task))
     if not e or "value" not in e:
         return None
-    return {"stats": e["value"], "at": e["at"], "fresh": e["key"] == rs.identity(f)}
+    return {"stats": e["value"], "at": e["at"], "fresh": e["key"] == _tok_key(f)}
 
 
 def token_stats(d: Path, task: str, compute: bool = True) -> dict | None:
-    """a row's benchmark's token stats from its scored samples: compute, work
+    """a row's benchmark's token stats from its stored answers: compute, work
     them out now unless kept for these very answers (the worker, the tests,
     scripts/report_token_stats.py); else what is kept. None when the row has
     no stored answers, or (compute False) nothing is kept"""
     from . import report_stats as rs
-    f = samples_file(d, task)
+    f = stats_file(d, task)
     if f is None:
         return None
     if not compute:
         k = token_kept(d, task)
         return k["stats"] if k else None
-    key, slot = rs.identity(f), _tok_slot(d, task)
+    key, slot = _tok_key(f), _tok_slot(d, task)
     e = rs.kept(slot)
     if e and e.get("key") == key and "value" in e:
         return e["value"]
@@ -747,9 +833,9 @@ def jobs(rid: str, rep: dict) -> list:
     for o in rep["ours"]:
         d = row_dir(o["row"])
         for b in rep["benchmarks"]:
-            f = samples_file(d, b["task"])
+            f = stats_file(d, b["task"])
             if f is not None:
-                out.append(rs.Job(_tok_slot(d, b["task"]), rs.identity(f),
+                out.append(rs.Job(_tok_slot(d, b["task"]), _tok_key(f),
                                   f"thinking tokens, {o['label']} · {b['label']}",
                                   lambda f=f: token_stats_of(f)))
     # the loop examples, once either model has answers stored
@@ -765,11 +851,12 @@ def jobs(rid: str, rep: dict) -> list:
 
 def _sources(rep: dict, rows: list[dict], theirs: list[dict]) -> dict:
     ep = db.reported_import_last("epoch")
-    entered = [db_row_time(c.get("entered")) for t in theirs for c in t["cells"].values()
-               if c.get("entered")]
+    times = entered_times([c.get("entered") for t in theirs for c in t["cells"].values()
+                           if c.get("entered")])
+    entered = list(times.values())
     ours_at = ours_changed(rows)
     return {"ours": {"at": ours_at, "words": f"as of the last import, {when(ours_at)}"
-                     if ours_at else "nothing imported yet"},
+                     if ours_at else "nothing imported yet", "when": when(ours_at)},
             "epoch": {"at": ep["at"] if ep else None,
                       "words": f"imported {day(ep['at'])}" if ep else "not imported yet",
                       "credit": reported.SOURCES["epoch"]["credit"],
@@ -779,10 +866,29 @@ def _sources(rep: dict, rows: list[dict], theirs: list[dict]) -> dict:
 
 def db_row_time(rid) -> float | None:
     """when a card's entry was made"""
+    return entered_times([rid]).get(rid)
+
+
+def entered_times(ids: list) -> dict:
+    """21d: when each card entry was made, in one read"""
     from contextlib import closing
+    ids = [i for i in ids if i is not None]
+    if not ids:
+        return {}
     with closing(db._conn()) as c:
-        row = c.execute("SELECT created_at FROM reported_scores WHERE id=?", (rid,)).fetchone()
-    return float(row[0]) if row else None
+        rows = c.execute("SELECT id, created_at FROM reported_scores WHERE id IN (%s)"
+                         % ",".join("?" * len(ids)), ids).fetchall()
+    return {r[0]: float(r[1]) for r in rows if r[1] is not None}
+
+
+def bench_meta(benches: list[dict]) -> list[dict]:
+    """21d: each benchmark with how many times each of its questions is asked
+    and what a question is called: a score line says 198 questions × 4, never
+    792 answers"""
+    _scripts()
+    import frontier as fb
+    return [{**b, "epochs": int((fb.BENCH.get(b["task"]) or {}).get("epochs") or 1),
+             "unit": "tasks" if b["task"] == "arc_agi2_public" else "questions"} for b in benches]
 
 
 def report(rid: str, payload: dict | None = None, compute: bool = False) -> dict | None:
@@ -807,8 +913,9 @@ def report(rid: str, payload: dict | None = None, compute: bool = False) -> dict
             for x in m["summary"]:
                 x["board"] = board.get(lbl, {}).get(x["key"])
         src = ours_changed(rows)
-        return {**got, "sources": {"ours": {"at": src, "words": f"as of the last import, "
-                                            f"{when(src)}" if src else "nothing imported yet"}}}
+        return {**got, "benchmarks": bench_meta(got["benchmarks"]),
+                "sources": {"ours": {"at": src, "words": f"as of the last import, "
+                                     f"{when(src)}" if src else "nothing imported yet"}}}
     theirs = their_rows(rep)
     if compute:
         for r in rows:
@@ -816,18 +923,26 @@ def report(rid: str, payload: dict | None = None, compute: bool = False) -> dict
                 token_stats(Path(r["dir"]), b["task"])
         loops(rep, rows)
     stats, kept_at = kept_stats(rep, rows)
+    times = entered_times([c.get("entered") for t in theirs for c in t["cells"].values()
+                           if c.get("entered")])
     for t in theirs:
         for c in t["cells"].values():
             if c.get("entered"):
-                c["entered_at"] = day(db_row_time(c["entered"]))
+                c["entered_at"] = day(times.get(c["entered"]))
     models = rows + theirs
     picks = [r for r in rows if r["pick"]]
     return {
         "id": rid, "title": rep.get("title") or rid, "what": rep.get("what") or "",
-        "benchmarks": rep["benchmarks"], "ours": rows, "theirs": theirs,
+        "benchmarks": bench_meta(rep["benchmarks"]), "ours": rows, "theirs": theirs,
+        # 21d: Models ▸ Latest — its benchmarks (the models are the picked
+        # rows and the others marked "glance")
+        "glance": {"benchmarks": [k for k in rep.get("glance_benchmarks") or []
+                                  if any(b["key"] == k for b in rep["benchmarks"])]},
         "standing": {p["label"]: standing(p, models, rep["benchmarks"]) for p in picks},
         "picks": [p["label"] for p in picks],
         "tokens": stats, "tokenLine": token_line(rep, rows, stats),
+        # 21d: what each token column means, as the published page says it
+        "tokenDefs": page_defs(rep),
         "tokenLimits": rep.get("token_limits") or {},
         "loops": {"task": (rep.get("loops") or {}).get("task"),
                   "first": (rep.get("loops") or {}).get("first"),
@@ -841,6 +956,25 @@ def report(rid: str, payload: dict | None = None, compute: bool = False) -> dict
         "ranOut": ran_out_links(),
         # 21c: the page as masein publishes it, served here
         "page": page_url(rid, rep)}
+
+
+def page_defs(rep: dict) -> list[list[str]]:
+    """21d: the published page's definitions under its token table — [[term,
+    definition], …] from its <dl class="sc-defs">, word for word; [] without
+    a page or the list"""
+    import html as _html
+
+    from . import report_page
+    pg = report_page.page_of(rep)
+    if not pg:
+        return []
+    text = pg["file"].read_text(encoding="utf-8")
+    m = re.search(r'<dl class="sc-defs">(.*?)</dl>', text, re.S)
+    if not m:
+        return []
+    plain = lambda x: _html.unescape(re.sub(r"<[^>]+>", "", x)).strip()      # noqa: E731
+    return [[plain(dt), plain(dd)] for dt, dd in
+            re.findall(r"<dt>(.*?)</dt>\s*<dd>(.*?)</dd>", m.group(1), re.S)]
 
 
 def page_url(rid: str, rep: dict) -> str:
@@ -885,6 +1019,21 @@ def stats_at(ats: list[float]) -> dict:
     return {"at": max(ats), "words": f"worked out {when(max(ats))}"}
 
 
+def glance_meta() -> dict | None:
+    """21d: what Models ▸ Latest reads — the first report naming its glance
+    benchmarks: its id and title, its picked rows (board model ids) and those
+    benchmarks' tasks. None when no report names any"""
+    for rid, rep in files().items():
+        keys = rep.get("glance_benchmarks") or []
+        if rep.get("kind") == "ran_out" or not keys:
+            continue
+        task = {b["key"]: b["task"] for b in rep["benchmarks"]}
+        return {"report": rid, "title": rep.get("title") or rid,
+                "rows": [o["row"] for o in rep["ours"] if o.get("pick")],
+                "tasks": [task[k] for k in keys if k in task]}
+    return None
+
+
 def ran_out_links() -> list[dict]:
     """21b: each ran-out report and the models it lists — the scorecard's
     ran-out chart and loop examples link to it"""
@@ -894,13 +1043,12 @@ def ran_out_links() -> list[dict]:
 
 def listing(payload: dict | None = None) -> list[dict]:
     """every report as a card: its title, what it is, the models in it, and
-    when its numbers last changed"""
-    if payload is None:
-        from . import app
-        payload = app.results_payload()
+    when its numbers last changed. 21d: never the board's whole payload — a
+    card needs the rows' names and folders, not their numbers (2.3 s on the
+    server whenever that payload was being built again)"""
     out = []
     for rid, rep in files().items():
-        rows = our_rows(rep, payload.get("cells") or {})
+        rows = our_rows(rep, (payload or {}).get("cells") or {})
         if rep.get("kind") == "ran_out":
             last = ours_changed(rows)
             out.append({"id": rid, "title": rep.get("title") or rid, "what": rep.get("what") or "",

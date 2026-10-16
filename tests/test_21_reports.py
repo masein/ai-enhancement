@@ -3,8 +3,8 @@
 every version a report names, each value as Epoch's data had it on 14 Oct;
 the card cells go through the board's own card entry; the sums (the "level"
 band, the higher and lower counts, the summary line, the token line); the
-token stats equal masein's ~/tokens.py on stored answers built to match two
-of its rows; a loop example from the hidden half is refused; each of our
+token stats equal masein's ~/tokens.py run on the same stored answers (21d); a
+loop example from the hidden half is refused; each of our
 rows' status line. Epoch's data is a trimmed copy of 14 Oct's (CC BY 4.0);
 nothing is fetched, no model runs, nothing is graded."""
 
@@ -22,7 +22,6 @@ from service import config, db, reported, reports
 
 FIX = Path(__file__).resolve().parent / "fixtures"
 EPOCH = FIX / "epoch-2026-10-14"
-TOKENS = [json.loads(x) for x in (FIX / "tokens-2026-10-14.jsonl").read_text().splitlines()]
 REPORT = json.loads((reported.REPORTS_DIR / "step-checkpoints.json").read_text())
 
 
@@ -92,23 +91,19 @@ def test_an_unchanged_file_is_imported_again_when_a_report_names_more(svc):
     assert reported.import_epoch(fetch=fetch, board=[])["status"] == "unchanged"
 
 
-def test_the_token_script_sets_the_stats_beside_tokens_py(svc, capsys, monkeypatch):
+def test_the_token_script_sets_the_stats_beside_tokens_py(svc, capsys, tmp_path):
+    """scripts/report_token_stats.py beside ~/tokens.py's own output on the same
+    stored answers: every row and benchmark the same (21d)"""
     import report_token_stats as rts
-    row = GPQA
-    runs = build(LAYOUT["gpqa"], row)
-    from service import frontier as sf
-    d = config.OUT_DIR / row["row"]
-    td = sf.task_dir(d, row["task"])
-    td.mkdir(parents=True, exist_ok=True)
-    (td / f"samples_{row['task']}_2026-10-14T07-20-00.000000.jsonl").write_text("".join(
-        json.dumps({"doc_id": k, "doc": {"id": f"q{k}"}, "resps": [[a]],
-                    "frontier": [{"epoch": 0, "tokens": t, "ran_out": out, "ok": ok}]}) + "\n"
-        for k, (t, out, ok, a) in enumerate(runs)))
-    f = FIX / "tokens-2026-10-14.jsonl"
+    import token_answers as ta
+    ta.write(config.OUT_DIR)
+    theirs = ta.tokens_py(config.RESULTS_ROOT)
+    f = tmp_path / "tokens.jsonl"
+    f.write_text("".join(json.dumps({"row": r, "task": t, **v}) + "\n"
+                         for (r, t), v in theirs.items()))
     assert rts.main(["step-checkpoints", "--against", str(f)]) == 0
     out = capsys.readouterr().out
-    assert f"{row['row']} · gpqa_diamond_epoch: same" in out and out.rstrip().endswith(
-        "1 the same, 0 different")
+    assert out.rstrip().endswith(f"{len(theirs)} the same, 0 different"), out[-1500:]
 
 
 def test_versions_kept_for_a_report_are_never_rows_of_outside_data(svc):
@@ -247,68 +242,42 @@ def test_the_token_line():
 
 
 # ---------------------------------------------------------------------------
-# the token stats: equal to ~/tokens.py on answers built to match two rows
+# the token stats: ~/tokens.py's, field by field, on the same stored answers
 # ---------------------------------------------------------------------------
 
-def text(share: float, n: int, closed: bool = True) -> str:
-    """an answer of n characters whose thinking is `share` of them"""
-    if not closed:
-        return "<think>" + "x" * (n - 7)
-    k = round(share * n)
-    return "<think>" + "x" * k + "</think>" + "y" * (n - k - 15)
+def test_the_token_stats_equal_tokens_py(svc):
+    """21d: masein's tokens.py run on varied stored answers, and the board's
+    stats on the same files — equal in every field, every row and benchmark
+    (21c's differed: think_share averaged, the tags in an answer's share, the
+    median and p90 taken another way, thinking rounded once)"""
+    import token_answers as ta
+    done = ta.write(config.OUT_DIR)
+    theirs = ta.tokens_py(config.RESULTS_ROOT)
+    assert sorted(theirs) == sorted(done) and len(done) == 15
+    assert {v["src"] for v in theirs.values()} == {"samples", "answers"}
+    for (row, task), want in theirs.items():
+        got = reports.token_stats(config.OUT_DIR / row, task)
+        assert got == want, (row, task, {k: (got.get(k), v) for k, v in want.items()
+                                         if got.get(k) != v})
+        # kept until the answers change: asked again, the same, read from the store
+        assert reports.token_stats(config.OUT_DIR / row, task, compute=False) == got
 
 
-def build(groups: list[tuple], target: dict) -> list[tuple]:
-    """runs of (tokens, ran out, right, answer) from groups of (count, tokens,
-    ran out, right, thinking share, characters); the last group's last run
-    is tuned so the thinking tokens' mean lands on the row's"""
-    runs = []
-    for count, tok, out, ok, share, n in groups:
-        runs += [(tok, out, ok, text(share, n, closed=not out)) for _ in range(count)]
-
-    def think(r):
-        return r[0] * reports.think_share(r[3])
-    want = target["think_mean"] * len(runs)
-    t, out, ok, _ = runs[-1]
-    n = groups[-1][5]
-    rest = sum(think(r) for r in runs[:-1])
-    runs[-1] = (t, out, ok, text((want - rest) / t, n))
-    return runs
-
-
-ROW = {(r["row"], r["task"]): r for r in TOKENS}
-GPQA = ROW[("served__Qwen3.6-35B-A3B-BF16-lda-2610__thinking", "gpqa_diamond_epoch")]
-OTIS = ROW[("served__Qwen3.6-35B-A3B-BF16-lda-2610__thinking", "otis_aime_epoch")]
-LAYOUT = {
-    # 792 answers, none ran out: 395 short, 2 at the median, 120 wrong, the
-    # rest long, the 90th percentile and the longest
-    "gpqa": [(394, 3054, False, True, 0.92774, 2000), (1, 3247, False, True, 0.92774, 2000),
-             (2, 5594, False, True, 4831 / 5594, 60000), (120, 11648, False, False, 0.92257, 2000),
-             (195, 15000, False, True, 0.92257, 2000), (79, 19772, False, True, 0.92257, 2000),
-             (1, 76912, False, True, 0.92257, 60000)],
-    # 360: 39 ran out at the limit, 306 right, 15 wrong
-    "otis": [(39, 81920, True, False, 1.0, 60000), (179, 20000, False, True, 0.98496, 2000),
-             (2, 32104, False, True, 31130 / 32104, 60000), (15, 64470, False, False, 0.965666, 2000),
-             (124, 50138, False, True, 0.965666, 2000), (1, 50214, False, True, 0.965666, 60000)],
-}
-
-
-@pytest.mark.parametrize("which,row", [("gpqa", GPQA), ("otis", OTIS)])
-def test_the_token_stats_equal_tokens_py(svc, which, row):
-    runs = build(LAYOUT[which], row)
-    d = config.OUT_DIR / row["row"]
-    from service import frontier as sf
-    td = sf.task_dir(d, row["task"])
-    td.mkdir(parents=True, exist_ok=True)
-    (td / f"samples_{row['task']}_2026-10-14T07-20-00.000000.jsonl").write_text("".join(
-        json.dumps({"doc_id": k, "doc": {"id": f"q{k}"}, "resps": [[a]],
-                    "frontier": [{"epoch": 0, "tokens": t, "ran_out": out, "ok": ok}]}) + "\n"
-        for k, (t, out, ok, a) in enumerate(runs)))
-    got = reports.token_stats(d, row["task"])
-    want = {k: v for k, v in row.items() if k not in ("row", "task")}
-    assert got == want, {k: (got.get(k), v) for k, v in want.items() if got.get(k) != v}
-    # kept until the file changes: asked again, the same, read from the cache
-    assert reports.token_stats(d, row["task"], compute=False) == got
+def test_where_the_old_counting_and_tokens_py_part():
+    """the four places 21c counted otherwise, each on a small case"""
+    # the median of an even count: the upper middle value; p90 at int(0.9·n)
+    assert reports.quantile([1, 2, 3, 4], .5) == 3
+    assert reports.quantile(list(range(1, 11)), .9) == 10        # not 9, the nearest rank
+    # an answer's share leaves the tags out; the share over all characters
+    got = reports.token_stats_from([("<think>" + "x" * 90 + "</think>" + "y" * 10, 100, "stop",
+                                     True),
+                                    ("<think>" + "x" * 10 + "</think>" + "y" * 90, 100, "stop",
+                                     False)])
+    assert got["think_share"] == 0.5 and got["think_mean"] == 50          # 90 and 10
+    assert (got["tok_med"], got["right_n"], got["wrong_n"]) == (100, 1, 1)
+    # a cut answer: never right or wrong, counted as ran out
+    cut = reports.token_stats_from([("<think>" + "x" * 50, 32768, None, False)])
+    assert (cut["ran_out"], cut["right_n"], cut["wrong_n"]) == (1, 0, 0)
 
 
 # ---------------------------------------------------------------------------
