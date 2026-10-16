@@ -196,8 +196,10 @@ def test_on_a_phone_the_filters_are_one_button_and_the_table_starts_near_the_top
         # the table scrolls sideways on a phone, so its scroll buttons take one
         # 26px line above it (the sideways-scroll fix); the fold of the
         # filters, which this guards, saves far more than that. 16.3: Row 1 —
-        # five kinds of test, and Table or Chart — wraps on a phone, as asked
-        assert gap <= 370, gap
+        # five kinds of test, and Table or Chart — wraps on a phone, as asked.
+        # 21d: Row 2 holds When ▾ too, in view as asked: with CI's fonts it
+        # takes a third short line there (370.5); with others it fits in two
+        assert gap <= 380, gap
         assert page.locator("#pill-size").count() == 0            # folded away
         # 16.3: Row 1 wraps inside the screen; nothing scrolls sideways
         rights = page.evaluate("""() => [...document.querySelectorAll('[data-lb-row1] .chip-btn')]

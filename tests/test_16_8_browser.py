@@ -215,7 +215,7 @@ def test_the_filters_panel_is_one_row_of_compact_menus_that_wraps(live, page, wi
     boxes = pills.evaluate_all("""ps => ps.map(p => p.getBoundingClientRect())
         .map(r => [r.left, r.top, r.width])""")
     sw = sheet.bounding_box()["width"]
-    assert len(boxes) == 6, boxes
+    assert len(boxes) == 5, boxes                 # 21d: When ▾ left it for Row 2
     assert all(w < sw * 0.6 for _, _, w in boxes), (sw, boxes)        # compact, never full width
     lines = sorted({round(top) for _, top, _ in boxes})
     assert len(lines) <= (1 if width >= 1400 else 3), lines            # one row, wrapping
