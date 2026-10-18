@@ -5055,7 +5055,7 @@ Not before the demo: a new hidden set changes every Everyday score.
 - **Why b11555 is built here:** the runner image has no llama-server, and
   upstream's own Linux CUDA build is made on Ubuntu 24.04 (glibc 2.38); the
   runner image is 22.04 (glibc 2.35). `build_llama_tarball.sh` builds the tag
-  in CUDA 12.8 on 22.04 with the release's CCCL (v3.4.3), for sm_120.
+  in CUDA 12.8 on 22.04 with the release's CCCL (v3.4.3) and no NCCL, for sm_120.
 - **The file:** `Ornith-1.5-35B-Q4_K_M.gguf` (21,713,463,040 bytes, sha256
   `42739874…d41f`, `ornith-ai/Ornith-1.5-35B-A3B-GGUF` at `12393612`), pinned in
   `PLAN_PINS["L"]`, fetched straight from the public repository.

@@ -38,8 +38,9 @@ every value:
   own. Upstream's own Linux CUDA 12.8 build is made on Ubuntu 24.04 and needs
   glibc 2.38; the runner image is Ubuntu 22.04 (glibc 2.35), where it stops at
   "GLIBC_2.38 not found". So the tag is built by our script in CUDA 12.8 on
-  Ubuntu 22.04, as the lda tarball was, with the release's own CCCL (v3.4.3),
-  for sm_120 (the RTX 5090 and the RTX PRO 6000). It loads `qwen35moe`: its
+  Ubuntu 22.04, as the lda tarball was, with the release's own CCCL (v3.4.3)
+  and, as the release, no NCCL (one GPU a server), for sm_120 (the RTX 5090
+  and the RTX PRO 6000). It loads `qwen35moe`: its
   `libllama` names the architecture, as the lda build's does for Qwen3.6.
 - **Sampling:** temperature 1.0, top-p 0.95, top-k 20 (the card's settings
   for its benchmarks), min-p 0.0, presence penalty 0, repeat penalty 1.0 — the
@@ -72,7 +73,7 @@ git clone https://github.com/ggml-org/llama.cpp ~/llama.cpp-upstream && git -C ~
 ```
 
 ```bash
-cd ~/benchmarks/aienh && LLAMA_CUDA_ARCHS=120 LLAMA_CMAKE_ARGS="-DGGML_CUDA_CCCL_VERSION=v3.4.3 -DLLAMA_OPENSSL=OFF" scripts/build_llama_tarball.sh ~/llama.cpp-upstream ~/llama-server-b11555.tar.gz
+cd ~/benchmarks/aienh && LLAMA_CUDA_ARCHS=120 LLAMA_CMAKE_ARGS="-DGGML_CUDA_CCCL_VERSION=v3.4.3 -DGGML_CUDA_NCCL=OFF -DLLAMA_OPENSSL=OFF" scripts/build_llama_tarball.sh ~/llama.cpp-upstream ~/llama-server-b11555.tar.gz
 ```
 
 Its last line gives its size and sha256. Then into the private repository,

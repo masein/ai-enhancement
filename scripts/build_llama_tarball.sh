@@ -90,8 +90,11 @@ if ! grep -E 'LLAMA_(BUILD_NUMBER|COMMIT) =' "$info" > /out/build-info; then
 fi
 mkdir -p /out/llama/bin /out/llama/lib
 cp -L build-tarball/bin/llama-server /out/llama/bin/
-# 17d: "+", not ";" — find then says when a copy failed, and the build stops
-find build-tarball -name "*.so*" \( -type f -o -type l \) -exec cp -P -t /out/llama/lib/ {} +
+# 17d: "+", not ";" — find then says when a copy failed, and the build stops.
+# 22: a shared library's name ends ".so" or holds ".so." — "*.so*" took three
+# of CCCL's source files fetched into the build (algorithm.sort_heap.h, …)
+find build-tarball \( -name "*.so" -o -name "*.so.*" \) \( -type f -o -type l \) \
+  -exec cp -P -t /out/llama/lib/ {} +
 for l in libcudart.so libcublas.so libcublasLt.so; do
   cp -P /usr/local/cuda/lib64/${l}* /out/llama/lib/
 done

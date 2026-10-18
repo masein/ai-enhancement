@@ -474,8 +474,11 @@ def test_the_docs_box_lines_are_the_pilot_and_L1_to_L21_whole():
     # the tarball, built from the tag as the runtime names it
     assert "git -C ~/llama.cpp-upstream checkout b11555" in text
     assert ('LLAMA_CUDA_ARCHS=120 LLAMA_CMAKE_ARGS="-DGGML_CUDA_CCCL_VERSION=v3.4.3 '
-            '-DLLAMA_OPENSSL=OFF" scripts/build_llama_tarball.sh ~/llama.cpp-upstream '
-            '~/llama-server-b11555.tar.gz') in text
+            '-DGGML_CUDA_NCCL=OFF -DLLAMA_OPENSSL=OFF" scripts/build_llama_tarball.sh '
+            '~/llama.cpp-upstream ~/llama-server-b11555.tar.gz') in text
+    # 22: the tarball's libraries alone — "*.so*" took CCCL's sources too
+    script = (ROOT / "scripts" / "build_llama_tarball.sh").read_text()
+    assert 'find build-tarball \\( -name "*.so" -o -name "*.so.*" \\)' in script
     assert f"`{SHA}`" in text and "21,713,463,040 bytes" in text
 
 
