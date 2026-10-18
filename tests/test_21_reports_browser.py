@@ -171,11 +171,11 @@ def test_the_list_and_the_report_open_and_the_picker_moves_the_tiles(live, page,
     assert "“Wait”" in page.locator("[data-rp-loop='486']").inner_text()
     # 6 and 7: every model, ours in bold; the cards' links beside their numbers
     every = page.locator("[data-rp-every]")
-    assert every.locator("td.rp-ours").count() == 6
+    assert every.locator("td.rp-ours").count() == 7          # 22: and Ornith-1.5, measured here
     assert every.locator("td.rp-ours").first.evaluate(
         "e => +getComputedStyle(e).fontWeight") >= 600                  # ours in bold
     assert every.locator("[data-card-link]").count() >= 19
-    assert page.locator("[data-rp-cards] a").count() == 6
+    assert page.locator("[data-rp-cards] a").count() == 7    # 22: and Ornith-1.5's card
     assert no_sideways(page)
     SCREENS.mkdir(parents=True, exist_ok=True)
     page.locator("[data-rp-pick='step4000']").click()

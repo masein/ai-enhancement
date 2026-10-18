@@ -1,6 +1,7 @@
 """21d in a real browser, at 1280 and 400 px, light and dark: Models opens on
-Latest when the link names no view — exactly the report's picked rows and the
-eight it marks "glance", on GPQA Diamond, OTIS Mock AIME, MMLU-Pro and HLE,
+Latest when the link names no view — exactly the report's rows marked
+"glance" (22: ours too, and Ornith-1.5's two), on GPQA Diamond, OTIS Mock AIME,
+MMLU-Pro and HLE,
 no rank and no average, every number the report's; When ▾ beside Group and
 Models, by the date tested or added, kept in the link; the report's token
 table with its definitions, and its score lines in questions × runs. The
@@ -22,7 +23,8 @@ from test_21d_glance import GLANCE, PICKED
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase21d"
 GOOD, SKEWED = "fx/good-750m", "fx/skewed-360m"
-LDA = [SPEC[x]["row"] for x in SPEC]                 # our six rows, tested now
+# our six rows, tested now — 22: Ornith-1.5's isn't run in this world
+LDA = [SPEC[x]["row"] for x in SPEC if x != "Ornith-1.5 Q4_K_M"]
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -85,7 +87,7 @@ def test_models_opens_on_latest(live, page, width, scheme):
                                       "ts => ts.map(t => t.textContent.trim())")
     assert heads == ["Model", "GPQA Diamond", "OTIS Mock AIME", "MMLU-Pro", "HLE", "Source"]
     rows = first_text(page, "[data-latest-table] tbody tr")
-    assert sorted(r[0] for r in rows) == sorted(PICKED + GLANCE)
+    assert sorted(r[0] for r in rows) == sorted([*PICKED, "Ornith-1.5 Q4_K_M", *GLANCE])
     # no rank and no average: a name opens every row, no column is either
     assert not any(re.fullmatch(r"#?\d+", r[0]) for r in rows)
     assert not any(h.lower() in ("#", "rank", "avg", "average") for h in heads)
@@ -94,7 +96,7 @@ def test_models_opens_on_latest(live, page, width, scheme):
     assert g == sorted(g, reverse=True), g
     # our rows bold; each published row says where it is from
     ours = page.locator("[data-latest-ours='true'] td:first-child")
-    assert ours.count() == 5
+    assert ours.count() == 6                                  # 22: and Ornith-1.5, measured here
     assert ours.first.evaluate("e => +getComputedStyle(e).fontWeight") >= 600
     src = {r[0]: r[-1] for r in rows}
     assert src["GPT-6 Astra (max)"] == "Epoch AI"

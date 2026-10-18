@@ -16,7 +16,11 @@ request (and /apply-template) answers with; FAKE_LLAMA_THINK=never answers
 without thinking whatever it is told. 20: --list-devices lists one CUDA card,
 or none with CUDA's own error when FAKE_LLAMA_DEVICES=none;
 FAKE_LLAMA_BROKEN=1 fails as a binary missing a library does, before
-anything. 18e: FAKE_LLAMA_DRAFTS=1 has its /slots say they draft tokens."""
+anything. 18e: FAKE_LLAMA_DRAFTS=1 has its /slots say they draft tokens. 22:
+FAKE_LLAMA_VERSION is what --version prints (upstream's "version: 0.6.0-dev
+(build 11555, commit 1cf776776)"); FAKE_LLAMA_TEMPLATE the chat template its
+/props names; FAKE_LLAMA_THINK=inline answers with its thinking and
+"</think>" in the reply, as a server that doesn't split them off does."""
 
 from __future__ import annotations
 
@@ -45,7 +49,7 @@ def main() -> int:
               "open shared object file: No such file or directory", file=sys.stderr)
         return 127
     if "--version" in argv:
-        print(VERSION, file=sys.stderr)
+        print(os.environ.get("FAKE_LLAMA_VERSION") or VERSION, file=sys.stderr)
         return 0
     if "--list-devices" in argv:
         if os.environ.get("FAKE_LLAMA_DEVICES") == "none":
@@ -65,6 +69,8 @@ def main() -> int:
     shown = os.environ.get("FAKE_LLAMA_MODEL_PATH") or model
     status = int(os.environ.get("FAKE_LLAMA_STATUS") or 200)
     never_think = os.environ.get("FAKE_LLAMA_THINK") == "never"
+    inline = os.environ.get("FAKE_LLAMA_THINK") == "inline"
+    template = os.environ.get("FAKE_LLAMA_TEMPLATE") or "{# a fake template #}"
     port = int(arg(argv, "--port", default="8080"))
     ctx = int(arg(argv, "-c", "--ctx-size", default="4096"))
     slots = int(arg(argv, "-np", "--parallel", default="1"))
@@ -100,7 +106,7 @@ def main() -> int:
             if self.path == "/props":
                 return self._send(200, {"model_path": shown, "build_info": "b6543-abc1234",
                                         "total_slots": slots,
-                                        "chat_template": "{# a fake template #}",
+                                        "chat_template": template,
                                         "default_generation_settings": {"n_ctx": ctx // slots}})
             if self.path == "/slots":
                 drafts = os.environ.get("FAKE_LLAMA_DRAFTS") == "1"
@@ -126,7 +132,9 @@ def main() -> int:
             on = (body.get("chat_template_kwargs") or {}).get("enable_thinking") \
                 and not never_think
             msg = {"role": "assistant", "content": f"The options compared.\nANSWER: {pick}"}
-            if on:
+            if on and inline:
+                msg["content"] = "Weighing each option in turn.\n</think>\n\n" + msg["content"]
+            elif on:
                 msg["reasoning_content"] = "Weighing each option in turn."
             with lock:
                 count["n"] += 1

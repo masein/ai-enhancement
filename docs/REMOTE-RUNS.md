@@ -1401,6 +1401,21 @@ it sees, the architectures it was built for) and records the binary's and
 each library's sha256 and its commit. Every box of a model must run the same
 build directory, as with the tarball.
 
+# Ornith-1.5-35B-A3B on plan L (22)
+
+A third-party model (`ornith-ai/Ornith-1.5-35B-A3B-GGUF`, its Q4_K_M file) on
+plan L's 21 boxes, thinking on, with a runtime of its own,
+**`card-ornith`**: upstream llama.cpp b11555 built from its tag, the card's
+settings (temperature 1.0, top-p 0.95, top-k 20, min-p 0, no presence or
+repeat penalty), the GGUF's own chat template, `-ctk q8_0 -ctv q8_0
+--flash-attn on`. Never the lda runtime: its served id
+(`served/Ornith-1.5-35B-A3B-Q4_K_M`) runs on card-ornith alone, the box
+refuses any `LOOKAHEAD_*` variable and a build that reads one, and the import
+refuses a bundle asked another way. A pilot on the first box
+(`frontier_box.py L1 --pilot …`) asks 20 GPQA Diamond and 5 MMLU-Pro questions
+before the other 20 are rented. The tarball, the pilot, the 21 box lines,
+the fetch and the first import: docs/ORNITH-RUN.md.
+
 # Speed tests: the cheapest box per answer (19)
 
 Which box runs our benchmarks for the fewest dollars per answer, measured the

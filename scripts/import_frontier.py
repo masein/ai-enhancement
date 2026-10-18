@@ -639,6 +639,11 @@ def runtime_problem(setup: dict, rec: dict) -> str:
         return (f"it was asked with {('runtime ' + got) if got else 'no named runtime'}; "
                 f"{rec.get('id')} is registered with {('runtime ' + want) if want else 'none'} "
                 "— a runtime's rows never mix with another's")
+    # 22: a model a runtime names runs on it alone (Ornith-1.5 on card-ornith),
+    # and that runtime its own models alone
+    why = fb.runtime_model_refused(got, str(rec.get("id") or ""))
+    if why:
+        return f"it can't be imported: {why}"
     if got:
         rt, srv = fb.RUNTIMES[got], setup.get("server") or {}
         env = srv.get("env") if isinstance(srv.get("env"), dict) else {}
@@ -647,6 +652,14 @@ def runtime_problem(setup: dict, rec: dict) -> str:
         want_flags = fb.runtime_flags(got)
         if flags[:len(want_flags)] != want_flags:
             miss.append("its flags " + " ".join(want_flags))
+        # 22: what the runtime never gives its server, and the llama.cpp it runs
+        miss += [f"no {k}" for k in fb.runtime_env_refused(got, env)]
+        built = fb.runtime_build_refused(got, srv.get("build"), srv.get("commit"),
+                                         ((srv.get("dir") or {}).get("version_file")))
+        if built:
+            miss.append(built)
+        if rt.get("template_sha256") and srv.get("chat_template_sha256") != rt["template_sha256"]:
+            miss.append(f"the GGUF's own chat template (sha256 {rt['template_sha256'][:16]}…)")
         if miss:
             return (f"its box didn't run runtime {got} as this board defines it: "
                     + "; ".join(miss) + " — the box's image and this board differ")

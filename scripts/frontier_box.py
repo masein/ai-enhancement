@@ -39,6 +39,21 @@ the lda branch's tarball as any build's:
 
 --server-dir, in place of --server, is the fallback: a build directory the
 team put on the box (docs/STEP4000-RUN.md).
+
+22: Ornith-1.5-35B-A3B (Q4_K_M), a third-party model, on plan L's boxes with
+a runtime of its own — card-ornith: upstream llama.cpp b11555 and its card's
+settings, never the lda runtime. Its model names its runtime (fb.RUNTIMES's
+"models") and what it is based on; its file is pinned (PLAN_PINS):
+
+    python scripts/frontier_box.py L13 --as served/Ornith-1.5-35B-A3B-Q4_K_M \\
+        --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@<commit>/Ornith-1.5-35B-Q4_K_M.gguf \\
+        --server hf://<you>/evalboard-private@<commit>/llama-server-b11555.tar.gz \\
+        --runtime card-ornith
+
+--pilot, on the first box before the other 20 are rented: 20 GPQA Diamond
+and 5 MMLU-Pro questions with the runtime, a line each, the plan's hours at
+their pace, and last whether the thinking and the answer came back apart
+(docs/ORNITH-RUN.md).
 """
 
 from __future__ import annotations
@@ -93,6 +108,11 @@ PILOT = {"per_token": 10_880, "recurrent": 68_059_136, "file": 22_854_339_808,
 # its test grids, 167 in its 120 tasks at the pinned revision, each asked twice
 ANSWERS = {t: (167 if t == ARC else b["n"]) * b["epochs"] for t, b in fb.BENCH.items()}
 PARITY_STEP = ("parity", (), "", 8)
+# 22: a runtime's pilot (fb.PILOT's questions), on the first box of a plan
+# before the others are rented — at the plan's 8 slots
+PILOT_STEP = ("pilot", tuple(fb.PILOT["n"]), "", 8)
+# 22: a 5090 on vast.ai, an hour, for the pilot's sum
+BOX_PRICE = 0.50
 RUNS = 3                    # 17g: a step's runs on its own (service/frontier.WRITE_OFF_RUNS)
 
 # a step: (thinking, its benchmarks, its shard, its slots). ARC-AGI-2's prompts
@@ -161,7 +181,11 @@ PLAN_PINS = {"L": {
     "Qwen3.6-35B-A3B-BF16-00001-of-00002.gguf":
         "a172dfea1fe8bb29132ea2f250c74cdc7d619d518d3f072d3816e31a69ce44a2",
     "Qwen3.6-35B-A3B-BF16-00002-of-00002.gguf":
-        "b90b4d07e1be4967aec932e2501e7476ec5f44de772c7eb082d6e9c3ac105161"}}
+        "b90b4d07e1be4967aec932e2501e7476ec5f44de772c7eb082d6e9c3ac105161",
+    # 22: Ornith-1.5-35B-A3B's Q4_K_M, 21,713,463,040 bytes, as Hugging Face
+    # publishes it in ornith-ai/Ornith-1.5-35B-A3B-GGUF at 12393612fd4f
+    "Ornith-1.5-35B-Q4_K_M.gguf":
+        "42739874cc2ccfdb8523b23fbe52e29b2a7555c8176737ca9ca0b5d59859d41f"}}
 
 
 def gpu_refused(box: str, info: dict | None = None) -> str:
@@ -181,7 +205,7 @@ def gpu_refused(box: str, info: dict | None = None) -> str:
     bad = sorted({n for n in names if not any(w in n for w in want)})
     if bad:
         return (f"{box}: this box has {', '.join(bad)} — plan {box[:1].upper()} runs on an "
-                f"{cards} only (its lda build is for sm_120 alone). Nothing was fetched")
+                f"{cards} only (its builds are for sm_120 alone). Nothing was fetched")
     return ""
 
 
@@ -270,6 +294,12 @@ def folder(a: argparse.Namespace, box: str, k: int, step: Step) -> Path:
     return Path(a.root) / build / step_name(box, k, step)
 
 
+def pilot_folder(a: argparse.Namespace) -> Path:
+    """22: the pilot's folder, in the build's own — named with no "-", so the
+    fetch takes it for no step of a plan"""
+    return Path(a.root) / a.served_as.split("/", 1)[-1] / "pilot"
+
+
 def steps_of(box: str) -> list[tuple[str, Step]]:
     """18b: each step folder a box's line makes, with its step"""
     plan = PLANS.get(box[:1].upper()) or {}
@@ -316,7 +346,7 @@ def argv_of(box: str, k: int, step: Step, a: argparse.Namespace) -> list[str]:
     out = [sys.executable, str(HERE / "remote_gguf.py"), "--as", a.served_as, "--gguf", a.gguf,
            *(["--server-dir", a.server_dir] if getattr(a, "server_dir", "") else
              ["--server", a.server]),
-           "--based-on", a.based_on, "--label", box,
+           "--based-on", based_on_of(a), "--label", box,
            "--files", str(Path(a.root) / "files"), "--flags", flags_of(a, box)]
     rt = runtime_of(a, box)
     if rt:
@@ -325,15 +355,19 @@ def argv_of(box: str, k: int, step: Step, a: argparse.Namespace) -> list[str]:
         out += ["--pin", pin]
     if getattr(a, "slots_fit", False):
         out += ["--slots-fit"]
-    if getattr(a, "max_slots", 0) and th != "parity":   # 18e point 21: more, where they fit
+    if getattr(a, "max_slots", 0) and th not in ("parity", "pilot"):   # 18e point 21
         out += ["--max-slots", str(a.max_slots)]
     if a.env:
         out += ["--env", a.env]
-    if a.ask_written_off:
+    if a.ask_written_off and th != "pilot":
         out += ["--ask-written-off"]
     if th == "parity":
         return out + ["--thinking", "off", "--slots", str(slots), "--parity",
                       "--out", str(folder(a, box, k, step))]
+    if th == "pilot":
+        # 22: at the plan's slots, so its pace is the plan's
+        return out + ["--thinking", "on", "--slots", str(slots), "--min-slots",
+                      str(max(1, slots - 1)), "--pilot", "--out", str(pilot_folder(a))]
     out += ["--thinking", th, "--slots", str(slots)]
     if slots > 1 and ARC not in tasks:
         out += ["--min-slots", str(slots - 1)]
@@ -345,8 +379,19 @@ def argv_of(box: str, k: int, step: Step, a: argparse.Namespace) -> list[str]:
 
 
 def runtime_of(a: argparse.Namespace, box: str) -> str:
-    """20: the runtime a box's steps run: the line's, else its plan's"""
-    return getattr(a, "runtime", "") or PLAN_RUNTIME.get(box[:1].upper(), "")
+    """20: the runtime a box's steps run: the line's, else its plan's. 22:
+    else the one its model runs on alone (Ornith-1.5's card-ornith), before
+    the plan's"""
+    return (getattr(a, "runtime", "") or fb.runtime_of_model(getattr(a, "served_as", ""))
+            or PLAN_RUNTIME.get(box[:1].upper(), ""))
+
+
+def based_on_of(a: argparse.Namespace) -> str:
+    """22: what the model is based on: the line's, else what its runtime
+    names for it, else BASED_ON"""
+    rt = fb.RUNTIMES.get(fb.runtime_of_model(getattr(a, "served_as", ""))) or {}
+    return (getattr(a, "based_on", "") or (rt.get("models") or {}).get(a.served_as)
+            or BASED_ON)
 
 
 def flags_of(a: argparse.Namespace, box: str) -> str:
@@ -385,8 +430,11 @@ def parser() -> argparse.ArgumentParser:
                     help="20: a llama.cpp build directory on the box, in place of --server")
     ap.add_argument("--runtime", default="", choices=["", *sorted(fb.RUNTIMES)],
                     help="20: a named runtime (plan L's boxes run "
-                         f"{PLAN_RUNTIME.get('L')} without it)")
-    ap.add_argument("--based-on", default=BASED_ON)
+                         f"{PLAN_RUNTIME.get('L')} without it; 22: a model a runtime names, "
+                         "that runtime)")
+    ap.add_argument("--based-on", default="",
+                    help=f"what the model is based on (default: what its runtime names for "
+                         f"it, else {BASED_ON})")
     ap.add_argument("--flags", default=None,
                     help=f"llama-server's flags (default: {FLAGS}; none beside a runtime)")
     ap.add_argument("--env", default="", help="the build's llama-server environment, if any")
@@ -399,6 +447,12 @@ def parser() -> argparse.ArgumentParser:
                     help="18e point 21: each step runs more slots than planned, up to this "
                          "many, where the box's memory check confirms they fit (25 on an RTX "
                          "PRO 6000 with BF16)")
+    ap.add_argument("--pilot", action="store_true",
+                    help="22: a runtime's pilot on this box before the others are rented: "
+                         f"{' and '.join(str(n) for n in fb.PILOT['n'].values())} questions of "
+                         "GPQA Diamond and MMLU-Pro, thinking on, a line each and last whether "
+                         "the thinking and the answer came back apart (into /workspace/<build>/"
+                         "pilot, which the fetch never reads)")
     ap.add_argument("--slots-fit", action="store_true",
                     help="17g: the slots given fit this card — the memory check's estimate is "
                          "printed, and not held to")
@@ -423,16 +477,85 @@ def main(argv: list[str] | None = None) -> int:
     boxes = [x.upper() for x in [a.box, *(a.then or [])]]
     for box in boxes:
         box_of(box)                     # a label of no plan: refused before anything
+    if a.pilot and len(boxes) > 1:
+        ap.error("--pilot: one box's label (the box it runs on)")
+    # 22: a model a runtime names runs on it alone, and the runtime its own
+    # models alone — said before anything is fetched
+    for box in dict.fromkeys(boxes):
+        why = fb.runtime_model_refused(runtime_of(a, box), a.served_as)
+        if why:
+            raise SystemExit(f"{box}: {why}. Nothing was fetched")
     # 20: the card first — the plan's build runs on its cards alone
     for box in dict.fromkeys(boxes):
         why = gpu_refused(box)
         if why:
             raise SystemExit(why)
+    if a.pilot:
+        return run_pilot(a, boxes[0])
     # 18e point 1: every label after the first is queued from the start
     for box in boxes[1:]:
         line_state(a, box, "queued")
     codes = [run_box(a, box) for box in boxes]
     return 0 if all(c == 0 for c in codes) else 1
+
+
+def run_pilot(a: argparse.Namespace, box: str) -> int:
+    """22: a runtime's pilot on this box — remote_gguf.py --pilot, then what
+    its pace makes of the plan, and its verdict again as the last line"""
+    rt = runtime_of(a, box)
+    if not rt:
+        raise SystemExit("--pilot: a runtime's pilot, and this line runs none (--runtime)")
+    print(f"{box}: the pilot — " + " and ".join(
+        f"{fb.PILOT['n'][t]} {fb.BENCH[t]['label']}" for t in ordered(PILOT_STEP[1]))
+        + " questions, thinking on, each asked once, before the other boxes are rented",
+        flush=True)
+    print(fb.runtime_words(rt), flush=True)
+    cmd = argv_of(box, 0, PILOT_STEP, a)
+    print(" ".join(shlex.quote(x) for x in cmd[1:]), flush=True)
+    summary = pilot_folder(a) / "pilot.json"
+    summary.unlink(missing_ok=True)             # only this pilot's is read after
+    code = subprocess.run(cmd).returncode
+    try:
+        got = json.loads(summary.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        got = {}
+    if not isinstance(got, dict):
+        got = {}
+    if not got.get("verdict"):
+        print(f"\n{box}: the pilot didn't finish (exit {code}) — its lines above say why; paste "
+              "the same line again to ask it again", flush=True)
+        return code or 1
+    print()
+    for line in plan_at_pace(box[:1].upper(), got.get("paces") or {}):
+        print(line, flush=True)
+    print(got["verdict"], flush=True)
+    return code
+
+
+def plan_at_pace(plan: str, paces: dict) -> list[str]:
+    """22: the plan's hours at the pilot's GPQA Diamond pace, against the pace
+    the plan assumes for it (the 6 Oct pilot's, under today's limits) — a
+    rough guide from 20 answers"""
+    p = paces.get(GPQA) or {}
+    if not p.get("pace_s"):
+        return [f"plan {plan}: no GPQA Diamond pace from the pilot — its hours stay the plan's"]
+    assumed = PACE[("on", GPQA)] * limit_factor("on", GPQA)
+    ratio = p["pace_s"] / assumed
+    boxes = {b: sum(hours(s) for s in st) * ratio for b, st in PLANS[plan].items()}
+    total = sum(boxes.values())
+    out = [f"GPQA Diamond here: about {p['pace_s']:.1f} s of the box's time an answer, "
+           f"{p['at_once']} at a time, where plan {plan} assumes {assumed:.1f} (×{ratio:.2f})"]
+    m = paces.get(MMLU) or {}
+    if m.get("pace_s"):
+        want = PACE[("on", MMLU)] * limit_factor("on", MMLU)
+        out.append(f"MMLU-Pro here: about {m['pace_s']:.1f} s of the box's time an answer, "
+                   f"{m['at_once']} at a time, where plan {plan} assumes {want:.1f} at 8 "
+                   f"(×{m['pace_s'] / want:.2f}, from {m.get('answers', 5)} answers: for "
+                   "information)")
+    out.append(f"plan {plan} at GPQA Diamond's pace here: about {max(boxes.values()):.1f} h the "
+               f"longest box, {total:.0f} box-hours, ${total * BOX_PRICE:,.0f} at "
+               f"${BOX_PRICE:.2f} an hour — from {p['answers']} answers, a rough guide")
+    return out
 
 
 def line_state(a: argparse.Namespace, box: str, state: str) -> None:
