@@ -13,37 +13,42 @@
    "loops"
   ]
  },
- "what": "Where the team's step checkpoints (and the Q4, BF16 and Q2 baselines, all on the lda runtime) stand against popular models on the benchmarks those models report.",
+ "what": "Where the team's step checkpoints (and the Q4, BF16 and Q2 baselines, all on the lda runtime) stand against popular models on the benchmarks those models report — and Ornith-1.5-35B-A3B, a model measured here on its own card's settings, beside them.",
  "ours": [
   {
    "label": "step4000",
    "row": "served/step4000-lda-2610 · thinking",
    "colour": 0,
-   "pick": true
+   "pick": true,
+   "glance": true
   },
   {
    "label": "step1000",
    "row": "served/step1000-lda-2610 · thinking",
    "colour": 4,
-   "pick": true
+   "pick": true,
+   "glance": true
   },
   {
    "label": "Q4 (UD-Q4_K_XL)",
    "row": "served/Qwen3.6-35B-A3B-Q4-lda-2610 · thinking",
    "colour": 1,
-   "pick": true
+   "pick": true,
+   "glance": true
   },
   {
    "label": "BF16",
    "row": "served/Qwen3.6-35B-A3B-BF16-lda-2610 · thinking",
    "colour": 2,
-   "pick": true
+   "pick": true,
+   "glance": true
   },
   {
    "label": "Q2 (UD-Q2_K_XL)",
    "row": "served/Qwen3.6-35B-A3B-Q2-lda-2610 · thinking",
    "colour": 3,
-   "pick": true
+   "pick": true,
+   "glance": true
   },
   {
    "label": "Q4, earlier run",
@@ -52,6 +57,14 @@
    "pick": false,
    "note": "the same Q4 file on Qwen's own sampling settings, 7–8 Oct, for reference",
    "page_status": "7–8 Oct, Qwen's card settings"
+  },
+  {
+   "label": "Ornith-1.5 Q4_K_M",
+   "row": "served/Ornith-1.5-35B-A3B-Q4_K_M · thinking",
+   "colour": 5,
+   "pick": true,
+   "glance": true,
+   "note": "measured here, on its card's settings; not the team's model"
   }
  ],
  "reference": "Q4 (UD-Q4_K_XL)",
@@ -346,6 +359,39 @@
      5.8
     ]
    }
+  },
+  {
+   "label": "Ornith-1.5-35B-A3B, its card",
+   "glance": true,
+   "maker": "Ornith AI",
+   "size": "35B / 3B",
+   "group": "near",
+   "epoch_version": null,
+   "hle": {
+    "from": "card",
+    "value": 25.6,
+    "card": "Ornith-1.5-35B-A3B model card",
+    "model": "Ornith-1.5-35B-A3B",
+    "maker": "Ornith AI",
+    "benchmark": "HLE (no tools)",
+    "setting": "no tools, each run judged by Claude Opus 4.6, averaged over five runs, as the card reports it",
+    "note": "5-run average",
+    "url": "https://huggingface.co/ornith-ai/Ornith-1.5-35B-A3B-GGUF/blob/12393612fd4f730ff5aadc23e9b8f9648aa49ceb/README.md",
+    "date": "2026-08-24"
+   },
+   "gpqa": {
+    "from": "card",
+    "value": 89.2,
+    "card": "Ornith-1.5-35B-A3B model card",
+    "model": "Ornith-1.5-35B-A3B",
+    "maker": "Ornith AI",
+    "benchmark": "GPQA Diamond",
+    "setting": "averaged over five runs, as the card reports it",
+    "note": "5-run average",
+    "url": "https://huggingface.co/ornith-ai/Ornith-1.5-35B-A3B-GGUF/blob/12393612fd4f730ff5aadc23e9b8f9648aa49ceb/README.md",
+    "date": "2026-08-24"
+   },
+   "check_14oct": {}
   },
   {
    "label": "Qwen3.6-35B-A3B, Qwen's report",

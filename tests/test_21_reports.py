@@ -154,12 +154,13 @@ def test_the_card_cells_go_through_the_card_entry_once(svc, capsys):
     import enter_report_cards as erc
     assert erc.main(["step-checkpoints", "--by", "masein"]) == 0
     cards = [r for r in db.reported_scores() if r.get("source") == "card"]
-    assert len(cards) == 19 and all(c["by"] == "masein" for c in cards)
+    # 22: and Ornith-1.5's card's GPQA Diamond and HLE (no tools)
+    assert len(cards) == 21 and all(c["by"] == "masein" for c in cards)
     assert all(c["url"].startswith("https://huggingface.co/") and "/blob/" in c["url"]
                for c in cards)
     assert erc.main(["step-checkpoints", "--by", "masein"]) == 0
-    assert "0 card numbers entered by masein, 19 already there" in capsys.readouterr().out
-    assert len([r for r in db.reported_scores() if r.get("source") == "card"]) == 19
+    assert "0 card numbers entered by masein, 21 already there" in capsys.readouterr().out
+    assert len([r for r in db.reported_scores() if r.get("source") == "card"]) == 21
     rows = {r["label"]: r for r in reports.their_rows(REPORT)}
     for t in REPORT["theirs"]:
         for k, spec in t.items():
@@ -351,7 +352,7 @@ def test_the_endpoints_read_and_start_nothing(svc, monkeypatch):
     got = {r["id"]: r for r in svc.get("/api/reports").json()["reports"]}
     assert sorted(got) == ["ran-out-of-room", "step-checkpoints"]          # 21b: a second
     sc = got["step-checkpoints"]
-    assert sc["ours"][0] == "step4000" and sc["others"] == 41
+    assert sc["ours"][0] == "step4000" and sc["others"] == 42          # 22: Ornith's card
     r = svc.get("/api/reports/step-checkpoints").json()
     assert r["picks"][0] == "step4000" and "Q4, earlier run" not in r["picks"]
     assert r["sources"]["epoch"]["words"].startswith("imported ")

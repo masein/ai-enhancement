@@ -194,6 +194,14 @@ def test_each_dataset_has_the_published_columns_and_types(svc):
 def test_every_other_model_equals_the_published_row(svc):
     world()
     got = get(svc, "others")
+    # 22: Ornith-1.5's card, added after the page was published — its own row
+    ornith = [g for g in got if g["model"] == "Ornith-1.5-35B-A3B, its card"]
+    assert ornith == [{"model": "Ornith-1.5-35B-A3B, its card", "maker": "Ornith AI",
+                       "size": "35B / 3B", "gpqa": 89.2, "gpqa_se": None, "otis": None,
+                       "otis_se": None, "math": None, "math_se": None, "simpleqa": None,
+                       "simpleqa_se": None, "hle": 25.6, "hle_src": "lab", "mmlupro": None,
+                       "source": "Ornith's model card (5-run average)"}]
+    got = [g for g in got if g not in ornith]
     assert len(got) == 41 == len(OTHERS)
     for g, w in zip(got, OTHERS):
         if w["model"] == "o4-mini (high)":
@@ -205,6 +213,9 @@ def test_every_other_model_equals_the_published_row(svc):
 def test_our_rows_equal_the_published_ones_but_step1000s(svc):
     world()
     got = get(svc, "ours")
+    # 22: Ornith-1.5's rows, after the page was published, last — not run yet
+    assert {r["status"] for r in got if r["model"] == "Ornith-1.5 Q4_K_M"} == {"Not run yet"}
+    got = [r for r in got if r["model"] != "Ornith-1.5 Q4_K_M"]
     assert [(r["model"], r["bench"]) for r in got] == [(r["model"], r["bench"]) for r in OURS]
     for g, w in zip(got, OURS):
         if w["model"] == "step1000":
@@ -302,7 +313,8 @@ def test_the_status_lines(svc):
                    "step1000": "Running · 20 of 21 chunks in",
                    "Q4 (UD-Q4_K_XL)": "Complete · 21 of 21 chunks",
                    "BF16": "Complete · 21 of 21 chunks", "Q2 (UD-Q2_K_XL)": "Complete · 21 of 21 chunks",
-                   "Q4, earlier run": "7–8 Oct, Qwen's card settings"}
+                   "Q4, earlier run": "7–8 Oct, Qwen's card settings",
+                   "Ornith-1.5 Q4_K_M": "Not run yet"}                     # 22
     # every box in, one benchmark waiting for its grader
     row = {"cells": {"a": {"state": "score"}, "b": {"state": "waits"}}, "chunks": [21, 21],
            "status": ""}

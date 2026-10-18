@@ -25,10 +25,12 @@ from test_21c_page import ITEMS, REPORT, SPEC, world
 PAGE = reported.REPORTS_DIR / "pages" / "step-checkpoints.html"
 # docs/prompts/phase-21d/step-checkpoints-page.html, as masein gave it
 PAGE_SHA256 = "831d21e60515b535433d33507c35c4c05eda503bbb566b985d81c289990d0433"
+# 22: and Ornith-1.5's card, beside our measurement of it
 GLANCE = ["GPT-6 Astra (max)", "DeepSeek-V4-Pro (max)", "Qwen3.6-35B-A3B, Qwen's report",
           "Qwen3.5-35B-A3B", "GPT-5 mini (high)", "o4-mini (high)", "gpt-oss-120b (high)",
-          "DeepSeek-R1-0528"]
+          "DeepSeek-R1-0528", "Ornith-1.5-35B-A3B, its card"]
 PICKED = ["step4000", "step1000", "Q4 (UD-Q4_K_XL)", "BF16", "Q2 (UD-Q2_K_XL)"]
+ORNITH_ROW = "served/Ornith-1.5-35B-A3B-Q4_K_M · thinking"
 
 
 @pytest.fixture
@@ -70,9 +72,10 @@ def test_the_token_definitions_are_the_pages_own_words(svc):
 
 
 def test_latest_reads_the_report_alone(svc):
-    """the picked rows and the eight marked glance, on GPQA Diamond, OTIS Mock
-    AIME, MMLU-Pro and HLE — read from the report file; the payload names
-    the report, its rows and its benchmarks' tasks"""
+    """the rows marked glance — ours (22: where it was every picked row) and
+    nine published ones — on GPQA Diamond, OTIS Mock AIME, MMLU-Pro and HLE,
+    read from the report file; the payload names the report, its rows and
+    its benchmarks' tasks"""
     world()
     rep = json.loads((reported.REPORTS_DIR / "step-checkpoints.json").read_text())
     assert [t["label"] for t in rep["theirs"] if t.get("glance")] == [
@@ -81,11 +84,13 @@ def test_latest_reads_the_report_alone(svc):
     got = svc.get("/api/reports/step-checkpoints").json()
     assert got["glance"] == {"benchmarks": ["gpqa", "otis", "mmlupro", "hle"]}
     assert sorted(t["label"] for t in got["theirs"] if t["glance"]) == sorted(GLANCE)
-    assert [r["label"] for r in got["ours"] if r["pick"]] == PICKED
+    # 22: Ornith-1.5 picked and on Latest too, last
+    assert [r["label"] for r in got["ours"] if r["pick"]] == [*PICKED, "Ornith-1.5 Q4_K_M"]
+    assert [r["label"] for r in got["ours"] if r["glance"]] == [*PICKED, "Ornith-1.5 Q4_K_M"]
     from service import app
     meta = app.results_payload()["glance"]
     assert meta == {"report": "step-checkpoints", "title": REPORT["title"],
-                    "rows": [SPEC[x]["row"] for x in PICKED],
+                    "rows": [*(SPEC[x]["row"] for x in PICKED), ORNITH_ROW],
                     "tasks": ["gpqa_diamond_epoch", "otis_aime_epoch", "mmlupro_tiger",
                               "hle_text_cais"]}
 
@@ -118,7 +123,7 @@ def test_the_reports_list_never_builds_the_boards_numbers_and_is_quick(svc, monk
         slow = max(slow, time.time() - t)
         assert r.status_code == 200
     got = {x["id"]: x for x in r.json()["reports"]}
-    assert got["step-checkpoints"]["others"] == 41 and got["step-checkpoints"]["changed"]
+    assert got["step-checkpoints"]["others"] == 42 and got["step-checkpoints"]["changed"]
     assert slow < 0.2, slow
 
 

@@ -131,7 +131,8 @@ def page(svc) -> dict:
 def test_the_counts_are_the_boards_for_step4000_and_step1000(svc):
     got = page(svc)
     assert got["insightOnly"] and got["showHidden"] and got["decided"] == "masein, 14 Oct 2026"
-    assert got["picks"] == ["step4000", "step1000"]
+    # 22: and Ornith-1.5, measured here on its card's settings, to set beside them
+    assert got["picks"] == ["step4000", "step1000", "Ornith-1.5 Q4_K_M"]
     for label in ("step4000", "step1000"):
         for x in got["models"][label]["summary"]:
             if x["board"] is not None:
@@ -251,7 +252,7 @@ def test_nothing_from_it_reaches_a_training_or_improve_path():
 def test_the_list_card_says_insight_only(svc):
     got = {r["id"]: r for r in svc.get("/api/reports").json()["reports"]}
     assert got["ran-out-of-room"]["insight"] is True
-    assert got["ran-out-of-room"]["ours"] == ["step4000", "step1000"]
+    assert got["ran-out-of-room"]["ours"] == ["step4000", "step1000", "Ornith-1.5 Q4_K_M"]
     assert not got["step-checkpoints"].get("insight")
 
 

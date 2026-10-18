@@ -29,7 +29,10 @@ import or a grading batch.
 `eval_tasks/reports/step-checkpoints.json` holds:
 
 - `ours`: each of our rows (`served/… · thinking`), its label, its colour slot,
-  and whether it is in the picker;
+  whether it is in the picker, whether Models ▸ Latest shows it (`glance`),
+  and a `note` saying what it is where it isn't one of the team's (22:
+  Ornith-1.5 Q4_K_M, "measured here, on its card's settings; not the team's
+  model");
 - `benchmarks`: our task for each benchmark, Epoch's name for it, and whether
   it is compared;
 - `theirs`: each other model, with:
@@ -44,27 +47,50 @@ import or a grading batch.
 - `page`: the full page (below), its file in `eval_tasks/reports/pages/`, its
   starting pick and its datasets; and on a reference row, `page_status`, the
   status the page shows for it ("7–8 Oct, Qwen's card settings");
-- `glance: true` on the popular models Models ▸ Latest shows, and
-  `glance_benchmarks`, its benchmarks (below);
+- `glance: true` on the rows Models ▸ Latest shows, ours and the popular
+  models alike, and `glance_benchmarks`, its benchmarks (below);
 - on a card cell, `note`: a word the cell's source says with it ("medium
   effort" on o4-mini's MMLU-Pro).
 
 ## Models ▸ Latest
 
 Models opens on Latest when the link names no other view. It is one table:
-the report's picked rows (step4000, step1000, Q4, BF16, Q2) and the popular
-models marked `glance: true`, on the report's `glance_benchmarks` (GPQA
-Diamond, OTIS Mock AIME, MMLU-Pro, HLE).
+the report's rows marked `glance: true` — ours (step4000, step1000, Q4, BF16,
+Q2, and Ornith-1.5 Q4_K_M) and the popular models — on the report's
+`glance_benchmarks` (GPQA Diamond, OTIS Mock AIME, MMLU-Pro, HLE).
 
 - Every number is read from the report, so the two always agree.
 - Our rows are bold; each published row says where it is from, a model card
-  with its link.
+  with its link. One of ours with a note says it in its Source column
+  (Ornith-1.5: "Measured here, on its card's settings; not the team's model").
 - It is sorted by the first benchmark, with no rank and no average: published
   numbers are never ranked or averaged with ours.
 
 Change the models by editing `glance` in the report file. Latest is shown
-only while one of the picked rows has a score; until then Models opens on
+only while one of our rows on it has a score; until then Models opens on
 Standard.
+
+## Ornith-1.5-35B-A3B (22)
+
+A third-party model a colleague asked about, measured here with a runtime of
+its own (`card-ornith`: upstream llama.cpp and its card's settings, never the
+lda runtime; docs/ORNITH-RUN.md). On the step-checkpoints report:
+
+- **Ours:** "Ornith-1.5 Q4_K_M" (`served/Ornith-1.5-35B-A3B-Q4_K_M · thinking`),
+  colour slot 5, in the picker, on Latest, with its note;
+- **Its card:** "Ornith-1.5-35B-A3B, its card", a published row with its card's
+  GPQA Diamond 89.2 and HLE 25.6 (no tools), each the card's average of five
+  runs (the cell's note) and linked to the card at commit `12393612`, on
+  Latest so the claim sits beside the measurement. Like every published row it
+  is never ranked or averaged with ours.
+
+On the ran-out report it is in the picker beside step4000 and step1000.
+
+The published page (`pages/step-checkpoints.html`) is masein's, unchanged. Its
+picker and colours name its own five models, so Ornith-1.5 isn't one of its
+picks; its tables read the report's rows, so Ornith-1.5's row is in its table
+of our scores (grey, as "Q4, earlier run" is) and its card's row among the
+other models.
 
 ## What the numbers mean
 

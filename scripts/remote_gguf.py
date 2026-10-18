@@ -51,6 +51,19 @@ commit and branch of a .git near it. --runtime lda-2610 sets a named
 runtime's environment, its server's flags and the sampling every request
 carries (scripts/frontier.py RUNTIMES), each said on the step's line.
 
+22: --runtime card-ornith, a third-party model on its card's settings: the
+runtime names its llama.cpp (upstream b11555: the server's --version and the
+tarball's VERSION are checked before the GGUF is fetched), its model (a
+model a runtime names runs on it alone), the variables it never gives its
+server (LOOKAHEAD_*, nor runs a build that reads them) and the chat template
+it asks with (the GGUF's own, its sha256 checked against the server's /props
+before a question). --pilot asks 20 GPQA Diamond and 5 MMLU-Pro questions
+once each, thinking on: a line each (the thinking's length, the answer the
+board read, the right one, the seconds), each benchmark's pace, and last
+whether every answer that finished came back with its thinking apart
+(reasoning_content) and its answer in the reply — no bundle, and no progress
+file, so the fetch never takes it for a step.
+
 The token is typed, never on the command line (where the shell's history
 would keep it):
 
@@ -707,7 +720,11 @@ def version_of(exe: Path, env: dict) -> dict:
         text = (r.stdout + r.stderr).strip()
     except (OSError, subprocess.SubprocessError) as e:
         text = f"--version failed: {e}"
-    m = re.search(r"version:\s*(\d+)\s*\(([0-9a-f]+)\)", text)
+    # 22: and upstream's words since its 0.x versions — "version: 0.6.0-dev
+    # (build 11555, commit 1cf776776)" — where the lda build says "version:
+    # 9954 (a4a76a75)"
+    m = re.search(r"version:\s*(\d+)\s*\(([0-9a-f]+)\)", text) \
+        or re.search(r"\(build\s+(\d+),\s*commit\s+([0-9a-f]+)\)", text)
     return {"text": "\n".join(text.splitlines()[:6]), "build": int(m[1]) if m else None,
             "commit": m[2] if m else None}
 
@@ -928,6 +945,143 @@ def make_bundle(out: Path, served_as: str, thinking: bool, tasks: list[str], sta
     return path, done, incomplete
 
 
+# ---------------------------------------------------------------------------
+# 22: a runtime's pilot — one box asks fb.PILOT's questions before the other
+# boxes are rented, through the board's own code (service/frontier.settings,
+# served.answer_one, frontier.score), and says what came back
+# ---------------------------------------------------------------------------
+
+PILOT_FILE, PILOT_SUMMARY = "pilot.jsonl", "pilot.json"
+
+
+def not_apart(r: dict) -> str:
+    """22: '' when an answer that finished came back with its thinking apart
+    from its reply (the server's reasoning_content) and a reply with no think
+    tags in it; else what went wrong. One that ran out of room isn't judged:
+    its reply never came"""
+    if r.get("error"):
+        return f"no answer ({r['error']})"
+    if r.get("ran_out"):
+        return ""
+    if r.get("fallback"):
+        return "asked without the server's chat parsing (its chat endpoint failed on it twice)"
+    if not r.get("thinking_apart"):
+        return "no thinking apart from the reply (reasoning_content empty)"
+    if r.get("reply_tags"):
+        return "think tags in the reply"
+    if not r.get("reply_chars"):
+        return "an empty reply"
+    return ""
+
+
+def pilot_line(r: dict, k: int, of: int) -> str:
+    label = fb.BENCH[r["task"]]["label"]
+    why = not_apart(r)
+    toks = f" · {r['tokens']:,} tokens in all" if r.get("tokens") is not None else ""
+    return (f"{label} {k} of {of} (question {r['id']}): thinking {r['thinking_chars']:,} "
+            f"characters{toks} · read {r['read'] or '—'} · right {r['right']} "
+            f"{'✓' if r['ok'] else '✗'} · {r['seconds']:.0f} s"
+            + (" · ran out of room" if r.get("ran_out") else "")
+            + (f" · NOT apart: {why}" if why else ""))
+
+
+def pilot_verdict(rows: list[dict]) -> tuple[bool, str]:
+    """22: the pilot's last line — whether the thinking and the answer came
+    back apart in every answer that finished"""
+    judged = [r for r in rows if not r.get("ran_out") or r.get("error")]
+    out = len(rows) - len(judged)
+    bad = [(r, not_apart(r)) for r in judged if not_apart(r)]
+    if not judged:
+        return False, ("Thinking and answer: not judged — every answer ran out of room before "
+                       "it replied")
+    if not bad:
+        return True, (f"Thinking and answer separated correctly: all {len(judged)} answers that "
+                      "finished came back with the thinking apart (reasoning_content) and the "
+                      "answer in the reply, no think tags in it"
+                      + (f"; {out} ran out of room before replying, not judged" if out else ""))
+    r, why = bad[0]
+    return False, (f"Thinking and answer NOT separated correctly in {len(bad)} of {len(judged)} "
+                   f"answers — the first, {fb.BENCH[r['task']]['label']} question {r['id']}: "
+                   f"{why}. Don't rent the other boxes yet")
+
+
+def pilot_ask(rec: dict, tasks: list[str], out: Path, say, slots: int) -> dict:
+    """fb.PILOT's questions of each task, `slots` at a time, a task after the
+    other: each answer's line as it lands, each task's summary, and the
+    verdict — {separated, verdict, paces}"""
+    from concurrent.futures import ThreadPoolExecutor
+
+    from service import config, served
+    from service import frontier as sf
+    fb.set_root(config.BENCH_ROOT)
+    dest = out / PILOT_FILE
+    dest.unlink(missing_ok=True)                # asked again, the pilot starts again
+    lock = threading.Lock()
+    rows: list[dict] = []
+    paces: dict[str, dict] = {}
+    for task in tasks:
+        items = fb.pilot_items(task, config.BENCH_ROOT)
+        s = sf.settings(rec, task, True)
+        done = {"n": 0}
+
+        def one(it: dict, task=task, s=s, n=len(items)) -> None:
+            text, need = fb.prompt(task, it)
+            seed = fb.seed_of(task, it["id"], 0)
+            si = {**s, "seed": seed,
+                  **({"system": fb.system_of(task)} if fb.system_of(task) else {})}
+            t0 = time.time()
+            try:
+                a = served.answer_one(rec, text, si)
+            except served.ServerStopped as e:
+                raise SystemExit(f"pilot: the server stopped answering "
+                                 f"({getattr(e, 'refused', '') or e}) — paste the line again to "
+                                 "ask the pilot again") from None
+            secs = time.time() - t0
+            answer = str(a)
+            sc = fb.score(task, answer, a.finish, need) if not a.error else \
+                {"read": None, "ok": False, "ran_out": False}
+            content = a.content or ""
+            r = {"task": task, "id": str(it["id"]), "seed": seed, "seconds": round(secs, 1),
+                 "tokens": a.tokens, "finish": a.finish,
+                 "thinking_chars": len(fb.thinking_of(answer)), "reply_chars": len(content.strip()),
+                 "thinking_apart": bool(a.reasoning_chars),
+                 "reply_tags": "<think>" in content or "</think>" in content,
+                 "read": sc["read"], "right": need.get("key"), "ok": bool(sc["ok"]),
+                 "ran_out": bool(sc["ran_out"]), "fallback": bool(a.fallback),
+                 "error": ((a.error or {}).get("chat") or "no answer")[:200] if a.error else "",
+                 "answer": answer}
+            with lock:
+                rows.append(r)
+                done["n"] += 1
+                with open(dest, "a", encoding="utf-8") as fh:
+                    fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+                say(pilot_line(r, done["n"], n))
+        t0 = time.time()
+        with ThreadPoolExecutor(max_workers=slots) as pool:
+            list(pool.map(one, items))
+        wall = time.time() - t0
+        mine = [r for r in rows if r["task"] == task]
+        mean = sum(r["seconds"] for r in mine) / max(1, len(mine))
+        at_once = min(slots, len(mine)) or 1
+        paces[task] = {"answers": len(mine), "right": sum(r["ok"] for r in mine),
+                       "mean_s": round(mean, 1), "wall_s": round(wall, 1), "at_once": at_once,
+                       # the box's seconds an answer, `at_once` asked side by side —
+                       # what plan L's paces are (frontier_box.PACE, at 8 slots)
+                       "pace_s": round(mean / at_once, 2),
+                       "ran_out": sum(r["ran_out"] for r in mine)}
+    say("")
+    for task, p in paces.items():
+        mine = [r for r in rows if r["task"] == task]
+        say(f"{fb.BENCH[task]['label']}: {p['right']} of {p['answers']} right · thinking "
+            f"{sum(r['thinking_chars'] for r in mine) // max(1, len(mine)):,} characters on "
+            f"average · {p['mean_s']:.0f} s an answer, {p['at_once']} at a time ({p['wall_s']:.0f} "
+            f"s for all {p['answers']}): about {p['pace_s']:.1f} s of the box's time an answer · "
+            f"{p['ran_out']} ran out of room")
+    ok, verdict = pilot_verdict(rows)
+    say(verdict)
+    return {"separated": ok, "verdict": verdict, "paces": paces}
+
+
 _PROGRESS_LOCK = threading.Lock()
 
 
@@ -935,6 +1089,8 @@ def progress(out: Path, **fields) -> None:
     """17f: the step's progress file, its fields merged in, the time it was
     last written with them — 17i: one writer at a time (the parity step's
     questions are asked side by side, and each writes its count)"""
+    if STEP.get("pilot"):
+        return                      # 22: a pilot is no step of a plan: the fetch never sees it
     p = out / PROGRESS
     out.mkdir(parents=True, exist_ok=True)
     with _PROGRESS_LOCK:
@@ -1066,6 +1222,12 @@ def _main(argv: list[str] | None = None) -> int:
                     help="17b: the parity check's --n questions, thinking off and greedy and "
                          "each asked twice, to --out/parity.jsonl — no bundle "
                          "(scripts/frontier_parity.py compare)")
+    ap.add_argument("--pilot", action="store_true",
+                    help="22: a runtime's pilot — 20 GPQA Diamond and 5 MMLU-Pro questions, "
+                         "thinking on, each asked once: a line each (its thinking's length, the "
+                         "answer the board read, the right one, its seconds), to "
+                         "--out/pilot.jsonl, and last whether the thinking and the answer came "
+                         "back apart. No bundle, no progress file: the fetch never sees it")
     a = ap.parse_args(argv)
     if not a.served_as.startswith("served/") or not re.fullmatch(r"served/[A-Za-z0-9._-]+",
                                                                  a.served_as):
@@ -1081,6 +1243,15 @@ def _main(argv: list[str] | None = None) -> int:
         ap.error(f"--flags: {', '.join(own_flags(flags))} are set by this script")
     extra_env = parse_env(a.env)
     pins = parse_pins(a.pin)
+    # 22: a model a runtime names runs on it alone, and that runtime runs its
+    # own models alone — Ornith-1.5 never on the lda runtime, nor without one
+    why = fb.runtime_model_refused(a.runtime or "", a.served_as)
+    if why:
+        ap.error(f"--as: {why}")
+    if a.pilot and not (a.runtime and a.thinking == "on"):
+        ap.error("--pilot: a runtime's pilot, thinking on (--runtime, --thinking on)")
+    if a.pilot and a.parity:
+        ap.error("--pilot or --parity, not both")
     if a.runtime:
         # 20: the runtime's environment and flags, nothing typed beside them
         # that would change what it is
@@ -1092,6 +1263,11 @@ def _main(argv: list[str] | None = None) -> int:
         names = {f.split("=", 1)[0] for f in flags}
         theirs = {x for x in fb.runtime_flags(a.runtime) if x.startswith("-")} | {
             "-fa", "--cache-type-k", "--cache-type-v", "--sampling-seq", "--samplers"}
+        # 22: one asking with the GGUF's own template takes no other, and its
+        # server splits the thinking off as it does by default
+        if rt.get("template_sha256"):
+            theirs |= {"--chat-template", "--chat-template-file", "--reasoning-format",
+                       "--no-jinja", "--chat-template-kwargs"}
         refused = sorted(n for n in names if fb.RUNTIME_REFUSES.match(n) or n in theirs)
         if refused:
             ap.error(f"--flags: {', '.join(refused)} — runtime {a.runtime} sets the cache, "
@@ -1101,15 +1277,23 @@ def _main(argv: list[str] | None = None) -> int:
             r"^LLAMA_ARG_\w*(DRAFT|SPEC|REASONING|SAMPL|TEMP|TOP_|MIN_P|PENALTY|REPEAT)", k))
         if clash:
             ap.error(f"--env: {', '.join(clash)} — runtime {a.runtime} sets its own")
+        # 22: and what it never gives its server (card-ornith: the lda branch's)
+        never = fb.runtime_env_refused(a.runtime, extra_env)
+        if never:
+            ap.error(f"--env: {', '.join(never)} — runtime {a.runtime} never gives its server "
+                     + " or ".join(f"{p}*" for p in rt["refuses_env"]))
         extra_env = {**rt["env"], **extra_env}
         flags = fb.runtime_flags(a.runtime) + flags
     out = Path(a.out).resolve()
     thinking = a.thinking == "on"
     STEP["out"] = out
+    STEP["pilot"] = bool(a.pilot)            # 22: writes no progress file
     progress(out, label=a.label or "", model=a.served_as, thinking=a.thinking,
              parity=bool(a.parity), tasks=[t for t in fb.TASKS if t in (a.only or [])],
              state="starting", why="", line="", incomplete={})
-    if not a.only and not a.parity:
+    if a.pilot and a.only:
+        ap.error("--pilot asks its own questions: no --only")
+    if not a.only and not a.parity and not a.pilot:
         # 17d: a box names its benchmarks, thinking on or off — every one at
         # once is more context than a card holds, and asks ARC-AGI-2 with
         # thinking off
@@ -1118,6 +1302,8 @@ def _main(argv: list[str] | None = None) -> int:
     if a.parity:
         # 17b: the parity check's questions, thinking off, whatever --thinking says
         tasks, thinking = [fb.PARITY["task"]], False
+    if a.pilot:
+        tasks = [t for t in fb.TASKS if t in fb.PILOT["n"]]
     # 17c: a context the card can't hold is refused here, before the download.
     # 17d: worked out from the GGUF's header, its cache type and this card;
     # the stated --max-context only when those can't be read
@@ -1222,6 +1408,26 @@ def _main(argv: list[str] | None = None) -> int:
             raise SystemExit(f"runtime {a.runtime} sets {', '.join(unset)}, and this build "
                              "(llama-server and its libraries) never reads it: not the "
                              "build the runtime is for? Nothing was asked")
+        rt = fb.RUNTIMES[a.runtime]
+        # 22: a runtime that never gives its server the lda branch's variables
+        # never runs a build that reads them — the other runtimes' of those
+        # (LOOKAHEAD_MOE_ROUTER_NORM, in the lda build's libllama.so; upstream
+        # names none)
+        theirs = sorted({k for n, r in fb.RUNTIMES.items() if n != a.runtime for k in r["env"]
+                         if fb.runtime_env_refused(a.runtime, {k: ""})})
+        read = [k for k in theirs if k not in build_reads(srv, theirs)]
+        if read:
+            raise SystemExit(f"runtime {a.runtime} never runs a build that reads "
+                             f"{', '.join(read)} (the lda branch's), and this one does. Nothing "
+                             "was asked")
+        # 22: and one that names its llama.cpp runs that one: its --version,
+        # and the tarball's VERSION — before the GGUF's tens of GB are fetched
+        if rt.get("build"):
+            v0 = version_of(srv["bin"], env)
+            why = fb.runtime_build_refused(a.runtime, v0["build"], v0["commit"], version_file(
+                srv["root"] if a.server_dir else srv["bin"].parent.parent))
+            if why:
+                raise SystemExit(f"{why}: not the build the runtime is for. Nothing was asked")
     paths = [fetch(src, files, say) for src in split_parts(a.gguf)]
     gguf_path = paths[0]
     shas = [sha256_cached(x, state, say, files / "sha256.json") for x in paths]
@@ -1348,6 +1554,10 @@ def _main(argv: list[str] | None = None) -> int:
         except Exception as e:                          # noqa: BLE001 — said in one line
             # 17c: the error's own words; the terms only when access was refused
             raise SystemExit(rb.scrub(fb.load_failed(t, e))) from None
+        if a.pilot:
+            say(f"{fb.BENCH[t]['label']}: the pilot's {len(fb.pilot_items(t, config.BENCH_ROOT))} "
+                f"of its {len(items)} questions, each asked once, thinking on")
+            continue
         mine = fb.shard_of(items, shard)
         say(f"{fb.BENCH[t]['label']}: {len(mine)} of its {len(items)} questions here × "
             f"{fb.BENCH[t]['epochs']} run{'s' if fb.BENCH[t]['epochs'] > 1 else ''}")
@@ -1363,6 +1573,18 @@ def _main(argv: list[str] | None = None) -> int:
                                           if tmpl else None)
         server["n_ctx"] = (props.get("default_generation_settings") or {}).get("n_ctx")
         server["total_slots"] = props.get("total_slots")
+        # 22: a runtime that asks with the GGUF's own chat template — llama.cpp
+        # serves it as the file holds it (its two patches are for other
+        # families' templates) — is refused another, before a question
+        want_tmpl = (fb.RUNTIMES.get(a.runtime or "") or {}).get("template_sha256")
+        if want_tmpl and server["chat_template_sha256"] != want_tmpl:
+            raise SystemExit(f"runtime {a.runtime} asks with the GGUF's own chat template "
+                             f"(sha256 {want_tmpl[:16]}…), and this server's is "
+                             f"{(server['chat_template_sha256'] or 'none')[:16]}…: another "
+                             "file? Nothing was asked")
+        if want_tmpl:
+            say(f"the chat template: the GGUF's own (sha256 {want_tmpl[:16]}…), as runtime "
+                f"{a.runtime} asks")
         # 17c: what its slots say of speculation — the import compares it with
         # the registered launch (a draft model under any spelling drafts)
         from service import served as sv
@@ -1420,6 +1642,18 @@ def _main(argv: list[str] | None = None) -> int:
             progress(out, state="whole", parity_file={"name": dest.name, "answers": n,
                                                       "sha256": rb.sha256_file(dest)})
             return 0
+        if a.pilot:
+            # 22: the pilot's questions, a line each, and its verdict last
+            got = pilot_ask(rec, tasks, out, say, a.slots)
+            (out / PILOT_SUMMARY).write_text(json.dumps({
+                **got, "model": a.served_as, "runtime": a.runtime, "slots": a.slots,
+                "label": a.label or None, "gpu": gpu.get("name"),
+                "gguf": {k: gguf[k] for k in ("name", "size", "sha256")},
+                "server": {k: server.get(k) for k in ("build", "commit", "binary_sha256",
+                                                      "tarball_sha256", "chat_template_sha256")},
+                "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}, indent=1),
+                encoding="utf-8")
+            return 0 if got["separated"] else 1
         sid = db.add(a.served_as, "instruct", SUITE, a.by, "run on a rented GPU (remote_gguf.py)",
                      thinking=thinking, tasks=tasks if len(tasks) < len(fb.TASKS) else None)
         watch = Watch(sid, say, out=out)

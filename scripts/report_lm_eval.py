@@ -11573,9 +11573,10 @@ const MOBILE_CHIPS = ['mobileall', 'devicemark', 'mobile', 'mmlu'];
 // 12f.2b: #tab=models&view=phone is Models with the phone builds chosen
 const MODELS_VIEWS = { latest: 'Latest', standard: 'Standard', mobile: 'Mobile',
   everyday: 'Everyday', frontier: 'Frontier', exam: 'Knowledge exam' };
-// 21d: Latest — what we're working on now, at first glance: the report's
-// picked rows (our step checkpoints, the original model) and the popular
-// models it marks "glance", on its four benchmarks, every number the report's.
+// 21d: Latest — what we're working on now, at first glance: the rows the
+// report marks "glance" — ours (our step checkpoints, the original model; 22:
+// Ornith-1.5 measured here) and the popular models — on its four benchmarks,
+// every number the report's.
 // Live only; the view Models opens on while any of those rows has a score
 const glance = () => (LIVE && DATA && DATA.glance) || null;
 function latestOn() {
@@ -27395,7 +27396,9 @@ function lbLatest(ms) {
   const first = (benches[0] || {}).key;
   // When ▾ keeps our rows of its dates; a published row has none of ours
   const t = testedSel(L.tested);
-  const mine = d.ours.filter(r => r.pick).filter(r => {
+  // 22: our rows the report marks "glance", as the published ones are
+  const ours = d.ours.filter(r => r.glance);
+  const mine = ours.filter(r => {
     if (t.span === 'any') return true;
     const m = DATA.models.find(x => x.id === r.row);
     return m ? testedOk(t, m, L.date) : t.none;
@@ -27419,15 +27422,17 @@ function lbLatest(ms) {
         ...benches.map(b => m.ours ? rpOurCell(m.cells[b.key], b, true)
           : rpTheirCell(m.cells[b.key])),
         el('td', { class: 'src' + (m.ours ? ' rp-ours' : ''), 'data-latest-source': '1',
-          text: m.ours ? `Our run · ${m.status}` : m.source || 'Epoch AI' }))))));
+          // 22: a row's note says what it is (Ornith-1.5: measured here, not the team's)
+          text: m.ours ? `${m.note ? m.note[0].toUpperCase() + m.note.slice(1) : 'Our run'}`
+            + ` · ${m.status}` : m.source || 'Epoch AI' }))))));
   card.append(from, table,
     el('p', { class: 'small se', 'data-latest-legend': '1', text: RP_SCORE_LEGEND
       + ' † HLE from Epoch AI’s collection of other sources. A model card’s number has no ±; '
       + '“card” links the card it is from. Published numbers are never ranked or averaged '
       + 'with ours.' }),
-    t.span !== 'any' && mine.length < d.ours.filter(r => r.pick).length
+    t.span !== 'any' && mine.length < ours.length
       ? el('p', { class: 'small se', 'data-latest-when': '1', text: `When ▾ keeps `
-        + `${mine.length} of our ${d.ours.filter(r => r.pick).length} runs; the published `
+        + `${mine.length} of our ${ours.length} runs; the published `
         + 'models are always shown.' }) : '');
   return [card];
 }

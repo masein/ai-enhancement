@@ -257,7 +257,88 @@ RUNTIMES = {
                      "repeat_last_n": 64},
         "flags": ["-ctk", "q8_0", "-ctv", "q8_0", "--flash-attn", "on"],
     },
+    # 22: a third-party model on its own card's settings — never the lda
+    # runtime. Upstream llama.cpp at its release b11555, built from that tag
+    # (the release's own Linux build needs glibc 2.38, and the runner image
+    # has 2.35); temperature 1.0, top-p 0.95, top-k 20 as Ornith-1.5's card
+    # gives them for its benchmarks, min-p 0, no presence or repeat penalty;
+    # the GGUF's own chat template. Its box refuses a build that isn't that
+    # tag, any LOOKAHEAD_* variable, and a model other than its own
+    "card-ornith": {
+        "words": "upstream llama.cpp b11555, Ornith-1.5's card settings, the GGUF's own chat "
+                 "template, no reasoning budget, no speculative decoding, thinking on",
+        "env": {},
+        "thinking": ("on",),
+        "sampling": {"temperature": 1.0, "top_k": 20, "top_p": 0.95, "min_p": 0.0,
+                     "presence_penalty": 0.0, "repeat_penalty": 1.0},
+        "flags": ["-ctk", "q8_0", "-ctv", "q8_0", "--flash-attn", "on"],
+        # the llama.cpp it runs: its release tag, build number and commit, as
+        # `llama-server --version` and the tarball's VERSION say them
+        "build": {"repo": "ggml-org/llama.cpp", "tag": "b11555", "number": 11555,
+                  "commit": "1cf7767765b872806e1bb74cfb55614f4334f02f"},
+        # the variables it never gives its server: the lda branch's
+        "refuses_env": ("LOOKAHEAD_",),
+        # the models it runs, each with what the board registers it as based on
+        "models": {"served/Ornith-1.5-35B-A3B-Q4_K_M": "ornith-ai/Ornith-1.5-35B-A3B"},
+        # the GGUF's own chat template (tokenizer.chat_template of
+        # Ornith-1.5-35B-Q4_K_M.gguf at 12393612): the card's
+        # chat_template.jinja (ornith-ai/Ornith-1.5-35B-A3B at 10fbf86f, sha256
+        # 182e77dd…) with Unsloth's fixes for system/developer messages and
+        # tool calls — the two render a benchmark's messages (a user turn, or
+        # a system and a user turn, thinking on or off) the same
+        "template_sha256": "f55f52930aa8bf44ab5cb85f99370fcc3c56e9a85640b812086d5330bce5d86b",
+    },
 }
+
+
+def runtime_of_model(served_as: str) -> str:
+    """22: the runtime a model is only ever run with ('' for a model no
+    runtime names)"""
+    return next((k for k, rt in RUNTIMES.items() if served_as in (rt.get("models") or {})), "")
+
+
+def runtime_model_refused(name: str, served_as: str) -> str:
+    """22: '' when `served_as` may be asked with runtime `name` ('' for none);
+    else why not — a runtime naming its models runs those alone, and a model
+    a runtime names runs on that runtime alone"""
+    own = runtime_of_model(served_as)
+    if own and own != name:
+        return (f"{served_as} runs on runtime {own} alone — "
+                + (f"not {name}" if name else "give --runtime " + own))
+    models = (RUNTIMES.get(name) or {}).get("models") or {}
+    if models and served_as not in models:
+        return f"runtime {name} runs {', '.join(models)} alone — not {served_as}"
+    return ""
+
+
+def runtime_env_refused(name: str, env: dict) -> list[str]:
+    """22: the variables of `env` a runtime never gives its server"""
+    bad = (RUNTIMES.get(name) or {}).get("refuses_env") or ()
+    return sorted(k for k in env if bad and k.startswith(tuple(bad)))
+
+
+def runtime_build_refused(name: str, build: int | None, commit: str | None,
+                          version_file: dict | None = None) -> str:
+    """22: '' when a runtime that names its llama.cpp is given that one — its
+    --version's build number and commit, and the tarball's VERSION (its
+    commit, nothing uncommitted) when it has one; else why not"""
+    want = (RUNTIMES.get(name) or {}).get("build")
+    if not want:
+        return ""
+    got = f"build {build if build is not None else '?'} ({commit or '?'})"
+    said = f"upstream llama.cpp {want['tag']} (build {want['number']}, {want['commit'][:9]})"
+    if build != want["number"] or not commit or not want["commit"].startswith(commit):
+        return f"runtime {name} runs {said}, and this llama-server is {got}"
+    vf = version_file or {}
+    if vf.get("commit") and vf["commit"] != want["commit"]:
+        return (f"runtime {name} runs {said}, and this tarball's VERSION says commit "
+                f"{vf['commit'][:12]}")
+    if vf.get("uncommitted_changes") == "yes":
+        return (f"runtime {name} runs {said} as released, and this tarball was built from a "
+                "tree with changes not committed (its VERSION)")
+    return ""
+
+
 # the server's flag for each sampling value
 SAMPLING_FLAGS = {"temperature": "--temp", "top_k": "--top-k", "top_p": "--top-p",
                   "min_p": "--min-p", "presence_penalty": "--presence-penalty",
@@ -290,7 +371,9 @@ def runtime_words(name: str) -> str:
     rt = RUNTIMES[name]
     env = " ".join(f"{k}={v}" for k, v in rt["env"].items())
     samp = ", ".join(f"{SAMPLING_WORDS[k]} {v}" for k, v in rt["sampling"].items())
-    return f"runtime {name} ({rt['words']}): {env} · {samp} · " + " ".join(rt["flags"])
+    # 22: a runtime with no variables says so
+    return (f"runtime {name} ({rt['words']}): {env or 'no variables'} · {samp} · "
+            + " ".join(rt["flags"]))
 
 
 def slot_context(tasks: list[str], on: bool) -> int:
@@ -952,6 +1035,20 @@ def parity_items(root: Path, n: int | None = None) -> list[dict]:
     items = load(PARITY["task"], root)
     pick = sorted(random.Random(PARITY["seed"]).sample(range(len(items)),
                                                        min(n or PARITY["n"], len(items))))
+    return [items[i] for i in pick]
+
+
+# 22: a new runtime's pilot, on one box before the others are rented — a few
+# questions of two benchmarks scored by code, thinking on, each asked once:
+# the same ones on every machine (a sample seeded by the benchmark)
+PILOT = {"seed": "frontier-pilot-22", "n": {"gpqa_diamond_epoch": 20, "mmlupro_tiger": 5}}
+
+
+def pilot_items(task: str, root: Path) -> list[dict]:
+    """the pilot's questions of `task`, in the benchmark's order"""
+    items = load(task, root)
+    n = min(PILOT["n"][task], len(items))
+    pick = sorted(random.Random(f"{PILOT['seed']}:{task}").sample(range(len(items)), n))
     return [items[i] for i in pick]
 
 

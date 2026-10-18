@@ -935,6 +935,11 @@ class Answer(str):
     # 17: why it stopped, as the server says ("stop", "length"): an answer cut
     # at its budget is scored as one that ran out of room
     finish: str | None = None
+    # 22: what the server's chat parsing gave apart — the thinking's length
+    # (reasoning_content) and the reply (content) — for a pilot's check that
+    # the two came back separated; None when asked without it (ask_raw)
+    reasoning_chars: int | None = None
+    content: str | None = None
 
 
 def ask(rec: dict, text: str, s: dict) -> str:
@@ -956,6 +961,7 @@ def ask(rec: dict, text: str, s: dict) -> str:
     # llama-server says reasoning_content; OpenRouter says reasoning (12m.3)
     think = msg.get("reasoning_content") or msg.get("reasoning") or ""
     out = Answer(f"<think>\n{think}\n</think>\n\n{text}" if think else text)
+    out.reasoning_chars, out.content = len(think), text
     used = (reply.get("usage") or {}).get("completion_tokens")
     out.tokens = int(used) if isinstance(used, (int, float)) and used >= 0 else None
     out.usage = reply.get("usage") if isinstance(reply.get("usage"), dict) else None

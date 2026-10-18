@@ -5034,6 +5034,50 @@ Not before the demo: a new hidden set changes every Everyday score.
 - Point 9 came with 20.
 - Tests: `tests/test_18d1_scores_spending.py`.
 
+### 22 — Ornith-1.5-35B-A3B (Q4_K_M) on plan L (18 Oct)
+
+- **A third-party model on its card's settings**, never the lda runtime: the
+  runtime **`card-ornith`** (`frontier.RUNTIMES`) — upstream llama.cpp b11555
+  (commit `1cf7767765b8`), temperature 1.0, top-p 0.95, top-k 20, min-p 0,
+  presence and repeat penalty off (the server's defaults and in each request),
+  the GGUF's own chat template, `-ctk q8_0 -ctv q8_0 --flash-attn on`, no
+  variables. A runtime may name its llama.cpp (`build`), its models
+  (`models`, each with what it is based on), the variables it never gives
+  its server (`refuses_env`) and its template (`template_sha256`).
+- **The box refuses, before the GGUF is fetched:** Ornith on any other
+  runtime or none, card-ornith with another model, a `LOOKAHEAD_*` variable,
+  a build that reads the lda runtime's variable, a llama-server whose
+  `--version` or whose tarball's VERSION isn't b11555 at `1cf776776` with
+  nothing uncommitted; and before a question, a server whose `/props`
+  template isn't the GGUF's own. The import refuses the same
+  (`runtime_problem`). `version_of` reads upstream's new version line
+  ("version: 0.6.0-dev (build 11555, commit 1cf776776)").
+- **Why b11555 is built here:** the runner image has no llama-server, and
+  upstream's own Linux CUDA build is made on Ubuntu 24.04 (glibc 2.38); the
+  runner image is 22.04 (glibc 2.35). `build_llama_tarball.sh` builds the tag
+  in CUDA 12.8 on 22.04 with the release's CCCL (v3.4.3), for sm_120.
+- **The file:** `Ornith-1.5-35B-Q4_K_M.gguf` (21,713,463,040 bytes, sha256
+  `42739874…d41f`, `ornith-ai/Ornith-1.5-35B-A3B-GGUF` at `12393612`), pinned in
+  `PLAN_PINS["L"]`, fetched straight from the public repository.
+- **The pilot** (`frontier_box.py L1 --pilot …`, `remote_gguf.py --pilot`):
+  20 GPQA Diamond and 5 MMLU-Pro questions (`frontier.PILOT`, a seeded
+  sample), thinking on, each once — a line each (thinking's length, the
+  answer read, the right one, seconds), each benchmark's pace, plan L's hours
+  at it, and last whether every answer that finished came back with its
+  thinking apart (`served.Answer.reasoning_chars` and `.content`, kept from
+  the server's reply). No bundle and no progress file, in a folder named
+  `pilot`: the fetch never reads it.
+- **The reports:** "Ornith-1.5 Q4_K_M" among ours (colour slot 5, picked, on
+  Latest, with its note), "Ornith-1.5-35B-A3B, its card" (GPQA Diamond 89.2,
+  HLE 25.6, 5-run averages, the card at `12393612`) on Latest beside it; on the
+  ran-out report's picker. Latest now reads `glance` on our rows as on the
+  published ones (the five picked rows carry it).
+- Docs: `docs/ORNITH-RUN.md` (the tarball, the pilot, the 21 box lines, the
+  fetch and the first import), `docs/REMOTE-RUNS.md` § Ornith, `docs/REPORTS.md`.
+- Tests: `tests/test_22_ornith.py`, `tests/test_22_browser.py`; the stand-in
+  llama-server can say upstream's version, serve a given template and answer
+  with its thinking inline.
+
 ### 20 — step4000 against Q4 and BF16 (11 Oct)
 
 - **The main path is G2's** (the server came back mid-phase): the `lda` build as a

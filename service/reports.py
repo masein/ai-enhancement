@@ -225,6 +225,8 @@ def our_rows(rep: dict, cells: dict) -> list[dict]:
                          else f"{have} of {len(per)} benchmarks in")
         out.append({"id": "ours:" + o["label"], "label": o["label"], "row": mid, "ours": True,
                     "colour": o.get("colour"), "pick": bool(o.get("pick")),
+                    # 22: on Models ▸ Latest, as a published row marked "glance" is
+                    "glance": o.get("glance") is True,
                     "note": o.get("note") or "", "cells": per, "status": " · ".join(parts),
                     "chunks": list(ch) if ch else None, "dir": str(d)})
     return out
@@ -940,8 +942,9 @@ def report(rid: str, payload: dict | None = None, compute: bool = False) -> dict
     return {
         "id": rid, "title": rep.get("title") or rid, "what": rep.get("what") or "",
         "benchmarks": bench_meta(rep["benchmarks"]), "ours": rows, "theirs": theirs,
-        # 21d: Models ▸ Latest — its benchmarks (the models are the picked
-        # rows and the others marked "glance")
+        # 21d: Models ▸ Latest — its benchmarks (the models are the rows,
+        # ours and the others, marked "glance" — 22: ours too, where it was
+        # every picked row)
         "glance": {"benchmarks": [k for k in rep.get("glance_benchmarks") or []
                                   if any(b["key"] == k for b in rep["benchmarks"])]},
         "standing": {p["label"]: standing(p, models, rep["benchmarks"]) for p in picks},
@@ -1027,15 +1030,16 @@ def stats_at(ats: list[float]) -> dict:
 
 def glance_meta() -> dict | None:
     """21d: what Models ▸ Latest reads — the first report naming its glance
-    benchmarks: its id and title, its picked rows (board model ids) and those
-    benchmarks' tasks. None when no report names any"""
+    benchmarks: its id and title, our rows it marks "glance" (board model
+    ids; 22: where it was every picked row) and those benchmarks' tasks. None
+    when no report names any"""
     for rid, rep in files().items():
         keys = rep.get("glance_benchmarks") or []
         if rep.get("kind") == "ran_out" or not keys:
             continue
         task = {b["key"]: b["task"] for b in rep["benchmarks"]}
         return {"report": rid, "title": rep.get("title") or rid,
-                "rows": [o["row"] for o in rep["ours"] if o.get("pick")],
+                "rows": [o["row"] for o in rep["ours"] if o.get("glance") is True],
                 "tasks": [task[k] for k in keys if k in task]}
     return None
 
