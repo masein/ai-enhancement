@@ -65,8 +65,13 @@ The import refuses a bundle asked any other way.
 
 ## O0. The tarball (once, on the server, about 15 minutes)
 
-A full clone, not a shallow one: the build's number is the count of its
-commits (11555).
+**Built and uploaded (18 Oct):** `llama-server-b11555.tar.gz`, 616 MiB, sha256
+`79af365a8bd7918a9591fc378221adfdbc3daef3f299788790c867e825b76409`, in the private repository at commit
+`33b3ea8c8d33f70975eed7dd50f943e6419c3f3b`. Plan L's box line pins it by name
+(`frontier_box.PLAN_PINS`), beside the lda tarball: a file of that name with
+another sha256 is refused before anything is asked. The next one, the same
+way — a full clone, not a shallow one: the build's number is the count of
+its commits (11555).
 
 ```bash
 git clone https://github.com/ggml-org/llama.cpp ~/llama.cpp-upstream && git -C ~/llama.cpp-upstream checkout b11555
@@ -83,10 +88,9 @@ beside the lda tarball:
 hf upload <you>/evalboard-private ~/llama-server-b11555.tar.gz llama-server-b11555.tar.gz
 ```
 
-`<commit>` below is the private repository's commit that holds it (its page
-on Hugging Face, Files and versions ▸ History), so every box fetches the same
-file. Send me its sha256 and I pin it in `PLAN_PINS` as the lda tarball's is;
-until then each box checks its build and commit.
+The lines below fetch it at that commit (`@33b3ea8c8d33…`), so every box
+fetches the same file, whatever is uploaded later; each box also checks its
+build and commit.
 
 ## O1. The pilot, on the first box
 
@@ -117,7 +121,7 @@ The pilot — 20 GPQA Diamond and 5 MMLU-Pro questions, thinking on, each
 asked once, at plan L's 8 slots:
 
 ```bash
-python scripts/frontier_box.py L1 --pilot --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-b11555.tar.gz --runtime card-ornith
+python scripts/frontier_box.py L1 --pilot --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@33b3ea8c8d33f70975eed7dd50f943e6419c3f3b/llama-server-b11555.tar.gz --runtime card-ornith
 ```
 
 It checks the card, prints the runtime's every value, fetches and checks the
@@ -148,127 +152,127 @@ tmux, `cd /app`, the token), then its line:
 1. **L1** — Humanity's Last Exam · shard 1/9 · 8 slots · about 5.5 h at plan L's paces
 
    ```bash
-   python scripts/frontier_box.py L1 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-b11555.tar.gz --runtime card-ornith
+   python scripts/frontier_box.py L1 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@33b3ea8c8d33f70975eed7dd50f943e6419c3f3b/llama-server-b11555.tar.gz --runtime card-ornith
    ```
 
 2. **L2** — Humanity's Last Exam · shard 2/9 · 8 slots · about 5.5 h at plan L's paces
 
    ```bash
-   python scripts/frontier_box.py L2 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-b11555.tar.gz --runtime card-ornith
+   python scripts/frontier_box.py L2 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@33b3ea8c8d33f70975eed7dd50f943e6419c3f3b/llama-server-b11555.tar.gz --runtime card-ornith
    ```
 
 3. **L3** — Humanity's Last Exam · shard 3/9 · 8 slots · about 5.5 h at plan L's paces
 
    ```bash
-   python scripts/frontier_box.py L3 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-b11555.tar.gz --runtime card-ornith
+   python scripts/frontier_box.py L3 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@33b3ea8c8d33f70975eed7dd50f943e6419c3f3b/llama-server-b11555.tar.gz --runtime card-ornith
    ```
 
 4. **L4** — Humanity's Last Exam · shard 4/9 · 8 slots · about 5.5 h at plan L's paces
 
    ```bash
-   python scripts/frontier_box.py L4 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-b11555.tar.gz --runtime card-ornith
+   python scripts/frontier_box.py L4 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@33b3ea8c8d33f70975eed7dd50f943e6419c3f3b/llama-server-b11555.tar.gz --runtime card-ornith
    ```
 
 5. **L5** — Humanity's Last Exam · shard 5/9 · 8 slots · about 5.5 h at plan L's paces
 
    ```bash
-   python scripts/frontier_box.py L5 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-b11555.tar.gz --runtime card-ornith
+   python scripts/frontier_box.py L5 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@33b3ea8c8d33f70975eed7dd50f943e6419c3f3b/llama-server-b11555.tar.gz --runtime card-ornith
    ```
 
 6. **L6** — Humanity's Last Exam · shard 6/9 · 8 slots · about 5.5 h at plan L's paces
 
    ```bash
-   python scripts/frontier_box.py L6 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-b11555.tar.gz --runtime card-ornith
+   python scripts/frontier_box.py L6 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@33b3ea8c8d33f70975eed7dd50f943e6419c3f3b/llama-server-b11555.tar.gz --runtime card-ornith
    ```
 
 7. **L7** — Humanity's Last Exam · shard 7/9 · 8 slots · about 5.5 h at plan L's paces
 
    ```bash
-   python scripts/frontier_box.py L7 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-b11555.tar.gz --runtime card-ornith
+   python scripts/frontier_box.py L7 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@33b3ea8c8d33f70975eed7dd50f943e6419c3f3b/llama-server-b11555.tar.gz --runtime card-ornith
    ```
 
 8. **L8** — Humanity's Last Exam · shard 8/9 · 8 slots · about 5.5 h at plan L's paces
 
    ```bash
-   python scripts/frontier_box.py L8 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-b11555.tar.gz --runtime card-ornith
+   python scripts/frontier_box.py L8 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@33b3ea8c8d33f70975eed7dd50f943e6419c3f3b/llama-server-b11555.tar.gz --runtime card-ornith
    ```
 
 9. **L9** — Humanity's Last Exam · shard 9/9 · 8 slots · about 5.5 h at plan L's paces
 
    ```bash
-   python scripts/frontier_box.py L9 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-b11555.tar.gz --runtime card-ornith
+   python scripts/frontier_box.py L9 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@33b3ea8c8d33f70975eed7dd50f943e6419c3f3b/llama-server-b11555.tar.gz --runtime card-ornith
    ```
 
 10. **L10** — MMLU-Pro · shard 1/3 · 8 slots · about 5.9 h at plan L's paces
 
    ```bash
-   python scripts/frontier_box.py L10 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-b11555.tar.gz --runtime card-ornith
+   python scripts/frontier_box.py L10 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@33b3ea8c8d33f70975eed7dd50f943e6419c3f3b/llama-server-b11555.tar.gz --runtime card-ornith
    ```
 
 11. **L11** — MMLU-Pro · shard 2/3 · 8 slots · about 5.9 h at plan L's paces
 
    ```bash
-   python scripts/frontier_box.py L11 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-b11555.tar.gz --runtime card-ornith
+   python scripts/frontier_box.py L11 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@33b3ea8c8d33f70975eed7dd50f943e6419c3f3b/llama-server-b11555.tar.gz --runtime card-ornith
    ```
 
 12. **L12** — MMLU-Pro · shard 3/3 · 8 slots · about 5.9 h at plan L's paces
 
    ```bash
-   python scripts/frontier_box.py L12 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-b11555.tar.gz --runtime card-ornith
+   python scripts/frontier_box.py L12 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@33b3ea8c8d33f70975eed7dd50f943e6419c3f3b/llama-server-b11555.tar.gz --runtime card-ornith
    ```
 
 13. **L13** — GPQA Diamond, MATH Level 5 · shard 1/4 · 8 slots · about 5.4 h at plan L's paces
 
    ```bash
-   python scripts/frontier_box.py L13 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-b11555.tar.gz --runtime card-ornith
+   python scripts/frontier_box.py L13 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@33b3ea8c8d33f70975eed7dd50f943e6419c3f3b/llama-server-b11555.tar.gz --runtime card-ornith
    ```
 
 14. **L14** — GPQA Diamond, MATH Level 5 · shard 2/4 · 8 slots · about 5.4 h at plan L's paces
 
    ```bash
-   python scripts/frontier_box.py L14 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-b11555.tar.gz --runtime card-ornith
+   python scripts/frontier_box.py L14 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@33b3ea8c8d33f70975eed7dd50f943e6419c3f3b/llama-server-b11555.tar.gz --runtime card-ornith
    ```
 
 15. **L15** — GPQA Diamond, MATH Level 5 · shard 3/4 · 8 slots · about 5.4 h at plan L's paces
 
    ```bash
-   python scripts/frontier_box.py L15 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-b11555.tar.gz --runtime card-ornith
+   python scripts/frontier_box.py L15 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@33b3ea8c8d33f70975eed7dd50f943e6419c3f3b/llama-server-b11555.tar.gz --runtime card-ornith
    ```
 
 16. **L16** — GPQA Diamond, MATH Level 5 · shard 4/4 · 8 slots · about 5.4 h at plan L's paces
 
    ```bash
-   python scripts/frontier_box.py L16 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-b11555.tar.gz --runtime card-ornith
+   python scripts/frontier_box.py L16 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@33b3ea8c8d33f70975eed7dd50f943e6419c3f3b/llama-server-b11555.tar.gz --runtime card-ornith
    ```
 
 17. **L17** — OTIS Mock AIME 2024–2025 · shard 1/3 · 8 slots; then SimpleQA Verified · 8 slots · about 5.2 h at plan L's paces
 
    ```bash
-   python scripts/frontier_box.py L17 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-b11555.tar.gz --runtime card-ornith
+   python scripts/frontier_box.py L17 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@33b3ea8c8d33f70975eed7dd50f943e6419c3f3b/llama-server-b11555.tar.gz --runtime card-ornith
    ```
 
 18. **L18** — OTIS Mock AIME 2024–2025 · shard 2/3 · 8 slots · about 4.2 h at plan L's paces
 
    ```bash
-   python scripts/frontier_box.py L18 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-b11555.tar.gz --runtime card-ornith
+   python scripts/frontier_box.py L18 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@33b3ea8c8d33f70975eed7dd50f943e6419c3f3b/llama-server-b11555.tar.gz --runtime card-ornith
    ```
 
 19. **L19** — OTIS Mock AIME 2024–2025 · shard 3/3 · 8 slots · about 4.2 h at plan L's paces
 
    ```bash
-   python scripts/frontier_box.py L19 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-b11555.tar.gz --runtime card-ornith
+   python scripts/frontier_box.py L19 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@33b3ea8c8d33f70975eed7dd50f943e6419c3f3b/llama-server-b11555.tar.gz --runtime card-ornith
    ```
 
 20. **L20** — ARC-AGI-2 · shard 1/2 · 5 slots · about 5.8 h at plan L's paces
 
    ```bash
-   python scripts/frontier_box.py L20 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-b11555.tar.gz --runtime card-ornith
+   python scripts/frontier_box.py L20 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@33b3ea8c8d33f70975eed7dd50f943e6419c3f3b/llama-server-b11555.tar.gz --runtime card-ornith
    ```
 
 21. **L21** — ARC-AGI-2 · shard 2/2 · 5 slots · about 5.8 h at plan L's paces
 
    ```bash
-   python scripts/frontier_box.py L21 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-b11555.tar.gz --runtime card-ornith
+   python scripts/frontier_box.py L21 --as served/Ornith-1.5-35B-A3B-Q4_K_M --gguf hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/Ornith-1.5-35B-Q4_K_M.gguf --server hf://<you>/evalboard-private@33b3ea8c8d33f70975eed7dd50f943e6419c3f3b/llama-server-b11555.tar.gz --runtime card-ornith
    ```
 
 Plan L at the 6 Oct pilot's paces (the phone build, which routes 4 experts a

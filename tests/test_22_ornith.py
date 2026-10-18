@@ -39,6 +39,10 @@ BASED_ON = "ornith-ai/Ornith-1.5-35B-A3B"
 GGUF = ("hf://ornith-ai/Ornith-1.5-35B-A3B-GGUF@12393612fd4f730ff5aadc23e9b8f9648aa49ceb/"
         "Ornith-1.5-35B-Q4_K_M.gguf")
 SHA = "42739874cc2ccfdb8523b23fbe52e29b2a7555c8176737ca9ca0b5d59859d41f"
+# 22.1: the b11555 tarball masein built and uploaded, and the private
+# repository's commit that holds it
+TARBALL_SHA = "79af365a8bd7918a9591fc378221adfdbc3daef3f299788790c867e825b76409"
+PRIVATE_COMMIT = "33b3ea8c8d33f70975eed7dd50f943e6419c3f3b"
 UPSTREAM = "1cf7767765b872806e1bb74cfb55614f4334f02f"
 VERSION_LINE = ("version: 0.6.0-dev (build 11555, commit 1cf776776)\n"
                 "built with GNU 11.4.0 for Linux x86_64")
@@ -398,6 +402,7 @@ def test_a_pilot_is_a_runtimes_thinking_on_and_asks_its_own_questions(tmp_path, 
 
 def test_an_ornith_box_line_runs_its_runtime_and_pins_its_file():
     assert fx.PLAN_PINS["L"]["Ornith-1.5-35B-Q4_K_M.gguf"] == SHA
+    assert fx.PLAN_PINS["L"]["llama-server-b11555.tar.gz"] == TARBALL_SHA      # 22.1
     for more in ([], ["--runtime", RT]):
         a = fx.parser().parse_args(["L13", "--as", ORNITH, "--gguf", GGUF, "--server",
                                     "hf://me/p@c/llama-server-b11555.tar.gz", *more])
@@ -406,7 +411,7 @@ def test_an_ornith_box_line_runs_its_runtime_and_pins_its_file():
         assert argv[argv.index("--based-on") + 1] == BASED_ON
         assert argv[argv.index("--flags") + 1] == ""
         assert [argv[k + 1] for k, x in enumerate(argv) if x == "--pin"] == [
-            f"Ornith-1.5-35B-Q4_K_M.gguf={SHA}"]
+            f"Ornith-1.5-35B-Q4_K_M.gguf={SHA}", f"llama-server-b11555.tar.gz={TARBALL_SHA}"]
         assert argv[argv.index("--out") + 1] == "/workspace/Ornith-1.5-35B-A3B-Q4_K_M/L13-1"
     # the pilot: the same files and runtime, its own folder, the plan's 8 slots
     argv = fx.argv_of("L1", 0, fx.PILOT_STEP, a)
@@ -464,7 +469,8 @@ def test_the_docs_box_lines_are_the_pilot_and_L1_to_L21_whole():
     for x in lines:
         a = fx.parser().parse_args(x[2:])
         assert a.served_as == ORNITH and a.gguf == GGUF and a.runtime == RT
-        assert a.server == "hf://<you>/evalboard-private@<commit>/llama-server-b11555.tar.gz"
+        assert a.server == (f"hf://<you>/evalboard-private@{PRIVATE_COMMIT}/"
+                            "llama-server-b11555.tar.gz")
         assert not a.based_on and not a.flags and not a.env
     text = DOC.read_text(encoding="utf-8")
     # the first import, with --register and the file's sha256; the fetch with it
