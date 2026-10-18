@@ -23,7 +23,8 @@ from test_21d_glance import GLANCE, PICKED
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase21d"
 GOOD, SKEWED = "fx/good-750m", "fx/skewed-360m"
-LDA = [SPEC[x]["row"] for x in SPEC]                 # our six rows, tested now
+# our six rows, tested now — 22: Ornith-1.5's isn't run in this world
+LDA = [SPEC[x]["row"] for x in SPEC if x != "Ornith-1.5 Q4_K_M"]
 
 
 @pytest.fixture(scope="module", autouse=True)
