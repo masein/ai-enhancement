@@ -182,6 +182,11 @@ PLAN_PINS = {"L": {
         "a172dfea1fe8bb29132ea2f250c74cdc7d619d518d3f072d3816e31a69ce44a2",
     "Qwen3.6-35B-A3B-BF16-00002-of-00002.gguf":
         "b90b4d07e1be4967aec932e2501e7476ec5f44de772c7eb082d6e9c3ac105161",
+    # 22.1: upstream llama.cpp b11555 built from its tag (build_llama_tarball.sh,
+    # CUDA 12.8 on Ubuntu 22.04, sm_120, CCCL v3.4.3, no NCCL), 616 MiB, in the
+    # private repository at 33b3ea8c8d33 — runtime card-ornith's
+    "llama-server-b11555.tar.gz":
+        "79af365a8bd7918a9591fc378221adfdbc3daef3f299788790c867e825b76409",
     # 22: Ornith-1.5-35B-A3B's Q4_K_M, 21,713,463,040 bytes, as Hugging Face
     # publishes it in ornith-ai/Ornith-1.5-35B-A3B-GGUF at 12393612fd4f
     "Ornith-1.5-35B-Q4_K_M.gguf":

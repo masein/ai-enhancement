@@ -5056,6 +5056,10 @@ Not before the demo: a new hidden set changes every Everyday score.
   upstream's own Linux CUDA build is made on Ubuntu 24.04 (glibc 2.38); the
   runner image is 22.04 (glibc 2.35). `build_llama_tarball.sh` builds the tag
   in CUDA 12.8 on 22.04 with the release's CCCL (v3.4.3) and no NCCL, for sm_120.
+- **22.1, the tarball pinned:** `llama-server-b11555.tar.gz` (616 MiB, sha256
+  `79af365a…6409`), built by masein and in the private repository at
+  `33b3ea8c8d33`, pinned in `PLAN_PINS["L"]` beside the lda tarball; the box
+  lines in `docs/ORNITH-RUN.md` fetch it at that commit.
 - **The file:** `Ornith-1.5-35B-Q4_K_M.gguf` (21,713,463,040 bytes, sha256
   `42739874…d41f`, `ornith-ai/Ornith-1.5-35B-A3B-GGUF` at `12393612`), pinned in
   `PLAN_PINS["L"]`, fetched straight from the public repository.
