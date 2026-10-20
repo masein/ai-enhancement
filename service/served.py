@@ -917,6 +917,20 @@ def _doc_hash(doc: dict) -> str:
                           .encode("utf-8")).hexdigest()
 
 
+# 23: llama-server's timings an answer keeps, as scripts/agent_relay.py's
+# TIMINGS: its prompt's tokens and milliseconds (cache_n of them from its
+# cache), its output's tokens and milliseconds
+TIMINGS = ("cache_n", "prompt_n", "prompt_ms", "predicted_n", "predicted_ms")
+
+
+def timings_of(t) -> dict:
+    """the timings a reply gives, numbers only"""
+    if not isinstance(t, dict):
+        return {}
+    return {k: t[k] for k in TIMINGS if isinstance(t.get(k), (int, float))
+            and not isinstance(t.get(k), bool)}
+
+
 class Answer(str):
     """a reply's text, with how many tokens the server says it generated
     (12i.4: an answer's length, thinking included, as the server counts it)"""
@@ -940,6 +954,11 @@ class Answer(str):
     # the two came back separated; None when asked without it (ask_raw)
     reasoning_chars: int | None = None
     content: str | None = None
+    # 23: how long it took — llama-server's timings, the prompt's tokens as its
+    # usage says, and the seconds the request took as this client saw it
+    timings: dict | None = None
+    prompt_tokens: int | None = None
+    wall_s: float | None = None
 
 
 def ask(rec: dict, text: str, s: dict) -> str:
@@ -953,8 +972,10 @@ def ask(rec: dict, text: str, s: dict) -> str:
     if is_openrouter(rec):
         body.update(_pinned_route(rec))
     base, key = _endpoint(rec)
+    t0 = time.time()
     reply = _post(base + "/chat/completions", key, body, item=not is_openrouter(rec),
                   timeout=timeout_for(s))
+    wall = time.time() - t0
     choice = (reply.get("choices") or [{}])[0]
     msg = choice.get("message") or {}
     text = msg.get("content") or ""
@@ -971,6 +992,11 @@ def ask(rec: dict, text: str, s: dict) -> str:
     t = reply.get("timings") or {}
     if isinstance(t.get("draft_n"), (int, float)) and t["draft_n"] > 0:
         out.draft = {"n": int(t["draft_n"]), "accepted": int(t.get("draft_n_accepted") or 0)}
+    pt = (reply.get("usage") or {}).get("prompt_tokens") if isinstance(reply.get("usage"),
+                                                                       dict) else None
+    out.timings = timings_of(t)
+    out.prompt_tokens = int(pt) if isinstance(pt, (int, float)) and pt >= 0 else None
+    out.wall_s = round(wall, 3)
     return out
 
 
@@ -1021,10 +1047,12 @@ def ask_raw(rec: dict, text: str, s: dict) -> "Answer":
     sampling = {k: s[k] for k in ("temperature", "top_p", "top_k", "min_p", "presence_penalty",
                                   "repeat_penalty", "repeat_last_n", "seed")
                 if s.get(k) is not None}
+    t0 = time.time()
     reply = _post(root + "/completion", key, {
         "prompt": prompt, "n_predict": s["max_tokens"], **sampling,
         "stop": list(s.get("stop") or []), "cache_prompt": False, "stream": False},
         timeout=timeout_for(s))
+    wall = time.time() - t0
     raw = reply.get("content") or ""
     out = Answer(("<think>\n" + raw) if re.search(r"<think>\s*$", prompt) else raw)
     t = reply.get("timings") if isinstance(reply.get("timings"), dict) else {}
@@ -1035,6 +1063,11 @@ def ask_raw(rec: dict, text: str, s: dict) -> "Answer":
                   if reply.get("stop_type") in ("eos", "word") else None)
     if isinstance(t.get("draft_n"), (int, float)) and t["draft_n"] > 0:
         out.draft = {"n": int(t["draft_n"]), "accepted": int(t.get("draft_n_accepted") or 0)}
+    # 23: its timings too; /completion counts the prompt as tokens_evaluated
+    pt = reply.get("tokens_evaluated")
+    out.timings = timings_of(t)
+    out.prompt_tokens = int(pt) if isinstance(pt, (int, float)) and pt >= 0 else None
+    out.wall_s = round(wall, 3)
     return out
 
 

@@ -846,7 +846,7 @@ def startup_log(path: Path, limit: int = 400) -> str:
 
 def register_here(served_as: str, name: str, based_on: str, base: str, thinking: bool,
                   how: str, flags: list[str] | None = None, env: dict | None = None,
-                  runtime: str | None = None) -> dict:
+                  runtime: str | None = None, slots: int | None = None) -> dict:
     """the served model, in this box's own database, as the board keeps one —
     17b: with the launch it was given, which each task's setup records"""
     from service import db, served
@@ -859,7 +859,9 @@ def register_here(served_as: str, name: str, based_on: str, base: str, thinking:
            "env": " ".join(f"{k}={v}" for k, v in sorted((env or {}).items())),
            "speculative": p.get("speculative"),
            # 20: its runtime, whose sampling each request carries
-           **({"runtime": runtime} if runtime else {})}
+           **({"runtime": runtime} if runtime else {}),
+           # 23: its slots (-np), which each task's setup.json records
+           **({"slots": slots} if slots else {})}
     db.served_put(rec)
     served.write_meta(rec)
     return rec
@@ -1604,7 +1606,8 @@ def _main(argv: list[str] | None = None) -> int:
         rec = register_here(a.served_as, a.served_as.split("/", 1)[1], a.based_on,
                             srv_proc.base, thinking,
                             f"llama.cpp {ver['build'] or '?'} on {gpu.get('name') or 'a GPU'}: "
-                            + " ".join(server["argv"]), flags, extra_env, a.runtime)
+                            + " ".join(server["argv"]), flags, extra_env, a.runtime,
+                            a.slots)
         if a.parity:
             from service import frontier as sf
             dest = out / "parity.jsonl"

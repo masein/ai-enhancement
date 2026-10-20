@@ -248,10 +248,10 @@ def paired(a: dict, b: dict) -> tuple[float, float, int] | None:
         return None
     diffs = [sum(b["per"][q]) / len(b["per"][q]) - sum(a["per"][q]) / len(a["per"][q])
              for q in qs]
-    n = len(diffs)
-    mu = sum(diffs) / n
-    var = sum((x - mu) ** 2 for x in diffs) / (n - 1)
-    return mu, (var / n) ** 0.5, n
+    # 23: the paired sums, one definition (scripts/paired_stats.py)
+    import paired_stats as ps
+    mu, se = ps.mean_se(diffs)
+    return mu, se, len(diffs)
 
 
 def table(task: str, scores: list[tuple[str, dict]]) -> list[str]:

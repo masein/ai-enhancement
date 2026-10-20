@@ -85,14 +85,20 @@ def files() -> dict[str, dict]:
         stamp.append((str(f), st.st_mtime_ns, st.st_size))
     if stamp == _files_memo["stamp"]:
         return {k: json.loads(json.dumps(v)) for k, v in _files_memo["out"].items()}
-    out = {}
+    out, paired = {}, {}
     for f in fs:
         try:
             rep = json.loads(f.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        if isinstance(rep, dict) and rep.get("id") and isinstance(rep.get("ours"), list):
+        if isinstance(rep, dict) and rep.get("id") and rep.get("kind") == "paired":
+            paired[str(rep["id"])] = rep
+        elif isinstance(rep, dict) and rep.get("id") and isinstance(rep.get("ours"), list):
             out[str(rep["id"])] = rep
+    # 23: a paired report's builds are another report's rows, read from it
+    from . import paired as pd
+    for rid, rep in paired.items():
+        out[rid] = pd.resolve(rep, out)
     _files_memo.update(stamp=stamp, out=out)
     return {k: json.loads(json.dumps(v)) for k, v in out.items()}
 
@@ -899,10 +905,12 @@ def bench_meta(benches: list[dict]) -> list[dict]:
              "unit": "tasks" if b["task"] == "arc_agi2_public" else "questions"} for b in benches]
 
 
-def report(rid: str, payload: dict | None = None, compute: bool = False) -> dict | None:
+def report(rid: str, payload: dict | None = None, compute: bool = False, a: str = "",
+           b: str = "") -> dict | None:
     """one report, every number from the board's tables. compute: work the
     token stats and loop examples out now (the tests, the scripts); a page
-    reads what the stats worker kept (21c), never computing"""
+    reads what the stats worker kept (21c), never computing. 23: a paired
+    report for the builds a and b (its default pair when not given)"""
     rep = files().get(rid)
     if rep is None:
         return None
@@ -910,6 +918,14 @@ def report(rid: str, payload: dict | None = None, compute: bool = False) -> dict
         from . import app
         payload = app.results_payload()
     rows = our_rows(rep, payload.get("cells") or {})
+    if rep.get("kind") == "paired":
+        # 23: two builds, question by question (service/paired.py)
+        from . import paired as pd
+        got = pd.report(rep, rows, a, b, compute=compute)
+        src = ours_changed(rows)
+        return {**got, "sources": {"ours": {"at": src, "words": f"as of the last import, "
+                                                                 f"{when(src)}"
+                                            if src else "nothing imported yet"}}}
     if rep.get("kind") == "ran_out":
         # 21b: the answers our models ran out of room on (service/ran_out.py),
         # each benchmark's count beside the board's own
@@ -963,6 +979,9 @@ def report(rid: str, payload: dict | None = None, compute: bool = False) -> dict
         "reference": rep.get("reference"),
         # 21b: where a model's ran-out answers are listed, report by report
         "ranOut": ran_out_links(),
+        # 23: the report comparing two of these rows question by question
+        "paired": next((x for x, r in files().items() if r.get("kind") == "paired"
+                        and (r.get("builds") or {}).get("from") == rid), None),
         # 21c: the page as masein publishes it, served here
         "page": page_url(rid, rep)}
 
@@ -1064,6 +1083,13 @@ def listing(payload: dict | None = None) -> list[dict]:
             out.append({"id": rid, "title": rep.get("title") or rid, "what": rep.get("what") or "",
                         "ours": [r["label"] for r in rows if r["pick"]], "others": 0,
                         "against": rep.get("against"), "insight": True,
+                        "changed": when(last) if last else "", "changed_at": last})
+            continue
+        if rep.get("kind") == "paired":
+            # 23: every build of the file, compared with itself only
+            last = ours_changed(rows)
+            out.append({"id": rid, "title": rep.get("title") or rid, "what": rep.get("what") or "",
+                        "ours": [r["label"] for r in rows], "others": 0, "paired": True,
                         "changed": when(last) if last else "", "changed_at": last})
             continue
         src = _sources(rep, rows, their_rows(rep))

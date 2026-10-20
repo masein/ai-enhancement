@@ -20,7 +20,8 @@ anything. 18e: FAKE_LLAMA_DRAFTS=1 has its /slots say they draft tokens. 22:
 FAKE_LLAMA_VERSION is what --version prints (upstream's "version: 0.6.0-dev
 (build 11555, commit 1cf776776)"); FAKE_LLAMA_TEMPLATE the chat template its
 /props names; FAKE_LLAMA_THINK=inline answers with its thinking and
-"</think>" in the reply, as a server that doesn't split them off does."""
+"</think>" in the reply, as a server that doesn't split them off does. 23:
+FAKE_LLAMA_TIMINGS=1 gives each answer llama-server's timings."""
 
 from __future__ import annotations
 
@@ -150,7 +151,11 @@ def main() -> int:
                 os._exit(3)
             self._send(200, {"id": "chatcmpl-1", "object": "chat.completion",
                              "choices": [{"index": 0, "message": msg, "finish_reason": "stop"}],
-                             "usage": {"prompt_tokens": 50, "completion_tokens": 12}})
+                             "usage": {"prompt_tokens": 50, "completion_tokens": 12},
+                             **({"timings": {"cache_n": 8, "prompt_n": 42, "prompt_ms": 31.5,
+                                             "prompt_per_second": 1333.3, "predicted_n": 12,
+                                             "predicted_ms": 240.25}}
+                                if os.environ.get("FAKE_LLAMA_TIMINGS") == "1" else {})})
             with lock:
                 sent["n"] += 1
 
