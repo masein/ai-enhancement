@@ -1,0 +1,58 @@
+{
+ "id": "paired",
+ "kind": "paired",
+ "title": "Two builds, question by question",
+ "what": "Which questions one build gets right and the other gets wrong.",
+ "builds": {
+  "from": "step-checkpoints"
+ },
+ "default": [
+  "step4000",
+  "Q4 (UD-Q4_K_XL)"
+ ],
+ "benchmarks": [
+  {
+   "key": "gpqa",
+   "task": "gpqa_diamond_epoch",
+   "label": "GPQA Diamond"
+  },
+  {
+   "key": "hle",
+   "task": "hle_text_cais",
+   "label": "HLE"
+  },
+  {
+   "key": "otis",
+   "task": "otis_aime_epoch",
+   "label": "OTIS Mock AIME"
+  },
+  {
+   "key": "math",
+   "task": "math_l5_epoch",
+   "label": "MATH Level 5"
+  },
+  {
+   "key": "mmlupro",
+   "task": "mmlupro_tiger",
+   "label": "MMLU-Pro"
+  },
+  {
+   "key": "simpleqa",
+   "task": "simpleqa_epoch",
+   "label": "SimpleQA Verified"
+  },
+  {
+   "key": "arc",
+   "task": "arc_agi2_public",
+   "label": "ARC-AGI-2"
+  }
+ ],
+ "notes": [
+  "Why question by question. Both builds answered the same questions. A question both got right, or both got wrong, tells us nothing about which is better; only the questions where they differ count. Comparing that way finds much smaller real differences than setting two scores with their ± side by side.",
+  "The 95% range is where the true difference most likely lies. If it crosses 0, the two builds can't be told apart on that benchmark with this many questions, and the verdict says \"can't tell\".",
+  "The test. With one answer per question, the verdict uses the exact McNemar test, which looks only at the questions where the two builds differ. With several answers per question, each question counts once, at its average, and the verdict uses the range.",
+  "Churn. Two builds with the same score can still differ on many questions. The line under the table compares that churn with how often each build disagrees with itself between two of its own runs; churn well above that is a sign the builds really behave differently, even where the scores are level.",
+  "Ran out of room counts as wrong, as everywhere on the board; SimpleQA's \"not attempted\" counts as not right.",
+  "Questions listed follow the board's reader rules: the hidden half is counted but not listed."
+ ]
+}

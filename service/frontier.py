@@ -125,7 +125,11 @@ def _setup(rec: dict, task: str, on: bool, s: dict) -> dict:
         # decoding, read from the flags, the environment and "How it's
         # served" — so reordered flags, slots and context don't count
         "launch_setup": launch_setup(rec),
-        "shard": {"i": sh[0], "n": sh[1]} if sh else None}
+        "shard": {"i": sh[0], "n": sh[1]} if sh else None,
+        # 23: the answers in flight at once and the server's slots (-np): with
+        # one slot, prompt_ms is a fair time to first word; with more it isn't
+        "concurrency": {"in_flight": served.concurrency(rec),
+                        "server_slots": rec.get("slots")}}
 
 
 def launch_setup(rec: dict) -> dict:
@@ -332,7 +336,13 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
             return
         line = {"id": it["id"], "epoch": e, "seed": seed, "answer": str(a),
                 "finish": getattr(a, "finish", None), "tokens": a.tokens,
-                "at": round(time.time(), 3)}
+                "at": round(time.time(), 3),
+                # 23: how long it took, for 23c — llama-server's timings, its
+                # prompt's tokens, and the request's seconds as the board saw it
+                **(getattr(a, "timings", None) or {}),
+                **({"prompt_tokens": a.prompt_tokens}
+                   if getattr(a, "prompt_tokens", None) is not None else {}),
+                **({"wall_s": a.wall_s} if getattr(a, "wall_s", None) is not None else {})}
         if a.fallback:
             line["fallback"] = a.fallback
         n = write(line)

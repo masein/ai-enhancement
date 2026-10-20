@@ -1,6 +1,7 @@
 """21c: the reports' stats — the thinking tokens and loop examples of a
 scorecard (service/reports.py), the lists of a ran-out report
-(service/ran_out.py) — worked out in a process of their own and kept on disk.
+(service/ran_out.py), 23: every pair of a paired report's builds
+(service/paired.py) — worked out in a process of their own and kept on disk.
 
 21 worked them out in a thread of the server's own: reading every stored
 answer (gigabytes of them) inside the server held up every other request,
@@ -122,7 +123,9 @@ def keep(slot: str, key: str, value: object = None, error: str = "") -> dict:
         finally:
             fcntl.flock(lk, fcntl.LOCK_UN)
     with _mem_lock:
-        _mem["stamp"] = None
+        # 23: read again on the next look — never None, which is also "no file
+        # here": a store kept for one root was read back for another without one
+        _mem["stamp"] = ("unread",)
     return entry
 
 
@@ -132,10 +135,12 @@ def keep(slot: str, key: str, value: object = None, error: str = "") -> dict:
 
 def jobs() -> list[Job]:
     """every report's stats, each once"""
-    from . import ran_out, reports
+    from . import paired, ran_out, reports
     out: dict[str, Job] = {}
     for rid, rep in reports.files().items():
-        got = ran_out.jobs(rep) if rep.get("kind") == "ran_out" else reports.jobs(rid, rep)
+        # 23: and every pair of a paired report's builds, each benchmark
+        got = ran_out.jobs(rep) if rep.get("kind") == "ran_out" else paired.jobs(rep) \
+            if rep.get("kind") == "paired" else reports.jobs(rid, rep)
         for j in got:
             out.setdefault(j.slot, j)
     return list(out.values())

@@ -1681,23 +1681,44 @@ def reports_list():
 def reports_answer(rid: str, model: str, task: str, id: str, epoch: int = 0):
     """21b: one answer of a ran-out report, opened — its thinking in full, read
     only now (they run to 80,000 tokens); a question the report doesn't show
-    is refused"""
-    from . import ran_out, reports
+    is refused. 23: and one build's answer in a paired report"""
+    from . import paired, ran_out, reports
     rep = reports.files().get(rid)
-    if rep is None or rep.get("kind") != "ran_out":
-        raise HTTPException(404, f"no report {rid!r} of answers that ran out")
+    if rep is None or rep.get("kind") not in ("ran_out", "paired"):
+        raise HTTPException(404, f"no report {rid!r} whose answers can be opened")
     try:
+        if rep.get("kind") == "paired":
+            return paired.one(rep, model, task, id, epoch)
         return ran_out.one(rep, model, task, id, epoch)
-    except ran_out.Refused as e:
+    except (ran_out.Refused, paired.Refused) as e:
         raise HTTPException(403, str(e)) from None
     except KeyError as e:
         raise HTTPException(404, str(e).strip("'\"")) from None
 
 
 @app.get("/api/reports/{rid}")
-def reports_one(rid: str):
-    from . import reports
-    got = reports.report(rid, results_payload())
+def reports_one(rid: str, a: str = "", b: str = "", bench: str = "", side: str = ""):
+    """a report, every number from the board's tables. 23: a paired report for
+    the builds a and b; with bench and side, one count's question list"""
+    from . import paired, reports
+    rep = reports.files().get(rid)
+    if rep is not None and rep.get("kind") == "paired":
+        if a and a == b:
+            raise HTTPException(400, "pick two different builds")
+        if a and a not in paired.labels(rep) or b and b not in paired.labels(rep):
+            raise HTTPException(404, "no such build in this report")
+        if bench:
+            task = next((x["task"] for x in rep["benchmarks"] if x["key"] == bench), None)
+            if task is None or not (a and b):
+                raise HTTPException(404, "give a, b and one of the report's benchmarks")
+            try:
+                return paired.question_list(rep, a, b, task, side)
+            except KeyError as e:
+                raise HTTPException(404, str(e).strip("'\"")) from None
+    try:
+        got = reports.report(rid, results_payload(), a=a, b=b)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from None
     if got is None:
         raise HTTPException(404, f"no report {rid!r}")
     return got

@@ -1106,9 +1106,9 @@ def parity_compare(server: list[dict], box: list[dict]) -> dict:
     rs, rb = sum(right(a[i]) for i in ids), sum(box_right(b[i]) for i in ids)
     margin, z = PARITY["margin"], PARITY["z"]
     if n:
-        mean = sum(d) / n
-        var = sum((x - mean) ** 2 for x in d) / (n - 1) if n > 1 else 0.0
-        se = (var / n) ** 0.5
+        # 23: the paired sums, one definition (scripts/paired_stats.py)
+        import paired_stats as ps
+        mean, se = ps.mean_se(d)
         lo, hi = mean - z * se, mean + z * se
     else:
         mean = lo = hi = 0.0

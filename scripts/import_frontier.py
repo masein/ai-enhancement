@@ -282,6 +282,12 @@ def bad_line(r, epochs: int) -> str:
             return f"has a {k} that isn't a count"
     if r.get("fallback") is not None and not isinstance(r["fallback"], dict):
         return "has a fallback that isn't a record"
+    # 23: how long it took, on lines from a box image after 23 — optional
+    for k in ("cache_n", "prompt_n", "prompt_ms", "predicted_n", "predicted_ms",
+              "prompt_tokens", "wall_s"):
+        if r.get(k) is not None and (not isinstance(r[k], (int, float))
+                                     or isinstance(r[k], bool) or r[k] < 0):
+            return f"has a {k} that isn't a number"
     return ""
 
 

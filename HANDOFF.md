@@ -5034,6 +5034,32 @@ Not before the demo: a new hidden set changes every Everyday score.
 - Point 9 came with 20.
 - Tests: `tests/test_18d1_scores_spending.py`.
 
+### 23 — two builds, question by question; timings on every answer (20 Oct)
+
+- **The report** `eval_tasks/reports/paired.json` (`kind: "paired"`,
+  `service/paired.py`): two of our builds on the questions both answered —
+  each benchmark's difference with its 95% range and verdict (exact McNemar
+  with one run a question; the paired standard error with several, and
+  ARC-AGI-2 by task), the questions each way, how many differ, and for GPQA
+  and OTIS how often each build disagrees with itself. Its builds are the
+  scorecard's rows; the page is `vPaired` (a picker with ⇄, a sentence, the
+  settings line when two ran another way, an SVG chart, the table, the
+  question lists and an answer, the notes), at `&a=…&b=…`.
+- **The sums** in `scripts/paired_stats.py`, used by `score_bundle.paired()`
+  and `frontier.parity_compare` too.
+- **The worker** keeps every pair (21 for seven builds), each benchmark;
+  `/api/reports/paired?a=&b=` reads them, `&bench=&side=` one count's
+  questions, `/api/reports/paired/answer` one build's answer (the hidden half
+  refused). `report_stats.keep` marks its memory unread with a marker of its
+  own (None, "no file here", read one root's store back for another).
+- **Timings:** each answer line keeps llama-server's `cache_n`, `prompt_n`,
+  `prompt_ms`, `predicted_n`, `predicted_ms` (as `agent_relay.TIMINGS`),
+  `prompt_tokens` and `wall_s`; each task's `setup.json` its `concurrency`
+  (answers in flight, the server's slots). Nothing reads them yet (23c); the
+  import accepts lines with and without them.
+- Tests: `tests/test_23_paired_sums.py`, `test_23_paired.py`,
+  `test_23_timings.py`, `test_23_browser.py`.
+
 ### 22 — Ornith-1.5-35B-A3B (Q4_K_M) on plan L (18 Oct)
 
 - **A third-party model on its card's settings**, never the lda runtime: the

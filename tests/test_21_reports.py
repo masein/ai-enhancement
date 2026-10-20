@@ -350,7 +350,8 @@ def test_the_endpoints_read_and_start_nothing(svc, monkeypatch):
     monkeypatch.setattr(db, "add", no)
     monkeypatch.setattr(reported, "import_epoch", no)
     got = {r["id"]: r for r in svc.get("/api/reports").json()["reports"]}
-    assert sorted(got) == ["ran-out-of-room", "step-checkpoints"]          # 21b: a second
+    # 21b: a second; 23: a third, two builds question by question
+    assert sorted(got) == ["paired", "ran-out-of-room", "step-checkpoints"]
     sc = got["step-checkpoints"]
     assert sc["ours"][0] == "step4000" and sc["others"] == 42          # 22: Ornith's card
     r = svc.get("/api/reports/step-checkpoints").json()
