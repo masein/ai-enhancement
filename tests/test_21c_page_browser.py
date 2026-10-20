@@ -65,9 +65,11 @@ def test_the_page_draws_from_our_server_alone(live, page, width, scheme):
     assert bg == ("rgb(247, 247, 245)" if scheme == "light" else "rgb(13, 13, 13)"), bg
     # our runs, each with its status
     rows = page.locator("#ours-body tr")
-    assert rows.count() == 7                          # 22: and Ornith-1.5's, not run yet
-    assert rows.nth(0).locator("td").nth(1).inner_text() == "Complete · 21 of 21 chunks"
-    assert rows.nth(1).locator("td").nth(1).inner_text() == "Running · 20 of 21 chunks in"
+    assert rows.count() == 8              # 22: and Ornith-1.5's; 23b: step8804's, not scored yet
+    # 23b: step8804 first, not scored yet; then step4000 and step1000 as before
+    assert rows.nth(0).locator("td").nth(1).inner_text() == "Not scored yet"
+    assert rows.nth(1).locator("td").nth(1).inner_text() == "Complete · 21 of 21 chunks"
+    assert rows.nth(2).locator("td").nth(1).inner_text() == "Running · 20 of 21 chunks in"
     # the takeaway, worked out by the page's own calcs from our data
     assert page.locator("#takeaway .dash-skeleton").count() == 0
     # the picker changes the line and the tiles
@@ -134,7 +136,7 @@ def test_the_numbers_are_21s_cell_for_cell(live, page):
         "rows => rows.map(r => [r.dataset.rpRow, ...[...r.children].slice(1).map("
         "c => c.firstChild && c.firstChild.nodeType === 3 ? c.firstChild.textContent.trim() "
         ": c.textContent.trim())])")
-    assert len(theirs) == 7                           # 22: and Ornith-1.5's
+    assert len(theirs) == 8                           # 22: and Ornith-1.5's; 23b: step8804's
     for row in theirs:
         name, vals = row[0], row[1:]
         got = [v.split(" ± ")[0] for v in vals]
@@ -152,7 +154,8 @@ def test_the_numbers_are_21s_cell_for_cell(live, page):
         # models; 21 against "Q4, earlier run" too. 22: both against
         # Ornith-1.5's card; 21 against Ornith-1.5's own row too, one of ours
         # off the lda runtime as "Q4, earlier run" is
-        assert len(ref) == 48 and len(rows) == 46 and not {"Q4, earlier run",
+        # 23b: 21 against step8804 too, not scored yet
+        assert len(ref) == 49 and len(rows) == 46 and not {"Q4, earlier run",
                                                            "Ornith-1.5 Q4_K_M"} & {
             r[0][0] for r in rows}, (pick, len(ref), len(rows))
         for r in rows:

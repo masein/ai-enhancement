@@ -5034,6 +5034,31 @@ Not before the demo: a new hidden set changes every Everyday score.
 - Point 9 came with 20.
 - Tests: `tests/test_18d1_scores_spending.py`.
 
+### 23b — beyond the score; step8804 in the scorecard (20 Oct)
+
+- **`service/beyond.py`:** each row's benchmark, from its newest scored
+  samples — reliability (GPQA, OTIS: always, sometimes, never), calibration
+  (HLE: CAIS's calibration error, `calib_err` ported from
+  `run_judge_results.py` at `a59048963171`, quirks kept; ten bins; mean
+  stated confidence; replies stating none), SimpleQA (right, wrong, not
+  attempted, ran out; tries, right when it tries, F) and loops (by
+  `fb.ends_in_loop`, of all and of those that ran out). The stats worker keeps
+  them for every row with scored Frontier answers; `/api/beyond?model=` reads
+  them; the scorecard's payload carries its rows' (`beyond`).
+- **The page:** a model's Scores tab ends with "Beyond the score" (`byBlock`),
+  closed unless opened, its header the calibration error; inside, a sentence
+  and one small SVG each. The scorecard has a section "Beyond the score" after
+  "Scores by benchmark" (`rpBeyond`), a column "Ended in a loop" and the chart
+  "Score against thinking" (`rpThinkChart`) in "Thinking tokens", and the four
+  notes.
+- **step8804** first in the scorecard's `ours` (colour slot 6, picked, on
+  Latest) and the paired report's default pair with step4000. A row with
+  nothing scored says "Not scored yet" (it said "Not run yet").
+- **The ± sentence** of the published page and the board's legend: "It comes
+  from how much the score varies between questions; a question asked several
+  times counts once, at the average of its runs."
+- Tests: `tests/test_23b_beyond.py`, `tests/test_23b_browser.py`.
+
 ### 23 — two builds, question by question; timings on every answer (20 Oct)
 
 - **The report** `eval_tasks/reports/paired.json` (`kind: "paired"`,

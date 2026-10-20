@@ -171,7 +171,7 @@ def test_the_list_and_the_report_open_and_the_picker_moves_the_tiles(live, page,
     assert "“Wait”" in page.locator("[data-rp-loop='486']").inner_text()
     # 6 and 7: every model, ours in bold; the cards' links beside their numbers
     every = page.locator("[data-rp-every]")
-    assert every.locator("td.rp-ours").count() == 7          # 22: and Ornith-1.5, measured here
+    assert every.locator("td.rp-ours").count() == 8   # 22: and Ornith-1.5; 23b: and step8804
     assert every.locator("td.rp-ours").first.evaluate(
         "e => +getComputedStyle(e).fontWeight") >= 600                  # ours in bold
     assert every.locator("[data-card-link]").count() >= 19

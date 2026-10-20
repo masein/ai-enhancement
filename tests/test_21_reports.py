@@ -306,7 +306,9 @@ def registry(d: Path, shards: dict, tasks: dict) -> None:
 
 def test_each_rows_status_and_a_dash_for_what_isnt_finished(svc):
     from service import frontier as sf
-    rep = {**REPORT, "ours": REPORT["ours"][:2]}
+    # step4000 and step1000 (23b: step8804, first, left out)
+    rep = {**REPORT, "ours": [o for o in REPORT["ours"] if o["label"] in ("step4000",
+                                                                          "step1000")]}
     s4, s1 = (reports.row_dir(o["row"]) for o in rep["ours"])
     # step4000: every plan L box in but HLE's ninth (8 of 9 held), GPQA scored,
     # SimpleQA's answers whole and waiting for its grader
@@ -353,9 +355,10 @@ def test_the_endpoints_read_and_start_nothing(svc, monkeypatch):
     # 21b: a second; 23: a third, two builds question by question
     assert sorted(got) == ["paired", "ran-out-of-room", "step-checkpoints"]
     sc = got["step-checkpoints"]
-    assert sc["ours"][0] == "step4000" and sc["others"] == 42          # 22: Ornith's card
+    # 23b: step8804 first; 22: Ornith's card
+    assert sc["ours"][:2] == ["step8804", "step4000"] and sc["others"] == 42
     r = svc.get("/api/reports/step-checkpoints").json()
-    assert r["picks"][0] == "step4000" and "Q4, earlier run" not in r["picks"]
+    assert r["picks"][:2] == ["step8804", "step4000"] and "Q4, earlier run" not in r["picks"]
     assert r["sources"]["epoch"]["words"].startswith("imported ")
     assert r["sources"]["epoch"]["credit"] == "Data: Epoch AI, CC BY 4.0"
     assert svc.get("/api/reports/nothing").status_code == 404

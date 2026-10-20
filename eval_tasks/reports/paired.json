@@ -7,8 +7,8 @@
   "from": "step-checkpoints"
  },
  "default": [
-  "step4000",
-  "Q4 (UD-Q4_K_XL)"
+  "step8804",
+  "step4000"
  ],
  "benchmarks": [
   {

@@ -1677,6 +1677,15 @@ def reports_list():
     return {"reports": reports.listing()}
 
 
+@app.get("/api/beyond")
+def beyond_view(model: str):
+    """23b: a row's measures beyond the score — reliability, calibration,
+    SimpleQA's tries and loops — as the stats worker kept them; never
+    computed here"""
+    from . import beyond
+    return beyond.of_row(model)
+
+
 @app.get("/api/reports/{rid}/answer")
 def reports_answer(rid: str, model: str, task: str, id: str, epoch: int = 0):
     """21b: one answer of a ran-out report, opened — its thinking in full, read

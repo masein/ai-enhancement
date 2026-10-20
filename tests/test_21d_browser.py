@@ -24,7 +24,7 @@ pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase21d"
 GOOD, SKEWED = "fx/good-750m", "fx/skewed-360m"
 # our six rows, tested now — 22: Ornith-1.5's isn't run in this world
-LDA = [SPEC[x]["row"] for x in SPEC if x != "Ornith-1.5 Q4_K_M"]
+LDA = [SPEC[x]["row"] for x in SPEC if x not in ("Ornith-1.5 Q4_K_M", "step8804")]  # 23b
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -87,7 +87,9 @@ def test_models_opens_on_latest(live, page, width, scheme):
                                       "ts => ts.map(t => t.textContent.trim())")
     assert heads == ["Model", "GPQA Diamond", "OTIS Mock AIME", "MMLU-Pro", "HLE", "Source"]
     rows = first_text(page, "[data-latest-table] tbody tr")
-    assert sorted(r[0] for r in rows) == sorted([*PICKED, "Ornith-1.5 Q4_K_M", *GLANCE])
+    # 23b: and step8804, not scored yet
+    assert sorted(r[0] for r in rows) == sorted(["step8804", *PICKED, "Ornith-1.5 Q4_K_M",
+                                                 *GLANCE])
     # no rank and no average: a name opens every row, no column is either
     assert not any(re.fullmatch(r"#?\d+", r[0]) for r in rows)
     assert not any(h.lower() in ("#", "rank", "avg", "average") for h in heads)
@@ -96,7 +98,7 @@ def test_models_opens_on_latest(live, page, width, scheme):
     assert g == sorted(g, reverse=True), g
     # our rows bold; each published row says where it is from
     ours = page.locator("[data-latest-ours='true'] td:first-child")
-    assert ours.count() == 6                                  # 22: and Ornith-1.5, measured here
+    assert ours.count() == 7                       # 22: and Ornith-1.5; 23b: and step8804
     assert ours.first.evaluate("e => +getComputedStyle(e).fontWeight") >= 600
     src = {r[0]: r[-1] for r in rows}
     assert src["GPT-6 Astra (max)"] == "Epoch AI"
@@ -225,10 +227,12 @@ def test_the_reports_numbers_say_what_they_are(live, page, width, scheme):
     # the token table: the page's names, each with its definition
     heads = page.eval_on_selector_all("[data-rp-tokens] thead th", "ts => ts.map(t => "
                                       "t.dataset.rpTokCol)")
+    # 23b: and "Ended in a loop", by the board's loop rule
     assert heads == ["Benchmark", "Answers", "Average thinking", "Median thinking", "Output p90",
-                     "Average output, right", "Average output, wrong", "Ran out", "Output total"]
+                     "Average output, right", "Average output, wrong", "Ran out", "Output total",
+                     "Ended in a loop"]
     qs = page.locator("[data-rp-tokens] thead .rp-q")
-    assert qs.count() == 8                                   # every column but Benchmark
+    assert qs.count() == 9                                   # every column but Benchmark
     defs = dict(zip(page.eval_on_selector_all("[data-rp-tok-defs] dt", "d => d.map(x => "
                                               "x.textContent)"),
                     page.eval_on_selector_all("[data-rp-tok-defs] dd", "d => d.map(x => "

@@ -55,6 +55,24 @@ NOTES = [
     "models only.",
     "Reasoning settings: each model is shown at the setting the file names, normally its "
     "highest. gpt-oss-20b is at medium, which scored higher than its high setting.",
+    # 23b: beyond the score, as the brief words them
+    "Always right / never right. GPQA Diamond is asked 4 times a question and OTIS Mock AIME 8 "
+    "times, each time with a different seed. A question the build gets right every time is one "
+    "it knows; one it gets right only sometimes is a coin toss. Two builds with the same score "
+    "can split very differently.",
+    "Calibration error is CAIS's measure for HLE, the one Scale's HLE leaderboard shows: answers "
+    "are sorted by the confidence the model states, cut into groups of 100, and in each group the "
+    "stated confidence is compared with the share actually right. 0 means \"80% sure\" is right "
+    "80% of the time; most models score far above 0 on HLE, because they state high confidence on "
+    "questions they get wrong. The confidence is the one the judge reads from the answer; where "
+    "the answer states none, the judge counts 100%.",
+    "SimpleQA: tries and F. \"Not attempted\" means the model said it didn't know. Right when it "
+    "tries is the share right among the answers it gave. F is the harmonic mean of the two "
+    "scores, the SimpleQA paper's single number. Our prompt asks the model to always guess "
+    "(Epoch AI's line), so most tries are expected.",
+    "Ended in a loop uses the board's rule: the last 200 characters before the end repeat at "
+    "least three times in the last 20,000. Other papers count loops differently, so compare "
+    "these numbers only with each other.",
 ]
 
 
@@ -227,7 +245,7 @@ def our_rows(rep: dict, cells: dict) -> list[dict]:
                          + (" waits" if len(waits) == 1 else " wait") + " for grading")
         have = sum(1 for x in per.values() if x["state"] == "score")
         if not parts:
-            parts.append("Complete" if have == len(per) else "Not run yet" if not have
+            parts.append("Complete" if have == len(per) else "Not scored yet" if not have
                          else f"{have} of {len(per)} benchmarks in")
         out.append({"id": "ours:" + o["label"], "label": o["label"], "row": mid, "ours": True,
                     "colour": o.get("colour"), "pick": bool(o.get("pick")),
@@ -643,9 +661,13 @@ def token_line(rep: dict, rows: list[dict], stats: dict) -> str:
     """"step4000 thinks X× as long as Q4 on GPQA Diamond and Y× on MMLU-Pro;
     over the N benchmarks both finished, it wrote A million output tokens to
     Q4's B million." — '' until both have numbers"""
-    first = rows[0] if rows else None
     ref = next((r for r in rows if r["label"] == rep.get("reference")), None)
-    if not first or not ref or first is ref:
+    # 23b: the first row with thinking stats on both — step8804, first, once
+    # it has them; step4000 until then
+    first = next((r for r in rows if r is not ref and all(
+        ((stats.get(r["label"]) or {}).get(t) or {}).get("think_mean")
+        for t in ("gpqa_diamond_epoch", "mmlupro_tiger"))), None)
+    if not first or not ref:
         return ""
     names = {b["task"]: b["label"] for b in rep["benchmarks"]}
 
@@ -856,6 +878,9 @@ def jobs(rid: str, rep: dict) -> list:
     if (rep.get("loops") or {}).get("examples") and any(_loop_files(rep)[1:]):
         out.append(rs.Job("loops|" + rid, _loops_key(rep), f"loop examples, {rid}",
                           lambda: loops_of(rep)))
+    # 23b: and its rows' measures beyond the score
+    from . import beyond
+    out += beyond.jobs([row_dir(o["row"]) for o in rep["ours"]])
     return out
 
 
@@ -979,11 +1004,29 @@ def report(rid: str, payload: dict | None = None, compute: bool = False, a: str 
         "reference": rep.get("reference"),
         # 21b: where a model's ran-out answers are listed, report by report
         "ranOut": ran_out_links(),
+        # 23b: beyond the score — each of our rows' measures as kept
+        "beyond": beyond_of(rows, rep["benchmarks"], compute),
         # 23: the report comparing two of these rows question by question
         "paired": next((x for x, r in files().items() if r.get("kind") == "paired"
                         and (r.get("builds") or {}).get("from") == rid), None),
         # 21c: the page as masein publishes it, served here
         "page": page_url(rid, rep)}
+
+
+def beyond_of(rows: list[dict], benches: list[dict], compute: bool = False) -> dict:
+    """23b: {label: {benchmark key: measures}} as the stats worker kept them
+    (service/beyond.py); worked out now with `compute`"""
+    from . import beyond
+    out: dict = {}
+    for r in rows:
+        d = Path(r["dir"])
+        for b in benches:
+            x = beyond.kept(d, b["task"], compute)
+            if x:
+                out.setdefault(r["label"], {})[b["key"]] = {
+                    k: v for k, v in x.items() if k in ("loops", "reliability", "calibration",
+                                                        "simpleqa", "fresh", "at")}
+    return out
 
 
 def page_defs(rep: dict) -> list[list[str]]:

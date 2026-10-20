@@ -141,6 +141,9 @@ def world(keep_stats: bool = True) -> None:
             # kept as the stats worker keeps them, for the files stored now
             report_stats.keep(reports._tok_slot(d, s["task"]), reports._tok_key(f),
                               {k: v for k, v in s.items() if k not in ("row", "task")})
+            # 23b: and its measures beyond the score, worked out as the worker does
+            from service import beyond
+            beyond.kept(d, s["task"], compute=True)
     # step1000's MATH Level 5: every answer in, not scored yet
     from service import frontier as sf
     m = sf.task_dir(reports.row_dir(SPEC["step1000"]["row"]), "math_l5_epoch")
@@ -213,13 +216,17 @@ def test_every_other_model_equals_the_published_row(svc):
 def test_our_rows_equal_the_published_ones_but_step1000s(svc):
     world()
     got = get(svc, "ours")
-    # 22: Ornith-1.5's rows, after the page was published, last — not run yet
-    assert {r["status"] for r in got if r["model"] == "Ornith-1.5 Q4_K_M"} == {"Not run yet"}
-    got = [r for r in got if r["model"] != "Ornith-1.5 Q4_K_M"]
+    # 22: Ornith-1.5's rows, after the page was published, last — not scored
+    # yet; 23b: step8804's, first, the same
+    late = ("Ornith-1.5 Q4_K_M", "step8804")
+    assert {r["status"] for r in got if r["model"] in late} == {"Not scored yet"}
+    assert got[0]["model"] == "step8804" and got[0]["order"] == 0
+    got = [r for r in got if r["model"] not in late]
     assert [(r["model"], r["bench"]) for r in got] == [(r["model"], r["bench"]) for r in OURS]
     for g, w in zip(got, OURS):
         if w["model"] == "step1000":
             continue
+        w = {**w, "order": w["order"] + 1}          # 23b: one place down, behind step8804
         assert g == w, {k: (g.get(k), v) for k, v in w.items() if g.get(k) != v}
     s1 = {r["bench"]: r for r in got if r["model"] == "step1000"}
     assert s1["gpqa"]["status"] == "Running · 20 of 21 chunks in"
@@ -233,6 +240,8 @@ def test_the_finished_models_token_rows_equal_the_published_ones(svc):
     assert len(want) == 35
     for w in want:
         g = got[(w["model"], w["bench"])]
+        if "order" in w:
+            w = {**w, "order": w["order"] + 1}      # 23b: one place down, behind step8804
         assert g == w, {k: (g.get(k), v) for k, v in w.items() if g.get(k) != v}
     # step1000's MATH Level 5: every answer in, some still to be graded
     assert got[("step1000", "math")]["state"] == "all answers in, waiting for grading"
@@ -314,7 +323,8 @@ def test_the_status_lines(svc):
                    "Q4 (UD-Q4_K_XL)": "Complete · 21 of 21 chunks",
                    "BF16": "Complete · 21 of 21 chunks", "Q2 (UD-Q2_K_XL)": "Complete · 21 of 21 chunks",
                    "Q4, earlier run": "7–8 Oct, Qwen's card settings",
-                   "Ornith-1.5 Q4_K_M": "Not run yet"}                     # 22
+                   "step8804": "Not scored yet",                         # 23b
+                   "Ornith-1.5 Q4_K_M": "Not scored yet"}                     # 22
     # every box in, one benchmark waiting for its grader
     row = {"cells": {"a": {"state": "score"}, "b": {"state": "waits"}}, "chunks": [21, 21],
            "status": ""}
@@ -430,7 +440,8 @@ def test_a_stat_whose_answers_changed_is_shown_with_its_time_until_the_new_one_i
     no_computing(monkeypatch)
     r = svc.get("/api/reports/step-checkpoints").json()
     assert r["tokens"]["BF16"]["gpqa_diamond_epoch"]["think_mean"] == 8370      # the kept one
-    assert r["working"]["todo"] == 1 and not r["working"]["first"]
+    # 23b: its token stats and its measures beyond the score, both from that file
+    assert r["working"]["todo"] == 2 and not r["working"]["first"]
     assert r["statsAt"]["words"].startswith("worked out ")
     assert f.exists()
 

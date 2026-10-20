@@ -39,7 +39,7 @@ def test_latest_shows_ornith_measured_here_and_its_cards_claim_beside_it(live, p
     # ours: not run yet, a dash in every cell, and what it is in its Source
     assert rows[OURS][1:5] == ["—", "—", "—", "—"]
     assert rows[OURS][-1] == ("Measured here, on its card's settings; not the team's model · "
-                              "Not run yet")
+                              "Not scored yet")
     me = page.locator(f"[data-latest-row='{OURS}']")
     assert me.get_attribute("data-latest-ours") == "true"
     assert me.locator(".rp-dot").get_attribute("style") == "background:var(--s6)"
@@ -69,10 +69,11 @@ def test_the_report_lists_it_in_our_runs_and_its_picker(live, page, width):
     page.wait_for_selector(f"[data-rp-row='{OURS}']", timeout=30000)
     row = page.locator(f"[data-rp-row='{OURS}']")
     assert row.locator(".rp-dot").get_attribute("style") == "background:var(--s6)"
-    assert page.locator(f"[data-rp-status='{OURS}']").inner_text() == "Not run yet"
+    assert page.locator(f"[data-rp-status='{OURS}']").inner_text() == "Not scored yet"
     assert "measured here, on its card's settings; not the team's model" in row.inner_text()
     picks = page.eval_on_selector_all("[data-rp-pick]", "bs => bs.map(b => b.textContent)")
-    assert picks == ["step4000", "step1000", "Q4 (UD-Q4_K_XL)", "BF16", "Q2 (UD-Q2_K_XL)", OURS]
+    assert picks == ["step8804", "step4000", "step1000", "Q4 (UD-Q4_K_XL)", "BF16",
+                     "Q2 (UD-Q2_K_XL)", OURS]                          # 23b: step8804 first
     page.locator(f"[data-rp-pick='{OURS}']").click()
     page.wait_for_selector(f"[data-rp-pick='{OURS}'][aria-checked='true']")
     assert page.locator("[data-rp-summary]").inner_text()

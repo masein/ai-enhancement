@@ -30,6 +30,7 @@ GLANCE = ["GPT-6 Astra (max)", "DeepSeek-V4-Pro (max)", "Qwen3.6-35B-A3B, Qwen's
           "Qwen3.5-35B-A3B", "GPT-5 mini (high)", "o4-mini (high)", "gpt-oss-120b (high)",
           "DeepSeek-R1-0528", "Ornith-1.5-35B-A3B, its card"]
 PICKED = ["step4000", "step1000", "Q4 (UD-Q4_K_XL)", "BF16", "Q2 (UD-Q2_K_XL)"]
+STEP8804_ROW = "served/step8804-lda-2610 · thinking"           # 23b: first in the picker
 ORNITH_ROW = "served/Ornith-1.5-35B-A3B-Q4_K_M · thinking"
 
 
@@ -41,8 +42,16 @@ def svc(tmp_path, monkeypatch):
     client.__exit__(None, None, None)
 
 
+# 23b: its ± sentence corrected, as masein asked — the only change to it
+OLD_SE = b"It comes from one run, from the number of questions and the score."
+NEW_SE = (b"It comes from how much the score varies between questions; a question asked "
+          b"several times counts once, at the average of its runs.")
+
+
 def test_the_page_is_the_one_masein_gave():
-    assert hashlib.sha256(PAGE.read_bytes()).hexdigest() == PAGE_SHA256
+    raw = PAGE.read_bytes()
+    assert raw.count(NEW_SE) == 1 and OLD_SE not in raw
+    assert hashlib.sha256(raw.replace(NEW_SE, OLD_SE)).hexdigest() == PAGE_SHA256
     text = PAGE.read_text(encoding="utf-8")
     for h in ("Average thinking", "Median thinking", "Output p90", "Average output, right",
               "Average output, wrong", "Ran out", "Output total"):
@@ -85,12 +94,13 @@ def test_latest_reads_the_report_alone(svc):
     assert got["glance"] == {"benchmarks": ["gpqa", "otis", "mmlupro", "hle"]}
     assert sorted(t["label"] for t in got["theirs"] if t["glance"]) == sorted(GLANCE)
     # 22: Ornith-1.5 picked and on Latest too, last
-    assert [r["label"] for r in got["ours"] if r["pick"]] == [*PICKED, "Ornith-1.5 Q4_K_M"]
-    assert [r["label"] for r in got["ours"] if r["glance"]] == [*PICKED, "Ornith-1.5 Q4_K_M"]
+    want = ["step8804", *PICKED, "Ornith-1.5 Q4_K_M"]
+    assert [r["label"] for r in got["ours"] if r["pick"]] == want
+    assert [r["label"] for r in got["ours"] if r["glance"]] == want
     from service import app
     meta = app.results_payload()["glance"]
     assert meta == {"report": "step-checkpoints", "title": REPORT["title"],
-                    "rows": [*(SPEC[x]["row"] for x in PICKED), ORNITH_ROW],
+                    "rows": [STEP8804_ROW, *(SPEC[x]["row"] for x in PICKED), ORNITH_ROW],
                     "tasks": ["gpqa_diamond_epoch", "otis_aime_epoch", "mmlupro_tiger",
                               "hle_text_cais"]}
 

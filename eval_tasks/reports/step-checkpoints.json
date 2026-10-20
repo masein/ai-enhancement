@@ -16,6 +16,13 @@
  "what": "Where the team's step checkpoints (and the Q4, BF16 and Q2 baselines, all on the lda runtime) stand against popular models on the benchmarks those models report — and Ornith-1.5-35B-A3B, a model measured here on its own card's settings, beside them.",
  "ours": [
   {
+   "label": "step8804",
+   "row": "served/step8804-lda-2610 · thinking",
+   "colour": 6,
+   "pick": true,
+   "glance": true
+  },
+  {
    "label": "step4000",
    "row": "served/step4000-lda-2610 · thinking",
    "colour": 0,

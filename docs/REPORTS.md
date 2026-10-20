@@ -98,7 +98,10 @@ other models.
   many questions and how many times each is asked: GPQA Diamond 198 × 4, OTIS
   Mock AIME 45 × 8, ARC-AGI-2 167 tasks × 2, the rest once.
 - **±** is its standard error: how far the score could move with a different
-  draw of questions of the same kind.
+  draw of questions of the same kind. It comes from how much the score varies
+  between questions; a question asked several times counts once, at the
+  average of its runs (23b: the published page and the board say so, where
+  they said "from one run").
 - **The token columns** are named as the published page names them, and their
   definitions are the page's own words, read from its file.
 - **The thinking tokens** are counted exactly as `~/tokens.py` counts them
@@ -245,6 +248,43 @@ these question by question ▸", its first two picks).
   quoting it are withheld. No Epoch, card or Artificial Analysis number.
 
 After a deploy, the pairs are worked out once by the worker:
+
+```bash
+cd ~/benchmarks/aienh && time sudo docker compose exec -T bench python -m service.report_stats --again
+```
+
+## Beyond the score (23b)
+
+Four measures from the answers and grades the board keeps, worked out by the
+stats worker for every row with scored Frontier answers (`service/beyond.py`)
+and kept in `stats.json`; totals over both halves, no question listed.
+
+- **Reliability** (GPQA Diamond ×4, OTIS Mock AIME ×8): the share of
+  questions right every time, never, and sometimes. A question with a run not
+  graded yet is left out and counted.
+- **Calibration** (HLE): CAIS's calibration error, ported from
+  `hle_eval/run_judge_results.py` at `a59048963171` with its quirks (bins of
+  100 answers sorted by the judge's confidence; the last bin never counted, so
+  100 to 199 answers give 0; fewer than 100 give none), over the graded
+  answers with a confidence; answers that ran out have no grade and are
+  counted. Answers sharing a confidence keep question order, where numpy's
+  sort gives an order of its own. Ten bins of stated confidence for the
+  chart, the mean stated confidence beside the share right, and how many
+  replies stated none (the judge counts those as 100%).
+- **SimpleQA Verified:** right, wrong, not attempted and ran out; tries
+  ((A + B) of all), right when it tries (A of A + B), and F, the SimpleQA
+  paper's harmonic mean of the two. The board's score (A of all) doesn't
+  change. Our prompt carries Epoch AI's "guessing game" line, so tries are high
+  by design.
+- **Loops:** the share of answers ending in a loop by the board's rule
+  (`fb.ends_in_loop`), of all and of those that ran out of room.
+
+They show on a model page's Scores tab ("Beyond the score", closed unless
+opened, its header the HLE calibration error), and on the step-checkpoints
+report: a section after "Scores by benchmark", a column "Ended in a loop" in
+"Thinking tokens" and its chart "Score against thinking".
+
+After a deploy, the worker works them out once:
 
 ```bash
 cd ~/benchmarks/aienh && time sudo docker compose exec -T bench python -m service.report_stats --again
