@@ -452,6 +452,13 @@ def spent(d: Path) -> dict:
             "together_n": statistics.mode(ns) if ns else None, "benches": benches}
 
 
+def report_label(mid: str) -> str | None:
+    """a row's name in a report ("step8804"), for a sentence"""
+    from . import reports
+    return next((o.get("label") for r in reports.files().values()
+                 for o in r.get("ours") or [] if o.get("row") == mid and o.get("label")), None)
+
+
 def speed_of(mid: str, kept_benches: dict) -> dict | None:
     """23c: a row's "Speed and energy": its Frontier benchmarks' speeds (kept
     by the worker) with its boxes' card checks, energy and dollars — or a
@@ -465,12 +472,8 @@ def speed_of(mid: str, kept_benches: dict) -> dict | None:
         if b:
             benches[t] = b
     if benches or sp.get("boxes"):
-        # its name in a report ("step8804"), for the sentence
-        label = next((o.get("label") for r in reports.files().values()
-                      for o in r.get("ours") or [] if o.get("row") == mid and o.get("label")),
-                     None)
         return {"source": "frontier", **{k: v for k, v in sp.items() if k != "benches"},
-                "benches": benches, "label": label}
+                "benches": benches, "label": report_label(mid)}
     dm = dm_kept(d)
     if dm:
         return {"source": "devicemark", "protocol": DM_PROTOCOL, "benches": dm,
@@ -512,10 +515,14 @@ def of_row(mid: str, compute: bool = False) -> dict:
     has = [t for t in fb.TASKS if reports.samples_file(d, t) is not None]
     if compute:
         dm_kept(d, compute=True)
-    js = jobs([d]) + dm_jobs([d])
+    from . import thinks
+    js = jobs([d]) + dm_jobs([d]) + thinks.jobs([d])
     return {"model": mid, "benches": got, "has": has,
             "labels": {t: fb.BENCH[t]["label"] for t in fb.TASKS},
             # 23c: its speed and energy
             "speed": speed_of(mid, got),
+            # 23d: how it thinks, and its name in a report for the sentence
+            "thinks": thinks.of_row(d, compute), "secondWords": list(thinks.SECOND),
+            "label": report_label(mid),
             "working": {} if compute or not js else rs.working(js),
             "statsAt": reports.stats_at(ats)}

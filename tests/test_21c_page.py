@@ -141,9 +141,12 @@ def world(keep_stats: bool = True) -> None:
             # kept as the stats worker keeps them, for the files stored now
             report_stats.keep(reports._tok_slot(d, s["task"]), reports._tok_key(f),
                               {k: v for k, v in s.items() if k not in ("row", "task")})
-            # 23b: and its measures beyond the score, worked out as the worker does
-            from service import beyond
+            # 23b: and its measures beyond the score, worked out as the worker does —
+            # 23d: and how it thinks
+            from service import beyond, thinks
             beyond.kept(d, s["task"], compute=True)
+            if s["task"] in thinks.TASKS:
+                thinks.kept(d, s["task"], compute=True)
     # step1000's MATH Level 5: every answer in, not scored yet
     from service import frontier as sf
     m = sf.task_dir(reports.row_dir(SPEC["step1000"]["row"]), "math_l5_epoch")
@@ -440,8 +443,9 @@ def test_a_stat_whose_answers_changed_is_shown_with_its_time_until_the_new_one_i
     no_computing(monkeypatch)
     r = svc.get("/api/reports/step-checkpoints").json()
     assert r["tokens"]["BF16"]["gpqa_diamond_epoch"]["think_mean"] == 8370      # the kept one
-    # 23b: its token stats and its measures beyond the score, both from that file
-    assert r["working"]["todo"] == 2 and not r["working"]["first"]
+    # 23b: its token stats and its measures beyond the score, both from that file —
+    # 23d: and how it thinks
+    assert r["working"]["todo"] == 3 and not r["working"]["first"]
     assert r["statsAt"]["words"].startswith("worked out ")
     assert f.exists()
 

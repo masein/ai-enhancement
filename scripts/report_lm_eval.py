@@ -5590,6 +5590,27 @@ table.rp tr.rp-group td { background:var(--plane); font-weight:600; text-align:l
 /* 23c: speed and energy — the card's table as wide as it needs, a label wrapping
    where the column is narrow (it was cut short at 400 px) */
 .by-sub { margin:var(--sp-3) 0 2px; font-size:var(--fs-1); font-weight:600; }
+/* 23d: how it thinks — a bar a build, before and after it first stated the answer */
+.th-part { margin-top:var(--sp-4); }
+.th-part h3 { margin:0 0 var(--sp-1); }
+table.rp[data-th-table] thead th, table.rp[data-th-model] thead th { white-space:normal;
+  vertical-align:bottom; min-width:5.5rem; }
+table.rp[data-th-table] thead th:first-child, table.rp[data-th-model] thead th:first-child { min-width:0; }
+.th-chart { margin:var(--sp-3) 0 var(--sp-1); display:grid; gap:6px; max-width:760px; }
+.th-key { display:flex; flex-wrap:wrap; gap:2px 14px; color:var(--text-secondary); }
+.th-sw { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px;
+  vertical-align:-1px; }
+.th-row { display:grid; grid-template-columns:minmax(0, 10rem) minmax(0, 1fr) auto; gap:8px;
+  align-items:center; }
+.th-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.th-track { display:flex; height:16px; min-width:0; }
+.th-track span { display:block; height:100%; }
+.th-before { background:color-mix(in srgb, var(--accent) 40%, transparent); }
+.th-after { background:var(--accent); }
+.th-lab { color:var(--text-secondary); white-space:nowrap; font-variant-numeric:tabular-nums; }
+@media (max-width:600px) {
+  .th-row { grid-template-columns:minmax(0, 1fr); gap:2px; margin-bottom:4px; }
+  .th-lab { white-space:normal; } }
 .by-part table.rp[data-by-card] { min-width:0; width:auto; }
 .by-part table.rp[data-by-card] td.num { min-width:5.5rem; }
 /* 23c: ten columns — their headers wrap, as the token table's do, so the last two show */
@@ -27816,7 +27837,9 @@ function vReport(id) {
     (d.tokenDefs || []).length ? el('dl', { class: 'rp-defs', 'data-rp-tok-defs': '1' },
       d.tokenDefs.flatMap(([dt, dd]) => [el('dt', { text: dt }), el('dd', { text: dd })])) : '',
     // 23b: the score against how much each build thinks
-    rpThinkChart(d, benches.filter(b => b.compare)));
+    rpThinkChart(d, benches.filter(b => b.compare)),
+    // 23d: how it thinks — when it first had the answer, and what it did next
+    rpThinks(d, id));
   // 5. loop examples
   const L = d.loops;
   const loops = el('div', { class: 'card', 'data-report-section': 'loops' },
@@ -28542,6 +28565,9 @@ function byBlock(m) {
           + `${rpN(v.loops.answers)})` }),
         el('td', { class: 'num', text: v.loops.ran_out ? `${byPct(v.loops.share_of_ran_out, 1)} `
           + `(${rpN(v.loops.ran_out_looped)} of ${rpN(v.loops.ran_out)})` : '—' }))))))));
+  // 23d: how it thinks
+  const th = TH_TASKS.filter(t => thCounted((d.thinks || {})[t]));
+  if (th.length) parts.push(part('thinks', 'How it thinks', ...byThinks(d, m, th, lab)));
   // 23c: speed and energy, last
   if (d.speed) parts.push(part('speed', 'Speed and energy', ...bySpeed(d.speed, m, lab)));
   blk.append(...parts, el('p', { class: 'small se', text: (d.statsAt || {}).words
@@ -28640,6 +28666,132 @@ function bySpeed(sp, m, lab) {
           ...(priced ? [el('td', { class: 'num', 'data-by-usd': t,
             text: byUsd(B[t].usd_per_answer) })] : [])))))));
   }
+  return out;
+}
+// ---- 23d: how it thinks ----
+// the four benchmarks first_right reads, GPQA Diamond first
+const TH_TASKS = ['gpqa_diamond_epoch', 'mmlupro_tiger', 'math_l5_epoch', 'otis_aime_epoch'];
+const thPct = v => v == null ? '—' : `${Math.round(100 * v)}%`;
+const thN = v => v == null ? '—' : Math.round(v).toLocaleString('en');
+const thF = v => v == null ? '—' : v.toFixed(1);
+// answers it counted: right, wrong or ran out (not those left out)
+const thCounted = x => !!x && !!(((x.right || {}).n) || ((x.wrong || {}).n) || ((x.ran_out || {}).n));
+// a build's numbers in a sentence, its name given
+function thSays(x) {
+  const r = (x || {}).right || {};
+  return r.pos_median != null ? `${thPct(r.pos_median)} of the way into its thinking and spends `
+    + `${thPct(r.checking)} of a right answer after it` : '';
+}
+function thLost(x) {
+  const w = (x || {}).wrong || {};
+  return w.lost_share != null ? `Of its wrong answers, ${thPct(w.lost_share)} had stated the right `
+    + 'answer first.' : '';
+}
+// a row's cells, a build's or a benchmark's: the table's eight columns after its name
+function thCells(x, words) {
+  const r = x.right || {}, w = x.wrong || {}, o = x.ran_out || {}, s2 = x.second || {};
+  const sec = k => (s2[k] || {}).all_per_1k;
+  const per = k => words.map(wd => `${wd} ${thF(((s2[k] || {}).per_1k || {})[wd])}`).join(', ');
+  const td = (text, title, attr) => el('td', { class: 'num', title, ...(attr || {}), text });
+  return [
+    td(thPct(r.stated_share), r.n ? `${rpN(r.stated)} of ${rpN(r.n)} right answers state it in `
+      + 'the thinking' : 'no right answer that finished'),
+    td(thPct(r.pos_median), 'where the thinking first states it, the median: 0% is its start'),
+    td(thPct(r.checking), 'tokens after it over all its tokens, averaged over the right answers '
+      + 'that state it'),
+    td(thN(r.after_median), r.before_median != null ? `median tokens before it ${thN(r.before_median)}`
+      : ''),
+    td(thPct(w.lost_share), w.n ? `${rpN(w.lost)} of ${rpN(w.n)} wrong answers` : 'no wrong answer '
+      + 'that finished', { 'data-th-lost': '1' }),
+    td(thPct(o.stated_share), o.n ? `${rpN(o.stated)} of ${rpN(o.n)} that ran out` : 'none ran out'),
+    td(`${thF(sec('right'))} / ${thF(sec('wrong'))}`, `right: ${per('right')}; wrong: ${per('wrong')}`
+      + ' — per 1,000 thinking tokens', { 'data-th-second': '1' })];
+}
+const TH_HEAD = ['Right answers stating it in the thinking', 'Median position',
+  'Checking share', 'Median tokens after it', 'Had it, then lost it (of wrong answers)',
+  'Ran out with it already stated', 'Second thoughts per 1,000 tokens, right / wrong'];
+// what was left out, in a line: answers, summed over what is shown
+function thLeft(xs) {
+  const q = xs.reduce((a, x) => a + (x.no_item_answers || 0), 0);
+  const u = xs.reduce((a, x) => a + (x.ungraded || 0), 0);
+  return q || u ? el('p', { class: 'small se', 'data-th-left': '1', text: 'Left out: '
+    + [q ? `${rpN(q)} answer${q === 1 ? '' : 's'} whose question isn’t in this machine’s question `
+      + 'cache' : '', u ? `${rpN(u)} answer${u === 1 ? '' : 's'} not graded yet` : '']
+      .filter(Boolean).join('; ') + '.' }) : '';
+}
+// the right answers' median tokens, before it first stated the answer and
+// after — a bar each, both numbers on it
+function thBars(rows, aria) {
+  const rs = rows.filter(r => r.before != null && r.after != null);
+  if (!rs.length) return '';
+  const max = Math.max(...rs.map(r => r.before + r.after)) || 1;
+  return el('div', { class: 'th-chart', 'data-th-chart': '1', role: 'img', 'aria-label': aria },
+    el('div', { class: 'th-key small' },
+      el('span', {}, el('span', { class: 'th-sw th-before' }), 'before it first stated the answer'),
+      el('span', {}, el('span', { class: 'th-sw th-after' }), 'after')),
+    rs.map(r => el('div', { class: 'th-row', 'data-th-bar': r.name },
+      el('span', { class: 'th-name', title: r.name }, r.colour ? el('span', { class: 'rp-dot',
+        style: `background:${r.colour}` }) : '', r.name),
+      el('div', { class: 'th-track' },
+        el('span', { class: 'th-before', style: `width:${100 * r.before / max}%`,
+          title: `${thN(r.before)} tokens before` }),
+        el('span', { class: 'th-after', style: `width:${100 * r.after / max}%`,
+          title: `${thN(r.after)} tokens after` })),
+      el('span', { class: 'th-lab small', text: `${thN(r.before)} before · ${thN(r.after)} after` }))));
+}
+// the report's part, inside Thinking tokens: its pills, sentence, table and bars
+function rpThinks(d, id) {
+  const R = RPS();
+  R.thinks = R.thinks || {};
+  const benches = TH_TASKS.map(t => d.benchmarks.find(b => b.task === t)).filter(Boolean);
+  if (!benches.length) return '';
+  const sel = benches.find(b => b.key === R.thinks[id]) || benches[0];
+  const T = d.thinks || {}, of = p => (T[p] || {})[sel.key];
+  const ref = d.reference, refShort = String(ref || '').split(' (')[0];
+  const first = d.picks.find(p => p !== ref && thSays(of(p)));
+  const say = first ? `On ${sel.label}, ${first} first states the right answer ${thSays(of(first))}`
+    + (ref && thSays(of(ref)) ? `; ${refShort}: ${thPct(of(ref).right.pos_median)} and `
+      + `${thPct(of(ref).right.checking)}` : '') + '. ' + thLost(of(first)) : '';
+  const rows = d.picks.map(p => ({ p, m: d.ours.find(x => x.label === p) || {}, x: of(p) }));
+  const have = rows.filter(r => thCounted(r.x));
+  return el('div', { class: 'th-part', 'data-th-part': '1' },
+    el('h3', { text: 'How it thinks' }),
+    el('p', { class: 'small se', text: 'When each build first states the right answer in its '
+      + 'thinking, how much it writes after that, and how often it had the right answer and then '
+      + 'gave a wrong one. Second thoughts counts ' + (d.secondWords || []).map(w => `“${w}”`)
+        .join(', ') + ' at the start of a sentence. The notes below say more.' }),
+    el('div', { class: 'rp-picker', role: 'radiogroup', 'aria-label': 'benchmark',
+        'data-th-pills': '1' },
+      benches.map(b => el('button', { class: 'chip-btn' + (b === sel ? ' on' : ''), role: 'radio',
+        'aria-checked': String(b === sel), 'data-th-bench': b.key, text: b.label,
+        onclick: () => { R.thinks[id] = b.key; render(); } }))),
+    say ? el('p', { class: 'rp-line', 'data-th-sentence': '1', text: say }) : '',
+    have.length ? el('div', { class: 'rp-scroll' }, el('table', { class: 'rp', 'data-th-table': sel.key },
+      el('thead', {}, el('tr', {}, el('th', { text: 'Build' }), ...TH_HEAD.map(h => el('th', { text: h })))),
+      el('tbody', {}, have.map(r => el('tr', { 'data-th-row': r.p },
+        el('td', { class: 'rp-ours' }, el('span', { class: 'rp-dot', style: `background:${rpColour(r.m)}` }), r.p),
+        ...thCells(r.x, d.secondWords || [])))))) : el('p', { class: 'small se',
+      text: `No ${sel.label} answers worked out yet.` }),
+    thLeft(rows.filter(r => r.x).map(r => r.x)),
+    thBars(have.map(r => ({ name: r.p, colour: rpColour(r.m), before: r.x.right.before_median,
+      after: r.x.right.after_median })), `${sel.label}: right answers’ median tokens before and `
+      + 'after they first stated the answer'));
+}
+// the model page's part: its sentence, a line a benchmark, its bars
+function byThinks(d, m, ts, lab) {
+  const T = d.thinks, who = d.label || m.name || m.id;
+  const t0 = ts.find(t => thSays(T[t]));
+  const out = [];
+  if (t0) out.push(el('p', { class: 'small', 'data-th-sentence': '1', text: `On ${lab(t0)}, ${who} `
+    + `first states the right answer ${thSays(T[t0])}. ${thLost(T[t0])}`.trim() }));
+  out.push(el('div', { class: 'rp-scroll' }, el('table', { class: 'rp', 'data-th-model': '1' },
+      el('thead', {}, el('tr', {}, el('th', { text: 'Benchmark' }), ...TH_HEAD.map(h => el('th', { text: h })))),
+      el('tbody', {}, ts.map(t => el('tr', { 'data-th-row': t }, el('td', { text: lab(t) }),
+        ...thCells(T[t], d.secondWords || [])))))),
+    thLeft(ts.map(t => T[t])),
+    thBars(ts.map(t => ({ name: lab(t), before: (T[t].right || {}).before_median,
+      after: (T[t].right || {}).after_median })), 'right answers’ median tokens before and after '
+      + 'they first stated the answer, a benchmark each'));
   return out;
 }
 // the report's section: one row per picked build, each cell's sentence on hover

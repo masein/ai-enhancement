@@ -76,6 +76,22 @@ NOTES = [
     "Ended in a loop uses the board's rule: the last 200 characters before the end repeat at "
     "least three times in the last 20,000. Other papers count loops differently, so compare "
     "these numbers only with each other.",
+    # 23d: how it thinks, as the brief words them
+    "First states the right answer means the first place the thinking says it clearly: \"the "
+    "answer is (B)\", the right option's letter with its text, or the exact final answer on MATH "
+    "Level 5 and OTIS — the rule the ran-out report uses. A model that only weighs an option "
+    "(\"maybe (B)?\") doesn't count; one that states it and then checks it does. Not read on "
+    "HLE, SimpleQA and ARC-AGI-2.",
+    "Checking share is how much of a right answer comes after the model first stated it: "
+    "re-checking, or second-guessing. Some checking is good; a lot of it is what makes answers "
+    "long and sometimes run out of room (Chen et al. 2024, \"Do NOT Think That Much for "
+    "2+3=?\").",
+    "Had it, then lost it is the share of wrong answers whose thinking had stated the right "
+    "answer before giving a wrong one. A high number means the model can find the answer but "
+    "doesn't trust it (Wang et al. 2025, \"Thoughts Are All Over the Place\").",
+    "Second thoughts counts \"Wait\", \"Alternatively\", \"Hmm\" and \"Actually\" at the "
+    "start of a sentence, per 1,000 thinking tokens. It's a rough sign of how often the model "
+    "changes course, not a measure of quality.",
 ]
 
 
@@ -881,9 +897,10 @@ def jobs(rid: str, rep: dict) -> list:
     if (rep.get("loops") or {}).get("examples") and any(_loop_files(rep)[1:]):
         out.append(rs.Job("loops|" + rid, _loops_key(rep), f"loop examples, {rid}",
                           lambda: loops_of(rep)))
-    # 23b: and its rows' measures beyond the score
-    from . import beyond
+    # 23b: and its rows' measures beyond the score; 23d: and how each thinks
+    from . import beyond, thinks
     out += beyond.jobs([row_dir(o["row"]) for o in rep["ours"]])
+    out += thinks.jobs([row_dir(o["row"]) for o in rep["ours"]])
     return out
 
 
@@ -1012,6 +1029,8 @@ def report(rid: str, payload: dict | None = None, compute: bool = False, a: str 
         # 23c: and each one's card speed alone and GPQA Diamond's energy an
         # answer, from its imports' card checks (the next run on)
         "speed": speed_cols(rows),
+        # 23d: how each thinks, the four benchmarks first_right reads
+        "thinks": thinks_of(rows, rep["benchmarks"], compute), "secondWords": _second(),
         # 23: the report comparing two of these rows question by question
         "paired": next((x for x, r in files().items() if r.get("kind") == "paired"
                         and (r.get("builds") or {}).get("from") == rid), None),
@@ -1033,6 +1052,25 @@ def beyond_of(rows: list[dict], benches: list[dict], compute: bool = False) -> d
                     k: v for k, v in x.items() if k in ("loops", "reliability", "calibration",
                                                         "simpleqa", "fresh", "at")}
     return out
+
+
+def thinks_of(rows: list[dict], benches: list[dict], compute: bool = False) -> dict:
+    """23d: {label: {benchmark key: measures}} as the stats worker kept them
+    (service/thinks.py); worked out now with `compute`"""
+    from . import thinks
+    out: dict = {}
+    for r in rows:
+        for b in benches:
+            if b["task"] in thinks.TASKS:
+                x = thinks.kept(Path(r["dir"]), b["task"], compute)
+                if x:
+                    out.setdefault(r["label"], {})[b["key"]] = x
+    return out
+
+
+def _second() -> list[str]:
+    from . import thinks
+    return list(thinks.SECOND)
 
 
 def speed_cols(rows: list[dict]) -> dict:
