@@ -36,6 +36,15 @@ bundle made again changes nothing. A bundle of a model with no --sha (G6's
 calibration, its first import registering it) is fetched and left for you
 to import by hand. A box's address is printed here only, never kept.
 
+23c: a step's card check on its line once the box has made it ("card: 142
+tok/s alone, 610 at 8 · 340 W limit · PCIe 5 ×16"), and while it asks its
+card's mean power and use ("312 W · 96% busy"); after each round, a box whose
+card is slow among its build's — 20% or more below the others' median speed
+(three others at least), its PCIe link below its maximum, its power limit
+under its default, or under 60% busy for a quarter of an hour — is flagged,
+with the hours replacing it would save, here and on the board's list. The
+fetch never stops or replaces a box itself.
+
 Python's standard library only: it runs on the server, outside the image.
 """
 
@@ -54,6 +63,9 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
+if str(HERE) not in sys.path:
+    sys.path.insert(0, str(HERE))
+import card_check as cc  # noqa: E402 — the standard library only, as this script
 IMPORT = ["sudo", "docker", "compose", "exec", "-T", "bench", "python",
           "scripts/import_remote.py"]
 # 17j: an import refused for an off run's thinking share — the board's words,
@@ -265,8 +277,12 @@ def progress_words(p: dict) -> str:
     what = ("the parity questions" if p.get("parity") is True else
             ", ".join(tasks) + f" · thinking {p.get('thinking')}")
     state = str(p.get("state") or "?")
+    # 23c: its card, once checked, and while it asks the card's power and use
+    card = cc.words(p.get("card")) if isinstance(p.get("card"), dict) else ""
+    use = cc.use_words(p.get("use")) if state == "asking" else ""
     return (f"{p.get('label') or '?'} {Path(str(p.get('dir'))).name} · {what} · {state}"
             + (f" · {p['line']}" if p.get("line") and state == "asking" else "")
+            + (f" · {use}" if use else "") + (f" · {card}" if card else "")
             + (f" · {p['why']}" if p.get("why") and state == "stopped" else "")
             + f" · started {p.get('started_at') or '?'}"
             + (f" · {restarts} restart{'s' if restarts != 1 else ''}" if restarts else "")
@@ -578,7 +594,14 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
               "safe": safe, "box_id": bid,
               # 18c point 22: a refused import, said on Runs ("not imported yet" it read)
               **({"import_refused": why_refused[str(p.get("dir"))]}
-                 if str(p.get("dir")) in why_refused else {})} for p in progress]
+                 if str(p.get("dir")) in why_refused else {}),
+              # 23c: its card check and its card's use, in words; and what the
+              # slow-card flag reads, kept here (never sent to the board)
+              **({"card": cc.words(p["card"])} if isinstance(p.get("card"), dict)
+                 and cc.words(p["card"]) else {}),
+              **({"use": cc.use_words(p.get("use"))} if p.get("state") == "asking"
+                 and cc.use_words(p.get("use")) else {}),
+              "_p": p} for p in progress]
     return safe, failed, lines, steps, True
 
 
@@ -611,6 +634,81 @@ def imported_here(a: argparse.Namespace, model: str, spec: tuple) -> bool:
         (held.get("shards") or {}).get(t) or [])) for t in tasks)
 
 
+_PACE = re.compile(r"^(?P<label>.+?) (?P<n>\d[\d,]*) of (?P<of>\d[\d,]*) · "
+                   r"(?P<each>\d+(?:\.\d+)?) s an answer")
+
+
+def step_of(p: dict) -> list[dict]:
+    """23c: a step's benchmarks as the slow-card flag reads them — each one's
+    answers (its line's count for the one asked now, else the plan's over the
+    shard's parts), what the box has answered of it and its own seconds an
+    answer, from its line; and the plan's pace, for a benchmark no other box
+    asks now"""
+    import frontier_box as fbx
+    fb = fbx.fb
+    tasks = [t for t in fb.TASKS if t in set(p.get("tasks") or [])]
+    m = _PACE.match(str(p.get("line") or "")) if p.get("state") == "asking" else None
+    now = next((t for t in tasks if m and fb.BENCH[t]["label"] == m["label"]), None)
+    if now is None and tasks:
+        now = tasks[0]                      # loading, or before its first answer: the first
+    sh = re.fullmatch(r"(\d+)/(\d+)", str(p.get("shard") or ""))
+    parts = int(sh[2]) if sh and int(sh[2]) > 0 else 1
+    th = "on" if p.get("thinking") == "on" else "off"
+    out, seen = [], False
+    for t in tasks:
+        answers = round(fbx.ANSWERS[t] / parts)
+        st = "now" if t == now else "next" if seen else "done"
+        seen |= t == now
+        mine = m if t == now and m else None
+        step = (th, (t,), str(p.get("shard") or ""), 8)
+        try:
+            plan = fbx.hours(step) * 3600 / answers if answers else None
+        except (SystemExit, ValueError, KeyError, ZeroDivisionError):
+            plan = None
+        out.append({"task": t, "label": fb.BENCH[t]["label"], "state": st,
+                    "answers": int(mine["of"].replace(",", "")) if mine else answers,
+                    "n": int(mine["n"].replace(",", "")) if mine else 0,
+                    "pace": float(mine["each"]) if mine else None, "plan_pace": plan})
+    return out
+
+
+def slow_cards(steps: list[dict]) -> list[str]:
+    """23c: the boxes whose card is slow among their build's, flagged on their
+    steps (for the board's list) and in a line each here — a box once, by the
+    step it asks now (else its newest), compared with its build's other
+    boxes. Nothing is stopped or replaced"""
+    boxes: dict = {}
+    for x in steps:
+        x.pop("slow", None)                 # a box unreached since keeps no old flag
+        x.pop("slow_why", None)
+        p = x.get("_p") if isinstance(x.get("_p"), dict) else None
+        if not p or not p.get("model") or x.get("state") == "abandoned":
+            continue
+        k = (p["model"], x.get("box_id") or "", str(x.get("label") or ""))
+        asking = p.get("state") in ("asking", "starting") and x.get("reachable", True)
+        was = boxes.get(k)
+        if was is None or (asking, _int(p.get("at"))) > (was["asking"], was["at"]):
+            try:
+                step = step_of(p)
+            except Exception:                           # noqa: BLE001 — that box, unflagged
+                step = []
+            boxes[k] = {"key": f"{x.get('box_id')}|{x.get('step')}", "model": p["model"],
+                        "label": x.get("label"), "check": p.get("card"), "use": p.get("use"),
+                        "asking": asking, "at": _int(p.get("at")), "step": step}
+    try:
+        flags = cc.slow_flags(list(boxes.values()))
+    except Exception as e:                              # noqa: BLE001 — said, never the round's end
+        return [f"the slow-card check couldn't be worked out this round: {e}"]
+    lines = []
+    for x in steps:
+        f = flags.get(f"{x.get('box_id')}|{x.get('step')}")
+        if f:
+            x["slow"], x["slow_why"] = f["words"], f["numbers"]
+            lines.append(f"{x.get('label')} {x.get('step')} ({str(x['_p'].get('model'))}): "
+                         f"{f['words']}")
+    return lines
+
+
 def post_boxes(steps: list[dict], dest: Path, asked: list[str] | None = None,
                reached: list[str] | None = None, every: float = 0) -> str:
     """17f: the boxes' steps to the board, for Runs' "On rented boxes" list —
@@ -623,6 +721,9 @@ def post_boxes(steps: list[dict], dest: Path, asked: list[str] | None = None,
     # 17i: and how often it reads them, so the board says when the next is due
     head = [{"asked": sorted(asked or []), "reached": sorted(reached or []),
              **({"every": every} if every else {})}] if asked is not None else []
+    # 23c: what only the fetch reads (a step's progress, for the slow-card
+    # flag) stays here
+    steps = [{k: v for k, v in x.items() if not k.startswith("_")} for x in steps]
     path.write_text(json.dumps([*head, *steps]), encoding="utf-8")
     code, said = run([*IMPORT, "--boxes", str(path)], cwd=REPO, timeout=IMPORT_S)
     return ("the board's list of rented boxes: " + last(said, "updated") if code == 0 else
@@ -918,6 +1019,10 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"{build}'s parity compare didn't run ({first[:160]}) — asked again "
                           "next round", flush=True)
                     failed_any = True
+        # 23c: a slow card among a build's boxes, a line each — the fetch
+        # never stops or replaces one
+        for line in slow_cards([x for v in known.values() for x in v]):
+            print(line, flush=True)
         if a.board:
             print(post_boxes([x for v in known.values() for x in v], dest,
                              [box_id(f"{b['host']}:{b['port']}", dest) for b in boxes],

@@ -64,6 +64,18 @@ whether every answer that finished came back with its thinking apart
 (reasoning_content) and its answer in the reply — no bundle, and no progress
 file, so the fetch never takes it for a step.
 
+23c: the card, measured (scripts/card_check.py). Once llama-server is up
+and before the step asks anything, the card check: the card as nvidia-smi
+says (its power limit and default, its PCIe link now and at most) and a
+speed probe against this server — prompt and output tokens a second for one
+user at 512 and 16,384 tokens, and for eight at once — in the progress file
+and the bundle's setup. And a sampler beside the server, from its start to
+its end: the card's power, use, memory and throttling every five seconds, to
+the step's gpu.jsonl (in the bundle), its running means in the progress
+file, and the step's watt-hours shared among its benchmarks by the seconds
+their answers took. --price, the box's dollars an hour, kept in the setup:
+the board works out dollars an answer from it, and never without it.
+
 The token is typed, never on the command line (where the shell's history
 would keep it):
 
@@ -98,6 +110,7 @@ for p in (str(REPO), str(HERE)):
     if p not in sys.path:
         sys.path.insert(0, p)
 import frontier as fb  # noqa: E402
+import card_check as cc  # noqa: E402
 import remote_bundle as rb  # noqa: E402
 from remote_run import Out, board_commit  # noqa: E402
 
@@ -108,6 +121,7 @@ STATE = "remote_gguf.json"
 # when it started and its sessions; never the box's address
 PROGRESS = "progress.json"
 OWN_LOG = "remote_gguf.log"
+GPU_FILE = "gpu.jsonl"              # 23c: the sampler's readings, in the bundle
 SERVER_LOG = "llama-server.log"
 # what this script sets itself: given in --flags, refused
 OWN_FLAGS = {"-m", "--model", "--host", "--port", "-c", "--ctx-size", "-np", "--parallel",
@@ -907,16 +921,39 @@ def make_bundle(out: Path, served_as: str, thinking: bool, tasks: list[str], sta
     own = out / OWN_LOG
     log += ("\n===== remote_gguf =====\n" + own.read_text(encoding="utf-8")) if own.exists() else ""
     log += "\n===== llama-server, as it started =====\n" + startup_log(out / SERVER_LOG)
+    # 23c: the card's readings, its checks, and each benchmark's share of the
+    # step's energy and time — by the seconds its answers took (a step asks
+    # its benchmarks one after another); its dollars when a price was given
+    samples = cc.read_samples(out / GPU_FILE)
+    if samples:
+        files[GPU_FILE] = (out / GPU_FILE).read_bytes()
+    use = cc.summarise(samples) if samples else {}
+    price = price_of(state)
+    took = {}
+    for t in tasks:
+        got = sf.read_answers(sf.task_dir(row, t) / sf.ANSWERS).values() if row else []
+        took[t] = (sum(float(r["wall_s"]) for r in got if isinstance(r.get("wall_s"), (int, float))),
+                   sum(1 for _ in got))
+    by = 0 if sum(w for w, _ in took.values()) > 0 else 1     # seconds, else answers
+    whole = sum(x[by] for x in took.values())
     per = {}
     for t in tasks:
         spec = fb.BENCH[t]
         s = sf.settings(rec, t, thinking)
+        share = took[t][by] / whole if whole else None
+        spent = {}
+        if share is not None and use.get("seconds"):
+            spent["server_s"] = round(use["seconds"] * share, 1)
+            if use.get("wh") is not None:
+                spent["energy_wh"] = round(use["wh"] * share, 3)
+            if price is not None:
+                spent["cost_usd"] = round(price * spent["server_s"] / 3600, 4)
         per[t] = {"protocol_version": spec["protocol_version"],
                   "revision": spec["source"]["revision"], "epochs": spec["epochs"],
                   "budget": s["max_tokens"], "family": sf.family_of(rec) or "",
                   "sampling": {k: v for k, v in s.items()
                                if k not in ("max_tokens", "chat_template_kwargs")},
-                  "switch": s.get("chat_template_kwargs"),
+                  "switch": s.get("chat_template_kwargs"), **spent,
                   **(done.get(t) or {}), **({"incomplete": True} if t in incomplete else {})}
     setup = {"suite": SUITE, "protocol": fb.VERSION, "served_as": served_as,
              **({"runtime": rec["runtime"]} if rec.get("runtime") else {}),
@@ -928,7 +965,13 @@ def make_bundle(out: Path, served_as: str, thinking: bool, tasks: list[str], sta
              "box": state.get("label") or None, "image": (board_commit() or "")[:7] or None,
              "shard": {"i": shard[0], "n": shard[1]} if shard else None,
              "started_at": state.get("started_at"),
-             "finished_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+             "finished_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+             # 23c: each session's card check, the card's use over the step,
+             # and the box's price when every session was given the same one
+             **({"card_checks": state["card_checks"]} if state.get("card_checks") else {}),
+             **({"gpu_use": use} if use else {}),
+             **({"price": {"per_hour": price, "by": "the box line (--price)"}}
+                if price is not None else {})}
     files["run.log"] = rb.scrub(log).encode("utf-8")
     files["setup.json"] = rb.scrub(json.dumps(setup, indent=1, sort_keys=True)).encode("utf-8")
     digest = hashlib.sha256(b"".join(files[n] for n in sorted(files)
@@ -945,6 +988,17 @@ def make_bundle(out: Path, served_as: str, thinking: bool, tasks: list[str], sta
     parts = [fb.BENCH[t]["short"] for t in tasks] if len(tasks) < len(fb.TASKS) else None
     path = rb.write(out / rb.bundle_name(SUITE, served_as, thinking, shard, parts), files)
     return path, done, incomplete
+
+
+def price_of(state: dict) -> float | None:
+    """23c: the box's dollars an hour — when every session of the step was
+    given one, and the same one; else none (a cost is never guessed)"""
+    got = state.get("prices") or []
+    vals = {x.get("per_hour") for x in got if isinstance(x, dict)}
+    if not got or len(got) < int(state.get("sessions") or 1) or len(vals) != 1:
+        return None
+    v = next(iter(vals))
+    return float(v) if isinstance(v, (int, float)) and v > 0 else None
 
 
 # ---------------------------------------------------------------------------
@@ -1224,6 +1278,9 @@ def _main(argv: list[str] | None = None) -> int:
                     help="17b: the parity check's --n questions, thinking off and greedy and "
                          "each asked twice, to --out/parity.jsonl — no bundle "
                          "(scripts/frontier_parity.py compare)")
+    ap.add_argument("--price", type=float, default=None,
+                    help="23c: the box's price, dollars an hour — kept in the setup, for the "
+                         "board's dollars an answer (never guessed without it)")
     ap.add_argument("--pilot", action="store_true",
                     help="22: a runtime's pilot — 20 GPQA Diamond and 5 MMLU-Pro questions, "
                          "thinking on, each asked once: a line each (its thinking's length, the "
@@ -1240,6 +1297,8 @@ def _main(argv: list[str] | None = None) -> int:
         ap.error(f"--shard: {e}")
     if a.slots < 1:
         ap.error("--slots: at least 1")
+    if a.price is not None and not (0 < a.price < 1000):
+        ap.error("--price: the box's dollars an hour, e.g. 0.42")
     flags = shlex.split(a.flags)
     if own_flags(flags):
         ap.error(f"--flags: {', '.join(own_flags(flags))} are set by this script")
@@ -1482,6 +1541,9 @@ def _main(argv: list[str] | None = None) -> int:
     state["setup"] = setup
     state.setdefault("slots", []).append({"session": int(state.get("sessions", 0)) + 1,
                                           "slots": a.slots})
+    # 23c: the price this session was given, or none
+    state["prices"] = [*(state.get("prices") or []),
+                       {"session": int(state.get("sessions", 0)) + 1, "per_hour": a.price}]
     server["sessions_slots"] = state["slots"]
     state.update({"served_as": a.served_as, "thinking": thinking, "gguf_sha256": sha,
                   "started_at": state.get("started_at")
@@ -1567,6 +1629,12 @@ def _main(argv: list[str] | None = None) -> int:
     srv_proc = Server(srv, gguf_path, a.port, a.slots, ctx, flags, extra_env, out / SERVER_LOG)
     status = "failed"
     rec = None
+    # 23c: the card's readings from the server's start to its end (a pilot,
+    # no step of a plan, takes none)
+    sampler = None if a.pilot else cc.Sampler(
+        out / GPU_FILE, report=lambda use: progress(out, use=use))
+    if sampler is not None:
+        sampler.start()
     try:
         srv_proc.start(a.load_timeout, say, gguf_path)
         props = srv_proc.props()
@@ -1608,6 +1676,16 @@ def _main(argv: list[str] | None = None) -> int:
                             f"llama.cpp {ver['build'] or '?'} on {gpu.get('name') or 'a GPU'}: "
                             + " ".join(server["argv"]), flags, extra_env, a.runtime,
                             a.slots)
+        if sampler is not None:
+            # 23c: the card check, before the first question — kept with this
+            # session, said in the progress file at once. A failed probe is
+            # said; the step goes on
+            sampler.phase = "check"
+            chk = {**cc.check(srv_proc.base, ctx, a.slots, say), "session": state["sessions"]}
+            state["card_checks"] = [*(state.get("card_checks") or []), chk]
+            sp.write_text(json.dumps(state, indent=1), encoding="utf-8")
+            progress(out, card=chk)
+            sampler.phase = "asking"
         if a.parity:
             from service import frontier as sf
             dest = out / "parity.jsonl"
@@ -1667,6 +1745,8 @@ def _main(argv: list[str] | None = None) -> int:
         finally:
             watch.stop()
             watch.tick()
+            if sampler is not None:
+                sampler.phase = "after"
         row = db.get(sid) or {}
         status = row.get("status") or "failed"
         say(f"the run: {status} · {row.get('progress') or ''}"
@@ -1674,6 +1754,16 @@ def _main(argv: list[str] | None = None) -> int:
                else ""))
     finally:
         srv_proc.stop()
+        if sampler is not None:
+            sampler.stop()
+            if sampler.error:
+                say(f"the card's power and use couldn't be read: {sampler.error}")
+            use = cc.summarise(sampler.samples)
+            if use.get("wh") is not None:
+                say(f"the card while it ran: {use['wh']:.1f} Wh"
+                    + (f" · {cc.use_words(use)} while asking" if cc.use_words(use) else "")
+                    + (f" · peak memory {use['peak_mib']:,} MiB" if use.get("peak_mib") else ""))
+            progress(out, use=cc.running(sampler.samples, time.time()))
     if rec is None:
         progress(out, state="stopped", why="llama-server didn't come up")
         return 1

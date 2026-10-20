@@ -4542,6 +4542,7 @@ td.evdtotal .evd-ranout { display:block; white-space:normal; text-align:right; }
 .rented-prog { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 .rented-prog .runbar { flex:1 1 30px; min-width:30px; max-width:140px; margin:0; }
 .rented-prog [data-rented-open] { padding:0 4px; white-space:nowrap; }   /* 18b: wrapped at 1440 */
+.rented-prog .rented-slow { overflow-wrap:anywhere; cursor:help; }   /* 23c */
 /* 18d point 9: the count, the bar and the finish one group, never split — a
    wider font in CI put the finish 31 px below the bar; on a phone it wraps */
 .rented-main { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
@@ -5586,6 +5587,17 @@ table.rp tr.rp-group td { background:var(--plane); font-weight:600; text-align:l
   minmax(min(100%, 240px), 1fr)); }
 .by-panel h3 { margin:0; font-size:var(--fs-1); }
 .by-think { display:block; width:100%; height:auto; }
+/* 23c: speed and energy — the card's table as wide as it needs, a label wrapping
+   where the column is narrow (it was cut short at 400 px) */
+.by-sub { margin:var(--sp-3) 0 2px; font-size:var(--fs-1); font-weight:600; }
+.by-part table.rp[data-by-card] { min-width:0; width:auto; }
+.by-part table.rp[data-by-card] td.num { min-width:5.5rem; }
+/* 23c: ten columns — their headers wrap, as the token table's do, so the last two show */
+table.rp[data-by-table] thead th { white-space:normal; vertical-align:bottom; min-width:5rem; }
+table.rp[data-by-table] thead th:first-child { min-width:0; }
+.by-part table.rp[data-by-card] td:first-child,
+.by-part table.rp[data-by-speed] td:first-child { white-space:normal; text-overflow:clip; }
+.by-part table.rp[data-by-card] td:first-child { min-width:8rem; }
 /* 23: two builds, question by question */
 .pd-pick { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; margin:var(--sp-2) 0; }
 .pd-pill { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -8722,7 +8734,9 @@ function modelScoresTab(m, kinds) {
   const newest = taken.reduce((a, b) => (b.at || 0) > (a.at || 0) ? b : a).kind;
   const mine = state.mblk[m.id] || {};
   // 23b: beyond the score, after the others, for a row with Frontier answers
-  const beyond = LIVE && frontierTasks().some(t => cell(t, m.id)) ? [byBlock(m)] : [];
+  // — 23c: or a DeviceMark served row, for its speed
+  const beyond = LIVE && (frontierTasks().some(t => cell(t, m.id))
+    || (String(m.id).startsWith('served/') && !!dmRowById(m.id))) ? [byBlock(m)] : [];
   // 12z B1: the GGUF's block is there before its first number: Measure is in it
   return [...kinds.filter(k => k.taken || k.kind === 'gguf').map(k => {
     const open = k.kind in mine ? mine[k.kind] : k.kind === newest;
@@ -20207,8 +20221,10 @@ function rentedRow(x, ncols) {
   const open = many && !!(state.rentedOpen || {})[x.id];
   // 18b: a box's times in words — "this part done Thu 14:25 · box free Thu
   // 18:06" — and its label without the step's id
+  // 23c: its card and its card's use on hover, and a slow card's flag with
+  // its numbers
   const boxLine = b => el('li', { 'data-rented-box': `${b.label}|${b.step}`,
-      'data-box-status': b.status },
+      'data-box-status': b.status, title: [b.card, b.use].filter(Boolean).join(' · ') },
     `${b.label}` + (b.shard ? ` · shard ${b.shard}` : '') + ' · ',
     el('span', { class: ['stopped', 'quiet', 'unreached'].includes(b.status) ? 'warntext' : '',
       text: b.words }),
@@ -20221,7 +20237,10 @@ function rentedRow(x, ncols) {
     (b.notes || []).length ? el('span', { 'data-box-notes': '1',
       text: ' · ' + b.notes.join(' · ') }) : '',
     b.behind && b.heard && b.status !== 'unreached' ? el('span', { class: 'warntext',
-      'data-box-heard': '1', text: ` · no contact for ${rel(b.heard)}` }) : '');
+      'data-box-heard': '1', text: ` · no contact for ${rel(b.heard)}` }) : '',
+    b.slow ? el('span', { class: 'warntext', 'data-box-slow': '1', title: b.slow_why || '',
+      text: ` · ${b.slow}` }) : '');
+  const slow = x.slow || [];
   const odd = x.attention || [];
   return [el('tr', { 'data-rented-run': x.id, 'data-queue-row': x.id },
     el('td', { class: 'num se qc-narrow-off', text: '—',
@@ -20259,6 +20278,12 @@ function rentedRow(x, ncols) {
       odd.length ? el('span', { class: 'warntext', 'data-rented-attention': String(odd.length),
         title: odd.join('\n'), text: odd.length === 1 ? odd[0] : `${odd.length} boxes need a look` })
         : '',
+      // 23c: a slow card the fetch flagged — its numbers on hover; never
+      // stopped or replaced by the board
+      slow.length ? el('span', { class: 'warntext rented-slow', 'data-rented-slow': String(slow.length),
+        title: slow.map(f => `${f.label}: ${f.words}` + (f.numbers ? `\n${f.numbers}` : '')).join('\n\n'),
+        text: slow.length === 1 ? (many ? `${slow[0].label}: ` : '') + slow[0].words
+          : `${slow.length} slow cards: ${slow.map(f => f.label).join(', ')}` }) : '',
       // 18b: one wording, the status's — and not twice
       x.behind && x.heard && !odd.length && x.status !== 'unreached' ? el('span', {
         class: 'warntext', 'data-rented-heard': '1', text: `no contact for ${rel(x.heard)}` })
@@ -28448,7 +28473,9 @@ function byBlock(m) {
   const B = BYS(), d = B.data[m.id];
   if (!d && !B.err[m.id] && netReady()) byLoad(m.id);
   const cal = d && d.benches.hle_text_cais && d.benches.hle_text_cais.calibration;
+  const sh = d && bySpeedHead(d.speed);
   const head = cal && cal.error != null ? `calibration error ${Math.round(cal.error)}`
+    : sh ? sh
     : d ? (Object.keys(d.benches).length ? 'calibration error —' : 'not worked out yet') : '…';
   const mine = state.mblk[m.id] || {}, open = !!mine.beyond;
   const blk = el('details', { class: 'card kblock', 'data-kind-block': 'beyond',
@@ -28468,7 +28495,7 @@ function byBlock(m) {
   const part = (key, title, ...kids) => el('div', { class: 'kpart by-part', 'data-by-part': key },
     el('h3', { text: title }), ...kids);
   const parts = [];
-  if (!Object.keys(bx).length) parts.push(el('p', { class: 'small se', text: d.working && d.working.todo
+  if (!Object.keys(bx).length && !d.speed) parts.push(el('p', { class: 'small se', text: d.working && d.working.todo
     ? 'Being worked out from the stored answers — back in a minute.'
     : 'Not worked out yet.' }));
   const rel = ['gpqa_diamond_epoch', 'otis_aime_epoch'].filter(t => bx[t] && bx[t].reliability);
@@ -28490,7 +28517,11 @@ function byBlock(m) {
         : '') + '. '
       + (c.unstated ? `${rpN(c.unstated)} stated no confidence: the judge counts those as 100%.`
         : 'Every one stated a confidence.') }),
-    c.n ? byCalChart(c) : ''));
+    c.n ? byCalChart(c) : '',
+    // 23c: what CAIS's error leaves out — its last group, the most confident
+    c.n >= 100 ? el('p', { class: 'small se', 'data-by-cal-left': String(byCalLeft(c.n)),
+      text: `the error leaves out the ${rpN(byCalLeft(c.n))} most confident answers, as CAIS’s `
+        + 'does.' }) : ''));
   const s = bx.simpleqa_epoch && bx.simpleqa_epoch.simpleqa;
   if (s) parts.push(part('simpleqa', 'SimpleQA Verified',
     el('p', { class: 'small', 'data-by-sqa': '1', text: bySqaWords(s) }),
@@ -28511,17 +28542,113 @@ function byBlock(m) {
           + `${rpN(v.loops.answers)})` }),
         el('td', { class: 'num', text: v.loops.ran_out ? `${byPct(v.loops.share_of_ran_out, 1)} `
           + `(${rpN(v.loops.ran_out_looped)} of ${rpN(v.loops.ran_out)})` : '—' }))))))));
+  // 23c: speed and energy, last
+  if (d.speed) parts.push(part('speed', 'Speed and energy', ...bySpeed(d.speed, m, lab)));
   blk.append(...parts, el('p', { class: 'small se', text: (d.statsAt || {}).words
     ? `${d.statsAt.words[0].toUpperCase()}${d.statsAt.words.slice(1)}, from the stored answers.`
     : '' }));
   return blk;
 }
+// 23c: CAIS's error counts every group of 100 but the last, which takes the
+// rest: n − 100·(⌊n/100⌋ − 1) answers, the most confident, left out
+const byCalLeft = n => n - 100 * (Math.floor(n / 100) - 1);
+// 23c: speed and energy — numbers as a person reads them
+const byTok = v => v == null ? '—' : v >= 10 ? Math.round(v).toLocaleString('en') : v.toFixed(1);
+const byWh = v => v == null ? '—' : `${v >= 1 ? v.toFixed(1) : v.toFixed(2)} Wh`;
+const byUsd = v => v == null ? '—' : `$${v >= 0.01 ? v.toFixed(3) : v.toFixed(4)}`;
+const bySecs = v => v == null ? '—' : v >= 90 ? `${(v / 60).toFixed(1)} min` : `${v.toFixed(1)} s`;
+const bySecWords = v => v >= 90 ? `${(v / 60).toFixed(1)} minutes` : `${Math.round(v)} seconds`;
+// "an RTX 5090", "an HLE answer", "a GPQA Diamond answer", "a MATH-500 item":
+// an acronym's article as its letters are said, a word's as it is
+const byA = x => (/^MATH\b/.test(x) ? /^[aeiou]/i.test(x)
+  : /^[A-Z0-9][A-Z0-9-]+\b/.test(x) ? /^[AEFHILMNORSX8]/.test(x) : /^[aeiou]/i.test(x)) ? 'an' : 'a';
+const byAn = name => `${byA(name)} ${name}`;
+// a benchmark as a sentence names it
+const BY_SHORT = { hle_text_cais: 'HLE' };
+function bySpeedHead(sp) {
+  if (!sp) return '';
+  const a = ((sp.probe || {}).alone_out || {}).median;
+  if (a != null) return `${byTok(a)} tok/s alone`;
+  const b = Object.values(sp.benches || {}).find(x => x.out_tok_s != null);
+  return b ? `${byTok(b.out_tok_s)} tok/s` : '';
+}
+// the part's sentence, its card's speeds and each benchmark's
+function bySpeed(sp, m, lab) {
+  const dm = sp.source === 'devicemark';
+  const name = (dm ? (sp.labels || {}) : {});
+  const bl = t => name[t] || BY_SHORT[t] || lab(t);
+  const B = sp.benches || {}, P = sp.probe || {};
+  const card = (sp.cards || []).length === 1 ? byAn(sp.cards[0])
+    : (sp.cards || []).length ? `its cards (${sp.cards.join(', ')})` : 'its card';
+  const first = ['hle_text_cais', 'mmlu_pro', ...Object.keys(B)].find(t => B[t] && B[t].wall_median != null);
+  const who = sp.label || m.name || m.id;
+  const alone = (P.alone_out || {}).median, many = (P.together_out || {}).median;
+  let say = '';
+  if (dm) {
+    say = `Under ${sp.protocol}, ` + (first ? `${byAn(bl(first))} item takes `
+      + bySecWords(B[first].wall_median)
+      + (B[first].out_tok_s != null ? ` at ${byTok(B[first].out_tok_s)} tokens a second` : '') : 'no item kept its time') + '.';
+  } else {
+    const parts = [];
+    if (alone != null) parts.push(`On ${card}, ${who} writes ${byTok(alone)} tokens a second for one user`
+      + (many != null ? ` and ${byTok(many)} in all for ${sp.together_n || 8}` : ''));
+    if (first) parts.push(`${parts.length ? '' : `With ${B[first].at_once || 'its'} answers at once, `}`
+      + `${byAn(bl(first))} answer takes `
+      + bySecWords(B[first].wall_median)
+      + (B[first].wh_per_answer != null ? ` and ${byWh(B[first].wh_per_answer)}` : ''));
+    say = parts.length ? parts.join('; ') + '.' : 'Measured from the next run on.';
+    say = say[0].toUpperCase() + say.slice(1);
+  }
+  const out = [el('p', { class: 'small', 'data-by-speed-sentence': '1', text: say })];
+  const rng = x => x ? (x.n > 1 ? `${byTok(x.lo)}–${byTok(x.hi)}` : '—') : '—';
+  const rows = [['Output tok/s alone (512-token prompt)', P.alone_out],
+    ['Prompt tok/s at 512 tokens', P.alone_prompt], ['Prompt tok/s at 16,384 tokens', P.long_prompt],
+    ['Output tok/s at 16,384 tokens', P.long_out],
+    [`Output tok/s in all, ${sp.together_n || 8} at once`, P.together_out]].filter(([, x]) => x);
+  if (!dm && rows.length) out.push(el('h4', { class: 'by-sub', text: `Speed on ${card}` }),
+    el('p', { class: 'small se', text: `Its card check before each step’s first question: the `
+      + `median over ${rpN(sp.boxes)} box${sp.boxes === 1 ? '' : 'es'}, with the range. 256 tokens `
+      + 'out each, from llama-server’s own timings.' }),
+    el('div', { class: 'rp-scroll' }, el('table', { class: 'rp', 'data-by-card': '1' },
+      el('thead', {}, el('tr', {}, ['', 'Median', 'Range'].map(h => el('th', { text: h })))),
+      el('tbody', {}, rows.map(([k, x]) => el('tr', {}, el('td', { text: k }),
+        el('td', { class: 'num', text: byTok(x.median) }), el('td', { class: 'num', text: rng(x) })))))));
+  const ts = Object.keys(B).filter(t => B[t].wall_median != null || B[t].out_tok_s != null
+    || B[t].wh_per_answer != null);
+  if (ts.length) {
+    const priced = ts.some(t => B[t].usd_per_answer != null);
+    const energy = ts.some(t => B[t].wh_per_answer != null);
+    const once = [...new Set(ts.map(t => B[t].at_once).filter(Boolean))];
+    out.push(el('h4', { class: 'by-sub', text: dm ? 'Each benchmark, under DeviceMark’s protocol'
+      : `Each benchmark, with ${once.length === 1 ? once[0] : 'several'} answers at once` }),
+      el('p', { class: 'small se', text: (dm ? 'Seconds an item as the board saw them, and '
+        + 'llama-server’s decode tokens a second.' : 'Seconds an answer as the board saw them, and '
+        + 'output tokens a second from llama-server’s timings — as the answers were asked, '
+        + 'several side by side.') + (energy ? ' Energy: each step’s watt-hours, read from '
+        + 'the card every five seconds, over its answers.' : '') + (priced ? ' Dollars: the '
+        + 'box’s price an hour, as its line gave it, over the time its server ran.' : '') }),
+      el('div', { class: 'rp-scroll' }, el('table', { class: 'rp', 'data-by-speed': '1' },
+        el('thead', {}, el('tr', {}, ['Benchmark', 'Seconds, median', '90th percentile',
+          dm ? 'Decode tok/s' : 'Output tok/s', ...(energy ? ['Energy an answer'] : []),
+          ...(priced ? ['Dollars an answer'] : [])].map(h => el('th', { text: h })))),
+        el('tbody', {}, ts.map(t => el('tr', { 'data-by-speed-row': t },
+          el('td', { text: bl(t) }),
+          el('td', { class: 'num', text: bySecs(B[t].wall_median) }),
+          el('td', { class: 'num', text: bySecs(B[t].wall_p90) }),
+          el('td', { class: 'num', text: byTok(B[t].out_tok_s) }),
+          ...(energy ? [el('td', { class: 'num', 'data-by-wh': t, text: byWh(B[t].wh_per_answer) })] : []),
+          ...(priced ? [el('td', { class: 'num', 'data-by-usd': t,
+            text: byUsd(B[t].usd_per_answer) })] : [])))))));
+  }
+  return out;
+}
 // the report's section: one row per picked build, each cell's sentence on hover
 function rpBeyond(d) {
-  const B = d.beyond || {};
+  const B = d.beyond || {}, SP = d.speed || {};
   const cell = (txt, tip, attr) => el('td', { class: 'num', title: tip, ...attr, text: txt });
+  const NEXT = 'measured from the next run on';
   const rows = d.picks.map(p => {
-    const m = d.ours.find(x => x.label === p) || {}, b = B[p] || {};
+    const m = d.ours.find(x => x.label === p) || {}, b = B[p] || {}, sp = SP[p] || {};
     const g = (b.gpqa || {}).reliability, o = (b.otis || {}).reliability;
     const c = (b.hle || {}).calibration, s = (b.simpleqa || {}).simpleqa;
     return el('tr', { 'data-by-row': p },
@@ -28532,18 +28659,30 @@ function rpBeyond(d) {
       cell(c && c.n ? `${Math.round(c.mean_confidence)}%` : '—', c ? byCalWords(c) : 'not worked out yet'),
       cell(s && s.total ? byPct(s.tries) : '—', s ? bySqaWords(s) : 'not worked out yet'),
       cell(s && s.total ? byPct(s.right_when_tries, 1) : '—', s ? bySqaWords(s) : 'not worked out yet'),
-      cell(s && s.total ? (100 * (s.f || 0)).toFixed(1) : '—', s ? bySqaWords(s) : 'not worked out yet', { 'data-by-cell': `${p}:f` }));
+      cell(s && s.total ? (100 * (s.f || 0)).toFixed(1) : '—', s ? bySqaWords(s) : 'not worked out yet', { 'data-by-cell': `${p}:f` }),
+      // 23c: its card's speed alone and GPQA Diamond's energy an answer
+      cell(sp.alone_out ? byTok(sp.alone_out.median) : '—', sp.alone_out
+        ? `output tokens a second for one user: the median over ${rpN(sp.alone_out.n)} box`
+          + `${sp.alone_out.n === 1 ? '' : 'es'}` + (sp.alone_out.n > 1
+            ? ` (${byTok(sp.alone_out.lo)}–${byTok(sp.alone_out.hi)})` : '') : NEXT,
+        { 'data-by-cell': `${p}:alone` }),
+      cell(sp.gpqa_wh != null ? byWh(sp.gpqa_wh) : '—', sp.gpqa_wh != null
+        ? 'each step’s watt-hours over its GPQA Diamond answers, asked several at once' : NEXT,
+        { 'data-by-cell': `${p}:gpqa-wh` }));
   });
   return el('div', { class: 'card', 'data-report-section': 'beyond' },
     el('h2', { text: 'Beyond the score' }),
     el('p', { class: 'small se', 'data-by-how': '1', text: 'How to read this: how often each '
       + 'build is right every time it is asked; how far its stated confidence on HLE is from the '
       + 'share it gets right (0 is perfect); how often it tries on SimpleQA and how often it is '
-      + 'right when it does. Hover a number for its sentence; the notes below say more.' }),
+      + 'right when it does; how fast its card writes for one user, and the energy a GPQA '
+      + 'Diamond answer takes (from the next run on). Hover a number for its sentence; the notes '
+      + 'below say more.' }),
     el('div', { class: 'rp-scroll' }, el('table', { class: 'rp', 'data-by-table': '1' },
       el('thead', {}, el('tr', {}, ['Build', 'GPQA always right', 'OTIS always right',
         'HLE calibration error', 'HLE mean stated confidence', 'SimpleQA tries',
-        'SimpleQA right when it tries', 'SimpleQA F'].map(h => el('th', { text: h })))),
+        'SimpleQA right when it tries', 'SimpleQA F', 'Output tok/s alone',
+        'GPQA Diamond energy an answer'].map(h => el('th', { text: h })))),
       el('tbody', {}, rows))));
 }
 // "Score against thinking": a small panel a benchmark — x its mean thinking

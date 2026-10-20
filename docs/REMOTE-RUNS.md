@@ -1416,6 +1416,57 @@ refuses a bundle asked another way. A pilot on the first box
 before the other 20 are rented. The tarball, the pilot, the 21 box lines,
 the fetch and the first import: docs/ORNITH-RUN.md.
 
+# The card, measured: speed, power and a slow card (23c)
+
+From the runner image after 23c, every step checks its card before its
+first question, and reads it while it answers (`scripts/card_check.py`):
+
+- **The card check**, once llama-server is up: the card as nvidia-smi says
+  (its power limit and default, its PCIe link now and at most — read under
+  load, as a card at rest lowers it) and a speed probe against the step's
+  own server: a 512-token prompt alone three times (the median), a
+  16,384-token prompt alone once, and eight 512-token prompts at once, 256
+  tokens out each, from llama-server's own timings — thirteen requests and a
+  warm-up, no benchmark question. The box prints it as a line —
+  `card: 142 tok/s alone, 610 at 8 · 575 W limit · PCIe 5 ×16` — and keeps it
+  in the step's progress file and its bundle. A probe that fails says why and
+  the step goes on.
+- **The sampler**, from the server's start to its end: power, use, memory,
+  clock, heat and throttle reasons every five seconds, to the step's
+  `gpu.jsonl` (in the bundle). The bundle's setup has the step's watt-hours,
+  and each benchmark's share of them by the seconds its answers took.
+- **The price**: `--price <dollars an hour>` on the box line, as vast.ai
+  shows it for the box. Each step keeps it, and the board works out dollars
+  an answer from it — never without it:
+
+  ```bash
+  python scripts/frontier_box.py L2 --as served/<build> --gguf <its file> --server <its tarball> --price 0.42
+  ```
+
+**The fetch** (G3–G4, L3) prints each step's card line and, while it asks,
+its card's mean power and use (`312 W · 96% busy`). After each round, a box
+whose card is slow among its build's boxes gets a line of its own:
+
+```
+L10 L10-1 (served/step8804-lda-2610): slow card — 98 tok/s against the others' 142; replacing it now would save about 9 hours
+```
+
+— 20% or more below the median of the build's other boxes (three at least),
+its PCIe link below its maximum, its power limit under its default, or under
+60% busy for a quarter of an hour. The hours: its time left at its own pace,
+less a new box's whole step at the others' pace and half an hour to set it
+up (before it has a pace, the others' scaled by the two cards' speeds); none
+said under an hour. The same flag is on Runs' list of rented boxes, its
+numbers on hover. Nothing is stopped or replaced but by you.
+
+**On the board**: a model page's Beyond the score gets "Speed and energy"
+(the card's speeds over the row's boxes, each benchmark's seconds and output
+tokens a second an answer, watt-hours and — with a price — dollars an
+answer), and the step-checkpoints report two columns: output tok/s alone and
+GPQA Diamond's energy an answer. A row from before 23c shows a dash there,
+"measured from the next run on". The board must run 23c before the first
+23c bundle is imported (an older board refuses its `gpu.jsonl`).
+
 # Speed tests: the cheapest box per answer (19)
 
 Which box runs our benchmarks for the fewest dollars per answer, measured the

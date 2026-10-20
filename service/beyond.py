@@ -15,6 +15,15 @@ reads them:
 - loops (every benchmark): the share of answers fb.ends_in_loop flags, by the
   board's loop rule, of all answers and of those that ran out of room.
 
+23c: speed and energy — each benchmark's seconds an answer as the board saw
+them (wall_s: the median and the 90th percentile) and its output tokens a
+second (llama-server's predicted_n over predicted_ms, the median), from the
+answers' timings; the row's card checks (the median over its boxes, and the
+range) and each benchmark's watt-hours and dollars an answer, from what its
+imports kept (scripts/import_frontier.py), dollars only where every box was
+given its price. A DeviceMark served row: its items' wall_s and decode_tok_s.
+A row from before 23 has no timings: nothing is shown, never a zero.
+
 Totals over both halves: no question is listed or quoted. Worked out by the
 stats worker (service/report_stats.py) for every row with scored Frontier
 answers, and kept; a page reads what is kept, never computing. Nothing here
@@ -22,8 +31,10 @@ starts a run, a grading or a paid call."""
 
 from __future__ import annotations
 
+import json
 import math
 import re
+import statistics
 import sys
 from pathlib import Path
 
@@ -32,7 +43,7 @@ from . import config
 GPQA, OTIS, HLE, SQA = ("gpqa_diamond_epoch", "otis_aime_epoch", "hle_text_cais",
                         "simpleqa_epoch")
 RELIABLE = (GPQA, OTIS)
-WAY = "beyond-1"
+WAY = "beyond-2"                # 23c: and each benchmark's speed
 FEW = 20                    # a confidence bin with fewer answers is drawn faint
 # HLE_SYSTEM asks each answer for a "Confidence: N%" line
 _STATED = re.compile(r"(?im)^\W*confidence\W*:\s*\d{1,3}(?:\.\d+)?\s*%")
@@ -239,10 +250,51 @@ def rows_of(f: Path) -> list[dict]:
     return out
 
 
+def _n(v) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+
+
+def p90(xs: list[float]) -> float | None:
+    """the 90th percentile, nearest rank: the smallest value with at least
+    90% of them at or under it"""
+    xs = sorted(xs)
+    return xs[max(0, math.ceil(0.9 * len(xs)) - 1)] if xs else None
+
+
+def speed(rows: list[dict], at_once: int | None = None) -> dict | None:
+    """23c: a benchmark's seconds an answer as the board saw them (wall_s) and
+    its output tokens a second (predicted_n ÷ predicted_ms), from its
+    answers' timings — None when none has them (a row from before 23)"""
+    walls = [float(r["wall_s"]) for row in rows for r in row["runs"]
+             if _n(r.get("wall_s")) and r["wall_s"] > 0]
+    rates = [r["predicted_n"] / r["predicted_ms"] * 1000 for row in rows for r in row["runs"]
+             if _n(r.get("predicted_n")) and _n(r.get("predicted_ms"))
+             and r["predicted_n"] > 0 and r["predicted_ms"] > 0]
+    if not walls and not rates:
+        return None
+    return {"n": len(walls), "wall_median": statistics.median(walls) if walls else None,
+            "wall_p90": p90(walls), "out_n": len(rates),
+            "out_tok_s": statistics.median(rates) if rates else None,
+            **({"at_once": at_once} if at_once else {})}
+
+
+def _at_once(f: Path) -> int | None:
+    """the answers asked at once, as the task's setup.json says (23)"""
+    try:
+        c = json.loads((f.parent / "setup.json").read_text(encoding="utf-8")).get("concurrency")
+    except (OSError, ValueError, AttributeError):
+        return None
+    v = (c or {}).get("in_flight") if isinstance(c, dict) else None
+    return v if isinstance(v, int) and v > 0 else None
+
+
 def measures(f: Path, task: str) -> dict:
     """a row's benchmark, every measure that applies to it"""
     rows = rows_of(f)
     out = {"task": task, "loops": loops(rows)}
+    sp = speed(rows, _at_once(f))
+    if sp:
+        out["speed"] = sp
     if task in RELIABLE:
         out["reliability"] = reliability(rows)
     if task == HLE:
@@ -292,6 +344,140 @@ def jobs(dirs: list[Path] | None = None) -> list:
     return out
 
 
+# 23c: a DeviceMark served row's speed, from its scored items
+DM_ITEMS = "devicemark_items.jsonl"
+DM_BENCHES = {"ifeval": "IFEval", "mmlu_pro": "MMLU-Pro", "math": "MATH-500"}
+DM_PROTOCOL = ("DeviceMark’s protocol: thinking off, greedy, up to 4,096 tokens, on the "
+               "board server’s own card")
+
+
+def dm_speed(f: Path) -> dict:
+    """each DeviceMark bench's seconds an item (wall_s) and its decode tokens
+    a second (decode_tok_s, llama-server's), as the items keep them"""
+    from . import reports
+    by: dict[str, list[dict]] = {}
+    for _, row in reports.jsonl(f):
+        if isinstance(row, dict) and row.get("bench") in DM_BENCHES:
+            by.setdefault(row["bench"], []).append(row)
+    out = {}
+    for b, items in by.items():
+        walls = [float(x["wall_s"]) for x in items if _n(x.get("wall_s")) and x["wall_s"] > 0]
+        rates = [float(x["decode_tok_s"]) for x in items
+                 if _n(x.get("decode_tok_s")) and x["decode_tok_s"] > 0]
+        if walls or rates:
+            out[b] = {"n": len(walls), "wall_median": statistics.median(walls) if walls else None,
+                      "wall_p90": p90(walls), "out_n": len(rates),
+                      "out_tok_s": statistics.median(rates) if rates else None}
+    return out
+
+
+def _dm_slot(d: Path) -> str:
+    return f"beyond-dm|{d}"
+
+
+def dm_jobs(dirs: list[Path] | None = None) -> list:
+    from . import report_stats as rs
+    root = Path(config.OUT_DIR)
+    if dirs is None:
+        dirs = sorted(p.parent for p in root.glob(f"*/{DM_ITEMS}")) if root.is_dir() else []
+    return [rs.Job(_dm_slot(d), f"{WAY}|{rs.identity(d / DM_ITEMS)}",
+                   f"speed, {d.name} · DeviceMark", lambda f=d / DM_ITEMS: dm_speed(f))
+            for d in dirs if (d / DM_ITEMS).exists()]
+
+
+def dm_kept(d: Path, compute: bool = False) -> dict | None:
+    from . import report_stats as rs
+    f = d / DM_ITEMS
+    if not f.exists():
+        return None
+    key = f"{WAY}|{rs.identity(f)}"
+    e = rs.kept(_dm_slot(d))
+    if compute and (not e or e.get("key") != key or "value" not in e):
+        e = rs.keep(_dm_slot(d), key, dm_speed(f))
+    return e["value"] if e and "value" in e else None
+
+
+def _spread(xs: list[float]) -> dict | None:
+    xs = [x for x in xs if _n(x)]
+    return {"median": statistics.median(xs), "lo": min(xs), "hi": max(xs), "n": len(xs)} \
+        if xs else None
+
+
+CARD_KEYS = ("alone_out", "alone_prompt", "long_prompt", "long_out", "together_out")
+
+
+def spent(d: Path) -> dict:
+    """23c: what the row's imports kept of its boxes — each card check once
+    a box (its speeds: the median over the boxes and the range), and each
+    benchmark's watt-hours and dollars an answer over its bundles (its
+    shards'): watt-hours only where every bundle has them, dollars only
+    where every box was given its price. {} for a row with none"""
+    try:
+        reg = json.loads((d / "frontier_imports.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    tasks = reg.get("tasks") if isinstance(reg, dict) and isinstance(reg.get("tasks"), dict) \
+        else {}
+    cards, seen, benches = [], set(), {}
+    for t, x in tasks.items():
+        if not isinstance(x, dict):
+            continue
+        parts = [p for p in x.get("shard_bundles") or [x] if isinstance(p, dict)]
+        for p in parts:
+            c = p.get("card")
+            who = p.get("box") or p.get("sha256") or p.get("bundle")
+            if isinstance(c, dict) and who not in seen:
+                seen.add(who)
+                cards.append(c)
+        n = sum(p["answers"] for p in parts if isinstance(p.get("answers"), int))
+        b = {}
+        if n and parts and all(_n(p.get("energy_wh")) and isinstance(p.get("answers"), int)
+                               for p in parts):
+            b["wh"] = sum(p["energy_wh"] for p in parts)
+            b["wh_per_answer"] = b["wh"] / n
+        if n and parts and all(_n(p.get("cost_usd")) and isinstance(p.get("answers"), int)
+                               for p in parts):
+            b["usd"] = sum(p["cost_usd"] for p in parts)
+            b["usd_per_answer"] = b["usd"] / n
+        if b:
+            benches[t] = {**b, "answers": n, "boxes": len(parts)}
+    if not cards and not benches:
+        return {}
+    _scripts()
+    import import_frontier as imf
+    names = sorted({imf.short_gpu(c.get("name")) for c in cards if imf.short_gpu(c.get("name"))})
+    ns = [c["together_n"] for c in cards if isinstance(c.get("together_n"), int)]
+    return {"cards": names, "boxes": len(cards),
+            "probe": {k: _spread([c.get(k) for c in cards]) for k in CARD_KEYS},
+            "together_n": statistics.mode(ns) if ns else None, "benches": benches}
+
+
+def speed_of(mid: str, kept_benches: dict) -> dict | None:
+    """23c: a row's "Speed and energy": its Frontier benchmarks' speeds (kept
+    by the worker) with its boxes' card checks, energy and dollars — or a
+    DeviceMark served row's items' speeds. None when it has neither"""
+    from . import reports
+    d = reports.row_dir(mid)
+    sp = spent(d)
+    benches = {}
+    for t, x in kept_benches.items():
+        b = {**(x.get("speed") or {}), **((sp.get("benches") or {}).get(t) or {})}
+        if b:
+            benches[t] = b
+    if benches or sp.get("boxes"):
+        # its name in a report ("step8804"), for the sentence
+        label = next((o.get("label") for r in reports.files().values()
+                      for o in r.get("ours") or [] if o.get("row") == mid and o.get("label")),
+                     None)
+        return {"source": "frontier", **{k: v for k, v in sp.items() if k != "benches"},
+                "benches": benches, "label": label}
+    dm = dm_kept(d)
+    if dm:
+        return {"source": "devicemark", "protocol": DM_PROTOCOL, "benches": dm,
+                "labels": DM_BENCHES}
+    return None
+
+
 def kept(d: Path, task: str, compute: bool = False) -> dict | None:
     """a row's benchmark's measures as kept (worked out now with `compute`):
     None when never worked out; `fresh` False when its answers changed since"""
@@ -324,7 +510,12 @@ def of_row(mid: str, compute: bool = False) -> dict:
             got[t] = x
             ats.append(x["at"])
     has = [t for t in fb.TASKS if reports.samples_file(d, t) is not None]
+    if compute:
+        dm_kept(d, compute=True)
+    js = jobs([d]) + dm_jobs([d])
     return {"model": mid, "benches": got, "has": has,
             "labels": {t: fb.BENCH[t]["label"] for t in fb.TASKS},
-            "working": {} if compute or not has else rs.working(jobs([d])),
+            # 23c: its speed and energy
+            "speed": speed_of(mid, got),
+            "working": {} if compute or not js else rs.working(js),
             "statsAt": reports.stats_at(ats)}

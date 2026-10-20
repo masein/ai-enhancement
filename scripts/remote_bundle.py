@@ -25,6 +25,8 @@ devicemark-<model>-thinking-<on|off>-shard-<i>-of-<n>.tar.gz), holds:
                  revision, the battery's hashes, the protocol's version, what
                  lm_eval was told, each task's pace
   run.log        the run's log, every session of it in order
+  gpu.jsonl      23c (Frontier): the card's power, use and memory every five
+                 seconds while the step's server ran
   results/<row>/model_meta.json and results/<row>/<task>_0shot/…
                  the answers in the layout the board reads: lm_eval's samples and
                  results files, never its cache
@@ -298,7 +300,8 @@ def write(path: Path, files: dict[str, bytes]) -> Path:
     return path
 
 
-_SAFE = re.compile(r"^(bundle\.json|setup\.json|run\.log|results/[^/]+/[^\0]+)$")
+# 23c: and gpu.jsonl, the card's readings while the step ran
+_SAFE = re.compile(r"^(bundle\.json|setup\.json|run\.log|gpu\.jsonl|results/[^/]+/[^\0]+)$")
 
 
 class _Capped:
