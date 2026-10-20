@@ -65,7 +65,10 @@ NOTES = [
     "stated confidence is compared with the share actually right. 0 means \"80% sure\" is right "
     "80% of the time; most models score far above 0 on HLE, because they state high confidence on "
     "questions they get wrong. The confidence is the one the judge reads from the answer; where "
-    "the answer states none, the judge counts 100%.",
+    "the answer states none, the judge counts 100%. "
+    # 23c: the last group, said
+    "CAIS's measure leaves out its last group, the answers stated with the highest confidence; "
+    "the chart above shows every answer.",
     "SimpleQA: tries and F. \"Not attempted\" means the model said it didn't know. Right when it "
     "tries is the share right among the answers it gave. F is the harmonic mean of the two "
     "scores, the SimpleQA paper's single number. Our prompt asks the model to always guess "
@@ -1006,6 +1009,9 @@ def report(rid: str, payload: dict | None = None, compute: bool = False, a: str 
         "ranOut": ran_out_links(),
         # 23b: beyond the score — each of our rows' measures as kept
         "beyond": beyond_of(rows, rep["benchmarks"], compute),
+        # 23c: and each one's card speed alone and GPQA Diamond's energy an
+        # answer, from its imports' card checks (the next run on)
+        "speed": speed_cols(rows),
         # 23: the report comparing two of these rows question by question
         "paired": next((x for x, r in files().items() if r.get("kind") == "paired"
                         and (r.get("builds") or {}).get("from") == rid), None),
@@ -1026,6 +1032,24 @@ def beyond_of(rows: list[dict], benches: list[dict], compute: bool = False) -> d
                 out.setdefault(r["label"], {})[b["key"]] = {
                     k: v for k, v in x.items() if k in ("loops", "reliability", "calibration",
                                                         "simpleqa", "fresh", "at")}
+    return out
+
+
+def speed_cols(rows: list[dict]) -> dict:
+    """23c: {label: {alone_out, gpqa_wh}} for the rows whose imports kept a
+    card check or GPQA Diamond's energy; none for the others"""
+    from . import beyond
+    out: dict = {}
+    for r in rows:
+        sp = beyond.spent(Path(r["dir"]))
+        if not sp:
+            continue
+        a = (sp.get("probe") or {}).get("alone_out")
+        g = (sp.get("benches") or {}).get(beyond.GPQA) or {}
+        got = {**({"alone_out": a} if a else {}),
+               **({"gpqa_wh": g["wh_per_answer"]} if "wh_per_answer" in g else {})}
+        if got:
+            out[r["label"]] = got
     return out
 
 

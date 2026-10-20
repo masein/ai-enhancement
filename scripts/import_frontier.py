@@ -361,12 +361,18 @@ _SETUP_TYPES = {
                "tarball_sha256": str},
     "gpu": {"name": str, "count": int, "names": [str]},
     "tasks": {"*": {"protocol_version": str, "revision": str, "epochs": int, "budget": int,
-                    "family": str}},
+                    "family": str,
+                    # 23c: its share of the step's energy, time and price
+                    "energy_wh": (int, float), "server_s": (int, float),
+                    "cost_usd": (int, float)}},
     # 17g: what the run's own view and the where read — checked before
     # anything moves (a box given as a number was a crash after the answers
     # had moved)
     "box": str, "sessions": int, "started_at": str, "finished_at": str, "image": str,
     "runtime": str,                         # 20
+    # 23c: the card checks, the card's use, the box's price
+    "card_checks": [dict], "gpu_use": {"wh": (int, float), "seconds": (int, float)},
+    "price": {"per_hour": (int, float)},
 }
 
 
@@ -425,6 +431,52 @@ def setup_problems(setup) -> list[str]:
     if isinstance(env, dict) and not all(isinstance(x, str) for x in env.values()):
         out.append("setup.json's server.env holds a value that isn't text")
     return out
+
+
+# 23c: what an entry keeps of its bundle's card and energy
+SPENT = ("answers", "card", "energy_wh", "server_s", "cost_usd", "price_per_hour")
+
+
+def card_of(setup: dict) -> dict | None:
+    """23c: the bundle's card check, in short — its last session's that has
+    the probe's speeds (a restart on another card is checked again), the
+    card's name, limits and link with it"""
+    checks = [c for c in setup.get("card_checks") or [] if isinstance(c, dict)]
+    c = next((x for x in reversed(checks) if isinstance(x.get("probe"), dict)), None)
+    if c is None:
+        return None
+    p, card = c["probe"], c.get("card") if isinstance(c.get("card"), dict) else {}
+
+    def num(v):
+        return v if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(
+            v) else None
+    al, lo, tg = (p.get(k) if isinstance(p.get(k), dict) else {}
+                  for k in ("alone", "long", "together"))
+    out = {"name": str(card.get("name") or (setup.get("gpu") or {}).get("name") or "")[:80],
+           "alone_out": num(al.get("output_tok_s")), "alone_prompt": num(al.get("prompt_tok_s")),
+           "long_out": num(lo.get("output_tok_s")), "long_prompt": num(lo.get("prompt_tok_s")),
+           "together_out": num(tg.get("output_tok_s")),
+           "together_n": tg.get("n") if isinstance(tg.get("n"), int) else None,
+           **{k: num(card.get(k)) for k in ("power_limit_w", "power_default_w")},
+           **{k: card.get(k) if isinstance(card.get(k), int) else None
+              for k in ("pcie_gen", "pcie_gen_max", "pcie_width", "pcie_width_max")}}
+    return {k: v for k, v in out.items() if v not in (None, "")}
+
+
+def spent_of(setup: dict, task: str, answers: int) -> dict:
+    """23c: a task's card check and its share of the step's energy, seconds
+    and dollars, as the bundle's setup gives them; nothing for a bundle from
+    before 23c"""
+    t = ((setup.get("tasks") or {}).get(task) or {}) if isinstance(setup.get("tasks"), dict) \
+        else {}
+    out = {k: t[k] for k in ("energy_wh", "server_s", "cost_usd")
+           if isinstance(t.get(k), (int, float)) and not isinstance(t.get(k), bool)}
+    price = (setup.get("price") or {}).get("per_hour") if isinstance(setup.get("price"), dict) \
+        else None
+    if isinstance(price, (int, float)) and not isinstance(price, bool):
+        out["price_per_hour"] = price
+    card = card_of(setup)
+    return {**out, **({"card": card} if card else {})} if out or card else {}
 
 
 def split_problem(gg: dict, file_sha: str) -> str:
@@ -855,7 +907,10 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
                  "by": by, "gguf_sha256": gg.get("sha256"), "llama_cpp": srv.get("build"),
                  "answers": len(ans), "setup": shard_setup(srv),
                  # 17f: G5's box it ran on, as its line said (never its address)
-                 "box": setup.get("box") or ""}
+                 "box": setup.get("box") or "",
+                 # 23c: its card check, and its share of the step's energy,
+                 # time and dollars — for the model page's speed and energy
+                 **spent_of(setup, t, len(ans))}
         if shard:
             i, n = shard
             sh = (reg.get("shards") or {}).get(t) or {}
@@ -902,7 +957,9 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
                 cards |= Counter(x.get("gpu_names") or [x["gpu"]])
             whole = {**entry, "gpus": sorted(cards.elements()), "shards": n,
                      "shard_bundles": [{"shard": j, **{k: x.get(k) for k in (
-                                            "gpu", "sha256", "bundle", "box")}}
+                                            "gpu", "sha256", "bundle", "box")},
+                                        # 23c: each shard's card and energy
+                                        **{k: x[k] for k in SPENT if k in x}}
                                        for j, x in enumerate(parts, 1)],
                      "boxes": sorted({x.get("box") for x in parts if x.get("box")}),
                      "answers": len(merged)}
@@ -1284,7 +1341,10 @@ BOX_FIELDS = {"label": str, "model": str, "step": str, "thinking": str, "tasks":
               "shard": str, "parity": bool, "state": str, "line": str, "started_at": str,
               "sessions": int, "at": (int, float), "seen_at": (int, float), "reachable": bool,
               "safe": bool, "why": str, "box_id": str,
-              "import_refused": str}            # 18c point 22: the board's words, said on Runs
+              "import_refused": str,            # 18c point 22: the board's words, said on Runs
+              # 23c: its card check and its card's use in words, and the
+              # slow-card flag the fetch raised, with its numbers
+              "card": str, "use": str, "slow": str, "slow_why": str}
 QUIET_S = 45 * 60                       # a box not heard from for this long says so
 # 17g: a step done (its box safe to destroy) leaves the list this long after
 # the fetch last saw it — thirty days on it still read "done, safe to destroy"
@@ -1311,6 +1371,7 @@ def _fine(v, t) -> bool:
 
 
 CAP = 300                               # 17i: a string kept on the list, at most
+CAP_LONG, LONG_FIELDS = 800, ("slow_why",)  # 23c: a slow card's numbers, for the hover
 
 
 def box_row(r) -> dict | None:
@@ -1326,7 +1387,8 @@ def box_row(r) -> dict | None:
         v = r.get(k)
         if k not in r or not _fine(v, t):
             continue
-        x[k] = v[:CAP] if isinstance(v, str) else [i[:CAP] for i in v[:50]] \
+        cap = CAP_LONG if k in LONG_FIELDS else CAP
+        x[k] = v[:cap] if isinstance(v, str) else [i[:CAP] for i in v[:50]] \
             if isinstance(v, list) else v
     return x if x.get("label") and x.get("model") and x.get("step") else None
 
@@ -1678,6 +1740,10 @@ def rented_runs(boxes: list[dict], now: float, posted: float | None) -> list[dic
             "status_words": words, "n": n if counted else None, "of": of if counted else None,
             "benchmarks": bench if len(bench) > 1 else [],
             "boxes_n": len(steps), "finish": finish, "attention": odd,
+            # 23c: the boxes of it the fetch flagged as slow cards
+            "slow": [{"label": b.get("label"), "words": b["slow"],
+                      "numbers": b.get("slow_why") or ""}
+                     for b, (k, _) in zip(steps, st) if b.get("slow") and k != "done"],
             **({"import_refused": refused[:300]} if refused else {}),
             "heard": heard, "behind": behind, "started_at": started[0] if started else None,
             "where": "rented GPU · " + (f"box {labels[0]}" if len(labels) == 1 else
@@ -1689,6 +1755,8 @@ def rented_runs(boxes: list[dict], now: float, posted: float | None) -> list[dic
                        "step_finish": b.get("step_finish") if k == "running" else None,
                        "box_finish": b.get("box_finish") if k == "running" else None,
                        "notes": notes.get(str(b.get("label") or ""), []),
+                       # 23c: its card, its use, and a slow card's flag
+                       **{k: b[k] for k in ("card", "use", "slow", "slow_why") if b.get(k)},
                        "heard": h or None,
                        "behind": bool(posted and b.get("heard") and b["heard"] < posted - 60)
                        or k in ("unreached", "quiet")}

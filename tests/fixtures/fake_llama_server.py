@@ -21,7 +21,13 @@ FAKE_LLAMA_VERSION is what --version prints (upstream's "version: 0.6.0-dev
 (build 11555, commit 1cf776776)"); FAKE_LLAMA_TEMPLATE the chat template its
 /props names; FAKE_LLAMA_THINK=inline answers with its thinking and
 "</think>" in the reply, as a server that doesn't split them off does. 23:
-FAKE_LLAMA_TIMINGS=1 gives each answer llama-server's timings."""
+FAKE_LLAMA_TIMINGS=1 gives each answer llama-server's timings. 23c: /tokenize
+(a token a word) and /completion with token ids, for the card check's speed
+probe, its timings fixed (PROBE below) — a prompt of 1,024 tokens or fewer
+asked alone takes the next of the three ALONE rates in turn, a longer one the
+LONG rates, and one asked while others are (the eight at once) 80 tok/s out
+plus one for each asked before it in the batch; FAKE_LLAMA_PROBE_STATUS a
+status /completion answers with (the chat requests still answer)."""
 
 from __future__ import annotations
 
@@ -34,6 +40,10 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 VERSION = "version: 6543 (abc1234)\nbuilt with cc (fake) for x86_64-linux-gnu"
+# 23c: the probe's timings — (prompt tok/s, output tok/s)
+PROBE = {"alone": [(9000.0, 140.0), (8000.0, 150.0), (10000.0, 120.0)],
+         "long": (6000.0, 110.0), "together_prompt": 5000.0, "together_out": 80.0,
+         "warm": (7000.0, 100.0)}
 
 
 def arg(argv: list[str], *names: str, default: str = "") -> str:
@@ -81,6 +91,8 @@ def main() -> int:
     lock = threading.Lock()
     count = {"n": 0}
     sent = {"n": 0}
+    probe_status = int(os.environ.get("FAKE_LLAMA_PROBE_STATUS") or 200)
+    busy = {"now": 0, "alone": 0, "peers": {}}         # 23c: the probe's requests
     print(f"main: loading model {os.path.basename(model)}", flush=True)
 
     class H(BaseHTTPRequestHandler):
@@ -114,8 +126,49 @@ def main() -> int:
                 return self._send(200, [{"id": i, "speculative": drafts} for i in range(slots)])
             return self._send(404, {"error": {"message": "not found"}})
 
+        def completion(self, body: dict):
+            """23c: the speed probe's request — token ids in, n_predict out"""
+            if probe_status != 200:
+                return self._send(probe_status, {"error": {"code": probe_status,
+                                                           "message": "probe refused"}})
+            ids = body.get("prompt") if isinstance(body.get("prompt"), list) else []
+            n, out = len(ids), int(body.get("n_predict") or 16)
+            me = object()
+            with lock:
+                k = busy["now"]                         # how many were asked before it
+                busy["now"] += 1
+                busy["peers"][me] = busy["now"]
+                for x in busy["peers"]:
+                    busy["peers"][x] = max(busy["peers"][x], busy["now"])
+            time.sleep(0.15)                            # long enough to meet the others
+            with lock:
+                peers = busy["peers"].pop(me)
+                busy["now"] -= 1
+            if out < 64:
+                pr, tg = PROBE["warm"]
+            elif peers > 1:
+                pr, tg = PROBE["together_prompt"], PROBE["together_out"] + k
+            elif n > 1024:
+                pr, tg = PROBE["long"]
+            else:
+                with lock:
+                    pr, tg = PROBE["alone"][busy["alone"] % len(PROBE["alone"])]
+                    busy["alone"] += 1
+            return self._send(200, {"content": "x " * out, "tokens_predicted": out,
+                                    "tokens_evaluated": n, "stop": True,
+                                    "timings": {"prompt_n": n, "prompt_ms": n / pr * 1000,
+                                                "prompt_per_second": pr, "predicted_n": out,
+                                                "predicted_ms": out / tg * 1000,
+                                                "predicted_per_second": tg}})
+
         def do_POST(self):
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)))
+            if self.path == "/tokenize":
+                text = str(body.get("content") or "")
+                return self._send(200, {"tokens": [sum(w.encode()) % 50000
+                                                   for w in text.split()]})
+            if self.path == "/completion":
+                return self.completion(body)
             if self.path not in ("/v1/chat/completions", "/chat/completions"):
                 return self._send(404, {"error": {"message": "not found"}})
             if status != 200:

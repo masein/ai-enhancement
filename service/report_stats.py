@@ -146,7 +146,8 @@ def jobs() -> list[Job]:
             out.setdefault(j.slot, j)
     # 23b: beyond the score, every row with scored Frontier answers
     from . import beyond
-    for j in beyond.jobs():
+    # 23c: and every DeviceMark served row's speed
+    for j in beyond.jobs() + beyond.dm_jobs():
         out.setdefault(j.slot, j)
     return list(out.values())
 

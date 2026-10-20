@@ -366,6 +366,8 @@ def argv_of(box: str, k: int, step: Step, a: argparse.Namespace) -> list[str]:
         out += ["--env", a.env]
     if a.ask_written_off and th != "pilot":
         out += ["--ask-written-off"]
+    if getattr(a, "price", None) is not None and th != "pilot":
+        out += ["--price", f"{a.price:g}"]          # 23c: the box's dollars an hour
     if th == "parity":
         return out + ["--thinking", "off", "--slots", str(slots), "--parity",
                       "--out", str(folder(a, box, k, step))]
@@ -461,6 +463,10 @@ def parser() -> argparse.ArgumentParser:
     ap.add_argument("--slots-fit", action="store_true",
                     help="17g: the slots given fit this card — the memory check's estimate is "
                          "printed, and not held to")
+    ap.add_argument("--price", type=float, default=None,
+                    help="23c: this box's price, dollars an hour, as the rental says — each "
+                         "step keeps it, and the board works out dollars an answer from it "
+                         "(none is shown without it)")
     return ap
 
 
@@ -479,6 +485,8 @@ def main(argv: list[str] | None = None) -> int:
                  + (" (or --server-dir)" if "--server" in missing else ""))
     if a.server and a.server_dir:
         ap.error("--server or --server-dir, not both")
+    if a.price is not None and not (0 < a.price < 1000):
+        ap.error("--price: the box's dollars an hour, e.g. 0.42")
     boxes = [x.upper() for x in [a.box, *(a.then or [])]]
     for box in boxes:
         box_of(box)                     # a label of no plan: refused before anything
