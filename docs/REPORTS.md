@@ -213,3 +213,39 @@ is.
 Diamond's and HLE's (their authors ask), and MATH's (disputed copyright). Their
 answers show their stats and their thinking, with each line that quotes the
 question withheld.
+
+## Two builds, question by question (23)
+
+`eval_tasks/reports/paired.json` (`"kind": "paired"`) compares two of our
+builds on the questions both answered, at
+`#tab=reports&report=paired&a=<build>&b=<build>`: a link a colleague can open
+on the same pair. The scorecard links to it under Our runs ("Compare two of
+these question by question ▸", its first two picks).
+
+- **The builds** are every row of the scorecard's `ours` (`"builds": {"from":
+  "step-checkpoints"}`), "Q4, earlier run" among them; a new checkpoint added
+  there is here too. The picker offers those with scored answers. `default`
+  is the pair it opens on.
+- **The numbers** come from each row's newest scored samples (`frontier[].ok`,
+  the board's own verdict), lined up by question id. A question only one build
+  answered, or one not graded on either side yet, is left out and the row says
+  how many. One run a question (HLE, MATH Level 5, MMLU-Pro, SimpleQA): the
+  difference, its 95% range and the exact McNemar test. Several runs (GPQA ×4,
+  OTIS ×8) and ARC-AGI-2 by task: each question at its average, the paired
+  standard error and the range. The sums are `scripts/paired_stats.py`, which
+  `score_bundle.py` and the parity check use too.
+- **Churn:** under the table, for GPQA and OTIS, how often each build gives a
+  different result between two of its own runs, beside how often the two
+  builds differ.
+- **The worker** works out all 21 pairs, each benchmark, and keeps them in
+  `stats.json`; a page reads what is kept, and swaps A and B by flipping signs
+  and counts.
+- **The reader's rules:** the hidden half is counted, never listed or opened;
+  GPQA, HLE and MATH never show their question text, and an answer's lines
+  quoting it are withheld. No Epoch, card or Artificial Analysis number.
+
+After a deploy, the pairs are worked out once by the worker:
+
+```bash
+cd ~/benchmarks/aienh && time sudo docker compose exec -T bench python -m service.report_stats --again
+```

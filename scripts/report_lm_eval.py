@@ -5578,6 +5578,38 @@ table.rp tr.rp-group td { background:var(--plane); font-weight:600; text-align:l
   color:var(--text-secondary); margin:var(--sp-2) 0; }
 .st-higher { color:var(--success-text); } .st-lower { color:var(--critical-text); }
 .st-level { color:var(--muted); }
+/* 23: two builds, question by question */
+.pd-pick { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; margin:var(--sp-2) 0; }
+.pd-pick select { max-width:min(100%, 260px); }
+.pd-sentence { font-size:var(--fs-3); margin:var(--sp-2) 0 var(--sp-1); }
+.pd-chart { display:grid; grid-template-columns:minmax(0, 16rem) minmax(0, 1fr); gap:4px 12px;
+  align-items:center; margin-top:var(--sp-2); }
+@media (max-width: 640px) {
+  .pd-chart { grid-template-columns:minmax(0, 1fr); gap:0; }
+  .pd-chart .pd-bar { margin-bottom:8px; }
+}
+.pd-chart .pd-lab { font-size:var(--fs-1); min-width:0; overflow-wrap:anywhere; }
+.pd-chart .pd-lab b { font-family:var(--font-mono); font-weight:600; }
+.pd-bar { width:100%; height:20px; display:block; }
+.pd-axis { position:relative; height:16px; font-size:10px; color:var(--muted); }
+.pd-axis span { position:absolute; transform:translateX(-50%); white-space:nowrap; }
+.pd-sides { display:flex; justify-content:space-between; font-size:var(--fs-1);
+  color:var(--text-secondary); }
+.pd-chip { display:inline-block; border:1px solid var(--border); border-radius:999px;
+  padding:0 8px; font-size:var(--fs-1); white-space:nowrap; }
+.pd-chip.pd-a, .pd-chip.pd-b { border-color:var(--accent); color:var(--text-primary);
+  font-weight:600; }
+.pd-chip.pd-tie { color:var(--muted); }
+.pd-count { font-family:var(--font-mono); background:none; border:1px solid var(--border);
+  border-radius:var(--r-1); padding:1px 8px; cursor:pointer; color:var(--text-primary); }
+.pd-count[aria-pressed="true"] { background:var(--accent); border-color:var(--accent); color:#fff; }
+.pd-count:disabled { cursor:default; opacity:.6; }
+.pd-items { list-style:none; padding:0; margin:var(--sp-2) 0 0; }
+.pd-items > li { border-top:1px solid var(--border); padding:6px 0; }
+.pd-items .pd-links { display:flex; flex-wrap:wrap; gap:4px 14px; }
+.pd-ans { margin:6px 0 0; }
+.pd-ans pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:40vh; overflow:auto;
+  font-size:var(--fs-1); background:var(--plane); padding:6px; border-radius:var(--r-1); }
 .rp-benches { display:grid; gap:var(--sp-4) var(--sp-5);
   grid-template-columns:repeat(auto-fill, minmax(min(100%, 420px), 1fr)); }
 .rp-bench { min-width:0; }
@@ -10594,9 +10626,12 @@ function viewHash(v) {
   if (v === 'playground') return 'tab=playground' + (state.pg.id ? '&chat=' + state.pg.id : '');
   // 21: a report, so a reload and a link land on it
   if (v === 'reports') {
-    const R = RPS(), ro = R.id && R.ro && R.ro[R.id];
+    const R = RPS(), ro = R.id && R.ro && R.ro[R.id], pd = R.id && R.pd && R.pd[R.id];
     // 21b: a ran-out report's model, benchmark and opened question
+    // 23: a paired report's two builds
     return 'tab=reports' + (R.id ? '&report=' + encodeURIComponent(R.id) : '')
+      + (pd && pd.a ? '&a=' + encodeURIComponent(pd.a) : '')
+      + (pd && pd.b ? '&b=' + encodeURIComponent(pd.b) : '')
       + (ro && ro.pick ? '&model=' + encodeURIComponent(ro.pick) : '')
       + (ro && ro.bench ? '&bench=' + encodeURIComponent(ro.bench) : '')
       + (ro && ro.open ? '&open=' + encodeURIComponent(ro.open) : '');
@@ -10647,6 +10682,9 @@ function viewOfHash(name, params) {
             playground: 'playground', reports: 'reports' }[n];
   if (n === 'reports') {
     RPS().id = p.get('report') || null;
+    // 23: a paired report's two builds, from its link
+    if (RPS().id && (p.get('a') || p.get('b')))
+      Object.assign(pdState(RPS().id), { a: p.get('a') || null, b: p.get('b') || null });
     if (RPS().id && (p.get('model') || p.get('bench') || p.get('open') || (RPS().ro || {})[RPS().id])) {
       const S = roState(RPS().id);
       Object.assign(S, { pick: p.get('model') || S.pick, bench: p.get('bench') || '',
@@ -27559,6 +27597,8 @@ function vReport(id) {
       : skeleton(6, { 'data-loading': 'report' }))];
   // 21b: a report of the answers that ran out of room
   if (d.kind === 'ran_out') return vRanOut(id, d, back);
+  // 23: two builds, question by question
+  if (d.kind === 'paired') return vPaired(id, d, back);
   const benches = d.benchmarks, compared = benches.filter(b => b.compare);
   const pick = R.pick[id] && d.picks.includes(R.pick[id]) ? R.pick[id] : d.picks[0];
   const st = d.standing[pick];
@@ -27588,7 +27628,14 @@ function vReport(id) {
           el('span', { class: 'rp-status', 'data-rp-status': m.label, text: m.status }),
           m.note ? el('span', { class: 'rp-sub', text: m.note }) : ''),
         ...benches.map(b => rpOurCell(m.cells[b.key], b))))))),
-    el('p', { class: 'small se', 'data-rp-score-legend': '1', text: RP_SCORE_LEGEND }));
+    el('p', { class: 'small se', 'data-rp-score-legend': '1', text: RP_SCORE_LEGEND }),
+    // 23: two of these, question by question, opened on the first two picks
+    d.paired && d.picks.length > 1 ? el('p', { class: 'small' }, el('a', {
+      href: `#tab=reports&report=${encodeURIComponent(d.paired)}&a=${encodeURIComponent(d.picks[0])}`
+        + `&b=${encodeURIComponent(d.picks[1])}`, 'data-rp-paired': d.paired,
+      text: 'Compare two of these question by question ▸',
+      onclick: e => { e.preventDefault(); Object.assign(pdState(d.paired), { a: d.picks[0],
+        b: d.picks[1], open: null }); rpOpen(d.paired); } })) : '');
   // 2. where we stand
   const stand = el('div', { class: 'card', 'data-report-section': 'stand' },
     el('h2', { text: 'Where we stand' }),
@@ -27984,6 +28031,283 @@ function vRanOut(id, d, back) {
     rows.length > 300 ? el('p', { class: 'small se', text: `The first 300 of ${rows.length}: `
       + 'choose a benchmark or a subject for the rest.' }) : '');
   return [back, head, top, list];
+}
+
+// ---------------------------------------------------------------------------
+// 23: two builds, question by question (#tab=reports&report=paired&a=…&b=…).
+// Every number is the server's, kept by the stats worker: the page swaps A
+// and B by flipping signs and counts, never asking again (pdFlip, as
+// service/paired.flip does)
+// ---------------------------------------------------------------------------
+function pdState(id) {
+  const R = RPS();
+  R.pd = R.pd || {};
+  return (R.pd[id] = R.pd[id] || { a: null, b: null, got: {}, asked: {}, err: {}, open: null,
+    lists: {}, ans: {}, read: {} });
+}
+const pdKey = (a, b) => a + '\u0000' + b;
+const PD_WORDS = { 'A higher': 'pd-a', 'B higher': 'pd-b', "can't tell": 'pd-tie' };
+function pdFlipPair(x) {
+  if (!x) return x;
+  const neg = v => v == null ? v : -v;
+  const sw = { 'A higher': 'B higher', 'B higher': 'A higher' };
+  return { ...x, d: neg(x.d), lo: neg(x.hi), hi: neg(x.lo), verdict: sw[x.verdict] || x.verdict,
+    a_better: x.b_better, b_better: x.a_better, only_a: x.only_b, only_b: x.only_a,
+    skip_a: x.skip_b, skip_b: x.skip_a,
+    self: x.self ? { ...x.self, a: x.self.b, b: x.self.a } : x.self,
+    lists: { a: (x.lists || {}).b || [], b: (x.lists || {}).a || [] },
+    held: { a: (x.held || {}).b || 0, b: (x.held || {}).a || 0 } };
+}
+function pdSentence(a, b, rows) {
+  const done = rows.filter(r => r.pair && r.pair.n);
+  if (!done.length) return `${a} and ${b} have no benchmark compared yet.`;
+  const up = done.filter(r => r.pair.verdict === 'A higher').length;
+  const down = done.filter(r => r.pair.verdict === 'B higher').length;
+  return `${a} is higher than ${b} on ${up} benchmark${up === 1 ? '' : 's'}, lower on ${down}, `
+    + `and the two can't be told apart on ${done.length - up - down}.`;
+}
+function pdFlip(d) {
+  const rows = d.rows.map(r => ({ ...r, a: r.b, b: r.a, pair: pdFlipPair(r.pair) }));
+  const sp = d.settingsParts ? { a: d.settingsParts.b, b: d.settingsParts.a } : null;
+  return { ...d, a: d.b, b: d.a, rows, settingsParts: sp,
+    settings: sp ? `${d.b} ran on ${sp.a}; ${d.a} on ${sp.b}.` : '',
+    sentence: pdSentence(d.b, d.a, rows) };
+}
+async function pdLoad(id, a, b) {
+  const S = pdState(id), k = pdKey(a, b);
+  if (S.asked[k]) return;
+  S.asked[k] = true;
+  try {
+    S.got[k] = await api(`api/reports/${encodeURIComponent(id)}?a=${encodeURIComponent(a)}`
+      + `&b=${encodeURIComponent(b)}`);
+    S.err[k] = '';
+  } catch (e) { S.err[k] = e.message; }
+  S.asked[k] = false;
+  if (state.tab === 'reports') render();
+}
+// the pair's numbers: as asked, or the other order's flipped
+function pdData(id, d, a, b) {
+  const S = pdState(id), k = pdKey(a, b);
+  if (d.a === a && d.b === b) return d;
+  if (d.a === b && d.b === a) return pdFlip(d);
+  if (S.got[k]) return S.got[k];
+  if (S.got[pdKey(b, a)]) return (S.got[k] = pdFlip(S.got[pdKey(b, a)]));
+  if (!S.err[k] && netReady()) pdLoad(id, a, b);
+  return null;
+}
+function pdGo(id, a, b) {
+  const S = pdState(id);
+  Object.assign(S, { a, b, open: null });
+  navigate({ tab: 'reports', model: null, topic: null });
+}
+const pdPts = v => v == null ? '—' : (v >= 0 ? '+' : '−') + Math.abs(100 * v).toFixed(1);
+const pdPct = v => v == null ? '—' : (100 * v).toFixed(1) + '%';
+// what was compared: "2,141 of 2,158 questions; 17 not graded for B yet"
+function pdOf(x, r, a, b) {
+  const unit = r.unit || 'questions';
+  const left = [x.skip_a ? `${rpN(x.skip_a)} not graded for ${a} yet` : '',
+    x.skip_b ? `${rpN(x.skip_b)} not graded for ${b} yet` : '',
+    x.only_a ? `${rpN(x.only_a)} only ${a} answered` : '',
+    x.only_b ? `${rpN(x.only_b)} only ${b} answered` : ''].filter(Boolean);
+  const head = x.n === x.of ? `${rpN(x.n)} ${unit}` : `${rpN(x.n)} of ${rpN(x.of)} ${unit}`;
+  return head + (x.runs > 1 ? ` × ${x.runs} runs` : '') + (left.length ? '; ' + left.join(', ')
+    : '');
+}
+// the chart: A − B on each benchmark, its 95% range, a line at 0
+function pdChart(d) {
+  const rows = d.rows.filter(r => r.pair && r.pair.n);
+  if (!rows.length) return '';
+  let m = 0;
+  for (const r of rows) m = Math.max(m, Math.abs(r.pair.lo || 0), Math.abs(r.pair.hi || 0));
+  m = Math.max(0.05, Math.ceil(m * 20) / 20);
+  const x = v => 150 + 150 * Math.max(-1, Math.min(1, v / m));
+  const grid = el('div', { class: 'pd-chart', 'data-pd-chart': '1', role: 'img',
+    'aria-label': `${d.a} minus ${d.b}, in points, with each 95% range` });
+  for (const r of rows) {
+    const p = r.pair, tie = p.verdict === "can't tell";
+    const svg = el('svg:svg', { class: 'pd-bar', viewBox: '0 0 300 20',
+      preserveAspectRatio: 'none', 'aria-hidden': 'true' });
+    svg.append(el('svg:line', { x1: 150, x2: 150, y1: 0, y2: 20, stroke: 'var(--axis)',
+      'stroke-width': 1, 'vector-effect': 'non-scaling-stroke' }));
+    svg.append(el('svg:line', { x1: x(p.lo), x2: x(p.hi), y1: 10, y2: 10,
+      stroke: tie ? 'var(--muted)' : 'var(--accent)', 'stroke-width': 4,
+      'vector-effect': 'non-scaling-stroke' }));
+    svg.append(el('svg:line', { x1: x(p.d), x2: x(p.d), y1: 3, y2: 17,
+      stroke: 'var(--text-primary)', 'stroke-width': 3, 'vector-effect': 'non-scaling-stroke' }));
+    grid.append(el('div', { class: 'pd-lab', 'data-pd-bar': r.key },
+      r.label + ' ', el('b', { text: pdPts(p.d) }), ' ',
+      el('span', { class: 'se', text: tie ? "can't tell" : p.verdict.replace('A', d.a)
+        .replace(/^B/, d.b) })), svg);
+  }
+  const ticks = [-m, -m / 2, 0, m / 2, m];
+  grid.append(el('div', {}), el('div', {},
+    el('div', { class: 'pd-axis' }, ticks.map(t => el('span', {
+      style: `left:${(100 * x(t) / 300).toFixed(2)}%`, text: (t > 0 ? '+' : t < 0 ? '−' : '')
+        + Math.abs(Math.round(100 * t * 10) / 10) }))),
+    el('div', { class: 'pd-sides', 'data-pd-sides': '1' },
+      el('span', { text: `← ${d.b} higher` }), el('span', { text: `${d.a} higher →` }))));
+  return grid;
+}
+async function pdList(id, a, b, key, side) {
+  const S = pdState(id), k = [a, b, key, side].join('\u0000');
+  if (S.lists[k] && S.lists[k] !== 'asking') return;
+  S.lists[k] = 'asking';
+  try {
+    S.lists[k] = await api(`api/reports/${encodeURIComponent(id)}?a=${encodeURIComponent(a)}`
+      + `&b=${encodeURIComponent(b)}&bench=${encodeURIComponent(key)}&side=${side}`);
+  } catch (e) { S.lists[k] = { err: e.message }; }
+  if (state.tab === 'reports') render();
+}
+async function pdAnswer(id, who, task, qid, epoch) {
+  const S = pdState(id), k = [who, task, qid, epoch].join('\u0000');
+  if (S.ans[k]) return;
+  S.ans[k] = 'asking';
+  try {
+    S.ans[k] = await api(`api/reports/${encodeURIComponent(id)}/answer?model=`
+      + `${encodeURIComponent(who)}&task=${encodeURIComponent(task)}&id=${encodeURIComponent(qid)}`
+      + `&epoch=${epoch}`);
+  } catch (e) { S.ans[k] = { err: e.message }; }
+  if (state.tab === 'reports') render();
+}
+function pdOpened(id, who, task, qid, epoch) {
+  const S = pdState(id), k = [who, task, qid, epoch].join('\u0000'), a = S.ans[k];
+  if (!a || a === 'asking') {
+    if (!a) pdAnswer(id, who, task, qid, epoch);
+    return el('div', { class: 'pd-ans' }, skeleton(2, { 'data-loading': 'pd-answer' }));
+  }
+  if (a.err) return el('p', { class: 'warn pd-ans', 'data-pd-refused': '1', text: a.err });
+  return el('div', { class: 'pd-ans', 'data-pd-answer': `${who}:${qid}:${epoch}` },
+    a.runs.length > 1 ? el('div', { class: 'rp-picker' }, a.runs.map(r => el('button', {
+      class: 'chip-btn' + (r.epoch === a.epoch ? ' on' : ''), type: 'button',
+      'aria-pressed': String(r.epoch === a.epoch),
+      text: `Run ${r.epoch + 1} ${r.ran_out ? '· ran out' : r.ok ? '✓' : '✗'}`,
+      onclick: () => { S.read[`${who}:${qid}`] = r.epoch; render(); } }))) : '',
+    el('p', { class: 'small', text: `${who}, run ${a.epoch + 1}: ${a.verdict}`
+      + (a.ok ? ' · right' : ' · not right') }),
+    a.withheld ? el('p', { class: 'small se', 'data-pd-withheld': '1', text: 'Question text '
+        + 'withheld: ' + a.withheld + '. Each line of the answer that quotes it is withheld.' })
+      : a.question ? el('p', { class: 'small', 'data-pd-question': '1', text: a.question.q }) : '',
+    a.thinking ? el('details', {}, el('summary', { text: `Its thinking, `
+      + `${rpN(a.thinking.length)} characters` }), el('pre', { text: a.thinking })) : '',
+    el('pre', { 'data-pd-reply': '1', text: a.reply || '(nothing after its thinking)' }));
+}
+function pdPanel(id, d, r) {
+  const S = pdState(id), side = S.open.side, k = [d.a, d.b, r.key, side].join('\u0000');
+  const L = S.lists[k];
+  if (!L) pdList(id, d.a, d.b, r.key, side);
+  const who = side === 'a' ? d.a : d.b, other = side === 'a' ? d.b : d.a;
+  const card = el('div', { class: 'card', 'data-pd-list': `${r.key}:${side}` },
+    el('h3', { text: `${r.label}: ${who} higher than ${other}` }));
+  if (!L || L === 'asking') return (card.append(skeleton(3, { 'data-loading': 'pd-list' })), card);
+  if (L.err) return (card.append(el('p', { class: 'warn', text: L.err })), card);
+  const unit = r.unit || 'questions';
+  card.append(el('p', { class: 'small', 'data-pd-list-head': '1', text: `${rpN(L.n)} ${unit}; `
+    + `${rpN(L.listed)} listed, ${rpN(L.hidden)} in the hidden half.` }));
+  card.append(el('ul', { class: 'pd-items' }, L.items.map(x => {
+    const out = (s, nm) => s.runs > 1 ? `${nm} right ${s.right} of ${s.runs}`
+      + (s.ran_out ? `, ran out ${s.ran_out}` : '') : `${nm} ${s.right ? 'right' : 'wrong'}`
+      + (s.ran_out ? ', ran out of room' : '');
+    const qid = (x.grids || [x.id])[0];
+    const links = [[d.a, 'A'], [d.b, 'B']].map(([nm, s]) => {
+      const key = `${nm}:${qid}`, open = S.read[key] != null;
+      return el('a', { href: '#', 'data-pd-read': `${s}:${x.id}`,
+        text: `Read ${s}’s answer ▸`, onclick: e => { e.preventDefault();
+          if (open) delete S.read[key]; else S.read[key] = 0; render(); } });
+    });
+    const opened = [d.a, d.b].filter(nm => S.read[`${nm}:${qid}`] != null)
+      .map(nm => pdOpened(id, nm, r.task, qid, S.read[`${nm}:${qid}`]));
+    return el('li', { 'data-pd-item': x.id },
+      el('div', {}, el('b', { text: x.id }), x.grids ? el('span', { class: 'small se',
+        text: ` · ${x.grids.length} test grid${x.grids.length === 1 ? '' : 's'}` }) : ''),
+      el('div', { class: 'small' }, out(x.a, d.a) + ' · ' + out(x.b, d.b)),
+      el('div', { class: 'pd-links small' }, links), ...opened);
+  })));
+  return card;
+}
+function vPaired(id, d0, back) {
+  const S = pdState(id);
+  const offer = d0.offered || [];
+  let a = S.a && offer.includes(S.a) ? S.a : d0.a, b = S.b && offer.includes(S.b) ? S.b : d0.b;
+  const same = a === b;
+  const pick = (which, v) => el('select', { [`data-pd-${which}`]: '1', 'aria-label':
+      which === 'a' ? 'build A' : 'build B',
+    onchange: e => which === 'a' ? pdGo(id, e.target.value, b) : pdGo(id, a, e.target.value) },
+    offer.map(x => el('option', { value: x, text: x, ...(x === v ? { selected: '' } : {}) })));
+  const head = el('div', { class: 'card', 'data-report': id },
+    el('h2', { text: d0.title }), el('p', { class: 'sub', text: d0.what }),
+    el('div', { class: 'rp-fresh' }, el('span', { text: 'Our answers: '
+      + ((d0.sources || {}).ours || {}).words })),
+    el('div', { class: 'pd-pick', 'data-pd-picker': '1' }, 'Compare ', pick('a', a), ' with ',
+      pick('b', b), el('button', { class: 'btn ghost', type: 'button', 'data-pd-swap': '1',
+        title: 'Swap A and B', 'aria-label': 'Swap A and B', text: '⇄',
+        onclick: () => pdGo(id, b, a) })));
+  if (same) return [back, (head.append(el('p', { class: 'warn', 'data-pd-same': '1',
+    text: 'Pick two different builds: a build compared with itself says nothing.' })), head)];
+  const k = pdKey(a, b), d = pdData(id, d0, a, b);
+  if (!d) {
+    head.append(S.err[k] ? el('p', { class: 'warn', text: 'The pair couldn’t be read: '
+      + S.err[k] }) : skeleton(4, { 'data-loading': 'pd-pair' }));
+    return [back, head];
+  }
+  head.append(el('p', { class: 'pd-sentence', 'data-pd-sentence': '1', text: d.sentence }),
+    d.settings ? el('p', { class: 'small', 'data-pd-settings': '1', text: d.settings }) : '',
+    rpWorking(d));
+  const chart = el('div', { class: 'card', 'data-report-section': 'pd-chart' },
+    el('h2', { text: `${a} − ${b}, in points` }),
+    pdChart(d) || el('p', { class: 'small se', text: 'No benchmark compared yet.' }));
+  const count = (r, side) => {
+    const n = side === 'a' ? r.pair.a_better : r.pair.b_better;
+    const on = S.open && S.open.key === r.key && S.open.side === side;
+    return el('td', { class: 'num' }, el('button', { class: 'pd-count', type: 'button',
+      'data-pd-count': `${r.key}:${side}`, 'aria-pressed': String(!!on), disabled: n ? null : '',
+      text: rpN(n), onclick: () => { S.open = on ? null : { key: r.key, side }; render(); } }));
+  };
+  const rows = d.rows.map(r => {
+    if (!r.pair) return el('tr', { 'data-pd-row': r.key },
+      el('td', { text: r.label }), rpOurCell(r.a, r, true), rpOurCell(r.b, r, true),
+      el('td', { class: 'dash', colspan: 5, text: r.missing || 'being worked out' }));
+    const p = r.pair;
+    return el('tr', { 'data-pd-row': r.key },
+      el('td', {}, r.label, el('span', { class: 'rp-sub', 'data-pd-of': r.key,
+        text: pdOf(p, r, a, b) })),
+      rpOurCell(r.a, r, true), rpOurCell(r.b, r, true),
+      el('td', { class: 'num', 'data-pd-diff': r.key,
+        text: `${pdPts(p.d)} (${pdPts(p.lo)} to ${pdPts(p.hi)})` }),
+      el('td', {}, el('span', { class: 'pd-chip ' + (PD_WORDS[p.verdict] || ''),
+        'data-pd-verdict': r.key, title: p.verdict === 'A higher' ? `${a} higher`
+          : p.verdict === 'B higher' ? `${b} higher` : 'the 95% range crosses 0'
+            + (p.p != null ? ` · McNemar p = ${p.p.toFixed(4)}` : ''), text: p.verdict })),
+      count(r, 'a'), count(r, 'b'),
+      el('td', { class: 'num', 'data-pd-differ': r.key, text: pdPct(p.differ) }));
+  });
+  const selfs = d.rows.filter(r => r.pair && r.pair.self && r.pair.self.a != null).map(r =>
+    el('p', { class: 'small', 'data-pd-self': r.key, text: 'Each build also disagrees with '
+      + `itself: between two of its own runs, ${a} gives a different result on `
+      + `${pdPct(r.pair.self.a)} of ${r.label} questions, ${b} on ${pdPct(r.pair.self.b)}. `
+      + `The two builds disagree on ${pdPct(r.pair.self.cross)}.` }));
+  const table = el('div', { class: 'card', 'data-report-section': 'pd-table' },
+    el('h2', { text: 'Benchmark by benchmark' }),
+    el('div', { class: 'rp-scroll' }, el('table', { class: 'rp', 'data-pd-table': '1' },
+      el('thead', {}, el('tr', {}, el('th', { text: 'Benchmark' }),
+        el('th', { text: 'A' }, el('span', { class: 'rp-sub', text: a })),
+        el('th', { text: 'B' }, el('span', { class: 'rp-sub', text: b })),
+        el('th', { text: 'Difference' }, el('span', { class: 'rp-sub', text: 'A − B, 95% range' })),
+        el('th', { text: 'Verdict' }),
+        el('th', { text: 'A right, B wrong' }), el('th', { text: 'B right, A wrong' }),
+        el('th', { text: 'Differ' }))),
+      el('tbody', {}, rows))),
+    el('p', { class: 'small se', text: 'A and B as the board shows them. With several runs a '
+      + 'question, the counts are the questions where one build’s average over its runs is '
+      + 'above the other’s; on ARC-AGI-2, the tasks where its task score is.' }),
+    ...selfs);
+  const open = S.open && d.rows.find(r => r.key === S.open.key && r.pair);
+  const notes = el('div', { class: 'card', 'data-report-section': 'pd-notes' },
+    el('h2', { text: 'How to read this' }),
+    el('ul', { class: 'rp-notes' }, (d.notes || []).map(n => {
+      const i = n.indexOf('. ');
+      return el('li', {}, el('b', { text: n.slice(0, i + 1) }), n.slice(i + 1));
+    })));
+  return [back, head, chart, table, open ? pdPanel(id, d, open) : '', notes];
 }
 
 function benchLabel(benches, task) {

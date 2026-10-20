@@ -339,16 +339,22 @@ def settings_words(setup: dict) -> str:
                             "server defaults" else f"{fam}'s card settings")
 
 
-def settings_line(rep: dict, a: str, b: str) -> str:
-    """'' when the two ran on the same settings; else each one's, in words"""
+def settings_parts(rep: dict, a: str, b: str) -> dict | None:
+    """each one's settings in words when the two didn't run the same way;
+    None when they did, or a setup can't be read"""
     sa, sb = _setup(rep, a), _setup(rep, b)
     if not sa or not sb:
-        return ""
-    same = (sa.get("runtime") or "") == (sb.get("runtime") or "") and \
-        sa.get("sampling") == sb.get("sampling")
-    if same:
-        return ""
-    return f"{a} ran on {settings_words(sa)}; {b} on {settings_words(sb)}."
+        return None
+    if (sa.get("runtime") or "") == (sb.get("runtime") or "") and \
+            sa.get("sampling") == sb.get("sampling"):
+        return None
+    return {"a": settings_words(sa), "b": settings_words(sb)}
+
+
+def settings_line(rep: dict, a: str, b: str) -> str:
+    """'' when the two ran on the same settings; else each one's, in words"""
+    p = settings_parts(rep, a, b)
+    return f"{a} ran on {p['a']}; {b} on {p['b']}." if p else ""
 
 
 def sentence(a: str, b: str, rows: list[dict]) -> str:
@@ -397,7 +403,8 @@ def report(rep: dict, rows: list[dict], a: str = "", b: str = "", compute: bool 
             "default": rep.get("default") or [], "a": a, "b": b,
             "colours": {o["label"]: o.get("colour") for o in rep["ours"]},
             "rows": out_rows, "sentence": sentence(a, b, out_rows),
-            "settings": settings_line(rep, a, b), "notes": rep.get("notes") or NOTES,
+            "settings": settings_line(rep, a, b), "settingsParts": settings_parts(rep, a, b),
+            "notes": rep.get("notes") or NOTES,
             "pending": pending, "working": {} if compute else rs.working(js),
             "statsAt": reports.stats_at(ats)}
 
