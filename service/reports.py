@@ -92,6 +92,13 @@ NOTES = [
     "Second thoughts counts \"Wait\", \"Alternatively\", \"Hmm\" and \"Actually\" at the "
     "start of a sentence, per 1,000 thinking tokens. It's a rough sign of how often the model "
     "changes course, not a measure of quality.",
+    # 23e: across training, and near the ceiling (service/training.CEILING)
+    "Across training draws our checkpoints of the same training run in order of their training "
+    "step. The label on each segment is the question-by-question verdict between the two "
+    "checkpoints, from the two-builds report: it can say \"higher\" or \"lower\" where the two "
+    "scores' ± overlap, because it compares the same questions.",
+    "Near the ceiling marks a benchmark where our reference build scores 90% or more. There, a "
+    "few questions decide the difference.",
 ]
 
 
@@ -270,6 +277,8 @@ def our_rows(rep: dict, cells: dict) -> list[dict]:
                     "colour": o.get("colour"), "pick": bool(o.get("pick")),
                     # 22: on Models ▸ Latest, as a published row marked "glance" is
                     "glance": o.get("glance") is True,
+                    # 23e: a checkpoint's training step
+                    **({"step": o["step"]} if isinstance(o.get("step"), int) else {}),
                     "note": o.get("note") or "", "cells": per, "status": " · ".join(parts),
                     "chunks": list(ch) if ch else None, "dir": str(d)})
     return out
@@ -1031,6 +1040,9 @@ def report(rid: str, payload: dict | None = None, compute: bool = False, a: str 
         "speed": speed_cols(rows),
         # 23d: how each thinks, the four benchmarks first_right reads
         "thinks": thinks_of(rows, rep["benchmarks"], compute), "secondWords": _second(),
+        # 23e: our checkpoints across training, and the benchmarks near the ceiling
+        "training": _training(rep, rows, compute), "ceiling": _ceiling(rep, rows),
+        "ceilingWords": _ceiling_words(),
         # 23: the report comparing two of these rows question by question
         "paired": next((x for x, r in files().items() if r.get("kind") == "paired"
                         and (r.get("builds") or {}).get("from") == rid), None),
@@ -1064,8 +1076,52 @@ def thinks_of(rows: list[dict], benches: list[dict], compute: bool = False) -> d
             if b["task"] in thinks.TASKS:
                 x = thinks.kept(Path(r["dir"]), b["task"], compute)
                 if x:
+                    # 23e: the lists' sizes; the lists themselves on asking
+                    ls = x.pop("lists", None) or {}
+                    x["listed"] = {k: {"listed": len(v.get("items") or []),
+                                       "hidden": v.get("hidden") or 0} for k, v in ls.items()}
                     out.setdefault(r["label"], {})[b["key"]] = x
     return out
+
+
+def thinks_list(rid: str, label: str, key: str, which: str) -> dict:
+    """23e: the answers behind "had it, then lost it" (which: lost) or "ran
+    out with it already stated" (ran_out) for one build and benchmark, as the
+    worker kept them: the shown half listed, the hidden half counted. Raises
+    KeyError when there is no such list"""
+    from . import thinks
+    rep = files().get(rid)
+    if rep is None or which not in ("lost", "ran_out"):
+        raise KeyError("no such list")
+    o = next((x for x in rep.get("ours") or [] if x.get("label") == label), None)
+    b = next((x for x in rep.get("benchmarks") or [] if x.get("key") == key), None)
+    if o is None or b is None or b["task"] not in thinks.TASKS:
+        raise KeyError("no such build or benchmark in this report")
+    x = thinks.kept(row_dir(o["row"]), b["task"])
+    ls = ((x or {}).get("lists") or {}).get(which)
+    if ls is None:
+        raise KeyError("not worked out yet")
+    items = ls.get("items") or []
+    from . import ran_out
+    return {"label": label, "bench": key, "task": b["task"], "which": which,
+            "warning": ran_out.WARNING,
+            "n": len(items) + (ls.get("hidden") or 0), "listed": len(items),
+            "hidden": ls.get("hidden") or 0, "items": items}
+
+
+def _training(rep: dict, rows: list[dict], compute: bool = False) -> dict | None:
+    from . import training
+    return training.of_report(rep, rows, compute)
+
+
+def _ceiling(rep: dict, rows: list[dict]) -> dict:
+    from . import training
+    return training.near_ceiling(rep, rows)
+
+
+def _ceiling_words() -> str:
+    from . import training
+    return training.CEILING_WORDS
 
 
 def _second() -> list[str]:

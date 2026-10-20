@@ -22,6 +22,7 @@ text; an answer is shown with each line quoting its question withheld."""
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -52,6 +53,9 @@ NOTES = [
     "counts as not right.",
     "Questions listed follow the board's reader rules: the hidden half is counted but not "
     "listed.",
+    # 23e: as the step-checkpoints report says it
+    "Near the ceiling marks a benchmark where our reference build scores 90% or more. There, a "
+    "few questions decide the difference.",
 ]
 # how a runtime's settings are said in the line under the sentence
 RUNTIME_WORDS = {"lda-2610": "the lda runtime", "card-ornith": "its own card's settings"}
@@ -363,11 +367,19 @@ def sentence(a: str, b: str, rows: list[dict]) -> str:
     done = [r for r in rows if r.get("pair") and r["pair"].get("n")]
     if not done:
         return f"{a} and {b} have no benchmark compared yet."
-    up = sum(1 for r in done if r["pair"]["verdict"] == ps.A_HIGHER)
-    down = sum(1 for r in done if r["pair"]["verdict"] == ps.B_HIGHER)
-    level = len(done) - up - down
-    bits = [f"higher than {b} on {up} benchmark{'s' if up != 1 else ''}",
-            f"lower on {down}"]
+    up = [r for r in done if r["pair"]["verdict"] == ps.A_HIGHER]
+    down = [r for r in done if r["pair"]["verdict"] == ps.B_HIGHER]
+    level = len(done) - len(up) - len(down)
+
+    def ceil(rs: list[dict]) -> str:
+        # 23e: a higher or lower near the ceiling says so
+        names = [r["label"] for r in rs if r.get("ceiling")]
+        if not names:
+            return ""
+        return " (" + (names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and "
+                       + names[-1]) + " near the ceiling)"
+    bits = [f"higher than {b} on {len(up)} benchmark{'s' if len(up) != 1 else ''}{ceil(up)}",
+            f"lower on {len(down)}{ceil(down)}"]
     return (f"{a} is {bits[0]}, {bits[1]}, and the two can't be told apart on {level}.")
 
 
@@ -385,6 +397,11 @@ def report(rep: dict, rows: list[dict], a: str = "", b: str = "", compute: bool 
     if a == b:
         raise ValueError("pick two different builds")
     cells = {r["label"]: r["cells"] for r in rows}
+    # 23e: near the ceiling, by the reference of the report its builds come from
+    src = (reports.files().get((rep.get("builds") or {}).get("from") or "") or {}) \
+        if isinstance(rep.get("builds"), dict) else {}
+    from . import training
+    ref_cells = cells.get(src.get("reference")) or {}
     out_rows, ats, pending = [], [], []
     for bm in reports.bench_meta(rep["benchmarks"]):
         fa, fb_ = samples(rep, a, bm["task"]), samples(rep, b, bm["task"])
@@ -393,8 +410,10 @@ def report(rep: dict, rows: list[dict], a: str = "", b: str = "", compute: bool 
             pending.append(bm["label"])
         if x:
             ats.append(x["at"])
+        rv = (ref_cells.get(bm["key"]) or {}).get("v")
         out_rows.append({**bm, "a": (cells.get(a) or {}).get(bm["key"]),
                          "b": (cells.get(b) or {}).get(bm["key"]),
+                         "ceiling": isinstance(rv, (int, float)) and rv >= training.CEILING,
                          "pair": x, "missing": "" if fa is not None and fb_ is not None else (
                              f"no scored answers from {a if fa is None else b}")})
     js = [j for j in jobs(rep) if f"|{a}|" in j.slot and f"|{b}|" in j.slot]
@@ -404,7 +423,7 @@ def report(rep: dict, rows: list[dict], a: str = "", b: str = "", compute: bool 
             "colours": {o["label"]: o.get("colour") for o in rep["ours"]},
             "rows": out_rows, "sentence": sentence(a, b, out_rows),
             "settings": settings_line(rep, a, b), "settingsParts": settings_parts(rep, a, b),
-            "notes": rep.get("notes") or NOTES,
+            "notes": rep.get("notes") or NOTES, "ceilingWords": training.CEILING_WORDS,
             "pending": pending, "working": {} if compute else rs.working(js),
             "statsAt": reports.stats_at(ats)}
 
@@ -472,7 +491,13 @@ def one(rep: dict, label: str, task: str, qid: str, epoch: int) -> dict:
     shown = fb.shown(task, it) if it and not gone else None
     clean = (lambda s: ran_out.scrub(s, it)) if gone else (lambda s: s)
     run = {**runs[k], "answer": text}
+    thinking, reply = clean(fb.thinking_of(text)), clean(fb.visible(text))
+    right = ran_out.right_of(task, it) if it else {}
     return {"task": task, "id": str(qid), "epoch": int(epoch), "label": label,
+            # 23e: where its thinking first stated the right answer and its
+            # reply's final answer, marked; the right option's letter alone
+            "marks": {"first": first_mark(task, it, thinking), "final": final_mark(task, reply)},
+            "right_letter": right.get("letter") or None,
             "withheld": gone, "runs": [{"epoch": int(r.get("epoch", i) or 0),
                                         "ok": r.get("ok"), "ran_out": bool(r.get("ran_out"))}
                                        for i, r in enumerate(runs)],
@@ -480,4 +505,48 @@ def one(rep: dict, label: str, task: str, qid: str, epoch: int) -> dict:
                                                 "options": shown.get("options") or []},
             "ok": runs[k].get("ok"), "ran_out": bool(runs[k].get("ran_out")),
             "verdict": fb.verdict(task, run), "tokens": runs[k].get("tokens"),
-            "thinking": clean(fb.thinking_of(text)), "reply": clean(fb.visible(text))}
+            "thinking": thinking, "reply": reply}
+
+
+def first_mark(task: str, item: dict | None, thinking: str) -> list[int] | None:
+    """23e: [start, end] of where the thinking first states the right answer
+    (ran_out.first_right) — to the end of its sentence or line, 200
+    characters at most; None where it never does"""
+    from . import ran_out
+    at = ran_out.first_right(task, item, thinking) if item and thinking else None
+    if at is None:
+        return None
+    end = at + 1
+    while end < len(thinking) and end - at < 200 and thinking[end] not in ".!?\n":
+        end += 1
+    return [at, min(len(thinking), end + 1)]
+
+
+_FINAL = {"letter": r"(?i)\banswer\s*[:：]?\s*\**\s*\(?[A-J]\)?(?![A-Za-z0-9])",
+          "boxed": r"\\boxed\{", "exact": r"(?i)exact answer\s*:[^\n]*",
+          "any": r"(?i)\b(?:final\s+)?answer\s*(?:is|:)[^\n]{0,80}"}
+
+
+def final_mark(task: str, reply: str) -> list[int] | None:
+    """23e: [start, end] of the reply's final answer: its last "ANSWER: X"
+    (GPQA, MMLU-Pro), its last \\boxed{…} (MATH, OTIS), "Exact Answer: …"
+    (HLE), else its last "answer is …"; None when it has none"""
+    if not reply:
+        return None
+    if task in ("gpqa_diamond_epoch", "mmlupro_tiger"):
+        ms = list(re.finditer(_FINAL["letter"], reply))
+    elif task in ("math_l5_epoch", "otis_aime_epoch"):
+        ms = list(re.finditer(_FINAL["boxed"], reply))
+        if ms:
+            m = ms[-1]
+            depth, j = 1, m.end()
+            while j < len(reply) and depth:
+                depth += {"{": 1, "}": -1}.get(reply[j], 0)
+                j += 1
+            return [m.start(), j]
+    elif task == "hle_text_cais":
+        ms = list(re.finditer(_FINAL["exact"], reply))
+    else:
+        ms = []
+    ms = ms or list(re.finditer(_FINAL["any"], reply))
+    return [ms[-1].start(), ms[-1].end()] if ms else None

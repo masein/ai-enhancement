@@ -1705,6 +1705,19 @@ def reports_answer(rid: str, model: str, task: str, id: str, epoch: int = 0):
         raise HTTPException(404, str(e).strip("'\"")) from None
 
 
+@app.get("/api/reports/{rid}/thinks")
+def reports_thinks(rid: str, model: str, bench: str, which: str):
+    """23e: the answers behind "had it, then lost it" (which=lost) or "ran
+    out with it already stated" (which=ran_out) for one build and benchmark
+    of a scorecard: the shown half listed as the worker kept it, the hidden
+    half counted — never computed here"""
+    from . import reports
+    try:
+        return reports.thinks_list(rid, model, bench, which)
+    except KeyError as e:
+        raise HTTPException(404, str(e).strip("'\"")) from None
+
+
 @app.get("/api/reports/{rid}")
 def reports_one(rid: str, a: str = "", b: str = "", bench: str = "", side: str = ""):
     """a report, every number from the board's tables. 23: a paired report for

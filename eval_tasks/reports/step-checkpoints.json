@@ -17,6 +17,7 @@
  "ours": [
   {
    "label": "step8804",
+   "step": 8804,
    "row": "served/step8804-lda-2610 · thinking",
    "colour": 6,
    "pick": true,
@@ -24,6 +25,7 @@
   },
   {
    "label": "step4000",
+   "step": 4000,
    "row": "served/step4000-lda-2610 · thinking",
    "colour": 0,
    "pick": true,
@@ -31,6 +33,7 @@
   },
   {
    "label": "step1000",
+   "step": 1000,
    "row": "served/step1000-lda-2610 · thinking",
    "colour": 4,
    "pick": true,
@@ -75,6 +78,13 @@
   }
  ],
  "reference": "Q4 (UD-Q4_K_XL)",
+ "training": {
+  "label": "Training steps",
+  "references": [
+   "Q4 (UD-Q4_K_XL)",
+   "BF16"
+  ]
+ },
  "glance_benchmarks": [
   "gpqa",
   "otis",
