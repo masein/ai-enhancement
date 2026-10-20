@@ -109,7 +109,8 @@ def test_the_scorecards_how_it_thinks(live, page, width, scheme):
     # 18 of 18 right answers state it; 4 of its 10 wrong answers had it first; one of the two
     # that ran out had it
     s4 = rows[1]
-    assert s4[1] == "100%" and s4[5] == "40%" and s4[6] == "50%"
+    # 23e: the two that open their answers end in ▸
+    assert s4[1] == "100%" and s4[5] == "40% ▸" and s4[6] == "50% ▸"
     assert page.locator("[data-th-bar]").count() == 2
     assert no_sideways(page) and page.errors == []
     SCREENS.mkdir(parents=True, exist_ok=True)
@@ -122,7 +123,7 @@ def test_the_scorecards_how_it_thinks(live, page, width, scheme):
     page.wait_for_selector("[data-th-table='mmlupro']")
     m = table(page)
     assert [r[0] for r in m[1:]] == [S4, Q4]
-    assert m[1][6] == "100%" and m[2][1] == "0%"
+    assert m[1][6] == "100% ▸" and m[2][1] == "0%"
     assert page.locator("[data-th-bar]").count() == 0          # no right answer states it
     assert no_sideways(page) and page.errors == []
     part.screenshot(path=str(SCREENS / f"report-thinks-mmlupro-{width}-{scheme}.png"))

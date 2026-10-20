@@ -5590,6 +5590,24 @@ table.rp tr.rp-group td { background:var(--plane); font-weight:600; text-align:l
 /* 23c: speed and energy — the card's table as wide as it needs, a label wrapping
    where the column is narrow (it was cut short at 400 px) */
 .by-sub { margin:var(--sp-3) 0 2px; font-size:var(--fs-1); font-weight:600; }
+/* 23e: near the ceiling, across training, the examples and the reader's marks */
+.rp-ceil { display:inline-block; margin-left:6px; padding:0 6px; border-radius:999px;
+  border:1px solid var(--warning); color:var(--text-secondary); font-size:var(--fs-0, 11px);
+  font-weight:400; text-transform:none; letter-spacing:0; white-space:nowrap; cursor:help;
+  vertical-align:1px; }
+.tr-panels { grid-template-columns:repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
+.tr-svg { display:block; width:100%; height:auto; }
+.tr-seg text { fill:var(--text-primary); paint-order:stroke; stroke:var(--surface-1);
+  stroke-width:3px; stroke-linejoin:round; cursor:pointer; }
+.tr-seg.tr-higher text { fill:var(--success-text); }
+.tr-seg.tr-lower text { fill:var(--critical-text); }
+.tr-seg:hover text, .tr-seg:focus text { text-decoration:underline; }
+.th-open { background:none; border:0; padding:0; color:var(--accent); cursor:pointer;
+  font:inherit; text-decoration:underline; }
+.th-list { margin-top:var(--sp-3); }
+.pd-mark { color:inherit; border-radius:2px; padding:0 1px; }
+.pd-mark-first { background:color-mix(in srgb, var(--warning) 40%, transparent); }
+.pd-mark-final { background:color-mix(in srgb, var(--accent) 30%, transparent); }
 /* 23d: how it thinks — a bar a build, before and after it first stated the answer */
 .th-part { margin-top:var(--sp-4); }
 .th-part h3 { margin:0 0 var(--sp-1); }
@@ -27684,7 +27702,8 @@ function vReport(id) {
     el('h2', { text: 'Our runs' }),
     el('div', { class: 'rp-scroll' }, el('table', { class: 'rp', 'data-rp-ours': '1' },
       el('thead', {}, el('tr', {}, el('th', { text: 'Model' }),
-        ...benches.map(b => el('th', { text: b.label, title: b.compare ? '' : b.why })))),
+        ...benches.map(b => el('th', { title: b.compare ? '' : b.why }, b.label,
+          rpCeil(d, b.key))))),
       el('tbody', {}, d.ours.map(m => el('tr', { 'data-rp-row': m.label },
         el('td', { class: 'rp-ours', title: m.row },
           el('span', { class: 'rp-dot', style: `background:${rpColour(m)}` }), m.label,
@@ -27756,6 +27775,7 @@ function vReport(id) {
         .sort((p, q) => q.cells[b.key].v - p.cells[b.key].v);
       return el('div', { class: 'rp-bench', 'data-rp-bench': b.key },
         el('h3', { text: b.label + (b.compare ? '' : ' (ours only — never compared)') },
+          rpCeil(d, b.key),
           el('span', { class: 'rp-sub', text: `the line from ${Math.round(dom[b.key][0] * 100)} `
             + `to ${Math.round(dom[b.key][1] * 100)}` })),
         rows.length ? el('div', { class: 'rp-dots' }, rows.flatMap(m => {
@@ -27908,7 +27928,7 @@ function vReport(id) {
         el('a', { href: c.url, target: '_blank', rel: 'noopener', text: c.card }),
         c.at ? ` · entered ${c.at}${c.by ? ' by ' + c.by : ''}` : ' · not entered yet'))))
       : '');
-  return [back, head, ours, stand, byBench, rpBeyond(d), tok, loops, every, notes];
+  return [back, head, ours, rpTraining(d), stand, byBench, rpBeyond(d), tok, loops, every, notes];
 }
 // ---------------------------------------------------------------------------
 // 21b: a report of the answers our models ran out of room on — for insight
@@ -28250,6 +28270,16 @@ function pdOpened(id, who, task, qid, epoch) {
     return el('div', { class: 'pd-ans' }, skeleton(2, { 'data-loading': 'pd-answer' }));
   }
   if (a.err) return el('p', { class: 'warn pd-ans', 'data-pd-refused': '1', text: a.err });
+  // 23e: where its thinking first stated the right answer, and its final answer, marked
+  const mk = a.marks || {};
+  const marked = (text, span, what) => !span ? [text] : [text.slice(0, span[0]),
+    el('mark', { class: 'pd-mark pd-mark-' + what, 'data-pd-mark': what,
+      text: text.slice(span[0], span[1]) }), text.slice(span[1])];
+  const think = a.thinking ? el('pre', {}, ...marked(a.thinking, mk.first, 'first')) : null;
+  if (think && mk.first) requestAnimationFrame(() => {
+    const m = think.querySelector('mark');
+    if (m && think.scrollHeight > think.clientHeight) think.scrollTop = Math.max(0, m.offsetTop - think.offsetTop - 40);
+  });
   return el('div', { class: 'pd-ans', 'data-pd-answer': `${who}:${qid}:${epoch}` },
     a.runs.length > 1 ? el('div', { class: 'rp-picker' }, a.runs.map(r => el('button', {
       class: 'chip-btn' + (r.epoch === a.epoch ? ' on' : ''), type: 'button',
@@ -28261,9 +28291,13 @@ function pdOpened(id, who, task, qid, epoch) {
     a.withheld ? el('p', { class: 'small se', 'data-pd-withheld': '1', text: 'Question text '
         + 'withheld: ' + a.withheld + '. Each line of the answer that quotes it is withheld.' })
       : a.question ? el('p', { class: 'small', 'data-pd-question': '1', text: a.question.q }) : '',
-    a.thinking ? el('details', {}, el('summary', { text: `Its thinking, `
-      + `${rpN(a.thinking.length)} characters` }), el('pre', { text: a.thinking })) : '',
-    el('pre', { 'data-pd-reply': '1', text: a.reply || '(nothing after its thinking)' }));
+    a.right_letter ? el('p', { class: 'small', 'data-pd-right': '1',
+      text: `The right option: (${a.right_letter}).` }) : '',
+    a.thinking ? el('details', { open: mk.first ? '' : null }, el('summary', { text: `Its thinking, `
+      + `${rpN(a.thinking.length)} characters` + (mk.first ? ' · marked where it first stated the '
+        + 'right answer' : ' · it never states the right answer clearly') }), think) : '',
+    el('pre', { 'data-pd-reply': '1' }, ...(a.reply ? marked(a.reply, mk.final, 'final')
+      : ['(nothing after its thinking)'])));
 }
 function pdPanel(id, d, r) {
   const S = pdState(id), side = S.open.side, k = [d.a, d.b, r.key, side].join('\u0000');
@@ -28353,7 +28387,8 @@ function vPaired(id, d0, back) {
       el('td', { class: 'dash', colspan: 5, text: r.missing || 'being worked out' }));
     const p = r.pair;
     return el('tr', { 'data-pd-row': r.key },
-      el('td', {}, r.label, el('span', { class: 'rp-sub', 'data-pd-of': r.key,
+      el('td', {}, r.label, rpCeil({ ceiling: { [r.key]: r.ceiling }, ceilingWords: d.ceilingWords },
+        r.key), el('span', { class: 'rp-sub', 'data-pd-of': r.key,
         text: pdOf(p, r, a, b) })),
       rpOurCell(r.a, r, true), rpOurCell(r.b, r, true),
       el('td', { class: 'num', 'data-pd-diff': r.key,
@@ -28668,6 +28703,107 @@ function bySpeed(sp, m, lab) {
   }
   return out;
 }
+// ---- 23e: near the ceiling, and across training ----
+// a benchmark where the reference build scores 90% or more: marked wherever
+// the report names it, the reason on hover
+function rpCeil(d, key) {
+  return (d.ceiling || {})[key] ? el('span', { class: 'rp-ceil', 'data-ceil': key,
+    title: d.ceilingWords || '', tabindex: '0', text: 'near the ceiling' }) : '';
+}
+const trShort = x => String(x).split(' (')[0];
+// one benchmark's panel: x the training step, y the score; each scored
+// checkpoint a dot with its ±1 SE, joined in step order; the references as
+// dashed lines; each segment's verdict from the two-builds report, a link
+function trPanel(d, T, b, byL) {
+  const cps = T.checkpoints;
+  const pts = cps.map(c => ({ ...c, m: byL[c.label] || {}, c: ((byL[c.label] || {}).cells || {})[b.key] || {} }))
+    .filter(p => p.c.v != null);
+  const refs = T.references.map(r => ({ label: trShort(r), v: (((byL[r] || {}).cells || {})[b.key] || {}).v }))
+    .filter(r => r.v != null);
+  const missing = cps.filter(c => !pts.some(p => p.label === c.label));
+  const head = el('h3', {}, b.label, rpCeil(d, b.key));
+  if (!pts.length && !refs.length) return el('div', { class: 'by-panel tr-panel', 'data-tr-panel': b.key },
+    head, el('p', { class: 'small se', 'data-tr-missing': b.key, text: 'No checkpoint scored yet.' }));
+  const W = 280, H = 190, L = 36, R = 44, Tp = 14, B = 32, pw = W - L - R, ph = H - Tp - B;
+  const steps = cps.map(c => c.step), sx0 = Math.min(...steps), sx1 = Math.max(...steps);
+  const pad = (sx1 - sx0) * 0.08 || 1;
+  const X = v => L + pw * (v - (sx0 - pad)) / (sx1 - sx0 + 2 * pad);
+  const ys = [...pts.flatMap(p => [p.c.v - (p.c.se || 0), p.c.v + (p.c.se || 0)]), ...refs.map(r => r.v)];
+  let y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const yp = (y1 - y0) * 0.15 || 0.02;
+  y0 = Math.max(0, y0 - yp); y1 = Math.min(1, y1 + yp);
+  if (y1 - y0 < 0.02) { y0 = Math.max(0, y0 - 0.01); y1 = Math.min(1, y1 + 0.01); }
+  const Y = v => Tp + ph * (1 - (v - y0) / (y1 - y0));
+  const svg = el('svg:svg', { class: 'tr-svg', viewBox: `0 0 ${W} ${H}`, role: 'img',
+    'aria-label': `${b.label}: each checkpoint's score by training step` });
+  svg.append(el('svg:rect', { x: L, y: Tp, width: pw, height: ph, fill: 'none', stroke: 'var(--grid)' }));
+  for (const v of [y0 + (y1 - y0) * 0.1, (y0 + y1) / 2, y1 - (y1 - y0) * 0.1])
+    svg.append(el('svg:text', { x: L - 4, y: Y(v) + 3, 'text-anchor': 'end', 'font-size': 8,
+      fill: 'var(--muted)', text: (100 * v).toFixed(1) }));
+  for (const c of cps)
+    svg.append(el('svg:line', { x1: X(c.step), x2: X(c.step), y1: Tp + ph, y2: Tp + ph + 3, stroke: 'var(--axis)' }),
+      el('svg:text', { x: X(c.step), y: Tp + ph + 12, 'text-anchor': 'middle', 'font-size': 8,
+        fill: 'var(--muted)', text: c.step.toLocaleString('en') }));
+  svg.append(el('svg:text', { x: L + pw / 2, y: H - 4, 'text-anchor': 'middle', 'font-size': 8,
+    fill: 'var(--text-secondary)', text: T.label.toLowerCase() }));
+  // the references: dashed, labelled at their right end (a label on another's moved aside)
+  const placed = [];
+  for (const r of [...refs].sort((p, q) => q.v - p.v)) {
+    let ly = Y(r.v) + 3;
+    while (placed.some(q => Math.abs(q - ly) < 9)) ly += 9;
+    placed.push(ly);
+    svg.append(el('svg:line', { x1: L, x2: L + pw, y1: Y(r.v), y2: Y(r.v), stroke: 'var(--text-secondary)',
+      'stroke-dasharray': '4 3', 'stroke-width': 1, 'data-tr-ref': `${b.key}:${r.label}` },
+      el('svg:title', { text: `${r.label}: ${rpNum(r.v)}` })),
+      el('svg:text', { x: L + pw + 3, y: ly, 'font-size': 8, fill: 'var(--text-secondary)', text: r.label }));
+  }
+  // the line through the checkpoints, then each one's whisker and dot
+  if (pts.length > 1) svg.append(el('svg:polyline', { points: pts.map(p => `${X(p.step)},${Y(p.c.v)}`).join(' '),
+    fill: 'none', stroke: 'var(--accent)', 'stroke-width': 1.5, 'data-tr-line': b.key }));
+  for (const p of pts) {
+    const se = p.c.se || 0, cx = X(p.step);
+    svg.append(el('svg:line', { x1: cx, x2: cx, y1: Y(p.c.v - se), y2: Y(p.c.v + se), stroke: rpColour(p.m),
+      'stroke-width': 1.5, 'data-tr-whisker': `${b.key}:${p.label}` }),
+      el('svg:circle', { cx, cy: Y(p.c.v), r: 4, fill: rpColour(p.m), 'data-tr-dot': `${b.key}:${p.label}` },
+        el('svg:title', { text: `${p.label}: ${rpNum(p.c.v)} ± ${rpNum(se)}` })));
+  }
+  // each segment's verdict, at its middle: a link to the two-builds report on that pair
+  for (const g of T.segments[b.key] || []) {
+    const pa = pts.find(p => p.label === g.a), pb = pts.find(p => p.label === g.b);
+    if (!pa || !pb || !g.verdict) continue;
+    const mx = (X(pa.step) + X(pb.step)) / 2, my = (Y(pa.c.v) + Y(pb.c.v)) / 2 - 6;
+    const words = `${g.d == null ? '' : (g.d > 0 ? '+' : g.d < 0 ? '−' : '') + Math.abs(g.d).toFixed(1) + ', '}${g.verdict}`;
+    const href = `#tab=reports&report=${encodeURIComponent(T.paired || '')}&a=${encodeURIComponent(g.b)}`
+      + `&b=${encodeURIComponent(g.a)}`;
+    svg.append(el('svg:a', { href, 'data-tr-seg': `${b.key}:${g.a}>${g.b}`, class: 'tr-seg tr-' + g.verdict.replace(/\W+/g, ''),
+        onclick: e => { e.preventDefault(); if (!T.paired) return;
+          Object.assign(pdState(T.paired), { a: g.b, b: g.a, open: null }); rpOpen(T.paired); } },
+      el('svg:title', { text: `${g.b} against ${g.a}, question by question: ${g.verdict} — open the two-builds report` }),
+      el('svg:text', { x: mx, y: my, 'text-anchor': 'middle', 'font-size': 8.5, text: words })));
+  }
+  return el('div', { class: 'by-panel tr-panel', 'data-tr-panel': b.key }, head, svg,
+    missing.length ? el('p', { class: 'small se', 'data-tr-missing': b.key,
+      text: missing.map(c => `${c.label}: not scored yet`).join(' · ') }) : '');
+}
+// "Across training": a panel a benchmark, once two checkpoints are scored on one
+function rpTraining(d) {
+  const T = d.training;
+  if (!T || (T.checkpoints || []).length < 2) return '';
+  const byL = Object.fromEntries(d.ours.map(m => [m.label, m]));
+  const scored = b => T.checkpoints.filter(c => (((byL[c.label] || {}).cells || {})[b.key] || {}).v != null);
+  if (!d.benchmarks.some(b => scored(b).length >= 2)) return '';
+  const refs = T.references.map(trShort);
+  return el('div', { class: 'card', 'data-report-section': 'training' },
+    el('h2', { text: 'Across training' }),
+    T.sentence ? el('p', { class: 'rp-line', 'data-tr-sentence': '1', text: T.sentence }) : '',
+    T.against ? el('p', { class: 'small', 'data-tr-against': '1', text: T.against }) : '',
+    el('p', { class: 'small se', text: `Our checkpoints of the same training run, by training `
+      + `step: each dot a score with ±1 standard error, joined in order`
+      + (refs.length ? `; ${refs.join(' and ')} as dashed lines` : '') + '. The label on a '
+      + 'segment is the question-by-question verdict between the two checkpoints, and opens the '
+      + 'two-builds report on that pair. Each panel has its own scale.' }),
+    el('div', { class: 'by-panels tr-panels' }, d.benchmarks.map(b => trPanel(d, T, b, byL))));
+}
 // ---- 23d: how it thinks ----
 // the four benchmarks first_right reads, GPQA Diamond first
 const TH_TASKS = ['gpqa_diamond_epoch', 'mmlupro_tiger', 'math_l5_epoch', 'otis_aime_epoch'];
@@ -28687,8 +28823,10 @@ function thLost(x) {
   return w.lost_share != null ? `Of its wrong answers, ${thPct(w.lost_share)} had stated the right `
     + 'answer first.' : '';
 }
-// a row's cells, a build's or a benchmark's: the table's eight columns after its name
-function thCells(x, words) {
+// a row's cells, a build's or a benchmark's: the table's eight columns after its name —
+// 23e: in the report, "had it, then lost it" and "ran out with it already stated" open
+// their answers (open(which) gives the click; none on the model page)
+function thCells(x, words, open) {
   const r = x.right || {}, w = x.wrong || {}, o = x.ran_out || {}, s2 = x.second || {};
   const sec = k => (s2[k] || {}).all_per_1k;
   const per = k => words.map(wd => `${wd} ${thF(((s2[k] || {}).per_1k || {})[wd])}`).join(', ');
@@ -28701,11 +28839,66 @@ function thCells(x, words) {
       + 'that state it'),
     td(thN(r.after_median), r.before_median != null ? `median tokens before it ${thN(r.before_median)}`
       : ''),
-    td(thPct(w.lost_share), w.n ? `${rpN(w.lost)} of ${rpN(w.n)} wrong answers` : 'no wrong answer '
-      + 'that finished', { 'data-th-lost': '1' }),
-    td(thPct(o.stated_share), o.n ? `${rpN(o.stated)} of ${rpN(o.n)} that ran out` : 'none ran out'),
+    thLink(td(thPct(w.lost_share), w.n ? `${rpN(w.lost)} of ${rpN(w.n)} wrong answers`
+      : 'no wrong answer that finished', { 'data-th-lost': '1' }), w.lost, open, 'lost'),
+    thLink(td(thPct(o.stated_share), o.n ? `${rpN(o.stated)} of ${rpN(o.n)} that ran out`
+      : 'none ran out', { 'data-th-out': '1' }), o.stated, open, 'ran_out'),
     td(`${thF(sec('right'))} / ${thF(sec('wrong'))}`, `right: ${per('right')}; wrong: ${per('wrong')}`
       + ' — per 1,000 thinking tokens', { 'data-th-second': '1' })];
+}
+// 23e: a number that opens its answers, where there are some and a list to open
+function thLink(td, n, open, which) {
+  if (!open || !n) return td;
+  const on = open(which, true);
+  const text = td.textContent;
+  td.textContent = '';
+  td.append(el('button', { class: 'th-open', type: 'button', 'data-th-open': which,
+    'aria-expanded': String(!!on), text: text + (on ? ' ▾' : ' ▸'), onclick: () => open(which) }));
+  return td;
+}
+const TH_LIST_TITLE = { lost: 'Had it, then lost it', ran_out: 'Ran out with it already stated' };
+async function thFetch(id, o, k) {
+  const R = RPS();
+  R.thLists[k] = 'asking';
+  try {
+    R.thLists[k] = await api(`api/reports/${encodeURIComponent(id)}/thinks?model=`
+      + `${encodeURIComponent(o.p)}&bench=${encodeURIComponent(o.key)}&which=${o.which}`);
+  } catch (e) { R.thLists[k] = { err: e.message }; }
+  if (state.tab === 'reports') render();
+}
+// the answers behind one of the two numbers: the shown half, each opened in
+// the two-builds report's reader with its marks; the hidden half counted
+function thList(d, id, sel) {
+  const R = RPS(), o = (R.thOpen || {})[id];
+  if (!o || o.key !== sel.key) return '';
+  R.thLists = R.thLists || {};
+  const k = [o.p, o.key, o.which].join('\u0000'), L = R.thLists[k];
+  const card = el('div', { class: 'th-list', 'data-th-list': `${o.p}|${o.key}|${o.which}` },
+    el('h4', { class: 'by-sub', text: `${TH_LIST_TITLE[o.which]}: ${o.p} on ${sel.label}` }));
+  if (!L) thFetch(id, o, k);
+  if (!L || L === 'asking') return (card.append(skeleton(3, { 'data-loading': 'th-list' })), card);
+  if (L.err) return (card.append(el('p', { class: 'warn', text: L.err })), card);
+  const P = d.paired && pdState(d.paired);
+  card.append(L.warning ? roWarn(L.warning) : '',
+    el('p', { class: 'small', 'data-th-list-head': '1', text: `${rpN(L.n)} answer`
+      + `${L.n === 1 ? '' : 's'}; ${rpN(L.listed)} listed, ${rpN(L.hidden)} in the hidden half.` }),
+    el('ul', { class: 'pd-items' }, L.items.map(x => {
+      const key = `${o.p}:${x.id}`, opened = P && P.read[key] != null;
+      return el('li', { 'data-th-item': `${x.id}:${x.epoch}` },
+        el('div', {}, el('b', { text: x.id }), x.epoch ? el('span', { class: 'small se',
+          text: ` · run ${x.epoch + 1}` }) : ''),
+        el('div', { class: 'small' }, [x.ran_out ? 'ran out of room before its answer'
+          : `answered ${x.read == null ? 'nothing it could read' : x.read}`,
+        x.pos != null ? `first stated the right answer ${thPct(x.pos)} of the way into its thinking`
+          : 'stated it only after its thinking'].join(' · ')),
+        P ? el('div', { class: 'pd-links small' }, el('a', { href: '#', 'data-th-read': x.id,
+          text: opened ? 'Close the answer ▾' : 'Read the answer ▸', onclick: e => {
+            e.preventDefault();
+            if (opened) delete P.read[key]; else P.read[key] = x.epoch;
+            render(); } })) : '',
+        opened ? pdOpened(d.paired, o.p, L.task, x.id, P.read[key]) : '');
+    })));
+  return card;
 }
 const TH_HEAD = ['Right answers stating it in the thinking', 'Median position',
   'Checking share', 'Median tokens after it', 'Had it, then lost it (of wrong answers)',
@@ -28770,8 +28963,15 @@ function rpThinks(d, id) {
       el('thead', {}, el('tr', {}, el('th', { text: 'Build' }), ...TH_HEAD.map(h => el('th', { text: h })))),
       el('tbody', {}, have.map(r => el('tr', { 'data-th-row': r.p },
         el('td', { class: 'rp-ours' }, el('span', { class: 'rp-dot', style: `background:${rpColour(r.m)}` }), r.p),
-        ...thCells(r.x, d.secondWords || [])))))) : el('p', { class: 'small se',
+        ...thCells(r.x, d.secondWords || [], (which, ask) => {
+          const cur = (R.thOpen || {})[id];
+          const on = !!cur && cur.p === r.p && cur.key === sel.key && cur.which === which;
+          if (ask) return on;
+          R.thOpen = { ...(R.thOpen || {}), [id]: on ? null : { p: r.p, key: sel.key, which } };
+          render();
+        })))))) : el('p', { class: 'small se',
       text: `No ${sel.label} answers worked out yet.` }),
+    thList(d, id, sel),
     thLeft(rows.filter(r => r.x).map(r => r.x)),
     thBars(have.map(r => ({ name: r.p, colour: rpColour(r.m), before: r.x.right.before_median,
       after: r.x.right.after_median })), `${sel.label}: right answers’ median tokens before and `

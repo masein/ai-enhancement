@@ -19,6 +19,10 @@ newest scored samples and this machine's question cache:
   "had it, then lost it";
 - answers that ran out: the share that stated it before the limit, read on
   the whole text as the ran-out report reads it (the same number);
+- 23e: and the answers behind those two — had it, then lost it, and ran out
+  with it stated — each listed (its question, run, where it first stated
+  the answer, what it answered in the end) in the shown half only, the
+  hidden half counted (reports.shown_half, the reader's rule);
 - second thoughts: SECOND's words at the start of a sentence in the
   thinking, each and in all, per 1,000 thinking tokens (the token stats'
   estimate), right answers and wrong ones apart.
@@ -37,7 +41,7 @@ import sys
 from pathlib import Path
 
 TASKS = ("gpqa_diamond_epoch", "mmlupro_tiger", "math_l5_epoch", "otis_aime_epoch")
-WAY = "thinks-1"
+WAY = "thinks-2"                # 23e: and the answers behind two of its numbers
 # "second thoughts": these words at the start of a sentence — named on the page
 SECOND = ("Wait", "Alternatively", "Hmm", "Actually")
 # a sentence's start: the text's or a line's, or after . ! or ? — then any
@@ -111,6 +115,20 @@ def measures(f: Path, task: str) -> dict:
     items = ran_out._items(task)
     right, wrong, cut = [], [], []
     answers = ungraded = 0
+    # 23e: the answers behind "had it, then lost it" and "ran out with it
+    # stated" — listed in the shown half, counted in the hidden
+    lists: dict[str, dict] = {k: {"items": [], "hidden": 0} for k in ("lost", "ran_out")}
+
+    def listed(which: str, qid: str, epoch: int, run: dict, text: str) -> None:
+        if not reports.shown_half(task, qid):
+            lists[which]["hidden"] += 1
+            return
+        thinking, _ = split(text)
+        at = ran_out.first_right(task, it, thinking) if thinking else None
+        lists[which]["items"].append({
+            "id": qid, "epoch": epoch, "ran_out": bool(run.get("ran_out")),
+            "pos": at / len(thinking) if at is not None else None,
+            "read": None if run.get("read") is None else str(run["read"])[:60]})
     missing: set[str] = set()
     missing_runs = 0
     for _, row in reports.jsonl(f):
@@ -126,15 +144,20 @@ def measures(f: Path, task: str) -> dict:
                 missing_runs += 1
                 continue
             text = (resps[k][0] if k < len(resps) and resps[k] else "") or ""
+            e = int(run.get("epoch", k) or 0)
             if run.get("ran_out"):
                 # as the ran-out report reads it: the whole text
                 cut.append(ran_out.first_right(task, it, text) is not None)
+                if cut[-1]:
+                    listed("ran_out", qid, e, run, text)
                 continue
             ok = run.get("ok")
             if ok is None or run.get("ungraded"):
                 ungraded += 1
                 continue
             (right if ok is True else wrong).append(one(task, it, text, run.get("tokens")))
+            if ok is not True and wrong[-1]["stated"]:
+                listed("lost", qid, e, run, text)
     st = [r for r in right if r["stated"]]
     lost = [r for r in wrong if r["stated"]]
     return {
@@ -150,7 +173,8 @@ def measures(f: Path, task: str) -> dict:
                   "lost_share": len(lost) / len(wrong) if wrong else None},
         "ran_out": {"n": len(cut), "stated": sum(cut),
                     "stated_share": sum(cut) / len(cut) if cut else None},
-        "second": {"right": _per_k(right), "wrong": _per_k(wrong)}}
+        "second": {"right": _per_k(right), "wrong": _per_k(wrong)},
+        "lists": lists}
 
 
 # ---------------------------------------------------------------------------

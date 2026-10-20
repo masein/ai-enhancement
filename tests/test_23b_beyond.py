@@ -204,8 +204,9 @@ def test_the_worker_keeps_them_and_the_route_never_computes(svc, monkeypatch):
 def test_step8804_joins_the_scorecard_first_and_the_paired_report_once_scored(svc):
     rep = reports.files()["step-checkpoints"]
     o = rep["ours"][0]
-    assert o == {"label": "step8804", "row": "served/step8804-lda-2610 · thinking", "colour": 6,
-                 "pick": True, "glance": True}
+    # 23e: with its training step
+    assert o == {"label": "step8804", "step": 8804, "row": "served/step8804-lda-2610 · thinking",
+                 "colour": 6, "pick": True, "glance": True}
     from service import app
     r = reports.report("step-checkpoints", app.results_payload())
     row = next(x for x in r["ours"] if x["label"] == "step8804")
