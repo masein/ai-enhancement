@@ -153,5 +153,5 @@ def test_the_link_opens_the_same_pair_and_the_same_build_twice_is_refused(live, 
     link = page.locator("[data-rp-paired='paired']")
     link.wait_for(timeout=30000)
     assert link.inner_text() == "Compare two of these question by question ▸"
-    assert "report=paired&a=step4000&b=step1000" in link.get_attribute("href")
+    assert "report=paired&a=step8804&b=step4000" in link.get_attribute("href")   # 23b
     assert page.errors == []

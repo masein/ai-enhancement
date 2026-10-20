@@ -1,7 +1,8 @@
 """21c: the reports' stats — the thinking tokens and loop examples of a
 scorecard (service/reports.py), the lists of a ran-out report
 (service/ran_out.py), 23: every pair of a paired report's builds
-(service/paired.py) — worked out in a process of their own and kept on disk.
+(service/paired.py), 23b: each row's measures beyond the score
+(service/beyond.py) — worked out in a process of their own and kept on disk.
 
 21 worked them out in a thread of the server's own: reading every stored
 answer (gigabytes of them) inside the server held up every other request,
@@ -143,6 +144,10 @@ def jobs() -> list[Job]:
             if rep.get("kind") == "paired" else reports.jobs(rid, rep)
         for j in got:
             out.setdefault(j.slot, j)
+    # 23b: beyond the score, every row with scored Frontier answers
+    from . import beyond
+    for j in beyond.jobs():
+        out.setdefault(j.slot, j)
     return list(out.values())
 
 

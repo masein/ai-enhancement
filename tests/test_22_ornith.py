@@ -502,7 +502,8 @@ def test_ornith_is_ours_on_latest_and_its_cards_claim_sits_beside_it(svc):  # no
                  "note": "measured here, on its card's settings; not the team's model"}
     # the next free colour: no other row of ours has it
     assert [x.get("colour") for x in rep["ours"] if x is not o].count(5) == 0
-    assert max(x["colour"] for x in rep["ours"] if x is not o and x.get("colour") is not None) == 4
+    # 5 was the next free when it came; 23b: step8804 took 6 after it
+    assert {x["label"]: x["colour"] for x in rep["ours"]}["step8804"] == 6
     t = next(x for x in rep["theirs"] if x["label"] == "Ornith-1.5-35B-A3B, its card")
     url = ("https://huggingface.co/ornith-ai/Ornith-1.5-35B-A3B-GGUF/blob/"
            "12393612fd4f730ff5aadc23e9b8f9648aa49ceb/README.md")

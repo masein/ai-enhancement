@@ -5578,6 +5578,14 @@ table.rp tr.rp-group td { background:var(--plane); font-weight:600; text-align:l
   color:var(--text-secondary); margin:var(--sp-2) 0; }
 .st-higher { color:var(--success-text); } .st-lower { color:var(--critical-text); }
 .st-level { color:var(--muted); }
+/* 23b: beyond the score */
+.by-part h3 { margin:var(--sp-3) 0 var(--sp-1); font-size:var(--fs-2); }
+.by-stack, .by-cal { display:block; width:100%; max-width:420px; height:auto; }
+.by-key { display:flex; flex-wrap:wrap; gap:2px 12px; color:var(--text-secondary); margin:4px 0 8px; }
+.by-panels { display:grid; gap:var(--sp-3); grid-template-columns:repeat(auto-fill,
+  minmax(min(100%, 240px), 1fr)); }
+.by-panel h3 { margin:0; font-size:var(--fs-1); }
+.by-think { display:block; width:100%; height:auto; }
 /* 23: two builds, question by question */
 .pd-pick { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; margin:var(--sp-2) 0; }
 .pd-pill { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -8713,8 +8721,10 @@ function modelScoresTab(m, kinds) {
     gg && LIVE ? ggufStartPanel(m.id) : '')];
   const newest = taken.reduce((a, b) => (b.at || 0) > (a.at || 0) ? b : a).kind;
   const mine = state.mblk[m.id] || {};
+  // 23b: beyond the score, after the others, for a row with Frontier answers
+  const beyond = LIVE && frontierTasks().some(t => cell(t, m.id)) ? [byBlock(m)] : [];
   // 12z B1: the GGUF's block is there before its first number: Measure is in it
-  return kinds.filter(k => k.taken || k.kind === 'gguf').map(k => {
+  return [...kinds.filter(k => k.taken || k.kind === 'gguf').map(k => {
     const open = k.kind in mine ? mine[k.kind] : k.kind === newest;
     const [v, sub] = kindValue(m, k.kind);
     // a closed block is built when it opens: the judged tables are the
@@ -8732,7 +8742,7 @@ function modelScoresTab(m, kinds) {
         k.kind === 'exam' && m.judgedAvg == null
           ? el('span', { class: 'kblock-sub small se', text: sub }) : ''),
       ...(open ? kindParts(m, k.kind) : []));
-  });
+  }), ...beyond];
 }
 // the sections a block holds: each keeps its code, not its card
 function kindParts(m, kind) {
@@ -27496,8 +27506,9 @@ function rpWorking(d) {
 // 21d: what a score is, in words, under every table of scores
 const RP_SCORE_LEGEND = 'Score: the average over every answer, in percent. ±: its standard error '
   + '— how far the score could move with a different draw of questions of the same kind. It comes '
-  + 'from one run, from the number of questions and the score. Two scores closer than about two '
-  + 'standard errors are level.';
+  + 'from how much the score varies between questions; a question asked several times counts '
+  + 'once, at the average of its runs. Two scores closer than about two standard errors are '
+  + 'level.';
 const rpN = v => Number(v).toLocaleString('en');
 // 21d: how many questions, asked how many times — "198 questions × 4",
 // "167 tasks × 2" — never "792 answers"
@@ -27602,7 +27613,11 @@ function vReport(id) {
   // 23: two builds, question by question
   if (d.kind === 'paired') return vPaired(id, d, back);
   const benches = d.benchmarks, compared = benches.filter(b => b.compare);
-  const pick = R.pick[id] && d.picks.includes(R.pick[id]) ? R.pick[id] : d.picks[0];
+  // 23b: opened on the first pick with a score — step8804 first in the
+  // picker, step4000 shown until it is scored
+  const scored = d.picks.find(p => ((d.ours.find(m => m.label === p) || {}).cells
+    && Object.values(d.ours.find(m => m.label === p).cells).some(c => c && c.v != null)));
+  const pick = R.pick[id] && d.picks.includes(R.pick[id]) ? R.pick[id] : scored || d.picks[0];
   const st = d.standing[pick];
   const all = [...d.ours, ...d.theirs];
   const dom = Object.fromEntries(benches.map(b => [b.key, rpDomain(all.map(m => m.cells[b.key]))]));
@@ -27738,15 +27753,17 @@ function vReport(id) {
       + benches.map(b => `${b.label} ${Number(limit(b.task)).toLocaleString('en')}`).join(', ')
       + '.' }),
     el('div', { class: 'rp-scroll tall' }, el('table', { class: 'rp', 'data-rp-tokens': '1' },
-      el('thead', {}, el('tr', {}, RP_TOK_COLS.map(([h, dt]) => {
+      el('thead', {}, el('tr', {}, ...RP_TOK_COLS.map(([h, dt]) => {
         const def = (d.tokenDefs || []).find(x => x[0] === dt);
         return el('th', { 'data-rp-tok-col': h }, h, def ? rpQ(h, def[1]) : '');
-      }))),
+      }), el('th', { 'data-rp-tok-col': 'Ended in a loop' }, 'Ended in a loop',
+        rpQ('Ended in a loop', 'The share of answers that ended in a loop, ' + BY_LOOP_RULE
+          + '. Other papers count loops differently.')))),
       el('tbody', {}, d.ours.flatMap(m => {
         const s = T[m.label] || {};
         const rows = benches.filter(b => s[b.task]);
         const N = v => v == null ? '—' : Number(v).toLocaleString('en');
-        return [el('tr', { class: 'rp-group' }, el('td', { colspan: 9 },
+        return [el('tr', { class: 'rp-group' }, el('td', { colspan: 10 },
             el('span', { class: 'rp-dot', style: `background:${rpColour(m)}` }), m.label)),
           ...(rows.length ? rows.map(b => {
             const x = s[b.task];
@@ -27761,13 +27778,20 @@ function vReport(id) {
                 : '') }),
               el('td', { class: 'num', text: N(x.ran_out) }),
               el('td', { class: 'num', text: x.tok_sum >= 1e6 ? (x.tok_sum / 1e6).toFixed(1)
-                + 'M' : N(x.tok_sum) }));
-          }) : [el('tr', {}, el('td', { class: 'dash', colspan: 9,
+                + 'M' : N(x.tok_sum) }),
+              (lp => el('td', { class: 'num', 'data-rp-tok-loop': `${m.label}|${b.task}`,
+                text: lp && lp.answers ? byPct(lp.share, 1) : '—',
+                title: lp && lp.answers ? `${N(lp.looped)} of ${N(lp.answers)}; of those that ran `
+                  + `out, ${lp.ran_out ? byPct(lp.share_of_ran_out, 1) : '—'}` : '' }))(
+                (((d.beyond || {})[m.label] || {})[b.key] || {}).loops));
+          }) : [el('tr', {}, el('td', { class: 'dash', colspan: 10,
             text: 'No stored answers worked out yet.' }))])];
       })))),
     // 21d: what each column means, in the published page's own words
     (d.tokenDefs || []).length ? el('dl', { class: 'rp-defs', 'data-rp-tok-defs': '1' },
-      d.tokenDefs.flatMap(([dt, dd]) => [el('dt', { text: dt }), el('dd', { text: dd })])) : '');
+      d.tokenDefs.flatMap(([dt, dd]) => [el('dt', { text: dt }), el('dd', { text: dd })])) : '',
+    // 23b: the score against how much each build thinks
+    rpThinkChart(d, benches.filter(b => b.compare)));
   // 5. loop examples
   const L = d.loops;
   const loops = el('div', { class: 'card', 'data-report-section': 'loops' },
@@ -27836,7 +27860,7 @@ function vReport(id) {
         el('a', { href: c.url, target: '_blank', rel: 'noopener', text: c.card }),
         c.at ? ` · entered ${c.at}${c.by ? ' by ' + c.by : ''}` : ' · not entered yet'))))
       : '');
-  return [back, head, ours, stand, byBench, tok, loops, every, notes];
+  return [back, head, ours, stand, byBench, rpBeyond(d), tok, loops, every, notes];
 }
 // ---------------------------------------------------------------------------
 // 21b: a report of the answers our models ran out of room on — for insight
@@ -28321,6 +28345,255 @@ function vPaired(id, d0, back) {
       return el('li', {}, el('b', { text: n.slice(0, i + 1) }), n.slice(i + 1));
     })));
   return [back, head, chart, table, open ? pdPanel(id, d, open) : '', notes];
+}
+
+// ---------------------------------------------------------------------------
+// 23b: beyond the score — how reliable a build is (GPQA ×4, OTIS ×8), how well
+// calibrated (HLE: CAIS's calibration error), how honest (SimpleQA: tries and
+// F) and how it thinks (loops, by the board's rule). Every number the stats
+// worker kept (service/beyond.py); a sentence first, then one small picture
+// ---------------------------------------------------------------------------
+const BYS = () => (state.beyond = state.beyond || { data: {}, asked: {}, err: {} });
+async function byLoad(mid) {
+  const B = BYS();
+  if (B.asked[mid]) return;
+  B.asked[mid] = true;
+  try { B.data[mid] = await api('api/beyond?model=' + encodeURIComponent(mid)); B.err[mid] = ''; }
+  catch (e) { B.err[mid] = e.message; }
+  B.asked[mid] = false;
+  if (state.model === mid) render();
+  const d = B.data[mid];
+  if (d && d.working && d.working.todo)
+    setTimeout(() => { if (state.model === mid) byLoad(mid); }, 5000);
+}
+const byPct = (v, k = 0) => v == null ? '—' : (100 * v).toFixed(k) + '%';
+const BY_LOOP_RULE = 'by the board’s loop rule: the last 200 characters before the end repeat '
+  + 'at least three times in the last 20,000';
+// the sentences, each measure's — on the model page and in the report's hover
+function byRelWords(r, label) {
+  if (!r || !r.n) return `${label}: no question graded on every run yet.`;
+  return `Right every time on ${byPct(r.always_share)} of ${label} questions, never on `
+    + `${byPct(r.never_share)}, and sometimes on ${byPct(r.sometimes_share)} (${r.runs} runs each).`
+    + (r.left_out ? ` ${rpN(r.left_out)} left out: not every run graded yet.` : '');
+}
+function byCalWords(c) {
+  if (!c || !c.n) return 'No HLE answer graded with a confidence yet.';
+  return `Says it is ${Math.round(c.mean_confidence)}% sure on average and is right `
+    + `${byPct(c.right)} of the time. ` + (c.error == null
+      ? 'Calibration error: needs 100 graded answers (CAIS’s measure).'
+      : `Calibration error ${Math.round(c.error)} (CAIS’s measure, as on Scale’s HLE board; `
+        + '0 is perfect).');
+}
+function bySqaWords(s) {
+  if (!s || !s.total) return 'No SimpleQA answer graded yet.';
+  return `Tries ${byPct(s.tries)} of questions; right on ${byPct(s.right_share, 1)} of all `
+    + `and ${byPct(s.right_when_tries, 1)} of the ones it tries; F ${(100 * (s.f || 0)).toFixed(1)}.`;
+}
+// a stacked bar: each part its share, labelled on the bar where it fits and
+// beneath it always — never colour alone
+function byStack(parts, aria) {
+  const total = parts.reduce((a, p) => a + p.n, 0) || 1;
+  const W = 360, H = 26;
+  const svg = el('svg:svg', { class: 'by-stack', viewBox: `0 0 ${W} ${H}`, role: 'img',
+    'aria-label': aria });
+  let x = 0;
+  for (const p of parts) {
+    const w = W * p.n / total;
+    if (w > 0) {
+      svg.append(el('svg:rect', { x, y: 0, width: w, height: H, fill: p.fill,
+        'fill-opacity': 0.35, stroke: p.fill, 'stroke-width': 1 },
+        el('svg:title', { text: `${p.words}: ${rpN(p.n)} (${byPct(p.n / total, 1)})` })));
+      if (w > 46) svg.append(el('svg:text', { x: x + w / 2, y: 17, 'text-anchor': 'middle',
+        'font-size': 11, fill: 'var(--text-primary)', text: `${p.short} ${byPct(p.n / total)}` }));
+    }
+    x += w;
+  }
+  return el('div', { class: 'by-stackwrap' }, svg, el('div', { class: 'by-key small' },
+    parts.map(p => el('span', {}, el('span', { class: 'rp-dot', style: `background:${p.fill}` }),
+      `${p.words} ${rpN(p.n)} (${byPct(p.n / total, 1)})`))));
+}
+// HLE: share right per stated-confidence bin, the diagonal where they agree
+function byCalChart(c) {
+  const W = 360, H = 210, L = 34, B = 40, T = 8, R = 8;
+  const pw = W - L - R, ph = H - T - B;
+  const svg = el('svg:svg', { class: 'by-cal', viewBox: `0 0 ${W} ${H}`, role: 'img',
+    'aria-label': 'share right per stated confidence, with the line where they agree' });
+  const x = v => L + pw * v / 100, y = v => T + ph * (1 - v);
+  for (const t of [0, 0.5, 1]) {
+    svg.append(el('svg:line', { x1: L, x2: W - R, y1: y(t), y2: y(t), stroke: 'var(--grid)' }));
+    svg.append(el('svg:text', { x: L - 4, y: y(t) + 3, 'text-anchor': 'end', 'font-size': 9,
+      fill: 'var(--muted)', text: `${t * 100}%` }));
+  }
+  c.bins.forEach((b, i) => {
+    const x0 = x(i * 10) + 2, w = pw / 10 - 4, few = b.n < 20;
+    if (b.right != null) svg.append(el('svg:rect', { x: x0, y: y(b.right), width: w,
+      height: Math.max(0.5, y(0) - y(b.right)), fill: 'var(--accent)', 'fill-opacity': few ? 0.25 : 0.8,
+      'data-by-bin': String(i), 'data-by-few': String(few) },
+      el('svg:title', { text: `stated ${b.lo}–${b.hi}%: ${rpN(b.n)} answer${b.n === 1 ? '' : 's'}, `
+        + `right ${byPct(b.right)}` + (few ? ' · few answers' : '') })));
+    svg.append(el('svg:text', { x: x0 + w / 2, y: H - B + 12, 'text-anchor': 'middle',
+      'font-size': 8, fill: 'var(--muted)', text: rpN(b.n) }));
+    svg.append(el('svg:text', { x: x0 + w / 2, y: H - B + 23, 'text-anchor': 'middle',
+      'font-size': 8, fill: 'var(--muted)', text: `${b.lo}` }));
+  });
+  svg.append(el('svg:line', { x1: x(0), y1: y(0), x2: x(100), y2: y(1), stroke: 'var(--text-primary)',
+    'stroke-dasharray': '4 3', 'stroke-width': 1 }, el('svg:title', { text: 'where share right '
+      + 'equals stated confidence' })));
+  svg.append(el('svg:text', { x: L + pw / 2, y: H - 3, 'text-anchor': 'middle', 'font-size': 9,
+    fill: 'var(--text-secondary)', text: 'stated confidence (%) · answers in each, above' }));
+  return svg;
+}
+// the model page's block, after the kinds' blocks: closed unless opened
+function byBlock(m) {
+  const B = BYS(), d = B.data[m.id];
+  if (!d && !B.err[m.id] && netReady()) byLoad(m.id);
+  const cal = d && d.benches.hle_text_cais && d.benches.hle_text_cais.calibration;
+  const head = cal && cal.error != null ? `calibration error ${Math.round(cal.error)}`
+    : d ? (Object.keys(d.benches).length ? 'calibration error —' : 'not worked out yet') : '…';
+  const mine = state.mblk[m.id] || {}, open = !!mine.beyond;
+  const blk = el('details', { class: 'card kblock', 'data-kind-block': 'beyond',
+      open: open ? '' : null, ontoggle: e => {
+        const now = e.target.open, o = state.mblk[m.id] = state.mblk[m.id] || {};
+        if (!!o.beyond === now) return;
+        o.beyond = now;
+        if (now) render();
+      } },
+    el('summary', { class: 'kblock-sum' }, el('span', { class: 'kblock-k',
+      text: 'Beyond the score' }), el('span', { class: 'kblock-v', 'data-by-head': '1',
+      text: head })));
+  if (!open) return blk;
+  if (B.err[m.id]) return (blk.append(el('p', { class: 'warn', text: B.err[m.id] })), blk);
+  if (!d) return (blk.append(skeleton(4, { 'data-loading': 'beyond' })), blk);
+  const bx = d.benches, lab = t => (d.labels || {})[t] || t;
+  const part = (key, title, ...kids) => el('div', { class: 'kpart by-part', 'data-by-part': key },
+    el('h3', { text: title }), ...kids);
+  const parts = [];
+  if (!Object.keys(bx).length) parts.push(el('p', { class: 'small se', text: d.working && d.working.todo
+    ? 'Being worked out from the stored answers — back in a minute.'
+    : 'Not worked out yet.' }));
+  const rel = ['gpqa_diamond_epoch', 'otis_aime_epoch'].filter(t => bx[t] && bx[t].reliability);
+  if (rel.length) parts.push(part('reliability', 'Reliability', ...rel.flatMap(t => {
+    const r = bx[t].reliability;
+    return [el('p', { class: 'small', 'data-by-rel': t, text: byRelWords(r, lab(t)) }),
+      r.n ? byStack([{ n: r.always, words: 'always right', short: 'always', fill: 'var(--good)' },
+        { n: r.sometimes, words: 'sometimes', short: 'sometimes', fill: 'var(--warning)' },
+        { n: r.never, words: 'never right', short: 'never', fill: 'var(--critical)' }],
+      `${lab(t)}: right always, sometimes, never`) : ''];
+  })));
+  const c = bx.hle_text_cais && bx.hle_text_cais.calibration;
+  if (c) parts.push(part('calibration', 'Calibration (HLE)',
+    el('p', { class: 'small', 'data-by-cal': '1', text: byCalWords(c) }),
+    el('p', { class: 'small se', text: `On ${rpN(c.n)} graded answers`
+      + (c.ran_out ? `; ${rpN(c.ran_out)} ran out and have no grade` : '')
+      + (c.waiting ? `; ${rpN(c.waiting)} not graded yet` : '')
+      + (c.no_judge_confidence ? `; ${rpN(c.no_judge_confidence)} with no confidence from the judge`
+        : '') + '. '
+      + (c.unstated ? `${rpN(c.unstated)} stated no confidence: the judge counts those as 100%.`
+        : 'Every one stated a confidence.') }),
+    c.n ? byCalChart(c) : ''));
+  const s = bx.simpleqa_epoch && bx.simpleqa_epoch.simpleqa;
+  if (s) parts.push(part('simpleqa', 'SimpleQA Verified',
+    el('p', { class: 'small', 'data-by-sqa': '1', text: bySqaWords(s) }),
+    s.total ? byStack([{ n: s.right, words: 'right', short: 'right', fill: 'var(--good)' },
+      { n: s.wrong, words: 'wrong', short: 'wrong', fill: 'var(--critical)' },
+      { n: s.not_attempted, words: 'didn’t try', short: 'didn’t try', fill: 'var(--s7)' },
+      { n: s.ran_out, words: 'ran out of room', short: 'ran out', fill: 'var(--muted)' }],
+    'SimpleQA: right, wrong, didn’t try, ran out') : ''));
+  const lp = Object.entries(bx).filter(([, v]) => v.loops && v.loops.answers);
+  if (lp.length) parts.push(part('loops', 'Loops',
+    el('p', { class: 'small se', text: 'Answers that ended in a loop, ' + BY_LOOP_RULE + '.' }),
+    el('div', { class: 'rp-scroll' }, el('table', { class: 'rp', 'data-by-loops': '1' },
+      el('thead', {}, el('tr', {}, el('th', { text: 'Benchmark' }),
+        el('th', { text: 'Ended in a loop' }), el('th', { text: 'Of those that ran out' }))),
+      el('tbody', {}, lp.map(([t, v]) => el('tr', { 'data-by-loop': t },
+        el('td', { text: lab(t) }),
+        el('td', { class: 'num', text: `${byPct(v.loops.share, 1)} (${rpN(v.loops.looped)} of `
+          + `${rpN(v.loops.answers)})` }),
+        el('td', { class: 'num', text: v.loops.ran_out ? `${byPct(v.loops.share_of_ran_out, 1)} `
+          + `(${rpN(v.loops.ran_out_looped)} of ${rpN(v.loops.ran_out)})` : '—' }))))))));
+  blk.append(...parts, el('p', { class: 'small se', text: (d.statsAt || {}).words
+    ? `${d.statsAt.words[0].toUpperCase()}${d.statsAt.words.slice(1)}, from the stored answers.`
+    : '' }));
+  return blk;
+}
+// the report's section: one row per picked build, each cell's sentence on hover
+function rpBeyond(d) {
+  const B = d.beyond || {};
+  const cell = (txt, tip, attr) => el('td', { class: 'num', title: tip, ...attr, text: txt });
+  const rows = d.picks.map(p => {
+    const m = d.ours.find(x => x.label === p) || {}, b = B[p] || {};
+    const g = (b.gpqa || {}).reliability, o = (b.otis || {}).reliability;
+    const c = (b.hle || {}).calibration, s = (b.simpleqa || {}).simpleqa;
+    return el('tr', { 'data-by-row': p },
+      el('td', { class: 'rp-ours' }, el('span', { class: 'rp-dot', style: `background:${rpColour(m)}` }), p),
+      cell(g && g.n ? byPct(g.always_share) : '—', g ? byRelWords(g, 'GPQA Diamond') : 'not worked out yet', { 'data-by-cell': `${p}:gpqa` }),
+      cell(o && o.n ? byPct(o.always_share) : '—', o ? byRelWords(o, 'OTIS Mock AIME') : 'not worked out yet'),
+      cell(c && c.error != null ? String(Math.round(c.error)) : '—', c ? byCalWords(c) : 'not worked out yet', { 'data-by-cell': `${p}:cal` }),
+      cell(c && c.n ? `${Math.round(c.mean_confidence)}%` : '—', c ? byCalWords(c) : 'not worked out yet'),
+      cell(s && s.total ? byPct(s.tries) : '—', s ? bySqaWords(s) : 'not worked out yet'),
+      cell(s && s.total ? byPct(s.right_when_tries, 1) : '—', s ? bySqaWords(s) : 'not worked out yet'),
+      cell(s && s.total ? (100 * (s.f || 0)).toFixed(1) : '—', s ? bySqaWords(s) : 'not worked out yet', { 'data-by-cell': `${p}:f` }));
+  });
+  return el('div', { class: 'card', 'data-report-section': 'beyond' },
+    el('h2', { text: 'Beyond the score' }),
+    el('p', { class: 'small se', 'data-by-how': '1', text: 'How to read this: how often each '
+      + 'build is right every time it is asked; how far its stated confidence on HLE is from the '
+      + 'share it gets right (0 is perfect); how often it tries on SimpleQA and how often it is '
+      + 'right when it does. Hover a number for its sentence; the notes below say more.' }),
+    el('div', { class: 'rp-scroll' }, el('table', { class: 'rp', 'data-by-table': '1' },
+      el('thead', {}, el('tr', {}, ['Build', 'GPQA always right', 'OTIS always right',
+        'HLE calibration error', 'HLE mean stated confidence', 'SimpleQA tries',
+        'SimpleQA right when it tries', 'SimpleQA F'].map(h => el('th', { text: h })))),
+      el('tbody', {}, rows))));
+}
+// "Score against thinking": a small panel a benchmark — x its mean thinking
+// tokens, y the board's score, a dot a build in its picker colour, labelled
+function rpThinkChart(d, benches) {
+  const T = d.tokens || {};
+  const panels = benches.map(b => {
+    const pts = d.ours.filter(m => m.pick).map(m => ({ m, x: ((T[m.label] || {})[b.task] || {}).think_mean,
+      y: (m.cells[b.key] || {}).v })).filter(p => p.x != null && p.y != null);
+    if (pts.length < 2) return null;
+    const W = 260, H = 170, L = 34, Bm = 26, Tp = 10, R = 12, pw = W - L - R, ph = H - Tp - Bm;
+    const nice = (lo, hi) => { const pad = (hi - lo) * 0.12 || Math.max(1, hi * 0.1); return [lo - pad, hi + pad]; };
+    const [x0, x1] = nice(Math.min(...pts.map(p => p.x)), Math.max(...pts.map(p => p.x)));
+    const [y0, y1] = nice(Math.min(...pts.map(p => p.y)), Math.max(...pts.map(p => p.y)));
+    const X = v => L + pw * (v - x0) / (x1 - x0), Y = v => Tp + ph * (1 - (v - y0) / (y1 - y0));
+    const svg = el('svg:svg', { class: 'by-think', viewBox: `0 0 ${W} ${H}`, role: 'img',
+      'aria-label': `${b.label}: score against mean thinking tokens` });
+    svg.append(el('svg:rect', { x: L, y: Tp, width: pw, height: ph, fill: 'none', stroke: 'var(--grid)' }));
+    for (const v of [x0 + (x1 - x0) * 0.1, (x0 + x1) / 2, x1 - (x1 - x0) * 0.1])
+      svg.append(el('svg:text', { x: X(v), y: H - Bm + 12, 'text-anchor': 'middle', 'font-size': 8,
+        fill: 'var(--muted)', text: Math.round(v).toLocaleString('en') }));
+    for (const v of [y0 + (y1 - y0) * 0.1, (y0 + y1) / 2, y1 - (y1 - y0) * 0.1])
+      svg.append(el('svg:text', { x: L - 3, y: Y(v) + 3, 'text-anchor': 'end', 'font-size': 8,
+        fill: 'var(--muted)', text: (100 * v).toFixed(1) }));
+    // labels inside the panel: on the right half to the dot's left, and one
+    // that would sit on another's moved down a line
+    const placed = [];
+    for (const p of [...pts].sort((u, v) => Y(u.y) - Y(v.y))) {
+      const cx = X(p.x), left = cx > L + pw / 2, w = 4.6 * p.m.label.length;
+      let ly = Y(p.y) + 3;
+      const x0 = left ? cx - 6 - w : cx + 6;
+      while (placed.some(q => Math.abs(q.y - ly) < 9 && x0 < q.x0 + q.w && q.x0 < x0 + w))
+        ly += 9;
+      placed.push({ x0, w, y: ly });
+      svg.append(el('svg:circle', { cx, cy: Y(p.y), r: 4, fill: rpColour(p.m),
+        'data-by-dot': `${b.key}:${p.m.label}` }, el('svg:title', { text: `${p.m.label}: `
+        + `${rpNum(p.y)} at ${Math.round(p.x).toLocaleString('en')} thinking tokens` })));
+      svg.append(el('svg:text', { x: left ? cx - 6 : cx + 6, y: ly, 'font-size': 8,
+        'text-anchor': left ? 'end' : 'start', fill: 'var(--text-primary)', text: p.m.label }));
+    }
+    svg.append(el('svg:text', { x: L + pw / 2, y: H - 2, 'text-anchor': 'middle', 'font-size': 8,
+      fill: 'var(--text-secondary)', text: 'mean thinking tokens per answer' }));
+    return el('div', { class: 'by-panel', 'data-by-think': b.key }, el('h3', { text: b.label }), svg);
+  }).filter(Boolean);
+  if (!panels.length) return '';
+  return el('div', { 'data-by-think-chart': '1' }, el('h3', { text: 'Score against thinking' }),
+    el('p', { class: 'small se', text: 'A dot a build: its mean thinking tokens per answer '
+      + 'across, the board’s score up. Up and to the left is better — the same score for less '
+      + 'thinking. Each panel has its own scales.' }),
+    el('div', { class: 'by-panels' }, panels));
 }
 
 function benchLabel(benches, task) {
