@@ -5580,7 +5580,9 @@ table.rp tr.rp-group td { background:var(--plane); font-weight:600; text-align:l
 .st-level { color:var(--muted); }
 /* 23: two builds, question by question */
 .pd-pick { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; margin:var(--sp-2) 0; }
-.pd-pick select { max-width:min(100%, 260px); }
+.pd-pill { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.moremenu [data-pd-choice] .rp-dot { margin-right:8px; }
+.moremenu [data-pd-choice]:disabled { opacity:.5; cursor:default; }
 .pd-sentence { font-size:var(--fs-3); margin:var(--sp-2) 0 var(--sp-1); }
 .pd-chart { display:grid; grid-template-columns:minmax(0, 16rem) minmax(0, 1fr); gap:4px 12px;
   align-items:center; margin-top:var(--sp-2); }
@@ -28229,18 +28231,29 @@ function vPaired(id, d0, back) {
   const offer = d0.offered || [];
   let a = S.a && offer.includes(S.a) ? S.a : d0.a, b = S.b && offer.includes(S.b) ? S.b : d0.b;
   const same = a === b;
-  const pick = (which, v) => el('select', { [`data-pd-${which}`]: '1', 'aria-label':
-      which === 'a' ? 'build A' : 'build B',
-    onchange: e => which === 'a' ? pdGo(id, e.target.value, b) : pdGo(id, a, e.target.value) },
-    offer.map(x => el('option', { value: x, text: x, ...(x === v ? { selected: '' } : {}) })));
+  // a pill each, as Models' pickers are: its menu the builds with their
+  // colours, the one on the other side not offered again
+  const dot = x => el('span', { class: 'rp-dot', style: `background:${rpColour({ colour:
+    (d0.colours || {})[x] })}` });
+  const pick = (which, v, other) => popover(el('button', { class: 'pill on pd-pill',
+      id: 'pill-pd-' + which, 'data-pd-pill': which, 'data-value': v,
+      'aria-label': `build ${which.toUpperCase()}: ${v}` }, dot(v), `${v} ▾`),
+    () => el('div', { class: 'moremenu', id: 'pop-pd-' + which,
+        'aria-label': `build ${which.toUpperCase()}` },
+      offer.map(x => el('button', { role: 'menuitemradio', 'data-pd-choice': x,
+          'aria-checked': String(x === v), disabled: x === other ? '' : null,
+          title: x === other ? `already ${which === 'a' ? 'B' : 'A'}` : '',
+          onclick: () => { popClose(true); if (which === 'a') pdGo(id, x, b); else pdGo(id, a, x); } },
+        dot(x), x, x === other ? el('span', { class: 'se', text:
+          ` · ${which === 'a' ? 'B' : 'A'}` }) : ''))), { key: 'pd-' + which });
   const head = el('div', { class: 'card', 'data-report': id },
     el('h2', { text: d0.title }), el('p', { class: 'sub', text: d0.what }),
     el('div', { class: 'rp-fresh' }, el('span', { text: 'Our answers: '
       + ((d0.sources || {}).ours || {}).words })),
-    el('div', { class: 'pd-pick', 'data-pd-picker': '1' }, 'Compare ', pick('a', a), ' with ',
-      pick('b', b), el('button', { class: 'btn ghost', type: 'button', 'data-pd-swap': '1',
-        title: 'Swap A and B', 'aria-label': 'Swap A and B', text: '⇄',
-        onclick: () => pdGo(id, b, a) })));
+    el('div', { class: 'pd-pick', 'data-pd-picker': '1' },
+      el('span', { text: 'Compare' }), pick('a', a, b), el('span', { text: 'with' }),
+      pick('b', b, a), el('button', { class: 'pill', type: 'button', 'data-pd-swap': '1',
+        title: 'Swap A and B', text: '⇄ Swap', onclick: () => pdGo(id, b, a) })));
   if (same) return [back, (head.append(el('p', { class: 'warn', 'data-pd-same': '1',
     text: 'Pick two different builds: a build compared with itself says nothing.' })), head)];
   const k = pdKey(a, b), d = pdData(id, d0, a, b);

@@ -38,6 +38,16 @@ def open_pair(page, live, hash_: str = "", width: int = 1280, scheme: str = "lig
     page.wait_for_selector("[data-pd-table]", timeout=30000)
 
 
+def picked(page, which: str) -> str:
+    return page.locator(f"[data-pd-pill='{which}']").get_attribute("data-value")
+
+
+def choose(page, which: str, build: str) -> None:
+    """a build from a pill's menu"""
+    page.locator(f"[data-pd-pill='{which}']").click()
+    page.locator(f"#pop-pd-{which} [data-pd-choice='{build}']").click()
+
+
 def diffs(page) -> dict[str, str]:
     return dict(page.eval_on_selector_all(
         "[data-pd-diff]", "ts => ts.map(t => [t.dataset.pdDiff, t.textContent])"))
@@ -47,10 +57,17 @@ def diffs(page) -> dict[str, str]:
                                           (400, "dark")])
 def test_the_pair_its_chart_and_table(live, page, width, scheme):
     open_pair(page, live, width=width, scheme=scheme)
-    assert page.locator("[data-pd-a]").input_value() == S4
-    assert page.locator("[data-pd-b]").input_value() == Q4
-    opts = page.eval_on_selector_all("[data-pd-a] option", "os => os.map(o => o.value)")
-    assert set(opts) == {S4, Q4, EARLY, ORN}                    # those with answers only
+    assert picked(page, "a") == S4 and picked(page, "b") == Q4
+    assert page.locator("select").count() == 0                  # pills, as Models' pickers
+    page.locator("[data-pd-pill='a']").click()
+    opts = page.eval_on_selector_all("#pop-pd-a [data-pd-choice]",
+                                     "os => os.map(o => [o.dataset.pdChoice, o.disabled])")
+    assert {x for x, _ in opts} == {S4, Q4, EARLY, ORN}         # those with answers only
+    assert dict(opts)[Q4] is True and dict(opts)[EARLY] is False   # B's isn't offered to A
+    SCREENS.mkdir(parents=True, exist_ok=True)
+    page.screenshot(path=str(SCREENS / f"picker-{width}-{scheme}.png"),
+                    clip={"x": 0, "y": 0, "width": width, "height": 520})
+    page.keyboard.press("Escape")
     s = page.locator("[data-pd-sentence]").inner_text()
     assert s.startswith(f"{S4} is higher than {Q4} on ") and "can't be told apart on" in s
     assert page.locator("[data-pd-settings]").count() == 0     # the same runtime
@@ -84,7 +101,8 @@ def test_the_swap_flips_the_numbers_without_asking_again(live, page):
     asked: list[str] = []
     page.on("request", lambda r: asked.append(r.url) if "/api/reports/paired" in r.url else None)
     page.locator("[data-pd-swap]").click()
-    page.wait_for_function(f"document.querySelector('[data-pd-a]').value === {Q4!r}")
+    page.wait_for_function("document.querySelector(\"[data-pd-pill='a']\").dataset.value"
+                           f" === {Q4!r}")
     after = diffs(page)
     for k, v in before.items():
         assert after[k].split(" ")[0] == ("−" + v[1:] if v.startswith("+") else
@@ -96,13 +114,13 @@ def test_the_swap_flips_the_numbers_without_asking_again(live, page):
 
 def test_another_pair_a_count_its_list_and_an_answer(live, page):
     open_pair(page, live)
-    page.locator("[data-pd-b]").select_option(ORN)
+    choose(page, "b", ORN)
     page.wait_for_function("document.querySelector('[data-pd-settings]') !== null")
     assert page.locator("[data-pd-settings]").inner_text() == (
         f"{S4} ran on the lda runtime; {ORN} on its own card's settings.")
     assert "b=Ornith" in page.evaluate("decodeURIComponent(location.hash)")
     # back to Q4, and MMLU-Pro's count of A higher opened
-    page.locator("[data-pd-b]").select_option(Q4)
+    choose(page, "b", Q4)
     page.wait_for_selector("[data-pd-count='mmlupro:a']")
     page.locator("[data-pd-count='mmlupro:a']").click()
     head = page.locator("[data-pd-list-head]")
@@ -122,10 +140,11 @@ def test_another_pair_a_count_its_list_and_an_answer(live, page):
 
 def test_the_link_opens_the_same_pair_and_the_same_build_twice_is_refused(live, page):
     open_pair(page, live, f"a={EARLY.replace(' ', '%20').replace(',', '%2C')}&b={Q4}")
-    assert page.locator("[data-pd-a]").input_value() == EARLY
+    assert picked(page, "a") == EARLY
     assert page.locator("[data-pd-settings]").inner_text() == (
         f"{EARLY} ran on Qwen's card settings; {Q4} on the lda runtime.")
-    page.locator("[data-pd-a]").select_option(Q4)
+    # the same build twice — only a link can ask it — is refused
+    page.goto(live["base"] + f"/#tab=reports&report=paired&a={Q4}&b={Q4}")
     page.wait_for_selector("[data-pd-same]")
     assert "Pick two different builds" in page.locator("[data-pd-same]").inner_text()
     assert page.locator("[data-pd-table]").count() == 0
