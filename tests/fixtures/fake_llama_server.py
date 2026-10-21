@@ -25,9 +25,14 @@ FAKE_LLAMA_TIMINGS=1 gives each answer llama-server's timings. 23c: /tokenize
 (a token a word) and /completion with token ids, for the card check's speed
 probe, its timings fixed (PROBE below) — a prompt of 1,024 tokens or fewer
 asked alone takes the next of the three ALONE rates in turn, a longer one the
-LONG rates, and one asked while others are (the eight at once) 80 tok/s out
-plus one for each asked before it in the batch; FAKE_LLAMA_PROBE_STATUS a
-status /completion answers with (the chat requests still answer)."""
+LONG rates, and one of the eight asked at once 80 tok/s out plus one for each
+of its batch asked before it; FAKE_LLAMA_PROBE_STATUS a status /completion
+answers with (the chat requests still answer). Which of the eight a request
+is, it says itself: the probe gives each its own slice of the text, never
+its start (scripts/card_check.py), so a short prompt that doesn't begin
+where the text does is one of them — told by what it asks, not by when it
+comes (on a slow runner the eighth could arrive after the other seven were
+done, and was taken for one asked alone: CI's 140 among 80…87)."""
 
 from __future__ import annotations
 
@@ -92,7 +97,9 @@ def main() -> int:
     count = {"n": 0}
     sent = {"n": 0}
     probe_status = int(os.environ.get("FAKE_LLAMA_PROBE_STATUS") or 200)
-    busy = {"now": 0, "alone": 0, "peers": {}}         # 23c: the probe's requests
+    # 23c: the probe's requests — the text it tokenized, the next ALONE rate,
+    # and how many of the eight have been asked since its warm-up
+    busy = {"text": [], "alone": 0, "together": 0}
     print(f"main: loading model {os.path.basename(model)}", flush=True)
 
     class H(BaseHTTPRequestHandler):
@@ -133,27 +140,21 @@ def main() -> int:
                                                            "message": "probe refused"}})
             ids = body.get("prompt") if isinstance(body.get("prompt"), list) else []
             n, out = len(ids), int(body.get("n_predict") or 16)
-            me = object()
+            head = busy["text"][:32]
+            together = n <= 1024 and out >= 64 and bool(head) and ids[:len(head)] != head
             with lock:
-                k = busy["now"]                         # how many were asked before it
-                busy["now"] += 1
-                busy["peers"][me] = busy["now"]
-                for x in busy["peers"]:
-                    busy["peers"][x] = max(busy["peers"][x], busy["now"])
-            time.sleep(0.15)                            # long enough to meet the others
-            with lock:
-                peers = busy["peers"].pop(me)
-                busy["now"] -= 1
-            if out < 64:
-                pr, tg = PROBE["warm"]
-            elif peers > 1:
-                pr, tg = PROBE["together_prompt"], PROBE["together_out"] + k
-            elif n > 1024:
-                pr, tg = PROBE["long"]
-            else:
-                with lock:
+                if out < 64:
+                    busy["together"] = 0                # a probe's warm-up: a new batch
+                    pr, tg = PROBE["warm"]
+                elif together:
+                    pr, tg = PROBE["together_prompt"], PROBE["together_out"] + busy["together"]
+                    busy["together"] += 1
+                elif n > 1024:
+                    pr, tg = PROBE["long"]
+                else:
                     pr, tg = PROBE["alone"][busy["alone"] % len(PROBE["alone"])]
                     busy["alone"] += 1
+            time.sleep(0.15)                            # the eight still overlap
             return self._send(200, {"content": "x " * out, "tokens_predicted": out,
                                     "tokens_evaluated": n, "stop": True,
                                     "timings": {"prompt_n": n, "prompt_ms": n / pr * 1000,
@@ -165,8 +166,10 @@ def main() -> int:
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)))
             if self.path == "/tokenize":
                 text = str(body.get("content") or "")
-                return self._send(200, {"tokens": [sum(w.encode()) % 50000
-                                                   for w in text.split()]})
+                toks = [sum(w.encode()) % 50000 for w in text.split()]
+                with lock:
+                    busy["text"] = toks                 # 23c: the probe's text, as asked
+                return self._send(200, {"tokens": toks})
             if self.path == "/completion":
                 return self.completion(body)
             if self.path not in ("/v1/chat/completions", "/chat/completions"):
