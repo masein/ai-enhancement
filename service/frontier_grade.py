@@ -216,13 +216,15 @@ def held_rows(moving: list[dict] | None = None) -> dict:
     return out
 
 
-def waiting(view: bool = False, hold: dict | None = None) -> list[dict]:
+def waiting(view: bool = False, hold: dict | None = None, light: bool = False) -> list[dict]:
     """every row's answers a grader is still to see, by benchmark — those out
     in a batch now left out (17c: but not those cancelled from it, unsent):
     [{slot, task, row, model, base, items}]. 17g: `view` — as Start would
     leave them with the grader chosen now (the dry run), each row saying what
     the switch does (`switch`: kept, regrade, match) and how many grades
-    the grader gave before come back (`reused`)"""
+    the grader gave before come back (`reused`). 24: `light` — from each
+    answers file's index (sf.answer_index), the answers' texts not read:
+    each item with its grader's message length (`chars`), for the dry run"""
     # 17h: in the dry run, a batch Start moves to the grader chosen now
     # (stopped, then another chosen) holds nothing — its answers are priced
     # here, at the grader they go to (they were priced at the stopped one's)
@@ -252,7 +254,8 @@ def waiting(view: bool = False, hold: dict | None = None) -> list[dict]:
                 how, reused = _switch(seen, now.get("version") or now.get("id"),
                                       fg.prompt_sha(slot))
             try:
-                todo = sf.to_grade(row, t, grades=seen)
+                todo = sf.to_grade(row, t, grades=seen, items=sf.items_of(t),
+                                   index=sf.answer_index(row, t) if light else None)
             except Exception:                           # noqa: BLE001 — no dataset here
                 continue
             todo = [x for x in todo if (row.name, t, sf.gkey(x["id"], x["epoch"])) not in out_now]
@@ -338,7 +341,7 @@ def estimate() -> dict:
     """the dry run: each grader's answers, tokens and cost for what waits.
     Nothing is sent"""
     hold = held_rows()
-    est = _estimate(waiting(view=True, hold=hold))
+    est = _estimate(waiting(view=True, hold=hold, light=True))
     try:
         est.update(over_limit=ai_models.over_limit(), limit=ai_models.limit(),
                    spent=round(db.spend_this_month(), 2))
@@ -410,8 +413,10 @@ def _estimate(ws: list[dict]) -> dict:
                          "after": w.get("after") or "", "after_state": w.get("after_state")})
             continue
         g = grader(slot)
-        items = {it["id"]: it for it in fb.load(w["task"], config.BENCH_ROOT)}
-        tin = sum(len(fg.render(slot, items[x["id"]], x)) for x in w["items"]) // CHARS_A_TOKEN
+        items = {it["id"]: it for it in sf.items_of(w["task"])}
+        # 24: each message's length as its answers file's index has it
+        tin = sum(x["chars"] if x.get("chars") is not None else len(fg.render(
+            slot, items[x["id"]], x)) for x in w["items"]) // CHARS_A_TOKEN
         # 17b: what Start sends with each answer — its reasoning and its cap
         a = fg.ask(slot, reasons(g), structured(g))
         cap = min(a["max_tokens"], config.OPENROUTER_MAX_TOKENS)
@@ -1238,9 +1243,9 @@ def _cost(slot: str, g: dict, task: str, todo: list[dict]) -> float | None:
     pin, pout = _price(g)
     if pin is None or pout is None:
         return None
-    items = {it["id"]: it for it in fb.load(task, config.BENCH_ROOT)}
-    tin = sum(len(fg.render(slot, items[x["id"]], x)) for x in todo
-              if x["id"] in items) // CHARS_A_TOKEN
+    items = {it["id"]: it for it in sf.items_of(task)}
+    tin = sum(x["chars"] if x.get("chars") is not None else len(fg.render(
+        slot, items[x["id"]], x)) for x in todo if x["id"] in items) // CHARS_A_TOKEN
     return round((tin * pin + len(todo) * out_tokens(slot, g)[0] * pout) / 1e6, 4)
 
 
@@ -1278,7 +1283,8 @@ def mismatches() -> list[dict]:
                 seen = copy.deepcopy(sf.read_grades(d))
                 seen["regrade_to"] = {"by": mine[0], "prompt_sha256": mine[1]}
                 _switch(seen, *mine)
-                todo = sf.to_grade(d.parent.parent, t, grades=seen)
+                todo = sf.to_grade(d.parent.parent, t, grades=seen, items=sf.items_of(t),
+                                   index=sf.answer_index(d.parent.parent, t))
                 r["offer"] = {"answers": len(todo), "usd": _cost(slot, now, t, todo),
                               "to": now.get("version") or now.get("id")}
         out.append({"slot": slot, "task": t, "label": fb.BENCH[t]["label"],

@@ -411,11 +411,12 @@ def report(rep: dict, rows: list[dict], a: str = "", b: str = "", compute: bool 
         if x:
             ats.append(x["at"])
         rv = (ref_cells.get(bm["key"]) or {}).get("v")
+        missing = "" if fa is not None and fb_ is not None else waiting_words(
+            rep, a if fa is None else b, bm["task"])
         out_rows.append({**bm, "a": (cells.get(a) or {}).get(bm["key"]),
                          "b": (cells.get(b) or {}).get(bm["key"]),
                          "ceiling": isinstance(rv, (int, float)) and rv >= training.CEILING,
-                         "pair": x, "missing": "" if fa is not None and fb_ is not None else (
-                             f"no scored answers from {a if fa is None else b}")})
+                         "pair": x, "missing": missing})
     js = [j for j in jobs(rep) if f"|{a}|" in j.slot and f"|{b}|" in j.slot]
     return {"id": rep["id"], "kind": KIND, "title": rep.get("title") or TITLE,
             "what": rep.get("what") or WHAT, "builds": labels(rep), "offered": offer,
@@ -428,6 +429,33 @@ def report(rep: dict, rows: list[dict], a: str = "", b: str = "", compute: bool 
             "statsAt": reports.stats_at(ats)}
 
 
+_lines: dict[str, tuple[str, int]] = {}
+
+
+def waiting_words(rep: dict, label: str, task: str) -> str:
+    """24: a build with no scored answers on a benchmark — "waiting for
+    grading — 2,098 answers from step8804" when its answers are in and not
+    graded yet, else "no answers from step8804" """
+    from . import frontier as sf
+    from . import report_stats as rs
+    from . import reports
+    f = sf.task_dir(reports.row_dir(_row(rep, label)), task) / sf.ANSWERS
+    if not f.is_file():
+        return f"no answers from {label}"
+    key = rs.identity(f)
+    n = _lines.get(str(f), ("", 0))
+    if n[0] != key:
+        # the grading page's index counts them (a graded benchmark's), else the lines
+        idx = sf.answer_index(reports.row_dir(_row(rep, label)), task, compute=False)
+        if idx is None:
+            with open(f, "rb") as fh:
+                idx = [1 for line in fh if line.strip()]
+        n = (key, len(idx))
+        _lines[str(f)] = n
+    return f"waiting for grading — {n[1]:,} answers from {label}" if n[1] else \
+        f"no answers from {label}"
+
+
 def question_list(rep: dict, a: str, b: str, task: str, side: str) -> dict:
     """one count's questions: those that may be listed, each with how often
     each build ran out of room, and how many are in the hidden half"""
@@ -438,12 +466,26 @@ def question_list(rep: dict, a: str, b: str, task: str, side: str) -> dict:
         raise KeyError("not worked out yet")
     ta = table_of(samples(rep, a, task), task)
     tb = table_of(samples(rep, b, task), task)
+    # 24: each question's subject (never its text), and each build's runs —
+    # the card opens on the runs that differ
+    _scripts()
+    import frontier as fb
+
+    from . import ran_out
+    cache = {str(it["id"]): it for it in (fb.cached(task, config.BENCH_ROOT) or [])}
+
+    def runs(t: dict) -> list[dict]:
+        return [{"epoch": e, "ok": ok, "ran_out": out}
+                for e, ok, out in zip(t.get("epochs") or [], t.get("ok") or [], t.get("out") or [])]
     items = []
     for e in x["lists"][side]:
         ids = e.get("grids") or [e["id"]]
         ra = [ta.get(q) or {} for q in ids]
         rb_ = [tb.get(q) or {} for q in ids]
         items.append({"id": e["id"], "grids": e.get("grids"),
+                      "subject": subject_of(cache.get(str(ids[0]))),
+                      "a_runs": runs(ra[0]) if not e.get("grids") else [],
+                      "b_runs": runs(rb_[0]) if not e.get("grids") else [],
                       "a": {"right": sum(sum(r.get("ok") or []) for r in ra),
                             "runs": sum(len(r.get("ok") or []) for r in ra),
                             "ran_out": sum(sum(r.get("out") or []) for r in ra)},
@@ -452,7 +494,21 @@ def question_list(rep: dict, a: str, b: str, task: str, side: str) -> dict:
                             "ran_out": sum(sum(r.get("out") or []) for r in rb_)}})
     n = x["a_better"] if side == "a" else x["b_better"]
     return {"task": task, "side": side, "n": n, "listed": len(items),
-            "hidden": x["held"][side], "items": items}
+            "hidden": x["held"][side], "items": items, "runs": x.get("runs") or 1,
+            "unit": x.get("unit") or "questions", "warning": ran_out.WARNING,
+            "withheld": fb.unlisted(task)}
+
+
+# 24: a question's subject, where this machine's copy has one — never its text
+SUBJECT_FIELDS = ("subdomain", "Subdomain", "category", "subject", "topic")
+
+
+def subject_of(item: dict | None) -> str:
+    for k in SUBJECT_FIELDS:
+        v = (item or {}).get(k)
+        if isinstance(v, str) and v.strip():
+            return v.strip()[:80]
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -493,11 +549,26 @@ def one(rep: dict, label: str, task: str, qid: str, epoch: int) -> dict:
     run = {**runs[k], "answer": text}
     thinking, reply = clean(fb.thinking_of(text)), clean(fb.visible(text))
     right = ran_out.right_of(task, it) if it else {}
+    # 24: its thinking's tokens (the token stats' character share), and the
+    # right answer as the reader may show it: a letter alone where the
+    # question is withheld (GPQA), nothing on HLE and MATH
+    raw_t, raw_r = fb.thinking_of(text), fb.visible(text)
+    toks = runs[k].get("tokens")
+    think_toks = round(toks * len(raw_t) / (len(raw_t) + len(raw_r))) if isinstance(
+        toks, int) and (raw_t or raw_r) else None
+    if gone:
+        shown_right = {"letter": right["letter"]} if right.get("letter") else None
+    elif shown:
+        shown_right = ({"letter": right["letter"], "text": right.get("text") or ""}
+                       if right.get("letter") else {"answer": str(shown.get("reference") or "")})
+    else:
+        shown_right = None
     return {"task": task, "id": str(qid), "epoch": int(epoch), "label": label,
             # 23e: where its thinking first stated the right answer and its
             # reply's final answer, marked; the right option's letter alone
             "marks": {"first": first_mark(task, it, thinking), "final": final_mark(task, reply)},
-            "right_letter": right.get("letter") or None,
+            "right_letter": right.get("letter") or None, "right": shown_right,
+            "read": runs[k].get("read"), "subject": subject_of(it), "think_tokens": think_toks,
             "withheld": gone, "runs": [{"epoch": int(r.get("epoch", i) or 0),
                                         "ok": r.get("ok"), "ran_out": bool(r.get("ran_out"))}
                                        for i, r in enumerate(runs)],

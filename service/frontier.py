@@ -565,7 +565,7 @@ def answer_sha(answer: str) -> str:
 
 
 def marks(row: Path, task: str, items: list[dict] | None = None,
-          grades: dict | None = None) -> dict:
+          grades: dict | None = None, index: dict | None = None) -> dict:
     """every answer of the task's, scored: {runs: {question: [run]}, missing:
     [(question, run)], items}. A run: {epoch, ok, code_ok, read, ran_out,
     answer, finish, tokens, error, grade} — `ok` the score the page uses: the
@@ -573,33 +573,44 @@ def marks(row: Path, task: str, items: list[dict] | None = None,
     it says right and the check's when it says wrong or can't read (None
     until the check has run); for a graded one, its grader's (None until
     graded). An answer that ran out of room is wrong, and never sent to a
-    grader or a check"""
+    grader or a check. 24: with `index` (answer_index), each answer's score,
+    sha256 and grader's message length as worked out once for its file — its
+    text not read (a run's `answer` None, its `chars` given): the dry run"""
     fb.set_root(config.BENCH_ROOT)
     spec = fb.BENCH[task]
     items = items if items is not None else fb.load(task, config.BENCH_ROOT)
     d = task_dir(row, task)
     # 17g: the grades as Start would leave them (the dry run's), or on file
     gr = read_grades(d) if grades is None else grades
-    got, grades = read_answers(d / ANSWERS), (gr.get("items") or {})
+    got = read_answers(d / ANSWERS) if index is None else None
+    grades = gr.get("items") or {}
     refused = gr.get("refused") or {}
     runs: dict[str, list[dict]] = {}
     missing = []
     for it in items:
-        _, need = fb.prompt(task, it)
+        need = fb.prompt(task, it)[1] if index is None else None
         for e in range(spec["epochs"]):
-            a = got.get((it["id"], e))
-            if a is None:
-                missing.append((it["id"], e))
-                continue
-            sc = fb.score(task, a.get("answer") or "", a.get("finish"), need)
+            if index is not None:
+                a = index.get(gkey(it["id"], e))
+                if a is None:
+                    missing.append((it["id"], e))
+                    continue
+                sc, sha = {k: a[k] for k in ("ok", "read", "ran_out")}, a["sha"]
+            else:
+                a = got.get((it["id"], e))
+                if a is None:
+                    missing.append((it["id"], e))
+                    continue
+                sc = fb.score(task, a.get("answer") or "", a.get("finish"), need)
+                sha = answer_sha(a.get("answer") or "")
             g = grades.get(gkey(it["id"], e))
-            if g is not None and g.get("answer_sha256") != answer_sha(a.get("answer") or ""):
+            if g is not None and g.get("answer_sha256") != sha:
                 g = None                    # 17b: graded another answer: graded again
             ok = sc["ok"]
             # 17c: no grade after GRADE_TRIES tries, for this answer: ungraded
             no = refused.get(gkey(it["id"], e)) or {}
             ungraded = (g is None and int(no.get("tries") or 0) >= GRADE_TRIES
-                        and no.get("answer_sha256") == answer_sha(a.get("answer") or ""))
+                        and no.get("answer_sha256") == sha)
             if sc["ran_out"] or a.get("unanswered"):
                 ok = False                  # 17c: no answer from the server: wrong, never graded
             elif ungraded and (spec.get("grader") or (spec.get("look") and not sc["ok"])):
@@ -613,22 +624,134 @@ def marks(row: Path, task: str, items: list[dict] | None = None,
                       else None if g is None else bool(g.get("ok")))
             runs.setdefault(it["id"], []).append({
                 "epoch": e, "ok": ok, "code_ok": sc["ok"], "read": sc["read"],
-                "ran_out": sc["ran_out"], "answer": a.get("answer") or "",
+                "ran_out": sc["ran_out"],
+                "answer": (a.get("answer") or "") if index is None else None,
                 "finish": a.get("finish"), "tokens": a.get("tokens"),
                 "error": a.get("error"), "unanswered": a.get("unanswered"),
-                "ungraded": bool(ungraded and ok is False and not sc["ok"]), "grade": g})
+                "ungraded": bool(ungraded and ok is False and not sc["ok"]), "grade": g,
+                **({"chars": a.get("chars")} if index is not None else {})})
     return {"runs": runs, "missing": missing, "items": items}
 
 
-def to_grade(row: Path, task: str, grades: dict | None = None) -> list[dict]:
+# ---------------------------------------------------------------------------
+# 24: each answers file's index, for the grading page's dry run — the
+# answers of every graded row were read in full, scored and each grader's
+# message built on every request (61.8 s and 120.6 s on 21 Oct). Worked out
+# once for a file (the stats worker does it after an import), kept on disk
+# beside the stats and in this process until the answers, the questions or
+# the grader's prompt change; grades are never in it
+# ---------------------------------------------------------------------------
+
+INDEX_WAY = "grading-index-1"
+_index_memo: dict[str, tuple[str, dict]] = {}
+_items_memo: dict[str, tuple[str, list]] = {}
+
+
+def _identity(f: Path) -> str:
+    try:
+        st = Path(f).stat()
+        return f"{f}|{st.st_mtime_ns}|{st.st_size}"
+    except OSError:
+        return f"{f}|-"
+
+
+def items_of(task: str) -> list[dict]:
+    """the task's questions, read again only when this machine's copy changes"""
+    p = fb._cache(config.BENCH_ROOT, task)
+    key = _identity(p)
+    got = _items_memo.get(task)
+    if got and got[0] == key:
+        return got[1]
+    items = fb.load(task, config.BENCH_ROOT)
+    _items_memo[task] = (_identity(p), items)
+    return items
+
+
+def _index_file(d: Path) -> Path:
+    from . import report_stats
+    return report_stats.folder() / "grading" / (
+        hashlib.sha256(str(d).encode("utf-8")).hexdigest()[:24] + ".json")
+
+
+def index_key(row: Path, task: str) -> str:
+    import frontier_graders as fg
+    slot = fg.SLOT_OF.get(task)
+    return "|".join([INDEX_WAY, _identity(task_dir(row, task) / ANSWERS),
+                     _identity(fb._cache(config.BENCH_ROOT, task)),
+                     fg.prompt_sha(slot) if slot else "-"])
+
+
+def build_index(row: Path, task: str) -> dict:
+    """{"<question>#<run>": {sha, ok, read, ran_out, finish, tokens, error,
+    unanswered, chars}} — chars, the grader's message's length for it
+    (frontier_graders.render), as the dry run counts its tokens"""
+    import frontier_graders as fg
+    slot = fg.SLOT_OF.get(task)
+    items = items_of(task)
+    got = read_answers(task_dir(row, task) / ANSWERS)
+    out = {}
+    for it in items:
+        need = fb.prompt(task, it)[1]
+        for e in range(fb.BENCH[task]["epochs"]):
+            a = got.get((it["id"], e))
+            if a is None:
+                continue
+            text = a.get("answer") or ""
+            sc = fb.score(task, text, a.get("finish"), need)
+            out[gkey(it["id"], e)] = {
+                "sha": answer_sha(text), "ok": sc["ok"], "read": sc["read"],
+                "ran_out": sc["ran_out"], "finish": a.get("finish"), "tokens": a.get("tokens"),
+                "error": a.get("error"), "unanswered": a.get("unanswered"),
+                "chars": len(fg.render(slot, it, {"answer": text, "read": sc["read"]}))
+                if slot else None}
+    return out
+
+
+def answer_index(row: Path, task: str, compute: bool = True) -> dict | None:
+    """the answers file's index (build_index) for its file as it is now: from
+    this process, else from disk, else worked out (`compute`) and kept"""
+    d = task_dir(row, task)
+    key = index_key(row, task)
+    m = _index_memo.get(str(d))
+    if m and m[0] == key:
+        return m[1]
+    f = _index_file(d)
+    try:
+        kept = json.loads(f.read_text(encoding="utf-8"))
+        if kept.get("key") == key and isinstance(kept.get("index"), dict):
+            _index_memo[str(d)] = (key, kept["index"])
+            return kept["index"]
+    except (OSError, ValueError, AttributeError):
+        pass
+    if not compute:
+        return None
+    got = build_index(row, task)
+    keep_index(d, key, got)
+    return got
+
+
+def keep_index(d: Path, key: str, index: dict) -> None:
+    f = _index_file(d)
+    f.parent.mkdir(parents=True, exist_ok=True)
+    tmp = f.with_suffix(f".{threading.get_ident()}.part")
+    tmp.write_text(json.dumps({"key": key, "row": str(d), "index": index}), encoding="utf-8")
+    tmp.replace(f)
+    if len(_index_memo) > 256:
+        _index_memo.clear()
+    _index_memo[str(d)] = (key, index)
+
+
+def to_grade(row: Path, task: str, grades: dict | None = None, index: dict | None = None,
+             items: list[dict] | None = None) -> list[dict]:
     """stage 3: the answers a grader (or Epoch's model check) is still to see —
     every answer of a graded benchmark, and for one Epoch checks with a model,
     those the code marks wrong or can't read; never one that ran out of room.
-    17g: `grades` as Start would leave them, for the dry run"""
+    17g: `grades` as Start would leave them, for the dry run. 24: with
+    `index`, from it: each one's grader's message length (`chars`), no text"""
     spec = fb.BENCH[task]
     if not (spec.get("grader") or spec.get("look")):
         return []
-    m = marks(row, task, grades=grades)
+    m = marks(row, task, items=items, grades=grades, index=index)
     if m["missing"]:
         return []
     out = []
@@ -637,7 +760,8 @@ def to_grade(row: Path, task: str, grades: dict | None = None) -> list[dict]:
             if r["grade"] is None and r["ok"] is None and not r["ran_out"] \
                     and not r.get("ungraded"):
                 out.append({"id": it["id"], "epoch": r["epoch"], "answer": r["answer"],
-                            "read": r["read"]})
+                            "read": r["read"], **({"chars": r["chars"]} if index is not None
+                                                 else {})})
     return out
 
 

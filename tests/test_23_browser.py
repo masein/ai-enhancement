@@ -1,6 +1,7 @@
 """23 in a real browser, at 1280 and 400 px, light and dark: two builds,
-question by question — the picker and the swap, the chart and the table
-changing with the pair, a count opening its questions and an answer, the
+question by question — the picker and the swap, the table-chart (24: the
+chart and the table one) changing with the pair, a part of a split bar
+opening its questions (24: a card at a time, both answers), the
 link with a= and b= opening the same pair, the same build twice refused,
 nothing scrolling sideways. The world is tests/test_23_paired.py's (invented
 questions and answers), every pair worked out by the stats worker first."""
@@ -50,7 +51,7 @@ def choose(page, which: str, build: str) -> None:
 
 def diffs(page) -> dict[str, str]:
     return dict(page.eval_on_selector_all(
-        "[data-pd-diff]", "ts => ts.map(t => [t.dataset.pdDiff, t.textContent])"))
+        "[data-pd-diff]", "ts => ts.map(t => [t.dataset.pdDiff, t.textContent.trim()])"))
 
 
 @pytest.mark.parametrize("width,scheme", [(1280, "light"), (1280, "dark"), (400, "light"),
@@ -71,24 +72,22 @@ def test_the_pair_its_chart_and_table(live, page, width, scheme):
     s = page.locator("[data-pd-sentence]").inner_text()
     assert s.startswith(f"{S4} is higher than {Q4} on ") and "can't be told apart on" in s
     assert page.locator("[data-pd-settings]").count() == 0     # the same runtime
-    # a bar a benchmark compared, labelled; the two sides named under the axis
+    # a range bar a benchmark compared; the two sides named under the axis
     bars = page.locator("[data-pd-bar]")
     assert bars.count() == 5                                    # HLE and MATH: no answers
     assert page.locator("[data-pd-sides]").inner_text().replace("\n", " ") == \
         f"← {Q4} higher {S4} higher →"
-    # the table: MMLU-Pro 9 against 1 of 50, A higher
-    assert page.locator("[data-pd-verdict='mmlupro']").inner_text() == "A higher"
-    assert diffs(page)["mmlupro"].startswith("+16.0 (")
-    assert page.locator("[data-pd-count='mmlupro:a']").inner_text() == "9"
-    assert page.locator("[data-pd-differ='mmlupro']").inner_text() == "20.0%"
-    assert page.locator("[data-pd-row='hle']").inner_text().count("no scored answers") == 1
-    line = page.locator("[data-pd-self='gpqa']").inner_text()
-    assert line.startswith(f"Each build also disagrees with itself: between two of its own "
-                           f"runs, {S4} gives a different result on ") and \
-        "% of GPQA Diamond questions, " in line and ". The two builds disagree on " in line
-    # at 400 px each label sits above its bar, the bar the width of the card
-    bar = page.locator("[data-pd-bar='gpqa'] + svg").bounding_box()
-    assert bar["width"] > (200 if width == 400 else 600), bar
+    # MMLU-Pro 9 against 1 of 50: step4000 higher, its split bar's parts the two counts
+    assert page.locator("[data-pd-verdict='mmlupro']").inner_text() == f"{S4} higher"
+    assert diffs(page)["mmlupro"] == "+16.0"
+    assert page.locator("[data-pd-part='mmlupro:a']").inner_text() == "9 ▸"
+    assert page.locator("[data-pd-differ='mmlupro']").inner_text() == "on 20.0% of questions"
+    assert page.locator("[data-pd-wait='hle']").inner_text() == f"no answers from {S4}"
+    line = page.locator("[data-pd-differ='gpqa']").inner_text()
+    assert line.startswith("a run of each differs ") and "; each differs from itself " in line
+    # at 400 px the row stacks: its difference the width of the card
+    bar = page.locator("[data-pd-diff='gpqa'] .pdx-track").bounding_box()
+    assert bar["width"] > (200 if width == 400 else 100), bar
     assert no_sideways(page) and page.errors == []
     SCREENS.mkdir(parents=True, exist_ok=True)
     page.evaluate("window.scrollTo(0, 0)")
@@ -107,32 +106,30 @@ def test_the_swap_flips_the_numbers_without_asking_again(live, page):
     for k, v in before.items():
         assert after[k].split(" ")[0] == ("−" + v[1:] if v.startswith("+") else
                                           "+" + v[1:] if v.startswith("−") else v).split(" ")[0]
-    assert page.locator("[data-pd-verdict='mmlupro']").inner_text() == "B higher"
+    assert page.locator("[data-pd-verdict='mmlupro']").inner_text() == f"{S4} higher"
     assert not asked                                            # flipped, never asked again
     assert "a=Q4" in page.evaluate("decodeURIComponent(location.hash)")
 
 
-def test_another_pair_a_count_its_list_and_an_answer(live, page):
+def test_another_pair_a_part_its_questions_and_both_answers(live, page):
     open_pair(page, live)
     choose(page, "b", ORN)
     page.wait_for_function("document.querySelector('[data-pd-settings]') !== null")
     assert page.locator("[data-pd-settings]").inner_text() == (
         f"{S4} ran on the lda runtime; {ORN} on its own card's settings.")
     assert "b=Ornith" in page.evaluate("decodeURIComponent(location.hash)")
-    # back to Q4, and MMLU-Pro's count of A higher opened
+    # back to Q4, and MMLU-Pro's part where step4000 is right opened
     choose(page, "b", Q4)
-    page.wait_for_selector("[data-pd-count='mmlupro:a']")
-    page.locator("[data-pd-count='mmlupro:a']").click()
+    page.wait_for_selector("[data-pd-part='mmlupro:a']")
+    page.locator("[data-pd-part='mmlupro:a']").click()
     head = page.locator("[data-pd-list-head]")
     head.wait_for()
     words = head.inner_text()
-    assert words.startswith("9 questions; ") and words.endswith(" in the hidden half.")
-    items = page.locator("[data-pd-item]")
-    listed = int(words.split("; ")[1].split(" ")[0])
-    assert items.count() == listed
-    first = items.first.get_attribute("data-pd-item")
-    page.locator(f"[data-pd-read='A:{first}']").click()
-    page.wait_for_selector("[data-pd-answer] [data-pd-reply]")
+    assert words.endswith(" in the hidden half, counted but never shown")
+    listed = int(words.split(" ")[0])
+    assert page.locator("[data-pd-pos]").inner_text() == f"1 of {listed}"
+    page.wait_for_selector(f"[data-pd-col-of='{Q4}'] [data-pd-reply]")
+    page.wait_for_selector(f"[data-pd-col-of='{S4}'] [data-pd-reply]")
     assert page.locator("[data-pd-question]").first.inner_text().startswith(
         "Invented MMLU-Pro question")
     assert no_sideways(page) and page.errors == []
