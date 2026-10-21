@@ -329,65 +329,8 @@ def page(browser):
     pg.on("console", lambda m: errors.append(f"console.error: {m.text}")
           if m.type == "error" else None)
     pg.errors = errors
-    # DEBUG(24b): what the page did, for a failed test's report
-    import time as _t
-    t0 = _t.time()
-    trace = []
-    pg.on("console", lambda m: trace.append(f"{_t.time() - t0:7.2f} console.{m.type}: {m.text[:200]}"))
-    pg.on("framenavigated", lambda f: trace.append(f"{_t.time() - t0:7.2f} nav {f.url}")
-          if f == pg.main_frame else None)
-    pg.on("request", lambda r: trace.append(f"{_t.time() - t0:7.2f} req {r.url[-70:]}")
-          if "/api/" in r.url else None)
-    pg.on("requestfinished", lambda r: trace.append(f"{_t.time() - t0:7.2f} done {r.url[-70:]}")
-          if "/api/" in r.url else None)
-    pg.on("requestfailed", lambda r: trace.append(f"{_t.time() - t0:7.2f} FAIL {r.url[-70:]}")
-          if "/api/" in r.url else None)
-    pg.trace = trace
     yield pg
     ctx.close()
-
-
-@pytest.hookimpl(hookwrapper=True)
-def pytest_runtest_makereport(item, call):
-    # DEBUG(24b): a failed browser test says what its page was doing
-    out = yield
-    rep = out.get_result()
-    if rep.when != "call" or not rep.failed or "page" not in item.funcargs:
-        return
-    pg = item.funcargs["page"]
-    print("\n==DBG==", item.nodeid, flush=True)
-    print("errors:", pg.errors, flush=True)
-    try:
-        pg.wait_for_function("true", timeout=3000)
-        print("page answers", flush=True)
-    except Exception as e:                                      # noqa: BLE001
-        print("page busy:", str(e)[:200], flush=True)
-    try:
-        print("state:", pg.evaluate("""() => JSON.stringify({qQ: state.qQ, qWhere: state.qWhere,
-          qStatus: state.qStatus, tab: state.tab, hash: location.hash,
-          rented: document.querySelectorAll('[data-rented-run]').length,
-          tables: document.querySelectorAll('[data-queue-table]').length,
-          inputs: [...document.querySelectorAll('input[aria-label="filter queue"]')].map(i => i.value),
-          active: document.activeElement && document.activeElement.outerHTML.slice(0, 120),
-          bar: !!document.querySelector('[data-build-bar]'),
-          failed: !!document.querySelector('[data-draw-failed]'),
-          boxes: ((state.boxes || {}).runs || []).length, queue: (state.queue || []).length})"""),
-              flush=True)
-    except Exception as e:                                      # noqa: BLE001
-        print("eval failed:", str(e)[:200], flush=True)
-    for line in getattr(pg, "trace", [])[-80:]:
-        print("  ", line, flush=True)
-    live = item.funcargs.get("live")
-    if live:
-        import time as _t
-        import urllib.request
-        for path in ("/api/submissions/count", "/api/frontier/boxes"):
-            t = _t.time()
-            try:
-                urllib.request.urlopen(live["base"] + path, timeout=20).read()
-                print(f"server {path}: {_t.time() - t:.2f}s", flush=True)
-            except Exception as e:                              # noqa: BLE001
-                print(f"server {path}: {e} after {_t.time() - t:.2f}s", flush=True)
 
 
 # 12b: the old tab names, and where each one lives now (the brief's §1)
