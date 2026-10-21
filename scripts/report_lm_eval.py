@@ -20133,17 +20133,20 @@ function vQueue(part = { form: true, list: true }) {
     });
   }
   const qCount = el('span', { class: 'count-note', 'data-queue-count': '1' });
+  const qStatusSel = mkSel('status filter',
+      [['all', 'status: all'], ['active', 'active'], ['queued', 'queued'],
+       ['done', 'done'], ['failed', 'failed'], ['canceled', 'canceled']],
+      state.qStatus, v => { state.qStatus = v; rebuildQueue(); });
+  const qWhereSel = mkSel('where filter', [['all', 'where: all'], ['here', 'this server'],
+      ['rented', 'rented GPUs']], state.qWhere, v => { state.qWhere = v; rebuildQueue(); });
   const qToolbar = el('div', { class: 'toolbar', style: 'margin-top:2px' },
     el('input', { type: 'search', value: state.qQ, style: 'flex:1;min-width:160px',
       placeholder: 'filter: model, person, note…', 'aria-label': 'filter queue',
+      // a whole-page redraw (the judge's health, landing late) gives the field
+      // its focus and caret back: the next letters went to the page's body
+      'data-keep': 'queue-filter',
       oninput: e => { state.qQ = e.target.value; rebuildQueue(); } }),
-    mkSel('status filter',
-      [['all', 'status: all'], ['active', 'active'], ['queued', 'queued'],
-       ['done', 'done'], ['failed', 'failed'], ['canceled', 'canceled']],
-      state.qStatus, v => { state.qStatus = v; rebuildQueue(); }),
-    mkSel('where filter', [['all', 'where: all'], ['here', 'this server'],
-      ['rented', 'rented GPUs']], state.qWhere, v => { state.qWhere = v; rebuildQueue(); }),
-    qCount);
+    qStatusSel, qWhereSel, qCount);
   const qThead = el('thead');
   const qTbody = el('tbody');
   const qPager = el('div');
@@ -20156,6 +20159,16 @@ function vQueue(part = { form: true, list: true }) {
       openTest(); });
   // in place, same reason as everywhere: the 5s poll must never eat a keystroke
   function rebuildQueue() {
+    // a whole-page redraw drew the list again while a control of this one was
+    // still in use — an open filter's options keep their panel across it — so
+    // the list on the page is redrawn, not this one, gone from it
+    if (!qTbody.isConnected && state.queueRedraw && state.queueRedraw !== rebuildQueue) {
+      state.queueRedraw();
+      return;
+    }
+    // and its filters say what is chosen, wherever it was chosen
+    if (qStatusSel.value !== state.qStatus) qStatusSel.value = state.qStatus;
+    if (qWhereSel.value !== state.qWhere) qWhereSel.value = state.qWhere;
     // 17g: the boxes' list with the table — the poll redraws only this.
     // 17i: one line now; the runs are rows of the table
     qBoxes.replaceChildren(rentedLine() || '');
