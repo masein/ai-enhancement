@@ -96,7 +96,7 @@ def test_a_version_change_still_moves(svc, monkeypatch):  # noqa: F811
 def test_a_provider_no_longer_listed_is_said_on_the_row_and_the_batch(svc, monkeypatch):  # noqa: F811
     monkeypatch.setattr(ai_models, "drifted", DRIFTED)
     monkeypatch.setattr(ai_models, "_EP", {})
-    monkeypatch.setattr(ai_models, "providers", lambda mid: [
+    monkeypatch.setattr(ai_models, "_endpoints", lambda mid: [
         {"name": "Google AI Studio", "tag": "google-ai-studio/flex", "precision": "unknown",
          "price_in": 0.3, "price_out": 2.5, "up": True}])
     vertex = {"kind": "openrouter", "id": GEMINI, "version": GRADERS[GEMINI][0],

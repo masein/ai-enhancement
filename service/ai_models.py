@@ -537,6 +537,13 @@ _EP: dict[str, tuple[float, list | None]] = {}
 _EP_ASKING: set[str] = set()
 
 
+def _endpoints(model_id: str) -> list[dict] | None:
+    """what served_by asks, in the background: the providers OpenRouter
+    lists now (the tests stand in for it — the list is public, and a test's
+    invented provider would read as gone)"""
+    return providers(model_id)
+
+
 def served_by(model_id: str) -> list[dict] | None:
     """the providers serving the model now, as OpenRouter last said — never
     waits: an answer older than EP_S is asked again in the background. None
@@ -549,9 +556,11 @@ def served_by(model_id: str) -> list[dict] | None:
 
         def ask():
             try:
-                _EP[model_id] = (time.time(), providers(model_id))
-            finally:
-                _EP_ASKING.discard(model_id)
+                got = _endpoints(model_id)
+            except BaseException:                       # noqa: BLE001 — unknown, never raised here
+                got = None
+            _EP[model_id] = (time.time(), got)
+            _EP_ASKING.discard(model_id)
         threading.Thread(target=ask, daemon=True).start()
     return got[1] if got else None
 
