@@ -53,8 +53,8 @@ def test_latest_shows_ornith_measured_here_and_its_cards_claim_beside_it(live, p
     for k in range(2):
         assert f"/blob/{COMMIT}/README.md" in links.nth(k).get_attribute("href")
     assert rows[CARD][-1] == "Ornith's model card (5-run average)"
-    # the team's rows as before
-    assert rows["step4000"][-1].startswith("Our run · Complete")
+    # the team's rows as before — 25: instruction following not in yet (plan I)
+    assert rows["step4000"][-1].startswith("Our run · 7 of 9 benchmarks in")
     assert no_sideways(page) and page.errors == []
     SCREENS.mkdir(parents=True, exist_ok=True)
     page.evaluate("window.scrollTo(0, 0)")
