@@ -5764,6 +5764,13 @@ table.rp[data-by-table] thead th:first-child { min-width:0; }
 .pd-col { min-width:0; border:1px solid var(--border); border-radius:var(--r-1); padding:var(--sp-2); }
 .pd-col-head { display:flex; align-items:center; gap:6px; }
 .pd-ok { color:var(--success-text); } .pd-no { color:var(--critical-text); }
+/* 25c: a reported model's facts, as published */
+.rm-facts { display:grid; grid-template-columns:max-content 1fr; gap:4px 14px; margin:var(--sp-2) 0;
+  font-size:var(--fs-1); }
+.rm-facts dt { color:var(--text-secondary); }
+.rm-facts dd { margin:0; overflow-wrap:anywhere; }
+table.rp.od td { vertical-align:top; }
+table.rp.od td[data-od-fact] { text-align:left; white-space:normal; min-width:7rem; max-width:13rem; }
 /* 25: each instruction under a reply, followed or not */
 .pd-follow { list-style:none; padding:0; margin:6px 0 10px; font-size:var(--fs-1); }
 .pd-follow li { margin:2px 0; overflow-wrap:anywhere; }
@@ -7789,7 +7796,69 @@ function vTaint(m) {
   return card;
 }
 
+// 25c: a model known only by what its makers publish — its page. Never run
+// here, never in an average or rank; each number as published, with its link,
+// and what it is as published: its base, its size, the memory it needs and
+// its speed, the device named
+function vReportedModel(id) {
+  repLoad();
+  const from = (history.state || {}).from, prev = from != null && from !== location.hash;
+  const back = el('a', { class: 'backlink', href: prev ? from : '#tab=models&chip=frontier',
+    onclick: prev ? e => { e.preventDefault(); history.back(); } : null,
+    text: prev ? `← Back to ${hashWords(from)}` : '← Models' });
+  const m = (REP().models || []).find(x => x.id === id);
+  if (!m) return [back, el('div', { class: 'card' }, (state.rep || {}).loaded
+    ? note('No such model.') : skeleton(4, { 'data-loading': 'reported' }))];
+  const f = m.facts || {}, by = m.publishedBy || m.maker || '';
+  const scores = (REP().scores || []).filter(s => s.model === id);
+  const pub = (x, words) => x && x.url ? el('a', { href: x.url, target: '_blank', rel: 'noopener',
+    text: words || `published by ${by}` }) : '';
+  const fact = (label, x, key) => [el('dt', { text: label }), el('dd', { 'data-rm-fact': key },
+    !x ? '—' : x.none ? [el('span', { class: 'se', text: x.none }), x.how ? ` · ${x.how}` : '']
+      : [x.words || '', x.device ? ` on ${x.device}` : '', x.battery ? ` · ${x.battery}` : '',
+        x.how ? el('span', { class: 'se', text: ` · ${x.how}` }) : '',
+        x.note ? el('span', { class: 'se', text: ` · ${x.note}` }) : '',
+        x.url ? ' · ' : '', pub(x)])];
+  return [back,
+    el('div', { class: 'card', 'data-reported-model': id },
+      el('h1', { class: 'mtitle', text: m.name }),
+      el('p', { class: 'sub', 'data-rm-said': '1', text: `${m.maker || 'its maker'} · published `
+        + 'numbers only: never run here, never in an average or a rank' }),
+      el('dl', { class: 'rm-facts' },
+        fact('Base model', f.base ? { words: f.base } : null, 'base'),
+        f.kind ? fact('What it is', { words: f.kind }, 'kind') : '',
+        fact('Size on disk', f.disk, 'disk'), fact('Memory it needs', f.memory, 'memory'),
+        fact('On a phone', f.phone, 'phone'),
+        ...(f.speed || []).map((s, i) => fact(i ? '' : 'Elsewhere', s, 'speed'))),
+      el('p', { class: 'small' }, m.link ? el('a', { href: m.link, target: '_blank',
+        rel: 'noopener', 'data-rm-link': '1', text: 'its page ▸' }) : '',
+        f.paper ? [' · ', el('a', { href: f.paper, target: '_blank', rel: 'noopener',
+          text: 'its paper ▸' })] : '')),
+    el('div', { class: 'card', 'data-rm-scores': id },
+      el('h2', { text: 'Its numbers, as published' }),
+      scores.length ? el('div', { class: 'rp-scroll' }, el('table', { class: 'rp' },
+        el('thead', {}, el('tr', {}, ['Benchmark', 'Score', 'Source', 'Their setting', 'Date']
+          .map(t => el('th', { text: t })))),
+        el('tbody', {}, scores.map(s => el('tr', { 'data-rm-score': s.benchmark },
+          el('td', { text: s.benchmark }), el('td', { class: 'num', text: repShow(s) }),
+          el('td', {}, s.url ? el('a', { href: s.url, target: '_blank', rel: 'noopener',
+            'data-rm-published': s.benchmark, text: repTag({ ...s, setting: '' }) })
+            : repTag({ ...s, setting: '' }),
+            s.by ? el('span', { class: 'rp-sub', text: `entered by ${s.by}` }) : ''),
+          el('td', { class: 'small', text: s.setting || '' }),
+          el('td', { class: 'small', text: s.date || '' }))))))
+        : note('No numbers entered yet.'),
+      (f.also || []).length ? [el('h3', { text: 'Also published' }),
+        el('ul', { class: 'rp-notes small', 'data-rm-also': '1' }, f.also.map(a => el('li', {},
+          `${a.benchmark}: ${a.value}` + (a.base != null ? ` (its base ${a.base})` : ''),
+          a.url ? [' · ', pub(a)] : '')))] : '',
+      el('p', { class: 'small se', text: 'Published numbers come from each maker’s own harness '
+        + 'and settings: compare them with each other loosely, and never with a number measured '
+        + 'here as if they were one.' }))];
+}
 function vModel() {
+  // 25c: one known only by what its makers publish
+  if (/^reported\//.test(state.model || '')) return vReportedModel(state.model);
   const m = DATA.models.find(x => x.id === state.model);
   if (!m) return [note('No such model.')];
   // 12z B4: Back, when this page was reached from one here, and named for
@@ -10947,6 +11016,8 @@ function routeFromHash() {
   state.read = rd;
   const h = decodeURIComponent(rest);
   const m = /^model=([^&]+)(?:&(.*))?$/.exec(h);
+  // 25c: a model known only by what its makers publish has a page of its own
+  if (m && LIVE && /^reported\//.test(m[1])) { state.model = m[1]; state.topic = null; return; }
   if (m && DATA.models.some(x => x.id === canonId(m[1]))) {
     state.model = canonId(m[1]); state.topic = null;
     // 16c: a benchmark's answers, from a Results row; without one, a page
@@ -11097,7 +11168,8 @@ const SUB_WORDS = { model: 'By model', training: 'Training runs', standard: 'Sta
 function hashWords(h) {
   const [rest] = splitRead(h), s = decodeURIComponent(rest);
   const mo = /^model=(.+)$/.exec(s);
-  if (mo) return (DATA.models.find(x => x.id === canonId(mo[1])) || {}).name || 'the model';
+  if (mo) return (DATA.models.find(x => x.id === canonId(mo[1]))
+    || (REP().models || []).find(x => x.id === mo[1]) || {}).name || 'the model';
   const tp = /^topic=(.+)$/.exec(s);
   if (tp) return topicOfSlug(tp[1]) || 'the topic';
   const p = new URLSearchParams(rest);
@@ -13409,7 +13481,9 @@ function repOf(id, source) {
 }
 const repShow = s => s.unit === 'points' ? s.value.toFixed(1) : (100 * s.value).toFixed(1);
 // "reported by Epoch AI · 5-shot, CoT" — a cell's method, so two settings are never one row
-const repTag = s => `reported by ${repSrc(s.source).name}` + (s.setting ? ` · ${s.setting}` : '');
+// 25c: a model card's number says whose page it is on: "published by Edge0"
+const repTag = s => (s.source === 'card' && s.published_by ? `published by ${s.published_by}`
+  : `reported by ${repSrc(s.source).name}`) + (s.setting ? ` · ${s.setting}` : '');
 // the lm_eval task a reported benchmark is the same test as, by its names —
 // its panel sits beside that one's on Benchmarks, never merged into it
 const REP_SAME = { mmlu: ['mmlu'], mmlu_pro: ['mmlu-pro', 'mmlu pro'], hendrycks_math500:
@@ -13880,13 +13954,20 @@ function lbFrontier(ms) {
         'data-fr-setting': x.rep.setting, 'data-lead': rl ? '1' : null, style: tint, tabindex: '0',
         ...repAt,
         'data-tip': JSON.stringify([`${r.m.name} · ${c.name}`, ...repTip]) },
-      b(rl, repShow(x.rep)), mark);
+      b(rl, repShow(x.rep)), mark,
+      // 25c: a model card's number, whose page it is on, with its link
+      x.rep.source === 'card' && x.rep.published_by ? el('div', { class: 'small se fr-tag',
+        'data-fr-published': r.m.id }, x.rep.url ? el('a', { href: x.rep.url, target: '_blank',
+          rel: 'noopener', text: `published by ${x.rep.published_by}` })
+          : `published by ${x.rep.published_by}`) : '');
   };
   const frShort = shortNames(rows.map(r => r.m.name), 26);
   const nameCell = r => el('td', { class: 'model pin', 'data-model': r.m.id,
       title: r.m.reportedOnly ? 'not run here: only what others report' : r.m.id },
     el('div', { class: 'mcell' },
-      r.m.reportedOnly ? el('span', { class: 'mname', text: r.m.name })
+      // 25c: one known only as published opens its own page too
+      r.m.reportedOnly ? el('a', { class: 'mname', href: '#model=' + encodeURIComponent(r.m.id),
+        'data-fr-page': r.m.id, text: r.m.name })
         : mnameLink(r.m, frShort, { href: '#model=' + encodeURIComponent(r.m.id) }),
       !r.m.reportedOnly ? el('span', { class: 'badge', 'data-fr-ours': r.m.id,
         title: 'measured on this board', text: 'ours' }) : '',
@@ -13906,8 +13987,8 @@ function lbFrontier(ms) {
           text: g })));
       last = g;
     }
-    tbody.append(el('tr', { 'data-fr-row': r.m.id, class: r.m.reportedOnly ? '' : 'clickrow',
-      onclick: e => { if (e.target.closest('a, button') || r.m.reportedOnly) return;
+    tbody.append(el('tr', { 'data-fr-row': r.m.id, class: 'clickrow',
+      onclick: e => { if (e.target.closest('a, button')) return;
         navigate({ model: r.m.id, topic: null }); } }, nameCell(r), cols.map(c => td(r, c))));
   }
   const thead = el('thead', {},
@@ -27854,6 +27935,8 @@ function vReport(id) {
   if (d.kind === 'ran_out') return vRanOut(id, d, back);
   // 23: two builds, question by question
   if (d.kind === 'paired') return vPaired(id, d, back);
+  // 25c: of the models that can run on a phone, which are best
+  if (d.kind === 'on_device') return vOnDevice(id, d, back);
   const benches = d.benchmarks, compared = benches.filter(b => b.compare);
   // 23b: opened on the first pick with a score — step8804 first in the
   // picker, step4000 shown until it is scored
@@ -28112,6 +28195,208 @@ function vReport(id) {
       : '');
   return [back, head, ours, rpTraining(d), stand, byBench, rpFollow(d), rpBeyond(d), tok, loops,
     every, notes];
+}
+// ---------------------------------------------------------------------------
+// 25c: On-device models — of the models that can run on a phone, which are
+// best, and where are ours. Ours measured here, the others as their makers
+// publish them, each number saying which (service/ondevice.py). A measured
+// dot is a filled circle, a published one a hollow diamond: told apart by
+// shape as well as by fill
+// ---------------------------------------------------------------------------
+const OD_LEGEND = '● measured here · ◇ published by its maker';
+function odMark(ours, cx, cy, colour, attrs = {}) {
+  return ours
+    ? el('svg:circle', { cx, cy, r: 4.5, fill: colour, 'data-od-shape': 'circle', ...attrs })
+    : el('svg:path', { d: `M ${cx} ${cy - 5.5} L ${cx + 5.5} ${cy} L ${cx} ${cy + 5.5} `
+        + `L ${cx - 5.5} ${cy} Z`, fill: 'var(--surface-1)', stroke: 'var(--text-secondary)',
+        'stroke-width': 1.6, 'data-od-shape': 'diamond', ...attrs });
+}
+const odColour = r => r.ours ? rpColour(r) : 'var(--text-secondary)';
+// a chart's short name: "Edge0-35B", "Bonsai 2 9B", "Gemma E4B", "Q4"
+const odShort = label => trShort(String(label).replace(/-A\d+B-preview$/, '')
+  .replace(/^Ternary /, '').replace(/ \(1-bit\)$/, '').replace(/^Gemma 4 /, 'Gemma '));
+// a base's name without whose run it was ("of Qwen3.5 9B"), the whole in its tooltip
+const odBase = label => String(label || '').replace(/ \([^)]*run\)$/, '')
+  .replace(/, measured here$/, '');
+// a cell's source, in words: "measured here", or "published by Edge0" with its link
+function odSource(r, c) {
+  if (r.ours) return el('span', { class: 'rp-sub', 'data-od-src': 'here', text: 'measured here' });
+  const url = (c && c.url) || r.link;
+  return el('span', { class: 'rp-sub', 'data-od-src': 'published' },
+    url ? el('a', { href: url, target: '_blank', rel: 'noopener', 'data-od-link': '1',
+      text: `published by ${r.publishedBy}` }) : `published by ${r.publishedBy}`);
+}
+// a fact as published (size, memory, phone speed): its words, how, and link
+function odFact(r, f, key) {
+  if (!f) return el('td', { class: 'dash', 'data-od-fact': `${r.label}|${key}`, text: '—' });
+  if (f.none) return el('td', { 'data-od-fact': `${r.label}|${key}` },
+    el('span', { class: 'se', text: f.none }),
+    f.how ? el('span', { class: 'rp-sub', text: f.how }) : '');
+  return el('td', { 'data-od-fact': `${r.label}|${key}`, title: f.how || '' },
+    f.words, f.device ? el('span', { class: 'rp-sub', text: f.device }) : '',
+    f.by_hand ? el('span', { class: 'rp-sub', 'data-od-by-hand': '1',
+      text: `reported by hand by ${f.by_hand}` + (f.date ? `, ${f.date}` : '') }) : '',
+    f.note ? el('span', { class: 'rp-sub', text: f.note }) : '',
+    !r.ours && f.url ? el('span', { class: 'rp-sub' }, el('a', { href: f.url, target: '_blank',
+      rel: 'noopener', text: `published by ${r.publishedBy}` })) : '');
+}
+function odScore(r, b) {
+  const c = r.cells[b.key] || {};
+  if (c.v == null) return el('td', { class: 'dash', 'data-od-cell': `${r.label}|${b.key}`,
+    title: r.ours ? 'not in yet' : 'not published', text: '—' });
+  const keep = (r.retention || {})[b.key];
+  return el('td', { class: 'num', 'data-od-cell': `${r.label}|${b.key}`,
+      title: r.ours ? (c.how || '') : `${c.card || ''}: ${c.setting || ''}` },
+    rpNum(c.v) + (r.ours && c.se ? ` ± ${rpNum(c.se)}` : ''), odSource(r, c),
+    keep != null ? el('span', { class: 'rp-sub', 'data-od-keep': `${r.label}|${b.key}`,
+      text: `keeps ${(100 * keep).toFixed(1)}% of its base` }) : '');
+}
+function odName(r) {
+  return el('td', { class: r.ours ? 'rp-ours' : '', title: r.label },
+    r.ours ? el('span', { class: 'rp-dot', style: `background:${rpColour(r)}` }) : '',
+    r.ours || !r.page ? r.label : el('a', { href: '#model=' + encodeURIComponent(r.page),
+      'data-od-page': r.label, text: r.label }),
+    r.kind ? el('span', { class: 'rp-sub', text: r.kind }) : '');
+}
+// retention: each model against its own base on the same source, a panel a benchmark
+function odKeepPanel(b, rows) {
+  const W = 340, LW = 128, LH = 34, R = 14, Tp = 12, B = 26, FS = 12;
+  const vs = rows.map(r => r.retention[b.key]);
+  const lo = Math.min(0.6, Math.floor(Math.min(...vs) * 10) / 10);
+  const hi = Math.max(1.1, Math.ceil(Math.max(...vs) * 10) / 10);
+  const H = Tp + LH * rows.length + B, L = LW + 10, pw = W - L - R;
+  const X = v => L + pw * (v - lo) / (hi - lo);
+  const svg = el('svg:svg', { class: 'tr-svg', viewBox: `0 0 ${W} ${H}`, role: 'img',
+    'aria-label': `${b.label}: each model's score as a share of its own base's` });
+  const step = hi - lo > 0.6 ? 0.2 : 0.1;
+  for (let k = Math.ceil(lo / 0.1 - 1e-9); k * 0.1 <= hi + 1e-9; k++) {
+    const v = k * 0.1, at = Math.round(v * 100);
+    svg.append(el('svg:line', { x1: X(v), x2: X(v), y1: Tp, y2: H - B,
+      stroke: at === 100 ? 'var(--axis)' : 'var(--grid)', 'stroke-width': at === 100 ? 1.2 : 0.5 }));
+    if (at === 100 || Math.abs(v / step - Math.round(v / step)) < 1e-6)
+      svg.append(el('svg:text', { x: X(v), y: H - B + 15, 'text-anchor': 'middle', 'font-size': FS,
+        fill: 'var(--muted)', 'data-od-keep-tick': b.key, text: `${at}%` }));
+  }
+  rows.forEach((r, i) => {
+    const y = Tp + LH * i, v = r.retention[b.key];
+    svg.append(el('svg:text', { x: 0, y: y + 13, 'font-size': FS, fill: 'var(--text-primary)',
+        text: odShort(r.label) }, el('svg:title', { text: r.label })),
+      el('svg:text', { x: 0, y: y + 26, 'font-size': 10.5, fill: 'var(--muted)',
+        'data-od-base': `${b.key}:${r.label}`, text: `of ${odBase(r.baseLabel)}` },
+        el('svg:title', { text: `of ${r.baseLabel}` })));
+    const m = odMark(r.ours, X(v), y + 16, odColour(r), { 'data-od-keep-dot': `${b.key}:${r.label}` });
+    m.append(el('svg:title', { text: `${r.label}: ${(100 * v).toFixed(1)}% of ${r.baseLabel}` }));
+    svg.append(m);
+  });
+  return el('div', { class: 'by-panel tr-panel', 'data-od-keep-panel': b.key },
+    el('h3', { text: b.label }), svg);
+}
+// score against the memory each needs, a panel a benchmark, log x
+function odMemPanel(b, pts) {
+  const W = 280, H = 230, L = 38, R = 14, Tp = 16, B = 40, pw = W - L - R, ph = H - Tp - B, FS = 12;
+  const xs = pts.map(p => p.x);
+  const x0 = Math.min(...xs) / 1.5, x1 = Math.max(...xs) * 1.5;
+  const X = v => L + pw * (Math.log10(v) - Math.log10(x0)) / (Math.log10(x1) - Math.log10(x0));
+  const yt = trTicks(Math.min(...pts.map(p => p.c.v)), Math.max(...pts.map(p => p.c.v)));
+  const y0 = yt[0] / 100, y1 = yt[yt.length - 1] / 100;
+  const Y = v => Tp + ph * (1 - (v - y0) / (y1 - y0));
+  const svg = el('svg:svg', { class: 'tr-svg', viewBox: `0 0 ${W} ${H}`, role: 'img',
+    'aria-label': `${b.label}: score against the memory each model needs` });
+  svg.append(el('svg:rect', { x: L, y: Tp, width: pw, height: ph, fill: 'none', stroke: 'var(--grid)' }));
+  for (const v of yt) svg.append(el('svg:line', { x1: L, x2: L + pw, y1: Y(v / 100), y2: Y(v / 100),
+      stroke: 'var(--grid)', 'stroke-width': 0.5 }),
+    el('svg:text', { x: L - 4, y: Y(v / 100) + 4, 'text-anchor': 'end', 'font-size': FS,
+      fill: 'var(--muted)', text: String(v) }));
+  for (const v of szTicks(x0, x1)) svg.append(el('svg:line', { x1: X(v), x2: X(v), y1: Tp, y2: Tp + ph,
+      stroke: 'var(--grid)', 'stroke-width': 0.5 }),
+    el('svg:text', { x: X(v), y: Tp + ph + 15, 'text-anchor': 'middle', 'font-size': FS,
+      fill: 'var(--muted)', 'data-od-mem-tick': b.key, text: String(v) }));
+  svg.append(el('svg:text', { x: L + pw / 2, y: H - 4, 'text-anchor': 'middle', 'font-size': FS,
+    fill: 'var(--text-secondary)', text: 'memory it needs, GB (log scale)' }));
+  const placed = [], dots = pts.map(p => Object.assign(p, { cx: X(p.x), cy: Y(p.c.v) }));
+  for (const p of [...pts].sort((u, v) => Y(u.c.v) - Y(v.c.v))) {
+    const cx = X(p.x), cy = Y(p.c.v);
+    const m = odMark(p.r.ours, cx, cy, odColour(p.r), { 'data-od-mem-dot': `${b.key}:${p.r.label}` });
+    m.append(el('svg:title', { text: `${p.r.label}: ${rpNum(p.c.v)} at ${p.r.memory.words} · `
+      + `${p.r.ours ? 'measured here' : 'published by ' + p.r.publishedBy}` }));
+    svg.append(m);
+    const name = odShort(p.r.label), w = 7 * name.length;
+    // its label: beside its dot on the side with room, else above or below it —
+    // the first that meets no other label nor dot
+    const tries = [[cx + 8, cy + 4], [cx - 8 - w, cy + 4], [cx - w / 2, cy - 9],
+                   [cx - w / 2, cy + 17]].map(([x, y]) => ({ x: Math.max(L + 2,
+                     Math.min(L + pw - w - 2, x)), y }));
+    const free = t => !placed.some(q => Math.abs(q.y - t.y) < FS && t.x < q.x + q.w && q.x < t.x + w)
+      && !dots.some(d => Math.abs(d.cy - (t.y - 4)) < 8 && t.x - 6 < d.cx && d.cx < t.x + w + 6);
+    const t = tries.find(free) || tries[0];
+    placed.push({ x: t.x, w, y: t.y });
+    svg.append(el('svg:text', { x: t.x, y: t.y, 'font-size': FS, fill: 'var(--text-primary)',
+      'data-od-mem-label': `${b.key}:${p.r.label}`, text: name }));
+  }
+  return el('div', { class: 'by-panel tr-panel', 'data-od-mem-panel': b.key },
+    el('h3', { text: b.label }), svg);
+}
+function vOnDevice(id, d, back) {
+  const B = d.benchmarks, R = d.rows;
+  const head = el('div', { class: 'card', 'data-report': id },
+    el('h2', { text: d.title }), el('p', { class: 'sub', text: d.what }),
+    el('div', { class: 'rp-fresh', 'data-report-fresh': '1' },
+      el('span', { text: 'Our scores: ' + ((d.sources || {}).ours || {}).words }),
+      el('span', { text: 'Published numbers: each with its source and the date it gives' })));
+  const table = el('div', { class: 'card', 'data-report-section': 'od-table' },
+    el('h2', { text: 'The models' }),
+    el('div', { class: 'rp-scroll' }, el('table', { class: 'rp od', 'data-od-table': '1' },
+      el('thead', {}, el('tr', {}, ['Model', 'Base model', 'Size on disk', 'Memory it needs',
+        'Phone speed', ...B.map(b => b.label)].map(t => el('th', { text: t })))),
+      el('tbody', {}, R.map(r => el('tr', { 'data-od-row': r.label,
+          'data-od-ours': String(r.ours) },
+        odName(r), el('td', { 'data-od-fact': `${r.label}|base`, text: r.base || '—' }),
+        odFact(r, r.disk, 'disk'), odFact(r, r.memory, 'memory'), odFact(r, r.phone, 'phone'),
+        ...B.map(b => odScore(r, b))))))),
+    el('p', { class: 'small se', text: 'Every cell says where its number comes from: '
+      + '“measured here” on this board, or “published by …” with its link. Ours need the whole '
+      + 'file in memory on the server; a phone’s figures come only from a phone.' }),
+    (() => {
+      const also = R.filter(r => (r.also || []).length || (r.speed || []).length);
+      return also.length ? el('div', { 'data-od-also': '1' },
+        el('h3', { text: 'Also published' }),
+        el('ul', { class: 'rp-notes small' }, also.map(r => el('li', { 'data-od-also-of': r.label },
+          el('b', { text: r.label }), ': ',
+          [...(r.also || []).map(a => `${a.benchmark} ${a.value}` + (a.base != null
+            ? ` (its base ${a.base})` : '')),
+           ...(r.speed || []).map(s => `${s.words} on ${s.device}`)].join(' · '),
+          r.paper ? el('span', {}, ' · ', el('a', { href: r.paper, target: '_blank',
+            rel: 'noopener', text: 'its paper' })) : '')))) : '';
+    })());
+  const keepPanels = B.map(b => {
+    const rows = R.filter(r => (r.retention || {})[b.key] != null);
+    return rows.length ? odKeepPanel(b, rows) : null;
+  }).filter(Boolean);
+  const keep = el('div', { class: 'card', 'data-report-section': 'od-keep' },
+    el('h2', { text: 'What each keeps of its own base' }),
+    el('p', { class: 'small se', text: 'Each source ran its own harness, so scores aren’t '
+      + 'comparable point for point across sources. But each ran its model beside its own '
+      + 'full-precision base on the same harness: a model’s score as a share of its base’s is the '
+      + 'fair comparison. Ours against our BF16, measured here. ' + OD_LEGEND + '.' }),
+    keepPanels.length ? el('div', { class: 'by-panels tr-panels' }, keepPanels)
+      : el('p', { class: 'small se', text: 'No model has both its own score and its base’s yet.' }));
+  const memPanels = B.map(b => {
+    const pts = R.filter(r => r.memory && r.memory.gb && (r.cells[b.key] || {}).v != null)
+      .map(r => ({ r, x: r.memory.gb, c: r.cells[b.key] }));
+    return pts.length ? odMemPanel(b, pts) : null;
+  }).filter(Boolean);
+  const unmem = R.filter(r => !(r.memory && r.memory.gb));
+  const mem = el('div', { class: 'card', 'data-report-section': 'od-memory' },
+    el('h2', { text: 'Score against memory needed' }),
+    el('p', { class: 'small se', text: 'The memory each needs as its maker publishes it (ours: '
+      + 'its whole file, as loaded on the server). Each panel has its own scale. ' + OD_LEGEND + '.' }),
+    memPanels.length ? el('div', { class: 'by-panels tr-panels' }, memPanels) : '',
+    unmem.length ? el('p', { class: 'small se', 'data-od-no-memory': '1',
+      text: unmem.map(r => `${r.label}: memory not known`).join(' · ') } ) : '');
+  const notes = el('div', { class: 'card', 'data-report-section': 'notes' },
+    el('h2', { text: 'How to read this' }),
+    el('ul', { class: 'rp-notes' }, (d.notes || []).map(n => el('li', { text: n }))));
+  return [back, head, table, keep, mem, notes];
 }
 // ---------------------------------------------------------------------------
 // 21b: a report of the answers our models ran out of room on — for insight

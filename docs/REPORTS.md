@@ -289,3 +289,34 @@ After a deploy, the worker works them out once:
 ```bash
 cd ~/benchmarks/aienh && time sudo docker compose exec -T bench python -m service.report_stats --again
 ```
+
+## On-device models (25c)
+
+`eval_tasks/reports/on-device.json` (`"kind": "on_device"`, listed after the
+others): of the models that can run on a phone, which are best — and where
+are ours.
+
+- **Rows.** Ours, measured here: the step checkpoints and the Q4 baseline,
+  and every phone build with a score on the report's benchmarks. The others,
+  published: Edge0-35B and -8B, Bonsai 27B (1-bit), Ternary Bonsai 2 2B, 4B
+  and 9B, and Gemma 4 E4B and E2B. Nothing is measured here for those, and
+  nothing is estimated.
+- **Columns.** Base model, size on disk, the memory it needs, phone speed
+  (the device named, or "no phone numbers yet"), GPQA Diamond, MMLU-Pro,
+  IFEval and IFBench. Every cell says "measured here", or "published by …"
+  with its link.
+- **Retention.** Each row's score over its own base's, from the same
+  source. For a published model, that is its maker's base row
+  (`base_only`), entered like the others but never a row on Models (the
+  card's `report_only`). For ours, it is our BF16.
+- **Where the numbers live.** Scores come from the board's own tables
+  (measured) and its card entries (published). The other facts (size,
+  memory, speeds, what else was published) are in the file, each with its
+  link. A reported model's page on Models reads them too.
+
+Enter its card numbers once, after checking each on its source. Gemma 4's
+are 25b's and are already there:
+
+```bash
+cd ~/benchmarks/aienh && sudo docker compose exec -T bench python scripts/enter_report_cards.py on-device --by masein
+```

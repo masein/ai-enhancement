@@ -1812,6 +1812,8 @@ class ReportedCardIn(BaseModel):
     url: str = ""
     date: str = ""
     entered_by: str = ""
+    published_by: str = ""          # 25c: whose page it is on, when not the maker's
+    report_only: bool = False       # 25c: a base model's, for a report's retention
 
 
 @app.post("/api/reported/cards")

@@ -401,7 +401,8 @@ def test_benchmarks_draws_reported_numbers_as_ticks_on_their_benchmark_only(live
     # the frontier chip from what was imported
     chip = page.locator("[data-frontier-chip='mmlu']")
     assert chip.inner_text() == "frontier 91.2%"
-    assert "Frontier Test 5.5, reported by model card · 5-shot" in chip.get_attribute("title")
+    # 25c: a model card's number says whose page it is on
+    assert "Frontier Test 5.5, published by OpenAI · 5-shot" in chip.get_attribute("title")
     # a Frontier group: a panel a default benchmark, bars of one setting — 16.4:
     # on Models ▸ Frontier ▸ Chart
     shot(page.locator("[data-panel='mmlu']"), "mmlu-reference-ticks.png")
