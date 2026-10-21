@@ -156,18 +156,16 @@
    "task": "ifeval_google",
    "label": "IFEval",
    "epoch": null,
-   "compare": false,
-   "why": "Model cards report IFEval under their own settings, and no comparable published numbers exist for IFBench; compared only among our builds.",
-   "in_every": false
+   "compare": true,
+   "why": "Compared with Google's published Gemma 4 numbers; their harness and IFEval metric differ from ours, so treat small gaps as level."
   },
   {
    "key": "ifbench",
    "task": "ifbench_test",
    "label": "IFBench",
    "epoch": null,
-   "compare": false,
-   "why": "Model cards report IFEval under their own settings, and no comparable published numbers exist for IFBench; compared only among our builds.",
-   "in_every": false
+   "compare": true,
+   "why": "Compared with Google's published Gemma 4 numbers; their harness and IFEval metric differ from ours, so treat small gaps as level."
   }
  ],
  "token_limits": {
@@ -1324,6 +1322,116 @@
      1.1
     ]
    }
+  },
+  {
+   "label": "Gemma 4 E4B",
+   "glance": false,
+   "maker": "Google (open)",
+   "size": "4.5B effective (8B with embeddings)",
+   "group": "near",
+   "epoch_version": null,
+   "epoch_why": "not on Epoch AI: its list (21 Oct) has Gemma 4 31B IT and 26B A4B only",
+   "note": "Google's own numbers, thinking mode, Google's own harness and prompts. IFEval's metric (prompt- or instruction-level, strict or loose) isn't stated.",
+   "gpqa": {
+    "from": "card",
+    "value": 58.6,
+    "card": "Gemma 4 E4B model card",
+    "model": "Gemma 4 E4B",
+    "maker": "Google",
+    "benchmark": "GPQA Diamond",
+    "setting": "thinking mode, Google's own harness and prompts, as Google reports it",
+    "url": "https://huggingface.co/google/gemma-4-E4B-it/blob/ee0ef6023621cff504d758262d4e04895a5af4a2/README.md",
+    "date": "2026-07-20"
+   },
+   "mmlupro": {
+    "from": "card",
+    "value": 69.4,
+    "card": "Gemma 4 E4B model card",
+    "model": "Gemma 4 E4B",
+    "maker": "Google",
+    "benchmark": "MMLU Pro",
+    "setting": "thinking mode, Google's own harness and prompts, as Google reports it",
+    "url": "https://huggingface.co/google/gemma-4-E4B-it/blob/ee0ef6023621cff504d758262d4e04895a5af4a2/README.md",
+    "date": "2026-07-20"
+   },
+   "ifeval": {
+    "from": "card",
+    "value": 96.7,
+    "card": "Gemma 4 Technical Report (arXiv 2607.02770 v2), Table 5",
+    "model": "Gemma 4 E4B",
+    "maker": "Google",
+    "benchmark": "IFEval",
+    "setting": "thinking mode, Google's own harness and prompts, as Google reports it; Table 5's caption: all models in thinking mode",
+    "url": "https://arxiv.org/abs/2607.02770",
+    "date": "2026-07-24"
+   },
+   "ifbench": {
+    "from": "card",
+    "value": 44.0,
+    "card": "Gemma 4 Technical Report (arXiv 2607.02770 v2), Table 5",
+    "model": "Gemma 4 E4B",
+    "maker": "Google",
+    "benchmark": "IFBench",
+    "setting": "thinking mode, Google's own harness and prompts, as Google reports it; Table 5's caption: all models in thinking mode",
+    "url": "https://arxiv.org/abs/2607.02770",
+    "date": "2026-07-24"
+   },
+   "check_14oct": {}
+  },
+  {
+   "label": "Gemma 4 E2B",
+   "glance": false,
+   "maker": "Google (open)",
+   "size": "2.3B effective (5.1B with embeddings)",
+   "group": "near",
+   "epoch_version": null,
+   "epoch_why": "not on Epoch AI: its list (21 Oct) has Gemma 4 31B IT and 26B A4B only",
+   "note": "Google's own numbers, thinking mode, Google's own harness and prompts. IFEval's metric (prompt- or instruction-level, strict or loose) isn't stated.",
+   "gpqa": {
+    "from": "card",
+    "value": 43.4,
+    "card": "Gemma 4 E2B model card",
+    "model": "Gemma 4 E2B",
+    "maker": "Google",
+    "benchmark": "GPQA Diamond",
+    "setting": "thinking mode, Google's own harness and prompts, as Google reports it",
+    "url": "https://huggingface.co/google/gemma-4-E2B-it/blob/3e22461f65e89153144f8adb70e3b8c2cc9845a7/README.md",
+    "date": "2026-07-20"
+   },
+   "mmlupro": {
+    "from": "card",
+    "value": 60.0,
+    "card": "Gemma 4 E2B model card",
+    "model": "Gemma 4 E2B",
+    "maker": "Google",
+    "benchmark": "MMLU Pro",
+    "setting": "thinking mode, Google's own harness and prompts, as Google reports it",
+    "url": "https://huggingface.co/google/gemma-4-E2B-it/blob/3e22461f65e89153144f8adb70e3b8c2cc9845a7/README.md",
+    "date": "2026-07-20"
+   },
+   "ifeval": {
+    "from": "card",
+    "value": 94.6,
+    "card": "Gemma 4 Technical Report (arXiv 2607.02770 v2), Table 5",
+    "model": "Gemma 4 E2B",
+    "maker": "Google",
+    "benchmark": "IFEval",
+    "setting": "thinking mode, Google's own harness and prompts, as Google reports it; Table 5's caption: all models in thinking mode",
+    "url": "https://arxiv.org/abs/2607.02770",
+    "date": "2026-07-24"
+   },
+   "ifbench": {
+    "from": "card",
+    "value": 38.0,
+    "card": "Gemma 4 Technical Report (arXiv 2607.02770 v2), Table 5",
+    "model": "Gemma 4 E2B",
+    "maker": "Google",
+    "benchmark": "IFBench",
+    "setting": "thinking mode, Google's own harness and prompts, as Google reports it; Table 5's caption: all models in thinking mode",
+    "url": "https://arxiv.org/abs/2607.02770",
+    "date": "2026-07-24"
+   },
+   "check_14oct": {}
   }
  ],
  "epoch_checked": "2026-10-14"

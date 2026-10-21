@@ -27791,7 +27791,10 @@ function rpTheirCell(c) {
 }
 function rpName(m) {
   return el('td', { class: m.ours ? 'rp-ours' : '', title: m.label },
-    m.ours ? el('span', { class: 'rp-dot', style: `background:${rpColour(m)}` }) : '', m.label);
+    m.ours ? el('span', { class: 'rp-dot', style: `background:${rpColour(m)}` }) : '', m.label,
+    // 25b: what the file says of another model's numbers, once under its name
+    !m.ours && m.note ? el('span', { class: 'rp-sub', 'data-their-note': m.label,
+      text: m.note }) : '');
 }
 // a benchmark's range on its charts: every score and its error in it,
 // rounded out to tens — the 0–100 line bunched MMLU-Pro's 40 models into 10
