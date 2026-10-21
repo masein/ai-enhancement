@@ -176,7 +176,8 @@ def test_the_list_and_the_report_open_and_the_picker_moves_the_tiles(live, page,
     assert every.locator("td.rp-ours").first.evaluate(
         "e => +getComputedStyle(e).fontWeight") >= 600                  # ours in bold
     assert every.locator("[data-card-link]").count() >= 19
-    assert page.locator("[data-rp-cards] a").count() == 7    # 22: and Ornith-1.5's card
+    # 22: and Ornith-1.5's card; 25b: Gemma 4 E4B's and E2B's, and Google's report
+    assert page.locator("[data-rp-cards] a").count() == 10
     assert no_sideways(page)
     SCREENS.mkdir(parents=True, exist_ok=True)
     page.locator("[data-rp-pick='step4000']").click()

@@ -157,11 +157,11 @@ def test_the_section_puts_thinking_on_and_off_side_by_side_with_its_sentence(svc
     ours = {r["label"]: r for r in d["ours"]}
     assert ours[S88]["cells"]["ifeval"]["v"] == pytest.approx(0.30)
     assert ours[S88]["status"].endswith("benchmarks in")                       # 2 of 9
-    # never compared with others: not in Where we stand, nor Every model
+    # 25b: compared with Google's own Gemma 4 numbers — in Where we stand and
+    # Every model (tests/test_25b_gemma.py)
     b = {x["key"]: x for x in d["benchmarks"]}
-    assert b["ifeval"]["compare"] is False and b["ifbench"]["compare"] is False
-    assert b["ifeval"]["in_every"] is False and b["ifbench"]["in_every"] is False
-    assert {t["key"] for t in d["standing"][S88]["tiles"]}.isdisjoint({"ifeval", "ifbench"})
+    assert b["ifeval"]["compare"] is True and b["ifbench"]["compare"] is True
+    assert "in_every" not in b["ifeval"] and "in_every" not in b["ifbench"]
     # Across training: a segment between the two checkpoints, with its verdict —
     # four prompts apart, too few to tell (McNemar's p 0.125)
     seg = d["training"]["segments"]["ifeval"]

@@ -207,7 +207,13 @@ def test_every_other_model_equals_the_published_row(svc):
                        "otis_se": None, "math": None, "math_se": None, "simpleqa": None,
                        "simpleqa_se": None, "hle": 25.6, "hle_src": "lab", "mmlupro": None,
                        "source": "Ornith's model card (5-run average)"}]
-    got = [g for g in got if g not in ornith]
+    # 25b: Gemma 4 E4B and E2B, from Google's own numbers, after it too — the
+    # page's benchmarks theirs from the card: GPQA Diamond and MMLU-Pro
+    gemma = [g for g in got if g["model"].startswith("Gemma 4 E")]
+    assert [(g["model"], g["gpqa"], g["mmlupro"], g["gpqa_se"], g["hle"], g["source"])
+            for g in gemma] == [("Gemma 4 E4B", 58.6, 69.4, None, None, "Gemma's model card"),
+                                ("Gemma 4 E2B", 43.4, 60.0, None, None, "Gemma's model card")]
+    got = [g for g in got if g not in ornith and g not in gemma]
     assert len(got) == 41 == len(OTHERS)
     for g, w in zip(got, OTHERS):
         if w["model"] == "o4-mini (high)":

@@ -99,14 +99,16 @@ NOTES = [
     "scores' ± overlap, because it compares the same questions.",
     "Near the ceiling marks a benchmark where our reference build scores 90% or more. There, a "
     "few questions decide the difference.",
-    # 25: instruction following
+    # 25: instruction following. 25b: and Google's Gemma 4 E4B and E2B beside it
     "Instruction following. IFEval (all 541 prompts) and IFBench (its 300) are checked by each "
     "benchmark's own code on the reply alone, the thinking taken off, one run a prompt. A "
     "prompt is right when every instruction in it was followed: IFEval's number is strict, "
     "IFBench's loose, as their authors report them; the other two prompt-level and "
-    "instruction-level numbers are on each score's line. They are compared only among our "
-    "builds. DeviceMark's IFEval (300 prompts, thinking capped) is another protocol and is "
-    "never in these columns.",
+    "instruction-level numbers are on each score's line. The other models' numbers are Google's "
+    "own for Gemma 4 E4B and E2B (its technical report, Table 5): thinking mode, Google's own "
+    "harness and prompts, and IFEval's metric not stated, so a small gap to them says little. "
+    "DeviceMark's IFEval (300 prompts, thinking capped) is another protocol and is never in "
+    "these columns.",
 ]
 
 
@@ -413,6 +415,8 @@ def their_rows(rep: dict, scores: list[dict] | None = None) -> list[dict]:
         out.append({"id": "theirs:" + t["label"], "label": t["label"], "ours": False,
                     "maker": t.get("maker") or "", "size": t.get("size"),
                     "group": t.get("group") or "", "version": t.get("epoch_version"),
+                    # 25b: what the file says of the row's numbers (Gemma 4's: Google's own)
+                    **({"note": str(t["note"])} if t.get("note") else {}),
                     "cells": per,
                     # 21d: where its numbers come from, in words; and whether
                     # Models ▸ Latest sets it beside ours

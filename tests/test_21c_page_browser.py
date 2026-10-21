@@ -154,8 +154,9 @@ def test_the_numbers_are_21s_cell_for_cell(live, page):
         # models; 21 against "Q4, earlier run" too. 22: both against
         # Ornith-1.5's card; 21 against Ornith-1.5's own row too, one of ours
         # off the lda runtime as "Q4, earlier run" is
-        # 23b: 21 against step8804 too, not scored yet
-        assert len(ref) == 49 and len(rows) == 46 and not {"Q4, earlier run",
+        # 23b: 21 against step8804 too, not scored yet. 25b: both against Gemma 4
+        # E4B and E2B, Google's own numbers
+        assert len(ref) == 51 and len(rows) == 48 and not {"Q4, earlier run",
                                                            "Ornith-1.5 Q4_K_M"} & {
             r[0][0] for r in rows}, (pick, len(ref), len(rows))
         for r in rows:
@@ -167,7 +168,10 @@ def test_the_numbers_are_21s_cell_for_cell(live, page):
                 assert g[0] == w[0], (pick, name, k, g, w)
                 assert state.get(g[1].split()[-1], "dash") == next(
                     (c for c in w[1].split() if c.startswith("st-")), "dash"), (pick, name, k, g, w)
-            assert [r[7][0], r[8][0]] == [ref[name][6][0], ref[name][7][0]], (pick, name)
+            # higher and lower: 21's count IFEval and IFBench too (25b), the page's
+            # seven don't — the same where a model has neither, Gemma 4's aside
+            if not name.startswith("Gemma 4 E"):
+                assert [r[7][0], r[8][0]] == [ref[name][-2][0], ref[name][-1][0]], (pick, name)
     # every other model: the page's compare table, 21's "every model" table
     every = page.eval_on_selector_all(
         "[data-rp-every] tbody tr",
@@ -184,7 +188,7 @@ def test_the_numbers_are_21s_cell_for_cell(live, page):
         want = [by[k].split(" ± ")[0].rstrip("†") for k in order]
         assert want == [x.rstrip("†") for x in compare[name]], (name, want, compare[name])
         checked += 1
-    assert checked == len(compare) == 47                    # 22: and Ornith-1.5's card
+    assert checked == len(compare) == 49        # 22: and Ornith-1.5's card; 25b: Gemma 4 ×2
     # the thinking tokens: answers, thinking mean and median, p90, right and
     # wrong means, ran out
     for row in page.eval_on_selector_all(

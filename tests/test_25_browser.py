@@ -92,11 +92,10 @@ def test_instruction_following_on_and_off_side_by_side(live, page, width, scheme
     assert page.locator(f"[data-fl-cell='{S88}|ifeval_google:strict|off']").get_attribute(
         "title") == "served/step8804-lda-2610"
     assert "DeviceMark" in page.locator("[data-fl-legend]").inner_text()
-    # ours only: in Our runs, never in Where we stand or Every model
+    # in Our runs; 25b: and, compared with Google's Gemma 4 numbers, in Where we
+    # stand and Every model (tests/test_25b_browser.py)
     assert {"IFEval", "IFBench"} <= set(heads(page, "[data-rp-ours]"))
-    assert not {"IFEval", "IFBench"} & set(heads(page, "[data-rp-every]"))
-    tiles = page.eval_on_selector_all("[data-rp-tile]", "ts => ts.map(t => t.dataset.rpTile)")
-    assert not {"ifeval", "ifbench"} & set(tiles)
+    assert {"IFEval", "IFBench"} <= set(heads(page, "[data-rp-every]"))
     assert no_sideways(page) and page.errors == []
     SCREENS.mkdir(parents=True, exist_ok=True)
     shot(page, page.locator("[data-report-section='follow']"),

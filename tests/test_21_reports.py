@@ -154,13 +154,14 @@ def test_the_card_cells_go_through_the_card_entry_once(svc, capsys):
     import enter_report_cards as erc
     assert erc.main(["step-checkpoints", "--by", "masein"]) == 0
     cards = [r for r in db.reported_scores() if r.get("source") == "card"]
-    # 22: and Ornith-1.5's card's GPQA Diamond and HLE (no tools)
-    assert len(cards) == 21 and all(c["by"] == "masein" for c in cards)
+    # 22: and Ornith-1.5's card's GPQA Diamond and HLE (no tools). 25b: and Gemma 4
+    # E4B's and E2B's four each — two from their cards, two from Google's report
+    assert len(cards) == 29 and all(c["by"] == "masein" for c in cards)
     assert all(c["url"].startswith("https://huggingface.co/") and "/blob/" in c["url"]
-               for c in cards)
+               or c["url"] == "https://arxiv.org/abs/2607.02770" for c in cards)
     assert erc.main(["step-checkpoints", "--by", "masein"]) == 0
-    assert "0 card numbers entered by masein, 21 already there" in capsys.readouterr().out
-    assert len([r for r in db.reported_scores() if r.get("source") == "card"]) == 21
+    assert "0 card numbers entered by masein, 29 already there" in capsys.readouterr().out
+    assert len([r for r in db.reported_scores() if r.get("source") == "card"]) == 29
     rows = {r["label"]: r for r in reports.their_rows(REPORT)}
     for t in REPORT["theirs"]:
         for k, spec in t.items():
@@ -356,7 +357,7 @@ def test_the_endpoints_read_and_start_nothing(svc, monkeypatch):
     assert sorted(got) == ["paired", "ran-out-of-room", "step-checkpoints"]
     sc = got["step-checkpoints"]
     # 23b: step8804 first; 22: Ornith's card
-    assert sc["ours"][:2] == ["step8804", "step4000"] and sc["others"] == 42
+    assert sc["ours"][:2] == ["step8804", "step4000"] and sc["others"] == 44   # 25b: Gemma 4 ×2
     r = svc.get("/api/reports/step-checkpoints").json()
     assert r["picks"][:2] == ["step8804", "step4000"] and "Q4, earlier run" not in r["picks"]
     assert r["sources"]["epoch"]["words"].startswith("imported ")

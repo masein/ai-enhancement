@@ -135,7 +135,7 @@ def test_the_reports_list_never_builds_the_boards_numbers_and_is_quick(svc, monk
         slow = max(slow, time.time() - t)
         assert r.status_code == 200
     got = {x["id"]: x for x in r.json()["reports"]}
-    assert got["step-checkpoints"]["others"] == 42 and got["step-checkpoints"]["changed"]
+    assert got["step-checkpoints"]["others"] == 44 and got["step-checkpoints"]["changed"]  # 25b
     assert slow < 0.2, slow
 
 
