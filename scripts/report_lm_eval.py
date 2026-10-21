@@ -5595,7 +5595,7 @@ table.rp tr.rp-group td { background:var(--plane); font-weight:600; text-align:l
   border:1px solid var(--warning); color:var(--text-secondary); font-size:var(--fs-0, 11px);
   font-weight:400; text-transform:none; letter-spacing:0; white-space:nowrap; cursor:help;
   vertical-align:1px; }
-.tr-panels { grid-template-columns:repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
+.tr-panels { grid-template-columns:repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
 .tr-svg { display:block; width:100%; height:auto; }
 .tr-seg text { fill:var(--text-primary); paint-order:stroke; stroke:var(--surface-1);
   stroke-width:3px; stroke-linejoin:round; cursor:pointer; }
@@ -5652,20 +5652,80 @@ table.rp[data-by-table] thead th:first-child { min-width:0; }
 .pd-chart .pd-lab { font-size:var(--fs-1); min-width:0; overflow-wrap:anywhere; }
 .pd-chart .pd-lab b { font-family:var(--font-mono); font-weight:600; }
 .pd-bar { width:100%; height:20px; display:block; }
-.pd-axis { position:relative; height:16px; font-size:10px; color:var(--muted); }
-.pd-axis span { position:absolute; transform:translateX(-50%); white-space:nowrap; }
-.pd-sides { display:flex; justify-content:space-between; font-size:var(--fs-1);
-  color:var(--text-secondary); }
 .pd-chip { display:inline-block; border:1px solid var(--border); border-radius:999px;
   padding:0 8px; font-size:var(--fs-1); white-space:nowrap; }
 .pd-chip.pd-a, .pd-chip.pd-b { border-color:var(--accent); color:var(--text-primary);
   font-weight:600; }
 .pd-chip.pd-tie { color:var(--muted); }
-.pd-count { font-family:var(--font-mono); background:none; border:1px solid var(--border);
-  border-radius:var(--r-1); padding:1px 8px; cursor:pointer; color:var(--text-primary); }
-.pd-count[aria-pressed="true"] { background:var(--accent); border-color:var(--accent); color:#fff; }
-.pd-count:disabled { cursor:default; opacity:.6; }
 .pd-items { list-style:none; padding:0; margin:var(--sp-2) 0 0; }
+/* 24: the two-builds report's table-chart, and its reader */
+.pdx { display:grid; margin-top:var(--sp-2); }
+.pdx-row { display:grid; grid-template-columns:minmax(9rem, 1.2fr) minmax(4.5rem, .5fr)
+  minmax(4.5rem, .5fr) minmax(11rem, 1.5fr) minmax(6.5rem, .7fr) minmax(12rem, 1.6fr);
+  gap:4px 12px; align-items:center; padding:10px 0; border-bottom:1px solid var(--border); }
+.pdx-head { align-items:end; padding-top:0; color:var(--text-secondary); font-size:var(--fs-1);
+  font-weight:600; }
+.pdx-name { min-width:0; }
+.pdx-name .rp-sub { display:block; }
+.pdx-a, .pdx-b { text-align:right; }
+.pdx-wait { grid-column:4 / -1; }
+.pdx-diff { min-width:0; }
+.pdx-diffbox { display:flex; align-items:center; gap:6px; min-width:0; }
+.pdx-track, .pdx-axis { position:relative; flex:1 1 auto; min-width:0; }
+.pdx-track { height:20px; }
+.pdx-zero { position:absolute; top:1px; bottom:1px; width:1px; background:var(--grid);
+  transform:translateX(-50%); }
+.pdx-range { position:absolute; top:7px; height:6px; border-radius:3px;
+  background:color-mix(in srgb, var(--muted) 40%, transparent); }
+.pdx-range.sure { background:color-mix(in srgb, var(--accent) 60%, transparent); }
+.pdx-dot { position:absolute; top:5px; width:10px; height:10px; border-radius:50%;
+  background:var(--text-secondary); transform:translateX(-50%); }
+.pdx-dot.sure { background:var(--accent); }
+.pdx-axis { height:14px; font-size:var(--fs-1); font-weight:400; color:var(--muted); }
+.pdx-axis span { position:absolute; top:0; line-height:14px; transform:translateX(-50%);
+  white-space:nowrap; }
+.pdx-axis span.lo { transform:none; } .pdx-axis span.hi { transform:translateX(-100%); }
+.pdx-dv { font-family:var(--font-mono); font-size:var(--fs-1); min-width:3.6em; text-align:right;
+  flex:none; }
+.pdx-sides { display:flex; justify-content:space-between; gap:8px; font-weight:400; }
+.pdx-keys { display:flex; justify-content:space-between; gap:8px; font-weight:400; }
+.pdx-row:not(.pdx-head) .pdx-keys { display:none; }
+.pdx-bar { display:flex; gap:2px; margin:2px 0; }
+.pdx-part { flex:1 1 0; min-width:3rem; border:1px solid var(--pc); border-radius:4px;
+  background:color-mix(in srgb, var(--pc) 22%, transparent); color:var(--text-primary);
+  font:inherit; font-family:var(--font-mono); font-size:var(--fs-1); padding:3px 6px;
+  cursor:pointer; text-align:center; white-space:nowrap; }
+.pdx-part:hover:not(:disabled), .pdx-part[aria-pressed="true"] {
+  background:color-mix(in srgb, var(--pc) 45%, transparent); }
+.pdx-part:disabled { cursor:default; opacity:.55; }
+@media (max-width:700px) {
+  .pdx-row { grid-template-columns:minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:"name name" "a b" "diff diff" "verdict verdict" "split split"; }
+  .pdx-name { grid-area:name; } .pdx-a { grid-area:a; text-align:left; }
+  .pdx-b { grid-area:b; } .pdx-diff { grid-area:diff; } .pdx-verdict { grid-area:verdict; }
+  .pdx-split { grid-area:split; } .pdx-wait { grid-column:1 / -1; }
+  .pdx-head .pdx-verdict, .pdx-head .pdx-split, .pdx-head .pdx-name { display:none; }
+  .pdx-row:not(.pdx-head) .pdx-keys { display:flex; } }
+.pd-reader h3 { margin-top:0; }
+.pd-filters { display:flex; flex-wrap:wrap; gap:6px 16px; align-items:center; margin:var(--sp-2) 0; }
+.pd-filters select { max-width:100%; }
+.pd-card { border-top:1px solid var(--border); margin-top:var(--sp-2); padding-top:var(--sp-2); }
+.pd-card:focus { outline:none; }
+.pd-nav { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; margin-bottom:var(--sp-2); }
+.pd-q p { margin:0 0 6px; white-space:pre-wrap; overflow-wrap:anywhere; }
+.pd-opts { margin:0 0 6px; padding-left:1.6rem; }
+.pd-cols { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:var(--sp-3); margin-top:var(--sp-2); }
+@media (max-width:700px) { .pd-cols { grid-template-columns:minmax(0, 1fr); } }
+.pd-col { min-width:0; border:1px solid var(--border); border-radius:var(--r-1); padding:var(--sp-2); }
+.pd-col-head { display:flex; align-items:center; gap:6px; }
+.pd-ok { color:var(--success-text); } .pd-no { color:var(--critical-text); }
+.pd-final { font-size:var(--fs-4, 22px); font-weight:600; margin:6px 0; overflow-wrap:anywhere; }
+.pd-runs { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:6px; }
+.pd-run { border:1px solid var(--border); border-radius:4px; background:none; color:inherit;
+  font:inherit; padding:1px 7px; cursor:pointer; }
+.pd-run.on { border-color:var(--accent); background:color-mix(in srgb, var(--accent) 18%, transparent); }
+.pd-col pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:40vh; overflow:auto;
+  font-size:var(--fs-1); background:var(--plane); border-radius:var(--r-1); padding:var(--sp-2); }
 .pd-items > li { border-top:1px solid var(--border); padding:6px 0; }
 .pd-items .pd-links { display:flex; flex-wrap:wrap; gap:4px 14px; }
 .pd-ans { margin:6px 0 0; }
@@ -10697,8 +10757,11 @@ function viewHash(v) {
     return 'tab=reports' + (R.id ? '&report=' + encodeURIComponent(R.id) : '')
       + (pd && pd.a ? '&a=' + encodeURIComponent(pd.a) : '')
       + (pd && pd.b ? '&b=' + encodeURIComponent(pd.b) : '')
+      // 24: and its reader's benchmark, side and question
+      + (pd && pd.open ? `&bench=${encodeURIComponent(pd.open.key)}&side=${pd.open.side}`
+        + `&q=${(pd.open.q || 0) + 1}` : '')
       + (ro && ro.pick ? '&model=' + encodeURIComponent(ro.pick) : '')
-      + (ro && ro.bench ? '&bench=' + encodeURIComponent(ro.bench) : '')
+      + (ro && ro.bench && !(pd && pd.open) ? '&bench=' + encodeURIComponent(ro.bench) : '')
       + (ro && ro.open ? '&open=' + encodeURIComponent(ro.open) : '');
   }
   // 18: an agent run's page, and a task's, so a reload and a link land on it
@@ -10750,7 +10813,11 @@ function viewOfHash(name, params) {
     // 23: a paired report's two builds, from its link
     if (RPS().id && (p.get('a') || p.get('b')))
       Object.assign(pdState(RPS().id), { a: p.get('a') || null, b: p.get('b') || null });
-    if (RPS().id && (p.get('model') || p.get('bench') || p.get('open') || (RPS().ro || {})[RPS().id])) {
+    // 24: a paired report's reader, opened on its question
+    if (RPS().id && p.get('side') && p.get('bench'))
+      Object.assign(pdState(RPS().id), { open: { key: p.get('bench'), side: p.get('side') === 'b'
+        ? 'b' : 'a', q: Math.max(0, (parseInt(p.get('q'), 10) || 1) - 1), subj: '', out: false } });
+    if (RPS().id && !p.get('side') && (p.get('model') || p.get('bench') || p.get('open') || (RPS().ro || {})[RPS().id])) {
       const S = roState(RPS().id);
       Object.assign(S, { pick: p.get('model') || S.pick, bench: p.get('bench') || '',
         open: p.get('open') || null });
@@ -28207,41 +28274,6 @@ function pdOf(x, r, a, b) {
   return head + (x.runs > 1 ? ` × ${x.runs} runs` : '') + (left.length ? '; ' + left.join(', ')
     : '');
 }
-// the chart: A − B on each benchmark, its 95% range, a line at 0
-function pdChart(d) {
-  const rows = d.rows.filter(r => r.pair && r.pair.n);
-  if (!rows.length) return '';
-  let m = 0;
-  for (const r of rows) m = Math.max(m, Math.abs(r.pair.lo || 0), Math.abs(r.pair.hi || 0));
-  m = Math.max(0.05, Math.ceil(m * 20) / 20);
-  const x = v => 150 + 150 * Math.max(-1, Math.min(1, v / m));
-  const grid = el('div', { class: 'pd-chart', 'data-pd-chart': '1', role: 'img',
-    'aria-label': `${d.a} minus ${d.b}, in points, with each 95% range` });
-  for (const r of rows) {
-    const p = r.pair, tie = p.verdict === "can't tell";
-    const svg = el('svg:svg', { class: 'pd-bar', viewBox: '0 0 300 20',
-      preserveAspectRatio: 'none', 'aria-hidden': 'true' });
-    svg.append(el('svg:line', { x1: 150, x2: 150, y1: 0, y2: 20, stroke: 'var(--axis)',
-      'stroke-width': 1, 'vector-effect': 'non-scaling-stroke' }));
-    svg.append(el('svg:line', { x1: x(p.lo), x2: x(p.hi), y1: 10, y2: 10,
-      stroke: tie ? 'var(--muted)' : 'var(--accent)', 'stroke-width': 4,
-      'vector-effect': 'non-scaling-stroke' }));
-    svg.append(el('svg:line', { x1: x(p.d), x2: x(p.d), y1: 3, y2: 17,
-      stroke: 'var(--text-primary)', 'stroke-width': 3, 'vector-effect': 'non-scaling-stroke' }));
-    grid.append(el('div', { class: 'pd-lab', 'data-pd-bar': r.key },
-      r.label + ' ', el('b', { text: pdPts(p.d) }), ' ',
-      el('span', { class: 'se', text: tie ? "can't tell" : p.verdict.replace('A', d.a)
-        .replace(/^B/, d.b) })), svg);
-  }
-  const ticks = [-m, -m / 2, 0, m / 2, m];
-  grid.append(el('div', {}), el('div', {},
-    el('div', { class: 'pd-axis' }, ticks.map(t => el('span', {
-      style: `left:${(100 * x(t) / 300).toFixed(2)}%`, text: (t > 0 ? '+' : t < 0 ? '−' : '')
-        + Math.abs(Math.round(100 * t * 10) / 10) }))),
-    el('div', { class: 'pd-sides', 'data-pd-sides': '1' },
-      el('span', { text: `← ${d.b} higher` }), el('span', { text: `${d.a} higher →` }))));
-  return grid;
-}
 async function pdList(id, a, b, key, side) {
   const S = pdState(id), k = [a, b, key, side].join('\u0000');
   if (S.lists[k] && S.lists[k] !== 'asking') return;
@@ -28299,39 +28331,6 @@ function pdOpened(id, who, task, qid, epoch) {
     el('pre', { 'data-pd-reply': '1' }, ...(a.reply ? marked(a.reply, mk.final, 'final')
       : ['(nothing after its thinking)'])));
 }
-function pdPanel(id, d, r) {
-  const S = pdState(id), side = S.open.side, k = [d.a, d.b, r.key, side].join('\u0000');
-  const L = S.lists[k];
-  if (!L) pdList(id, d.a, d.b, r.key, side);
-  const who = side === 'a' ? d.a : d.b, other = side === 'a' ? d.b : d.a;
-  const card = el('div', { class: 'card', 'data-pd-list': `${r.key}:${side}` },
-    el('h3', { text: `${r.label}: ${who} higher than ${other}` }));
-  if (!L || L === 'asking') return (card.append(skeleton(3, { 'data-loading': 'pd-list' })), card);
-  if (L.err) return (card.append(el('p', { class: 'warn', text: L.err })), card);
-  const unit = r.unit || 'questions';
-  card.append(el('p', { class: 'small', 'data-pd-list-head': '1', text: `${rpN(L.n)} ${unit}; `
-    + `${rpN(L.listed)} listed, ${rpN(L.hidden)} in the hidden half.` }));
-  card.append(el('ul', { class: 'pd-items' }, L.items.map(x => {
-    const out = (s, nm) => s.runs > 1 ? `${nm} right ${s.right} of ${s.runs}`
-      + (s.ran_out ? `, ran out ${s.ran_out}` : '') : `${nm} ${s.right ? 'right' : 'wrong'}`
-      + (s.ran_out ? ', ran out of room' : '');
-    const qid = (x.grids || [x.id])[0];
-    const links = [[d.a, 'A'], [d.b, 'B']].map(([nm, s]) => {
-      const key = `${nm}:${qid}`, open = S.read[key] != null;
-      return el('a', { href: '#', 'data-pd-read': `${s}:${x.id}`,
-        text: `Read ${s}’s answer ▸`, onclick: e => { e.preventDefault();
-          if (open) delete S.read[key]; else S.read[key] = 0; render(); } });
-    });
-    const opened = [d.a, d.b].filter(nm => S.read[`${nm}:${qid}`] != null)
-      .map(nm => pdOpened(id, nm, r.task, qid, S.read[`${nm}:${qid}`]));
-    return el('li', { 'data-pd-item': x.id },
-      el('div', {}, el('b', { text: x.id }), x.grids ? el('span', { class: 'small se',
-        text: ` · ${x.grids.length} test grid${x.grids.length === 1 ? '' : 's'}` }) : ''),
-      el('div', { class: 'small' }, out(x.a, d.a) + ' · ' + out(x.b, d.b)),
-      el('div', { class: 'pd-links small' }, links), ...opened);
-  })));
-  return card;
-}
 function vPaired(id, d0, back) {
   const S = pdState(id);
   const offer = d0.offered || [];
@@ -28371,55 +28370,9 @@ function vPaired(id, d0, back) {
   head.append(el('p', { class: 'pd-sentence', 'data-pd-sentence': '1', text: d.sentence }),
     d.settings ? el('p', { class: 'small', 'data-pd-settings': '1', text: d.settings }) : '',
     rpWorking(d));
-  const chart = el('div', { class: 'card', 'data-report-section': 'pd-chart' },
-    el('h2', { text: `${a} − ${b}, in points` }),
-    pdChart(d) || el('p', { class: 'small se', text: 'No benchmark compared yet.' }));
-  const count = (r, side) => {
-    const n = side === 'a' ? r.pair.a_better : r.pair.b_better;
-    const on = S.open && S.open.key === r.key && S.open.side === side;
-    return el('td', { class: 'num' }, el('button', { class: 'pd-count', type: 'button',
-      'data-pd-count': `${r.key}:${side}`, 'aria-pressed': String(!!on), disabled: n ? null : '',
-      text: rpN(n), onclick: () => { S.open = on ? null : { key: r.key, side }; render(); } }));
-  };
-  const rows = d.rows.map(r => {
-    if (!r.pair) return el('tr', { 'data-pd-row': r.key },
-      el('td', { text: r.label }), rpOurCell(r.a, r, true), rpOurCell(r.b, r, true),
-      el('td', { class: 'dash', colspan: 5, text: r.missing || 'being worked out' }));
-    const p = r.pair;
-    return el('tr', { 'data-pd-row': r.key },
-      el('td', {}, r.label, rpCeil({ ceiling: { [r.key]: r.ceiling }, ceilingWords: d.ceilingWords },
-        r.key), el('span', { class: 'rp-sub', 'data-pd-of': r.key,
-        text: pdOf(p, r, a, b) })),
-      rpOurCell(r.a, r, true), rpOurCell(r.b, r, true),
-      el('td', { class: 'num', 'data-pd-diff': r.key,
-        text: `${pdPts(p.d)} (${pdPts(p.lo)} to ${pdPts(p.hi)})` }),
-      el('td', {}, el('span', { class: 'pd-chip ' + (PD_WORDS[p.verdict] || ''),
-        'data-pd-verdict': r.key, title: p.verdict === 'A higher' ? `${a} higher`
-          : p.verdict === 'B higher' ? `${b} higher` : 'the 95% range crosses 0'
-            + (p.p != null ? ` · McNemar p = ${p.p.toFixed(4)}` : ''), text: p.verdict })),
-      count(r, 'a'), count(r, 'b'),
-      el('td', { class: 'num', 'data-pd-differ': r.key, text: pdPct(p.differ) }));
-  });
-  const selfs = d.rows.filter(r => r.pair && r.pair.self && r.pair.self.a != null).map(r =>
-    el('p', { class: 'small', 'data-pd-self': r.key, text: 'Each build also disagrees with '
-      + `itself: between two of its own runs, ${a} gives a different result on `
-      + `${pdPct(r.pair.self.a)} of ${r.label} questions, ${b} on ${pdPct(r.pair.self.b)}. `
-      + `The two builds disagree on ${pdPct(r.pair.self.cross)}.` }));
-  const table = el('div', { class: 'card', 'data-report-section': 'pd-table' },
-    el('h2', { text: 'Benchmark by benchmark' }),
-    el('div', { class: 'rp-scroll' }, el('table', { class: 'rp', 'data-pd-table': '1' },
-      el('thead', {}, el('tr', {}, el('th', { text: 'Benchmark' }),
-        el('th', { text: 'A' }, el('span', { class: 'rp-sub', text: a })),
-        el('th', { text: 'B' }, el('span', { class: 'rp-sub', text: b })),
-        el('th', { text: 'Difference' }, el('span', { class: 'rp-sub', text: 'A − B, 95% range' })),
-        el('th', { text: 'Verdict' }),
-        el('th', { text: 'A right, B wrong' }), el('th', { text: 'B right, A wrong' }),
-        el('th', { text: 'Differ' }))),
-      el('tbody', {}, rows))),
-    el('p', { class: 'small se', text: 'A and B as the board shows them. With several runs a '
-      + 'question, the counts are the questions where one build’s average over its runs is '
-      + 'above the other’s; on ARC-AGI-2, the tasks where its task score is.' }),
-    ...selfs);
+  // 24: one table-chart, a row a benchmark; a part of its split bar opens
+  // the questions under it, both builds' answers side by side
+  const table = pdTable(id, d);
   const open = S.open && d.rows.find(r => r.key === S.open.key && r.pair);
   const notes = el('div', { class: 'card', 'data-report-section': 'pd-notes' },
     el('h2', { text: 'How to read this' }),
@@ -28427,7 +28380,258 @@ function vPaired(id, d0, back) {
       const i = n.indexOf('. ');
       return el('li', {}, el('b', { text: n.slice(0, i + 1) }), n.slice(i + 1));
     })));
-  return [back, head, chart, table, open ? pdPanel(id, d, open) : '', notes];
+  return [back, head, table, open ? pdReader(id, d, open) : '', notes];
+}
+
+// ---- 24: the table-chart ----
+// one scale for every row's difference: ±10 points, or wider where a range needs it
+function pdScale(rows) {
+  let m = 0.10;
+  for (const r of rows) if (r.pair && r.pair.n)
+    m = Math.max(m, ...[r.pair.lo, r.pair.hi, r.pair.d].filter(v => v != null).map(Math.abs));
+  return Math.ceil(m * 20 - 1e-9) / 20;
+}
+const PD_W = 200, PD_PAD = 8;
+const pdX = (v, m) => PD_W / 2 + (PD_W / 2 - PD_PAD) * v / m;
+// a row's difference: the 95% range a bar, the difference a dot, a faint
+// line at 0 — placed by share of the track, so every row and the header's
+// ticks share one scale whatever the width
+const pdAt = (v, m) => 100 * pdX(v, m) / PD_W;
+function pdDiffBar(p, m) {
+  const sure = p.verdict !== "can't tell";
+  const lo = p.lo == null ? null : pdAt(p.lo, m), hi = p.hi == null ? null : pdAt(p.hi, m);
+  return el('div', { class: 'pdx-track', role: 'img', 'aria-label': `difference ${pdPts(p.d)} `
+      + `points, 95% range ${pdPts(p.lo)} to ${pdPts(p.hi)}` },
+    el('span', { class: 'pdx-zero', style: `left:${pdAt(0, m)}%` }),
+    lo != null && hi != null ? el('span', { class: 'pdx-range' + (sure ? ' sure' : ''),
+      'data-pd-bar': sure ? 'sure' : 'tie', style: `left:${lo}%;width:${Math.max(0.5, hi - lo)}%` })
+      : '',
+    el('span', { class: 'pdx-dot' + (sure ? ' sure' : ''), 'data-pd-dot': '1',
+      style: `left:${pdAt(p.d || 0, m)}%` }));
+}
+// where they differ: B right and A wrong on the left, the other way on the
+// right, each part its count and a link to those questions
+function pdSplit(id, d, r) {
+  const S = pdState(id), p = r.pair, unit = r.unit || 'questions';
+  const parts = [['b', p.b_better, d.b, d.a], ['a', p.a_better, d.a, d.b]];
+  const tot = (p.a_better + p.b_better) || 1;
+  const several = (p.runs || 1) > 1;
+  const col = x => rpColour({ colour: (d.colours || {})[x] });
+  const bar = el('div', { class: 'pdx-bar', 'data-pd-split': r.key }, parts.map(([side, n, win, lose]) => {
+    const on = S.open && S.open.key === r.key && S.open.side === side;
+    const words = `See the ${rpN(n)} ${unit} ${win} got right ${several ? 'more often than ' + lose
+      : 'and ' + lose + ' got wrong'}, with both answers`;
+    return el('button', { class: 'pdx-part', type: 'button', 'data-pd-part': `${r.key}:${side}`,
+      'aria-pressed': String(!!on), disabled: n ? null : '', title: n ? words : `none the other way`,
+      'aria-label': n ? words : `no ${unit} ${win} got right and ${lose} wrong`,
+      style: `flex-grow:${n / tot};--pc:${col(win)}`,
+      onclick: () => { S.open = on ? null : { key: r.key, side, q: 0, subj: '', out: false };
+        render(); pdUrl(); } }, `${rpN(n)}${n ? ' ▸' : ''}`);
+  }));
+  const s2 = p.self && p.self.a != null
+    ? `a run of each differs ${pdPct(p.self.cross)} of the time; each differs from itself `
+      + `${pdPct(p.self.a)} and ${pdPct(p.self.b)}`
+    : `on ${pdPct(p.differ)} of ${unit}`;
+  return [pdKeys(d), bar,
+    el('div', { class: 'small se', 'data-pd-differ': r.key, text: s2 })];
+}
+const pdKeys = (d, cls = '') => el('div', { class: 'pdx-keys small se ' + cls },
+  el('span', { text: `← ${d.b} right, ${d.a} wrong` }), el('span', { text: `${d.a} right, ${d.b} wrong →` }));
+function pdTable(id, d) {
+  const a = d.a, b = d.b, m = pdScale(d.rows);
+  const tick = v => el('span', { style: `left:${pdAt(v, m)}%`, class: v < 0 ? 'lo' : v > 0 ? 'hi' : '',
+    text: (v > 0 ? '+' : v < 0 ? '−' : '') + Math.round(Math.abs(100 * v)) });
+  // the ticks over the same track as the rows', the value's room beside it
+  const axis = el('div', { class: 'pdx-diffbox' }, el('div', { class: 'pdx-axis', 'aria-hidden': 'true',
+    'data-pd-scale': String(Math.round(100 * m)) }, tick(-m), tick(0), tick(m)),
+    el('span', { class: 'pdx-dv' }));
+  const head = el('div', { class: 'pdx-row pdx-head', role: 'row' },
+    el('div', { class: 'pdx-name', role: 'columnheader', text: 'Benchmark' }),
+    el('div', { class: 'pdx-a num', role: 'columnheader', text: a, 'data-pd-col': 'a' }),
+    el('div', { class: 'pdx-b num', role: 'columnheader', text: b, 'data-pd-col': 'b' }),
+    el('div', { class: 'pdx-diff', role: 'columnheader' },
+      el('div', { class: 'small', text: 'Difference, points, 95% range' }), axis,
+      el('div', { class: 'pdx-sides small se', 'data-pd-sides': '1' },
+        el('span', { text: `← ${b} higher` }), el('span', { text: `${a} higher →` }))),
+    el('div', { class: 'pdx-verdict', role: 'columnheader', text: 'Verdict' }),
+    el('div', { class: 'pdx-split', role: 'columnheader' }, el('div', { text: 'Where they differ' }),
+      pdKeys(d, 'pdx-keys-head')));
+  const score = (c, r, cls) => {
+    const td = rpOurCell(c, r, true);
+    const x = el('div', { class: td.className + ' ' + cls, title: td.title || '', role: 'cell' });
+    x.append(...td.childNodes);
+    return x;
+  };
+  const rows = d.rows.map(r => {
+    const p = r.pair, ceil = rpCeil({ ceiling: { [r.key]: r.ceiling }, ceilingWords: d.ceilingWords }, r.key);
+    const name = el('div', { class: 'pdx-name', role: 'cell' }, el('span', { text: r.label }), ceil,
+      p ? el('span', { class: 'rp-sub', 'data-pd-of': r.key, text: pdOf(p, r, a, b) }) : '');
+    if (!p) return el('div', { class: 'pdx-row', role: 'row', 'data-pd-row': r.key }, name,
+      score(r.a, r, 'pdx-a'), score(r.b, r, 'pdx-b'),
+      el('div', { class: 'pdx-wait dash', role: 'cell', 'data-pd-wait': r.key,
+        text: r.missing || 'being worked out' }));
+    return el('div', { class: 'pdx-row', role: 'row', 'data-pd-row': r.key }, name,
+      score(r.a, r, 'pdx-a'), score(r.b, r, 'pdx-b'),
+      el('div', { class: 'pdx-diff', role: 'cell', 'data-pd-diff': r.key },
+        el('div', { class: 'pdx-diffbox' }, pdDiffBar(p, m), el('span', { class: 'pdx-dv',
+          text: pdPts(p.d), title: `${pdPts(p.lo)} to ${pdPts(p.hi)}, the 95% range` }))),
+      el('div', { class: 'pdx-verdict', role: 'cell' }, el('span', { class: 'pd-chip '
+          + (PD_WORDS[p.verdict] || ''), 'data-pd-verdict': r.key,
+        title: p.verdict === "can't tell" ? 'the 95% range crosses 0'
+          + (p.p != null ? ` · McNemar p = ${p.p.toFixed(4)}` : '') : (p.p != null
+          ? `McNemar p = ${p.p.toFixed(4)}` : 'the 95% range leaves out 0'),
+        text: p.verdict === 'A higher' ? `${a} higher` : p.verdict === 'B higher' ? `${b} higher`
+          : p.verdict })),
+      el('div', { class: 'pdx-split', role: 'cell' }, ...pdSplit(id, d, r)));
+  });
+  return el('div', { class: 'card', 'data-report-section': 'pd-table' },
+    el('h2', { text: 'Benchmark by benchmark' }),
+    el('div', { class: 'pdx', role: 'table', 'data-pd-table': '1',
+      'aria-label': `${a} against ${b}, benchmark by benchmark` }, head, ...rows),
+    el('p', { class: 'small se', text: 'Scores as the board shows them. With several runs a '
+      + 'question, a question counts on one side when that build’s average over its runs is '
+      + 'higher; on ARC-AGI-2, a task when its task score is.' }));
+}
+
+// ---- 24: the reader — the questions, both builds' answers side by side ----
+// the arrow keys move the reader's card, unless a field has the keys
+document.addEventListener('keydown', e => {
+  if (state.tab !== 'reports' || e.altKey || e.ctrlKey || e.metaKey) return;
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  const t = e.target && e.target.tagName;
+  if (t === 'INPUT' || t === 'SELECT' || t === 'TEXTAREA') return;
+  const R = RPS(), S = R.id && R.pd && R.pd[R.id];
+  if (!S || !S.open || !document.querySelector('[data-pd-card]')) return;
+  e.preventDefault();
+  pdMove(R.id, e.key === 'ArrowRight' ? 1 : -1);
+});
+function pdUrl() {
+  if (location.hash.slice(1) !== hashFor()) history.replaceState(history.state, '', '#' + hashFor());
+}
+function pdItems(L, o) {
+  return L.items.map((x, i) => ({ ...x, i })).filter(x => (!o.subj || x.subject === o.subj)
+    && (!o.out || [...(x.a_runs || []), ...(x.b_runs || [])].some(y => y.ran_out)));
+}
+// the run each column opens on: the one that differs — a right run of the
+// build that did better, a wrong run of the other
+function pdRunOf(runs, right) {
+  const r = (runs || []).find(y => !!y.ok === right) || (runs || [])[0];
+  return r ? r.epoch : 0;
+}
+function pdMove(id, step) {
+  const S = pdState(id), o = S.open, nav = S._nav || [];
+  if (!o || !nav.length) return;
+  const at = Math.max(0, nav.indexOf(o.q));
+  const to = Math.min(nav.length - 1, Math.max(0, at + step));
+  if (nav[to] === o.q) return;
+  o.q = nav[to];
+  render(); pdUrl();
+}
+function pdReader(id, d, r) {
+  const S = pdState(id), o = S.open, side = o.side;
+  const k = [d.a, d.b, r.key, side].join('\u0000'), L = S.lists[k];
+  if (!L) pdList(id, d.a, d.b, r.key, side);
+  const win = side === 'a' ? d.a : d.b, lose = side === 'a' ? d.b : d.a;
+  const n = side === 'a' ? r.pair.a_better : r.pair.b_better, unit = r.unit || 'questions';
+  const several = (r.pair.runs || 1) > 1;
+  const card = el('div', { class: 'card pd-reader', 'data-pd-reader': `${r.key}:${side}` },
+    el('h3', { 'data-pd-reader-title': '1', text: `${r.label} — ${rpN(n)} ${unit} ${win} got right `
+      + (several ? `more often than ${lose}` : `and ${lose} got wrong`) }));
+  if (!L || L === 'asking') return (card.append(skeleton(3, { 'data-loading': 'pd-list' })), card);
+  if (L.err) return (card.append(el('p', { class: 'warn', text: L.err })), card);
+  card.append(el('p', { class: 'small', 'data-pd-list-head': '1', text: `${rpN(L.listed)} shown `
+    + `here; ${rpN(L.hidden)} in the hidden half, counted but never shown` }),
+    L.warning ? roWarn(L.warning) : '');
+  // long lists: a subject filter and "ran out only"
+  if (L.listed >= 30) {
+    const subs = [...new Set(L.items.map(x => x.subject).filter(Boolean))].sort();
+    card.append(el('div', { class: 'pd-filters small', 'data-pd-filters': '1' },
+      subs.length ? el('label', {}, 'Subject ', el('select', { 'data-pd-subject': '1',
+        onchange: e => { o.subj = e.target.value; o.q = (pdItems(L, o)[0] || {}).i ?? 0; render(); pdUrl(); } },
+        el('option', { value: '', text: 'all', selected: !o.subj ? '' : null }),
+        subs.map(x => el('option', { value: x, text: x, selected: o.subj === x ? '' : null })))) : '',
+      el('label', {}, el('input', { type: 'checkbox', 'data-pd-ranout': '1', checked: o.out ? '' : null,
+        onchange: e => { o.out = e.target.checked; o.q = (pdItems(L, o)[0] || {}).i ?? 0; render(); pdUrl(); } }),
+        ' ran out only')));
+  }
+  const xs = pdItems(L, o);
+  S._nav = xs.map(x => x.i);
+  if (!xs.length) return (card.append(el('p', { class: 'small se', text: L.listed
+    ? 'No question here matches.' : `None of these ${unit} is in the shown half.` })), card);
+  let at = xs.findIndex(x => x.i === o.q);
+  if (at < 0) { at = 0; o.q = xs[0].i; }
+  const x = xs[at];
+  const qid = (x.grids || [x.id])[0];
+  const filtered = xs.length !== L.listed;
+  // the run each column shows: as clicked, else the one that differs
+  const ep = (who, runs, right) => {
+    const key = `${who}:${qid}`;
+    return S.runSel && S.runSel[key] != null ? S.runSel[key] : pdRunOf(runs, right);
+  };
+  const cols = [[d.a, x.a_runs, side === 'a'], [d.b, x.b_runs, side === 'b']].map(([who, runs, better]) => {
+    const e = ep(who, runs, better);
+    return { who, runs, e, ans: pdGet(id, who, r.task, qid, e) };
+  });
+  const any = cols.map(c => c.ans).find(v => v && v !== 'asking' && !v.err);
+  const nav = el('div', { class: 'pd-nav' },
+    el('button', { class: 'pill', type: 'button', 'data-pd-prev': '1', disabled: at ? null : '',
+      text: '← Previous', onclick: () => pdMove(id, -1) }),
+    el('span', { 'data-pd-pos': '1', text: `${at + 1} of ${rpN(xs.length)}${filtered ? ' shown' : ''}` }),
+    x.subject ? el('span', { class: 'se', 'data-pd-subject-of': '1', text: x.subject }) : '',
+    el('button', { class: 'pill', type: 'button', 'data-pd-next': '1',
+      disabled: at < xs.length - 1 ? null : '', text: 'Next →', onclick: () => pdMove(id, 1) }));
+  const q = any ? (any.withheld
+    ? el('p', { class: 'small se', 'data-pd-withheld': '1', text: `The question isn’t shown: the `
+      + `board keeps ${r.label}’s questions unlisted.` })
+    : any.question ? el('div', { class: 'pd-q', 'data-pd-question': '1' },
+      el('p', { text: any.question.q }),
+      (any.question.options || []).length ? el('ol', { class: 'pd-opts', type: 'A' },
+        any.question.options.map(t => el('li', { text: t }))) : '') : '') : '';
+  const right = any && any.right ? el('p', { class: 'small', 'data-pd-right': '1', text:
+    'The right answer: ' + (any.right.letter ? `(${any.right.letter})`
+      + (any.right.text ? ` ${any.right.text}` : '') : any.right.answer) }) : '';
+  card.append(el('div', { class: 'pd-card', 'data-pd-card': x.id, tabindex: '-1' }, nav, q, right,
+    el('div', { class: 'pd-cols' }, cols.map(c => pdCol(id, d, r, c, qid)))));
+  return card;
+}
+// an answer, asked once and kept
+function pdGet(id, who, task, qid, epoch) {
+  const S = pdState(id), k = [who, task, qid, epoch].join('\u0000');
+  if (!S.ans[k]) pdAnswer(id, who, task, qid, epoch);
+  return S.ans[k];
+}
+function pdCol(id, d, r, c, qid) {
+  const S = pdState(id);
+  const head = el('div', { class: 'pd-col-head' }, el('span', { class: 'rp-dot',
+    style: `background:${rpColour({ colour: (d.colours || {})[c.who] })}` }), el('b', { text: c.who }));
+  const a = c.ans;
+  if (!a || a === 'asking') return el('div', { class: 'pd-col' }, head, skeleton(2, { 'data-loading': 'pd-answer' }));
+  if (a.err) return el('div', { class: 'pd-col' }, head, el('p', { class: 'warn', 'data-pd-refused': '1', text: a.err }));
+  head.append(el('span', { class: a.ok ? 'pd-ok' : 'pd-no', 'data-pd-ok': String(!!a.ok),
+    text: a.ok ? ' ✓' : ' ✗' }));
+  const mk = a.marks || {};
+  const marked = (text, span, what) => !span ? [text] : [text.slice(0, span[0]),
+    el('mark', { class: 'pd-mark pd-mark-' + what, 'data-pd-mark': what,
+      text: text.slice(span[0], span[1]) }), text.slice(span[1])];
+  const letter = ['gpqa_diamond_epoch', 'mmlupro_tiger'].includes(r.task);
+  const read = a.read == null ? '—' : letter ? `(${a.read})` : String(a.read);
+  return el('div', { class: 'pd-col', 'data-pd-col-of': c.who },
+    head,
+    el('div', { class: 'pd-final', 'data-pd-final': c.who, title: a.verdict, text: read }),
+    (c.runs || []).length > 1 ? el('div', { class: 'pd-runs', 'data-pd-runs': c.who }, c.runs.map(y =>
+      el('button', { type: 'button', class: 'pd-run' + (y.epoch === c.e ? ' on' : ''),
+        'aria-pressed': String(y.epoch === c.e), 'data-pd-run': `${c.who}:${y.epoch}`,
+        title: `run ${y.epoch + 1}: ${y.ran_out ? 'ran out of room' : y.ok ? 'right' : 'wrong'}`,
+        text: y.ok ? '✓' : '✗', onclick: () => {
+          S.runSel = { ...(S.runSel || {}), [`${c.who}:${qid}`]: y.epoch }; render(); } }))) : '',
+    a.ran_out ? el('p', { class: 'small warntext', text: 'ran out of room' }) : '',
+    el('pre', { class: 'pd-reply', 'data-pd-reply': c.who }, ...(a.reply ? marked(a.reply, mk.final, 'final')
+      : ['(nothing after its thinking)'])),
+    a.thinking ? el('details', { 'data-pd-thinking': c.who }, el('summary', { text: 'Show its thinking'
+      + (a.think_tokens != null ? ` (${rpN(a.think_tokens)} tokens)` : '') }),
+      el('p', { class: 'small se', text: mk.first ? 'Marked: where it first stated the right answer.'
+        : 'It never states the right answer clearly.' }),
+      el('pre', {}, ...marked(a.thinking, mk.first, 'first'))) : '');
 }
 
 // ---------------------------------------------------------------------------
@@ -28724,39 +28928,48 @@ function trPanel(d, T, b, byL) {
   const head = el('h3', {}, b.label, rpCeil(d, b.key));
   if (!pts.length && !refs.length) return el('div', { class: 'by-panel tr-panel', 'data-tr-panel': b.key },
     head, el('p', { class: 'small se', 'data-tr-missing': b.key, text: 'No checkpoint scored yet.' }));
-  const W = 280, H = 190, L = 36, R = 44, Tp = 14, B = 32, pw = W - L - R, ph = H - Tp - B;
+  // 24: drawn no wider than the narrowest panel (260 px), so its 12-unit
+  // text is never under the board's small text
+  const W = 260, H = 220, L = 38, R = 46, Tp = 16, B = 40, pw = W - L - R, ph = H - Tp - B, FS = 12;
   const steps = cps.map(c => c.step), sx0 = Math.min(...steps), sx1 = Math.max(...steps);
   const pad = (sx1 - sx0) * 0.08 || 1;
   const X = v => L + pw * (v - (sx0 - pad)) / (sx1 - sx0 + 2 * pad);
   const ys = [...pts.flatMap(p => [p.c.v - (p.c.se || 0), p.c.v + (p.c.se || 0)]), ...refs.map(r => r.v)];
-  let y0 = Math.min(...ys), y1 = Math.max(...ys);
-  const yp = (y1 - y0) * 0.15 || 0.02;
-  y0 = Math.max(0, y0 - yp); y1 = Math.min(1, y1 + yp);
-  if (y1 - y0 < 0.02) { y0 = Math.max(0, y0 - 0.01); y1 = Math.min(1, y1 + 0.01); }
+  // 24: round ticks (60, 70, 80 …), the scale running from one to another
+  const yt = trTicks(Math.min(...ys), Math.max(...ys));
+  const y0 = yt[0] / 100, y1 = yt[yt.length - 1] / 100;
   const Y = v => Tp + ph * (1 - (v - y0) / (y1 - y0));
   const svg = el('svg:svg', { class: 'tr-svg', viewBox: `0 0 ${W} ${H}`, role: 'img',
     'aria-label': `${b.label}: each checkpoint's score by training step` });
   svg.append(el('svg:rect', { x: L, y: Tp, width: pw, height: ph, fill: 'none', stroke: 'var(--grid)' }));
-  for (const v of [y0 + (y1 - y0) * 0.1, (y0 + y1) / 2, y1 - (y1 - y0) * 0.1])
-    svg.append(el('svg:text', { x: L - 4, y: Y(v) + 3, 'text-anchor': 'end', 'font-size': 8,
-      fill: 'var(--muted)', text: (100 * v).toFixed(1) }));
+  const dec = yt.length > 1 && yt[1] - yt[0] < 1 ? 1 : 0;
+  for (const v of yt) {
+    svg.append(el('svg:line', { x1: L, x2: L + pw, y1: Y(v / 100), y2: Y(v / 100), stroke: 'var(--grid)',
+      'stroke-width': 0.5 }),
+      el('svg:text', { x: L - 4, y: Y(v / 100) + 4, 'text-anchor': 'end', 'font-size': FS,
+        fill: 'var(--muted)', 'data-tr-tick': b.key, text: v.toFixed(dec) }));
+  }
   for (const c of cps)
     svg.append(el('svg:line', { x1: X(c.step), x2: X(c.step), y1: Tp + ph, y2: Tp + ph + 3, stroke: 'var(--axis)' }),
-      el('svg:text', { x: X(c.step), y: Tp + ph + 12, 'text-anchor': 'middle', 'font-size': 8,
-        fill: 'var(--muted)', text: c.step.toLocaleString('en') }));
-  svg.append(el('svg:text', { x: L + pw / 2, y: H - 4, 'text-anchor': 'middle', 'font-size': 8,
+      el('svg:text', { x: X(c.step), y: Tp + ph + 15, 'text-anchor': 'middle', 'font-size': FS,
+        fill: 'var(--muted)', text: trStep(c.step) }));
+  svg.append(el('svg:text', { x: L + pw / 2, y: H - 4, 'text-anchor': 'middle', 'font-size': FS,
     fill: 'var(--text-secondary)', text: T.label.toLowerCase() }));
-  // the references: dashed, labelled at their right end (a label on another's moved aside)
-  const placed = [];
-  for (const r of [...refs].sort((p, q) => q.v - p.v)) {
-    let ly = Y(r.v) + 3;
-    while (placed.some(q => Math.abs(q - ly) < 9)) ly += 9;
-    placed.push(ly);
+  // the references: dashed, labelled at their right end — 24: labels closer
+  // than a line of text spread apart, the higher line's above, never on top
+  const LH = Math.ceil(FS * 1.35);                       // a line of 12-unit text, glyphs and all
+  const labs = [...refs].sort((p, q) => q.v - p.v).map(r => ({ r, y: Y(r.v) + 4 }));
+  for (let i = 1; i < labs.length; i++) if (labs[i].y - labs[i - 1].y < LH) {
+    const mid = (labs[i].y + labs[i - 1].y) / 2;
+    labs[i - 1].y = Math.min(labs[i - 1].y, mid - LH / 2);
+    labs[i].y = Math.max(labs[i].y, labs[i - 1].y + LH);
+  }
+  for (const { r, y } of labs)
     svg.append(el('svg:line', { x1: L, x2: L + pw, y1: Y(r.v), y2: Y(r.v), stroke: 'var(--text-secondary)',
       'stroke-dasharray': '4 3', 'stroke-width': 1, 'data-tr-ref': `${b.key}:${r.label}` },
       el('svg:title', { text: `${r.label}: ${rpNum(r.v)}` })),
-      el('svg:text', { x: L + pw + 3, y: ly, 'font-size': 8, fill: 'var(--text-secondary)', text: r.label }));
-  }
+      el('svg:text', { x: L + pw + 3, y, 'font-size': FS, fill: 'var(--text-secondary)',
+        'data-tr-ref-label': `${b.key}:${r.label}`, text: r.label }));
   // the line through the checkpoints, then each one's whisker and dot
   if (pts.length > 1) svg.append(el('svg:polyline', { points: pts.map(p => `${X(p.step)},${Y(p.c.v)}`).join(' '),
     fill: 'none', stroke: 'var(--accent)', 'stroke-width': 1.5, 'data-tr-line': b.key }));
@@ -28779,12 +28992,25 @@ function trPanel(d, T, b, byL) {
         onclick: e => { e.preventDefault(); if (!T.paired) return;
           Object.assign(pdState(T.paired), { a: g.b, b: g.a, open: null }); rpOpen(T.paired); } },
       el('svg:title', { text: `${g.b} against ${g.a}, question by question: ${g.verdict} — open the two-builds report` }),
-      el('svg:text', { x: mx, y: my, 'text-anchor': 'middle', 'font-size': 8.5, text: words })));
+      el('svg:text', { x: mx, y: my, 'text-anchor': 'middle', 'font-size': FS, text: words })));
   }
   return el('div', { class: 'by-panel tr-panel', 'data-tr-panel': b.key }, head, svg,
     missing.length ? el('p', { class: 'small se', 'data-tr-missing': b.key,
       text: missing.map(c => `${c.label}: not scored yet`).join(' · ') }) : '');
 }
+// 24: round ticks for a score scale given in shares, in points: a step of 1,
+// 2, 2.5, 5 or 10 points (×10ⁿ), three to six of them, the ends rounded out
+function trTicks(lo, hi) {
+  let a = 100 * Math.max(0, lo), z = 100 * Math.min(1, hi);
+  if (z - a < 1) { a = Math.max(0, a - 0.5); z = Math.min(100, z + 0.5); }
+  const raw = (z - a) / 4, mag = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map(x => x * mag).find(x => x >= raw) || 10 * mag;
+  const t0 = Math.floor(a / step + 1e-9) * step, t1 = Math.ceil(z / step - 1e-9) * step;
+  const out = [];
+  for (let v = t0; v <= t1 + step / 1e6; v += step) out.push(Math.round(v * 1000) / 1000);
+  return out.length > 1 ? out : [t0, t0 + step];
+}
+const trStep = v => v.toLocaleString('en');
 // "Across training": a panel a benchmark, once two checkpoints are scored on one
 function rpTraining(d) {
   const T = d.training;
@@ -28998,44 +29224,63 @@ function byThinks(d, m, ts, lab) {
 function rpBeyond(d) {
   const B = d.beyond || {}, SP = d.speed || {};
   const cell = (txt, tip, attr) => el('td', { class: 'num', title: tip, ...attr, text: txt });
-  const NEXT = 'measured from the next run on';
+  const NEXT = 'measured from the next run on', NOT = 'not worked out yet';
+  const of = p => {
+    const b = B[p] || {};
+    return { g: (b.gpqa || {}).reliability, o: (b.otis || {}).reliability,
+      c: (b.hle || {}).calibration, s: (b.simpleqa || {}).simpleqa, sp: SP[p] || {} };
+  };
+  // each column: its heading, its words in "How to read this", whether a
+  // build has it, and its cell — 24: one empty for every build isn't shown,
+  // and its words wait until a build has it
+  const COLS = [
+    ['GPQA always right', 'rel', x => x.g && x.g.n, (p, x) => cell(x.g && x.g.n ? byPct(x.g.always_share)
+      : '—', x.g ? byRelWords(x.g, 'GPQA Diamond') : NOT, { 'data-by-cell': `${p}:gpqa` })],
+    ['OTIS always right', 'rel', x => x.o && x.o.n, (p, x) => cell(x.o && x.o.n ? byPct(x.o.always_share)
+      : '—', x.o ? byRelWords(x.o, 'OTIS Mock AIME') : NOT)],
+    ['HLE calibration error', 'cal', x => x.c && x.c.error != null, (p, x) => cell(x.c && x.c.error != null
+      ? String(Math.round(x.c.error)) : '—', x.c ? byCalWords(x.c) : NOT, { 'data-by-cell': `${p}:cal` })],
+    ['HLE mean stated confidence', 'cal', x => x.c && x.c.n, (p, x) => cell(x.c && x.c.n
+      ? `${Math.round(x.c.mean_confidence)}%` : '—', x.c ? byCalWords(x.c) : NOT)],
+    ['SimpleQA tries', 'sqa', x => x.s && x.s.total, (p, x) => cell(x.s && x.s.total ? byPct(x.s.tries) : '—',
+      x.s ? bySqaWords(x.s) : NOT)],
+    ['SimpleQA right when it tries', 'sqa', x => x.s && x.s.total, (p, x) => cell(x.s && x.s.total
+      ? byPct(x.s.right_when_tries, 1) : '—', x.s ? bySqaWords(x.s) : NOT)],
+    ['SimpleQA F', 'sqa', x => x.s && x.s.total, (p, x) => cell(x.s && x.s.total
+      ? (100 * (x.s.f || 0)).toFixed(1) : '—', x.s ? bySqaWords(x.s) : NOT, { 'data-by-cell': `${p}:f` })],
+    // 23c: its card's speed alone and GPQA Diamond's energy an answer
+    ['Output tok/s alone', 'alone', x => x.sp.alone_out, (p, x) => cell(x.sp.alone_out
+      ? byTok(x.sp.alone_out.median) : '—', x.sp.alone_out ? `output tokens a second for one user: `
+        + `the median over ${rpN(x.sp.alone_out.n)} box${x.sp.alone_out.n === 1 ? '' : 'es'}`
+        + (x.sp.alone_out.n > 1 ? ` (${byTok(x.sp.alone_out.lo)}–${byTok(x.sp.alone_out.hi)})` : '')
+        : NEXT, { 'data-by-cell': `${p}:alone` })],
+    ['GPQA Diamond energy an answer', 'energy', x => x.sp.gpqa_wh != null, (p, x) => cell(
+      x.sp.gpqa_wh != null ? byWh(x.sp.gpqa_wh) : '—', x.sp.gpqa_wh != null ? 'each step’s '
+        + 'watt-hours over its GPQA Diamond answers, asked several at once' : NEXT,
+      { 'data-by-cell': `${p}:gpqa-wh` })]];
+  const WORDS = { rel: 'how often each build is right every time it is asked',
+    cal: 'how far its stated confidence on HLE is from the share it gets right (0 is perfect)',
+    sqa: 'how often it tries on SimpleQA and how often it is right when it does',
+    alone: 'how fast its card writes for one user', energy: 'the energy a GPQA Diamond answer takes' };
+  const xs = Object.fromEntries(d.picks.map(p => [p, of(p)]));
+  const cols = COLS.filter(([, , has]) => d.picks.some(p => has(xs[p])));
+  const groups = [...new Set(cols.map(c => c[1]))];
   const rows = d.picks.map(p => {
-    const m = d.ours.find(x => x.label === p) || {}, b = B[p] || {}, sp = SP[p] || {};
-    const g = (b.gpqa || {}).reliability, o = (b.otis || {}).reliability;
-    const c = (b.hle || {}).calibration, s = (b.simpleqa || {}).simpleqa;
+    const m = d.ours.find(x => x.label === p) || {};
     return el('tr', { 'data-by-row': p },
       el('td', { class: 'rp-ours' }, el('span', { class: 'rp-dot', style: `background:${rpColour(m)}` }), p),
-      cell(g && g.n ? byPct(g.always_share) : '—', g ? byRelWords(g, 'GPQA Diamond') : 'not worked out yet', { 'data-by-cell': `${p}:gpqa` }),
-      cell(o && o.n ? byPct(o.always_share) : '—', o ? byRelWords(o, 'OTIS Mock AIME') : 'not worked out yet'),
-      cell(c && c.error != null ? String(Math.round(c.error)) : '—', c ? byCalWords(c) : 'not worked out yet', { 'data-by-cell': `${p}:cal` }),
-      cell(c && c.n ? `${Math.round(c.mean_confidence)}%` : '—', c ? byCalWords(c) : 'not worked out yet'),
-      cell(s && s.total ? byPct(s.tries) : '—', s ? bySqaWords(s) : 'not worked out yet'),
-      cell(s && s.total ? byPct(s.right_when_tries, 1) : '—', s ? bySqaWords(s) : 'not worked out yet'),
-      cell(s && s.total ? (100 * (s.f || 0)).toFixed(1) : '—', s ? bySqaWords(s) : 'not worked out yet', { 'data-by-cell': `${p}:f` }),
-      // 23c: its card's speed alone and GPQA Diamond's energy an answer
-      cell(sp.alone_out ? byTok(sp.alone_out.median) : '—', sp.alone_out
-        ? `output tokens a second for one user: the median over ${rpN(sp.alone_out.n)} box`
-          + `${sp.alone_out.n === 1 ? '' : 'es'}` + (sp.alone_out.n > 1
-            ? ` (${byTok(sp.alone_out.lo)}–${byTok(sp.alone_out.hi)})` : '') : NEXT,
-        { 'data-by-cell': `${p}:alone` }),
-      cell(sp.gpqa_wh != null ? byWh(sp.gpqa_wh) : '—', sp.gpqa_wh != null
-        ? 'each step’s watt-hours over its GPQA Diamond answers, asked several at once' : NEXT,
-        { 'data-by-cell': `${p}:gpqa-wh` }));
+      ...cols.map(c => c[3](p, xs[p])));
   });
+  const said = groups.map(g => WORDS[g]);
   return el('div', { class: 'card', 'data-report-section': 'beyond' },
     el('h2', { text: 'Beyond the score' }),
-    el('p', { class: 'small se', 'data-by-how': '1', text: 'How to read this: how often each '
-      + 'build is right every time it is asked; how far its stated confidence on HLE is from the '
-      + 'share it gets right (0 is perfect); how often it tries on SimpleQA and how often it is '
-      + 'right when it does; how fast its card writes for one user, and the energy a GPQA '
-      + 'Diamond answer takes (from the next run on). Hover a number for its sentence; the notes '
+    el('p', { class: 'small se', 'data-by-how': '1', text: 'How to read this: '
+      + (said.length ? said.join('; ') + '. ' : '') + 'Hover a number for its sentence; the notes '
       + 'below say more.' }),
-    el('div', { class: 'rp-scroll' }, el('table', { class: 'rp', 'data-by-table': '1' },
-      el('thead', {}, el('tr', {}, ['Build', 'GPQA always right', 'OTIS always right',
-        'HLE calibration error', 'HLE mean stated confidence', 'SimpleQA tries',
-        'SimpleQA right when it tries', 'SimpleQA F', 'Output tok/s alone',
-        'GPQA Diamond energy an answer'].map(h => el('th', { text: h })))),
-      el('tbody', {}, rows))));
+    cols.length ? el('div', { class: 'rp-scroll' }, el('table', { class: 'rp', 'data-by-table': '1' },
+      el('thead', {}, el('tr', {}, ['Build', ...cols.map(c => c[0])].map(h => el('th', {
+        'data-by-col': h, text: h })))),
+      el('tbody', {}, rows))) : el('p', { class: 'small se', text: 'Not worked out yet.' }));
 }
 // "Score against thinking": a small panel a benchmark — x its mean thinking
 // tokens, y the board's score, a dot a build in its picker colour, labelled

@@ -146,11 +146,41 @@ def jobs() -> list[Job]:
             out.setdefault(j.slot, j)
     # 23b: beyond the score, every row with scored Frontier answers
     from . import beyond
-    # 23c: and every DeviceMark served row's speed; 23d: and how each thinks
+    # 23c: and every DeviceMark served row's speed; 23d: and how each thinks;
+    # 24: and each graded benchmark's answers index, for the grading page
     from . import thinks
-    for j in beyond.jobs() + beyond.dm_jobs() + thinks.jobs():
+    for j in beyond.jobs() + beyond.dm_jobs() + thinks.jobs() + grading_jobs():
         out.setdefault(j.slot, j)
     return list(out.values())
+
+
+def grading_jobs() -> list[Job]:
+    """24: each row's graded benchmarks' answers index (service/frontier
+    answer_index), worked out after an import so the grading page's dry run
+    reads it, never every answer"""
+    from . import frontier as sf
+    import frontier_graders as fg
+    root = Path(config.OUT_DIR)
+    out = []
+    for t in fg.SLOT_OF:
+        # only where this machine has the questions: the worker never fetches
+        if not sf.fb._cache(config.BENCH_ROOT, t).exists():
+            continue
+        for d in sorted(root.glob(f"*/{t}_0shot/{sf.SUB}")) if root.is_dir() else []:
+            if not (d / sf.ANSWERS).is_file():
+                continue
+            row = d.parent.parent
+            try:
+                key = sf.index_key(row, t)
+            except Exception:                           # noqa: BLE001 — no grader here
+                continue
+
+            def fn(row=row, t=t, key=key, d=d):
+                got = sf.build_index(row, t)
+                sf.keep_index(d, key, got)
+                return {"answers": len(got)}
+            out.append(Job(f"gindex|{d}", key, f"grading index, {row.name} · {t}", fn))
+    return out
 
 
 def stale(js: list[Job] | None = None) -> list[Job]:
