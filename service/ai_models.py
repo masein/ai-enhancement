@@ -529,8 +529,50 @@ def save(job: str, model_id: str, by: str) -> dict:
     return value
 
 
+# 24b: the providers OpenRouter lists for a model, asked at most this often —
+# a pinned provider that stops serving it (Gemini 2.5 Flash on Google Vertex,
+# 21 Oct) is said, where its batch read five 404s in a row
+EP_S = 3600
+_EP: dict[str, tuple[float, list | None]] = {}
+_EP_ASKING: set[str] = set()
+
+
+def served_by(model_id: str) -> list[dict] | None:
+    """the providers serving the model now, as OpenRouter last said — never
+    waits: an answer older than EP_S is asked again in the background. None
+    while it isn't known"""
+    got = _EP.get(model_id)
+    if got and time.time() - got[0] < EP_S:
+        return got[1]
+    if model_id not in _EP_ASKING:
+        _EP_ASKING.add(model_id)
+
+        def ask():
+            try:
+                _EP[model_id] = (time.time(), providers(model_id))
+            finally:
+                _EP_ASKING.discard(model_id)
+        threading.Thread(target=ask, daemon=True).start()
+    return got[1] if got else None
+
+
+def provider_gone(c: dict) -> str:
+    """'' while the pinned provider still serves the pinned model (or nobody
+    knows yet); else why not, in one line"""
+    if not c or c.get("kind") != "openrouter" or not c.get("provider") or not has_key():
+        return ""
+    eps = served_by(c["id"])
+    if eps is None:
+        return ""
+    if c["provider"] in {e.get("tag") for e in eps} | {e.get("name") for e in eps}:
+        return ""
+    return (f"OpenRouter no longer serves {c['id']} on {c['provider']} — choose the job's "
+            "model again on AI models")
+
+
 def drifted(c: dict) -> str:
-    """'' while a pinned model still means what was saved; else why not"""
+    """'' while a pinned model still means what was saved; else why not —
+    24b: and while its pinned provider still serves it"""
     if not c or c.get("kind") != "openrouter":
         return ""
     # 16c: asked before each request of a batch and on every poll — never
@@ -545,7 +587,7 @@ def drifted(c: dict) -> str:
     if now["version"] != c.get("version"):
         return (f"{c['id']} now points to {now['version']}, not the {c.get('version')} this job "
                 "was pinned to — choose it again on AI models")
-    return ""
+    return provider_gone(c)
 
 
 # ---------------------------------------------------------------------------

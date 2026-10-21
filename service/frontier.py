@@ -1190,17 +1190,23 @@ def graders_of(d: Path, flat: list[dict], known: dict | None = None
     with it ({..., "topup": {version, prompt_sha256, n}})"""
     used: dict = {}
     after: dict = {}
+    provs: dict = {}
     for r in flat:
         gr = r.get("grade")
         if gr:
             k = (gr.get("by"), gr.get("prompt_sha256"))
             used[k] = used.get(k, 0) + 1
+            # 24b: the provider each grade names (none before 24b)
+            if gr.get("provider"):
+                p = provs.setdefault(k, {})
+                p[gr["provider"]] = p.get(gr["provider"], 0) + 1
             was = gr.get("after") or {}
             after.setdefault(k, set()).add((was.get("by"), was.get("prompt_sha256")))
     known = {(x.get("version"), x.get("prompt_sha256")): x
              for x in ((known if known is not None else read_grades(d)).get("graders")
                        or [])}
-    every = [{**known.get(k, {"version": k[0], "prompt_sha256": k[1]}), "n": n}
+    every = [{**known.get(k, {"version": k[0], "prompt_sha256": k[1]}), "n": n,
+              **({"providers": provs[k]} if len(provs.get(k) or {}) > 1 else {})}
              for k, n in sorted(used.items(), key=lambda kv: -kv[1])]
     if len(every) == 1:
         return {k: v for k, v in every[0].items() if k != "n"}, every

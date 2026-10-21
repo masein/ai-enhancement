@@ -1504,7 +1504,11 @@ def _main(argv: list[str] | None = None) -> int:
     if pinned and state.get("gguf_sha256") and state["gguf_sha256"] != sha:
         raise SystemExit(f"{out} holds answers of another file ({state['gguf_sha256'][:16]}, now "
                          f"{sha[:16]}): they can't be mixed — start another --out")
+    # 24b: its quant, as the file's own header names it (general.file_type)
+    import gguf_header
+    ftype = (gguf_header.read(gguf_path) or {}).get("file_type")
     gguf = {"name": gguf_path.name, "sha256": sha, "size": sum(x.stat().st_size for x in paths),
+            **({"file_type": str(ftype)} if ftype else {}),
             "source": a.gguf if a.gguf.startswith("hf://") else "a path on the box",
             **({"parts": [{"name": x.name, "sha256": h, "size": x.stat().st_size}
                           for x, h in zip(paths, shas)]} if len(paths) > 1 else {})}

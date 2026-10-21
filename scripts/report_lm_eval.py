@@ -1774,9 +1774,13 @@ def _graders_words(d: dict) -> str:
     """the grader and prompt behind a score — 17b: or each of them, with how
     many answers it graded, when there is more than one"""
     def one(g: dict) -> str:
+        # 24b: the answers it checked on each provider, when on more than one
+        on = g.get("providers") or {}
         return (f"{g.get('version') or g.get('model')}"
                 + (f" with {g['prompt_words']}" if g.get("prompt_words") else "")
-                + f" ({str(g.get('prompt_sha256') or '')[:8]})")
+                + f" ({str(g.get('prompt_sha256') or '')[:8]})"
+                + (" — " + ", ".join(f"{int(n):,} on {p}" for p, n in on.items())
+                   if len(on) > 1 else ""))
     if len(d.get("graders") or []) > 1:
         every = d.get("graders") or []
         return (f"{len(every)} graders or prompts — "
@@ -5596,6 +5600,13 @@ table.rp tr.rp-group td { background:var(--plane); font-weight:600; text-align:l
   font-weight:400; text-transform:none; letter-spacing:0; white-space:nowrap; cursor:help;
   vertical-align:1px; }
 .tr-panels { grid-template-columns:repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
+/* 24b: a build's quant and size under its name */
+.rp-meta { display:block; font-family:var(--font-mono); font-size:11px; font-weight:400;
+  color:var(--text-secondary); text-transform:none; letter-spacing:0; white-space:nowrap; }
+.rp-meta.inline { display:inline; margin-left:8px; }
+.moremenu .rp-meta { margin-left:22px; }
+.tr-legend { display:flex; flex-wrap:wrap; gap:6px 18px; margin:var(--sp-2) 0; font-size:var(--fs-1); }
+.tr-key .rp-meta { margin-left:14px; }
 .tr-svg { display:block; width:100%; height:auto; }
 .tr-seg text { fill:var(--text-primary); paint-order:stroke; stroke:var(--surface-1);
   stroke-width:3px; stroke-linejoin:round; cursor:pointer; }
@@ -25718,7 +25729,10 @@ function frontierGradingCard() {
             text: String(now.name || now.id || '—').split(': ').pop() }),
           el('div', { class: 'small se', text: g.chosen
             ? `on ${now.provider_name || now.provider} · ${now.version}`
-            : `the suggestion — the owners’: ${g.owners}; pinned when you press Start` })),
+            : `the suggestion — the owners’: ${g.owners}; pinned when you press Start` }),
+          // 24b: its pinned provider no longer serving it, said plainly
+          g.gone ? el('div', { class: 'small warntext', 'data-frontier-grader-gone': g.slot,
+            text: g.gone }) : ''),
         el('td', { class: 'small', 'data-frontier-grader-prompt': g.slot },
           g.prompt, el('div', { class: 'small se mono', text: 'sha256 ' + g.prompt_sha256.slice(0, 12) })),
         el('td', { class: 'mono small aiprice', text: now.price_in != null
@@ -27773,7 +27787,7 @@ function vReport(id) {
           rpCeil(d, b.key))))),
       el('tbody', {}, d.ours.map(m => el('tr', { 'data-rp-row': m.label },
         el('td', { class: 'rp-ours', title: m.row },
-          el('span', { class: 'rp-dot', style: `background:${rpColour(m)}` }), m.label,
+          el('span', { class: 'rp-dot', style: `background:${rpColour(m)}` }), m.label, rpMeta(m),
           el('span', { class: 'rp-status', 'data-rp-status': m.label, text: m.status }),
           m.note ? el('span', { class: 'rp-sub', text: m.note }) : ''),
         ...benches.map(b => rpOurCell(m.cells[b.key], b))))))),
@@ -27854,6 +27868,8 @@ function vReport(id) {
               + (c.dagger ? '†' : '') })];
         })) : el('p', { class: 'small se', text: 'No scores yet.' }));
     })),
+    // 24b: score against file size, a panel a benchmark
+    rpSizeChart(d, benches),
     el('h3', { text: 'Ran out of room', style: 'margin-top:var(--sp-4)' }),
     el('div', { class: 'rp-scroll' }, el('table', { class: 'rp', 'data-rp-ranout': '1' },
       el('thead', {}, el('tr', {}, el('th', { text: 'Model' }),
@@ -27897,7 +27913,8 @@ function vReport(id) {
         const rows = benches.filter(b => s[b.task]);
         const N = v => v == null ? '—' : Number(v).toLocaleString('en');
         return [el('tr', { class: 'rp-group' }, el('td', { colspan: 10 },
-            el('span', { class: 'rp-dot', style: `background:${rpColour(m)}` }), m.label)),
+            el('span', { class: 'rp-dot', style: `background:${rpColour(m)}` }), m.label,
+            rpMeta(m, true))),
           ...(rows.length ? rows.map(b => {
             const x = s[b.task];
             return el('tr', { 'data-rp-tok': `${m.label}|${b.task}` },
@@ -28350,7 +28367,8 @@ function vPaired(id, d0, back) {
           title: x === other ? `already ${which === 'a' ? 'B' : 'A'}` : '',
           onclick: () => { popClose(true); if (which === 'a') pdGo(id, x, b); else pdGo(id, a, x); } },
         dot(x), x, x === other ? el('span', { class: 'se', text:
-          ` · ${which === 'a' ? 'B' : 'A'}` }) : ''))), { key: 'pd-' + which });
+          ` · ${which === 'a' ? 'B' : 'A'}` }) : '', rpMeta((d0.meta || {})[x])))),
+    { key: 'pd-' + which });
   const head = el('div', { class: 'card', 'data-report': id },
     el('h2', { text: d0.title }), el('p', { class: 'sub', text: d0.what }),
     el('div', { class: 'rp-fresh' }, el('span', { text: 'Our answers: '
@@ -28447,8 +28465,10 @@ function pdTable(id, d) {
     el('span', { class: 'pdx-dv' }));
   const head = el('div', { class: 'pdx-row pdx-head', role: 'row' },
     el('div', { class: 'pdx-name', role: 'columnheader', text: 'Benchmark' }),
-    el('div', { class: 'pdx-a num', role: 'columnheader', text: a, 'data-pd-col': 'a' }),
-    el('div', { class: 'pdx-b num', role: 'columnheader', text: b, 'data-pd-col': 'b' }),
+    el('div', { class: 'pdx-a num', role: 'columnheader', 'data-pd-col': 'a' }, a,
+      rpMeta((d.meta || {})[a])),
+    el('div', { class: 'pdx-b num', role: 'columnheader', 'data-pd-col': 'b' }, b,
+      rpMeta((d.meta || {})[b])),
     el('div', { class: 'pdx-diff', role: 'columnheader' },
       el('div', { class: 'small', text: 'Difference, points, 95% range' }), axis,
       el('div', { class: 'pdx-sides small se', 'data-pd-sides': '1' },
@@ -28907,6 +28927,94 @@ function bySpeed(sp, m, lab) {
   }
   return out;
 }
+// ---- 24b: a build's quant and size, and score against file size ----
+// its file's quant and size, as its files say — a small mono line under its name
+function rpMeta(x, inline) {
+  const n = x && x.size, q = x && x.quant;
+  const t = [q, n ? `${(n / 1e9).toFixed(1)} GB` : ''].filter(Boolean).join(' · ');
+  return t ? el('span', { class: 'rp-meta' + (inline ? ' inline' : ''), 'data-rp-meta': t, text: t })
+    : '';
+}
+// round sizes for a log axis, in GB: 1, 2, 5, 10, 20, 50 … inside [lo, hi]
+function szTicks(lo, hi) {
+  const out = [];
+  for (let e = -1; e <= 4; e++) for (const k of [1, 2, 5]) {
+    const v = k * 10 ** e;
+    if (v >= lo && v <= hi) out.push(Math.round(v * 100) / 100);
+  }
+  return out;
+}
+// one panel a benchmark: x the file's size (log), y the score; each of our
+// picked builds with a size a dot and its ±1 SE, labelled; a build no
+// smaller build beats starred, the stars joined from small to large
+function rpSizePanel(d, b, pts) {
+  for (const p of pts) p.star = !pts.some(q => q !== p && q.x < p.x && q.c.v > p.c.v);
+  const W = 260, H = 220, L = 38, R = 14, Tp = 16, B = 40, pw = W - L - R, ph = H - Tp - B, FS = 12;
+  const xs = pts.map(p => p.x);
+  const x0 = Math.min(...xs) / 1.35, x1 = Math.max(...xs) * 1.35;
+  const X = v => L + pw * (Math.log10(v) - Math.log10(x0)) / (Math.log10(x1) - Math.log10(x0));
+  const yt = trTicks(Math.min(...pts.map(p => p.c.v - (p.c.se || 0))),
+    Math.max(...pts.map(p => p.c.v + (p.c.se || 0))));
+  const y0 = yt[0] / 100, y1 = yt[yt.length - 1] / 100;
+  const Y = v => Tp + ph * (1 - (v - y0) / (y1 - y0));
+  const svg = el('svg:svg', { class: 'tr-svg', viewBox: `0 0 ${W} ${H}`, role: 'img',
+    'aria-label': `${b.label}: score against the GGUF's size` });
+  svg.append(el('svg:rect', { x: L, y: Tp, width: pw, height: ph, fill: 'none', stroke: 'var(--grid)' }));
+  const dec = yt.length > 1 && yt[1] - yt[0] < 1 ? 1 : 0;
+  for (const v of yt) svg.append(el('svg:line', { x1: L, x2: L + pw, y1: Y(v / 100), y2: Y(v / 100),
+      stroke: 'var(--grid)', 'stroke-width': 0.5 }),
+    el('svg:text', { x: L - 4, y: Y(v / 100) + 4, 'text-anchor': 'end', 'font-size': FS,
+      fill: 'var(--muted)', text: v.toFixed(dec) }));
+  for (const v of szTicks(x0, x1)) svg.append(el('svg:line', { x1: X(v), x2: X(v), y1: Tp, y2: Tp + ph,
+      stroke: 'var(--grid)', 'stroke-width': 0.5 }),
+    el('svg:text', { x: X(v), y: Tp + ph + 15, 'text-anchor': 'middle', 'font-size': FS,
+      fill: 'var(--muted)', 'data-sz-tick': b.key, text: String(v) }));
+  svg.append(el('svg:text', { x: L + pw / 2, y: H - 4, 'text-anchor': 'middle', 'font-size': FS,
+    fill: 'var(--text-secondary)', text: 'GGUF size, GB (log scale)' }));
+  const stars = pts.filter(p => p.star).sort((p, q) => p.x - q.x);
+  if (stars.length > 1) svg.append(el('svg:polyline', { points: stars.map(p => `${X(p.x)},${Y(p.c.v)}`)
+    .join(' '), fill: 'none', stroke: 'var(--text-secondary)', 'stroke-width': 1, 'data-sz-frontier': b.key }));
+  const placed = [];
+  for (const p of [...pts].sort((u, v) => Y(u.c.v) - Y(v.c.v))) {
+    const cx = X(p.x), cy = Y(p.c.v), se = p.c.se || 0;
+    svg.append(el('svg:line', { x1: cx, x2: cx, y1: Y(p.c.v - se), y2: Y(p.c.v + se), stroke: rpColour(p.m),
+      'stroke-width': 1.5 }),
+      el('svg:circle', { cx, cy, r: 4, fill: rpColour(p.m), 'data-sz-dot': `${b.key}:${p.m.label}`,
+        'data-sz-star': String(p.star) }, el('svg:title', { text: `${p.m.label}: ${rpNum(p.c.v)} ± `
+          + `${rpNum(se)} at ${p.x.toFixed(1)} GB` + (p.star ? ' · no smaller build scores higher' : '') })));
+    const name = (p.star ? '★ ' : '') + trShort(p.m.label);
+    const left = cx > L + pw / 2, w = 6.6 * name.length;
+    let ly = cy + 4;
+    const lx = left ? cx - 7 - w : cx + 7;
+    while (placed.some(q => Math.abs(q.y - ly) < FS + 2 && lx < q.x + q.w && q.x < lx + w)) ly += FS + 2;
+    placed.push({ x: lx, w, y: ly });
+    svg.append(el('svg:text', { x: left ? cx - 7 : cx + 7, y: ly, 'font-size': FS,
+      'text-anchor': left ? 'end' : 'start', fill: 'var(--text-primary)',
+      'data-sz-label': `${b.key}:${p.m.label}`, text: name }));
+  }
+  return el('div', { class: 'by-panel tr-panel', 'data-sz-panel': b.key },
+    el('h3', {}, b.label, rpCeil(d, b.key)), svg);
+}
+function rpSizeChart(d, benches) {
+  const ours = d.ours.filter(m => m.pick);
+  const scored = m => benches.some(b => (m.cells[b.key] || {}).v != null);
+  const sized = ours.filter(m => m.size), unsized = ours.filter(m => !m.size && scored(m));
+  const panels = benches.map(b => {
+    const pts = sized.map(m => ({ m, x: m.size / 1e9, c: m.cells[b.key] || {} })).filter(p => p.c.v != null);
+    return pts.length ? rpSizePanel(d, b, pts) : null;
+  }).filter(Boolean);
+  if (!panels.length && !unsized.length) return '';
+  return el('div', { 'data-size-chart': '1', style: 'margin-top:var(--sp-4)' },
+    el('h3', { text: 'Score against file size' }),
+    el('p', { class: 'small se', text: 'Each of our builds by the size of its GGUF (the file’s own '
+      + 'bytes, as its import kept them), its score with ±1 standard error. Each panel has its '
+      + 'own scale.' }),
+    panels.length ? el('div', { class: 'by-panels tr-panels' }, panels) : '',
+    panels.length ? el('p', { class: 'small se', 'data-sz-star-note': '1',
+      text: '★ = no smaller build scores higher on this benchmark.' }) : '',
+    unsized.length ? el('p', { class: 'small se', 'data-sz-missing': '1',
+      text: unsized.map(m => `${m.label}: size not known`).join(' · ') }) : '');
+}
 // ---- 23e: near the ceiling, and across training ----
 // a benchmark where the reference build scores 90% or more: marked wherever
 // the report names it, the reason on hover
@@ -29023,6 +29131,11 @@ function rpTraining(d) {
     el('h2', { text: 'Across training' }),
     T.sentence ? el('p', { class: 'rp-line', 'data-tr-sentence': '1', text: T.sentence }) : '',
     T.against ? el('p', { class: 'small', 'data-tr-against': '1', text: T.against }) : '',
+    // 24b: the builds drawn, each its quant and size under its name
+    el('div', { class: 'tr-legend', 'data-tr-legend': '1' }, [...T.checkpoints.map(c => c.label),
+      ...T.references].map(x => { const m = byL[x] || {};
+      return el('span', { class: 'tr-key', 'data-tr-key': x }, el('span', { class: 'rp-dot',
+        style: `background:${rpColour(m)}` }), x, rpMeta(m)); })),
     el('p', { class: 'small se', text: `Our checkpoints of the same training run, by training `
       + `step: each dot a score with ±1 standard error, joined in order`
       + (refs.length ? `; ${refs.join(' and ')} as dashed lines` : '') + '. The label on a '
@@ -29188,7 +29301,8 @@ function rpThinks(d, id) {
     have.length ? el('div', { class: 'rp-scroll' }, el('table', { class: 'rp', 'data-th-table': sel.key },
       el('thead', {}, el('tr', {}, el('th', { text: 'Build' }), ...TH_HEAD.map(h => el('th', { text: h })))),
       el('tbody', {}, have.map(r => el('tr', { 'data-th-row': r.p },
-        el('td', { class: 'rp-ours' }, el('span', { class: 'rp-dot', style: `background:${rpColour(r.m)}` }), r.p),
+        el('td', { class: 'rp-ours' }, el('span', { class: 'rp-dot', style: `background:${rpColour(r.m)}` }), r.p,
+          rpMeta(r.m)),
         ...thCells(r.x, d.secondWords || [], (which, ask) => {
           const cur = (R.thOpen || {})[id];
           const on = !!cur && cur.p === r.p && cur.key === sel.key && cur.which === which;
@@ -29268,7 +29382,8 @@ function rpBeyond(d) {
   const rows = d.picks.map(p => {
     const m = d.ours.find(x => x.label === p) || {};
     return el('tr', { 'data-by-row': p },
-      el('td', { class: 'rp-ours' }, el('span', { class: 'rp-dot', style: `background:${rpColour(m)}` }), p),
+      el('td', { class: 'rp-ours' }, el('span', { class: 'rp-dot', style: `background:${rpColour(m)}` }), p,
+        rpMeta(m)),
       ...cols.map(c => c[3](p, xs[p])));
   });
   const said = groups.map(g => WORDS[g]);
