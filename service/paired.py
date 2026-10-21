@@ -422,6 +422,8 @@ def report(rep: dict, rows: list[dict], a: str = "", b: str = "", compute: bool 
             "what": rep.get("what") or WHAT, "builds": labels(rep), "offered": offer,
             "default": rep.get("default") or [], "a": a, "b": b,
             "colours": {o["label"]: o.get("colour") for o in rep["ours"]},
+            # 24b: each build's quant and size, under its name
+            "meta": {r["label"]: {k: r[k] for k in ("quant", "size") if r.get(k)} for r in rows},
             "rows": out_rows, "sentence": sentence(a, b, out_rows),
             "settings": settings_line(rep, a, b), "settingsParts": settings_parts(rep, a, b),
             "notes": rep.get("notes") or NOTES, "ceilingWords": training.CEILING_WORDS,

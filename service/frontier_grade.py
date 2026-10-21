@@ -291,11 +291,18 @@ def _landed(p: dict) -> dict:
 
 def _moving(p: dict) -> str:
     """17c/17h: why Start moves a batch out to the grader pinned now — its
-    grader drifted on OpenRouter, or another was chosen since — '' if not"""
+    grader drifted on OpenRouter, or another was chosen since — '' if not.
+    24b: or the same model on another provider (OTIS's batch stayed on Google
+    Vertex, 404 every time, after Gemini 2.5 Flash was chosen again on Google
+    AI Studio)"""
     now = chosen(p["slot"]) or {}
-    return ai_models.drifted(p["pin"]) or (
-        "another grader was chosen" if now and now.get("version") != p["pin"].get("version")
-        else "")
+    if ai_models.drifted(p["pin"]):
+        return ai_models.drifted(p["pin"])
+    if now and now.get("version") != p["pin"].get("version"):
+        return "another grader was chosen"
+    if now and (now.get("provider") or "") != (p["pin"].get("provider") or ""):
+        return "another provider was chosen"
+    return ""
 
 
 def _price(g: dict) -> tuple[float | None, float | None]:
@@ -982,8 +989,11 @@ def _apply(g: dict, d: Path, slot: str, pin: dict, meta: dict, items: dict,
     g.setdefault("items", {})
     g.setdefault("refused", {})
     rec = grader_record(slot, pin, meta.get("by", ""), meta.get("prompt_sha256") or "")
+    # 24b: a record a grader and provider — the same model on another
+    # provider keeps the first one's
     graders = [x for x in g.get("graders") or [] if x.get("version") != rec["version"]
-               or x.get("prompt_sha256") != rec["prompt_sha256"]]
+               or x.get("prompt_sha256") != rec["prompt_sha256"]
+               or x.get("provider") != rec["provider"]]
     g["graders"] = [*graders, rec]
     g["grader"] = rec
     sent = meta.get("answers") or {}
@@ -1033,8 +1043,10 @@ def _apply(g: dict, d: Path, slot: str, pin: dict, meta: dict, items: dict,
             after = ({"after": {"by": was.get("by"), "prompt_sha256": was.get("prompt_sha256")}}
                      if was and (was.get("by"), was.get("prompt_sha256"))
                      != (rec["version"], rec["prompt_sha256"]) else {})
+            # 24b: and the provider that gave it
             g["items"][key] = {**got, "by": rec["version"], "prompt_sha256": rec["prompt_sha256"],
-                               "answer_sha256": sent[key], "at": time.time(), **after}
+                               "provider": rec["provider"], "answer_sha256": sent[key],
+                               "at": time.time(), **after}
             g["refused"].pop(key, None)
             n += 1
         except Exception as e:                      # noqa: BLE001 — that answer only
@@ -1332,7 +1344,9 @@ def status() -> dict:
                          # 17j: whether HLE's judge answers in CAIS's JSON schema
                          # (structured outputs) — None when OpenRouter doesn't say
                          **({"json_only": structured(grader(s))} if s == "hle" else {}),
-                         "reasoning_words": g["reasoning_words"]}
+                         "reasoning_words": g["reasoning_words"],
+                         # 24b: its pinned provider no longer serving it, said
+                         "gone": ai_models.provider_gone(chosen(s) or {})}
                         for s, g in fg.GRADERS.items()],
             "estimate": est,
             "key_warning": ai_models.more_than_key(est.get("usd")),

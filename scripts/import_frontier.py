@@ -355,7 +355,8 @@ def register_refused(model: str, file_sha: str) -> str:
 # as gpu.name swapped the row in, then failed with a traceback and no Runs entry)
 _SETUP_TYPES = {
     "protocol": str, "based_on": str, "where": str,
-    "gguf": {"name": str, "sha256": str, "size": int, "source": str},
+    "gguf": {"name": str, "sha256": str, "size": int, "source": str,
+             "file_type": str},                     # 24b: its quant, from its header
     "server": {"build": (int, str), "commit": str, "version": str, "slots": int,
                "flags": [str], "env": dict, "argv": [str], "binary_sha256": str,
                "tarball_sha256": str},
@@ -822,6 +823,14 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
                               **({"parts": gg["parts"]} if gg.get("parts") else {})}
         db.served_put(rec)
         say(f"{model}'s file is now registered by its sha256 {file_sha[:16]}…, as {by} gave it")
+    # 24b: the file's own bytes and quant, as the box read them — the line under
+    # the build's name in the reports. Only what the file says: never typed
+    gfile = {**({"size": gg["size"]} if isinstance(gg.get("size"), int) else {}),
+             **({"file_type": gg["file_type"][:40]} if isinstance(gg.get("file_type"), str)
+                and gg.get("file_type") else {})}
+    if gfile and {**(rec.get("gguf_file") or {}), **gfile} != (rec.get("gguf_file") or {}):
+        rec["gguf_file"] = {**(rec.get("gguf_file") or {}), **gfile}
+        db.served_put(rec)
     srv = setup.get("server") or {}
     gpu = (setup.get("gpu") or {}).get("name") or "a GPU"
     say(f"as this board asks it: {gg.get('name')} (the registered file), llama.cpp "

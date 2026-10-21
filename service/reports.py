@@ -235,6 +235,42 @@ def _answers_whole(d: Path, task: str) -> bool:
     return (sf.task_dir(d, task) / sf.ANSWERS).is_file()
 
 
+_quant_memo: dict[str, tuple[str, str | None]] = {}
+
+
+def build_file(mid: str) -> dict:
+    """24b: {quant, size} of a row's GGUF, as its files say — the size the
+    box measured (kept at import), else the registered file's (its parts
+    summed), else the served pin's; the quant from the GGUF's header (the
+    box's, kept at import), else from the file here when it is here. What
+    isn't known is left out, never guessed"""
+    from . import served
+    rec = served.get(mid.removesuffix(" · thinking")) or {}
+    gf = rec.get("gguf_file") if isinstance(rec.get("gguf_file"), dict) else {}
+    fs = rec.get("file_sha256") if isinstance(rec.get("file_sha256"), dict) else {}
+    parts = [p.get("size") for p in fs.get("parts") or [] if isinstance(p, dict)]
+
+    def num(v):
+        return v if isinstance(v, int) and not isinstance(v, bool) and v > 0 else None
+    size = (num(gf.get("size")) or (sum(parts) if parts and all(num(x) for x in parts) else None)
+            or num(fs.get("size")) or num((rec.get("gguf_pin") or {}).get("size"))
+            or num((rec.get("pin") or {}).get("size")))
+    quant = gf.get("file_type") if isinstance(gf.get("file_type"), str) else None
+    path = rec.get("gguf_path") or ""
+    if not quant and path:
+        from . import report_stats as rs
+        key = rs.identity(Path(path))
+        got = _quant_memo.get(path)
+        if not got or got[0] != key:
+            _scripts()
+            import gguf_header
+            got = (key, (gguf_header.read(path) or {}).get("file_type") if Path(path).is_file()
+                   else None)
+            _quant_memo[path] = got
+        quant = got[1]
+    return {**({"quant": str(quant)} if quant else {}), **({"size": size} if size else {})}
+
+
 def our_rows(rep: dict, cells: dict) -> list[dict]:
     """each of our rows as the board shows it: per benchmark the score, its
     standard error, the answers and how many ran out of room — or a dash and
@@ -279,6 +315,8 @@ def our_rows(rep: dict, cells: dict) -> list[dict]:
                     "glance": o.get("glance") is True,
                     # 23e: a checkpoint's training step
                     **({"step": o["step"]} if isinstance(o.get("step"), int) else {}),
+                    # 24b: its file's quant and size, under its name
+                    **build_file(mid),
                     "note": o.get("note") or "", "cells": per, "status": " · ".join(parts),
                     "chunks": list(ch) if ch else None, "dir": str(d)})
     return out

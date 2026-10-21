@@ -1394,8 +1394,8 @@ class OpenRouterChat(LocalOpenAI):
     AT_LIMIT = ("stopped at this month's AI limit — nothing more is sent until you press "
                 "Carry on, whatever happens to the limit or the month: raise the limit on AI "
                 "models first")
-    AT_DRIFT = ("stopped: its pinned model moved to another version — nothing more is sent "
-                "until you press Carry on")
+    AT_DRIFT = ("stopped: its pinned model moved to another version, or its provider no longer "
+                "serves it — nothing more is sent until you press Carry on")
 
     def at_wait(self, batch_id: str, why: str) -> None:
         """18d point 4: every paid batch, stopped at the month's limit or at a

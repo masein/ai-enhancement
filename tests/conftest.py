@@ -76,6 +76,20 @@ def invented_question_sets():
     frontier.expected = real
 
 
+@pytest.fixture(scope="session", autouse=True)
+def no_provider_lists():
+    """24b: nothing here asks OpenRouter which providers serve a model — its
+    list is public and answers any key, and a test's invented provider ("p")
+    read as gone held every grading batch in CI. Unknown, so nothing is said;
+    a test of it stands in for the list itself (monkeypatch
+    ai_models._endpoints)"""
+    from service import ai_models
+    real = ai_models._endpoints
+    ai_models._endpoints = lambda model_id: None
+    yield
+    ai_models._endpoints = real
+
+
 def hidden_env(root: Path) -> dict:
     """what a subprocess needs to read the same bank"""
     sit_hidden(root)
