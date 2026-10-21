@@ -132,6 +132,28 @@ def test_the_probe_as_worked_by_hand(server):
     assert cc.check(base, 20480, 3, run=Smi())["probe"]["together"]["output_tok_s"] == 243.0
 
 
+def test_the_eighth_asked_late_is_still_one_of_the_eight(server, monkeypatch):
+    """the fake tells the eight asked at once by what they ask, never by when
+    they come: on a slow runner the eighth reached it after the other seven
+    were done and was taken for one asked alone (CI, 21 Oct: 140 among
+    80…86). Held back here past the others, it is still the eighth"""
+    base = server()
+    toks = cc.tokens_of(base)
+    last = cc.prompt(toks, cc.SHORT, start=37 * cc.TOGETHER)
+    real = cc.complete
+
+    def late(b, ids, n_out=cc.OUT):
+        if ids == last:
+            time.sleep(0.6)                             # well past the others' 0.15 s
+        return real(b, ids, n_out)
+    monkeypatch.setattr(cc, "complete", late)
+    p = cc.check(base, 20480, 8, run=Smi())["probe"]
+    assert sorted(p["together"]["each"]) == [80.0 + k for k in range(8)]
+    assert p["together"]["output_tok_s"] == 668.0
+    # and the ones asked alone took their own rates, in turn, none taken by it
+    assert [r["output_tok_s"] for r in p["alone"]["runs"]] == [140.0, 150.0, 120.0]
+
+
 def test_a_probe_that_fails_says_why_and_never_raises(server):
     base = server(FAKE_LLAMA_PROBE_STATUS="500")
     rec = cc.check(base, 20480, 8, run=Smi())
