@@ -23,7 +23,7 @@ from test_step3_collects import IN_IMAGE
 ROOT = Path(__file__).resolve().parents[1]
 PIN = re.compile(r"^lm_eval\[([^\]]+)\]==([\d.]+)", re.M)
 # a distribution whose module is named otherwise
-MODULE = {"beautifulsoup4": "bs4", "pyyaml": "yaml", "scikit-learn": "sklearn"}
+MODULE = {"beautifulsoup4": "bs4", "pyyaml": "yaml", "scikit-learn": "sklearn", "absl-py": "absl"}
 
 
 def lm_eval():
@@ -298,7 +298,7 @@ def test_the_image_has_what_the_tests_import_at_the_top():
     This is the other half: the first kind imports, in the image"""
     lm_eval()
     for name in sorted(IN_IMAGE):
-        importlib.import_module(name)
+        importlib.import_module(MODULE.get(name, name))     # 25: absl-py is absl
 
 
 def test_an_hf_devicemark_run_in_a_test_fetches_no_tokenizer(svc, monkeypatch):  # noqa: F811
