@@ -1,0 +1,10 @@
+{
+  "about": "26: our names for the phone app's opaque ids (service/telemetry.py). masein fills it with what Kevin tells him; an id not here shows as itself, \"(not named yet)\", never guessed. Plain names only, nothing secret: this file goes to the public mirror. models: model_id -> {name, row (the board row, served/...), what, sha256}; tiers, engines: id -> a short description; devices: model code -> its marketing name, only those we're sure of.",
+  "models": {},
+  "tiers": {},
+  "engines": {},
+  "devices": {
+    "CPH2747": "OnePlus 15",
+    "SM-S938B": "Galaxy S25 Ultra"
+  }
+}

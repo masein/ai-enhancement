@@ -35,7 +35,7 @@ from starlette.background import BackgroundTask
 from . import (ai_models, builder, chat, config, db, disk, hfmeta, judge_test, llm, llm_poller,
                startup, suggest, worker)
 from . import playground
-from . import api_v1, downloads, gguf, gpu, phone, reported, served, sizes, uploads
+from . import api_v1, downloads, gguf, gpu, phone, reported, served, sizes, telemetry, uploads
 from . import proposals as prop
 from . import public_files
 from . import reader
@@ -70,6 +70,7 @@ async def lifespan(_app: FastAPI):
     worker.start()
     llm_poller.start()
     chat.start_janitor()         # 12d.1: an idle chat model unloads
+    telemetry.start()            # 26: the testers' phone checks, every 10 min, when R2's keys are set
     try:                         # 16b review: an upload's check a restart cut short
         again = uploads.resume_checks()
         if again:
@@ -84,6 +85,7 @@ async def lifespan(_app: FastAPI):
     except Exception as e:       # noqa: BLE001 — never stops the service starting
         print(f"[mmp key] could not look at the batches out: {e!r}")
     yield
+    telemetry.stop()
     llm_poller.stop()
     worker.stop()
 
@@ -1651,7 +1653,23 @@ class PhoneIn(BaseModel):
 
 @app.get("/api/phone")
 def phone_builds():
-    return {"builds": phone.builds(), "readme": phone.README}
+    """26: and what our testers' phones measured, per board row the names
+    map a model to — never mixed with what was typed in by hand"""
+    from . import reports
+    return {"builds": phone.builds(), "readme": phone.README,
+            "measured": telemetry.by_row(), "sync": telemetry.status()["line"],
+            "report": next((rid for rid, r in reports.files().items()
+                            if r.get("kind") == "phone_tests"), "")}
+
+
+@app.get("/api/phone/tests/{test_id}")
+def phone_test(test_id: str):
+    """26: one tester's test, opened — every check with its reply (our app's
+    own output; the board is internal)"""
+    t = telemetry.one(test_id)
+    if t is None:
+        raise HTTPException(404, "no such test here")
+    return t
 
 
 # ---------------------------------------------------------------------------

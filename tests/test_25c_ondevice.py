@@ -162,7 +162,8 @@ def test_our_phone_build_where_it_has_numbers(svc):
     rows = {r["label"]: r for r in fresh()["rows"]}
     ph = rows["Qwen3.6-35B-A3B k4-LDA phone build (phone build)"]
     assert ph["phoneBuild"] and ph["cells"]["gpqa"]["v"] == pytest.approx(0.70)
-    assert ph["phone"] == {"none": "no phone numbers on the board yet"}
+    assert ph["phone"] == {"none": "none reported by hand yet"}
+    assert ph["testers"] == {"none": "no tests from our testers' phones yet"}
     # one typed in from the phone: said as reported by hand, never as measured
     db.phone_add(PHONE, {"device": "OnePlus 15", "decode_median": 13.5, "by": "kevin",
                          "date": "2026-10-20"})
@@ -182,8 +183,8 @@ def test_a_reported_model_is_never_in_an_average_or_rank(svc):
     got = svc.get("/api/reported").json()
     e0 = next(m for m in got["models"] if m["name"] == "Edge0-35B-A3B-preview")
     assert e0["id"].startswith("reported/") and e0["measured"] is None
-    # the Reports list: the fourth, after the others
+    # the Reports list: the fourth, after the others (26: our testers' phones after it)
     ids = [r["id"] for r in svc.get("/api/reports").json()["reports"]]
-    assert ids == ["ran-out-of-room", "step-checkpoints", "paired", "on-device"]
+    assert ids == ["ran-out-of-room", "step-checkpoints", "paired", "on-device", "testers"]
     assert ondevice.listing_counts(REP) == (["step8804", "step4000", "step1000",
                                              "Q4 (UD-Q4_K_XL)"], 8)

@@ -1,0 +1,9 @@
+{
+  "id": "testers",
+  "kind": "phone_tests",
+  "order": 5,
+  "title": "On our testers' phones",
+  "what": "The checks our phone app runs on itself once on each tester's phone, read from Kevin's telemetry every 10 minutes: every test, the medians per phone and model, and what failed. Measured on the phone, never estimated.",
+  "ours": [],
+  "benchmarks": []
+}

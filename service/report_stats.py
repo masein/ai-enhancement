@@ -140,8 +140,8 @@ def jobs() -> list[Job]:
     out: dict[str, Job] = {}
     for rid, rep in reports.files().items():
         # 23: and every pair of a paired report's builds, each benchmark
-        if rep.get("kind") == "on_device":
-            continue                    # 25c: its numbers are the board's, nothing to work out
+        if rep.get("kind") in ("on_device", "phone_tests"):
+            continue                    # 25c, 26: nothing to work out
         got = ran_out.jobs(rep) if rep.get("kind") == "ran_out" else paired.jobs(rep) \
             if rep.get("kind") == "paired" else reports.jobs(rid, rep)
         for j in got:

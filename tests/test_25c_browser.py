@@ -64,7 +64,8 @@ def test_the_on_device_report(live, page, width, scheme):
     assert order == ["od-table", "od-keep", "od-memory", "notes"]
     heads = page.eval_on_selector_all("[data-od-table] thead th", "ts => ts.map(t => t.textContent)")
     assert heads == ["Model", "Base model", "Size on disk", "Memory it needs", "Phone speed",
-                     "GPQA Diamond", "MMLU-Pro", "IFEval", "IFBench"]
+                     "Measured on our testers’ phones", "GPQA Diamond", "MMLU-Pro", "IFEval",
+                     "IFBench"]
     rows = page.eval_on_selector_all("[data-od-row]", "rs => rs.map(r => r.dataset.odRow)")
     assert rows[:4] == ["step8804", "step4000", "step1000", "Q4 (UD-Q4_K_XL)"]
     assert rows[4:] == ["Edge0-35B-A3B-preview", "Edge0-8B-A1B-preview", "Bonsai 27B (1-bit)",

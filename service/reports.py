@@ -1045,6 +1045,10 @@ def report(rid: str, payload: dict | None = None, compute: bool = False, a: str 
     rep = files().get(rid)
     if rep is None:
         return None
+    if rep.get("kind") == "phone_tests":
+        # 26: our testers' phone checks, from Kevin's telemetry (service/telemetry.py)
+        from . import telemetry
+        return telemetry.report(rep)
     if payload is None:
         from . import app
         payload = app.results_payload()
@@ -1328,6 +1332,13 @@ def listing(payload: dict | None = None) -> list[dict]:
     server whenever that payload was being built again)"""
     out = []
     for rid, rep in files().items():
+        if rep.get("kind") == "phone_tests":
+            # 26: the tests synced, and when the sync last worked
+            from . import telemetry
+            out.append({"id": rid, "title": rep.get("title") or rid,
+                        "what": rep.get("what") or "", "ours": [], "others": 0,
+                        **telemetry.listing_line()})
+            continue
         rows = our_rows(rep, (payload or {}).get("cells") or {})
         if rep.get("kind") == "ran_out":
             last = ours_changed(rows)

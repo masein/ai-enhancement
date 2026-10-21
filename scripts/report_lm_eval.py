@@ -4622,6 +4622,10 @@ td.evdtotal .evd-ranout { display:block; white-space:normal; text-align:right; }
 .phone-grid h3 { margin:0 0 6px; font-size:var(--fs-3, 1rem); }
 .phone-grid dd, .phone-grid td { overflow-wrap:anywhere; }
 .phone-grid td.num { white-space:nowrap; }
+/* 26: measured on our testers' phones, above what was typed in by hand */
+.phone-testers { margin-bottom:16px; }
+.phone-testers h3 { margin:0 0 6px; font-size:var(--fs-3, 1rem); }
+.phone-testers td.num { white-space:nowrap; }
 .rep-by { color:var(--text-secondary); font-size:var(--fs-1); white-space:nowrap; }
 .badge.prelim { color:var(--warning-text); border-color:var(--warning); }
 .tiebest { font-weight:650; }
@@ -5771,6 +5775,19 @@ table.rp[data-by-table] thead th:first-child { min-width:0; }
 .rm-facts dd { margin:0; overflow-wrap:anywhere; }
 table.rp.od td { vertical-align:top; }
 table.rp.od td[data-od-fact] { text-align:left; white-space:normal; min-width:7rem; max-width:13rem; }
+/* 26: our testers' phone checks — a flagged test greyed, a flagged cell too */
+table.rp.pt th, table.rp.pt td,
+table.rp.pt-checks th, table.rp.pt-checks td { text-align:left; }
+table.rp.pt th.num, table.rp.pt td.num,
+table.rp.pt-checks th.num, table.rp.pt-checks td.num { text-align:right; }
+table.rp.pt tr.pt-flag > td, table.rp.pt td.pt-off { color:var(--muted); background:var(--plane); }
+table.rp.pt td.pt-off { text-decoration:line-through; text-decoration-color:var(--axis); }
+table.rp.pt tr.pt-on > td { background:var(--accent-soft); }
+table.rp.pt td.pt-bad { color:var(--critical-text); font-weight:600; }
+table.rp.pt-checks td.pt-reply { text-align:left; white-space:pre-wrap; overflow-wrap:anywhere;
+  min-width:14rem; max-width:32rem; }
+.pt-test-head { display:flex; justify-content:space-between; align-items:center; gap:var(--sp-2); }
+.pt-test-head h2 { margin:0; min-width:0; overflow-wrap:anywhere; }
 /* 25: each instruction under a reply, followed or not */
 .pd-follow { list-style:none; padding:0; margin:6px 0 10px; font-size:var(--fs-1); }
 .pd-follow li { margin:2px 0; overflow-wrap:anywhere; }
@@ -5949,7 +5966,7 @@ const state = {
         flags: '' }, msg: '', busy: '', start: {} },
   // 12f.2: On phone — the reports, by model, and each build's form
   phone: { loaded: false, loading: false, byId: {}, readme: null, open: {}, f: {}, msg: {},
-           busy: '' },
+           busy: '', measured: {}, sync: '', report: '' },
   srv: { open: false, f: { name: '', base_url: '', key: '', based_on: '', how: '', thinking: 'auto',
          phone: false, flags: '', env: '' },
          msg: '', reported: null, saved: false, busy: '', list: null, loading: false },
@@ -7929,8 +7946,10 @@ function modelKinds(m) {
     (E.questions || []).length ? { kind: 'everyday', label: 'Everyday', taken: !!e,
       at: e ? e.marked_at || 0 : 0 } : null,
     // 12f.2: a phone build's fourth — the numbers reported from the phone
-    (servedOf(m.id) || {}).phone ? { kind: 'phone', label: 'Mobile · on the phone, reported',
-      taken: phoneReports(m.id).length > 0 || !!state.phone.open[m.id],
+    // 26: and what our testers' phones measured, the two told apart
+    (servedOf(m.id) || {}).phone ? { kind: 'phone', label: 'Mobile · on the phone',
+      taken: phoneReports(m.id).length > 0 || phoneTested(m.id).length > 0
+        || !!state.phone.open[m.id],
       at: (phoneReports(m.id)[0] || {}).at || 0 } : null,
     // 12q.C: DeviceMark's protocol, a card for each thinking mode it ran
     ...Object.entries(DM_KINDS).map(([kind, [mode, label]]) => {
@@ -7946,6 +7965,11 @@ function modelKinds(m) {
 function kindValue(m, kind) {
   if (DM_KINDS[kind]) return dmKindValue(m, DM_KINDS[kind][0]);
   if (kind === 'phone') {
+    // 26: measured on our testers' phones first — the phone with the most
+    // tests — else as typed in by hand
+    const t = [...phoneTested(m.id)].sort((a, b) => b.n - a.n)[0];
+    if (t) return [ptN(t.decode), `tok/s decode, median on ${t.phone.name} · measured on our `
+      + `testers’ phones`];
     const r = phoneReports(m.id)[0];
     if (!r) return ['—', 'nothing reported from the phone yet'];
     return [String(r.decode_median), `tok/s median on ${r.device} · reported by ${r.by}`];
@@ -13434,6 +13458,8 @@ function isPhoneRow(m) {
 const phoneTag = m => isPhoneRow(m) ? el('span', { class: 'badge served', 'data-phone-tag': m.id,
   title: 'served: a phone build, or a setup of its file', text: 'phone build' }) : '';
 const phoneReports = id => state.phone.byId[id] || [];
+// 26: per phone, the medians our testers' phones measured (a decode to show)
+const phoneTested = id => ((state.phone.measured || {})[id] || []).filter(p => p.decode != null);
 async function loadPhone() {
   const P = state.phone;
   P.loading = true;
@@ -13441,6 +13467,8 @@ async function loadPhone() {
     const j = await api('api/phone');
     P.byId = Object.fromEntries((j.builds || []).map(b => [b.id, b.reports || []]));
     P.readme = j.readme || null;
+    // 26: what our testers' phones measured, by the board row the names map to
+    P.measured = j.measured || {}; P.sync = j.sync || ''; P.report = j.report || '';
   } catch (e) { /* the card says nothing is reported yet */ }
   P.loading = false; P.loaded = true;
   render();
@@ -14778,7 +14806,7 @@ function phoneBody(b, id) {
   const P = state.phone;
   if (LIVE && !P.loaded && !P.loading && netReady()) loadPhone();
   const r = phoneReports(id)[0];
-  return el('div', { 'data-phone-card': id },
+  return el('div', { 'data-phone-card': id }, phoneTesters(id),
     el('div', { class: 'phone-grid' }, phoneReported(r, id), phoneMeasured(b, id)),
     phoneReports(id).length > 1 ? el('p', { class: 'small se', 'data-phone-earlier': id,
       text: 'Earlier reports: ' + phoneReports(id).slice(1).map(x =>
@@ -14786,16 +14814,48 @@ function phoneBody(b, id) {
       : '',
     LIVE ? phoneForm(id) : '');
 }
+// 26: measured on our testers' phones — per phone the medians over its
+// finished tests, with their dates; never mixed with what was typed in
+function phoneTesters(id) {
+  const P = state.phone, got = phoneTested(id);
+  const open = P.report ? el('a', { href: '#tab=reports&report=' + encodeURIComponent(P.report),
+    'data-phone-testers-open': id, text: 'Every test ▸',
+    onclick: e => { e.preventDefault(); rpOpen(P.report); } }) : '';
+  return el('div', { class: 'phone-testers', 'data-phone-testers': id },
+    el('h3', { text: 'Measured on our testers’ phones' }),
+    got.length ? [
+      el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
+        el('thead', {}, el('tr', {}, ['Phone', 'Tests', 'Decode', 'Prefill', 'First word',
+          'Engine memory', 'Temperature rise'].map((h, i) => el('th', { class: i ? 'num' : '',
+          text: h })))),
+        el('tbody', {}, got.map(p => el('tr', { 'data-phone-tested': p.phone.name },
+          el('td', { text: p.phone.name }, el('div', { class: 'small se', text: p.model.name })),
+          el('td', { class: 'num', text: String(p.n) }, el('div', { class: 'small se',
+            text: p.first === p.last ? p.last : `${p.first} to ${p.last}` })),
+          el('td', { class: 'num', 'data-phone-tested-decode': p.phone.name,
+            text: `${ptN(p.decode)} tok/s` }),
+          el('td', { class: 'num', text: p.prefill_warm == null ? '—'
+            : `${ptN(p.prefill_warm)} tok/s` }),
+          el('td', { class: 'num', text: ptS(p.ttft_ms) }),
+          el('td', { class: 'num', text: ptMB(p.engine_mem_mb) }),
+          el('td', { class: 'num', text: ptSigned(p.temp_rise, ' °C') })))))),
+      el('p', { class: 'small se', 'data-phone-testers-how': id },
+        'Medians over each phone’s finished tests of the app’s own check, measured on the '
+        + 'phone · ', open)]
+      : el('p', { class: 'small', 'data-phone-testers-none': id, text: !LIVE && !P.loaded
+        ? 'Measured numbers are on the live board.' : 'No tests from our testers’ phones yet'
+          + (P.sync && /not set up/.test(P.sync) ? ` (${P.sync})` : '') + '.' }, ' ', open));
+}
 function phoneReported(r, id) {
   if (!r) return el('div', { 'data-phone-reported': id },
-    el('h3', { text: 'Measured on the phone' }),
+    el('h3', { text: 'Reported by hand' }),
     el('p', { class: 'small', 'data-phone-none': id, text: LIVE || state.phone.loaded
       ? 'Nothing reported from the phone yet.' : 'Reported numbers are on the live board.' }));
   const by = el('span', { class: 'rep-by', 'data-reported-by': r.by, text: ` · reported by ${r.by}` });
   const row = (k, v, key) => v ? [el('dt', { text: k }),
     el('dd', { 'data-phone-field': key }, v, by.cloneNode(true))] : [];
   return el('div', { 'data-phone-reported': id },
-    el('h3', { text: 'Measured on the phone' }),
+    el('h3', { text: 'Reported by hand' }),
     el('p', { class: 'small se', 'data-phone-source': id, text: `Reported by ${r.by}, measured `
       + `${r.date}` + (r.source ? ` · from ${r.source}` : '')
       + (r.entered_by && r.entered_by !== r.by ? ` · entered by ${r.entered_by}` : '') }),
@@ -27705,10 +27765,11 @@ function vReports() {
         'data-report-insight': r.id, text: 'Insight only' }) : ''),
       el('p', { text: r.what }),
       el('p', { class: 'small', 'data-report-models': r.id,
-        text: 'Ours: ' + r.ours.join(', ') + (r.others ? ` · against ${r.others} other models`
-          : '') }),
+        // 26: the testers' phone checks say what is in, not whose
+        text: r.line || 'Ours: ' + r.ours.join(', ') + (r.others
+          ? ` · against ${r.others} other models` : '') }),
       el('p', { class: 'small se', 'data-report-changed': r.id,
-        text: r.changed ? 'Numbers last changed ' + r.changed : 'No numbers yet' })),
+        text: r.sync || (r.changed ? 'Numbers last changed ' + r.changed : 'No numbers yet') })),
       // 21c: the page as masein publishes it, served by the board, in a tab of its own
       r.page ? el('div', { class: 'rp-card-acts' }, rpPageLink(r.id, r.page)) : '')))
       : el('p', { class: 'small', text: 'No reports yet: a report is a file in '
@@ -27937,6 +27998,8 @@ function vReport(id) {
   if (d.kind === 'paired') return vPaired(id, d, back);
   // 25c: of the models that can run on a phone, which are best
   if (d.kind === 'on_device') return vOnDevice(id, d, back);
+  // 26: our testers' phone checks
+  if (d.kind === 'phone_tests') return vPhoneTests(id, d, back);
   const benches = d.benchmarks, compared = benches.filter(b => b.compare);
   // 23b: opened on the first pick with a score — step8804 first in the
   // picker, step4000 shown until it is scored
@@ -28240,6 +28303,20 @@ function odFact(r, f, key) {
     !r.ours && f.url ? el('span', { class: 'rp-sub' }, el('a', { href: f.url, target: '_blank',
       rel: 'noopener', text: `published by ${r.publishedBy}` })) : '');
 }
+// 26: our phone build as our testers' phones measured it — per phone the
+// medians of decode and engine memory, the phone named; never mixed with a
+// published speed or one typed in by hand
+function odTesters(r) {
+  const f = r.testers, key = `${r.label}|testers`;
+  if (!f) return el('td', { class: 'dash', 'data-od-fact': key, title: r.ours
+    ? 'not a phone build' : 'its phone speed is as published, in Phone speed', text: '—' });
+  if (f.none) return el('td', { 'data-od-fact': key }, el('span', { class: 'se', text: f.none }));
+  return el('td', { 'data-od-fact': key }, f.phones.map(p => el('div', { 'data-od-tester': p.phone },
+    `${ptN(p.decode)} tok/s decode` + (p.engine_mem_mb != null ? ` · ${ptMB(p.engine_mem_mb)}` : ''),
+    el('span', { class: 'rp-sub', text: `${p.phone}, median of ${p.n} test${p.n === 1 ? '' : 's'}`
+      + (p.last ? `, ${p.first === p.last ? p.last : `${p.first} to ${p.last}`}` : '') }),
+    el('span', { class: 'rp-sub', text: 'measured on our testers’ phones' }))));
+}
 function odScore(r, b) {
   const c = r.cells[b.key] || {};
   if (c.v == null) return el('td', { class: 'dash', 'data-od-cell': `${r.label}|${b.key}`,
@@ -28347,12 +28424,13 @@ function vOnDevice(id, d, back) {
     el('h2', { text: 'The models' }),
     el('div', { class: 'rp-scroll' }, el('table', { class: 'rp od', 'data-od-table': '1' },
       el('thead', {}, el('tr', {}, ['Model', 'Base model', 'Size on disk', 'Memory it needs',
-        'Phone speed', ...B.map(b => b.label)].map(t => el('th', { text: t })))),
+        'Phone speed', 'Measured on our testers’ phones', ...B.map(b => b.label)]
+        .map(t => el('th', { text: t })))),
       el('tbody', {}, R.map(r => el('tr', { 'data-od-row': r.label,
           'data-od-ours': String(r.ours) },
         odName(r), el('td', { 'data-od-fact': `${r.label}|base`, text: r.base || '—' }),
         odFact(r, r.disk, 'disk'), odFact(r, r.memory, 'memory'), odFact(r, r.phone, 'phone'),
-        ...B.map(b => odScore(r, b))))))),
+        odTesters(r), ...B.map(b => odScore(r, b))))))),
     el('p', { class: 'small se', text: 'Every cell says where its number comes from: '
       + '“measured here” on this board, or “published by …” with its link. Ours need the whole '
       + 'file in memory on the server; a phone’s figures come only from a phone.' }),
@@ -28397,6 +28475,188 @@ function vOnDevice(id, d, back) {
     el('h2', { text: 'How to read this' }),
     el('ul', { class: 'rp-notes' }, (d.notes || []).map(n => el('li', { text: n }))));
   return [back, head, table, keep, mem, notes];
+}
+// ---------------------------------------------------------------------------
+// 26: On our testers' phones — the checks our phone app runs on itself once
+// on each tester's phone, from Kevin's telemetry (service/telemetry.py). Its
+// columns are his Testers dashboard's where both show the same thing, so the
+// two never disagree. A flagged test is greyed and kept out of the medians it
+// would skew, the reason on hover; a test opens to every check and its reply
+// ---------------------------------------------------------------------------
+const ptN = (v, d = 1) => v == null ? '—' : Number(v).toFixed(d);
+const ptMB = v => v == null ? '—' : `${Math.round(v).toLocaleString('en')} MB`;
+const ptS = ms => ms == null ? '—' : `${(ms / 1000).toFixed(1)} s`;
+const ptSigned = (v, unit) => v == null ? '—'
+  : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1) + unit;
+function ptDay(s) {
+  const d = s ? new Date(s) : null;
+  return d && !isNaN(d) ? d.toLocaleString('en-GB', { day: 'numeric', month: 'short',
+    hour: '2-digit', minute: '2-digit' }) : '—';
+}
+const ptState = id => {
+  const R = RPS();
+  R.pt = R.pt || {};
+  return (R.pt[id] = R.pt[id] || { open: null, got: {}, err: {} });
+};
+async function ptOpen(id, tid) {
+  const S = ptState(id);
+  S.open = S.open === tid ? null : tid;
+  render();
+  if (!S.open || S.got[tid]) return;
+  try { S.got[tid] = await api('api/phone/tests/' + encodeURIComponent(tid)); S.err[tid] = ''; }
+  catch (e) { S.err[tid] = String((e && e.message) || e); }
+  if (state.tab === 'reports' && RPS().id === id) {
+    render();
+    const box = document.querySelector('[data-pt-test]');
+    if (box) box.scrollIntoView({ block: 'nearest' });
+  }
+}
+// a cell a flag keeps out of the medians: greyed, its reasons on hover
+function ptCell(t, text, sub, key, off) {
+  const why = off ? off.join(' · ') : '';
+  return el('td', { class: 'num' + (why ? ' pt-off' : ''), 'data-pt-cell': `${t.test_id}|${key}`,
+      title: why || null },
+    text, sub ? el('span', { class: 'rp-sub', text: sub }) : '');
+}
+const PT_COLS = ['Received', 'Tester', 'Phone', 'App · engine', 'Model', 'Result', 'First load',
+  'Time to first word', 'Prefill, cold → warm', 'Decode', 'Sustained', 'Engine memory',
+  'Peak swap', 'Lowest free memory', 'Battery', 'Thermal max', 'Answers', 'Charging'];
+function ptRow(id, t) {
+  const S = ptState(id), sp = t.flags.speed.length ? t.flags.speed : null,
+    bt = t.flags.battery.length ? t.flags.battery : null;
+  const why = [...t.flags.speed, ...t.flags.battery].join(' · ');
+  const left = (text, sub, key, attrs = {}) => el('td', { 'data-pt-cell': `${t.test_id}|${key}`,
+    ...attrs }, text, sub ? el('span', { class: 'rp-sub', text: sub }) : '');
+  return el('tr', { class: 'clickrow' + (t.flags.impossible ? ' pt-flag' : '')
+      + (S.open === t.test_id ? ' pt-on' : ''), tabindex: 0, 'data-pt-row': t.test_id,
+      'data-pt-flagged': String(!!why), title: why || 'Open its checks',
+      onclick: () => ptOpen(id, t.test_id),
+      onkeydown: e => { if (e.key === 'Enter') ptOpen(id, t.test_id); } },
+    left(ptDay(t.received), why ? 'flagged' : '', 'received'),
+    left(t.tester || '—', '', 'tester'),
+    left(t.phone.name, t.phone.ram_gb ? `${t.phone.ram_gb} GB RAM` : '', 'phone',
+      { title: [t.phone.maker, t.phone.code, t.phone.os].filter(Boolean).join(' · ') }),
+    left(t.app || '—', t.engine.name, 'app'),
+    left(t.model.name, t.tier.id ? t.tier.name : '', 'model'),
+    left(t.ok ? 'ok' : t.outcome || '—', '', 'result', { class: t.ok ? '' : 'pt-bad' }),
+    ptCell(t, t.first_load_s == null ? '—' : `${ptN(t.first_load_s)} s`, '', 'load'),
+    ptCell(t, ptS(t.ttft_ms), '', 'ttft', sp),
+    ptCell(t, `${ptN(t.prefill_cold)} → ${ptN(t.prefill_warm)}`, 'tok/s', 'prefill', sp),
+    ptCell(t, ptN(t.decode), t.decode_from ? `tok/s, ${t.decode_from}` : '', 'decode', sp),
+    ptCell(t, ptSigned(t.sustained.pct, '%'), t.sustained.first != null
+      ? `${ptN(t.sustained.first)} → ${ptN(t.sustained.last)}` : '', 'sustained', sp),
+    ptCell(t, ptMB(t.engine_mem_mb), '', 'engine'),
+    ptCell(t, ptMB(t.peak_swap_mb), '', 'swap'),
+    ptCell(t, ptMB(t.mem_min_mb), '', 'memmin'),
+    ptCell(t, `${ptN(t.battery.start)} → ${ptN(t.battery.end)} °C`,
+      t.battery.rise != null ? ptSigned(t.battery.rise, ' °C') : '', 'battery', bt),
+    ptCell(t, t.thermal_max == null ? '—' : String(t.thermal_max), '', 'thermal'),
+    ptCell(t, `${t.answers.done}/${t.answers.run}`, '', 'answers'),
+    left(t.charging ? 'yes' : 'no', '', 'charging'));
+}
+// a test opened: every check with its status, time, speeds and reply
+function ptTest(id, d) {
+  const S = ptState(id), t = d.tests.find(x => x.test_id === S.open);
+  if (!t) return '';
+  const got = S.got[t.test_id];
+  return el('div', { class: 'card', 'data-pt-test': t.test_id },
+    el('div', { class: 'pt-test-head' },
+      el('h2', { text: `${t.tester || 'A tester'}’s test, ${ptDay(t.received)}` }),
+      el('button', { class: 'quiet', 'data-pt-close': '1', text: 'Close',
+        onclick: () => { S.open = null; render(); } })),
+    el('p', { class: 'small se', text: [t.phone.name, t.app && `app ${t.app}`, t.engine.name,
+      t.model.name, t.ok ? 'finished' : t.outcome].filter(Boolean).join(' · ') }),
+    S.err[t.test_id] ? el('p', { class: 'warn', text: 'Its checks couldn’t be read: '
+      + S.err[t.test_id] })
+      : !got ? skeleton(3, { 'data-loading': 'pt-test' })
+      : got.unread ? el('p', { class: 'small', text: got.unread })
+      : el('div', { class: 'rp-scroll' }, el('table', { class: 'rp pt-checks' },
+        el('thead', {}, el('tr', {}, ['Check', 'Status', 'Time', 'First word', 'Prefill',
+          'Decode', 'Reply'].map((h, i) => el('th', { class: i >= 2 && i < 6 ? 'num' : null,
+          text: h })))),
+        el('tbody', {}, got.checks.map(c => el('tr', { 'data-pt-check': c.id },
+          el('td', { text: c.id || '—' }, c.finish ? el('span', { class: 'rp-sub',
+            text: c.finish }) : ''),
+          el('td', { class: c.status === 'done' ? '' : 'dash', text: c.status || '—' }),
+          el('td', { class: 'num', text: c.wall_ms ? ptS(c.wall_ms) : '—' }),
+          el('td', { class: 'num', text: ptS(c.ttft_ms) }),
+          el('td', { class: 'num', text: c.prefill_tps == null ? '—'
+            : `${ptN(c.prefill_tps)} tok/s` }),
+          el('td', { class: 'num', text: c.decode_tps == null ? '—'
+            : `${ptN(c.decode_tps)} tok/s` }),
+          el('td', { class: 'pt-reply', 'data-pt-reply': c.id, text: c.text || '' })))))));
+}
+function vPhoneTests(id, d, back) {
+  const sync = d.sync || {}, T = d.tiles;
+  const tile = (k, label, v, note) => el('div', { class: 'tile', 'data-pt-tile': k },
+    el('div', { class: 'label', text: label }), el('div', { class: 'value', text: String(v) }),
+    note ? el('div', { class: 'note', text: note }) : '');
+  const head = el('div', { class: 'card', 'data-report': id },
+    el('h2', { text: d.title }), el('p', { class: 'sub', text: d.what }),
+    el('p', { class: 'small' + (sync.set_up === false || sync.error ? ' warn' : ' se'),
+      'data-pt-sync': '1', text: sync.line || '' }),
+    el('div', { class: 'tiles', 'data-pt-tiles': '1' },
+      tile('tests', 'Tests', T.tests), tile('phones', 'Phones', T.phones),
+      tile('testers', 'Testers', T.testers),
+      tile('unfinished', 'Didn’t finish', T.unfinished)));
+  const lim = Object.entries(d.limits || {}).map(([k, v]) =>
+    `decode above ${v.decode} tok/s or prefill above ${Number(v.prefill).toLocaleString('en')}`
+    + ` tok/s for a ${k} model`).join('; ');
+  const table = el('div', { class: 'card', 'data-report-section': 'pt-tests' },
+    el('h2', { text: 'Every test' }),
+    d.tests.length ? el('div', { class: 'rp-scroll tall' }, el('table', { class: 'rp pt',
+        'data-pt-table': '1' },
+      el('thead', {}, el('tr', {}, PT_COLS.map((h, i) => el('th', {
+        class: i >= 6 && i < PT_COLS.length - 1 ? 'num' : null, text: h })))),
+      el('tbody', {}, d.tests.map(t => ptRow(id, t)))))
+      : el('p', { class: 'small', 'data-pt-none': '1', text: sync.set_up === false
+        ? 'No tests here: the sync isn’t set up.' : 'No tests here yet.' }),
+    el('p', { class: 'small se', 'data-pt-flags': '1', text: 'Newest first; click a test to '
+      + 'open its checks. A test is flagged — greyed, and kept out of the medians it would '
+      + `skew, the reason on hover — when a speed is one no phone can do (${lim}), `
+      + 'when it ran while charging (its battery temperatures), or when the app left the '
+      + 'foreground (its speeds). Decode is the sustain check’s, or think-math’s when sustain '
+      + 'didn’t run; answers are the checks done over those run.' }));
+  const per = el('div', { class: 'card', 'data-report-section': 'pt-per-phone' },
+    el('h2', { text: 'Per phone and model' }),
+    d.perPhone.length ? el('div', { class: 'rp-scroll' }, el('table', { class: 'rp pt',
+        'data-pt-per': '1' },
+      el('thead', {}, el('tr', {}, ['Phone', 'Model', 'Tests', 'Decode', 'Prefill, warm',
+        'Time to first word', 'Engine memory', 'Temperature rise', 'Dates']
+        .map((h, i) => el('th', { class: i >= 2 && i < 8 ? 'num' : null, text: h })))),
+      el('tbody', {}, d.perPhone.map(p => el('tr', {
+          'data-pt-per-row': `${p.phone.code}|${p.model.id}` },
+        el('td', { text: p.phone.name }), el('td', { text: p.model.name }),
+        el('td', { class: 'num', 'data-pt-per-n': '1', text: `${p.n} of ${p.tests}` },
+          el('span', { class: 'rp-sub', text: 'in the medians' })),
+        el('td', { class: 'num', 'data-pt-per-decode': '1', text: ptN(p.decode) },
+          el('span', { class: 'rp-sub', text: 'tok/s' })),
+        el('td', { class: 'num', text: ptN(p.prefill_warm) },
+          el('span', { class: 'rp-sub', text: 'tok/s' })),
+        el('td', { class: 'num', text: ptS(p.ttft_ms) }),
+        el('td', { class: 'num', text: ptMB(p.engine_mem_mb) }),
+        el('td', { class: 'num', 'data-pt-per-rise': '1', text: ptSigned(p.temp_rise, ' °C') }),
+        el('td', { text: p.first ? (p.first === p.last ? p.first : `${p.first} to ${p.last}`)
+          : '—' }))))))
+      : el('p', { class: 'small se', text: 'No finished tests yet.' }),
+    el('p', { class: 'small se', text: 'Medians over each phone’s finished tests: the speeds '
+      + 'without the tests flagged for them, the temperature rise without those run while '
+      + 'charging.' }));
+  const kinds = [...new Set((d.unread || []).map(u => u.why))];
+  const failed = el('div', { class: 'card', 'data-report-section': 'pt-failed' },
+    el('h2', { text: 'What failed' }),
+    d.failed.length ? el('ul', { class: 'rp-notes' }, d.failed.map(f => el('li', {
+        'data-pt-failed': `${f.phone.code}|${f.app}` },
+      el('b', { text: `${f.phone.name}, app ${f.app || '—'}` }),
+      `: ${f.n} test${f.n === 1 ? '' : 's'}, ${f.outcomes.join(', ')}`,
+      el('span', { class: 'rp-sub', text: f.tests.map(x => ptDay(x.received)
+        + (x.tester ? ` by ${x.tester}` : '')).join(' · ') }))))
+      : el('p', { class: 'small se', text: d.tests.length ? 'Every test finished.'
+        : 'Nothing yet.' }),
+    kinds.length ? el('p', { class: 'small se', 'data-pt-unread': '1',
+      text: 'Kept as they came, not read: ' + kinds.map(w =>
+        `${d.unread.filter(u => u.why === w).length} (${w})`).join(', ') }) : '');
+  return [back, head, table, ptTest(id, d), per, failed].filter(Boolean);
 }
 // ---------------------------------------------------------------------------
 // 21b: a report of the answers our models ran out of room on — for insight

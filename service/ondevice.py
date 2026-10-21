@@ -5,10 +5,12 @@ The report file (eval_tasks/reports/on-device.json, `kind: "on_device"`)
 names the rows and where each number comes from; every number is read from
 the board's own tables:
 - ours, measured here: the rows the file names (the step checkpoints and the
-  Q4 baseline), and every phone build with a score on its benchmarks; their
-  scores as the board has them (`reports.our_rows`), their file's size as
-  the box measured it (`reports.build_file`), a phone speed only as someone
-  reported it by hand (service/phone.py);
+  Q4 baseline), and every phone build with a score on its benchmarks or a
+  test on our testers' phones; their scores as the board has them
+  (`reports.our_rows`), their file's size as the box measured it
+  (`reports.build_file`), a phone speed as someone reported it by hand
+  (service/phone.py) and, 26, as our testers' phones measured it
+  (service/telemetry.py) — the two never mixed;
 - theirs, published: each model's numbers as entered through the board's
   card entry (`reports.their_rows`, scripts/enter_report_cards.py), and its
   facts as the file gives them, each with its link — size on disk, memory it
@@ -20,26 +22,42 @@ row's score over its base's, from the same source (ours over our BF16)."""
 
 from __future__ import annotations
 
-from . import phone, reports
+from . import phone, reports, telemetry
 
 KIND = "on_device"
 THINKING = " · thinking"
 
 
-def _phone_rows(rep: dict, cells: dict) -> list[dict]:
+def _phone_rows(rep: dict, cells: dict, measured: dict) -> list[dict]:
     """our phone builds with a score on the report's benchmarks — the row
-    with thinking on when it has one, else the plain one"""
+    with thinking on when it has one, else the plain one — or, 26, a test on
+    our testers' phones"""
     have = {o["row"] for o in rep["ours"]}
     out = []
     for b in phone.builds():
         for mid in (b["id"] + THINKING, b["id"]):
             if mid in have:
                 break
-            if any((cells.get(x["task"]) or {}).get(mid) for x in rep["benchmarks"]):
+            if any((cells.get(x["task"]) or {}).get(mid) for x in rep["benchmarks"]) \
+                    or mid == b["id"] and measured.get(b["id"]):
                 out.append({"label": f"{b['name']} (phone build)", "row": mid, "colour": None,
                             "phone_build": b["id"]})
                 break
     return out
+
+
+def _testers_of(spec: dict, measured: dict) -> dict | None:
+    """26: a phone build as our testers' phones measured it — per phone the
+    medians of decode and engine memory, the phone named; None for a row that
+    is no phone build"""
+    if not spec.get("phone_build"):
+        return None
+    got = [p for p in measured.get(spec["phone_build"]) or [] if p.get("decode") is not None]
+    if not got:
+        return {"none": "no tests from our testers' phones yet"}
+    return {"phones": [{"phone": p["phone"]["name"], "decode": p["decode"],
+                        "engine_mem_mb": p["engine_mem_mb"], "n": p["n"],
+                        "first": p["first"], "last": p["last"]} for p in got]}
 
 
 def _gb(n_bytes) -> float | None:
@@ -57,7 +75,7 @@ def _phone_of_ours(spec: dict) -> dict:
         return {"none": "not measured on a phone yet"}
     got = [r for r in phone.reports(spec["phone_build"]) if r.get("decode_median")]
     if not got:
-        return {"none": "no phone numbers on the board yet"}
+        return {"none": "none reported by hand yet"}
     r = got[0]                                            # newest first
     return {"tok_s": r["decode_median"], "device": r.get("device") or "",
             "words": f"{r['decode_median']:g} tok/s decode, median",
@@ -67,8 +85,10 @@ def _phone_of_ours(spec: dict) -> dict:
 def report(rep: dict, cells: dict) -> dict:
     """the report's payload: its rows with their facts, scores, sources and
     retention, the benchmarks and the notes"""
+    measured = telemetry.by_row() if rep.get("phone_builds") else {}
     rep = {**rep, "ours": [*rep["ours"],
-                           *(_phone_rows(rep, cells) if rep.get("phone_builds") else [])]}
+                           *(_phone_rows(rep, cells, measured) if rep.get("phone_builds")
+                             else [])]}
     benches = rep["benchmarks"]
     rows = reports.our_rows(rep, cells)
     base_ours = next((r for r in rows if r["label"] == rep.get("ours_base")), None)
@@ -89,7 +109,7 @@ def report(rep: dict, cells: dict) -> dict:
             "memory": {"gb": gb, "words": f"{gb:.1f} GB",
                        "how": "the whole file, loaded on the server; not measured on a phone yet"}
             if gb else None,
-            "phone": _phone_of_ours(spec), "cells": sc,
+            "phone": _phone_of_ours(spec), "testers": _testers_of(spec, measured), "cells": sc,
             "retention": {} if r is base_ours else {
                 b["key"]: _ratio(sc[b["key"]].get("v"), (base.get(b["key"]) or {}).get("v"))
                 for b in benches if _ratio(sc[b["key"]].get("v"),
