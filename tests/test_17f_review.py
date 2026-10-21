@@ -36,10 +36,12 @@ HLE, SQA, MMLU, GPQA = "hle_text_cais", "simpleqa_epoch", "mmlupro_tiger", "gpqa
 def test_1_the_limits_of_6_oct():
     on = {t: b["budget"]["on"] for t, b in fb.BENCH.items()}
     off = {t: b["budget"]["off"] for t, b in fb.BENCH.items() if t != "arc_agi2_public"}
+    # 25: and instruction following's two at SimpleQA's
     assert on == {GPQA: 81920, HLE: 81920, "otis_aime_epoch": 81920, "arc_agi2_public": 81920,
-                  "math_l5_epoch": 65536, MMLU: 32768, SQA: 32768}
+                  "math_l5_epoch": 65536, MMLU: 32768, SQA: 32768,
+                  "ifeval_google": 32768, "ifbench_test": 32768}
     assert off == {GPQA: 16384, HLE: 16384, "otis_aime_epoch": 16384, "math_l5_epoch": 8192,
-                   MMLU: 8192, SQA: 4096}
+                   MMLU: 8192, SQA: 4096, "ifeval_google": 4096, "ifbench_test": 4096}
 
 
 def test_1_both_plans_redone_with_the_new_limits():

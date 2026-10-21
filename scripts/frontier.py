@@ -205,8 +205,41 @@ BENCH: dict[str, dict] = {
         "n": 120, "epochs": 2, "aggregate": "pass@2", "budget": {"on": HARD_ON, "off": OFF_LONG},
         # a task's training pairs, 30 × 30 grids at most, are long prompts
         "room": 32768, "scorer": "grid"},
+    # 25: instruction following — each prompt as it is, the user's message, no
+    # system prompt; checked by the benchmark's own code (vendored, pinned) on
+    # the reply alone, its thinking stripped, as IFEval's and IFBench's authors
+    # do for thinking models (scripts/instruction_following.py). One run a
+    # prompt at SimpleQA's token limits; an answer that ran out of room follows
+    # no instruction. The board's number is the one its authors report; the
+    # other three (prompt- and instruction-level, strict and loose) beside it
+    "ifeval_google": {
+        "short": "ifeval", "label": "IFEval", "group": "Instruction following",
+        "reported_as": ["ifeval"],
+        "note": "all 541 prompts; the reply alone, its thinking stripped",
+        "protocol": "Google's IFEval: the prompt as the user's message, its official checkers "
+                    "(lm_eval 0.4.12's) on the reply alone; prompt-level strict",
+        "protocol_version": "google-ifeval-lmeval-0.4.12",
+        "source": {"hf": "google/IFEval", "split": "train",
+                   "revision": "966cd89545d6b6acfd7638bc708b98261ca58e84", "gated": False,
+                   "licence": "Apache-2.0"},
+        "n": 541, "epochs": 1, "budget": {"on": ON, "off": OFF}, "room": 1024,
+        "scorer": "ifeval", "metric": "strict"},
+    "ifbench_test": {
+        "short": "ifbench", "label": "IFBench", "group": "Instruction following",
+        "reported_as": ["ifbench"],
+        "note": "its 300 single-turn prompts; the reply alone, its thinking stripped",
+        "protocol": "AI2's IFBench: the prompt as the user's message, its own checkers "
+                    "(allenai/IFBench 1c40f0c) on the reply alone; prompt-level loose",
+        "protocol_version": "ai2-ifbench-1c40f0c",
+        "source": {"hf": "allenai/IFBench_test", "split": "train",
+                   "revision": "2e8a48de45ff3bf41242f927254ca81b59ca3ae2", "gated": False,
+                   "licence": "ODC-BY-1.0 (research use); its code Apache-2.0"},
+        "n": 300, "epochs": 1, "budget": {"on": ON, "off": OFF}, "room": 1024,
+        "scorer": "ifbench", "metric": "loose"},
 }
 TASKS = list(BENCH)
+# 25: the benchmarks a reply's instructions are checked on, and how
+FOLLOW = {t for t, b in BENCH.items() if b["scorer"] in ("ifeval", "ifbench")}
 
 # the sampling a model's own card recommends, by thinking setting: the nearest
 # a local model has to "each API's default temperature", which Epoch uses
@@ -252,6 +285,9 @@ RUNTIMES = {
                  "decoding, thinking on",
         "env": {"LOOKAHEAD_MOE_ROUTER_NORM": "1"},
         "thinking": ("on",),
+        # 25: and off for instruction following alone (plan I), its sampling as
+        # with thinking on — the same asking, the thinking switched off
+        "off_for": ("ifeval_google", "ifbench_test"),
         "sampling": {"temperature": 1.0, "top_k": 20, "top_p": 0.95, "min_p": 0.0,
                      "presence_penalty": 1.5, "repeat_penalty": LDA_REPEAT_PENALTY,
                      "repeat_last_n": 64},
@@ -309,6 +345,20 @@ def runtime_model_refused(name: str, served_as: str) -> str:
     if models and served_as not in models:
         return f"runtime {name} runs {', '.join(models)} alone — not {served_as}"
     return ""
+
+
+def runtime_thinking_refused(name: str, thinking: str, tasks: list[str]) -> str:
+    """'' when runtime `name` asks `tasks` with thinking `thinking`; else why
+    not — 25: a runtime may ask thinking off of some benchmarks alone
+    (lda-2610: instruction following, plan I), and of those only"""
+    rt = RUNTIMES[name]
+    off_for = rt.get("off_for") or ()
+    if thinking in rt["thinking"] or (thinking == "off" and tasks
+                                      and set(tasks) <= set(off_for)):
+        return ""
+    return (f"--runtime {name} asks thinking {' or '.join(rt['thinking'])} only"
+            + (f" (off for {' and '.join(BENCH[t]['label'] for t in off_for)} alone)"
+               if off_for else ""))
 
 
 def runtime_env_refused(name: str, env: dict) -> list[str]:
@@ -583,6 +633,14 @@ def _fetch_source(task: str):
         return {"items": items, "extra": {"shots": shots}}
     if task == "arc_agi2_public":
         return _arc_rows()
+    if task in FOLLOW:
+        # 25: the prompt, its instructions and their arguments — an argument
+        # the dataset leaves unset dropped, as the checkers drop it
+        return [{"id": str(r["key"]), "question": r["prompt"],
+                 "instructions": list(r["instruction_id_list"]),
+                 "kwargs": [{k: v for k, v in (d or {}).items() if v is not None}
+                            for d in r["kwargs"]]}
+                for r in _hf_load(task)]
     raise KeyError(task)
 
 
@@ -723,6 +781,9 @@ def prompt(task: str, item: dict) -> tuple[str, dict]:
                 {"key": item["answer"], "letters": MMLU_PRO_LETTERS[:len(item["options"])]})
     if task == "arc_agi2_public":
         return _arc_prompt(item), {"answer": item["answer"]}
+    if task in FOLLOW:
+        return item["question"], {"prompt": item["question"], "ids": item["instructions"],
+                                  "kwargs": item["kwargs"]}
     raise KeyError(task)
 
 
@@ -987,6 +1048,17 @@ def score(task: str, answer: str, finish: str | None, need: dict) -> dict:
         got = None if out else read_grid(answer)
         return {"ok": got is not None and got == need["answer"],
                 "read": None if got is None else json.dumps(got), "ran_out": out}
+    if kind in ("ifeval", "ifbench"):
+        # 25: each instruction, strict and loose, on the reply alone; an answer
+        # that ran out of room follows none. Right: every one followed, by the
+        # benchmark's own measure (IFEval's strict, IFBench's loose)
+        if out:
+            got = {h: [False] * len(need["ids"]) for h in ("strict", "loose")}
+        else:
+            import instruction_following as inf
+            got = inf.check(kind, need["prompt"], need["ids"], need["kwargs"], visible(answer))
+        return {"ok": all(got[BENCH[task]["metric"]]), "read": None, "ran_out": out,
+                "follow": {"ids": list(need["ids"]), **got}}
     if kind == "graded":
         vis = visible(answer)
         m = _HLE_ANSWER.findall(vis) if task == "hle_text_cais" else []
@@ -1208,6 +1280,11 @@ def verdict(task: str, run: dict) -> str:
     g = run.get("grade") or {}
     if run.get("ran_out"):
         return "ran out of room before its answer"
+    f = run.get("follow")
+    if f:                                         # 25: as DeviceMark's IFEval says it
+        n = len(f["ids"])
+        return (f"strict: {sum(f['strict'])} of {n} instructions followed · "
+                f"loose: {sum(f['loose'])} of {n}")
     bits = [f"read as {str(run['read'])[:80]}" if run.get("read") is not None
             else "no answer read"]
     if g:

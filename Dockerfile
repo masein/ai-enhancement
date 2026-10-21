@@ -32,7 +32,8 @@ RUN python -m pip install --no-cache-dir --break-system-packages -r /tmp/require
 # never downloads it: five DeviceMark runs on hf failed at "Resource
 # 'punkt_tab' not found" when the checker went to. Pinned as BGE is — the
 # nltk_data commit, the file's size and git blob hash (scripts/nltk_data.py) —
-# into /usr/share/nltk_data, on NLTK's own search path
+# into /usr/share/nltk_data, on NLTK's own search path. 25: with English
+# stopwords and part-of-speech tagger beside it, for IFBench's checkers
 COPY scripts/nltk_data.py /tmp/nltk_data.py
 RUN python /tmp/nltk_data.py --dest /usr/share/nltk_data && rm /tmp/nltk_data.py
 
@@ -88,6 +89,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends tmux openssh-se
 RUN python -c "import torch, lm_eval, transformers, accelerate, datasets; \
 import math_verify, langdetect, nltk, immutabledict; \
 nltk.data.find('tokenizers/punkt_tab/english/'); \
+import absl, emoji, syllapy; \
+nltk.data.find('corpora/stopwords/english'); nltk.data.find('taggers/averaged_perceptron_tagger_eng/'); \
 import importlib.util as u; \
 print('runner env OK — torch', torch.__version__, '| lm_eval', lm_eval.__version__, \
 '| transformers', transformers.__version__, \
@@ -134,6 +137,8 @@ RUN python -m pip install --no-cache-dir --break-system-packages "pytest>=8" htt
 RUN python -c "import torch, lm_eval, transformers, accelerate, datasets, fastapi, uvicorn, pytest, httpx; \
 import math_verify, langdetect, nltk, immutabledict; \
 nltk.data.find('tokenizers/punkt_tab/english/'); \
+import absl, emoji, syllapy; \
+nltk.data.find('corpora/stopwords/english'); nltk.data.find('taggers/averaged_perceptron_tagger_eng/'); \
 import lm_eval.models.openai_completions, aiohttp, tenacity, tiktoken; \
 import importlib.util as u; \
 print('image env OK — torch', torch.__version__, '| built for CUDA', torch.version.cuda, \

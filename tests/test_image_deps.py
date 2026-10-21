@@ -23,7 +23,7 @@ from test_step3_collects import IN_IMAGE
 ROOT = Path(__file__).resolve().parents[1]
 PIN = re.compile(r"^lm_eval\[([^\]]+)\]==([\d.]+)", re.M)
 # a distribution whose module is named otherwise
-MODULE = {"beautifulsoup4": "bs4", "pyyaml": "yaml", "scikit-learn": "sklearn"}
+MODULE = {"beautifulsoup4": "bs4", "pyyaml": "yaml", "scikit-learn": "sklearn", "absl-py": "absl"}
 
 
 def lm_eval():
@@ -160,12 +160,48 @@ def test_ifeval_counts_sentences_with_no_network(monkeypatch):
     assert check.check_following(text) is False
 
 
+def test_ifbench_checks_a_reply_with_no_network(monkeypatch):
+    """25: IFBench's checkers (scripts/ifbench_official) tag parts of speech,
+    count stopwords and split sentences with NLTK's data, which the image has
+    from its build — with the network cut off and a download made to fail,
+    they still check: in CI's image-deps job and in deploy step 3"""
+    lm_eval()
+    import socket
+
+    import nltk
+
+    def no_network(*a, **k):
+        raise OSError("25: no network in this test")
+    monkeypatch.setattr(socket, "create_connection", no_network)
+    monkeypatch.setattr(socket.socket, "connect", no_network)
+    monkeypatch.setattr(nltk, "download", lambda *a, **k: pytest.fail(
+        "an IFBench checker tried to download NLTK's data"))
+    for res in ("tokenizers/punkt_tab/english/", "corpora/stopwords/english",
+                "taggers/averaged_perceptron_tagger_eng/"):
+        nltk.data.find(res)
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import emoji  # noqa: F401 — the two packages its checkers import
+    import syllapy  # noqa: F401
+
+    import instruction_following as inf
+    # stopwords under half the words, and a verb first (the tagger's)
+    ids, kw = ["ratio:stop_words", "words:start_verb"], [{"percentage": 50}, {}]
+    assert inf.check("ifbench", "p", ids, kw, "Take trains across mountains, valleys and "
+                     "cities.") == {"strict": [True, True], "loose": [True, True]}
+    assert inf.check("ifbench", "p", ids, kw, "The train is in the city and it is on the way "
+                     "to the park.") == {"strict": [False, False], "loose": [False, False]}
+
+
 def test_the_image_fetches_the_pinned_punkt_tab():
     """12q.D: the Dockerfile fetches it with the pinned script, and the build
     fails when it isn't found; CI's image-deps job fetches it the same way"""
     docker = (ROOT / "Dockerfile").read_text(encoding="utf-8")
     assert "RUN python /tmp/nltk_data.py --dest /usr/share/nltk_data" in docker
     assert "nltk.data.find('tokenizers/punkt_tab/english/')" in docker
+    # 25: and IFBench's two besides, found when the image is built
+    assert "nltk.data.find('corpora/stopwords/english')" in docker
+    assert "nltk.data.find('taggers/averaged_perceptron_tagger_eng/')" in docker
+    assert "import absl, emoji, syllapy" in docker
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     assert 'python scripts/nltk_data.py --dest "$RUNNER_TEMP/nltk_data"' in ci
 
@@ -262,7 +298,7 @@ def test_the_image_has_what_the_tests_import_at_the_top():
     This is the other half: the first kind imports, in the image"""
     lm_eval()
     for name in sorted(IN_IMAGE):
-        importlib.import_module(name)
+        importlib.import_module(MODULE.get(name, name))     # 25: absl-py is absl
 
 
 def test_an_hf_devicemark_run_in_a_test_fetches_no_tokenizer(svc, monkeypatch):  # noqa: F811

@@ -161,13 +161,16 @@ def test_2_3_each_plan_runs_every_benchmark_once_one_line_a_box():
                 # every step fits the card as the box checks it
                 assert fb.slot_context(list(tasks), th == "on") * slots <= rg.MAX_CONTEXT
         # 20: plan L asks thinking on only, and has no parity step (the
-        # server it compares with is out of reach)
+        # server it compares with is out of reach). 25: plans A, B and L run the
+        # Frontier suite; plan I instruction following, on then off, on the
+        # lda runtime (no parity step either)
         on_only = name == "L"
-        want = {("on", t) for t in fb.TASKS} | (set() if on_only else {
-            ("off", t) for t in fb.TASKS if t != fbx.ARC})
+        suite = sorted(fb.FOLLOW) if name == "I" else fbx.SUITE
+        want = {("on", t) for t in suite} | (set() if on_only else {
+            ("off", t) for t in suite if t != fbx.ARC})
         assert set(have) == want, name
         assert all(have[k] == set(range(1, of[k] + 1)) for k in have), name
-        assert parity == (0 if on_only else 1), name   # 17f: one box a build asks it first
+        assert parity == (0 if name in ("L", "I") else 1), name   # 17f: one box a build asks it first
     longest = {p: max(sum(fbx.hours(s) for s in st) for st in b.values())
                for p, b in fbx.PLANS.items()}
     assert longest["A"] <= 18 and longest["B"] <= 10.5 and longest["L"] <= 6.0

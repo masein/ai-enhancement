@@ -336,7 +336,7 @@ def test_each_rows_status_and_a_dash_for_what_isnt_finished(svc):
                                   "how": "by code", "final": True, "state": "score"}
     assert a["cells"]["hle"]["v"] is None and a["cells"]["hle"]["state"] == "held"  # no old number
     assert a["cells"]["simpleqa"]["state"] == "waits"
-    assert rows["step1000"]["status"] == "1 of 7 benchmarks in"
+    assert rows["step1000"]["status"] == "1 of 9 benchmarks in"      # 25: with IFEval and IFBench
     # every benchmark scored, nothing held: Complete
     full = {b["task"]: {"served/step1000-lda-2610 · thinking": {"v": 0.5, "se": 0.01}}
             for b in rep["benchmarks"]}

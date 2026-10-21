@@ -45,6 +45,16 @@
    "key": "arc",
    "task": "arc_agi2_public",
    "label": "ARC-AGI-2"
+  },
+  {
+   "key": "ifeval",
+   "task": "ifeval_google",
+   "label": "IFEval"
+  },
+  {
+   "key": "ifbench",
+   "task": "ifbench_test",
+   "label": "IFBench"
   }
  ],
  "notes": [

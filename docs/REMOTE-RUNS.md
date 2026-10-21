@@ -1467,6 +1467,32 @@ GPQA Diamond's energy an answer. A row from before 23c shows a dash there,
 "measured from the next run on". The board must run 23c before the first
 23c bundle is imported (an older board refuses its `gpu.jsonl`).
 
+# Instruction following: plan I (25)
+
+IFEval (all 541 prompts, `google/IFEval`) and IFBench (its 300 single-turn
+prompts, `allenai/IFBench_test`) for one of our builds, on one box, end to
+end, on the lda runtime: **`I1`** asks both with thinking on, then the same
+with thinking off (the lda runtime asks thinking off of these two alone).
+SimpleQA's token limits (32,768 on, 4,096 off), one run a prompt — about 1–1½
+hours on, 10–15 minutes off on a good card (an estimate until the first box
+says). Each prompt as it is, the user's message, no system prompt; the reply
+is checked by each benchmark's own code (`scripts/ifeval_official`,
+`scripts/ifbench_official`, scripts/VENDORED.txt), its thinking stripped. The
+thinking-on answers land in the build's `· thinking` row, the thinking-off
+ones in its plain row. Like plan L's, on an RTX 5090 or RTX PRO 6000 only,
+from the runner image at the tag after this change (23c's card check and
+power sampler included), with the box's price in dollars an hour as vast.ai
+shows it (0.42 here):
+
+```bash
+python scripts/frontier_box.py I1 --as served/<build> --gguf hf://<you>/evalboard-private@<commit>/<build>.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-lda-a4a76a7.tar.gz --price 0.42
+```
+
+`python scripts/frontier_box.py --list I` prints the plan. The fetch and the
+import are plan L's (L3). On the board: the step-checkpoints report's
+"Instruction following" (each build, thinking on beside off) and the
+two-builds report, each instruction ✓ or ✗ under each reply.
+
 # Speed tests: the cheapest box per answer (19)
 
 Which box runs our benchmarks for the fewest dollars per answer, measured the

@@ -76,6 +76,10 @@ FLAGS = "-ctk q8_0 -ctv q8_0 --flash-attn on"
 
 GPQA, OTIS, MATH, HLE = "gpqa_diamond_epoch", "otis_aime_epoch", "math_l5_epoch", "hle_text_cais"
 SQA, MMLU, ARC = "simpleqa_epoch", "mmlupro_tiger", "arc_agi2_public"
+IFEVAL, IFBENCH = "ifeval_google", "ifbench_test"
+# 25: the Frontier suite plans A, B and L each run whole; plan I runs
+# instruction following, IFEval and IFBench
+SUITE = tuple(t for t in fb.TASKS if t not in fb.FOLLOW)
 
 # the pilot's seconds an answer, wall-clock on the box at 8 slots (ARC-AGI-2
 # at 5); SimpleQA with thinking on wasn't asked (its MMLU-Pro was stopped by
@@ -85,8 +89,11 @@ PACE = {
     ("on", OTIS): 104.3, ("on", ARC): 109.4, ("on", SQA): 3.6,
     ("off", GPQA): 4.3, ("off", HLE): 5.0, ("off", MATH): 5.2, ("off", MMLU): 1.9,
     ("off", OTIS): 9.1, ("off", SQA): 0.6,
+    # 25: not asked yet — masein's estimate of a build's plan I on a good card,
+    # about 1–1½ hours with thinking on and 10–15 minutes off, over its 841
+    ("on", IFEVAL): 5.0, ("on", IFBENCH): 5.0, ("off", IFEVAL): 0.9, ("off", IFBENCH): 0.9,
 }
-GUESSED = {("on", SQA)}
+GUESSED = {("on", SQA), ("on", IFEVAL), ("on", IFBENCH), ("off", IFEVAL), ("off", IFBENCH)}
 PILOT_SLOTS = {ARC: 5}                  # the slots each pace was measured at; 8 otherwise
 
 # 17f: what ran out of room on the pilot — (answers that ran out, of, the mean
@@ -159,13 +166,19 @@ PLANS: dict[str, dict[str, list[Step]]] = {
         "L20": [("on", (ARC,), "1/2", 5)],
         "L21": [("on", (ARC,), "2/2", 5)],
     },
+    # 25: instruction following, one box a build end to end on the lda
+    # runtime: IFEval and IFBench with thinking on, then the same with it off
+    # (their answers land in the build's · thinking row, then its plain one)
+    "I": {
+        "I1": [("on", (IFEVAL, IFBENCH), "", 8), ("off", (IFEVAL, IFBENCH), "", 8)],
+    },
 }
 # 20: the runtime a plan's boxes run, unless the line names another
-PLAN_RUNTIME = {"L": "lda-2610"}
+PLAN_RUNTIME = {"L": "lda-2610", "I": "lda-2610"}
 # 20: the cards a plan's build runs on — the lda tarball is built for sm_120
 # alone (the RTX 5090 and the RTX PRO 6000): a box line on any other card is
 # refused before anything is fetched
-PLAN_GPUS = {"L": ("RTX 5090", "RTX PRO 6000")}
+PLAN_GPUS = {"L": ("RTX 5090", "RTX PRO 6000"), "I": ("RTX 5090", "RTX PRO 6000")}
 # 20: the files a plan's boxes run, by name, and the sha256 each must have:
 # the lda tarball (teraformer/lda-2026-09-22 at a4a76a751, build 9954, sm_120,
 # CUDA 12.8, no web page), step4000's GGUF (13,592,481,632 bytes), and the
@@ -191,6 +204,8 @@ PLAN_PINS = {"L": {
     # publishes it in ornith-ai/Ornith-1.5-35B-A3B-GGUF at 12393612fd4f
     "Ornith-1.5-35B-Q4_K_M.gguf":
         "42739874cc2ccfdb8523b23fbe52e29b2a7555c8176737ca9ca0b5d59859d41f"}}
+# 25: plan I runs the same files, checked the same
+PLAN_PINS["I"] = PLAN_PINS["L"]
 
 
 def gpu_refused(box: str, info: dict | None = None) -> str:
@@ -416,7 +431,8 @@ def listing(plan: str) -> list[str]:
         lines.append(f"{box} · about {sum(hours(s) for s in steps):.1f} h")
         lines += [f"  {k}. {words(s)}" for k, s in enumerate(steps, 1)]
     total = sum(hours(s) for steps in boxes.values() for s in steps)
-    lines.append(f"{len(boxes)} boxes a build · {total:.1f} box-hours a build · the longest "
+    lines.append(f"{len(boxes)} box{'es' if len(boxes) != 1 else ''} a build · "
+                 f"{total:.1f} box-hours a build · the longest "
                  f"{max(sum(hours(s) for s in st) for st in boxes.values()):.1f} h")
     return lines
 
@@ -424,7 +440,8 @@ def listing(plan: str) -> list[str]:
 def parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("box", nargs="?", help="the box: A1 … A9, B1 … B15 (G5), L1 … L21")
+    ap.add_argument("box", nargs="?", help="the box: A1 … A9, B1 … B15 (G5), L1 … L21, "
+                                           "I1 (25: instruction following)")
     ap.add_argument("then", nargs="*", help="18e point 1: more labels, run one after another "
                                             "on this box (L1 L2): each later one's line is "
                                             "written \"queued\" at the start, so the fetch "

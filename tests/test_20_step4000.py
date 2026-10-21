@@ -289,7 +289,7 @@ def test_plan_L_is_thinking_on_every_benchmark_whole_and_no_box_over_6_hours(): 
         for _, tasks, shard, _ in st:
             for t in tasks:
                 cover.setdefault(t, []).append(fb.parse_shard(shard))
-    assert set(cover) == set(fb.TASKS)
+    assert set(cover) == set(fx.SUITE)                  # 25: plan I runs the other two
     for t, shards in cover.items():
         if shards == [None]:
             continue

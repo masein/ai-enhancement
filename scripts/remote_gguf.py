@@ -1317,8 +1317,9 @@ def _main(argv: list[str] | None = None) -> int:
         # 20: the runtime's environment and flags, nothing typed beside them
         # that would change what it is
         rt = fb.RUNTIMES[a.runtime]
-        if a.thinking not in rt["thinking"]:
-            ap.error(f"--runtime {a.runtime} asks thinking {' or '.join(rt['thinking'])} only")
+        why = fb.runtime_thinking_refused(a.runtime, a.thinking, a.only or [])
+        if why:
+            ap.error(why)
         if a.parity:
             ap.error(f"--runtime {a.runtime}: no parity questions (they ask thinking off)")
         names = {f.split("=", 1)[0] for f in flags}

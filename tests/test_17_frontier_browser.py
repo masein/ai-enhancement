@@ -72,7 +72,8 @@ def test_the_frontier_benchmarks_thinking_on_are_what_is_queued(live, page, srv)
     st, body, j = started(page)
     assert st == 200, j
     assert body["suite"] == "frontier" and body["thinking"] is True
-    assert "arc_agi2_public" not in body["tasks"] and len(body["tasks"]) == 6
+    # 25: seven Frontier benchmarks and instruction following's two, ARC-AGI-2 unticked
+    assert "arc_agi2_public" not in body["tasks"] and len(body["tasks"]) == 8
     row = db.get(j["id"])
     assert row["thinking"] == 1 and "arc_agi2_public" not in json.loads(row["tasks"])
     assert page.errors == []

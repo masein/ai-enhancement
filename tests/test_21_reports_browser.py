@@ -129,9 +129,10 @@ def test_the_list_and_the_report_open_and_the_picker_moves_the_tiles(live, page,
     assert page.evaluate("location.hash") == "#tab=reports&report=step-checkpoints"
     # 1: our runs, each with its status, a dash where a benchmark isn't in
     ours = page.locator("[data-rp-ours]")
-    assert ours.locator("[data-rp-status='step4000']").inner_text() == "Complete"
+    # 25: every Frontier benchmark in, IFEval and IFBench (plan I) not yet
+    assert ours.locator("[data-rp-status='step4000']").inner_text() == "7 of 9 benchmarks in"
     assert "61.6 ± 3.1" in ours.locator("[data-rp-row='step4000']").inner_text()
-    assert ours.locator("[data-rp-row='step1000'] td.dash").count() == 2
+    assert ours.locator("[data-rp-row='step1000'] td.dash").count() == 4
     # a note under a name wraps inside its column, never cut at its edge
     note = ours.locator("[data-rp-row='Q4, earlier run'] td").first
     assert note.evaluate("e => e.scrollWidth <= e.clientWidth + 1")

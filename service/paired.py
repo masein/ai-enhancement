@@ -56,6 +56,10 @@ NOTES = [
     # 23e: as the step-checkpoints report says it
     "Near the ceiling marks a benchmark where our reference build scores 90% or more. There, a "
     "few questions decide the difference.",
+    # 25: instruction following, thinking on
+    "IFEval and IFBench: a prompt is right when every instruction in it was followed — IFEval "
+    "strictly, IFBench loosely, as their authors report them — so the test is McNemar's on "
+    "those. Under each reply, each instruction is marked ✓ or ✗; the thinking is never checked.",
 ]
 # how a runtime's settings are said in the line under the sentence
 RUNTIME_WORDS = {"lda-2610": "the lda runtime", "card-ornith": "its own card's settings"}
@@ -89,13 +93,18 @@ def labels(rep: dict) -> list[str]:
     return [o["label"] for o in rep["ours"]]
 
 
-def _row(rep: dict, label: str) -> str:
-    return next(o["row"] for o in rep["ours"] if o["label"] == label)
+def _row(rep: dict, label: str, off: bool = False) -> str:
+    """its row — 25: `off`, its plain row, where thinking-off answers land"""
+    row = next(o["row"] for o in rep["ours"] if o["label"] == label)
+    return row.removesuffix(" · thinking") if off else row
 
 
-def samples(rep: dict, label: str, task: str) -> Path | None:
+def samples(rep: dict, label: str, task: str, off: bool = False) -> Path | None:
     from . import reports
-    return reports.samples_file(reports.row_dir(_row(rep, label)), task)
+    row = _row(rep, label, off)
+    if off and row == _row(rep, label):
+        return None                     # a row with no thinking row beside it has no off one
+    return reports.samples_file(reports.row_dir(row), task)
 
 
 def offered(rep: dict) -> list[str]:
@@ -266,8 +275,8 @@ def pairs(rep: dict) -> list[tuple[str, str]]:
     return [(ls[i], ls[j]) for i in range(len(ls)) for j in range(i + 1, len(ls))]
 
 
-def _slot(rep: dict, a: str, b: str, task: str) -> str:
-    return "|".join(["paired", str(rep.get("id")), a, b, task])
+def _slot(rep: dict, a: str, b: str, task: str, off: bool = False) -> str:
+    return "|".join(["paired", str(rep.get("id")), a, b, task, *(["off"] if off else [])])
 
 
 def _key(fa: Path | None, fb_: Path | None) -> str:
@@ -275,22 +284,30 @@ def _key(fa: Path | None, fb_: Path | None) -> str:
     return "|".join([WAY, rs.identity(fa), rs.identity(fb_)])
 
 
-def work_out(rep: dict, a: str, b: str, task: str) -> dict:
-    fa, fb_ = samples(rep, a, task), samples(rep, b, task)
+def work_out(rep: dict, a: str, b: str, task: str, off: bool = False) -> dict:
+    fa, fb_ = samples(rep, a, task, off), samples(rep, b, task, off)
     return pair(rep, task, table_of(fa, task), table_of(fb_, task))
 
 
 def jobs(rep: dict) -> list:
-    """23: every pair's benchmarks both builds have scored answers for"""
+    """23: every pair's benchmarks both builds have scored answers for. 25:
+    and instruction following's with thinking off too, the builds' plain
+    rows — the section's sentence says both"""
+    _scripts()
+    import frontier as fb
+
     from . import report_stats as rs
     out = []
     for a, b in pairs(rep):
         for bm in rep["benchmarks"]:
-            fa, fb_ = samples(rep, a, bm["task"]), samples(rep, b, bm["task"])
-            if fa is not None and fb_ is not None:
-                out.append(rs.Job(_slot(rep, a, b, bm["task"]), _key(fa, fb_),
-                                  f"question by question, {a} and {b} · {bm['label']}",
-                                  lambda a=a, b=b, t=bm["task"]: work_out(rep, a, b, t)))
+            for off in (False, True) if bm["task"] in fb.FOLLOW else (False,):
+                fa, fb_ = samples(rep, a, bm["task"], off), samples(rep, b, bm["task"], off)
+                if fa is not None and fb_ is not None:
+                    out.append(rs.Job(_slot(rep, a, b, bm["task"], off), _key(fa, fb_),
+                                      f"question by question, {a} and {b} · {bm['label']}"
+                                      + (", thinking off" if off else ""),
+                                      lambda a=a, b=b, t=bm["task"], o=off: work_out(rep, a, b,
+                                                                                     t, o)))
     return out
 
 
@@ -300,16 +317,18 @@ def _ordered(rep: dict, a: str, b: str) -> tuple[str, str, bool]:
     return (a, b, False) if ls.index(a) < ls.index(b) else (b, a, True)
 
 
-def kept(rep: dict, a: str, b: str, task: str, compute: bool = False) -> dict | None:
+def kept(rep: dict, a: str, b: str, task: str, compute: bool = False, off: bool = False
+         ) -> dict | None:
     """A against B on one benchmark, as kept (worked out now with `compute`):
-    None when never worked out, `fresh` False when the answers changed since"""
+    None when never worked out, `fresh` False when the answers changed since.
+    25: `off`, their thinking-off answers (instruction following's)"""
     from . import report_stats as rs
     x, y, flipped = _ordered(rep, a, b)
-    slot = _slot(rep, x, y, task)
-    key = _key(samples(rep, x, task), samples(rep, y, task))
+    slot = _slot(rep, x, y, task, off)
+    key = _key(samples(rep, x, task, off), samples(rep, y, task, off))
     e = rs.kept(slot)
     if compute and (not e or e.get("key") != key or "value" not in e):
-        e = rs.keep(slot, key, work_out(rep, x, y, task))
+        e = rs.keep(slot, key, work_out(rep, x, y, task, off))
     if not e or "value" not in e:
         return None
     v = e["value"]
@@ -565,10 +584,22 @@ def one(rep: dict, label: str, task: str, qid: str, epoch: int) -> dict:
                        if right.get("letter") else {"answer": str(shown.get("reference") or "")})
     else:
         shown_right = None
+    # 25: instruction following has no right answer: each instruction of the
+    # prompt, followed or not under the benchmark's own measure, and the other
+    follow = runs[k].get("follow") if task in fb.FOLLOW else None
+    metric = (fb.BENCH.get(task) or {}).get("metric")
+    if task in fb.FOLLOW:
+        shown_right = None
     return {"task": task, "id": str(qid), "epoch": int(epoch), "label": label,
             # 23e: where its thinking first stated the right answer and its
             # reply's final answer, marked; the right option's letter alone
-            "marks": {"first": first_mark(task, it, thinking), "final": final_mark(task, reply)},
+            "marks": {"first": first_mark(task, it, thinking),
+                      "final": None if task in fb.FOLLOW else final_mark(task, reply)},
+            **({"instructions": [{"id": i, "strict": bool(st), "loose": bool(lo),
+                                  "ok": bool(lo if metric == "loose" else st)}
+                                 for i, st, lo in zip(follow["ids"], follow["strict"],
+                                                      follow["loose"])],
+                "metric": metric} if follow else {}),
             "right_letter": right.get("letter") or None, "right": shown_right,
             "read": runs[k].get("read"), "subject": subject_of(it), "think_tokens": think_toks,
             "withheld": gone, "runs": [{"epoch": int(r.get("epoch", i) or 0),

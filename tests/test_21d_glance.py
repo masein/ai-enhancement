@@ -64,7 +64,9 @@ def test_a_report_says_how_many_times_each_question_is_asked(svc):
     asked = {b["key"]: (b["epochs"], b["unit"]) for b in got["benchmarks"]}
     assert asked == {"gpqa": (4, "questions"), "hle": (1, "questions"), "otis": (8, "questions"),
                      "math": (1, "questions"), "mmlupro": (1, "questions"),
-                     "simpleqa": (1, "questions"), "arc": (2, "tasks")}
+                     "simpleqa": (1, "questions"), "arc": (2, "tasks"),
+                     # 25: instruction following, one run a prompt
+                     "ifeval": (1, "questions"), "ifbench": (1, "questions")}
     ro = svc.get("/api/reports/ran-out-of-room").json()
     assert {b["key"]: b["epochs"] for b in ro["benchmarks"]}["gpqa"] == 4
 

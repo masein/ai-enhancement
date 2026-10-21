@@ -17,3 +17,8 @@ pyrage==1.4.0    # 12p.1: the encrypted export's round trip is tested
 langdetect==1.0.9
 nltk==3.10.3
 immutabledict==4.3.1
+# 25: and IFBench's (scripts/ifbench_official, AI2's, vendored) these besides —
+# the image has them through requirements.txt and lm_eval
+absl-py==2.5.0
+emoji==2.16.0
+syllapy==0.8.0
