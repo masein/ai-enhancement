@@ -11,6 +11,15 @@
    "others",
    "tokens",
    "loops"
+  ],
+  "benchmarks": [
+   "gpqa",
+   "hle",
+   "otis",
+   "math",
+   "mmlupro",
+   "simpleqa",
+   "arc"
   ]
  },
  "what": "Where the team's step checkpoints (and the Q4, BF16 and Q2 baselines, all on the lda runtime) stand against popular models on the benchmarks those models report — and Ornith-1.5-35B-A3B, a model measured here on its own card's settings, beside them.",
@@ -141,12 +150,32 @@
    "epoch": null,
    "compare": false,
    "why": "published ARC-AGI-2 numbers are on ARC Prize's held-back set; ours is the public set"
+  },
+  {
+   "key": "ifeval",
+   "task": "ifeval_google",
+   "label": "IFEval",
+   "epoch": null,
+   "compare": false,
+   "why": "Model cards report IFEval under their own settings, and no comparable published numbers exist for IFBench; compared only among our builds.",
+   "in_every": false
+  },
+  {
+   "key": "ifbench",
+   "task": "ifbench_test",
+   "label": "IFBench",
+   "epoch": null,
+   "compare": false,
+   "why": "Model cards report IFEval under their own settings, and no comparable published numbers exist for IFBench; compared only among our builds.",
+   "in_every": false
   }
  ],
  "token_limits": {
   "mmlupro_tiger": 32768,
   "simpleqa_epoch": 32768,
   "math_l5_epoch": 65536,
+  "ifeval_google": 32768,
+  "ifbench_test": 32768,
   "others": 81920
  },
  "loops": {

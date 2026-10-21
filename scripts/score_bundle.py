@@ -47,7 +47,7 @@ import frontier as fb  # noqa: E402
 import remote_bundle as rb  # noqa: E402
 
 CODE = ("gpqa_diamond_epoch", "otis_aime_epoch", "math_l5_epoch", "mmlupro_tiger",
-        "arc_agi2_public")
+        "arc_agi2_public", "ifeval_google", "ifbench_test")
 GRADED = ("hle_text_cais", "simpleqa_epoch")
 _HF = re.compile(r"^hf://(?P<type>datasets/|models/)?(?P<repo>[^/@\s]+/[^/@\s]+)"
                  r"(?:@(?P<rev>[^/\s]+))?(?:/(?P<path>\S*))?$")

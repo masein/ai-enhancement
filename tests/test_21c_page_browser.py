@@ -138,7 +138,7 @@ def test_the_numbers_are_21s_cell_for_cell(live, page):
         ": c.textContent.trim())])")
     assert len(theirs) == 8                           # 22: and Ornith-1.5's; 23b: step8804's
     for row in theirs:
-        name, vals = row[0], row[1:]
+        name, vals = row[0], row[1:1 + len(benches)]     # 25: the page's seven, then IF's two
         got = [v.split(" ± ")[0] for v in vals]
         assert got == mine[name], (name, got, mine[name])
     # where it stands: each head-to-head cell, its gap and its verdict

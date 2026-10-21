@@ -22,7 +22,9 @@ line-length = 92
 #       phase-12b3/checks.py is the reference the everyday checks are tested against;
 #       so is masein's tokens.py (21d), the token stats are tested against it
 extend-exclude = ["runs", "Claude outputs", "artifacts", "docs/prompts",
-                  "tests/fixtures/tokens_py"]
+                  "tests/fixtures/tokens_py",
+                  # 25: IFBench's checkers, kept as AI2 wrote them (scripts/VENDORED.txt)
+                  "scripts/ifbench_official"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W"]

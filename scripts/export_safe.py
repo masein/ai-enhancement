@@ -602,7 +602,9 @@ def log_lines(text: str, questions: Questions | None,
 
 # 17i: the benchmarks whose questions may be shown — every other Frontier set
 # is gated or withheld
-FRONTIER_SHOWN = ("mmlupro_tiger", "simpleqa_epoch", "arc_agi2_public")
+FRONTIER_SHOWN = ("mmlupro_tiger", "simpleqa_epoch", "arc_agi2_public",
+                  # 25: public prompts, as their authors publish them
+                  "ifeval_google", "ifbench_test")
 _TEXT_FIELDS = ("question", "problem", "prompt", "text", "passage", "input", "context",
                 "instruction", "stem", "A", "B", "C", "D")
 

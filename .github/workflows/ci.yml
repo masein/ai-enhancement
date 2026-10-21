@@ -66,7 +66,13 @@ jobs:
       - name: py_compile scripts/ service/ clients/
         if: matrix.shard == 1
         run: python -m compileall -q scripts service clients
+      # 25: IFBench's and IFEval's checkers find NLTK's data here, as the
+      # image has it — fetched pinned, never by a check
+      - name: NLTK's data, as the image fetches it (12q.D, 25)
+        run: python scripts/nltk_data.py --dest "$RUNNER_TEMP/nltk_data"
       - name: unit and API tests, shard ${{ matrix.shard }} of 3
+        env:
+          NLTK_DATA: ${{ runner.temp }}/nltk_data
         run: >-
           pytest -q -n auto --dist worksteal --durations=15
           -m "not gpu and not network and not dashboard"
@@ -100,7 +106,11 @@ jobs:
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
       - name: playwright chromium
         run: playwright install --with-deps chromium
+      - name: NLTK's data, as the image fetches it (12q.D, 25)
+        run: python scripts/nltk_data.py --dest "$RUNNER_TEMP/nltk_data"
       - name: dashboard, shard ${{ matrix.shard }} of 5
+        env:
+          NLTK_DATA: ${{ runner.temp }}/nltk_data
         run: pytest -q -m dashboard --splits 5 --group ${{ matrix.shard }}
       - uses: actions/upload-artifact@v4
         if: failure()
@@ -149,7 +159,7 @@ jobs:
                   d = re.split(r"[\s;<>=!~\[]", r, maxsplit=1)[0]
                   print(f"{d}=={md.version(d)}")
           PY
-      - name: NLTK's punkt_tab, as the image fetches it (12q.D)
+      - name: NLTK's data, as the image fetches it (12q.D, 25)
         run: python scripts/nltk_data.py --dest "$RUNNER_TEMP/nltk_data"
       - name: the imports a run needs
         run: >-

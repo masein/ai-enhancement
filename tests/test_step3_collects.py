@@ -30,7 +30,9 @@ STEP3 = "not gpu and not network and not dashboard"
 # three, with lm_eval[ifeval]), or installed beside it (the Dockerfile's check
 # imports pytest and httpx)
 IN_IMAGE = {"pytest", "httpx", "fastapi", "uvicorn", "pydantic", "pyrage", "langdetect", "nltk",
-            "immutabledict"}
+            "immutabledict",
+            # 25: IFBench's checkers' (emoji and syllapy by name, absl-py with lm_eval)
+            "absl-py", "emoji", "syllapy"}
 # …and what it hasn't: the distribution, and the module a test would import
 NOT_IN_IMAGE = {"playwright": "playwright", "ruff": "ruff", "pytest-xdist": "xdist",
                 "pytest-split": "pytest_split"}

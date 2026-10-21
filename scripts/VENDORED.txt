@@ -1,0 +1,25 @@
+Code here that others wrote, kept as they wrote it: where each came from, at
+what version, under what licence, and what was changed. Each changed line is
+marked in its file, and a test undoes the changes and compares the result
+with the source, byte for byte. Nothing in these folders is downloaded or
+built at run time; NLTK's data they read is in the image (scripts/nltk_data.py).
+
+scripts/ifeval_official/   12q
+    IFEval's checkers (google-research instruction_following_eval), as
+    lm_eval v0.4.12 ships them: lm_eval/tasks/ifeval/{instructions,
+    instructions_registry, instructions_util, utils}.py. Apache-2.0.
+    Changed: the imports are this folder's; punkt_tab is looked for when a
+    sentence is first counted, not on import.
+    Checked: tests/test_image_deps.py, against the installed lm_eval.
+
+scripts/ifbench_official/  25
+    IFBench's checkers and its evaluation_lib.py, allenai/IFBench at
+    1c40f0c10d9b5c5c2f10a175a28007ebb64f7f4d (9 Sep 2026):
+    ifbench/{__init__, instructions, instructions_registry,
+    instructions_util, classic_instructions}.py and evaluation_lib.py.
+    Apache-2.0 (its LICENSE beside them). Its test set's data is ODC-BY-1.0.
+    Changed: the imports are this folder's; nothing is made or downloaded on
+    import (no .nltk_data folder in the package, no NLTK_DATA set, no
+    download_nltk_resources() call).
+    Checked: tests/test_25_ifbench.py, against the commit's files (their
+    sha256), and against IFBench's own run_eval on its sample_output.jsonl.

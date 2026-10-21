@@ -1571,6 +1571,18 @@ _TASK_META = {
                "Prompt-level strict accuracy: an answer counts only when it keeps every "
                "instruction; instruction-level, beside it, counts each one. Instruct models "
                "only, and never in the overall average."),
+    # 25: on rented boxes, for our builds — never with the IFEval above
+    "ifeval_google": ("instruction following",
+                      "Google's IFEval, all 541 prompts, asked on rented boxes as the "
+                      "Frontier suite is and checked by its official checkers on the reply "
+                      "alone, its thinking taken off. Prompt-level strict, as its authors "
+                      "report it; the other three of its four numbers under it. Not the "
+                      "IFEval above (lm_eval's harness), nor DeviceMark's."),
+    "ifbench_test": ("instruction following",
+                     "AI2's IFBench: 58 kinds of instruction unseen in training on 300 real "
+                     "users' prompts, checked by its own code on the reply alone, its "
+                     "thinking taken off. Prompt-level loose, as its paper reports it; the "
+                     "other three of its four numbers under it."),
     "mmlu_pro": ("instruction & maths",
                  "MMLU made harder: 12,032 questions with ten options each, answered with "
                  "the reasoning written out (5-shot chain of thought) and scored on the "
@@ -1826,6 +1838,18 @@ def frontier_how(d: dict | None) -> str | None:
              else "")
     if d.get("scored_by") == "grader":
         return (f"graded by {who}" if who else "graded") + end + counts
+    # 25: instruction following — the number is the one its authors report;
+    # the other three of its four beside it
+    f = d.get("follow")
+    if isinstance(f, dict):
+        def pc(x):
+            v = (x or {}).get("v")
+            return f"{100 * v:.1f}" if isinstance(v, (int, float)) else "—"
+        main = "loose" if f.get("metric") == "loose" else "strict"
+        other = "strict" if main == "loose" else "loose"
+        return (f"by its own checkers, on the reply alone: prompt-level {main} · prompt-level "
+                f"{other} {pc(f.get(f'prompt_{other}'))} · instruction-level strict "
+                f"{pc(f.get('inst_strict'))}, loose {pc(f.get('inst_loose'))}" + counts)
     look = d.get("look")
     if isinstance(look, dict):
         if look.get("waiting"):
@@ -1911,6 +1935,8 @@ def frontier_bench_meta() -> dict:
                   "protocol": b["protocol"], "runs": runs, "budget": b["budget"],
                   "scorer": "grader" if b.get("grader") else "code",
                   "unlisted": bool(b.get("unlisted")), "reportedAs": b.get("reported_as") or [],
+                  # 25: instruction following's measure, as its authors report it
+                  "metric": b.get("metric") or "",
                   # 17c: its card on Benchmarks — the set, where it comes from, its licence
                   "n": b["n"], "licence": b["source"].get("licence") or "",
                   "gated": bool(b["source"].get("gated")), "source": fb.source_name(t),
@@ -2522,6 +2548,9 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
                     # for its line — a report reads them from here
                     "answers": ((run.get("frontier") or {}).get(task) or {}).get("answers"),
                     "ranOut": ((run.get("frontier") or {}).get(task) or {}).get("ran_out"),
+                    # 25: instruction following's four numbers, for its section
+                    **({"follow": ((run.get("frontier") or {}).get(task) or {})["follow"]}
+                       if ((run.get("frontier") or {}).get(task) or {}).get("follow") else {}),
                     **({"final": False} if ((run.get("frontier") or {}).get(task) or {})
                        .get("final") is False else {})}
                    if (run.get("frontier") or {}).get(task) else {}),
@@ -5606,6 +5635,11 @@ table.rp tr.rp-group td { background:var(--plane); font-weight:600; text-align:l
 .rp-meta.inline { display:inline; margin-left:8px; }
 .moremenu .rp-meta { margin-left:22px; }
 .tr-legend { display:flex; flex-wrap:wrap; gap:6px 18px; margin:var(--sp-2) 0; font-size:var(--fs-1); }
+/* 25: instruction following — each column thinking on, then off */
+table.rp.fl thead th { position:static; }
+table.rp.fl th.fl-group { text-align:center; border-bottom:none; padding-bottom:0; }
+table.rp.fl th.fl-sub { font-weight:400; font-size:11px; }
+table.rp.fl .fl-start { border-left:1px solid var(--border); }
 .tr-key .rp-meta { margin-left:14px; }
 .tr-svg { display:block; width:100%; height:auto; }
 .tr-seg text { fill:var(--text-primary); paint-order:stroke; stroke:var(--surface-1);
@@ -5730,6 +5764,10 @@ table.rp[data-by-table] thead th:first-child { min-width:0; }
 .pd-col { min-width:0; border:1px solid var(--border); border-radius:var(--r-1); padding:var(--sp-2); }
 .pd-col-head { display:flex; align-items:center; gap:6px; }
 .pd-ok { color:var(--success-text); } .pd-no { color:var(--critical-text); }
+/* 25: each instruction under a reply, followed or not */
+.pd-follow { list-style:none; padding:0; margin:6px 0 10px; font-size:var(--fs-1); }
+.pd-follow li { margin:2px 0; overflow-wrap:anywhere; }
+.pd-follow code { font-family:var(--font-mono); font-size:12px; }
 .pd-final { font-size:var(--fs-4, 22px); font-weight:600; margin:6px 0; overflow-wrap:anywhere; }
 .pd-runs { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:6px; }
 .pd-run { border:1px solid var(--border); border-radius:4px; background:none; color:inherit;
@@ -8116,7 +8154,9 @@ function servedPinNow(m) {
   const got = P[m.id];
   if (netReady() && (!got || (!got.busy && Date.now() - got.at > 60000))) {
     P[m.id] = { ...(got || {}), busy: true, at: Date.now() };
-    api('api/served/pin?id=' + encodeURIComponent(m.id))
+    // 25: by its served record's id — a thinking row's own ("… · thinking") is
+    // no record, and was a 404 a minute on its page
+    api('api/served/pin?id=' + encodeURIComponent(String(m.id).replace(/ · thinking$/, '')))
       .then(d => { P[m.id] = { at: Date.now(), d }; render(); })
       .catch(() => { P[m.id] = { at: Date.now(), d: null }; });
   }
@@ -9103,9 +9143,19 @@ const METRIC_WORDS = { acc: 'accuracy', acc_norm: 'accuracy', exact_match: 'exac
   word_perplexity: 'perplexity' };
 function resultName(t) {
   const mt = (DATA.tasks[t] || {}).metric || '';
-  const w = METRIC_WORDS[mt] || mt.replace(/_/g, ' ');
+  // 25: instruction following's measure, as its authors report it
+  const fm = (FB()[t] || {}).metric;
+  const w = fm ? 'prompt-level ' + fm : METRIC_WORDS[mt] || mt.replace(/_/g, ' ');
   // the set is the group row's above it: "CNN/DailyMail", not "… (MobileAIBench)"
   return benchName(t).replace(/ \(MobileAIBench\)$/, '') + (w ? ' · ' + w : '');
+}
+// 25: "↑ prompt-level loose 40.0 · instruction-level strict 30.0, loose 40.0"
+function followWords(f) {
+  const main = f.metric === 'loose' ? 'loose' : 'strict', other = main === 'loose' ? 'strict' : 'loose';
+  const p = x => x && x.v != null ? (100 * x.v).toFixed(1) : '—';
+  return `↑ prompt-level ${other} ${p(f['prompt_' + other])} · instruction-level strict `
+    + `${p(f.inst_strict)}, loose ${p(f.inst_loose)} — over ${f.prompts} prompts and `
+    + `${f.instructions} instructions`;
 }
 // Results: every task this model has, grouped by domain
 function resultsPart(m) {
@@ -9134,6 +9184,9 @@ function resultsPart(m) {
         el('td', {}, scoreBar(t, c)),
         el('td', { class: 'num se', text: c.shots != null ? c.shots + '-shot' : '—' }),
         el('td', { class: 'num se', text: c.n != null ? String(c.n) : '—' })));
+      // 25: the other three of instruction following's four numbers
+      if (c.follow) rows.push(el('tr', { class: 'flagrow', 'data-result-follow': t },
+        el('td', { colspan: 5, text: followWords(c.follow) })));
       if (atChance) rows.push(el('tr', { class: 'flagrow' }, el('td', { colspan: 5,
         text: '↑ within 1.96 standard errors of chance — not distinguishable '
             + 'from guessing' })));
@@ -12456,6 +12509,8 @@ const BENCH_NAMES = { mmlu: 'MMLU', hellaswag: 'HellaSwag', piqa: 'PIQA', winogr
   bbq_3000: 'BBQ', bbq_all: 'BBQ (all 29,246)',
   gpqa_diamond_cot_zeroshot: 'GPQA Diamond (CoT)', gpqa_diamond_zeroshot: 'GPQA Diamond (4 options)',
   gpqa_diamond_epoch: 'GPQA Diamond (Epoch AI\u2019s way)',
+  // 25: never read as lm_eval's IFEval (above) or DeviceMark's
+  ifeval_google: 'IFEval (the reply alone)', ifbench_test: 'IFBench',
   simpleqa_verified: 'SimpleQA Verified', mab_hotpotqa: 'HotpotQA (MobileAIBench)',
   mab_sql: 'SQL from a question (MobileAIBench)', mab_dolly: 'Dolly (MobileAIBench)',
   mab_cnndm: 'CNN/DailyMail (MobileAIBench)', mab_xsum: 'XSum (MobileAIBench)',
@@ -12900,7 +12955,8 @@ const LB_SHORT = { arc_challenge: 'ARC-C', arc_easy: 'ARC-E', truthfulqa_mc2: 'T
   mab_dolly: 'Dolly', mab_cnndm: 'CNN/DM', mab_xsum: 'XSum', mab_mtbench: 'MT-Bench',
   mab_adv: 'Adv. instr.', mab_privacy: 'Privacy', mab_socchem: 'Agrees with crowd',
   mobile_mmlu_pro: 'Mobile-MMLU-Pro', mobile_mmlu_full: 'Mobile-MMLU (full)',
-  dm_ifeval: 'IFEval (DM)', dm_mmlu_pro: 'MMLU-Pro (DM)', dm_math: 'MATH (DM)' };
+  dm_ifeval: 'IFEval (DM)', dm_mmlu_pro: 'MMLU-Pro (DM)', dm_math: 'MATH (DM)',
+  ifeval_google: 'IFEval (reply)', ifbench_test: 'IFBench' };
 
 // A column's setup, in words — its tooltip, and its accessible name. The
 // header shows only the name; this is where the n-shot, the unit and the
@@ -13549,7 +13605,9 @@ const FR_GROUPS = [
   ['Knowledge & reasoning', [/^gpqa\b/, /humanity.s last exam|^hle\b/, /^simpleqa/, /^mmlu-?pro\b/]],
   ['Maths', [/otis|mock aime/, /^frontiermath/, /^math level 5/]],
   ['Coding & agents', [/^swe-?bench verified/, /^terminal.?bench/, /^deepswe/]],
-  ['Puzzles & games', [/^arc-?agi/, /^simplebench/, /^chess puzzles?/]]];
+  ['Puzzles & games', [/^arc-?agi/, /^simplebench/, /^chess puzzles?/]],
+  // 25: measured on rented boxes, for our builds
+  ['Instruction following', [/^ifeval\b/, /^ifbench\b/]]];
 // one benchmark by its name across sources: "GPQA diamond" is "GPQA Diamond"
 const frKey = b => String(b || '').toLowerCase().replace(/\s+/g, ' ').trim();
 function frPlace(name) {
@@ -21962,7 +22020,30 @@ const CAT_FRONTIER = {
       + 'answer is (X)”',
     differs: 'TIGER-Lab’s own API protocol, 5-shot chain of thought from the question’s '
       + 'category: the model card’s sampling, not temperature 0, and no random guess when '
-      + 'nothing is read.' } };
+      + 'nothing is read.' },
+  // 25: instruction following, which Epoch AI doesn't run: how each differs
+  // from its authors' own way
+  ifeval_google: { line: 'Prompts that each carry instructions a program can check — '
+      + '“answer in exactly 3 bullet points”, “no commas”, “end with this phrase”: all 541.',
+    by: 'Zhou et al., Instruction-Following Evaluation for Large Language Models (Google, 2023)',
+    marked: 'by IFEval’s own checkers (lm_eval 0.4.12’s copy, the one DeviceMark’s IFEval '
+      + 'uses), on the reply alone, its thinking taken off: prompt-level strict, every '
+      + 'instruction of a prompt followed. The other three of its four numbers are on the '
+      + 'score’s line',
+    vs: 'How it differs from its authors’ way',
+    differs: 'The prompt as it is, with the build’s chat template and no system prompt; the '
+      + 'model card’s sampling, not greedy; 1 run. Not DeviceMark’s IFEval (300 prompts, '
+      + 'thinking capped), nor this board’s IFEval column (lm_eval’s), and never averaged '
+      + 'with either.' },
+  ifbench_test: { line: 'Harder instructions than IFEval’s, 58 kinds unseen in training — '
+      + 'counting, ratios, word games — on 300 real users’ prompts.',
+    by: 'Pyatkin et al., Generalizing Verifiable Instruction Following (AI2, NeurIPS 2025)',
+    marked: 'by IFBench’s own checkers (allenai/IFBench at 1c40f0c, vendored), on the reply '
+      + 'alone, its thinking taken off: prompt-level loose, as its paper reports it. The '
+      + 'other three of its four numbers are on the score’s line',
+    vs: 'How it differs from its authors’ way',
+    differs: 'The prompt as it is, with the build’s chat template and no system prompt; the '
+      + 'model card’s sampling, not temperature 0; 1 run, the single-turn set.' } };
 const CAT_SECTIONS = [['standard', 'Standard'], ['mobile', 'Mobile'], ['everyday', 'Everyday'],
   ['frontier', 'Frontier'], ['agent', 'Agent tasks'], ['exam', 'Knowledge exam']];
 
@@ -22155,7 +22236,7 @@ function catCards() {
         url: b.url || '',
         licence: (b.licence || '') + (b.gated ? ' (gated)' : ''), questions: b.n,
         qnote: t === 'arc_agi2_public' ? 'tasks' : '',
-        protocol: `How it differs from Epoch AI’s way: ${c.differs}`,
+        protocol: `${c.vs || 'How it differs from Epoch AI’s way'}: ${c.differs}`,
         avg: 'never in the Avg' };
     }),
     ...LIVE ? [{ key: 'reported', name: 'What others report', see: ['frontier'],
@@ -27993,8 +28074,9 @@ function vReport(id) {
               + `${x.first.line_n} times: “${x.first.line}”` }) : '',
             el('pre', { class: 'rp-excerpt', text: x.first.excerpt })]
             : el('p', { class: 'small se', text: `${L.first}: no stored answer.` })]))));
-  // 6. every model, by GPQA Diamond
-  const g = benches[0].key;
+  // 6. every model, by GPQA Diamond. 25: a benchmark no other model has a
+  // number on (in_every false: instruction following) is left out
+  const g = benches[0].key, everyB = benches.filter(b => b.in_every !== false);
   const every = el('div', { class: 'card', 'data-report-section': 'every' },
     el('h2', { text: 'Every model' }),
     el('p', { class: 'small se', text: `Sorted by ${benches[0].label}; ours in bold. † from `
@@ -28002,10 +28084,10 @@ function vReport(id) {
       + 'from.' }),
     el('div', { class: 'rp-scroll tall' }, el('table', { class: 'rp', 'data-rp-every': '1' },
       el('thead', {}, el('tr', {}, el('th', { text: 'Model' }),
-        ...benches.map(b => el('th', { text: b.label })))),
+        ...everyB.map(b => el('th', { text: b.label })))),
       el('tbody', {}, [...all].sort((p, q) => ((q.cells[g] || {}).v ?? -1)
           - ((p.cells[g] || {}).v ?? -1))
-        .map(m => el('tr', {}, rpName(m), ...benches.map(b => m.ours
+        .map(m => el('tr', {}, rpName(m), ...everyB.map(b => m.ours
           ? rpOurCell(m.cells[b.key], b) : rpTheirCell(m.cells[b.key]))))))),
     el('p', { class: 'small se', text: RP_SCORE_LEGEND }));
   // 7. how to read this
@@ -28025,7 +28107,8 @@ function vReport(id) {
         el('a', { href: c.url, target: '_blank', rel: 'noopener', text: c.card }),
         c.at ? ` · entered ${c.at}${c.by ? ' by ' + c.by : ''}` : ' · not entered yet'))))
       : '');
-  return [back, head, ours, rpTraining(d), stand, byBench, rpBeyond(d), tok, loops, every, notes];
+  return [back, head, ours, rpTraining(d), stand, byBench, rpFollow(d), rpBeyond(d), tok, loops,
+    every, notes];
 }
 // ---------------------------------------------------------------------------
 // 21b: a report of the answers our models ran out of room on — for insight
@@ -28647,7 +28730,20 @@ function pdCol(id, d, r, c, qid) {
     el('mark', { class: 'pd-mark pd-mark-' + what, 'data-pd-mark': what,
       text: text.slice(span[0], span[1]) }), text.slice(span[1])];
   const letter = ['gpqa_diamond_epoch', 'mmlupro_tiger'].includes(r.task);
-  const read = a.read == null ? '—' : letter ? `(${a.read})` : String(a.read);
+  // 25: instruction following — how many of the prompt's instructions it
+  // followed, under its benchmark's own measure, and each one under the reply
+  const ins = a.instructions;
+  const read = ins ? `${ins.filter(x => x.ok).length} of ${ins.length} followed (${a.metric})`
+    : a.read == null ? '—' : letter ? `(${a.read})` : String(a.read);
+  const other = a.metric === 'loose' ? 'strict' : 'loose';
+  const follow = ins ? el('ul', { class: 'pd-follow', 'data-pd-follow': c.who }, ins.map(x =>
+    el('li', { 'data-pd-inst': x.id, 'data-pd-inst-ok': String(x.ok),
+        'aria-label': `${x.id}: ${x.ok ? 'followed' : 'not followed'} (${a.metric})`,
+        title: `strict ${x.strict ? '✓' : '✗'} · loose ${x.loose ? '✓' : '✗'}` },
+      el('span', { class: x.ok ? 'pd-ok' : 'pd-no', 'aria-hidden': 'true',
+        text: x.ok ? '✓' : '✗' }), ' ', el('code', { text: x.id }),
+      x.strict !== x.loose ? el('span', { class: 'small se', text: ` · ${other} `
+        + ((other === 'strict' ? x.strict : x.loose) ? '✓' : '✗') }) : ''))) : '';
   return el('div', { class: 'pd-col', 'data-pd-col-of': c.who },
     head,
     el('div', { class: 'pd-final', 'data-pd-final': c.who, title: a.verdict, text: read }),
@@ -28660,9 +28756,11 @@ function pdCol(id, d, r, c, qid) {
     a.ran_out ? el('p', { class: 'small warntext', text: 'ran out of room' }) : '',
     el('pre', { class: 'pd-reply', 'data-pd-reply': c.who }, ...(a.reply ? marked(a.reply, mk.final, 'final')
       : ['(nothing after its thinking)'])),
+    follow,
     a.thinking ? el('details', { 'data-pd-thinking': c.who }, el('summary', { text: 'Show its thinking'
       + (a.think_tokens != null ? ` (${rpN(a.think_tokens)} tokens)` : '') }),
-      el('p', { class: 'small se', text: mk.first ? 'Marked: where it first stated the right answer.'
+      ins ? el('p', { class: 'small se', text: 'Its thinking is never checked: only the reply.' })
+      : el('p', { class: 'small se', text: mk.first ? 'Marked: where it first stated the right answer.'
         : 'It never states the right answer clearly.' }),
       el('pre', {}, ...marked(a.thinking, mk.first, 'first'))) : '');
 }
@@ -29133,6 +29231,41 @@ function trTicks(lo, hi) {
 }
 const trStep = v => v.toLocaleString('en');
 // "Across training": a panel a benchmark, once two checkpoints are scored on one
+// 25: instruction following, thinking on and off — a row a build, IFEval
+// strict and loose and IFBench loose, each side by side (service/follow.py)
+const FL_LEGEND = 'Prompt-level: a prompt counts when every instruction in it was followed — '
+  + 'strict as the reply is written, loose after the checkers’ own allowances (its first or '
+  + 'last line, and asterisks, set aside). IFEval’s authors report strict, IFBench’s loose. '
+  + '± one standard error over prompts. Thinking on is each build’s thinking row; off, its '
+  + 'plain row (plan I’s second step). DeviceMark’s IFEval (300 prompts, thinking capped) is '
+  + 'another protocol, never in these columns.';
+function rpFollow(d) {
+  const F = d.follow;
+  if (!F) return '';
+  const val = x => x ? `${rpNum(x.v)}${x.se ? ' ± ' + rpNum(x.se) : ''}` : '—';
+  return el('div', { class: 'card', 'data-report-section': 'follow' },
+    el('h2', { text: 'Instruction following' }),
+    F.sentence ? el('p', { class: 'rp-line', 'data-fl-sentence': '1', text: F.sentence })
+      : el('p', { class: 'small se', 'data-fl-sentence': '', text: 'Not measured yet: each '
+        + 'build’s plan I box asks IFEval and IFBench with thinking on, then off.' }),
+    el('div', { class: 'rp-scroll' }, el('table', { class: 'rp fl', 'data-fl-table': '1' },
+      el('thead', {},
+        el('tr', {}, el('th', { rowspan: '2', text: 'Model' }),
+          ...F.columns.map(c => el('th', { colspan: '2', class: 'fl-group fl-start',
+            'data-fl-col': c.key, text: c.label }))),
+        el('tr', {}, ...F.columns.flatMap(() => ['on', 'off'].map(w => el('th', {
+          class: 'fl-sub' + (w === 'on' ? ' fl-start' : ''), text: `thinking ${w}` }))))),
+      el('tbody', {}, F.rows.map(r => el('tr', { 'data-fl-row': r.label },
+        el('td', { class: 'rp-ours', title: r.row },
+          el('span', { class: 'rp-dot', style: `background:${rpColour(r)}` }), r.label),
+        ...F.columns.flatMap(c => ['on', 'off'].map(w => {
+          const x = (r.cells[c.key] || {})[w];
+          return el('td', { class: (x ? 'num' : 'dash') + (w === 'on' ? ' fl-start' : ''),
+            'data-fl-cell': `${r.label}|${c.key}|${w}`,
+            title: (w === 'on' ? r.row : r.rowOff) || '', text: val(x) });
+        }))))))),
+    el('p', { class: 'small se', 'data-fl-legend': '1', text: FL_LEGEND }));
+}
 function rpTraining(d) {
   const T = d.training;
   if (!T || (T.checkpoints || []).length < 2) return '';

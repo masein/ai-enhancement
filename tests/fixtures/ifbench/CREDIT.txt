@@ -1,0 +1,16 @@
+IFBench's test set and its sample output, gzipped, as AI2 publishes them:
+github.com/allenai/IFBench at 1c40f0c10d9b5c5c2f10a175a28007ebb64f7f4d.
+
+IFBench_test.jsonl.gz   ifbench/data/IFBench_test.jsonl (300 prompts), the same
+                        rows as huggingface.co/datasets/allenai/IFBench_test at
+                        2e8a48de45ff3bf41242f927254ca81b59ca3ae2, the board's pin
+                        (sha256 of the file, unzipped: a2bf7b8e7ed1…)
+sample_output.jsonl.gz  data/sample_output.jsonl, a reply to each (sha256
+                        unzipped: f9ad5227e47b…)
+
+Pyatkin et al., Generalizing Verifiable Instruction Following (AI2, NeurIPS
+2025). The data is ODC-BY-1.0, for research and educational use under AI2's
+Responsible Use Guidelines; the replies were written by third-party models.
+The code is Apache-2.0. tests/test_25_ifbench.py checks the vendored
+checkers (scripts/ifbench_official) give the numbers IFBench's own run_eval
+gives on these two files.

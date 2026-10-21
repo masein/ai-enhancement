@@ -629,6 +629,8 @@ def marks(row: Path, task: str, items: list[dict] | None = None,
                 "finish": a.get("finish"), "tokens": a.get("tokens"),
                 "error": a.get("error"), "unanswered": a.get("unanswered"),
                 "ungraded": bool(ungraded and ok is False and not sc["ok"]), "grade": g,
+                # 25: each instruction asked, followed or not, strict and loose
+                **({"follow": sc["follow"]} if sc.get("follow") else {}),
                 **({"chars": a.get("chars")} if index is not None else {})})
     return {"runs": runs, "missing": missing, "items": items}
 
@@ -1111,6 +1113,12 @@ def score_task(row: Path, task: str, rec: dict, log=print, runs_log: bool = True
               # 17d: and a score with an answer its grader gave no grade isn't final
               **({"final": False} if out["state"] == "not final" else {}),
               **({"look": {"done": looked, "waiting": waiting}} if spec.get("look") else {})}
+    if task in fb.FOLLOW:
+        # 25: the four numbers IFEval and IFBench report — the board's is one of
+        # them (`metric`), the others said beside it
+        import instruction_following as inf
+        detail["follow"] = {**inf.numbers([r["follow"] for r in flat if r.get("follow")]),
+                            "metric": spec["metric"]}
     res = {"alias": task, "acc,none": page["score"], "acc_stderr,none": page["se"]}
     if spec.get("look") and code:
         res.update({"acc_code,none": code["score"], "acc_code_stderr,none": code["se"]})

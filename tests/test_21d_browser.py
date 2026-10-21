@@ -104,7 +104,8 @@ def test_models_opens_on_latest(live, page, width, scheme):
     assert src["GPT-6 Astra (max)"] == "Epoch AI"
     assert src["DeepSeek-V4-Pro (max)"] == "Epoch AI; HLE, MMLU-Pro: DeepSeek card"
     assert src["o4-mini (high)"] == "Epoch AI; MMLU-Pro: Qwen card (medium effort)"
-    assert src["step4000"].startswith("Our run · Complete")
+    # 25: the report's IFEval and IFBench not in yet (plan I)
+    assert src["step4000"].startswith("Our run · 7 of 9 benchmarks in")
     assert page.locator("[data-latest-table] [data-card-link]").count() >= 8
     # a card's number has no ±; ours always has one
     assert all("±" in r[1] for r in rows if r[0] in PICKED and r[1] != "—")

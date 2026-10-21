@@ -138,7 +138,8 @@ def shot(page, loc, path: Path) -> None:
 def test_the_table_chart(live, page, width, scheme):
     open_pair(page, live, width=width, scheme=scheme)
     rows = page.eval_on_selector_all("[data-pd-row]", "rs => rs.map(r => r.dataset.pdRow)")
-    assert rows == ["gpqa", "hle", "otis", "math", "mmlupro", "simpleqa", "arc"]   # HLE in
+    assert rows == ["gpqa", "hle", "otis", "math", "mmlupro", "simpleqa", "arc",   # HLE in
+                    "ifeval", "ifbench"]                                           # 25
     assert page.locator("[data-pd-wait='hle']").inner_text() == (
         f"waiting for grading — 2,098 answers from {S4}")
     assert page.locator("[data-pd-wait='math']").inner_text() == f"no answers from {S4}"

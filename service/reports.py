@@ -99,6 +99,14 @@ NOTES = [
     "scores' ± overlap, because it compares the same questions.",
     "Near the ceiling marks a benchmark where our reference build scores 90% or more. There, a "
     "few questions decide the difference.",
+    # 25: instruction following
+    "Instruction following. IFEval (all 541 prompts) and IFBench (its 300) are checked by each "
+    "benchmark's own code on the reply alone, the thinking taken off, one run a prompt. A "
+    "prompt is right when every instruction in it was followed: IFEval's number is strict, "
+    "IFBench's loose, as their authors report them; the other two prompt-level and "
+    "instruction-level numbers are on each score's line. They are compared only among our "
+    "builds. DeviceMark's IFEval (300 prompts, thinking capped) is another protocol and is "
+    "never in these columns.",
 ]
 
 
@@ -1081,6 +1089,8 @@ def report(rid: str, payload: dict | None = None, compute: bool = False, a: str 
         # 23e: our checkpoints across training, and the benchmarks near the ceiling
         "training": _training(rep, rows, compute), "ceiling": _ceiling(rep, rows),
         "ceilingWords": _ceiling_words(),
+        # 25: instruction following, thinking on and off (service/follow.py)
+        "follow": _follow(rep, rows, payload.get("cells") or {}, compute),
         # 23: the report comparing two of these rows question by question
         "paired": next((x for x, r in files().items() if r.get("kind") == "paired"
                         and (r.get("builds") or {}).get("from") == rid), None),
@@ -1150,6 +1160,11 @@ def thinks_list(rid: str, label: str, key: str, which: str) -> dict:
 def _training(rep: dict, rows: list[dict], compute: bool = False) -> dict | None:
     from . import training
     return training.of_report(rep, rows, compute)
+
+
+def _follow(rep: dict, rows: list[dict], cells: dict, compute: bool = False) -> dict | None:
+    from . import follow
+    return follow.of_report(rep, rows, cells, compute)
 
 
 def _ceiling(rep: dict, rows: list[dict]) -> dict:

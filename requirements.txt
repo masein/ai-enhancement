@@ -24,6 +24,11 @@ tiktoken==0.14.0
 transformers==5.5.3
 # MATH-500's answers compared as maths, not strings (scripts/generative.py)
 math-verify[antlr4_11_0]==0.9.0
+# 25: IFBench's checkers (scripts/ifbench_official, AI2's, vendored) import these
+# beside IFEval's three; its absl-py comes in with lm_eval already. Neither
+# brings anything else
+emoji==2.16.0
+syllapy==0.8.0
 # 15.6: every direct requirement pinned. The board's image is built on the
 # server at deploy and the runner image by the mirror's Actions at merge: an
 # unpinned package resolves to whatever is newest at each build, and the two

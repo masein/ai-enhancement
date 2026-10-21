@@ -196,11 +196,22 @@ def loops(rep: dict, examples: list[dict]) -> list[dict]:
     return out
 
 
+def on_page(rep: dict) -> dict:
+    """25: the report as its page shows it — the benchmarks the page was
+    written for (its `benchmarks`), when it names them: one added to the
+    report since (instruction following) isn't on the published page, and its
+    rows' status lines are the page's"""
+    keys = (rep.get("page") or {}).get("benchmarks")
+    if not keys:
+        return rep
+    return {**rep, "benchmarks": [b for b in rep["benchmarks"] if b["key"] in keys]}
+
+
 def _report(rid: str) -> dict:
     rep = reports.files().get(rid)
     if rep is None or rep.get("kind") == "ran_out" or not page_of(rep):
         raise KeyError(f"no report page {rid!r}")
-    return rep
+    return on_page(rep)
 
 
 def dataset(rid: str, did: str, payload: dict | None = None) -> list[dict]:

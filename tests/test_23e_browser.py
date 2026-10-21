@@ -82,7 +82,7 @@ def test_across_training_draws_and_a_segment_opens_its_pair(live, page, width, s
     order = page.eval_on_selector_all("[data-report-section]", "s => s.map(x => x.dataset"
                                       ".reportSection)")
     assert order[order.index("ours") + 1] == "training"          # right after Our runs
-    assert page.locator("[data-tr-panel]").count() == 7
+    assert page.locator("[data-tr-panel]").count() == 9          # 25: and IFEval, IFBench
     # HLE: the three checkpoints, their whiskers, the line, Q4 and BF16 dashed
     assert page.locator("[data-tr-dot^='hle:']").count() == 3
     assert page.locator("[data-tr-whisker^='hle:']").count() == 3
