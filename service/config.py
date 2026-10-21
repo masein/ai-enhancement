@@ -654,3 +654,13 @@ def tasks_for_suite(suite: str, bbq_all: bool = False, part: str = "") -> list[s
     if bbq_all and suite == "full":
         base = [BBQ_ALL_TASK if t == BBQ_TASK else t for t in base]
     return base + discovered_ppl_tasks()
+# 26: our testers' phone checks, from Kevin's telemetry on Cloudflare R2
+# (service/telemetry.py) — read-only. The keys are masein's, in the server's
+# .env alone (interpolated by docker-compose), never in the repo, a page or a
+# log; without them the page says so and nothing else changes
+R2_ENDPOINT = os.environ.get("R2_ENDPOINT", "").strip().rstrip("/")
+R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID", "").strip()
+R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY", "").strip()
+R2_BUCKET = os.environ.get("R2_BUCKET", "").strip() or "teraformer-models"
+R2_TELEMETRY_PREFIX = os.environ.get("R2_TELEMETRY_PREFIX", "").strip() or "telemetry/speedcheck/"
+TELEMETRY_SYNC_S = int(os.environ.get("TELEMETRY_SYNC_S", "600"))      # every 10 minutes

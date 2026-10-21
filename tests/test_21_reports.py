@@ -354,8 +354,9 @@ def test_the_endpoints_read_and_start_nothing(svc, monkeypatch):
     monkeypatch.setattr(reported, "import_epoch", no)
     got = {r["id"]: r for r in svc.get("/api/reports").json()["reports"]}
     # 21b: a second; 23: a third, two builds question by question
-    # 25c: and a fourth, the on-device models
-    assert sorted(got) == ["on-device", "paired", "ran-out-of-room", "step-checkpoints"]
+    # 25c: and a fourth, the on-device models; 26: a fifth, our testers' phones
+    assert sorted(got) == ["on-device", "paired", "ran-out-of-room", "step-checkpoints",
+                           "testers"]
     sc = got["step-checkpoints"]
     # 23b: step8804 first; 22: Ornith's card
     assert sc["ours"][:2] == ["step8804", "step4000"] and sc["others"] == 44   # 25b: Gemma 4 ×2

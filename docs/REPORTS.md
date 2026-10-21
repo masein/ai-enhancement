@@ -302,9 +302,11 @@ are ours.
   and 9B, and Gemma 4 E4B and E2B. Nothing is measured here for those, and
   nothing is estimated.
 - **Columns.** Base model, size on disk, the memory it needs, phone speed
-  (the device named, or "no phone numbers yet"), GPQA Diamond, MMLU-Pro,
-  IFEval and IFBench. Every cell says "measured here", or "published by …"
-  with its link.
+  (the device named, or "no phone numbers yet"), what our testers' phones
+  measured (26: our phone build's decode and engine memory, per phone),
+  GPQA Diamond, MMLU-Pro, IFEval and IFBench. Every cell says "measured
+  here", "measured on our testers' phones", or "published by …" with its
+  link.
 - **Retention.** Each row's score over its own base's, from the same
   source. For a published model, that is its maker's base row
   (`base_only`), entered like the others but never a row on Models (the
@@ -320,3 +322,61 @@ are 25b's and are already there:
 ```bash
 cd ~/benchmarks/aienh && sudo docker compose exec -T bench python scripts/enter_report_cards.py on-device --by masein
 ```
+
+## On our testers' phones (26)
+
+`eval_tasks/reports/testers.json` (`kind: "phone_tests"`, `service/telemetry.py`).
+Our phone app ("Etachat") checks itself once on each tester's phone and
+uploads one JSON a test to Cloudflare R2 (Kevin's format, schema 1). The
+board reads the same files. It is read-only, and it never asks his app to change.
+
+- **The sync.** Every 10 minutes (`TELEMETRY_SYNC_S`), while the R2 keys are
+  in `.env`, it lists `R2_TELEMETRY_PREFIX` in `R2_BUCKET`. It downloads only
+  the tests it doesn't have yet, by test id. Each is kept as it came in
+  `BENCH_ROOT/phone/telemetry/<install_id>/<test_id>.json`. Nothing is ever
+  written to R2.
+  - It uses no boto3: two signed GETs (AWS Signature V4, `service/r2.py`).
+  - Without the keys the place says "Phone checks: not set up — R2 keys
+    missing in .env". A failed sync says why, and when the last good one was.
+  - To sync now: `python -m service.telemetry sync`.
+- **Reading.** A test is read as Kevin's Testers dashboard reads it, so the
+  two never disagree:
+  - answers are the checks done over those run (`not_run` never counts);
+  - prefill is speed-cold → speed-warm;
+  - decode is the sustain check's, or think-math's when sustain didn't run;
+  - time to first word is speed-warm's;
+  - sustained is sustain's last third over its first.
+
+  A field we don't know stays in the raw file. A higher schema is kept raw
+  and said ("schema 2: not read yet").
+- **Names.** These are ours: `eval_tasks/phone/names.json` maps the app's
+  ids to names:
+  - `models` maps a `model_id` to `{name, row, what, sha256}`; `row` is the
+    board row it belongs to (`served/...`);
+  - `tiers` and `engines` map an id to a short description;
+  - `devices` maps a model code to its marketing name.
+
+  An id not in it shows as itself with "(not named yet)", never guessed.
+  Plain names only: the file goes to the public mirror.
+- **Flags.** A flagged test is greyed and kept out of the medians it would
+  skew, with the reason on hover. The thresholds are in one constant,
+  `telemetry.IMPOSSIBLE`. A test is flagged when:
+  - it shows a speed no phone can do: decode above 60 tok/s, or prefill
+    above 2,000, for a model named as 30B-class (25B to 40B). This test
+    leaves the medians entirely;
+  - it ran while charging: its battery temperatures are left out;
+  - the app left the foreground (`stayed_in_app: false`): its speeds are
+    left out.
+- **On the page.**
+  - Tiles: tests, phones, testers, didn't finish.
+  - Every test, newest first. Click one to open every check with its reply.
+  - The medians per phone and model, over its finished tests.
+  - What failed, by phone and app version.
+- **Elsewhere.** The phone build that `names.json` maps a model to shows the
+  measured medians per phone on its model page ("Mobile · on the phone"),
+  above the numbers typed in by hand. Those keep their label, "Reported by
+  hand". The On-device report has a column for them too.
+
+Tester labels and install ids are shown on the board, which is internal.
+The tests use made-up ones.
+

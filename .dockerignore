@@ -27,6 +27,8 @@ eval_tasks/*
 !eval_tasks/devicemark
 # 21: the reports, each a file — the Reports place and the daily import read them
 !eval_tasks/reports
+# 26: our names for the phone app's ids (model, tier, engine, device)
+!eval_tasks/phone
 logs/
 artifacts/
 service.sqlite3*

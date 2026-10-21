@@ -194,6 +194,8 @@ COPY eval_tasks/devicemark/ eval_tasks/devicemark/
 # 21: the reports (one file each): the Reports place reads them, and the
 # daily Epoch import keeps every version they name
 COPY eval_tasks/reports/ eval_tasks/reports/
+# 26: our names for the phone app's ids — the testers' phone checks read them
+COPY eval_tasks/phone/ eval_tasks/phone/
 COPY FRIENDS.md ./
 
 # the same check the service runs at startup, at BUILD time: an image missing
