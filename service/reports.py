@@ -153,6 +153,9 @@ def files() -> dict[str, dict]:
     from . import paired as pd
     for rid, rep in paired.items():
         out[rid] = pd.resolve(rep, out)
+    # 25c: a file's `order` places it among the others (the On-device report
+    # comes last, after the scorecard the others look to first); by name else
+    out = dict(sorted(out.items(), key=lambda kv: int(kv[1].get("order") or 0)))
     _files_memo.update(stamp=stamp, out=out)
     return {k: json.loads(json.dumps(v)) for k, v in out.items()}
 
@@ -359,6 +362,30 @@ def ours_changed(rows: list[dict]) -> float | None:
 def _is_hle(r: dict) -> bool:
     name = str(r.get("benchmark") or "").lower()
     return "hle" in name or "humanity" in name or str(r.get("file") or "").startswith("hle")
+
+
+def reported_facts() -> dict[str, dict]:
+    """25c: {a reported model's key: what a report file says of it} — its
+    facts as published (base model, size on disk, memory it needs, phone
+    speed with the device named, what else it published), its link and whose
+    page its numbers are on, for the model's page on Models. A base model's
+    row (`base_only`) is the report's alone"""
+    out: dict[str, dict] = {}
+    for rid, rep in files().items():
+        for t in rep.get("theirs") or []:
+            if t.get("base_only") or not isinstance(t.get("facts"), dict):
+                continue
+            spec = next((c for b in rep.get("benchmarks") or []
+                         if isinstance(c := t.get(b["key"]), dict) and c.get("from") == "card"),
+                        None)
+            if spec is None:
+                continue
+            k = reported.canon(reported.key(spec.get("model") or t["label"],
+                                            spec.get("maker") or t.get("maker") or ""))
+            out.setdefault(k, {"facts": t["facts"], "link": t.get("link") or "",
+                               "publishedBy": t.get("published_by") or "",
+                               "label": t["label"], "report": rid})
+    return out
 
 
 def their_rows(rep: dict, scores: list[dict] | None = None) -> list[dict]:
@@ -1030,6 +1057,12 @@ def report(rid: str, payload: dict | None = None, compute: bool = False, a: str 
         return {**got, "sources": {"ours": {"at": src, "words": f"as of the last import, "
                                                                  f"{when(src)}"
                                             if src else "nothing imported yet"}}}
+    if rep.get("kind") == "on_device":
+        # 25c: of the models that can run on a phone, which are best (service/ondevice.py)
+        from . import ondevice
+        got = ondevice.report(rep, payload.get("cells") or {})
+        src = _sources(rep, rows, their_rows(rep))
+        return {**got, "sources": src}
     if rep.get("kind") == "ran_out":
         # 21b: the answers our models ran out of room on (service/ran_out.py),
         # each benchmark's count beside the board's own
@@ -1301,6 +1334,16 @@ def listing(payload: dict | None = None) -> list[dict]:
             out.append({"id": rid, "title": rep.get("title") or rid, "what": rep.get("what") or "",
                         "ours": [r["label"] for r in rows if r["pick"]], "others": 0,
                         "against": rep.get("against"), "insight": True,
+                        "changed": when(last) if last else "", "changed_at": last})
+            continue
+        if rep.get("kind") == "on_device":
+            # 25c: ours measured here, the others as published
+            from . import ondevice
+            ours, others = ondevice.listing_counts(rep)
+            src = _sources(rep, rows, their_rows(rep))
+            last = max([x for x in (src["ours"]["at"], src["cards"]["at"]) if x] or [0]) or None
+            out.append({"id": rid, "title": rep.get("title") or rid,
+                        "what": rep.get("what") or "", "ours": ours, "others": others,
                         "changed": when(last) if last else "", "changed_at": last})
             continue
         if rep.get("kind") == "paired":

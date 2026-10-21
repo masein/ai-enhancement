@@ -1,0 +1,924 @@
+{
+ "id": "on-device",
+ "kind": "on_device",
+ "order": 4,
+ "title": "On-device models",
+ "what": "Of the models that can run on a phone, which are best — and where are ours? Ours measured here, the others as their makers publish them.",
+ "ours": [
+  {
+   "label": "step8804",
+   "row": "served/step8804-lda-2610 · thinking",
+   "colour": 6,
+   "step": 8804
+  },
+  {
+   "label": "step4000",
+   "row": "served/step4000-lda-2610 · thinking",
+   "colour": 0,
+   "step": 4000
+  },
+  {
+   "label": "step1000",
+   "row": "served/step1000-lda-2610 · thinking",
+   "colour": 4,
+   "step": 1000
+  },
+  {
+   "label": "Q4 (UD-Q4_K_XL)",
+   "row": "served/Qwen3.6-35B-A3B-Q4-lda-2610 · thinking",
+   "colour": 1
+  },
+  {
+   "label": "BF16",
+   "row": "served/Qwen3.6-35B-A3B-BF16-lda-2610 · thinking",
+   "colour": 2,
+   "base_only": true
+  }
+ ],
+ "ours_base": "BF16",
+ "phone_builds": true,
+ "benchmarks": [
+  {
+   "key": "gpqa",
+   "task": "gpqa_diamond_epoch",
+   "label": "GPQA Diamond"
+  },
+  {
+   "key": "mmlupro",
+   "task": "mmlupro_tiger",
+   "label": "MMLU-Pro"
+  },
+  {
+   "key": "ifeval",
+   "task": "ifeval_google",
+   "label": "IFEval"
+  },
+  {
+   "key": "ifbench",
+   "task": "ifbench_test",
+   "label": "IFBench"
+  }
+ ],
+ "theirs": [
+  {
+   "label": "Edge0-35B-A3B-preview",
+   "maker": "Edge0",
+   "published_by": "Edge0",
+   "link": "https://huggingface.co/Edge0/Edge0-35B-A3B-preview/blob/3fe15cbf2bd5bbcdfd611035e1ac88971ff1cdab/README.md",
+   "base": "Qwen3.6-35B-A3B fp16 (Edge0's run)",
+   "facts": {
+    "base": "Qwen3.6-35B-A3B (the base our builds share)",
+    "kind": "int4, 4 routed experts (K=4), a trained prerouter, experts streamed from SSD, a distilled Recover-LoRA",
+    "disk": {
+     "gb": 19.6,
+     "words": "19.6 GB",
+     "how": "MLX, as its Hugging Face page gives it",
+     "note": "its README says about 23 GB",
+     "url": "https://huggingface.co/Edge0/Edge0-35B-A3B-preview/blob/3fe15cbf2bd5bbcdfd611035e1ac88971ff1cdab/README.md"
+    },
+    "memory": {
+     "gb": 3.1138512896,
+     "words": "2.9 GiB",
+     "how": "peak MLX allocator memory, short contexts (not the process's RSS)",
+     "url": "https://github.com/Edge0-AI/Edge0/blob/7a203f255355e2641ec39f8b9df1b5343f22f548/README.md"
+    },
+    "phone": {
+     "none": "no phone numbers yet",
+     "how": "its iOS and Android engines are \"still maturing\", its card says",
+     "url": "https://huggingface.co/Edge0/Edge0-35B-A3B-preview/blob/3fe15cbf2bd5bbcdfd611035e1ac88971ff1cdab/README.md"
+    },
+    "speed": [
+     {
+      "words": "decode 14.9–17.7 tok/s, prefill 113 / 140 tok/s (cold / warm)",
+      "device": "Mac mini M4 Pro, 24 GB",
+      "url": "https://github.com/Edge0-AI/Edge0/blob/7a203f255355e2641ec39f8b9df1b5343f22f548/README.md"
+     }
+    ],
+    "also": [
+     {
+      "benchmark": "AIME 2026",
+      "value": 86.6,
+      "base": 92.7,
+      "url": "https://github.com/Edge0-AI/Edge0/blob/7a203f255355e2641ec39f8b9df1b5343f22f548/README.md"
+     },
+     {
+      "benchmark": "HumanEval",
+      "value": 90.9,
+      "base": 95.1,
+      "url": "https://github.com/Edge0-AI/Edge0/blob/7a203f255355e2641ec39f8b9df1b5343f22f548/README.md"
+     }
+    ],
+    "paper": "https://arxiv.org/abs/2609.18063"
+   },
+   "gpqa": {
+    "from": "card",
+    "value": 79.8,
+    "card": "Edge0 README (Quality)",
+    "model": "Edge0-35B-A3B-preview",
+    "maker": "Edge0",
+    "benchmark": "GPQA-Diamond",
+    "setting": "Edge0's own run with OpenCompass, identical settings for the model and its fp16 base; thinking setting not stated",
+    "url": "https://github.com/Edge0-AI/Edge0/blob/7a203f255355e2641ec39f8b9df1b5343f22f548/README.md",
+    "date": "2026-10-21",
+    "published_by": "Edge0"
+   },
+   "mmlupro": {
+    "from": "card",
+    "value": 81.0,
+    "card": "Edge0 README (Quality)",
+    "model": "Edge0-35B-A3B-preview",
+    "maker": "Edge0",
+    "benchmark": "MMLU-Pro",
+    "setting": "Edge0's own run with OpenCompass, identical settings for the model and its fp16 base; thinking setting not stated",
+    "url": "https://github.com/Edge0-AI/Edge0/blob/7a203f255355e2641ec39f8b9df1b5343f22f548/README.md",
+    "date": "2026-10-21",
+    "published_by": "Edge0"
+   },
+   "ifbench": {
+    "from": "card",
+    "value": 57.9,
+    "card": "Edge0 README (Quality)",
+    "model": "Edge0-35B-A3B-preview",
+    "maker": "Edge0",
+    "benchmark": "IFBench",
+    "setting": "Edge0's own run with OpenCompass, identical settings for the model and its fp16 base; thinking setting not stated",
+    "url": "https://github.com/Edge0-AI/Edge0/blob/7a203f255355e2641ec39f8b9df1b5343f22f548/README.md",
+    "date": "2026-10-21",
+    "published_by": "Edge0"
+   }
+  },
+  {
+   "label": "Edge0-8B-A1B-preview",
+   "maker": "Edge0",
+   "published_by": "Edge0",
+   "link": "https://huggingface.co/Edge0/Edge0-8B-A1B-preview/blob/269b9a2c4a69d897c50e9f4e125328481d7c0fcf/README.md",
+   "base": "Ling 3.0 tiny fp16 (Edge0's run)",
+   "facts": {
+    "base": "Ling 3.0 tiny (inclusionAI)",
+    "kind": "int4, routing prediction, experts streamed from SSD",
+    "disk": {
+     "gb": 4.55,
+     "words": "4.55 GB",
+     "how": "MLX, as its Hugging Face page gives it",
+     "note": "its README says about 4.2 GB",
+     "url": "https://huggingface.co/Edge0/Edge0-8B-A1B-preview/blob/269b9a2c4a69d897c50e9f4e125328481d7c0fcf/README.md"
+    },
+    "memory": {
+     "gb": 1.073741824,
+     "words": "1.0 GiB",
+     "how": "peak MLX allocator memory, short contexts (not the process's RSS)",
+     "url": "https://github.com/Edge0-AI/Edge0/blob/7a203f255355e2641ec39f8b9df1b5343f22f548/README.md"
+    },
+    "phone": {
+     "none": "no phone numbers yet",
+     "how": "its iOS and Android engines are \"still maturing\", its card says",
+     "url": "https://huggingface.co/Edge0/Edge0-8B-A1B-preview/blob/269b9a2c4a69d897c50e9f4e125328481d7c0fcf/README.md"
+    },
+    "speed": [
+     {
+      "words": "decode 23.9–25.3 tok/s, prefill 500 / 1428 tok/s (cold / warm)",
+      "device": "Mac mini M4 Pro, 24 GB",
+      "url": "https://github.com/Edge0-AI/Edge0/blob/7a203f255355e2641ec39f8b9df1b5343f22f548/README.md"
+     }
+    ],
+    "also": [
+     {
+      "benchmark": "AIME 2026",
+      "value": 63.3,
+      "base": 73.3,
+      "url": "https://github.com/Edge0-AI/Edge0/blob/7a203f255355e2641ec39f8b9df1b5343f22f548/README.md"
+     },
+     {
+      "benchmark": "HumanEval",
+      "value": 91.5,
+      "base": 92.7,
+      "url": "https://github.com/Edge0-AI/Edge0/blob/7a203f255355e2641ec39f8b9df1b5343f22f548/README.md"
+     }
+    ],
+    "paper": "https://arxiv.org/abs/2609.18063"
+   },
+   "gpqa": {
+    "from": "card",
+    "value": 70.7,
+    "card": "Edge0 README (Quality)",
+    "model": "Edge0-8B-A1B-preview",
+    "maker": "Edge0",
+    "benchmark": "GPQA-Diamond",
+    "setting": "Edge0's own run with OpenCompass, identical settings for the model and its fp16 base; thinking setting not stated",
+    "url": "https://github.com/Edge0-AI/Edge0/blob/7a203f255355e2641ec39f8b9df1b5343f22f548/README.md",
+    "date": "2026-10-21",
+    "published_by": "Edge0"
+   },
+   "mmlupro": {
+    "from": "card",
+    "value": 70.1,
+    "card": "Edge0 README (Quality)",
+    "model": "Edge0-8B-A1B-preview",
+    "maker": "Edge0",
+    "benchmark": "MMLU-Pro",
+    "setting": "Edge0's own run with OpenCompass, identical settings for the model and its fp16 base; thinking setting not stated",
+    "url": "https://github.com/Edge0-AI/Edge0/blob/7a203f255355e2641ec39f8b9df1b5343f22f548/README.md",
+    "date": "2026-10-21",
+    "published_by": "Edge0"
+   },
+   "ifbench": {
+    "from": "card",
+    "value": 53.9,
+    "card": "Edge0 README (Quality)",
+    "model": "Edge0-8B-A1B-preview",
+    "maker": "Edge0",
+    "benchmark": "IFBench",
+    "setting": "Edge0's own run with OpenCompass, identical settings for the model and its fp16 base; thinking setting not stated",
+    "url": "https://github.com/Edge0-AI/Edge0/blob/7a203f255355e2641ec39f8b9df1b5343f22f548/README.md",
+    "date": "2026-10-21",
+    "published_by": "Edge0"
+   }
+  },
+  {
+   "label": "Qwen3.6-35B-A3B fp16 (Edge0's run)",
+   "maker": "Alibaba",
+   "published_by": "Edge0",
+   "base_only": true,
+   "gpqa": {
+    "from": "card",
+    "value": 81.8,
+    "card": "Edge0 README (Quality)",
+    "model": "Qwen3.6-35B-A3B fp16, as Edge0 ran it",
+    "maker": "Alibaba",
+    "benchmark": "GPQA-Diamond",
+    "setting": "Edge0's own run with OpenCompass, identical settings for the model and its fp16 base; thinking setting not stated",
+    "url": "https://github.com/Edge0-AI/Edge0/blob/7a203f255355e2641ec39f8b9df1b5343f22f548/README.md",
+    "date": "2026-10-21",
+    "published_by": "Edge0"
+   },
+   "mmlupro": {
+    "from": "card",
+    "value": 84.6,
+    "card": "Edge0 README (Quality)",
+    "model": "Qwen3.6-35B-A3B fp16, as Edge0 ran it",
+    "maker": "Alibaba",
+    "benchmark": "MMLU-Pro",
+    "setting": "Edge0's own run with OpenCompass, identical settings for the model and its fp16 base; thinking setting not stated",
+    "url": "https://github.com/Edge0-AI/Edge0/blob/7a203f255355e2641ec39f8b9df1b5343f22f548/README.md",
+    "date": "2026-10-21",
+    "published_by": "Edge0"
+   },
+   "ifbench": {
+    "from": "card",
+    "value": 61.7,
+    "card": "Edge0 README (Quality)",
+    "model": "Qwen3.6-35B-A3B fp16, as Edge0 ran it",
+    "maker": "Alibaba",
+    "benchmark": "IFBench",
+    "setting": "Edge0's own run with OpenCompass, identical settings for the model and its fp16 base; thinking setting not stated",
+    "url": "https://github.com/Edge0-AI/Edge0/blob/7a203f255355e2641ec39f8b9df1b5343f22f548/README.md",
+    "date": "2026-10-21",
+    "published_by": "Edge0"
+   }
+  },
+  {
+   "label": "Ling 3.0 tiny fp16 (Edge0's run)",
+   "maker": "inclusionAI",
+   "published_by": "Edge0",
+   "base_only": true,
+   "gpqa": {
+    "from": "card",
+    "value": 71.2,
+    "card": "Edge0 README (Quality)",
+    "model": "Ling 3.0 tiny fp16, as Edge0 ran it",
+    "maker": "inclusionAI",
+    "benchmark": "GPQA-Diamond",
+    "setting": "Edge0's own run with OpenCompass, identical settings for the model and its fp16 base; thinking setting not stated",
+    "url": "https://github.com/Edge0-AI/Edge0/blob/7a203f255355e2641ec39f8b9df1b5343f22f548/README.md",
+    "date": "2026-10-21",
+    "published_by": "Edge0"
+   },
+   "mmlupro": {
+    "from": "card",
+    "value": 65.8,
+    "card": "Edge0 README (Quality)",
+    "model": "Ling 3.0 tiny fp16, as Edge0 ran it",
+    "maker": "inclusionAI",
+    "benchmark": "MMLU-Pro",
+    "setting": "Edge0's own run with OpenCompass, identical settings for the model and its fp16 base; thinking setting not stated",
+    "url": "https://github.com/Edge0-AI/Edge0/blob/7a203f255355e2641ec39f8b9df1b5343f22f548/README.md",
+    "date": "2026-10-21",
+    "published_by": "Edge0"
+   },
+   "ifbench": {
+    "from": "card",
+    "value": 60.6,
+    "card": "Edge0 README (Quality)",
+    "model": "Ling 3.0 tiny fp16, as Edge0 ran it",
+    "maker": "inclusionAI",
+    "benchmark": "IFBench",
+    "setting": "Edge0's own run with OpenCompass, identical settings for the model and its fp16 base; thinking setting not stated",
+    "url": "https://github.com/Edge0-AI/Edge0/blob/7a203f255355e2641ec39f8b9df1b5343f22f548/README.md",
+    "date": "2026-10-21",
+    "published_by": "Edge0"
+   }
+  },
+  {
+   "label": "Bonsai 27B (1-bit)",
+   "maker": "PrismML",
+   "published_by": "PrismML",
+   "link": "https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit/blob/ef22f239c670078e1507f9769bcaa66657332b96/README.md",
+   "base": "Qwen3.6-27B FP16 (PrismML's run)",
+   "facts": {
+    "base": "Qwen3.6-27B",
+    "kind": "1-bit (1.125 bits a weight)",
+    "disk": {
+     "gb": 3.9,
+     "words": "3.9 GB",
+     "how": "deployed size, its card says",
+     "note": "the MLX pack is 5.13 GB on disk",
+     "url": "https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit/blob/ef22f239c670078e1507f9769bcaa66657332b96/README.md"
+    },
+    "memory": {
+     "gb": 3.9,
+     "words": "3.9 GB",
+     "how": "its deployed footprint, which fits an iPhone 17 Pro Max's per-app budget, its card says",
+     "url": "https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit/blob/ef22f239c670078e1507f9769bcaa66657332b96/README.md"
+    },
+    "phone": {
+     "tok_s": 11.0,
+     "words": "about 11 tok/s decode (10.8 sustained), prompt 111 tok/s at 512",
+     "device": "iPhone 17 Pro Max",
+     "battery": "672 tokens per 1% of battery (their estimate)",
+     "url": "https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit/blob/ef22f239c670078e1507f9769bcaa66657332b96/README.md"
+    },
+    "speed": [
+     {
+      "words": "decode 44.2 tok/s, prompt 421 tok/s at 512",
+      "device": "Apple M5 Pro laptop",
+      "url": "https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit/blob/ef22f239c670078e1507f9769bcaa66657332b96/README.md"
+     }
+    ],
+    "also": [
+     {
+      "benchmark": "AIME 2026",
+      "value": 87.08,
+      "base": 93.33,
+      "url": "https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit/blob/ef22f239c670078e1507f9769bcaa66657332b96/README.md"
+     },
+     {
+      "benchmark": "MATH-500",
+      "value": 98.0,
+      "base": 99.4,
+      "url": "https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit/blob/ef22f239c670078e1507f9769bcaa66657332b96/README.md"
+     },
+     {
+      "benchmark": "HumanEval+",
+      "value": 89.63,
+      "base": 95.12,
+      "url": "https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit/blob/ef22f239c670078e1507f9769bcaa66657332b96/README.md"
+     }
+    ]
+   },
+   "ifeval": {
+    "from": "card",
+    "value": 79.11,
+    "card": "Bonsai 27B model card",
+    "model": "Bonsai 27B (1-bit)",
+    "maker": "PrismML",
+    "benchmark": "IFEval",
+    "setting": "PrismML's own run: EvalScope + vLLM on an H100, thinking mode, the same for the model and its FP16 base",
+    "url": "https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit/blob/ef22f239c670078e1507f9769bcaa66657332b96/README.md",
+    "date": "2026-07-14",
+    "published_by": "PrismML"
+   },
+   "ifbench": {
+    "from": "card",
+    "value": 52.36,
+    "card": "Bonsai 27B model card",
+    "model": "Bonsai 27B (1-bit)",
+    "maker": "PrismML",
+    "benchmark": "IFBench (prompt-loose)",
+    "setting": "PrismML's own run: EvalScope + vLLM on an H100, thinking mode, the same for the model and its FP16 base",
+    "url": "https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit/blob/ef22f239c670078e1507f9769bcaa66657332b96/README.md",
+    "date": "2026-07-14",
+    "published_by": "PrismML"
+   }
+  },
+  {
+   "label": "Qwen3.6-27B FP16 (PrismML's run)",
+   "maker": "Alibaba",
+   "published_by": "PrismML",
+   "base_only": true,
+   "ifeval": {
+    "from": "card",
+    "value": 88.91,
+    "card": "Bonsai 27B model card",
+    "model": "Qwen3.6-27B FP16, as PrismML ran it",
+    "maker": "Alibaba",
+    "benchmark": "IFEval",
+    "setting": "PrismML's own run: EvalScope + vLLM on an H100, thinking mode, the same for the model and its FP16 base",
+    "url": "https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit/blob/ef22f239c670078e1507f9769bcaa66657332b96/README.md",
+    "date": "2026-07-14",
+    "published_by": "PrismML"
+   },
+   "ifbench": {
+    "from": "card",
+    "value": 68.03,
+    "card": "Bonsai 27B model card",
+    "model": "Qwen3.6-27B FP16, as PrismML ran it",
+    "maker": "Alibaba",
+    "benchmark": "IFBench (prompt-loose)",
+    "setting": "PrismML's own run: EvalScope + vLLM on an H100, thinking mode, the same for the model and its FP16 base",
+    "url": "https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit/blob/ef22f239c670078e1507f9769bcaa66657332b96/README.md",
+    "date": "2026-07-14",
+    "published_by": "PrismML"
+   }
+  },
+  {
+   "label": "Ternary Bonsai 2 2B",
+   "maker": "PrismML",
+   "published_by": "PrismML",
+   "link": "https://huggingface.co/prism-ml/Ternary-Bonsai-2-2B-gguf",
+   "base": "Qwen3.5 2B (PrismML's run)",
+   "facts": {
+    "base": "Qwen3.5 2B",
+    "kind": "ternary ({−1, 0, +1})",
+    "disk": {
+     "gb": 0.43,
+     "words": "0.43 GB",
+     "how": "its footprint, PrismML's post says",
+     "url": "https://prismml.com/news/bonsai-2-family"
+    },
+    "memory": {
+     "gb": 0.43,
+     "words": "0.43 GB",
+     "how": "its footprint, PrismML's post says",
+     "url": "https://prismml.com/news/bonsai-2-family"
+    },
+    "phone": {
+     "tok_s": 120.0,
+     "words": "up to 120 tok/s",
+     "device": "iPhone 18 Pro Max",
+     "url": "https://prismml.com/news/bonsai-2-family"
+    }
+   },
+   "gpqa": {
+    "from": "card",
+    "value": 39.6,
+    "card": "PrismML: Ternary Bonsai 2 2B, 4B and 9B",
+    "model": "Ternary Bonsai 2 2B",
+    "maker": "PrismML",
+    "benchmark": "GPQA Diamond",
+    "setting": "PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated",
+    "url": "https://prismml.com/news/bonsai-2-family",
+    "date": "2026-10-15",
+    "published_by": "PrismML"
+   },
+   "ifeval": {
+    "from": "card",
+    "value": 85.77,
+    "card": "PrismML: Ternary Bonsai 2 2B, 4B and 9B",
+    "model": "Ternary Bonsai 2 2B",
+    "maker": "PrismML",
+    "benchmark": "IFEval",
+    "setting": "PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated",
+    "url": "https://prismml.com/news/bonsai-2-family",
+    "date": "2026-10-15",
+    "published_by": "PrismML"
+   },
+   "ifbench": {
+    "from": "card",
+    "value": 48.0,
+    "card": "PrismML: Ternary Bonsai 2 2B, 4B and 9B",
+    "model": "Ternary Bonsai 2 2B",
+    "maker": "PrismML",
+    "benchmark": "IFBench",
+    "setting": "PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated",
+    "url": "https://prismml.com/news/bonsai-2-family",
+    "date": "2026-10-15",
+    "published_by": "PrismML"
+   }
+  },
+  {
+   "label": "Qwen3.5 2B (PrismML's run)",
+   "maker": "Alibaba",
+   "published_by": "PrismML",
+   "base_only": true,
+   "gpqa": {
+    "from": "card",
+    "value": 58.48,
+    "card": "PrismML: Ternary Bonsai 2 2B, 4B and 9B",
+    "model": "Qwen3.5 2B, as PrismML ran it",
+    "maker": "Alibaba",
+    "benchmark": "GPQA Diamond",
+    "setting": "PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated",
+    "url": "https://prismml.com/news/bonsai-2-family",
+    "date": "2026-10-15",
+    "published_by": "PrismML"
+   },
+   "ifeval": {
+    "from": "card",
+    "value": 75.79,
+    "card": "PrismML: Ternary Bonsai 2 2B, 4B and 9B",
+    "model": "Qwen3.5 2B, as PrismML ran it",
+    "maker": "Alibaba",
+    "benchmark": "IFEval",
+    "setting": "PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated",
+    "url": "https://prismml.com/news/bonsai-2-family",
+    "date": "2026-10-15",
+    "published_by": "PrismML"
+   },
+   "ifbench": {
+    "from": "card",
+    "value": 34.33,
+    "card": "PrismML: Ternary Bonsai 2 2B, 4B and 9B",
+    "model": "Qwen3.5 2B, as PrismML ran it",
+    "maker": "Alibaba",
+    "benchmark": "IFBench",
+    "setting": "PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated",
+    "url": "https://prismml.com/news/bonsai-2-family",
+    "date": "2026-10-15",
+    "published_by": "PrismML"
+   }
+  },
+  {
+   "label": "Ternary Bonsai 2 4B",
+   "maker": "PrismML",
+   "published_by": "PrismML",
+   "link": "https://huggingface.co/prism-ml/Ternary-Bonsai-2-4B-gguf",
+   "base": "Qwen3.5 4B (PrismML's run)",
+   "facts": {
+    "base": "Qwen3.5 4B",
+    "kind": "ternary ({−1, 0, +1})",
+    "disk": {
+     "gb": 0.95,
+     "words": "0.95 GB",
+     "how": "its footprint, PrismML's post says",
+     "url": "https://prismml.com/news/bonsai-2-family"
+    },
+    "memory": {
+     "gb": 0.95,
+     "words": "0.95 GB",
+     "how": "its footprint, PrismML's post says",
+     "url": "https://prismml.com/news/bonsai-2-family"
+    },
+    "phone": {
+     "none": "no phone number for the 4B",
+     "how": "PrismML gives the 2B's and the 9B's",
+     "url": "https://prismml.com/news/bonsai-2-family"
+    }
+   },
+   "gpqa": {
+    "from": "card",
+    "value": 63.84,
+    "card": "PrismML: Ternary Bonsai 2 2B, 4B and 9B",
+    "model": "Ternary Bonsai 2 4B",
+    "maker": "PrismML",
+    "benchmark": "GPQA Diamond",
+    "setting": "PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated",
+    "url": "https://prismml.com/news/bonsai-2-family",
+    "date": "2026-10-15",
+    "published_by": "PrismML"
+   },
+   "ifeval": {
+    "from": "card",
+    "value": 88.91,
+    "card": "PrismML: Ternary Bonsai 2 2B, 4B and 9B",
+    "model": "Ternary Bonsai 2 4B",
+    "maker": "PrismML",
+    "benchmark": "IFEval",
+    "setting": "PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated",
+    "url": "https://prismml.com/news/bonsai-2-family",
+    "date": "2026-10-15",
+    "published_by": "PrismML"
+   },
+   "ifbench": {
+    "from": "card",
+    "value": 56.33,
+    "card": "PrismML: Ternary Bonsai 2 2B, 4B and 9B",
+    "model": "Ternary Bonsai 2 4B",
+    "maker": "PrismML",
+    "benchmark": "IFBench",
+    "setting": "PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated",
+    "url": "https://prismml.com/news/bonsai-2-family",
+    "date": "2026-10-15",
+    "published_by": "PrismML"
+   }
+  },
+  {
+   "label": "Qwen3.5 4B (PrismML's run)",
+   "maker": "Alibaba",
+   "published_by": "PrismML",
+   "base_only": true,
+   "gpqa": {
+    "from": "card",
+    "value": 78.08,
+    "card": "PrismML: Ternary Bonsai 2 2B, 4B and 9B",
+    "model": "Qwen3.5 4B, as PrismML ran it",
+    "maker": "Alibaba",
+    "benchmark": "GPQA Diamond",
+    "setting": "PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated",
+    "url": "https://prismml.com/news/bonsai-2-family",
+    "date": "2026-10-15",
+    "published_by": "PrismML"
+   },
+   "ifeval": {
+    "from": "card",
+    "value": 86.69,
+    "card": "PrismML: Ternary Bonsai 2 2B, 4B and 9B",
+    "model": "Qwen3.5 4B, as PrismML ran it",
+    "maker": "Alibaba",
+    "benchmark": "IFEval",
+    "setting": "PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated",
+    "url": "https://prismml.com/news/bonsai-2-family",
+    "date": "2026-10-15",
+    "published_by": "PrismML"
+   },
+   "ifbench": {
+    "from": "card",
+    "value": 50.33,
+    "card": "PrismML: Ternary Bonsai 2 2B, 4B and 9B",
+    "model": "Qwen3.5 4B, as PrismML ran it",
+    "maker": "Alibaba",
+    "benchmark": "IFBench",
+    "setting": "PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated",
+    "url": "https://prismml.com/news/bonsai-2-family",
+    "date": "2026-10-15",
+    "published_by": "PrismML"
+   }
+  },
+  {
+   "label": "Ternary Bonsai 2 9B",
+   "maker": "PrismML",
+   "published_by": "PrismML",
+   "link": "https://huggingface.co/prism-ml/Ternary-Bonsai-2-9B-gguf",
+   "base": "Qwen3.5 9B (PrismML's run)",
+   "facts": {
+    "base": "Qwen3.5 9B",
+    "kind": "ternary ({−1, 0, +1})",
+    "disk": {
+     "gb": 2.0,
+     "words": "2 GB",
+     "how": "its footprint, PrismML's post says",
+     "url": "https://prismml.com/news/bonsai-2-family"
+    },
+    "memory": {
+     "gb": 2.0,
+     "words": "2 GB",
+     "how": "its footprint, PrismML's post says",
+     "url": "https://prismml.com/news/bonsai-2-family"
+    },
+    "phone": {
+     "tok_s": 34.0,
+     "words": "up to 34 tok/s",
+     "device": "iPhone 18 Pro Max",
+     "url": "https://prismml.com/news/bonsai-2-family"
+    }
+   },
+   "gpqa": {
+    "from": "card",
+    "value": 69.9,
+    "card": "PrismML: Ternary Bonsai 2 2B, 4B and 9B",
+    "model": "Ternary Bonsai 2 9B",
+    "maker": "PrismML",
+    "benchmark": "GPQA Diamond",
+    "setting": "PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated",
+    "url": "https://prismml.com/news/bonsai-2-family",
+    "date": "2026-10-15",
+    "published_by": "PrismML"
+   },
+   "ifeval": {
+    "from": "card",
+    "value": 90.02,
+    "card": "PrismML: Ternary Bonsai 2 2B, 4B and 9B",
+    "model": "Ternary Bonsai 2 9B",
+    "maker": "PrismML",
+    "benchmark": "IFEval",
+    "setting": "PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated",
+    "url": "https://prismml.com/news/bonsai-2-family",
+    "date": "2026-10-15",
+    "published_by": "PrismML"
+   },
+   "ifbench": {
+    "from": "card",
+    "value": 57.0,
+    "card": "PrismML: Ternary Bonsai 2 2B, 4B and 9B",
+    "model": "Ternary Bonsai 2 9B",
+    "maker": "PrismML",
+    "benchmark": "IFBench",
+    "setting": "PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated",
+    "url": "https://prismml.com/news/bonsai-2-family",
+    "date": "2026-10-15",
+    "published_by": "PrismML"
+   }
+  },
+  {
+   "label": "Qwen3.5 9B (PrismML's run)",
+   "maker": "Alibaba",
+   "published_by": "PrismML",
+   "base_only": true,
+   "gpqa": {
+    "from": "card",
+    "value": 82.53,
+    "card": "PrismML: Ternary Bonsai 2 2B, 4B and 9B",
+    "model": "Qwen3.5 9B, as PrismML ran it",
+    "maker": "Alibaba",
+    "benchmark": "GPQA Diamond",
+    "setting": "PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated",
+    "url": "https://prismml.com/news/bonsai-2-family",
+    "date": "2026-10-15",
+    "published_by": "PrismML"
+   },
+   "ifeval": {
+    "from": "card",
+    "value": 89.65,
+    "card": "PrismML: Ternary Bonsai 2 2B, 4B and 9B",
+    "model": "Qwen3.5 9B, as PrismML ran it",
+    "maker": "Alibaba",
+    "benchmark": "IFEval",
+    "setting": "PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated",
+    "url": "https://prismml.com/news/bonsai-2-family",
+    "date": "2026-10-15",
+    "published_by": "PrismML"
+   },
+   "ifbench": {
+    "from": "card",
+    "value": 57.33,
+    "card": "PrismML: Ternary Bonsai 2 2B, 4B and 9B",
+    "model": "Qwen3.5 9B, as PrismML ran it",
+    "maker": "Alibaba",
+    "benchmark": "IFBench",
+    "setting": "PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated",
+    "url": "https://prismml.com/news/bonsai-2-family",
+    "date": "2026-10-15",
+    "published_by": "PrismML"
+   }
+  },
+  {
+   "label": "Gemma 4 E4B",
+   "maker": "Google",
+   "published_by": "Google",
+   "link": "https://huggingface.co/google/gemma-4-E4B-it",
+   "base": null,
+   "facts": {
+    "base": "none: the model itself, Google's full model",
+    "kind": "4.5B effective (8B with embeddings)",
+    "disk": {
+     "gb": 2.3,
+     "words": "2.3 GB",
+     "how": "its weights in Google's mobile quantization, text only (the report's Table 3)",
+     "url": "https://arxiv.org/abs/2607.02770"
+    },
+    "memory": {
+     "gb": 2.44,
+     "words": "2.44 GB",
+     "how": "those weights and an int8 KV cache at 32k context, +0.14 GB (Table 3)",
+     "url": "https://arxiv.org/abs/2607.02770"
+    },
+    "phone": {
+     "none": "no phone numbers published",
+     "how": "Google gives none for these two",
+     "url": "https://huggingface.co/google/gemma-4-E4B-it"
+    },
+    "also": [
+     {
+      "benchmark": "AIME 2026",
+      "value": 42.5,
+      "url": "https://huggingface.co/google/gemma-4-E4B-it/blob/ee0ef6023621cff504d758262d4e04895a5af4a2/README.md"
+     }
+    ]
+   },
+   "gpqa": {
+    "from": "card",
+    "value": 58.6,
+    "card": "Gemma 4 E4B model card",
+    "model": "Gemma 4 E4B",
+    "maker": "Google",
+    "benchmark": "GPQA Diamond",
+    "setting": "thinking mode, Google's own harness and prompts, as Google reports it",
+    "url": "https://huggingface.co/google/gemma-4-E4B-it/blob/ee0ef6023621cff504d758262d4e04895a5af4a2/README.md",
+    "date": "2026-07-20",
+    "published_by": "Google"
+   },
+   "mmlupro": {
+    "from": "card",
+    "value": 69.4,
+    "card": "Gemma 4 E4B model card",
+    "model": "Gemma 4 E4B",
+    "maker": "Google",
+    "benchmark": "MMLU Pro",
+    "setting": "thinking mode, Google's own harness and prompts, as Google reports it",
+    "url": "https://huggingface.co/google/gemma-4-E4B-it/blob/ee0ef6023621cff504d758262d4e04895a5af4a2/README.md",
+    "date": "2026-07-20",
+    "published_by": "Google"
+   },
+   "ifeval": {
+    "from": "card",
+    "value": 96.7,
+    "card": "Gemma 4 Technical Report (arXiv 2607.02770 v2), Table 5",
+    "model": "Gemma 4 E4B",
+    "maker": "Google",
+    "benchmark": "IFEval",
+    "setting": "thinking mode, Google's own harness and prompts, as Google reports it; Table 5's caption: all models in thinking mode",
+    "url": "https://arxiv.org/abs/2607.02770",
+    "date": "2026-07-24",
+    "published_by": "Google"
+   },
+   "ifbench": {
+    "from": "card",
+    "value": 44.0,
+    "card": "Gemma 4 Technical Report (arXiv 2607.02770 v2), Table 5",
+    "model": "Gemma 4 E4B",
+    "maker": "Google",
+    "benchmark": "IFBench",
+    "setting": "thinking mode, Google's own harness and prompts, as Google reports it; Table 5's caption: all models in thinking mode",
+    "url": "https://arxiv.org/abs/2607.02770",
+    "date": "2026-07-24",
+    "published_by": "Google"
+   }
+  },
+  {
+   "label": "Gemma 4 E2B",
+   "maker": "Google",
+   "published_by": "Google",
+   "link": "https://huggingface.co/google/gemma-4-E2B-it",
+   "base": null,
+   "facts": {
+    "base": "none: the model itself, Google's full model",
+    "kind": "2.3B effective (5.1B with embeddings)",
+    "disk": {
+     "gb": 0.8,
+     "words": "0.8 GB",
+     "how": "its weights in Google's mobile quantization, text only (the report's Table 3)",
+     "url": "https://arxiv.org/abs/2607.02770"
+    },
+    "memory": {
+     "gb": 0.85,
+     "words": "0.85 GB",
+     "how": "those weights and an int8 KV cache at 32k context, +0.05 GB (Table 3)",
+     "url": "https://arxiv.org/abs/2607.02770"
+    },
+    "phone": {
+     "none": "no phone numbers published",
+     "how": "Google gives none for these two",
+     "url": "https://huggingface.co/google/gemma-4-E2B-it"
+    },
+    "also": [
+     {
+      "benchmark": "AIME 2026",
+      "value": 37.5,
+      "url": "https://huggingface.co/google/gemma-4-E2B-it/blob/3e22461f65e89153144f8adb70e3b8c2cc9845a7/README.md"
+     }
+    ]
+   },
+   "gpqa": {
+    "from": "card",
+    "value": 43.4,
+    "card": "Gemma 4 E2B model card",
+    "model": "Gemma 4 E2B",
+    "maker": "Google",
+    "benchmark": "GPQA Diamond",
+    "setting": "thinking mode, Google's own harness and prompts, as Google reports it",
+    "url": "https://huggingface.co/google/gemma-4-E2B-it/blob/3e22461f65e89153144f8adb70e3b8c2cc9845a7/README.md",
+    "date": "2026-07-20",
+    "published_by": "Google"
+   },
+   "mmlupro": {
+    "from": "card",
+    "value": 60.0,
+    "card": "Gemma 4 E2B model card",
+    "model": "Gemma 4 E2B",
+    "maker": "Google",
+    "benchmark": "MMLU Pro",
+    "setting": "thinking mode, Google's own harness and prompts, as Google reports it",
+    "url": "https://huggingface.co/google/gemma-4-E2B-it/blob/3e22461f65e89153144f8adb70e3b8c2cc9845a7/README.md",
+    "date": "2026-07-20",
+    "published_by": "Google"
+   },
+   "ifeval": {
+    "from": "card",
+    "value": 94.6,
+    "card": "Gemma 4 Technical Report (arXiv 2607.02770 v2), Table 5",
+    "model": "Gemma 4 E2B",
+    "maker": "Google",
+    "benchmark": "IFEval",
+    "setting": "thinking mode, Google's own harness and prompts, as Google reports it; Table 5's caption: all models in thinking mode",
+    "url": "https://arxiv.org/abs/2607.02770",
+    "date": "2026-07-24",
+    "published_by": "Google"
+   },
+   "ifbench": {
+    "from": "card",
+    "value": 38.0,
+    "card": "Gemma 4 Technical Report (arXiv 2607.02770 v2), Table 5",
+    "model": "Gemma 4 E2B",
+    "maker": "Google",
+    "benchmark": "IFBench",
+    "setting": "thinking mode, Google's own harness and prompts, as Google reports it; Table 5's caption: all models in thinking mode",
+    "url": "https://arxiv.org/abs/2607.02770",
+    "date": "2026-07-24",
+    "published_by": "Google"
+   }
+  }
+ ],
+ "notes": [
+  "Published numbers come from each maker's own harness and settings, and are shown as published. Compare them with each other loosely; compare a model with its own base on the same source — retention — more confidently. Our numbers are measured here under Epoch AI's protocols.",
+  "Edge0-35B is built from the same base as our builds (Qwen3.6-35B-A3B) with four routed experts, routing prediction and SSD streaming."
+ ]
+}

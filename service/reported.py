@@ -448,7 +448,13 @@ def card_add(f: dict, entered_by: str) -> dict:
         raise ValueError("Who entered it")
     row = {"key": key(name, maker), "name": name[:120], "maker": maker[:60],
            "benchmark": bench[:80], "unit": "share", "value": value, "setting": setting[:200],
-           "url": url[:500], "date": date, "by": who[:80]}
+           "url": url[:500], "date": date, "by": who[:80],
+           # 25c: whose page the number is on ("Edge0", "PrismML"), when it
+           # isn't the model's maker's own; and a base model's number, kept
+           # for a report's retention and never a row on Models
+           **({"published_by": str(f["published_by"]).strip()[:60]}
+              if str(f.get("published_by") or "").strip() else {}),
+           **({"report_only": True} if f.get("report_only") is True else {})}
     row["id"] = db.reported_card_add(row)
     return row
 
@@ -487,7 +493,10 @@ def view(board: list[str] | None = None) -> dict:
         scores.append({"model": rid, "source": r["source"], "benchmark": r["benchmark"],
                        "value": r["value"], "se": r.get("se"), "unit": r["unit"],
                        "setting": r["setting"],
-                       "url": r["url"], "date": r.get("date") or "", "by": r.get("by") or ""})
+                       "url": r["url"], "date": r.get("date") or "", "by": r.get("by") or "",
+                       # 25c: "published by Edge0", with its link
+                       "published_by": r.get("published_by") or (
+                           r["maker"] if r["source"] == "card" else "")})
     srcs = {}
     for s, meta in SOURCES.items():
         last = db.reported_import_last(s) if s != "card" else None
@@ -497,6 +506,13 @@ def view(board: list[str] | None = None) -> dict:
                    # 12n.1: the day its numbers were imported, for the credit line
                    "imported": _dt.datetime.fromtimestamp(last["at"]).strftime("%Y-%m-%d")
                    if last else ""}
+    # 25c: a reported model's page — its facts as a report file gives them
+    # (base model, size, memory and speed as published, what else it published)
+    from . import reports as _reports
+    facts = _reports.reported_facts()
+    for m in models.values():
+        if not m["measured"] and m["key"] in facts:
+            m.update(facts[m["key"]])
     return {"sources": srcs, "models": list(models.values()), "scores": scores,
             # 14.4.4: each restricted source's badge and sentence, as the sets' are
             "restrictions": restrictions(),

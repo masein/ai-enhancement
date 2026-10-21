@@ -33,7 +33,10 @@ def cells(rep: dict) -> list[dict]:
                             "maker": c.get("maker") or t.get("maker") or "",
                             "benchmark": c.get("benchmark") or b["label"],
                             "value": str(c.get("value")), "setting": c.get("setting") or "",
-                            "url": c.get("url") or "", "date": c.get("date") or ""})
+                            "url": c.get("url") or "", "date": c.get("date") or "",
+                            # 25c: whose page it is on; a base model's kept for the report
+                            "published_by": c.get("published_by") or t.get("published_by") or "",
+                            "report_only": t.get("base_only") is True})
     return out
 
 
