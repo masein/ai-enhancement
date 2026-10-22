@@ -5388,11 +5388,14 @@ table.lb tr.clickrow { cursor:pointer; }
 table.lb tr.clickrow:hover td { background:var(--accent-soft); }
 /* 16c: a row that opens something is reached from the keyboard too */
 table.lb tr.clickrow:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
-table.lb tr.nottested td { background:var(--plane); }
-table.lb tr.nottested-row td { font-size:var(--fs-2); padding-left:24px; }
+table.lb tr.nottested td, table.mt-table tr.nottested td { background:var(--plane); }
+table.lb tr.nottested-row td, table.mt-table tr.nottested-row td { font-size:var(--fs-2);
+  padding-left:24px; text-align:left; }
 /* a row across every column: its words stay in view while the table scrolls */
 table.lb tr.nottested td > [data-not-tested-toggle],
-table.lb tr.nottested-row td > .ntpin { position:sticky; left:24px; display:inline-block; }
+table.lb tr.nottested-row td > .ntpin,
+table.mt-table tr.nottested td > [data-not-tested-toggle],
+table.mt-table tr.nottested-row td > .ntpin { position:sticky; left:24px; display:inline-block; }
 table.lb td.evmark { font-weight:700; }
 /* a table with no rank column (Knowledge exam, Everyday tasks) pins its
    model column at the edge */
@@ -5807,29 +5810,29 @@ table.mt-table th.mt-hg { font-size:12px; font-weight:500; color:var(--muted); t
   border-bottom:1px solid var(--grid); padding-bottom:4px; }
 .mt-h1 { display:block; font-family:var(--font-mono); font-size:12px; font-weight:600;
   letter-spacing:.04em; text-transform:uppercase; color:var(--text-secondary); white-space:nowrap; }
-.mt-h2 { display:block; font-size:11px; font-weight:400; color:var(--muted); white-space:nowrap;
+.mt-h2 { display:block; font-size:12px; font-weight:400; color:var(--muted); white-space:nowrap;
   font-family:var(--font-sans); }
 table.mt-table th.sortable { cursor:pointer; }
 table.mt-table th .dir { color:var(--accent); }
-table.mt-table td.mt-name, table.mt-table th.model { position:sticky; left:0; z-index:2;
-  box-shadow:1px 0 0 var(--border); }
+table.mt-table td.mt-name, table.mt-table th.model, table.mt-table th.mt-hg-name { position:sticky;
+  left:0; z-index:2; box-shadow:1px 0 0 var(--border); }
 table.mt-table thead th.model { z-index:5; }
-table.mt-table.mt-ranked td.mt-rank, table.mt-table.mt-ranked th.rank,
-table.mt-table.mt-ranked th.mt-hg.pin0 { position:sticky; left:0; z-index:2; width:40px;
+table.mt-table.mt-ranked td.mt-rank, table.mt-table.mt-ranked th.rank { position:sticky; left:0;
+  z-index:2; width:40px;
   min-width:40px; max-width:40px; padding-left:8px; padding-right:4px; }
 table.mt-table.mt-ranked td.mt-name, table.mt-table.mt-ranked th.model { left:40px; }
 table.mt-table.mt-ranked thead th.rank { z-index:5; }
 .mt-nrow { display:flex; align-items:center; gap:8px; min-width:0; }
 .mt-nrow .badge { margin-left:0; }
-.mt-name .mname { font-weight:600; color:var(--text-primary); text-decoration:none; overflow:hidden;
-  text-overflow:ellipsis; white-space:nowrap; max-width:22rem; }
+.mt-name .mname { font-weight:600; color:var(--text-primary); text-decoration:none;
+  white-space:nowrap; }
 .mt-name a.mname:hover { text-decoration:underline; }
 .mt-line { font-size:12px; color:var(--muted); margin:2px 0 0 18px; white-space:normal;
   max-width:24rem; line-height:1.35; }
 .mt-mark { display:inline-block; width:10px; height:10px; border-radius:50%; flex:0 0 10px; }
 .mt-mark.pub { background:transparent; border:1.5px solid var(--muted); box-sizing:border-box; }
 table.mt-table tr.mt-group th { background:var(--plane); font-family:var(--font-sans);
-  font-size:13px; font-weight:600; text-align:left; color:var(--text-primary); position:static;
+  font-size:14px; font-weight:600; text-align:left; color:var(--text-primary); position:static;
   text-transform:none; letter-spacing:0; }
 .mt-gnote { font-weight:400; color:var(--muted); margin-left:8px; }
 table.mt-table tr.mt-sub-row td.mt-subname { padding-left:36px; }
@@ -5844,7 +5847,7 @@ table.mt-table td.tcell:focus-visible { outline:2px solid var(--accent); outline
   color:var(--muted); margin-left:1px; }
 .mt-se { font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:11px;
   color:var(--muted); margin-left:3px; }
-.mt-sub { display:block; font-size:11px; color:var(--muted); font-family:var(--font-sans);
+.mt-sub { display:block; font-size:12px; color:var(--muted); font-family:var(--font-sans);
   font-weight:400; }
 .mt-bar { display:block; height:3px; min-width:56px; margin-top:5px; border-radius:2px;
   background:var(--grid); overflow:hidden; }
@@ -5864,10 +5867,10 @@ table.mt-table td .cellnote.warn { color:var(--warning-text); }
   nav[data-models-switch] > * { flex:0 0 auto; }
 }
 .mt-sortsel { display:flex; align-items:center; gap:6px; justify-self:start; }
-.mt-cgroup { font-weight:600; font-size:13px; margin-top:6px; }
+.mt-cgroup { font-weight:600; font-size:14px; margin-top:6px; }
 .mt-card { border:1px solid var(--border); border-radius:var(--r-2); padding:10px 12px;
   background:var(--surface-1); cursor:pointer; min-width:0; }
-.mt-card .mname { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mt-card .mname { font-weight:600; white-space:normal; overflow-wrap:anywhere; min-width:0; }
 .mt-card .mt-line { margin-left:18px; }
 .mt-cscores { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:8px;
   margin-top:8px; }
@@ -12547,7 +12550,6 @@ function lbS() {
       // 27: bars are the default; Tint on gives each column its own heat instead
       tint = localStorage.getItem('bench-lb-tint') === 'on';
       howto = localStorage.getItem('bench-lb-howto') === 'open';
-      state.lbSe = localStorage.getItem('bench-lb-se') === 'on';
     } catch (e) { /* private mode: the defaults */ }
     state.lb = { ...LB_DEFAULTS, open: [], models: null, cols: null, tint, howto, shown: {},
                  focus: null, weak: null, radarSrc: 'tasks', view: 'standard', chip: 'all',
@@ -13551,10 +13553,12 @@ function mtLine(m, o = {}) {
   out.push(...p.line);
   if (!o.published) {
     if (isPhoneRow(m)) out.push('phone build');
+    else if (isOpenRouter(mtServed(m))) out.push('via OpenRouter');
     else if (mtServed(m) && !m.rowOf) out.push('served');
     else if (ggufOnly(m) || m.rowOf) out.push('GGUF');
     else if (m.source === 'artifact') out.push('uploaded');
-    if (m.kind === 'base' && !mtServed(m)) out.push('base');
+    // the chip that said instruct or base, a word now
+    if ((m.kind === 'base' || m.kind === 'instruct') && !mtServed(m)) out.push(m.kind);
   }
   const th = o.thinking !== undefined ? o.thinking : p.thinking;
   if (th) out.push(`thinking ${th}`);
@@ -13794,9 +13798,11 @@ function modelTable(spec) {
     const at = { 'data-mt-col': c.key, ...((x && x.attrs) || {}) };
     if (x && x.node) return el('td', { class: 'mt-c' + (c.num === false ? '' : ' num'), ...at },
       x.node);
-    if (!x || (x.v == null && x.text == null))
+    // no number: a dash, or what stands for one ("– 2/3", "awaiting judge"), plain
+    if (!x || x.v == null)
       return el('td', { class: 'mt-c num mt-none', ...at, title: (x && x.why) || null,
-        'data-tip': x && x.tip ? JSON.stringify(x.tip) : null }, '–');
+        'data-tip': x && x.tip && x.tip.length ? JSON.stringify(x.tip) : null },
+      (x && x.text) || '–');
     if (x.pub) letters.add(x.pub.letter);
     const lead = x.lead !== undefined ? !!x.lead : leads[c.key].has(r);
     const txt = x.text ?? (c.score ? (100 * x.v).toFixed(1) : String(x.v));
@@ -13806,7 +13812,7 @@ function modelTable(spec) {
         + (x.dim ? ' dim' : '') + (sub ? ' mt-subc' : ''),
         style: h ? `background:var(--heat-${h})` : null, 'data-lead': lead ? '1' : null,
         'data-mt-v': typeof x.v === 'number' ? String(x.v) : null,
-        'data-mt-heat': h ? String(h) : null, tabindex: '0',
+        'data-mt-heat': h ? String(h) : null, tabindex: '0', title: x.why || null,
         'data-tip': JSON.stringify([txt + (x.se ? ` ± ${x.se}` : ''),
           `${r.name} · ${c.full || c.label}`, ...(lead ? ['best in the column, or within its '
             + 'noise'] : []), ...(x.tip || [])]),
@@ -13818,7 +13824,8 @@ function modelTable(spec) {
             href: x.pub.url, target: '_blank', rel: 'noopener', 'data-card-link': '1',
             text: x.pub.letter }) : x.pub.letter) : ''),
       x.se ? el('span', { class: 'mt-se', text: `±${x.se}` }) : '',
-      x.sub ? el('span', { class: 'mt-sub', 'data-mt-sub': '1', text: x.sub }) : '',
+      x.sub ? el('span', { class: 'mt-sub' + (x.subClass ? ' ' + x.subClass : ''), 'data-mt-sub': '1',
+        text: x.sub }) : '',
       bar != null ? el('span', { class: 'mt-bar', 'aria-hidden': 'true' },
         el('i', { style: `width:${Math.max(0, Math.min(100, 100 * bar)).toFixed(1)}%;`
           + `background:${r.mark === 'pub' ? 'var(--axis)' : r.colour || 'var(--accent)'}` }))
@@ -13829,7 +13836,7 @@ function modelTable(spec) {
     'data-mt-mark': r.mark, 'aria-label': r.mark === 'pub' ? 'published' : 'measured here',
     style: r.mark === 'pub' ? null : `background:${r.colour || 'var(--accent)'}` });
   const nameTd = (r, sub) => el('td', { class: 'mt-name model pin' + (sub ? ' mt-subname' : ''),
-      'data-model': r.id, title: r.full || r.name },
+      'data-model': r.id, title: r.full || r.name, style: `--fam:${r.colour || 'var(--axis)'}` },
     el('div', { class: 'mt-nrow' }, sub ? '' : mark(r),
       r.href ? el('a', { class: 'mname mlink', href: r.href, 'data-mt-name': r.key,
         text: sub ? r.subLabel || r.name : midTrunc(r.name, 40) })
@@ -13845,7 +13852,8 @@ function modelTable(spec) {
         if (e.target.closest('a, button, input, select, label, .badge[title]')) return;
         if (r.open) r.open(); else if (r.id) navigate({ model: r.nav || r.id, topic: null });
       } },
-    spec.rank ? el('td', { class: 'rank pin0 num mt-rank' }, el('span', { class: 'mono',
+    spec.rank ? el('td', { class: 'rank pin0 num mt-rank', ...((r.rank || {}).attrs || {}) },
+      el('span', { class: 'mono',
       'data-row-n': (r.rank || {}).n || null, text: (r.rank || {}).text ?? '',
       title: (r.rank || {}).title || null })) : '',
     nameTd(r, sub), cols.map(c => cell(r, c, sub)));
@@ -13879,19 +13887,25 @@ function modelTable(spec) {
       sorted(c) ? el('span', { class: 'dir', text: spec.sort.dir > 0 ? ' ▲' : ' ▼' }) : ''),
     c.sub ? el('span', { class: 'mt-h2', text: c.sub }) : '', ...(c.extra || []));
   const thead = el('thead', {},
-    spec.colGroups && grp.some(x => x.g) ? el('tr', { class: 'mt-hgroups' },
-      spec.rank ? el('th', { class: 'mt-hg pin0' }) : '', el('th', { class: 'mt-hg model pin' }),
-      grp.map(({ g, n }) => el('th', { colspan: String(n), class: 'mt-hg', scope: 'colgroup',
-        'data-mt-colgroup': g || null, text: g, ...(g && spec.layout
-          ? layoutGroupDrag(spec.layout, g) : {}) }))) : '',
+    spec.colGroups && grp.some(x => x.g) ? el('tr', { class: 'mt-hgroups grp' },
+      // the rank, the names and the columns of no group under one empty head
+      el('th', { class: 'mt-hg mt-hg-name nogrp', colspan: String(1 + (spec.rank ? 1 : 0)
+        + (grp.length && !grp[0].g ? grp[0].n : 0)) }),
+      (grp.length && !grp[0].g ? grp.slice(1) : grp).map(({ g, n }) => el('th', { colspan:
+        String(n), class: 'mt-hg', scope: 'colgroup',
+        'data-mt-colgroup': g || null, ...(g && spec.layout ? layoutGroupDrag(spec.layout, g) : {}) },
+        g, spec.groupBadge ? spec.groupBadge(g) : ''))) : '',
     el('tr', { class: 'mt-hrow names' },
-      spec.rank ? el('th', { class: 'rank pin0 num mt-h', scope: 'col', text: '#' }) : '',
-      el('th', { class: 'mt-h model pin', scope: 'col', 'data-mt-col': 'name', 'data-lcol': 'name' },
-        el('span', { class: 'mt-h1', text: 'Model' }), ...(spec.layout
+      spec.rank ? el('th', { class: 'rank pin0 num mt-h', scope: 'col', 'data-col': 'rank',
+        'data-lcol': 'rank' }, el('span', { class: 'mt-h1', text: '#' })) : '',
+      el('th', { class: 'mt-h model pin', scope: 'col', 'data-mt-col': 'name', 'data-col': 'name',
+        'data-lcol': 'name', 'data-tip': spec.nameTip ? JSON.stringify(spec.nameTip) : null },
+        el('span', { class: 'mt-h1 hname', text: 'Model' }), ...(spec.layout
           ? layoutBits(spec.layout, 'name', 'Model', { movable: false }) : [])),
       cols.map(th)));
   const table = el('table', { class: 'mt-table' + (tint ? ' tinted' : '')
-      + (spec.rank ? ' mt-ranked' : ''), 'data-model-table': spec.view, 'data-lb-table': '1',
+      + (spec.rank ? ' mt-ranked' : '') + (spec.tableClass ? ' ' + spec.tableClass : ''),
+    'data-model-table': spec.view, 'data-lb-table': '1',
     ...(spec.layout ? layoutAttrs(spec.layout) : {}), ...(spec.attrs || {}) }, thead, tbody);
   if (spec.layout) layoutApply(table);
   // under 640 px: a card a model — its mark, name and line, its four headline scores
@@ -13902,8 +13916,11 @@ function modelTable(spec) {
       onclick: e => { if (e.target.closest('a, button, input, select, label')) return;
         if (r.open) r.open(); else if (r.id) navigate({ model: r.nav || r.id, topic: null }); },
       onkeydown: e => { if (e.key === 'Enter') e.currentTarget.click(); } },
+    // a copy of each badge that says something (the table keeps the badges themselves;
+    // a tick box or a button is the table's alone)
     el('div', { class: 'mt-nrow' }, mark(r), el('span', { class: 'mname', text: r.name }),
-      ...(r.badges || []).filter(Boolean)),
+      ...(r.badges || []).filter(b => b && b.nodeType && !b.matches('input, button')
+        && !b.querySelector('input, button')).map(mtBareCopy)),
     r.line ? el('div', { class: 'mt-line', text: r.line }) : '',
     el('div', { class: 'mt-cscores' }, cardCols.map(c => {
       const x = r.cells[c.key];
@@ -13920,19 +13937,18 @@ function modelTable(spec) {
     })));
   const sortable = cols.filter(c => c.sortable !== false && spec.onSort);
   const cards = el('div', { class: 'mt-cards', 'data-mt-cards': spec.view },
-    sortable.length ? el('label', { class: 'small mt-sortsel' }, 'Sort ▾ ',
-      el('select', { 'data-mt-sort': '1', 'aria-label': 'sort by',
-        onchange: e => spec.onSort(e.target.value) },
-        sortable.map(c => el('option', { value: c.key, selected: sorted(c) ? '' : null,
-          text: c.label })))) : '',
+    // the board's own menu, never a native select (11f)
+    sortable.length ? el('div', { class: 'mt-sortsel', 'data-mt-sort': spec.view },
+      pillMenu('mtsort-' + spec.view, 'Sort', sortable.map(c => [c.key, c.label]),
+        (spec.sort || {}).key || sortable[0].key, k => spec.onSort(k))) : '',
     sections.map(([g, label, rs]) => [g ? el('div', { class: 'mt-cgroup', text: label }) : '',
       ...rs.map(card)]));
   const key = [...letters].sort().map(k => `${k} ${MT_LETTERS[k] || k}`).join(' · ');
   return el('div', { class: 'mt', 'data-mt': spec.view },
     el('div', { class: 'mt-legend small se', 'data-mt-legend': '1' },
       el('span', { text: tint ? MT_LEGEND_TINT : MT_LEGEND }), mtTintSwitch()),
-    el('div', { class: 'mt-wide' }, hfade('mt-' + spec.view, el('div', { class: 'mt-box',
-      'data-hkeep': 'mt-' + spec.view }, table))),
+    el('div', { class: 'mt-wide' }, hfade(spec.hkey || 'mt-' + spec.view, el('div', {
+      class: 'mt-box', 'data-hkeep': spec.hkey || 'mt-' + spec.view }, table))),
     cards,
     key ? el('p', { class: 'small se mt-key', 'data-mt-letters': [...letters].sort().join(''),
       text: 'Published numbers in italics, by source: ' + key }) : '',
@@ -13945,6 +13961,19 @@ function modelTable(spec) {
       : '',
     ...(spec.foot || []));
 }
+// a badge's copy for a card: the table keeps the original and its hooks
+function mtBareCopy(b) {
+  const c = b.cloneNode(true);
+  for (const e of [c, ...c.querySelectorAll('*')])
+    for (const a of [...e.attributes]) if (a.name.startsWith('data-') || a.name === 'id')
+      e.removeAttribute(a.name);
+  return c;
+}
+// 16b: the views whose answers the thinking rule decides — Mobile, Frontier,
+// Instruction & maths: there a model that can turn thinking off was asked with it off
+const mtRuled = () => ['mobile', 'frontier'].includes(lbTest())
+  || (lbTest() === 'standard' && lbS().chip === 'instruction');
+const mtRuledOff = m => !m.thinkingRow && canSwitchThinking(m.dmHome || m.id) && mtRuled();
 // a board model as a row of modelTable: its mark, name, line and group
 function mtRowOf(m, o = {}) {
   const parts = nameParts(m.name, { measured: true, basedOn: mtBasedOn(m) });
@@ -13954,8 +13983,12 @@ function mtRowOf(m, o = {}) {
     ? String(m.dmHome || m.rowOf || m.id).split('/')[0] : '');
   return { key: o.key || m.id, id: m.id, nav: m.rowOf || m.dmHome || m.id,
     href: '#model=' + encodeURIComponent(m.rowOf || m.dmHome || m.id), mark: 'here',
-    colour: mtColour(m), name: mtNameOf(parts), full: `${m.name}\n${m.id}`,
-    line: mtLine(m, { parts, group, maker, thinking: thinkingOf(m) }), group,
+    colour: mtColour(m), name: mtNameOf(parts), full: `${m.name}\nfamily: ${famOf(m)}\n${m.id}`
+      // how a served model runs (an OpenRouter pin), as its tag's title said
+      + ((mtServed(m) || {}).how ? `\n${mtServed(m).how}` : '')
+      + (mtRuledOff(m) ? '\n\nAsked with thinking off. ' + THINKING_RULE_WORDS : ''),
+    line: mtLine(m, { parts, group, maker, thinking: thinkingOf(m) || (mtRuledOff(m) ? 'off'
+      : null) }), group,
     attrs: o.attrs || {}, cells: o.cells || {}, badges: o.badges || [] };
 }
 // 12b: Models — the Leaderboard and the Models tab, one table. A switch for
@@ -14203,9 +14236,10 @@ function frPanels(hl) {
 // measured here), the most shared first; Show all N brings the rest. With
 // only reported models chosen, the Frontier view's default set
 function repCmpGroups(ms) {
-  const cols = frColumns(), colOf = b => cols.find(c => c.key === frKey(b)) || {};
+  // 27: Frontier's columns go by one key a benchmark (HLE is Humanity's Last Exam)
+  const cols = frColumns(), colOf = b => cols.find(c => c.key === mtBenchKey(b)) || {};
   const has = (m, b) => (REP().scores || []).some(s => s.model === m.id
-    && frKey(s.benchmark) === frKey(b)) || (!m.reportedOnly && (colOf(b).here || [])
+    && mtBenchKey(s.benchmark) === mtBenchKey(b)) || (!m.reportedOnly && (colOf(b).here || [])
     .some(h => h.get(m)));
   const count = b => ms.filter(m => has(m, b)).length;
   const onlyRep = ms.every(m => m.reportedOnly);
@@ -14618,7 +14652,7 @@ function lbFrontier(ms) {
       + `reported for at least half of the ${(REP().models || []).length} imported models, and `
       + 'those measured here too.'),
     rows.length ? modelTable({ view: 'frontier', attrs: { 'data-frontier-table': '1' },
-      cols: cols.map(asCol), rows, groups: true, colGroups: true, layout: 'frontier',
+      cols: cols.map(asCol), rows, groups: true, colGroups: true, layout: 'frontier', hkey: 'fr',
       sort: F.sort, onSort: k => { F.sort = { key: k, dir: F.sort.key === k ? -F.sort.dir : -1 };
         render(); },
       foot: [el('p', { class: 'lbcap', text: 'Bold is the best of the cells with one setting — '
@@ -14993,7 +15027,9 @@ function dmSpec(rows) {
         : [base ? base.line : r.label, theirs ? `our run, beside DeviceMark’s ${theirs.name}`
           : ''].filter(Boolean).join(' · '),
       rank: { text: r.rank || (r.kind === 'cloud' ? '☁' : ''), title: r.kind === 'cloud'
-        ? 'a cloud API: not ranked, as on DeviceMark’s board' : null },
+        ? 'a cloud API: not ranked, as on DeviceMark’s board' : null,
+        attrs: { 'data-dm-rank': r.id, 'data-tip': r.kind === 'cloud' ? JSON.stringify(['a cloud '
+          + 'API: not ranked, as on DeviceMark’s board']) : null } },
       attrs: { 'data-dm-row': r.id, 'data-dm-external': ext ? '1' : null,
         'data-dm-pair': theirs ? theirs.id : null,
         'data-dm-whose': ext ? 'theirs' : 'ours', class: r.id === D.flash ? 'dmfocus' : null },
@@ -15026,7 +15062,8 @@ function dmSpec(rows) {
     } else if (placed.has(r.id)) out.push(...mine(ours.filter(x => x.id.replace(/ · thinking$/, '')
       === r.id.replace(/ · thinking$/, ''))));
   }
-  return { view: 'devicemark', attrs: { 'data-dm-table': '1' }, cols, rows: out, groups: true,
+  return { view: 'devicemark', hkey: 'dmtable', attrs: { 'data-dm-table': '1' }, cols, rows: out,
+    groups: true,
     rank: true, sorted: true, hideEmpty: false };
 }
 function lbOnDevice(ms) {
@@ -15604,12 +15641,14 @@ function lbEveryday(ms) {
   // 12f.2b: what was reported from the phone, beside the score, while a row has it
   const reps = repCols(have);
   const every = groups.map(([g, label]) => ({ key: 'g:' + g, label, full: label, score: true,
-    sub: `${evdQs(g).length} questions`, attrs: { 'data-evd-col': g } }));
+    sub: `${evdQs(g).length} questions`, attrs: { 'data-evd-col': g, ...layoutDrag(LK, g, '') },
+    extra: layoutBits(LK, g, label) }));
   const dflt = every.map(c => c.key);
   const shown = new Set(mtColsShown('everyday', every, dflt));
   const cols = [...every.filter(c => shown.has(c.key)),
     { key: 'total', label: 'Total', full: 'Every group', score: true,
-      sub: `${evdHidden()} questions`, attrs: { 'data-lcol': 'total' } },
+      sub: `${evdHidden()} questions`, attrs: { 'data-lcol': 'total' },
+      extra: layoutBits(LK, 'total', 'Total', { movable: false }) },
     ...reps.map(c => ({ key: c.key, label: c.short, full: `${c.label}, ${c.unit}`, num: true,
       attrs: { 'data-col': c.key } }))];
   S.sort = S.sort && cols.some(c => c.key === S.sort.key) ? S.sort : { key: 'total', dir: -1 };
@@ -15632,11 +15671,7 @@ function lbEveryday(ms) {
           text: 'Run', onclick: ev => { ev.preventDefault(); ev.stopPropagation();
             evdDialog({ only: m.id, returnTo: `[data-evd-run="${CSS.escape(m.id)}"]` }); } })]
           : '')] : [] };
-    for (const c of reps) {
-      const v = repVal(m, c);
-      cells[c.key] = v == null ? { v: null } : { v, text: c.rep === 'q' ? String(v) : v.toFixed(1),
-        sub: `reported by ${phoneRep(m.id).by}`, attrs: { 'data-rep-cell': c.key } };
-    }
+    for (const c of reps) cells[c.key] = repDesc(m, c);
     return mtRowOf(m, { attrs: { 'data-lb-row': m.id }, cells });
   };
   const made = mtThinkRows(have).map(({ m, other }) => ({ ...rowOf(m),
@@ -15647,7 +15682,8 @@ function lbEveryday(ms) {
     lbToolbar(ms, lbColumns(ms), new Set(), 0, null, mtColumnsPill('everyday', every,
       [...shown], dflt)),
     modelTable({ view: 'everyday', attrs: { 'data-lb-everyday': '1' }, cols, rows: made,
-      groups: true, sort: S.sort, cardCols: ['total', ...[...shown].slice(0, 3)],
+      groups: true, sort: S.sort, cardCols: ['total', ...[...shown].slice(0, 3)], layout: LK,
+      hkey: 'lb',
       onSort: k => { S.sort = { key: k, dir: S.sort.key === k ? -S.sort.dir : -1 }; render(); },
       extra: notTestedRows(none, cols.length + 1, 'everyday') }),
     el('p', { class: 'lbcap', text: `${evdAll()} questions in ${evdGroupsWord()} groups, typed the way `
@@ -16445,10 +16481,11 @@ function vLeaderboard(ms) {
     if (c.key === 'params') {
       // 16.1: the board's one size — entered, the harness's, the file's or
       // its base model's — total, and active where they differ
-      return { v: m.params, text: P(m.params), sub: activeOf(m) ? `${P(activeOf(m))} act` : null,
-        noLead: true, keep: false, attrs: { 'data-params-src': m.paramsSrc || null },
-        tip: [sizeTip(m) || (m.params == null ? 'size not recorded' : ''), activeTip(m)]
-          .filter(Boolean) };
+      return { v: m.params, text: m.params == null ? null : P(m.params),
+        sub: activeOf(m) ? `${P(activeOf(m))} act` : null,
+        subClass: 'act', noLead: true, keep: false, attrs: { 'data-params-src': m.paramsSrc || null },
+        why: [sizeTip(m) || (m.params == null ? 'size not recorded' : ''), activeTip(m)]
+          .filter(Boolean).join('\n') || null };
     }
     if (c.key === 'date') {
       // 11f: "15 Sep"; the year only when it is not this one — 16.6: the
@@ -16706,12 +16743,22 @@ function vLeaderboard(ms) {
       : genView ? (m.kind === 'base' ? 'instruct only' : null) : null,
     !lbAll.length);
   // what Copy as CSV copies: these rows, these columns, as shown (12h.2)
-  state.lbTable = { cols: visCols, rows: lbAll, val, custom };
+  // 27: the rows the table shows — a model's other thinking setting with "both"
+  state.lbTable = { cols: visCols, rows: lbPairs.flatMap(({ m, other }) => [m, ...(other
+    ? [other] : [])]), val, custom,
+    // a built table's row numbers, as the table shows them: a sub-row has none
+    num: new Map(lbPairs.flatMap(({ m, other }, i) => [[m, i + 1], ...(other ? [[other, '']] : [])])) };
 
   // 27: drawn by the one table: groups, Ours first, in the order sorted here
   const table = modelTable({ view: L.view === 'exam' ? 'exam' : lbTest(L), cols: mtCols,
     rows: mtRows, groups: true, sorted: true, rank: visRank, hideEmpty: false, layout: LK,
+    // 16.3: Pro's categories carry their badge once, on their group's heading
+    groupBadge: g => visCols.some(c => c.mmpcat && c.group === g)
+      ? rBadge(restrictOf(MMP), { 'data-group-head-restriction': g }) : '',
+    hkey: 'lb', nameTip: (() => { const c = visCols.find(x => x.key === 'name');
+      return c ? lbColTip(c) : null; })(),
     colGroups: grouped, attrs: dmv ? { 'data-lb-dmview': '1' } : {}, extra: extraRows,
+    tableClass: dmv ? 'dmview' : '',
     sort: { key: state.sort.key, dir: state.sort.dir },
     onSort: key => { const c = cols.find(x => x.key === key) || {};
       state.sort = { key, dir: state.sort.key === key ? -state.sort.dir
@@ -16761,8 +16808,8 @@ function vLeaderboard(ms) {
       : !rowsIn.length ? empty('No models match these filters.', 'Clear all', lbClearAll,
         { 'data-no-match': '1' })
         : table,
-      el('p', { class: 'lbcap', 'data-lb-caption': '1', text: 'Hover a column name for its '
-        + 'setup · click a row for the model' }),
+      el('p', { class: 'lbcap', 'data-lb-caption': '1', text: 'Bold = best in the column or '
+        + 'within its noise · hover a column name for its setup · click a row for the model' }),
       lbHowTo(ms)),
     // 14.4: the full Mobile-MMLU's own table — 16.3: under Mobile ▸ Mobile-MMLU's
     L.view === 'standard' && L.chip === 'mmlu' && !custom ? mmfCard() : '',
@@ -16889,7 +16936,7 @@ function hfadeUpdate(root) {
   // the scroller with overflow:visible, so only the Leaderboard clipped. Now
   // every sticky table does, and gives up its page-sticky header while it
   // scrolls, exactly as the Leaderboard's does
-  (root || document).querySelectorAll('.lb-wrap.stick').forEach(sc => {
+  (root || document).querySelectorAll('.lb-wrap.stick, .mt-box').forEach(sc => {
     const t = sc.querySelector('table');
     if (!t) return;
     const wide = t.offsetWidth > sc.clientWidth + 1;
@@ -17549,15 +17596,8 @@ function lbColumnsPill(cols, shown, nHidden) {
               try { localStorage.setItem('bench-lb-tint', e.target.checked ? 'on' : 'off'); }
               catch (x) { /* private */ }
               lbSet({ tint: e.target.checked }); } }),
-          ' Tint the leaders'),
-        // 11f: the ± is a hover away by default; this puts it on every cell
-        el('label', { class: 'small tintsw' },
-          el('input', { type: 'checkbox', 'data-show-se': '1', checked: state.lbSe ? '' : null,
-            onchange: e => {
-              try { localStorage.setItem('bench-lb-se', e.target.checked ? 'on' : 'off'); }
-              catch (x) { /* private */ }
-              state.lbSe = e.target.checked; render(); } }),
-          ' Show ± errors')));
+          // 27: each column's own heat in place of the bars; the ± is always on the cell
+          ' Tint')));
   }, { key: 'columns', menu: false, rebuild: true, inCard: true });
 }
 
@@ -17983,7 +18023,7 @@ function lbCsv() {
   };
   const text = (m, c) => {
     // 12o.1: a table someone built numbers its rows (12i.0), unaveraged ones too
-    if (c.key === 'rank') { if (t.custom) return t.rows.indexOf(m) + 1;
+    if (c.key === 'rank') { if (t.custom) return t.num ? t.num.get(m) ?? '' : t.rows.indexOf(m) + 1;
       const r = rankOf(m); return r ? r.n : ''; }
     if (c.key === 'params') return m.params == null ? '' : P(m.params);
     if (c.key === 'date') return String(lastEval(m) || '').slice(0, 10);
@@ -28364,7 +28404,8 @@ function mtTheirCell(c, t, b) {
     + (c.entered_at ? ` · entered ${c.entered_at}${c.by ? ' by ' + c.by : ''}` : '')
     : c.src === 'epoch_external' ? `Epoch AI, ${c.setting} (not Epoch’s own run)`
     : 'Epoch AI’s own run' + (c.date ? ` · ${c.date}` : '');
-  const letter = mtLetter(c.src, t.publishedBy || t.maker);
+  // whose page the number is on: the card's own words ("Qwen card"), else its maker
+  const letter = mtLetter(c.src, c.published_by || c.card || t.publishedBy || t.maker);
   return { v: c.v, text: rpNum(c.v) + (c.dagger ? '†' : ''), se: c.se ? rpNum(c.se) : null,
     seV: c.se || null, date: c.date || '', pub: { letter, tip: `${MT_LETTERS[letter]}: ${tip}`,
       url: c.src === 'card' ? c.url : '' }, tip: [tip, ...(c.note ? [c.note] : [])],

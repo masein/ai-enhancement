@@ -55,18 +55,23 @@ def go(page, live, hash_, sel, width=1400):
 
 
 def test_the_calibration_line_says_thinking_off_or_on(live, page):
+    # 27: ours measured here, thinking off; its thinking run a sub-row with "both";
+    # Epoch's number on a row of its own, published
+    page.goto(live["base"] + "/")
+    page.evaluate("localStorage.setItem('bench-mt-thinking', 'both')")
     go(page, live, "tab=models&chip=frontier", "[data-frontier-table]")
-    off = page.locator(f"[data-fr-cal='{GOOD}'][data-fr-cell='gpqa diamond']")
-    assert off.inner_text().replace("\n", "") == "measured here 36.0 (thinking off) · Epoch 38.0"
+    off = page.locator(f"tr[data-fr-row='{GOOD}'] [data-fr-cell='gpqa']")
+    assert off.locator(".mt-n").inner_text() == "36.0"
     assert off.get_attribute("data-fr-thinking") == "off"
-    on = page.locator(f"[data-fr-cal='{THINKING}'][data-fr-cell='gpqa diamond']")
-    assert on.inner_text().replace("\n", "") == "measured here 40.0 (thinking on) · Epoch 38.0"
-    # Epoch's number is ranked once, on its own row: beside the thinking row it
-    # is the calibration only
-    assert on.locator("[data-fr-borrowed]").count() == 1
-    assert on.locator("[data-fr-set^='epoch|']").count() == 0
-    reps = page.locator("[data-fr-cell='gpqa diamond'] [data-fr-set^='epoch|'], "
-                        "[data-fr-cell='gpqa diamond'][data-fr-set^='epoch|']")
+    on = page.locator(f"tr[data-fr-row='{THINKING}'] [data-fr-cell='gpqa']")
+    assert on.locator(".mt-n").inner_text() == "40.0" and on.get_attribute("data-fr-thinking") == "on"
+    assert "mt-sub-row" in page.locator(f"tr[data-fr-row='{THINKING}']").get_attribute("class")
+    pub = page.locator(f"tr[data-fr-row='{GOOD}|published'] [data-fr-cell='gpqa'] .mt-n")
+    assert pub.inner_text() == "38.0E"
+    # Epoch's number is ranked once, on its own row
+    assert on.get_attribute("data-fr-set").startswith("here|")
+    reps = page.locator("[data-fr-cell='gpqa'] [data-fr-set^='epoch|'], "
+                        "[data-fr-cell='gpqa'][data-fr-set^='epoch|']")
     vals = [reps.nth(i).get_attribute("data-fr-v") for i in range(reps.count())]
     assert vals.count("38") + vals.count("0.38") + vals.count("38.0") <= 1
     page.locator("[data-frontier-table]").scroll_into_view_if_needed()

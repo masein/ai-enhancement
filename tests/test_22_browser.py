@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from test_21c_page import world
-from test_21d_browser import first_text, go, no_sideways
+from test_21d_browser import LATEST, go, no_sideways
 
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase22"
@@ -34,27 +34,31 @@ def board(live):
 def test_latest_shows_ornith_measured_here_and_its_cards_claim_beside_it(live, page, width,
                                                                          scheme):
     go(page, live, width=width, scheme=scheme)
-    rows = {r[0]: r for r in first_text(page, "[data-latest-table] tbody tr")}
+    # 27: ours, not run yet, has no score shown: hidden and counted, a click away
+    page.locator("[data-latest] [data-mt-empty-toggle]").click()
+    page.wait_for_selector(f"[data-latest-row='{OURS}']", state="attached")
+    rows = {x: r for r in page.evaluate(LATEST) for x in r["labels"]}
     assert OURS in rows and CARD in rows
-    # ours: not run yet, a dash in every cell, and what it is in its Source
-    assert rows[OURS][1:5] == ["—", "—", "—", "—"]
-    assert rows[OURS][-1] == ("Measured here, on its card's settings; not the team's model · "
-                              "Not scored yet")
+    # ours: a dash in every cell, and what it is in its Source
+    assert list(rows[OURS]["cells"].values()) == ["–", "–", "–", "–"]
+    assert rows[OURS]["src"] == ("Measured here, on its card's settings; not the team's model · "
+                                 "Not scored yet")
     me = page.locator(f"[data-latest-row='{OURS}']")
     assert me.get_attribute("data-latest-ours") == "true"
-    assert me.locator(".rp-dot").get_attribute("style") == "background:var(--s6)"
-    # its card's claim: GPQA Diamond and HLE, no ±, each linked to the card at its commit
+    assert me.locator(".mt-mark").get_attribute("style") == "background:var(--s6)"
+    # its card's claim: GPQA Diamond and HLE, no ±, each letter linked to the card at its commit
     card = page.locator(f"[data-latest-row='{CARD}']")
     assert card.get_attribute("data-latest-ours") == "false"
-    assert rows[CARD][1].startswith("89.2") and rows[CARD][4].startswith("25.6")
-    assert "±" not in rows[CARD][1] and rows[CARD][2] == "—" and rows[CARD][3] == "—"
+    assert rows[CARD]["cells"]["gpqa"] == "89.2" and rows[CARD]["cells"]["hle"] == "25.6"
+    assert not rows[CARD]["se"]["gpqa"] and rows[CARD]["cells"]["otis"] == "–" \
+        and rows[CARD]["cells"]["mmlupro"] == "–"
     links = card.locator("[data-card-link]")
     assert links.count() == 2
     for k in range(2):
         assert f"/blob/{COMMIT}/README.md" in links.nth(k).get_attribute("href")
-    assert rows[CARD][-1] == "Ornith's model card (5-run average)"
+    assert rows[CARD]["src"] == "Ornith's model card (5-run average)"
     # the team's rows as before — 25: instruction following not in yet (plan I)
-    assert rows["step4000"][-1].startswith("Our run · 7 of 9 benchmarks in")
+    assert rows["step4000"]["src"].startswith("Our run · 7 of 9 benchmarks in")
     assert no_sideways(page) and page.errors == []
     SCREENS.mkdir(parents=True, exist_ok=True)
     page.evaluate("window.scrollTo(0, 0)")

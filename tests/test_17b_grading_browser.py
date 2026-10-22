@@ -175,16 +175,14 @@ def test_start_pressed_sends_once_and_stop_then_carry_on(live, page, monkeypatch
 def test_the_frontier_view_ranks_two_models_checked_alike_in_one_pool(live, page):
     # MATH Level 5 is measured here: one of the view's columns by default
     go(page, live, "tab=models&chip=frontier", "[data-frontier-table]")
-    cells = page.locator("[data-fr-cell='math level 5'] [data-fr-set^='here|'], "
-                         "[data-fr-cell='math level 5'][data-fr-set^='here|']")
-    page.wait_for_function("document.querySelectorAll(\"[data-fr-cell='math level 5'] "
-                           "[data-fr-set^='here|'], [data-fr-cell='math level 5']"
+    # 27: one column a benchmark, "math-l5"; how each was measured on its hover
+    cells = page.locator("[data-fr-cell='math-l5'][data-fr-set^='here|']")
+    page.wait_for_function("document.querySelectorAll(\"[data-fr-cell='math-l5']"
                            "[data-fr-set^='here|']\").length >= 2")
     sets = {cells.nth(i).get_attribute("data-fr-set") for i in range(cells.count())}
-    tags = page.locator("[data-fr-cell='math level 5'] .fr-tag").all_inner_texts()
+    tags = [" ".join(json.loads(cells.nth(i).get_attribute("data-tip"))) for i in range(cells.count())]
     # each cell says its own code-alone number; both rank in the one setting
     assert any("code alone 33.3" in t for t in tags) and any("code alone 66.7" in t for t in tags)
     assert len(sets) == 1 and "code alone" not in next(iter(sets))
-    assert page.locator("[data-fr-cell='math level 5'] [data-fr-lead], "
-                        "[data-fr-cell='math level 5'][data-fr-lead]").count() >= 1
+    assert page.locator("[data-fr-cell='math-l5'][data-fr-lead]").count() >= 1
     assert page.errors == []

@@ -44,7 +44,9 @@ def go(page, live, hash_, sel, width=1280, scheme="light", fresh=()):
         page.evaluate("ks => ks.forEach(k => localStorage.removeItem('bench-layout-' + k))",
                       list(fresh))
         page.reload()
-    page.wait_for_selector(sel)
+    # 27: under 640 px a card a model; the table is the wide view's
+    page.wait_for_selector(sel if width >= 640 or sel != "[data-lb-table]"
+                           else "[data-lb-card] [data-mt-card]")
 
 
 def kept(page, key):

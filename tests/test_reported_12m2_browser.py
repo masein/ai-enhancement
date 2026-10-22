@@ -72,12 +72,14 @@ def test_models_menu_has_the_reported_models_by_maker_and_a_chosen_one_is_a_row(
     page.wait_for_selector("[data-rep-hidden='1']")
     assert page.locator(f"tr[data-lb-row='{F55}']").count() == 0
     page.locator("[data-rep-hidden-go]").click()
-    page.locator("[data-frontier-all]").click()
+    # 27: Columns ▾ ▸ Show all — every benchmark reported
+    page.locator("[data-mt-columns]").click()
+    page.locator("[data-show-all]").click()
+    page.keyboard.press("Escape")
     cell = page.locator(f"[data-fr-rep='{F55}'][data-fr-cell='mmlu-pro']")
     cell.wait_for()
-    assert cell.inner_text() == "87.3"
-    t = tip(cell)
-    assert "reported by Artificial Analysis · Artificial Analysis's own run" in t[1]
+    assert cell.locator(".mt-n").evaluate("n => n.firstChild.textContent") == "87.3"
+    assert any("reported by Artificial Analysis · Artificial Analysis's own run" in x for x in tip(cell))
     assert "Data: Artificial Analysis" in page.locator("[data-frontier-credit]").inner_text()
     # the model has no average, so no rank
     assert page.evaluate(f"officialAvg(anyModel({json.dumps(F55)}))") is None

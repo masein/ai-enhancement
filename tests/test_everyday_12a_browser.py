@@ -313,8 +313,8 @@ def test_it_is_reached_from_benchmarks_and_test_a_model_offers_it(live, page):
 def test_the_pilot_is_on_no_leaderboard(live, page):
     page.set_viewport_size({"width": 1400, "height": 1000})
     page.goto(live["base"] + "/#tab=leaderboard")
-    page.wait_for_selector("table.lb")
-    cols = page.evaluate("[...document.querySelectorAll('table.lb thead th[data-col]')]"
+    page.wait_for_selector("table[data-lb-table]")
+    cols = page.evaluate("[...document.querySelectorAll('table[data-lb-table] thead th[data-col]')]"
                          ".map(th => th.dataset.col)")
     assert not any("everyday" in c for c in cols)
     assert "everyday" not in page.evaluate("JSON.stringify([DATA.models, DATA.accTasks, "

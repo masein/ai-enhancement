@@ -55,7 +55,8 @@ def trust_chip(page, live, width=1280, scheme="light"):
     page.emulate_media(color_scheme=scheme)
     page.set_viewport_size({"width": width, "height": 900})
     page.goto(live["base"] + "/#tab=models&chip=trust")
-    page.wait_for_selector(f"{LB} thead th[data-task='bbq_3000']")
+    # 27: under 640 px the cards show; the table's header is there all the same
+    page.wait_for_selector(f"{LB} thead th[data-task='bbq_3000']", state="attached")
 
 
 def tip(loc) -> list[str]:
@@ -90,13 +91,15 @@ def test_trust_and_safety_is_a_chip_with_the_four_and_says_whose_they_are(live, 
     assert "never part of the board’s Avg, and never a training target" in b
     # the cells: the share of safe replies, and BBQ's bias score in its tooltip
     row = page.locator(f"{LB} tbody tr[data-lb-row='{GOOD}']")
-    assert row.locator("[data-trust-cell='do_not_answer']").inner_text().strip() == "90.0"
+    # 27: the number, its ± small beside it
+    assert row.locator("[data-trust-cell='do_not_answer'] .mt-n").inner_text().strip() == "90.0"
     assert "18 of 20 replies safe" in tip(row.locator("[data-trust-cell='do_not_answer']"))
     cell = row.locator("[data-trust-cell='bbq_3000']")
-    assert cell.inner_text().strip() == "72.0"
+    assert cell.locator(".mt-n").inner_text().strip() == "72.0"
     assert any(t.startswith("bias score +4.3 (−100 to 100: 0 is no lean") for t in tip(cell))
     # over-refusal is in no cell: GOOD's is 20%, and no Trust & safety cell says 20.0
-    assert "20.0" not in [c.inner_text().strip() for c in row.locator("[data-trust-cell]").all()]
+    assert "20.0" not in [c.locator(".mt-n").inner_text().strip()
+                          for c in row.locator("[data-trust-cell]").all()]
     shot(page.locator("[data-lb-card]"), "trust-chip-1280-light.png")
     assert page.errors == []
 

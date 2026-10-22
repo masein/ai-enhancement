@@ -32,6 +32,13 @@ def start(page, live, width, at="#tab=home"):
         page.goto(live["base"] + "/" + at)
 
 
+def open_row(page, width, mid):
+    """27: a model's row opens its page — under 640 px its card"""
+    sel = f"tr[data-lb-row='{mid}'] td.num" if width >= 640 else f"[data-mt-card='{mid}']"
+    page.wait_for_selector(sel)
+    page.locator(sel).first.click()
+
+
 def no_sideways(page):
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
 
@@ -39,8 +46,7 @@ def no_sideways(page):
 @pytest.mark.parametrize("width", WIDTHS)
 def test_test_a_model_closes_when_the_page_changes(live, page, width):
     start(page, live, width, "#tab=models")
-    page.wait_for_selector(f"tr[data-lb-row='{MODEL}']")
-    page.locator(f"tr[data-lb-row='{MODEL}'] td.num").first.click()
+    open_row(page, width, MODEL)
     page.wait_for_selector("[data-model-hero]")
     page.locator("[data-test-model]").click()
     dlg = page.locator("[data-dialog='test']")
@@ -48,7 +54,7 @@ def test_test_a_model_closes_when_the_page_changes(live, page, width):
     assert dlg.locator("[data-ms='submit'] input").input_value() == MODEL
     # Back: the dialog was this page's
     page.go_back()
-    page.wait_for_selector("[data-lb-table]")
+    page.wait_for_selector("[data-lb-table]", state="attached")
     assert dlg.count() == 0 and page.evaluate("state.testOpen") is False
     # an address typed in, or a link followed, leaves it too
     page.go_forward()
@@ -66,8 +72,7 @@ def test_test_a_model_closes_when_the_page_changes(live, page, width):
 def test_back_goes_back_and_names_where_it_goes(live, page, width):
     # from Models ▸ Math, the link says so, and is Back
     start(page, live, width, "#tab=models&chip=math")
-    page.wait_for_selector(f"tr[data-lb-row='{MODEL}']")
-    page.locator(f"tr[data-lb-row='{MODEL}'] td.num").first.click()
+    open_row(page, width, MODEL)
     page.wait_for_selector("[data-model-hero]")
     back = page.locator(".backlink")
     assert back.inner_text() == "← Back to Models · Math"
@@ -140,7 +145,7 @@ def test_the_view_in_use_is_named_on_row_1_and_group(live, page, width, chip, te
                                       ("knowledge", "exam"), ("standard", "standard")])
 def test_a_models_view_has_an_address_by_sub(live, page, width, sub, view):
     start(page, live, width, f"#tab=models&sub={sub}")
-    page.wait_for_selector("[data-lb-table], [data-lb-everyday]")
+    page.wait_for_selector("[data-lb-table], [data-lb-everyday]", state="attached")
     assert page.evaluate("lbS().view") == view
     # the address bar shows it the way the board writes it
     want = "#tab=models" + ("" if view == "standard" else f"&view={view}")

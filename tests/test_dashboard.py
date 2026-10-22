@@ -276,29 +276,29 @@ def test_leaderboard_knowledge_shows_mmlu_by_area_and_by_topic(surface, diag):
     eight areas, and the per-topic columns one tick away under Columns."""
     pg = surface.open("#tab=leaderboard")
     choose_chip(pg, "knowledge")
-    pg.wait_for_selector("table.lb thead th[data-area]")
+    pg.wait_for_selector("table[data-lb-table] thead th[data-area]")
     # 11e: the areas some model here has a number for (the fixture's MMLU
     # subjects reach five of the eight)
-    assert pg.locator("table.lb thead th[data-area]").count() == pg.evaluate(
+    assert pg.locator("table[data-lb-table] thead th[data-area]").count() == pg.evaluate(
         "Object.keys(DATA.meta.areas).filter(a => visible().some(m => areaMmlu(m, a))).length")
-    assert pg.locator("table.lb thead th[data-area]").count() >= 1
-    assert pg.locator("table.lb thead th[data-task='mmlu']").count() == 1
+    assert pg.locator("table[data-lb-table] thead th[data-area]").count() >= 1
+    assert pg.locator("table[data-lb-table] thead th[data-task='mmlu']").count() == 1
     # the per-topic columns, one tick away: a topic under 30 items is greyed
     pg.locator("[data-columns-menu]").click()               # 16.3: Columns ▾, on Row 2
     pg.locator("#pop-columns [data-column-group-all='cats']").click()
-    pg.wait_for_selector("table.lb thead th[data-col='cat:Economics']")
+    pg.wait_for_selector("table[data-lb-table] thead th[data-col='cat:Economics']")
     pg.keyboard.press("Escape")
-    table = pg.locator("table.lb")
+    table = pg.locator("table[data-lb-table]")
     assert table.locator("td.dim").count() > 0 and table.locator("td.lead").count() > 0
     # a model with nothing on Knowledge — no MMLU, no diagnosis — is not a row
     # of dashes (12b): it sits under "Not tested on this", collapsed
-    assert pg.locator("table.lb tbody tr[data-lb-row='local/nodiag-step400']").count() == 0
+    assert pg.locator("table[data-lb-table] tbody tr[data-lb-row='local/nodiag-step400']").count() == 0
     pg.locator("[data-not-tested-toggle]").click()
     pg.wait_for_selector("tr[data-not-tested-row='local/nodiag-step400']")
     # the control column carries its warning in All tasks
     choose_chip(pg, "all")
     show_all_columns(pg)                             # six task columns by default (9c)
-    th = pg.locator("table.lb thead th[data-task='mmlu_perm']")
+    th = pg.locator("table[data-lb-table] thead th[data-task='mmlu_perm']")
     assert "CONTROL" in th.get_attribute("data-tip")          # 11f: the name's tooltip
     assert surface.errors == []
 
@@ -358,18 +358,18 @@ def test_judged_section_and_the_control_sentence(surface, tree):
 def test_judged_columns_appear_once_calibrated(surface):
     # 12b: the judged columns are the Knowledge exam view's, on the switch
     pg = surface.open("#tab=models&view=exam")
-    pg.wait_for_selector("table.lb thead th[data-col='javg']")
+    pg.wait_for_selector("table[data-lb-table] thead th[data-col='javg']")
     show_all_columns(pg)
     # 11f: one line of names; the κ and the 0–4 scale are each judged
     # column's tooltip
-    ths = pg.locator("table.lb thead tr.names th").evaluate_all(
+    ths = pg.locator("table[data-lb-table] thead tr.names th").evaluate_all(
         "ts => ts.map(t => [t.textContent.trim(), t.dataset.tip || ''])")
     heads = [h for h, _ in ths]
     judged = [(h, tip) for h, tip in ths if "0–4" in tip]
     assert len(judged) >= 4 and any(h == "Judged" for h, _ in judged)
     assert any(h.startswith("Economics") and "agreement" in tip for h, tip in judged)
     assert not any(h.startswith(("fr_", "exam_")) for h in heads)   # never as a task column
-    row = pg.locator("table.lb tbody tr[data-lb-row='fx/good-750m']")
+    row = pg.locator("table[data-lb-table] tbody tr[data-lb-row='fx/good-750m']")
     assert float(row.locator("[data-judged-avg]").text_content()) >= 0
     assert surface.errors == []
 
@@ -616,7 +616,8 @@ def test_screenshots_for_the_pr(surface):
             pg.screenshot(path=SCREENS / f"model-skewed-{scheme}-{width}.png", full_page=True)
             surface.open("#tab=leaderboard")
             choose_chip(pg, "knowledge")
-            pg.wait_for_selector("table.lb thead th[data-area]")
+            # 27: under 640 px the cards show; the table's header is there all the same
+            pg.wait_for_selector("table[data-lb-table] thead th[data-area]", state="attached")
             pg.screenshot(path=SCREENS / f"leaderboard-knowledge-{scheme}-{width}.png",
                           full_page=True)
             surface.open(model_link("fx/good-750m-tuned-test"))
@@ -632,7 +633,7 @@ def test_the_models_table_lists_every_model_and_filters_it(surface):
     or under the one "Not tested on this" line — and its filters, the old
     tab's included, are in Filters ▾."""
     pg = surface.open("#tab=models")
-    rows = pg.locator("table.lb tbody tr[data-lb-row]")
+    rows = pg.locator("table[data-lb-table] tbody tr[data-lb-row]")
     n = rows.count()
     line = pg.locator("[data-not-tested]")
     untested = int(line.get_attribute("data-not-tested")) if line.count() else 0
@@ -643,14 +644,14 @@ def test_the_models_table_lists_every_model_and_filters_it(surface):
     # 16.3: Type, where Kind mixed type with where a model came from
     pg.locator("#pill-type").click()
     pg.locator("#pop-type [data-choice='instruct']").click()
-    pg.wait_for_function("n => document.querySelectorAll('table.lb tbody tr[data-lb-row]')"
+    pg.wait_for_function("n => document.querySelectorAll('table[data-lb-table] tbody tr[data-lb-row]')"
                          ".length < n", arg=n)
     instruct = rows.count()
     assert 0 < instruct < n
     assert all("instruct" in rows.nth(i).text_content() for i in range(instruct))
     pg.locator("#pill-type").click()
     pg.locator("#pop-type [data-choice='all']").click()
-    pg.wait_for_function("n => document.querySelectorAll('table.lb tbody tr[data-lb-row]')"
+    pg.wait_for_function("n => document.querySelectorAll('table[data-lb-table] tbody tr[data-lb-row]')"
                          ".length === n", arg=n)
     # the old tab's search: the Models picker finds by name, id or family
     pg.locator("#pill-models").click()
@@ -660,11 +661,12 @@ def test_the_models_table_lists_every_model_and_filters_it(surface):
     assert all("good" in pg.locator("#pop-models .mrow").nth(i).text_content()
                for i in range(shown.count()))
     pg.keyboard.press("Escape")
-    # sort on a column, both ways
-    pg.locator("table.lb thead th[data-col='params']").click()
-    first = rows.first.get_attribute("data-lb-row")
-    pg.locator("table.lb thead th[data-col='params']").click()
-    assert rows.first.get_attribute("data-lb-row") != first
+    # sort on a column, both ways — 27: inside each group, ours first
+    opened = pg.locator("table[data-lb-table] tbody tr[data-lb-row][data-mt-group='open']")
+    pg.locator("table[data-lb-table] thead th[data-col='params']").click()
+    first = opened.first.get_attribute("data-lb-row")
+    pg.locator("table[data-lb-table] thead th[data-col='params']").click()
+    assert opened.first.get_attribute("data-lb-row") != first
     SCREENS.mkdir(exist_ok=True)
     pg.screenshot(path=SCREENS / "models-tab.png", full_page=True)
     assert surface.errors == []
@@ -679,10 +681,10 @@ def test_the_radars_model_chips_are_the_only_comparison(surface):
     assert pg.locator("table.jd[data-models-table] input[type=checkbox][aria-label^='compare']"
                       ).count() == 0
     surface.tab("Leaderboard")
-    assert pg.locator("table.lb thead th.cmp").count() == 0
+    assert pg.locator("table[data-lb-table] thead th.cmp").count() == 0
     # 12m.1: a row's one tick is Compare's (a view of its own, Compare N ▸)
-    ticks = pg.locator("table.lb tbody input[type=checkbox]")
-    assert ticks.count() == pg.locator("table.lb tbody input[data-cmp-tick]").count() > 0
+    ticks = pg.locator("table[data-lb-table] tbody input[type=checkbox]")
+    assert ticks.count() == pg.locator("table[data-lb-table] tbody input[data-cmp-tick]").count() > 0
     radar = pg.locator("[data-radar]")
     assert "Add up to 5 models" in radar.locator("[data-radar-prompt]").text_content()
     ids = [m["id"] for m in DATA_MODELS(pg)][:6]

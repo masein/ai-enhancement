@@ -100,12 +100,14 @@ def test_mobile_tasks_has_the_full_sets_own_table_and_no_column_of_it(live, page
     assert card.locator("h2").inner_text() == "Mobile-MMLU (full) Non-commercial"
     rows = card.locator("[data-mmf-row]")
     assert rows.evaluate_all("xs => xs.map(x => x.dataset.mmfRow)") == [GOOD, CHANCE]
-    assert card.locator(f"[data-mmf-cell='{GOOD}']").inner_text() == "94.4%"      # 17 of 18
-    assert card.locator(f"[data-mmf-cell='{CHANCE}']").inner_text() == "38.9%"    # 7 of 18
+    # 27: the number, its ± small beside it
+    assert card.locator(f"[data-mmf-cell='{GOOD}'] .mt-n").text_content() == "94.4%"   # 17 of 18
+    assert card.locator(f"[data-mmf-cell='{CHANCE}'] .mt-n").text_content() == "38.9%"  # 7 of 18
     about = card.locator("[data-mmf-about]").inner_text()
     assert "never in any average, rank or overall" in about and "provisional key" in about
     assert "CC BY-NC-ND 4.0" in card.locator("[data-mmf-credit]").inner_text()
-    heads = card.locator("thead th").evaluate_all("xs => xs.map(x => x.textContent)")
+    heads = card.locator("thead th").evaluate_all(
+        "xs => xs.map(x => (x.querySelector('.mt-h1') || x).textContent.replace(/[▲▼]/g, '').trim())")
     assert "Rank" not in heads and "Avg" not in heads and heads[:2] == ["Model", "Accuracy"]
     no_sideways(page)
     shot(card, f"table-{width}.png")

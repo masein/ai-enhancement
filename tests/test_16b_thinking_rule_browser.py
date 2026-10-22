@@ -69,7 +69,8 @@ def go(page, live, hash_, sel, width=1400):
     page.set_viewport_size({"width": width, "height": 1000})
     page.goto("about:blank")
     page.goto(live["base"] + "/#" + hash_)
-    page.wait_for_selector(sel)
+    page.wait_for_selector(sel, state="attached" if page.viewport_size["width"] < 640
+                           else "visible")  # 27: under 640 px the cards show; the table is there all the same
 
 
 def no_sideways(page):
@@ -96,15 +97,10 @@ def test_the_rule_is_on_the_cards_of_the_suites_it_decides(live, page, lda):
 @pytest.mark.parametrize("width", WIDTHS)
 def test_the_rule_is_on_the_row_where_it_decides(live, page, lda, width):
     go(page, live, "tab=models&chip=mobile", "[data-lb-table]", width)
-    off = page.locator(f"[data-thinking-off='{lda}']")
-    off.wait_for(state="attached")
-    assert off.inner_text() == "thinking off"
-    assert off.get_attribute("title") == "Asked with thinking off.\n\n" + RULE
-    on = page.locator(f"[data-thinking-badge='{lda} · thinking']")
-    assert on.inner_text() == "thinking" and on.get_attribute("title").endswith("\n\n" + RULE)
-    # the name's tooltip says it too (the badge gives way before its row's
-    # name is cut), and the two rows never read alike
+    # 27: its line says "thinking off", and its name's tooltip the rule
     cell = page.locator(f"[data-lb-table] td.model[data-model='{lda}']")
+    cell.wait_for(state="attached")
+    assert "thinking off" in cell.locator("[data-mt-line]").text_content().split(" · ")
     assert cell.get_attribute("title").endswith("\n\nAsked with thinking off. " + RULE)
     names = page.evaluate("DATA.models.filter(m => m.id.startsWith(%r)).map(m => m.name)" % lda)
     assert sorted(names) == ["LDA auto", "LDA auto · thinking"]
@@ -113,7 +109,8 @@ def test_the_rule_is_on_the_row_where_it_decides(live, page, lda, width):
         steady_shot(page.locator("[data-lb-card]"), SCREENS / "mobile-rows-1400.png")
     # Standard's All: its rule isn't the suite's, so nothing is said there
     go(page, live, "tab=models", "[data-lb-table]", width)
-    assert page.locator("[data-thinking-off]").count() == 0
+    assert not any("Asked with thinking off" in (t or "") for t in page.locator(
+        "[data-lb-table] td.model").evaluate_all("xs => xs.map(x => x.title)"))
     assert page.errors == []
 
 

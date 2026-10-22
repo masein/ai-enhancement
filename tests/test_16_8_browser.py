@@ -71,20 +71,16 @@ def setups(live):
     appmod._cache.update(key=None, payload=None, at=0.0)
 
 
-NAMES = """() => [...document.querySelectorAll('[data-lb-card] table.lb tbody td.model')].map(td => {
-  const n = td.querySelector('.mname'), b = td.querySelector('.mcell');
-  const cut = n.dataset.cut === '1', s = n.querySelector('.mn-short');
-  const shown = cut ? s.textContent : (n.querySelector('.mn-full') || n).textContent;
-  const cs = getComputedStyle(td);
-  return { id: td.dataset.model, shown, cut,
-    over: n.scrollWidth > n.clientWidth + 1,
-    room: td.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight),
-    block: b ? b.getBoundingClientRect().width : null };
+# 27: a row's name is displayName's, whole — only a raw run id is cut, in its middle
+NAMES = """() => [...document.querySelectorAll('[data-lb-card] table[data-lb-table] tbody '
+    + 'tr.mt-row:not(.mt-sub-row) td.model')].map(td => {
+  const n = td.querySelector('.mname');
+  return { id: td.dataset.model, shown: n.textContent, over: n.scrollWidth > n.clientWidth + 1 };
 })"""
 
 
 def names(page) -> list[dict]:
-    page.wait_for_function("document.querySelector('[data-lb-card] table.lb tbody td.model')")
+    page.wait_for_function("document.querySelector('[data-lb-card] table[data-lb-table] tbody td.model')")
     page.wait_for_timeout(200)
     return page.evaluate(NAMES)
 
@@ -92,12 +88,7 @@ def names(page) -> list[dict]:
 def check(got: list[dict], view: str) -> None:
     assert got, view
     for r in got:
-        # a name is whole, or its block fills its column and its short form is shown, whole
-        if r["cut"]:
-            assert r["block"] >= r["room"] - 2, (view, r)
-            assert not r["over"], (view, r)
-        else:
-            assert not r["over"], (view, r)
+        assert not r["over"], (view, r)                             # whole, never cut short
     shown = [r["shown"] for r in got]
     assert len(set(shown)) == len(shown), (view, shown)          # never two the same
 
@@ -132,16 +123,15 @@ def test_the_fit_follows_the_window(live, page, setups):
     page.set_viewport_size({"width": 1024, "height": 1000})
     page.wait_for_timeout(300)
     check(names(page), "mobile at 1024")
-    # narrow enough that names are cut: each shows its short form, whole,
-    # and the two that differ at their end still read apart
+    # 27: at 640 the table still; each name whole, and the two that differ at
+    # their end read apart (under 640, a card a model)
     page.set_viewport_size({"width": 640, "height": 1000})
     page.wait_for_timeout(300)
     got = names(page)
     check(got, "mobile at 640")
-    assert any(r["cut"] for r in got), got
     by = {r["id"]: r["shown"] for r in got}
     assert by[setups[0]] != by[setups[1]] and "MTP" in by[setups[1]]
-    # a cut name keeps its front as far as it fits, and its end whole
+    # a name keeps its front and its end
     for i, end in ((2, "k-8"), (3, "k-8 MTP")):
         assert by[setups[i]].startswith("Qwen3.6") and by[setups[i]].endswith(end), by
     SCREENS.mkdir(parents=True, exist_ok=True)
@@ -207,7 +197,7 @@ def test_prelim_is_standards_alone(live, page, setups):
 def test_the_filters_panel_is_one_row_of_compact_menus_that_wraps(live, page, width):
     page.set_viewport_size({"width": width, "height": 900})
     page.goto(live["base"] + "/#tab=models")
-    page.wait_for_selector("[data-lb-table]")
+    page.wait_for_selector("[data-lb-table]" if width >= 640 else "[data-mt-card]")
     page.locator("[data-filters]").click()
     sheet = page.locator("[data-filter-sheet]")
     sheet.wait_for()

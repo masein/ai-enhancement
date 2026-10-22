@@ -134,6 +134,10 @@ def test_a_published_model_has_its_own_page_and_frontier_row(live, page):
     page.wait_for_selector("[data-frontier-table]", timeout=30000)
     row = page.locator("[data-fr-row^='reported/'][data-fr-row*='edge0-35b']")
     assert row.count() == 1
-    assert row.locator("[data-fr-published]").first.inner_text() == "published by Edge0"
-    assert row.locator("[data-fr-page]").get_attribute("href").startswith("#model=reported%2F")
+    # 27: its number in italics, Edge0's letter linking its page; the row opens its own page
+    cell = row.locator("[data-fr-published]").first
+    assert cell.get_attribute("data-fr-published") == "Edge0"
+    assert cell.locator("[data-mt-src]").inner_text() == "X"
+    assert row.get_attribute("data-fr-page").startswith("reported/")
+    assert row.locator("a[data-mt-name]").get_attribute("href").startswith("#model=reported%2F")
     assert row.locator("[data-fr-ours]").count() == 0 and page.errors == []

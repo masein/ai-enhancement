@@ -93,7 +93,11 @@ def test_a_partial_everyday_total_is_greyed_with_what_is_not_asked_and_its_run(l
     page.goto(live["base"] + "/#tab=models&view=everyday")
     row = page.locator(f"tr[data-lb-row='{PARTIAL}'] [data-evd-partial='55']")
     row.wait_for()
-    assert " ".join(row.inner_text().split()) == "84 of 139 · 55 not asked yet · Run"
+    # 27: the share big, "84 of 139" under it, greyed, and what isn't asked under that
+    assert " ".join(row.inner_text().split()) == "55 not asked yet · Run"
+    total = page.locator(f"tr[data-lb-row='{PARTIAL}'] td[data-mt-col='total']")
+    assert total.locator("[data-mt-sub]").inner_text() == "84 of 139"
+    assert "dim" in total.get_attribute("class")
     page.goto(live["base"] + "/#model=" + PARTIAL.replace("/", "%2F"))
     block = page.locator(f"[data-everyday-block='{PARTIAL}'] [data-evd-partial='55']")
     block.wait_for()

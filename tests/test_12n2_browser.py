@@ -82,25 +82,24 @@ def ids(*ms):
 
 def test_the_frontier_view_has_both_with_our_cells_tagged_and_the_calibration(live, page):
     go(page, live, "tab=models&chip=frontier", "[data-frontier-table]")
-    cols = page.locator("[data-fr-col]").evaluate_all("xs => xs.map(x => x.dataset.frCol)")
-    assert "gpqa diamond" in cols and "simpleqa verified" in cols
-    # the model in both: ours and Epoch's, side by side, with the one-line tooltip
-    cal = page.locator(f"[data-fr-cal='{GOOD}'][data-fr-cell='gpqa diamond']")
-    assert cal.inner_text().replace("\n", "") == "measured here 36.0 · Epoch 38.0"
-    assert tip(cal) == [CAL]
-    # ours alone: tagged with how, chain of thought first
-    ours = page.locator(f"[data-fr-here='{SKEWED}'][data-fr-cell='gpqa diamond']")
-    assert ours.locator(".fr-tag").inner_text() == "measured here · CoT, 0-shot"
-    sqa = page.locator(f"[data-fr-here='{GOOD}'][data-fr-cell='simpleqa verified']")
-    assert sqa.locator(".fr-tag").inner_text() == \
-        "measured here · graded by the judge, the dataset’s grader"
+    cols = page.locator("thead [data-fr-col]").evaluate_all("xs => xs.map(x => x.dataset.frCol)")
+    assert "gpqa" in cols and "simpleqa" in cols                  # 27: one column a benchmark
+    # the model in both: two rows, ours measured here and Epoch's as published
+    here_n = page.locator(f"tr[data-fr-row='{GOOD}'] [data-fr-cell='gpqa'] .mt-n")
+    pub_n = page.locator(f"tr[data-fr-row='{GOOD}|published'] [data-fr-cell='gpqa'] .mt-n")
+    assert here_n.inner_text() == "36.0" and pub_n.inner_text() == "38.0E"
+    # ours alone: how it was measured on hover, chain of thought first
+    ours = page.locator(f"[data-fr-here='{SKEWED}'][data-fr-cell='gpqa']")
+    assert "measured here · CoT, 0-shot" in tip(ours)
+    sqa = page.locator(f"[data-fr-here='{GOOD}'][data-fr-cell='simpleqa']")
+    assert "measured here · graded by the judge, the dataset’s grader" in tip(sqa)
     # ranked within one setting: our two CoT cells with each other, Epoch's with Epoch's
-    here = page.locator("[data-fr-cell='gpqa diamond'] [data-fr-set^='here|'], "
-                        "[data-fr-cell='gpqa diamond'][data-fr-set^='here|']")
+    here = page.locator("[data-fr-cell='gpqa'] [data-fr-set^='here|'], "
+                        "[data-fr-cell='gpqa'][data-fr-set^='here|']")
     lead = [here.nth(i).get_attribute("data-fr-v") for i in range(here.count())
             if here.nth(i).get_attribute("data-fr-lead")]
     assert "0.36" in lead                        # the best of ours (the other is within its noise)
-    gpt = page.locator(f"[data-fr-rep='{GPT55}'][data-fr-cell='gpqa diamond']")
+    gpt = page.locator(f"[data-fr-rep='{GPT55}'][data-fr-cell='gpqa']")
     assert gpt.get_attribute("data-fr-set") == "epoch|Epoch AI's own run"
     shot(page.locator("[data-frontier]"), "frontier-gpqa-1400.png")
     assert page.errors == []
@@ -153,12 +152,12 @@ def test_gpqas_forms_are_never_averaged_together(live, page):
        f"{ids(GOOD)}", "[data-lb-table]")
     assert page.locator("[data-gpqa-mix]").inner_text() == (
         " · no Avg: GPQA Diamond measured 2 ways is one benchmark, never averaged with itself")
-    assert page.locator(f"[data-cavg='{GOOD}']").inner_text() == "—"
+    assert page.locator(f"[data-cavg='{GOOD}']").inner_text() == "–"
     # one form with another benchmark averages as any two columns do
     go(page, live, f"tab=models&cols=gpqa_diamond_cot_zeroshot,simpleqa_verified&models="
        f"{ids(GOOD)}", "[data-lb-table]")
     assert page.locator("[data-gpqa-mix]").count() == 0
-    assert page.locator(f"[data-cavg='{GOOD}']").inner_text() != "—"
+    assert page.locator(f"[data-cavg='{GOOD}']").inner_text() != "–"
     assert page.errors == []
 
 

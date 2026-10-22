@@ -251,7 +251,7 @@ def test_the_model_cells_children_stay_inside_the_cell(live, page, width):
     page.wait_for_selector(f"{LB} [data-dup-toggle]")
     out = page.evaluate(f"""() => [...document.querySelectorAll('{LB} tbody td.model')].flatMap(td => {{
         const c = td.getBoundingClientRect();
-        return [...td.querySelectorAll('.mcell > *')].filter(k => k.offsetParent).map(k => {{
+        return [...td.querySelectorAll('.mt-nrow > *, .mt-line')].filter(k => k.offsetParent).map(k => {{
           const r = k.getBoundingClientRect();
           return [td.dataset.model, k.className || k.tagName,
                   r.left >= c.left - 0.5 && r.right <= c.right + 0.5]; }}); }})""")
@@ -471,7 +471,7 @@ def test_at_400px_the_header_is_one_line_and_the_places_are_one_menu(live, phone
     # Menu ▾, and the run counter, Test a model, the dot and the name kept
     page = phone
     page.goto(live["base"] + "/#tab=leaderboard")
-    page.wait_for_selector(f"{LB} tbody tr[data-lb-row]")
+    page.wait_for_selector("[data-lb-card] [data-mt-card]")           # 27: a card a model
     h = page.evaluate("document.getElementById('bar').getBoundingClientRect().height")
     assert h <= 64, h
     assert not page.locator("#tabs").is_visible()
@@ -492,37 +492,23 @@ def test_at_400px_the_header_is_one_line_and_the_places_are_one_menu(live, phone
 
 
 def test_at_400px_the_leaderboard_shows_a_score(live, phone):
+    # 27: under 640 px a card a model — its name, its line, its four headline
+    # scores with their bars; of the badges, only "prelim" stays; nothing overflows
     page = phone
     served(page, _with_a_long_duplicate)
     page.goto(live["base"] + "/#tab=leaderboard&status=all")
-    page.wait_for_selector(f"{LB} tbody tr[data-lb-row]")
-    geo = page.evaluate(f"""() => {{
-      const sc = document.querySelector('[data-hkeep="lb"]'), s = sc.getBoundingClientRect();
-      const row = document.querySelector('{LB} tbody tr[data-lb-row]');
-      const pin = row.querySelector('td.model').getBoundingClientRect();
-      const rank = row.querySelector('td.rank').getBoundingClientRect();
-      // a score: a tinted score cell, not Params
-      const nums = [...row.querySelectorAll('td.tcell')].map(td => td.getBoundingClientRect())
-        .filter(r => r.left >= pin.right - 0.5 && r.right <= s.right + 0.5);
-      return {{scroller: s.width, pinned: pin.right - rank.left, visible: nums.length}}; }}""")
-    assert geo["pinned"] <= 0.45 * geo["scroller"] + 1, geo
-    assert geo["visible"] >= 1, geo
-    # of the badges, only "prelim" stays
-    shown = page.evaluate(f"""() => [...document.querySelectorAll('{LB} td.model .mcell > *')]
-      .filter(e => e.offsetParent && !e.classList.contains('mname')).map(e => e.className)""")
+    page.wait_for_selector("[data-lb-card] [data-mt-card]")
+    card = page.locator("[data-mt-card]").first
+    nums = card.locator("[data-mt-card-col] .mt-n").all_inner_texts()
+    assert any(n not in ("–", "") for n in nums), nums
+    shown = page.evaluate("""() => [...document.querySelectorAll('[data-mt-card] .mt-nrow > *')]
+      .filter(e => e.offsetParent && !e.classList.contains('mname') && !e.classList.contains('mt-mark'))
+      .map(e => e.className)""")
     assert all("prelim" in c for c in shown), shown
-    # the right edge fades and says there is more — a button above the table
-    fade = page.locator("[data-hfade='lb']")
-    assert fade.get_attribute("data-more") == "1"
-    assert page.locator("[data-hfade='lb'] [data-scroll='right']").is_visible()
-    assert page.locator("[data-hfade='lb'] [data-scroll='right']").text_content() == "scroll →"
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
+    for c in page.locator("[data-mt-card]").all():
+        assert c.evaluate("e => e.scrollWidth <= e.clientWidth + 1")
     shot(page, "11e-10-leaderboard-400-light.png")
-    # scrolled to the end, the hint goes; a poll keeps the scroll
-    page.evaluate("const s = document.querySelector('[data-hkeep=\"lb\"]'); s.scrollLeft = s.scrollWidth")
-    page.wait_for_function("document.querySelector('[data-hfade=\"lb\"]').dataset.more === '0'")
-    x = page.evaluate("document.querySelector('[data-hkeep=\"lb\"]').scrollLeft")
-    page.evaluate("render()")
-    assert page.evaluate("document.querySelector('[data-hkeep=\"lb\"]').scrollLeft") == x
     assert page.errors == []
 
 

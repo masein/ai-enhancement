@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
 from pathlib import Path
 
 import pytest
@@ -40,7 +39,8 @@ def board(live):
     # the Q4 baseline on Everyday (good-750m's marks) and DeviceMark too
     tree = live["tree"]
     d = reports.row_dir(Q4)
-    shutil.copy(Path(tree["models"]["fx/good-750m"]["dir"]) / "everyday.json", d / "everyday.json")
+    marks = json.loads((Path(tree["models"]["fx/good-750m"]["dir"]) / "everyday.json").read_text())
+    (d / "everyday.json").write_text(json.dumps({**marks, "model": Q4}))
     _row(config.OUT_DIR, Q4.removesuffix(" · thinking"), {"ifeval": 0.8, "mmlu_pro": 0.7,
          "math": 0.6}, {**SERVED, "name": "Qwen3.6-35B-A3B Q4 (lda runtime)"}, thinking=True)
     import service.app as appmod
@@ -183,7 +183,7 @@ def test_no_blanks(live, page):
             ".map(t => t.dataset.mtCol)")
         assert blank == [], (tab, blank[:5])
         dashes = page.eval_on_selector_all("[data-lb-card] td.mt-none", "ts => ts.map(t => t.textContent)")
-        assert dashes and set(dashes) <= {"–"} | {d for d in dashes if d.startswith("– ")}, tab
+        assert all(d == "–" or d.startswith("– ") for d in dashes), tab
 
 
 def test_everyday_shows_the_share_big_and_the_count_under(live, page):
@@ -233,6 +233,9 @@ def test_the_thinking_filter(live, page):
 
 
 def test_a_row_with_no_score_shown_is_hidden_and_counted(live, page):
+    # IFEval alone: most of Frontier's models have no number in it
+    page.goto(live["base"] + "/")
+    page.evaluate("() => localStorage.setItem('bench-mt-cols', JSON.stringify({ frontier: ['ifeval'] }))")
     go(page, live, TABS["frontier"])
     line = page.locator("[data-mt-empty]")
     n = int(line.get_attribute("data-mt-empty"))

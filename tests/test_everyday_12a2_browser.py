@@ -132,13 +132,15 @@ def test_models_everyday_is_a_column_per_group_and_the_total(live, page):
     page.goto(live["base"] + "/#tab=models&view=everyday")
     t = page.locator("[data-lb-everyday]")
     t.wait_for()
-    heads = t.locator("thead th").all_inner_texts()
+    heads = t.locator("thead th .mt-h1").all_inner_texts()
     # the headers are set in capitals by the stylesheet
-    assert [h.lower() for h in heads[1:-1]] == [g.lower() for g in GROUPS]
-    assert heads[-1].lower() == "total"
+    assert [h.lower().replace(" ▼", "") for h in heads[1:-1]] == [g.lower() for g in GROUPS]
+    assert heads[-1].lower().replace(" ▼", "") == "total"
+    # 27: the share passed big, the count under it
     row = t.locator("tr[data-lb-row='fx/good-750m']")
-    assert row.locator("[data-evd-g='writing']").inner_text() == "21 of 21"      # 12g.2
-    assert row.locator("[data-everyday-count]").inner_text() == "149 of 149"
+    w = row.locator("[data-evd-g='writing']")
+    assert w.locator(".mt-n").inner_text() == "100" and w.locator("[data-mt-sub]").inner_text() == "21 of 21"
+    assert row.locator("[data-everyday-count] [data-mt-sub]").inner_text() == "149 of 149"
     assert page.locator("[data-lb-card] [data-pilot-badge]").count() == 1
     assert page.errors == []
 

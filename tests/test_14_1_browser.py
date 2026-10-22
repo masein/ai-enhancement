@@ -57,7 +57,8 @@ def go(page, live, hash_, sel, width=1400):
     page.set_viewport_size({"width": width, "height": 1000})
     page.goto("about:blank")
     page.goto(live["base"] + "/#" + hash_)
-    page.wait_for_selector(sel)
+    page.wait_for_selector(sel, state="attached" if page.viewport_size["width"] < 640
+                           else "visible")  # 27: under 640 px the cards show; the table is there all the same
 
 
 def no_sideways(page):

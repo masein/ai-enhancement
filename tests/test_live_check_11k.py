@@ -149,9 +149,14 @@ def test_a_topic_with_an_open_proposal_says_review_it(live, page):
 def test_a_tooltip_at_the_right_edge_stays_in_the_window(live, page):
     page.set_viewport_size({"width": 1240, "height": 900})
     page.goto(live["base"] + "/#tab=leaderboard")
-    page.wait_for_selector("table.lb thead th[data-tip]")
-    heads = page.locator("table.lb thead th[data-tip]")
-    box = heads.nth(heads.count() - 1).bounding_box()      # the rightmost column
+    page.wait_for_selector("table[data-lb-table] thead th[data-tip]")
+    # 27: the rightmost column in sight (the table scrolls in its own box)
+    i = page.evaluate("""() => { const sc = document.querySelector('.mt-box').getBoundingClientRect();
+      const hs = [...document.querySelectorAll('table[data-lb-table] thead th[data-tip]')];
+      let at = 0; hs.forEach((h, k) => { if (h.getBoundingClientRect().right <= sc.right) at = k; });
+      return at; }""")
+    heads = page.locator("table[data-lb-table] thead th[data-tip]")
+    box = heads.nth(i).bounding_box()
     page.mouse.move(box["x"] + box["width"] - 2, box["y"] + box["height"] / 2)
     page.wait_for_function("() => tip.style.opacity === '1'")
     r = page.evaluate("""() => { const b = tip.getBoundingClientRect();

@@ -54,9 +54,10 @@ def test_the_card_sets_its_raw_link_and_the_chart_shows_it(live, page, width):
     # beside the row in the On-device chart's table, as DeviceMark's rows link theirs
     page.goto("about:blank")
     page.goto(live["base"] + "/#tab=models&chip=ondevice")
-    page.wait_for_selector("[data-dm-table]")
+    page.wait_for_selector("[data-dm-table]", state="attached")
     raw = page.locator(f"[data-dm-raw='{GOOD} · thinking']")
     assert raw.get_attribute("href") == URL
-    page.locator(f"tr[data-dm-row='{GOOD} · thinking']").screenshot(
-        path=SCREENS / f"chart-row-{width}.png")
+    if width >= 640:                       # 27: under 640 px a card a model
+        page.locator(f"tr[data-dm-row='{GOOD} · thinking']").screenshot(
+            path=SCREENS / f"chart-row-{width}.png")
     assert page.errors == []

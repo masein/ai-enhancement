@@ -81,11 +81,13 @@ def shot(part, name):
     steady_shot(part, SCREENS / name)
 
 
-def go(page, live, hash_="", width=1400, sel=f"{LB} tbody tr"):
+def go(page, live, hash_="", width=1400, sel=None):
     page.set_viewport_size({"width": width, "height": 1000})
     page.goto("about:blank")
     page.goto(live["base"] + "/#tab=models" + (("&" + hash_) if hash_ else ""))
-    page.wait_for_selector(sel)
+    # 27: under 640 px a card a model, else the table's rows
+    page.wait_for_selector(sel or ("[data-lb-card] [data-mt-card]" if width < 640
+                                   else f"{LB} tbody tr.mt-row"))
 
 
 def heads(page):
@@ -368,15 +370,16 @@ def test_columns_is_one_menu_that_keeps_both_jobs(live, page, width):
     hidden = menu.locator("[data-column-group='tasks'] input[data-column]:not(:checked)").first
     key = hidden.get_attribute("data-column")
     hidden.check()
-    page.wait_for_selector(f"{LB} th[data-col='{key}']")
+    # 27: a phone shows cards; the table's header is there all the same
+    page.wait_for_selector(f"{LB} th[data-col='{key}']", state="attached")
     assert page.locator(f"{LB} th[data-col='avg']").count() == 1
     # a table of the ticked ones, with their own Avg
     menu.locator("[data-columns-mode-pick='built']").check()
-    page.wait_for_selector(f"{LB} th[data-col='cavg']")
+    page.wait_for_selector(f"{LB} th[data-col='cavg']", state="attached")
     assert page.locator("#pill-columns").inner_text().startswith("Columns · Avg of ")
     assert page.locator(f"{LB} th[data-col='avg']").count() == 0
     menu.locator("[data-columns-mode-pick='shown']").check()
-    page.wait_for_selector(f"{LB} th[data-col='avg']")
+    page.wait_for_selector(f"{LB} th[data-col='avg']", state="attached")
     page.keyboard.press("Escape")
     assert page.errors == []
 

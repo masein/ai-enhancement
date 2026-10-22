@@ -76,8 +76,9 @@ def test_a_mixed_set_lists_every_model_with_any_value_and_one_avg_a_method(live,
     # each has its method's Avg only: a board model none of llama.cpp's
     avg = lambda m, meth: page.locator(  # noqa: E731
         f"tr[data-lb-row='{m}'] [data-cavg='{m}'][data-cavg-method='{meth}']").inner_text()
-    assert avg(GOOD, "lm_eval") != "—" and avg(GOOD, "llama.cpp") == "—"
-    assert avg(SERVED, "llama.cpp") != "—" and avg(SERVED, "lm_eval") == "—"
+    # 27: "–" for no score
+    assert avg(GOOD, "lm_eval") != "–" and avg(GOOD, "llama.cpp") == "–"
+    assert avg(SERVED, "llama.cpp") != "–" and avg(SERVED, "lm_eval") == "–"
     # the missing cells read "—" — a server can't be asked MMLU's log-likelihoods: blank, why
     # on hover
     for m, col in ((GOOD, "gguf:hellaswag"), (SERVED, "mmlu")):
@@ -86,7 +87,7 @@ def test_a_mixed_set_lists_every_model_with_any_value_and_one_avg_a_method(live,
           const i = [...t.querySelector('thead tr:last-child').children]
             .findIndex(th => th.dataset.col === c);
           return t.querySelector(`tbody tr[data-lb-row="${m}"]`).children[i].textContent.trim();
-        }""", [m, col]) in ("—", ""), (m, col)
+        }""", [m, col]) == "–", (m, col)                       # 27: "–", never a blank
     # sorted by one method's Avg: its models first
     page.locator("th[data-col='cavg:llama.cpp']").click()
     page.wait_for_selector("th[data-col='cavg:llama.cpp'][aria-sort='descending']")

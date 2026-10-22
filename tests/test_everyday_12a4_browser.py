@@ -135,8 +135,10 @@ def test_answers_that_ran_out_of_room_are_said_beside_the_score(live, page):
     assert page.locator("th[data-evd-model='fx/good-750m'] [data-evd-ran-out]").count() == 0
     page.goto(live["base"] + "/#tab=models&view=everyday")
     page.wait_for_selector("[data-lb-everyday]")
-    assert re.fullmatch(r"1 of \d+ ran out of room",
-                        page.locator("tr[data-lb-row='fx/skewed-360m'] [data-evd-ran-out]").inner_text())
+    # 27: on Models ▸ Everyday, how many ran out is in the Total's hover
+    total = page.locator("tr[data-lb-row='fx/skewed-360m'] [data-evd-ran-out]")
+    assert total.get_attribute("data-evd-ran-out") == "1"
+    assert any(re.match(r"1 of \d+ ran out of room", t) for t in json.loads(total.get_attribute("data-tip")))
     assert page.errors == []
 
 
