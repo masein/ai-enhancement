@@ -399,6 +399,62 @@ def by_row() -> dict[str, list[dict]]:
     return out
 
 
+def checkpoint_rows(cp: str, ids: list[str]) -> list[str]:
+    """27c: the board rows of an app model's checkpoint (names.json's
+    `checkpoint`): a served id as it is, or a checkpoint's name ("step8804")
+    — every served row named it, or it and a dash ("served/step8804-lda-2610")"""
+    cp = (cp or "").strip()
+    if not cp:
+        return []
+    if "/" in cp:
+        return [i for i in ids if i == cp]
+    return [i for i in ids if i.startswith("served/")
+            and (i.split("/", 1)[1] == cp or i.split("/", 1)[1].startswith(cp + "-"))]
+
+
+def _row_sha(rec: dict) -> str:
+    """a served row's file's sha256, as the board pinned it"""
+    fs = rec.get("file_sha256") if isinstance(rec.get("file_sha256"), dict) else {}
+    gp = rec.get("gguf_pin") if isinstance(rec.get("gguf_pin"), dict) else {}
+    return str(gp.get("sha256") or fs.get("sha256") or "").strip().lower()
+
+
+def by_checkpoint() -> list[dict]:
+    """27c: each named app model with a checkpoint — the board rows of that
+    checkpoint (thinking on or off), whether each is the same file (Kevin's
+    sha256 in names.json against the row's pin; until it is there, not yet
+    checked), its medians per phone over its finished tests, and whether it
+    is a variant (another app model of the same checkpoint, named otherwise:
+    model-003, step4000-denseq8) — never mixed with its checkpoint's own"""
+    from . import db
+    ts, _ = tests()
+    per = per_phone(ts)
+    recs = {r["id"]: r for r in db.served_all() if isinstance(r, dict) and r.get("id")}
+    models = {k: v for k, v in (names().get("models") or {}).items()
+              if isinstance(v, dict) and str(v.get("checkpoint") or "").strip()}
+    out = []
+    for mid, m in models.items():
+        cp = str(m["checkpoint"]).strip()
+        rows = checkpoint_rows(cp, list(recs))
+        sha = str(m.get("sha256") or "").strip().lower()
+        same = [k for k, v in models.items() if str(v["checkpoint"]).strip() == cp]
+        name = m.get("name") or mid
+        out.append({"model": {"id": mid, "name": name, "what": m.get("what") or "",
+                              "checkpoint": cp},
+                    "variant": len(same) > 1 and name != cp.split("/")[-1],
+                    "rows": rows, "checked": {r: bool(sha) and sha == _row_sha(recs[r])
+                                              for r in rows},
+                    "phones": [p for p in per if p["model"]["id"] == mid and p["n"]]})
+    return out
+
+
+def checked_line(entry: dict, row: str) -> str:
+    """27c: what a model page and the On-device report say of the app's file"""
+    return ("the same file (sha256 checked)" if entry["checked"].get(row)
+            else f"the app's {entry['model']['name']} file — not yet checked to be this "
+                 "exact file")
+
+
 def report(rep: dict) -> dict:
     """the place's payload: the sync's line, the tiles, every test, the
     medians per phone and model, what failed, and the files not read"""

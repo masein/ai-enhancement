@@ -94,7 +94,8 @@ def place(page, live, width, scheme):
     page.set_viewport_size({"width": width, "height": 1000})
     page.goto("about:blank")
     page.goto(live["base"] + "/#tab=reports&report=testers")
-    page.wait_for_selector("[data-pt-table]", timeout=30000)
+    # 27c: 27's table — on a phone, its cards; the table is in the page all the same
+    page.wait_for_selector("[data-pt-table]", state="attached", timeout=30000)
 
 
 @pytest.mark.parametrize("width,scheme", SIZES)
@@ -108,26 +109,33 @@ def test_on_our_testers_phones(live, page, width, scheme):
     # newest first, as Kevin's
     rows = page.eval_on_selector_all("[data-pt-row]", "rs => rs.map(r => r.dataset.ptRow)")
     assert rows == ["t1", "t2", "t4", "t3", "t5", "t6", "x1", "x2", "x3"]
-    heads = page.eval_on_selector_all("[data-pt-table] thead th", "ts => ts.map(t => t.textContent)")
-    assert heads[:6] == ["Received", "Tester", "Phone", "App · engine", "Model", "Result"]
+    # 27c: 27's table, grouped under Speed, Memory and Battery; the engine build,
+    # thermal max, charging and first load are in a test's panel
+    heads = page.eval_on_selector_all("[data-pt-table] thead tr.mt-hrow th[data-mt-col]",
+                                      "ts => ts.map(t => t.dataset.mtCol)")
+    assert heads == ["name", "phone", "app", "model", "result", "answers", "ttft", "prefill",
+                     "decode", "sustained", "engine", "swap", "memmin", "battery", "rise"]
     cell = lambda t, k: page.locator(f"[data-pt-cell='{t}|{k}']")       # noqa: E731
-    first = lambda t, k: cell(t, k).evaluate("c => c.firstChild.textContent")  # noqa: E731
+    first = lambda t, k: cell(t, k).evaluate(                           # noqa: E731
+        "c => (c.querySelector('.mt-n') || c).textContent")
     # the attached test, read as his dashboard reads it
-    assert [first("t1", k) for k in ("load", "ttft", "prefill", "decode", "sustained", "engine",
-                                      "swap", "memmin", "battery", "answers", "charging")] == [
-        "10.7 s", "5.0 s", "32.6 → 36.2", "13.0", "−4.5%", "4,565 MB", "6,452 MB", "5,553 MB",
-        "32.3 → 33.7 °C", "8/8", "no"]
-    assert cell("t1", "phone").inner_text().split("\n") == ["OnePlus 15", "16 GB RAM"]
-    assert cell("t1", "model").inner_text().split("\n")[0] == \
-        "k4 phone build, Q4 (Qwen3.6-35B-A3B)"
+    assert [first("t1", k) for k in ("ttft", "prefill", "decode", "sustained", "engine",
+                                      "swap", "memmin", "battery", "rise", "answers")] == [
+        "5.0 s", "36.2", "13.0", "−4.5%", "4,565 MB", "6,452 MB", "5,553 MB",
+        "32.3 → 33.7", "+1.4 °C", "8/8"]
+    parts = lambda t, k: cell(t, k).evaluate(                           # noqa: E731
+        "c => [...c.querySelectorAll('.mt-n, .mt-sub')].map(x => x.textContent)")
+    assert parts("t1", "phone") == ["OnePlus 15", "16 GB RAM"]
+    assert parts("t1", "model")[0] == "k4 phone build, Q4 (Qwen3.6-35B-A3B)"
     assert first("x1", "phone") == "23078PND5G (not named yet)"
     assert first("x1", "result") == "server_crash"
     # flagged: the impossible one greyed whole, its reason on hover; the
     # charging one greyed in its battery column only
     t4 = page.locator("[data-pt-row='t4']")
     assert "pt-flag" in t4.get_attribute("class")
-    assert t4.get_attribute("title") == ("decode 400 tok/s: no phone does that with a 30B-class "
-                                         "model (above 60)")
+    # 27c: the "flagged" word under its date gives the reason on hover
+    assert page.locator("[data-pt-flag-why='t4']").get_attribute("title") == (
+        "decode 400 tok/s: no phone does that with a 30B-class model (above 60)")
     assert "pt-off" in cell("t5", "battery").get_attribute("class")
     assert "pt-off" not in cell("t5", "decode").get_attribute("class")
     assert cell("t5", "battery").get_attribute("title").startswith("it ran while charging")
@@ -148,8 +156,8 @@ def test_on_our_testers_phones(live, page, width, scheme):
     shot(page, page.locator("[data-report-section='pt-per-phone']"),
          SCREENS / f"testers-per-phone-{tag}.png")
     shot(page, page.locator("[data-report-section='pt-failed']"), SCREENS / f"testers-failed-{tag}.png")
-    # a test opened: every check, its time, speeds and reply
-    page.locator("[data-pt-row='t1']").click()
+    # a test opened, in its panel (27c): every check, its time, speeds and reply
+    page.locator("[data-pt-row='t1'] td.mt-name" if width >= 640 else "[data-mt-card='t1']").click()
     page.wait_for_selector("[data-pt-check='sustain']")
     checks = page.eval_on_selector_all("[data-pt-check]", "rs => rs.map(r => r.dataset.ptCheck)")
     assert checks == ["speed-cold", "speed-warm", "id-who", "math-fast", "think-math", "web-no",

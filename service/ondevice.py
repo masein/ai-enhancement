@@ -28,10 +28,12 @@ KIND = "on_device"
 THINKING = " · thinking"
 
 
-def _phone_rows(rep: dict, cells: dict, measured: dict) -> list[dict]:
+def _phone_rows(rep: dict, cells: dict, measured: dict, cps: list[dict] | None = None
+                ) -> list[dict]:
     """our phone builds with a score on the report's benchmarks — the row
     with thinking on when it has one, else the plain one — or, 26, a test on
-    our testers' phones"""
+    our testers' phones (27c: by its checkpoint too)"""
+    tested = {r for e in cps or [] if not e["variant"] and e["phones"] for r in e["rows"]}
     have = {o["row"] for o in rep["ours"]}
     out = []
     for b in phone.builds():
@@ -39,25 +41,38 @@ def _phone_rows(rep: dict, cells: dict, measured: dict) -> list[dict]:
             if mid in have:
                 break
             if any((cells.get(x["task"]) or {}).get(mid) for x in rep["benchmarks"]) \
-                    or mid == b["id"] and measured.get(b["id"]):
+                    or mid == b["id"] and (measured.get(b["id"]) or b["id"] in tested):
                 out.append({"label": f"{b['name']} (phone build)", "row": mid, "colour": None,
                             "phone_build": b["id"]})
                 break
     return out
 
 
-def _testers_of(spec: dict, measured: dict) -> dict | None:
+def _testers_of(spec: dict, measured: dict, cps: list[dict] | None = None) -> dict | None:
     """26: a phone build as our testers' phones measured it — per phone the
-    medians of decode and engine memory, the phone named; None for a row that
-    is no phone build"""
+    medians of decode and engine memory, the phone named; None for a row with
+    none. 27c: and any row of ours whose checkpoint an app model is (names.json's
+    `checkpoint`), with what is known of the file: "the same file (sha256
+    checked)", or the app's file not yet checked to be this one — a variant
+    (model-003) never stands for its checkpoint here"""
+    def phones(got):
+        return [{"phone": p["phone"]["name"], "decode": p["decode"],
+                 "engine_mem_mb": p["engine_mem_mb"], "n": p["n"],
+                 "first": p["first"], "last": p["last"]} for p in got]
+    got = [p for p in measured.get(spec.get("phone_build") or "") or []
+           if p.get("decode") is not None]
+    if got:
+        return {"phones": phones(got), "line": "the same file (sha256 checked)"}
+    base = str(spec.get("row") or "").removesuffix(THINKING)
+    for e in cps or []:
+        if not e["variant"] and base in e["rows"]:
+            got = [p for p in e["phones"] if p.get("decode") is not None]
+            if got:
+                return {"phones": phones(got), "line": telemetry.checked_line(e, base),
+                        "model": e["model"]["name"]}
     if not spec.get("phone_build"):
         return None
-    got = [p for p in measured.get(spec["phone_build"]) or [] if p.get("decode") is not None]
-    if not got:
-        return {"none": "no tests from our testers' phones yet"}
-    return {"phones": [{"phone": p["phone"]["name"], "decode": p["decode"],
-                        "engine_mem_mb": p["engine_mem_mb"], "n": p["n"],
-                        "first": p["first"], "last": p["last"]} for p in got]}
+    return {"none": "no tests from our testers' phones yet"}
 
 
 def _gb(n_bytes) -> float | None:
@@ -86,8 +101,9 @@ def report(rep: dict, cells: dict) -> dict:
     """the report's payload: its rows with their facts, scores, sources and
     retention, the benchmarks and the notes"""
     measured = telemetry.by_row() if rep.get("phone_builds") else {}
+    cps = telemetry.by_checkpoint() if rep.get("phone_builds") else []
     rep = {**rep, "ours": [*rep["ours"],
-                           *(_phone_rows(rep, cells, measured) if rep.get("phone_builds")
+                           *(_phone_rows(rep, cells, measured, cps) if rep.get("phone_builds")
                              else [])]}
     benches = rep["benchmarks"]
     rows = reports.our_rows(rep, cells)
@@ -109,7 +125,7 @@ def report(rep: dict, cells: dict) -> dict:
             "memory": {"gb": gb, "words": f"{gb:.1f} GB",
                        "how": "the whole file, loaded on the server; not measured on a phone yet"}
             if gb else None,
-            "phone": _phone_of_ours(spec), "testers": _testers_of(spec, measured), "cells": sc,
+            "phone": _phone_of_ours(spec), "testers": _testers_of(spec, measured, cps), "cells": sc,
             "retention": {} if r is base_ours else {
                 b["key"]: _ratio(sc[b["key"]].get("v"), (base.get(b["key"]) or {}).get("v"))
                 for b in benches if _ratio(sc[b["key"]].get("v"),

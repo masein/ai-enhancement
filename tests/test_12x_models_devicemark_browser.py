@@ -133,14 +133,15 @@ def test_the_chip_shows_each_models_rows_both_modes_sorted_by_the_composite(live
     want = {SETUP, SETUP + " · thinking", QWEN, QWEN + " · thinking"}
     assert want <= set(shown)
     subs = page.locator("tr.mt-sub-row[data-lb-row]").evaluate_all("rs => rs.map(r => r.dataset.lbRow)")
-    assert set(subs) == {SETUP + " · thinking", QWEN + " · thinking"}
+    # 27c: both settings fully measured, a tie: thinking on is the row, off its sub-row
+    assert set(subs) == {SETUP, QWEN}
     # each model's rows together, the models sorted by the composite, highest first
     comp = {m: page.evaluate(f"dmVal({json.dumps(m)}, 'composite')") for m in want}
     order = [m for m in shown if m in want]
-    assert order.index(SETUP) + 1 == order.index(SETUP + " · thinking")
-    assert order.index(QWEN) + 1 == order.index(QWEN + " · thinking")
-    firsts = [m for m in order if m in (SETUP, QWEN)]
-    assert firsts == sorted((SETUP, QWEN), key=lambda m: -comp[m])
+    assert order.index(SETUP + " · thinking") + 1 == order.index(SETUP)
+    assert order.index(QWEN + " · thinking") + 1 == order.index(QWEN)
+    firsts = [m for m in order if m in (SETUP + " · thinking", QWEN + " · thinking")]
+    assert firsts == sorted((SETUP + " · thinking", QWEN + " · thinking"), key=lambda m: -comp[m])
     # the numbers are the row's: the composite and each bench with half its interval
     off = page.evaluate(f"dmRowById({json.dumps(SETUP)})")
     half = 50 * (off["composite"]["ci"][1] - off["composite"]["ci"][0])
@@ -155,12 +156,13 @@ def test_the_chip_shows_each_models_rows_both_modes_sorted_by_the_composite(live
     assert tip[0] == f"{100 * off['composite']['value']:.1f} ± {half:.1f}"
     assert tip[-1].startswith("the ± is half the 95% interval · ")
     assert tip[-1].endswith(" among ranked rows (cloud lines aren’t ranked)")
-    # the served setup's thinking row is made under it, said so, and opens the setup's page
+    # the served setup's thinking row is made from it and opens the setup's page; 27c:
+    # a tie, so it is the model's row, its thinking-off row under it, said so
     row = page.locator(f"tr[data-lb-row='{SETUP} · thinking']")
-    assert row.locator("[data-mt-name]").inner_text() == "thinking on"
+    sub = page.locator(f"tr.mt-sub-row[data-lb-row='{SETUP}']")
+    assert sub.locator("[data-mt-name]").inner_text() == "thinking off"
     # its line says what its setup is: a phone build
-    base = page.locator(f"tr[data-lb-row='{SETUP}']")
-    assert "phone build" in base.locator("[data-mt-line]").inner_text()
+    assert "phone build" in row.locator("[data-mt-line]").inner_text()
     assert row.locator("a").first.get_attribute("href") == "#model=" + quote(SETUP, safe="")
     # the best in a column is found among the made rows too, and the line says the sort
     best = page.locator("[data-dm-cell='composite'][data-lead]").evaluate_all(
@@ -204,7 +206,9 @@ def test_the_picker_has_the_group_and_chosen_models_bring_their_thinking_rows(li
 
 
 def test_with_another_columns_chosen_the_empty_table_offers_devicemarks(live, page, rows):
-    go(page, live, f"tab=models&cols=ifeval&models={ids(SETUP, QWEN)}", "[data-lb-table]")
+    # 27c: the thinking-off rows, as Thinking: off shows them
+    go(page, live, f"tab=models&cols=ifeval&models={ids(SETUP, QWEN)}", "[data-lb-table]",
+       thinking="off")
     empty = page.locator("[data-none-has]")
     empty.wait_for()
     assert empty.locator("[data-other-set='devicemark']").inner_text() == \
@@ -219,7 +223,7 @@ def test_with_another_columns_chosen_the_empty_table_offers_devicemarks(live, pa
 
 def test_at_400px(live, page, rows):
     go(page, live, f"tab=models&chip=devicemark&models={ids(SETUP, QWEN)}", "[data-lb-table]",
-       width=400)
+       width=400, thinking="off")                   # 27c: its thinking-off card
     # 27: a card a model
     assert page.locator(f"[data-mt-card='{SETUP}']").count() == 1
     # the chosen two are tested, here: not "2 chosen · 0 tested"
@@ -239,7 +243,8 @@ def test_the_devicemark_view_names_rows_whole_and_drops_standards_notions(live, 
     from service import sizes
     sizes.set_size(SETUP, "35B", "3B", "masein")             # 16.1: as the deploy step does
     appmod._cache.update(key=None, payload=None, at=0.0)
-    go(page, live, "tab=models&chip=devicemark", "[data-lb-table]", width=width)
+    # 27c: the thinking-off rows, as Thinking: off shows them (a tie shows thinking on)
+    go(page, live, "tab=models&chip=devicemark", "[data-lb-table]", width=width, thinking="off")
     assert "dmview" in page.locator("[data-lb-table]").get_attribute("class").split()
     # the whole name, nothing cut, at 1400; a phone's card wraps it already
     if width == 1400:

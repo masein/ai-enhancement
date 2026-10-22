@@ -228,7 +228,8 @@ def test_mobile_mmlu_is_pro_with_its_categories(live, page, width):
 
 def test_devicemarks_table_and_its_chart_remembered_for_that_view(live, page):
     go(page, live, "view=mobile&group=devicemark")
-    assert "dm:composite" in heads(page) and SETUP in row_ids(page)
+    # 27c: a tie shows the thinking-on row; the setup is there either way
+    assert "dm:composite" in heads(page) and {SETUP, SETUP + " · thinking"} & set(row_ids(page))
     page.locator("[data-lb-show] [data-show='chart']").click()
     page.wait_for_selector("[data-ondevice]")
     assert page.evaluate("location.hash") == "#tab=models&view=mobile&group=devicemark&show=chart"

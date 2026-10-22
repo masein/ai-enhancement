@@ -218,10 +218,11 @@ def test_tint_on_tints_every_tab_and_off_gives_bars(live, page, tab):
 def test_the_thinking_filter(live, page):
     base = "Qwen/Qwen3.5-2B"
     go(page, live, TABS["mobile"], thinking="both")
-    row = page.locator(f"tr[data-lb-row='{base}']")
-    sub = page.locator(f"tr.mt-sub-row[data-lb-row='{base} · thinking']")
+    # 27c: both settings fully measured, a tie: thinking on is the row, off under it
+    row = page.locator(f"tr[data-lb-row='{base} · thinking']:not(.mt-sub-row)")
+    sub = page.locator(f"tr.mt-sub-row[data-lb-row='{base}']")
     assert row.count() == 1 and sub.count() == 1
-    assert sub.locator("[data-mt-name]").inner_text() == "thinking on"
+    assert sub.locator("[data-mt-name]").inner_text() == "thinking off"
     go(page, live, TABS["mobile"], thinking="off")
     assert page.locator(f"tr[data-lb-row='{base} · thinking']").count() == 0
     comp = page.locator(f"tr[data-lb-row='{base}'] td[data-mt-col='dm:composite'] .mt-n")

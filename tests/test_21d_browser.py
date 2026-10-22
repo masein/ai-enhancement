@@ -102,7 +102,8 @@ def test_models_opens_on_latest(live, page, width, scheme):
     # 27: each column's short name, never cut, what it tests and how many under it
     heads = page.eval_on_selector_all("[data-latest-table] thead tr.mt-hrow th .mt-h1",
                                       "ts => ts.map(t => t.textContent.replace(/[▲▼]/g, '').trim())")
-    assert heads == ["Model", "GPQA", "OTIS", "MMLU-Pro", "HLE", "Source"]
+    # 27c: IFEval and IFBench too, in the menu's one order
+    assert heads == ["Model", "GPQA", "HLE", "OTIS", "MMLU-Pro", "IFEval", "IFBench", "Source"]
     assert page.locator("[data-latest-table] th[data-latest-col='gpqa'] .mt-h2").text_content() \
         == "science · 198 × 4"
     rows = page.evaluate(LATEST)

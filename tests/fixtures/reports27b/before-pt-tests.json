@@ -1,0 +1,672 @@
+{
+ "testers": {
+  "tests": {
+   "t1": {
+    "Answers": {
+     "text": "8/8",
+     "tip": ""
+    },
+    "App · engine": {
+     "text": "1.4 engine, made-up build",
+     "tip": ""
+    },
+    "Battery": {
+     "text": "32.3 → 33.7 °C +1.4 °C",
+     "tip": ""
+    },
+    "Charging": {
+     "text": "no",
+     "tip": ""
+    },
+    "Decode": {
+     "text": "13.0 tok/s, sustain",
+     "tip": ""
+    },
+    "Engine memory": {
+     "text": "4,565 MB",
+     "tip": ""
+    },
+    "First load": {
+     "text": "10.7 s",
+     "tip": ""
+    },
+    "Lowest free memory": {
+     "text": "5,553 MB",
+     "tip": ""
+    },
+    "Model": {
+     "text": "k4 phone build, Q4 (Qwen3.6-35B-A3B) tier 0",
+     "tip": ""
+    },
+    "Peak swap": {
+     "text": "6,452 MB",
+     "tip": ""
+    },
+    "Phone": {
+     "text": "OnePlus 15 16 GB RAM",
+     "tip": "OnePlus · CPH2747 · Android 16"
+    },
+    "Prefill, cold → warm": {
+     "text": "32.6 → 36.2 tok/s",
+     "tip": ""
+    },
+    "Received": {
+     "text": "20 Oct, 17:55",
+     "tip": ""
+    },
+    "Result": {
+     "text": "ok",
+     "tip": ""
+    },
+    "Sustained": {
+     "text": "−4.5% 13.2 → 12.6",
+     "tip": ""
+    },
+    "Tester": {
+     "text": "tester-a",
+     "tip": ""
+    },
+    "Thermal max": {
+     "text": "1",
+     "tip": ""
+    },
+    "Time to first word": {
+     "text": "5.0 s",
+     "tip": ""
+    }
+   },
+   "t2": {
+    "Answers": {
+     "text": "8/8",
+     "tip": ""
+    },
+    "App · engine": {
+     "text": "1.4 engine, made-up build",
+     "tip": ""
+    },
+    "Battery": {
+     "text": "32.3 → 34.1 °C +1.8 °C",
+     "tip": ""
+    },
+    "Charging": {
+     "text": "no",
+     "tip": ""
+    },
+    "Decode": {
+     "text": "13.6 tok/s, sustain",
+     "tip": ""
+    },
+    "Engine memory": {
+     "text": "4,565 MB",
+     "tip": ""
+    },
+    "First load": {
+     "text": "10.7 s",
+     "tip": ""
+    },
+    "Lowest free memory": {
+     "text": "5,553 MB",
+     "tip": ""
+    },
+    "Model": {
+     "text": "k4 phone build, Q4 (Qwen3.6-35B-A3B) tier 0",
+     "tip": ""
+    },
+    "Peak swap": {
+     "text": "6,452 MB",
+     "tip": ""
+    },
+    "Phone": {
+     "text": "OnePlus 15 16 GB RAM",
+     "tip": "OnePlus · CPH2747 · Android 16"
+    },
+    "Prefill, cold → warm": {
+     "text": "32.6 → 36.2 tok/s",
+     "tip": ""
+    },
+    "Received": {
+     "text": "19 Oct, 09:10",
+     "tip": ""
+    },
+    "Result": {
+     "text": "ok",
+     "tip": ""
+    },
+    "Sustained": {
+     "text": "−4.5% 13.2 → 12.6",
+     "tip": ""
+    },
+    "Tester": {
+     "text": "tester-a",
+     "tip": ""
+    },
+    "Thermal max": {
+     "text": "1",
+     "tip": ""
+    },
+    "Time to first word": {
+     "text": "5.0 s",
+     "tip": ""
+    }
+   },
+   "t3": {
+    "Answers": {
+     "text": "8/8",
+     "tip": ""
+    },
+    "App · engine": {
+     "text": "1.4 engine, made-up build",
+     "tip": ""
+    },
+    "Battery": {
+     "text": "32.3 → 33.9 °C +1.6 °C",
+     "tip": ""
+    },
+    "Charging": {
+     "text": "no",
+     "tip": ""
+    },
+    "Decode": {
+     "text": "12.4 tok/s, sustain",
+     "tip": ""
+    },
+    "Engine memory": {
+     "text": "4,565 MB",
+     "tip": ""
+    },
+    "First load": {
+     "text": "10.7 s",
+     "tip": ""
+    },
+    "Lowest free memory": {
+     "text": "5,553 MB",
+     "tip": ""
+    },
+    "Model": {
+     "text": "k4 phone build, Q4 (Qwen3.6-35B-A3B) tier 0",
+     "tip": ""
+    },
+    "Peak swap": {
+     "text": "6,452 MB",
+     "tip": ""
+    },
+    "Phone": {
+     "text": "OnePlus 15 16 GB RAM",
+     "tip": "OnePlus · CPH2747 · Android 16"
+    },
+    "Prefill, cold → warm": {
+     "text": "32.6 → 36.2 tok/s",
+     "tip": ""
+    },
+    "Received": {
+     "text": "18 Oct, 12:00",
+     "tip": ""
+    },
+    "Result": {
+     "text": "ok",
+     "tip": ""
+    },
+    "Sustained": {
+     "text": "−4.5% 13.2 → 12.6",
+     "tip": ""
+    },
+    "Tester": {
+     "text": "tester-b",
+     "tip": ""
+    },
+    "Thermal max": {
+     "text": "1",
+     "tip": ""
+    },
+    "Time to first word": {
+     "text": "5.0 s",
+     "tip": ""
+    }
+   },
+   "t4": {
+    "Answers": {
+     "text": "8/8",
+     "tip": ""
+    },
+    "App · engine": {
+     "text": "1.4 engine, made-up build",
+     "tip": ""
+    },
+    "Battery": {
+     "text": "32.3 → 33.7 °C +1.4 °C",
+     "tip": ""
+    },
+    "Charging": {
+     "text": "no",
+     "tip": ""
+    },
+    "Decode": {
+     "text": "400.0 tok/s, sustain",
+     "tip": "decode 400 tok/s: no phone does that with a 30B-class model (above 60)"
+    },
+    "Engine memory": {
+     "text": "4,565 MB",
+     "tip": ""
+    },
+    "First load": {
+     "text": "10.7 s",
+     "tip": ""
+    },
+    "Lowest free memory": {
+     "text": "5,553 MB",
+     "tip": ""
+    },
+    "Model": {
+     "text": "k4 phone build, Q4 (Qwen3.6-35B-A3B) tier 0",
+     "tip": ""
+    },
+    "Peak swap": {
+     "text": "6,452 MB",
+     "tip": ""
+    },
+    "Phone": {
+     "text": "OnePlus 15 16 GB RAM",
+     "tip": "OnePlus · CPH2747 · Android 16"
+    },
+    "Prefill, cold → warm": {
+     "text": "32.6 → 36.2 tok/s",
+     "tip": "decode 400 tok/s: no phone does that with a 30B-class model (above 60)"
+    },
+    "Received": {
+     "text": "18 Oct, 15:30 flagged",
+     "tip": ""
+    },
+    "Result": {
+     "text": "ok",
+     "tip": ""
+    },
+    "Sustained": {
+     "text": "−4.5% 13.2 → 12.6",
+     "tip": "decode 400 tok/s: no phone does that with a 30B-class model (above 60)"
+    },
+    "Tester": {
+     "text": "tester-b",
+     "tip": ""
+    },
+    "Thermal max": {
+     "text": "1",
+     "tip": ""
+    },
+    "Time to first word": {
+     "text": "5.0 s",
+     "tip": "decode 400 tok/s: no phone does that with a 30B-class model (above 60)"
+    }
+   },
+   "t5": {
+    "Answers": {
+     "text": "8/8",
+     "tip": ""
+    },
+    "App · engine": {
+     "text": "1.4 engine, made-up build",
+     "tip": ""
+    },
+    "Battery": {
+     "text": "32.3 → 39.0 °C +6.7 °C",
+     "tip": "it ran while charging: its battery temperatures aren't the battery's alone"
+    },
+    "Charging": {
+     "text": "yes",
+     "tip": ""
+    },
+    "Decode": {
+     "text": "13.0 tok/s, sustain",
+     "tip": ""
+    },
+    "Engine memory": {
+     "text": "4,565 MB",
+     "tip": ""
+    },
+    "First load": {
+     "text": "10.7 s",
+     "tip": ""
+    },
+    "Lowest free memory": {
+     "text": "5,553 MB",
+     "tip": ""
+    },
+    "Model": {
+     "text": "k4 phone build, Q4 (Qwen3.6-35B-A3B) tier 0",
+     "tip": ""
+    },
+    "Peak swap": {
+     "text": "6,452 MB",
+     "tip": ""
+    },
+    "Phone": {
+     "text": "OnePlus 15 16 GB RAM",
+     "tip": "OnePlus · CPH2747 · Android 16"
+    },
+    "Prefill, cold → warm": {
+     "text": "32.6 → 36.2 tok/s",
+     "tip": ""
+    },
+    "Received": {
+     "text": "17 Oct, 08:00 flagged",
+     "tip": ""
+    },
+    "Result": {
+     "text": "ok",
+     "tip": ""
+    },
+    "Sustained": {
+     "text": "−4.5% 13.2 → 12.6",
+     "tip": ""
+    },
+    "Tester": {
+     "text": "tester-c",
+     "tip": ""
+    },
+    "Thermal max": {
+     "text": "1",
+     "tip": ""
+    },
+    "Time to first word": {
+     "text": "5.0 s",
+     "tip": ""
+    }
+   },
+   "t6": {
+    "Answers": {
+     "text": "8/8",
+     "tip": ""
+    },
+    "App · engine": {
+     "text": "1.4 engine, made-up build",
+     "tip": ""
+    },
+    "Battery": {
+     "text": "32.3 → 33.7 °C +1.4 °C",
+     "tip": ""
+    },
+    "Charging": {
+     "text": "no",
+     "tip": ""
+    },
+    "Decode": {
+     "text": "9.8 tok/s, sustain",
+     "tip": ""
+    },
+    "Engine memory": {
+     "text": "4,565 MB",
+     "tip": ""
+    },
+    "First load": {
+     "text": "10.7 s",
+     "tip": ""
+    },
+    "Lowest free memory": {
+     "text": "5,553 MB",
+     "tip": ""
+    },
+    "Model": {
+     "text": "k4 phone build, Q4 (Qwen3.6-35B-A3B) tier 0",
+     "tip": ""
+    },
+    "Peak swap": {
+     "text": "6,452 MB",
+     "tip": ""
+    },
+    "Phone": {
+     "text": "Galaxy S25 Ultra 16 GB RAM",
+     "tip": "OnePlus · SM-S938B · Android 16"
+    },
+    "Prefill, cold → warm": {
+     "text": "32.6 → 36.2 tok/s",
+     "tip": ""
+    },
+    "Received": {
+     "text": "16 Oct, 20:45",
+     "tip": ""
+    },
+    "Result": {
+     "text": "ok",
+     "tip": ""
+    },
+    "Sustained": {
+     "text": "−4.5% 13.2 → 12.6",
+     "tip": ""
+    },
+    "Tester": {
+     "text": "tester-c",
+     "tip": ""
+    },
+    "Thermal max": {
+     "text": "1",
+     "tip": ""
+    },
+    "Time to first word": {
+     "text": "5.0 s",
+     "tip": ""
+    }
+   },
+   "x1": {
+    "Answers": {
+     "text": "8/8",
+     "tip": ""
+    },
+    "App · engine": {
+     "text": "1.4 engine, made-up build",
+     "tip": ""
+    },
+    "Battery": {
+     "text": "32.3 → 33.7 °C +1.4 °C",
+     "tip": ""
+    },
+    "Charging": {
+     "text": "no",
+     "tip": ""
+    },
+    "Decode": {
+     "text": "13.0 tok/s, sustain",
+     "tip": ""
+    },
+    "Engine memory": {
+     "text": "4,565 MB",
+     "tip": ""
+    },
+    "First load": {
+     "text": "10.7 s",
+     "tip": ""
+    },
+    "Lowest free memory": {
+     "text": "5,553 MB",
+     "tip": ""
+    },
+    "Model": {
+     "text": "k4 phone build, Q4 (Qwen3.6-35B-A3B) tier 0",
+     "tip": ""
+    },
+    "Peak swap": {
+     "text": "6,452 MB",
+     "tip": ""
+    },
+    "Phone": {
+     "text": "23078PND5G (not named yet) 16 GB RAM",
+     "tip": "OnePlus · 23078PND5G · Android 16"
+    },
+    "Prefill, cold → warm": {
+     "text": "32.6 → 36.2 tok/s",
+     "tip": ""
+    },
+    "Received": {
+     "text": "16 Oct, 10:00",
+     "tip": ""
+    },
+    "Result": {
+     "text": "server_crash",
+     "tip": ""
+    },
+    "Sustained": {
+     "text": "−4.5% 13.2 → 12.6",
+     "tip": ""
+    },
+    "Tester": {
+     "text": "tester-d",
+     "tip": ""
+    },
+    "Thermal max": {
+     "text": "1",
+     "tip": ""
+    },
+    "Time to first word": {
+     "text": "5.0 s",
+     "tip": ""
+    }
+   },
+   "x2": {
+    "Answers": {
+     "text": "8/8",
+     "tip": ""
+    },
+    "App · engine": {
+     "text": "1.4 engine, made-up build",
+     "tip": ""
+    },
+    "Battery": {
+     "text": "32.3 → 33.7 °C +1.4 °C",
+     "tip": ""
+    },
+    "Charging": {
+     "text": "no",
+     "tip": ""
+    },
+    "Decode": {
+     "text": "13.0 tok/s, sustain",
+     "tip": ""
+    },
+    "Engine memory": {
+     "text": "4,565 MB",
+     "tip": ""
+    },
+    "First load": {
+     "text": "10.7 s",
+     "tip": ""
+    },
+    "Lowest free memory": {
+     "text": "5,553 MB",
+     "tip": ""
+    },
+    "Model": {
+     "text": "k4 phone build, Q4 (Qwen3.6-35B-A3B) tier 0",
+     "tip": ""
+    },
+    "Peak swap": {
+     "text": "6,452 MB",
+     "tip": ""
+    },
+    "Phone": {
+     "text": "23078PND5G (not named yet) 16 GB RAM",
+     "tip": "OnePlus · 23078PND5G · Android 16"
+    },
+    "Prefill, cold → warm": {
+     "text": "32.6 → 36.2 tok/s",
+     "tip": ""
+    },
+    "Received": {
+     "text": "15 Oct, 10:00",
+     "tip": ""
+    },
+    "Result": {
+     "text": "server_crash",
+     "tip": ""
+    },
+    "Sustained": {
+     "text": "−4.5% 13.2 → 12.6",
+     "tip": ""
+    },
+    "Tester": {
+     "text": "tester-d",
+     "tip": ""
+    },
+    "Thermal max": {
+     "text": "1",
+     "tip": ""
+    },
+    "Time to first word": {
+     "text": "5.0 s",
+     "tip": ""
+    }
+   },
+   "x3": {
+    "Answers": {
+     "text": "8/8",
+     "tip": ""
+    },
+    "App · engine": {
+     "text": "1.4 engine, made-up build",
+     "tip": ""
+    },
+    "Battery": {
+     "text": "32.3 → 33.7 °C +1.4 °C",
+     "tip": ""
+    },
+    "Charging": {
+     "text": "no",
+     "tip": ""
+    },
+    "Decode": {
+     "text": "13.0 tok/s, sustain",
+     "tip": ""
+    },
+    "Engine memory": {
+     "text": "4,565 MB",
+     "tip": ""
+    },
+    "First load": {
+     "text": "10.7 s",
+     "tip": ""
+    },
+    "Lowest free memory": {
+     "text": "5,553 MB",
+     "tip": ""
+    },
+    "Model": {
+     "text": "k4 phone build, Q4 (Qwen3.6-35B-A3B) tier 0",
+     "tip": ""
+    },
+    "Peak swap": {
+     "text": "6,452 MB",
+     "tip": ""
+    },
+    "Phone": {
+     "text": "Galaxy S25 Ultra 16 GB RAM",
+     "tip": "OnePlus · SM-S938B · Android 16"
+    },
+    "Prefill, cold → warm": {
+     "text": "32.6 → 36.2 tok/s",
+     "tip": ""
+    },
+    "Received": {
+     "text": "14 Oct, 10:00",
+     "tip": ""
+    },
+    "Result": {
+     "text": "server_crash",
+     "tip": ""
+    },
+    "Sustained": {
+     "text": "−4.5% 13.2 → 12.6",
+     "tip": ""
+    },
+    "Tester": {
+     "text": "tester-c",
+     "tip": ""
+    },
+    "Thermal max": {
+     "text": "1",
+     "tip": ""
+    },
+    "Time to first word": {
+     "text": "5.0 s",
+     "tip": ""
+    }
+   }
+  }
+ }
+}

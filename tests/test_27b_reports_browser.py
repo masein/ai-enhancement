@@ -125,15 +125,17 @@ def test_at_400_the_table_is_27s_cards(live, page, width):
     assert no_sideways(page) and page.errors == []
 
 
-# every label, every mark and every bare point of a chart's panels
+# every label, every mark and every leader of a chart's panels
 LABELS = """(sel) => [...document.querySelectorAll(sel)].map(p => {
   const r = e => { const b = e.getBoundingClientRect();
     return [b.left, b.top, b.right, b.bottom]; };
-  const marks = [...p.querySelectorAll('[data-od-mem-dot], [data-sz-dot], [data-by-dot]')];
   return { labels: [...p.querySelectorAll('[data-chart-label]')].map(l => ({
-      name: l.dataset.chartLabel, r: r(l) })),
-    marks: marks.map(m => ({ name: (m.querySelector('title') || {}).textContent || '', r: r(m) })),
-    bare: (p.querySelector('[data-chart-bare]') || {}).textContent || '' };
+      id: l.dataset.chartFor, r: r(l) })),
+    marks: [...p.querySelectorAll('[data-chart-point]')].map(m => ({ id: m.dataset.chartPoint,
+      ours: m.tagName === 'circle', best: m.dataset.odBest === '1',
+      title: (m.querySelector('title') || {}).textContent || '', r: r(m) })),
+    leads: [...p.querySelectorAll('[data-chart-leader]')].map(l => Math.hypot(
+      l.x2.baseVal.value - l.x1.baseVal.value, l.y2.baseVal.value - l.y1.baseVal.value)) };
 })"""
 
 
@@ -141,21 +143,31 @@ def meet(a, b, pad=0.0):
     return a[0] < b[2] - pad and b[0] < a[2] - pad and a[1] < b[3] - pad and b[1] < a[3] - pad
 
 
-def check_panels(panels):
+def far(r, m):
+    """a label's box to a mark's centre"""
+    cx, cy = (m[0] + m[2]) / 2, (m[1] + m[3]) / 2
+    return ((max(r[0] - cx, 0, cx - r[2])) ** 2 + (max(r[1] - cy, 0, cy - r[3])) ** 2) ** 0.5
+
+
+def check_panels(panels, memory=False):
     assert panels
     for p in panels:
-        ls = p["labels"]
+        ls, ms = p["labels"], p["marks"]
+        by = {m["id"]: m for m in ms}
         for i, a in enumerate(ls):
             for b in ls[i + 1:]:
                 assert not meet(a["r"], b["r"]), (a, b)
-            for m in p["marks"]:
+            for m in ms:
                 assert not meet(a["r"], m["r"], 0.5), (a, m)
-        # a point with no label: its name on hover, and under the panel
-        named = {x["name"] for x in ls}
-        for m in p["marks"]:
-            assert m["name"], m
-        assert len(ls) + (p["bare"].count("·") + 1 if p["bare"] else 0) == len(p["marks"]), p
-        assert all(n.replace("★ ", "") for n in named)
+            # 27c: a label is nearer its own point than any other
+            own = far(a["r"], by[a["id"]]["r"])
+            assert all(own < far(a["r"], m["r"]) for m in ms if m["id"] != a["id"]), a
+            # On-device's: ours, and the published on the best-for-their-memory line
+            if memory:
+                assert by[a["id"]]["ours"] or by[a["id"]]["best"], a
+        # no leader longer than 24; every point named on hover
+        assert all(x <= 24.5 for x in p["leads"]), p["leads"]
+        assert all(m["title"] for m in ms), ms
 
 
 @pytest.mark.parametrize("width", [1280, 400])
@@ -163,9 +175,13 @@ def test_the_charts_labels_never_meet_nor_cover_a_point(live, page, width):
     report(page, live, width=width, wait="[data-od-mem-panel]")
     panels = page.evaluate(LABELS, "[data-od-mem-panel]")
     assert len(panels) == 4
-    check_panels(panels)
-    # in this world every point of On-device's panels finds a spot
-    assert sum(len(p["labels"]) for p in panels) == sum(len(p["marks"]) for p in panels) >= 25
+    check_panels(panels, memory=True)
+    # fewer labels, by design: not every point is labelled; ours are where they fit
+    assert 0 < sum(len(p["labels"]) for p in panels) < sum(len(p["marks"]) for p in panels)
+    # one legend above the four: each family once, in its hue
+    fams = page.eval_on_selector_all("[data-od-leg-family]", "ls => ls.map(l => l.dataset.odLegFamily)")
+    assert fams == ["edge0", "bonsai", "gemma"]
+    assert page.locator("[data-od-mem-frontier]").count() == 4
     report(page, live, "step-checkpoints", width=width, wait="[data-sz-panel]")
     sz = page.evaluate(LABELS, "[data-sz-panel]")
     check_panels(sz)

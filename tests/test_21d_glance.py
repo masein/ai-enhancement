@@ -93,7 +93,9 @@ def test_latest_reads_the_report_alone(svc):
         t for t in [x["label"] for x in rep["theirs"]] if t in GLANCE]
     assert sorted(t["label"] for t in rep["theirs"] if t.get("glance")) == sorted(GLANCE)
     got = svc.get("/api/reports/step-checkpoints").json()
-    assert got["glance"] == {"benchmarks": ["gpqa", "otis", "mmlupro", "hle"]}
+    # 27b: and IFEval and IFBench, now that our three builds have them
+    assert got["glance"] == {"benchmarks": ["gpqa", "otis", "mmlupro", "hle", "ifeval",
+                                            "ifbench"]}
     assert sorted(t["label"] for t in got["theirs"] if t["glance"]) == sorted(GLANCE)
     # 22: Ornith-1.5 picked and on Latest too, last
     want = ["step8804", *PICKED, "Ornith-1.5 Q4_K_M"]
@@ -104,7 +106,7 @@ def test_latest_reads_the_report_alone(svc):
     assert meta == {"report": "step-checkpoints", "title": REPORT["title"],
                     "rows": [STEP8804_ROW, *(SPEC[x]["row"] for x in PICKED), ORNITH_ROW],
                     "tasks": ["gpqa_diamond_epoch", "otis_aime_epoch", "mmlupro_tiger",
-                              "hle_text_cais"]}
+                              "hle_text_cais", "ifeval_google", "ifbench_test"]}
 
 
 def test_o4_minis_mmlu_pro_says_medium_effort(svc):
