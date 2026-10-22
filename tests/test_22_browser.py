@@ -70,9 +70,10 @@ def test_the_report_lists_it_in_our_runs_and_its_picker(live, page, width):
     page.set_viewport_size({"width": width, "height": 1000})
     page.goto("about:blank")
     page.goto(live["base"] + "/#tab=reports&report=step-checkpoints")
-    page.wait_for_selector(f"[data-rp-row='{OURS}']", timeout=30000)
+    # 27b: modelTable's row (on a phone, its card's; the row is in the page)
+    page.wait_for_selector(f"[data-rp-row='{OURS}']", state="attached", timeout=30000)
     row = page.locator(f"[data-rp-row='{OURS}']")
-    assert row.locator(".rp-dot").get_attribute("style") == "background:var(--s6)"
+    assert row.locator("[data-mt-mark='here']").get_attribute("style") == "background:var(--s6)"
     assert page.locator(f"[data-rp-status='{OURS}']").inner_text() == "Not scored yet"
     assert "measured here, on its card's settings; not the team's model" in row.inner_text()
     picks = page.eval_on_selector_all("[data-rp-pick]", "bs => bs.map(b => b.textContent)")
@@ -82,8 +83,8 @@ def test_the_report_lists_it_in_our_runs_and_its_picker(live, page, width):
     page.wait_for_selector(f"[data-rp-pick='{OURS}'][aria-checked='true']")
     assert page.locator("[data-rp-summary]").inner_text()
     # its card's row among the other models
-    assert page.locator(f"[data-rp-every] tbody tr[data-rp-row='{CARD}']").count() == 1 or \
-        CARD in page.locator("[data-rp-every]").inner_text()
+    assert page.locator(f"[data-rp-every] tr[data-rp-every-row='{CARD}'], "
+                        f"[data-rp-every] tr[data-rp-every-rows*='{CARD}']").count() == 1
     assert no_sideways(page) and page.errors == []
     SCREENS.mkdir(parents=True, exist_ok=True)
     page.locator("[data-report-section='ours']").screenshot(

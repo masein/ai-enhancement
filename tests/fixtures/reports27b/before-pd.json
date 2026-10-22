@@ -1,0 +1,208 @@
+{
+ "paired": {
+  "pd": {
+   "arc": {
+    "pdx-a": {
+     "text": "60.4 ± 8.0",
+     "tip": "24 tasks × 2"
+    },
+    "pdx-b": {
+     "text": "62.5 ± 6.2",
+     "tip": "24 tasks × 2"
+    },
+    "pdx-diff": {
+     "text": "−12.5",
+     "tip": " −37.0 to +12.0, the 95% range"
+    },
+    "pdx-name": {
+     "text": "ARC-AGI-2 12 tasks × 2 runs",
+     "tip": ""
+    },
+    "pdx-split": {
+     "text": "3 ▸ 2 ▸ on 41.7% of tasks",
+     "tip": " See the 3 tasks Q4 (UD-Q4_K_XL) got right more often than step4000, with both answers See the 2 tasks step4000 got right more often than Q4 (UD-Q4_K_XL), with both answers"
+    },
+    "pdx-verdict": {
+     "text": "can't tell",
+     "tip": " the 95% range crosses 0"
+    }
+   },
+   "gpqa": {
+    "pdx-a": {
+     "text": "61.7 ± 4.6",
+     "tip": "30 questions × 4"
+    },
+    "pdx-b": {
+     "text": "37.5 ± 4.8",
+     "tip": "30 questions × 4"
+    },
+    "pdx-diff": {
+     "text": "+24.2",
+     "tip": " +14.1 to +34.3, the 95% range"
+    },
+    "pdx-name": {
+     "text": "GPQA Diamond 30 questions × 4 runs",
+     "tip": ""
+    },
+    "pdx-split": {
+     "text": "0 16 ▸ a run of each differs 47.9% of the time; each differs from itself 46.7% and 45.0%",
+     "tip": " none the other way See the 16 questions step4000 got right more often than Q4 (UD-Q4_K_XL), with both answers"
+    },
+    "pdx-verdict": {
+     "text": "step4000 higher",
+     "tip": " the 95% range leaves out 0"
+    }
+   },
+   "hle": {
+    "pdx-a": {
+     "text": "—",
+     "tip": "waits for grading"
+    },
+    "pdx-b": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "pdx-name": {
+     "text": "HLE",
+     "tip": ""
+    },
+    "pdx-wait": {
+     "text": "waiting for grading — 2,098 answers from step4000",
+     "tip": ""
+    }
+   },
+   "ifbench": {
+    "pdx-a": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "pdx-b": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "pdx-name": {
+     "text": "IFBench",
+     "tip": ""
+    },
+    "pdx-wait": {
+     "text": "no answers from step4000",
+     "tip": ""
+    }
+   },
+   "ifeval": {
+    "pdx-a": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "pdx-b": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "pdx-name": {
+     "text": "IFEval",
+     "tip": ""
+    },
+    "pdx-wait": {
+     "text": "no answers from step4000",
+     "tip": ""
+    }
+   },
+   "math": {
+    "pdx-a": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "pdx-b": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "pdx-name": {
+     "text": "MATH Level 5",
+     "tip": ""
+    },
+    "pdx-wait": {
+     "text": "no answers from step4000",
+     "tip": ""
+    }
+   },
+   "mmlupro": {
+    "pdx-a": {
+     "text": "57.5 ± 3.5",
+     "tip": "200 questions"
+    },
+    "pdx-b": {
+     "text": "42.5 ± 3.5",
+     "tip": "200 questions"
+    },
+    "pdx-diff": {
+     "text": "+15.0",
+     "tip": " +5.9 to +24.1, the 95% range"
+    },
+    "pdx-name": {
+     "text": "MMLU-Pro 200 questions",
+     "tip": ""
+    },
+    "pdx-split": {
+     "text": "30 ▸ 60 ▸ on 45.0% of questions",
+     "tip": " See the 30 questions Q4 (UD-Q4_K_XL) got right and step4000 got wrong, with both answers See the 60 questions step4000 got right and Q4 (UD-Q4_K_XL) got wrong, with both answers"
+    },
+    "pdx-verdict": {
+     "text": "step4000 higher",
+     "tip": " McNemar p = 0.0021"
+    }
+   },
+   "otis": {
+    "pdx-a": {
+     "text": "68.1 ± 6.6",
+     "tip": "9 questions × 8"
+    },
+    "pdx-b": {
+     "text": "41.7 ± 8.3",
+     "tip": "9 questions × 8"
+    },
+    "pdx-diff": {
+     "text": "+26.4",
+     "tip": " +3.9 to +48.9, the 95% range"
+    },
+    "pdx-name": {
+     "text": "OTIS Mock AIME 9 questions × 8 runs",
+     "tip": ""
+    },
+    "pdx-split": {
+     "text": "2 ▸ 7 ▸ a run of each differs 54.5% of the time; each differs from itself 41.7% and 42.9%",
+     "tip": " See the 2 questions Q4 (UD-Q4_K_XL) got right more often than step4000, with both answers See the 7 questions step4000 got right more often than Q4 (UD-Q4_K_XL), with both answers"
+    },
+    "pdx-verdict": {
+     "text": "step4000 higher",
+     "tip": " the 95% range leaves out 0"
+    }
+   },
+   "simpleqa": {
+    "pdx-a": {
+     "text": "58.3 ± 6.4",
+     "tip": "60 questions"
+    },
+    "pdx-b": {
+     "text": "41.7 ± 6.4",
+     "tip": "60 questions"
+    },
+    "pdx-diff": {
+     "text": "+16.7",
+     "tip": " −0.2 to +33.6, the 95% range"
+    },
+    "pdx-name": {
+     "text": "SimpleQA Verified 60 questions",
+     "tip": ""
+    },
+    "pdx-split": {
+     "text": "9 ▸ 19 ▸ on 46.7% of questions",
+     "tip": " See the 9 questions Q4 (UD-Q4_K_XL) got right and step4000 got wrong, with both answers See the 19 questions step4000 got right and Q4 (UD-Q4_K_XL) got wrong, with both answers"
+    },
+    "pdx-verdict": {
+     "text": "can't tell",
+     "tip": " the 95% range crosses 0 · McNemar p = 0.0872"
+    }
+   }
+  }
+ }
+}

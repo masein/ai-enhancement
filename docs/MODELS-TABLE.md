@@ -91,6 +91,55 @@ modelling's cross-entropy table (a row per task and model) keep their own.
     page. Sort ▾ sits above the cards, and the tabs scroll sideways. Tint
     has nothing to tint on a card, so its switch shows on the wide view only.
 
+## The Reports pages (27b)
+
+Where a report lists models with their scores, it draws through the same
+`modelTable`, and every score cell through `scoreCell(x, o)`, the one cell
+(`o.tag` 'div' for a table drawn in divs).
+
+- **On-device.** A row's line holds its base ("of Qwen3.6-35B-A3B"), what it
+  is, and its source once with its link ("published by Edge0 · README"); ours
+  say "measured here". The Base model column is gone.
+  - **Scores:** GPQA Diamond, MMLU-Pro, IFEval, IFBench. A published number is
+    in italics with its letter, which links its source; there is no "published
+    by" line in a cell. What a model keeps of its base is the one line under a
+    score ("89.7% of its base").
+  - **Memory:** one number, what it needs; the size on disk small under it only
+    when the two differ ("2.9 GiB" over "19.6 GB on disk").
+  - **On a phone:** our testers' median when they measured it (the row's dot,
+    decode tok/s, the phone and its tests under it, every phone on hover); else
+    the published speed, in italics with its letter, the phone under it; else
+    "–". A speed typed in by hand is on hover when our testers measured the
+    build, and otherwise shows plain with "by hand" under it. Long notes are on
+    hover.
+  - The table runs its full height and scrolls sideways in its own box; at
+    400 px it is 27's cards.
+- **Step checkpoints.** Our runs, Every model and Ran out of room. Every model
+  is one row a model: a model two sources give numbers for is one row, each
+  cell its newer number, the other on hover. The head-to-head table stays: its
+  cells are one model minus another, not scores.
+- **The two builds.** Its rows are benchmarks (a table-chart with the
+  difference, the verdict and where they differ), so it keeps its own layout;
+  each build's score is a `scoreCell`.
+- **On our testers' phones.** The medians per phone and model are a row a model
+  on a phone ("step8804 · OnePlus 15"), its line the phone's memory and the
+  tests' dates. Every test stays as it is: a row a test.
+
+## Chart labels (27b)
+
+`chartLabels(svg, pts, box, o)` places the labels of every scatter chart:
+On-device's score against memory, the file-size chart and score against
+thinking.
+
+- A label tries the spots right, left, above and below its point, and takes
+  the first that touches no other label, no point, no line it is told to keep
+  off (the file-size chart's frontier and ± whiskers) and no edge of the plot.
+- If none is free, it takes the nearest free spot a short reach away, with a
+  leader line that crosses no label and no other point.
+- If there is still none, the point stays bare: its name is on its hover and in
+  a line under the panel.
+- Ours are placed first, so they get the best spots.
+
 ## Tests
 
 - `tests/test_27_values_browser.py` checks that no number changed.
@@ -102,3 +151,10 @@ modelling's cross-entropy table (a row per task and model) keep their own.
   name everywhere, the naming rules, Frontier's columns, no blanks,
   Everyday, Tint, the Thinking filter, empty rows, and every tab at 1280 and
   400, light and dark, scrolled both ways.
+- `tests/test_27b_values_*_browser.py` check that no number on the Reports
+  pages changed, on three worlds (On-device and Step checkpoints; our testers'
+  phones; the two builds), against `tests/fixtures/reports27b/before-*.json`
+  (`values27b.py`).
+- `tests/test_27b_reports_browser.py` and `tests/test_27b_phone_browser.py`
+  cover the On-device table, its cells, Memory and On a phone, the cards, the
+  testers' medians, and every chart label's place at 1280 and 400.

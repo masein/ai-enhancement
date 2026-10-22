@@ -53,7 +53,7 @@ def report(page, live, width, scheme):
     page.set_viewport_size({"width": width, "height": 1000})
     page.goto("about:blank")
     page.goto(live["base"] + "/#tab=reports&report=on-device")
-    page.wait_for_selector("[data-od-table]", timeout=30000)
+    page.wait_for_selector("[data-od-table]", state="attached", timeout=30000)
 
 
 @pytest.mark.parametrize("width,scheme", SIZES)
@@ -62,33 +62,40 @@ def test_the_on_device_report(live, page, width, scheme):
     order = page.eval_on_selector_all("[data-report-section]",
                                       "ss => ss.map(s => s.dataset.reportSection)")
     assert order == ["od-table", "od-keep", "od-memory", "notes"]
-    heads = page.eval_on_selector_all("[data-od-table] thead th", "ts => ts.map(t => t.textContent)")
-    assert heads == ["Model", "Base model", "Size on disk", "Memory it needs", "Phone speed",
-                     "Measured on our testers’ phones", "GPQA Diamond", "MMLU-Pro", "IFEval",
-                     "IFBench"]
-    rows = page.eval_on_selector_all("[data-od-row]", "rs => rs.map(r => r.dataset.odRow)")
-    assert rows[:4] == ["step8804", "step4000", "step1000", "Q4 (UD-Q4_K_XL)"]
-    assert rows[4:] == ["Edge0-35B-A3B-preview", "Edge0-8B-A1B-preview", "Bonsai 27B (1-bit)",
-                        "Ternary Bonsai 2 2B", "Ternary Bonsai 2 4B", "Ternary Bonsai 2 9B",
-                        "Gemma 4 E4B", "Gemma 4 E2B"]
-    # every cell says where it is from: measured here, or published by … with its link
+    # 27b: 27's table — the base in the row's line; Memory and On a phone one column each
+    heads = page.eval_on_selector_all("[data-od-table] thead tr.mt-hrow th[data-mt-col]",
+                                      "ts => ts.map(t => t.dataset.mtCol)")
+    assert heads == ["name", "gpqa", "mmlupro", "ifeval", "ifbench", "memory", "phone"]
+    # ours, then the others as their makers publish them, each by GPQA Diamond; a
+    # row with no score yet (step8804's) counted under the table
+    group = lambda g: page.eval_on_selector_all(                            # noqa: E731
+        f"[data-od-table] tr[data-mt-group='{g}']", "rs => rs.map(r => r.dataset.odRow)")
+    assert group("ours") == ["Q4 (UD-Q4_K_XL)", "step4000", "step1000"]
+    assert group("open") == ["Edge0-35B-A3B-preview", "Edge0-8B-A1B-preview", "Ternary Bonsai 2 9B",
+                             "Ternary Bonsai 2 4B", "Gemma 4 E4B", "Gemma 4 E2B",
+                             "Ternary Bonsai 2 2B", "Bonsai 27B (1-bit)"]
+    assert page.locator("[data-mt-empty]").get_attribute("data-mt-empty") == "1"
+    # every cell says where it is from: its mark and italics, a published one's letter
+    # linking its source; the source once in the row's line, linked
     e0 = page.locator("[data-od-cell='Edge0-35B-A3B-preview|gpqa']")
-    assert e0.inner_text().split("\n")[0] == "79.8"
-    assert e0.locator("[data-od-link]").get_attribute("href") == E0
-    assert e0.locator("[data-od-link]").inner_text() == "published by Edge0"
-    assert e0.locator("[data-od-keep]").inner_text() == "keeps 97.6% of its base"
+    assert e0.locator(".mt-n").inner_text() == "79.8X"
+    assert e0.locator("[data-card-link]").get_attribute("href") == E0
+    line = page.locator("tr[data-od-row='Edge0-35B-A3B-preview'] [data-mt-line]")
+    assert "published by Edge0" in line.inner_text()
+    assert e0.locator("[data-od-keep]").inner_text() == "97.6% of its base"
     assert page.locator("[data-od-keep='Ternary Bonsai 2 9B|ifbench']").inner_text() == (
-        "keeps 99.4% of its base")
-    s4 = page.locator("[data-od-cell='step4000|gpqa']")
-    assert s4.locator("[data-od-src]").inner_text() == "measured here"
-    assert page.locator("[data-od-fact='Edge0-35B-A3B-preview|phone']").inner_text().startswith(
-        "no phone numbers yet")
-    assert page.locator("[data-od-fact='Bonsai 27B (1-bit)|phone']").inner_text().startswith(
-        "about 11 tok/s decode")
-    assert "iPhone 17 Pro Max" in page.locator("[data-od-fact='Bonsai 27B (1-bit)|phone']").inner_text()
-    assert page.locator("[data-od-fact='Edge0-35B-A3B-preview|disk']").inner_text().startswith(
-        "19.6 GB")
-    assert page.locator("[data-od-fact='step4000|disk']").inner_text().startswith("15.8 GB")
+        "99.4% of its base")
+    assert page.locator("tr[data-od-row='step4000'] [data-mt-line]").inner_text().endswith(
+        "measured here")
+    assert page.locator("[data-od-fact='Edge0-35B-A3B-preview|phone']").get_attribute(
+        "data-tip").startswith('["no phone numbers yet"')
+    b27 = page.locator("[data-od-fact='Bonsai 27B (1-bit)|phone']")
+    assert b27.locator(".mt-n").inner_text() == "11 tok/sP"
+    assert b27.locator(".mt-sub").inner_text() == "iPhone 17 Pro Max"
+    assert "about 11 tok/s decode" in b27.get_attribute("data-tip")
+    assert page.locator("[data-od-disk='Edge0-35B-A3B-preview']").inner_text() == (
+        "19.6 GB on disk")
+    assert page.locator("[data-od-fact='step4000|memory'] .mt-n").inner_text() == "15.8 GB"
     # the charts: ours a filled circle, theirs a hollow diamond — shape and fill
     for chart in ("keep", "mem"):
         marks = page.eval_on_selector_all(
@@ -116,7 +123,8 @@ def test_the_on_device_report(live, page, width, scheme):
 
 def test_a_published_model_has_its_own_page_and_frontier_row(live, page):
     report(page, live, 1280, "light")
-    page.locator("[data-od-page='Edge0-35B-A3B-preview']").click()
+    # 27b: its name opens its page, as a row's name does on Models
+    page.locator("tr[data-od-row='Edge0-35B-A3B-preview'] a[data-mt-name]").click()
     page.wait_for_selector("[data-reported-model]", timeout=30000)
     assert page.locator("h1.mtitle").inner_text() == "Edge0-35B-A3B-preview"
     assert "never in an average or a rank" in page.locator("[data-rm-said]").inner_text()

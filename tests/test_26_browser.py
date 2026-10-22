@@ -133,9 +133,11 @@ def test_on_our_testers_phones(live, page, width, scheme):
     assert cell("t5", "battery").get_attribute("title").startswith("it ran while charging")
     # per phone and model: OnePlus 15's medians, without the impossible one
     op = page.locator("[data-pt-per-row='CPH2747|model-004']")
-    assert op.locator("[data-pt-per-n]").evaluate("c => c.firstChild.textContent") == "4 of 5"
-    assert op.locator("[data-pt-per-decode]").evaluate("c => c.firstChild.textContent") == "13.0"
-    assert op.locator("[data-pt-per-rise]").inner_text() == "+1.6 °C"     # not t5's, charging
+    # 27b: modelTable's row and cells
+    assert op.locator("[data-pt-per-n] .mt-n").evaluate("c => c.textContent") == "4 of 5"
+    assert op.locator("[data-pt-per-decode] .mt-n").evaluate("c => c.textContent") == "13.0"
+    assert op.locator("[data-pt-per-rise] .mt-n").evaluate("c => c.textContent") == (
+        "+1.6 °C")                                                         # not t5's, charging
     # what failed, by phone and app version
     failed = page.eval_on_selector_all("[data-pt-failed]", "ls => ls.map(l => l.dataset.ptFailed)")
     assert failed == ["23078PND5G|1.4", "SM-S938B|1.4"]
@@ -202,15 +204,21 @@ def test_the_on_device_report_has_our_testers_column(live, page):
     page.goto(live["base"] + "/#tab=reports&report=on-device")
     page.wait_for_selector("[data-od-table]", timeout=30000)
     row = f"{NAME} (phone build)"
-    cell = page.locator(f"[data-od-fact='{row}|testers']")
-    got = cell.locator("[data-od-tester]").all_inner_texts()
-    assert [g.split("\n") for g in got] == [
-        ["9.8 tok/s decode · 4,565 MB", "Galaxy S25 Ultra, median of 1 test, 2026-10-16",
-         "measured on our testers’ phones"],
-        ["13.0 tok/s decode · 4,565 MB", "OnePlus 15, median of 4 tests, 2026-10-17 to 2026-10-20",
-         "measured on our testers’ phones"]]
-    # the hand-typed one stays in Phone speed, said so; a published model's column is a dash
-    assert "reported by hand by Sam" in page.locator(f"[data-od-fact='{row}|phone']").inner_text()
-    assert page.locator("[data-od-fact='Bonsai 27B (1-bit)|testers']").inner_text() == "—"
+    # 27b: one column, On a phone — our testers' median wins it: the row's dot,
+    # decode tok/s, the phone and its tests under it; every phone on hover
+    cell = page.locator(f"[data-od-fact='{row}|phone']")
+    assert cell.locator("[data-mt-cell-mark='here']").count() == 1
+    assert cell.locator(".mt-n").inner_text() == "13.0 tok/s"
+    assert cell.locator(".mt-sub").inner_text() == "OnePlus 15 · 4 tests · +1 phone"
+    tip = cell.get_attribute("data-tip")
+    assert "Galaxy S25 Ultra: 9.8 tok/s · engine memory 4,565 MB, median of 1 test, 2026-10-16" in tip
+    assert "OnePlus 15: 13.0 tok/s · engine memory 4,565 MB, median of 4 tests, 2026-10-17 to " \
+        "2026-10-20" in tip
+    # the hand-typed one never mixed in: on hover, said so
+    assert "reported by hand: 13.5 tok/s decode, median on OnePlus 15 by Sam" in tip
+    # a published model's: its own speed, in italics with its letter, the phone under it
+    b27 = page.locator("[data-od-fact='Bonsai 27B (1-bit)|phone']")
+    assert b27.locator(".mt-n.mt-pub").inner_text() == "11 tok/sP"
+    assert b27.locator(".mt-sub").inner_text() == "iPhone 17 Pro Max"
     assert page.errors == []
     shot(page, page.locator("[data-report-section='od-table']"), SCREENS / "on-device-testers-1280.png")
