@@ -36,7 +36,7 @@ def test_gemma_in_every_model_and_their_tiles(live, page, width, scheme):
     got = dict(zip(keys, cells))
     assert got["GPQA Diamond"].startswith("58.6") and got["MMLU-Pro"].startswith("69.4")
     assert got["IFEval"].startswith("96.7") and got["IFBench"].startswith("44.0")
-    assert got["HLE"] == got["OTIS Mock AIME"] == got["ARC-AGI-2"] == "—"
+    assert got["HLE"] == got["OTIS Mock AIME"] == got["ARC-AGI-2"] == "–"          # 27's dash
     links = row.locator("[data-card-link]").evaluate_all("as => as.map(a => a.href)")
     assert links == [CARD["Gemma 4 E4B"], CARD["Gemma 4 E4B"], ARXIV, ARXIV]
     # Where we stand: IFEval's and IFBench's tiles, step8804's number in each
@@ -48,6 +48,7 @@ def test_gemma_in_every_model_and_their_tiles(live, page, width, scheme):
     shot(page, page.locator("[data-rp-tile='ifbench']"), SCREENS / f"tile-{width}-{scheme}.png")
     # the row is inside Every model's own scroller: shot as the element, scrolled to
     both = page.locator("[data-rp-every] tbody tr").filter(has=page.locator("[data-their-note]"))
-    both.first.scroll_into_view_if_needed()
+    if width >= 640:                                     # 27b: on a phone, 27's cards
+        both.first.scroll_into_view_if_needed()
     page.locator("[data-report-section='every']").screenshot(
         path=str(SCREENS / f"every-{width}-{scheme}.png"))

@@ -81,10 +81,10 @@ def shot(part, name):
 
 
 def first_text(page, sel: str) -> list[list[str]]:
-    """each row: its model's name, then each cell's own number (its first line)"""
-    return page.eval_on_selector_all(sel, """rows => rows.map(r => [r.children[0].title
-      || r.children[0].textContent.trim(), ...[...r.children].slice(1).map(c => c.firstChild
-      && c.firstChild.nodeType === 3 ? c.firstChild.textContent.trim() : c.textContent.trim())])""")
+    """each row: its model's name, then each cell's own number (its first line);
+    27b: a report's table is modelTable's, a row by each label it answers to"""
+    from values27b import MT_FIRST
+    return page.eval_on_selector_all(sel, MT_FIRST)
 
 
 # ---------------------------------------------------------------------------
@@ -162,10 +162,14 @@ def test_latest_equals_the_report_and_a_named_view_stays(live, page):
     order = ["gpqa", "hle", "otis", "math", "mmlupro", "simpleqa", "arc"]
     num = lambda x: x.split(" ")[0].replace("—", "–")             # noqa: E731
     for r in latest:
-        # a row is its label's numbers; a row two sources make shows one of theirs a cell
+        # a row is its label's numbers; a row two sources make shows one of theirs a
+        # cell. 27b: the report's table makes one row of a model's two sources
+        # where Latest shows one (its glance rows): an empty cell there may be
+        # the other source's number here
         by = [dict(zip(order, every[x])) for x in r["labels"]]
         for k in ("gpqa", "otis", "mmlupro", "hle"):
-            assert r["cells"][k] in {num(b[k]) for b in by}, (r["labels"], k)
+            assert r["cells"][k] == "–" or r["cells"][k] in {num(b[k]) for b in by}, (
+                r["labels"], k)
     # Standard, named in the link, stays Standard on a reload
     go(page, live)
     page.locator("[data-models-view='standard']").click()
@@ -239,12 +243,17 @@ def test_the_reports_numbers_say_what_they_are(live, page, width, scheme):
     page.goto("about:blank")
     page.goto(live["base"] + "/#tab=reports&report=step-checkpoints")
     page.wait_for_selector("[data-rp-tok]", timeout=30000)
-    # a score cell: "74.2 ± 2.6", then "198 questions × 4 · 3 answers ran out"
-    cell = page.locator("[data-rp-row='step4000'] td").nth(1)
-    assert cell.inner_text().startswith("74.2 ± 2.6")
-    assert cell.locator("[data-rp-asked]").inner_text() == "198 questions × 4 · 3 answers ran out"
-    arc = page.locator("[data-rp-row='step4000'] td").nth(7).locator("[data-rp-asked]")
-    assert arc.inner_text() == "167 tasks × 2 · 3 answers ran out"
+    # a score cell: "74.2", its ± small; 27b: "198 questions × 4 · 3 answers ran
+    # out" on its hover, the column's head "science · 198 × 4"
+    cell = page.locator("[data-rp-row='step4000'] td[data-mt-col='gpqa']")
+    assert cell.locator(".mt-n").inner_text() == "74.2"
+    assert cell.locator(".mt-se").inner_text() == "±2.6"
+    assert "198 questions × 4 · 3 answers ran out" in cell.get_attribute("data-tip").replace(
+        '","', " · ")
+    assert page.locator("[data-rp-ours] th[data-mt-col='gpqa'] .mt-h2").inner_text() == (
+        "science · 198 × 4")
+    arc = page.locator("[data-rp-row='step4000'] td[data-mt-col='arc']").get_attribute("data-tip")
+    assert "167 tasks × 2" in arc and "3 answers ran out" in arc
     assert "792 answers" not in page.locator("[data-rp-ours]").inner_text()
     # 21d.1: a loop example's length is its thinking, as the page says it
     page.wait_for_selector("[data-rp-loop='486'] [data-rp-thought='against']", timeout=30000)

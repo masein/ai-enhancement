@@ -57,11 +57,13 @@ def report(page, live, width, scheme, hash_="report=step-checkpoints", wait="[da
     page.set_viewport_size({"width": width, "height": 1000})
     page.goto("about:blank")
     page.goto(live["base"] + "/#tab=reports&" + hash_)
-    page.wait_for_selector(wait, timeout=30000)
+    page.wait_for_selector(wait, state="attached", timeout=30000)
 
 
 def heads(page, sel: str) -> list[str]:
-    return page.eval_on_selector_all(f"{sel} thead th", "ts => ts.map(t => t.textContent.trim())")
+    # 27b: a modelTable column by its whole name (its title), as the old head read
+    return page.eval_on_selector_all(f"{sel} thead th", "ts => ts.map(t => t.dataset.mtCol "
+                                     "&& t.title || t.textContent.trim())")
 
 
 @pytest.mark.parametrize("width,scheme", SIZES)

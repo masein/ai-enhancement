@@ -1,0 +1,670 @@
+{
+ "on-device": {
+  "od": {
+   "Bonsai 27B (1-bit)": {
+    "Base model": {
+     "text": "Qwen3.6-27B",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "Measured on our testers’ phones": {
+     "text": "—",
+     "tip": "its phone speed is as published, in Phone speed"
+    },
+    "Memory it needs": {
+     "text": "3.9 GB published by PrismML",
+     "tip": "its deployed footprint, which fits an iPhone 17 Pro Max's per-app budget, its card says"
+    },
+    "Model": {
+     "text": "Bonsai 27B (1-bit) 1-bit (1.125 bits a weight)",
+     "tip": "Bonsai 27B (1-bit)"
+    },
+    "Phone speed": {
+     "text": "about 11 tok/s decode (10.8 sustained), prompt 111 tok/s at 512 iPhone 17 Pro Max published by PrismML",
+     "tip": ""
+    },
+    "Size on disk": {
+     "text": "3.9 GB the MLX pack is 5.13 GB on disk published by PrismML",
+     "tip": "deployed size, its card says"
+    }
+   },
+   "Edge0-35B-A3B-preview": {
+    "Base model": {
+     "text": "Qwen3.6-35B-A3B (the base our builds share)",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "Measured on our testers’ phones": {
+     "text": "—",
+     "tip": "its phone speed is as published, in Phone speed"
+    },
+    "Memory it needs": {
+     "text": "2.9 GiB published by Edge0",
+     "tip": "peak MLX allocator memory, short contexts (not the process's RSS)"
+    },
+    "Model": {
+     "text": "Edge0-35B-A3B-preview int4, 4 routed experts (K=4), a trained prerouter, experts streamed from SSD, a distilled Recover-LoRA",
+     "tip": "Edge0-35B-A3B-preview"
+    },
+    "Phone speed": {
+     "text": "no phone numbers yet its iOS and Android engines are \"still maturing\", its card says",
+     "tip": ""
+    },
+    "Size on disk": {
+     "text": "19.6 GB its README says about 23 GB published by Edge0",
+     "tip": "MLX, as its Hugging Face page gives it"
+    }
+   },
+   "Edge0-8B-A1B-preview": {
+    "Base model": {
+     "text": "Ling 3.0 tiny (inclusionAI)",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "Measured on our testers’ phones": {
+     "text": "—",
+     "tip": "its phone speed is as published, in Phone speed"
+    },
+    "Memory it needs": {
+     "text": "1.0 GiB published by Edge0",
+     "tip": "peak MLX allocator memory, short contexts (not the process's RSS)"
+    },
+    "Model": {
+     "text": "Edge0-8B-A1B-preview int4, routing prediction, experts streamed from SSD",
+     "tip": "Edge0-8B-A1B-preview"
+    },
+    "Phone speed": {
+     "text": "no phone numbers yet its iOS and Android engines are \"still maturing\", its card says",
+     "tip": ""
+    },
+    "Size on disk": {
+     "text": "4.55 GB its README says about 4.2 GB published by Edge0",
+     "tip": "MLX, as its Hugging Face page gives it"
+    }
+   },
+   "Gemma 4 E2B": {
+    "Base model": {
+     "text": "none: the model itself, Google's full model",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "Measured on our testers’ phones": {
+     "text": "—",
+     "tip": "its phone speed is as published, in Phone speed"
+    },
+    "Memory it needs": {
+     "text": "0.85 GB published by Google",
+     "tip": "those weights and an int8 KV cache at 32k context, +0.05 GB (Table 3)"
+    },
+    "Model": {
+     "text": "Gemma 4 E2B 2.3B effective (5.1B with embeddings)",
+     "tip": "Gemma 4 E2B"
+    },
+    "Phone speed": {
+     "text": "no phone numbers published Google gives none for these two",
+     "tip": ""
+    },
+    "Size on disk": {
+     "text": "0.8 GB published by Google",
+     "tip": "its weights in Google's mobile quantization, text only (the report's Table 3)"
+    }
+   },
+   "Gemma 4 E4B": {
+    "Base model": {
+     "text": "none: the model itself, Google's full model",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "Measured on our testers’ phones": {
+     "text": "—",
+     "tip": "its phone speed is as published, in Phone speed"
+    },
+    "Memory it needs": {
+     "text": "2.44 GB published by Google",
+     "tip": "those weights and an int8 KV cache at 32k context, +0.14 GB (Table 3)"
+    },
+    "Model": {
+     "text": "Gemma 4 E4B 4.5B effective (8B with embeddings)",
+     "tip": "Gemma 4 E4B"
+    },
+    "Phone speed": {
+     "text": "no phone numbers published Google gives none for these two",
+     "tip": ""
+    },
+    "Size on disk": {
+     "text": "2.3 GB published by Google",
+     "tip": "its weights in Google's mobile quantization, text only (the report's Table 3)"
+    }
+   },
+   "Q4 (UD-Q4_K_XL)": {
+    "Base model": {
+     "text": "Qwen3.6-35B-A3B",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "Measured on our testers’ phones": {
+     "text": "—",
+     "tip": "not a phone build"
+    },
+    "Memory it needs": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "Q4 (UD-Q4_K_XL)",
+     "tip": "Q4 (UD-Q4_K_XL)"
+    },
+    "Phone speed": {
+     "text": "not measured on a phone yet",
+     "tip": ""
+    },
+    "Size on disk": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Ternary Bonsai 2 2B": {
+    "Base model": {
+     "text": "Qwen3.5 2B",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "Measured on our testers’ phones": {
+     "text": "—",
+     "tip": "its phone speed is as published, in Phone speed"
+    },
+    "Memory it needs": {
+     "text": "0.43 GB published by PrismML",
+     "tip": "its footprint, PrismML's post says"
+    },
+    "Model": {
+     "text": "Ternary Bonsai 2 2B ternary ({−1, 0, +1})",
+     "tip": "Ternary Bonsai 2 2B"
+    },
+    "Phone speed": {
+     "text": "up to 120 tok/s iPhone 18 Pro Max published by PrismML",
+     "tip": ""
+    },
+    "Size on disk": {
+     "text": "0.43 GB published by PrismML",
+     "tip": "its footprint, PrismML's post says"
+    }
+   },
+   "Ternary Bonsai 2 4B": {
+    "Base model": {
+     "text": "Qwen3.5 4B",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "Measured on our testers’ phones": {
+     "text": "—",
+     "tip": "its phone speed is as published, in Phone speed"
+    },
+    "Memory it needs": {
+     "text": "0.95 GB published by PrismML",
+     "tip": "its footprint, PrismML's post says"
+    },
+    "Model": {
+     "text": "Ternary Bonsai 2 4B ternary ({−1, 0, +1})",
+     "tip": "Ternary Bonsai 2 4B"
+    },
+    "Phone speed": {
+     "text": "no phone number for the 4B PrismML gives the 2B's and the 9B's",
+     "tip": ""
+    },
+    "Size on disk": {
+     "text": "0.95 GB published by PrismML",
+     "tip": "its footprint, PrismML's post says"
+    }
+   },
+   "Ternary Bonsai 2 9B": {
+    "Base model": {
+     "text": "Qwen3.5 9B",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "Measured on our testers’ phones": {
+     "text": "—",
+     "tip": "its phone speed is as published, in Phone speed"
+    },
+    "Memory it needs": {
+     "text": "2 GB published by PrismML",
+     "tip": "its footprint, PrismML's post says"
+    },
+    "Model": {
+     "text": "Ternary Bonsai 2 9B ternary ({−1, 0, +1})",
+     "tip": "Ternary Bonsai 2 9B"
+    },
+    "Phone speed": {
+     "text": "up to 34 tok/s iPhone 18 Pro Max published by PrismML",
+     "tip": ""
+    },
+    "Size on disk": {
+     "text": "2 GB published by PrismML",
+     "tip": "its footprint, PrismML's post says"
+    }
+   },
+   "fx k4 phone build (phone build)": {
+    "Base model": {
+     "text": "Qwen3.6-35B-A3B",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "70.0 ± 2.0 measured here",
+     "tip": "by code"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "Measured on our testers’ phones": {
+     "text": "9.8 tok/s decode · 4,565 MB Galaxy S25 Ultra, median of 1 test, 2026-10-16 measured on our testers’ phones 13.0 tok/s decode · 4,565 MB OnePlus 15, median of 4 tests, 2026-10-17 to 2026-10-20 measured on our testers’ phones",
+     "tip": ""
+    },
+    "Memory it needs": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "fx k4 phone build (phone build)",
+     "tip": "fx k4 phone build (phone build)"
+    },
+    "Phone speed": {
+     "text": "13.5 tok/s decode, median OnePlus 15 reported by hand by Sam, 2026-10-01",
+     "tip": ""
+    },
+    "Size on disk": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "step1000": {
+    "Base model": {
+     "text": "Qwen3.6-35B-A3B",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "Measured on our testers’ phones": {
+     "text": "—",
+     "tip": "not a phone build"
+    },
+    "Memory it needs": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "step1000",
+     "tip": "step1000"
+    },
+    "Phone speed": {
+     "text": "not measured on a phone yet",
+     "tip": ""
+    },
+    "Size on disk": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "step4000": {
+    "Base model": {
+     "text": "Qwen3.6-35B-A3B",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "Measured on our testers’ phones": {
+     "text": "—",
+     "tip": "not a phone build"
+    },
+    "Memory it needs": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "step4000",
+     "tip": "step4000"
+    },
+    "Phone speed": {
+     "text": "not measured on a phone yet",
+     "tip": ""
+    },
+    "Size on disk": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "step8804": {
+    "Base model": {
+     "text": "Qwen3.6-35B-A3B",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "Measured on our testers’ phones": {
+     "text": "—",
+     "tip": "not a phone build"
+    },
+    "Memory it needs": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "step8804",
+     "tip": "step8804"
+    },
+    "Phone speed": {
+     "text": "not measured on a phone yet",
+     "tip": ""
+    },
+    "Size on disk": {
+     "text": "—",
+     "tip": ""
+    }
+   }
+  }
+ },
+ "testers": {
+  "per": {
+   "23078PND5G|model-004": {
+    "Dates": {
+     "text": "—",
+     "tip": ""
+    },
+    "Decode": {
+     "text": "— tok/s",
+     "tip": ""
+    },
+    "Engine memory": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "k4 phone build, Q4 (Qwen3.6-35B-A3B)",
+     "tip": ""
+    },
+    "Phone": {
+     "text": "23078PND5G (not named yet)",
+     "tip": ""
+    },
+    "Prefill, warm": {
+     "text": "— tok/s",
+     "tip": ""
+    },
+    "Temperature rise": {
+     "text": "—",
+     "tip": ""
+    },
+    "Tests": {
+     "text": "0 of 2 in the medians",
+     "tip": ""
+    },
+    "Time to first word": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "CPH2747|model-004": {
+    "Dates": {
+     "text": "2026-10-17 to 2026-10-20",
+     "tip": ""
+    },
+    "Decode": {
+     "text": "13.0 tok/s",
+     "tip": ""
+    },
+    "Engine memory": {
+     "text": "4,565 MB",
+     "tip": ""
+    },
+    "Model": {
+     "text": "k4 phone build, Q4 (Qwen3.6-35B-A3B)",
+     "tip": ""
+    },
+    "Phone": {
+     "text": "OnePlus 15",
+     "tip": ""
+    },
+    "Prefill, warm": {
+     "text": "36.2 tok/s",
+     "tip": ""
+    },
+    "Temperature rise": {
+     "text": "+1.6 °C",
+     "tip": ""
+    },
+    "Tests": {
+     "text": "4 of 5 in the medians",
+     "tip": ""
+    },
+    "Time to first word": {
+     "text": "5.0 s",
+     "tip": ""
+    }
+   },
+   "SM-S938B|model-004": {
+    "Dates": {
+     "text": "2026-10-16",
+     "tip": ""
+    },
+    "Decode": {
+     "text": "9.8 tok/s",
+     "tip": ""
+    },
+    "Engine memory": {
+     "text": "4,565 MB",
+     "tip": ""
+    },
+    "Model": {
+     "text": "k4 phone build, Q4 (Qwen3.6-35B-A3B)",
+     "tip": ""
+    },
+    "Phone": {
+     "text": "Galaxy S25 Ultra",
+     "tip": ""
+    },
+    "Prefill, warm": {
+     "text": "36.2 tok/s",
+     "tip": ""
+    },
+    "Temperature rise": {
+     "text": "+1.4 °C",
+     "tip": ""
+    },
+    "Tests": {
+     "text": "1 of 2 in the medians",
+     "tip": ""
+    },
+    "Time to first word": {
+     "text": "5.0 s",
+     "tip": ""
+    }
+   }
+  }
+ }
+}

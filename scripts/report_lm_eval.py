@@ -5798,6 +5798,10 @@ table.rp.pt-checks td.pt-reply { text-align:left; white-space:pre-wrap; overflow
 .mt-legend .mt-tint { white-space:nowrap; margin:0; padding:0; border:0; }
 .mt-box { overflow:auto; max-height:min(78vh, 1400px); border:1px solid var(--border);
   border-radius:var(--r-2); background:var(--surface-1); }
+/* 27b: a report's table runs its full height; it scrolls sideways only */
+.mt-box.free { max-height:none; overflow-y:hidden; }
+/* 27b: a number measured on our testers' phones, the row's dot before it */
+.mt-cmark { width:8px; height:8px; flex:none; margin-right:5px; vertical-align:1px; }
 table.mt-table { border-collapse:separate; border-spacing:0; width:100%; min-width:100%;
   font-size:14px; table-layout:auto; }
 table.mt-table th, table.mt-table td { padding:8px 12px; border-bottom:1px solid var(--border);
@@ -5815,7 +5819,7 @@ table.mt-table th.mt-hg { font-size:12px; font-weight:500; color:var(--muted); t
 table.mt-table thead td.mt-hg-gap { background:var(--surface-1); border-bottom:1px solid var(--grid);
   padding:0; height:auto; }
 .mt-h2 { display:block; font-size:12px; font-weight:400; color:var(--muted); white-space:nowrap;
-  font-family:var(--font-sans); }
+  font-family:var(--font-sans); text-transform:none; letter-spacing:0; }
 table.mt-table th.sortable { cursor:pointer; }
 table.mt-table th .dir { color:var(--accent); }
 table.mt-table td.mt-name, table.mt-table th.model, table.mt-table th.mt-hg-name { position:sticky;
@@ -13762,6 +13766,51 @@ function mtSortRows(rows, spec) {
     return typeof va === 'string' ? s.dir * natCmp(va, vb) : s.dir * (va - vb);
   });
 }
+// 27b: one cell, every table: modelTable's, the Reports pages' and the two
+// builds' table-chart (o.tag 'div'). x: the cell (above); o: {col, row, lead,
+// heat (1–5 with Tint on), tint, sub (a sub-row's), tag, cls}
+function scoreCell(x, o = {}) {
+  const c = o.col || {}, r = o.row || {}, tag = o.tag || 'td';
+  const at = { 'data-mt-col': c.key || null, ...((x && x.attrs) || {}) };
+  const cls = (o.cls ? o.cls + ' ' : '') + 'mt-c' + (c.num === false ? '' : ' num');
+  if (x && x.node) return el(tag, { class: cls, ...at }, x.node);
+  // no number: a dash, or what stands for one ("– 2/3", "awaiting judge"), plain
+  if (!x || x.v == null)
+    return el(tag, { class: cls + ' mt-none', ...at, title: (x && x.why) || null,
+      'data-tip': x && x.tip && x.tip.length ? JSON.stringify(x.tip) : null },
+    (x && x.text) || '–');
+  const lead = !!o.lead;
+  const txt = x.text ?? (c.score ? (100 * x.v).toFixed(1) : String(x.v));
+  const h = o.heat || null;
+  const bar = c.score && !o.tint && x.v != null && !x.dim ? (x.bar ?? x.v) : null;
+  const name = r.name || '';
+  return el(tag, { class: cls + ' tcell' + (lead ? ' lead' : '') + (x.pub ? ' mt-pubc' : '')
+      + (x.dim ? ' dim' : '') + (o.sub ? ' mt-subc' : ''),
+      style: h ? `background:var(--heat-${h})` : null, 'data-lead': lead ? '1' : null,
+      'data-mt-v': typeof x.v === 'number' ? String(x.v) : null,
+      'data-mt-heat': h ? String(h) : null, tabindex: '0', title: x.why || null,
+      'data-tip': JSON.stringify([txt + (x.se ? ` ± ${x.se}` : ''),
+        ...(name || c.full || c.label ? [[name, c.full || c.label].filter(Boolean).join(' · ')] : []),
+        ...(lead ? ['best in the column, or within its noise'] : []), ...(x.tip || [])]),
+      ...at },
+    // a number measured on a phone of ours, as the row's mark says it
+    x.dot ? el('span', { class: 'mt-mark here mt-cmark', 'data-mt-cell-mark': 'here',
+      'aria-label': 'measured', style: `background:${r.colour || 'var(--accent)'}` }) : '',
+    el('span', { class: 'mt-n' + (x.pub ? ' mt-pub' : '') },
+      lead ? el('b', { text: txt }) : txt,
+      x.pub ? el('sup', { class: 'mt-src', 'data-mt-src': x.pub.letter,
+        title: x.pub.tip || MT_LETTERS[x.pub.letter] || '' }, x.pub.url ? el('a', {
+          href: x.pub.url, target: '_blank', rel: 'noopener', 'data-card-link': '1',
+          text: x.pub.letter }) : x.pub.letter) : ''),
+    x.se ? el('span', { class: 'mt-se', text: `±${x.se}` }) : '',
+    x.sub ? el('span', { class: 'mt-sub' + (x.subClass ? ' ' + x.subClass : ''), 'data-mt-sub': '1',
+      ...(x.subAttrs || {}), text: x.sub }) : '',
+    bar != null ? el('span', { class: 'mt-bar', 'aria-hidden': 'true' },
+      el('i', { style: `width:${Math.max(0, Math.min(100, 100 * bar)).toFixed(1)}%;`
+        + `background:${r.mark === 'pub' ? 'var(--axis)' : r.colour || 'var(--accent)'}` }))
+      : '',
+    ...(x.notes || []));
+}
 function modelTable(spec) {
   const L = lbS(), tint = !!L.tint, S = mtS(spec.view), cols = spec.cols;
   // rows with no score in any column shown are hidden, and counted under the table
@@ -13801,42 +13850,10 @@ function modelTable(spec) {
   };
   const cell = (r, c, sub) => {
     const x = r.cells[c.key];
-    const at = { 'data-mt-col': c.key, ...((x && x.attrs) || {}) };
-    if (x && x.node) return el('td', { class: 'mt-c' + (c.num === false ? '' : ' num'), ...at },
-      x.node);
-    // no number: a dash, or what stands for one ("– 2/3", "awaiting judge"), plain
-    if (!x || x.v == null)
-      return el('td', { class: 'mt-c num mt-none', ...at, title: (x && x.why) || null,
-        'data-tip': x && x.tip && x.tip.length ? JSON.stringify(x.tip) : null },
-      (x && x.text) || '–');
-    if (x.pub) letters.add(x.pub.letter);
-    const lead = x.lead !== undefined ? !!x.lead : leads[c.key].has(r);
-    const txt = x.text ?? (c.score ? (100 * x.v).toFixed(1) : String(x.v));
-    const h = tint && (c.score || c.heat) && !x.dim ? heat(c, x.v) : null;
-    const bar = c.score && !tint && x.v != null && !x.dim ? (x.bar ?? x.v) : null;
-    return el('td', { class: 'mt-c num tcell' + (lead ? ' lead' : '') + (x.pub ? ' mt-pubc' : '')
-        + (x.dim ? ' dim' : '') + (sub ? ' mt-subc' : ''),
-        style: h ? `background:var(--heat-${h})` : null, 'data-lead': lead ? '1' : null,
-        'data-mt-v': typeof x.v === 'number' ? String(x.v) : null,
-        'data-mt-heat': h ? String(h) : null, tabindex: '0', title: x.why || null,
-        'data-tip': JSON.stringify([txt + (x.se ? ` ± ${x.se}` : ''),
-          `${r.name} · ${c.full || c.label}`, ...(lead ? ['best in the column, or within its '
-            + 'noise'] : []), ...(x.tip || [])]),
-        ...at },
-      el('span', { class: 'mt-n' + (x.pub ? ' mt-pub' : '') },
-        lead ? el('b', { text: txt }) : txt,
-        x.pub ? el('sup', { class: 'mt-src', 'data-mt-src': x.pub.letter,
-          title: x.pub.tip || MT_LETTERS[x.pub.letter] || '' }, x.pub.url ? el('a', {
-            href: x.pub.url, target: '_blank', rel: 'noopener', 'data-card-link': '1',
-            text: x.pub.letter }) : x.pub.letter) : ''),
-      x.se ? el('span', { class: 'mt-se', text: `±${x.se}` }) : '',
-      x.sub ? el('span', { class: 'mt-sub' + (x.subClass ? ' ' + x.subClass : ''), 'data-mt-sub': '1',
-        text: x.sub }) : '',
-      bar != null ? el('span', { class: 'mt-bar', 'aria-hidden': 'true' },
-        el('i', { style: `width:${Math.max(0, Math.min(100, 100 * bar)).toFixed(1)}%;`
-          + `background:${r.mark === 'pub' ? 'var(--axis)' : r.colour || 'var(--accent)'}` }))
-        : '',
-      ...(x.notes || []));
+    if (x && x.pub && x.v != null && !x.node) letters.add(x.pub.letter);
+    const lead = x && x.v != null ? (x.lead !== undefined ? !!x.lead : leads[c.key].has(r)) : false;
+    return scoreCell(x, { col: c, row: r, lead, sub,
+      heat: tint && x && (c.score || c.heat) && !x.dim ? heat(c, x.v) : null, tint });
   };
   const mark = r => el('span', { class: 'mt-mark ' + (r.mark === 'pub' ? 'pub' : 'here'),
     'data-mt-mark': r.mark, 'aria-label': r.mark === 'pub' ? 'published' : 'measured here',
@@ -13848,7 +13865,7 @@ function modelTable(spec) {
         text: sub ? r.subLabel || r.name : midTrunc(r.name, 40) })
         : el('span', { class: 'mname', 'data-mt-name': r.key, text: midTrunc(r.name, 40) }),
       ...(r.badges || []).filter(Boolean)),
-    !sub && r.line ? el('div', { class: 'mt-line', 'data-mt-line': r.key, text: r.line }) : '');
+    !sub && r.line ? el('div', { class: 'mt-line', 'data-mt-line': r.key }, mtLineKids(r.line)) : '');
   const tr = (r, sub = false) => el('tr', { 'data-mt-row': r.key, 'data-mt-group': r.group || null,
       'data-mt-pub': r.mark === 'pub' ? '1' : null, ...(r.attrs || {}),
       // a row's own class (a duplicate's, one a page sent here) beside the table's
@@ -13932,7 +13949,7 @@ function modelTable(spec) {
     el('div', { class: 'mt-nrow' }, mark(r), el('span', { class: 'mname', text: r.name }),
       ...(r.badges || []).filter(b => b && b.nodeType && !b.matches('input, button')
         && !b.querySelector('input, button')).map(mtBareCopy)),
-    r.line ? el('div', { class: 'mt-line', text: r.line }) : '',
+    r.line ? el('div', { class: 'mt-line' }, mtLineKids(r.line, true)) : '',
     el('div', { class: 'mt-cscores' }, cardCols.map(c => {
       const x = r.cells[c.key];
       const none = !x || (x.v == null && x.text == null);
@@ -13959,7 +13976,8 @@ function modelTable(spec) {
     el('div', { class: 'mt-legend small se', 'data-mt-legend': '1' },
       el('span', { text: tint ? MT_LEGEND_TINT : MT_LEGEND }), mtTintSwitch()),
     el('div', { class: 'mt-wide' }, hfade(spec.hkey || 'mt-' + spec.view, el('div', {
-      class: 'mt-box', 'data-hkeep': spec.hkey || 'mt-' + spec.view }, table))),
+      class: 'mt-box' + (spec.free ? ' free' : ''), 'data-hkeep': spec.hkey || 'mt-' + spec.view },
+      table))),
     cards,
     key ? el('p', { class: 'small se mt-key', 'data-mt-letters': [...letters].sort().join(''),
       text: 'Published numbers in italics, by source: ' + key }) : '',
@@ -13971,6 +13989,13 @@ function modelTable(spec) {
         ? 'hide them' : 'show them', onclick: () => { S.showEmpty = !S.showEmpty; render(); } }))
       : '',
     ...(spec.foot || []));
+}
+// 27b: a row's line: words, or words and nodes (a source's link) joined by " · ";
+// a card's copy keeps the words and links, without the table's hooks
+function mtLineKids(line, copy = false) {
+  if (!Array.isArray(line)) return [String(line)];
+  return line.filter(x => x !== '' && x != null).flatMap((x, i) => [i ? ' · ' : '',
+    x.nodeType ? (copy ? mtBareCopy(x) : x) : String(x)]);
 }
 // a badge's copy for a card: the table keeps the original and its hooks
 // a column's name long enough to wrap between its words ("Mathematics & Science");
@@ -28404,12 +28429,80 @@ function mtAskedShort(n, b) {
   const k = (b && b.epochs) || 1, q = Math.round(n / k);
   return k > 1 && q * k === n ? `${rpN(q)} × ${k}` : rpN(n);
 }
-function mtReportCol(b, rows) {
+function mtReportCol(b, rows, attrs = { 'data-latest-col': b.key }) {
   const m = mtBench(b.label) || mtBench(b.epoch) || {};
   const n = Math.max(0, ...rows.filter(r => r.ours).map(r => (r.cells[b.key] || {}).answers || 0));
   return { key: b.key, label: m.short || b.label, full: b.label, score: true,
-    sub: [m.what, mtAskedShort(n, b)].filter(Boolean).join(' · '),
-    attrs: { 'data-latest-col': b.key } };
+    sub: [m.what, mtAskedShort(n, b)].filter(Boolean).join(' · '), attrs };
+}
+// 27b: a report's row of ours as a row of modelTable (Latest, and the report's
+// own tables): its board name and line, each benchmark its score and ±, how
+// many were asked and ran out on hover. o: {attrs, cellAttrs(b), how (the
+// cell's how too), line (more for its line)}
+function rpOursRow(r, benches, o = {}) {
+  const m = DATA.models.find(x => x.id === r.row);
+  const base = m ? mtRowOf(m) : { key: r.label, id: null, mark: 'here', colour: rpColour(r),
+    name: displayName({ name: r.label }), group: 'ours' };
+  const size = r.size ? `${(r.size / 1e9).toFixed(1)} GB` : undefined;
+  const line = m ? mtLine(m, { group: base.group, size: o.line ? '' : size, thinking: thinkingOf(m) })
+    : '';
+  return { ...base, key: 'ours:' + r.label, colour: r.colour != null ? rpColour(r) : base.colour,
+    line: o.line ? [...line.split(' · ').filter(x => x && x !== r.quant), ...o.line] : line,
+    attrs: o.attrs || {}, cells: Object.fromEntries(benches.map(b => {
+      const c = r.cells[b.key], at = o.cellAttrs ? o.cellAttrs(b) : {};
+      if (!c || c.v == null) return [b.key, { v: null, why: (c && c.why) || 'not in yet', attrs: at }];
+      const parts = [rpAsked(c.answers, b), c.ranOut ? `${rpN(c.ranOut)} answer`
+        + `${c.ranOut === 1 ? '' : 's'} ran out` : ''].filter(Boolean);
+      return [b.key, { v: c.v, text: rpNum(c.v), se: rpNum(c.se), seV: c.se,
+        tip: [...parts, ...(o.how && c.how ? [c.how] : [])], attrs: at }];
+    })) };
+}
+// a report's published rows, one a model: two sources of one model are one row,
+// each cell its newer number with its letter, the other on hover. o: {attrs(x),
+// manyAttr (the attribute naming every label of a merged row), cellAttrs(b),
+// noteNode (its note a node, hooked)}
+function rpTheirsRows(list, benches, o = {}) {
+  const theirs = new Map();
+  for (const x of list) {
+    const name = displayName({ name: x.label, published: true });
+    const parts = nameParts(x.label, { measured: false });
+    const maker = String(x.maker || '').replace(/\s*\(open\)\s*$/i, '');
+    const group = mtGroup({ name: x.label }, true, x.maker);
+    const cells = Object.fromEntries(benches.map(b => {
+      const c = mtTheirCell(x.cells[b.key], x, b);
+      return [b.key, o.cellAttrs ? { ...c, attrs: o.cellAttrs(b, c) } : c];
+    }));
+    const was = theirs.get(name);
+    if (!was) {
+      theirs.set(name, { key: 'theirs:' + x.label, id: null, mark: 'pub', name, group,
+        line: [maker, group === 'open' ? 'open' : 'closed', ...parts.line, x.note
+          ? (o.noteNode ? el('span', { 'data-their-note': x.label, text: x.note }) : x.note) : '',
+          parts.thinking ? `thinking ${parts.thinking}` : ''].filter(Boolean),
+        labels: [x.label], sources: [x.source || 'Epoch AI'], cells,
+        attrs: o.attrs ? o.attrs(x) : {} });
+      continue;
+    }
+    was.labels.push(x.label);
+    was.sources.push(x.source || 'Epoch AI');
+    if (o.manyAttr) was.attrs[o.manyAttr] = was.labels.join('|');
+    for (const b of benches) {
+      const a = was.cells[b.key], c = cells[b.key];
+      if (c.v == null) continue;
+      if (a.v == null) { was.cells[b.key] = c; continue; }
+      const [win, lose] = (c.date || '') > (a.date || '') ? [c, a] : [a, c];
+      was.cells[b.key] = { ...win, tip: [...(win.tip || []), `also ${lose.text}`
+        + `${lose.se ? ` ± ${lose.se}` : ''} from ${MT_LETTERS[lose.pub.letter]}`
+        + `${lose.date ? ` (${lose.date})` : ''}`] };
+    }
+  }
+  return [...theirs.values()].map(x => {
+    const opened = REP().models.find(m => !m.measured
+      && displayName({ ...m, published: true }) === x.name) || null;
+    // a line of words when nothing in it is a node
+    const line = x.line.some(y => y && y.nodeType) ? x.line : x.line.join(' · ');
+    return { ...x, line, id: opened ? opened.id : null,
+      href: opened ? '#model=' + encodeURIComponent(opened.id) : null };
+  });
 }
 // a report row's published cell: the number, its source's letter, the rest on hover
 function mtTheirCell(c, t, b) {
@@ -28455,64 +28548,18 @@ function lbLatest(ms) {
   const cols = [...shown.map(k => every.find(c => c.key === k)),
     { key: 'src', label: 'Source', num: false, sortable: false }];
   S.sort = S.sort && cols.some(c => c.key === S.sort.key) ? S.sort : { key: dflt[0], dir: -1 };
-  const rows = [];
-  for (const r of mine) {
-    const m = DATA.models.find(x => x.id === r.row);
-    const base = m ? mtRowOf(m) : { key: r.label, id: null, mark: 'here', colour: rpColour(r),
-      name: displayName({ name: r.label }), group: 'ours' };
-    const size = r.size ? `${(r.size / 1e9).toFixed(1)} GB` : undefined;
-    rows.push({ ...base, key: 'ours:' + r.label, colour: r.colour != null ? rpColour(r) : base.colour,
-      line: m ? mtLine(m, { group: base.group, size, thinking: thinkingOf(m) }) : '',
-      attrs: { 'data-latest-row': r.label, 'data-latest-ours': 'true' },
-      cells: Object.fromEntries([...benches.map(b => {
-        const c = r.cells[b.key];
-        if (!c || c.v == null) return [b.key, { v: null, why: (c && c.why) || 'not in yet',
-          attrs: { 'data-latest-cell': b.key } }];
-        const parts = [rpAsked(c.answers, b), c.ranOut ? `${rpN(c.ranOut)} answer`
-          + `${c.ranOut === 1 ? '' : 's'} ran out` : ''].filter(Boolean);
-        return [b.key, { v: c.v, text: rpNum(c.v), se: rpNum(c.se), seV: c.se, tip: parts,
-          attrs: { 'data-latest-cell': b.key } }];
-      }), ['src', { node: el('span', { 'data-latest-source': '1', text: `${r.note
-        ? r.note[0].toUpperCase() + r.note.slice(1) : 'Our run'} · ${r.status}` }), keep: false }]]) });
-  }
-  // a published model is one row: two sources of it are one row, each cell its
-  // newer number with its letter, the other on hover
-  const theirs = new Map();
-  for (const x of d.theirs.filter(r => r.glance)) {
-    const name = displayName({ name: x.label, published: true });
-    const parts = nameParts(x.label, { measured: false });
-    const maker = String(x.maker || '').replace(/\s*\(open\)\s*$/i, '');
-    const group = mtGroup({ name: x.label }, true, x.maker);
-    const cells = Object.fromEntries(benches.map(b => [b.key, mtTheirCell(x.cells[b.key], x, b)]));
-    const was = theirs.get(name);
-    if (!was) {
-      theirs.set(name, { key: 'theirs:' + x.label, id: null, mark: 'pub', name, group,
-        line: [maker, group === 'open' ? 'open' : 'closed', ...parts.line, x.note || '',
-          parts.thinking ? `thinking ${parts.thinking}` : ''].filter(Boolean).join(' · '),
-        labels: [x.label], sources: [x.source || 'Epoch AI'], cells,
-        attrs: { 'data-latest-row': x.label, 'data-latest-ours': 'false' } });
-      continue;
-    }
-    was.labels.push(x.label);
-    was.sources.push(x.source || 'Epoch AI');
-    was.attrs['data-latest-rows'] = was.labels.join('|');
-    for (const b of benches) {
-      const a = was.cells[b.key], c = cells[b.key];
-      if (c.v == null) continue;
-      if (a.v == null) { was.cells[b.key] = c; continue; }
-      const [win, lose] = (c.date || '') > (a.date || '') ? [c, a] : [a, c];
-      was.cells[b.key] = { ...win, tip: [...(win.tip || []), `also ${lose.text}`
-        + ` from ${MT_LETTERS[lose.pub.letter]}${lose.date ? ` (${lose.date})` : ''}`] };
-    }
-  }
-  for (const x of theirs.values()) {
-    const opened = REP().models.find(m => !m.measured
-      && displayName({ ...m, published: true }) === x.name) || null;
-    rows.push({ ...x, id: opened ? opened.id : null, href: opened
-      ? '#model=' + encodeURIComponent(opened.id) : null,
-      cells: { ...x.cells, src: { node: el('span', { 'data-latest-source': '1',
-        text: [...new Set(x.sources)].join(' · ') }), keep: false } } });
-  }
+  const rows = mine.map(r => {
+    const row = rpOursRow(r, benches, { attrs: { 'data-latest-row': r.label,
+      'data-latest-ours': 'true' }, cellAttrs: b => ({ 'data-latest-cell': b.key }) });
+    row.cells.src = { node: el('span', { 'data-latest-source': '1', text: `${r.note
+      ? r.note[0].toUpperCase() + r.note.slice(1) : 'Our run'} · ${r.status}` }), keep: false };
+    return row;
+  });
+  for (const x of rpTheirsRows(d.theirs.filter(r => r.glance), benches, {
+      attrs: x => ({ 'data-latest-row': x.label, 'data-latest-ours': 'false' }),
+      manyAttr: 'data-latest-rows' }))
+    rows.push({ ...x, cells: { ...x.cells, src: { node: el('span', { 'data-latest-source': '1',
+      text: [...new Set(x.sources)].join(' · ') }), keep: false } } });
   const at = (d.sources.ours || {}).when;
   const from = el('p', { class: 'small se', 'data-latest-from': g.report },
     `From the ${d.id} report · as of ${at || 'no import yet'} · `,
@@ -28569,44 +28616,6 @@ function rpAsked(n, b) {
   return q * k === n ? `${rpN(q)} ${q === 1 ? unit.replace(/s$/, '') : unit} × ${k}`
     : `${rpN(n)} answer${n === 1 ? '' : 's'}`;
 }
-// a cell of ours: "61.6 ± 3.1", how many questions and how many answers ran
-// out beneath (each part kept on one line); a dash and why for a benchmark
-// that isn't finished. `compact` (Latest): the score alone, the rest on hover
-function rpOurCell(c, b, compact = false) {
-  if (!c || c.v == null)
-    return el('td', { class: 'dash', title: (c && c.why) || 'not in yet', text: '—' });
-  const parts = [rpAsked(c.answers, b), c.ranOut ? `${rpN(c.ranOut)} answer`
-    + `${c.ranOut === 1 ? '' : 's'} ran out` : ''].filter(Boolean);
-  if (compact) return el('td', { class: 'num', title: parts.join(' · '),
-    text: `${rpNum(c.v)} ± ${rpNum(c.se)}` });
-  return el('td', { class: 'num', title: c.how || '' },
-    `${rpNum(c.v)} ± ${rpNum(c.se)}`,
-    el('span', { class: 'rp-sub', 'data-rp-asked': '1' }, parts.flatMap((x, i) =>
-      [i ? ' · ' : '', el('span', { class: 'nw', text: x })])));
-}
-// a cell of theirs: Epoch's own run with its error; HLE from Epoch's
-// collection marked †; a card's number with its link beside it
-function rpTheirCell(c) {
-  if (!c || c.v == null)
-    return el('td', { class: 'dash', title: c && c.why ? c.why : '', text: '—' });
-  const tip = c.src === 'card' ? `${c.card}: ${c.setting}${c.entered_at ? ` · entered `
-      + `${c.entered_at}${c.by ? ' by ' + c.by : ''}` : ''}`
-    : c.src === 'epoch_external' ? `Epoch AI, ${c.setting} (not Epoch’s own run)`
-    : 'Epoch AI’s own run';
-  return el('td', { class: 'num', title: tip },
-    rpNum(c.v) + (c.se ? ` ± ${rpNum(c.se)}` : '') + (c.dagger ? '†' : ''),
-    c.src === 'card' ? el('span', { class: 'rp-sub' }, el('a', { href: c.url, target: '_blank',
-      rel: 'noopener', 'data-card-link': '1', text: 'card' }),
-      // 21d: what the file says of the number ("medium effort")
-      c.note ? el('span', { 'data-card-note': '1', text: ' · ' + c.note }) : '') : '');
-}
-function rpName(m) {
-  return el('td', { class: m.ours ? 'rp-ours' : '', title: m.label },
-    m.ours ? el('span', { class: 'rp-dot', style: `background:${rpColour(m)}` }) : '', m.label,
-    // 25b: what the file says of another model's numbers, once under its name
-    !m.ours && m.note ? el('span', { class: 'rp-sub', 'data-their-note': m.label,
-      text: m.note }) : '');
-}
 // a benchmark's range on its charts: every score and its error in it,
 // rounded out to tens — the 0–100 line bunched MMLU-Pro's 40 models into 10
 function rpDomain(cells) {
@@ -28653,6 +28662,53 @@ function rpDotSvg(v, se, colour, dom) {
   svg.append(el('svg:circle', { cx: x(v), cy: 7, r: 3.5, fill: colour }));
   return svg;
 }
+// 27b: the Step checkpoints report's tables on modelTable: "Our runs" (ours,
+// every benchmark) and "Every model" (ours and the published, one row a model)
+function rpSpec(id, d, which, list, benches) {
+  const S = mtS(`rp-${which}-${id}`);
+  const cols = benches.map(b => ({ ...mtReportCol(b, d.ours, { 'data-rp-col': b.key }),
+    extra: [rpCeil(d, b.key), !b.compare && b.why ? el('span', { class: 'mt-h2 rp-why',
+      title: b.why, text: 'ours only' }) : ''] }));
+  S.sort = S.sort && cols.some(c => c.key === S.sort.key) ? S.sort
+    : { key: (benches[0] || {}).key, dir: -1 };
+  const hook = which === 'ours' ? 'data-rp-row' : 'data-rp-every-row';
+  const rows = list.filter(r => r.ours).map(r => rpOursRow(r, benches, { how: true,
+    attrs: { [hook]: r.label }, line: [rpMetaWords(r), el('span', {
+      'data-rp-status': which === 'ours' ? r.label : null, text: r.status }), r.note || ''] }));
+  if (which === 'every') rows.push(...rpTheirsRows(list.filter(r => !r.ours), benches, {
+    attrs: x => ({ [hook]: x.label }), manyAttr: 'data-rp-every-rows', noteNode: true }));
+  return { view: `rp-${which}`, free: true, attrs: { [`data-rp-${which}`]: '1' }, hkey: `rp-${which}-${id}`,
+    cols, rows, groups: true, sort: S.sort, hideEmpty: which === 'every' ? undefined : false,
+    onSort: k => { S.sort = { key: k, dir: S.sort.key === k ? -S.sort.dir : -1 }; render(); },
+    groupNotes: { ours: 'measured here, same questions' } };
+}
+// 27b: how many of each of our runs' answers ran out of room, a benchmark a
+// column, each linked to the ran-out report's answers
+function rpRanOutSpec(id, d, benches) {
+  const rows = d.ours.map(m => {
+    const row = rpOursRow(m, benches, { attrs: { 'data-rp-ranout-row': m.label },
+      line: [rpMetaWords(m)] });
+    for (const b of benches) {
+      const c = m.cells[b.key];
+      // 21b: a model's ran-out answers are listed in a report of their own
+      const to = (d.ranOut || []).find(x => x.models.includes(m.label));
+      if (!(c && c.v != null && c.answers)) { row.cells[b.key] = { v: null }; continue; }
+      const share = (c.ranOut || 0) / c.answers, pct = (100 * share).toFixed(1) + '%';
+      row.cells[b.key] = { v: share, text: pct, noLead: true, tip: [`${c.ranOut || 0} of ${c.answers}`],
+        node: to && c.ranOut ? el('a', { href: `#tab=reports&report=${encodeURIComponent(to.id)}`
+            + `&model=${encodeURIComponent(m.label)}&bench=${b.key}`, title: `${c.ranOut} of ${c.answers}`,
+          'data-ro-link': `${m.label}|${b.key}`, text: pct,
+          onclick: e => { e.preventDefault(); Object.assign(roState(to.id), { pick: m.label,
+            bench: b.key, subject: '', open: null }); rpOpen(to.id); } }) : null };
+      if (!row.cells[b.key].node) delete row.cells[b.key].node;
+    }
+    return row;
+  });
+  const cols = benches.map(b => ({ key: b.key, label: (mtBench(b.label) || {}).short || b.label,
+    full: b.label, sub: 'ran out', lower: true, heat: true, attrs: { 'data-rp-col': b.key } }));
+  return { view: 'rp-ranout', free: true, attrs: { 'data-rp-ranout': '1' }, hkey: 'rp-ranout-' + id, cols, rows,
+    sorted: true, hideEmpty: false };
+}
 function vReport(id) {
   const R = RPS(), d = R.data[id];
   if (!d && netReady()) loadReport(id);
@@ -28690,19 +28746,10 @@ function vReport(id) {
       el('a', { href: S.epoch.url, target: '_blank', rel: 'noopener', 'data-credit': 'epoch',
         text: S.epoch.credit })),
     d.page ? el('div', { class: 'rp-card-acts' }, rpPageLink(id, d.page)) : '');
-  // 1. our runs
+  // 1. our runs — 27b: on modelTable, as Models' tables are
   const ours = el('div', { class: 'card', 'data-report-section': 'ours' },
     el('h2', { text: 'Our runs' }),
-    el('div', { class: 'rp-scroll' }, el('table', { class: 'rp', 'data-rp-ours': '1' },
-      el('thead', {}, el('tr', {}, el('th', { text: 'Model' }),
-        ...benches.map(b => el('th', { title: b.compare ? '' : b.why }, b.label,
-          rpCeil(d, b.key))))),
-      el('tbody', {}, d.ours.map(m => el('tr', { 'data-rp-row': m.label },
-        el('td', { class: 'rp-ours', title: m.row },
-          el('span', { class: 'rp-dot', style: `background:${rpColour(m)}` }), m.label, rpMeta(m),
-          el('span', { class: 'rp-status', 'data-rp-status': m.label, text: m.status }),
-          m.note ? el('span', { class: 'rp-sub', text: m.note }) : ''),
-        ...benches.map(b => rpOurCell(m.cells[b.key], b))))))),
+    modelTable(rpSpec(id, d, 'ours', d.ours, benches)),
     el('p', { class: 'small se', 'data-rp-score-legend': '1', text: RP_SCORE_LEGEND }),
     // 23: two of these, question by question, opened on the first two picks
     d.paired && d.picks.length > 1 ? el('p', { class: 'small' }, el('a', {
@@ -28783,23 +28830,7 @@ function vReport(id) {
     // 24b: score against file size, a panel a benchmark
     rpSizeChart(d, benches),
     el('h3', { text: 'Ran out of room', style: 'margin-top:var(--sp-4)' }),
-    el('div', { class: 'rp-scroll' }, el('table', { class: 'rp', 'data-rp-ranout': '1' },
-      el('thead', {}, el('tr', {}, el('th', { text: 'Model' }),
-        ...benches.map(b => el('th', { text: b.label })))),
-      el('tbody', {}, d.ours.map(m => el('tr', {}, rpName(m), ...benches.map(b => {
-        const c = m.cells[b.key];
-        // 21b: a model's ran-out answers are listed in a report of their own
-        const to = (d.ranOut || []).find(x => x.models.includes(m.label));
-        const pct = c && c.answers ? (100 * (c.ranOut || 0) / c.answers).toFixed(1) + '%' : '';
-        return c && c.v != null && c.answers ? el('td', { class: 'num',
-            title: `${c.ranOut || 0} of ${c.answers}` },
-            to && c.ranOut ? el('a', { href: `#tab=reports&report=${encodeURIComponent(to.id)}`
-                + `&model=${encodeURIComponent(m.label)}&bench=${b.key}`,
-              'data-ro-link': `${m.label}|${b.key}`, text: pct,
-              onclick: e => { e.preventDefault(); Object.assign(roState(to.id), { pick: m.label,
-                bench: b.key, subject: '', open: null }); rpOpen(to.id); } }) : pct)
-          : el('td', { class: 'dash', text: '—' });
-      })))))));
+    modelTable(rpRanOutSpec(id, d, benches)));
   // 4. thinking tokens
   const T = d.tokens, lim = d.tokenLimits;
   const limit = task => lim[task] || lim.others;
@@ -28894,19 +28925,13 @@ function vReport(id) {
             : el('p', { class: 'small se', text: `${L.first}: no stored answer.` })]))));
   // 6. every model, by GPQA Diamond. 25: a benchmark no other model has a
   // number on (in_every false: instruction following) is left out
-  const g = benches[0].key, everyB = benches.filter(b => b.in_every !== false);
+  const everyB = benches.filter(b => b.in_every !== false);
   const every = el('div', { class: 'card', 'data-report-section': 'every' },
     el('h2', { text: 'Every model' }),
-    el('p', { class: 'small se', text: `Sorted by ${benches[0].label}; ours in bold. † from `
-      + 'Epoch AI’s collection of other sources; “card” links the model card a number came '
-      + 'from.' }),
-    el('div', { class: 'rp-scroll tall' }, el('table', { class: 'rp', 'data-rp-every': '1' },
-      el('thead', {}, el('tr', {}, el('th', { text: 'Model' }),
-        ...everyB.map(b => el('th', { text: b.label })))),
-      el('tbody', {}, [...all].sort((p, q) => ((q.cells[g] || {}).v ?? -1)
-          - ((p.cells[g] || {}).v ?? -1))
-        .map(m => el('tr', {}, rpName(m), ...everyB.map(b => m.ours
-          ? rpOurCell(m.cells[b.key], b) : rpTheirCell(m.cells[b.key]))))))),
+    el('p', { class: 'small se', text: `Sorted by ${benches[0].label} until a column is chosen; `
+      + 'ours first. † from Epoch AI’s collection of other sources; a card’s letter links the '
+      + 'model card a number came from.' }),
+    modelTable(rpSpec(id, d, 'every', all, everyB)),
     el('p', { class: 'small se', text: RP_SCORE_LEGEND }));
   // 7. how to read this
   const cards = [];
@@ -28935,6 +28960,81 @@ function vReport(id) {
 // dot is a filled circle, a published one a hollow diamond: told apart by
 // shape as well as by fill
 // ---------------------------------------------------------------------------
+// ---- 27b: one label placer for every scatter chart -------------------------
+// On-device's score against memory, the file-size chart and score against
+// thinking: each point's label tries the spots right, left, above and below
+// its mark, and takes the first that touches no other label, no mark and no
+// edge of the plot; else the nearest free spot a short reach away, with a
+// leader line to it; else none — its name is on the mark's hover and in the
+// list under the panel. Ours are placed first, so they get the best spots.
+// pts: [{cx, cy, r (the mark's half-size), name, ours, attrs (the label's)}];
+// box: the plot's {x0, y0, x1, y1}; o: {fs, segs (lines a label keeps off: a
+// frontier, the ± whiskers, as [x1, y1, x2, y2])}. Returns the points it left bare
+const LBL = {};
+function lblWidth(text, fs) {
+  const c = LBL.c || (LBL.c = document.createElement('canvas').getContext('2d'));
+  c.font = `${fs}px system-ui, -apple-system, sans-serif`;
+  return c.measureText(text).width;
+}
+function chartLabels(svg, pts, box, o = {}) {
+  const fs = o.fs || 12, h = fs * 1.25, pad = 1.5;
+  const marks = pts.map(p => ({ p, x0: p.cx - p.r - pad, y0: p.cy - p.r - pad, x1: p.cx + p.r + pad,
+    y1: p.cy + p.r + pad }));
+  const placed = [], bare = [];
+  const hit = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+  const inside = a => a.x0 >= box.x0 + 1 && a.x1 <= box.x1 - 1 && a.y0 >= box.y0 + 1
+    && a.y1 <= box.y1 - 1;
+  const onSeg = (a, [x1, y1, x2, y2]) => {
+    const n = Math.max(1, Math.ceil(Math.hypot(x2 - x1, y2 - y1) / 1.5));
+    for (let i = 0; i <= n; i++) {
+      const x = x1 + (x2 - x1) * i / n, y = y1 + (y2 - y1) * i / n;
+      if (x > a.x0 && x < a.x1 && y > a.y0 && y < a.y1) return true;
+    }
+    return false;
+  };
+  const free = a => inside(a) && !placed.some(q => hit(a, q)) && !marks.some(m => hit(a, m))
+    && !(o.segs || []).some(sg => onSeg(a, sg));
+  // a leader line that crosses no label and no other mark
+  const clear = (p, x1, y1, x2, y2) => {
+    const n = Math.ceil(Math.hypot(x2 - x1, y2 - y1) / 2);
+    for (let i = 1; i < n; i++) {
+      const x = x1 + (x2 - x1) * i / n, y = y1 + (y2 - y1) * i / n;
+      const at = q => x > q.x0 && x < q.x1 && y > q.y0 && y < q.y1;
+      if (placed.some(at) || marks.some(m => m.p !== p && at(m))) return false;
+    }
+    return true;
+  };
+  for (const p of [...pts].sort((a, b) => (b.ours ? 1 : 0) - (a.ours ? 1 : 0) || a.cy - b.cy)) {
+    const w = lblWidth(p.name, fs), g = p.r + 3;
+    const rect = (x0, y0) => ({ x0, y0, x1: x0 + w, y1: y0 + h });
+    let spot = [rect(p.cx + g, p.cy - h / 2), rect(p.cx - g - w, p.cy - h / 2),
+      rect(p.cx - w / 2, p.cy - g - h), rect(p.cx - w / 2, p.cy + g)].find(free), lead = null;
+    for (let d = g + 8; !spot && d <= g + 56; d += 6)
+      for (let k = 0; k < 24 && !spot; k++) {
+        const t = 2 * Math.PI * k / 24, cs = Math.cos(t), sn = Math.sin(t);
+        const x = p.cx + d * cs, y = p.cy + d * sn;
+        const a = rect(cs > 0.3 ? x : cs < -0.3 ? x - w : x - w / 2,
+          sn > 0.3 ? y : sn < -0.3 ? y - h : y - h / 2);
+        const ex = Math.max(a.x0, Math.min(a.x1, p.cx)), ey = Math.max(a.y0, Math.min(a.y1, p.cy));
+        const sx = p.cx + (p.r + 1) * cs, sy = p.cy + (p.r + 1) * sn;
+        if (free(a) && clear(p, sx, sy, ex, ey)) { spot = a; lead = [sx, sy, ex, ey]; }
+      }
+    if (!spot) { bare.push(p); continue; }
+    placed.push(spot);
+    if (lead) svg.append(el('svg:line', { x1: lead[0], y1: lead[1], x2: lead[2], y2: lead[3],
+      stroke: 'var(--muted)', 'stroke-width': 0.8, 'data-chart-leader': p.name }));
+    svg.append(el('svg:text', { x: spot.x0, y: spot.y0 + h / 2, 'dominant-baseline': 'central',
+      'font-size': fs, fill: 'var(--text-primary)', 'data-chart-label': p.name, ...(p.attrs || {}),
+      text: p.name }));
+  }
+  return bare;
+}
+// the points a panel left without a label: their names, under it
+function chartBare(bare, key) {
+  return bare.length ? el('p', { class: 'small se chart-bare', 'data-chart-bare': key,
+    text: 'Not labelled, to keep the points clear (hover one for its name): '
+      + bare.map(p => p.name).join(' · ') }) : '';
+}
 const OD_LEGEND = '● measured here · ◇ published by its maker';
 function odMark(ours, cx, cy, colour, attrs = {}) {
   return ours
@@ -28950,59 +29050,130 @@ const odShort = label => trShort(String(label).replace(/-A\d+B-preview$/, '')
 // a base's name without whose run it was ("of Qwen3.5 9B"), the whole in its tooltip
 const odBase = label => String(label || '').replace(/ \([^)]*run\)$/, '')
   .replace(/, measured here$/, '');
-// a cell's source, in words: "measured here", or "published by Edge0" with its link
-function odSource(r, c) {
-  if (r.ours) return el('span', { class: 'rp-sub', 'data-od-src': 'here', text: 'measured here' });
-  const url = (c && c.url) || r.link;
-  return el('span', { class: 'rp-sub', 'data-od-src': 'published' },
-    url ? el('a', { href: url, target: '_blank', rel: 'noopener', 'data-od-link': '1',
-      text: `published by ${r.publishedBy}` }) : `published by ${r.publishedBy}`);
+// 27b: the On-device table on 27's parts — a row's line says its base, what it
+// is and its source once ("published by Edge0 · README", linked; ours
+// "measured here"); a cell is 27's, a published number in italics with its
+// letter, what it keeps of its base its one second line; Memory one number,
+// the size on disk under it when it differs; On a phone our testers' median
+// when they measured it, else the published speed, else "–"
+const OD_COLS = ['gpqa', 'mmlupro', 'ifeval', 'ifbench'];
+// a base's plain name: "Qwen3.6-35B-A3B (the base our builds share)" is
+// Qwen3.6-35B-A3B; "none: the model itself" is no base
+const odBaseName = t => /^none\b/i.test(String(t || '')) ? ''
+  : String(t || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+// a link's words: its README, its Hugging Face page, a paper, else its site
+function odLinkWords(url) {
+  const u = String(url || '');
+  if (/readme\.md$/i.test(u)) return 'README';
+  if (/huggingface\.co\//.test(u)) return 'Hugging Face';
+  if (/arxiv\.org\//.test(u)) return 'paper';
+  try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return 'source'; }
 }
-// a fact as published (size, memory, phone speed): its words, how, and link
-function odFact(r, f, key) {
-  if (!f) return el('td', { class: 'dash', 'data-od-fact': `${r.label}|${key}`, text: '—' });
-  if (f.none) return el('td', { 'data-od-fact': `${r.label}|${key}` },
-    el('span', { class: 'se', text: f.none }),
-    f.how ? el('span', { class: 'rp-sub', text: f.how }) : '');
-  return el('td', { 'data-od-fact': `${r.label}|${key}`, title: f.how || '' },
-    f.words, f.device ? el('span', { class: 'rp-sub', text: f.device }) : '',
-    f.by_hand ? el('span', { class: 'rp-sub', 'data-od-by-hand': '1',
-      text: `reported by hand by ${f.by_hand}` + (f.date ? `, ${f.date}` : '') }) : '',
-    f.note ? el('span', { class: 'rp-sub', text: f.note }) : '',
-    !r.ours && f.url ? el('span', { class: 'rp-sub' }, el('a', { href: f.url, target: '_blank',
-      rel: 'noopener', text: `published by ${r.publishedBy}` })) : '');
-}
-// 26: our phone build as our testers' phones measured it — per phone the
-// medians of decode and engine memory, the phone named; never mixed with a
-// published speed or one typed in by hand
-function odTesters(r) {
-  const f = r.testers, key = `${r.label}|testers`;
-  if (!f) return el('td', { class: 'dash', 'data-od-fact': key, title: r.ours
-    ? 'not a phone build' : 'its phone speed is as published, in Phone speed', text: '—' });
-  if (f.none) return el('td', { 'data-od-fact': key }, el('span', { class: 'se', text: f.none }));
-  return el('td', { 'data-od-fact': key }, f.phones.map(p => el('div', { 'data-od-tester': p.phone },
-    `${ptN(p.decode)} tok/s decode` + (p.engine_mem_mb != null ? ` · ${ptMB(p.engine_mem_mb)}` : ''),
-    el('span', { class: 'rp-sub', text: `${p.phone}, median of ${p.n} test${p.n === 1 ? '' : 's'}`
-      + (p.last ? `, ${p.first === p.last ? p.last : `${p.first} to ${p.last}`}` : '') }),
-    el('span', { class: 'rp-sub', text: 'measured on our testers’ phones' }))));
-}
-function odScore(r, b) {
-  const c = r.cells[b.key] || {};
-  if (c.v == null) return el('td', { class: 'dash', 'data-od-cell': `${r.label}|${b.key}`,
-    title: r.ours ? 'not in yet' : 'not published', text: '—' });
+const odLetter = r => mtLetter('card', r.publishedBy || r.maker);
+const odTok = v => `${Number(v).toLocaleString('en', { maximumFractionDigits: 1 })} tok/s`;
+function odScoreCell(r, b) {
+  const c = r.cells[b.key] || {}, at = { 'data-od-cell': `${r.label}|${b.key}` };
+  if (c.v == null) return { v: null, why: r.ours ? 'not in yet' : 'not published', attrs: at };
   const keep = (r.retention || {})[b.key];
-  return el('td', { class: 'num', 'data-od-cell': `${r.label}|${b.key}`,
-      title: r.ours ? (c.how || '') : `${c.card || ''}: ${c.setting || ''}` },
-    rpNum(c.v) + (r.ours && c.se ? ` ± ${rpNum(c.se)}` : ''), odSource(r, c),
-    keep != null ? el('span', { class: 'rp-sub', 'data-od-keep': `${r.label}|${b.key}`,
-      text: `keeps ${(100 * keep).toFixed(1)}% of its base` }) : '');
+  const L = odLetter(r);
+  return { v: c.v, text: rpNum(c.v), se: r.ours && c.se ? rpNum(c.se) : null, seV: r.ours ? c.se
+      || null : null,
+    pub: r.ours ? null : { letter: L, tip: `${MT_LETTERS[L] || r.publishedBy}: ${c.card || ''}`,
+      url: c.url || r.link || '' },
+    sub: keep != null ? `${(100 * keep).toFixed(1)}% of its base` : null, subClass: 'od-keep',
+    subAttrs: keep != null ? { 'data-od-keep': `${r.label}|${b.key}` } : {},
+    tip: r.ours ? [c.how || '', 'measured here'].filter(Boolean)
+      : [`${c.card || ''}: ${c.setting || ''}`, `published by ${r.publishedBy}`],
+    attrs: at };
 }
-function odName(r) {
-  return el('td', { class: r.ours ? 'rp-ours' : '', title: r.label },
-    r.ours ? el('span', { class: 'rp-dot', style: `background:${rpColour(r)}` }) : '',
-    r.ours || !r.page ? r.label : el('a', { href: '#model=' + encodeURIComponent(r.page),
-      'data-od-page': r.label, text: r.label }),
-    r.kind ? el('span', { class: 'rp-sub', text: r.kind }) : '');
+// Memory: what it needs, the size on disk under it when that differs
+function odMemoryCell(r) {
+  const m = r.memory, d = r.disk, at = { 'data-od-fact': `${r.label}|memory` };
+  const how = f => f ? [f.how, f.note, f.by_hand ? `reported by hand by ${f.by_hand}` : '']
+    .filter(Boolean).join('; ') : '';
+  if (!m || m.none || !m.words) return { v: null, text: m && m.none ? '–' : null,
+    why: [m && m.none, m && m.how].filter(Boolean).join(' · ') || 'not known', noLead: true,
+    attrs: at };
+  const disk = d && d.words && d.words !== m.words ? d.words : '';
+  const L = odLetter(r);
+  return { v: m.gb ?? null, text: m.words, noLead: true, sub: disk ? `${disk} on disk` : null,
+    subClass: 'od-disk', subAttrs: disk ? { 'data-od-disk': r.label } : {},
+    pub: r.ours ? null : { letter: L, tip: `${MT_LETTERS[L] || r.publishedBy}`, url: m.url || '' },
+    tip: [`memory it needs: ${m.words}${how(m) ? ' — ' + how(m) : ''}`,
+      d && d.words ? `on disk: ${d.words}${how(d) ? ' — ' + how(d) : ''}` : ''].filter(Boolean),
+    attrs: at };
+}
+// On a phone: our testers' median wins; else a published speed; else "–"
+function odPhoneCell(r) {
+  const at = { 'data-od-fact': `${r.label}|phone` }, f = r.phone || {}, t = r.testers;
+  const byHand = f.by_hand != null && f.tok_s != null ? `reported by hand: ${f.words}`
+    + (f.device ? ` on ${f.device}` : '') + ` by ${f.by_hand}${f.date ? `, ${f.date}` : ''}` : '';
+  if (t && (t.phones || []).length) {
+    const ps = [...t.phones], top = ps.reduce((a, p) => (p.n > a.n ? p : a), ps[0]);
+    const more = ps.length - 1;
+    return { v: top.decode, text: `${ptN(top.decode)} tok/s`, dot: true, noLead: true,
+      sub: `${top.phone} · ${top.n} test${top.n === 1 ? '' : 's'}`
+        + (more ? ` · +${more} phone${more === 1 ? '' : 's'}` : ''),
+      tip: ['measured on our testers’ phones, decode, the median a phone:', ...ps.map(p =>
+        `${p.phone}: ${ptN(p.decode)} tok/s` + (p.engine_mem_mb != null
+          ? ` · engine memory ${ptMB(p.engine_mem_mb)}` : '') + `, median of ${p.n} test`
+        + `${p.n === 1 ? '' : 's'}` + (p.last ? `, ${p.first === p.last ? p.last
+          : `${p.first} to ${p.last}`}` : '')), ...(byHand ? [byHand] : [])],
+      attrs: { ...at, 'data-od-measured': '1' } };
+  }
+  if (f.tok_s != null) {
+    const L = odLetter(r), hand = r.ours;
+    return { v: f.tok_s, text: odTok(f.tok_s), noLead: true,
+      sub: [f.device, hand ? 'by hand' : ''].filter(Boolean).join(' · ') || null,
+      pub: hand ? null : { letter: L, tip: MT_LETTERS[L] || r.publishedBy, url: f.url || '' },
+      tip: [f.words, f.battery, f.how, hand ? byHand : ''].filter(Boolean), attrs: at };
+  }
+  return { v: null, text: '–', noLead: true,
+    tip: [f.none, f.how].filter(Boolean), why: [f.none, f.how].filter(Boolean).join(' · '),
+    attrs: at };
+}
+function odSpec(id, d) {
+  const B = OD_COLS.map(k => d.benchmarks.find(b => b.key === k)).filter(Boolean)
+    .concat(d.benchmarks.filter(b => !OD_COLS.includes(b.key)));
+  const S = mtS('od-' + id);
+  const cols = [...B.map(b => {
+    const m = mtBench(b.label) || {};
+    const n = Math.max(0, ...d.rows.filter(r => r.ours).map(r => (r.cells[b.key] || {}).answers || 0));
+    return { key: b.key, label: m.short || b.label, full: b.label, score: true,
+      sub: [m.what, mtAskedShort(n, b)].filter(Boolean).join(' · ') };
+  }),
+  { key: 'memory', label: 'Memory', full: 'Memory', sub: 'it needs', lower: true },
+  { key: 'phone', label: 'On a phone', full: 'On a phone', sub: 'decode' }];
+  S.sort = S.sort && cols.some(c => c.key === S.sort.key) ? S.sort : { key: B[0].key, dir: -1 };
+  const rows = d.rows.map(r => {
+    const m = r.ours ? DATA.models.find(x => x.id === r.row) : null;
+    const base = m ? mtRowOf(m) : null;
+    const parts = nameParts(r.label, { measured: !!r.ours });
+    const of = odBaseName(r.ours ? r.base : (r.base || r.baseLabel));
+    const src = r.ours ? 'measured here' : el('span', { 'data-od-src': 'published' },
+      `published by ${r.publishedBy}`, r.link ? ' · ' : '',
+      r.link ? el('a', { href: r.link, target: '_blank', rel: 'noopener', 'data-od-link': '1',
+        text: odLinkWords(r.link) }) : '');
+    return { key: r.label, id: base ? base.id : r.page || null,
+      nav: base ? base.nav : r.page || null,
+      href: base ? base.href : r.page ? '#model=' + encodeURIComponent(r.page) : null,
+      mark: r.ours ? 'here' : 'pub',
+      colour: r.ours ? (r.colour != null ? rpColour(r) : base ? base.colour : 'var(--accent)') : null,
+      name: base ? base.name : displayName({ name: r.label, published: !r.ours }),
+      full: r.label + (r.kind ? `\n${r.kind}` : '') + (r.base ? `\nbase: ${r.base}` : ''),
+      line: [of ? `of ${of}` : '', r.kind || '',
+        ...(r.ours ? [] : parts.line.filter(w => !String(r.kind || '').includes(w))),
+        r.ours && r.phoneBuild ? 'phone build' : '', src],
+      group: r.ours ? 'ours' : mtGroup({ name: r.label }, true, r.maker),
+      attrs: { 'data-od-row': r.label, 'data-od-ours': String(!!r.ours) },
+      cells: { ...Object.fromEntries(B.map(b => [b.key, odScoreCell(r, b)])),
+        memory: odMemoryCell(r), phone: odPhoneCell(r) } };
+  });
+  return { view: 'od', attrs: { 'data-od-table': '1' }, free: true, hkey: 'od-' + id, cols, rows, groups: true,
+    // the least memory first, the highest score or speed first
+    sort: S.sort, onSort: k => { S.sort = { key: k, dir: S.sort.key === k ? -S.sort.dir
+      : k === 'memory' ? 1 : -1 }; render(); }, cardCols: B.slice(0, 4).map(b => b.key),
+    groupNotes: { ours: 'measured here', open: 'as their makers publish them' } };
 }
 // retention: each model against its own base on the same source, a panel a benchmark
 function odKeepPanel(b, rows) {
@@ -29059,28 +29230,19 @@ function odMemPanel(b, pts) {
       fill: 'var(--muted)', 'data-od-mem-tick': b.key, text: String(v) }));
   svg.append(el('svg:text', { x: L + pw / 2, y: H - 4, 'text-anchor': 'middle', 'font-size': FS,
     fill: 'var(--text-secondary)', text: 'memory it needs, GB (log scale)' }));
-  const placed = [], dots = pts.map(p => Object.assign(p, { cx: X(p.x), cy: Y(p.c.v) }));
+  const labels = [];
   for (const p of [...pts].sort((u, v) => Y(u.c.v) - Y(v.c.v))) {
     const cx = X(p.x), cy = Y(p.c.v);
     const m = odMark(p.r.ours, cx, cy, odColour(p.r), { 'data-od-mem-dot': `${b.key}:${p.r.label}` });
     m.append(el('svg:title', { text: `${p.r.label}: ${rpNum(p.c.v)} at ${p.r.memory.words} · `
       + `${p.r.ours ? 'measured here' : 'published by ' + p.r.publishedBy}` }));
     svg.append(m);
-    const name = odShort(p.r.label), w = 7 * name.length;
-    // its label: beside its dot on the side with room, else above or below it —
-    // the first that meets no other label nor dot
-    const tries = [[cx + 8, cy + 4], [cx - 8 - w, cy + 4], [cx - w / 2, cy - 9],
-                   [cx - w / 2, cy + 17]].map(([x, y]) => ({ x: Math.max(L + 2,
-                     Math.min(L + pw - w - 2, x)), y }));
-    const free = t => !placed.some(q => Math.abs(q.y - t.y) < FS && t.x < q.x + q.w && q.x < t.x + w)
-      && !dots.some(d => Math.abs(d.cy - (t.y - 4)) < 8 && t.x - 6 < d.cx && d.cx < t.x + w + 6);
-    const t = tries.find(free) || tries[0];
-    placed.push({ x: t.x, w, y: t.y });
-    svg.append(el('svg:text', { x: t.x, y: t.y, 'font-size': FS, fill: 'var(--text-primary)',
-      'data-od-mem-label': `${b.key}:${p.r.label}`, text: name }));
+    labels.push({ cx, cy, r: p.r.ours ? 4.5 : 5.5, name: odShort(p.r.label), ours: p.r.ours,
+      attrs: { 'data-od-mem-label': `${b.key}:${p.r.label}` } });
   }
+  const bare = chartLabels(svg, labels, { x0: L, y0: Tp, x1: L + pw, y1: Tp + ph }, { fs: FS });
   return el('div', { class: 'by-panel tr-panel', 'data-od-mem-panel': b.key },
-    el('h3', { text: b.label }), svg);
+    el('h3', { text: b.label }), svg, chartBare(bare, 'od-mem:' + b.key));
 }
 function vOnDevice(id, d, back) {
   const B = d.benchmarks, R = d.rows;
@@ -29091,18 +29253,11 @@ function vOnDevice(id, d, back) {
       el('span', { text: 'Published numbers: each with its source and the date it gives' })));
   const table = el('div', { class: 'card', 'data-report-section': 'od-table' },
     el('h2', { text: 'The models' }),
-    el('div', { class: 'rp-scroll' }, el('table', { class: 'rp od', 'data-od-table': '1' },
-      el('thead', {}, el('tr', {}, ['Model', 'Base model', 'Size on disk', 'Memory it needs',
-        'Phone speed', 'Measured on our testers’ phones', ...B.map(b => b.label)]
-        .map(t => el('th', { text: t })))),
-      el('tbody', {}, R.map(r => el('tr', { 'data-od-row': r.label,
-          'data-od-ours': String(r.ours) },
-        odName(r), el('td', { 'data-od-fact': `${r.label}|base`, text: r.base || '—' }),
-        odFact(r, r.disk, 'disk'), odFact(r, r.memory, 'memory'), odFact(r, r.phone, 'phone'),
-        odTesters(r), ...B.map(b => odScore(r, b))))))),
-    el('p', { class: 'small se', text: 'Every cell says where its number comes from: '
-      + '“measured here” on this board, or “published by …” with its link. Ours need the whole '
-      + 'file in memory on the server; a phone’s figures come only from a phone.' }),
+    modelTable(odSpec(id, d)),
+    el('p', { class: 'small se', 'data-od-legend': '1', text: 'A filled dot is measured here; a '
+      + 'ring and italics, published: the letter is its source, linked in the row’s line. A score’s '
+      + 'second line is what it keeps of its own base on the same source. Ours need the whole file '
+      + 'in memory on the server; a phone’s figures come only from a phone.' }),
     (() => {
       const also = R.filter(r => (r.also || []).length || (r.speed || []).length);
       return also.length ? el('div', { 'data-od-also': '1' },
@@ -29255,6 +29410,52 @@ function ptTest(id, d) {
             : `${ptN(c.decode_tps)} tok/s` }),
           el('td', { class: 'pt-reply', 'data-pt-reply': c.id, text: c.text || '' })))))));
 }
+// 27b: the medians per phone and model on modelTable — a row a model on a phone
+// ("step8804 · OnePlus 15"), measured on our testers' phones, its line the
+// phone's memory and the tests' dates
+function ptPerSpec(id, d) {
+  const S = mtS('pt-per-' + id);
+  const cols = [
+    { key: 'tests', label: 'Tests', full: 'Tests', sub: 'in the medians', sortable: false },
+    { key: 'decode', label: 'Decode', full: 'Decode', sub: 'tok/s' },
+    { key: 'prefill', label: 'Prefill', full: 'Prefill, warm', sub: 'warm, tok/s' },
+    { key: 'ttft', label: 'First word', full: 'Time to first word', sub: 'time to it', lower: true },
+    { key: 'engine', label: 'Engine memory', full: 'Engine memory', sub: 'MB', lower: true },
+    { key: 'rise', label: 'Temp. rise', full: 'Temperature rise', sub: 'battery, °C', lower: true }];
+  S.sort = S.sort && cols.some(c => c.key === S.sort.key) ? S.sort : { key: 'decode', dir: -1 };
+  const lower = new Set(cols.filter(c => c.lower).map(c => c.key));
+  const rows = d.perPhone.map(p => {
+    const m = p.model.row ? DATA.models.find(x => x.id === p.model.row) : null;
+    // an id the names file doesn't name yet is its id here, and its line says so
+    const model = m ? displayName(m) : p.model.named === false ? p.model.id : p.model.name;
+    const phone = p.phone.named === false && p.phone.code ? p.phone.code : p.phone.name;
+    const unnamed = [p.model.named === false ? 'model' : '', p.phone.named === false ? 'phone' : '']
+      .filter(Boolean);
+    const num = (v, text, extra = {}) => v == null ? { v: null, text: '–' }
+      : { v, text, ...extra };
+    return { key: `${p.phone.code}|${p.model.id}`, id: m ? m.id : null, nav: m ? m.id : null,
+      href: m ? '#model=' + encodeURIComponent(m.id) : null, mark: 'here',
+      colour: m ? mtColour(m) : 'var(--accent)', name: `${model} · ${phone}`,
+      full: [p.model.name, p.model.what, p.phone.name, [p.phone.maker, p.phone.code]
+        .filter(Boolean).join(' ')].filter(Boolean).join('\n'),
+      line: [unnamed.length ? `${unnamed.join(' and ')} not named yet` : '',
+        p.phone.ram_gb ? `${p.phone.ram_gb} GB RAM` : '', p.first ? (p.first === p.last
+          ? p.first : `${p.first} to ${p.last}`) : ''].filter(Boolean).join(' · ') || null,
+      attrs: { 'data-pt-per-row': `${p.phone.code}|${p.model.id}` },
+      cells: { tests: { v: p.n, text: `${p.n} of ${p.tests}`, noLead: true,
+          attrs: { 'data-pt-per-n': '1' } },
+        decode: num(p.decode, ptN(p.decode), { attrs: { 'data-pt-per-decode': '1' } }),
+        prefill: num(p.prefill_warm, ptN(p.prefill_warm)),
+        ttft: num(p.ttft_ms, ptS(p.ttft_ms)),
+        engine: num(p.engine_mem_mb, ptMB(p.engine_mem_mb)),
+        rise: num(p.temp_rise, ptSigned(p.temp_rise, ' °C'), { noLead: true,
+          attrs: { 'data-pt-per-rise': '1' } }) } };
+  });
+  return { view: 'pt-per', free: true, attrs: { 'data-pt-per': '1' }, hkey: 'pt-per-' + id, cols, rows,
+    sort: S.sort, hideEmpty: false, cardCols: ['decode', 'prefill', 'ttft', 'engine'],
+    onSort: k => { S.sort = { key: k, dir: S.sort.key === k ? -S.sort.dir : lower.has(k) ? 1 : -1 };
+      render(); } };
+}
 function vPhoneTests(id, d, back) {
   const sync = d.sync || {}, T = d.tiles;
   const tile = (k, label, v, note) => el('div', { class: 'tile', 'data-pt-tile': k },
@@ -29288,26 +29489,8 @@ function vPhoneTests(id, d, back) {
       + 'didn’t run; answers are the checks done over those run.' }));
   const per = el('div', { class: 'card', 'data-report-section': 'pt-per-phone' },
     el('h2', { text: 'Per phone and model' }),
-    d.perPhone.length ? el('div', { class: 'rp-scroll' }, el('table', { class: 'rp pt',
-        'data-pt-per': '1' },
-      el('thead', {}, el('tr', {}, ['Phone', 'Model', 'Tests', 'Decode', 'Prefill, warm',
-        'Time to first word', 'Engine memory', 'Temperature rise', 'Dates']
-        .map((h, i) => el('th', { class: i >= 2 && i < 8 ? 'num' : null, text: h })))),
-      el('tbody', {}, d.perPhone.map(p => el('tr', {
-          'data-pt-per-row': `${p.phone.code}|${p.model.id}` },
-        el('td', { text: p.phone.name }), el('td', { text: p.model.name }),
-        el('td', { class: 'num', 'data-pt-per-n': '1', text: `${p.n} of ${p.tests}` },
-          el('span', { class: 'rp-sub', text: 'in the medians' })),
-        el('td', { class: 'num', 'data-pt-per-decode': '1', text: ptN(p.decode) },
-          el('span', { class: 'rp-sub', text: 'tok/s' })),
-        el('td', { class: 'num', text: ptN(p.prefill_warm) },
-          el('span', { class: 'rp-sub', text: 'tok/s' })),
-        el('td', { class: 'num', text: ptS(p.ttft_ms) }),
-        el('td', { class: 'num', text: ptMB(p.engine_mem_mb) }),
-        el('td', { class: 'num', 'data-pt-per-rise': '1', text: ptSigned(p.temp_rise, ' °C') }),
-        el('td', { text: p.first ? (p.first === p.last ? p.first : `${p.first} to ${p.last}`)
-          : '—' }))))))
-      : el('p', { class: 'small se', text: 'No finished tests yet.' }),
+    d.perPhone.length ? modelTable(ptPerSpec(id, d)) : null,
+    d.perPhone.length ? '' : el('p', { class: 'small se', text: 'No finished tests yet.' }),
     el('p', { class: 'small se', text: 'Medians over each phone’s finished tests: the speeds '
       + 'without the tests flagged for them, the temperature rise without those run while '
       + 'charging.' }));
@@ -29789,11 +29972,18 @@ function pdTable(id, d) {
     el('div', { class: 'pdx-verdict', role: 'columnheader', text: 'Verdict' }),
     el('div', { class: 'pdx-split', role: 'columnheader' }, el('div', { text: 'Where they differ' }),
       pdKeys(d, 'pdx-keys-head')));
+  // 27b: each build's score is scoreCell's, as on every table: the number, a
+  // small ±, its bar; how many were asked and ran out on hover
   const score = (c, r, cls) => {
-    const td = rpOurCell(c, r, true);
-    const x = el('div', { class: td.className + ' ' + cls, title: td.title || '', role: 'cell' });
-    x.append(...td.childNodes);
-    return x;
+    const x = !c || c.v == null ? { v: null, why: (c && c.why) || 'not in yet' }
+      : { v: c.v, text: rpNum(c.v), se: rpNum(c.se), seV: c.se, tip: [rpAsked(c.answers, r),
+        c.ranOut ? `${rpN(c.ranOut)} answer${c.ranOut === 1 ? '' : 's'} ran out` : '']
+        .filter(Boolean) };
+    const cell = scoreCell(x, { tag: 'div', cls, col: { key: cls, score: true, label: r.label },
+      row: { name: cls === 'pdx-a' ? a : b, colour: rpColour({ colour: (d.colours || {})[
+        cls === 'pdx-a' ? a : b] }) } });
+    cell.setAttribute('role', 'cell');
+    return cell;
   };
   const rows = d.rows.map(r => {
     const p = r.pair, ceil = rpCeil({ ceiling: { [r.key]: r.ceiling }, ceilingWords: d.ceilingWords }, r.key);
@@ -30257,6 +30447,12 @@ function bySpeed(sp, m, lab) {
 }
 // ---- 24b: a build's quant and size, and score against file size ----
 // its file's quant and size, as its files say — a small mono line under its name
+// 27b: a build's quant and size as words in a row's line ("Q4_K_M · 15.8 GB")
+function rpMetaWords(x) {
+  const n = x && x.size, t = [x && x.quant, n ? `${(n / 1e9).toFixed(1)} GB` : ''].filter(Boolean)
+    .join(' · ');
+  return t ? el('span', { 'data-rp-meta': t, text: t }) : '';
+}
 function rpMeta(x, inline) {
   const n = x && x.size, q = x && x.quant;
   const t = [q, n ? `${(n / 1e9).toFixed(1)} GB` : ''].filter(Boolean).join(' · ');
@@ -30302,7 +30498,10 @@ function rpSizePanel(d, b, pts) {
   const stars = pts.filter(p => p.star).sort((p, q) => p.x - q.x);
   if (stars.length > 1) svg.append(el('svg:polyline', { points: stars.map(p => `${X(p.x)},${Y(p.c.v)}`)
     .join(' '), fill: 'none', stroke: 'var(--text-secondary)', 'stroke-width': 1, 'data-sz-frontier': b.key }));
-  const placed = [];
+  // the lines a label keeps off: the frontier's, and each build's ± whisker
+  const segs = [...stars.slice(1).map((p, i) => [X(stars[i].x), Y(stars[i].c.v), X(p.x), Y(p.c.v)]),
+    ...pts.map(p => [X(p.x), Y(p.c.v - (p.c.se || 0)), X(p.x), Y(p.c.v + (p.c.se || 0))])];
+  const labels = [];
   for (const p of [...pts].sort((u, v) => Y(u.c.v) - Y(v.c.v))) {
     const cx = X(p.x), cy = Y(p.c.v), se = p.c.se || 0;
     svg.append(el('svg:line', { x1: cx, x2: cx, y1: Y(p.c.v - se), y2: Y(p.c.v + se), stroke: rpColour(p.m),
@@ -30310,18 +30509,12 @@ function rpSizePanel(d, b, pts) {
       el('svg:circle', { cx, cy, r: 4, fill: rpColour(p.m), 'data-sz-dot': `${b.key}:${p.m.label}`,
         'data-sz-star': String(p.star) }, el('svg:title', { text: `${p.m.label}: ${rpNum(p.c.v)} ± `
           + `${rpNum(se)} at ${p.x.toFixed(1)} GB` + (p.star ? ' · no smaller build scores higher' : '') })));
-    const name = (p.star ? '★ ' : '') + trShort(p.m.label);
-    const left = cx > L + pw / 2, w = 6.6 * name.length;
-    let ly = cy + 4;
-    const lx = left ? cx - 7 - w : cx + 7;
-    while (placed.some(q => Math.abs(q.y - ly) < FS + 2 && lx < q.x + q.w && q.x < lx + w)) ly += FS + 2;
-    placed.push({ x: lx, w, y: ly });
-    svg.append(el('svg:text', { x: left ? cx - 7 : cx + 7, y: ly, 'font-size': FS,
-      'text-anchor': left ? 'end' : 'start', fill: 'var(--text-primary)',
-      'data-sz-label': `${b.key}:${p.m.label}`, text: name }));
+    labels.push({ cx, cy, r: 4, name: (p.star ? '★ ' : '') + trShort(p.m.label), ours: true,
+      attrs: { 'data-sz-label': `${b.key}:${p.m.label}` } });
   }
+  const bare = chartLabels(svg, labels, { x0: L, y0: Tp, x1: L + pw, y1: Tp + ph }, { fs: FS, segs });
   return el('div', { class: 'by-panel tr-panel', 'data-sz-panel': b.key },
-    el('h3', {}, b.label, rpCeil(d, b.key)), svg);
+    el('h3', {}, b.label, rpCeil(d, b.key)), svg, chartBare(bare, 'sz:' + b.key));
 }
 function rpSizeChart(d, benches) {
   const ours = d.ours.filter(m => m.pick);
@@ -30782,25 +30975,21 @@ function rpThinkChart(d, benches) {
     for (const v of [y0 + (y1 - y0) * 0.1, (y0 + y1) / 2, y1 - (y1 - y0) * 0.1])
       svg.append(el('svg:text', { x: L - 3, y: Y(v) + 3, 'text-anchor': 'end', 'font-size': 8,
         fill: 'var(--muted)', text: (100 * v).toFixed(1) }));
-    // labels inside the panel: on the right half to the dot's left, and one
-    // that would sit on another's moved down a line
-    const placed = [];
-    for (const p of [...pts].sort((u, v) => Y(u.y) - Y(v.y))) {
-      const cx = X(p.x), left = cx > L + pw / 2, w = 4.6 * p.m.label.length;
-      let ly = Y(p.y) + 3;
-      const x0 = left ? cx - 6 - w : cx + 6;
-      while (placed.some(q => Math.abs(q.y - ly) < 9 && x0 < q.x0 + q.w && q.x0 < x0 + w))
-        ly += 9;
-      placed.push({ x0, w, y: ly });
-      svg.append(el('svg:circle', { cx, cy: Y(p.y), r: 4, fill: rpColour(p.m),
+    // 27b: the one label placer
+    const labels = [];
+    for (const p of pts) {
+      const cx = X(p.x), cy = Y(p.y);
+      svg.append(el('svg:circle', { cx, cy, r: 4, fill: rpColour(p.m),
         'data-by-dot': `${b.key}:${p.m.label}` }, el('svg:title', { text: `${p.m.label}: `
         + `${rpNum(p.y)} at ${Math.round(p.x).toLocaleString('en')} thinking tokens` })));
-      svg.append(el('svg:text', { x: left ? cx - 6 : cx + 6, y: ly, 'font-size': 8,
-        'text-anchor': left ? 'end' : 'start', fill: 'var(--text-primary)', text: p.m.label }));
+      labels.push({ cx, cy, r: 4, name: p.m.label, ours: true,
+        attrs: { 'data-by-label': `${b.key}:${p.m.label}` } });
     }
+    const bare = chartLabels(svg, labels, { x0: L, y0: Tp, x1: L + pw, y1: Tp + ph }, { fs: 8 });
     svg.append(el('svg:text', { x: L + pw / 2, y: H - 2, 'text-anchor': 'middle', 'font-size': 8,
       fill: 'var(--text-secondary)', text: 'mean thinking tokens per answer' }));
-    return el('div', { class: 'by-panel', 'data-by-think': b.key }, el('h3', { text: b.label }), svg);
+    return el('div', { class: 'by-panel', 'data-by-think': b.key }, el('h3', { text: b.label }), svg,
+      chartBare(bare, 'by:' + b.key));
   }).filter(Boolean);
   if (!panels.length) return '';
   return el('div', { 'data-by-think-chart': '1' }, el('h3', { text: 'Score against thinking' }),

@@ -131,10 +131,11 @@ def test_the_list_and_the_report_open_and_the_picker_moves_the_tiles(live, page,
     ours = page.locator("[data-rp-ours]")
     # 25: every Frontier benchmark in, IFEval and IFBench (plan I) not yet
     assert ours.locator("[data-rp-status='step4000']").inner_text() == "7 of 9 benchmarks in"
-    assert "61.6 ± 3.1" in ours.locator("[data-rp-row='step4000']").inner_text()
-    assert ours.locator("[data-rp-row='step1000'] td.dash").count() == 4
+    # 27b: 27's cell — the number, its ± small after it; "–" for none
+    assert "61.6±3.1" in ours.locator("[data-rp-row='step4000']").inner_text()
+    assert ours.locator("[data-rp-row='step1000'] td.mt-none").count() == 4
     # a note under a name wraps inside its column, never cut at its edge
-    note = ours.locator("[data-rp-row='Q4, earlier run'] td").first
+    note = ours.locator("[data-rp-row='Q4, earlier run'] td.mt-name")
     assert note.evaluate("e => e.scrollWidth <= e.clientWidth + 1")
     # sources, each with its own time; Epoch's credit
     fresh = page.locator("[data-report-fresh]").inner_text()
@@ -170,11 +171,15 @@ def test_the_list_and_the_report_open_and_the_picker_moves_the_tiles(live, page,
         "step4000 thinks ")
     page.wait_for_selector("[data-rp-loop='486'] .rp-excerpt", timeout=30000)
     assert "“Wait”" in page.locator("[data-rp-loop='486']").inner_text()
-    # 6 and 7: every model, ours in bold; the cards' links beside their numbers
-    every = page.locator("[data-rp-every]")
-    assert every.locator("td.rp-ours").count() == 8   # 22: and Ornith-1.5; 23b: and step8804
-    assert every.locator("td.rp-ours").first.evaluate(
-        "e => +getComputedStyle(e).fontWeight") >= 600                  # ours in bold
+    # 6 and 7: every model, ours first with their filled dots (27b); a card's
+    # letter links it. Rows with no score yet are counted under it, and shown
+    every = page.locator("[data-report-section='every']")
+    every.locator("[data-mt-empty-toggle]").click()
+    page.wait_for_selector("[data-report-section='every'] [data-mt-empty-toggle]:text('hide them')",
+                           state="attached")
+    ours_rows = every.locator("tr[data-mt-group='ours']")
+    assert ours_rows.count() == 8                     # 22: and Ornith-1.5; 23b: and step8804
+    assert every.locator("tr[data-mt-group='ours'] [data-mt-mark='here']").count() == 8
     assert every.locator("[data-card-link]").count() >= 19
     # 22: and Ornith-1.5's card; 25b: Gemma 4 E4B's and E2B's, and Google's report
     assert page.locator("[data-rp-cards] a").count() == 10

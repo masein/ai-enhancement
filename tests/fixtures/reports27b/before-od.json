@@ -1,0 +1,3374 @@
+{
+ "on-device": {
+  "od": {
+   "Bonsai 27B (1-bit)": {
+    "Base model": {
+     "text": "Qwen3.6-27B",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "IFBench": {
+     "text": "52.4 published by PrismML keeps 77.0% of its base",
+     "tip": "Bonsai 27B model card: PrismML's own run: EvalScope + vLLM on an H100, thinking mode, the same for the model and its FP16 base"
+    },
+    "IFEval": {
+     "text": "79.1 published by PrismML keeps 89.0% of its base",
+     "tip": "Bonsai 27B model card: PrismML's own run: EvalScope + vLLM on an H100, thinking mode, the same for the model and its FP16 base"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "Measured on our testers’ phones": {
+     "text": "—",
+     "tip": "its phone speed is as published, in Phone speed"
+    },
+    "Memory it needs": {
+     "text": "3.9 GB published by PrismML",
+     "tip": "its deployed footprint, which fits an iPhone 17 Pro Max's per-app budget, its card says"
+    },
+    "Model": {
+     "text": "Bonsai 27B (1-bit) 1-bit (1.125 bits a weight)",
+     "tip": "Bonsai 27B (1-bit)"
+    },
+    "Phone speed": {
+     "text": "about 11 tok/s decode (10.8 sustained), prompt 111 tok/s at 512 iPhone 17 Pro Max published by PrismML",
+     "tip": ""
+    },
+    "Size on disk": {
+     "text": "3.9 GB the MLX pack is 5.13 GB on disk published by PrismML",
+     "tip": "deployed size, its card says"
+    }
+   },
+   "Edge0-35B-A3B-preview": {
+    "Base model": {
+     "text": "Qwen3.6-35B-A3B (the base our builds share)",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "79.8 published by Edge0 keeps 97.6% of its base",
+     "tip": "Edge0 README (Quality): Edge0's own run with OpenCompass, identical settings for the model and its fp16 base; thinking setting not stated"
+    },
+    "IFBench": {
+     "text": "57.9 published by Edge0 keeps 93.8% of its base",
+     "tip": "Edge0 README (Quality): Edge0's own run with OpenCompass, identical settings for the model and its fp16 base; thinking setting not stated"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "MMLU-Pro": {
+     "text": "81.0 published by Edge0 keeps 95.7% of its base",
+     "tip": "Edge0 README (Quality): Edge0's own run with OpenCompass, identical settings for the model and its fp16 base; thinking setting not stated"
+    },
+    "Measured on our testers’ phones": {
+     "text": "—",
+     "tip": "its phone speed is as published, in Phone speed"
+    },
+    "Memory it needs": {
+     "text": "2.9 GiB published by Edge0",
+     "tip": "peak MLX allocator memory, short contexts (not the process's RSS)"
+    },
+    "Model": {
+     "text": "Edge0-35B-A3B-preview int4, 4 routed experts (K=4), a trained prerouter, experts streamed from SSD, a distilled Recover-LoRA",
+     "tip": "Edge0-35B-A3B-preview"
+    },
+    "Phone speed": {
+     "text": "no phone numbers yet its iOS and Android engines are \"still maturing\", its card says",
+     "tip": ""
+    },
+    "Size on disk": {
+     "text": "19.6 GB its README says about 23 GB published by Edge0",
+     "tip": "MLX, as its Hugging Face page gives it"
+    }
+   },
+   "Edge0-8B-A1B-preview": {
+    "Base model": {
+     "text": "Ling 3.0 tiny (inclusionAI)",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "70.7 published by Edge0 keeps 99.3% of its base",
+     "tip": "Edge0 README (Quality): Edge0's own run with OpenCompass, identical settings for the model and its fp16 base; thinking setting not stated"
+    },
+    "IFBench": {
+     "text": "53.9 published by Edge0 keeps 88.9% of its base",
+     "tip": "Edge0 README (Quality): Edge0's own run with OpenCompass, identical settings for the model and its fp16 base; thinking setting not stated"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "MMLU-Pro": {
+     "text": "70.1 published by Edge0 keeps 106.5% of its base",
+     "tip": "Edge0 README (Quality): Edge0's own run with OpenCompass, identical settings for the model and its fp16 base; thinking setting not stated"
+    },
+    "Measured on our testers’ phones": {
+     "text": "—",
+     "tip": "its phone speed is as published, in Phone speed"
+    },
+    "Memory it needs": {
+     "text": "1.0 GiB published by Edge0",
+     "tip": "peak MLX allocator memory, short contexts (not the process's RSS)"
+    },
+    "Model": {
+     "text": "Edge0-8B-A1B-preview int4, routing prediction, experts streamed from SSD",
+     "tip": "Edge0-8B-A1B-preview"
+    },
+    "Phone speed": {
+     "text": "no phone numbers yet its iOS and Android engines are \"still maturing\", its card says",
+     "tip": ""
+    },
+    "Size on disk": {
+     "text": "4.55 GB its README says about 4.2 GB published by Edge0",
+     "tip": "MLX, as its Hugging Face page gives it"
+    }
+   },
+   "Gemma 4 E2B": {
+    "Base model": {
+     "text": "none: the model itself, Google's full model",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "43.4 published by Google",
+     "tip": "Gemma 4 E2B model card: thinking mode, Google's own harness and prompts, as Google reports it"
+    },
+    "IFBench": {
+     "text": "38.0 published by Google",
+     "tip": "Gemma 4 Technical Report (arXiv 2607.02770 v2), Table 5: thinking mode, Google's own harness and prompts, as Google reports it; Table 5's caption: all models in thinking mode"
+    },
+    "IFEval": {
+     "text": "94.6 published by Google",
+     "tip": "Gemma 4 Technical Report (arXiv 2607.02770 v2), Table 5: thinking mode, Google's own harness and prompts, as Google reports it; Table 5's caption: all models in thinking mode"
+    },
+    "MMLU-Pro": {
+     "text": "60.0 published by Google",
+     "tip": "Gemma 4 E2B model card: thinking mode, Google's own harness and prompts, as Google reports it"
+    },
+    "Measured on our testers’ phones": {
+     "text": "—",
+     "tip": "its phone speed is as published, in Phone speed"
+    },
+    "Memory it needs": {
+     "text": "0.85 GB published by Google",
+     "tip": "those weights and an int8 KV cache at 32k context, +0.05 GB (Table 3)"
+    },
+    "Model": {
+     "text": "Gemma 4 E2B 2.3B effective (5.1B with embeddings)",
+     "tip": "Gemma 4 E2B"
+    },
+    "Phone speed": {
+     "text": "no phone numbers published Google gives none for these two",
+     "tip": ""
+    },
+    "Size on disk": {
+     "text": "0.8 GB published by Google",
+     "tip": "its weights in Google's mobile quantization, text only (the report's Table 3)"
+    }
+   },
+   "Gemma 4 E4B": {
+    "Base model": {
+     "text": "none: the model itself, Google's full model",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "58.6 published by Google",
+     "tip": "Gemma 4 E4B model card: thinking mode, Google's own harness and prompts, as Google reports it"
+    },
+    "IFBench": {
+     "text": "44.0 published by Google",
+     "tip": "Gemma 4 Technical Report (arXiv 2607.02770 v2), Table 5: thinking mode, Google's own harness and prompts, as Google reports it; Table 5's caption: all models in thinking mode"
+    },
+    "IFEval": {
+     "text": "96.7 published by Google",
+     "tip": "Gemma 4 Technical Report (arXiv 2607.02770 v2), Table 5: thinking mode, Google's own harness and prompts, as Google reports it; Table 5's caption: all models in thinking mode"
+    },
+    "MMLU-Pro": {
+     "text": "69.4 published by Google",
+     "tip": "Gemma 4 E4B model card: thinking mode, Google's own harness and prompts, as Google reports it"
+    },
+    "Measured on our testers’ phones": {
+     "text": "—",
+     "tip": "its phone speed is as published, in Phone speed"
+    },
+    "Memory it needs": {
+     "text": "2.44 GB published by Google",
+     "tip": "those weights and an int8 KV cache at 32k context, +0.14 GB (Table 3)"
+    },
+    "Model": {
+     "text": "Gemma 4 E4B 4.5B effective (8B with embeddings)",
+     "tip": "Gemma 4 E4B"
+    },
+    "Phone speed": {
+     "text": "no phone numbers published Google gives none for these two",
+     "tip": ""
+    },
+    "Size on disk": {
+     "text": "2.3 GB published by Google",
+     "tip": "its weights in Google's mobile quantization, text only (the report's Table 3)"
+    }
+   },
+   "Q4 (UD-Q4_K_XL)": {
+    "Base model": {
+     "text": "Qwen3.6-35B-A3B",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "85.1 ± 2.1 measured here keeps 100.4% of its base",
+     "tip": "by code"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MMLU-Pro": {
+     "text": "85.0 ± 0.3 measured here keeps 100.0% of its base",
+     "tip": "by code"
+    },
+    "Measured on our testers’ phones": {
+     "text": "—",
+     "tip": "not a phone build"
+    },
+    "Memory it needs": {
+     "text": "22.0 GB",
+     "tip": "the whole file, loaded on the server; not measured on a phone yet"
+    },
+    "Model": {
+     "text": "Q4 (UD-Q4_K_XL)",
+     "tip": "Q4 (UD-Q4_K_XL)"
+    },
+    "Phone speed": {
+     "text": "not measured on a phone yet",
+     "tip": ""
+    },
+    "Size on disk": {
+     "text": "22.0 GB",
+     "tip": "its GGUF, as the box measured it"
+    }
+   },
+   "Ternary Bonsai 2 2B": {
+    "Base model": {
+     "text": "Qwen3.5 2B",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "39.6 published by PrismML keeps 67.7% of its base",
+     "tip": "PrismML: Ternary Bonsai 2 2B, 4B and 9B: PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated"
+    },
+    "IFBench": {
+     "text": "48.0 published by PrismML keeps 139.8% of its base",
+     "tip": "PrismML: Ternary Bonsai 2 2B, 4B and 9B: PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated"
+    },
+    "IFEval": {
+     "text": "85.8 published by PrismML keeps 113.2% of its base",
+     "tip": "PrismML: Ternary Bonsai 2 2B, 4B and 9B: PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "Measured on our testers’ phones": {
+     "text": "—",
+     "tip": "its phone speed is as published, in Phone speed"
+    },
+    "Memory it needs": {
+     "text": "0.43 GB published by PrismML",
+     "tip": "its footprint, PrismML's post says"
+    },
+    "Model": {
+     "text": "Ternary Bonsai 2 2B ternary ({−1, 0, +1})",
+     "tip": "Ternary Bonsai 2 2B"
+    },
+    "Phone speed": {
+     "text": "up to 120 tok/s iPhone 18 Pro Max published by PrismML",
+     "tip": ""
+    },
+    "Size on disk": {
+     "text": "0.43 GB published by PrismML",
+     "tip": "its footprint, PrismML's post says"
+    }
+   },
+   "Ternary Bonsai 2 4B": {
+    "Base model": {
+     "text": "Qwen3.5 4B",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "63.8 published by PrismML keeps 81.8% of its base",
+     "tip": "PrismML: Ternary Bonsai 2 2B, 4B and 9B: PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated"
+    },
+    "IFBench": {
+     "text": "56.3 published by PrismML keeps 111.9% of its base",
+     "tip": "PrismML: Ternary Bonsai 2 2B, 4B and 9B: PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated"
+    },
+    "IFEval": {
+     "text": "88.9 published by PrismML keeps 102.6% of its base",
+     "tip": "PrismML: Ternary Bonsai 2 2B, 4B and 9B: PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "Measured on our testers’ phones": {
+     "text": "—",
+     "tip": "its phone speed is as published, in Phone speed"
+    },
+    "Memory it needs": {
+     "text": "0.95 GB published by PrismML",
+     "tip": "its footprint, PrismML's post says"
+    },
+    "Model": {
+     "text": "Ternary Bonsai 2 4B ternary ({−1, 0, +1})",
+     "tip": "Ternary Bonsai 2 4B"
+    },
+    "Phone speed": {
+     "text": "no phone number for the 4B PrismML gives the 2B's and the 9B's",
+     "tip": ""
+    },
+    "Size on disk": {
+     "text": "0.95 GB published by PrismML",
+     "tip": "its footprint, PrismML's post says"
+    }
+   },
+   "Ternary Bonsai 2 9B": {
+    "Base model": {
+     "text": "Qwen3.5 9B",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "69.9 published by PrismML keeps 84.7% of its base",
+     "tip": "PrismML: Ternary Bonsai 2 2B, 4B and 9B: PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated"
+    },
+    "IFBench": {
+     "text": "57.0 published by PrismML keeps 99.4% of its base",
+     "tip": "PrismML: Ternary Bonsai 2 2B, 4B and 9B: PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated"
+    },
+    "IFEval": {
+     "text": "90.0 published by PrismML keeps 100.4% of its base",
+     "tip": "PrismML: Ternary Bonsai 2 2B, 4B and 9B: PrismML's own run, beside its full-precision Qwen3.5 base; settings not stated"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": "not published"
+    },
+    "Measured on our testers’ phones": {
+     "text": "—",
+     "tip": "its phone speed is as published, in Phone speed"
+    },
+    "Memory it needs": {
+     "text": "2 GB published by PrismML",
+     "tip": "its footprint, PrismML's post says"
+    },
+    "Model": {
+     "text": "Ternary Bonsai 2 9B ternary ({−1, 0, +1})",
+     "tip": "Ternary Bonsai 2 9B"
+    },
+    "Phone speed": {
+     "text": "up to 34 tok/s iPhone 18 Pro Max published by PrismML",
+     "tip": ""
+    },
+    "Size on disk": {
+     "text": "2 GB published by PrismML",
+     "tip": "its footprint, PrismML's post says"
+    }
+   },
+   "step1000": {
+    "Base model": {
+     "text": "Qwen3.6-35B-A3B",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "65.7 ± 2.8 measured here keeps 77.5% of its base",
+     "tip": "by code · 4% ran out of room (35 of 792), counted wrong"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MMLU-Pro": {
+     "text": "71.4 ± 0.4 measured here keeps 84.0% of its base",
+     "tip": "by code · 5% ran out of room (595 of 12,032), counted wrong"
+    },
+    "Measured on our testers’ phones": {
+     "text": "—",
+     "tip": "not a phone build"
+    },
+    "Memory it needs": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "step1000",
+     "tip": "step1000"
+    },
+    "Phone speed": {
+     "text": "not measured on a phone yet",
+     "tip": ""
+    },
+    "Size on disk": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "step4000": {
+    "Base model": {
+     "text": "Qwen3.6-35B-A3B",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "74.2 ± 2.6 measured here keeps 87.5% of its base",
+     "tip": "by code · 0% ran out of room (3 of 792), counted wrong"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MMLU-Pro": {
+     "text": "78.0 ± 0.4 measured here keeps 91.8% of its base",
+     "tip": "by code · 2% ran out of room (232 of 12,032), counted wrong"
+    },
+    "Measured on our testers’ phones": {
+     "text": "—",
+     "tip": "not a phone build"
+    },
+    "Memory it needs": {
+     "text": "15.8 GB",
+     "tip": "the whole file, loaded on the server; not measured on a phone yet"
+    },
+    "Model": {
+     "text": "step4000",
+     "tip": "step4000"
+    },
+    "Phone speed": {
+     "text": "not measured on a phone yet",
+     "tip": ""
+    },
+    "Size on disk": {
+     "text": "15.8 GB",
+     "tip": "its GGUF, as the box measured it"
+    }
+   },
+   "step8804": {
+    "Base model": {
+     "text": "Qwen3.6-35B-A3B",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "Measured on our testers’ phones": {
+     "text": "—",
+     "tip": "not a phone build"
+    },
+    "Memory it needs": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "step8804",
+     "tip": "step8804"
+    },
+    "Phone speed": {
+     "text": "not measured on a phone yet",
+     "tip": ""
+    },
+    "Size on disk": {
+     "text": "—",
+     "tip": ""
+    }
+   }
+  }
+ },
+ "step-checkpoints": {
+  "every": {
+   "BF16": {
+    "ARC-AGI-2": {
+     "text": "8.5 ± 2.3 167 tasks × 2 · 26 answers ran out",
+     "tip": "by code · 8% ran out of room (26 of 334), counted wrong"
+    },
+    "GPQA Diamond": {
+     "text": "84.8 ± 2.1 198 questions × 4",
+     "tip": "by code"
+    },
+    "HLE": {
+     "text": "20.7 ± 0.9 2,158 questions · 47 answers ran out",
+     "tip": "by code · 2% ran out of room (47 of 2,158), counted wrong"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MATH Level 5": {
+     "text": "98.9 ± 0.3 1,324 questions · 3 answers ran out",
+     "tip": "by code · 0% ran out of room (3 of 1,324), counted wrong"
+    },
+    "MMLU-Pro": {
+     "text": "85.0 ± 0.3 12,032 questions",
+     "tip": "by code"
+    },
+    "Model": {
+     "text": "BF16",
+     "tip": "BF16"
+    },
+    "OTIS Mock AIME": {
+     "text": "85.0 ± 4.9 45 questions × 8 · 39 answers ran out",
+     "tip": "by code · 11% ran out of room (39 of 360), counted wrong"
+    },
+    "SimpleQA Verified": {
+     "text": "19.0 ± 1.2 1,000 questions · 4 answers ran out",
+     "tip": "by code · 0% ran out of room (4 of 1,000), counted wrong"
+    }
+   },
+   "Claude 3.5 Sonnet (Oct 2024)": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "55.3 ± 2.8",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "4.1†",
+     "tip": "Epoch AI, from another source (not Epoch’s own run)"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "56.9 ± 1.1",
+     "tip": "Epoch AI’s own run"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "Claude 3.5 Sonnet (Oct 2024)",
+     "tip": "Claude 3.5 Sonnet (Oct 2024)"
+    },
+    "OTIS Mock AIME": {
+     "text": "8.5 ± 2.6",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Claude 3.7 Sonnet (64K thinking)": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "79.7 ± 2.7",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "8.0†",
+     "tip": "Epoch AI, from another source (not Epoch’s own run)"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "91.2 ± 0.8",
+     "tip": "Epoch AI’s own run"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "Claude 3.7 Sonnet (64K thinking)",
+     "tip": "Claude 3.7 Sonnet (64K thinking)"
+    },
+    "OTIS Mock AIME": {
+     "text": "57.8 ± 7.4",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Claude Haiku 4.5 (32K thinking)": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "71.2 ± 3.2",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "96.4 ± 0.5",
+     "tip": "Epoch AI’s own run"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "Claude Haiku 4.5 (32K thinking)",
+     "tip": "Claude Haiku 4.5 (32K thinking)"
+    },
+    "OTIS Mock AIME": {
+     "text": "66.7 ± 7.1",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "12.6 ± 1.0",
+     "tip": "Epoch AI’s own run"
+    }
+   },
+   "Claude Opus 5.5 (max)": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "90.6 ± 1.9",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "Claude Opus 5.5 (max)",
+     "tip": "Claude Opus 5.5 (max)"
+    },
+    "OTIS Mock AIME": {
+     "text": "100.0",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "72.2 ± 1.4",
+     "tip": "Epoch AI’s own run"
+    }
+   },
+   "DeepSeek-R1": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "71.7 ± 3.1",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "8.5 card",
+     "tip": "DeepSeek-R1-0528 model card: the text-only prompts, in the card's comparison table · entered 22 Oct by masein"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "93.1 ± 0.7",
+     "tip": "Epoch AI’s own run"
+    },
+    "MMLU-Pro": {
+     "text": "84.0 card",
+     "tip": "DeepSeek-R1-0528 model card: in the card's comparison table · entered 22 Oct by masein"
+    },
+    "Model": {
+     "text": "DeepSeek-R1",
+     "tip": "DeepSeek-R1"
+    },
+    "OTIS Mock AIME": {
+     "text": "53.3 ± 7.5",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "DeepSeek-R1-0528": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "76.3 ± 2.4",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "17.7 card",
+     "tip": "DeepSeek-R1-0528 model card: the text-only prompts, as the card says · entered 22 Oct by masein"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "96.6 ± 0.4",
+     "tip": "Epoch AI’s own run"
+    },
+    "MMLU-Pro": {
+     "text": "85.0 card",
+     "tip": "DeepSeek-R1-0528 model card: as the card reports it · entered 22 Oct by masein"
+    },
+    "Model": {
+     "text": "DeepSeek-R1-0528",
+     "tip": "DeepSeek-R1-0528"
+    },
+    "OTIS Mock AIME": {
+     "text": "66.4 ± 4.9",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "DeepSeek-V3-0324": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "67.6 ± 2.7",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "75.5 ± 0.9",
+     "tip": "Epoch AI’s own run"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "DeepSeek-V3-0324",
+     "tip": "DeepSeek-V3-0324"
+    },
+    "OTIS Mock AIME": {
+     "text": "37.8 ± 6.2",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "DeepSeek-V4-Pro (max)": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "89.6 ± 1.7",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "37.7 card",
+     "tip": "DeepSeek-V4-Pro model card: Max reasoning (the card's V4-Pro Max column), no tools · entered 22 Oct by masein"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "87.5 card",
+     "tip": "DeepSeek-V4-Pro model card: Max reasoning (the card's V4-Pro Max column) · entered 22 Oct by masein"
+    },
+    "Model": {
+     "text": "DeepSeek-V4-Pro (max)",
+     "tip": "DeepSeek-V4-Pro (max)"
+    },
+    "OTIS Mock AIME": {
+     "text": "96.7 ± 2.0",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "47.0 ± 1.6",
+     "tip": "Epoch AI’s own run"
+    }
+   },
+   "GPT-4.1": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "66.9 ± 2.8",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "5.4†",
+     "tip": "Epoch AI, from another source (not Epoch’s own run)"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "83.0 ± 0.8",
+     "tip": "Epoch AI’s own run"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "GPT-4.1",
+     "tip": "GPT-4.1"
+    },
+    "OTIS Mock AIME": {
+     "text": "38.3 ± 6.3",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "31.1 ± 1.5",
+     "tip": "Epoch AI’s own run"
+    }
+   },
+   "GPT-4o (Aug 2024)": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "49.2 ± 2.6",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "53.3 ± 1.1",
+     "tip": "Epoch AI’s own run"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "GPT-4o (Aug 2024)",
+     "tip": "GPT-4o (Aug 2024)"
+    },
+    "OTIS Mock AIME": {
+     "text": "6.4 ± 2.6",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "26.0 ± 1.4",
+     "tip": "Epoch AI’s own run"
+    }
+   },
+   "GPT-5 mini (high)": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "75.0 ± 2.3",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "19.4†",
+     "tip": "Epoch AI, from another source (not Epoch’s own run)"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "97.8 ± 0.3",
+     "tip": "Epoch AI’s own run"
+    },
+    "MMLU-Pro": {
+     "text": "83.7 card",
+     "tip": "Qwen3.5-35B-A3B model card: in the card's comparison table; its reasoning effort isn't stated there · entered 22 Oct by masein"
+    },
+    "Model": {
+     "text": "GPT-5 mini (high)",
+     "tip": "GPT-5 mini (high)"
+    },
+    "OTIS Mock AIME": {
+     "text": "86.7 ± 4.3",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "21.6 ± 1.3",
+     "tip": "Epoch AI’s own run"
+    }
+   },
+   "GPT-5 nano (high)": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "69.4 ± 2.8",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "94.9 ± 0.5",
+     "tip": "Epoch AI’s own run"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "GPT-5 nano (high)",
+     "tip": "GPT-5 nano (high)"
+    },
+    "OTIS Mock AIME": {
+     "text": "81.1 ± 4.6",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "11.7 ± 1.0",
+     "tip": "Epoch AI’s own run"
+    }
+   },
+   "GPT-5.5 Instant": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "82.5 ± 2.3",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "GPT-5.5 Instant",
+     "tip": "GPT-5.5 Instant"
+    },
+    "OTIS Mock AIME": {
+     "text": "68.1 ± 6.2",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "GPT-6 Astra (max)": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "95.8 ± 1.4",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "54.8†",
+     "tip": "Epoch AI, from another source (not Epoch’s own run)"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "GPT-6 Astra (max)",
+     "tip": "GPT-6 Astra (max)"
+    },
+    "OTIS Mock AIME": {
+     "text": "100.0",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "75.6 ± 1.4",
+     "tip": "Epoch AI’s own run"
+    }
+   },
+   "Gemini 2.0 Flash": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "64.1 ± 2.7",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "82.2 ± 0.9",
+     "tip": "Epoch AI’s own run"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "Gemini 2.0 Flash",
+     "tip": "Gemini 2.0 Flash"
+    },
+    "OTIS Mock AIME": {
+     "text": "31.1 ± 6.3",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Gemini 2.5 Flash (Apr preview)": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "—",
+     "tip": ""
+    },
+    "HLE": {
+     "text": "12.1†",
+     "tip": "Epoch AI, from another source (not Epoch’s own run)"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "Gemini 2.5 Flash (Apr preview)",
+     "tip": "Gemini 2.5 Flash (Apr preview)"
+    },
+    "OTIS Mock AIME": {
+     "text": "73.1 ± 5.5",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Gemini 3.1 Flash-Lite (high)": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "81.8 ± 2.7",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "8.6†",
+     "tip": "Epoch AI, from another source (not Epoch’s own run)"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "Gemini 3.1 Flash-Lite (high)",
+     "tip": "Gemini 3.1 Flash-Lite (high)"
+    },
+    "OTIS Mock AIME": {
+     "text": "80.0 ± 6.0",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Gemini 3.5 Flash-Lite (high)": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "83.3 ± 2.7",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "Gemini 3.5 Flash-Lite (high)",
+     "tip": "Gemini 3.5 Flash-Lite (high)"
+    },
+    "OTIS Mock AIME": {
+     "text": "71.1 ± 6.8",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Gemini 3.8 Flash (high)": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "95.4 ± 1.4",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "44.5†",
+     "tip": "Epoch AI, from another source (not Epoch’s own run)"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "Gemini 3.8 Flash (high)",
+     "tip": "Gemini 3.8 Flash (high)"
+    },
+    "OTIS Mock AIME": {
+     "text": "98.9 ± 0.9",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "69.7 ± 1.5",
+     "tip": "Epoch AI’s own run"
+    }
+   },
+   "Gemma 3 27B": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "47.7 ± 2.7",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "74.0 ± 1.1",
+     "tip": "Epoch AI’s own run"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "Gemma 3 27B",
+     "tip": "Gemma 3 27B"
+    },
+    "OTIS Mock AIME": {
+     "text": "22.5 ± 5.3",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Gemma 4 26B A4B (minimal)": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "73.2 ± 3.2",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "Gemma 4 26B A4B (minimal)",
+     "tip": "Gemma 4 26B A4B (minimal)"
+    },
+    "OTIS Mock AIME": {
+     "text": "82.2 ± 5.8",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Gemma 4 31B IT (minimal)": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "75.8 ± 3.1",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "Gemma 4 31B IT (minimal)",
+     "tip": "Gemma 4 31B IT (minimal)"
+    },
+    "OTIS Mock AIME": {
+     "text": "73.3 ± 6.7",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Gemma 4 E2B": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "43.4 card",
+     "tip": "Gemma 4 E2B model card: thinking mode, Google's own harness and prompts, as Google reports it · entered 22 Oct by masein"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "38.0 card",
+     "tip": "Gemma 4 Technical Report (arXiv 2607.02770 v2), Table 5: thinking mode, Google's own harness and prompts, as Google reports it; Table 5's caption: all models in thinking mode · entered 22 Oct by masein"
+    },
+    "IFEval": {
+     "text": "94.6 card",
+     "tip": "Gemma 4 Technical Report (arXiv 2607.02770 v2), Table 5: thinking mode, Google's own harness and prompts, as Google reports it; Table 5's caption: all models in thinking mode · entered 22 Oct by masein"
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "60.0 card",
+     "tip": "Gemma 4 E2B model card: thinking mode, Google's own harness and prompts, as Google reports it · entered 22 Oct by masein"
+    },
+    "Model": {
+     "text": "Gemma 4 E2B Google's own numbers, thinking mode, Google's own harness and prompts. IFEval's metric (prompt- or instruction-level, strict or loose) isn't stated.",
+     "tip": "Gemma 4 E2B"
+    },
+    "OTIS Mock AIME": {
+     "text": "—",
+     "tip": ""
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Gemma 4 E4B": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "58.6 card",
+     "tip": "Gemma 4 E4B model card: thinking mode, Google's own harness and prompts, as Google reports it · entered 22 Oct by masein"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "44.0 card",
+     "tip": "Gemma 4 Technical Report (arXiv 2607.02770 v2), Table 5: thinking mode, Google's own harness and prompts, as Google reports it; Table 5's caption: all models in thinking mode · entered 22 Oct by masein"
+    },
+    "IFEval": {
+     "text": "96.7 card",
+     "tip": "Gemma 4 Technical Report (arXiv 2607.02770 v2), Table 5: thinking mode, Google's own harness and prompts, as Google reports it; Table 5's caption: all models in thinking mode · entered 22 Oct by masein"
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "69.4 card",
+     "tip": "Gemma 4 E4B model card: thinking mode, Google's own harness and prompts, as Google reports it · entered 22 Oct by masein"
+    },
+    "Model": {
+     "text": "Gemma 4 E4B Google's own numbers, thinking mode, Google's own harness and prompts. IFEval's metric (prompt- or instruction-level, strict or loose) isn't stated.",
+     "tip": "Gemma 4 E4B"
+    },
+    "OTIS Mock AIME": {
+     "text": "—",
+     "tip": ""
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Grok 3 mini (high)": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "75.5 ± 2.8",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "88.1 ± 0.9",
+     "tip": "Epoch AI’s own run"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "Grok 3 mini (high)",
+     "tip": "Grok 3 mini (high)"
+    },
+    "OTIS Mock AIME": {
+     "text": "77.8 ± 6.3",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Llama 3.3 70B": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "47.4 ± 2.9",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "41.6 ± 1.2",
+     "tip": "Epoch AI’s own run"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "Llama 3.3 70B",
+     "tip": "Llama 3.3 70B"
+    },
+    "OTIS Mock AIME": {
+     "text": "5.1 ± 2.4",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Llama 4 Maverick": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "67.0 ± 2.8",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "5.7†",
+     "tip": "Epoch AI, from another source (not Epoch’s own run)"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "73.0 ± 1.1",
+     "tip": "Epoch AI’s own run"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "Llama 4 Maverick",
+     "tip": "Llama 4 Maverick"
+    },
+    "OTIS Mock AIME": {
+     "text": "20.6 ± 4.9",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Mistral Medium 3": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "59.5 ± 2.8",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "4.5†",
+     "tip": "Epoch AI, from another source (not Epoch’s own run)"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "81.6 ± 0.9",
+     "tip": "Epoch AI’s own run"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "Mistral Medium 3",
+     "tip": "Mistral Medium 3"
+    },
+    "OTIS Mock AIME": {
+     "text": "32.2 ± 6.0",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Ornith-1.5 Q4_K_M": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "GPQA Diamond": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "Model": {
+     "text": "Ornith-1.5 Q4_K_M",
+     "tip": "Ornith-1.5 Q4_K_M"
+    },
+    "OTIS Mock AIME": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": "not in yet"
+    }
+   },
+   "Ornith-1.5-35B-A3B, its card": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "89.2 card · 5-run average",
+     "tip": "Ornith-1.5-35B-A3B model card: averaged over five runs, as the card reports it · entered 22 Oct by masein"
+    },
+    "HLE": {
+     "text": "25.6 card · 5-run average",
+     "tip": "Ornith-1.5-35B-A3B model card: no tools, each run judged by Claude Opus 4.6, averaged over five runs, as the card reports it · entered 22 Oct by masein"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "Ornith-1.5-35B-A3B, its card",
+     "tip": "Ornith-1.5-35B-A3B, its card"
+    },
+    "OTIS Mock AIME": {
+     "text": "—",
+     "tip": ""
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Phi-4": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "56.1 ± 2.6",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "64.9 ± 1.1",
+     "tip": "Epoch AI’s own run"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "Phi-4",
+     "tip": "Phi-4"
+    },
+    "OTIS Mock AIME": {
+     "text": "13.8 ± 3.7",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Q2 (UD-Q2_K_XL)": {
+    "ARC-AGI-2": {
+     "text": "4.2 ± 1.7 167 tasks × 2 · 61 answers ran out",
+     "tip": "by code · 18% ran out of room (61 of 334), counted wrong"
+    },
+    "GPQA Diamond": {
+     "text": "81.8 ± 2.3 198 questions × 4",
+     "tip": "by code"
+    },
+    "HLE": {
+     "text": "19.1 ± 0.8 2,158 questions · 46 answers ran out",
+     "tip": "by code · 2% ran out of room (46 of 2,158), counted wrong"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MATH Level 5": {
+     "text": "98.2 ± 0.4 1,324 questions · 9 answers ran out",
+     "tip": "by code · 1% ran out of room (9 of 1,324), counted wrong"
+    },
+    "MMLU-Pro": {
+     "text": "83.8 ± 0.3 12,032 questions · 3 answers ran out",
+     "tip": "by code · 0% ran out of room (3 of 12,032), counted wrong"
+    },
+    "Model": {
+     "text": "Q2 (UD-Q2_K_XL)",
+     "tip": "Q2 (UD-Q2_K_XL)"
+    },
+    "OTIS Mock AIME": {
+     "text": "83.3 ± 4.9 45 questions × 8 · 39 answers ran out",
+     "tip": "by code · 11% ran out of room (39 of 360), counted wrong"
+    },
+    "SimpleQA Verified": {
+     "text": "12.3 ± 1.0 1,000 questions · 2 answers ran out",
+     "tip": "by code · 0% ran out of room (2 of 1,000), counted wrong"
+    }
+   },
+   "Q4 (UD-Q4_K_XL)": {
+    "ARC-AGI-2": {
+     "text": "7.5 ± 2.3 167 tasks × 2 · 19 answers ran out",
+     "tip": "by code · 6% ran out of room (19 of 334), counted wrong"
+    },
+    "GPQA Diamond": {
+     "text": "85.1 ± 2.1 198 questions × 4",
+     "tip": "by code"
+    },
+    "HLE": {
+     "text": "21.5 ± 0.9 2,158 questions · 47 answers ran out",
+     "tip": "by code · 2% ran out of room (47 of 2,158), counted wrong"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MATH Level 5": {
+     "text": "99.2 ± 0.2 1,324 questions · 2 answers ran out",
+     "tip": "by code · 0% ran out of room (2 of 1,324), counted wrong"
+    },
+    "MMLU-Pro": {
+     "text": "85.0 ± 0.3 12,032 questions",
+     "tip": "by code"
+    },
+    "Model": {
+     "text": "Q4 (UD-Q4_K_XL)",
+     "tip": "Q4 (UD-Q4_K_XL)"
+    },
+    "OTIS Mock AIME": {
+     "text": "86.1 ± 4.7 45 questions × 8 · 31 answers ran out",
+     "tip": "by code · 9% ran out of room (31 of 360), counted wrong"
+    },
+    "SimpleQA Verified": {
+     "text": "19.3 ± 1.2 1,000 questions · 1 answer ran out",
+     "tip": "by code · 0% ran out of room (1 of 1,000), counted wrong"
+    }
+   },
+   "Q4, earlier run": {
+    "ARC-AGI-2": {
+     "text": "5.8 ± 2.1 167 tasks × 2 · 26 answers ran out",
+     "tip": "by code · 8% ran out of room (26 of 334), counted wrong"
+    },
+    "GPQA Diamond": {
+     "text": "86.5 ± 2.0 198 questions × 4 · 1 answer ran out",
+     "tip": "by code · 0% ran out of room (1 of 792), counted wrong"
+    },
+    "HLE": {
+     "text": "21.5 ± 0.9 2,158 questions · 53 answers ran out",
+     "tip": "by code · 2% ran out of room (53 of 2,158), counted wrong"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MATH Level 5": {
+     "text": "98.9 ± 0.3 1,324 questions · 4 answers ran out",
+     "tip": "by code · 0% ran out of room (4 of 1,324), counted wrong"
+    },
+    "MMLU-Pro": {
+     "text": "84.8 ± 0.3 12,032 questions",
+     "tip": "by code"
+    },
+    "Model": {
+     "text": "Q4, earlier run",
+     "tip": "Q4, earlier run"
+    },
+    "OTIS Mock AIME": {
+     "text": "85.0 ± 5.0 45 questions × 8 · 41 answers ran out",
+     "tip": "by code · 11% ran out of room (41 of 360), counted wrong"
+    },
+    "SimpleQA Verified": {
+     "text": "20.7 ± 1.3 1,000 questions · 2 answers ran out",
+     "tip": "by code · 0% ran out of room (2 of 1,000), counted wrong"
+    }
+   },
+   "QwQ-32B": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "65.3 ± 2.8",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "QwQ-32B",
+     "tip": "QwQ-32B"
+    },
+    "OTIS Mock AIME": {
+     "text": "59.2 ± 6.3",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Qwen3-235B-A22B-Thinking-2507": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "80.1 ± 2.6",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "18.2 card",
+     "tip": "Qwen3-235B-A22B-Thinking-2507 model card: the text-only subset (the card's #) · entered 22 Oct by masein"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "84.4 card",
+     "tip": "Qwen3-235B-A22B-Thinking-2507 model card: thinking, as the card reports it · entered 22 Oct by masein"
+    },
+    "Model": {
+     "text": "Qwen3-235B-A22B-Thinking-2507",
+     "tip": "Qwen3-235B-A22B-Thinking-2507"
+    },
+    "OTIS Mock AIME": {
+     "text": "86.7 ± 5.1",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "40.4 ± 1.6",
+     "tip": "Epoch AI’s own run"
+    }
+   },
+   "Qwen3-30B-A3B (thinking)": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "61.7 ± 3.0",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "78.5 card",
+     "tip": "Qwen3-30B-A3B-Thinking-2507 model card: thinking, in the card's comparison table · entered 22 Oct by masein"
+    },
+    "Model": {
+     "text": "Qwen3-30B-A3B (thinking)",
+     "tip": "Qwen3-30B-A3B (thinking)"
+    },
+    "OTIS Mock AIME": {
+     "text": "62.8 ± 6.2",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Qwen3-30B-A3B-Thinking-2507": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "70.1 ± 2.8",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "80.9 card",
+     "tip": "Qwen3-30B-A3B-Thinking-2507 model card: thinking, as the card reports it · entered 22 Oct by masein"
+    },
+    "Model": {
+     "text": "Qwen3-30B-A3B-Thinking-2507",
+     "tip": "Qwen3-30B-A3B-Thinking-2507"
+    },
+    "OTIS Mock AIME": {
+     "text": "70.3 ± 6.0",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Qwen3-32B (thinking)": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "65.7 ± 2.8",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "Qwen3-32B (thinking)",
+     "tip": "Qwen3-32B (thinking)"
+    },
+    "OTIS Mock AIME": {
+     "text": "66.9 ± 6.0",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Qwen3-8B (thinking)": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "56.8 ± 2.9",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "Qwen3-8B (thinking)",
+     "tip": "Qwen3-8B (thinking)"
+    },
+    "OTIS Mock AIME": {
+     "text": "56.1 ± 6.5",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Qwen3.5-35B-A3B": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "83.5 ± 2.2",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "22.4 card",
+     "tip": "Qwen3.5-35B-A3B model card: thinking, as the card reports it · entered 22 Oct by masein"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "85.3 card",
+     "tip": "Qwen3.5-35B-A3B model card: thinking, as the card reports it · entered 22 Oct by masein"
+    },
+    "Model": {
+     "text": "Qwen3.5-35B-A3B",
+     "tip": "Qwen3.5-35B-A3B"
+    },
+    "OTIS Mock AIME": {
+     "text": "54.4 ± 6.2",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Qwen3.6-35B-A3B, Epoch's run": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "83.8 ± 2.6",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "Qwen3.6-35B-A3B, Epoch's run",
+     "tip": "Qwen3.6-35B-A3B, Epoch's run"
+    },
+    "OTIS Mock AIME": {
+     "text": "86.7 ± 5.1",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Qwen3.6-35B-A3B, Qwen's report": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "86.0 card",
+     "tip": "Qwen3.6-35B-A3B model card: thinking, as the card reports it · entered 22 Oct by masein"
+    },
+    "HLE": {
+     "text": "21.4 card",
+     "tip": "Qwen3.6-35B-A3B model card: thinking, as the card reports it · entered 22 Oct by masein"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "85.2 card",
+     "tip": "Qwen3.6-35B-A3B model card: thinking, as the card reports it · entered 22 Oct by masein"
+    },
+    "Model": {
+     "text": "Qwen3.6-35B-A3B, Qwen's report",
+     "tip": "Qwen3.6-35B-A3B, Qwen's report"
+    },
+    "OTIS Mock AIME": {
+     "text": "—",
+     "tip": ""
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "gpt-oss-120b (high)": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "75.8 ± 2.7",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "14.9 card",
+     "tip": "Qwen3.5-35B-A3B model card: in the card's comparison table; its reasoning effort isn't stated there · entered 22 Oct by masein"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "80.8 card",
+     "tip": "Qwen3.5-35B-A3B model card: in the card's comparison table; its reasoning effort isn't stated there · entered 22 Oct by masein"
+    },
+    "Model": {
+     "text": "gpt-oss-120b (high)",
+     "tip": "gpt-oss-120b (high)"
+    },
+    "OTIS Mock AIME": {
+     "text": "88.9 ± 4.5",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "gpt-oss-20b (medium)": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "60.8 ± 2.5",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "gpt-oss-20b (medium)",
+     "tip": "gpt-oss-20b (medium)"
+    },
+    "OTIS Mock AIME": {
+     "text": "65.3 ± 5.9",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "o1 (high)": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "76.8 ± 3.0",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "8.0†",
+     "tip": "Epoch AI, from another source (not Epoch’s own run)"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "94.7 ± 0.6",
+     "tip": "Epoch AI’s own run"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "o1 (high)",
+     "tip": "o1 (high)"
+    },
+    "OTIS Mock AIME": {
+     "text": "73.3 ± 6.7",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "41.1 ± 1.6",
+     "tip": "Epoch AI’s own run"
+    }
+   },
+   "o3-mini (high)": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "77.0 ± 2.6",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "96.5 ± 0.4",
+     "tip": "Epoch AI’s own run"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "o3-mini (high)",
+     "tip": "o3-mini (high)"
+    },
+    "OTIS Mock AIME": {
+     "text": "76.9 ± 5.2",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "15.3 ± 1.1",
+     "tip": "Epoch AI’s own run"
+    }
+   },
+   "o4-mini (high)": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "79.6 ± 2.4",
+     "tip": "Epoch AI’s own run"
+    },
+    "HLE": {
+     "text": "18.1†",
+     "tip": "Epoch AI, from another source (not Epoch’s own run)"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "97.8 ± 0.3",
+     "tip": "Epoch AI’s own run"
+    },
+    "MMLU-Pro": {
+     "text": "81.9 card · medium effort",
+     "tip": "Qwen3-235B-A22B-Thinking-2507 model card: in the card's comparison table, at medium reasoning effort (its footnote) · entered 22 Oct by masein"
+    },
+    "Model": {
+     "text": "o4-mini (high)",
+     "tip": "o4-mini (high)"
+    },
+    "OTIS Mock AIME": {
+     "text": "81.7 ± 4.7",
+     "tip": "Epoch AI’s own run"
+    },
+    "SimpleQA Verified": {
+     "text": "18.8 ± 1.2",
+     "tip": "Epoch AI’s own run"
+    }
+   },
+   "step1000": {
+    "ARC-AGI-2": {
+     "text": "0.6 ± 0.6 167 tasks × 2 · 32 answers ran out",
+     "tip": "by code · 10% ran out of room (32 of 334), counted wrong"
+    },
+    "GPQA Diamond": {
+     "text": "65.7 ± 2.8 198 questions × 4 · 35 answers ran out",
+     "tip": "by code · 4% ran out of room (35 of 792), counted wrong"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MMLU-Pro": {
+     "text": "71.4 ± 0.4 12,032 questions · 595 answers ran out",
+     "tip": "by code · 5% ran out of room (595 of 12,032), counted wrong"
+    },
+    "Model": {
+     "text": "step1000",
+     "tip": "step1000"
+    },
+    "OTIS Mock AIME": {
+     "text": "68.1 ± 5.9 45 questions × 8 · 77 answers ran out",
+     "tip": "by code · 21% ran out of room (77 of 360), counted wrong"
+    },
+    "SimpleQA Verified": {
+     "text": "4.9 ± 0.7 1,000 questions · 22 answers ran out",
+     "tip": "by code · 2% ran out of room (22 of 1,000), counted wrong"
+    }
+   },
+   "step4000": {
+    "ARC-AGI-2": {
+     "text": "1.4 ± 0.9 167 tasks × 2 · 3 answers ran out",
+     "tip": "by code · 1% ran out of room (3 of 334), counted wrong"
+    },
+    "GPQA Diamond": {
+     "text": "74.2 ± 2.6 198 questions × 4 · 3 answers ran out",
+     "tip": "by code · 0% ran out of room (3 of 792), counted wrong"
+    },
+    "HLE": {
+     "text": "12.6 ± 0.7 2,158 questions · 111 answers ran out",
+     "tip": "by code · 5% ran out of room (111 of 2,158), counted wrong"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MATH Level 5": {
+     "text": "97.0 ± 0.5 1,324 questions · 15 answers ran out",
+     "tip": "by code · 1% ran out of room (15 of 1,324), counted wrong"
+    },
+    "MMLU-Pro": {
+     "text": "78.0 ± 0.4 12,032 questions · 232 answers ran out",
+     "tip": "by code · 2% ran out of room (232 of 12,032), counted wrong"
+    },
+    "Model": {
+     "text": "step4000",
+     "tip": "step4000"
+    },
+    "OTIS Mock AIME": {
+     "text": "77.5 ± 5.5 45 questions × 8 · 46 answers ran out",
+     "tip": "by code · 13% ran out of room (46 of 360), counted wrong"
+    },
+    "SimpleQA Verified": {
+     "text": "6.8 ± 0.8 1,000 questions · 1 answer ran out",
+     "tip": "by code · 0% ran out of room (1 of 1,000), counted wrong"
+    }
+   },
+   "step8804": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "GPQA Diamond": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "Model": {
+     "text": "step8804",
+     "tip": "step8804"
+    },
+    "OTIS Mock AIME": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": "not in yet"
+    }
+   }
+  },
+  "ours": {
+   "BF16": {
+    "ARC-AGI-2": {
+     "text": "8.5 ± 2.3 167 tasks × 2 · 26 answers ran out",
+     "tip": "by code · 8% ran out of room (26 of 334), counted wrong"
+    },
+    "GPQA Diamond": {
+     "text": "84.8 ± 2.1 198 questions × 4",
+     "tip": "by code"
+    },
+    "HLE": {
+     "text": "20.7 ± 0.9 2,158 questions · 47 answers ran out",
+     "tip": "by code · 2% ran out of room (47 of 2,158), counted wrong"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MATH Level 5": {
+     "text": "98.9 ± 0.3 1,324 questions · 3 answers ran out",
+     "tip": "by code · 0% ran out of room (3 of 1,324), counted wrong"
+    },
+    "MMLU-Pro": {
+     "text": "85.0 ± 0.3 12,032 questions",
+     "tip": "by code"
+    },
+    "Model": {
+     "text": "BF16 BF16 · 70.0 GB 7 of 9 benchmarks in",
+     "tip": "served/Qwen3.6-35B-A3B-BF16-lda-2610 · thinking"
+    },
+    "OTIS Mock AIME": {
+     "text": "85.0 ± 4.9 45 questions × 8 · 39 answers ran out",
+     "tip": "by code · 11% ran out of room (39 of 360), counted wrong"
+    },
+    "SimpleQA Verified": {
+     "text": "19.0 ± 1.2 1,000 questions · 4 answers ran out",
+     "tip": "by code · 0% ran out of room (4 of 1,000), counted wrong"
+    }
+   },
+   "Ornith-1.5 Q4_K_M": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "GPQA Diamond": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "Model": {
+     "text": "Ornith-1.5 Q4_K_M Not scored yet measured here, on its card's settings; not the team's model",
+     "tip": "served/Ornith-1.5-35B-A3B-Q4_K_M · thinking"
+    },
+    "OTIS Mock AIME": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": "not in yet"
+    }
+   },
+   "Q2 (UD-Q2_K_XL)": {
+    "ARC-AGI-2": {
+     "text": "4.2 ± 1.7 167 tasks × 2 · 61 answers ran out",
+     "tip": "by code · 18% ran out of room (61 of 334), counted wrong"
+    },
+    "GPQA Diamond": {
+     "text": "81.8 ± 2.3 198 questions × 4",
+     "tip": "by code"
+    },
+    "HLE": {
+     "text": "19.1 ± 0.8 2,158 questions · 46 answers ran out",
+     "tip": "by code · 2% ran out of room (46 of 2,158), counted wrong"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MATH Level 5": {
+     "text": "98.2 ± 0.4 1,324 questions · 9 answers ran out",
+     "tip": "by code · 1% ran out of room (9 of 1,324), counted wrong"
+    },
+    "MMLU-Pro": {
+     "text": "83.8 ± 0.3 12,032 questions · 3 answers ran out",
+     "tip": "by code · 0% ran out of room (3 of 12,032), counted wrong"
+    },
+    "Model": {
+     "text": "Q2 (UD-Q2_K_XL) 13.0 GB 7 of 9 benchmarks in",
+     "tip": "served/Qwen3.6-35B-A3B-Q2-lda-2610 · thinking"
+    },
+    "OTIS Mock AIME": {
+     "text": "83.3 ± 4.9 45 questions × 8 · 39 answers ran out",
+     "tip": "by code · 11% ran out of room (39 of 360), counted wrong"
+    },
+    "SimpleQA Verified": {
+     "text": "12.3 ± 1.0 1,000 questions · 2 answers ran out",
+     "tip": "by code · 0% ran out of room (2 of 1,000), counted wrong"
+    }
+   },
+   "Q4 (UD-Q4_K_XL)": {
+    "ARC-AGI-2": {
+     "text": "7.5 ± 2.3 167 tasks × 2 · 19 answers ran out",
+     "tip": "by code · 6% ran out of room (19 of 334), counted wrong"
+    },
+    "GPQA Diamond": {
+     "text": "85.1 ± 2.1 198 questions × 4",
+     "tip": "by code"
+    },
+    "HLE": {
+     "text": "21.5 ± 0.9 2,158 questions · 47 answers ran out",
+     "tip": "by code · 2% ran out of room (47 of 2,158), counted wrong"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MATH Level 5": {
+     "text": "99.2 ± 0.2 1,324 questions · 2 answers ran out",
+     "tip": "by code · 0% ran out of room (2 of 1,324), counted wrong"
+    },
+    "MMLU-Pro": {
+     "text": "85.0 ± 0.3 12,032 questions",
+     "tip": "by code"
+    },
+    "Model": {
+     "text": "Q4 (UD-Q4_K_XL) Q4_K_M · 22.0 GB 7 of 9 benchmarks in",
+     "tip": "served/Qwen3.6-35B-A3B-Q4-lda-2610 · thinking"
+    },
+    "OTIS Mock AIME": {
+     "text": "86.1 ± 4.7 45 questions × 8 · 31 answers ran out",
+     "tip": "by code · 9% ran out of room (31 of 360), counted wrong"
+    },
+    "SimpleQA Verified": {
+     "text": "19.3 ± 1.2 1,000 questions · 1 answer ran out",
+     "tip": "by code · 0% ran out of room (1 of 1,000), counted wrong"
+    }
+   },
+   "Q4, earlier run": {
+    "ARC-AGI-2": {
+     "text": "5.8 ± 2.1 167 tasks × 2 · 26 answers ran out",
+     "tip": "by code · 8% ran out of room (26 of 334), counted wrong"
+    },
+    "GPQA Diamond": {
+     "text": "86.5 ± 2.0 198 questions × 4 · 1 answer ran out",
+     "tip": "by code · 0% ran out of room (1 of 792), counted wrong"
+    },
+    "HLE": {
+     "text": "21.5 ± 0.9 2,158 questions · 53 answers ran out",
+     "tip": "by code · 2% ran out of room (53 of 2,158), counted wrong"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MATH Level 5": {
+     "text": "98.9 ± 0.3 1,324 questions · 4 answers ran out",
+     "tip": "by code · 0% ran out of room (4 of 1,324), counted wrong"
+    },
+    "MMLU-Pro": {
+     "text": "84.8 ± 0.3 12,032 questions",
+     "tip": "by code"
+    },
+    "Model": {
+     "text": "Q4, earlier run 7 of 9 benchmarks in the same Q4 file on Qwen's own sampling settings, 7–8 Oct, for reference",
+     "tip": "served/Qwen3.6-35B-A3B-Q4-original-k-8 · thinking"
+    },
+    "OTIS Mock AIME": {
+     "text": "85.0 ± 5.0 45 questions × 8 · 41 answers ran out",
+     "tip": "by code · 11% ran out of room (41 of 360), counted wrong"
+    },
+    "SimpleQA Verified": {
+     "text": "20.7 ± 1.3 1,000 questions · 2 answers ran out",
+     "tip": "by code · 0% ran out of room (2 of 1,000), counted wrong"
+    }
+   },
+   "step1000": {
+    "ARC-AGI-2": {
+     "text": "0.6 ± 0.6 167 tasks × 2 · 32 answers ran out",
+     "tip": "by code · 10% ran out of room (32 of 334), counted wrong"
+    },
+    "GPQA Diamond": {
+     "text": "65.7 ± 2.8 198 questions × 4 · 35 answers ran out",
+     "tip": "by code · 4% ran out of room (35 of 792), counted wrong"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MMLU-Pro": {
+     "text": "71.4 ± 0.4 12,032 questions · 595 answers ran out",
+     "tip": "by code · 5% ran out of room (595 of 12,032), counted wrong"
+    },
+    "Model": {
+     "text": "step1000 20 of 21 chunks in",
+     "tip": "served/step1000-lda-2610 · thinking"
+    },
+    "OTIS Mock AIME": {
+     "text": "68.1 ± 5.9 45 questions × 8 · 77 answers ran out",
+     "tip": "by code · 21% ran out of room (77 of 360), counted wrong"
+    },
+    "SimpleQA Verified": {
+     "text": "4.9 ± 0.7 1,000 questions · 22 answers ran out",
+     "tip": "by code · 2% ran out of room (22 of 1,000), counted wrong"
+    }
+   },
+   "step4000": {
+    "ARC-AGI-2": {
+     "text": "1.4 ± 0.9 167 tasks × 2 · 3 answers ran out",
+     "tip": "by code · 1% ran out of room (3 of 334), counted wrong"
+    },
+    "GPQA Diamond": {
+     "text": "74.2 ± 2.6 198 questions × 4 · 3 answers ran out",
+     "tip": "by code · 0% ran out of room (3 of 792), counted wrong"
+    },
+    "HLE": {
+     "text": "12.6 ± 0.7 2,158 questions · 111 answers ran out",
+     "tip": "by code · 5% ran out of room (111 of 2,158), counted wrong"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MATH Level 5": {
+     "text": "97.0 ± 0.5 1,324 questions · 15 answers ran out",
+     "tip": "by code · 1% ran out of room (15 of 1,324), counted wrong"
+    },
+    "MMLU-Pro": {
+     "text": "78.0 ± 0.4 12,032 questions · 232 answers ran out",
+     "tip": "by code · 2% ran out of room (232 of 12,032), counted wrong"
+    },
+    "Model": {
+     "text": "step4000 Q4_K_M · 15.8 GB 7 of 9 benchmarks in",
+     "tip": "served/step4000-lda-2610 · thinking"
+    },
+    "OTIS Mock AIME": {
+     "text": "77.5 ± 5.5 45 questions × 8 · 46 answers ran out",
+     "tip": "by code · 13% ran out of room (46 of 360), counted wrong"
+    },
+    "SimpleQA Verified": {
+     "text": "6.8 ± 0.8 1,000 questions · 1 answer ran out",
+     "tip": "by code · 0% ran out of room (1 of 1,000), counted wrong"
+    }
+   },
+   "step8804": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "GPQA Diamond": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "Model": {
+     "text": "step8804 Not scored yet",
+     "tip": "served/step8804-lda-2610 · thinking"
+    },
+    "OTIS Mock AIME": {
+     "text": "—",
+     "tip": "not in yet"
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": "not in yet"
+    }
+   }
+  },
+  "ranout": {
+   "BF16": {
+    "ARC-AGI-2": {
+     "text": "7.8%",
+     "tip": "26 of 334"
+    },
+    "GPQA Diamond": {
+     "text": "0.0%",
+     "tip": "0 of 792"
+    },
+    "HLE": {
+     "text": "2.2%",
+     "tip": "47 of 2158"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "0.2%",
+     "tip": "3 of 1324"
+    },
+    "MMLU-Pro": {
+     "text": "0.0%",
+     "tip": "0 of 12032"
+    },
+    "Model": {
+     "text": "BF16",
+     "tip": "BF16"
+    },
+    "OTIS Mock AIME": {
+     "text": "10.8%",
+     "tip": "39 of 360"
+    },
+    "SimpleQA Verified": {
+     "text": "0.4%",
+     "tip": "4 of 1000"
+    }
+   },
+   "Ornith-1.5 Q4_K_M": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "—",
+     "tip": ""
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "Ornith-1.5 Q4_K_M",
+     "tip": "Ornith-1.5 Q4_K_M"
+    },
+    "OTIS Mock AIME": {
+     "text": "—",
+     "tip": ""
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   },
+   "Q2 (UD-Q2_K_XL)": {
+    "ARC-AGI-2": {
+     "text": "18.3%",
+     "tip": "61 of 334"
+    },
+    "GPQA Diamond": {
+     "text": "0.0%",
+     "tip": "0 of 792"
+    },
+    "HLE": {
+     "text": "2.1%",
+     "tip": "46 of 2158"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "0.7%",
+     "tip": "9 of 1324"
+    },
+    "MMLU-Pro": {
+     "text": "0.0%",
+     "tip": "3 of 12032"
+    },
+    "Model": {
+     "text": "Q2 (UD-Q2_K_XL)",
+     "tip": "Q2 (UD-Q2_K_XL)"
+    },
+    "OTIS Mock AIME": {
+     "text": "10.8%",
+     "tip": "39 of 360"
+    },
+    "SimpleQA Verified": {
+     "text": "0.2%",
+     "tip": "2 of 1000"
+    }
+   },
+   "Q4 (UD-Q4_K_XL)": {
+    "ARC-AGI-2": {
+     "text": "5.7%",
+     "tip": "19 of 334"
+    },
+    "GPQA Diamond": {
+     "text": "0.0%",
+     "tip": "0 of 792"
+    },
+    "HLE": {
+     "text": "2.2%",
+     "tip": "47 of 2158"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "0.2%",
+     "tip": "2 of 1324"
+    },
+    "MMLU-Pro": {
+     "text": "0.0%",
+     "tip": "0 of 12032"
+    },
+    "Model": {
+     "text": "Q4 (UD-Q4_K_XL)",
+     "tip": "Q4 (UD-Q4_K_XL)"
+    },
+    "OTIS Mock AIME": {
+     "text": "8.6%",
+     "tip": "31 of 360"
+    },
+    "SimpleQA Verified": {
+     "text": "0.1%",
+     "tip": "1 of 1000"
+    }
+   },
+   "Q4, earlier run": {
+    "ARC-AGI-2": {
+     "text": "7.8%",
+     "tip": "26 of 334"
+    },
+    "GPQA Diamond": {
+     "text": "0.1%",
+     "tip": "1 of 792"
+    },
+    "HLE": {
+     "text": "2.5%",
+     "tip": "53 of 2158"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "0.3%",
+     "tip": "4 of 1324"
+    },
+    "MMLU-Pro": {
+     "text": "0.0%",
+     "tip": "0 of 12032"
+    },
+    "Model": {
+     "text": "Q4, earlier run",
+     "tip": "Q4, earlier run"
+    },
+    "OTIS Mock AIME": {
+     "text": "11.4%",
+     "tip": "41 of 360"
+    },
+    "SimpleQA Verified": {
+     "text": "0.2%",
+     "tip": "2 of 1000"
+    }
+   },
+   "step1000": {
+    "ARC-AGI-2": {
+     "text": "9.6%",
+     "tip": "32 of 334"
+    },
+    "GPQA Diamond": {
+     "text": "4.4%",
+     "tip": "35 of 792"
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "4.9%",
+     "tip": "595 of 12032"
+    },
+    "Model": {
+     "text": "step1000",
+     "tip": "step1000"
+    },
+    "OTIS Mock AIME": {
+     "text": "21.4%",
+     "tip": "77 of 360"
+    },
+    "SimpleQA Verified": {
+     "text": "2.2%",
+     "tip": "22 of 1000"
+    }
+   },
+   "step4000": {
+    "ARC-AGI-2": {
+     "text": "0.9%",
+     "tip": "3 of 334"
+    },
+    "GPQA Diamond": {
+     "text": "0.4%",
+     "tip": "3 of 792"
+    },
+    "HLE": {
+     "text": "5.1%",
+     "tip": "111 of 2158"
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "1.1%",
+     "tip": "15 of 1324"
+    },
+    "MMLU-Pro": {
+     "text": "1.9%",
+     "tip": "232 of 12032"
+    },
+    "Model": {
+     "text": "step4000",
+     "tip": "step4000"
+    },
+    "OTIS Mock AIME": {
+     "text": "12.8%",
+     "tip": "46 of 360"
+    },
+    "SimpleQA Verified": {
+     "text": "0.1%",
+     "tip": "1 of 1000"
+    }
+   },
+   "step8804": {
+    "ARC-AGI-2": {
+     "text": "—",
+     "tip": ""
+    },
+    "GPQA Diamond": {
+     "text": "—",
+     "tip": ""
+    },
+    "HLE": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFBench": {
+     "text": "—",
+     "tip": ""
+    },
+    "IFEval": {
+     "text": "—",
+     "tip": ""
+    },
+    "MATH Level 5": {
+     "text": "—",
+     "tip": ""
+    },
+    "MMLU-Pro": {
+     "text": "—",
+     "tip": ""
+    },
+    "Model": {
+     "text": "step8804",
+     "tip": "step8804"
+    },
+    "OTIS Mock AIME": {
+     "text": "—",
+     "tip": ""
+    },
+    "SimpleQA Verified": {
+     "text": "—",
+     "tip": ""
+    }
+   }
+  }
+ }
+}

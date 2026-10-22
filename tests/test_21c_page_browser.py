@@ -131,11 +131,9 @@ def test_the_numbers_are_21s_cell_for_cell(live, page):
     page.wait_for_selector("[data-rp-tok]", timeout=30000)
     benches = ["gpqa", "hle", "otis", "math", "mmlupro", "simpleqa", "arc"]
     # our runs: 21 shows "74.2 ± 2.6"; the page "74.2"
-    theirs = page.eval_on_selector_all(
-        "[data-rp-ours] tbody tr",
-        "rows => rows.map(r => [r.dataset.rpRow, ...[...r.children].slice(1).map("
-        "c => c.firstChild && c.firstChild.nodeType === 3 ? c.firstChild.textContent.trim() "
-        ": c.textContent.trim())])")
+    # 27b: modelTable's rows, each cell's own number
+    from values27b import MT_FIRST
+    theirs = page.eval_on_selector_all("[data-rp-ours] tbody tr", MT_FIRST)
     assert len(theirs) == 8                           # 22: and Ornith-1.5's; 23b: step8804's
     for row in theirs:
         name, vals = row[0], row[1:1 + len(benches)]     # 25: the page's seven, then IF's two
@@ -173,12 +171,13 @@ def test_the_numbers_are_21s_cell_for_cell(live, page):
             if not name.startswith("Gemma 4 E"):
                 assert [r[7][0], r[8][0]] == [ref[name][-2][0], ref[name][-1][0]], (pick, name)
     # every other model: the page's compare table, 21's "every model" table
-    every = page.eval_on_selector_all(
-        "[data-rp-every] tbody tr",
-        "rows => rows.map(r => [r.children[0].title, ...[...r.children].slice(1).map("
-        "c => c.firstChild && c.firstChild.nodeType === 3 ? c.firstChild.textContent.trim() "
-        ": c.textContent.trim())])")
+    every = page.eval_on_selector_all("[data-rp-every] tbody tr", MT_FIRST)
     order = ["gpqa", "hle", "otis", "math", "simpleqa", "mmlupro"]
+    # 27b: a model two sources give numbers for is one row (Qwen's report and
+    # Epoch's run): each cell one of theirs, the newer (27's rule), the other on hover
+    merged = {x: set(g) for g in page.eval_on_selector_all(
+        "[data-rp-every] tr[data-rp-every-rows]", "rs => rs.map(r => r.dataset.rpEveryRows"
+        ".split('|'))") for x in g}
     checked = 0
     for row in every:
         name = row[0]
@@ -186,7 +185,9 @@ def test_the_numbers_are_21s_cell_for_cell(live, page):
             continue
         by = dict(zip(benches, row[1:]))
         want = [by[k].split(" ± ")[0].rstrip("†") for k in order]
-        assert want == [x.rstrip("†") for x in compare[name]], (name, want, compare[name])
+        for i, (w, c) in enumerate(zip(want, [x.rstrip("†") for x in compare[name]])):
+            others = {compare[o][i].rstrip("†") for o in merged.get(name, ()) if o in compare}
+            assert w == c or (name in merged and w in others), (name, order[i], w, c, others)
         checked += 1
     assert checked == len(compare) == 49        # 22: and Ornith-1.5's card; 25b: Gemma 4 ×2
     # the thinking tokens: answers, thinking mean and median, p90, right and
