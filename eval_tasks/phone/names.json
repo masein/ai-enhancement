@@ -1,7 +1,36 @@
 {
   "about": "26: our names for the phone app's opaque ids (service/telemetry.py). masein fills it with what Kevin tells him; an id not here shows as itself, \"(not named yet)\", never guessed. Plain names only, nothing secret: this file goes to the public mirror. models: model_id -> {name, row (the board row, served/...), what, sha256}; tiers, engines: id -> a short description; devices: model code -> its marketing name, only those we're sure of.",
-  "models": {},
-  "tiers": {},
+  "models": {
+    "model-001": {
+      "name": "Qwen3.6-35B-A3B k4-LDA, UD-Q4_K_XL",
+      "row": "",
+      "what": "the phone build of the original model",
+      "sha256": ""
+    },
+    "model-002": {
+      "name": "step4000",
+      "row": "",
+      "what": "",
+      "sha256": ""
+    },
+    "model-003": {
+      "name": "step4000-denseq8",
+      "row": "",
+      "what": "step4000 with its non-expert weights in q8_0 instead of q5_K",
+      "sha256": ""
+    },
+    "model-004": {
+      "name": "step8804",
+      "row": "",
+      "what": "",
+      "sha256": ""
+    }
+  },
+  "tiers": {
+    "T0": "RAM 14 GB or more",
+    "T1": "RAM 10 to 14 GB",
+    "T2": "RAM under 10 GB"
+  },
   "engines": {},
   "devices": {
     "CPH2747": "OnePlus 15",
