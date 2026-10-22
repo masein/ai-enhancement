@@ -156,12 +156,13 @@ def test_the_chip_shows_each_models_rows_both_modes_sorted_by_the_composite(live
     assert tip[0] == f"{100 * off['composite']['value']:.1f} ± {half:.1f}"
     assert tip[-1].startswith("the ± is half the 95% interval · ")
     assert tip[-1].endswith(" among ranked rows (cloud lines aren’t ranked)")
-    # the served setup's thinking row is made under it, said so, and opens the setup's page
+    # the served setup's thinking row is made from it and opens the setup's page; 27c:
+    # a tie, so it is the model's row, its thinking-off row under it, said so
     row = page.locator(f"tr[data-lb-row='{SETUP} · thinking']")
-    assert row.locator("[data-mt-name]").inner_text() == "thinking on"
+    sub = page.locator(f"tr.mt-sub-row[data-lb-row='{SETUP}']")
+    assert sub.locator("[data-mt-name]").inner_text() == "thinking off"
     # its line says what its setup is: a phone build
-    base = page.locator(f"tr[data-lb-row='{SETUP}']")
-    assert "phone build" in base.locator("[data-mt-line]").inner_text()
+    assert "phone build" in row.locator("[data-mt-line]").inner_text()
     assert row.locator("a").first.get_attribute("href") == "#model=" + quote(SETUP, safe="")
     # the best in a column is found among the made rows too, and the line says the sort
     best = page.locator("[data-dm-cell='composite'][data-lead]").evaluate_all(

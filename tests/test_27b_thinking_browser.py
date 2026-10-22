@@ -84,3 +84,24 @@ def test_off_and_both_still_show_the_other_setting(live, page):
     sub = page.locator(f"tr.mt-row.mt-sub-row[data-fr-row='{OFF}']")
     assert sub.count() == 1
     assert page.errors == []
+
+
+@pytest.mark.parametrize("width", [1280, 400])
+def test_frontier_as_each_runs_screens(live, page, width):
+    """the reply's screenshot: Frontier with Thinking "as each runs", dark"""
+    from pathlib import Path
+    page.emulate_media(color_scheme="dark")
+    frontier(page, live)
+    page.set_viewport_size({"width": width, "height": 1000})
+    page.goto("about:blank")
+    page.goto(live["base"] + "/#tab=models&view=frontier")
+    page.wait_for_selector("[data-lb-card] [data-mt-card]" if width < 640
+                           else "[data-frontier-table] tbody tr.mt-row", timeout=30000)
+    if width < 640:
+        assert page.locator(f"[data-mt-card='{ON}']").count() == 1
+        assert page.locator(f"[data-mt-card='{OFF}']").count() == 0
+    screens = Path(__file__).resolve().parent / "_screens" / "phase27c"
+    screens.mkdir(parents=True, exist_ok=True)
+    page.wait_for_timeout(300)
+    page.locator("[data-lb-card]").screenshot(path=str(screens / f"frontier-{width}-dark.png"))
+    assert page.errors == []

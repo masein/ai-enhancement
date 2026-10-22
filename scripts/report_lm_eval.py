@@ -3244,6 +3244,8 @@ CSS = r"""
   --heat-5:color-mix(in srgb, var(--accent) 24%, var(--surface-1));
   --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
   --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948;
+  /* 27c: the On-device charts' families of published models, one hue each */
+  --fam-edge0:#0e8fa3; --fam-bonsai:#a86b12; --fam-gemma:#5f7f12;
 }
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) .viz-root {
@@ -3259,6 +3261,7 @@ CSS = r"""
     --heat-5:color-mix(in srgb, var(--accent) 34%, var(--surface-1));
     --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
     --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+    --fam-edge0:#35b9cc; --fam-bonsai:#d39a45; --fam-gemma:#9bbd3d;
   --warning-text:#fab219; --critical-text:#ef6b6b;
   }
 }
@@ -3275,6 +3278,7 @@ CSS = r"""
   --heat-5:color-mix(in srgb, var(--accent) 34%, var(--surface-1));
   --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
   --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+    --fam-edge0:#35b9cc; --fam-bonsai:#d39a45; --fam-gemma:#9bbd3d;
   --warning-text:#fab219; --critical-text:#ef6b6b;
 }
 /* dim: slate blue-grey, softer than the near-black dark theme (the GitHub /
@@ -3293,6 +3297,7 @@ CSS = r"""
   --heat-5:color-mix(in srgb, var(--accent) 34%, var(--surface-1));
   --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
   --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+    --fam-edge0:#35b9cc; --fam-bonsai:#d39a45; --fam-gemma:#9bbd3d;
   --warning-text:#fab219; --critical-text:#ef6b6b;
 }
 * { box-sizing:border-box; }
@@ -5784,6 +5789,27 @@ table.rp.pt-checks th, table.rp.pt-checks td { text-align:left; }
 table.rp.pt th.num, table.rp.pt td.num,
 table.rp.pt-checks th.num, table.rp.pt-checks td.num { text-align:right; }
 table.rp.pt tr.pt-flag > td, table.rp.pt td.pt-off { color:var(--muted); background:var(--plane); }
+/* 27c: Every test on 27's table: a flagged value struck through, the row a
+   test opened marked; the test in a panel from the right, the page left be */
+table.mt-table tr.pt-flag > td { color:var(--muted); }
+table.mt-table td.pt-off .mt-n { text-decoration:line-through; text-decoration-color:var(--axis);
+  color:var(--muted); }
+table.mt-table td.pt-bad .mt-n { color:var(--critical-text); font-weight:600; }
+table.mt-table tr.pt-on > td { background:var(--accent-soft); }
+.pt-flagword { text-decoration:underline dotted; cursor:help; color:var(--warning-text); }
+.pt-panel { position:fixed; top:0; right:0; bottom:0; width:480px; max-width:100vw; z-index:60;
+  background:var(--surface-1); border-left:1px solid var(--border); overflow-y:auto;
+  box-shadow:-8px 0 24px rgba(0,0,0,.25); animation:pt-in .18s ease-out; }
+@keyframes pt-in { from { transform:translateX(24px); opacity:0; } to { transform:none; opacity:1; } }
+@media (prefers-reduced-motion: reduce) { .pt-panel { animation:none; } }
+@media (max-width:639px) { .pt-panel { width:100vw; border-left:0; } }
+.pt-panel-body { padding:16px 20px 24px; }
+.pt-panel .pt-x { font-size:20px; line-height:1; min-width:36px; min-height:36px; }
+.pt-conds { display:grid; grid-template-columns:max-content 1fr; gap:4px 12px; margin:0 0 12px; }
+.pt-conds dd { margin:0; font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+.pt-check { border-top:1px solid var(--border); padding:8px 0; }
+.pt-check-head { display:flex; flex-wrap:wrap; gap:4px 10px; align-items:baseline; }
+.pt-panel .pt-reply { white-space:pre-wrap; overflow-wrap:anywhere; margin-top:4px; }
 table.rp.pt td.pt-off { text-decoration:line-through; text-decoration-color:var(--axis); }
 table.rp.pt tr.pt-on > td { background:var(--accent-soft); }
 table.rp.pt td.pt-bad { color:var(--critical-text); font-weight:600; }
@@ -5798,6 +5824,10 @@ table.rp.pt-checks td.pt-reply { text-align:left; white-space:pre-wrap; overflow
 .mt-legend .mt-tint { white-space:nowrap; margin:0; padding:0; border:0; }
 .mt-box { overflow:auto; max-height:min(78vh, 1400px); border:1px solid var(--border);
   border-radius:var(--r-2); background:var(--surface-1); }
+/* 27c: the On-device charts' one legend */
+.od-legend { display:flex; flex-wrap:wrap; gap:4px 16px; margin:6px 0 10px; color:var(--text-secondary); }
+.od-leg { display:inline-flex; align-items:center; gap:5px; }
+.od-legmark { width:14px; height:14px; flex:none; }
 /* 27b: a report's table runs its full height; it scrolls sideways only */
 .mt-box.free { max-height:none; overflow-y:hidden; }
 /* 27b: a number measured on our testers' phones, the row's dot before it */
@@ -11026,7 +11056,10 @@ function viewHash(v) {
         + `&q=${(pd.open.q || 0) + 1}` : '')
       + (ro && ro.pick ? '&model=' + encodeURIComponent(ro.pick) : '')
       + (ro && ro.bench && !(pd && pd.open) ? '&bench=' + encodeURIComponent(ro.bench) : '')
-      + (ro && ro.open ? '&open=' + encodeURIComponent(ro.open) : '');
+      + (ro && ro.open ? '&open=' + encodeURIComponent(ro.open) : '')
+      // 27c: an open test of our testers' phones
+      + (R.id && R.pt && R.pt[R.id] && R.pt[R.id].open
+        ? '&test=' + encodeURIComponent(R.pt[R.id].open) : '');
   }
   // 18: an agent run's page, and a task's, so a reload and a link land on it
   if (v === 'queue' && (state.agentView || {}).key)
@@ -11081,6 +11114,8 @@ function viewOfHash(name, params) {
     if (RPS().id && p.get('side') && p.get('bench'))
       Object.assign(pdState(RPS().id), { open: { key: p.get('bench'), side: p.get('side') === 'b'
         ? 'b' : 'a', q: Math.max(0, (parseInt(p.get('q'), 10) || 1) - 1), subj: '', out: false } });
+    // 27c: a test of our testers' phones, opened in its panel
+    if (RPS().id && p.get('test')) ptState(RPS().id).open = p.get('test');
     if (RPS().id && !p.get('side') && (p.get('model') || p.get('bench') || p.get('open') || (RPS().ro || {})[RPS().id])) {
       const S = roState(RPS().id);
       Object.assign(S, { pick: p.get('model') || S.pick, bench: p.get('bench') || '',
@@ -13823,7 +13858,7 @@ function scoreCell(x, o = {}) {
   const bar = c.score && !o.tint && x.v != null && !x.dim ? (x.bar ?? x.v) : null;
   const name = r.name || '';
   return el(tag, { class: cls + ' tcell' + (lead ? ' lead' : '') + (x.pub ? ' mt-pubc' : '')
-      + (x.dim ? ' dim' : '') + (o.sub ? ' mt-subc' : ''),
+      + (x.dim ? ' dim' : '') + (o.sub ? ' mt-subc' : '') + (x.cls ? ' ' + x.cls : ''),
       style: h ? `background:var(--heat-${h})` : null, 'data-lead': lead ? '1' : null,
       'data-mt-v': typeof x.v === 'number' ? String(x.v) : null,
       'data-mt-heat': h ? String(h) : null, tabindex: '0', title: x.why || null,
@@ -14012,7 +14047,9 @@ function modelTable(spec) {
   const key = [...letters].sort().map(k => `${k} ${MT_LETTERS[k] || k}`).join(' · ');
   return el('div', { class: 'mt', 'data-mt': spec.view },
     el('div', { class: 'mt-legend small se', 'data-mt-legend': '1' },
-      el('span', { text: tint ? MT_LEGEND_TINT : MT_LEGEND }), mtTintSwitch()),
+      // 27c: a table says only what it uses (no published numbers, no ±: not said)
+      el('span', { text: spec.legend ? spec.legend(tint) : tint ? MT_LEGEND_TINT : MT_LEGEND }),
+      spec.noTint ? '' : mtTintSwitch()),
     el('div', { class: 'mt-wide' }, hfade(spec.hkey || 'mt-' + spec.view, el('div', {
       class: 'mt-box' + (spec.free ? ' free' : ''), 'data-hkeep': spec.hkey || 'mt-' + spec.view },
       table))),
@@ -29059,25 +29096,27 @@ function vReport(id) {
 // ---------------------------------------------------------------------------
 // ---- 27b: one label placer for every scatter chart -------------------------
 // On-device's score against memory, the file-size chart and score against
-// thinking: each point's label tries the spots right, left, above and below
-// its mark, and takes the first that touches no other label, no mark and no
-// edge of the plot; else the nearest free spot a short reach away, with a
-// leader line to it; else none — its name is on the mark's hover and in the
-// list under the panel. Ours are placed first, so they get the best spots.
-// pts: [{cx, cy, r (the mark's half-size), name, ours, attrs (the label's)}];
-// box: the plot's {x0, y0, x1, y1}; o: {fs, segs (lines a label keeps off: a
-// frontier, the ± whiskers, as [x1, y1, x2, y2])}. Returns the points it left bare
+// thinking. 27c: a label sits on the side of its point with room, touching it
+// — right, left, above or below — the first spot that meets no other label,
+// no point, no line it keeps off and no edge of the plot, and is nearer its
+// own point than any other; else a spot a short leader away (24 at most);
+// else it is dropped, its point named on hover. Ours are placed first.
+// pts: [{id, cx, cy, r (the mark's half-size), name, ours, label (false: a point
+// that only keeps labels off), attrs (the label's)}]; box: the plot's
+// {x0, y0, x1, y1}; o: {fs, segs ([x1, y1, x2, y2] lines to keep off)}.
+// Returns the points it dropped
 const LBL = {};
 function lblWidth(text, fs) {
   const c = LBL.c || (LBL.c = document.createElement('canvas').getContext('2d'));
   c.font = `${fs}px system-ui, -apple-system, sans-serif`;
   return c.measureText(text).width;
 }
+const LBL_LEAD = 24;
 function chartLabels(svg, pts, box, o = {}) {
   const fs = o.fs || 12, h = fs * 1.25, pad = 1.5;
   const marks = pts.map(p => ({ p, x0: p.cx - p.r - pad, y0: p.cy - p.r - pad, x1: p.cx + p.r + pad,
     y1: p.cy + p.r + pad }));
-  const placed = [], bare = [];
+  const placed = [], dropped = [];
   const hit = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
   const inside = a => a.x0 >= box.x0 + 1 && a.x1 <= box.x1 - 1 && a.y0 >= box.y0 + 1
     && a.y1 <= box.y1 - 1;
@@ -29089,8 +29128,12 @@ function chartLabels(svg, pts, box, o = {}) {
     }
     return false;
   };
-  const free = a => inside(a) && !placed.some(q => hit(a, q)) && !marks.some(m => hit(a, m))
-    && !(o.segs || []).some(sg => onSeg(a, sg));
+  // how far a label's box is from a point
+  const far = (a, q) => Math.hypot(Math.max(a.x0 - q.cx, 0, q.cx - a.x1),
+    Math.max(a.y0 - q.cy, 0, q.cy - a.y1));
+  const free = (a, p) => inside(a) && !placed.some(q => hit(a, q)) && !marks.some(m => hit(a, m))
+    && !(o.segs || []).some(sg => onSeg(a, sg))
+    && pts.every(q => q === p || far(a, p) < far(a, q));
   // a leader line that crosses no label and no other mark
   const clear = (p, x1, y1, x2, y2) => {
     const n = Math.ceil(Math.hypot(x2 - x1, y2 - y1) / 2);
@@ -29101,12 +29144,15 @@ function chartLabels(svg, pts, box, o = {}) {
     }
     return true;
   };
-  for (const p of [...pts].sort((a, b) => (b.ours ? 1 : 0) - (a.ours ? 1 : 0) || a.cy - b.cy)) {
-    const w = lblWidth(p.name, fs), g = p.r + 3;
+  const order = pts.filter(p => p.label !== false)
+    .sort((a, b) => (b.ours ? 1 : 0) - (a.ours ? 1 : 0) || a.cy - b.cy);
+  for (const p of order) {
+    const w = lblWidth(p.name, fs), g = p.r + 2;
     const rect = (x0, y0) => ({ x0, y0, x1: x0 + w, y1: y0 + h });
     let spot = [rect(p.cx + g, p.cy - h / 2), rect(p.cx - g - w, p.cy - h / 2),
-      rect(p.cx - w / 2, p.cy - g - h), rect(p.cx - w / 2, p.cy + g)].find(free), lead = null;
-    for (let d = g + 8; !spot && d <= g + 56; d += 6)
+      rect(p.cx - w / 2, p.cy - g - h), rect(p.cx - w / 2, p.cy + g)].find(a => free(a, p));
+    let lead = null;
+    for (let d = g + 6; !spot && d <= p.r + 1 + LBL_LEAD; d += 3)
       for (let k = 0; k < 24 && !spot; k++) {
         const t = 2 * Math.PI * k / 24, cs = Math.cos(t), sn = Math.sin(t);
         const x = p.cx + d * cs, y = p.cy + d * sn;
@@ -29114,33 +29160,38 @@ function chartLabels(svg, pts, box, o = {}) {
           sn > 0.3 ? y : sn < -0.3 ? y - h : y - h / 2);
         const ex = Math.max(a.x0, Math.min(a.x1, p.cx)), ey = Math.max(a.y0, Math.min(a.y1, p.cy));
         const sx = p.cx + (p.r + 1) * cs, sy = p.cy + (p.r + 1) * sn;
-        if (free(a) && clear(p, sx, sy, ex, ey)) { spot = a; lead = [sx, sy, ex, ey]; }
+        if (Math.hypot(ex - sx, ey - sy) <= LBL_LEAD && free(a, p) && clear(p, sx, sy, ex, ey)) {
+          spot = a; lead = [sx, sy, ex, ey];
+        }
       }
-    if (!spot) { bare.push(p); continue; }
+    if (!spot) { dropped.push(p); continue; }
     placed.push(spot);
     if (lead) svg.append(el('svg:line', { x1: lead[0], y1: lead[1], x2: lead[2], y2: lead[3],
-      stroke: 'var(--muted)', 'stroke-width': 0.8, 'data-chart-leader': p.name }));
+      stroke: 'var(--muted)', 'stroke-width': 0.8, 'data-chart-leader': p.id || p.name }));
     svg.append(el('svg:text', { x: spot.x0, y: spot.y0 + h / 2, 'dominant-baseline': 'central',
-      'font-size': fs, fill: 'var(--text-primary)', 'data-chart-label': p.name, ...(p.attrs || {}),
-      text: p.name }));
+      'font-size': fs, fill: 'var(--text-primary)', 'data-chart-label': p.name,
+      'data-chart-for': p.id || p.name, ...(p.attrs || {}), text: p.name }));
   }
-  return bare;
-}
-// the points a panel left without a label: their names, under it
-function chartBare(bare, key) {
-  return bare.length ? el('p', { class: 'small se chart-bare', 'data-chart-bare': key,
-    text: 'Not labelled, to keep the points clear (hover one for its name): '
-      + bare.map(p => p.name).join(' · ') }) : '';
+  return dropped;
 }
 const OD_LEGEND = '● measured here · ◇ published by its maker';
 function odMark(ours, cx, cy, colour, attrs = {}) {
   return ours
     ? el('svg:circle', { cx, cy, r: 4.5, fill: colour, 'data-od-shape': 'circle', ...attrs })
     : el('svg:path', { d: `M ${cx} ${cy - 5.5} L ${cx + 5.5} ${cy} L ${cx} ${cy + 5.5} `
-        + `L ${cx - 5.5} ${cy} Z`, fill: 'var(--surface-1)', stroke: 'var(--text-secondary)',
+        + `L ${cx - 5.5} ${cy} Z`, fill: 'var(--surface-1)', stroke: colour || 'var(--text-secondary)',
         'stroke-width': 1.6, 'data-od-shape': 'diamond', ...attrs });
 }
-const odColour = r => r.ours ? rpColour(r) : 'var(--text-secondary)';
+// 27c: a published model's family, one hue on every panel; ours their own colours
+const OD_FAMS = [['edge0', 'Edge0', /edge0/i], ['bonsai', 'Bonsai', /prism|bonsai/i],
+  ['gemma', 'Gemma', /google|gemma/i]];
+function odFamily(r) {
+  if (r.ours) return null;
+  const f = OD_FAMS.find(([, , re]) => re.test(`${r.publishedBy || ''} ${r.maker || ''} ${r.label}`));
+  return f ? { key: f[0], label: f[1], colour: `var(--fam-${f[0]})` }
+    : { key: 'other', label: r.publishedBy || 'Others', colour: 'var(--text-secondary)' };
+}
+const odColour = r => r.ours ? rpColour(r) : odFamily(r).colour;
 // a chart's short name: "Edge0-35B", "Bonsai 2 9B", "Gemma E4B", "Q4"
 const odShort = label => trShort(String(label).replace(/-A\d+B-preview$/, '')
   .replace(/^Ternary /, '').replace(/ \(1-bit\)$/, '').replace(/^Gemma 4 /, 'Gemma '));
@@ -29307,6 +29358,24 @@ function odKeepPanel(b, rows) {
     el('h3', { text: b.label }), svg);
 }
 // score against the memory each needs, a panel a benchmark, log x
+// 27c: one legend for the four panels: ours each in its colour, a filled dot;
+// each family of published models once, its hue, a hollow diamond, its models
+function odLegend(rows) {
+  const mark = (r, colour) => el('svg:svg', { class: 'od-legmark', viewBox: '0 0 14 14',
+    'aria-hidden': 'true' }, odMark(r.ours, 7, 7, colour));
+  const ours = rows.filter(r => r.ours), fams = new Map();
+  for (const r of rows.filter(x => !x.ours)) {
+    const f = odFamily(r);
+    if (!fams.has(f.key)) fams.set(f.key, { f, rows: [] });
+    fams.get(f.key).rows.push(r);
+  }
+  return el('div', { class: 'od-legend small', 'data-od-legend': '1' },
+    ours.map(r => el('span', { class: 'od-leg', 'data-od-leg': r.label }, mark(r, odColour(r)),
+      odShort(r.label))),
+    [...fams.values()].map(({ f, rows: rs }) => el('span', { class: 'od-leg',
+        'data-od-leg-family': f.key }, mark(rs[0], f.colour), el('b', { text: f.label }),
+      ': ' + rs.map(r => odShort(r.label)).join(', '))));
+}
 function odMemPanel(b, pts) {
   const W = 280, H = 230, L = 38, R = 14, Tp = 16, B = 40, pw = W - L - R, ph = H - Tp - B, FS = 12;
   const xs = pts.map(p => p.x);
@@ -29328,19 +29397,30 @@ function odMemPanel(b, pts) {
       fill: 'var(--muted)', 'data-od-mem-tick': b.key, text: String(v) }));
   svg.append(el('svg:text', { x: L + pw / 2, y: H - 4, 'text-anchor': 'middle', 'font-size': FS,
     fill: 'var(--text-secondary)', text: 'memory it needs, GB (log scale)' }));
+  // 27c: the best for their memory — no model needing less scores higher —
+  // joined by a line, as the file-size chart's frontier is
+  const best = new Set(pts.filter(p => !pts.some(q => q !== p && q.x < p.x && q.c.v > p.c.v)));
+  const line = [...best].sort((u, v) => u.x - v.x);
+  if (line.length > 1) svg.append(el('svg:polyline', { points: line.map(p => `${X(p.x)},${Y(p.c.v)}`)
+    .join(' '), fill: 'none', stroke: 'var(--text-secondary)', 'stroke-width': 1,
+    'stroke-dasharray': '3 2', 'data-od-mem-frontier': b.key }));
   const labels = [];
   for (const p of [...pts].sort((u, v) => Y(u.c.v) - Y(v.c.v))) {
-    const cx = X(p.x), cy = Y(p.c.v);
-    const m = odMark(p.r.ours, cx, cy, odColour(p.r), { 'data-od-mem-dot': `${b.key}:${p.r.label}` });
+    const cx = X(p.x), cy = Y(p.c.v), id = `${b.key}:${p.r.label}`;
+    const m = odMark(p.r.ours, cx, cy, odColour(p.r), { 'data-od-mem-dot': id,
+      'data-chart-point': id, 'data-od-best': best.has(p) ? '1' : null });
     m.append(el('svg:title', { text: `${p.r.label}: ${rpNum(p.c.v)} at ${p.r.memory.words} · `
       + `${p.r.ours ? 'measured here' : 'published by ' + p.r.publishedBy}` }));
     svg.append(m);
-    labels.push({ cx, cy, r: p.r.ours ? 4.5 : 5.5, name: odShort(p.r.label), ours: p.r.ours,
-      attrs: { 'data-od-mem-label': `${b.key}:${p.r.label}` } });
+    // labelled: ours, and the published on the line; the rest named on hover
+    // and in the legend above the panels
+    labels.push({ id, cx, cy, r: p.r.ours ? 4.5 : 5.5, name: odShort(p.r.label), ours: p.r.ours,
+      label: p.r.ours || best.has(p), attrs: { 'data-od-mem-label': id } });
   }
-  const bare = chartLabels(svg, labels, { x0: L, y0: Tp, x1: L + pw, y1: Tp + ph }, { fs: FS });
+  chartLabels(svg, labels, { x0: L, y0: Tp, x1: L + pw, y1: Tp + ph }, { fs: FS,
+    segs: line.slice(1).map((p, i) => [X(line[i].x), Y(line[i].c.v), X(p.x), Y(p.c.v)]) });
   return el('div', { class: 'by-panel tr-panel', 'data-od-mem-panel': b.key },
-    el('h3', { text: b.label }), svg, chartBare(bare, 'od-mem:' + b.key));
+    el('h3', { text: b.label }), svg);
 }
 function vOnDevice(id, d, back) {
   const B = d.benchmarks, R = d.rows;
@@ -29389,7 +29469,10 @@ function vOnDevice(id, d, back) {
   const mem = el('div', { class: 'card', 'data-report-section': 'od-memory' },
     el('h2', { text: 'Score against memory needed' }),
     el('p', { class: 'small se', text: 'The memory each needs as its maker publishes it (ours: '
-      + 'its whole file, as loaded on the server). Each panel has its own scale. ' + OD_LEGEND + '.' }),
+      + 'its whole file, as loaded on the server). Each panel has its own scale. The dashed line '
+      + 'joins the best for their memory: no model needing less scores higher. Ours and the '
+      + 'published models on the line are labelled; hover a point for any other.' }),
+    memPanels.length ? odLegend(R.filter(r => r.memory && r.memory.gb)) : '',
     memPanels.length ? el('div', { class: 'by-panels tr-panels' }, memPanels) : '',
     unmem.length ? el('p', { class: 'small se', 'data-od-no-memory': '1',
       text: unmem.map(r => `${r.label}: memory not known`).join(' · ') } ) : '');
@@ -29420,93 +29503,206 @@ const ptState = id => {
   R.pt = R.pt || {};
   return (R.pt[id] = R.pt[id] || { open: null, got: {}, err: {} });
 };
-async function ptOpen(id, tid) {
+// 27c: a test opens in a panel from the right (480 px; the whole screen on a
+// phone): its checks, replies and conditions. The page behind neither moves
+// nor redraws; the clicked row stays marked. Esc, × or a click outside closes
+// it; ↑ and ↓ move to the test before or after; the link says "&test=<id>".
+// The panel lives outside the page, so a redraw of the page leaves it be
+const PT = { panel: null, report: null, d: null };
+function ptUrl() {
+  const want = hashFor();
+  if (location.hash.slice(1) !== want) history.replaceState(history.state, '', '#' + want);
+}
+function ptMark(tid) {
+  document.querySelectorAll('[data-pt-row].pt-on').forEach(r => r.classList.remove('pt-on'));
+  if (tid) document.querySelectorAll(`[data-pt-row="${CSS.escape(tid)}"]`)
+    .forEach(r => r.classList.add('pt-on'));
+}
+function ptClose() {
+  const S = PT.report && ptState(PT.report);
+  if (S) S.open = null;
+  if (PT.panel) PT.panel.remove();
+  PT.panel = null;
+  ptMark(null);
+  if (state.tab === 'reports') ptUrl();
+}
+async function ptOpen(id, tid, d = PT.d) {
   const S = ptState(id);
-  S.open = S.open === tid ? null : tid;
-  render();
-  if (!S.open || S.got[tid]) return;
+  if (S.open === tid && PT.panel) return ptClose();
+  S.open = tid;
+  PT.report = id;
+  if (d) PT.d = d;
+  ptMark(tid);
+  ptUrl();
+  ptDraw(id);
+  if (S.got[tid] || S.err[tid]) return;
   try { S.got[tid] = await api('api/phone/tests/' + encodeURIComponent(tid)); S.err[tid] = ''; }
   catch (e) { S.err[tid] = String((e && e.message) || e); }
-  if (state.tab === 'reports' && RPS().id === id) {
-    render();
-    const box = document.querySelector('[data-pt-test]');
-    if (box) box.scrollIntoView({ block: 'nearest' });
+  if (S.open === tid && PT.panel) ptDraw(id);
+}
+// the test before or after the open one, in the table's order
+function ptMove(step) {
+  const S = PT.report && ptState(PT.report);
+  if (!S || !S.open) return;
+  const ids = [...document.querySelectorAll('[data-pt-table] tbody tr[data-pt-row]')]
+    .map(r => r.dataset.ptRow);
+  const i = ids.indexOf(S.open), next = ids[i + step];
+  if (i < 0 || !next) return;
+  ptOpen(PT.report, next);
+  const row = document.querySelector(`[data-pt-table] tr[data-pt-row="${CSS.escape(next)}"]`);
+  if (row) row.scrollIntoView({ block: 'nearest' });
+}
+document.addEventListener('keydown', e => {
+  if (!PT.panel || e.altKey || e.ctrlKey || e.metaKey) return;
+  const t = e.target && e.target.tagName;
+  if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return;
+  if (e.key === 'Escape') { e.preventDefault(); ptClose(); }
+  else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault(); ptMove(e.key === 'ArrowDown' ? 1 : -1);
+  }
+});
+// a click outside the panel closes it; a click on another test's row opens that one
+document.addEventListener('mousedown', e => {
+  if (!PT.panel || PT.panel.contains(e.target) || e.target.closest('[data-pt-row]')) return;
+  ptClose();
+});
+// the panel's place: the testers' report only; anywhere else it goes
+function ptGuard() {
+  if (PT.panel && !(state.tab === 'reports' && RPS().id === PT.report)) {
+    PT.panel.remove(); PT.panel = null;
   }
 }
-// a cell a flag keeps out of the medians: greyed, its reasons on hover
-function ptCell(t, text, sub, key, off) {
-  const why = off ? off.join(' · ') : '';
-  return el('td', { class: 'num' + (why ? ' pt-off' : ''), 'data-pt-cell': `${t.test_id}|${key}`,
-      title: why || null },
-    text, sub ? el('span', { class: 'rp-sub', text: sub }) : '');
-}
-const PT_COLS = ['Received', 'Tester', 'Phone', 'App · engine', 'Model', 'Result', 'First load',
-  'Time to first word', 'Prefill, cold → warm', 'Decode', 'Sustained', 'Engine memory',
-  'Peak swap', 'Lowest free memory', 'Battery', 'Thermal max', 'Answers', 'Charging'];
-function ptRow(id, t) {
-  const S = ptState(id), sp = t.flags.speed.length ? t.flags.speed : null,
-    bt = t.flags.battery.length ? t.flags.battery : null;
-  const why = [...t.flags.speed, ...t.flags.battery].join(' · ');
-  const left = (text, sub, key, attrs = {}) => el('td', { 'data-pt-cell': `${t.test_id}|${key}`,
-    ...attrs }, text, sub ? el('span', { class: 'rp-sub', text: sub }) : '');
-  return el('tr', { class: 'clickrow' + (t.flags.impossible ? ' pt-flag' : '')
-      + (S.open === t.test_id ? ' pt-on' : ''), tabindex: 0, 'data-pt-row': t.test_id,
-      'data-pt-flagged': String(!!why), title: why || 'Open its checks',
-      onclick: () => ptOpen(id, t.test_id),
-      onkeydown: e => { if (e.key === 'Enter') ptOpen(id, t.test_id); } },
-    left(ptDay(t.received), why ? 'flagged' : '', 'received'),
-    left(t.tester || '—', '', 'tester'),
-    left(t.phone.name, t.phone.ram_gb ? `${t.phone.ram_gb} GB RAM` : '', 'phone',
-      { title: [t.phone.maker, t.phone.code, t.phone.os].filter(Boolean).join(' · ') }),
-    left(t.app || '—', t.engine.name, 'app'),
-    left(t.model.name, t.tier.id ? t.tier.name : '', 'model'),
-    left(t.ok ? 'ok' : t.outcome || '—', '', 'result', { class: t.ok ? '' : 'pt-bad' }),
-    ptCell(t, t.first_load_s == null ? '—' : `${ptN(t.first_load_s)} s`, '', 'load'),
-    ptCell(t, ptS(t.ttft_ms), '', 'ttft', sp),
-    ptCell(t, `${ptN(t.prefill_cold)} → ${ptN(t.prefill_warm)}`, 'tok/s', 'prefill', sp),
-    ptCell(t, ptN(t.decode), t.decode_from ? `tok/s, ${t.decode_from}` : '', 'decode', sp),
-    ptCell(t, ptSigned(t.sustained.pct, '%'), t.sustained.first != null
-      ? `${ptN(t.sustained.first)} → ${ptN(t.sustained.last)}` : '', 'sustained', sp),
-    ptCell(t, ptMB(t.engine_mem_mb), '', 'engine'),
-    ptCell(t, ptMB(t.peak_swap_mb), '', 'swap'),
-    ptCell(t, ptMB(t.mem_min_mb), '', 'memmin'),
-    ptCell(t, `${ptN(t.battery.start)} → ${ptN(t.battery.end)} °C`,
-      t.battery.rise != null ? ptSigned(t.battery.rise, ' °C') : '', 'battery', bt),
-    ptCell(t, t.thermal_max == null ? '—' : String(t.thermal_max), '', 'thermal'),
-    ptCell(t, `${t.answers.done}/${t.answers.run}`, '', 'answers'),
-    left(t.charging ? 'yes' : 'no', '', 'charging'));
-}
-// a test opened: every check with its status, time, speeds and reply
-function ptTest(id, d) {
-  const S = ptState(id), t = d.tests.find(x => x.test_id === S.open);
-  if (!t) return '';
+function ptDraw(id) {
+  const S = ptState(id), d = PT.d, t = d && d.tests.find(x => x.test_id === S.open);
+  if (!t) return ptClose();
   const got = S.got[t.test_id];
-  return el('div', { class: 'card', 'data-pt-test': t.test_id },
+  const kv = (k, v) => [el('dt', { text: k }), el('dd', { 'data-pt-cond': k, text: v })];
+  const body = el('div', { class: 'pt-panel-body' },
     el('div', { class: 'pt-test-head' },
       el('h2', { text: `${t.tester || 'A tester'}’s test, ${ptDay(t.received)}` }),
-      el('button', { class: 'quiet', 'data-pt-close': '1', text: 'Close',
-        onclick: () => { S.open = null; render(); } })),
-    el('p', { class: 'small se', text: [t.phone.name, t.app && `app ${t.app}`, t.engine.name,
-      t.model.name, t.ok ? 'finished' : t.outcome].filter(Boolean).join(' · ') }),
+      el('button', { class: 'quiet pt-x', 'data-pt-close': '1', 'aria-label': 'Close',
+        title: 'Close (Esc)', text: '×', onclick: () => ptClose() })),
+    el('p', { class: 'small se', 'data-pt-what': '1', text: [t.phone.name, t.app && `app ${t.app}`,
+      t.model.name, t.tier.id ? t.tier.name : '', t.ok ? 'finished' : t.outcome]
+      .filter(Boolean).join(' · ') }),
+    el('h3', { text: 'Conditions' }),
+    el('dl', { class: 'pt-conds', 'data-pt-conds': t.test_id },
+      kv('First load', t.first_load_s == null ? '—' : `${ptN(t.first_load_s)} s`),
+      kv('Prefill, cold → warm', `${ptN(t.prefill_cold)} → ${ptN(t.prefill_warm)} tok/s`),
+      kv('Thermal max', t.thermal_max == null ? '—' : String(t.thermal_max)),
+      kv('Charging', t.charging ? 'yes' : 'no'),
+      kv('Battery', `${ptN(t.battery.start)} → ${ptN(t.battery.end)} °C`),
+      kv('Engine memory', ptMB(t.engine_mem_mb)), kv('Peak swap', ptMB(t.peak_swap_mb)),
+      kv('Lowest free memory', ptMB(t.mem_min_mb)),
+      kv('Engine build', t.engine.name || '—'), kv('Phone', [t.phone.maker, t.phone.code,
+        t.phone.os].filter(Boolean).join(' · ') || '—')),
+    el('h3', { text: 'Checks' }),
     S.err[t.test_id] ? el('p', { class: 'warn', text: 'Its checks couldn’t be read: '
       + S.err[t.test_id] })
       : !got ? skeleton(3, { 'data-loading': 'pt-test' })
       : got.unread ? el('p', { class: 'small', text: got.unread })
-      : el('div', { class: 'rp-scroll' }, el('table', { class: 'rp pt-checks' },
-        el('thead', {}, el('tr', {}, ['Check', 'Status', 'Time', 'First word', 'Prefill',
-          'Decode', 'Reply'].map((h, i) => el('th', { class: i >= 2 && i < 6 ? 'num' : null,
-          text: h })))),
-        el('tbody', {}, got.checks.map(c => el('tr', { 'data-pt-check': c.id },
-          el('td', { text: c.id || '—' }, c.finish ? el('span', { class: 'rp-sub',
-            text: c.finish }) : ''),
-          el('td', { class: c.status === 'done' ? '' : 'dash', text: c.status || '—' }),
-          el('td', { class: 'num', text: c.wall_ms ? ptS(c.wall_ms) : '—' }),
-          el('td', { class: 'num', text: ptS(c.ttft_ms) }),
-          el('td', { class: 'num', text: c.prefill_tps == null ? '—'
-            : `${ptN(c.prefill_tps)} tok/s` }),
-          el('td', { class: 'num', text: c.decode_tps == null ? '—'
-            : `${ptN(c.decode_tps)} tok/s` }),
-          el('td', { class: 'pt-reply', 'data-pt-reply': c.id, text: c.text || '' })))))));
+      : el('div', { class: 'pt-checks-list' }, got.checks.map(c => el('div', {
+          class: 'pt-check', 'data-pt-check': c.id },
+        el('div', { class: 'pt-check-head' }, el('b', { text: c.id || '—' }),
+          el('span', { class: 'small se', text: [c.status || '—', c.finish,
+            c.wall_ms ? ptS(c.wall_ms) : '', c.ttft_ms != null ? `first word ${ptS(c.ttft_ms)}` : '',
+            c.prefill_tps != null ? `prefill ${ptN(c.prefill_tps)} tok/s` : '',
+            c.decode_tps != null ? `decode ${ptN(c.decode_tps)} tok/s` : '']
+            .filter(Boolean).join(' · ') })),
+        el('div', { class: 'pt-reply', 'data-pt-reply': c.id, text: c.text || '' })))),
+    el('p', { class: 'small se', text: '↑ ↓ the test before or after · Esc closes' }));
+  if (!PT.panel) {
+    PT.panel = el('aside', { class: 'pt-panel', role: 'dialog', 'aria-label': 'a test',
+      'data-pt-panel': '1' });
+    document.body.append(PT.panel);
+  }
+  PT.panel.dataset.ptTest = t.test_id;
+  PT.panel.replaceChildren(body);
+}
+// a value a flag keeps out of the medians: struck through, its reasons on hover
+function ptFlagged(x, off) {
+  const why = off ? off.join(' · ') : '';
+  return why && x.v != null ? { ...x, cls: 'pt-off', why } : x;
+}
+// the dot of a model's rows: the colour its board rows have (its checkpoint's),
+// grey when the names file doesn't name it
+function ptModelColour(model) {
+  if (!model || model.named === false) return 'var(--muted)';
+  const cp = String(model.row || model.checkpoint || '');
+  const m = (DATA.models || []).find(x => {
+    const id = String(x.id).replace(/ · thinking$/, '');
+    return cp && (id === cp || (cp.indexOf('/') < 0 && id.startsWith('served/')
+      && (id.slice(7) === cp || id.slice(7).startsWith(cp + '-'))));
+  });
+  return m ? mtColour(m) : 'var(--accent)';
+}
+// 27c: every test on 27's table — its columns grouped under Speed, Memory and
+// Battery; thermal max, charging, first load and the engine build in its panel
+function ptTestsSpec(id, d) {
+  const SP = 'Speed', ME = 'Memory', BA = 'Battery';
+  const text = (key, label, full) => ({ key, label, full: full || label, num: false,
+    sortable: false });
+  const num = (key, label, full, group, sub) => ({ key, label, full, group, sub, sortable: false });
+  const cols = [text('phone', 'Phone'), text('app', 'App'), text('model', 'Model'),
+    text('result', 'Result'), num('answers', 'Answers', 'Answers', '', 'done of run'),
+    num('ttft', 'First word', 'Time to first word', SP),
+    num('prefill', 'Prefill', 'Prefill, warm', SP, 'warm, tok/s'),
+    num('decode', 'Decode', 'Decode', SP, 'tok/s'),
+    num('sustained', 'Sustained', 'Sustained', SP),
+    num('engine', 'Engine', 'Engine memory', ME), num('swap', 'Peak swap', 'Peak swap', ME),
+    num('memmin', 'Lowest free', 'Lowest free memory', ME),
+    num('battery', 'Start → end', 'Battery', BA, '°C'), num('rise', 'Rise', 'Battery rise', BA)];
+  const rows = d.tests.map(t => {
+    const sp = t.flags.speed.length ? t.flags.speed : null,
+      bt = t.flags.battery.length ? t.flags.battery : null;
+    const why = [...t.flags.speed, ...t.flags.battery].join(' · ');
+    const at = k => ({ 'data-pt-cell': `${t.test_id}|${k}` });
+    const words = (k, v, extra = {}) => ({ v: 1, text: v, noLead: true, attrs: at(k), ...extra });
+    const val = (k, v, shown, extra = {}) => v == null ? { v: null, text: '–', attrs: at(k) }
+      : { v, text: shown, noLead: true, attrs: at(k), ...extra };
+    // a test that crashed has no times: "–", never "0.0 s"
+    const time = v => t.ok && v != null && v > 0 ? v : null;
+    return { key: t.test_id, id: null, mark: 'here', colour: ptModelColour(t.model),
+      name: ptDay(t.received),
+      full: [t.tester, t.phone.name, t.model.name, t.first_load_s == null ? ''
+        : `first load ${ptN(t.first_load_s)} s`, t.thermal_max == null ? ''
+        : `thermal max ${t.thermal_max}`, `charging ${t.charging ? 'yes' : 'no'}`]
+        .filter(Boolean).join('\n'),
+      line: [t.tester || '—', why ? el('span', { class: 'pt-flagword',
+        'data-pt-flag-why': t.test_id, title: why, text: 'flagged' }) : ''],
+      attrs: { 'data-pt-row': t.test_id, 'data-pt-flagged': String(!!why),
+        class: [t.flags.impossible ? 'pt-flag' : '', ptState(id).open === t.test_id ? 'pt-on' : '']
+          .filter(Boolean).join(' ') || null },
+      open: () => ptOpen(id, t.test_id, d),
+      cells: {
+        phone: words('phone', t.phone.name, { sub: t.phone.ram_gb ? `${t.phone.ram_gb} GB RAM`
+          : null, why: [t.phone.maker, t.phone.code, t.phone.os].filter(Boolean).join(' · ')
+          || null }),
+        app: words('app', t.app || '—'),
+        model: words('model', t.model.name, { sub: t.tier.id ? t.tier.name : null }),
+        result: words('result', t.ok ? 'ok' : t.outcome || '—', { cls: t.ok ? null : 'pt-bad' }),
+        answers: val('answers', t.answers.run ? t.answers.done / t.answers.run : 0,
+          `${t.answers.done}/${t.answers.run}`),
+        ttft: ptFlagged(val('ttft', time(t.ttft_ms), ptS(t.ttft_ms)), sp),
+        prefill: ptFlagged(val('prefill', t.prefill_warm, ptN(t.prefill_warm),
+          { tip: [`cold → warm: ${ptN(t.prefill_cold)} → ${ptN(t.prefill_warm)} tok/s`] }), sp),
+        decode: ptFlagged(val('decode', t.decode, ptN(t.decode), { sub: t.decode_from
+          ? `tok/s, ${t.decode_from}` : null }), sp),
+        sustained: ptFlagged(val('sustained', t.sustained.pct, ptSigned(t.sustained.pct, '%'),
+          { sub: t.sustained.first != null ? `${ptN(t.sustained.first)} → `
+            + `${ptN(t.sustained.last)}` : null }), sp),
+        engine: val('engine', t.engine_mem_mb, ptMB(t.engine_mem_mb)),
+        swap: val('swap', t.peak_swap_mb, ptMB(t.peak_swap_mb)),
+        memmin: val('memmin', t.mem_min_mb, ptMB(t.mem_min_mb)),
+        battery: ptFlagged(val('battery', t.battery.start, `${ptN(t.battery.start)} → `
+          + `${ptN(t.battery.end)}`), bt),
+        rise: ptFlagged(val('rise', t.battery.rise, ptSigned(t.battery.rise, ' °C')), bt) } };
+  });
+  return { view: 'pt-tests', attrs: { 'data-pt-table': '1' }, hkey: 'pt-tests-' + id, cols, rows,
+    sorted: true, hideEmpty: false, colGroups: true, free: true, noTint: true,
+    cardCols: ['decode', 'ttft', 'engine', 'rise'],
+    legend: () => 'Newest first · a dot, the model’s colour (grey: not named yet) · struck '
+      + 'through: flagged, the reason on hover · click a test to open it' };
 }
 // 27b: the medians per phone and model on modelTable — a row a model on a phone
 // ("step8804 · OnePlus 15"), measured on our testers' phones, its line the
@@ -29515,17 +29711,24 @@ function ptPerSpec(id, d) {
   const S = mtS('pt-per-' + id);
   const cols = [
     { key: 'tests', label: 'Tests', full: 'Tests', sub: 'in the medians', sortable: false },
-    { key: 'decode', label: 'Decode', full: 'Decode', sub: 'tok/s' },
-    { key: 'prefill', label: 'Prefill', full: 'Prefill, warm', sub: 'warm, tok/s' },
-    { key: 'ttft', label: 'First word', full: 'Time to first word', sub: 'time to it', lower: true },
-    { key: 'engine', label: 'Engine memory', full: 'Engine memory', sub: 'MB', lower: true },
-    { key: 'rise', label: 'Temp. rise', full: 'Temperature rise', sub: 'battery, °C', lower: true }];
+    // 27c: each column tinted from its worst to its best with Tint on
+    { key: 'decode', label: 'Decode', full: 'Decode', sub: 'tok/s', heat: true },
+    { key: 'prefill', label: 'Prefill', full: 'Prefill, warm', sub: 'warm, tok/s', heat: true },
+    { key: 'ttft', label: 'First word', full: 'Time to first word', sub: 'time to it', lower: true,
+      heat: true },
+    { key: 'engine', label: 'Engine memory', full: 'Engine memory', sub: 'MB', lower: true,
+      heat: true },
+    { key: 'rise', label: 'Temp. rise', full: 'Temperature rise', sub: 'battery, °C', lower: true,
+      heat: true }];
   S.sort = S.sort && cols.some(c => c.key === S.sort.key) ? S.sort : { key: 'decode', dir: -1 };
   const lower = new Set(cols.filter(c => c.lower).map(c => c.key));
-  const rows = d.perPhone.map(p => {
+  // 27c: a phone with no finished test of a model ("0 of 1": crashes only) is
+  // in What failed, not here
+  const rows = d.perPhone.filter(p => p.n > 0).map(p => {
     const m = p.model.row ? DATA.models.find(x => x.id === p.model.row) : null;
-    // an id the names file doesn't name yet is its id here, and its line says so
-    const model = m ? displayName(m) : p.model.named === false ? p.model.id : p.model.name;
+    // the model as names.json names it (27c); an id it doesn't name yet is its
+    // id here, and its line says so
+    const model = p.model.named === false ? p.model.id : p.model.name;
     const phone = p.phone.named === false && p.phone.code ? p.phone.code : p.phone.name;
     const unnamed = [p.model.named === false ? 'model' : '', p.phone.named === false ? 'phone' : '']
       .filter(Boolean);
@@ -29533,7 +29736,7 @@ function ptPerSpec(id, d) {
       : { v, text, ...extra };
     return { key: `${p.phone.code}|${p.model.id}`, id: m ? m.id : null, nav: m ? m.id : null,
       href: m ? '#model=' + encodeURIComponent(m.id) : null, mark: 'here',
-      colour: m ? mtColour(m) : 'var(--accent)', name: `${model} · ${phone}`,
+      colour: m ? mtColour(m) : ptModelColour(p.model), name: `${model} · ${phone}`,
       full: [p.model.name, p.model.what, p.phone.name, [p.phone.maker, p.phone.code]
         .filter(Boolean).join(' ')].filter(Boolean).join('\n'),
       line: [unnamed.length ? `${unnamed.join(' and ')} not named yet` : '',
@@ -29550,6 +29753,8 @@ function ptPerSpec(id, d) {
           attrs: { 'data-pt-per-rise': '1' } }) } };
   });
   return { view: 'pt-per', free: true, attrs: { 'data-pt-per': '1' }, hkey: 'pt-per-' + id, cols, rows,
+    legend: tint => '● measured on our testers’ phones, the model’s colour (grey: not named yet)'
+      + (tint ? ' · tint = each column’s worst to best' : '') + ' · bold = best in the column',
     sort: S.sort, hideEmpty: false, cardCols: ['decode', 'prefill', 'ttft', 'engine'],
     onSort: k => { S.sort = { key: k, dir: S.sort.key === k ? -S.sort.dir : lower.has(k) ? 1 : -1 };
       render(); } };
@@ -29572,11 +29777,7 @@ function vPhoneTests(id, d, back) {
     + ` tok/s for a ${k} model`).join('; ');
   const table = el('div', { class: 'card', 'data-report-section': 'pt-tests' },
     el('h2', { text: 'Every test' }),
-    d.tests.length ? el('div', { class: 'rp-scroll tall' }, el('table', { class: 'rp pt',
-        'data-pt-table': '1' },
-      el('thead', {}, el('tr', {}, PT_COLS.map((h, i) => el('th', {
-        class: i >= 6 && i < PT_COLS.length - 1 ? 'num' : null, text: h })))),
-      el('tbody', {}, d.tests.map(t => ptRow(id, t)))))
+    d.tests.length ? modelTable(ptTestsSpec(id, d))
       : el('p', { class: 'small', 'data-pt-none': '1', text: sync.set_up === false
         ? 'No tests here: the sync isn’t set up.' : 'No tests here yet.' }),
     el('p', { class: 'small se', 'data-pt-flags': '1', text: 'Newest first; click a test to '
@@ -29606,7 +29807,19 @@ function vPhoneTests(id, d, back) {
     kinds.length ? el('p', { class: 'small se', 'data-pt-unread': '1',
       text: 'Kept as they came, not read: ' + kinds.map(w =>
         `${d.unread.filter(u => u.why === w).length} (${w})`).join(', ') }) : '');
-  return [back, head, table, ptTest(id, d), per, failed].filter(Boolean);
+  // 27c: a link's test (&test=<id>) opens in the panel, the page at its row
+  PT.d = d;
+  const S = ptState(id);
+  if (S.open && (!PT.panel || PT.panel.dataset.ptTest !== S.open)) {
+    const tid = S.open;
+    setTimeout(() => {
+      S.open = null;
+      ptOpen(id, tid, d);
+      const row = document.querySelector(`[data-pt-table] tr[data-pt-row="${CSS.escape(tid)}"]`);
+      if (row) row.scrollIntoView({ block: 'center' });
+    }, 0);
+  }
+  return [back, head, table, per, failed].filter(Boolean);
 }
 // ---------------------------------------------------------------------------
 // 21b: a report of the answers our models ran out of room on — for insight
@@ -30609,14 +30822,15 @@ function rpSizePanel(d, b, pts) {
     svg.append(el('svg:line', { x1: cx, x2: cx, y1: Y(p.c.v - se), y2: Y(p.c.v + se), stroke: rpColour(p.m),
       'stroke-width': 1.5 }),
       el('svg:circle', { cx, cy, r: 4, fill: rpColour(p.m), 'data-sz-dot': `${b.key}:${p.m.label}`,
-        'data-sz-star': String(p.star) }, el('svg:title', { text: `${p.m.label}: ${rpNum(p.c.v)} ± `
+        'data-sz-star': String(p.star), 'data-chart-point': `${b.key}:${p.m.label}` }, el('svg:title', { text: `${p.m.label}: ${rpNum(p.c.v)} ± `
           + `${rpNum(se)} at ${p.x.toFixed(1)} GB` + (p.star ? ' · no smaller build scores higher' : '') })));
-    labels.push({ cx, cy, r: 4, name: (p.star ? '★ ' : '') + trShort(p.m.label), ours: true,
+    labels.push({ id: `${b.key}:${p.m.label}`, cx, cy, r: 4,
+      name: (p.star ? '★ ' : '') + trShort(p.m.label), ours: true,
       attrs: { 'data-sz-label': `${b.key}:${p.m.label}` } });
   }
-  const bare = chartLabels(svg, labels, { x0: L, y0: Tp, x1: L + pw, y1: Tp + ph }, { fs: FS, segs });
+  chartLabels(svg, labels, { x0: L, y0: Tp, x1: L + pw, y1: Tp + ph }, { fs: FS, segs });
   return el('div', { class: 'by-panel tr-panel', 'data-sz-panel': b.key },
-    el('h3', {}, b.label, rpCeil(d, b.key)), svg, chartBare(bare, 'sz:' + b.key));
+    el('h3', {}, b.label, rpCeil(d, b.key)), svg);
 }
 function rpSizeChart(d, benches) {
   const ours = d.ours.filter(m => m.pick);
@@ -31082,16 +31296,16 @@ function rpThinkChart(d, benches) {
     for (const p of pts) {
       const cx = X(p.x), cy = Y(p.y);
       svg.append(el('svg:circle', { cx, cy, r: 4, fill: rpColour(p.m),
-        'data-by-dot': `${b.key}:${p.m.label}` }, el('svg:title', { text: `${p.m.label}: `
+        'data-by-dot': `${b.key}:${p.m.label}`, 'data-chart-point': `${b.key}:${p.m.label}` },
+        el('svg:title', { text: `${p.m.label}: `
         + `${rpNum(p.y)} at ${Math.round(p.x).toLocaleString('en')} thinking tokens` })));
-      labels.push({ cx, cy, r: 4, name: p.m.label, ours: true,
+      labels.push({ id: `${b.key}:${p.m.label}`, cx, cy, r: 4, name: p.m.label, ours: true,
         attrs: { 'data-by-label': `${b.key}:${p.m.label}` } });
     }
-    const bare = chartLabels(svg, labels, { x0: L, y0: Tp, x1: L + pw, y1: Tp + ph }, { fs: 8 });
+    chartLabels(svg, labels, { x0: L, y0: Tp, x1: L + pw, y1: Tp + ph }, { fs: 8 });
     svg.append(el('svg:text', { x: L + pw / 2, y: H - 2, 'text-anchor': 'middle', 'font-size': 8,
       fill: 'var(--text-secondary)', text: 'mean thinking tokens per answer' }));
-    return el('div', { class: 'by-panel', 'data-by-think': b.key }, el('h3', { text: b.label }), svg,
-      chartBare(bare, 'by:' + b.key));
+    return el('div', { class: 'by-panel', 'data-by-think': b.key }, el('h3', { text: b.label }), svg);
   }).filter(Boolean);
   if (!panels.length) return '';
   return el('div', { 'data-by-think-chart': '1' }, el('h3', { text: 'Score against thinking' }),
@@ -31201,6 +31415,7 @@ function render() {
   state.trRedraw = state.queueRedraw = null;
   renderWarnings();                 // one line, in the bar, on every tab
   renderAlarms();                   // 12p.1: and in red, a set that is missing or changed
+  ptGuard();                        // 27c: a test's panel, on the testers' report only
   const ms = visible();
   renderTabs();
   const view = document.getElementById('view');

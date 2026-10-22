@@ -40,7 +40,7 @@ OLD = """(specs) => {
       return ((f && f.nodeType === 3 ? f.textContent : th.textContent) || '').replace(/\\s+/g, ' ')
         .trim(); });
     for (const tr of t.querySelectorAll('tbody tr')) {
-      const id = tr.dataset.odRow || tr.dataset.rpRow || tr.dataset.ptPerRow
+      const id = tr.dataset.odRow || tr.dataset.rpRow || tr.dataset.ptPerRow || tr.dataset.ptRow
         || (tr.children[0] && tr.children[0].getAttribute('title'));
       if (!id || tr.classList.contains('rp-group')) continue;
       const row = rows[id] = {};
@@ -76,6 +76,7 @@ NEW = """(specs) => {
     for (const tr of t.querySelectorAll('tbody tr.mt-row')) {
       // a row two sources make one answers to each one's label
       const ids = [tr.dataset.odRow, tr.dataset.rpRow, tr.dataset.rpRanoutRow, tr.dataset.ptPerRow,
+        tr.dataset.ptRow,
         ...(tr.dataset.rpEveryRows || tr.dataset.rpEveryRow || '').split('|')].filter(Boolean);
       const nm = tr.querySelector('td.mt-name');
       for (const id of ids) {
@@ -163,9 +164,20 @@ OD_COLS = {"Model": ["name"], "Base model": ["name"], "Size on disk": ["memory"]
 OD_TESTERS = "Measured on our testers’ phones"
 
 
+# 27c: Every test's old columns — the received date, tester and what moved to
+# the test's panel (first load, thermal max, charging) in the row's name and
+# its hover; the battery's start → end and rise in two columns now
+TESTS_COLS = {"Received": ["name"], "Tester": ["name"], "First load": ["name"],
+              "Thermal max": ["name"], "Charging": ["name"], "Phone": ["phone"],
+              "App · engine": ["app"], "Model": ["model"], "Result": ["result"],
+              "Prefill, cold → warm": ["prefill"], "Battery": ["battery", "rise"]}
+
+
 def where(rid: str, tname: str, col: str, heads: dict) -> list[str]:
     if tname == "pd":
         return [col]
+    if tname == "tests":
+        return TESTS_COLS.get(col) or [heads.get(col, col)]
     if tname == "od" and col in OD_COLS:
         return OD_COLS[col]
     if col in ("Model", "Phone", "Dates"):
@@ -179,6 +191,10 @@ def seen_only(rid: str, tname: str, row: str, col: str, cells: dict) -> bool:
     median wins the cell); a phone note with no speed in it ("no phone number
     for the 4B"); and the phones after the first of our testers' (one phone's
     median shows, every phone's on hover)"""
+    # 27c: Every test's first load, thermal max and charging moved to the test's
+    # panel (and the row's hover); its prefill shows warm, cold on hover
+    if tname == "tests":
+        return col in ("First load", "Thermal max", "Charging", "Prefill, cold → warm")
     if tname != "od":
         return False
     if col == "Phone speed":
@@ -198,8 +214,16 @@ def lost(page, live, world: str, views: dict) -> list:
         for tname, rows in tables.items():
             heads = after.get(rid, {}).get(tname + ":heads", {})
             for row, cells in rows.items():
+                # 27c: a phone with no finished test of a model ("0 of 2") leaves the
+                # medians for What failed
+                if tname == "per" and (cells.get("Tests") or {}).get("text", "").startswith("0 of"):
+                    continue
                 for col, cell in cells.items():
                     want = nums(cell["text"])
+                    # 27c: a test that crashed has no times: "–", not "0.0 s"
+                    if tname == "tests" and col == "Time to first word" and (
+                            cells.get("Result") or {}).get("text") != "ok":
+                        continue
                     if not want:
                         continue
                     keys = where(rid, tname, col, heads)

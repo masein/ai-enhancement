@@ -77,8 +77,10 @@ modelling's cross-entropy table (a row per task and model) keep their own.
     build's thinking-off row holds only IFEval and IFBench. A model with one
     setting shows it.
   - "Both" shows the other setting as an indented sub-row.
-- **Columns ▾.** Says "Columns: N of M ▾". Each tab remembers its choice
-  (`bench-mt-cols`).
+- **Columns ▾.** Says "Columns: N of M ▾". A click changes the tab's current
+  set, never its default; every set shows in the menu's one order. Each tab
+  remembers its choice (`bench-mt-cols`) and keeps it in the page's link
+  (`view=latest&cols=…`) (27c).
   - Frontier has one column a benchmark: `MT_BENCH` holds every name others
     give it (HLE is Humanity's Last Exam, MMLU-Pro is MMLU Pro).
   - When two sources give a number for one benchmark, a measured number
@@ -127,20 +129,49 @@ Where a report lists models with their scores, it draws through the same
   on a phone ("step8804 · OnePlus 15"), its line the phone's memory and the
   tests' dates. Every test stays as it is: a row a test.
 
-## Chart labels (27b)
+## On our testers' phones (27c)
+
+- **Per phone and model.** A row a model on a phone, the model as
+  `eval_tasks/phone/names.json` names it ("step8804 · OnePlus 15"), its dot
+  the model's board colour (grey when not named). Tint tints it; its legend
+  says only what it uses. A phone with no finished test of a model is in What
+  failed, not here.
+- **Every test.** 27's table, its columns grouped under Speed, Memory and
+  Battery. A crash shows "–" for its times. A flagged value is struck through,
+  its reason on hover, as is the "flagged" word under the date. The engine
+  build, thermal max, charging and first load are in the test's panel.
+- **A test's panel.** It opens from the right (480 px, the whole screen on a
+  phone) with the test's conditions, checks and replies. The page behind
+  neither moves nor redraws, and the row stays marked. Esc, × or a click
+  outside closes it; ↑ and ↓ move between tests; the link says `&test=<id>`.
+- **On the model pages.** An app model's `checkpoint` (a served id, or a
+  checkpoint's name: "step8804" is every served row named it or it and a dash)
+  puts its medians per phone on every page of that checkpoint, thinking on or
+  off, under "On our testers' phones", with what is known of the file: "the
+  app's step8804 file — not yet checked to be this exact file" until Kevin's
+  sha256 in `names.json` matches the row's pin, then "the same file (sha256
+  checked)". A variant (model-003, step4000-denseq8) has its own heading on
+  step4000's page. The On-device report's "On a phone" follows the same rule.
+
+## Chart labels (27b, 27c)
 
 `chartLabels(svg, pts, box, o)` places the labels of every scatter chart:
 On-device's score against memory, the file-size chart and score against
 thinking.
 
-- A label tries the spots right, left, above and below its point, and takes
-  the first that touches no other label, no point, no line it is told to keep
-  off (the file-size chart's frontier and ± whiskers) and no edge of the plot.
-- If none is free, it takes the nearest free spot a short reach away, with a
-  leader line that crosses no label and no other point.
-- If there is still none, the point stays bare: its name is on its hover and in
-  a line under the panel.
+- A label sits on the side of its point with room, touching it: right, left,
+  above or below, the first that touches no other label, no point, no line it
+  is told to keep off (the frontiers and ± whiskers) and no edge of the plot,
+  and is nearer its own point than any other.
+- If none is free, it takes a spot a short leader away (24 at most), the
+  leader crossing no label and no other point.
+- If there is still none, the label is dropped: its point is named on hover.
 - Ours are placed first, so they get the best spots.
+- On-device's "Score against memory needed" labels only our builds and the
+  published models on the dashed best-for-their-memory line (no model needing
+  less scores higher). Every other point is named on hover and in one legend
+  above the four panels. Ours are filled dots in their own colours; Edge0,
+  Bonsai and Gemma are hollow diamonds, one hue each, on every panel.
 
 ## Tests
 

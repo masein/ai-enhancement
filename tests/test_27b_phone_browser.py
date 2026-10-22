@@ -50,10 +50,13 @@ def test_the_medians_per_phone_are_27s_table(live, page, width):
     go(page, live, "testers", "[data-pt-per]", width=width)
     t = page.locator("table[data-pt-per]")
     assert t.get_attribute("data-model-table") == "pt-per"
-    names = t.locator("tbody tr.mt-row [data-mt-name]").all_text_contents()
-    assert names[0] == f"{NAME} · OnePlus 15"                    # the fastest first
-    assert set(names) == {f"{NAME} · OnePlus 15", f"{NAME} · Galaxy S25 Ultra",
-                          f"{NAME} · 23078PND5G"}
+    # 27c: the model as names.json names it, then the phone; a phone with no
+    # finished test (23078PND5G: crashes only) is in What failed
+    names = [n.split(" · ")[-1] for n in t.locator("tbody tr.mt-row [data-mt-name]")
+             .all_text_contents()]
+    assert names == ["OnePlus 15", "Galaxy S25 Ultra"]          # the fastest first
+    assert t.locator("tbody tr.mt-row td.mt-name").first.get_attribute("title").startswith(
+        "k4 phone build, Q4 (Qwen3.6-35B-A3B)")
     row = t.locator("tr[data-pt-per-row='CPH2747|model-004']")
     assert row.locator("[data-pt-per-decode] .mt-n").inner_text() == "13.0"
     assert row.locator("[data-pt-per-n]").inner_text() == "4 of 5"
@@ -61,9 +64,7 @@ def test_the_medians_per_phone_are_27s_table(live, page, width):
     assert row.locator("[data-mt-line]").inner_text().endswith("2026-10-17 to 2026-10-20")
     assert row.locator("a[data-mt-name]").get_attribute("href") == "#model=" + PHONE.replace(
         "/", "%2F")
-    # an id the names file doesn't name yet is its id, and its line says so
-    bare = t.locator("tr[data-pt-per-row='23078PND5G|model-004'] [data-mt-line]")
-    assert bare.inner_text().startswith("phone not named yet")
+    assert t.locator("tr[data-pt-per-row='23078PND5G|model-004']").count() == 0
     if width < 640:
         assert page.locator("[data-mt-cards='pt-per'] [data-mt-card]").first.is_visible()
     assert no_sideways(page) and page.errors == []
