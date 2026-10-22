@@ -5788,6 +5788,93 @@ table.rp.pt-checks td.pt-reply { text-align:left; white-space:pre-wrap; overflow
   min-width:14rem; max-width:32rem; }
 .pt-test-head { display:flex; justify-content:space-between; align-items:center; gap:var(--sp-2); }
 .pt-test-head h2 { margin:0; min-width:0; overflow-wrap:anywhere; }
+/* 27: one table for every Models tab — one row, one cell, one frame */
+.mt { font-size:14px; }
+.mt-legend { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between;
+  gap:4px 16px; margin:var(--sp-2) 0; }
+.mt-legend .mt-tint { white-space:nowrap; margin:0; padding:0; border:0; }
+.mt-box { overflow:auto; max-height:min(78vh, 1400px); border:1px solid var(--border);
+  border-radius:var(--r-2); background:var(--surface-1); }
+table.mt-table { border-collapse:separate; border-spacing:0; width:100%; min-width:100%;
+  font-size:14px; table-layout:auto; }
+table.mt-table th, table.mt-table td { padding:8px 12px; border-bottom:1px solid var(--border);
+  background:var(--surface-1); vertical-align:top; white-space:nowrap; text-align:left; }
+table.mt-table th.num, table.mt-table td.num { text-align:right; }
+table.mt-table thead { position:sticky; top:0; z-index:4; }
+table.mt-table thead th { background:var(--surface-1); border-bottom:1px solid var(--border);
+  vertical-align:bottom; }
+table.mt-table th.mt-hg { font-size:12px; font-weight:500; color:var(--muted); text-align:center;
+  border-bottom:1px solid var(--grid); padding-bottom:4px; }
+.mt-h1 { display:block; font-family:var(--font-mono); font-size:12px; font-weight:600;
+  letter-spacing:.04em; text-transform:uppercase; color:var(--text-secondary); white-space:nowrap; }
+.mt-h2 { display:block; font-size:11px; font-weight:400; color:var(--muted); white-space:nowrap;
+  font-family:var(--font-sans); }
+table.mt-table th.sortable { cursor:pointer; }
+table.mt-table th .dir { color:var(--accent); }
+table.mt-table td.mt-name, table.mt-table th.model { position:sticky; left:0; z-index:2;
+  box-shadow:1px 0 0 var(--border); }
+table.mt-table thead th.model { z-index:5; }
+table.mt-table.mt-ranked td.mt-rank, table.mt-table.mt-ranked th.rank,
+table.mt-table.mt-ranked th.mt-hg.pin0 { position:sticky; left:0; z-index:2; width:40px;
+  min-width:40px; max-width:40px; padding-left:8px; padding-right:4px; }
+table.mt-table.mt-ranked td.mt-name, table.mt-table.mt-ranked th.model { left:40px; }
+table.mt-table.mt-ranked thead th.rank { z-index:5; }
+.mt-nrow { display:flex; align-items:center; gap:8px; min-width:0; }
+.mt-nrow .badge { margin-left:0; }
+.mt-name .mname { font-weight:600; color:var(--text-primary); text-decoration:none; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; max-width:22rem; }
+.mt-name a.mname:hover { text-decoration:underline; }
+.mt-line { font-size:12px; color:var(--muted); margin:2px 0 0 18px; white-space:normal;
+  max-width:24rem; line-height:1.35; }
+.mt-mark { display:inline-block; width:10px; height:10px; border-radius:50%; flex:0 0 10px; }
+.mt-mark.pub { background:transparent; border:1.5px solid var(--muted); box-sizing:border-box; }
+table.mt-table tr.mt-group th { background:var(--plane); font-family:var(--font-sans);
+  font-size:13px; font-weight:600; text-align:left; color:var(--text-primary); position:static;
+  text-transform:none; letter-spacing:0; }
+.mt-gnote { font-weight:400; color:var(--muted); margin-left:8px; }
+table.mt-table tr.mt-sub-row td.mt-subname { padding-left:36px; }
+table.mt-table tr.mt-sub-row td { border-bottom-style:dashed; }
+table.mt-table tr.mt-row:hover > td { background:var(--accent-soft); }
+table.mt-table td.tcell:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+.mt-n { font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:14px;
+  font-weight:400; }
+.mt-n b { font-weight:700; }
+.mt-pub { font-style:italic; }
+.mt-src { font-family:var(--font-sans); font-style:normal; font-size:9px; font-weight:600;
+  color:var(--muted); margin-left:1px; }
+.mt-se { font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:11px;
+  color:var(--muted); margin-left:3px; }
+.mt-sub { display:block; font-size:11px; color:var(--muted); font-family:var(--font-sans);
+  font-weight:400; }
+.mt-bar { display:block; height:3px; min-width:56px; margin-top:5px; border-radius:2px;
+  background:var(--grid); overflow:hidden; }
+.mt-bar i { display:block; height:100%; border-radius:2px; }
+table.mt-table td.mt-none { color:var(--muted); }
+table.mt-table td.dim .mt-n { color:var(--muted); }
+table.mt-table td .cellnote { display:block; font-family:var(--font-sans); font-size:10px;
+  color:var(--muted); white-space:normal; max-width:14rem; margin-left:auto; }
+table.mt-table td .cellnote.warn { color:var(--warning-text); }
+.mt-key, .mt-empty { margin:6px 0 0; }
+.mt-cards { display:none; }
+@media (max-width:639px) {
+  .mt .mt-wide { display:none; }
+  .mt-cards { display:grid; gap:8px; }
+  .mt-legend { font-size:12px; }
+  nav[data-models-switch] { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; }
+  nav[data-models-switch] > * { flex:0 0 auto; }
+}
+.mt-sortsel { display:flex; align-items:center; gap:6px; justify-self:start; }
+.mt-cgroup { font-weight:600; font-size:13px; margin-top:6px; }
+.mt-card { border:1px solid var(--border); border-radius:var(--r-2); padding:10px 12px;
+  background:var(--surface-1); cursor:pointer; min-width:0; }
+.mt-card .mname { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mt-card .mt-line { margin-left:18px; }
+.mt-cscores { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:8px;
+  margin-top:8px; }
+.mt-cs { min-width:0; }
+.mt-cs-h { display:block; font-family:var(--font-mono); font-size:10px; text-transform:uppercase;
+  color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mt-cs .mt-bar { min-width:0; }
 /* 25: each instruction under a reply, followed or not */
 .pd-follow { list-style:none; padding:0; margin:6px 0 10px; font-size:var(--fs-1); }
 .pd-follow li { margin:2px 0; overflow-wrap:anywhere; }
@@ -7838,7 +7925,8 @@ function vReportedModel(id) {
         x.url ? ' · ' : '', pub(x)])];
   return [back,
     el('div', { class: 'card', 'data-reported-model': id },
-      el('h1', { class: 'mtitle', text: m.name }),
+      el('h1', { class: 'mtitle', text: displayName({ ...m, published: true }),
+        title: m.name }),
       el('p', { class: 'sub', 'data-rm-said': '1', text: `${m.maker || 'its maker'} · published `
         + 'numbers only: never run here, never in an average or a rank' }),
       el('dl', { class: 'rm-facts' },
@@ -8695,7 +8783,9 @@ function modelHead(m, kinds) {
   return el('div', { class: 'card mhero', 'data-model-hero': '1' },
     el('div', { class: 'mtop' },
       el('div', { class: 'mtop-l' },
-        el('div', { class: 'mhead' }, el('h1', { class: 'mtitle', text: m.name }),
+        // 27: its name as every Models tab gives it; the board's whole name on hover
+        el('div', { class: 'mhead' }, el('h1', { class: 'mtitle', text: displayName(m),
+          title: m.name !== displayName(m) ? m.name : null }),
           (m.served || ggufOnly(m) ? '' : warnBadge(m)) || '', dupBadge(m) || ''),
         el('p', { class: 'mfacts', 'data-model-facts': '1' },
           // 16.1: its size first, where it came from on hover, and an edit
@@ -12233,23 +12323,31 @@ function mmfCard() {
   if (!D.name) return '';
   const rows = mmfTableRows(), cats = D.categories || [];
   const c = ((D.key || {}).counts || {}).all || {};
-  const head = el('tr', {}, el('th', { scope: 'col', text: 'Model' }),
-    el('th', { scope: 'col', class: 'num', text: 'Accuracy' }),
-    el('th', { scope: 'col', class: 'num', text: '±' }),
-    el('th', { scope: 'col', class: 'num', text: 'Questions' }),
-    el('th', { scope: 'col', text: 'How' }),
-    ...cats.map(k => el('th', { scope: 'col', class: 'num', 'data-mmf-cat-head': k, text: k })));
-  const body = rows.map(r => el('tr', { 'data-mmf-row': r.id, 'data-mmf-src': r.gguf ? 'gguf' : 'run' },
-    el('td', {}, el('a', { href: '#model=' + encodeURIComponent(r.id), text: r.name })),
-    r.lab ? el('td', { class: 'num se', 'data-mmf-labelled': r.id, text: 'labelled the key',
-      title: `${mmfPc(r.acc)} on the key it labelled: never ranked` })
-      : el('td', { class: 'num', 'data-mmf-cell': r.id, text: mmfPc(r.acc) }),
-    el('td', { class: 'num se', text: r.se ? (100 * r.se).toFixed(1) : '—' }),
-    el('td', { class: 'num se', text: (r.n || 0).toLocaleString('en') }),
-    el('td', { class: 'small se', text: r.src }),
-    ...cats.map(k => { const v = ((r.x || {}).by_category || {})[k];
-      return el('td', { class: 'num' + (v ? '' : ' se'), text: v && v.acc != null ? mmfPc(v.acc)
-        : '—' }); })));
+  // 27: drawn by the one table — accuracy with its ±, then the paper's 9 categories
+  const cols = [{ key: 'acc', label: 'Accuracy', full: 'Accuracy on our key', score: true },
+    { key: 'n', label: 'Questions', full: 'Questions asked' },
+    { key: 'how', label: 'How', full: 'How it was asked', num: false, sortable: false },
+    ...cats.map(k => ({ key: 'cat:' + k, label: k, full: k, score: true,
+      attrs: { 'data-mmf-cat-head': k } }))];
+  const mrows = rows.map(r => {
+    const m = DATA.models.find(x => x.id === r.id);
+    const base = m ? mtRowOf(m) : { id: r.id, mark: 'here', colour: 'var(--accent)',
+      name: displayName({ name: r.name }), group: mtGroup({ id: r.id, name: r.name }) };
+    return { ...base, key: r.id + (r.gguf ? '|gguf' : ''),
+      href: '#model=' + encodeURIComponent(r.id),
+      attrs: { 'data-mmf-row': r.id, 'data-mmf-src': r.gguf ? 'gguf' : 'run' },
+      cells: { acc: r.lab ? { v: null, text: 'labelled the key', why: `${mmfPc(r.acc)} on the `
+          + 'key it labelled: never ranked', attrs: { 'data-mmf-labelled': r.id } }
+        : { v: r.acc, text: mmfPc(r.acc), se: r.se ? (100 * r.se).toFixed(1) : null,
+          seV: r.se || null, attrs: { 'data-mmf-cell': r.id } },
+      n: { v: r.n || 0, text: (r.n || 0).toLocaleString('en'), noLead: true, keep: false },
+      how: { node: r.src, keep: false },
+      ...Object.fromEntries(cats.map(k => { const v = ((r.x || {}).by_category || {})[k];
+        return ['cat:' + k, v && v.acc != null ? { v: v.acc, text: mmfPc(v.acc) }
+          : { v: null }]; })) } };
+  });
+  const S = mtS('mmf');
+  S.sort = S.sort || { key: 'acc', dir: -1 };
   return el('div', { class: 'card', 'data-mmf-card': '1' },
     el('h2', {}, D.name, rBadge(restrictOf(MMF), { 'data-mmf-restriction': 'card' })),
     // 14.4.4: what its questions and scores may be used for, above its numbers
@@ -12262,8 +12360,9 @@ function mmfCard() {
       + 'never a column of the table above, never in any average, rank or overall. A full run '
       + 'scores Mobile-MMLU-Pro too, each on its own wording.' }),
     D.missing ? el('p', { class: 'warn small', 'data-mmf-missing': '1', text: D.missing }) : '',
-    rows.length ? el('div', { class: 'mmpwrap lb-wrap' }, el('table', { class: 'mmptab',
-        'data-mmf-table': '1' }, el('thead', {}, head), el('tbody', {}, body)))
+    rows.length ? modelTable({ view: 'mmf', attrs: { 'data-mmf-table': '1' }, cols, rows: mrows,
+      groups: true, sort: S.sort, onSort: k => { S.sort = { key: k, dir: S.sort.key === k
+        ? -S.sort.dir : -1 }; render(); } })
       : el('p', { class: 'small', 'data-mmf-none': '1', text: 'No model has sat the full set yet: '
         + 'Add a model ▸ On Hugging Face ▸ Mobile ▸ multiple choice, the full set.' }),
     el('p', { class: 'small se', 'data-mmf-checks': '1', text: [mmfKeyLine(), mmfChecksLine()]
@@ -12325,20 +12424,6 @@ const canSwitchThinking = id => thinkingModeOf(id) === 'switch'
 // 16b: the rule, said on the suites' cards and in Test a model
 const THINKING_RULE_WORDS = 'Thinking off for a model that can turn it off, served models too, '
   + 'unless a thinking run is asked for: that is a row of its own (“· thinking”).';
-// 16b: the views whose answers the rule decides: Mobile, Instruction & maths, Frontier
-const thinkRuleView = (L = lbS()) => ['mobile', 'frontier'].includes(lbTest(L))
-  || (lbTest(L) === 'standard' && L.chip === 'instruction');
-// the rule on the row: a thinking row (or a model that can't stop) says
-// "thinking"; in a view the rule decides, a model that can turn it off says
-// "thinking off"
-function thinkBadge(m, ruled) {
-  if (m.thinkingRow || ((m.gen || {}).thinking || {}).mode === 'always')
-    return el('span', { class: 'badge instruct', 'data-thinking-badge': m.id,
-      title: genMode(m) + (m.thinkingRow ? '\n\n' + THINKING_RULE_WORDS : ''), text: 'thinking' });
-  return ruled && canSwitchThinking(m.dmHome || m.id) ? el('span', { class: 'badge quiet give',
-    'data-thinking-off': m.id, title: 'Asked with thinking off.\n\n' + THINKING_RULE_WORDS,
-    text: 'thinking off' }) : '';
-}
 // how a model's generative answers were asked: "thinking off · on vllm"
 function genMode(m) {
   const g = m.gen || {}, th = g.thinking || {};
@@ -12457,9 +12542,10 @@ const LB_DEFAULTS = { size: 'all', source: 'all', type: 'all', tested: 'any', st
 // every five seconds rebuilds the DOM, and an opened row must survive it
 function lbS() {
   if (!state.lb) {
-    let tint = true, howto = false;
+    let tint = false, howto = false;
     try {
-      tint = localStorage.getItem('bench-lb-tint') !== 'off';
+      // 27: bars are the default; Tint on gives each column its own heat instead
+      tint = localStorage.getItem('bench-lb-tint') === 'on';
       howto = localStorage.getItem('bench-lb-howto') === 'open';
       state.lbSe = localStorage.getItem('bench-lb-se') === 'on';
     } catch (e) { /* private mode: the defaults */ }
@@ -12720,15 +12806,14 @@ function repCols(rows) {
           ...names.map(q => ({ key: 'rep:q:' + q, rep: 'q', q, label: q, short: q, num: true,
             group: REP_GROUP, unit: 'as reported' }))];
 }
-function repCell(m, c) {
+function repDesc(m, c) {
   const r = phoneRep(m.id), v = repVal(m, c);
-  if (v == null) return el('td', { class: 'num se', text: '' });
+  if (v == null) return { v: null, keep: false };
   // a speed to a tenth, as the phone reported it; a quality number as typed
   const shown = c.rep === 'q' ? (r.quality.find(x => x.name === c.q) || {}).value : v.toFixed(1);
-  return el('td', { class: 'num tcell', 'data-rep-cell': c.key,
-      title: `reported by ${r.by}, measured ${r.date} on ${r.device}`
-        + (r.source ? ` · from ${r.source}` : '') + ' · never in an average' },
-    String(shown), el('div', { class: 'small se rep-by', text: `reported by ${r.by}` }));
+  return { v, text: String(shown), sub: `reported by ${r.by}`, noLead: true, keep: false,
+    attrs: { 'data-rep-cell': c.key }, tip: [`reported by ${r.by}, measured ${r.date} on `
+      + `${r.device}` + (r.source ? ` · from ${r.source}` : '') + ' · never in an average'] };
 }
 function repVal(m, c) {
   const r = phoneRep(m.id);
@@ -13342,6 +13427,537 @@ function tiedWithBest(c, m, best, val) {
   return false;
 }
 
+// ===========================================================================
+// 27: one table for every Models tab. Latest, Standard, Mobile (DeviceMark's
+// table too), Everyday and Frontier draw through modelTable(spec): a view says
+// only which rows, which columns, the groups and the default sort.
+//  - a row: its mark (a filled dot in its own colour: measured here; a hollow
+//    grey ring: published by someone else), one name (displayName), one muted
+//    line under it (maker · size · quant · build · thinking), and a badge only
+//    for a status that matters;
+//  - a cell: the number, a small ±, a bar of the score out of 100 or, with
+//    Tint on, the column's own heat; a published number in italics with its
+//    source's letter; "–" for no score;
+//  - the frame: three groups (Ours, Open models, Closed models), sorted by the
+//    chosen column inside each; the header and the names stay put while the
+//    table scrolls in its own box; under 640 px a card a model.
+// No number is worked out here: every cell is the view's, drawn one way.
+// ===========================================================================
+
+// ---- the name: family · variant, the same on every tab and the model page --
+// a quant, in a name or its parentheses: "Q4", "UD-Q4_K_XL", "BF16", "PQ2_0", "1-bit"
+const MT_QUANT_RE = /^(?:UD-)?(?:I?Q\d(?:_[A-Z0-9]+)*|PQ\d(?:_\d+)?|BF16|FP16|F16|FP8|INT\d+\w*|\d+(?:\.\d+)?-bit)$/i;
+const MT_QUANT_TAIL = /^(.+?)[ -]((?:UD-)?(?:I?Q\d(?:_[A-Z0-9]+)*|PQ\d(?:_\d+)?|BF16|FP16|F16))$/;
+// words in a name's parentheses that say how it ran, not what it is: they go
+// to the line under the name ("Qwen3.6-35B-A3B Q4 (lda runtime)" is the plain one)
+const MT_LINE_WORDS = { 'lda runtime': 'lda runtime', 'phone build': 'phone build',
+  'card settings': 'on its card’s settings' };
+// how a board name splits: {family, variant, tag, line, thinking}. measured: a
+// model run here (a quant is its variant; a published one's goes to its line,
+// and its setting — "max", "high" — is its variant). basedOn: a served model's
+// base, which writes the team's short family out in full ("Qwen3.6 k4-LDA" is
+// "Qwen3.6-35B-A3B k4-LDA")
+function nameParts(raw, o = {}) {
+  let n = String(raw || '').replace(/\s+/g, ' ').trim();
+  const line = [];
+  let thinking = null;
+  // a thinking row (and a setup of one) is its model's row: the Thinking filter says which
+  if (/ · thinking(?= · |$)/i.test(n)) { thinking = 'on'; n = n.replace(/ · thinking(?= · |$)/i, ''); }
+  const segs = n.split(' · ');
+  let fam = segs.shift(), variant = '', tag = '';
+  const setup = [];
+  for (const s of segs) (/^GGUF$/i.test(s) ? line : setup).push(s);
+  // "Qwen3.6-35B-A3B, Qwen's report": where it is from is each cell's letter
+  const src = fam.match(/^(.+?), (?:its card|[^,]+(?:'|’)s (?:report|run|card))$/);
+  if (src) fam = src[1];
+  const par = fam.match(/^(.+?)\s*\(([^()]+)\)$/);
+  if (par) {
+    fam = par[1];
+    const bits = par[2].split(/,\s*/), lw = par[2].toLowerCase();
+    const q = bits.filter(b => MT_QUANT_RE.test(b)), w = bits.filter(b => !MT_QUANT_RE.test(b));
+    if (q.length) { if (o.measured) variant = q.join(' '); else line.push(...q); line.push(...w); }
+    else if (lw === 'thinking') thinking = 'on';
+    else if (MT_LINE_WORDS[lw]) line.push(MT_LINE_WORDS[lw]);
+    else tag = par[2];
+  }
+  if (!variant && o.measured) {
+    const t = fam.match(MT_QUANT_TAIL);
+    if (t) { fam = t[1]; variant = t[2]; }
+  }
+  // a card's "Qwen3-30B-A3B Thinking" is Qwen3-30B-A3B, thinking on
+  if (!o.measured && / Thinking$/.test(fam)) { fam = fam.replace(/ Thinking$/, ''); thinking = 'on'; }
+  const full = String(o.basedOn || '').split('/').pop(), first = fam.split(' ')[0];
+  if (full && first && full !== first && full.startsWith(first + '-')) fam = full + fam.slice(first.length);
+  // a published model's setting is its variant; ours keep an older run's tag
+  if (tag && !o.measured && !variant) { variant = tag; tag = ''; }
+  return { family: fam, variant: [variant, ...setup].filter(Boolean).join(' · '), tag, line,
+    thinking };
+}
+const mtNameOf = p => p.family + (p.variant ? ' · ' + p.variant : '') + (p.tag ? ` (${p.tag})` : '');
+const mtServed = m => (m && (m.served || servedOf(String(m.dmHome || m.rowOf || m.id || '')
+  .replace(/ · thinking$/, '')))) || null;
+const mtBasedOn = m => (mtServed(m) || {}).based_on || '';
+// the board's model (or a published one) by its name: one function, every tab
+function displayName(m) {
+  if (!m) return '';
+  return mtNameOf(nameParts(m.name, { measured: !m.reportedOnly && !m.published,
+    basedOn: mtBasedOn(m) }));
+}
+
+// ---- the groups: ours, open models, closed models --------------------------
+// whether a published model's weights are open: its name says (no source
+// carries it). Kept here, one list: a Hugging Face repo, or a family known open
+const MT_OPEN_RE = /\/|gemma|gpt-oss|llama|qwen|qwq|deepseek|mistral|mixtral|\bphi-|stablelm|tinyllama|bonsai|edge0|ornith|\bling\b|granite|smollm|pythia|\bopt-|lfm|youtu|nanbeige|olmo|kimi|\bglm|minimax/i;
+// someone else's model served or measured here as a GGUF (Ornith-1.5, Bonsai 2):
+// an open model with a filled dot, not one of ours
+const MT_OUTSIDE_RE = /^(ornith|bonsai|gemma|llama|deepseek|gpt-oss|mistral|phi|granite|smollm|pythia|qwen[23](?:\.5)?-)/i;
+const MT_GROUPS = [['ours', 'Ours'], ['open', 'Open models'], ['closed', 'Closed models']];
+function mtGroup(m, published = false, maker = '') {
+  if (published) return MT_OPEN_RE.test(m.name || '') || /\bopen\b/i.test(maker || '') ? 'open'
+    : 'closed';
+  const id = m.dmHome || m.rowOf || m.id || '';
+  if (/^local\//.test(id)) return 'ours';
+  if (/^(served|gguf)\//.test(id) && !MT_OUTSIDE_RE.test(m.name || '')) return 'ours';
+  return 'open';
+}
+
+// ---- the colour: the one each model has on the board's charts --------------
+// a report's colour for its rows (the scorecard's), else its family's
+function mtColour(m) {
+  const rc = (DATA && DATA.rowColours) || {}, id = m.dmHome || m.rowOf || m.id || '';
+  const base = String(id).replace(/ · thinking$/, '');
+  const k = rc[id] ?? rc[base] ?? rc[base + ' · thinking'];
+  return k != null ? `var(--s${(k % 8) + 1})` : famColor(m);
+}
+
+// ---- the line under a name -------------------------------------------------
+// maker (for others' models) · size or params · quant · build · thinking
+function mtFile(m) {
+  const s = mtServed(m), g = (G().registered || {})[m.rowOf || m.id] || {};
+  return String(((s || {}).pin || {}).file || g.path || '').split('/').pop();
+}
+function mtLine(m, o = {}) {
+  const p = o.parts || nameParts(m.name, { measured: !o.published, basedOn: mtBasedOn(m) });
+  const out = [];
+  if (o.maker) out.push(o.maker);
+  if (o.group && o.group !== 'ours' && (o.published || o.maker)) out.push(o.group === 'open'
+    ? 'open' : 'closed');
+  if (o.note) out.push(o.note);
+  const size = o.size ?? (m.params != null ? P(m.params) : '');
+  if (size && size !== '—') out.push(size);
+  // the quant its file is, when its name doesn't say it
+  const q = (mtFile(m).match(/(?:^|[-_.])((?:UD-)?I?Q\d(?:_[A-Z0-9]+)+)(?:[-_.]|$)/i) || [])[1];
+  if (q && !p.variant.includes(q)) out.push(q);
+  out.push(...p.line);
+  if (!o.published) {
+    if (isPhoneRow(m)) out.push('phone build');
+    else if (mtServed(m) && !m.rowOf) out.push('served');
+    else if (ggufOnly(m) || m.rowOf) out.push('GGUF');
+    else if (m.source === 'artifact') out.push('uploaded');
+    if (m.kind === 'base' && !mtServed(m)) out.push('base');
+  }
+  const th = o.thinking !== undefined ? o.thinking : p.thinking;
+  if (th) out.push(`thinking ${th}`);
+  return [...new Set(out.filter(Boolean))].join(' · ');
+}
+
+// ---- where a published number is from: a letter, the key under the table --
+const MT_LETTERS = { E: 'Epoch AI', Q: 'Qwen', G: 'Google', P: 'PrismML', X: 'Edge0',
+  C: 'model card', A: 'Artificial Analysis', D: 'DeviceMark' };
+function mtLetter(src, by = '') {
+  if (src === 'epoch' || src === 'epoch_external') return 'E';
+  if (src === 'aa') return 'A';
+  if (src === 'devicemark') return 'D';
+  const b = String(by || '').toLowerCase();
+  return /qwen|alibaba/.test(b) ? 'Q' : /google/.test(b) ? 'G' : /prism/.test(b) ? 'P'
+    : /edge0/.test(b) ? 'X' : 'C';
+}
+
+// ---- one column a benchmark: the names others give it, and its header ------
+// [key, short name (never cut), what it tests, the names it goes by]
+const MT_BENCH = [
+  ['gpqa', 'GPQA', 'science', [/^gpqa\b/]],
+  ['hle', 'HLE', 'hardest', [/^hle\b/, /humanity.s last exam/]],
+  ['mmlu-pro', 'MMLU-Pro', 'knowledge', [/^mmlu.?pro\b/]],
+  ['simpleqa', 'SimpleQA', 'facts', [/^simpleqa/]],
+  ['otis', 'OTIS', 'maths', [/otis|mock aime/]],
+  ['math-l5', 'MATH L5', 'maths', [/^math level 5/]],
+  ['frontiermath', 'FrontierMath', 'maths', [/^frontiermath/]],
+  ['ifeval', 'IFEval', 'instructions', [/^ifeval\b/]],
+  ['ifbench', 'IFBench', 'instructions', [/^ifbench\b/]],
+  ['arc-agi-2', 'ARC-AGI-2', 'puzzles', [/^arc-?agi-?2/]],
+  ['arc-agi', 'ARC-AGI', 'puzzles', [/^arc-?agi\b/]],
+  ['swe-bench', 'SWE-bench', 'coding', [/^swe-?bench verified/]],
+  ['terminal-bench', 'Terminal-Bench', 'agents', [/^terminal.?bench/]],
+  ['deepswe', 'DeepSWE', 'agents', [/^deepswe/]],
+  ['simplebench', 'SimpleBench', 'reasoning', [/^simplebench/]],
+  ['chess', 'Chess puzzles', 'puzzles', [/^chess puzzles?/]]];
+// a benchmark's one key, whatever it is called ("Humanity's Last Exam" is HLE)
+function mtBench(name) {
+  const k = String(name || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const b = MT_BENCH.find(([, , , rs]) => rs.some(r => r.test(k)));
+  return b ? { key: b[0], short: b[1], what: b[2] } : null;
+}
+const mtBenchKey = name => (mtBench(name) || {}).key || String(name || '').toLowerCase()
+  .replace(/\s+/g, ' ').trim();
+
+// ---- Thinking: on / off / both — one row a model ---------------------------
+const MT_THINK = [['default', 'as each runs'], ['on', 'on'], ['off', 'off'], ['both', 'both']];
+function mtThink() {
+  const L = lbS();
+  if (L.thinking == null) {
+    try { L.thinking = localStorage.getItem('bench-mt-thinking') || 'default'; }
+    catch (e) { L.thinking = 'default'; }
+  }
+  return L.thinking;
+}
+function mtThinkPill() {
+  const cur = mtThink();
+  return pillMenu('thinking', 'Thinking', MT_THINK, cur, v => {
+    try { localStorage.setItem('bench-mt-thinking', v); } catch (e) { /* private */ }
+    lbS().thinking = v; render(); });
+}
+// a model's rows, one a model: [{m, other}] — m the setting shown, other the
+// other setting when "both" (a sub-row under it). A model's own setting is
+// how its runs ask it: a served model as registered, else its switch's way
+function mtThinkRows(ms) {
+  return mtThinkPick(ms, m => m.id, m => thinkingOf(m)).map(({ x, other }) => ({ m: x, other }));
+}
+// any rows, by an id that ends " · thinking" for the setting on: [{x, other}],
+// in the order their models first came
+function mtThinkPick(items, idOf, plainSetting) {
+  const mode = mtThink(), by = new Map();
+  for (const x of items) {
+    const id = String(idOf(x)), base = id.replace(/ · thinking$/, '');
+    if (!by.has(base)) by.set(base, {});
+    by.get(base)[/ · thinking$/.test(id) ? 'on' : 'plain'] = x;
+  }
+  const out = [];
+  for (const g of by.values()) {
+    const plain = g.plain || null, on = g.on || null;
+    const plainOn = !!plain && plainSetting(plain) === 'on';
+    const own = plainOn ? (on || plain) : (plain || on);
+    let shown = own, other = null;
+    if (mode === 'on') shown = on || (plainOn ? plain : null);
+    else if (mode === 'off') shown = plain && !plainOn ? plain : null;
+    else if (mode === 'both') other = shown === plain ? on : plain;
+    if (shown) out.push({ x: shown, other: other && other !== shown ? other : null });
+  }
+  return out;
+}
+
+// ---- Columns: 9 of 56 ▾ — a tab's own choice, remembered -------------------
+function mtColsShown(view, all, dflt) {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem('bench-mt-cols') || '{}')[view] || null; }
+  catch (e) { saved = ((state.mtCols || {})[view]) || null; }
+  const keys = new Set(all.map(c => c.key));
+  const got = (saved || dflt).filter(k => keys.has(k));
+  return got.length ? got : dflt;
+}
+function mtColsSave(view, keys) {
+  state.mtCols = { ...(state.mtCols || {}), [view]: keys };
+  try {
+    const all = JSON.parse(localStorage.getItem('bench-mt-cols') || '{}');
+    all[view] = keys;
+    localStorage.setItem('bench-mt-cols', JSON.stringify(all));
+  } catch (e) { /* private */ }
+  render();
+}
+function mtColumnsPill(view, all, shown, dflt) {
+  const on = new Set(shown);
+  const btn = el('button', { class: 'pill', id: 'pill-columns', 'data-columns-menu': 'shown',
+    'data-mt-columns': `${shown.length}|${all.length}`,
+    text: `Columns: ${shown.length} of ${all.length} ▾` });
+  return popover(btn, () => {
+    const groups = [...new Set(all.map(c => c.group || ''))];
+    const set = keys => mtColsSave(view, all.map(c => c.key).filter(k => keys.has(k)));
+    return el('div', { class: 'moremenu colmenu-list benchmenu', id: 'pop-columns',
+        'aria-label': 'columns' },
+      groups.map(g => el('div', { class: 'colgroup', 'data-column-group': g || 'all' },
+        g ? el('div', { class: 'small se', text: g }) : '',
+        all.filter(c => (c.group || '') === g).map(c => el('label', { class: 'small' },
+          el('input', { type: 'checkbox', 'data-column': c.key, checked: on.has(c.key) ? '' : null,
+            onchange: e => { const s = new Set(on); e.target.checked ? s.add(c.key) : s.delete(c.key);
+              set(s); } }), ' ' + (c.full || c.label))))),
+      el('div', { class: 'frm' },
+        el('span', { class: 'small se', 'data-columns-shown': `${shown.length}|${all.length}`,
+          text: `${shown.length} of ${all.length} shown` }),
+        el('button', { class: 'quiet', text: 'Show all', 'data-show-all': '1',
+          onclick: () => set(new Set(all.map(c => c.key))) }),
+        el('button', { class: 'quiet', text: 'the default', 'data-columns-default': '1',
+          onclick: () => mtColsSave(view, dflt) })));
+  }, { key: 'columns', menu: false, rebuild: true, inCard: true });
+}
+
+// ---- Tint: one switch for every tab, remembered ----------------------------
+function mtTintSwitch() {
+  const L = lbS();
+  return el('label', { class: 'small tintsw mt-tint' },
+    el('input', { type: 'checkbox', 'data-tint': '1', checked: L.tint ? '' : null,
+      onchange: e => {
+        try { localStorage.setItem('bench-lb-tint', e.target.checked ? 'on' : 'off'); }
+        catch (x) { /* private */ }
+        lbSet({ tint: e.target.checked }); } }), ' Tint');
+}
+
+// ---- modelTable ------------------------------------------------------------
+// spec: {view, attrs, cols, rows, sort: {key, dir}, onSort, rank, groups,
+//        sorted (rows come in their order), extra (rows after the groups),
+//        hideEmpty, cardCols, foot}
+// col:  {key, label (the short name, never cut), sub (what · how many), full
+//        (the whole name, on hover), group (a column group above), score (a
+//        score out of 100: bar, tint, bold), lower, num, attrs}
+// row:  {key, id, href, mark ('here'|'pub'), colour, name, full, line, badges,
+//        group, rank: {text, title}, attrs, cells: {col key: cell}, children}
+// cell: {v (sorted on; a score as a share), text, se, sub, bar (0–1), pub:
+//        {letter, tip}, lead, tip (lines), attrs, notes, pool, why, node}
+const mtS = view => {
+  state.mt = state.mt || {};
+  return (state.mt[view] = state.mt[view] || { showEmpty: false });
+};
+const MT_LEGEND = '● measured here · ○ published · ± standard error · bar = out of 100 · '
+  + 'bold = best in the column';
+const MT_LEGEND_TINT = '● measured here · ○ published · ± standard error · tint = each column’s '
+  + 'lowest to highest · bold = best in the column';
+// the best in a column and those within its noise: measured with measured,
+// each source's numbers with their own — never across them
+function mtLeads(rows, c) {
+  const pools = {};
+  for (const r of rows) {
+    const x = r.cells[c.key];
+    if (!x || x.v == null || x.lead !== undefined || x.noLead) continue;
+    const k = x.pool || (x.pub ? 'pub:' + x.pub.letter : 'here');
+    (pools[k] = pools[k] || []).push({ r, v: x.v, se: x.seV ?? null });
+  }
+  const out = new Set();
+  for (const pool of Object.values(pools)) {
+    if (pool.length < 2) continue;
+    pool.sort((a, b) => c.lower ? a.v - b.v : b.v - a.v);
+    const best = pool[0];
+    for (const x of pool)
+      if (x === best || (x.se != null && best.se != null && x.se + best.se > 0
+          && Math.abs(best.v - x.v) / Math.sqrt(x.se * x.se + best.se * best.se) <= 1.96))
+        out.add(x.r);
+  }
+  return out;
+}
+function mtSortRows(rows, spec) {
+  const s = spec.sort;
+  if (spec.sorted || !s || !s.key) return rows;
+  const v = r => { const x = r.cells[s.key]; return x ? x.sortV ?? x.v : null; };
+  return [...rows].sort((a, b) => {
+    const va = v(a), vb = v(b);
+    if (va == null || vb == null) return (va == null) - (vb == null);
+    return typeof va === 'string' ? s.dir * natCmp(va, vb) : s.dir * (va - vb);
+  });
+}
+function modelTable(spec) {
+  const L = lbS(), tint = !!L.tint, S = mtS(spec.view), cols = spec.cols;
+  // rows with no score in any column shown are hidden, and counted under the table
+  const has = r => r.keep || cols.some(c => { const x = r.cells[c.key];
+    return x && (x.v != null || x.keep); });
+  const empty = spec.hideEmpty === false ? [] : spec.rows.filter(r => !has(r)
+    && !(r.children || []).some(has));
+  const rows = mtSortRows(S.showEmpty ? spec.rows : spec.rows.filter(r => !empty.includes(r)), spec);
+  // two rows never share a name in one table: a published twin of a model
+  // measured here says so; any other pair, the end of its id
+  const named = new Map();
+  for (const r of rows) (named.get(r.name) || named.set(r.name, []).get(r.name)).push(r);
+  for (const rs of named.values()) if (rs.length > 1) for (const r of rs) {
+    if (r.mark === 'pub' && rs.some(x => x.mark !== 'pub')) r.name += ' (published)';
+    else if (rs.filter(x => x.mark === r.mark).length > 1)
+      r.name += ` (${String(r.id || r.key).split('/').pop()})`;
+  }
+  const all = rows.flatMap(r => [r, ...(r.children || [])]);
+  // each column's leaders, and its lowest and highest for the tint
+  const leads = {}, range = {};
+  for (const c of cols) {
+    leads[c.key] = mtLeads(all, c);
+    const vs = all.map(r => (r.cells[c.key] || {}).v).filter(v => typeof v === 'number');
+    if (vs.length) range[c.key] = [Math.min(...vs), Math.max(...vs)];
+  }
+  const sections = spec.groups ? MT_GROUPS.map(([g, label]) => [g, label,
+    rows.filter(r => (r.group || 'open') === g)]).filter(([, , rs]) => rs.length)
+    : [[null, null, rows]];
+  const ncols = cols.length + 1 + (spec.rank ? 1 : 0);
+  const letters = new Set();
+  const heat = (c, v) => {
+    const rg = range[c.key];
+    if (!rg || typeof v !== 'number') return null;
+    let f = rg[1] > rg[0] ? (v - rg[0]) / (rg[1] - rg[0]) : 1;
+    if (c.lower) f = 1 - f;
+    return 1 + Math.min(4, Math.floor(f * 5));
+  };
+  const cell = (r, c, sub) => {
+    const x = r.cells[c.key];
+    const at = { 'data-mt-col': c.key, ...((x && x.attrs) || {}) };
+    if (x && x.node) return el('td', { class: 'mt-c' + (c.num === false ? '' : ' num'), ...at },
+      x.node);
+    if (!x || (x.v == null && x.text == null))
+      return el('td', { class: 'mt-c num mt-none', ...at, title: (x && x.why) || null,
+        'data-tip': x && x.tip ? JSON.stringify(x.tip) : null }, '–');
+    if (x.pub) letters.add(x.pub.letter);
+    const lead = x.lead !== undefined ? !!x.lead : leads[c.key].has(r);
+    const txt = x.text ?? (c.score ? (100 * x.v).toFixed(1) : String(x.v));
+    const h = tint && (c.score || c.heat) && !x.dim ? heat(c, x.v) : null;
+    const bar = c.score && !tint && x.v != null && !x.dim ? (x.bar ?? x.v) : null;
+    return el('td', { class: 'mt-c num tcell' + (lead ? ' lead' : '') + (x.pub ? ' mt-pubc' : '')
+        + (x.dim ? ' dim' : '') + (sub ? ' mt-subc' : ''),
+        style: h ? `background:var(--heat-${h})` : null, 'data-lead': lead ? '1' : null,
+        'data-mt-v': typeof x.v === 'number' ? String(x.v) : null,
+        'data-mt-heat': h ? String(h) : null, tabindex: '0',
+        'data-tip': JSON.stringify([txt + (x.se ? ` ± ${x.se}` : ''),
+          `${r.name} · ${c.full || c.label}`, ...(lead ? ['best in the column, or within its '
+            + 'noise'] : []), ...(x.tip || [])]),
+        ...at },
+      el('span', { class: 'mt-n' + (x.pub ? ' mt-pub' : '') },
+        lead ? el('b', { text: txt }) : txt,
+        x.pub ? el('sup', { class: 'mt-src', 'data-mt-src': x.pub.letter,
+          title: x.pub.tip || MT_LETTERS[x.pub.letter] || '' }, x.pub.url ? el('a', {
+            href: x.pub.url, target: '_blank', rel: 'noopener', 'data-card-link': '1',
+            text: x.pub.letter }) : x.pub.letter) : ''),
+      x.se ? el('span', { class: 'mt-se', text: `±${x.se}` }) : '',
+      x.sub ? el('span', { class: 'mt-sub', 'data-mt-sub': '1', text: x.sub }) : '',
+      bar != null ? el('span', { class: 'mt-bar', 'aria-hidden': 'true' },
+        el('i', { style: `width:${Math.max(0, Math.min(100, 100 * bar)).toFixed(1)}%;`
+          + `background:${r.mark === 'pub' ? 'var(--axis)' : r.colour || 'var(--accent)'}` }))
+        : '',
+      ...(x.notes || []));
+  };
+  const mark = r => el('span', { class: 'mt-mark ' + (r.mark === 'pub' ? 'pub' : 'here'),
+    'data-mt-mark': r.mark, 'aria-label': r.mark === 'pub' ? 'published' : 'measured here',
+    style: r.mark === 'pub' ? null : `background:${r.colour || 'var(--accent)'}` });
+  const nameTd = (r, sub) => el('td', { class: 'mt-name model pin' + (sub ? ' mt-subname' : ''),
+      'data-model': r.id, title: r.full || r.name },
+    el('div', { class: 'mt-nrow' }, sub ? '' : mark(r),
+      r.href ? el('a', { class: 'mname mlink', href: r.href, 'data-mt-name': r.key,
+        text: sub ? r.subLabel || r.name : midTrunc(r.name, 40) })
+        : el('span', { class: 'mname', 'data-mt-name': r.key, text: midTrunc(r.name, 40) }),
+      ...(r.badges || []).filter(Boolean)),
+    !sub && r.line ? el('div', { class: 'mt-line', 'data-mt-line': r.key, text: r.line }) : '');
+  const tr = (r, sub = false) => el('tr', { 'data-mt-row': r.key, 'data-mt-group': r.group || null,
+      'data-mt-pub': r.mark === 'pub' ? '1' : null, ...(r.attrs || {}),
+      // a row's own class (a duplicate's, one a page sent here) beside the table's
+      class: ['clickrow mt-row', sub ? 'mt-sub-row' : '', (r.attrs || {}).class].filter(Boolean)
+        .join(' '),
+      onclick: e => {
+        if (e.target.closest('a, button, input, select, label, .badge[title]')) return;
+        if (r.open) r.open(); else if (r.id) navigate({ model: r.nav || r.id, topic: null });
+      } },
+    spec.rank ? el('td', { class: 'rank pin0 num mt-rank' }, el('span', { class: 'mono',
+      'data-row-n': (r.rank || {}).n || null, text: (r.rank || {}).text ?? '',
+      title: (r.rank || {}).title || null })) : '',
+    nameTd(r, sub), cols.map(c => cell(r, c, sub)));
+  const tbody = el('tbody', {});
+  for (const [g, label, rs] of sections) {
+    if (g) tbody.append(el('tr', { class: 'mt-group', 'data-mt-group-head': g },
+      el('th', { colspan: String(ncols), scope: 'colgroup' }, el('span', { text: label }),
+        (spec.groupNotes || {})[g] ? el('span', { class: 'mt-gnote', text: spec.groupNotes[g] })
+          : '')));
+    for (const r of rs) {
+      tbody.append(tr(r));
+      for (const k of r.children || []) tbody.append(tr(k, true));
+    }
+  }
+  for (const x of spec.extra || []) tbody.append(x);
+  // the header: the short name, never cut, and what it tests under it; groups above
+  const grp = [];
+  for (const c of cols) {
+    const g = c.group || '';
+    if (grp.length && grp[grp.length - 1].g === g) grp[grp.length - 1].n++;
+    else grp.push({ g, n: 1 });
+  }
+  const sorted = c => spec.sort && spec.sort.key === c.key;
+  const th = c => el('th', { class: 'mt-h' + (c.num === false ? '' : ' num')
+        + (spec.onSort && c.sortable !== false ? ' sortable' : ''), scope: 'col',
+      'data-mt-col': c.key, title: c.full || c.label,
+      'aria-sort': sorted(c) ? (spec.sort.dir > 0 ? 'ascending' : 'descending') : 'none',
+      onclick: spec.onSort && c.sortable !== false ? () => spec.onSort(c.key) : null,
+      ...(c.attrs || {}) },
+    el('span', { class: 'mt-h1 hname', text: c.label },
+      sorted(c) ? el('span', { class: 'dir', text: spec.sort.dir > 0 ? ' ▲' : ' ▼' }) : ''),
+    c.sub ? el('span', { class: 'mt-h2', text: c.sub }) : '', ...(c.extra || []));
+  const thead = el('thead', {},
+    spec.colGroups && grp.some(x => x.g) ? el('tr', { class: 'mt-hgroups' },
+      spec.rank ? el('th', { class: 'mt-hg pin0' }) : '', el('th', { class: 'mt-hg model pin' }),
+      grp.map(({ g, n }) => el('th', { colspan: String(n), class: 'mt-hg', scope: 'colgroup',
+        'data-mt-colgroup': g || null, text: g, ...(g && spec.layout
+          ? layoutGroupDrag(spec.layout, g) : {}) }))) : '',
+    el('tr', { class: 'mt-hrow names' },
+      spec.rank ? el('th', { class: 'rank pin0 num mt-h', scope: 'col', text: '#' }) : '',
+      el('th', { class: 'mt-h model pin', scope: 'col', 'data-mt-col': 'name', 'data-lcol': 'name' },
+        el('span', { class: 'mt-h1', text: 'Model' }), ...(spec.layout
+          ? layoutBits(spec.layout, 'name', 'Model', { movable: false }) : [])),
+      cols.map(th)));
+  const table = el('table', { class: 'mt-table' + (tint ? ' tinted' : '')
+      + (spec.rank ? ' mt-ranked' : ''), 'data-model-table': spec.view, 'data-lb-table': '1',
+    ...(spec.layout ? layoutAttrs(spec.layout) : {}), ...(spec.attrs || {}) }, thead, tbody);
+  if (spec.layout) layoutApply(table);
+  // under 640 px: a card a model — its mark, name and line, its four headline scores
+  const cardCols = (spec.cardCols ? spec.cardCols.map(k => cols.find(c => c.key === k))
+    : cols.filter(c => c.score || c.card)).filter(Boolean).slice(0, 4);
+  const card = r => el('div', { class: 'mt-card clickrow', 'data-mt-card': r.key, role: 'link',
+      tabindex: '0', 'data-mt-group': r.group || null,
+      onclick: e => { if (e.target.closest('a, button, input, select, label')) return;
+        if (r.open) r.open(); else if (r.id) navigate({ model: r.nav || r.id, topic: null }); },
+      onkeydown: e => { if (e.key === 'Enter') e.currentTarget.click(); } },
+    el('div', { class: 'mt-nrow' }, mark(r), el('span', { class: 'mname', text: r.name }),
+      ...(r.badges || []).filter(Boolean)),
+    r.line ? el('div', { class: 'mt-line', text: r.line }) : '',
+    el('div', { class: 'mt-cscores' }, cardCols.map(c => {
+      const x = r.cells[c.key];
+      const none = !x || (x.v == null && x.text == null);
+      const txt = none ? '–' : x.text ?? (c.score ? (100 * x.v).toFixed(1) : String(x.v));
+      return el('div', { class: 'mt-cs', 'data-mt-card-col': c.key },
+        el('span', { class: 'mt-cs-h', text: c.label }),
+        el('span', { class: 'mt-n' + (x && x.pub ? ' mt-pub' : '') + (none ? ' mt-none' : '') },
+          txt, x && x.pub ? el('sup', { class: 'mt-src', text: x.pub.letter }) : ''),
+        !none && c.score && x.v != null && !x.dim ? el('span', { class: 'mt-bar' },
+          el('i', { style: `width:${Math.max(0, Math.min(100, 100 * (x.bar ?? x.v))).toFixed(1)}%;`
+            + `background:${r.mark === 'pub' ? 'var(--axis)' : r.colour || 'var(--accent)'}` }))
+          : '');
+    })));
+  const sortable = cols.filter(c => c.sortable !== false && spec.onSort);
+  const cards = el('div', { class: 'mt-cards', 'data-mt-cards': spec.view },
+    sortable.length ? el('label', { class: 'small mt-sortsel' }, 'Sort ▾ ',
+      el('select', { 'data-mt-sort': '1', 'aria-label': 'sort by',
+        onchange: e => spec.onSort(e.target.value) },
+        sortable.map(c => el('option', { value: c.key, selected: sorted(c) ? '' : null,
+          text: c.label })))) : '',
+    sections.map(([g, label, rs]) => [g ? el('div', { class: 'mt-cgroup', text: label }) : '',
+      ...rs.map(card)]));
+  const key = [...letters].sort().map(k => `${k} ${MT_LETTERS[k] || k}`).join(' · ');
+  return el('div', { class: 'mt', 'data-mt': spec.view },
+    el('div', { class: 'mt-legend small se', 'data-mt-legend': '1' },
+      el('span', { text: tint ? MT_LEGEND_TINT : MT_LEGEND }), mtTintSwitch()),
+    el('div', { class: 'mt-wide' }, hfade('mt-' + spec.view, el('div', { class: 'mt-box',
+      'data-hkeep': 'mt-' + spec.view }, table))),
+    cards,
+    key ? el('p', { class: 'small se mt-key', 'data-mt-letters': [...letters].sort().join(''),
+      text: 'Published numbers in italics, by source: ' + key }) : '',
+    empty.length ? el('p', { class: 'small se mt-empty', 'data-mt-empty': String(empty.length) },
+      S.showEmpty ? `${empty.length} model${empty.length === 1 ? ' has' : 's have'} no score in `
+        + 'these columns · ' : `${empty.length} more model${empty.length === 1 ? ' has' : 's have'}`
+        + ' no score in these columns · ',
+      el('button', { class: 'quiet', 'data-mt-empty-toggle': '1', text: S.showEmpty
+        ? 'hide them' : 'show them', onclick: () => { S.showEmpty = !S.showEmpty; render(); } }))
+      : '',
+    ...(spec.foot || []));
+}
+// a board model as a row of modelTable: its mark, name, line and group
+function mtRowOf(m, o = {}) {
+  const parts = nameParts(m.name, { measured: true, basedOn: mtBasedOn(m) });
+  const group = o.group || mtGroup(m);
+  const maker = group === 'ours' ? '' : o.maker ?? (String(m.dmHome || m.rowOf || m.id)
+    .includes('/') && !/^(served|gguf|local)\//.test(m.dmHome || m.rowOf || m.id)
+    ? String(m.dmHome || m.rowOf || m.id).split('/')[0] : '');
+  return { key: o.key || m.id, id: m.id, nav: m.rowOf || m.dmHome || m.id,
+    href: '#model=' + encodeURIComponent(m.rowOf || m.dmHome || m.id), mark: 'here',
+    colour: mtColour(m), name: mtNameOf(parts), full: `${m.name}\n${m.id}`,
+    line: mtLine(m, { parts, group, maker, thinking: thinkingOf(m) }), group,
+    attrs: o.attrs || {}, cells: o.cells || {}, badges: o.badges || [] };
+}
 // 12b: Models — the Leaderboard and the Models tab, one table. A switch for
 // the kind of test; a row opens the model page; models with nothing in this
 // view sit under one line at the bottom, not in rows of dashes
@@ -13752,22 +14368,14 @@ function frHere(name) {
         return g ? { v: g.v, se: g.se ?? null, tag: 'measured here · llama.cpp, 0-shot',
           set: 'measured here · llama.cpp, 0-shot' } : null; } }))];
 }
-// 17f: a Frontier score's where — every box its shards came from — and a
-// link to each Runs row it came from
-function frWhere(h) {
-  return el('div', { class: 'small se fr-where', 'data-fr-where': h.where },
-    `ran on ${h.where}`, ...(h.runs || []).flatMap(sid => [' · ', el('a', {
-      href: '#tab=runs', 'data-fr-run': String(sid), text: '#' + sid,
-      onclick: () => { state.qQ = `#${sid} `; state.qStatus = 'all'; state.qWhere = 'all'; } })]));
-}
 // 12n.2: the benchmarks measured here that the Frontier view always shows
 const FR_SHARED_12N = ['GPQA Diamond', 'SimpleQA Verified'];
 // 17: and every Frontier benchmark run as Epoch AI runs it, under the name
 // others report it by (its column)
 const frShared = () => [...new Set([...FR_SHARED_12N,
-  ...Object.values(FB()).map(b => b.column || b.label)].map(frKey))]
+  ...Object.values(FB()).map(b => b.column || b.label)].map(mtBenchKey))]
   .map(k => [...FR_SHARED_12N, ...Object.values(FB()).map(b => b.column || b.label)]
-    .find(x => frKey(x) === k));
+    .find(x => mtBenchKey(x) === k));
 const caps = s => (String(s).match(/[A-Z]/g) || []).length;
 // every reported benchmark: its name, its group, how many imported models
 // have it, and whether it is one of the defaults — reported for at least
@@ -13775,7 +14383,8 @@ const caps = s => (String(s).match(/[A-Z]/g) || []).length;
 function frColumns() {
   const R = REP(), by = new Map();
   for (const s of R.scores || []) {
-    const k = frKey(s.benchmark);
+    // 27: one column a benchmark — HLE is Humanity's Last Exam, MMLU-Pro is MMLU Pro
+    const k = mtBenchKey(s.benchmark);
     if (!by.has(k)) by.set(k, { key: k, names: {}, models: new Set() });
     const c = by.get(k);
     c.names[s.benchmark] = (c.names[s.benchmark] || 0) + 1;
@@ -13785,16 +14394,17 @@ function frColumns() {
   return [...by.values()].map(c => {
     const name = Object.keys(c.names).sort((a, b) => caps(b) - caps(a)
       || c.names[b] - c.names[a])[0];
-    const here = frHere(name);
+    // what the board measures of it, under any of its names
+    const here = [...new Map(Object.keys(c.names).flatMap(frHere).map(h => [h.key, h])).values()];
     const measured = DATA.models.some(m => here.some(h => h.get(m)));
     const [g, i, group] = frPlace(name);
     return { key: c.key, name, group, g, i, here, n: c.models.size, measured,
       // 12n.2's two always; 17's catalogue once measured here (the coverage rule)
-      dflt: 2 * c.models.size >= n || measured || FR_SHARED_12N.some(x => frKey(x) === c.key) };
-  }).concat(frShared().filter(x => !by.has(frKey(x))).map(name => {
+      dflt: 2 * c.models.size >= n || measured || FR_SHARED_12N.some(x => mtBenchKey(x) === c.key) };
+  }).concat(frShared().filter(x => !by.has(mtBenchKey(x))).map(name => {
     // 12n.2: measured here before anyone reports it — a column of ours alone
     const here = frHere(name), [g, i, group] = frPlace(name);
-    return { key: frKey(name), name, group, g, i, here, n: 0, dflt: true,
+    return { key: mtBenchKey(name), name, group, g, i, here, n: 0, dflt: true,
       measured: DATA.models.some(m => here.some(h => h.get(m))) };
   }).filter(c => c.measured))
     .sort((a, b) => a.g - b.g || a.i - b.i || b.n - a.n || natCmp(a.name, b.name));
@@ -13802,13 +14412,13 @@ function frColumns() {
 // a model's cell in a column: its reported numbers (the source's own run
 // first) and its number measured here
 function frCell(m, c) {
-  const reps = (REP().scores || []).filter(s => s.model === m.id && frKey(s.benchmark) === c.key)
+  const reps = (REP().scores || []).filter(s => s.model === m.id && mtBenchKey(s.benchmark) === c.key)
     .sort((a, b) => frRank(a) - frRank(b));
   const here = m.reportedOnly ? null : c.here.map(h => h.get(m)).find(Boolean) || null;
   // 12o.1: a thinking row is its model thinking — what is reported for the
   // model is its calibration too, shown beside it and never ranked again
   const own = m.thinkingRow && here && !reps.length ? (REP().scores || []).filter(s =>
-    s.model === m.id.replace(/ · thinking$/, '') && frKey(s.benchmark) === c.key)
+    s.model === m.id.replace(/ · thinking$/, '') && mtBenchKey(s.benchmark) === c.key)
     .sort((a, b) => frRank(a) - frRank(b)) : [];
   return own.length ? { rep: own[0], reps: own, here, borrowed: true }
     : { rep: reps[0] || null, reps, here };
@@ -13883,181 +14493,140 @@ const FR_CAL = 'Same questions, different prompt and settings. A large gap means
 function lbFrontier(ms) {
   const L = lbS(), F = state.fr = state.fr || { all: false, sort: null };
   const card = el('div', { class: 'card', 'data-lb-card': '1', 'data-frontier': '1' },
-    ...modelsHead(), lbToolbar(ms, lbColumns(ms), new Set(), 0),
-    // 12q.B: DeviceMark's on-device board, our phone builds on it
-    el('p', { class: 'small', 'data-frontier-ondevice': '1' },
-      'On a phone: DeviceMark’s board and our phone builds, by their protocol — ',
-      el('a', { href: '#', 'data-frontier-ondevice-go': '1', text: 'Mobile ▸ DeviceMark ▸ Chart',
-        onclick: e => { e.preventDefault(); lbOnDeviceGo(); } })));
+    ...modelsHead());
+  const ondevice = el('p', { class: 'small', 'data-frontier-ondevice': '1' },
+    'On a phone: DeviceMark’s board and our phone builds, by their protocol — ',
+    el('a', { href: '#', 'data-frontier-ondevice-go': '1', text: 'Mobile ▸ DeviceMark ▸ Chart',
+      onclick: e => { e.preventDefault(); lbOnDeviceGo(); } }));
   if (!state.rep.loaded) {
-    card.append(el('p', { class: 'small se', 'data-frontier-loading': '1',
-      text: 'Loading what others report…' }));
+    card.append(lbToolbar(ms, lbColumns(ms), new Set(), 0), ondevice,
+      el('p', { class: 'small se', 'data-frontier-loading': '1', text: 'Loading what others report…' }));
     return [card];
   }
   const every = frColumns();
   if (!every.length) {
-    card.append(empty('Nothing reported yet: AI models ▸ Outside data ▸ Import now reads Epoch '
+    card.append(lbToolbar(ms, lbColumns(ms), new Set(), 0), ondevice,
+      empty('Nothing reported yet: AI models ▸ Outside data ▸ Import now reads Epoch '
       + 'AI’s file.', 'AI models', () => navigate({ tab: 'ai', model: null, topic: null }),
       { 'data-frontier-none': '1' }));
     return [card];
   }
-  const ndef = every.filter(c => c.dflt).length;
-  // 12o.1: in the order they were left in, within their groups
-  const cols = layoutOrder('frontier', F.all || !ndef ? every : every.filter(c => c.dflt),
-    { keyOf: c => c.key, groupOf: c => c.group });
-  const rows = frRows(cols);
-  const leads = Object.fromEntries(cols.map(c => [c.key, frLeaders(rows, c)]));
-  // sorted by a column: a flat list, one with no number in it at the bottom;
-  // else by maker, the imported makers first and ours last
-  const sortC = F.sort && cols.find(c => c.key === F.sort.key);
-  const sv = (r, c) => { const x = frCell(r.m, c);
-    return x.rep ? x.rep.value : x.here ? x.here.v : null; };
-  const makers = [...new Set([...((REP().settings || {}).makers || []),
-    ...rows.map(r => r.maker).filter(Boolean).sort(natCmp)])];
-  const mk = r => r.maker == null ? makers.length : makers.indexOf(r.maker);
-  const ordered = [...rows].sort((a, b) => {
-    if (sortC) {
-      const va = sv(a, sortC), vb = sv(b, sortC);
-      if (va == null || vb == null) return (va == null) - (vb == null);
-      return F.sort.dir * (va - vb);
-    }
-    return mk(a) - mk(b) || natCmp(a.m.name, b.m.name);
-  });
-  const groups = [];
-  for (const c of cols) {
-    if (groups.length && groups[groups.length - 1].g === c.group) groups[groups.length - 1].n++;
-    else groups.push({ g: c.group, n: 1 });
-  }
-  const pct1 = v => (100 * v).toFixed(1);
-  const td = (r, c) => {
-    const x = frCell(r.m, c), lead = leads[c.key];
-    if (!x.rep && !x.here) return el('td', { class: 'num', 'data-fr-cell': c.key });
-    const rl = x.rep && lead.has(r.m.id + '|rep'), hl = x.here && lead.has(r.m.id + '|here');
-    const tint = (rl || hl) && L.tint ? 'background:var(--heat-3)' : null;
-    const b = (on, t) => on ? el('b', { text: t }) : t;
-    // a value its source took from another: a small mark, the source in the tooltip
-    const mark = x.rep && repElse(x.rep) ? el('sup', { class: 'fr-mark', text: '†',
-      title: x.rep.setting }) : '';
-    // 14.4.4: a restricted source's badge in its number's tooltip
-    const repTip = x.rep ? [`${repShow(x.rep)} · ${repTag(x.rep)}${rWords(repRestrict(x.rep.source))}`,
-      ...(x.rep.url ? [x.rep.url] : []),
-      ...(x.rep.date ? ['as of ' + x.rep.date] : []),
-      ...x.reps.slice(1).map(s => `also ${repShow(s)} · ${repTag(s)}`)] : [];
-    // each part says its setting and value: what it is ranked with, and how
-    const hereAt = { 'data-fr-set': 'here|' + ((x.here || {}).set || (x.here || {}).tag),
-      'data-fr-v': x.here
-      ? String(x.here.v) : null, 'data-fr-lead': hl ? '1' : null };
-    const repAt = { 'data-fr-set': x.rep ? `${x.rep.source}|${x.rep.setting}` : null,
-      'data-fr-v': x.rep ? String(x.rep.value) : null, 'data-fr-lead': rl ? '1' : null };
-    if (x.rep && x.here) {
-      // 12o.1: and whether ours thought first — Epoch's GPQA does, with reasoning
-      const th = thinkingOf(r.m);
-      return el('td', { class: 'num tcell fr-cal', 'data-fr-cell': c.key, 'data-fr-cal': r.m.id,
-          'data-fr-thinking': th, style: tint, tabindex: '0', 'data-tip': JSON.stringify([FR_CAL]) },
-        el('span', { class: 'fr-here', ...hereAt }, 'measured here ', b(hl, pct1(x.here.v)),
-          th ? el('span', { class: 'se fr-think', text: ` (thinking ${th})` }) : ''),
-        el('span', { class: 'se', text: ' · ' }),
-        el('span', { class: 'fr-rep', ...(x.borrowed ? { 'data-fr-borrowed': '1' } : repAt) },
-          `${REP_SHORT[x.rep.source] || x.rep.source} `, b(rl, repShow(x.rep)), mark));
-    }
-    if (x.here)
-      return el('td', { class: 'num tcell fr-here', 'data-fr-cell': c.key, 'data-fr-here': r.m.id,
-          'data-lead': hl ? '1' : null, style: tint, tabindex: '0', ...hereAt,
-          'data-tip': JSON.stringify([`${pct1(x.here.v)}`
-            + (x.here.se ? ` ± ${pct1(x.here.se)}` : ''), `${r.m.name} · ${c.name}`, x.here.tag,
-            ...(x.here.was ? [x.here.was] : []),
-            'ranked only with the cells measured the same way here'])},
-        b(hl, pct1(x.here.v)), el('div', { class: 'small se fr-tag', text: x.here.tag }),
-        x.here.differs ? el('div', { class: 'small warntext', 'data-fr-grader-differs': r.m.id,
-          text: x.here.differs }) : '',
-        x.here.where ? frWhere(x.here) : '',
-        // 17i: shards imported and held, waiting for the rest — the score is
-        // the answers here before
-        x.here.held ? el('div', { class: 'small warntext', 'data-fr-shards-held': r.m.id,
-          text: x.here.held }) : '',
-        // 18d point 2: a score that changed says what it was, where it is
-        x.here.was ? el('div', { class: 'small se', 'data-fr-was': r.m.id,
-          text: x.here.was }) : '');
-    return el('td', { class: 'num tcell', 'data-fr-cell': c.key, 'data-fr-rep': r.m.id,
-        'data-fr-setting': x.rep.setting, 'data-lead': rl ? '1' : null, style: tint, tabindex: '0',
-        ...repAt,
-        'data-tip': JSON.stringify([`${r.m.name} · ${c.name}`, ...repTip]) },
-      b(rl, repShow(x.rep)), mark,
-      // 25c: a model card's number, whose page it is on, with its link
-      x.rep.source === 'card' && x.rep.published_by ? el('div', { class: 'small se fr-tag',
-        'data-fr-published': r.m.id }, x.rep.url ? el('a', { href: x.rep.url, target: '_blank',
-          rel: 'noopener', text: `published by ${x.rep.published_by}` })
-          : `published by ${x.rep.published_by}`) : '');
+  // 27: Columns ▾ — the ones reported for at least half the imported models, and
+  // those measured here too, by default; a tab's choice remembered
+  const asCol = c => {
+    const b = mtBench(c.name) || {};
+    const t = (c.here.find(h => !String(h.key).startsWith('gguf:')) || {}).key;
+    const n = t ? Math.max(0, ...DATA.models.map(m => (cell(t, m.id) || {}).answers || 0)) : 0;
+    return { key: c.key, label: b.short || c.name, full: c.name, group: c.group, score: true,
+      sub: [b.what, n ? mtAskedShort(n, { epochs: (FB()[t] || {}).epochs || 1 }) : ''].filter(Boolean)
+        .join(' · '),
+      attrs: { 'data-fr-col': c.key, ...layoutDrag('frontier', c.key, c.group),
+        'data-tip': JSON.stringify([c.name, `reported for ${c.n} of `
+          + `${(REP().models || []).length} imported models`
+          + (c.measured ? ' · measured here too' : '')]) },
+      extra: layoutBits('frontier', c.key, c.name) };
   };
-  const frShort = shortNames(rows.map(r => r.m.name), 26);
-  const nameCell = r => el('td', { class: 'model pin', 'data-model': r.m.id,
-      title: r.m.reportedOnly ? 'not run here: only what others report' : r.m.id },
-    el('div', { class: 'mcell' },
-      // 25c: one known only as published opens its own page too
-      r.m.reportedOnly ? el('a', { class: 'mname', href: '#model=' + encodeURIComponent(r.m.id),
-        'data-fr-page': r.m.id, text: r.m.name })
-        : mnameLink(r.m, frShort, { href: '#model=' + encodeURIComponent(r.m.id) }),
-      !r.m.reportedOnly ? el('span', { class: 'badge', 'data-fr-ours': r.m.id,
-        title: 'measured on this board', text: 'ours' }) : '',
-      !r.m.reportedOnly ? thinkBadge(r.m, true) : '',
-      sortC ? el('span', { class: 'se small', text: ' ' + (r.maker || 'measured here') }) : ''));
-  const ncol = cols.length + 1;
-  const tbody = el('tbody', {});
-  let last;
-  for (const r of ordered) {
-    const g = r.maker == null ? 'Measured here' : r.maker;
-    if (!sortC && g !== last) {
-      const as = [...new Set(rows.filter(x => x.maker === r.maker).map(x => x.makerAs)
-        .filter(a => a && a !== r.maker))];
-      tbody.append(el('tr', { class: 'cmp-group', 'data-fr-maker': g },
-        el('th', { colspan: String(ncol), scope: 'colgroup', title: as.length
-          ? `${g}: the source files some of these under ${as.map(a => `“${a}”`).join(', ')}` : null,
-          text: g })));
-      last = g;
-    }
-    tbody.append(el('tr', { 'data-fr-row': r.m.id, class: 'clickrow',
-      onclick: e => { if (e.target.closest('a, button')) return;
-        navigate({ model: r.m.id, topic: null }); } }, nameCell(r), cols.map(c => td(r, c))));
+  const dflt = every.filter(c => c.dflt).map(c => c.key);
+  const shown = mtColsShown('frontier', every.map(c => ({ key: c.key })), dflt);
+  // 12o.1: in the order they were left in, within their groups
+  const cols = layoutOrder('frontier', every.filter(c => shown.includes(c.key)),
+    { keyOf: c => c.key, groupOf: c => c.group });
+  const listed = frRows(cols);
+  const leads = Object.fromEntries(cols.map(c => [c.key, frLeaders(listed, c)]));
+  const pct1 = v => (100 * v).toFixed(1);
+  // a number measured here: its setting on hover, a warning under it when it has one
+  const hereCell = (m, c, x) => {
+    const h = x.here;
+    return { v: h.v, text: pct1(h.v), se: h.se ? pct1(h.se) : null, seV: h.se || null,
+      lead: leads[c.key].has(m.id + '|here'),
+      // 17f: where it ran and the Runs rows it came from, on hover
+      tip: [h.tag, ...(h.where ? [`ran on ${h.where}` + ((h.runs || []).length ? ' · runs '
+        + h.runs.map(x => '#' + x).join(' ') : '')] : []), ...(h.was ? [h.was] : []),
+      'ranked only with the cells measured the same way here'],
+      attrs: { 'data-fr-cell': c.key, 'data-fr-here': m.id, 'data-fr-set': 'here|' + (h.set || h.tag),
+        'data-fr-v': String(h.v), 'data-fr-lead': leads[c.key].has(m.id + '|here') ? '1' : null,
+        'data-fr-thinking': thinkingOf(m) },
+      notes: [h.differs ? el('div', { class: 'cellnote warn', 'data-fr-grader-differs': m.id,
+        text: h.differs }) : '',
+      // 17i: shards imported and held, waiting for the rest
+      h.held ? el('div', { class: 'cellnote warn', 'data-fr-shards-held': m.id, text: h.held }) : '',
+      // 18d point 2: a score that changed says what it was
+      h.was ? el('div', { class: 'cellnote', 'data-fr-was': m.id, text: h.was }) : '']
+        .filter(Boolean) };
+  };
+  // a published number: italics and its source's letter, the rest on hover
+  const repCell = (m, c, x, maker) => {
+    const r = x.rep, lead = leads[c.key].has(m.id + '|rep');
+    const letter = mtLetter(r.source, r.published_by || maker);
+    return { v: r.unit === 'points' ? r.value / 100 : r.value, text: repShow(r) + (repElse(r) ? '†' : ''),
+      se: r.se ? (r.unit === 'points' ? r.se.toFixed(1) : pct1(r.se)) : null,
+      seV: r.se != null ? (r.unit === 'points' ? r.se / 100 : r.se) : null, lead,
+      pub: { letter, url: r.source === 'card' ? r.url : '', tip: `${MT_LETTERS[letter]} · ${repTag(r)}` },
+      tip: [`${repShow(r)} · ${repTag(r)}${rWords(repRestrict(r.source))}`,
+        ...(r.url ? [r.url] : []), ...(r.date ? ['as of ' + r.date] : []),
+        ...(repElse(r) ? [`† ${r.setting}`] : []),
+        ...x.reps.slice(1).map(s => `also ${repShow(s)} · ${repTag(s)}`)],
+      // 25c: a model card's number says whose page it is on: its letter links it
+      attrs: { 'data-fr-cell': c.key, 'data-fr-rep': m.id, 'data-fr-setting': r.setting,
+        'data-fr-set': `${r.source}|${r.setting}`, 'data-fr-v': String(r.value),
+        'data-fr-lead': lead ? '1' : null,
+        'data-fr-published': r.source === 'card' && r.published_by ? r.published_by : null } };
+  };
+  const rows = [];
+  // ours, and every model measured here: one row a model, its numbers measured here
+  const measured = listed.filter(r => !r.m.reportedOnly);
+  const byId = new Map(listed.map(r => [r.m.id, r]));
+  for (const { m, other } of mtThinkRows(measured.map(r => r.m))) {
+    const hereRow = mm => mtRowOf(mm, { attrs: { 'data-fr-row': mm.id, 'data-lb-row': mm.id },
+      cells: Object.fromEntries(cols.map(c => { const x = frCell(mm, c);
+        return [c.key, x.here ? hereCell(mm, c, x) : { v: null, attrs: { 'data-fr-cell': c.key } }];
+      })) });
+    rows.push({ ...hereRow(m), children: other ? [{ ...hereRow(other),
+      subLabel: `thinking ${thinkingOf(other) || 'on'}` }] : [] });
   }
-  const thead = el('thead', {},
-    el('tr', { class: 'grp' }, el('th', { class: 'grp nogrp', scope: 'colgroup' }),
-      groups.map(({ g, n }) => el('th', { colspan: String(n), class: 'grp', scope: 'colgroup',
-        'data-fr-group': g, text: g, ...layoutGroupDrag('frontier', g) }))),
-    el('tr', { class: 'names' }, el('th', { class: 'model pin', scope: 'col', 'data-lcol': 'name' },
-        'Model', ...layoutBits('frontier', 'name', 'Model', { movable: false })),
-      cols.map(c => {
-        const on = sortC === c;
-        return el('th', { class: 'num sortable', scope: 'col', 'data-fr-col': c.key,
-            ...layoutDrag('frontier', c.key, c.group),
-            'aria-sort': on ? (F.sort.dir > 0 ? 'ascending' : 'descending') : 'none',
-            'data-tip': JSON.stringify([c.name, `reported for ${c.n} of `
-              + `${(REP().models || []).length} imported models`
-              + (c.measured ? ' · measured here too' : '')]),
-            onclick: () => { F.sort = { key: c.key, dir: on ? -F.sort.dir : -1 }; render(); } },
-          el('span', { class: 'hname', text: midTrunc(c.name, 18) }),
-          on ? el('span', { class: 'dir', text: F.sort.dir > 0 ? ' ▲' : ' ▼' }) : '',
-          ...layoutBits('frontier', c.key, c.name));
-      })));
+  // a model measured here that others report too: a second row, theirs
+  for (const r of [...measured, ...listed.filter(x => x.m.reportedOnly)]) {
+    const m = r.m, cells = {};
+    let any = false;
+    for (const c of cols) {
+      const x = frCell(m, c);
+      if (x.rep && !x.borrowed) { cells[c.key] = repCell(m, c, x, r.maker); any = true; }
+      else cells[c.key] = { v: null, attrs: { 'data-fr-cell': c.key } };
+    }
+    if (!m.reportedOnly && !any) continue;
+    const maker = r.maker && r.maker !== 'other' ? r.maker : '';
+    const parts = nameParts(m.name, { measured: !m.reportedOnly });
+    const group = mtGroup(m, true, maker);
+    rows.push({ key: m.id + (m.reportedOnly ? '' : '|published'), id: m.id, nav: m.id,
+      href: '#model=' + encodeURIComponent(m.id), mark: 'pub', name: m.reportedOnly
+        ? displayName(m) : displayName(m), group, full: `${m.name}\n${byId.get(m.id).makerAs
+        || maker}`,
+      line: [maker, group === 'open' ? 'open' : 'closed', ...parts.line,
+        parts.thinking ? `thinking ${parts.thinking}` : ''].filter(Boolean).join(' · '),
+      attrs: { 'data-fr-row': m.reportedOnly ? m.id : m.id + '|published',
+        'data-fr-page': m.reportedOnly ? m.id : null }, cells });
+  }
+  F.sort = F.sort && cols.some(c => c.key === F.sort.key) ? F.sort
+    : { key: (cols[0] || {}).key, dir: -1 };
   card.append(
+    lbToolbar(ms, lbColumns(ms), new Set(), 0, null, mtColumnsPill('frontier', every.map(c =>
+      ({ key: c.key, label: c.name, full: c.name, group: c.group })), shown, dflt)),
+    ondevice,
     el('p', { class: 'small', 'data-frontier-credit': '1' }, frCredit(), ...frBadges()),
     el('p', { class: 'small se', 'data-frontier-cols': `${cols.length}|${every.length}` },
-      F.all ? `All ${every.length} benchmarks reported. ` : `The ${ndef} benchmarks reported for at `
-        + `least half of the ${(REP().models || []).length} imported models, and those measured `
-        + 'here too. ',
-      ndef < every.length ? el('button', { class: 'quiet', 'data-frontier-all': '1',
-        'aria-pressed': String(!!F.all), text: F.all ? `Only the ${ndef} ▸`
-          : `All ${every.length} benchmarks ▸`, onclick: () => { F.all = !F.all; render(); } }) : '',
-      sortC ? [' · ', el('button', { class: 'quiet', 'data-frontier-bymaker': '1',
-        text: 'by maker', onclick: () => { F.sort = null; render(); } })] : ''),
-    rows.length ? hfade('fr', el('div', { class: 'lb-wrap stick', 'data-hkeep': 'fr' },
-      layoutApply(el('table', { class: 'lb norank frtable' + (L.tint ? ' tinted' : ''),
-        'data-frontier-table': '1', ...layoutAttrs('frontier') }, thead, tbody))))
+      `${cols.length} of the ${every.length} benchmarks reported; by default the ${dflt.length} `
+      + `reported for at least half of the ${(REP().models || []).length} imported models, and `
+      + 'those measured here too.'),
+    rows.length ? modelTable({ view: 'frontier', attrs: { 'data-frontier-table': '1' },
+      cols: cols.map(asCol), rows, groups: true, colGroups: true, layout: 'frontier',
+      sort: F.sort, onSort: k => { F.sort = { key: k, dir: F.sort.key === k ? -F.sort.dir : -1 };
+        render(); },
+      foot: [el('p', { class: 'lbcap', text: 'Bold is the best of the cells with one setting — '
+        + 'Epoch AI’s own runs with each other, one outside source with itself, ours measured '
+        + 'here with ours; the rest aren’t ranked against them. † a value the source took from '
+        + 'elsewhere, named in its tooltip. Nothing here is averaged.' })] })
       : el('p', { class: 'note', 'data-frontier-empty': '1', text: 'None of the chosen models '
-        + 'has a number in these columns: Models ▾ chooses them.' }),
-    el('p', { class: 'lbcap', text: 'Bold is the best of the cells with one setting — Epoch AI’s '
-      + 'own runs with each other, one outside source with itself, ours measured here with '
-      + 'ours; the rest aren’t ranked against them. † a value the source took from elsewhere, '
-      + 'named in its tooltip. Nothing here is averaged.' }));
+        + 'has a number in these columns: Models ▾ chooses them.' }));
   return [card];
 }
 // ---- 12q.B: the On-device chart --------------------------------------------
@@ -14351,85 +14920,114 @@ function dmDeviceForm(r) {
     el('button', { class: 'quiet', text: 'Cancel',
       onclick: () => { D.edit = null; D.formMsg = ''; render(); } }), ' ', note);
 }
-function dmTable(rows) {
+// 27: DeviceMark's rows through modelTable — theirs as published (D), ours
+// measured here, each our run of their model a row of its own under its mark;
+// the rank and its interval rule as before
+function dmSpec(rows) {
   const D = state.dm;
   const sel = D.sel || new Set(rows.filter(r => !r.external).slice(0, 4).map(r => r.id));
   const tick = r => el('input', { type: 'checkbox', checked: sel.has(r.id) ? '' : null,
     'data-dm-sel': r.id, 'aria-label': `accuracy against budget: ${r.name}`,
     onchange: e => { const s = new Set(sel); e.target.checked ? s.add(r.id) : s.delete(r.id);
       D.sel = s; render(); } });
-  const ci = r => dmCi(r) ? ` ±${(50 * (dmCi(r)[1] - dmCi(r)[0])).toFixed(1)}` : '';
-  // a row with our run of it: theirs over ours — "theirs (int8, scored on a Mac; speed on iPhone 17 Pro): X", "ours (bf16, …): Y"
-  const both = (r, f, whole) => !(r.ours || []).length ? f(r)
-    : [el('span', { 'data-dm-theirs': r.id, text: (whole ? `theirs (${r.label}): ` : '') + f(r) }),
-      ...r.ours.map(o => el('span', { 'data-dm-ours': o.id,
-        text: (whole ? `ours (${o.label}): ` : '') + f(o) }))];
-  const num = r => 'num' + ((r.ours || []).length ? ' dmpair' : '');
-  const pairTip = r => (r.ours || []).length ? JSON.stringify(['theirs · ' + r.ours.map(o =>
-    `ours (${o.label})`).join(' · ')]) : null;
-  const ret = r => !r.retention || r.external ? '—' : el('span', { 'data-dm-retention': r.id,
+  const half = x => dmCi(x) ? (50 * (dmCi(x)[1] - dmCi(x)[0])).toFixed(1) : null;
+  const ret = r => !r.retention || r.external ? null : el('span', { 'data-dm-retention': r.id,
     'data-tip': JSON.stringify([`${r.name} ÷ ${r.retention.of}`, 'the phone build’s score over '
       + 'the original’s, per bench: the same items, the same thinking mode, no lookahead']) },
     ['ifeval', 'mmlu_pro', 'math'].map(b => r.retention[b] == null ? '—'
       : (100 * r.retention[b]).toFixed(0) + '%').join(' · '));
-  const head = ['#', 'Model / setup', 'Composite', 'IFEval', 'MMLU-Pro', 'MATH', 'Answered',
-    'Median tokens', 'Device tok/s', 'Server tok/s', 'Retention', 'Budget'];
-  return el('table', { class: 'lb norank dmtable', 'data-dm-table': '1' },
-    el('thead', {}, el('tr', {}, head.map(h => el('th', { class: /^(Model|#)/.test(h) ? '' : 'num',
-      scope: 'col', text: h })))),
-    el('tbody', {}, rows.map(r => el('tr', { 'data-dm-row': r.id,
-        'data-dm-external': r.external ? '1' : null,
-        class: r.id === D.flash ? 'dmfocus' : null },
-      el('td', { 'data-dm-rank': r.id, text: r.rank || (r.kind === 'cloud' ? '☁' : ''),
-        'data-tip': r.kind === 'cloud' ? JSON.stringify(['a cloud API: not ranked, as on '
-          + 'DeviceMark’s board']) : null }),
-      el('td', {}, el('span', { text: r.name }), ' ',
-        el('span', { class: 'badge', 'data-dm-whose': r.external ? 'theirs' : 'ours',
-          'data-tip': JSON.stringify(dmTip(r)),
-          text: r.external ? 'DeviceMark' + ((r.ours || []).length ? ' · and ours' : '') : 'ours' }),
+  const cols = [
+    { key: 'composite', label: 'Composite', full: 'DeviceMark composite', score: true,
+      sub: '± half its 95% interval' },
+    { key: 'ifeval', label: 'IFEval', full: 'IFEval (DeviceMark)', score: true, sub: '300 items' },
+    { key: 'mmlu_pro', label: 'MMLU-Pro', full: 'MMLU-Pro (DeviceMark)', score: true, sub: '196 items' },
+    { key: 'math', label: 'MATH', full: 'MATH (DeviceMark)', score: true, sub: '100 items' },
+    { key: 'answered', label: 'Answered', full: 'Answered within the cap', score: true },
+    { key: 'tokens', label: 'Median tokens', full: 'Median tokens an answer' },
+    { key: 'device', label: 'Device tok/s', full: 'Decode tok/s on a device', sortable: false },
+    { key: 'server', label: 'Server tok/s', full: 'Our server’s speed test', sortable: false },
+    { key: 'retention', label: 'Retention', full: 'A phone build’s score over the original’s',
+      num: false, sortable: false },
+    { key: 'budget', label: 'Budget', full: 'Draw it against the budget', sortable: false }];
+  const pub = r => r.external ? { letter: 'D', tip: `DeviceMark’s board: ${r.label}` } : null;
+  const row = (r, theirs) => {
+    const ext = !!r.external;
+    const cells = {
+      composite: r.cant_run && !ext ? { v: null } : { v: r.composite.value,
+        text: dmPct(r.composite.value), se: half(r), seV: dmCi(r) ? (dmCi(r)[1] - dmCi(r)[0]) / 3.92
+          : null, pub: pub(r), attrs: { 'data-dm-composite': r.id },
+        notes: [r.cant_run ? el('span', { class: 'cellnote', 'data-dm-cant': r.id,
+          'data-tip': JSON.stringify([r.cant_run]), text: 'ours: can’t run here' }) : '',
+        r.mode_differs ? el('span', { class: 'cellnote', 'data-dm-mode-differs': r.id,
+          'data-tip': JSON.stringify([r.mode_differs]), text: 'modes differ · not a calibration '
+            + 'point' }) : ''].filter(Boolean) },
+      ...Object.fromEntries(['ifeval', 'mmlu_pro', 'math'].map(b => [b, { v: r.benches[b].acc,
+        text: dmPct(r.benches[b].acc), pub: pub(r) }])),
+      answered: { v: r.answered_pct, text: dmPct(r.answered_pct), pub: pub(r),
+        tip: ext && r.answered_of ? [`answered: ${r.answered_of}`] : [] },
+      tokens: r.median_tokens == null ? { v: null } : { v: r.median_tokens,
+        text: Math.round(r.median_tokens).toLocaleString('en'), noLead: true },
+      device: { v: r.device ? r.device.tok_s : null, keep: false, attrs: { 'data-dm-device-cell': r.id },
+        node: [r.device ? `${r.device.tok_s}` : '–', !ext && LIVE ? ' ' : '',
+          !ext && LIVE ? el('button', { class: 'ghost dm-dev-edit', 'data-dm-device-edit': r.id,
+            'aria-label': (r.device ? 'edit the device speed of ' : 'enter a device speed for ') + r.name,
+            text: r.device ? 'edit' : 'enter', onclick: () => {
+              D.edit = r.id; D.form = r.device ? { ...r.device } : {}; D.formMsg = ''; render(); } })
+            : ''] },
+      server: { keep: false, attrs: { 'data-dm-server': r.id, 'data-tip': r.server_tok_s == null
+        ? null : JSON.stringify([state.dm.data.server_speed_label, 'the speed test: never on the chart']) },
+        node: ext ? 'n/a' : r.server_tok_s == null ? '–' : String(r.server_tok_s) },
+      retention: { keep: false, node: ret(r) || '–' },
+      budget: { keep: false, node: tick(r) } };
+    const m = !ext ? DATA.models.find(x => x.id === r.id) : null;
+    const base = m ? mtRowOf(m) : null;
+    // their setups keep their quant as the variant: theirs (int8) and ours (bf16) apart
+    const name = ext ? mtNameOf(nameParts(r.name, { measured: true })) : base ? base.name
+      : displayName({ name: String(r.name || r.model || r.id) });
+    const group = ext ? (r.kind === 'cloud' || !MT_OPEN_RE.test(`${r.model || ''} ${r.name}`)
+      ? 'closed' : 'open') : base ? base.group : mtGroup({ id: r.id, name: r.name });
+    return { key: r.id, id: ext ? null : r.id, nav: ext ? null : r.id, mark: ext ? 'pub' : 'here',
+      href: ext ? null : '#model=' + encodeURIComponent(r.id), open: ext ? () => {} : null,
+      colour: base ? base.colour : 'var(--accent)', name, group, full: `${r.name}\n${r.label || ''}`,
+      line: ext ? ['DeviceMark', group, r.label].filter(Boolean).join(' · ')
+        : [base ? base.line : r.label, theirs ? `our run, beside DeviceMark’s ${theirs.name}`
+          : ''].filter(Boolean).join(' · '),
+      rank: { text: r.rank || (r.kind === 'cloud' ? '☁' : ''), title: r.kind === 'cloud'
+        ? 'a cloud API: not ranked, as on DeviceMark’s board' : null },
+      attrs: { 'data-dm-row': r.id, 'data-dm-external': ext ? '1' : null,
+        'data-dm-pair': theirs ? theirs.id : null,
+        'data-dm-whose': ext ? 'theirs' : 'ours', class: r.id === D.flash ? 'dmfocus' : null },
+      badges: [
         r.inherited ? el('span', { class: 'small se', 'data-dm-inherited': r.id,
-          text: ` ${r.inherited.line}` }) : '',
+          text: r.inherited.line }) : '',
         // 15.4: ours links its raw run, as theirs on DeviceMark's board do
-        r.raw_url ? [' ', el('a', { href: r.raw_url, target: '_blank', rel: 'noopener',
-          class: 'small', 'data-dm-raw': r.id, text: 'raw' })] : '',
+        r.raw_url ? el('a', { href: r.raw_url, target: '_blank', rel: 'noopener',
+          class: 'small', 'data-dm-raw': r.id, text: 'raw' }) : '',
         // 15.7: numbers that may change, and why on hover
-        r.provisional ? [' ', el('span', { class: 'badge prelim', 'data-dm-provisional': r.id,
-          'data-tip': JSON.stringify([r.provisional]), text: 'provisional' })] : '',
+        r.provisional ? el('span', { class: 'badge prelim', 'data-dm-provisional': r.id,
+          'data-tip': JSON.stringify([r.provisional]), text: 'provisional' }) : '',
         dmOdd(r) ? el('span', { class: 'small se', 'data-dm-odd': r.id,
-          'data-tip': JSON.stringify(DM_ODD_TIP), text: ` ${dmOdd(r)}` }) : ''),
-      el('td', { class: num(r) + (r.cant_run ? ' dmpair' : ''), 'data-dm-composite': r.id },
-        // 12q.D: theirs, over "ours: can't run here" and why, on hover
-        r.cant_run && !(r.ours || []).length ? [
-          el('span', { 'data-dm-theirs': r.id,
-            text: `theirs (${r.label}): ${dmPct(r.composite.value)}${ci(r)}` }),
-          el('span', { class: 'se', 'data-dm-cant': r.id, 'data-tip': JSON.stringify([r.cant_run]),
-            text: 'ours: can’t run here' })]
-          : [both(r, x => dmPct(x.composite.value) + ci(x), true),
-            // 12q.E: a pair in different modes says so, under its two scores
-            ...(r.ours || []).filter(o => o.mode_differs).map(o => el('span', { class: 'se',
-              'data-dm-mode-differs': o.id, 'data-tip': JSON.stringify([o.mode_differs]),
-              text: 'modes differ · not a calibration point' }))]),
-      ...['ifeval', 'mmlu_pro', 'math'].map(b => el('td', { class: num(r), 'data-tip': pairTip(r) },
-        both(r, x => dmPct(x.benches[b].acc)))),
-      el('td', { class: num(r), 'data-tip': r.external ? JSON.stringify(
-        [`answered: ${r.answered_of}`, ...(pairTip(r) ? JSON.parse(pairTip(r)) : [])]) : null },
-        both(r, x => dmPct(x.answered_pct))),
-      el('td', { class: num(r), 'data-tip': pairTip(r) }, both(r, x => x.median_tokens == null
-        ? '—' : Math.round(x.median_tokens).toLocaleString())),
-      el('td', { class: 'num', 'data-dm-device-cell': r.id },
-        r.device ? `${r.device.tok_s}` : '—',
-        // 12z C6: a small control, apart from the number or the dash
-        !r.external && LIVE ? ' ' : '',
-        !r.external && LIVE ? el('button', { class: 'ghost dm-dev-edit', 'data-dm-device-edit': r.id,
-          'aria-label': (r.device ? 'edit the device speed of ' : 'enter a device speed for ') + r.name,
-          text: r.device ? 'edit' : 'enter', onclick: () => {
-            D.edit = r.id; D.form = r.device ? { ...r.device } : {}; D.formMsg = ''; render(); } })
-          : ''),
-      el('td', { class: 'num', 'data-dm-server': r.id, 'data-tip': r.server_tok_s == null ? null
-        : JSON.stringify([state.dm.data.server_speed_label, 'the speed test: never on the chart']),
-        text: r.external ? 'n/a' : r.server_tok_s == null ? '—' : String(r.server_tok_s) }),
-      el('td', { class: 'num' }, ret(r)),
-      el('td', { class: 'num' }, tick(r))))));
+          'data-tip': JSON.stringify(DM_ODD_TIP), text: dmOdd(r) }) : ''],
+      cells };
+  };
+  // ours: one row a model, its other thinking setting under it with "both"
+  const setting = r => { const m = DATA.models.find(x => x.id === r.id);
+    return m ? thinkingOf(m) : 'off'; };
+  const mine = (list, theirs) => mtThinkPick(list, r => r.id, setting).map(({ x, other }) =>
+    ({ ...row(x, theirs), children: other ? [{ ...row(other, theirs),
+      subLabel: `thinking ${/ · thinking$/.test(other.id) ? 'on' : 'off'}` }] : [] }));
+  const out = [];
+  const ours = rows.filter(r => !r.external);
+  const placed = new Set(mine(ours).map(r => r.key));
+  for (const r of rows) {
+    if (r.external) {
+      out.push(row(r));
+      out.push(...mine((r.ours || []).map(o => ({ ...o, external: false })), r));
+    } else if (placed.has(r.id)) out.push(...mine(ours.filter(x => x.id.replace(/ · thinking$/, '')
+      === r.id.replace(/ · thinking$/, ''))));
+  }
+  return { view: 'devicemark', attrs: { 'data-dm-table': '1' }, cols, rows: out, groups: true,
+    rank: true, sorted: true, hideEmpty: false };
 }
 function lbOnDevice(ms) {
   const D = state.dm;
@@ -14468,7 +15066,7 @@ function lbOnDevice(ms) {
         + `${ext.device || 'their device'}.` }),
     hfade('dmchart', el('div', { class: 'chartscroll', 'data-hkeep': 'dmchart' }, dmChart(rows))),
     dmKey(rows),
-    hfade('dmtable', el('div', { class: 'lb-wrap', 'data-hkeep': 'dmtable' }, dmTable(rows))),
+    modelTable(dmSpec(rows)),
     editing ? dmDeviceForm(editing) : '',
     el('p', { class: 'lbcap', text: 'Ranks: a row is above another only when its interval is '
       + 'wholly above the other’s; a shared rank is a tie (=); the cloud APIs aren’t ranked (☁), '
@@ -14989,61 +15587,73 @@ function notTestedRows(none, ncols, suite, whyNot = null, openFirst = false) {
             state.sub.suite = test; openTest(m.id); } })] : '')));
   })];
 }
-// Everyday tasks: each model's row — n of k per group, and the total (12a.2)
+// 27: an Everyday count as a cell: the share passed, a whole number, the big
+// figure ("81"), the count under it ("22 of 27"), the bar from the share
+const evdCell = (passed, total) => ({ v: total ? passed / total : null,
+  text: total ? String(Math.round(100 * passed / total)) : null, sub: `${passed} of ${total}` });
+// Everyday tasks: each model's row — per group the share it passed, "22 of 27"
+// under it, and the total (12a.2). 27: drawn by modelTable, highest first
 function lbEveryday(ms) {
   // 12o.1: its group columns in the order they were left in
-  const LK = 'models:everyday';
+  const LK = 'models:everyday', S = mtS('everyday');
   const groups = layoutOrder(LK, evdGroups(), { keyOf: ([g]) => g });
   const rows = lbFilter(ms);
-  const have = rows.filter(m => evdOf(m.id)).sort((a, b) => natCmp(a.name, b.name));
+  const have = rows.filter(m => evdOf(m.id));
   const none = rows.filter(m => !evdOf(m.id));
   const prov = have.some(m => evdOf(m.id).provisional);
   // 12f.2b: what was reported from the phone, beside the score, while a row has it
   const reps = repCols(have);
-  const ncols = groups.length + 2 + reps.length;
-  const table = layoutApply(el('table', { class: 'lb norank', 'data-lb-table': '1',
-      'data-lb-everyday': '1', ...layoutAttrs(LK) },
-    el('thead', {},
-      reps.length ? el('tr', { class: 'grp' }, el('th', { colspan: String(groups.length + 2),
-        class: 'grp nogrp', scope: 'colgroup' }), el('th', { colspan: String(reps.length),
-        class: 'grp', scope: 'colgroup', text: REP_GROUP })) : '',
-      el('tr', { class: 'names' },
-      el('th', { class: 'model pin', scope: 'col', 'data-lcol': 'name' }, 'Model',
-        ...layoutBits(LK, 'name', 'Model', { movable: false })),
-      groups.map(([g, label]) => el('th', { class: 'num', scope: 'col', 'data-evd-col': g,
-        title: `${evdQs(g).length} questions`, ...layoutDrag(LK, g, '') }, label,
-        ...layoutBits(LK, g, label))),
-      el('th', { class: 'num', scope: 'col', 'data-lcol': 'total' }, 'Total',
-        ...layoutBits(LK, 'total', 'Total', { movable: false })),
-      reps.map(c => el('th', { class: 'num', scope: 'col', 'data-col': c.key, 'data-lcol': c.key,
-        'data-tip': JSON.stringify(lbColTip(c)) }, c.short,
-        ...layoutBits(LK, c.key, c.short, { movable: false }))))),
-    el('tbody', {}, have.map(m => {
-      const e = evdOf(m.id), evShort = shortNames(have.map(x => x.name), 26);
-      return el('tr', { class: 'clickrow', 'data-lb-row': m.id,
-          onclick: ev => { if (ev.target.closest('a, button')) return;
-            navigate({ model: m.id, topic: null }); } },
-        el('td', { class: 'model pin', 'data-model': m.id },
-          el('div', { class: 'mcell' },
-            mnameLink(m, evShort, { href: '#model=' + encodeURIComponent(m.id) }),
-            phoneTag(m) || servedTag(m.id))),
-        groups.map(([g, label]) => {
-          const n = evdGroupCount(e, g);
-          return el('td', { class: 'num' + (n && !evdMissing(e) ? '' : ' se'), 'data-evd-g': g,
-            title: n ? label : 'not asked', text: n || '—' });
-        }),
-        // 12i.4: the ran-out note on its own line under the total, never beside it
-        el('td', { class: 'num evdtotal' }, el('div', {}, evdTotal(e, m.id)), evdRanOut(e)),
-        reps.map(c => repCell(m, c)));
-    }), notTestedRows(none, ncols, 'everyday'))));
+  const every = groups.map(([g, label]) => ({ key: 'g:' + g, label, full: label, score: true,
+    sub: `${evdQs(g).length} questions`, attrs: { 'data-evd-col': g } }));
+  const dflt = every.map(c => c.key);
+  const shown = new Set(mtColsShown('everyday', every, dflt));
+  const cols = [...every.filter(c => shown.has(c.key)),
+    { key: 'total', label: 'Total', full: 'Every group', score: true,
+      sub: `${evdHidden()} questions`, attrs: { 'data-lcol': 'total' } },
+    ...reps.map(c => ({ key: c.key, label: c.short, full: `${c.label}, ${c.unit}`, num: true,
+      attrs: { 'data-col': c.key } }))];
+  S.sort = S.sort && cols.some(c => c.key === S.sort.key) ? S.sort : { key: 'total', dir: -1 };
+  const rowOf = m => {
+    const e = evdOf(m.id), miss = evdMissing(e);
+    const cells = Object.fromEntries(groups.map(([g, label]) => {
+      const x = ((e && e.groups) || {})[g];
+      return ['g:' + g, x ? { ...evdCell(x.passed, x.total), dim: !!miss, tip: [label],
+        attrs: { 'data-evd-g': g } } : { v: null, why: 'not asked', attrs: { 'data-evd-g': g } }];
+    }));
+    cells.total = { ...evdCell(e.passed, e.total), dim: !!miss,
+      // 12i.4: how many ran out of room, in the Total's hover
+      tip: [e.ran_out ? `${e.ran_out} of ${e.total} ran out of room. ${RAN_OUT_WHY}` : '',
+        miss ? `over the ${e.total} hidden questions it has answered, not all ${evdHidden()} — `
+          + 'not comparable with a full count' : ''].filter(Boolean),
+      attrs: { 'data-everyday-count': evdCount(e), 'data-evd-ran-out': e.ran_out
+        ? String(e.ran_out) : null },
+      notes: miss ? [el('span', { class: 'cellnote', 'data-evd-partial': String(miss) },
+        `${miss} not asked yet`, LIVE ? [' · ', el('a', { href: '#', 'data-evd-run': m.id,
+          text: 'Run', onclick: ev => { ev.preventDefault(); ev.stopPropagation();
+            evdDialog({ only: m.id, returnTo: `[data-evd-run="${CSS.escape(m.id)}"]` }); } })]
+          : '')] : [] };
+    for (const c of reps) {
+      const v = repVal(m, c);
+      cells[c.key] = v == null ? { v: null } : { v, text: c.rep === 'q' ? String(v) : v.toFixed(1),
+        sub: `reported by ${phoneRep(m.id).by}`, attrs: { 'data-rep-cell': c.key } };
+    }
+    return mtRowOf(m, { attrs: { 'data-lb-row': m.id }, cells });
+  };
+  const made = mtThinkRows(have).map(({ m, other }) => ({ ...rowOf(m),
+    children: other ? [{ ...rowOf(other), subLabel: `thinking ${thinkingOf(other) || 'on'}` }]
+      : [] }));
   return [el('div', { class: 'card', 'data-lb-card': '1' },
     ...modelsHead(evdBadge(prov)),
-    lbToolbar(ms, lbColumns(ms), new Set(), 0),
-    hfade('lb', el('div', { class: 'lb-wrap', 'data-hkeep': 'lb' }, table)),
+    lbToolbar(ms, lbColumns(ms), new Set(), 0, null, mtColumnsPill('everyday', every,
+      [...shown], dflt)),
+    modelTable({ view: 'everyday', attrs: { 'data-lb-everyday': '1' }, cols, rows: made,
+      groups: true, sort: S.sort, cardCols: ['total', ...[...shown].slice(0, 3)],
+      onSort: k => { S.sort = { key: k, dir: S.sort.key === k ? -S.sort.dir : -1 }; render(); },
+      extra: notTestedRows(none, cols.length + 1, 'everyday') }),
     el('p', { class: 'lbcap', text: `${evdAll()} questions in ${evdGroupsWord()} groups, typed the way `
-      + `people type on a phone; each count is the ${evdHidden()} hidden ones. Open a model for `
-      + 'its answers to the practice ones; Benchmarks ▸ Everyday ▸ Manage questions has those '
-      + 'questions.' }))];
+      + `people type on a phone; each count is the ${evdHidden()} hidden ones, its share passed `
+      + 'above it. Open a model for its answers to the practice ones; Benchmarks ▸ Everyday ▸ '
+      + 'Manage questions has those questions.' }))];
 }
 
 // 12h.1: one generative cell — its number, and under it, only when there is
@@ -15063,7 +15673,7 @@ function trustCell(c, m, cc, one, pctn) {
 function genCell(c, m, cc, one, pctn) {
   const g = ((m.gen || {}).tasks || {})[c.task] || {}, far = ((m.gen || {}).far || {})[c.task];
   const sub = c.task === 'mmlu_pro' && (m.gen || {}).subset;
-  const td = one(c, m, cc.v, cc.se ? (100 * cc.se).toFixed(1) : null, pctn, {
+  const x = one(c, m, cc.v, cc.se ? (100 * cc.se).toFixed(1) : null, pctn, {
     title: [genMode(m), g.inst_acc != null ? `instruction-level ${pctn(g.inst_acc)}` : '',
       g.ran_out ? `${g.ran_out} answer${g.ran_out === 1 ? '' : 's'} ran out of room` : '',
       far ? `far below published (${far.published}${far.note ? ', ' + far.note : ''}): `
@@ -15071,13 +15681,13 @@ function genCell(c, m, cc, one, pctn) {
     'data-gen-cell': c.task });
   const note = (text, attrs, warn) => el('span', { class: 'cellnote' + (warn ? ' warn' : ''),
     ...attrs, text });
-  if (g.inst_acc != null) td.append(note(`${pctn(g.inst_acc)} by instruction`,
-    { 'data-inst-level': c.task }));
-  if (g.ran_out) td.append(note(`${g.ran_out} ran out of room`, { 'data-ran-out': String(g.ran_out) }));
-  if (sub) td.append(note('subset', { 'data-subset': c.task }));
-  if (far) td.append(note('far below published, check extraction', { 'data-far-below': c.task },
-    true));
-  return td;
+  x.notes = [g.inst_acc != null ? note(`${pctn(g.inst_acc)} by instruction`,
+    { 'data-inst-level': c.task }) : '',
+  g.ran_out ? note(`${g.ran_out} ran out of room`, { 'data-ran-out': String(g.ran_out) }) : '',
+  sub ? note('subset', { 'data-subset': c.task }) : '',
+  far ? note('far below published, check extraction', { 'data-far-below': c.task }, true) : '']
+    .filter(Boolean);
+  return x;
 }
 
 // ===========================================================================
@@ -15789,319 +16399,251 @@ function vLeaderboard(ms) {
   // shown: seven columns of dashes said nothing. Chosen by name, it stays
   if (!custom && !lbAll.some(m => visCols.some(c => c.gguf && val(m, c) != null)))
     visCols = visCols.filter(c => !c.gguf);
-  const lbPg = paged('leaderboard', lbAll, JSON.stringify([state.sort, state.q, state.kind,
+  const lbPairs = mtThinkRows(lbAll);
+  lbCounts.table = lbPairs.length;              // 27: a model's thinking row is its row
+  const lbPg = paged('leaderboard', lbPairs, JSON.stringify([state.sort, state.q, state.kind,
     state.src, state.avgMode, L.view, L.chip, L.source, L.type, L.tested, L.date, L.size, L.status,
-    L.models, L.cols]));
-  const rows = lbPg.rows.flatMap(m => [m, ...((state.lbDupOpen || {})[m.id] ? dupsOf[m.id] || [] : [])]);
-  // the leaders are bold whatever the Tint switch says; Tint only adds the wash
+    L.models, L.cols, mtThink()]));
+  // the leaders are bold whatever the Tint switch says
   const leaders = lbLeaders(visCols, val, dmMade);
 
-  // the chosen average stands in for Avg, arrow and all (12h.2)
-  const sortedBy = c => state.sort.key === c.key || (custom && isCavg(c) && sortCol === c);
-  // ---- header (11f): one line of one-word names. The setup — n-shot, unit,
-  // scale — is the name's tooltip, not three more lines; the group row is
-  // quiet, and only on All tasks, where there is more than one group
-  const groups = [];
-  for (const c of visCols) {
-    const g = c.group || '';
-    if (groups.length && groups[groups.length - 1].g === g) groups[groups.length - 1].n++;
-    else groups.push({ g, n: 1 });
-  }
-  const thead = el('thead', {},
-    grouped ? el('tr', { class: 'grp' }, groups.map(({ g, n }) => el('th', {
-      colspan: String(n), class: g ? 'grp' : 'grp nogrp', scope: 'colgroup',
-      ...(g ? layoutGroupDrag(LK, g) : {}) }, g,
-      // 16.3: Pro's categories: its badge once, on their heading
-      visCols.some(c => c.mmpcat && c.group === g)
-        ? rBadge(restrictOf(MMP), { 'data-group-head-restriction': g }) : ''))) : '',
-    el('tr', { class: 'names' }, visCols.map(c => {
-      const tipRows = lbColTip(c);
-      const fixed = LB_FIXED.has(c.key);
-      if (c.nosort) return el('th', { class: 'rank pin0', scope: 'col', 'data-col': c.key,
-        'data-lcol': c.key, 'data-tip': JSON.stringify(tipRows) }, c.label,
-        layoutGrip(LK, c.key, c.label));
-      return el('th', { 'data-col': c.key, 'data-task': c.task || null, 'data-area': c.area || null,
-        ...(fixed ? { 'data-lcol': c.key } : layoutDrag(LK, c.key, lgroup(c))),
-        'data-jarea': c.jarea || null,
-        class: (c.num ? 'num ' : '') + 'sortable' + (c.key === 'name' ? ' model pin' : '')
-          + (c.judged || c.jarea ? ' judged' : ''),
-        scope: 'col', 'data-tip': JSON.stringify(tipRows),
-        'aria-label': tipRows.join(' — '),
-        'aria-sort': sortedBy(c) ? (state.sort.dir > 0 ? 'ascending' : 'descending') : 'none',
-        onclick: () => { state.sort = { key: c.key,
-          dir: state.sort.key === c.key ? -state.sort.dir : (c.key === 'name' ? 1 : c.lower ? 1 : -1) };
-          render(); } },
-        el('span', { class: 'hname', text: c.short || c.label }),
+  // ---- a cell (11f, 27): the number, its ± small beside it, a bar (or the
+  // tint); a leader — the column's best, or inside its noise — is bold.
+  // Drawn by modelTable: here only what each cell holds
+  const one = (c, m, v, se, fmt, extra = {}) => {
+    const t = leaders[c.key];
+    const lead = !!(t && v != null && t.lead.has(m.id));
+    const { title, ...rest } = extra;
+    return { v, text: v == null ? null : fmt(v), se: se != null ? String(se) : null, lead,
+      tip: [...(lead ? [t.best.id === m.id ? 'best in the column' : 'within the noise of the best']
+        : []), ...(title ? [title] : [])],
+      attrs: { 'data-watch': `lb|${m.id}|${c.key}`, ...rest } };
+  };
+  const none = (title, attrs = {}, text = null) => ({ v: null, text, why: title || '', attrs });
+  const fact = (node, attrs = {}, title = null) => ({ node, keep: false,
+    attrs: { ...attrs, title } });
+  const pctn = v => (100 * v).toFixed(1);
+  const cellOf = (m, c) => {
+    if (c.key === 'family') return fact(famOf(m), { 'data-fact': 'family' });
+    if (c.key === 'kind') return fact(m.kind || '—', { 'data-fact': 'kind' });
+    if (c.key === 'source') return fact(sourceWords(sourceOf(m)), { 'data-fact': 'source' });
+    // 16.3: Mobile-MMLU-Pro by category, on our key; a model that labelled
+    // the key is never ranked, here either
+    if (c.mmpcat) {
+      const x = ((m.mmp || {}).by_category || {})[c.mmpcat];
+      if (mmpLabelled(m.id)) return none('it labelled the key: never ranked',
+        { 'data-mmpcat-cell': c.mmpcat });
+      if (!x || x.acc == null) return none('', { 'data-mmpcat-cell': c.mmpcat });
+      return one(c, m, x.acc, null, pctn, { 'data-mmpcat-cell': c.mmpcat,
+        title: `on ${Number(x.n || 0).toLocaleString('en')} kept questions`
+          + (mmpProvisional() ? ' · provisional key' : '') });
+    }
+    if (c.key === 'flags') return fact([(m.tainted || []).length ? el('span', { class: 'badge taint',
+      text: 'tainted', title: 'trained on data derived from ' + m.tainted.join(', ') }) : '',
+    m.provisional ? el('span', { class: 'badge taint', text: 'provisional' }) : ''],
+    { 'data-fact': 'flags' });
+    if (c.key === 'params') {
+      // 16.1: the board's one size — entered, the harness's, the file's or
+      // its base model's — total, and active where they differ
+      return { v: m.params, text: P(m.params), sub: activeOf(m) ? `${P(activeOf(m))} act` : null,
+        noLead: true, keep: false, attrs: { 'data-params-src': m.paramsSrc || null },
+        tip: [sizeTip(m) || (m.params == null ? 'size not recorded' : ''), activeTip(m)]
+          .filter(Boolean) };
+    }
+    if (c.key === 'date') {
+      // 11f: "15 Sep"; the year only when it is not this one — 16.6: the
+      // viewer's own day, and in full on hover
+      const ms2 = testedMs(m);
+      return { v: ms2 || null, text: ms2 ? dateShort(ms2 / 1000) : null, noLead: true, keep: false,
+        attrs: { 'data-date': testedDay(m) || '' }, tip: ms2 ? [whenFull(ms2 / 1000)] : [] };
+    }
+    if (isCavg(c)) {
+      const ts = c.ts || L.cols, a = customAvg(m, ts);
+      const at = { 'data-cavg': m.id, 'data-cavg-method': c.method };
+      // 12m.1: a GGUF's own row, measured only in a setup, has no average here.
+      // 12o.1: a row with some of them says how many, and which it lacks
+      if (!a) {
+        const miss = ts.filter(t => benchVal(t, m.id) == null);
+        const have = ts.length - miss.length;
+        return none(miss.length && have ? 'no ' + miss.map(benchName).join(', ') : '',
+          { ...at, 'data-cavg-missing': miss.length && have ? miss.join(',') : null },
+          miss.length && have ? `– ${have}/${ts.length}` : null);
+      }
+      return one(c, m, a.v, a.se != null ? (100 * a.se).toFixed(1) : null, pctn, {
+        title: `mean over ${ts.map(benchName).join(', ')}, `
+          + (state.avgMode === 'raw' ? 'raw accuracy' : 'scaled so chance = 0'), ...at });
+    }
+    if ((c.key === 'avg' || isCavg(c)) && narrow(m) || measures(c) && !canHave(m, c))
+      return none(c.gguf ? 'Measured on a GGUF file with llama-perplexity: none is registered '
+        + 'for this model.' : m.served && !m.rowOf ? SERVED_LINE : G().tip, { 'data-na': c.key });
+    if (c.key === 'avg') {
+      const a = officialAvg(m);
+      if (a == null) return none((m.missing || []).length ? 'missing: ' + m.missing.join(', ') : '',
+        {}, `– ${m.nhave}/${m.nreq}`);
+      const se = officialSe(m);
+      return one(c, m, a, se != null ? (100 * se).toFixed(1) : null, pctn, {
+        title: `mean over the ${m.nreq} required tasks, `
+          + (state.avgMode === 'raw' ? 'raw accuracy' : 'scaled so chance = 0') });
+    }
+    if (c.judged) {
+      const v = jval(m, c);
+      if (v == null) return none(c.judged !== 'avg' && (m.tainted || []).includes(c.judged)
+        ? 'trained on data derived from this topic — shown on the model page, not ranked'
+        : m.judgeState ? (m.judgeState.reasons || []).join('; ') || 'not judged' : 'not judged');
+      const prelim = !judgedOkM(m);
+      const x = prelim ? { v, text: num(v, 2), dim: true, lead: false } : one(c, m, v, null,
+        y => num(y, 2));
+      if (c.judged === 'avg') x.attrs = { ...(x.attrs || {}),
+        'data-judged-avg': prelim ? 'preliminary' : 'counts' };
+      return x;
+    }
+    if (c.jarea) {
+      const r = areaJudged(m, c.jarea);
+      if (r.v == null) return none(`${r.k} of ${r.n} topics judged` + (judgedOkM(m) ? ''
+        : ' — not ranked'), { 'data-jarea-cell': c.jarea });
+      return one(c, m, r.v, null, x => num(x, 2), { title: `${r.k} of ${r.n} topics judged`,
+        'data-jarea-cell': c.jarea });
+    }
+    if (c.area) {
+      const r = areaMmlu(m, c.area);
+      if (!r) return none('');
+      const k = state.avgMode === 'raw' ? 1 : 1 / 0.75;
+      return one(c, m, areaScaled(r.v), (100 * r.se * k).toFixed(1), pctn,
+        { title: `${r.n} questions · % ${scaleWords()}`, 'data-area-cell': c.area });
+    }
+    if (c.cat) {
+      const g = (mmluCats(m) || {})[c.cat];
+      if (!g || g.score_report == null) return none('');
+      if (g.n_report < CAT_MIN_N) return { v: g.score_report, text: pctn(g.score_report),
+        dim: true, lead: false, tip: [`${g.n_report} items — under ${CAT_MIN_N}, treat as noise`] };
+      return one(c, m, g.score_report, null, pctn, { title: `${g.n_report} leaderboard-half items` });
+    }
+    if (c.rep) return repDesc(m, c);
+    // 12x: DeviceMark's row: a score with half its 95% interval, the
+    // answered share, and the median tokens an answer
+    if (c.dm) {
+      const r = dmRowById(m.id), v = dmVal(m.id, c.dm);
+      if (v == null) return none(r ? '' : 'no DeviceMark run' + (m.thinkingRow
+        ? ' with thinking on' : ''), { 'data-dm-cell': c.dm });
+      const from = [r.inherited ? r.inherited.line : '', r.paired ? 'beside DeviceMark’s own row'
+        : r.rank ? dmRankWords(r.rank) : ''].filter(Boolean).join(' · ');
+      if (c.dm === 'tokens') return { v, text: Math.round(v).toLocaleString('en'), noLead: true,
+        attrs: { 'data-dm-cell': 'tokens' }, tip: from ? [from] : [] };
+      // 12z C7: answered is a share: its % sign
+      return one(c, m, v, c.dm === 'answered' ? null : dmHalfOf(m.id, c.dm),
+        c.dm === 'answered' ? x => pctn(x) + '%' : pctn,
+        { 'data-dm-cell': c.dm, title: [c.dm === 'answered' ? '' : 'the ± is half the 95% '
+          + 'interval', from].filter(Boolean).join(' · ') || null });
+    }
+    if (c.gguf) {
+      const g = ggufOf(m.id, c.gguf);
+      // 12m.1: a GGUF's own row holds its "as built" results alone; a
+      // setup's are that setup's row
+      if (!g) return none('', { 'data-gguf-cell': c.gguf },
+        (G().registered || {})[m.id] && !m.rowOf ? 'not measured yet' : null);
+      return one(c, m, g.v, g.se != null ? (100 * g.se).toFixed(1) : null, pctn,
+        { title: ggufWords(g), 'data-gguf-cell': c.gguf, 'data-gguf-full': String(g.full) });
+    }
+    const cc = cell(c.task, m.id);
+    const asked = c.task === 'do_not_answer' || c.task === 'xstest';
+    // 14.1: MT-Bench answered, the judge still to rate it (14.2: a trust set too)
+    const mtw = mabJudged(c.task) && !cc && ((m.mab || {})[c.task] || {}).n;
+    if (mtw) return none(`${m.mab[c.task].awaiting} of ${m.mab[c.task].n} `
+      + `${c.task === MTBENCH ? 'turns' : 'replies'} wait for the judge · `
+      + (m.mab.note || 'a judging step marks them'), { 'data-mab-awaiting': m.id,
+      'data-mab-awaiting-task': c.task }, 'awaiting judge');
+    if (cc && c.task === MTBENCH) return one(c, m, cc.v, cc.se ? (10 * cc.se).toFixed(2) : null,
+      x => (10 * x).toFixed(2), { 'data-mab-mtbench': m.id, title: mabJudgeLine(m) });
+    // 14.3: a model that labelled the key: its number, never ranked
+    if (c.task === MMP && mmpLabelled(m.id)) return none(`${pctn(mmpLabelled(m.id).v)}% on the `
+      + 'key it labelled: never ranked', { 'data-mmp-labelled': m.id }, 'labelled the key');
+    if (cc && c.task === MMP) return one(c, m, cc.v, cc.se ? (100 * cc.se).toFixed(1) : null,
+      pctn, { 'data-mmp-cell': m.id, title: [`on ${(cc.n || 0).toLocaleString('en')} of `
+        + `${((m.mmp || {}).of || 0).toLocaleString('en')} kept questions`,
+      mmpProvisional() ? 'provisional key' : '',
+      (restrictOf(MMP) || {}).badge].filter(Boolean).join(' · ') });
+    if (!cc) return none(chatOnly(c.task) && m.kind === 'base'
+      ? 'instruct only: asked through the chat template'
+      : asked && (m.trust || {}).waiting || c.task === SIMPLEQA && (m.simpleqa || {}).waiting
+        ? 'waiting for the judge' : '');
+    if (isGen(c.task)) return genCell(c, m, cc, one, pctn);
+    if (isTrust(c.task)) return trustCell(c, m, cc, one, pctn);
+    // 12n.2: the share correct, with what it didn't attempt said beside it
+    if (c.task === SIMPLEQA) {
+      const sq = m.simpleqa || {}, na = sq.not_attempted;
+      const x = one(c, m, cc.v, cc.se ? (100 * cc.se).toFixed(1) : null, pctn,
+        { title: [na ? `not attempted ${pctn(na.v)}% (${na.n} of ${na.of})` : '',
+          ((DATA.shared || {}).simpleqa || {}).honest || ''].filter(Boolean).join(' · ') });
+      if (na) x.notes = [el('div', { class: 'cellnote', 'data-sq-na': m.id,
+        text: `${pctn(na.v)}% not attempted` })];
+      return x;
+    }
+    return one(c, m, cc.v, cc.se && !c.lower ? (100 * cc.se).toFixed(1) : null,
+      c.lower ? x => num(x, 3) : pctn);
+  };
+  // 12z C7: the DeviceMark chip is its own view: Standard's ranks and "prelim" are not in it
+  const dmv = L.view === 'standard' && !L.cols && L.chip === 'devicemark';
+  // a board model as modelTable's row: its mark, name, line, the badges that matter
+  const rowFor = (m, at, sub) => mtRowOf(m, {
+    attrs: { 'data-lb-row': m.id, class: m.duplicateOf && dupsOf[m.duplicateOf] ? 'duprow' : null },
+    cells: Object.fromEntries(visCols.filter(c => !['rank', 'name'].includes(c.key))
+      .map(c => [c.key, cellOf(m, c)])),
+    badges: [
+      // 12m.1: tick two to eight rows, then Compare ▸
+      L.view === 'standard' && !sub ? el('input', { type: 'checkbox', class: 'cmptick',
+        'data-cmp-tick': m.id, 'aria-label': 'compare ' + m.name,
+        title: 'Tick two to eight models to compare them',
+        checked: (L.ticks || []).includes(m.id) ? '' : null,
+        onchange: e => { const t = new Set(L.ticks || []);
+          if (e.target.checked) t.add(m.id); else t.delete(m.id);
+          L.ticks = [...t]; render(); } }) : '',
+      // 16.8: "prelim 0/7" counts Standard's required benchmarks: Standard's alone
+      m.thinkingRow || m.served || ggufOnly(m) || dmv || lbTest(L) !== 'standard' ? ''
+        : warnBadge(m) || '', dupBadge(m) || '',
+      dupsOf[m.id] ? dupToggle(m, dupsOf[m.id]) : ''] });
+  const visRank = visCols.some(c => c.key === 'rank');
+  const rankFor = (m, i) => {
+    if (built) {
+      const n = i < 0 ? '' : String(lbPg.from + i);
+      return { text: n, n, title: n ? `row ${n} of ${lbPairs.length}, in the order the table `
+        + 'is sorted' : 'a duplicate of the row above' };
+    }
+    const r = rankOf(m);
+    return { text: r ? String(r.n) : '–', title: r ? `rank ${r.n} of ${r.of} ranked models on `
+      + 'this board' : 'preliminary — not ranked' };
+  };
+  const mtRows = lbPg.rows.map(({ m, other }, i) => ({ ...rowFor(m), rank: visRank ? rankFor(m, i)
+    : null, children: [
+      ...(other ? [{ ...rowFor(other, null, true), subLabel: `thinking ${other.thinkingRow ? 'on'
+        : thinkingOf(other) || 'off'}`, rank: visRank ? { text: '' } : null }] : []),
+      ...((state.lbDupOpen || {})[m.id] ? (dupsOf[m.id] || []).map(d => ({ ...rowFor(d, null, true),
+        subLabel: d.name, rank: visRank ? rankFor(d, -1) : null })) : [])] }));
+  // ---- the header (11f, 27): the short name, never cut, and its setup under
+  // it; the group row only on All tasks, where there is more than one group
+  const mtCols = visCols.filter(c => !['rank', 'name'].includes(c.key)).map(c => {
+    const tipRows = lbColTip(c);
+    const fixed = LB_FIXED.has(c.key);
+    const score = !!(c.task && !c.lower && !mabJudged(c.task) || c.area || c.cat || c.gguf
+      || (c.dm && c.dm !== 'tokens') || c.key === 'avg' || isCavg(c) || c.mmpcat);
+    // the short name, never cut; what it tests and how many questions under it
+    const n = c.task ? Math.max(0, ...DATA.models.map(m => { const x = cell(c.task, m.id) || {};
+      return x.n || x.answers || 0; })) : 0;
+    return { key: c.key, label: c.short || LB_SHORT[c.task] || (c.task ? benchName(c.task)
+        : c.label), full: tipRows.join(' — '), score,
+      num: !c.fact || c.key === 'params', group: grouped ? c.group || '' : '',
+      sub: c.task ? [((mtBench(benchName(c.task)) || {}).what || c.group || '').toLowerCase(),
+        n ? n.toLocaleString('en') : ''].filter(Boolean).join(' · ') : '',
+      attrs: { 'data-col': c.key, 'data-task': c.task || null, 'data-area': c.area || null,
+        'data-jarea': c.jarea || null, 'data-tip': JSON.stringify(tipRows),
+        ...(fixed ? { 'data-lcol': c.key } : layoutDrag(LK, c.key, lgroup(c))) },
+      extra: [
         // 14.4.4: a restricted set's badge, beside its name (and its GGUF column's)
-        // (Pro's categories carry it once, on their group's heading)
         rBadge(restrictOf(c.task || c.gguf), { 'data-col-restriction': c.key }),
         // 14.3: until the paper's three models land within 3 points
         c.task === MMP && mmpProvisional() ? el('span', { class: 'hkey', 'data-mmp-provisional': '1',
           text: 'provisional key' }) : '',
-        sortedBy(c) ? el('span', { class: 'dir', text: state.sort.dir > 0 ? ' ▲' : ' ▼' }) : '',
-        // 12o.1: its ⋯ and its width
         ...layoutBits(LK, c.key, c.label, { movable: !fixed,
-          task: c.task && canBrowse(c.task) ? c.task : null }));
-    })));
-
-  // ---- a cell (11f): the number only. A leader — the column's best, or
-  // inside its noise — is bold, and tinted with Tint on; nothing else is.
-  // The ± is the cell's tooltip (hover or focus), in the opened row, and on
-  // every cell with "Show ± errors"
-  const one = (c, m, v, se, fmt, extra = {}) => {
-    const t = leaders[c.key];
-    const lead = !!(t && v != null && t.lead.has(m.id));
-    const txt = v == null ? '—' : fmt(v);
-    const { title, ...rest } = extra;
-    return el('td', { class: 'num tcell' + (lead ? ' lead' : ''),
-        style: lead && L.tint ? 'background:var(--heat-3)' : null,
-        'data-lead': lead ? '1' : null, tabindex: v != null ? '0' : null,
-        'data-watch': `lb|${m.id}|${c.key}`,
-        'data-tip': v == null ? null : JSON.stringify([txt + (se != null ? ` ± ${se}` : ''),
-          `${m.name} · ${c.short || c.label}`,
-          ...(lead ? [t.best.id === m.id ? 'best in the column' : 'within the noise of the best']
-            : []), ...(title ? [title] : [])]),
-        ...rest },
-      lead ? el('b', { text: txt }) : txt,
-      // a thin space: the error belongs to the number
-      se != null && state.lbSe ? el('span', { class: 'se', text: `\u2009±${se}` }) : '');
-  };
-  const pctn = v => (100 * v).toFixed(1);
-  const ncols = visCols.length;
-  // 12z C7: the DeviceMark chip is its own view: names keep what tells two
-  // setups of one file apart, and Standard's ranks and "prelim" are not in it
-  const dmv = L.view === 'standard' && !L.cols && L.chip === 'devicemark';
-  const lbShort = shortNames(rows.map(m => m.name), 26);
-  const tbody = el('tbody', {});
-  rows.forEach(m => {
-    // 12b: a row opens the model page — the detail lives there, not in a
-    // row that expands
-    const tr = el('tr', { class: 'clickrow' + (m.duplicateOf && dupsOf[m.duplicateOf] ? ' duprow' : ''),
-      'data-lb-row': m.id,
-      onclick: e => {
-        // links, buttons, checkboxes and badges with a job of their own keep it
-        if (e.target.closest('a, button, input, select, label, .badge[title]')) return;
-        navigate({ model: m.rowOf || m.dmHome || m.id, topic: null });
-      } },
-      visCols.map(c => {
-        if (c.key === 'rank') {
-          if (built) {
-            // an opened duplicate sits under its row and takes no number
-            const at = lbPg.rows.indexOf(m);
-            const n = at < 0 ? '' : String(lbPg.from + at);
-            return el('td', { class: 'rank pin0 num' },
-              el('span', { class: 'mono', 'data-row-n': n, text: n,
-                title: n ? `row ${n} of ${lbAll.length}, in the order the table is sorted`
-                  : 'a duplicate of the row above' }));
-          }
-          const r = rankOf(m);
-          return el('td', { class: 'rank pin0 num' },
-            el('span', { class: 'mono', text: r ? String(r.n) : '—',
-              title: r ? `rank ${r.n} of ${r.of} ranked models on this board`
-                       : 'preliminary — not ranked' }));
-        }
-        if (c.key === 'family') return el('td', { class: 'small', 'data-fact': 'family',
-          text: famOf(m) });
-        if (c.key === 'kind') return el('td', { class: 'small', 'data-fact': 'kind',
-          text: m.kind || '—' });
-        if (c.key === 'source') return el('td', { class: 'small', 'data-fact': 'source',
-          text: sourceWords(sourceOf(m)) });
-        // 16.3: Mobile-MMLU-Pro by category, on our key; a model that labelled
-        // the key is never ranked, here either
-        if (c.mmpcat) {
-          const x = ((m.mmp || {}).by_category || {})[c.mmpcat];
-          if (mmpLabelled(m.id)) return el('td', { class: 'num se', 'data-mmpcat-cell': c.mmpcat,
-            text: '—', title: 'it labelled the key: never ranked' });
-          if (!x || x.acc == null) return el('td', { class: 'num se', 'data-mmpcat-cell': c.mmpcat,
-            text: '—' });
-          return one(c, m, x.acc, null, pctn, { 'data-mmpcat-cell': c.mmpcat,
-            title: `on ${Number(x.n || 0).toLocaleString('en')} kept questions`
-              + (mmpProvisional() ? ' · provisional key' : '') });
-        }
-        if (c.key === 'flags') return el('td', { class: 'small', 'data-fact': 'flags' },
-          (m.tainted || []).length ? el('span', { class: 'badge taint', text: 'tainted',
-            title: 'trained on data derived from ' + m.tainted.join(', ') }) : '',
-          m.provisional ? el('span', { class: 'badge taint', text: 'provisional' }) : '');
-        // 11e: one clipped line — the name ellipsises, the badges and the
-        // duplicate toggle follow inside the cell's own width, and nothing
-        // paints into Params
-        if (c.key === 'name') return el('td', { class: 'model pin', 'data-model': m.id,
-            style: `--fam:${famColor(m)}`,
-            title: modelSentence(m) + `\n\nfamily: ${famOf(m)}\n` + m.id
-              // 16b: the rule, where the row's badge may give way
-              + (!m.thinkingRow && thinkRuleView(L) && canSwitchThinking(m.dmHome || m.id)
-                ? '\n\nAsked with thinking off. ' + THINKING_RULE_WORDS : '') },
-          el('div', { class: 'mcell' },
-            // 12m.1: tick two to eight rows, then Compare ▸
-            L.view === 'standard' ? el('input', { type: 'checkbox', class: 'cmptick',
-              'data-cmp-tick': m.id, 'aria-label': 'compare ' + m.name,
-              title: 'Tick two to eight models to compare them',
-              checked: (L.ticks || []).includes(m.id) ? '' : null,
-              onchange: e => { const t = new Set(L.ticks || []);
-                if (e.target.checked) t.add(m.id); else t.delete(m.id);
-                L.ticks = [...t]; render(); } }) : '',
-            mnameLink(m, lbShort, { href: '#model=' + encodeURIComponent(m.rowOf || m.dmHome || m.id) }),
-            ckBadge(m) || (m.kind === 'instruct'
-              ? el('span', { class: 'badge instruct', text: 'instruct' })
-              : el('span', { class: 'badge', text: 'base' })),
-            phoneTag(m) || servedTag(m.dmHome || m.id),
-            // 12h.1: a thinking row, or a model that cannot stop thinking —
-            // 16b: and where the rule is the suite's, one asked with it off
-            thinkBadge(m, thinkRuleView(L)),
-            // a thinking row has only these three: Standard's "preliminary" is not its.
-            // 16.8: "prelim 0/7" counts Standard's required benchmarks: Standard's alone
-            m.thinkingRow || m.served || ggufOnly(m) || dmv || lbTest(L) !== 'standard' ? ''
-              : warnBadge(m) || '', dupBadge(m) || '',
-            dupsOf[m.id] ? dupToggle(m, dupsOf[m.id]) : ''));
-        if (c.key === 'params') {
-          // 16.1: the board's one size — entered, the harness's, the file's or
-          // its base model's — total, and active where they differ
-          return el('td', { class: 'num', 'data-params-src': m.paramsSrc || null,
-              title: [sizeTip(m) || (m.params == null ? 'size not recorded' : ''), activeTip(m)]
-                .filter(Boolean).join('\n') },
-            P(m.params), activeOf(m)
-              ? el('span', { class: 'act', text: `${P(activeOf(m))} act` }) : '');
-        }
-        if (c.key === 'date') {
-          // 11f: "15 Sep"; the year only when it is not this one — 16.6: the
-          // viewer's own day, and in full on hover
-          const ms = testedMs(m);
-          return el('td', { class: 'num small nowrap', 'data-date': testedDay(m) || '',
-            title: ms ? whenFull(ms / 1000) : '', text: ms ? dateShort(ms / 1000) : '—' });
-        }
-        if (isCavg(c)) {
-          const ts = c.ts || L.cols, a = customAvg(m, ts);
-          const at = { 'data-cavg': m.id, 'data-cavg-method': c.method };
-          // 12m.1: a GGUF's own row, measured only in a setup, has no average here.
-          // 12o.1: a row with some of them says how many, and which it lacks
-          if (!a) {
-            const miss = ts.filter(t => benchVal(t, m.id) == null);
-            const have = ts.length - miss.length;
-            return el('td', { class: 'num se', ...at,
-              'data-cavg-missing': miss.length && have ? miss.join(',') : null,
-              title: miss.length && have ? 'no ' + miss.map(benchName).join(', ') : null,
-              text: miss.length && have ? `— ${have}/${ts.length}` : '—' });
-          }
-          return one(c, m, a.v, a.se != null ? (100 * a.se).toFixed(1) : null, pctn, {
-            title: `mean over ${ts.map(benchName).join(', ')}, `
-              + (state.avgMode === 'raw' ? 'raw accuracy' : 'scaled so chance = 0'), ...at });
-        }
-        if ((c.key === 'avg' || isCavg(c)) && narrow(m)
-            || measures(c) && !canHave(m, c))
-          return el('td', { class: 'num na', 'data-na': c.key, title: c.gguf
-            ? 'Measured on a GGUF file with llama-perplexity: none is registered for this model.'
-            : m.served && !m.rowOf ? SERVED_LINE : G().tip });
-        if (c.key === 'avg') {
-          const a = officialAvg(m);
-          if (a == null) return el('td', { class: 'num se',
-            title: (m.missing || []).length ? 'missing: ' + m.missing.join(', ') : '',
-            text: `— ${m.nhave}/${m.nreq}` });
-          const se = officialSe(m);
-          return one(c, m, a, se != null ? (100 * se).toFixed(1) : null, pctn, {
-            title: `mean over the ${m.nreq} required tasks, `
-              + (state.avgMode === 'raw' ? 'raw accuracy' : 'scaled so chance = 0') });
-        }
-        if (c.judged) {
-          const v = jval(m, c);
-          if (v == null) return el('td', { class: 'num se', text: '—',
-            title: c.judged !== 'avg' && (m.tainted || []).includes(c.judged)
-              ? 'trained on data derived from this topic — shown on the model page, not ranked'
-              : m.judgeState ? (m.judgeState.reasons || []).join('; ') || 'not judged' : 'not judged' });
-          const prelim = !judgedOkM(m);
-          const td = prelim ? el('td', { class: 'num dim', text: num(v, 2) })
-            : one(c, m, v, null, x => num(x, 2));
-          if (c.judged === 'avg') td.dataset.judgedAvg = prelim ? 'preliminary' : 'counts';
-          return td;
-        }
-        if (c.jarea) {
-          const r = areaJudged(m, c.jarea);
-          if (r.v == null) return el('td', { class: 'num se', text: '—', 'data-jarea-cell': c.jarea,
-            title: `${r.k} of ${r.n} topics judged` + (judgedOkM(m) ? '' : ' — not ranked') });
-          return one(c, m, r.v, null, x => num(x, 2), { title: `${r.k} of ${r.n} topics judged`,
-            'data-jarea-cell': c.jarea });
-        }
-        if (c.area) {
-          const r = areaMmlu(m, c.area);
-          if (!r) return el('td', { class: 'num se', text: '—' });
-          const k = state.avgMode === 'raw' ? 1 : 1 / 0.75;
-          return one(c, m, areaScaled(r.v), (100 * r.se * k).toFixed(1), pctn,
-            { title: `${r.n} questions · % ${scaleWords()}`, 'data-area-cell': c.area });
-        }
-        if (c.cat) {
-          const g = (mmluCats(m) || {})[c.cat];
-          if (!g || g.score_report == null) return el('td', { class: 'num se', text: '—' });
-          if (g.n_report < CAT_MIN_N) return el('td', { class: 'num dim',
-            title: `${g.n_report} items — under ${CAT_MIN_N}, treat as noise`,
-            text: pctn(g.score_report) });
-          return one(c, m, g.score_report, null, pctn, { title: `${g.n_report} leaderboard-half items` });
-        }
-        if (c.rep) return repCell(m, c);
-        // 12x: DeviceMark's row: a score with half its 95% interval, the
-        // answered share, and the median tokens an answer
-        if (c.dm) {
-          const r = dmRowById(m.id), v = dmVal(m.id, c.dm);
-          if (v == null) return el('td', { class: 'num se', 'data-dm-cell': c.dm, text: '—',
-            title: r ? null : 'no DeviceMark run' + (m.thinkingRow ? ' with thinking on' : '') });
-          const from = [r.inherited ? r.inherited.line : '', r.paired ? 'beside DeviceMark’s own row'
-            : r.rank ? dmRankWords(r.rank) : ''].filter(Boolean).join(' · ');
-          if (c.dm === 'tokens') return el('td', { class: 'num tcell', 'data-dm-cell': 'tokens',
-            title: from || null, text: Math.round(v).toLocaleString('en') });
-          // 12z C7: answered is a share: its % sign
-          return one(c, m, v, c.dm === 'answered' ? null : dmHalfOf(m.id, c.dm),
-            c.dm === 'answered' ? x => pctn(x) + '%' : pctn,
-            { 'data-dm-cell': c.dm, title: [c.dm === 'answered' ? '' : 'the ± is half the 95% '
-              + 'interval', from].filter(Boolean).join(' · ') || null });
-        }
-        if (c.gguf) {
-          const g = ggufOf(m.id, c.gguf);
-          // 12m.1: a GGUF's own row holds its "as built" results alone; a
-          // setup's are that setup's row
-          if (!g) return el('td', { class: 'num se', 'data-gguf-cell': c.gguf,
-            text: (G().registered || {})[m.id] && !m.rowOf ? 'not measured yet' : '—' });
-          return one(c, m, g.v, g.se != null ? (100 * g.se).toFixed(1) : null, pctn,
-            { title: ggufWords(g), 'data-gguf-cell': c.gguf, 'data-gguf-full': String(g.full) });
-        }
-        const cc = cell(c.task, m.id);
-        const asked = c.task === 'do_not_answer' || c.task === 'xstest';
-        // 14.1: MT-Bench answered, the judge still to rate it (14.2: a trust set too)
-        const mtw = mabJudged(c.task) && !cc && ((m.mab || {})[c.task] || {}).n;
-        if (mtw) return el('td', { class: 'num se', 'data-mab-awaiting': m.id,
-          'data-mab-awaiting-task': c.task,
-          title: `${m.mab[c.task].awaiting} of ${m.mab[c.task].n} `
-            + `${c.task === MTBENCH ? 'turns' : 'replies'} wait for the judge · `
-            + (m.mab.note || 'a judging step marks them'), text: 'awaiting judge' });
-        if (cc && c.task === MTBENCH) return one(c, m, cc.v, cc.se ? (10 * cc.se).toFixed(2) : null,
-          x => (10 * x).toFixed(2), { 'data-mab-mtbench': m.id, title: mabJudgeLine(m) });
-        // 14.3: a model that labelled the key: its number, never ranked
-        if (c.task === MMP && mmpLabelled(m.id)) return el('td', { class: 'num se',
-          'data-mmp-labelled': m.id, text: 'labelled the key',
-          title: `${pctn(mmpLabelled(m.id).v)}% on the key it labelled: never ranked` });
-        if (cc && c.task === MMP) return one(c, m, cc.v, cc.se ? (100 * cc.se).toFixed(1) : null,
-          pctn, { 'data-mmp-cell': m.id, title: [`on ${(cc.n || 0).toLocaleString('en')} of `
-            + `${((m.mmp || {}).of || 0).toLocaleString('en')} kept questions`,
-          mmpProvisional() ? 'provisional key' : '',
-          (restrictOf(MMP) || {}).badge].filter(Boolean).join(' · ') });
-        if (!cc) return el('td', { class: 'num se', text: '—',
-          title: chatOnly(c.task) && m.kind === 'base'
-            ? 'instruct only: asked through the chat template'
-            : asked && (m.trust || {}).waiting || c.task === SIMPLEQA && (m.simpleqa || {}).waiting
-              ? 'waiting for the judge' : null });
-        if (isGen(c.task)) return genCell(c, m, cc, one, pctn);
-        if (isTrust(c.task)) return trustCell(c, m, cc, one, pctn);
-        // 12n.2: the share correct, with what it didn't attempt said beside it
-        if (c.task === SIMPLEQA) {
-          const sq = m.simpleqa || {}, na = sq.not_attempted;
-          const td = one(c, m, cc.v, cc.se ? (100 * cc.se).toFixed(1) : null, pctn,
-            { title: [na ? `not attempted ${pctn(na.v)}% (${na.n} of ${na.of})` : '',
-              ((DATA.shared || {}).simpleqa || {}).honest || ''].filter(Boolean).join(' · ') });
-          if (na) td.append(el('div', { class: 'cellnote', 'data-sq-na': m.id,
-            text: `${pctn(na.v)}% not attempted` }));
-          return td;
-        }
-        return one(c, m, cc.v, cc.se && !c.lower ? (100 * cc.se).toFixed(1) : null,
-          c.lower ? x => num(x, 3) : pctn);
-      }));
-    tbody.append(tr);
+          task: c.task && canBrowse(c.task) ? c.task : null })] };
   });
   // 12h.1: under Instruction & maths, a base model is not "not tested" but
   // "instruct only", said once here, never as an empty cell
@@ -16158,19 +16700,22 @@ function vLeaderboard(ms) {
       extra: vals.length ? llamaSwitch(llama, { 'data-llama-switch': m.id },
         'Show the llama.cpp columns') : null };
   };
-  tbody.append(...notTestedRows(notTested, ncols,
+  const extraRows = notTestedRows(notTested, mtCols.length + 1 + (visRank ? 1 : 0),
     genView ? 'generative' : L.view === 'exam' ? 'judged' : 'full',
     m => cannot(m) ? notHere(m) : custom ? missing(m)
       : genView ? (m.kind === 'base' ? 'instruct only' : null) : null,
-    !lbAll.length));
+    !lbAll.length);
   // what Copy as CSV copies: these rows, these columns, as shown (12h.2)
   state.lbTable = { cols: visCols, rows: lbAll, val, custom };
 
-  const table = layoutApply(el('table', { class: 'lb' + (L.tint ? ' tinted' : '')
-      + (visCols.some(c => c.key === 'rank') ? '' : ' norank') + (dmv ? ' dmview' : ''),
-      'data-lb-table': '1',
-      ...layoutAttrs(LK) },
-    thead, tbody));
+  // 27: drawn by the one table: groups, Ours first, in the order sorted here
+  const table = modelTable({ view: L.view === 'exam' ? 'exam' : lbTest(L), cols: mtCols,
+    rows: mtRows, groups: true, sorted: true, rank: visRank, hideEmpty: false, layout: LK,
+    colGroups: grouped, attrs: dmv ? { 'data-lb-dmview': '1' } : {}, extra: extraRows,
+    sort: { key: state.sort.key, dir: state.sort.dir },
+    onSort: key => { const c = cols.find(x => x.key === key) || {};
+      state.sort = { key, dir: state.sort.key === key ? -state.sort.dir
+        : (key === 'name' ? 1 : c.lower ? 1 : -1) }; render(); } });
   return [el('div', { class: 'card', 'data-lb-card': '1' },
       ...modelsHead(L.view === 'exam' ? judgeChecked() : ''),
       lbToolbar(ms, cols, shown, nHidden, lbCounts),
@@ -16215,11 +16760,9 @@ function vLeaderboard(ms) {
         'All ranked', () => lbSet({ models: null }), { 'data-no-models': '1' })
       : !rowsIn.length ? empty('No models match these filters.', 'Clear all', lbClearAll,
         { 'data-no-match': '1' })
-        : hfade('lb', el('div', { class: 'lb-wrap stick' + (state.lbWide ? ' hscroll' : ''),
-          'data-hkeep': 'lb' }, table)),
-      el('p', { class: 'lbcap', 'data-lb-caption': '1', text: 'Bold = best in the column or '
-        + 'within its noise · hover a score for its ± error · hover a column name for its setup · '
-        + 'click a row for the model' }),
+        : table,
+      el('p', { class: 'lbcap', 'data-lb-caption': '1', text: 'Hover a column name for its '
+        + 'setup · click a row for the model' }),
       lbHowTo(ms)),
     // 14.4: the full Mobile-MMLU's own table — 16.3: under Mobile ▸ Mobile-MMLU's
     L.view === 'standard' && L.chip === 'mmlu' && !custom ? mmfCard() : '',
@@ -16390,7 +16933,7 @@ function motionOff() { return matchMedia('(prefers-reduced-motion: reduce)').mat
 // ---- the toolbar: one row ---------------------------------------------------
 // 16.3: Row 2 — Group ▾, Models ▾, Filters ▾, Columns ▾ — the saved views,
 // and Row 3: a chip for each filter on, Clear all, and how many models
-function lbToolbar(ms, cols, shown, nHidden, counts = null) {
+function lbToolbar(ms, cols, shown, nHidden, counts = null, colsPill = null) {
   const L = lbS(), test = lbTest(L);
   // the benchmarks in view now, for Columns ▾ and the Chart: read when used,
   // as the panel outlives the render that built it
@@ -16426,7 +16969,9 @@ function lbToolbar(ms, cols, shown, nHidden, counts = null) {
       el('div', { class: 'pickers', 'data-pickers': '1' },
         // 21d: When ▾ in view, beside Group and Models
         LB_GROUPS[test] ? lbGroupPill(test) : '', lbModelsPill(ms), whenPill(ms), toggle,
-        colsHere ? lbColumnsPill(cols, shown, nHidden) : '',
+        colsPill || (colsHere ? lbColumnsPill(cols, shown, nHidden) : ''),
+        // 27: one row a model; which thinking setting it shows
+        ms.some(m => m.thinkingRow) ? mtThinkPill() : '',
         // 16.4: the Chart's Highlight ▾, Benchmarks ▸ Standard's before
         L.show === 'chart' && !lbChartWhy(L) && !(L.chip === 'devicemark' && !L.cols)
           ? hlPill(lbFilter(ms), (L.hl || []).slice(0, 3)) : '',
@@ -16904,16 +17449,6 @@ function layoutGroupDrag(key, group) {
       state.ldrag = null;
       layoutMoveGroup(key, d.table, d.groupHead, { group, after: e.clientX > r.left + r.width / 2 }); },
     ondragend: () => { state.ldrag = null; } };
-}
-// 12n.1: a name in a table's Model column. Under 600px a long one wraps to two
-// lines; the words it shares at the front with the table's others give way
-// first (shortNames), never its end — the full name stays its label
-function mnameLink(m, short, attrs = {}) {
-  const s = short && short.get(m.name);
-  return el('a', { class: 'mname mlink', 'aria-label': s && s !== m.name ? m.name : null,
-      title: m.name, ...attrs },
-    s && s !== m.name ? [el('span', { class: 'mn-full', text: m.name }),
-      el('span', { class: 'mn-short', 'aria-hidden': 'true', text: s })] : m.name);
 }
 // 12n.1: a picker group's own tick box — ticked, mixed or empty, as its
 // members are — and "all · none" beside its name. A click on the box ticks
@@ -27808,23 +28343,46 @@ async function latestLoad(id) {
   R.latestAt = Date.now();
   if (state.tab === 'leaderboard' && lbS().view === 'latest') render();
 }
+// 27: a benchmark of the report as a column: its short name, never cut, and
+// what it tests with how many questions under it ("science · 198 × 4")
+function mtAskedShort(n, b) {
+  if (!n) return '';
+  const k = (b && b.epochs) || 1, q = Math.round(n / k);
+  return k > 1 && q * k === n ? `${rpN(q)} × ${k}` : rpN(n);
+}
+function mtReportCol(b, rows) {
+  const m = mtBench(b.label) || mtBench(b.epoch) || {};
+  const n = Math.max(0, ...rows.filter(r => r.ours).map(r => (r.cells[b.key] || {}).answers || 0));
+  return { key: b.key, label: m.short || b.label, full: b.label, score: true,
+    sub: [m.what, mtAskedShort(n, b)].filter(Boolean).join(' · '),
+    attrs: { 'data-latest-col': b.key } };
+}
+// a report row's published cell: the number, its source's letter, the rest on hover
+function mtTheirCell(c, t, b) {
+  if (!c || c.v == null) return { v: null, why: (c && c.why) || '', attrs: { 'data-latest-cell': b.key } };
+  const tip = c.src === 'card' ? `${c.card}: ${c.setting}${c.date ? ` · ${c.date}` : ''}`
+    + (c.entered_at ? ` · entered ${c.entered_at}${c.by ? ' by ' + c.by : ''}` : '')
+    : c.src === 'epoch_external' ? `Epoch AI, ${c.setting} (not Epoch’s own run)`
+    : 'Epoch AI’s own run' + (c.date ? ` · ${c.date}` : '');
+  const letter = mtLetter(c.src, t.publishedBy || t.maker);
+  return { v: c.v, text: rpNum(c.v) + (c.dagger ? '†' : ''), se: c.se ? rpNum(c.se) : null,
+    seV: c.se || null, date: c.date || '', pub: { letter, tip: `${MT_LETTERS[letter]}: ${tip}`,
+      url: c.src === 'card' ? c.url : '' }, tip: [tip, ...(c.note ? [c.note] : [])],
+    attrs: { 'data-latest-cell': b.key, 'data-latest-src': c.src } };
+}
 function lbLatest(ms) {
-  const g = glance(), R = RPS(), d = R.data[g.report], L = lbS();
+  const g = glance(), R = RPS(), d = R.data[g.report], L = lbS(), S = mtS('latest');
   // read again a minute on, as the report's own view is
   if ((!d || Date.now() - (R.latestAt || 0) > 60000) && netReady()) latestLoad(g.report);
-  const bar = el('div', { class: 'lbbar narrow' },
-    el('div', { class: 'chiprow', 'data-lb-row2': '1' },
-      el('div', { class: 'pickers', 'data-pickers': '1' }, whenPill(ms))));
   const card = el('div', { class: 'card', 'data-lb-card': '1', 'data-latest': g.report },
-    ...modelsHead(), bar);
+    ...modelsHead());
   if (!d) {
-    card.append(R.latestErr ? el('p', { class: 'warn', text: 'The report couldn’t be read: '
+    card.append(el('div', { class: 'lbbar narrow' }, el('div', { class: 'chiprow',
+      'data-lb-row2': '1' }, el('div', { class: 'pickers', 'data-pickers': '1' }, whenPill(ms)))),
+    R.latestErr ? el('p', { class: 'warn', text: 'The report couldn’t be read: '
       + R.latestErr }) : skeleton(5, { 'data-loading': 'latest' }));
     return [card];
   }
-  const benches = (d.glance.benchmarks || []).map(k => d.benchmarks.find(b => b.key === k))
-    .filter(Boolean);
-  const first = (benches[0] || {}).key;
   // When ▾ keeps our rows of its dates; a published row has none of ours
   const t = testedSel(L.tested);
   // 22: our rows the report marks "glance", as the published ones are
@@ -27834,37 +28392,93 @@ function lbLatest(ms) {
     const m = DATA.models.find(x => x.id === r.row);
     return m ? testedOk(t, m, L.date) : t.none;
   });
-  const rows = [...mine, ...d.theirs.filter(r => r.glance)].sort((p, q) =>
-    (((q.cells[first] || {}).v) ?? -1) - (((p.cells[first] || {}).v) ?? -1));
+  // 27: Columns ▾ — every benchmark of the report, its four at a glance by default
+  const every = d.benchmarks.map(b => mtReportCol(b, d.ours));
+  const dflt = (d.glance.benchmarks || []).filter(k => every.some(c => c.key === k));
+  const shown = mtColsShown('latest', every, dflt);
+  const benches = shown.map(k => d.benchmarks.find(b => b.key === k)).filter(Boolean);
+  const cols = [...shown.map(k => every.find(c => c.key === k)),
+    { key: 'src', label: 'Source', num: false, sortable: false }];
+  S.sort = S.sort && cols.some(c => c.key === S.sort.key) ? S.sort : { key: dflt[0], dir: -1 };
+  const rows = [];
+  for (const r of mine) {
+    const m = DATA.models.find(x => x.id === r.row);
+    const base = m ? mtRowOf(m) : { key: r.label, id: null, mark: 'here', colour: rpColour(r),
+      name: displayName({ name: r.label }), group: 'ours' };
+    const size = r.size ? `${(r.size / 1e9).toFixed(1)} GB` : undefined;
+    rows.push({ ...base, key: 'ours:' + r.label, colour: r.colour != null ? rpColour(r) : base.colour,
+      line: m ? mtLine(m, { group: base.group, size, thinking: thinkingOf(m) }) : '',
+      attrs: { 'data-latest-row': r.label, 'data-latest-ours': 'true' },
+      cells: Object.fromEntries([...benches.map(b => {
+        const c = r.cells[b.key];
+        if (!c || c.v == null) return [b.key, { v: null, why: (c && c.why) || 'not in yet',
+          attrs: { 'data-latest-cell': b.key } }];
+        const parts = [rpAsked(c.answers, b), c.ranOut ? `${rpN(c.ranOut)} answer`
+          + `${c.ranOut === 1 ? '' : 's'} ran out` : ''].filter(Boolean);
+        return [b.key, { v: c.v, text: rpNum(c.v), se: rpNum(c.se), seV: c.se, tip: parts,
+          attrs: { 'data-latest-cell': b.key } }];
+      }), ['src', { node: el('span', { 'data-latest-source': '1', text: `${r.note
+        ? r.note[0].toUpperCase() + r.note.slice(1) : 'Our run'} · ${r.status}` }), keep: false }]]) });
+  }
+  // a published model is one row: two sources of it are one row, each cell its
+  // newer number with its letter, the other on hover
+  const theirs = new Map();
+  for (const x of d.theirs.filter(r => r.glance)) {
+    const name = displayName({ name: x.label, published: true });
+    const parts = nameParts(x.label, { measured: false });
+    const maker = String(x.maker || '').replace(/\s*\(open\)\s*$/i, '');
+    const group = mtGroup({ name: x.label }, true, x.maker);
+    const cells = Object.fromEntries(benches.map(b => [b.key, mtTheirCell(x.cells[b.key], x, b)]));
+    const was = theirs.get(name);
+    if (!was) {
+      theirs.set(name, { key: 'theirs:' + x.label, id: null, mark: 'pub', name, group,
+        line: [maker, group === 'open' ? 'open' : 'closed', ...parts.line, x.note || '',
+          parts.thinking ? `thinking ${parts.thinking}` : ''].filter(Boolean).join(' · '),
+        labels: [x.label], sources: [x.source || 'Epoch AI'], cells,
+        attrs: { 'data-latest-row': x.label, 'data-latest-ours': 'false' } });
+      continue;
+    }
+    was.labels.push(x.label);
+    was.sources.push(x.source || 'Epoch AI');
+    was.attrs['data-latest-rows'] = was.labels.join('|');
+    for (const b of benches) {
+      const a = was.cells[b.key], c = cells[b.key];
+      if (c.v == null) continue;
+      if (a.v == null) { was.cells[b.key] = c; continue; }
+      const [win, lose] = (c.date || '') > (a.date || '') ? [c, a] : [a, c];
+      was.cells[b.key] = { ...win, tip: [...(win.tip || []), `also ${lose.text}`
+        + ` from ${MT_LETTERS[lose.pub.letter]}${lose.date ? ` (${lose.date})` : ''}`] };
+    }
+  }
+  for (const x of theirs.values()) {
+    const opened = REP().models.find(m => !m.measured
+      && displayName({ ...m, published: true }) === x.name) || null;
+    rows.push({ ...x, id: opened ? opened.id : null, href: opened
+      ? '#model=' + encodeURIComponent(opened.id) : null,
+      cells: { ...x.cells, src: { node: el('span', { 'data-latest-source': '1',
+        text: [...new Set(x.sources)].join(' · ') }), keep: false } } });
+  }
   const at = (d.sources.ours || {}).when;
   const from = el('p', { class: 'small se', 'data-latest-from': g.report },
     `From the ${d.id} report · as of ${at || 'no import yet'} · `,
     el('a', { href: '#tab=reports&report=' + encodeURIComponent(d.id),
       'data-latest-open': d.id, text: 'Open the report ▸',
       onclick: e => { e.preventDefault(); rpOpen(d.id); } }));
-  const table = el('div', { class: 'rp-scroll', 'data-latest-scroll': '1' },
-    el('table', { class: 'rp latest', 'data-latest-table': '1' },
-      el('thead', {}, el('tr', {}, el('th', { text: 'Model' }),
-        ...benches.map(b => el('th', { 'data-latest-col': b.key, text: b.label })),
-        el('th', { class: 'src', text: 'Source' }))),
-      el('tbody', {}, rows.map(m => el('tr', { 'data-latest-row': m.label,
-          'data-latest-ours': String(!!m.ours) },
-        rpName(m),
-        ...benches.map(b => m.ours ? rpOurCell(m.cells[b.key], b, true)
-          : rpTheirCell(m.cells[b.key])),
-        el('td', { class: 'src' + (m.ours ? ' rp-ours' : ''), 'data-latest-source': '1',
-          // 22: a row's note says what it is (Ornith-1.5: measured here, not the team's)
-          text: m.ours ? `${m.note ? m.note[0].toUpperCase() + m.note.slice(1) : 'Our run'}`
-            + ` · ${m.status}` : m.source || 'Epoch AI' }))))));
-  card.append(from, table,
-    el('p', { class: 'small se', 'data-latest-legend': '1', text: RP_SCORE_LEGEND
-      + ' † HLE from Epoch AI’s collection of other sources. A model card’s number has no ±; '
-      + '“card” links the card it is from. Published numbers are never ranked or averaged '
-      + 'with ours.' }),
-    t.span !== 'any' && mine.length < ours.length
-      ? el('p', { class: 'small se', 'data-latest-when': '1', text: `When ▾ keeps `
-        + `${mine.length} of our ${ours.length} runs; the published `
-        + 'models are always shown.' }) : '');
+  card.append(
+    el('div', { class: 'lbbar narrow' }, el('div', { class: 'chiprow', 'data-lb-row2': '1' },
+      el('div', { class: 'pickers', 'data-pickers': '1' }, whenPill(ms),
+        mtColumnsPill('latest', every, shown, dflt)), from)),
+    modelTable({ view: 'latest', attrs: { 'data-latest-table': '1' }, cols, rows, groups: true,
+      sort: S.sort, onSort: k => { S.sort = { key: k, dir: S.sort.key === k ? -S.sort.dir : -1 };
+        render(); },
+      groupNotes: { ours: 'measured here, same questions' },
+      foot: [el('p', { class: 'small se', 'data-latest-legend': '1', text: RP_SCORE_LEGEND
+        + ' † HLE from Epoch AI’s collection of other sources. A model card’s number has no ±. '
+        + 'Published numbers are never ranked or averaged with ours.' }),
+      t.span !== 'any' && mine.length < ours.length
+        ? el('p', { class: 'small se', 'data-latest-when': '1', text: `When ▾ keeps `
+          + `${mine.length} of our ${ours.length} runs; the published `
+          + 'models are always shown.' }) : ''] }));
   return [card];
 }
 // 21c: a report's full page — the one masein publishes, served by the board

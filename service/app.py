@@ -493,6 +493,8 @@ def results_payload() -> dict:
     # 21d: Models ▸ Latest — the report it reads, its picked rows, its benchmarks
     from . import reports
     _cache["payload"]["glance"] = reports.glance_meta()
+    # 27: our rows' colours, the same on every Models tab
+    _cache["payload"]["rowColours"] = reports.row_colours()
     _cache["at"] = now
     return _cache["payload"]
 

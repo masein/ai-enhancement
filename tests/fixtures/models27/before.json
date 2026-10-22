@@ -1,0 +1,1619 @@
+{
+ "chip=ondevice": {
+  "apple-fm__system__system": {
+   "#": "2",
+   "Answered": "60.5",
+   "Budget": "",
+   "Composite": "55.8 ±4.3",
+   "Device tok/s": "—",
+   "IFEval": "82.1",
+   "MATH": "44.0",
+   "MMLU-Pro": "41.3",
+   "Median tokens": "622",
+   "Model / setup": "Apple Foundation Model DeviceMark",
+   "Retention": "—",
+   "Server tok/s": "n/a"
+  },
+  "gemini-flash__api__api": {
+   "#": "☁",
+   "Answered": "98.0",
+   "Budget": "",
+   "Composite": "92.1 ±2.4",
+   "Device tok/s": "—",
+   "IFEval": "95.1",
+   "MATH": "92.0",
+   "MMLU-Pro": "89.3",
+   "Median tokens": "—",
+   "Model / setup": "Gemini Flash (cloud) DeviceMark",
+   "Retention": "—",
+   "Server tok/s": "n/a"
+  },
+  "gemini-pro__api__api": {
+   "#": "☁",
+   "Answered": "96.0",
+   "Budget": "",
+   "Composite": "90.5 ±2.7",
+   "Device tok/s": "—",
+   "IFEval": "96.7",
+   "MATH": "88.0",
+   "MMLU-Pro": "86.7",
+   "Median tokens": "—",
+   "Model / setup": "Gemini Pro (cloud) DeviceMark",
+   "Retention": "—",
+   "Server tok/s": "n/a"
+  },
+  "gemma-4-e2b__int4__litertlm": {
+   "#": "=4",
+   "Answered": "80.1",
+   "Budget": "",
+   "Composite": "52.9 ±4.2",
+   "Device tok/s": "57",
+   "IFEval": "76.3",
+   "MATH": "34.0",
+   "MMLU-Pro": "48.5",
+   "Median tokens": "868",
+   "Model / setup": "Gemma 4 E2B (int4) DeviceMark",
+   "Retention": "—",
+   "Server tok/s": "n/a"
+  },
+  "granite-4.0-h-1b__int8hu__aimodel": {
+   "#": "=4",
+   "Answered": "97.0",
+   "Budget": "",
+   "Composite": "52.5 ±4.1",
+   "Device tok/s": "31",
+   "IFEval": "79.6",
+   "MATH": "51.0",
+   "MMLU-Pro": "27.0",
+   "Median tokens": "455",
+   "Model / setup": "Granite-4.0-H-1B (int8hu) DeviceMark",
+   "Retention": "—",
+   "Server tok/s": "n/a"
+  },
+  "lfm2.5-1.2b__int8hu__aimodel": {
+   "#": "=1",
+   "Answered": "99.7",
+   "Budget": "",
+   "Composite": "68.2 ±3.8",
+   "Device tok/s": "45.5",
+   "IFEval": "88.4",
+   "MATH": "75.0",
+   "MMLU-Pro": "41.3",
+   "Median tokens": "561",
+   "Model / setup": "LFM2.5-1.2B (int8hu) DeviceMark",
+   "Retention": "—",
+   "Server tok/s": "n/a"
+  },
+  "nanbeige-3b__int8hu__aimodel": {
+   "#": "=11",
+   "Answered": "45.3",
+   "Budget": "",
+   "Composite": "31.7 ±4.1",
+   "Device tok/s": "16.9",
+   "IFEval": "1.3",
+   "MATH": "60.0",
+   "MMLU-Pro": "33.7",
+   "Median tokens": "3,585",
+   "Model / setup": "Nanbeige4.1-3B (int8hu) DeviceMark",
+   "Retention": "—",
+   "Server tok/s": "n/a"
+  },
+  "nemotron-4b__int8hu__aimodel": {
+   "#": "=1",
+   "Answered": "90.9",
+   "Budget": "",
+   "Composite": "theirs (int8, scored on a Mac; speed on iPhone 17 Pro): 61.4 ±3.6 ours: can’t run here",
+   "Device tok/s": "14.7",
+   "IFEval": "43.4",
+   "MATH": "83.0",
+   "MMLU-Pro": "57.6",
+   "Median tokens": "765",
+   "Model / setup": "Nemotron-3-Nano-4B (int8hu) DeviceMark",
+   "Retention": "—",
+   "Server tok/s": "n/a"
+  },
+  "qwen3.5-0.8b__int8hu__aimodel": {
+   "#": "10",
+   "Answered": "76.0",
+   "Budget": "",
+   "Composite": "41.9 ±4.2",
+   "Device tok/s": "72",
+   "IFEval": "56.6",
+   "MATH": "37.0",
+   "MMLU-Pro": "32.1",
+   "Median tokens": "828",
+   "Model / setup": "Qwen3.5-0.8B (int8hu) DeviceMark",
+   "Retention": "—",
+   "Server tok/s": "n/a"
+  },
+  "qwen3.5-2b__int8hu__aimodel": {
+   "#": "=1",
+   "Answered": "86.2 48.3 55.0",
+   "Budget": "",
+   "Composite": "theirs (int8, scored on a Mac; speed on iPhone 17 Pro): 62.1 ±4.4 ours (bf16, our battery): 43.3 ±13.3 ours (bf16, our battery, thinking): 57.8 ±13.6 modes differ · not a calibration point modes differ · not a calibration point",
+   "Device tok/s": "29",
+   "IFEval": "69.2 60.0 53.3",
+   "MATH": "66.0 30.0 70.0",
+   "MMLU-Pro": "51.0 40.0 50.0",
+   "Median tokens": "846 310 310",
+   "Model / setup": "Qwen3.5-2B (int8hu) DeviceMark · and ours",
+   "Retention": "—",
+   "Server tok/s": "n/a"
+  },
+  "qwen3.5-4b__int8hu__aimodel": {
+   "#": "=11",
+   "Answered": "33.5",
+   "Budget": "",
+   "Composite": "26.1 ±3.8",
+   "Device tok/s": "10.8",
+   "IFEval": "31.5",
+   "MATH": "31.0",
+   "MMLU-Pro": "15.8",
+   "Median tokens": "3,917",
+   "Model / setup": "Qwen3.5-4B (int8hu) DeviceMark",
+   "Retention": "—",
+   "Server tok/s": "n/a"
+  },
+  "served/DM-k4-LDA-phone-build-MTP": {
+   "#": "=1",
+   "Answered": "66.7",
+   "Budget": "",
+   "Composite": "65.0 ±13.1",
+   "Device tok/s": "— enter",
+   "IFEval": "70.0",
+   "MATH": "60.0",
+   "MMLU-Pro": "65.0",
+   "Median tokens": "310",
+   "Model / setup": "DM k4-LDA phone build, MTP ours",
+   "Retention": "—",
+   "Server tok/s": "—"
+  },
+  "served/DM-k4-LDA-phone-build-MTP · thinking": {
+   "#": "=1",
+   "Answered": "61.7",
+   "Budget": "",
+   "Composite": "66.7 ±11.9",
+   "Device tok/s": "— enter",
+   "IFEval": "50.0",
+   "MATH": "80.0",
+   "MMLU-Pro": "70.0",
+   "Median tokens": "310",
+   "Model / setup": "DM k4-LDA phone build, MTP · thinking ours",
+   "Retention": "—",
+   "Server tok/s": "—"
+  },
+  "youtu-2b__int8__aimodel": {
+   "#": "=4",
+   "Answered": "64.5",
+   "Budget": "",
+   "Composite": "52.3 ±4.4",
+   "Device tok/s": "23.3",
+   "IFEval": "62.1",
+   "MATH": "53.0",
+   "MMLU-Pro": "41.8",
+   "Median tokens": "2,893",
+   "Model / setup": "Youtu-LLM-2B (int8) DeviceMark",
+   "Retention": "—",
+   "Server tok/s": "n/a"
+  }
+ },
+ "view=everyday": {
+  "fx/good-750m": {
+   "Honesty": "21 of 21",
+   "Instructions": "21 of 21",
+   "Model": "good-750m",
+   "Quick maths": "21 of 21",
+   "Summarise": "22 of 22",
+   "Total": "149 of 149",
+   "Transform": "22 of 22",
+   "Understanding": "21 of 21",
+   "Writing": "21 of 21"
+  },
+  "fx/skewed-360m": {
+   "Honesty": "21 of 21",
+   "Instructions": "10 of 21",
+   "Model": "skewed-360m",
+   "Quick maths": "10 of 21",
+   "Summarise": "22 of 22",
+   "Total": "94 of 149",
+   "Transform": "10 of 22",
+   "Understanding": "11 of 21",
+   "Writing": "10 of 21"
+  }
+ },
+ "view=frontier": {
+  "reported/anthropic/claude-3.5-sonnet-october-2024": {
+   "Model": "Claude 3.5 Sonnet (October 2024)",
+   "arc-agi-2": "",
+   "gpqa diamond": "55.3",
+   "hle": "4.1†",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "56.9",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "8.5",
+   "simpleqa verified": ""
+  },
+  "reported/anthropic/claude-3.7-sonnet": {
+   "Model": "Claude 3.7 Sonnet",
+   "arc-agi-2": "",
+   "gpqa diamond": "79.7",
+   "hle": "8.0†",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "91.2",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "57.8",
+   "simpleqa verified": ""
+  },
+  "reported/anthropic/claude-haiku-4.5": {
+   "Model": "Claude Haiku 4.5",
+   "arc-agi-2": "",
+   "gpqa diamond": "71.2",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "96.4",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "66.7",
+   "simpleqa verified": "12.6"
+  },
+  "reported/anthropic/claude-opus-5.5": {
+   "Model": "Claude Opus 5.5 (max)",
+   "arc-agi-2": "",
+   "gpqa diamond": "90.6",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "100.0",
+   "simpleqa verified": "72.2"
+  },
+  "reported/deepseek/deepseek-r1": {
+   "Model": "DeepSeek-R1",
+   "arc-agi-2": "",
+   "gpqa diamond": "",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "",
+   "simpleqa verified": ""
+  },
+  "reported/deepseek/deepseek-r1-0528": {
+   "Model": "DeepSeek-R1-0528",
+   "arc-agi-2": "",
+   "gpqa diamond": "",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "",
+   "simpleqa verified": ""
+  },
+  "reported/deepseek/deepseek-v4-pro-max": {
+   "Model": "DeepSeek-V4-Pro Max",
+   "arc-agi-2": "",
+   "gpqa diamond": "",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "",
+   "simpleqa verified": ""
+  },
+  "reported/edge0/edge0-35b-a3b-preview": {
+   "Model": "Edge0-35B-A3B-preview",
+   "arc-agi-2": "",
+   "gpqa diamond": "",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "81.0published by Edge0",
+   "otis mock aime 2024-2025": "",
+   "simpleqa verified": ""
+  },
+  "reported/edge0/edge0-8b-a1b-preview": {
+   "Model": "Edge0-8B-A1B-preview",
+   "arc-agi-2": "",
+   "gpqa diamond": "",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "70.1published by Edge0",
+   "otis mock aime 2024-2025": "",
+   "simpleqa verified": ""
+  },
+  "reported/google/gemini-2.0-flash-feb-2025": {
+   "Model": "Gemini 2.0 Flash (Feb 2025)",
+   "arc-agi-2": "",
+   "gpqa diamond": "64.1",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "82.2",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "31.1",
+   "simpleqa verified": ""
+  },
+  "reported/google/gemini-2.5-flash-apr-2025": {
+   "Model": "Gemini 2.5 Flash (Apr 2025)",
+   "arc-agi-2": "",
+   "gpqa diamond": "",
+   "hle": "12.1†",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "73.1",
+   "simpleqa verified": ""
+  },
+  "reported/google/gemini-3.1-flash-lite": {
+   "Model": "Gemini 3.1 Flash-Lite (high)",
+   "arc-agi-2": "",
+   "gpqa diamond": "81.8",
+   "hle": "8.6†",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "80.0",
+   "simpleqa verified": ""
+  },
+  "reported/google/gemini-3.5-flash-lite": {
+   "Model": "Gemini 3.5 Flash-Lite (high)",
+   "arc-agi-2": "",
+   "gpqa diamond": "83.3",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "71.1",
+   "simpleqa verified": ""
+  },
+  "reported/google/gemini-3.8-flash": {
+   "Model": "Gemini 3.8 Flash (high)",
+   "arc-agi-2": "",
+   "gpqa diamond": "95.4",
+   "hle": "44.5†",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "98.9",
+   "simpleqa verified": "69.7"
+  },
+  "reported/google/gemma-3-27b": {
+   "Model": "Gemma 3 27B",
+   "arc-agi-2": "",
+   "gpqa diamond": "47.7",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "74.0",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "22.5",
+   "simpleqa verified": ""
+  },
+  "reported/google/gemma-4-26b-a4b": {
+   "Model": "Gemma 4 26B A4B (minimal)",
+   "arc-agi-2": "",
+   "gpqa diamond": "73.2",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "82.2",
+   "simpleqa verified": ""
+  },
+  "reported/google/gemma-4-31b-it": {
+   "Model": "Gemma 4 31B IT (minimal)",
+   "arc-agi-2": "",
+   "gpqa diamond": "75.8",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "73.3",
+   "simpleqa verified": ""
+  },
+  "reported/google/gemma-4-e2b": {
+   "Model": "Gemma 4 E2B",
+   "arc-agi-2": "",
+   "gpqa diamond": "43.4published by Google",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "94.6published by Google",
+   "math level 5": "",
+   "mmlu pro": "60.0published by Google",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "",
+   "simpleqa verified": ""
+  },
+  "reported/google/gemma-4-e4b": {
+   "Model": "Gemma 4 E4B",
+   "arc-agi-2": "",
+   "gpqa diamond": "58.6published by Google",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "96.7published by Google",
+   "math level 5": "",
+   "mmlu pro": "69.4published by Google",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "",
+   "simpleqa verified": ""
+  },
+  "reported/openai/gpt-4.1": {
+   "Model": "GPT-4.1",
+   "arc-agi-2": "",
+   "gpqa diamond": "66.9",
+   "hle": "5.4†",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "83.0",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "38.3",
+   "simpleqa verified": "31.1"
+  },
+  "reported/openai/gpt-5-mini": {
+   "Model": "GPT-5 mini (high)",
+   "arc-agi-2": "",
+   "gpqa diamond": "75.0",
+   "hle": "19.4†",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "97.8",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "86.7",
+   "simpleqa verified": "21.6"
+  },
+  "reported/openai/gpt-5-mini-2025-08-07": {
+   "Model": "GPT-5-mini 2025-08-07",
+   "arc-agi-2": "",
+   "gpqa diamond": "",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "83.7published by OpenAI",
+   "otis mock aime 2024-2025": "",
+   "simpleqa verified": ""
+  },
+  "reported/openai/gpt-5-nano": {
+   "Model": "GPT-5 nano (high)",
+   "arc-agi-2": "",
+   "gpqa diamond": "69.4",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "94.9",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "81.1",
+   "simpleqa verified": "11.7"
+  },
+  "reported/openai/gpt-5.5-instant": {
+   "Model": "GPT-5.5 Instant",
+   "arc-agi-2": "",
+   "gpqa diamond": "82.5",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "68.1",
+   "simpleqa verified": ""
+  },
+  "reported/openai/gpt-6-astra": {
+   "Model": "GPT-6 Astra (max)",
+   "arc-agi-2": "",
+   "gpqa diamond": "95.8",
+   "hle": "54.8†",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "100.0",
+   "simpleqa verified": "75.6"
+  },
+  "reported/openai/gpt-oss-120b": {
+   "Model": "gpt-oss-120b (high)",
+   "arc-agi-2": "",
+   "gpqa diamond": "75.8",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "80.8published by OpenAI",
+   "otis mock aime 2024-2025": "88.9",
+   "simpleqa verified": ""
+  },
+  "reported/openai/gpt-oss-20b": {
+   "Model": "gpt-oss-20b (medium)",
+   "arc-agi-2": "",
+   "gpqa diamond": "60.8",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "65.3",
+   "simpleqa verified": ""
+  },
+  "reported/openai/o1": {
+   "Model": "o1 (high)",
+   "arc-agi-2": "",
+   "gpqa diamond": "76.8",
+   "hle": "8.0†",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "94.7",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "73.3",
+   "simpleqa verified": "41.1"
+  },
+  "reported/openai/o3-mini": {
+   "Model": "o3-mini (high)",
+   "arc-agi-2": "",
+   "gpqa diamond": "77.0",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "96.5",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "76.9",
+   "simpleqa verified": "15.3"
+  },
+  "reported/openai/o4-mini": {
+   "Model": "o4-mini (high)",
+   "arc-agi-2": "",
+   "gpqa diamond": "79.6",
+   "hle": "18.1†",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "97.8",
+   "mmlu pro": "",
+   "mmlu-pro": "81.9published by OpenAI",
+   "otis mock aime 2024-2025": "81.7",
+   "simpleqa verified": "18.8"
+  },
+  "reported/ornith-ai/ornith-1.5-35b-a3b": {
+   "Model": "Ornith-1.5-35B-A3B",
+   "arc-agi-2": "",
+   "gpqa diamond": "89.2published by Ornith AI",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "",
+   "simpleqa verified": ""
+  },
+  "reported/prismml/bonsai-27b-1-bit": {
+   "Model": "Bonsai 27B (1-bit)",
+   "arc-agi-2": "",
+   "gpqa diamond": "",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "79.1published by PrismML",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "",
+   "simpleqa verified": ""
+  },
+  "reported/prismml/ternary-bonsai-2-2b": {
+   "Model": "Ternary Bonsai 2 2B",
+   "arc-agi-2": "",
+   "gpqa diamond": "39.6published by PrismML",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "85.8published by PrismML",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "",
+   "simpleqa verified": ""
+  },
+  "reported/prismml/ternary-bonsai-2-4b": {
+   "Model": "Ternary Bonsai 2 4B",
+   "arc-agi-2": "",
+   "gpqa diamond": "63.8published by PrismML",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "88.9published by PrismML",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "",
+   "simpleqa verified": ""
+  },
+  "reported/prismml/ternary-bonsai-2-9b": {
+   "Model": "Ternary Bonsai 2 9B",
+   "arc-agi-2": "",
+   "gpqa diamond": "69.9published by PrismML",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "90.0published by PrismML",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "",
+   "simpleqa verified": ""
+  },
+  "reported/qwen/qwen3-235b-a22b-thinking-2507": {
+   "Model": "Qwen3-235B-A22B-Thinking-2507",
+   "arc-agi-2": "",
+   "gpqa diamond": "",
+   "hle": "18.2published by Qwen",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "84.4published by Qwen",
+   "otis mock aime 2024-2025": "",
+   "simpleqa verified": ""
+  },
+  "reported/qwen/qwen3-30b-a3b-thinking": {
+   "Model": "Qwen3-30B-A3B Thinking",
+   "arc-agi-2": "",
+   "gpqa diamond": "",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "78.5published by Qwen",
+   "otis mock aime 2024-2025": "",
+   "simpleqa verified": ""
+  },
+  "reported/qwen/qwen3-30b-a3b-thinking-2507": {
+   "Model": "Qwen3-30B-A3B-Thinking-2507",
+   "arc-agi-2": "",
+   "gpqa diamond": "",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "80.9published by Qwen",
+   "otis mock aime 2024-2025": "",
+   "simpleqa verified": ""
+  },
+  "reported/qwen/qwen3.5-35b-a3b": {
+   "Model": "Qwen3.5-35B-A3B",
+   "arc-agi-2": "",
+   "gpqa diamond": "",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "85.3published by Qwen",
+   "otis mock aime 2024-2025": "",
+   "simpleqa verified": ""
+  },
+  "reported/qwen/qwen3.6-35b-a3b": {
+   "Model": "Qwen3.6-35B-A3B",
+   "arc-agi-2": "",
+   "gpqa diamond": "",
+   "hle": "21.4published by Qwen",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "85.2published by Qwen",
+   "otis mock aime 2024-2025": "",
+   "simpleqa verified": ""
+  },
+  "served/DM-k4-LDA-phone-build-MTP": {
+   "Model": "DM k4-LDA phone build, MTP ours thinking off",
+   "arc-agi-2": "",
+   "gpqa diamond": "",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "62.0measured here · lm_eval, n-shot unknown",
+   "math level 5": "",
+   "mmlu pro": "",
+   "mmlu-pro": "",
+   "otis mock aime 2024-2025": "",
+   "simpleqa verified": ""
+  },
+  "served/Qwen3.6-35B-A3B-BF16-lda-2610 · thinking": {
+   "Model": "…BF16-lda-2610 · thinking ours thinking",
+   "arc-agi-2": "8.5measured here · public set · 2 attempts (pass@2) · by code · 8% ran out of room (26 of 334), counted wrongran on rented GPU · RTX 5090",
+   "gpqa diamond": "84.8measured here · Epoch AI’s way · 4 runs (Epoch AI: 16) · by coderan on rented GPU · RTX 5090",
+   "hle": "20.7measured here · text-only questions · 1 run · by code · 2% ran out of room (47 of 2,158), counted wrongran on rented GPU · RTX 5090",
+   "humanity's last exam": "20.7measured here · text-only questions · 1 run · by code · 2% ran out of room (47 of 2,158), counted wrongran on rented GPU · RTX 5090",
+   "ifeval": "",
+   "math level 5": "98.9measured here · Epoch AI’s way · 1 run (Epoch AI: 8) · by code · 0% ran out of room (3 of 1,324), counted wrongran on rented GPU · RTX 5090",
+   "mmlu pro": "85.0measured here · TIGER-Lab's 5-shot prompt; the card's sampling, not temperature 0; no random guess when unread · 1 run · by coderan on rented GPU · RTX 5090",
+   "mmlu-pro": "85.0measured here · TIGER-Lab's 5-shot prompt; the card's sampling, not temperature 0; no random guess when unread · 1 run · by coderan on rented GPU · RTX 5090",
+   "otis mock aime 2024-2025": "85.0measured here · Epoch AI’s way · 8 runs (Epoch AI: 16) · by code · 11% ran out of room (39 of 360), counted wrongran on rented GPU · RTX 5090",
+   "simpleqa verified": "19.0measured here · Epoch AI’s way · 1 run · by code · 0% ran out of room (4 of 1,000), counted wrongran on rented GPU · RTX 5090"
+  },
+  "served/Qwen3.6-35B-A3B-Q2-lda-2610 · thinking": {
+   "Model": "…A3B-Q2-lda-2610 · thinking ours thinking",
+   "arc-agi-2": "4.2measured here · public set · 2 attempts (pass@2) · by code · 18% ran out of room (61 of 334), counted wrongran on rented GPU · RTX 5090",
+   "gpqa diamond": "81.8measured here · Epoch AI’s way · 4 runs (Epoch AI: 16) · by coderan on rented GPU · RTX 5090",
+   "hle": "19.1measured here · text-only questions · 1 run · by code · 2% ran out of room (46 of 2,158), counted wrongran on rented GPU · RTX 5090",
+   "humanity's last exam": "19.1measured here · text-only questions · 1 run · by code · 2% ran out of room (46 of 2,158), counted wrongran on rented GPU · RTX 5090",
+   "ifeval": "",
+   "math level 5": "98.2measured here · Epoch AI’s way · 1 run (Epoch AI: 8) · by code · 1% ran out of room (9 of 1,324), counted wrongran on rented GPU · RTX 5090",
+   "mmlu pro": "83.8measured here · TIGER-Lab's 5-shot prompt; the card's sampling, not temperature 0; no random guess when unread · 1 run · by code · 0% ran out of room (3 of 12,032), counted wrongran on rented GPU · RTX 5090",
+   "mmlu-pro": "83.8measured here · TIGER-Lab's 5-shot prompt; the card's sampling, not temperature 0; no random guess when unread · 1 run · by code · 0% ran out of room (3 of 12,032), counted wrongran on rented GPU · RTX 5090",
+   "otis mock aime 2024-2025": "83.3measured here · Epoch AI’s way · 8 runs (Epoch AI: 16) · by code · 11% ran out of room (39 of 360), counted wrongran on rented GPU · RTX 5090",
+   "simpleqa verified": "12.3measured here · Epoch AI’s way · 1 run · by code · 0% ran out of room (2 of 1,000), counted wrongran on rented GPU · RTX 5090"
+  },
+  "served/Qwen3.6-35B-A3B-Q4-lda-2610 · thinking": {
+   "Model": "…A3B-Q4-lda-2610 · thinking ours thinking",
+   "arc-agi-2": "7.5measured here · public set · 2 attempts (pass@2) · by code · 6% ran out of room (19 of 334), counted wrongran on rented GPU · RTX 5090",
+   "gpqa diamond": "85.1measured here · Epoch AI’s way · 4 runs (Epoch AI: 16) · by coderan on rented GPU · RTX 5090",
+   "hle": "21.5measured here · text-only questions · 1 run · by code · 2% ran out of room (47 of 2,158), counted wrongran on rented GPU · RTX 5090",
+   "humanity's last exam": "21.5measured here · text-only questions · 1 run · by code · 2% ran out of room (47 of 2,158), counted wrongran on rented GPU · RTX 5090",
+   "ifeval": "",
+   "math level 5": "99.2measured here · Epoch AI’s way · 1 run (Epoch AI: 8) · by code · 0% ran out of room (2 of 1,324), counted wrongran on rented GPU · RTX 5090",
+   "mmlu pro": "85.0measured here · TIGER-Lab's 5-shot prompt; the card's sampling, not temperature 0; no random guess when unread · 1 run · by coderan on rented GPU · RTX 5090",
+   "mmlu-pro": "85.0measured here · TIGER-Lab's 5-shot prompt; the card's sampling, not temperature 0; no random guess when unread · 1 run · by coderan on rented GPU · RTX 5090",
+   "otis mock aime 2024-2025": "86.1measured here · Epoch AI’s way · 8 runs (Epoch AI: 16) · by code · 9% ran out of room (31 of 360), counted wrongran on rented GPU · RTX 5090",
+   "simpleqa verified": "19.3measured here · Epoch AI’s way · 1 run · by code · 0% ran out of room (1 of 1,000), counted wrongran on rented GPU · RTX 5090"
+  },
+  "served/Qwen3.6-35B-A3B-Q4-original-k-8 · thinking": {
+   "Model": "…original-k-8 · thinking ours thinking",
+   "arc-agi-2": "5.8measured here · public set · 2 attempts (pass@2) · by code · 8% ran out of room (26 of 334), counted wrongran on rented GPU · RTX 5090",
+   "gpqa diamond": "86.5measured here · Epoch AI’s way · 4 runs (Epoch AI: 16) · by code · 0% ran out of room (1 of 792), counted wrongran on rented GPU · RTX 5090",
+   "hle": "21.5measured here · text-only questions · 1 run · by code · 2% ran out of room (53 of 2,158), counted wrongran on rented GPU · RTX 5090",
+   "humanity's last exam": "21.5measured here · text-only questions · 1 run · by code · 2% ran out of room (53 of 2,158), counted wrongran on rented GPU · RTX 5090",
+   "ifeval": "",
+   "math level 5": "98.9measured here · Epoch AI’s way · 1 run (Epoch AI: 8) · by code · 0% ran out of room (4 of 1,324), counted wrongran on rented GPU · RTX 5090",
+   "mmlu pro": "84.8measured here · TIGER-Lab's 5-shot prompt; the card's sampling, not temperature 0; no random guess when unread · 1 run · by coderan on rented GPU · RTX 5090",
+   "mmlu-pro": "84.8measured here · TIGER-Lab's 5-shot prompt; the card's sampling, not temperature 0; no random guess when unread · 1 run · by coderan on rented GPU · RTX 5090",
+   "otis mock aime 2024-2025": "85.0measured here · Epoch AI’s way · 8 runs (Epoch AI: 16) · by code · 11% ran out of room (41 of 360), counted wrongran on rented GPU · RTX 5090",
+   "simpleqa verified": "20.7measured here · Epoch AI’s way · 1 run · by code · 0% ran out of room (2 of 1,000), counted wrongran on rented GPU · RTX 5090"
+  },
+  "served/step1000-lda-2610 · thinking": {
+   "Model": "step1000-lda…10 · thinking ours thinking",
+   "arc-agi-2": "0.6measured here · public set · 2 attempts (pass@2) · by code · 10% ran out of room (32 of 334), counted wrongran on rented GPU · RTX 5090",
+   "gpqa diamond": "65.7measured here · Epoch AI’s way · 4 runs (Epoch AI: 16) · by code · 4% ran out of room (35 of 792), counted wrongran on rented GPU · RTX 5090",
+   "hle": "",
+   "humanity's last exam": "",
+   "ifeval": "",
+   "math level 5": "",
+   "mmlu pro": "71.4measured here · TIGER-Lab's 5-shot prompt; the card's sampling, not temperature 0; no random guess when unread · 1 run · by code · 5% ran out of room (595 of 12,032), counted wrongran on rented GPU · RTX 5090",
+   "mmlu-pro": "71.4measured here · TIGER-Lab's 5-shot prompt; the card's sampling, not temperature 0; no random guess when unread · 1 run · by code · 5% ran out of room (595 of 12,032), counted wrongran on rented GPU · RTX 5090",
+   "otis mock aime 2024-2025": "68.1measured here · Epoch AI’s way · 8 runs (Epoch AI: 16) · by code · 21% ran out of room (77 of 360), counted wrongran on rented GPU · RTX 5090",
+   "simpleqa verified": "4.9measured here · Epoch AI’s way · 1 run · by code · 2% ran out of room (22 of 1,000), counted wrongran on rented GPU · RTX 5090"
+  },
+  "served/step4000-lda-2610 · thinking": {
+   "Model": "step4000-lda…10 · thinking ours thinking",
+   "arc-agi-2": "1.4measured here · public set · 2 attempts (pass@2) · by code · 1% ran out of room (3 of 334), counted wrongran on rented GPU · RTX 5090",
+   "gpqa diamond": "74.2measured here · Epoch AI’s way · 4 runs (Epoch AI: 16) · by code · 0% ran out of room (3 of 792), counted wrongran on rented GPU · RTX 5090",
+   "hle": "12.6measured here · text-only questions · 1 run · by code · 5% ran out of room (111 of 2,158), counted wrongran on rented GPU · RTX 5090",
+   "humanity's last exam": "12.6measured here · text-only questions · 1 run · by code · 5% ran out of room (111 of 2,158), counted wrongran on rented GPU · RTX 5090",
+   "ifeval": "",
+   "math level 5": "97.0measured here · Epoch AI’s way · 1 run (Epoch AI: 8) · by code · 1% ran out of room (15 of 1,324), counted wrongran on rented GPU · RTX 5090",
+   "mmlu pro": "78.0measured here · TIGER-Lab's 5-shot prompt; the card's sampling, not temperature 0; no random guess when unread · 1 run · by code · 2% ran out of room (232 of 12,032), counted wrongran on rented GPU · RTX 5090",
+   "mmlu-pro": "78.0measured here · TIGER-Lab's 5-shot prompt; the card's sampling, not temperature 0; no random guess when unread · 1 run · by code · 2% ran out of room (232 of 12,032), counted wrongran on rented GPU · RTX 5090",
+   "otis mock aime 2024-2025": "77.5measured here · Epoch AI’s way · 8 runs (Epoch AI: 16) · by code · 13% ran out of room (46 of 360), counted wrongran on rented GPU · RTX 5090",
+   "simpleqa verified": "6.8measured here · Epoch AI’s way · 1 run · by code · 0% ran out of room (1 of 1,000), counted wrongran on rented GPU · RTX 5090"
+  }
+ },
+ "view=latest": {
+  "BF16": {
+   "Model": "BF16",
+   "Source": "Our run · 7 of 9 benchmarks in",
+   "gpqa": "84.8 ± 2.1",
+   "hle": "20.7 ± 0.9",
+   "mmlupro": "85.0 ± 0.3",
+   "otis": "85.0 ± 4.9"
+  },
+  "DeepSeek-R1-0528": {
+   "Model": "DeepSeek-R1-0528",
+   "Source": "Epoch AI; HLE, MMLU-Pro: DeepSeek card",
+   "gpqa": "76.3 ± 2.4",
+   "hle": "17.7 card",
+   "mmlupro": "85.0 card",
+   "otis": "66.4 ± 4.9"
+  },
+  "DeepSeek-V4-Pro (max)": {
+   "Model": "DeepSeek-V4-Pro (max)",
+   "Source": "Epoch AI; HLE, MMLU-Pro: DeepSeek card",
+   "gpqa": "89.6 ± 1.7",
+   "hle": "37.7 card",
+   "mmlupro": "87.5 card",
+   "otis": "96.7 ± 2.0"
+  },
+  "GPT-5 mini (high)": {
+   "Model": "GPT-5 mini (high)",
+   "Source": "Epoch AI; MMLU-Pro: Qwen card",
+   "gpqa": "75.0 ± 2.3",
+   "hle": "19.4†",
+   "mmlupro": "83.7 card",
+   "otis": "86.7 ± 4.3"
+  },
+  "GPT-6 Astra (max)": {
+   "Model": "GPT-6 Astra (max)",
+   "Source": "Epoch AI",
+   "gpqa": "95.8 ± 1.4",
+   "hle": "54.8†",
+   "mmlupro": "—",
+   "otis": "100.0"
+  },
+  "Ornith-1.5 Q4_K_M": {
+   "Model": "Ornith-1.5 Q4_K_M",
+   "Source": "Measured here, on its card's settings; not the team's model · Not scored yet",
+   "gpqa": "—",
+   "hle": "—",
+   "mmlupro": "—",
+   "otis": "—"
+  },
+  "Ornith-1.5-35B-A3B, its card": {
+   "Model": "Ornith-1.5-35B-A3B, its card",
+   "Source": "Ornith's model card (5-run average)",
+   "gpqa": "89.2 card · 5-run average",
+   "hle": "25.6 card · 5-run average",
+   "mmlupro": "—",
+   "otis": "—"
+  },
+  "Q2 (UD-Q2_K_XL)": {
+   "Model": "Q2 (UD-Q2_K_XL)",
+   "Source": "Our run · 7 of 9 benchmarks in",
+   "gpqa": "81.8 ± 2.3",
+   "hle": "19.1 ± 0.8",
+   "mmlupro": "83.8 ± 0.3",
+   "otis": "83.3 ± 4.9"
+  },
+  "Q4 (UD-Q4_K_XL)": {
+   "Model": "Q4 (UD-Q4_K_XL)",
+   "Source": "Our run · 7 of 9 benchmarks in",
+   "gpqa": "85.1 ± 2.1",
+   "hle": "21.5 ± 0.9",
+   "mmlupro": "85.0 ± 0.3",
+   "otis": "86.1 ± 4.7"
+  },
+  "Qwen3.5-35B-A3B": {
+   "Model": "Qwen3.5-35B-A3B",
+   "Source": "Epoch AI; HLE, MMLU-Pro: Qwen card",
+   "gpqa": "83.5 ± 2.2",
+   "hle": "22.4 card",
+   "mmlupro": "85.3 card",
+   "otis": "54.4 ± 6.2"
+  },
+  "Qwen3.6-35B-A3B, Qwen's report": {
+   "Model": "Qwen3.6-35B-A3B, Qwen's report",
+   "Source": "Qwen's model card",
+   "gpqa": "86.0 card",
+   "hle": "21.4 card",
+   "mmlupro": "85.2 card",
+   "otis": "—"
+  },
+  "gpt-oss-120b (high)": {
+   "Model": "gpt-oss-120b (high)",
+   "Source": "Epoch AI; HLE, MMLU-Pro: Qwen card",
+   "gpqa": "75.8 ± 2.7",
+   "hle": "14.9 card",
+   "mmlupro": "80.8 card",
+   "otis": "88.9 ± 4.5"
+  },
+  "o4-mini (high)": {
+   "Model": "o4-mini (high)",
+   "Source": "Epoch AI; MMLU-Pro: Qwen card (medium effort)",
+   "gpqa": "79.6 ± 2.4",
+   "hle": "18.1†",
+   "mmlupro": "81.9 card · medium effort",
+   "otis": "81.7 ± 4.7"
+  },
+  "step1000": {
+   "Model": "step1000",
+   "Source": "Our run · 20 of 21 chunks in",
+   "gpqa": "65.7 ± 2.8",
+   "hle": "—",
+   "mmlupro": "71.4 ± 0.4",
+   "otis": "68.1 ± 5.9"
+  },
+  "step4000": {
+   "Model": "step4000",
+   "Source": "Our run · 7 of 9 benchmarks in",
+   "gpqa": "74.2 ± 2.6",
+   "hle": "12.6 ± 0.7",
+   "mmlupro": "78.0 ± 0.4",
+   "otis": "77.5 ± 5.5"
+  },
+  "step8804": {
+   "Model": "step8804",
+   "Source": "Our run · Not scored yet",
+   "gpqa": "—",
+   "hle": "—",
+   "mmlupro": "—",
+   "otis": "—"
+  }
+ },
+ "view=mobile&group=all": {
+  "Qwen/Qwen3.5-2B": {
+   "dm:composite": "43.3",
+   "mobile_mmlu_pro": "—",
+   "name": "Qwen3.5-2B instruct thinking off",
+   "params": "2B"
+  },
+  "fx/good-750m": {
+   "dm:composite": "—",
+   "mobile_mmlu_pro": "90.0",
+   "name": "good-750m instruct",
+   "params": "750M"
+  },
+  "fx/skewed-360m": {
+   "dm:composite": "—",
+   "mobile_mmlu_pro": "labelled the key",
+   "name": "skewed-360m instruct",
+   "params": "360M"
+  },
+  "served/DM-k4-LDA-phone-build-MTP": {
+   "dm:composite": "65.0",
+   "mobile_mmlu_pro": "",
+   "name": "DM k4-LDA phone build, MTP base phone build thinking off",
+   "params": "—"
+  }
+ },
+ "view=mobile&group=devicemark": {
+  "Qwen/Qwen3.5-2B": {
+   "dm:answered": "48.3%",
+   "dm:composite": "43.3",
+   "dm:ifeval": "60.0",
+   "dm:math": "30.0",
+   "dm:mmlu_pro": "40.0",
+   "dm:tokens": "310",
+   "name": "Qwen3.5-2B instruct thinking off",
+   "params": "2B"
+  },
+  "Qwen/Qwen3.5-2B · thinking": {
+   "dm:answered": "55.0%",
+   "dm:composite": "57.8",
+   "dm:ifeval": "53.3",
+   "dm:math": "70.0",
+   "dm:mmlu_pro": "50.0",
+   "dm:tokens": "310",
+   "name": "Qwen3.5-2B · thinking instruct thinking",
+   "params": "2B"
+  },
+  "served/DM-k4-LDA-phone-build-MTP": {
+   "dm:answered": "66.7%",
+   "dm:composite": "65.0",
+   "dm:ifeval": "70.0",
+   "dm:math": "60.0",
+   "dm:mmlu_pro": "65.0",
+   "dm:tokens": "310",
+   "name": "DM k4-LDA phone build, MTP base phone build thinking off",
+   "params": "—"
+  },
+  "served/DM-k4-LDA-phone-build-MTP · thinking": {
+   "dm:answered": "61.7%",
+   "dm:composite": "66.7",
+   "dm:ifeval": "50.0",
+   "dm:math": "80.0",
+   "dm:mmlu_pro": "70.0",
+   "dm:tokens": "310",
+   "name": "DM k4-LDA phone build, MTP · thinking base phone build thinking",
+   "params": "—"
+  }
+ },
+ "view=mobile&group=mmlu": {
+  "fx/good-750m": {
+   "mmpcat:Academic & Learning": "100.0",
+   "mmpcat:Business & Career": "100.0",
+   "mmpcat:Culture & Society": "100.0",
+   "mmpcat:Environment": "—",
+   "mmpcat:Health & Safety": "0.0",
+   "mmpcat:Home & Family": "100.0",
+   "mmpcat:Lifestyle & Personal": "100.0",
+   "mmpcat:Miscellaneous": "100.0",
+   "mmpcat:Technology & Digital": "100.0",
+   "mobile_mmlu_pro": "90.0",
+   "name": "good-750m instruct",
+   "params": "750M"
+  },
+  "fx/skewed-360m": {
+   "mmpcat:Academic & Learning": "—",
+   "mmpcat:Business & Career": "—",
+   "mmpcat:Culture & Society": "—",
+   "mmpcat:Environment": "—",
+   "mmpcat:Health & Safety": "—",
+   "mmpcat:Home & Family": "—",
+   "mmpcat:Lifestyle & Personal": "—",
+   "mmpcat:Miscellaneous": "—",
+   "mmpcat:Technology & Digital": "—",
+   "mobile_mmlu_pro": "labelled the key",
+   "name": "skewed-360m instruct",
+   "params": "360M"
+  }
+ },
+ "view=mobile&group=mobileaibench": {
+  "fx/good-750m": {
+   "mab_cnndm": "99.7",
+   "mab_dolly": "99.3",
+   "mab_hotpotqa": "100.0",
+   "mab_sql": "100.0",
+   "mab_xsum": "99.8",
+   "name": "good-750m instruct",
+   "params": "750M"
+  },
+  "fx/skewed-360m": {
+   "mab_cnndm": "0.4",
+   "mab_dolly": "0.1",
+   "mab_hotpotqa": "0.2",
+   "mab_sql": "0.0",
+   "mab_xsum": "0.1",
+   "name": "skewed-360m instruct",
+   "params": "360M"
+  }
+ },
+ "view=standard&group=all": {
+  "fx/below-135m-it": {
+   "arc_challenge": "13.3",
+   "arc_easy": "15.0",
+   "avg": "6.7",
+   "hellaswag": "15.0",
+   "mmlu": "16.9",
+   "name": "below-135m-it instruct",
+   "params": "135M",
+   "piqa": "18.3",
+   "rank": "9",
+   "winogrande": "18.3"
+  },
+  "fx/chance-160m": {
+   "arc_challenge": "28.3",
+   "arc_easy": "25.0",
+   "avg": "8.6",
+   "hellaswag": "23.8",
+   "mmlu": "29.1",
+   "name": "chance-160m base",
+   "params": "162M",
+   "piqa": "50.0",
+   "rank": "5",
+   "winogrande": "51.7"
+  },
+  "fx/good-750m": {
+   "arc_challenge": "70.0",
+   "arc_easy": "71.7",
+   "avg": "52.1",
+   "hellaswag": "72.5",
+   "mmlu": "64.1",
+   "name": "good-750m instruct",
+   "params": "750M",
+   "piqa": "66.7",
+   "rank": "3",
+   "winogrande": "73.3"
+  },
+  "fx/good-750m-tuned-skill": {
+   "arc_challenge": "90.0",
+   "arc_easy": "88.3",
+   "avg": "81.1",
+   "hellaswag": "90.0",
+   "mmlu": "94.4",
+   "name": "good-750m-tuned-skill base",
+   "params": "750M",
+   "piqa": "91.7",
+   "rank": "1",
+   "winogrande": "93.3"
+  },
+  "fx/good-750m-tuned-test": {
+   "arc_challenge": "83.3",
+   "arc_easy": "85.0",
+   "avg": "67.4",
+   "hellaswag": "85.0",
+   "mmlu": "82.5",
+   "name": "good-750m-tuned-test base",
+   "params": "750M",
+   "piqa": "80.0",
+   "rank": "2",
+   "winogrande": "75.0"
+  },
+  "fx/miscount-1b": {
+   "arc_challenge": "21.7",
+   "arc_easy": "21.7",
+   "avg": "7.0",
+   "hellaswag": "23.8",
+   "mmlu": "26.3",
+   "name": "miscount-1b base",
+   "params": "1B",
+   "piqa": "36.7",
+   "rank": "7",
+   "winogrande": "50.0"
+  },
+  "fx/one-option-70m": {
+   "arc_challenge": "25.0",
+   "arc_easy": "25.0",
+   "avg": "6.9",
+   "hellaswag": "25.0",
+   "mmlu": "25.6",
+   "name": "one-option-70m base",
+   "params": "70M",
+   "piqa": "50.0",
+   "rank": "8",
+   "winogrande": "50.0"
+  },
+  "fx/short-pick-410m": {
+   "arc_challenge": "20.0",
+   "arc_easy": "21.7",
+   "avg": "9.1",
+   "hellaswag": "25.0",
+   "mmlu": "21.9",
+   "name": "short-pick-410m base",
+   "params": "410M",
+   "piqa": "40.0",
+   "rank": "4",
+   "winogrande": "58.3"
+  },
+  "fx/skewed-360m": {
+   "arc_challenge": "23.3",
+   "arc_easy": "21.7",
+   "avg": "7.7",
+   "hellaswag": "27.5",
+   "mmlu": "21.6",
+   "name": "skewed-360m instruct",
+   "params": "360M",
+   "piqa": "51.7",
+   "rank": "6",
+   "winogrande": "46.7"
+  },
+  "local/nodiag-step400": {
+   "arc_challenge": "—",
+   "arc_easy": "21.7",
+   "avg": "— 2/7",
+   "hellaswag": "23.8",
+   "mmlu": "—",
+   "name": "nodiag-step400 uploaded prelim 2/7",
+   "params": "70M",
+   "piqa": "—",
+   "rank": "—",
+   "winogrande": "—"
+  }
+ },
+ "view=standard&group=commonsense": {
+  "fx/below-135m-it": {
+   "avg": "6.7",
+   "hellaswag": "15.0",
+   "name": "below-135m-it instruct",
+   "params": "135M",
+   "piqa": "18.3",
+   "rank": "9",
+   "winogrande": "18.3"
+  },
+  "fx/chance-160m": {
+   "avg": "8.6",
+   "hellaswag": "23.8",
+   "name": "chance-160m base",
+   "params": "162M",
+   "piqa": "50.0",
+   "rank": "5",
+   "winogrande": "51.7"
+  },
+  "fx/good-750m": {
+   "avg": "52.1",
+   "hellaswag": "72.5",
+   "name": "good-750m instruct",
+   "params": "750M",
+   "piqa": "66.7",
+   "rank": "3",
+   "winogrande": "73.3"
+  },
+  "fx/good-750m-tuned-skill": {
+   "avg": "81.1",
+   "hellaswag": "90.0",
+   "name": "good-750m-tuned-skill base",
+   "params": "750M",
+   "piqa": "91.7",
+   "rank": "1",
+   "winogrande": "93.3"
+  },
+  "fx/good-750m-tuned-test": {
+   "avg": "67.4",
+   "hellaswag": "85.0",
+   "name": "good-750m-tuned-test base",
+   "params": "750M",
+   "piqa": "80.0",
+   "rank": "2",
+   "winogrande": "75.0"
+  },
+  "fx/miscount-1b": {
+   "avg": "7.0",
+   "hellaswag": "23.8",
+   "name": "miscount-1b base",
+   "params": "1B",
+   "piqa": "36.7",
+   "rank": "7",
+   "winogrande": "50.0"
+  },
+  "fx/one-option-70m": {
+   "avg": "6.9",
+   "hellaswag": "25.0",
+   "name": "one-option-70m base",
+   "params": "70M",
+   "piqa": "50.0",
+   "rank": "8",
+   "winogrande": "50.0"
+  },
+  "fx/short-pick-410m": {
+   "avg": "9.1",
+   "hellaswag": "25.0",
+   "name": "short-pick-410m base",
+   "params": "410M",
+   "piqa": "40.0",
+   "rank": "4",
+   "winogrande": "58.3"
+  },
+  "fx/skewed-360m": {
+   "avg": "7.7",
+   "hellaswag": "27.5",
+   "name": "skewed-360m instruct",
+   "params": "360M",
+   "piqa": "51.7",
+   "rank": "6",
+   "winogrande": "46.7"
+  },
+  "local/nodiag-step400": {
+   "avg": "— 2/7",
+   "hellaswag": "23.8",
+   "name": "nodiag-step400 uploaded prelim 2/7",
+   "params": "70M",
+   "piqa": "—",
+   "rank": "—",
+   "winogrande": "—"
+  }
+ },
+ "view=standard&group=instruction": {
+  "served/DM-k4-LDA-phone-build-MTP": {
+   "ifeval": "62.0",
+   "name": "DM k4-LDA phone build, MTP base phone build thinking off",
+   "params": "—"
+  }
+ },
+ "view=standard&group=knowledge": {
+  "fx/below-135m-it": {
+   "area:Business & Law": "8.3",
+   "area:Health & Mind": "0.0",
+   "area:Humanities & Arts": "0.0",
+   "area:Mathematics & Science": "0.0",
+   "area:Society": "0.0",
+   "avg": "6.7",
+   "mmlu": "16.9",
+   "name": "below-135m-it instruct",
+   "params": "135M",
+   "rank": "9"
+  },
+  "fx/chance-160m": {
+   "area:Business & Law": "0.0",
+   "area:Health & Mind": "19.3",
+   "area:Humanities & Arts": "6.7",
+   "area:Mathematics & Science": "0.0",
+   "area:Society": "1.0",
+   "avg": "8.6",
+   "mmlu": "29.1",
+   "name": "chance-160m base",
+   "params": "162M",
+   "rank": "5"
+  },
+  "fx/good-750m": {
+   "area:Business & Law": "66.7",
+   "area:Health & Mind": "57.9",
+   "area:Humanities & Arts": "73.3",
+   "area:Mathematics & Science": "40.7",
+   "area:Society": "46.7",
+   "avg": "52.1",
+   "mmlu": "64.1",
+   "name": "good-750m instruct",
+   "params": "750M",
+   "rank": "3"
+  },
+  "fx/good-750m-tuned-skill": {
+   "area:Business & Law": "100.0",
+   "area:Health & Mind": "93.0",
+   "area:Humanities & Arts": "86.7",
+   "area:Mathematics & Science": "92.6",
+   "area:Society": "90.5",
+   "avg": "81.1",
+   "mmlu": "94.4",
+   "name": "good-750m-tuned-skill base",
+   "params": "750M",
+   "rank": "1"
+  },
+  "fx/good-750m-tuned-test": {
+   "area:Business & Law": "66.7",
+   "area:Health & Mind": "64.9",
+   "area:Humanities & Arts": "73.3",
+   "area:Mathematics & Science": "85.2",
+   "area:Society": "48.6",
+   "avg": "67.4",
+   "mmlu": "82.5",
+   "name": "good-750m-tuned-test base",
+   "params": "750M",
+   "rank": "2"
+  },
+  "fx/miscount-1b": {
+   "area:Business & Law": "0.0",
+   "area:Health & Mind": "0.0",
+   "area:Humanities & Arts": "0.0",
+   "area:Mathematics & Science": "18.5",
+   "area:Society": "4.8",
+   "avg": "7.0",
+   "mmlu": "26.3",
+   "name": "miscount-1b base",
+   "params": "1B",
+   "rank": "7"
+  },
+  "fx/one-option-70m": {
+   "area:Business & Law": "16.7",
+   "area:Health & Mind": "0.0",
+   "area:Humanities & Arts": "0.0",
+   "area:Mathematics & Science": "0.0",
+   "area:Society": "2.9",
+   "avg": "6.9",
+   "mmlu": "25.6",
+   "name": "one-option-70m base",
+   "params": "70M",
+   "rank": "8"
+  },
+  "fx/short-pick-410m": {
+   "area:Business & Law": "0.0",
+   "area:Health & Mind": "15.8",
+   "area:Humanities & Arts": "0.0",
+   "area:Mathematics & Science": "0.0",
+   "area:Society": "2.9",
+   "avg": "9.1",
+   "mmlu": "21.9",
+   "name": "short-pick-410m base",
+   "params": "410M",
+   "rank": "4"
+  },
+  "fx/skewed-360m": {
+   "area:Business & Law": "0.0",
+   "area:Health & Mind": "0.0",
+   "area:Humanities & Arts": "0.0",
+   "area:Mathematics & Science": "0.0",
+   "area:Society": "4.8",
+   "avg": "7.7",
+   "mmlu": "21.6",
+   "name": "skewed-360m instruct",
+   "params": "360M",
+   "rank": "6"
+  }
+ },
+ "view=standard&group=math": {
+  "fx/below-135m-it": {
+   "avg": "6.7",
+   "name": "below-135m-it instruct",
+   "params": "135M",
+   "rank": "9"
+  },
+  "fx/chance-160m": {
+   "avg": "8.6",
+   "name": "chance-160m base",
+   "params": "162M",
+   "rank": "5"
+  },
+  "fx/good-750m": {
+   "avg": "52.1",
+   "name": "good-750m instruct",
+   "params": "750M",
+   "rank": "3"
+  },
+  "fx/good-750m-tuned-skill": {
+   "avg": "81.1",
+   "name": "good-750m-tuned-skill base",
+   "params": "750M",
+   "rank": "1"
+  },
+  "fx/good-750m-tuned-test": {
+   "avg": "67.4",
+   "name": "good-750m-tuned-test base",
+   "params": "750M",
+   "rank": "2"
+  },
+  "fx/miscount-1b": {
+   "avg": "7.0",
+   "name": "miscount-1b base",
+   "params": "1B",
+   "rank": "7"
+  },
+  "fx/one-option-70m": {
+   "avg": "6.9",
+   "name": "one-option-70m base",
+   "params": "70M",
+   "rank": "8"
+  },
+  "fx/short-pick-410m": {
+   "avg": "9.1",
+   "name": "short-pick-410m base",
+   "params": "410M",
+   "rank": "4"
+  },
+  "fx/skewed-360m": {
+   "avg": "7.7",
+   "name": "skewed-360m instruct",
+   "params": "360M",
+   "rank": "6"
+  }
+ },
+ "view=standard&group=reasoning": {
+  "fx/below-135m-it": {
+   "arc_challenge": "13.3",
+   "arc_easy": "15.0",
+   "avg": "6.7",
+   "name": "below-135m-it instruct",
+   "params": "135M",
+   "rank": "9"
+  },
+  "fx/chance-160m": {
+   "arc_challenge": "28.3",
+   "arc_easy": "25.0",
+   "avg": "8.6",
+   "name": "chance-160m base",
+   "params": "162M",
+   "rank": "5"
+  },
+  "fx/good-750m": {
+   "arc_challenge": "70.0",
+   "arc_easy": "71.7",
+   "avg": "52.1",
+   "name": "good-750m instruct",
+   "params": "750M",
+   "rank": "3"
+  },
+  "fx/good-750m-tuned-skill": {
+   "arc_challenge": "90.0",
+   "arc_easy": "88.3",
+   "avg": "81.1",
+   "name": "good-750m-tuned-skill base",
+   "params": "750M",
+   "rank": "1"
+  },
+  "fx/good-750m-tuned-test": {
+   "arc_challenge": "83.3",
+   "arc_easy": "85.0",
+   "avg": "67.4",
+   "name": "good-750m-tuned-test base",
+   "params": "750M",
+   "rank": "2"
+  },
+  "fx/miscount-1b": {
+   "arc_challenge": "21.7",
+   "arc_easy": "21.7",
+   "avg": "7.0",
+   "name": "miscount-1b base",
+   "params": "1B",
+   "rank": "7"
+  },
+  "fx/one-option-70m": {
+   "arc_challenge": "25.0",
+   "arc_easy": "25.0",
+   "avg": "6.9",
+   "name": "one-option-70m base",
+   "params": "70M",
+   "rank": "8"
+  },
+  "fx/short-pick-410m": {
+   "arc_challenge": "20.0",
+   "arc_easy": "21.7",
+   "avg": "9.1",
+   "name": "short-pick-410m base",
+   "params": "410M",
+   "rank": "4"
+  },
+  "fx/skewed-360m": {
+   "arc_challenge": "23.3",
+   "arc_easy": "21.7",
+   "avg": "7.7",
+   "name": "skewed-360m instruct",
+   "params": "360M",
+   "rank": "6"
+  },
+  "local/nodiag-step400": {
+   "arc_challenge": "—",
+   "arc_easy": "21.7",
+   "avg": "— 2/7",
+   "name": "nodiag-step400 uploaded prelim 2/7",
+   "params": "70M",
+   "rank": "—"
+  }
+ },
+ "view=standard&group=trust": {
+  "fx/below-135m-it": {
+   "avg": "6.7",
+   "name": "below-135m-it instruct",
+   "params": "135M",
+   "rank": "9",
+   "truthfulqa_mc2": "47.1"
+  },
+  "fx/chance-160m": {
+   "avg": "8.6",
+   "name": "chance-160m base",
+   "params": "162M",
+   "rank": "5",
+   "truthfulqa_mc2": "47.2"
+  },
+  "fx/good-750m": {
+   "avg": "52.1",
+   "name": "good-750m instruct",
+   "params": "750M",
+   "rank": "3",
+   "truthfulqa_mc2": "47.2"
+  },
+  "fx/good-750m-tuned-skill": {
+   "avg": "81.1",
+   "name": "good-750m-tuned-skill base",
+   "params": "750M",
+   "rank": "1",
+   "truthfulqa_mc2": "47.3"
+  },
+  "fx/good-750m-tuned-test": {
+   "avg": "67.4",
+   "name": "good-750m-tuned-test base",
+   "params": "750M",
+   "rank": "2",
+   "truthfulqa_mc2": "47.2"
+  },
+  "fx/miscount-1b": {
+   "avg": "7.0",
+   "name": "miscount-1b base",
+   "params": "1B",
+   "rank": "7",
+   "truthfulqa_mc2": "47.5"
+  },
+  "fx/one-option-70m": {
+   "avg": "6.9",
+   "name": "one-option-70m base",
+   "params": "70M",
+   "rank": "8",
+   "truthfulqa_mc2": "47.4"
+  },
+  "fx/short-pick-410m": {
+   "avg": "9.1",
+   "name": "short-pick-410m base",
+   "params": "410M",
+   "rank": "4",
+   "truthfulqa_mc2": "47.2"
+  },
+  "fx/skewed-360m": {
+   "avg": "7.7",
+   "name": "skewed-360m instruct",
+   "params": "360M",
+   "rank": "6",
+   "truthfulqa_mc2": "47.1"
+  }
+ }
+}
