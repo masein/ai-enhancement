@@ -284,12 +284,16 @@ def test_the_compare_boxes_say_what_they_are_for_and_one_tick_says_what_next(liv
     page.wait_for_selector("[data-lb-table]")
     tip = page.locator("[data-lb-table] th[data-col='name']").get_attribute("data-tip")
     assert "tick two to eight models, then Compare ▸ lays them side by side" in tip
+    # 27d: first in its row, "Pick to compare"; one pick, the bar says it and
+    # Compare ▸ waits for a second
     boxes = page.locator("[data-cmp-tick]")
-    assert boxes.first.get_attribute("title") == "Tick two to eight models to compare them"
+    assert boxes.first.get_attribute("title") == "Pick to compare"
     boxes.nth(0).check()
-    one = page.locator("[data-cmp-one]")
-    one.wait_for()
-    assert one.inner_text() == "Tick one more to compare"
+    bar = page.locator("[data-cmp-bar]")
+    bar.wait_for()
+    assert bar.inner_text().startswith("1 picked")
+    assert page.locator("[data-cmp-go]").is_disabled()
+    assert page.locator("[data-cmp-go]").get_attribute("title") == "Pick at least two"
     boxes.nth(1).check()
     page.wait_for_selector("[data-cmp-go='2']")
     assert page.locator("[data-cmp-one]").count() == 0

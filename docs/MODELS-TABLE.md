@@ -95,6 +95,42 @@ modelling's cross-entropy table (a row per task and model) keep their own.
     page. Sort ▾ sits above the cards, and the tabs scroll sideways. Tint
     has nothing to tint on a card, so its switch shows on the wide view only.
 
+## The filter row, search, dates, rows and picks (27d)
+
+- **One filter row on every Models tab, in this order:** Search · Models ▾ ·
+  When ▾ · Filters ▾ · Thinking ▾ · (Group ▾) · Columns ▾ · Sort ▾. A filter a
+  tab can't use is left out: Thinking only where a model has both settings.
+  Latest has Models ▾ and Filters ▾ too. An active filter is a chip under the
+  row ("Models: ours ×", "When: 14–22 Oct ×"), with Clear all.
+- **Models ▾ ▸ Show:** All, Ours, Open or Closed, the groups every tab draws
+  (`only=ours` in the link).
+- **Search models…** filters as one types (150 ms after the last key). It
+  matches a row's name, its board id, the names it went by (the board's own,
+  a report's label), its maker and the words of its line — case, spaces,
+  hyphens and dots aside, every word in any order ("qwen36 q4"). Each group
+  shows only its matches, and a group with none goes; the matching letters
+  are marked; "3 of 37 models match"; "No model matches 'xyz' · Clear". Esc
+  clears it, "/" puts the cursor in it, and the link keeps it (`q=`).
+  Standard's pages go back to page 1.
+- **Never the whole page:** a filter's change, a search's or a date's redraws
+  the Models card alone (`lbSoft`): the page's scroll stays, the search box
+  keeps its focus and caret, and the table's sideways scroll comes back.
+- **When ▾:** presets as rows (Any time, Today, Last 7 days, Last 30 days, This
+  month, Since the newest checkpoint was added) and a range calendar the board
+  draws: two months (one on a phone), the days between tinted, a hover
+  previewing, a dot on each day a model was tested or submitted, the range in
+  words with Apply and Clear, the arrows and Enter, and a typed date ("14
+  oct", "2026-10-14", "14/10").
+- **Rows:** a row's line is one line, cut with "…" and whole on hover. The
+  words every row of a group shares go to the group's heading ("measured here,
+  same questions · lda runtime · served · thinking on"). Badges sit on the
+  name's line and are cut before the name is. The column menus' "⋯" shows on
+  hover or focus only, and MODEL's header cell reads as one through both rows.
+- **Pick to compare:** a box first in every row, before the dot; the header's
+  box picks every row shown, or none. A bar at the bottom says "3 picked ·
+  Compare ▸ · Clear" (two to eight; past eight, "at most 8"). The picks carry
+  over from tab to tab and survive a reload (`bench-cmp-picks`).
+
 ## The Reports pages (27b)
 
 Where a report lists models with their scores, it draws through the same

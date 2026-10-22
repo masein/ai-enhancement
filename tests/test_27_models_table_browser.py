@@ -167,8 +167,10 @@ def test_frontier_has_one_column_a_benchmark(live, page):
     cell = row.locator("td[data-mt-col='mmlu-pro']")
     assert cell.locator(".mt-n").evaluate("n => n.firstChild.textContent") == "69.4"
     assert cell.locator("[data-mt-src]").inner_text() == "G"
-    # the company is in its line; Ours first
-    assert "Google · open" in row.locator("[data-mt-line]").inner_text()
+    # the company is in its line; Ours first. 27d: "open", which every row of
+    # Open models shares, is on the group's heading
+    assert row.locator("[data-mt-line]").inner_text().split(" · ")[0] == "Google"
+    assert "open" in page.locator("[data-frontier-table] [data-mt-gnote='open']").inner_text()
     groups = page.eval_on_selector_all("[data-frontier-table] [data-mt-group-head]",
                                        "gs => gs.map(g => g.dataset.mtGroupHead)")
     assert groups[0] == "ours"

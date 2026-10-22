@@ -341,10 +341,12 @@ def test_tested_last_7_days_between_two_dates_and_no_date_said(live, page):
     shot(page.locator("[data-lb-card]"), "tested-7d-1400.png")
     # between two dates: one model's own day
     day = page.evaluate(f"testedDay(DATA.models.find(m => m.id === {json.dumps(SKEWED)}))")
+    # 27d: on the board's own calendar, the day typed in as its first and last
     page.locator("#pill-when").click()
-    page.locator("#pop-when [data-when-from]").fill(day)
-    page.locator("#pop-when [data-when-to]").fill(day)
-    page.locator("#pop-when [data-when-apply]").click()
+    for _ in range(2):
+        page.locator("#pop-when [data-cal-typed]").fill(day)
+        page.locator("#pop-when [data-cal-typed]").press("Enter")
+    page.locator("#pop-when [data-cal-apply]").click()
     page.wait_for_function(f"lbS().tested.startsWith({json.dumps(day + '..' + day)})")
     assert SKEWED in page.evaluate("lbFilter(DATA.models).map(m => m.id)")
     assert f"tested={day}..{day}" in page.evaluate("location.hash")

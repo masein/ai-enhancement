@@ -392,10 +392,11 @@ def test_models_is_one_table_and_a_row_opens_the_model_page(live, page):
         ["all", "knowledge", "commonsense", "reasoning", "math", "trust", "instruction", "lm"]
     page.keyboard.press("Escape")
     assert page.locator("[data-chip]").count() == 0
-    # Row 2: Group, Models, When (21d: in view, Tested before), Filters,
+    # Row 2 (27d: one order on every tab): Search, Models, When, Filters, Group,
     # Columns; Size, Source, Type and More (Status, Scale) in Filters ▾
+    assert page.locator("[data-pickers] [data-lb-search]").count() == 1
     assert page.locator("[data-pickers]").inner_text().split("\n")[:5] == \
-        ["Group: All ▾", "Models: all ▾", "When: any time ▾", "Filters ▾", "Columns ▾"]
+        ["Models: all ▾", "When: any time ▾", "Filters ▾", "Group: All ▾", "Columns ▾"]
     assert page.locator(".lbbar > .pills").count() == 0
     page.locator("[data-filters]").click()
     sheet = page.locator("[data-filter-sheet]")

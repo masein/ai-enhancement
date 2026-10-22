@@ -5867,6 +5867,75 @@ table.mt-table.mt-ranked thead th.rank { z-index:5; }
 .mt-name a.mname:hover { text-decoration:underline; }
 .mt-line { font-size:12px; color:var(--muted); margin:2px 0 0 18px; white-space:normal;
   max-width:24rem; line-height:1.35; }
+/* 27d: on a Models tab a row's line is one line — cut with "…", the whole on hover
+   (a report's keeps its source's link in sight, so it wraps) */
+.mt.mt-models .mt-line { white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  max-width:22rem; }
+.mt.mt-models .mt-name .mt-nrow { max-width:24rem; }
+.mt-name .mname { flex:0 0 auto; }
+/* badges sit on the name's line, and are cut before the name is */
+.mt-badges { display:inline-flex; align-items:center; gap:4px; min-width:0; flex:0 1 auto;
+  overflow:hidden; white-space:nowrap; }
+.mt-badges > * { flex:none; }
+mark.mt-hit { background:var(--accent-soft); color:inherit; border-radius:2px; padding:0; }
+/* 27d: Pick to compare, first in a row */
+.mt-nrow .cmptick, th.model .cmptick { margin:0; flex:none; width:14px; height:14px;
+  cursor:pointer; accent-color:var(--accent); }
+th.model .cmptick { margin-right:8px; vertical-align:-2px; }
+.mt-nrow .cmpgap { width:14px; flex:none; }
+.mt.mt-models .mt-card .mt-line { white-space:normal; max-width:none; }
+.cmpbar { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); z-index:50;
+  display:flex; align-items:center; gap:12px; padding:8px 14px; border-radius:999px;
+  background:var(--surface-1); border:1px solid var(--border); box-shadow:0 6px 24px rgba(0,0,0,.22);
+  font-size:var(--fs-2); max-width:calc(100vw - 32px); }
+.cmpbar [data-cmp-go][disabled] { opacity:.5; cursor:not-allowed; }
+/* 27d: Search models…, first in the filter row */
+input.lbsearch { width:13rem; min-height:32px; padding:4px 10px 4px 28px; border-radius:999px;
+  border:1px solid var(--border); background:var(--surface-1)
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E")
+  no-repeat 9px 50%; }
+@media (max-width:639px) { input.lbsearch { width:100%; flex:1 1 100%; } }
+.mt-found { margin:4px 0 0; }
+.mt-nomatch { margin:12px 0; color:var(--text-secondary); }
+.mshow { display:flex; align-items:center; gap:8px; padding:4px 10px 8px;
+  border-bottom:1px solid var(--border); margin-bottom:6px; }
+/* 27d: the header — MODEL's cell spans both rows; "⋯" only on hover or focus */
+table.mt-table thead th { position:relative; }
+table.mt-table thead th.mt-hg-name, table.mt-table thead td.mt-hg-gap { border-bottom-color:transparent; }
+table.mt-table thead tr.mt-hgroups + tr th.model, table.mt-table thead tr.mt-hgroups + tr th.rank,
+table.mt-table thead tr.mt-hgroups + tr th[data-lcol="params"],
+table.mt-table thead tr.mt-hgroups + tr th[data-lcol="avg"] { border-top:0; }
+table.mt-table th .col-more { position:absolute; top:4px; right:4px; margin:0; opacity:0; }
+table.mt-table th:hover .col-more, table.mt-table th:focus-within .col-more { opacity:1; }
+/* 27d: When ▾'s calendar, in the board's own colours */
+.whenmenu { max-width:min(640px, calc(100vw - 24px)); }
+.cal { display:flex; flex-direction:column; gap:8px; width:100%; }
+.cal-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.cal-acts { display:inline-flex; gap:6px; }
+.cal-nav { display:flex; align-items:flex-start; gap:4px; }
+.cal-nav > button { min-height:32px; padding:0 8px; font-size:16px; }
+.cal-months { display:flex; gap:16px; flex:1; justify-content:center; }
+.cal-month { min-width:0; }
+.cal-title { text-align:center; font-weight:600; font-size:var(--fs-2); margin-bottom:4px; }
+.cal-grid { display:grid; grid-template-columns:repeat(7, 32px); gap:2px 0; }
+.cal-wd { font-size:12px; color:var(--muted); text-align:center; }
+.cal-day { position:relative; height:30px; min-height:0; padding:0; border:0; border-radius:0;
+  background:none; color:var(--text-primary); font:inherit; font-size:14px; cursor:pointer;
+  font-variant-numeric:tabular-nums; }
+.cal-day:hover { background:var(--plane); }
+.cal-day.cal-today { font-weight:700; text-decoration:underline; text-underline-offset:3px; }
+.cal-day.cal-inr { background:var(--accent-soft); }
+.cal-day.cal-prev { background:color-mix(in srgb, var(--accent-soft) 60%, transparent); }
+.cal-day.cal-start, .cal-day.cal-end { background:var(--accent); color:var(--surface-1); border-radius:6px; }
+.cal-day.cal-dot::after { content:""; position:absolute; left:50%; bottom:3px; width:4px; height:4px;
+  margin-left:-2px; border-radius:50%; background:var(--text-secondary); }
+.cal-day.cal-start.cal-dot::after, .cal-day.cal-end.cal-dot::after { background:var(--surface-1); }
+.cal-day:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+.cal-type { display:flex; align-items:center; gap:6px; }
+.cal-typed { width:12rem; font:inherit; font-size:14px; padding:3px 8px; border-radius:6px;
+  border:1px solid var(--border); background:var(--surface-1); color:var(--text-primary); }
+.cal-typed.bad { border-color:var(--critical); }
+@media (max-width:639px) { .cal-grid { grid-template-columns:repeat(7, minmax(30px, 1fr)); } }
 .mt-mark { display:inline-block; width:10px; height:10px; border-radius:50%; flex:0 0 10px; }
 .mt-mark.pub { background:transparent; border:1.5px solid var(--muted); box-sizing:border-box; }
 table.mt-table tr.mt-group th { background:var(--plane); font-family:var(--font-sans);
@@ -12640,6 +12709,9 @@ function lbHash() {
     out.push('cols=' + mtColsChoice(test).map(encodeURIComponent).join(','));
   }
   if (L.models) out.push('models=' + L.models.map(encodeURIComponent).join(','));
+  // 27d: the search, and Models ▾ ▸ Show
+  if ((L.group || 'all') !== 'all') out.push('only=' + L.group);
+  if (L.q) out.push('q=' + encodeURIComponent(L.q));
   // 16.4: the Chart's highlighted models (Benchmarks ▸ Standard's, before)
   if (L.show === 'chart' && (L.hl || []).length) out.push('hl=' + L.hl.map(encodeURIComponent).join(','));
   return out.join('&');
@@ -12692,6 +12764,9 @@ function lbFromHash(rest) {
   const ms = list('models').map(canonId).filter(id => !DATA || ids.has(id)
     || id.startsWith('reported/'));
   L.models = ms.length ? [...new Set(ms)] : null;
+  // 27d: the search and Models ▾ ▸ Show, from the link
+  L.q = p.get('q') || '';
+  L.group = MT_SHOW.some(([g]) => g === p.get('only')) ? p.get('only') : 'all';
   const hl = list('hl').map(canonId).filter(id => !DATA || ids.has(id)).slice(0, 3);
   L.hl = hl.length ? [...new Set(hl)] : null;
   // 12m.1: the compared models, as the address names them, at most eight
@@ -12935,12 +13010,15 @@ function customAvg(m, ts) {
 
 // a change to the view: the address bar follows without a history entry per
 // click, and the page paints
+// 27d: what a filter changes — the Models card alone is drawn again (lbSoft)
+const LB_SOFT = new Set(['q', 'group', 'models', 'tested', 'date', 'size', 'source', 'type',
+  'status', 'tint', 'thinking']);
 function lbSet(patch) {
   Object.assign(lbS(), patch);
   lbRemember(patch);                         // 16.3: the viewer's last view
   const want = hashFor();
   if (location.hash.slice(1) !== want) history.replaceState(history.state, '', '#' + want);
-  render();
+  if (Object.keys(patch).every(k => LB_SOFT.has(k))) lbSoft(); else render();
 }
 
 // the family a model belongs to: the Hub organisation, or a local run's name
@@ -13573,6 +13651,8 @@ const MT_OPEN_RE = /\/|gemma|gpt-oss|llama|qwen|qwq|deepseek|mistral|mixtral|\bp
 // an open model with a filled dot, not one of ours
 const MT_OUTSIDE_RE = /^(ornith|bonsai|gemma|llama|deepseek|gpt-oss|mistral|phi|granite|smollm|pythia|qwen[23](?:\.5)?-)/i;
 const MT_GROUPS = [['ours', 'Ours'], ['open', 'Open models'], ['closed', 'Closed models']];
+// 27d: Models ▾ ▸ Show
+const MT_SHOW = [['all', 'All'], ['ours', 'Ours'], ['open', 'Open'], ['closed', 'Closed']];
 function mtGroup(m, published = false, maker = '') {
   if (published) return MT_OPEN_RE.test(m.name || '') || /\bopen\b/i.test(maker || '') ? 'open'
     : 'closed';
@@ -13678,7 +13758,7 @@ function mtThinkPill() {
   const cur = mtThink();
   return pillMenu('thinking', 'Thinking', MT_THINK, cur, v => {
     try { localStorage.setItem('bench-mt-thinking', v); } catch (e) { /* private */ }
-    lbS().thinking = v; render(); });
+    lbS().thinking = v; lbSoft(); });
 }
 // a model's rows, one a model: [{m, other}] — m the setting shown, other the
 // other setting when "both" (a sub-row under it). "As each runs" (27b): the
@@ -13746,7 +13826,7 @@ function mtColsSave(view, keys) {
   // and in the page's link
   const want = hashFor();
   if (location.hash.slice(1) !== want) history.replaceState(history.state, '', '#' + want);
-  render();
+  lbSoft();
 }
 function mtColumnsPill(view, all, shown, dflt) {
   const btn = el('button', { class: 'pill', id: 'pill-columns', 'data-columns-menu': 'shown',
@@ -13786,6 +13866,367 @@ function mtTintSwitch() {
         try { localStorage.setItem('bench-lb-tint', e.target.checked ? 'on' : 'off'); }
         catch (x) { /* private */ }
         lbSet({ tint: e.target.checked }); } }), ' Tint');
+}
+
+// ---- 27d: search, on every Models tab ---------------------------------------
+// "Search models…" first in the filter row. It filters as one types (150 ms
+// after the last key), matching a row's name, its board id, the names it went
+// by (27's name table: the board's own name, a report's label), its maker and
+// the words of its line — case, spaces, hyphens and dots aside, every word in
+// any order. Typing redraws the Models card alone (lbSoft), never the page,
+// and never moves its scroll; the link keeps it ("&q=…")
+const LBQ = { t: 0 };
+const mtNorm = s => String(s == null ? '' : s).toLowerCase().replace(/[\s\-._·,()]+/g, '');
+const mtQueryWords = q => String(q || '').trim().split(/\s+/).map(mtNorm).filter(Boolean);
+const mtLineText = line => Array.isArray(line)
+  ? line.filter(Boolean).map(x => x.nodeType ? x.textContent : String(x)).join(' · ')
+  : String(line || '');
+function mtHay(r) {
+  return mtNorm([r.name, r.search, r.id, mtLineText(r.line)].filter(Boolean).join(' '));
+}
+const mtMatches = (r, words) => { const h = mtHay(r); return words.every(w => h.includes(w)); };
+// the name, its matching letters marked
+function mtMarked(text, words) {
+  if (!words.length) return [text];
+  const keep = [], at = [];
+  for (let i = 0; i < text.length; i++) if (mtNorm(text[i])) { keep.push(text[i].toLowerCase()); at.push(i); }
+  const flat = keep.join(''), on = new Array(text.length).fill(false);
+  for (const w of words) {
+    let k = flat.indexOf(w);
+    while (k >= 0) {
+      for (let j = k; j < k + w.length; j++) on[at[j]] = true;
+      k = flat.indexOf(w, k + w.length);
+    }
+  }
+  if (!on.some(Boolean)) return [text];
+  const out = [];
+  let i = 0;
+  while (i < text.length) {
+    let j = i;
+    while (j < text.length && on[j] === on[i]) j++;
+    out.push(on[i] ? el('mark', { class: 'mt-hit', text: text.slice(i, j) }) : text.slice(i, j));
+    i = j;
+  }
+  return out;
+}
+function lbSearchBox() {
+  const L = lbS();
+  return el('input', { type: 'search', class: 'lbsearch', id: 'lb-search', 'data-lb-search': '1',
+    'data-keep': 'lb-search', placeholder: 'Search models…', 'aria-label': 'Search models',
+    autocomplete: 'off', spellcheck: 'false', value: L.q || '',
+    title: 'Name, id, maker or any word in a row’s line · / to search · Esc clears',
+    oninput: e => {
+      clearTimeout(LBQ.t);
+      const v = e.target.value;
+      LBQ.t = setTimeout(() => lbSet({ q: v }), 150);
+    },
+    onkeydown: e => {
+      if (e.key !== 'Escape' || !e.target.value) return;
+      e.preventDefault(); e.stopPropagation();
+      e.target.value = '';
+      clearTimeout(LBQ.t);
+      lbSet({ q: '' });
+    } });
+}
+// "/" anywhere on a Models tab puts the cursor in the search
+document.addEventListener('keydown', e => {
+  if (e.key !== '/' || e.altKey || e.ctrlKey || e.metaKey) return;
+  const t = e.target, tag = t && t.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) return;
+  const box = document.querySelector('[data-lb-search]');
+  if (!box) return;
+  e.preventDefault();
+  box.focus();
+  box.select();
+});
+function lbClearSearch() {
+  const box = document.querySelector('[data-lb-search]');
+  if (box) box.value = '';
+  lbSet({ q: '' });
+}
+// a Models view's rows as its search and Models ▾ ▸ Show leave them
+function mtFiltered(rows) {
+  const L = lbS(), words = mtQueryWords(L.q), g = L.group || 'all';
+  return rows.filter(r => (g === 'all' || (r.group || 'open') === g)
+    && (!words.length || mtMatches(r, words) || (r.children || []).some(k => mtMatches(k, words))));
+}
+
+// ---- 27d: the Models card drawn again in place --------------------------------
+// A filter's change, a search's or a date's redraws the Models card alone: the
+// page around it, its scroll and its search box (focus and caret) stay as
+// they are, and the table's sideways scroll comes back
+function lbSoft() {
+  const live = document.querySelector('#view [data-lb-card]');
+  if (!DATA || !live || state.model || state.topic || state.tab !== 'leaderboard') return render();
+  const fn = (TABS.find(([id]) => id === 'leaderboard') || [])[2];
+  const out = [].concat(fn ? fn(visible()) : []);
+  const card = out.map(n => n && n.nodeType === 1 ? (n.matches('[data-lb-card]') ? n
+    : n.querySelector('[data-lb-card]')) : null).find(Boolean);
+  if (!card) return render();
+  const y = scrollY;
+  const hk = [...live.querySelectorAll('[data-hkeep]')].map(e => [e.dataset.hkeep, e.scrollLeft]);
+  const box = live.querySelector('[data-lb-search]'), fresh = card.querySelector('[data-lb-search]');
+  // a node moved loses its focus: the box gets it back, its caret where it was
+  const had = box && document.activeElement === box
+    ? [box.selectionStart, box.selectionEnd] : null;
+  if (box && fresh) fresh.replaceWith(box);
+  live.replaceWith(card);
+  if (had && box.isConnected) {
+    box.focus({ preventScroll: true });
+    try { box.setSelectionRange(had[0], had[1]); } catch (e) { /* not a text field */ }
+  }
+  mtPlaceSort(card);
+  fitNames(card);
+  hfadeUpdate(card);
+  for (const [k, x] of hk) {
+    const e = card.querySelector(`[data-hkeep="${k}"]`);
+    if (e) e.scrollLeft = x;
+  }
+  hfadeUpdate(card);
+  chipsInSight(card);
+  numberSections();
+  popReanchor();
+  if (scrollY !== y) scrollTo(0, y);
+}
+
+// ---- 27d: Sort ▾, last in the filter row ---------------------------------------
+// modelTable draws its Sort ▾; on a Models tab it moves to the end of the row
+function mtPlaceSort(root) {
+  const r = root || document;
+  for (const card of [...(r.matches && r.matches('[data-lb-card]') ? [r] : []),
+    ...r.querySelectorAll('[data-lb-card]')]) {
+    const s = card.querySelector('[data-mt-sort-row]'), row = card.querySelector('[data-pickers]');
+    if (!s || !row || row.contains(s)) continue;
+    const count = row.querySelector('.lbcount');
+    if (count) row.insertBefore(s, count); else row.append(s);
+  }
+}
+
+// ---- 27d: Pick to compare ------------------------------------------------------
+// A box at the start of a row, on every Models tab, picks two to eight models
+// for Compare ▸ (12m.1); the header's box picks every row shown, or none. A bar
+// at the bottom says how many and opens the comparison. The picks carry over
+// from tab to tab and survive a reload. Ticking redraws nothing but the boxes
+// and the bar
+function cmpPicks() {
+  const L = lbS();
+  if (!L.picksRead) {
+    L.picksRead = true;
+    try {
+      const got = JSON.parse(localStorage.getItem('bench-cmp-picks') || '[]');
+      if (Array.isArray(got) && !(L.ticks || []).length) L.ticks = got.filter(x => typeof x === 'string');
+    } catch (e) { /* private */ }
+  }
+  return L.ticks || [];
+}
+function cmpSave(ids) {
+  lbS().ticks = [...new Set(ids)];
+  try { localStorage.setItem('bench-cmp-picks', JSON.stringify(lbS().ticks)); }
+  catch (e) { /* private */ }
+  cmpSync();
+}
+function cmpSync() {
+  const on = new Set(cmpPicks());
+  document.querySelectorAll('[data-cmp-tick]').forEach(b => { b.checked = on.has(b.dataset.cmpTick); });
+  document.querySelectorAll('[data-cmp-all]').forEach(b => {
+    const ids = JSON.parse(b.dataset.ids || '[]'), n = ids.filter(id => on.has(id)).length;
+    b.checked = !!ids.length && n === ids.length;
+    b.indeterminate = n > 0 && n < ids.length;
+  });
+  const bar = document.querySelector('[data-cmp-bar]'), fresh = cmpBar();
+  if (bar && fresh) bar.replaceWith(fresh);
+  else if (bar) bar.remove();
+  else if (fresh) (document.querySelector('#view [data-lb-card]') || document.body).append(fresh);
+}
+function cmpTick(id) {
+  return el('input', { type: 'checkbox', class: 'cmptick', 'data-cmp-tick': id,
+    'aria-label': 'Pick to compare', title: 'Pick to compare',
+    checked: cmpPicks().includes(id) ? '' : null,
+    onclick: e => e.stopPropagation(),
+    onchange: e => {
+      const s = new Set(cmpPicks());
+      if (e.target.checked) s.add(id); else s.delete(id);
+      cmpSave([...s]);
+    } });
+}
+function cmpAll(ids) {
+  const on = new Set(cmpPicks()), n = ids.filter(id => on.has(id)).length;
+  const box = el('input', { type: 'checkbox', class: 'cmptick', 'data-cmp-all': '1',
+    'data-ids': JSON.stringify(ids), 'aria-label': 'Pick every row shown to compare, or none',
+    title: 'Pick every row shown, or none', checked: ids.length && n === ids.length ? '' : null,
+    onclick: e => e.stopPropagation(),
+    onchange: e => {
+      const s = new Set(cmpPicks());
+      ids.forEach(id => e.target.checked ? s.add(id) : s.delete(id));
+      cmpSave([...s]);
+    } });
+  box.indeterminate = n > 0 && n < ids.length;
+  return box;
+}
+function cmpBar() {
+  const ids = cmpPicks(), n = ids.length;
+  if (!n) return null;
+  const ok = n >= 2 && n <= CMP_TOP;
+  return el('div', { class: 'cmpbar', role: 'region', 'aria-label': 'models picked to compare',
+      'data-cmp-bar': String(n) },
+    el('span', { 'data-cmp-count': String(n), text: `${n} picked` }),
+    el('button', { class: 'pill on', 'data-cmp-go': String(n), disabled: ok ? null : '',
+      title: n < 2 ? 'Pick at least two' : n > CMP_TOP ? `A comparison holds ${CMP_TOP}` : null,
+      text: 'Compare ▸', onclick: () => { if (ok) openCompare(cmpPicks()); } }),
+    n > CMP_TOP ? el('span', { class: 'small warn', 'data-cmp-most': '1',
+      text: `at most ${CMP_TOP}` }) : '',
+    el('button', { class: 'quiet', 'data-cmp-clear': '1', text: 'Clear',
+      onclick: () => cmpSave([]) }));
+}
+
+// ---- 27d: When ▾'s dates, on the board's own calendar ------------------------
+// Presets as rows; a range calendar the board draws (two months, one on a
+// phone), the days between tinted, a hover previewing, a dot on each day a
+// model was tested or submitted; the range in words above it with Apply and
+// Clear; the arrows, Enter and Esc; a typed date ("14 oct", "2026-10-14",
+// "14/10"). Choosing redraws the calendar alone
+const CAL_DAY = 864e5;
+const calKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-`
+  + String(d.getDate()).padStart(2, '0');
+const calDate = k => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
+const calAdd = (k, n) => calKey(new Date(calDate(k).getTime() + n * CAL_DAY + 3600e3));
+function calWords(from, to) {
+  if (!from) return 'Pick a first day';
+  const a = calDate(from), b = calDate(to || from);
+  const d = x => `${x.getDate()} ${MONTHS[x.getMonth()]}`;
+  const n = Math.round((b - a) / CAL_DAY) + 1;
+  return `${d(a)}${to && to !== from ? ' – ' + d(b) : ''} ${b.getFullYear()} · ${n} day${n === 1 ? '' : 's'}`;
+}
+// a typed date: "14 oct", "oct 14", "2026-10-14", "14/10", "14/10/2026"
+function calParse(s) {
+  const t = String(s || '').trim().toLowerCase(), y0 = new Date().getFullYear();
+  const mon = w => MONTHS.findIndex(m => w.startsWith(m.toLowerCase().slice(0, 3)));
+  const ok = (y, m, d) => {
+    const x = new Date(y, m, d);
+    return m >= 0 && x.getMonth() === m && x.getDate() === d ? calKey(x) : null;
+  };
+  let r;
+  if ((r = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(t))) return ok(+r[1], +r[2] - 1, +r[3]);
+  if ((r = /^(\d{1,2})[/.](\d{1,2})(?:[/.](\d{2,4}))?$/.exec(t)))
+    return ok(r[3] ? (+r[3] < 100 ? 2000 + +r[3] : +r[3]) : y0, +r[2] - 1, +r[1]);
+  if ((r = /^(\d{1,2})\s*([a-z]{3,})\.?(?:\s+(\d{4}))?$/.exec(t))) return ok(r[3] ? +r[3] : y0, mon(r[2]), +r[1]);
+  if ((r = /^([a-z]{3,})\.?\s+(\d{1,2})(?:,?\s+(\d{4}))?$/.exec(t))) return ok(r[3] ? +r[3] : y0, mon(r[1]), +r[2]);
+  return null;
+}
+// the days a model was tested or submitted: a dot each
+function calDots(ms) {
+  const out = new Set();
+  for (const m of ms) for (const by of ['tested', 'added']) {
+    const d = testedDay(m, by);
+    if (d) out.add(d);
+  }
+  return out;
+}
+function whenCalendar(ms, t, onApply) {
+  const today = calKey(new Date());
+  const C = { from: t.span === 'range' ? t.from : '', to: t.span === 'range' ? t.to : '', hover: '',
+    focus: t.span === 'range' ? t.to : today };
+  C.month = (C.focus || today).slice(0, 7);
+  const dots = calDots(ms), wrap = el('div', { class: 'cal', 'data-cal': '1' });
+  const two = () => !matchMedia('(max-width:639px)').matches;
+  const shift = (ym, n) => { const [y, m] = ym.split('-').map(Number), d = new Date(y, m - 1 + n, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+  const pick = k => {
+    if (!C.from || C.to) { C.from = k; C.to = ''; }
+    else if (k < C.from) { C.to = C.from; C.from = k; }
+    else C.to = k;
+    C.focus = k; C.hover = '';
+    draw(true);
+  };
+  const inRange = k => {
+    const end = C.to || C.hover;
+    if (!C.from || !end) return false;
+    const [a, b] = C.from <= end ? [C.from, end] : [end, C.from];
+    return k >= a && k <= b;
+  };
+  const month = ym => {
+    const [y, m] = ym.split('-').map(Number), first = new Date(y, m - 1, 1);
+    const pad = (first.getDay() + 6) % 7, days = new Date(y, m, 0).getDate();
+    const cells = [...Array(pad).fill(null), ...Array.from({ length: days }, (_, i) =>
+      calKey(new Date(y, m - 1, i + 1)))];
+    return el('div', { class: 'cal-month', 'data-cal-month': ym },
+      el('div', { class: 'cal-title', text: `${MONTHS[m - 1]} ${y}` }),
+      el('div', { class: 'cal-grid', role: 'grid' },
+        ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map(w => el('span', { class: 'cal-wd', text: w })),
+        cells.map(k => k ? el('button', { type: 'button', role: 'gridcell',
+            class: 'cal-day' + (k === today ? ' cal-today' : '') + (dots.has(k) ? ' cal-dot' : '')
+              + (k === C.from ? ' cal-start' : '') + (k === (C.to || '') ? ' cal-end' : '')
+              + (inRange(k) ? ' cal-inr' : '') + (!C.to && C.hover && inRange(k) ? ' cal-prev' : ''),
+            'data-cal-day': k, tabindex: k === C.focus ? '0' : '-1',
+            'aria-selected': String(k === C.from || k === C.to),
+            title: dots.has(k) ? 'a model was tested or submitted' : null,
+            text: String(+k.slice(8)),
+            onclick: e => { e.stopPropagation(); pick(k); },
+            onmouseenter: () => { if (C.from && !C.to) { C.hover = k; mark(); } } })
+          : el('span', { class: 'cal-pad' }))));
+  };
+  // the hover's preview: the classes alone, the buttons kept
+  const mark = () => wrap.querySelectorAll('[data-cal-day]').forEach(b => {
+    const k = b.dataset.calDay;
+    b.classList.toggle('cal-inr', inRange(k));
+    b.classList.toggle('cal-prev', !C.to && !!C.hover && inRange(k));
+  });
+  const typed = el('input', { type: 'text', class: 'cal-typed', 'data-cal-typed': '1',
+    placeholder: '14 oct · 2026-10-14 · 14/10', 'aria-label': 'type a date',
+    onkeydown: e => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault(); e.stopPropagation();
+      const k = calParse(e.target.value);
+      e.target.classList.toggle('bad', !k);
+      if (k) { C.month = k.slice(0, 7); e.target.value = ''; pick(k); }
+    } });
+  function draw(refocus) {
+    const months = two() ? [C.month, shift(C.month, 1)] : [C.month];
+    wrap.replaceChildren(
+      el('div', { class: 'cal-head' },
+        el('b', { 'data-cal-words': '1', text: calWords(C.from, C.to) }),
+        el('span', { class: 'cal-acts' },
+          el('button', { class: 'quiet', 'data-cal-clear': '1', text: 'Clear',
+            onclick: e => { e.stopPropagation(); C.from = C.to = C.hover = ''; draw(); } }),
+          el('button', { class: 'pill on', 'data-cal-apply': '1', disabled: C.from ? null : '',
+            text: 'Apply', onclick: e => { e.stopPropagation(); if (C.from) onApply(C.from, C.to || C.from); } }))),
+      el('div', { class: 'cal-nav' },
+        el('button', { class: 'quiet', 'data-cal-prev': '1', 'aria-label': 'months before', text: '‹',
+          onclick: e => { e.stopPropagation(); C.month = shift(C.month, -1); draw(); } }),
+        el('div', { class: 'cal-months' }, months.map(month)),
+        el('button', { class: 'quiet', 'data-cal-next': '1', 'aria-label': 'months after', text: '›',
+          onclick: e => { e.stopPropagation(); C.month = shift(C.month, 1); draw(); } })),
+      el('label', { class: 'small cal-type' }, 'Or type a date ', typed));
+    if (refocus) {
+      const f = wrap.querySelector(`[data-cal-day="${C.focus}"]`);
+      if (f) f.focus();
+    }
+  }
+  // the arrows move a day or a week, Enter picks; leaving the months shown turns them
+  wrap.addEventListener('keydown', e => {
+    const b = e.target.closest && e.target.closest('[data-cal-day]');
+    if (!b) return;
+    const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+    if (step) {
+      e.preventDefault(); e.stopPropagation();
+      C.focus = calAdd(b.dataset.calDay, step);
+      if (C.from && !C.to) C.hover = C.focus;
+      const shown = two() ? [C.month, shift(C.month, 1)] : [C.month];
+      if (!shown.includes(C.focus.slice(0, 7)))
+        C.month = C.focus < `${C.month}-01` ? C.focus.slice(0, 7) : shift(C.focus.slice(0, 7), two() ? -1 : 0);
+      draw(true);
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault(); e.stopPropagation(); pick(b.dataset.calDay);
+    }
+  });
+  draw();
+  return wrap;
+}
+// "Since the newest checkpoint was added": the day the latest step… row came
+function calNewestStep(ms) {
+  const steps = ms.filter(m => /(?:^|[\/_-])step\d+/i.test(`${m.id} ${m.name}`))
+    .map(m => addedMs(m)).filter(Boolean);
+  return steps.length ? calKey(new Date(Math.max(...steps))) : null;
 }
 
 // ---- modelTable ------------------------------------------------------------
@@ -13886,12 +14327,15 @@ function scoreCell(x, o = {}) {
 }
 function modelTable(spec) {
   const L = lbS(), tint = !!L.tint, S = mtS(spec.view), cols = spec.cols;
+  // 27d: on a Models tab the search and Models ▾ ▸ Show leave their rows
+  const words = spec.models ? mtQueryWords(L.q) : [];
+  const inRows = spec.models ? mtFiltered(spec.rows) : spec.rows;
   // rows with no score in any column shown are hidden, and counted under the table
   const has = r => r.keep || cols.some(c => { const x = r.cells[c.key];
     return x && (x.v != null || x.keep); });
-  const empty = spec.hideEmpty === false ? [] : spec.rows.filter(r => !has(r)
+  const empty = spec.hideEmpty === false ? [] : inRows.filter(r => !has(r)
     && !(r.children || []).some(has));
-  const rows = mtSortRows(S.showEmpty ? spec.rows : spec.rows.filter(r => !empty.includes(r)), spec);
+  const rows = mtSortRows(S.showEmpty ? inRows : inRows.filter(r => !empty.includes(r)), spec);
   // two rows never share a name in one table: a published twin of a model
   // measured here says so; any other pair, the end of its id
   const named = new Map();
@@ -13912,6 +14356,22 @@ function modelTable(spec) {
   const sections = spec.groups ? MT_GROUPS.map(([g, label]) => [g, label,
     rows.filter(r => (r.group || 'open') === g)]).filter(([, , rs]) => rs.length)
     : [[null, null, rows]];
+  // 27d: the words every row of a group shares leave the rows for its heading
+  // ("lda runtime · served · thinking on"), and each row keeps its own
+  const shared = {};
+  if (spec.groups) for (const [g, , rs] of sections) {
+    const lines = rs.map(r => typeof r.line === 'string' ? r.line.split(' · ') : null);
+    if (rs.length < 2 || lines.some(x => !x)) continue;
+    const common = lines[0].filter(w => lines.every(l => l.includes(w)));
+    if (!common.length) continue;
+    shared[g] = common;
+    for (const r of rs) r.line = r.line.split(' · ').filter(w => !common.includes(w)).join(' · ');
+  }
+  const gnote = g => [(spec.groupNotes || {})[g], ...(shared[g] || [])].filter(Boolean).join(' · ');
+  // 27d: Pick to compare — a row's model, on a Models tab: one on the board or reported
+  const pickOf = r => !spec.models ? null : r.pick !== undefined ? r.pick
+    : r.id && (DATA.models.some(m => m.id === r.id) || String(r.id).startsWith('reported/'))
+      ? r.id : null;
   const ncols = cols.length + 1 + (spec.rank ? 1 : 0);
   const letters = new Set();
   const heat = (c, v) => {
@@ -13931,14 +14391,20 @@ function modelTable(spec) {
   const mark = r => el('span', { class: 'mt-mark ' + (r.mark === 'pub' ? 'pub' : 'here'),
     'data-mt-mark': r.mark, 'aria-label': r.mark === 'pub' ? 'published' : 'measured here',
     style: r.mark === 'pub' ? null : `background:${r.colour || 'var(--accent)'}` });
-  const nameTd = (r, sub) => el('td', { class: 'mt-name model pin' + (sub ? ' mt-subname' : ''),
-      'data-model': r.id, title: r.full || r.name, style: `--fam:${r.colour || 'var(--axis)'}` },
-    el('div', { class: 'mt-nrow' }, sub ? '' : mark(r),
-      r.href ? el('a', { class: 'mname mlink', href: r.href, 'data-mt-name': r.key,
-        text: sub ? r.subLabel || r.name : midTrunc(r.name, 40) })
-        : el('span', { class: 'mname', 'data-mt-name': r.key, text: midTrunc(r.name, 40) }),
-      ...(r.badges || []).filter(Boolean)),
-    !sub && r.line ? el('div', { class: 'mt-line', 'data-mt-line': r.key }, mtLineKids(r.line)) : '');
+  const nameTd = (r, sub) => {
+    const shown = sub ? r.subLabel || r.name : midTrunc(r.name, 40), pk = sub ? null : pickOf(r);
+    const badges = (r.badges || []).filter(Boolean);
+    return el('td', { class: 'mt-name model pin' + (sub ? ' mt-subname' : ''),
+        'data-model': r.id, title: r.full || r.name, style: `--fam:${r.colour || 'var(--axis)'}` },
+      el('div', { class: 'mt-nrow' }, pk ? cmpTick(pk) : spec.models && !sub
+        ? el('span', { class: 'cmpgap' }) : '', sub ? '' : mark(r),
+        r.href ? el('a', { class: 'mname mlink', href: r.href, 'data-mt-name': r.key },
+          ...(sub ? [shown] : mtMarked(shown, words)))
+          : el('span', { class: 'mname', 'data-mt-name': r.key }, ...mtMarked(shown, words)),
+        badges.length ? el('span', { class: 'mt-badges' }, ...badges) : ''),
+      !sub && r.line ? el('div', { class: 'mt-line', 'data-mt-line': r.key,
+        title: mtLineText(r.line) }, mtLineKids(r.line)) : '');
+  };
   const tr = (r, sub = false) => el('tr', { 'data-mt-row': r.key, 'data-mt-group': r.group || null,
       'data-mt-pub': r.mark === 'pub' ? '1' : null, ...(r.attrs || {}),
       // a row's own class (a duplicate's, one a page sent here) beside the table's
@@ -13957,8 +14423,7 @@ function modelTable(spec) {
   for (const [g, label, rs] of sections) {
     if (g) tbody.append(el('tr', { class: 'mt-group', 'data-mt-group-head': g },
       el('th', { colspan: String(ncols), scope: 'colgroup' }, el('span', { text: label }),
-        (spec.groupNotes || {})[g] ? el('span', { class: 'mt-gnote', text: spec.groupNotes[g] })
-          : '')));
+        gnote(g) ? el('span', { class: 'mt-gnote', 'data-mt-gnote': g, text: gnote(g) }) : '')));
     for (const r of rs) {
       tbody.append(tr(r));
       for (const k of r.children || []) tbody.append(tr(k, true));
@@ -14001,6 +14466,7 @@ function modelTable(spec) {
         'data-lcol': 'rank' }, el('span', { class: 'mt-h1', text: '#' })) : '',
       el('th', { class: 'mt-h model pin', scope: 'col', 'data-mt-col': 'name', 'data-col': 'name',
         'data-lcol': 'name', 'data-tip': spec.nameTip ? JSON.stringify(spec.nameTip) : null },
+        spec.models && rows.some(pickOf) ? cmpAll(rows.map(pickOf).filter(Boolean)) : '',
         el('span', { class: 'mt-h1 hname', text: 'Model' }), ...(spec.layout
           ? layoutBits(spec.layout, 'name', 'Model', { movable: false }) : [])),
       cols.map(th)));
@@ -14037,15 +14503,32 @@ function modelTable(spec) {
           : '');
     })));
   const sortable = cols.filter(c => c.sortable !== false && spec.onSort);
+  // the board's own menu, never a native select (11f); 27d: on a Models tab it is
+  // last in the filter row (mtPlaceSort moves it there)
+  const sortPill = sortable.length ? el('div', { class: 'mt-sortsel', 'data-mt-sort': spec.view,
+      'data-mt-sort-row': spec.models ? '1' : null },
+    pillMenu('mtsort-' + spec.view, 'Sort', sortable.map(c => [c.key, c.label]),
+      (spec.sort || {}).key || sortable[0].key, k => spec.onSort(k))) : '';
   const cards = el('div', { class: 'mt-cards', 'data-mt-cards': spec.view },
-    // the board's own menu, never a native select (11f)
-    sortable.length ? el('div', { class: 'mt-sortsel', 'data-mt-sort': spec.view },
-      pillMenu('mtsort-' + spec.view, 'Sort', sortable.map(c => [c.key, c.label]),
-        (spec.sort || {}).key || sortable[0].key, k => spec.onSort(k))) : '',
-    sections.map(([g, label, rs]) => [g ? el('div', { class: 'mt-cgroup', text: label }) : '',
+    spec.models ? '' : sortPill,
+    sections.map(([g, label, rs]) => [g ? el('div', { class: 'mt-cgroup' }, label,
+      gnote(g) ? el('span', { class: 'mt-gnote', text: gnote(g) }) : '') : '',
       ...rs.map(card)]));
   const key = [...letters].sort().map(k => `${k} ${MT_LETTERS[k] || k}`).join(' · ');
-  return el('div', { class: 'mt', 'data-mt': spec.view },
+  // 27d: what the search found: "3 of 37 models match"; none, and a way back
+  const of = spec.searchOf ?? spec.rows.length, found = spec.searchFound ?? inRows.length;
+  const count = words.length ? el('p', { class: 'small se mt-found', 'data-lb-search-count':
+    `${found}|${of}`, text: `${found} of ${of} model${of === 1 ? '' : 's'} match` }) : '';
+  if (spec.models && !inRows.length && (words.length || (L.group || 'all') !== 'all'))
+    return el('div', { class: 'mt', 'data-mt': spec.view }, sortPill,
+      el('p', { class: 'mt-nomatch', 'data-lb-nomatch': '1' },
+        words.length ? `No model matches ‘${L.q.trim()}’ · ` : `No model in ${(MT_GROUPS.find(([g]) =>
+          g === L.group) || [, L.group])[1]} here · `,
+        el('button', { class: 'quiet', 'data-lb-nomatch-clear': '1', text: 'Clear',
+          onclick: () => words.length ? lbClearSearch() : lbSet({ group: 'all' }) })),
+      cmpBar() || '');
+  return el('div', { class: 'mt' + (spec.models ? ' mt-models' : ''), 'data-mt': spec.view },
+    count, spec.models ? sortPill : '',
     el('div', { class: 'mt-legend small se', 'data-mt-legend': '1' },
       // 27c: a table says only what it uses (no published numbers, no ±: not said)
       el('span', { text: spec.legend ? spec.legend(tint) : tint ? MT_LEGEND_TINT : MT_LEGEND }),
@@ -14061,9 +14544,9 @@ function modelTable(spec) {
         + 'these columns · ' : `${empty.length} more model${empty.length === 1 ? ' has' : 's have'}`
         + ' no score in these columns · ',
       el('button', { class: 'quiet', 'data-mt-empty-toggle': '1', text: S.showEmpty
-        ? 'hide them' : 'show them', onclick: () => { S.showEmpty = !S.showEmpty; render(); } }))
+        ? 'hide them' : 'show them', onclick: () => { S.showEmpty = !S.showEmpty; lbSoft(); } }))
       : '',
-    ...(spec.foot || []));
+    ...(spec.foot || []), spec.models ? cmpBar() || '' : '');
 }
 // 27b: a row's line: words, or words and nodes (a source's link) joined by " · ";
 // a card's copy keeps the words and links, without the table's hooks
@@ -14096,6 +14579,8 @@ function mtRowOf(m, o = {}) {
     .includes('/') && !/^(served|gguf|local)\//.test(m.dmHome || m.rowOf || m.id)
     ? String(m.dmHome || m.rowOf || m.id).split('/')[0] : '');
   return { key: o.key || m.id, id: m.id, nav: m.rowOf || m.dmHome || m.id,
+    // 27d: the names it goes by, for the search: the board's own, its ids
+    search: [m.name, m.id, m.rowOf, m.dmHome].filter(Boolean).join(' '),
     href: '#model=' + encodeURIComponent(m.rowOf || m.dmHome || m.id), mark: 'here',
     colour: mtColour(m), name: mtNameOf(parts), full: `${m.name}\nfamily: ${famOf(m)}\n${m.id}`
       // how a served model runs (an OpenRouter pin), as its tag's title said
@@ -14784,10 +15269,10 @@ function lbFrontier(ms) {
       `${cols.length} of the ${every.length} benchmarks reported; by default the ${dflt.length} `
       + `reported for at least half of the ${(REP().models || []).length} imported models, and `
       + 'those measured here too.'),
-    rows.length ? modelTable({ view: 'frontier', attrs: { 'data-frontier-table': '1' },
+    rows.length ? modelTable({ view: 'frontier', attrs: { 'data-frontier-table': '1' }, models: true,
       cols: cols.map(asCol), rows, groups: true, colGroups: true, layout: 'frontier', hkey: 'fr',
       sort: F.sort, onSort: k => { F.sort = { key: k, dir: F.sort.key === k ? -F.sort.dir : -1 };
-        render(); },
+        lbSoft(); },
       foot: [el('p', { class: 'lbcap', text: 'Bold is the best of the cells with one setting — '
         + 'Epoch AI’s own runs with each other, one outside source with itself, ours measured '
         + 'here with ours; the rest aren’t ranked against them. † a value the source took from '
@@ -15856,8 +16341,8 @@ function lbEveryday(ms) {
       [...shown], dflt)),
     modelTable({ view: 'everyday', attrs: { 'data-lb-everyday': '1' }, cols, rows: made,
       groups: true, sort: S.sort, cardCols: ['total', ...[...shown].slice(0, 3)], layout: LK,
-      hkey: 'lb',
-      onSort: k => { S.sort = { key: k, dir: S.sort.key === k ? -S.sort.dir : -1 }; render(); },
+      hkey: 'lb', models: true,
+      onSort: k => { S.sort = { key: k, dir: S.sort.key === k ? -S.sort.dir : -1 }; lbSoft(); },
       extra: notTestedRows(none, cols.length + 1, 'everyday') }),
     el('p', { class: 'lbcap', text: `${evdAll()} questions in ${evdGroupsWord()} groups, typed the way `
       + `people type on a phone; each count is the ${evdHidden()} hidden ones, its share passed `
@@ -16608,11 +17093,16 @@ function vLeaderboard(ms) {
   // shown: seven columns of dashes said nothing. Chosen by name, it stays
   if (!custom && !lbAll.some(m => visCols.some(c => c.gguf && val(m, c) != null)))
     visCols = visCols.filter(c => !c.gguf);
-  const lbPairs = mtThinkRows(lbAll, m => visCols.filter(c => val(m, c) != null).length);
+  const lbPairsAll = mtThinkRows(lbAll, m => visCols.filter(c => val(m, c) != null).length);
+  // 27d: the search and Models ▾ ▸ Show leave their rows before the pages; a
+  // change turns back to page 1
+  const lbPairs = (L.q || (L.group || 'all') !== 'all') ? mtFiltered(lbPairsAll.map(pr =>
+    ({ ...mtRowOf(pr.m), pair: pr, children: pr.other ? [mtRowOf(pr.other)] : [] })))
+    .map(r => r.pair) : lbPairsAll;
   lbCounts.table = lbPairs.length;              // 27: a model's thinking row is its row
   const lbPg = paged('leaderboard', lbPairs, JSON.stringify([state.sort, state.q, state.kind,
     state.src, state.avgMode, L.view, L.chip, L.source, L.type, L.tested, L.date, L.size, L.status,
-    L.models, L.cols, mtThink()]));
+    L.models, L.cols, mtThink(), L.q, L.group]));
   // the leaders are bold whatever the Tint switch says
   const leaders = lbLeaders(visCols, val, dmMade);
 
@@ -16799,14 +17289,6 @@ function vLeaderboard(ms) {
     cells: Object.fromEntries(visCols.filter(c => !['rank', 'name'].includes(c.key))
       .map(c => [c.key, cellOf(m, c)])),
     badges: [
-      // 12m.1: tick two to eight rows, then Compare ▸
-      L.view === 'standard' && !sub ? el('input', { type: 'checkbox', class: 'cmptick',
-        'data-cmp-tick': m.id, 'aria-label': 'compare ' + m.name,
-        title: 'Tick two to eight models to compare them',
-        checked: (L.ticks || []).includes(m.id) ? '' : null,
-        onchange: e => { const t = new Set(L.ticks || []);
-          if (e.target.checked) t.add(m.id); else t.delete(m.id);
-          L.ticks = [...t]; render(); } }) : '',
       // 16.8: "prelim 0/7" counts Standard's required benchmarks: Standard's alone
       m.thinkingRow || m.served || ggufOnly(m) || dmv || lbTest(L) !== 'standard' ? ''
         : warnBadge(m) || '', dupBadge(m) || '',
@@ -16933,9 +17415,10 @@ function vLeaderboard(ms) {
     colGroups: grouped, attrs: dmv ? { 'data-lb-dmview': '1' } : {}, extra: extraRows,
     tableClass: dmv ? 'dmview' : '',
     sort: { key: state.sort.key, dir: state.sort.dir },
+    models: true, searchOf: lbPairsAll.length, searchFound: lbPairs.length,
     onSort: key => { const c = cols.find(x => x.key === key) || {};
       state.sort = { key, dir: state.sort.key === key ? -state.sort.dir
-        : (key === 'name' ? 1 : c.lower ? 1 : -1) }; render(); } });
+        : (key === 'name' ? 1 : c.lower ? 1 : -1) }; lbSoft(); } });
   return [el('div', { class: 'card', 'data-lb-card': '1' },
       ...modelsHead(L.view === 'exam' ? judgeChecked() : ''),
       lbToolbar(ms, cols, shown, nHidden, lbCounts),
@@ -17187,15 +17670,19 @@ function lbToolbar(ms, cols, shown, nHidden, counts = null, colsPill = null) {
   return el('div', { class: 'lbbar narrow' },
     el('div', { class: 'chiprow', 'data-lb-row2': '1' },
       el('div', { class: 'pickers', 'data-pickers': '1' },
-        // 21d: When ▾ in view, beside Group and Models
-        LB_GROUPS[test] ? lbGroupPill(test) : '', lbModelsPill(ms), whenPill(ms), toggle,
+        // 27d: one row, the same on every tab: Search · Models ▾ · When ▾ ·
+        // Filters ▾ · Thinking ▾ · Columns ▾ · Sort ▾ (Group ▾ where a tab has
+        // groups of columns); a filter a tab can't use is left out
+        lbSearchBox(), lbModelsPill(ms), whenPill(ms), toggle,
+        // 27: one row a model; which thinking setting it shows — where one has both
+        L.view !== 'latest' && ms.some(m => m.thinkingRow && ms.some(x => x.id
+          === m.id.replace(/ · thinking$/, ''))) ? mtThinkPill() : '',
+        LB_GROUPS[test] ? lbGroupPill(test) : '',
         colsPill || (colsHere ? lbColumnsPill(cols, shown, nHidden) : ''),
-        // 27: one row a model; which thinking setting it shows
-        ms.some(m => m.thinkingRow) ? mtThinkPill() : '',
         // 16.4: the Chart's Highlight ▾, Benchmarks ▸ Standard's before
         L.show === 'chart' && !lbChartWhy(L) && !(L.chip === 'devicemark' && !L.cols)
           ? hlPill(lbFilter(ms), (L.hl || []).slice(0, 3)) : '',
-        L.view === 'standard' ? cmpGo() : '', count || '')),
+        count || '')),
     views, L.view === 'standard' ? lbViewForm() : '',
     open ? el('div', { class: 'fsheet', id: 'filter-sheet', role: 'dialog', 'aria-label': 'filters',
         'data-filter-sheet': '1',
@@ -17245,6 +17732,9 @@ function lbActiveRow(ms, counts = null) {
   if (state.avgMode === 'raw') on.push(['scale', 'Scale: raw accuracy', null]);
   const chosen = (L.models || []).filter(id => !id.startsWith('reported/')).length;
   if (L.models) on.push(['models', `Models: ${chosen} chosen`, { models: null }]);
+  // 27d: Models ▾ ▸ Show: ours, open or closed
+  if ((L.group || 'all') !== 'all') on.push(['group', `Models: ${(MT_SHOW.find(([g]) =>
+    g === L.group) || [, L.group])[1].toLowerCase()}`, { group: 'all' }]);
   const n = lbFilter(ms).length;
   return el('div', { class: 'lbactive', 'data-lb-active': String(on.length) },
     el('div', { class: 'onchips' }, on.map(([k, text, reset]) => el('span', { class: 'onchip',
@@ -17252,7 +17742,8 @@ function lbActiveRow(ms, counts = null) {
       el('button', { class: 'chip-x', 'data-on-remove': k, 'aria-label': `remove ${text}`,
         text: '×', onclick: () => { if (reset) lbSet(reset); else { state.avgMode = 'chance';
           render(); } } }))),
-      on.length > 1 || (on.length && on[0][0] !== 'models') ? el('button', { class: 'quiet',
+      // 27d: a Clear all at the end of the chips
+      on.length ? el('button', { class: 'quiet',
         'data-clear-all': '1', text: 'Clear all', onclick: lbClearAll }) : ''),
     el('span', { class: 'small se lbcount', 'data-lb-count': `${n}|${ms.length}`,
       'data-lb-counts': counts ? [counts.table, counts.not, counts.dup, counts.setup, counts.cannot]
@@ -17264,7 +17755,7 @@ function lbActiveRow(ms, counts = null) {
 }
 function lbClearAll() {
   state.avgMode = 'chance';
-  lbSet({ ...LB_DEFAULTS, models: null });
+  lbSet({ ...LB_DEFAULTS, models: null, group: 'all' });
 }
 // 16.3: Group ▾ — one choice in place of the chips, each with how many
 // benchmarks it holds, and Mobile-MMLU its restriction badge (14.4.4)
@@ -17343,14 +17834,16 @@ function whenPill(ms) {
     'data-pill': 'when', 'data-value': L.tested, 'data-when-by': by,
     text: `When: ${whenWords(t, by)} ▾` });
   return popover(btn, () => {
-    const D = state.lbRange = { from: t.from || '', to: t.to || '', ...(state.lbRange || {}) };
-    const apply = () => {
-      if (!D.from || !D.to) return;
-      popClose(true);
-      lbSet({ tested: testedVal({ span: 'range', from: D.from <= D.to ? D.from : D.to,
-        to: D.from <= D.to ? D.to : D.from, none: t.none }) });
-    };
-    return el('div', { class: 'moremenu', id: 'pop-when', 'aria-label': 'when' },
+    // 27d: presets as rows; a range on the board's own calendar
+    const today = calKey(new Date()), step = calNewestStep(ms);
+    const range = (from, to) => testedVal({ span: 'range', from, to, none: t.none });
+    const presets = [['any', 'Any time', 'any'], ['today', 'Today', range(today, today)],
+      ['7d', 'Last 7 days', testedVal({ span: '7d', none: t.none })],
+      ['30d', 'Last 30 days', testedVal({ span: '30d', none: t.none })],
+      ['month', 'This month', range(today.slice(0, 8) + '01', today)],
+      ...(step ? [['step', 'Since the newest checkpoint was added', range(step, today)]] : [])];
+    const cur = (presets.find(([, , v]) => v === testedVal(t)) || [])[0];
+    return el('div', { class: 'moremenu whenmenu', id: 'pop-when', 'aria-label': 'when' },
       el('div', { class: 'whenby', role: 'radiogroup', 'aria-label': 'which date' },
         el('span', { class: 'small se', text: 'Which date' }),
         el('div', { class: 'segbtn' }, LB_DATES.map(([v, w, what]) => el('button', {
@@ -17359,18 +17852,13 @@ function whenPill(ms) {
           onclick: () => { popClose(true); lbSet({ date: v }); } }))),
         el('span', { class: 'small se', 'data-when-what': by,
           text: (LB_DATES.find(([v]) => v === by) || LB_DATES[0])[2] })),
-      LB_TESTED.map(([v, w]) => el('button', { role: 'menuitemradio', 'data-choice': v,
-        'aria-checked': String(t.span === v), text: w,
-        onclick: () => { popClose(true); lbSet({ tested: testedVal({ span: v, none: t.none }) }); } })),
+      presets.map(([v, w, val]) => el('button', { role: 'menuitemradio', 'data-choice': v,
+        'aria-checked': String(cur === v), text: w,
+        onclick: () => { popClose(true); lbSet({ tested: val }); } })),
       el('div', { class: 'trange', 'data-when-range': '1', role: 'group',
           'aria-label': 'between two dates' },
         el('span', { class: 'small', text: 'Between two dates' }),
-        el('input', { type: 'date', 'aria-label': 'from', 'data-when-from': '1', value: D.from,
-          oninput: e => { D.from = e.target.value; } }),
-        el('input', { type: 'date', 'aria-label': 'to', 'data-when-to': '1', value: D.to,
-          oninput: e => { D.to = e.target.value; },
-          onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); apply(); } } }),
-        el('button', { class: 'quiet', 'data-when-apply': '1', text: 'Apply', onclick: apply })),
+        whenCalendar(ms, t, (from, to) => { popClose(true); lbSet({ tested: range(from, to) }); })),
       none && t.span !== 'any' ? el('button', { role: 'menuitemcheckbox', 'data-choice': TESTED_NONE,
         'aria-checked': String(t.none), text: `No date (${none})`,
         onclick: () => { popClose(true); lbSet({ tested: testedVal({ ...t, none: !t.none }) }); } })
@@ -17942,6 +18430,13 @@ function lbModelsPill(ms) {
     fill(state.lbModelsQ || '');
     say();
     return el('div', { class: 'moremenu modelsmenu', id: 'pop-models', 'aria-label': 'models' },
+      // 27d: the groups every Models tab draws: ours, open models, closed models
+      el('div', { class: 'mshow', role: 'radiogroup', 'aria-label': 'which models' },
+        el('span', { class: 'small se', text: 'Show' }),
+        el('div', { class: 'segbtn' }, MT_SHOW.map(([v, w]) => el('button', {
+          class: 'chip-btn' + ((L.group || 'all') === v ? ' on' : ''), role: 'radio',
+          'data-models-show': v, 'aria-checked': String((L.group || 'all') === v), text: w,
+          onclick: () => { popClose(true); lbSet({ group: v }); } })))),
       el('div', { class: 'frm' },
         el('button', { class: 'quiet', text: 'All ranked', 'data-models-default': '1',
           title: 'every model, the ranked ones first — the default', onclick: () => {
@@ -28581,6 +29076,7 @@ function rpOursRow(r, benches, o = {}) {
   const line = m ? mtLine(m, { group: base.group, size: o.line ? '' : size, thinking: thinkingOf(m) })
     : '';
   return { ...base, key: 'ours:' + r.label, colour: r.colour != null ? rpColour(r) : base.colour,
+    search: [base.search, r.label, r.row].filter(Boolean).join(' '),
     line: o.line ? [...line.split(' · ').filter(x => x && x !== r.quant), ...o.line] : line,
     attrs: o.attrs || {}, cells: Object.fromEntries(benches.map(b => {
       const c = r.cells[b.key], at = o.cellAttrs ? o.cellAttrs(b) : {};
@@ -28634,7 +29130,7 @@ function rpTheirsRows(list, benches, o = {}) {
       && displayName({ ...m, published: true }) === x.name) || null;
     // a line of words when nothing in it is a node
     const line = x.line.some(y => y && y.nodeType) ? x.line : x.line.join(' · ');
-    return { ...x, line, id: opened ? opened.id : null,
+    return { ...x, line, id: opened ? opened.id : null, search: x.labels.join(' '),
       href: opened ? '#model=' + encodeURIComponent(opened.id) : null };
   });
 }
@@ -28659,8 +29155,7 @@ function lbLatest(ms) {
   const card = el('div', { class: 'card', 'data-lb-card': '1', 'data-latest': g.report },
     ...modelsHead());
   if (!d) {
-    card.append(el('div', { class: 'lbbar narrow' }, el('div', { class: 'chiprow',
-      'data-lb-row2': '1' }, el('div', { class: 'pickers', 'data-pickers': '1' }, whenPill(ms)))),
+    card.append(lbToolbar(ms, lbColumns(ms), new Set(), 0),
     R.latestErr ? el('p', { class: 'warn', text: 'The report couldn’t be read: '
       + R.latestErr }) : skeleton(5, { 'data-loading': 'latest' }));
     return [card];
@@ -28669,10 +29164,11 @@ function lbLatest(ms) {
   const t = testedSel(L.tested);
   // 22: our rows the report marks "glance", as the published ones are
   const ours = d.ours.filter(r => r.glance);
+  // 27d: and Models ▾ and Filters ▾, as on Frontier: a board model's own filters
   const mine = ours.filter(r => {
-    if (t.span === 'any') return true;
     const m = DATA.models.find(x => x.id === r.row);
-    return m ? testedOk(t, m, L.date) : t.none;
+    if (!m) return t.span === 'any' ? !L.models : t.none && !L.models;
+    return lbFilter([m]).length > 0;
   });
   // 27: Columns ▾ — every benchmark of the report, its four at a glance by default
   const every = d.benchmarks.map(b => mtReportCol(b, d.ours));
@@ -28692,7 +29188,8 @@ function lbLatest(ms) {
   for (const x of rpTheirsRows(d.theirs.filter(r => r.glance), benches, {
       attrs: x => ({ 'data-latest-row': x.label, 'data-latest-ours': 'false' }),
       manyAttr: 'data-latest-rows' }))
-    rows.push({ ...x, cells: { ...x.cells, src: { node: el('span', { 'data-latest-source': '1',
+    // 27d: Models ▾'s choice: a published model by its page, chosen or not
+    if (!L.models || (x.id && L.models.includes(x.id))) rows.push({ ...x, cells: { ...x.cells, src: { node: el('span', { 'data-latest-source': '1',
       text: [...new Set(x.sources)].join(' · ') }), keep: false } } });
   const at = (d.sources.ours || {}).when;
   const from = el('p', { class: 'small se', 'data-latest-from': g.report },
@@ -28701,12 +29198,13 @@ function lbLatest(ms) {
       'data-latest-open': d.id, text: 'Open the report ▸',
       onclick: e => { e.preventDefault(); rpOpen(d.id); } }));
   card.append(
-    el('div', { class: 'lbbar narrow' }, el('div', { class: 'chiprow', 'data-lb-row2': '1' },
-      el('div', { class: 'pickers', 'data-pickers': '1' }, whenPill(ms),
-        mtColumnsPill('latest', every, shown, dflt)), from)),
+    // 27d: the filter row every tab has: Search, Models ▾, When ▾, Filters ▾, Columns ▾, Sort ▾
+    lbToolbar(ms, lbColumns(ms), new Set(), 0, null, mtColumnsPill('latest', every, shown, dflt)),
+    from,
     modelTable({ view: 'latest', attrs: { 'data-latest-table': '1' }, cols, rows, groups: true,
+      models: true,
       sort: S.sort, onSort: k => { S.sort = { key: k, dir: S.sort.key === k ? -S.sort.dir : -1 };
-        render(); },
+        lbSoft(); },
       groupNotes: { ours: 'measured here, same questions' },
       foot: [el('p', { class: 'small se', 'data-latest-legend': '1', text: RP_SCORE_LEGEND
         + ' † HLE from Epoch AI’s collection of other sources. A model card’s number has no ±. '
@@ -31486,6 +31984,7 @@ function render() {
   } else if (_settle) {
     requestAnimationFrame(settleAgain);
   }
+  mtPlaceSort(view);                     // 27d: Sort ▾, last in the filter row
   fitNames(view);                        // 16.8: before the scrollers are measured
   hfadeUpdate(view);                     // decides which boxes scroll…
   for (const [k, x] of hkeep) {          // …so the old sideways scroll can come back
