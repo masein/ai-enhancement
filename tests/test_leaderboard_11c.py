@@ -25,7 +25,9 @@ TOP = "fx/good-750m-tuned-skill"
 
 def open_lb(page, base, frag=""):
     page.goto(base + "/#tab=leaderboard" + frag)
-    page.wait_for_selector(f"{LB} tbody tr[data-lb-row]")
+    # 27: under 640 px a card a model, else the table's rows
+    page.wait_for_selector("[data-lb-card] [data-mt-card]" if page.viewport_size["width"] < 640
+                           else f"{LB} tbody tr[data-lb-row]")
 
 
 def heads(page):
@@ -174,7 +176,8 @@ def test_a_cell_the_z_test_cannot_tell_from_the_best_is_a_leader_too(live, page)
           out.push([(td.getAttribute('style') || ''), getComputedStyle(td.querySelector('b')).fontWeight]);
       return out; }}""")
     assert found, "the fixture has a pair inside the noise at the top of a column"
-    assert all("--heat-3" in st and int(w) >= 700 for st, w in found)
+    # 27: bold, whatever Tint says (Tint now gives every cell its column's heat)
+    assert all(int(w) >= 700 for _st, w in found)
     # and the z-test agrees: the pair is in DATA.sig as not significant
     assert page.evaluate("""() => DATA.accTasks.some(t => (DATA.sig[t] || []).some(r => !r[4]))""")
     assert page.errors == []
@@ -198,11 +201,15 @@ def test_no_provisional_cell_is_ever_tinted(live, page):
 # rows
 # ---------------------------------------------------------------------------
 
-def test_every_row_is_one_line(live, page):
+def test_every_row_is_two_lines_its_name_and_its_line(live, page):
+    # 27: a row is its name and one muted line under it, the same height on every row
     open_lb(page, live["base"])
     hs = page.evaluate(f"""() => [...document.querySelectorAll('{LB} tbody tr[data-lb-row]')]
       .map(tr => tr.getBoundingClientRect().height)""")
-    assert hs and min(hs) >= 39.5 and max(hs) <= 48, hs
+    assert hs and min(hs) >= 39.5 and max(hs) <= 64, hs
+    lines = page.locator(f"{LB} tbody [data-mt-line]").evaluate_all(
+        "xs => xs.map(x => x.getBoundingClientRect().height)")
+    assert lines and max(lines) <= 20, lines                     # one line each
     assert page.errors == []
 
 
@@ -352,26 +359,23 @@ def test_weakest_topics_says_so_when_nothing_is_judged(live, page):
 # the phone, and the pictures
 # ---------------------------------------------------------------------------
 
-def test_at_400px_the_model_column_is_pinned_and_nothing_overflows(live, page):
+def test_at_400px_a_card_a_model_and_nothing_overflows(live, page):
+    # 27: under 640 px a card a model — its mark, name, line and four headline scores
     page.set_viewport_size({"width": 400, "height": 860})
     open_lb(page, live["base"])
     assert page.evaluate(
         "document.documentElement.scrollWidth <= document.documentElement.clientWidth")
-    # the header sits above the first row, not on top of it
-    head = page.locator(f"{LB} thead tr:not(.grp)").bounding_box()
-    first = page.locator(f"{LB} tbody tr[data-lb-row]").first.bounding_box()
-    assert head["y"] + head["height"] <= first["y"] + 1, (head, first)
+    assert not page.locator(LB).is_visible()
+    card = page.locator(f"[data-mt-card='{TOP}']")
+    assert card.locator(".mt-mark").count() == 1 and card.locator(".mname").inner_text()
+    assert card.locator("[data-mt-card-col]").count() == 4
+    for c in page.locator("[data-mt-card]").all():
+        assert c.evaluate("e => e.scrollWidth <= e.clientWidth + 1")
+    # the model column is pinned in the wide table (1280)
+    page.set_viewport_size({"width": 1280, "height": 860})
+    open_lb(page, live["base"])
     td = page.locator(f"tr[data-lb-row='{TOP}'] td.model")
-    rank = page.locator(f"tr[data-lb-row='{TOP}'] td.rank")
     assert td.evaluate("e => getComputedStyle(e).position") == "sticky"
-    before = (rank.bounding_box()["x"], td.bounding_box()["x"])
-    wrap = page.locator(".lb-wrap.stick")
-    assert wrap.evaluate("e => e.scrollWidth > e.clientWidth")    # there is something to scroll
-    wrap.evaluate("e => e.scrollLeft = 400")
-    page.wait_for_timeout(100)
-    # the rank and the model stay exactly where they were; the scores move
-    assert abs(rank.bounding_box()["x"] - before[0]) < 1
-    assert abs(td.bounding_box()["x"] - before[1]) < 1
     assert page.errors == []
 
 

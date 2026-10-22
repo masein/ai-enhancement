@@ -78,42 +78,42 @@ def test_the_model_page_picks_a_judged_topic_from_a_searchable_list(live, page):
 def test_the_exam_view_shows_the_judged_average_and_hides_the_topic_columns(live, page):
     """12b: the judged average is the Knowledge exam view's, not Standard's."""
     page.goto(live["base"] + "/#tab=models&view=exam")
-    page.wait_for_selector("table.lb tbody tr")
-    cols = page.evaluate("[...document.querySelectorAll('table.lb thead th[data-col]')]"
+    page.wait_for_selector("table[data-lb-table] tbody tr")
+    cols = page.evaluate("[...document.querySelectorAll('table[data-lb-table] thead th[data-col]')]"
                          ".map(th => th.dataset.col)")
     assert "javg" in cols                                         # shown by default
     assert not any(c.startswith("cat:") for c in cols)            # categories: not here
     assert not any(c.startswith("j:") for c in cols)              # topics: hidden
-    avg = page.locator("table.lb tbody tr[data-lb-row='fx/good-750m'] [data-judged-avg]")
+    avg = page.locator("table[data-lb-table] tbody tr[data-lb-row='fx/good-750m'] [data-judged-avg]")
     # 11c: one line per cell; 11f: the 0–4 scale is the column name's tooltip
     assert avg.count() == 1 and float(avg.text_content()) >= 0
-    assert "0–4" in page.locator("table.lb thead th[data-col='javg']").get_attribute("data-tip")
+    assert "0–4" in page.locator("table[data-lb-table] thead th[data-col='javg']").get_attribute("data-tip")
     open_filters(page)
     page.locator("[data-columns-menu]").click()
     menu = page.locator("#pop-columns")
     assert menu.locator("[data-column-group='judged']").count() == 1
     menu.locator("[data-column-group-all='judged']").click()
-    page.wait_for_function("[...document.querySelectorAll('table.lb thead th')]"
+    page.wait_for_function("[...document.querySelectorAll('table[data-lb-table] thead th')]"
                            ".some(th => (th.dataset.col || '').startsWith('j:'))")
     # the popover stayed open, and its boxes say what is true now
     assert menu.locator("[data-column-group='judged'] input:not(:checked)").count() == 0
     menu.locator("[data-column-group-none='judged']").click()
-    page.wait_for_function("![...document.querySelectorAll('table.lb thead th')]"
+    page.wait_for_function("![...document.querySelectorAll('table[data-lb-table] thead th')]"
                            ".some(th => (th.dataset.col || '').startsWith('j:'))")
     page.keyboard.press("Escape")
     # MMLU's topics are Knowledge's columns, hidden until asked for
     page.goto(live["base"] + "/#tab=models&chip=knowledge")
-    page.wait_for_function("[...document.querySelectorAll('table.lb thead th')]"
+    page.wait_for_function("[...document.querySelectorAll('table[data-lb-table] thead th')]"
                            ".some(th => (th.dataset.col || '').startsWith('area:'))")
-    assert page.locator("table.lb thead th[data-col^='cat:']").count() == 0
+    assert page.locator("table[data-lb-table] thead th[data-col^='cat:']").count() == 0
     open_filters(page)
     page.locator("[data-columns-menu]").click()
     menu.locator("[data-column-group-all='cats']").click()
-    page.wait_for_function("[...document.querySelectorAll('table.lb thead th')]"
+    page.wait_for_function("[...document.querySelectorAll('table[data-lb-table] thead th')]"
                            ".some(th => th.dataset.col === 'cat:Economics')")
     assert menu.locator("[data-column-group='cats'] input:not(:checked)").count() == 0
     menu.locator("[data-column-group-none='cats']").click()
-    page.wait_for_function("![...document.querySelectorAll('table.lb thead th')]"
+    page.wait_for_function("![...document.querySelectorAll('table[data-lb-table] thead th')]"
                            ".some(th => (th.dataset.col || '').startsWith('cat:'))")
     assert page.errors == []
 

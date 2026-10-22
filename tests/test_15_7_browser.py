@@ -50,12 +50,15 @@ def test_a_provisional_row_says_why_and_which_reading_scored_it(live, page, widt
     SCREENS.mkdir(parents=True, exist_ok=True)
     on.locator("[data-dm-card]").screenshot(path=SCREENS / f"card-{width}.png")
     # the chart's table marks it, why on hover; the row scored by today's isn't marked
+    # 27: a model's thinking run is a sub-row under it with Thinking: both
+    page.evaluate("localStorage.setItem('bench-mt-thinking', 'both')")
     page.goto("about:blank")
     page.goto(live["base"] + "/#tab=models&chip=ondevice")
-    page.wait_for_selector("[data-dm-table]")
+    page.wait_for_selector("[data-dm-table]", state="attached")
     badge = page.locator(f"[data-dm-provisional='{GOOD} · thinking']")
     assert badge.inner_text() == "provisional" and WHY in badge.get_attribute("data-tip")
     assert page.locator(f"[data-dm-provisional='{GOOD}']").count() == 0
-    page.locator(f"tr[data-dm-row='{GOOD} · thinking']").screenshot(
-        path=SCREENS / f"chart-row-{width}.png")
+    if width >= 640:                       # 27: under 640 px a card a model
+        page.locator(f"tr[data-dm-row='{GOOD} · thinking']").screenshot(
+            path=SCREENS / f"chart-row-{width}.png")
     assert page.errors == []

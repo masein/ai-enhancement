@@ -98,30 +98,34 @@ def test_the_chart_draws_rows_on_a_device_as_points_and_the_rest_as_lines(live, 
 def test_the_table_ranks_everyone_theirs_read_only(live, page, ours):
     open_chart(page, live)
     t = page.locator("[data-dm-table]")
-    assert t.locator("tbody tr").count() == 14                  # ours of theirs: in their row
+    # 27: theirs as published, ours measured here — our run of their model a row of its own
+    assert t.locator("tbody tr.mt-row").count() == 14 + t.locator("tbody tr[data-dm-pair]").count()
     lfm = t.locator("[data-dm-row='lfm2.5-1.2b__int8hu__aimodel']")
-    assert "68.2 ±3.8" in lfm.inner_text()
-    assert lfm.locator("[data-dm-whose='theirs']").inner_text() == "DeviceMark"
+    comp = lfm.locator("[data-dm-composite] ")
+    assert comp.locator(".mt-n").evaluate("n => n.firstChild.textContent") == "68.2"
+    assert comp.locator(".mt-se").inner_text() == "±3.8" and comp.locator("[data-mt-src]").inner_text() == "D"
+    assert lfm.get_attribute("data-dm-whose") == "theirs"
+    assert lfm.locator("[data-mt-line]").inner_text().startswith("DeviceMark")
     assert lfm.locator("[data-dm-device-edit]").count() == 0             # theirs: read-only
     assert lfm.locator("[data-dm-server='lfm2.5-1.2b__int8hu__aimodel']").inner_text() == "n/a"
     mine = t.locator(f"[data-dm-row='{MTP}']")
-    assert mine.locator("[data-dm-whose='ours']").inner_text() == "ours"
+    assert mine.get_attribute("data-dm-whose") == "ours"
     assert mine.locator(f"[data-dm-server='{MTP}']").inner_text() == "31.5"
     # a phone build over the original: the same items, thinking, no lookahead
     assert mine.locator(f"[data-dm-retention='{MTP}']").inner_text() == "88% · 93% · 86%"
-    assert t.locator(f"[data-dm-row='{NEMO}']").count() == 0
-    nemo = t.locator(f"[data-dm-row='{THEIR_NEMO}']")
+    nemo = t.locator(f"tr[data-dm-row='{THEIR_NEMO}']")
     comp = nemo.locator(f"[data-dm-composite='{THEIR_NEMO}']")
-    assert comp.locator(f"[data-dm-theirs='{THEIR_NEMO}']").inner_text() == \
-        "theirs (int8, scored on a Mac; speed on iPhone 17 Pro): 61.4 ±3.6"
-    assert comp.locator(f"[data-dm-ours='{NEMO}']").inner_text().startswith(
-        "ours (bf16, our battery): ")
-    assert nemo.locator(f"[data-dm-ours='{NEMO}']").count() == 6    # composite, 3 benches, 2 more
-    assert nemo.locator("[data-dm-whose]").inner_text() == "DeviceMark · and ours"
+    assert comp.locator(".mt-n").evaluate("n => n.firstChild.textContent") == "61.4"
+    assert comp.locator(".mt-se").inner_text() == "±3.6"
+    assert "int8, scored on a Mac; speed on iPhone 17 Pro" in nemo.locator("[data-mt-line]").inner_text()
     assert nemo.locator("[data-dm-device-edit]").count() == 0
+    ours = t.locator(f"tr[data-dm-row='{NEMO}']")
+    assert ours.get_attribute("data-dm-pair") == THEIR_NEMO and ours.get_attribute("data-dm-whose") == "ours"
+    assert "bf16, our battery" in ours.locator("[data-mt-line]").inner_text()
     # 12q.B2: the cloud APIs unranked (☁), as on DeviceMark's board — LFM2.5-1.2B is =1 again
+    # 27: our run beside their row is no row of DeviceMark's ranking: no rank of its own
     rank = {r.get_attribute("data-dm-rank"): r.inner_text()
-            for r in t.locator("[data-dm-rank]").all()}
+            for r in t.locator("tr:not([data-dm-pair]) [data-dm-rank]").all()}
     assert rank["gemini-flash__api__api"] == rank["gemini-pro__api__api"] == "☁"
     assert rank["lfm2.5-1.2b__int8hu__aimodel"] == "=1"
     assert all(rank.values())
@@ -311,13 +315,13 @@ DEVICE_CELL = """id => { const td = document.querySelector(`[data-dm-device-cell
            text: td.textContent }; }"""
 
 
-@pytest.mark.parametrize("width", [1400, 375])
+@pytest.mark.parametrize("width", [1400])          # 27: under 640 px a card a model
 def test_the_device_speed_control_is_spaced_and_looks_like_one(live, page, ours, width):
     page.goto(live["base"] + "/")
     set_name(page, "masein")
     open_chart(page, live, width=width)
     got = page.evaluate(DEVICE_CELL, ORIG)
-    assert got["text"] == "— enter" and got["gap"] >= 6 and got["border"] >= 1, got
+    assert got["text"] == "– enter" and got["gap"] >= 6 and got["border"] >= 1, got
     assert page.locator(f"[data-dm-device-edit='{ORIG}']").get_attribute("aria-label") == \
         "enter a device speed for Qwen3.6 original k=8"
     page.locator(f"[data-dm-device-cell='{ORIG}']").screenshot(path=SCREENS / f"device-cell-{width}.png")

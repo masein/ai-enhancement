@@ -84,19 +84,18 @@ def test_on_models_a_served_model_is_a_normal_row_with_a_grey_served_tag(live, p
     page.goto(live["base"] + "/#tab=models&chip=instruction")
     cell = page.locator(f"td.model[data-model='{SID}']")
     cell.wait_for()
-    assert cell.locator(".mname").inner_text() == NAME
-    tag = cell.locator(f"[data-served-tag='{SID}']")
-    assert tag.inner_text() == "served" and tag.get_attribute("title") == HOW
-    # grey: the secondary text colour, as the other quiet badges
-    grey = page.evaluate("getComputedStyle(document.querySelector('.badge.ckpt, .badge.served'))"
-                         ".color")
-    assert tag.evaluate("e => getComputedStyle(e).color") == grey
+    # 27: its name as every tab gives it (the board's whole name on hover); what it is,
+    # served, in its muted line, as the tag said
+    assert cell.locator(".mname").inner_text() == "Qwen3.6-35B-A3B k4-LDA"
+    assert cell.get_attribute("title").startswith(NAME + "\n")
+    line = cell.locator("[data-mt-line]")
+    assert "served" in line.inner_text().split(" · ")
     shot(cell.locator("xpath=.."), "models-row.png")
-    # and on Everyday tasks, the same tag
+    # and on Everyday tasks, the same line
     page.locator("[data-models-view='everyday']").click()
-    tag = page.locator(f"td.model[data-model='{SID}'] [data-served-tag='{SID}']")
-    tag.wait_for()
-    assert tag.get_attribute("title") == HOW
+    line = page.locator(f"td.model[data-model='{SID}'] [data-mt-line]")
+    line.wait_for()
+    assert "served" in line.inner_text().split(" · ")
     assert page.errors == []
 
 

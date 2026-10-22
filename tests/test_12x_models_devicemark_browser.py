@@ -92,11 +92,14 @@ def rows(live):
     appmod._cache.update(key=None, payload=None, at=0.0)
 
 
-def go(page, live, hash_, sel, width=1400):
+def go(page, live, hash_, sel, width=1400, thinking="default"):
     page.set_viewport_size({"width": width, "height": 1000})
+    page.goto(live["base"] + "/")
+    page.evaluate(f"localStorage.setItem('bench-mt-thinking', '{thinking}')")
     page.goto("about:blank")
     page.goto(live["base"] + "/#" + hash_)
-    page.wait_for_selector(sel)
+    # 27: under 640 px a card a model; the table is the wide view's
+    page.wait_for_selector(sel if width >= 640 else "[data-lb-card] [data-mt-card]")
 
 
 def headers(page) -> list[str]:
@@ -122,16 +125,22 @@ def test_devicemark_is_offered_before_a_model_has_a_row(live, page):
 
 
 def test_the_chip_shows_each_models_rows_both_modes_sorted_by_the_composite(live, page, rows):
-    go(page, live, "tab=models&chip=devicemark", "[data-lb-table]")
+    # 27: one row a model; with Thinking: both, its other setting a sub-row under it
+    go(page, live, "tab=models&chip=devicemark", "[data-lb-table]", thinking="both")
     assert page.locator("#pill-group[data-value='devicemark']").count() == 1    # 16.3
     assert headers(page)[-6:] == DM_COLS and "Avg" not in headers(page)
     shown = page.locator("tr[data-lb-row]").evaluate_all("rs => rs.map(r => r.dataset.lbRow)")
     want = {SETUP, SETUP + " · thinking", QWEN, QWEN + " · thinking"}
     assert want <= set(shown)
-    # sorted by the composite, highest first
+    subs = page.locator("tr.mt-sub-row[data-lb-row]").evaluate_all("rs => rs.map(r => r.dataset.lbRow)")
+    assert set(subs) == {SETUP + " · thinking", QWEN + " · thinking"}
+    # each model's rows together, the models sorted by the composite, highest first
     comp = {m: page.evaluate(f"dmVal({json.dumps(m)}, 'composite')") for m in want}
     order = [m for m in shown if m in want]
-    assert order == sorted(want, key=lambda m: -comp[m])
+    assert order.index(SETUP) + 1 == order.index(SETUP + " · thinking")
+    assert order.index(QWEN) + 1 == order.index(QWEN + " · thinking")
+    firsts = [m for m in order if m in (SETUP, QWEN)]
+    assert firsts == sorted((SETUP, QWEN), key=lambda m: -comp[m])
     # the numbers are the row's: the composite and each bench with half its interval
     off = page.evaluate(f"dmRowById({json.dumps(SETUP)})")
     half = 50 * (off["composite"]["ci"][1] - off["composite"]["ci"][0])
@@ -146,18 +155,17 @@ def test_the_chip_shows_each_models_rows_both_modes_sorted_by_the_composite(live
     assert tip[0] == f"{100 * off['composite']['value']:.1f} ± {half:.1f}"
     assert tip[-1].startswith("the ± is half the 95% interval · ")
     assert tip[-1].endswith(" among ranked rows (cloud lines aren’t ranked)")
-    # the served setup's thinking row is made beside it, badged, and opens the setup's page
+    # the served setup's thinking row is made under it, said so, and opens the setup's page
     row = page.locator(f"tr[data-lb-row='{SETUP} · thinking']")
-    assert row.locator("[data-thinking-badge]").count() == 1
-    # and tagged as its setup is: a phone build
+    assert row.locator("[data-mt-name]").inner_text() == "thinking on"
+    # its line says what its setup is: a phone build
     base = page.locator(f"tr[data-lb-row='{SETUP}']")
-    assert base.locator("[data-phone-tag]").inner_text() == "phone build"
-    assert row.locator("[data-phone-tag]").inner_text() == "phone build"
+    assert "phone build" in base.locator("[data-mt-line]").inner_text()
     assert row.locator("a").first.get_attribute("href") == "#model=" + quote(SETUP, safe="")
     # the best in a column is found among the made rows too, and the line says the sort
     best = page.locator("[data-dm-cell='composite'][data-lead]").evaluate_all(
         "tds => tds.map(t => t.closest('tr').dataset.lbRow)")
-    assert best[0] == max(want, key=lambda m: comp[m])
+    assert max(want, key=lambda m: comp[m]) in best
     assert "sorted by DeviceMark composite ▼" in page.locator("[data-lb-card]").inner_text()
     # never bold for answered or tokens: they are not scores
     assert page.locator("[data-dm-cell='tokens'][data-lead], [data-dm-cell='answered'][data-lead]"
@@ -170,7 +178,8 @@ def test_the_chip_shows_each_models_rows_both_modes_sorted_by_the_composite(live
 def test_the_picker_has_the_group_and_chosen_models_bring_their_thinking_rows(live, page, rows):
     cols = ",".join(f"dm:{f}" for f in ("composite", "ifeval", "mmlu_pro", "math", "answered",
                                         "tokens"))
-    go(page, live, f"tab=models&cols={cols}&models={ids(SETUP, QWEN)}", "[data-lb-table]")
+    go(page, live, f"tab=models&cols={cols}&models={ids(SETUP, QWEN)}", "[data-lb-table]",
+       thinking="both")
     shown = page.locator("tr[data-lb-row]").evaluate_all("rs => rs.map(r => r.dataset.lbRow)")
     assert set(shown) == {SETUP, SETUP + " · thinking", QWEN, QWEN + " · thinking"}
     # DeviceMark's alone: no Avg column, and nothing averaged
@@ -211,7 +220,8 @@ def test_with_another_columns_chosen_the_empty_table_offers_devicemarks(live, pa
 def test_at_400px(live, page, rows):
     go(page, live, f"tab=models&chip=devicemark&models={ids(SETUP, QWEN)}", "[data-lb-table]",
        width=400)
-    assert page.locator(f"tr[data-lb-row='{SETUP} · thinking']").count() == 1
+    # 27: a card a model
+    assert page.locator(f"[data-mt-card='{SETUP}']").count() == 1
     # the chosen two are tested, here: not "2 chosen · 0 tested"
     line = page.locator("[data-lb-card]").inner_text()
     assert "tested" not in line
@@ -231,17 +241,17 @@ def test_the_devicemark_view_names_rows_whole_and_drops_standards_notions(live, 
     appmod._cache.update(key=None, payload=None, at=0.0)
     go(page, live, "tab=models&chip=devicemark", "[data-lb-table]", width=width)
     assert "dmview" in page.locator("[data-lb-table]").get_attribute("class").split()
-    # the whole name, in two lines at most, nothing cut, at 1400; a phone wraps it already
+    # the whole name, nothing cut, at 1400; a phone's card wraps it already
     if width == 1400:
-        name = page.locator(f"tr[data-lb-row='{SETUP} · thinking'] .mname")
-        assert name.inner_text() == "DM k4-LDA phone build, MTP · thinking"
+        name = page.locator(f"tr[data-lb-row='{SETUP}'] .mname")
+        assert name.inner_text() == "DM k4-LDA phone build, MTP"
         fit = name.evaluate("e => [e.scrollHeight, e.clientHeight, e.scrollWidth, e.clientWidth, "
                             "e.getBoundingClientRect().width, e.closest('td').getBoundingClientRect().width]")
         assert fit[0] <= fit[1] + 1 and fit[2] <= fit[3] + 1, fit
     # 16.1: Params as a person entered it — its base model's name, Qwen3.6-35B-A3B,
     # is only the form's suggestion — 35B, 3B active
     params = page.locator(f"tr[data-lb-row='{SETUP}'] td[data-params-src='entered']")
-    assert params.inner_text().split()[0] == "35B"
+    assert params.locator(".mt-n").text_content() == "35B"
     assert params.locator(".act").text_content() == "3B act"   # a phone's width hides it
     assert params.get_attribute("title") == "entered by masein\n3B active"
     # none of Standard's: no prelim badge, no count of ranked models

@@ -41,7 +41,9 @@ def served(page, edit, pattern="**/api/results*"):
 
 def open_lb(page, base, frag=""):
     page.goto(base + "/#tab=leaderboard" + frag)
-    page.wait_for_selector(f"{LB} tbody tr[data-lb-row]")
+    # 27: under 640 px a card a model, else the table's rows
+    page.wait_for_selector("[data-lb-card] [data-mt-card]" if page.viewport_size["width"] < 640
+                           else f"{LB} tbody tr[data-lb-row]")
 
 
 def results(base):
@@ -75,19 +77,22 @@ RECORD = """() => { window.__cls = [];
 # ---------------------------------------------------------------------------
 
 def test_the_header_is_one_line_of_names_under_a_quiet_group_row(live, page):
+    # 27: each column's short name on one line, never cut, what it tests muted under it
     page.set_viewport_size({"width": 1280, "height": 900})
     open_lb(page, live["base"])
     h = page.evaluate(f"document.querySelector('{LB} thead').getBoundingClientRect().height")
-    assert h <= 64, h
+    assert h <= 110, h
     names = page.evaluate(f"""() => [...document.querySelectorAll('{LB} thead tr.names th')]
-      .map(t => [t.textContent.trim(), t.getBoundingClientRect().height, t.dataset.tip || '',
-                 getComputedStyle(t, '::after').content, t.dataset.col])""")
-    for text, height, tip, after, col in names:
+      .map(t => {{ const n = t.querySelector('.mt-h1') || t;
+        return [n.textContent.replace(/[▲▼]/g, '').trim(), n.getBoundingClientRect().height,
+          t.dataset.tip || '', getComputedStyle(t, '::after').content, t.dataset.col,
+          n.scrollWidth <= n.clientWidth + 1]; }})""")
+    for text, height, tip, after, col, whole in names:
         assert "ⓘ" not in text and after in ("none", "normal", '""'), (text, after)
-        assert height <= 40, (text, height)                  # one line
-        assert tip, text                                     # every name has its setup
+        assert height <= 20 and whole, (text, height)        # one line, never cut
+        assert tip or col == "rank", text                    # every name has its setup
         assert " " not in text.replace(" ▼", "").replace(" ▲", "") or col.startswith(("area:", "j")), text
-    tips = {col: json.loads(tip) for _, _, tip, _, col in names}
+    tips = {col: json.loads(tip) for _, _, tip, _, col, _w in names if tip}
     for col in ("mmlu", "hellaswag", "arc_challenge"):
         if col in tips:
             assert re.search(r"\d+-shot", tips[col][0]), tips[col]
@@ -142,31 +147,22 @@ def test_the_judged_column_is_absent_while_every_value_would_be_a_dash(live, pag
 # 1b. cells: the number, bold for the leaders, ± a hover away
 # ---------------------------------------------------------------------------
 
-def test_no_error_on_a_cell_by_default_and_the_switch_puts_it_back(live, page):
-    page.evaluate("() => { try { localStorage.removeItem('bench-lb-se'); } catch (e) {} }")
+def test_the_error_is_small_after_the_number_and_on_hover(live, page):
+    # 27: the ± after the number, 11 px and muted — never the number's size
     open_lb(page, live["base"])
-    cells = page.locator(f"{LB} tbody td.tcell")
-    assert "±" not in page.locator(f"{LB} tbody").text_content()
-    # …it is in the tooltip, on hover and on focus
-    tips = page.evaluate(f"""() => [...document.querySelectorAll('{LB} tbody td.tcell[data-tip]')]
-      .map(td => JSON.parse(td.dataset.tip)[0])""")
-    assert tips and sum("±" in t for t in tips) >= len(tips) // 2
-    cells.first.focus()
+    sizes = page.evaluate(f"""() => [...document.querySelectorAll('{LB} tbody td.tcell')]
+      .filter(td => td.querySelector('.mt-se')).map(td => [
+        parseFloat(getComputedStyle(td.querySelector('.mt-se')).fontSize),
+        parseFloat(getComputedStyle(td.querySelector('.mt-n')).fontSize)])""")
+    assert sizes and all(se == 11 and n == 14 for se, n in sizes), sizes[:3]
+    # …and in the tooltip, on hover and on focus
+    page.locator(f"{LB} tbody td.tcell:has(.mt-se)").first.focus()
     page.wait_for_function("getComputedStyle(document.querySelector('#tip')).opacity === '1'")
     assert "±" in page.locator("#tip").text_content()
-    # the switch, in Columns (12b: under Filters ▾), remembered in this browser
+    # no switch for it any more
     open_filters(page)
     page.locator("#pill-columns").click()
-    page.locator("#pop-columns [data-show-se]").check()
-    page.wait_for_function(f"document.querySelector('{LB} tbody').textContent.includes('±')")
-    page.keyboard.press("Escape")
-    page.reload()
-    page.wait_for_selector(f"{LB} tbody tr[data-lb-row]")
-    assert "±" in page.locator(f"{LB} tbody").text_content()
-    open_filters(page)
-    page.locator("#pill-columns").click()
-    page.locator("#pop-columns [data-show-se]").uncheck()
-    page.wait_for_function(f"!document.querySelector('{LB} tbody').textContent.includes('±')")
+    assert page.locator("#pop-columns [data-show-se]").count() == 0
     assert page.errors == []
 
 
@@ -193,12 +189,13 @@ def test_the_bold_cells_are_exactly_the_z_tests_best_or_tied_set(live, page):
         assert bold == {m for m in tied if m in {r[0] for r in rows}}, (t, bold, tied)
         checked += 1
     assert checked >= 3
-    # only the bold cells are tinted, and every bold cell is (Tint is on)
+    # bold is the leaders and only them; Tint (off by default) tints nothing
     look = page.evaluate(f"""() => [...document.querySelectorAll('{LB} tbody td.tcell')]
       .map(td => {{ const b = td.querySelector('b');
         return [!!td.dataset.lead, (td.getAttribute('style') || '').includes('--heat'),
-                +(b ? getComputedStyle(b) : getComputedStyle(td)).fontWeight]; }})""")
-    assert all(lead == tinted for lead, tinted, _w in look)
+                +(b ? getComputedStyle(b) : getComputedStyle(td.querySelector('.mt-n') || td))
+                  .fontWeight]; }})""")
+    assert not any(tinted for _l, tinted, _w in look)
     assert all((w >= 700) == lead for lead, _t, w in look)
     # no glyphs in cells any more
     assert not re.search("[●≈]", page.locator(f"{LB} tbody").text_content())

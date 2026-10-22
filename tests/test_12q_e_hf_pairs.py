@@ -121,7 +121,8 @@ def test_on_the_chart_the_pairs_row_and_hover_say_the_modes_differ(live, page):
         page.goto("about:blank")
         page.goto(live["base"] + "/#tab=models&chip=ondevice")
         page.wait_for_selector("[data-dm-chart]")
-        cell = page.locator(f"[data-dm-composite='{THEIR_YOUTU}']")
+        # 27: our run of their model is a row of its own; its composite says the modes differ
+        cell = page.locator(f"tr[data-dm-pair='{THEIR_YOUTU}'] [data-dm-composite='{YOUTU}']")
         flag = cell.locator(f"[data-dm-mode-differs='{YOUTU}']")
         assert flag.inner_text() == "modes differ · not a calibration point"
         [why] = json.loads(flag.get_attribute("data-tip"))

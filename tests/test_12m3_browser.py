@@ -200,10 +200,11 @@ def test_its_row_is_tagged_via_openrouter_and_the_picker_groups_it_under_its_mak
     page.keyboard.press("Escape")
     # on Everyday tasks, its row tagged "via OpenRouter", how it runs in the tooltip
     page.locator("[data-models-view='everyday']").click()
-    tag = page.locator(f"td.model[data-model='{SID}'] [data-served-tag='{SID}']")
-    tag.wait_for()
-    assert tag.inner_text() == "via OpenRouter"
-    assert tag.get_attribute("title") == f"OpenRouter · {LUNA_V} · on OpenAI · no fallbacks"
+    # 27: "via OpenRouter" in its line, how it runs on its name's hover
+    cell = page.locator(f"td.model[data-model='{SID}']")
+    cell.locator("[data-mt-line]").wait_for()
+    assert "via OpenRouter" in cell.locator("[data-mt-line]").inner_text().split(" · ")
+    assert f"OpenRouter · {LUNA_V} · on OpenAI · no fallbacks" in cell.get_attribute("title")
     shot(page.locator(f"td.model[data-model='{SID}']").locator("xpath=.."), "12m3-models-row.png")
     # its page: what it is pinned to, checked at every run
     page.goto(live["base"] + "/#model=" + SID.replace("/", "%2F"))

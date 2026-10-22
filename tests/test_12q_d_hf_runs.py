@@ -124,9 +124,12 @@ def test_on_the_chart_their_row_and_their_point_say_so(live, page):
     page.goto("about:blank")
     page.goto(live["base"] + "/#tab=models&chip=ondevice")
     page.wait_for_selector("[data-dm-chart]")
+    # 27: their number, as published, its setup in its row's line
     cell = page.locator(f"[data-dm-composite='{THEIR_NEMO}']")
-    assert cell.locator(f"[data-dm-theirs='{THEIR_NEMO}']").inner_text() == \
-        "theirs (int8, scored on a Mac; speed on iPhone 17 Pro): 61.4 ±3.6"
+    assert cell.locator(".mt-n").evaluate("n => n.firstChild.textContent") == "61.4"
+    assert cell.locator(".mt-se").inner_text() == "±3.6"
+    assert "int8, scored on a Mac; speed on iPhone 17 Pro" in page.locator(
+        f"tr[data-dm-row='{THEIR_NEMO}'] [data-mt-line]").inner_text()
     cant = cell.locator(f"[data-dm-cant='{THEIR_NEMO}']")
     assert cant.inner_text() == "ours: can’t run here"
     assert json.loads(cant.get_attribute("data-tip")) == [catalog.cant_run_here(NEMO)]

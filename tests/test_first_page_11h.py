@@ -190,8 +190,9 @@ def test_on_a_phone_the_filters_are_one_button_and_the_table_starts_near_the_top
     ctx, page = new_page(browser, 400, 860, is_mobile=True, has_touch=True)
     try:
         page.goto(live["base"] + "/#tab=leaderboard")
-        page.wait_for_selector(f"{LB} tbody tr")
-        gap = page.evaluate(f"""() => document.querySelector('{LB} tbody tr').getBoundingClientRect().top
+        # 27: a card a model on a phone
+        page.wait_for_selector("[data-lb-card] [data-mt-card]")
+        gap = page.evaluate("""() => document.querySelector('[data-mt-card]').getBoundingClientRect().top
           - document.querySelector('[data-lb-card]').getBoundingClientRect().top""")
         # the table scrolls sideways on a phone, so its scroll buttons take one
         # 26px line above it (the sideways-scroll fix); the fold of the
@@ -201,10 +202,12 @@ def test_on_a_phone_the_filters_are_one_button_and_the_table_starts_near_the_top
         # takes a third short line there (370.5); with others it fits in two
         assert gap <= 380, gap
         assert page.locator("#pill-size").count() == 0            # folded away
-        # 16.3: Row 1 wraps inside the screen; nothing scrolls sideways
-        rights = page.evaluate("""() => [...document.querySelectorAll('[data-lb-row1] .chip-btn')]
-          .map(b => b.getBoundingClientRect().right)""")
-        assert rights and max(rights) <= 400, rights
+        # 16.3, 27: Row 1's tabs scroll sideways in their own row on a phone; the
+        # row stays inside the screen and the page never scrolls sideways
+        row1 = page.evaluate("""() => { const n = document.querySelector('[data-models-switch]');
+          const r = n.getBoundingClientRect();
+          return [r.right, getComputedStyle(n).overflowX, document.scrollingElement.scrollWidth]; }""")
+        assert row1[0] <= 400 and row1[1] in ("auto", "scroll") and row1[2] <= 400, row1
         btn = page.locator("[data-filters]")
         assert btn.text_content() == "Filters ▾"
         btn.click()

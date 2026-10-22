@@ -120,8 +120,8 @@ def test_models_has_the_gguf_group_only_for_models_with_a_result(live, page, mea
                      "GPQA Diamond"]
     cell = page.locator(f"tr[data-lb-row='{measured['gid']}'] td[data-gguf-cell='mmlu']")
     assert cell.inner_text().startswith("66.7")
-    # a model with no GGUF result: a dash, not a number
-    assert page.locator("tr[data-lb-row='fx/good-750m'] td").nth(-5).inner_text() in ("—", "")
+    # a model with no GGUF result: a dash, not a number — 27: "–", never a blank
+    assert page.locator("tr[data-lb-row='fx/good-750m'] td").nth(-5).inner_text() == "–"
     shot(page.locator("[data-lb-card]"), "models-gguf-group.png")
     assert page.errors == []
 
@@ -132,12 +132,13 @@ def test_the_gguf_group_goes_when_no_row_shown_has_a_number(live, page, measured
     of dashes said nothing"""
     page.set_viewport_size({"width": width, "height": 900})
     page.goto(live["base"] + "/#tab=models&kind=base")
-    page.wait_for_selector("table[data-lb-table] tr[data-lb-row]")
+    page.wait_for_selector("table[data-lb-table] tr[data-lb-row]", state="attached")
     assert page.locator("th[data-col^='gguf:']").count() == 0
     assert page.locator("[data-gguf-cell]").count() == 0
     # and it is back with the rows that have one
     page.goto(live["base"] + "/#tab=models")
-    page.wait_for_selector(f"tr[data-lb-row='{measured['gid']}'] td[data-gguf-cell='mmlu']")
+    page.wait_for_selector(f"tr[data-lb-row='{measured['gid']}'] td[data-gguf-cell='mmlu']",
+                           state="attached")
     assert page.locator("th[data-col^='gguf:']").count() == 7
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
     assert page.errors == []

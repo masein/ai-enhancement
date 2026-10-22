@@ -47,7 +47,7 @@ def test_a_changed_set_is_red_on_every_page(live, page, width):
         assert page.evaluate("getComputedStyle(document.querySelector('.alarm')).color") != \
             page.evaluate("getComputedStyle(document.body).color")
         # the board works: the Models table is there, and on another place too
-        page.wait_for_selector("[data-lb-table]")
+        page.wait_for_selector("[data-lb-table]", state="attached")
         if width == 1400:
             shot(page.locator("#alarms"), "banner-1400.png")
             go_tab(page, "Provenance")
@@ -70,6 +70,6 @@ def test_a_changed_set_is_red_on_every_page(live, page, width):
 def test_nothing_red_when_the_set_is_as_committed(live, page):
     page.goto("about:blank")
     page.goto(live["base"] + "/#tab=models")
-    page.wait_for_selector("[data-lb-table]")
+    page.wait_for_selector("[data-lb-table]", state="attached")
     assert page.locator("#alarms .alarm").count() == 0
     assert page.errors == []

@@ -142,6 +142,13 @@ def ids(*ms):
     return ",".join(quote(m, safe="") for m in ms)
 
 
+def all_cols(page):
+    """27: Columns ▾ ▸ Show all — every benchmark reported"""
+    page.locator("[data-mt-columns]").click()
+    page.locator("[data-show-all]").click()
+    page.keyboard.press("Escape")
+
+
 # ---------------------------------------------------------------------------
 # 1. all · none in every picker group
 # ---------------------------------------------------------------------------
@@ -233,47 +240,49 @@ def test_the_frontier_view_follows_the_coverage_rule_and_credits_once(live, page
     view = api(live, "/api/reported")
     view["scores"].append(ELSEWHERE)
     n = len(view["models"])
+    go(page, live, "tab=models&chip=frontier", "[data-frontier-table]")
+    # 27: one column a benchmark, whatever each source calls it
+    key = page.evaluate("ns => Object.fromEntries(ns.map(n => [n, mtBenchKey(n)]))",
+                        sorted({s["benchmark"] for s in view["scores"]}))
     have = {}
     for s in view["scores"]:
-        have.setdefault(frkey(s["benchmark"]), set()).add(s["model"])
-    go(page, live, "tab=models&chip=frontier", "[data-frontier-table]")
+        have.setdefault(key[s["benchmark"]], set()).add(s["model"])
     assert page.locator("[data-models-view='frontier']").get_attribute("aria-selected") == "true"
     cols = page.locator("[data-fr-col]").evaluate_all("xs => xs.map(x => x.dataset.frCol)")
     wide = {k for k, ms in have.items() if 2 * len(ms) >= n}
     assert wide <= set(cols)
     for k in set(cols) - wide:
         # a column under half the imported models is one measured here too
-        assert page.locator(f"[data-fr-here][data-fr-cell='{k}'], "
-                            f"[data-fr-cal][data-fr-cell='{k}']").count(), k
+        assert page.locator(f"[data-fr-here][data-fr-cell='{k}']").count(), k
     assert "mmlu" in cols                                       # measured here, and reported
-    # All N benchmarks
-    page.locator("[data-frontier-all]").click()
+    # 27: Columns ▾ — every benchmark reported
+    all_cols(page)
     page.wait_for_selector(f"[data-frontier-cols$='|{len(have)}']")
-    assert page.locator("[data-fr-col]").count() == len(have)
-    page.locator("[data-frontier-all]").click()
+    assert page.locator("thead [data-fr-col]").count() == len(have)
     # grouped by what they test: GPQA under Knowledge & reasoning, Aider under Other
-    groups = page.locator("[data-fr-group]").evaluate_all("xs => xs.map(x => x.dataset.frGroup)")
+    groups = page.locator("[data-mt-colgroup]").evaluate_all("xs => xs.map(x => x.dataset.mtColgroup)")
     assert groups[0] == "Knowledge & reasoning" and groups[-1] == "Other"
     # the credit once, in the header; a cell is a plain number
     credit = page.locator("[data-frontier-credit]").inner_text()
     assert credit.startswith("Data: Epoch AI, CC BY 4.0 · imported ")
     assert "Data: Artificial Analysis · imported " in credit
     assert page.locator("[data-frontier]").inner_text().count("Data: Epoch AI") == 1
-    page.locator("[data-frontier-all]").click()
     cell = page.locator(f"[data-fr-rep='{F55}'][data-fr-cell='mmlu-pro']")
-    assert re.fullmatch(r"\d+\.\d", cell.inner_text())
-    t = tip(cell)
-    assert "reported by Artificial Analysis · Artificial Analysis's own run" in t[1]
+    assert re.fullmatch(r"\d+\.\d", cell.locator(".mt-n").evaluate("n => n.firstChild.textContent"))
+    assert cell.locator("[data-mt-src]").inner_text() == "A"   # 27: its source, a letter
+    assert any("reported by Artificial Analysis · Artificial Analysis's own run" in x for x in tip(cell))
     # a value Epoch took from another source: marked, the source in its tooltip
-    mark = page.locator(f"[data-fr-rep='{CLAUDE}'][data-fr-cell='mmlu'] sup.fr-mark")
-    assert mark.inner_text() == "†"
-    assert mark.get_attribute("title") == "from Stanford CRFM Leaderboard, 5-shot"
+    mark = page.locator(f"[data-fr-rep='{CLAUDE}'][data-fr-cell='mmlu']")
+    assert mark.locator(".mt-n").evaluate("n => n.firstChild.textContent").endswith("†")
+    assert "† from Stanford CRFM Leaderboard, 5-shot" in tip(mark)
     # a card's number is the card's own: no mark
-    assert page.locator(f"[data-fr-rep='{F55}'][data-fr-cell='mmlu'] sup").count() == 0
-    # the rows by maker: one Google
-    makers = page.locator("[data-fr-maker]").evaluate_all("xs => xs.map(x => x.dataset.frMaker)")
-    assert "Google" in makers and "Google DeepMind" not in makers
-    assert makers[-1] == "Measured here"
+    card = page.locator(f"[data-fr-rep='{F55}'][data-fr-cell='mmlu'] .mt-n")
+    assert "†" not in card.evaluate("n => n.firstChild.textContent")
+    # 27: the maker is in each row's line, one Google; ours first
+    lines = page.locator("[data-frontier-table] [data-mt-line]").all_inner_texts()
+    assert any(x.startswith("Google · ") for x in lines)
+    assert not any("Google DeepMind" in x for x in lines)
+    assert page.locator("[data-mt-group-head]").first.get_attribute("data-mt-group-head") == "ours"
     shot(page.locator("[data-frontier]"), "frontier-1400-light.png")
     assert page.errors == []
 
@@ -281,7 +290,7 @@ def test_the_frontier_view_follows_the_coverage_rule_and_credits_once(live, page
 def test_the_frontier_ranks_only_within_one_setting(live, page):
     elsewhere(page)
     go(page, live, "tab=models&chip=frontier", "[data-frontier-table]")
-    page.locator("[data-frontier-all]").click()
+    all_cols(page)
     bad = page.evaluate("""() => {
       const out = [];
       const cols = [...document.querySelectorAll('[data-fr-col]')].map(x => x.dataset.frCol);
@@ -303,7 +312,8 @@ def test_the_frontier_ranks_only_within_one_setting(live, page):
     assert bad == []
     # a setting of one (the value from another source) is never bold
     lone = page.locator(f"[data-fr-rep='{CLAUDE}'][data-fr-cell='mmlu']")
-    assert lone.locator("sup.fr-mark").count() == 1 and lone.locator("b").count() == 0
+    assert lone.locator(".mt-n").inner_text().startswith(lone.locator(".mt-n").evaluate(
+        "n => n.firstChild.textContent")) and lone.locator("b").count() == 0
     assert page.errors == []
 
 
@@ -312,7 +322,8 @@ def test_our_cells_are_tagged_and_a_model_in_both_shows_both(live, page):
     ours = page.locator("[data-fr-here][data-fr-cell='mmlu']")
     assert ours.count() >= 2
     for i in range(ours.count()):
-        tag = ours.nth(i).locator(".fr-tag").inner_text()
+        # 27: how it was measured is on hover
+        tag = next(x for x in tip(ours.nth(i)) if x.startswith("measured here"))
         # 12n.2: the GGUF's MMLU is ours too, by its own method
         assert tag.startswith(("measured here · lm_eval, ", "measured here · llama.cpp, ")), tag
         assert "ranked only with the cells measured the same way here" in tip(ours.nth(i))
@@ -322,16 +333,18 @@ def test_our_cells_are_tagged_and_a_model_in_both_shows_both(live, page):
     vals = [float(here.nth(i).get_attribute("data-fr-v")) for i in range(here.count())]
     best = [v for i, v in enumerate(vals) if here.nth(i).get_attribute("data-fr-lead")]
     assert best and max(vals) in best
-    # the calibration line: measured here and the card's, with the one-line tooltip
-    cal = page.locator(f"[data-fr-cal='{GOOD}'][data-fr-cell='mmlu']")
-    assert re.fullmatch(r"measured here \d+\.\d · card 55\.0", cal.inner_text().replace("\n", ""))
-    assert tip(cal) == [FR_CAL]
-    # sortable: the column, then a model with no number goes to the bottom
-    page.locator("[data-fr-col='mmlu']").click()
-    rows = page.locator("[data-fr-row]").evaluate_all(
-        "xs => xs.map(x => (x.querySelector('[data-fr-cell=\"mmlu\"]') || {}).textContent || '')")
-    have = [r for r in rows if r.strip()]
-    assert rows[:len(have)] == have and not any(r.strip() for r in rows[len(have):])
+    # 27: a model measured here and published too is two rows, one with each mark
+    here = page.locator(f"tr[data-fr-row='{GOOD}'] [data-fr-cell='mmlu'] .mt-n")
+    card = page.locator(f"tr[data-fr-row='{GOOD}|published'] [data-fr-cell='mmlu'] .mt-n")
+    assert re.fullmatch(r"\d+\.\d", here.evaluate("n => n.firstChild.textContent"))
+    assert card.inner_text() == "55.0C" and "mt-pub" in card.get_attribute("class")
+    # sortable: the column, highest first in each group, a model with none of it last
+    page.locator("thead [data-fr-col='mmlu']").click()
+    for g in page.locator("[data-mt-group-head]").evaluate_all("xs => xs.map(x => x.dataset.mtGroupHead)"):
+        vals = page.locator(f"tr.mt-row[data-mt-group='{g}']:not(.mt-sub-row) [data-fr-cell='mmlu']") \
+            .evaluate_all("xs => xs.map(x => x.dataset.mtV ? +x.dataset.mtV : null)")
+        have = [v for v in vals if v is not None]
+        assert vals[:len(have)] == sorted(have, reverse=True) and None not in vals[:len(have)], g
     assert page.errors == []
 
 
@@ -356,7 +369,9 @@ def test_other_chips_never_show_a_reported_row_or_column(live, page):
     go(page, live, f"tab=models&models={ids(GOOD, F55)}", "[data-rep-hidden]")
     page.locator("[data-rep-hidden-go]").click()
     page.wait_for_selector(f"[data-frontier-table] [data-fr-row='{F55}']")
-    assert page.locator("[data-fr-row]").count() == 2
+    # 27: good-750m measured here, and as published; Frontier Test 5.5 as published
+    assert sorted(page.locator("[data-frontier-table] tr[data-fr-row]").evaluate_all(
+        "xs => xs.map(x => x.dataset.frRow)")) == sorted([GOOD, GOOD + "|published", F55])
     assert page.errors == []
 
 
@@ -382,7 +397,7 @@ def test_compare_shows_only_the_reported_benchmarks_they_share(live, page):
     rows = page.locator("[data-cmp-row^='rep:']").evaluate_all(
         "xs => xs.map(x => x.dataset.cmpRow.split(':').slice(2).join(':'))")
     dflt = page.evaluate("frColumns().filter(c => c.dflt).map(c => c.key)")
-    assert rows and all(frkey(r) in dflt for r in rows)
+    assert rows and all(page.evaluate("n => mtBenchKey(n)", r) in dflt for r in rows)
     assert page.errors == []
 
 
@@ -408,8 +423,8 @@ def test_benchmarks_draws_reported_numbers_as_ticks_on_their_benchmark_only(live
     shot(page.locator("[data-panel='mmlu']"), "mmlu-reference-ticks.png")
     go(page, live, "tab=models&view=frontier&show=chart", "[data-frontier-panels]")
     fr = page.locator("[data-frontier-panels]")
-    assert fr.locator("[data-panel='fr:gpqa diamond']").count() == 1
-    assert fr.locator("[data-panel='fr:gpqa diamond'] path.bar").count() >= 2
+    assert fr.locator("[data-panel='fr:gpqa']").count() == 1
+    assert fr.locator("[data-panel='fr:gpqa'] path.bar").count() >= 2
     assert page.errors == []
 
 
@@ -422,9 +437,9 @@ def test_a_served_model_and_its_gguf_are_one_model(live, page, board):
     rows = page.locator("[data-lb-row]").evaluate_all("xs => xs.map(x => x.dataset.lbRow)")
     assert board["gguf"] not in rows and not [r for r in rows if r.startswith(board["gguf"] + " ·")]
     assert SERVED in rows and SERVED_LA in rows
-    served = page.locator(f"tr[data-lb-row='{SERVED}'] [data-gguf-cell]").first
+    served = page.locator(f"tr[data-lb-row='{SERVED}'] [data-gguf-cell] .mt-n").first
     assert re.fullmatch(r"\d+\.\d", served.inner_text())
-    la = page.locator(f"tr[data-lb-row='{SERVED_LA}'] [data-gguf-cell='hellaswag']")
+    la = page.locator(f"tr[data-lb-row='{SERVED_LA}'] [data-gguf-cell='hellaswag'] .mt-n")
     look = page.evaluate(f"G().setups[{json.dumps(SERVED)}].find(x => x.name === 'lookahead 1')"
                          ".benches.hellaswag.v")
     assert la.inner_text() == f"{100 * look:.1f}"               # its setup's, lookahead 1
@@ -697,21 +712,18 @@ def test_the_model_column_widens_fits_resets_and_wraps_on_a_phone(live, page):
     assert page.evaluate(f"localStorage.getItem('{key}')") is None
     assert abs(page.evaluate("document.querySelector('[data-lb-table] thead th.model')"
                              ".getBoundingClientRect().width") - w0) <= 2
-    # a phone: no handle, and a long name wraps to two lines
-    go(page, live, f"tab=models&models={ids(SERVED_LA, GOOD)}", "[data-lb-table]", width=400)
+    # 27: a phone — a card a model, no handle, its whole name, nothing cut
+    go(page, live, f"tab=models&models={ids(SERVED_LA, GOOD)}", "[data-mt-card]", width=400)
     assert not page.locator("[data-lb-table] [data-col-grip='name']").is_visible()
-    name = page.locator(f"tr[data-lb-row='{SERVED_LA}'] .mname")
-    lh = float(name.evaluate("x => parseFloat(getComputedStyle(x).lineHeight) || 16"))
-    assert name.bounding_box()["height"] > 1.5 * lh
-    # what it keeps is its end, the setup; the whole name is its label
-    assert name.inner_text().replace("\n", " ").endswith("original · lookahead 1")
-    assert name.get_attribute("aria-label") == NAME + " · lookahead 1"
+    name = page.locator(f"[data-mt-card='{SERVED_LA}'] .mname")
+    assert name.inner_text() == NAME + " · lookahead 1"
+    assert name.evaluate("x => x.scrollWidth <= x.clientWidth + 1")
     shot(page.locator("[data-lb-card]"), "models-400-wraps.png")
     assert page.errors == []
 
 
 def test_the_frontier_view_at_400px_and_in_the_dark(live, page):
-    go(page, live, "tab=models&chip=frontier", "[data-frontier-table]", width=400, scheme="dark")
+    go(page, live, "tab=models&chip=frontier", "[data-mt-card]", width=400, scheme="dark")
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
     shot(page.locator("[data-frontier]"), "frontier-400-dark.png")
     go(page, live, f"tab=models&view=compare&m={ids(GOOD, F55)}", "[data-compare='2']", width=400,

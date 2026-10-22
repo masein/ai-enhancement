@@ -458,7 +458,10 @@ def test_the_everyday_view_shows_the_pilot_rows_with_one_badge(live, page):
     assert page.locator("[data-lb-card] h2 [data-pilot-badge]").count() == 1
     row = page.locator(f"[data-lb-row='{MODEL}']")
     # 12a.2: the bank, a column per group
-    assert row.locator("[data-everyday-count]").text_content() == "149 of 149"    # 12g.2, 12a.6, 12p.2
+    # 27: the share passed big, the count under it
+    total = row.locator("[data-everyday-count]")
+    assert total.get_attribute("data-everyday-count") == "149 of 149"    # 12g.2, 12a.6, 12p.2
+    assert total.locator("[data-mt-sub]").text_content() == "149 of 149"
     assert row.locator("[data-evd-g]").count() == 7                   # 12a.6: seven groups
     assert page.locator("[data-not-tested]").count() == 1
     shot(page, "12b-models-everyday-1512-light.png")

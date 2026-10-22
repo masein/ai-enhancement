@@ -7,6 +7,8 @@ other module) changes the Everyday wording, and with it who is compared."""
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from fake_openai import FakeServer
@@ -98,11 +100,13 @@ def test_the_everyday_total_and_its_ran_out_note_do_not_overlap(live, page, serv
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto(live["base"] + "/#tab=models")
     page.locator("[data-models-view='everyday']").click()
-    cell = page.locator(f"tr[data-lb-row='{SID}'] td.evdtotal")
+    # 27: the share big, the count under it, inside the cell; how many ran out on hover
+    cell = page.locator(f"tr[data-lb-row='{SID}'] td[data-mt-col='total']")
     cell.wait_for()
-    total, note = cell.locator("div").first.bounding_box(), cell.locator(".evd-ranout").bounding_box()
+    total, note = cell.locator(".mt-n").bounding_box(), cell.locator("[data-mt-sub]").bounding_box()
     box = cell.bounding_box()
     assert note["y"] >= total["y"] + total["height"] - 1, (total, note)
     assert note["x"] + note["width"] <= box["x"] + box["width"] + 1, (note, box)
+    assert any("ran out of room" in t for t in json.loads(cell.get_attribute("data-tip")))
     shot(cell.locator("xpath=.."), "everyday-total-ran-out-1280.png")
     assert page.errors == []

@@ -96,9 +96,9 @@ def test_phone_builds_and_their_setups_are_rows_with_a_tag(live, page, board):
     for rid in (PHONE, f"{PHONE} · lookahead 1"):
         row = page.locator(f"tr[data-lb-row='{rid}']")
         row.wait_for()
-        assert row.locator("[data-phone-tag]").inner_text() == "phone build"
-        # a phone build is served: one tag says both
-        assert row.locator("[data-served-tag]").count() == 0
+        # 27: its line says so; a phone build is served — one word says both
+        words = row.locator("[data-mt-line]").inner_text().split(" · ")
+        assert "phone build" in words and "served" not in words
     # the name is whole, not cut to fit the tags
     assert page.locator(f"tr[data-lb-row='{PHONE} · lookahead 1'] .mname").evaluate(
         "x => x.scrollWidth <= x.clientWidth")
@@ -150,9 +150,9 @@ def test_the_reported_numbers_are_a_group_of_their_own_never_averaged(live, page
     assert row.locator("[data-rep-cell='rep:median']").inner_text() == "13.5\nreported by Sam"
     assert row.locator("[data-rep-cell='rep:best']").inner_text() == "16.0\nreported by Sam"
     assert row.locator("[data-rep-cell='rep:q:MMLU']").inner_text().startswith("81.98%")
-    # a served row has only the columns it can have: blank, not dashes, and no Avg
+    # a served row has only the columns it can have — 27: "–", never a blank — and no Avg
     na = row.locator("td[data-na]")
-    assert na.count() > 0 and set(na.all_inner_texts()) == {""}
+    assert na.count() > 0 and set(na.all_inner_texts()) == {"–"}
     assert "Multiple-choice benchmarks need the model loaded here" in na.first.get_attribute("title")
     assert row.locator("td[data-watch$='|avg']").count() == 0 or \
         row.locator("td.na").count() >= 1

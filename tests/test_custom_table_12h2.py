@@ -80,6 +80,12 @@ def choose(page, *tasks):
     page.wait_for_selector("th[data-col='cavg']" if tasks else "[data-no-bench]")
 
 
+def both(page):
+    """27: Thinking: both — a model's other setting as a sub-row"""
+    page.evaluate("lbS().thinking = 'both'; render()")
+    page.wait_for_selector("tr.mt-sub-row")
+
+
 def rows(page):
     return [r.get_attribute("data-lb-row") for r in page.locator("tr[data-lb-row]").all()]
 
@@ -125,8 +131,12 @@ def test_three_benchmarks_make_an_average_of_those_three(live, page):
     assert page.locator("th[data-col='avg']").count() == 0        # not the board's Avg
     # the rows: the models with all three, ranked on this average — 12o.1: and,
     # after them, one with some of them, unaveraged
-    assert rows(page) == [THINK, MODEL, SHORT]                      # thinking: the better IFEval
-    assert page.locator(f"tr[data-lb-row='{THINK}'] td.rank").inner_text() == "1"
+    # 27: one row a model — its thinking row, with "both", a sub-row under it
+    assert rows(page) == [MODEL, SHORT]
+    both(page)
+    assert rows(page) == [MODEL, THINK, SHORT]
+    assert page.locator(f"tr[data-lb-row='{MODEL}'] td.rank").inner_text() == "1"
+    assert "mt-sub-row" in page.locator(f"tr[data-lb-row='{THINK}']").get_attribute("class")
     # the number and its ±, as the chosen columns make them
     for mid in (MODEL, THINK):
         v, se = tip_number(page.locator(f"td[data-cavg='{mid}']"))
@@ -152,7 +162,7 @@ def test_a_model_missing_one_is_not_averaged_and_says_what_is_missing(live, page
     # 12o.1: a row with the two it has; its Avg says what it lacks
     assert SHORT in rows(page)
     avg = page.locator(f"td[data-cavg='{SHORT}']")
-    assert avg.inner_text() == "— 2/3" and avg.get_attribute("title") == "no MATH-500"
+    assert avg.inner_text() == "– 2/3" and avg.get_attribute("title") == "no MATH-500"
     assert avg.get_attribute("data-lead") is None
     page.locator("[data-not-tested-toggle]").click()
     # a base model cannot sit them: said, and no Test
@@ -375,6 +385,7 @@ def test_a_saved_view_is_the_teams_and_only_its_owner_changes_it(live, browser):
 def test_the_csv_is_the_table_with_the_average_and_its_errors(live, page):
     models_tab(page, live["base"], THREE_URL)
     page.wait_for_selector("td[data-cavg]")
+    both(page)
     got = list(csv.reader(io.StringIO(page.evaluate("lbCsv()"))))
     assert got[0] == ["#", "Model", "Params", "Avg above chance", "Avg above chance ±", "IFEval",
                       "IFEval ±",
@@ -383,8 +394,10 @@ def test_the_csv_is_the_table_with_the_average_and_its_errors(live, page):
     for tr in page.locator("tr[data-lb-row]").all():
         mid = tr.get_attribute("data-lb-row")
         params = tr.locator("td").nth(2).inner_text()
-        line = [tr.locator("td.rank").inner_text(), tr.locator("a.mname").inner_text(),
-                "" if params == "—" else params]                  # a dash is an empty field
+        # 27: a model by its board name (a thinking sub-row shows "thinking on")
+        line = [tr.locator("td.rank").inner_text(),
+                tr.locator("td.model").get_attribute("title").split("\n")[0],
+                "" if params in ("—", "–") else params]           # a dash is an empty field
         for td in [page.locator(f"td[data-cavg='{mid}']"),
                    *(tr.locator(f"td[data-gen-cell='{t}']") for t in THREE)]:
             # 12o.1: a benchmark a row lacks is two empty fields
@@ -405,10 +418,11 @@ def test_the_csv_is_the_table_with_the_average_and_its_errors(live, page):
 def test_at_phone_width_the_pickers_stack_and_the_table_scrolls_in_its_box(live, page):
     seven = "cols=mmlu,hellaswag,arc_challenge,arc_easy,winogrande,piqa,truthfulqa_mc2"
     models_tab(page, live["base"], seven, width=400)
-    page.wait_for_selector("td[data-cavg]")
+    # 27: under 640 px a card a model; the table, and its box, are the wide view's
+    page.wait_for_selector("[data-lb-card] [data-mt-card]")
     box = page.evaluate("""() => {
       const r = s => document.querySelector(s).getBoundingClientRect();
-      const w = document.querySelector('.lb-wrap');
+      const w = document.querySelector('[data-mt-cards]');
       return { chipsBottom: r('[data-lb-row1]').bottom, pickTop: r('[data-pickers]').top,
                pickRight: Math.max(...[...document.querySelectorAll('[data-pickers] .pill')]
                  .map(b => b.getBoundingClientRect().right)),
@@ -417,8 +431,8 @@ def test_at_phone_width_the_pickers_stack_and_the_table_scrolls_in_its_box(live,
     assert box["pickTop"] >= box["chipsBottom"] - 1          # 16.3: under Row 1, a row of their own
     assert box["pickRight"] <= box["vw"]
     assert box["page"] <= box["vw"]                           # the page never scrolls sideways…
-    sw, cw, ov = box["wrap"]
-    assert sw > cw and ov in ("auto", "scroll")               # …the table does, in its own box
+    sw, cw, _ov = box["wrap"]
+    assert sw <= cw + 1                                       # …nor do the cards
     shot(page, "12h2-phone-400-light.png", full_page=True)
     built(page)
     shot(page, "12h2-phone-benchmarks-400-light.png")

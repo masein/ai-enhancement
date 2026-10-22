@@ -353,7 +353,7 @@ def test_every_way_in_opens_the_panel_on_the_model_page(live, page, judged_on):
     # a Models row opens the model page (12b: rows do not open in place), and
     # its Sit the exam opens the panel
     page.goto(base + "/#tab=leaderboard")
-    page.locator(f"table.lb tbody tr[data-lb-row='{MODEL}'] td.num").first.click()
+    page.locator(f"table[data-lb-table] tbody tr[data-lb-row='{MODEL}'] td.num").first.click()
     open_kind(page, "exam")                               # 12b.2: its block on Scores
     page.locator(f"[data-sit-open='{MODEL}']").click()
     page.wait_for_selector("[data-panel='msit']")

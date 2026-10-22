@@ -432,12 +432,13 @@ def their_rows(rep: dict, scores: list[dict] | None = None) -> list[dict]:
                 if hit:
                     r = hit[-1]
                     cell = {"v": r["value"], "se": None, "src": "epoch_external", "dagger": True,
-                            "setting": r.get("setting") or "", "url": r.get("url") or ""}
+                            "setting": r.get("setting") or "", "url": r.get("url") or "",
+                            "date": r.get("date") or ""}
             elif b.get("epoch") and t.get("epoch_version"):
                 r = own.get((str(t["epoch_version"]), str(b["epoch"]).lower()))
                 if r:
                     cell = {"v": r["value"], "se": r.get("se"), "src": "epoch",
-                            "setting": OWN_RUN}
+                            "setting": OWN_RUN, "date": r.get("date") or ""}
             per[b["key"]] = cell or {"v": None}
         out.append({"id": "theirs:" + t["label"], "label": t["label"], "ours": False,
                     "maker": t.get("maker") or "", "size": t.get("size"),
@@ -1300,6 +1301,18 @@ def stats_at(ats: list[float]) -> dict:
     if not ats:
         return {"at": None, "words": ""}
     return {"at": max(ats), "words": f"worked out {when(max(ats))}"}
+
+
+def row_colours() -> dict[str, int]:
+    """27: each of our rows' colour in the report files (the scorecard's
+    first), by board model id — a model has the one colour on every Models
+    tab and on the reports' charts"""
+    out: dict[str, int] = {}
+    for rep in files().values():
+        for o in rep.get("ours") or []:
+            if isinstance(o.get("colour"), int) and o.get("row"):
+                out.setdefault(o["row"], o["colour"])
+    return out
 
 
 def glance_meta() -> dict | None:

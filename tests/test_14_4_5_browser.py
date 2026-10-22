@@ -71,5 +71,5 @@ def test_switched_off_it_is_nowhere_on_the_page(live, page, switched_off):
 
 def test_switched_back_on_it_is_all_there_again(live, page):
     go(page, live, "tab=models&view=mobile&group=mmlu", "[data-mmf-card]")
-    assert page.locator(f"[data-mmf-cell='{GOOD}']").inner_text() == "94.4%"
+    assert page.locator(f"[data-mmf-cell='{GOOD}'] .mt-n").text_content() == "94.4%"
     assert page.errors == []

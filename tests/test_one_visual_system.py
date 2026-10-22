@@ -39,6 +39,7 @@ def test_every_piece_of_text_is_on_the_type_scale(live, page, where):
       const out = new Set();
       for (const e of document.querySelectorAll('.wrap *')) {
         if (e.closest('svg')) continue;                         // chart labels scale with the chart
+        if (e.closest('.mt-se')) continue;      // 27: a score's ± is 11 px, smaller than the scale
         if (![...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue;
         const r = e.getBoundingClientRect(); if (!r.width) continue;
         out.add(parseFloat(getComputedStyle(e).fontSize));

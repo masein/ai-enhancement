@@ -265,8 +265,8 @@ def test_review_flow_in_the_browser(live, page):
     # change — a reload is how a viewer sees it, so that is what the test does
     page.goto(base + "/#tab=leaderboard")
     page.reload()
-    page.wait_for_selector("table.lb")
-    row = page.locator("table.lb tbody tr",
+    page.wait_for_selector("table[data-lb-table]")
+    row = page.locator("table[data-lb-table] tbody tr",
                        has=page.locator("a.mname", has_text=re.compile(r"^good-750m$"))).first
     # 11h: "trained on this topic's practice data", in plain words
     assert "trained on Economics practice data" in row.locator(".badge.taint").text_content()
