@@ -201,8 +201,10 @@ def test_compare_is_reached_from_ticks_the_models_menu_and_the_model_page(live, 
     assert page.locator("[data-cmp-go]").count() == 0
     for mid in (GOOD, SKEWED):
         page.locator(f"[data-cmp-tick='{mid}']").check()
+    # 27d: the bar at the bottom: "2 picked · Compare ▸ · Clear"
     go = page.locator("[data-cmp-go]")
-    assert go.inner_text() == "Compare 2 ▸"
+    assert go.inner_text() == "Compare ▸"
+    assert page.locator("[data-cmp-bar]").inner_text().startswith("2 picked")
     go.click()
     page.wait_for_selector("[data-compare='2']")
     assert "view=compare&m=" + quote(GOOD, safe="") in page.evaluate("location.hash")

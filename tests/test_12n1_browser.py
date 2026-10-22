@@ -280,7 +280,8 @@ def test_the_frontier_view_follows_the_coverage_rule_and_credits_once(live, page
     assert "†" not in card.evaluate("n => n.firstChild.textContent")
     # 27: the maker is in each row's line, one Google; ours first
     lines = page.locator("[data-frontier-table] [data-mt-line]").all_inner_texts()
-    assert any(x.startswith("Google · ") for x in lines)
+    # 27d: a word every row of a group shares ("open") is on the group's heading
+    assert any(x == "Google" or x.startswith("Google · ") for x in lines)
     assert not any("Google DeepMind" in x for x in lines)
     assert page.locator("[data-mt-group-head]").first.get_attribute("data-mt-group-head") == "ours"
     shot(page.locator("[data-frontier]"), "frontier-1400-light.png")
