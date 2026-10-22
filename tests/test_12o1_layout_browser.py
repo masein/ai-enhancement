@@ -128,7 +128,8 @@ def test_a_column_moves_in_its_group_and_a_group_as_a_block_never_a_rank(live, p
     # a group, as a block: Reasoning before Knowledge
     drag(page, page.locator(f"{T} th[data-lgroup-head='Reasoning']"),
          page.locator(f"{T} th[data-lgroup-head='Knowledge']"), after=False)
-    page.wait_for_function("document.querySelector('[data-lb-table] thead tr.grp th:nth-child(2)')"
+    # 27: the first group's head is the first one after the pinned empty head
+    page.wait_for_function("document.querySelector('[data-lb-table] thead tr.grp th:not(.nogrp)')"
                            ".textContent === 'Reasoning'")
     moved = ["arc_easy", "arc_challenge", "mmlu", "winogrande", "hellaswag", "piqa"]
     assert heads(page) == moved

@@ -5810,6 +5810,10 @@ table.mt-table th.mt-hg { font-size:12px; font-weight:500; color:var(--muted); t
   border-bottom:1px solid var(--grid); padding-bottom:4px; }
 .mt-h1 { display:block; font-family:var(--font-mono); font-size:12px; font-weight:600;
   letter-spacing:.04em; text-transform:uppercase; color:var(--text-secondary); white-space:nowrap; }
+.mt-h1.mt-h1-wrap { white-space:normal; }
+.mt-h1 .mt-word { white-space:nowrap; }
+table.mt-table thead td.mt-hg-gap { background:var(--surface-1); border-bottom:1px solid var(--grid);
+  padding:0; height:auto; }
 .mt-h2 { display:block; font-size:12px; font-weight:400; color:var(--muted); white-space:nowrap;
   font-family:var(--font-sans); }
 table.mt-table th.sortable { cursor:pointer; }
@@ -5863,6 +5867,8 @@ table.mt-table td .cellnote.warn { color:var(--warning-text); }
   .mt .mt-wide { display:none; }
   .mt-cards { display:grid; gap:8px; }
   .mt-legend { font-size:12px; }
+  /* cards have nothing to tint */
+  .mt-legend .mt-tint { display:none; }
   nav[data-models-switch] { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; }
   nav[data-models-switch] > * { flex:0 0 auto; }
 }
@@ -13883,14 +13889,19 @@ function modelTable(spec) {
       'aria-sort': sorted(c) ? (spec.sort.dir > 0 ? 'ascending' : 'descending') : 'none',
       onclick: spec.onSort && c.sortable !== false ? () => spec.onSort(c.key) : null,
       ...(c.attrs || {}) },
-    el('span', { class: 'mt-h1 hname', text: c.label },
+    el('span', { class: 'mt-h1 hname' + (mtLongLabel(c.label) ? ' mt-h1-wrap' : '') },
+      // a long name of several words may wrap between them, never inside one
+      ...(mtLongLabel(c.label) ? c.label.split(' ').flatMap((w, i) =>
+        [i ? ' ' : '', el('span', { class: 'mt-word', text: w })]) : [c.label]),
       sorted(c) ? el('span', { class: 'dir', text: spec.sort.dir > 0 ? ' ▲' : ' ▼' }) : ''),
     c.sub ? el('span', { class: 'mt-h2', text: c.sub }) : '', ...(c.extra || []));
   const thead = el('thead', {},
     spec.colGroups && grp.some(x => x.g) ? el('tr', { class: 'mt-hgroups grp' },
-      // the rank, the names and the columns of no group under one empty head
-      el('th', { class: 'mt-hg mt-hg-name nogrp', colspan: String(1 + (spec.rank ? 1 : 0)
-        + (grp.length && !grp[0].g ? grp[0].n : 0)) }),
+      // an empty head over the rank and the names, pinned with them; the columns of
+      // no group before the first group get a plain empty cell, which scrolls
+      el('th', { class: 'mt-hg mt-hg-name nogrp', colspan: String(1 + (spec.rank ? 1 : 0)) }),
+      grp.length && !grp[0].g ? el('td', { class: 'mt-hg mt-hg-gap', colspan: String(grp[0].n) })
+        : '',
       (grp.length && !grp[0].g ? grp.slice(1) : grp).map(({ g, n }) => el('th', { colspan:
         String(n), class: 'mt-hg', scope: 'colgroup',
         'data-mt-colgroup': g || null, ...(g && spec.layout ? layoutGroupDrag(spec.layout, g) : {}) },
@@ -13962,6 +13973,9 @@ function modelTable(spec) {
     ...(spec.foot || []));
 }
 // a badge's copy for a card: the table keeps the original and its hooks
+// a column's name long enough to wrap between its words ("Mathematics & Science");
+// a short one (GPQA, MATH L5, ARC-AGI-2) never wraps
+function mtLongLabel(t) { return typeof t === 'string' && t.length > 12 && t.includes(' '); }
 function mtBareCopy(b) {
   const c = b.cloneNode(true);
   for (const e of [c, ...c.querySelectorAll('*')])

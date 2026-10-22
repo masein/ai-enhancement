@@ -64,6 +64,12 @@ modelling's cross-entropy table (a row per task and model) keep their own.
   - Ornith and Bonsai measured here are open models with a filled dot.
   - Whether a published model is open comes from one rule on its name
     (`MT_OPEN_RE`). No source carries it.
+- **Header.** The short name on the first line, never cut (GPQA, MATH L5,
+  ARC-AGI-2 never wrap); a long name of several words ("Mathematics &
+  Science") may wrap between its words. What it tests and how many questions
+  sit muted under it, the full name is on hover, and groups sit above. The
+  group row's empty head is pinned over # and Model only, so a scrolled
+  table never hides a group's name.
 - **Rank.** Standard and DeviceMark keep their # column and its interval rule.
 - **Thinking: on / off / both.** One row a model.
   - The default is each model's own setting (a served model as registered,
@@ -82,7 +88,8 @@ modelling's cross-entropy table (a row per task and model) keep their own.
     scrolls inside its own box; the page never scrolls sideways.
   - Under 640 px there is one card a model: its mark, name and line, and
     four headline scores with their bars. Tapping a card opens the model
-    page. Sort ▾ sits above the cards, and the tabs scroll sideways.
+    page. Sort ▾ sits above the cards, and the tabs scroll sideways. Tint
+    has nothing to tint on a card, so its switch shows on the wide view only.
 
 ## Tests
 
