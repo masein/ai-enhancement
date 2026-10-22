@@ -8029,7 +8029,9 @@ const KIND_ORDER = ['standard', 'gguf', 'dm', 'dm_thinking', 'phone', 'everyday'
 function modelKinds(m) {
   const J = DATA.judged || {}, E = evd(), e = evdOf(m.id);
   const P = state.phone;
-  if ((servedOf(m.id) || {}).phone && LIVE && !P.loaded && !P.loading && netReady()) loadPhone();
+  // 27c: any served row's page — our testers' phones measure a checkpoint's rows
+  if (((servedOf(m.id) || {}).phone || String(m.rowOf || m.id).startsWith('served/')) && LIVE
+      && !P.loaded && !P.loading && netReady()) loadPhone();
   const jt = Object.entries((m.judge || {}).tasks || {}).filter(([t]) => t.startsWith('exam_'));
   const ran = m.date ? Date.parse(String(m.date)) / 1000 : 0;
   const std = [...DATA.accTasks, ...DATA.pplTasks].some(t => cell(t, m.id));
@@ -9083,6 +9085,8 @@ function modelScoresTab(m, kinds) {
   // — 23c: or a DeviceMark served row, for its speed
   const beyond = LIVE && (frontierTasks().some(t => cell(t, m.id))
     || (String(m.id).startsWith('served/') && !!dmRowById(m.id))) ? [byBlock(m)] : [];
+  // 27c: our testers' phones, on every row of the checkpoint an app model is
+  const testers = LIVE ? [testersBlock(m)].filter(Boolean) : [];
   // 12z B1: the GGUF's block is there before its first number: Measure is in it
   return [...kinds.filter(k => k.taken || k.kind === 'gguf').map(k => {
     const open = k.kind in mine ? mine[k.kind] : k.kind === newest;
@@ -9102,7 +9106,7 @@ function modelScoresTab(m, kinds) {
         k.kind === 'exam' && m.judgedAvg == null
           ? el('span', { class: 'kblock-sub small se', text: sub }) : ''),
       ...(open ? kindParts(m, k.kind) : []));
-  }), ...beyond];
+  }), ...testers, ...beyond];
 }
 // the sections a block holds: each keeps its code, not its card
 function kindParts(m, kind) {
@@ -12576,6 +12580,7 @@ function lbS() {
 
 // the part of the hash after "tab=leaderboard": only what differs from the
 // defaults, so a plain link stays plain
+const MT_COL_VIEWS = ['latest', 'everyday', 'frontier'];
 function lbHash() {
   const L = lbS(), out = [];
   // 12m.1: "view=compare&m=Qwen%2FQwen3-1.7B,served%2F…" — the models and nothing else
@@ -12593,6 +12598,12 @@ function lbHash() {
   // address alone opens it: "cols=ifeval,mmlu_pro,math500&models=…"
   if (L.view === 'standard' && L.cols)
     out.push('cols=' + L.cols.map(t => LB_ALIAS[t] || t).join(','));
+  // 27c: Latest's, Everyday's and Frontier's own choice of columns, the view
+  // named with them (a link's "cols=" alone is Standard's table you build)
+  if (MT_COL_VIEWS.includes(test) && mtColsChoice(test)) {
+    if (!out.some(x => x.startsWith('view='))) out.unshift('view=' + test);
+    out.push('cols=' + mtColsChoice(test).map(encodeURIComponent).join(','));
+  }
   if (L.models) out.push('models=' + L.models.map(encodeURIComponent).join(','));
   // 16.4: the Chart's highlighted models (Benchmarks ▸ Standard's, before)
   if (L.show === 'chart' && (L.hl || []).length) out.push('hl=' + L.hl.map(encodeURIComponent).join(','));
@@ -12639,6 +12650,9 @@ function lbFromHash(rest) {
   const list = k => (p.get(k) || '').split(',').map(x => x.trim()).filter(Boolean);
   const unalias = Object.fromEntries(Object.entries(LB_ALIAS).map(([k, v]) => [v, k]));
   L.cols = L.view === 'standard' ? lbKnownCols(list('cols').map(t => unalias[t] || t)) : null;
+  // 27c: a link's columns for Latest, Everyday or Frontier are that tab's choice
+  if (MT_COL_VIEWS.includes(lbTest(L)) && list('cols').length)
+    state.mtCols = { ...(state.mtCols || {}), [lbTest(L)]: list('cols') };
   const ids = new Set(((DATA || {}).models || []).map(m => m.id));
   const ms = list('models').map(canonId).filter(id => !DATA || ids.has(id)
     || id.startsWith('reported/'));
@@ -13632,14 +13646,19 @@ function mtThinkPill() {
     lbS().thinking = v; render(); });
 }
 // a model's rows, one a model: [{m, other}] — m the setting shown, other the
-// other setting when "both" (a sub-row under it). A model's own setting is
-// how its runs ask it: a served model as registered, else its switch's way
-function mtThinkRows(ms) {
-  return mtThinkPick(ms, m => m.id, m => thinkingOf(m)).map(({ x, other }) => ({ m: x, other }));
+// other setting when "both" (a sub-row under it). "As each runs" (27b): the
+// setting with the most scores in the columns shown, a tie to thinking on —
+// since plan I a build's thinking-off row holds only IFEval and IFBench. Without
+// a count, a model's own setting: a served model as registered, else its switch's
+function mtThinkRows(ms, scores) {
+  return mtThinkPick(ms, m => m.id, m => thinkingOf(m), scores)
+    .map(({ x, other }) => ({ m: x, other }));
 }
 // any rows, by an id that ends " · thinking" for the setting on: [{x, other}],
-// in the order their models first came
-function mtThinkPick(items, idOf, plainSetting) {
+// in the order their models first came. scores(x): its scores in the columns
+// shown; prefer: a row a link names (a model page's "its row"), shown whatever
+// the setting
+function mtThinkPick(items, idOf, plainSetting, scores, prefer = null) {
   const mode = mtThink(), by = new Map();
   for (const x of items) {
     const id = String(idOf(x)), base = id.replace(/ · thinking$/, '');
@@ -13650,49 +13669,68 @@ function mtThinkPick(items, idOf, plainSetting) {
   for (const g of by.values()) {
     const plain = g.plain || null, on = g.on || null;
     const plainOn = !!plain && plainSetting(plain) === 'on';
-    const own = plainOn ? (on || plain) : (plain || on);
+    let own = plainOn ? (on || plain) : (plain || on);
+    // both settings measured: the one with more scores here, a tie to thinking on
+    if (scores && plain && on) own = scores(plain) > scores(on) ? plain : on;
     let shown = own, other = null;
     if (mode === 'on') shown = on || (plainOn ? plain : null);
     else if (mode === 'off') shown = plain && !plainOn ? plain : null;
     else if (mode === 'both') other = shown === plain ? on : plain;
+    if (prefer && (prefer === (plain && String(idOf(plain))) || prefer === (on && String(idOf(on))))) {
+      const want = prefer === (plain && String(idOf(plain))) ? plain : on;
+      if (shown !== want) { other = mode === 'both' ? shown : null; shown = want; }
+    }
     if (shown) out.push({ x: shown, other: other && other !== shown ? other : null });
   }
   return out;
 }
 
 // ---- Columns: 9 of 56 ▾ — a tab's own choice, remembered -------------------
-function mtColsShown(view, all, dflt) {
-  let saved = null;
-  try { saved = JSON.parse(localStorage.getItem('bench-mt-cols') || '{}')[view] || null; }
-  catch (e) { saved = ((state.mtCols || {})[view]) || null; }
-  const keys = new Set(all.map(c => c.key));
-  const got = (saved || dflt).filter(k => keys.has(k));
-  return got.length ? got : dflt;
+// 27c: a tab's choice is its current set (a click changes it, never the
+// default), kept in this browser and in the page's link; every set is shown in
+// the one order the menu lists ("GPQA, HLE, OTIS, …"), the default's too
+function mtColsChoice(view) {
+  if (state.mtCols && view in state.mtCols) return state.mtCols[view];
+  try { return JSON.parse(localStorage.getItem('bench-mt-cols') || '{}')[view] || null; }
+  catch (e) { return null; }
 }
+function mtColsShown(view, all, dflt) {
+  const keys = all.map(c => c.key), saved = mtColsChoice(view);
+  const want = new Set((saved || dflt).filter(k => keys.includes(k)));
+  const got = keys.filter(k => want.has(k));
+  return got.length ? got : keys.filter(k => dflt.includes(k));
+}
+// keys null: back to the default (forgotten here and in the link)
 function mtColsSave(view, keys) {
   state.mtCols = { ...(state.mtCols || {}), [view]: keys };
   try {
-    const all = JSON.parse(localStorage.getItem('bench-mt-cols') || '{}');
-    all[view] = keys;
-    localStorage.setItem('bench-mt-cols', JSON.stringify(all));
+    const saved = JSON.parse(localStorage.getItem('bench-mt-cols') || '{}');
+    if (keys) saved[view] = keys; else delete saved[view];
+    localStorage.setItem('bench-mt-cols', JSON.stringify(saved));
   } catch (e) { /* private */ }
+  // and in the page's link
+  const want = hashFor();
+  if (location.hash.slice(1) !== want) history.replaceState(history.state, '', '#' + want);
   render();
 }
 function mtColumnsPill(view, all, shown, dflt) {
-  const on = new Set(shown);
   const btn = el('button', { class: 'pill', id: 'pill-columns', 'data-columns-menu': 'shown',
     'data-mt-columns': `${shown.length}|${all.length}`,
     text: `Columns: ${shown.length} of ${all.length} ▾` });
   return popover(btn, () => {
     const groups = [...new Set(all.map(c => c.group || ''))];
+    // the set as it stands now — read when a box is clicked, never the one the
+    // menu was drawn with — in the menu's order
+    const now = () => new Set(mtColsShown(view, all, dflt));
     const set = keys => mtColsSave(view, all.map(c => c.key).filter(k => keys.has(k)));
     return el('div', { class: 'moremenu colmenu-list benchmenu', id: 'pop-columns',
         'aria-label': 'columns' },
       groups.map(g => el('div', { class: 'colgroup', 'data-column-group': g || 'all' },
         g ? el('div', { class: 'small se', text: g }) : '',
         all.filter(c => (c.group || '') === g).map(c => el('label', { class: 'small' },
-          el('input', { type: 'checkbox', 'data-column': c.key, checked: on.has(c.key) ? '' : null,
-            onchange: e => { const s = new Set(on); e.target.checked ? s.add(c.key) : s.delete(c.key);
+          el('input', { type: 'checkbox', 'data-column': c.key,
+            checked: shown.includes(c.key) ? '' : null,
+            onchange: e => { const s = now(); e.target.checked ? s.add(c.key) : s.delete(c.key);
               set(s); } }), ' ' + (c.full || c.label))))),
       el('div', { class: 'frm' },
         el('span', { class: 'small se', 'data-columns-shown': `${shown.length}|${all.length}`,
@@ -13700,7 +13738,7 @@ function mtColumnsPill(view, all, shown, dflt) {
         el('button', { class: 'quiet', text: 'Show all', 'data-show-all': '1',
           onclick: () => set(new Set(all.map(c => c.key))) }),
         el('button', { class: 'quiet', text: 'the default', 'data-columns-default': '1',
-          onclick: () => mtColsSave(view, dflt) })));
+          onclick: () => mtColsSave(view, null) })));
   }, { key: 'columns', menu: false, rebuild: true, inCard: true });
 }
 
@@ -14146,8 +14184,24 @@ function isPhoneRow(m) {
 const phoneTag = m => isPhoneRow(m) ? el('span', { class: 'badge served', 'data-phone-tag': m.id,
   title: 'served: a phone build, or a setup of its file', text: 'phone build' }) : '';
 const phoneReports = id => state.phone.byId[id] || [];
-// 26: per phone, the medians our testers' phones measured (a decode to show)
-const phoneTested = id => ((state.phone.measured || {})[id] || []).filter(p => p.decode != null);
+// 27c: the app models whose checkpoint this row is (names.json), each with its
+// medians per phone and what is known of its file
+function phoneCps(id) {
+  const base = String(id || '').replace(/ · thinking$/, '');
+  return (state.phone.checkpoints || []).filter(e => (e.rows || []).includes(base));
+}
+// what is known of the app's file, under the block's heading
+const phoneCpLine = (e, id) => (e.checked || {})[String(id).replace(/ · thinking$/, '')]
+  ? 'the same file (sha256 checked)'
+  : `the app’s ${e.model.name} file — not yet checked to be this exact file`;
+// 26: per phone, the medians our testers' phones measured (a decode to show);
+// 27c: by the row the names link, else by its checkpoint (never a variant's)
+function phoneTested(id) {
+  const got = ((state.phone.measured || {})[id] || []).filter(p => p.decode != null);
+  if (got.length) return got;
+  const e = phoneCps(id).find(x => !x.variant);
+  return e ? (e.phones || []).filter(p => p.decode != null) : [];
+}
 async function loadPhone() {
   const P = state.phone;
   P.loading = true;
@@ -14157,6 +14211,8 @@ async function loadPhone() {
     P.readme = j.readme || null;
     // 26: what our testers' phones measured, by the board row the names map to
     P.measured = j.measured || {}; P.sync = j.sync || ''; P.report = j.report || '';
+    // 27c: by each app model's checkpoint, until a sha256 links a row
+    P.checkpoints = j.checkpoints || [];
   } catch (e) { /* the card says nothing is reported yet */ }
   P.loading = false; P.loaded = true;
   render();
@@ -14649,7 +14705,8 @@ function lbFrontier(ms) {
   // ours, and every model measured here: one row a model, its numbers measured here
   const measured = listed.filter(r => !r.m.reportedOnly);
   const byId = new Map(listed.map(r => [r.m.id, r]));
-  for (const { m, other } of mtThinkRows(measured.map(r => r.m))) {
+  for (const { m, other } of mtThinkRows(measured.map(r => r.m),
+      mm => cols.filter(c => frCell(mm, c).here).length)) {
     const hereRow = mm => mtRowOf(mm, { attrs: { 'data-fr-row': mm.id, 'data-lb-row': mm.id },
       cells: Object.fromEntries(cols.map(c => { const x = frCell(mm, c);
         return [c.key, x.here ? hereCell(mm, c, x) : { v: null, attrs: { 'data-fr-cell': c.key } }];
@@ -15088,7 +15145,10 @@ function dmSpec(rows) {
   // ours: one row a model, its other thinking setting under it with "both"
   const setting = r => { const m = DATA.models.find(x => x.id === r.id);
     return m ? thinkingOf(m) : 'off'; };
-  const mine = (list, theirs) => mtThinkPick(list, r => r.id, setting).map(({ x, other }) =>
+  const scoresOf = r => Object.values(row(r).cells).filter(x => x && x.v != null).length;
+  // a row a model page links here is shown, whatever the Thinking filter picks
+  const mine = (list, theirs) => mtThinkPick(list, r => r.id, setting, scoresOf,
+    (state.dm || {}).flash).map(({ x, other }) =>
     ({ ...row(x, theirs), children: other ? [{ ...row(other, theirs),
       subLabel: `thinking ${/ · thinking$/.test(other.id) ? 'on' : 'off'}` }] : [] }));
   const out = [];
@@ -15490,35 +15550,71 @@ function phoneBody(b, id) {
 }
 // 26: measured on our testers' phones — per phone the medians over its
 // finished tests, with their dates; never mixed with what was typed in
+function phoneTestedTable(got, id) {
+  return el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-phone-tested-table': id },
+    el('thead', {}, el('tr', {}, ['Phone', 'Tests', 'Decode', 'Prefill', 'First word',
+      'Engine memory', 'Temperature rise'].map((h, i) => el('th', { class: i ? 'num' : '',
+      text: h })))),
+    el('tbody', {}, got.map(p => el('tr', { 'data-phone-tested': p.phone.name },
+      el('td', { text: p.phone.name }, el('div', { class: 'small se', text: p.model.name })),
+      el('td', { class: 'num', text: String(p.n) }, el('div', { class: 'small se',
+        text: p.first === p.last ? p.last : `${p.first} to ${p.last}` })),
+      el('td', { class: 'num', 'data-phone-tested-decode': p.phone.name,
+        text: `${ptN(p.decode)} tok/s` }),
+      el('td', { class: 'num', text: p.prefill_warm == null ? '—'
+        : `${ptN(p.prefill_warm)} tok/s` }),
+      el('td', { class: 'num', text: ptS(p.ttft_ms) }),
+      el('td', { class: 'num', text: ptMB(p.engine_mem_mb) }),
+      el('td', { class: 'num', text: ptSigned(p.temp_rise, ' °C') }))))));
+}
+// 27c: each app model of this row's checkpoint — its own first, a variant
+// (step4000-denseq8) under a heading of its own, never mixed with it
+function phoneCpParts(id) {
+  const es = phoneCps(id).filter(e => (e.phones || []).length);
+  const one = e => [el('p', { class: 'small se', 'data-phone-cp-line': e.model.id,
+    text: phoneCpLine(e, id) }), phoneTestedTable(e.phones, id)];
+  return [...es.filter(e => !e.variant).flatMap(one),
+    ...es.filter(e => e.variant).map(e => el('div', { class: 'phone-variant',
+        'data-phone-variant': e.model.id },
+      el('h4', { text: e.model.name + (e.model.what ? ` (${e.model.what})` : '') }), ...one(e)))];
+}
 function phoneTesters(id) {
-  const P = state.phone, got = phoneTested(id);
+  const P = state.phone, got = ((P.measured || {})[id] || []).filter(p => p.decode != null);
+  const cps = got.length ? [] : phoneCpParts(id);
   const open = P.report ? el('a', { href: '#tab=reports&report=' + encodeURIComponent(P.report),
     'data-phone-testers-open': id, text: 'Every test ▸',
     onclick: e => { e.preventDefault(); rpOpen(P.report); } }) : '';
+  const how = el('p', { class: 'small se', 'data-phone-testers-how': id },
+    'Medians over each phone’s finished tests of the app’s own check, measured on the '
+    + 'phone · ', open);
   return el('div', { class: 'phone-testers', 'data-phone-testers': id },
     el('h3', { text: 'Measured on our testers’ phones' }),
-    got.length ? [
-      el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
-        el('thead', {}, el('tr', {}, ['Phone', 'Tests', 'Decode', 'Prefill', 'First word',
-          'Engine memory', 'Temperature rise'].map((h, i) => el('th', { class: i ? 'num' : '',
-          text: h })))),
-        el('tbody', {}, got.map(p => el('tr', { 'data-phone-tested': p.phone.name },
-          el('td', { text: p.phone.name }, el('div', { class: 'small se', text: p.model.name })),
-          el('td', { class: 'num', text: String(p.n) }, el('div', { class: 'small se',
-            text: p.first === p.last ? p.last : `${p.first} to ${p.last}` })),
-          el('td', { class: 'num', 'data-phone-tested-decode': p.phone.name,
-            text: `${ptN(p.decode)} tok/s` }),
-          el('td', { class: 'num', text: p.prefill_warm == null ? '—'
-            : `${ptN(p.prefill_warm)} tok/s` }),
-          el('td', { class: 'num', text: ptS(p.ttft_ms) }),
-          el('td', { class: 'num', text: ptMB(p.engine_mem_mb) }),
-          el('td', { class: 'num', text: ptSigned(p.temp_rise, ' °C') })))))),
-      el('p', { class: 'small se', 'data-phone-testers-how': id },
-        'Medians over each phone’s finished tests of the app’s own check, measured on the '
-        + 'phone · ', open)]
+    got.length ? [el('p', { class: 'small se', 'data-phone-cp-line': 'row',
+      text: 'the same file (sha256 checked)' }), phoneTestedTable(got, id), how]
+      : cps.length ? [...cps, how]
       : el('p', { class: 'small', 'data-phone-testers-none': id, text: !LIVE && !P.loaded
         ? 'Measured numbers are on the live board.' : 'No tests from our testers’ phones yet'
           + (P.sync && /not set up/.test(P.sync) ? ` (${P.sync})` : '') + '.' }, ' ', open));
+}
+// 27c: the block on a model page of a checkpoint our testers' phones ran — a
+// step checkpoint's, thinking on or off; a phone build's is in its own block
+function testersBlock(m) {
+  const id = m.rowOf || m.id;
+  if (isPhoneRow(m) || !phoneCps(id).some(e => (e.phones || []).length)) return null;
+  const mine = state.mblk[m.id] || {}, open = 'testers' in mine ? mine.testers : true;
+  const t = [...phoneTested(id)].sort((a, b) => b.n - a.n)[0];
+  return el('details', { class: 'card kblock', 'data-kind-block': 'testers', open: open ? '' : null,
+      ontoggle: e => { const o = state.mblk[m.id] = state.mblk[m.id] || {};
+        o.testers = e.target.open; } },
+    el('summary', { class: 'kblock-sum' }, el('span', { class: 'kblock-k',
+      text: 'On our testers’ phones' }), el('span', { class: 'kblock-v', 'data-testers-head': id,
+      text: t ? `${ptN(t.decode)} tok/s decode, median on ${t.phone.name}` : 'a variant only' })),
+    el('div', { class: 'kpart', 'data-phone-testers': id }, ...phoneCpParts(id),
+      el('p', { class: 'small se' }, 'Medians over each phone’s finished tests of the app’s own '
+        + 'check, measured on the phone · ', state.phone.report ? el('a', {
+          href: '#tab=reports&report=' + encodeURIComponent(state.phone.report),
+          text: 'Every test ▸', onclick: e => { e.preventDefault(); rpOpen(state.phone.report); } })
+          : '')));
 }
 function phoneReported(r, id) {
   if (!r) return el('div', { 'data-phone-reported': id },
@@ -15713,7 +15809,8 @@ function lbEveryday(ms) {
     for (const c of reps) cells[c.key] = repDesc(m, c);
     return mtRowOf(m, { attrs: { 'data-lb-row': m.id }, cells });
   };
-  const made = mtThinkRows(have).map(({ m, other }) => ({ ...rowOf(m),
+  const scoresOf = m => Object.values(rowOf(m).cells).filter(x => x && x.v != null).length;
+  const made = mtThinkRows(have, scoresOf).map(({ m, other }) => ({ ...rowOf(m),
     children: other ? [{ ...rowOf(other), subLabel: `thinking ${thinkingOf(other) || 'on'}` }]
       : [] }));
   return [el('div', { class: 'card', 'data-lb-card': '1' },
@@ -16474,7 +16571,7 @@ function vLeaderboard(ms) {
   // shown: seven columns of dashes said nothing. Chosen by name, it stays
   if (!custom && !lbAll.some(m => visCols.some(c => c.gguf && val(m, c) != null)))
     visCols = visCols.filter(c => !c.gguf);
-  const lbPairs = mtThinkRows(lbAll);
+  const lbPairs = mtThinkRows(lbAll, m => visCols.filter(c => val(m, c) != null).length);
   lbCounts.table = lbPairs.length;              // 27: a model's thinking row is its row
   const lbPg = paged('leaderboard', lbPairs, JSON.stringify([state.sort, state.q, state.kind,
     state.src, state.avgMode, L.view, L.chip, L.source, L.type, L.tested, L.date, L.size, L.status,
@@ -29114,7 +29211,8 @@ function odPhoneCell(r) {
     return { v: top.decode, text: `${ptN(top.decode)} tok/s`, dot: true, noLead: true,
       sub: `${top.phone} · ${top.n} test${top.n === 1 ? '' : 's'}`
         + (more ? ` · +${more} phone${more === 1 ? '' : 's'}` : ''),
-      tip: ['measured on our testers’ phones, decode, the median a phone:', ...ps.map(p =>
+      tip: ['measured on our testers’ phones, decode, the median a phone:', ...(t.line
+        ? [t.line] : []), ...ps.map(p =>
         `${p.phone}: ${ptN(p.decode)} tok/s` + (p.engine_mem_mb != null
           ? ` · engine memory ${ptMB(p.engine_mem_mb)}` : '') + `, median of ${p.n} test`
         + `${p.n === 1 ? '' : 's'}` + (p.last ? `, ${p.first === p.last ? p.last
@@ -30222,17 +30320,21 @@ function byStack(parts, aria) {
   const svg = el('svg:svg', { class: 'by-stack', viewBox: `0 0 ${W} ${H}`, role: 'img',
     'aria-label': aria });
   let x = 0;
-  for (const p of parts) {
+  parts.forEach((p, i) => {
     const w = W * p.n / total;
     if (w > 0) {
       svg.append(el('svg:rect', { x, y: 0, width: w, height: H, fill: p.fill,
-        'fill-opacity': 0.35, stroke: p.fill, 'stroke-width': 1 },
+        'fill-opacity': 0.35, stroke: p.fill, 'stroke-width': 1, 'data-by-seg': String(i) },
         el('svg:title', { text: `${p.words}: ${rpN(p.n)} (${byPct(p.n / total, 1)})` })));
-      if (w > 46) svg.append(el('svg:text', { x: x + w / 2, y: 17, 'text-anchor': 'middle',
-        'font-size': 11, fill: 'var(--text-primary)', text: `${p.short} ${byPct(p.n / total)}` }));
+      // 27c: the words go inside only when they fit with room on both sides;
+      // else none — the key under the bar gives the numbers
+      const t = `${p.short} ${byPct(p.n / total)}`;
+      if (lblWidth(t, 11) + 12 <= w) svg.append(el('svg:text', { x: x + w / 2, y: 17,
+        'text-anchor': 'middle', 'font-size': 11, fill: 'var(--text-primary)',
+        'data-by-seg-text': String(i), text: t }));
     }
     x += w;
-  }
+  });
   return el('div', { class: 'by-stackwrap' }, svg, el('div', { class: 'by-key small' },
     parts.map(p => el('span', {}, el('span', { class: 'rp-dot', style: `background:${p.fill}` }),
       `${p.words} ${rpN(p.n)} (${byPct(p.n / total, 1)})`))));

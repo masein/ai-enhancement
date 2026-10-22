@@ -131,12 +131,13 @@ def test_three_benchmarks_make_an_average_of_those_three(live, page):
     assert page.locator("th[data-col='avg']").count() == 0        # not the board's Avg
     # the rows: the models with all three, ranked on this average — 12o.1: and,
     # after them, one with some of them, unaveraged
-    # 27: one row a model — its thinking row, with "both", a sub-row under it
-    assert rows(page) == [MODEL, SHORT]
+    # 27: one row a model — its other setting, with "both", a sub-row under it.
+    # 27c: both have the three, a tie: its thinking-on row, thinking off under it
+    assert rows(page) == [THINK, SHORT]
     both(page)
-    assert rows(page) == [MODEL, THINK, SHORT]
-    assert page.locator(f"tr[data-lb-row='{MODEL}'] td.rank").inner_text() == "1"
-    assert "mt-sub-row" in page.locator(f"tr[data-lb-row='{THINK}']").get_attribute("class")
+    assert rows(page) == [THINK, MODEL, SHORT]
+    assert page.locator(f"tr[data-lb-row='{THINK}'] td.rank").inner_text() == "1"
+    assert "mt-sub-row" in page.locator(f"tr[data-lb-row='{MODEL}']").get_attribute("class")
     # the number and its ±, as the chosen columns make them
     for mid in (MODEL, THINK):
         v, se = tip_number(page.locator(f"td[data-cavg='{mid}']"))

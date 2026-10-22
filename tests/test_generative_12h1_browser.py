@@ -49,10 +49,12 @@ def served(page, edit):
     page.route("**/api/results*", handle)
 
 
-def instruction_view(page, base, width=1400):
+def instruction_view(page, base, width=1400, thinking=None):
     page.set_viewport_size({"width": width, "height": 1000})
     page.goto(base + "/#tab=models")
     page.wait_for_selector("[data-lb-table]", state="attached")
+    if thinking:                                           # 27c: Thinking ▾ as asked
+        page.evaluate(f"lbS().thinking = {thinking!r}; render()")
     choose_chip(page, "instruction")                       # 16.3: Group ▾
     page.wait_for_selector("th[data-col='ifeval']", state="attached")
 
@@ -63,13 +65,14 @@ def test_instruction_and_maths_is_a_group_of_three(live, page):
     heads = [h.lower() for h in page.locator("[data-lb-table] thead tr.names th .hname")
              .all_inner_texts()]
     assert heads == ["model", "params", "ifeval", "mmlu-pro", "math-500"]
-    # 27: one row a model; its thinking run, with Thinking: both, a sub-row labelled
-    # so — its numbers its own, never merged with the other's
+    # 27: one row a model; its other run, with Thinking: both, a sub-row labelled
+    # so — its numbers its own, never merged with the other's. 27c: both runs have
+    # the three, a tie: its thinking-on row shows, thinking off under it
     rows = [r.get_attribute("data-lb-row") for r in page.locator("tr[data-lb-row]").all()]
-    assert MODEL in rows and THINK not in rows
+    assert THINK in rows and MODEL not in rows
     page.evaluate("lbS().thinking = 'both'; render()")
-    page.wait_for_selector(f"tr.mt-sub-row[data-lb-row='{THINK}']")
-    assert page.locator(f"tr[data-lb-row='{THINK}'] [data-mt-name]").inner_text() == "thinking on"
+    page.wait_for_selector(f"tr.mt-sub-row[data-lb-row='{MODEL}']")
+    assert page.locator(f"tr[data-lb-row='{MODEL}'] [data-mt-name]").inner_text() == "thinking off"
     # the column says who scores it and how it is asked
     tip = json.loads(page.locator("th[data-col='mmlu_pro']").get_attribute("data-tip"))
     assert any(t.startswith("scored by exact match on the letter A–J") for t in tip)
@@ -82,7 +85,7 @@ def test_instruction_and_maths_is_a_group_of_three(live, page):
 
 
 def test_each_cell_says_what_else_there_is(live, page):
-    instruction_view(page, live["base"])
+    instruction_view(page, live["base"], thinking="off")          # 27c: its thinking-off row
     row = page.locator(f"tr[data-lb-row='{MODEL}']")
     mmlu = row.locator("td[data-gen-cell='mmlu_pro']")
     assert mmlu.inner_text().startswith("76.9")                   # 10 of 13, the board's reading
@@ -112,7 +115,7 @@ def test_a_score_far_below_published_is_flagged_on_its_cell(live, page):
             if m["id"] == MODEL:
                 m["gen"]["far"] = {"ifeval": {"published": 86.2, "note": "", "gap": 36.2}}
     served(page, far)
-    instruction_view(page, live["base"])
+    instruction_view(page, live["base"], thinking="off")          # 27c: its thinking-off row
     cellx = page.locator(f"tr[data-lb-row='{MODEL}'] td[data-gen-cell='ifeval']")
     assert cellx.locator("[data-far-below]").inner_text() == \
         "far below published, check extraction"

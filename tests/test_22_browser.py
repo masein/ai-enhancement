@@ -40,7 +40,7 @@ def test_latest_shows_ornith_measured_here_and_its_cards_claim_beside_it(live, p
     rows = {x: r for r in page.evaluate(LATEST) for x in r["labels"]}
     assert OURS in rows and CARD in rows
     # ours: a dash in every cell, and what it is in its Source
-    assert list(rows[OURS]["cells"].values()) == ["–", "–", "–", "–"]
+    assert list(rows[OURS]["cells"].values()) == ["–"] * 6        # 27c: and IFEval, IFBench
     assert rows[OURS]["src"] == ("Measured here, on its card's settings; not the team's model · "
                                  "Not scored yet")
     me = page.locator(f"[data-latest-row='{OURS}']")

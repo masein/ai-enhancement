@@ -72,8 +72,10 @@ modelling's cross-entropy table (a row per task and model) keep their own.
   table never hides a group's name.
 - **Rank.** Standard and DeviceMark keep their # column and its interval rule.
 - **Thinking: on / off / both.** One row a model.
-  - The default is each model's own setting (a served model as registered,
-    else its switch's way).
+  - The default, "as each runs", shows each model's setting with the most
+    scores in the columns shown, a tie to thinking on (27b): since plan I a
+    build's thinking-off row holds only IFEval and IFBench. A model with one
+    setting shows it.
   - "Both" shows the other setting as an indented sub-row.
 - **Columns ▾.** Says "Columns: N of M ▾". Each tab remembers its choice
   (`bench-mt-cols`).

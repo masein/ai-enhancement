@@ -98,7 +98,9 @@
   "gpqa",
   "otis",
   "mmlupro",
-  "hle"
+  "hle",
+  "ifeval",
+  "ifbench"
  ],
  "benchmarks": [
   {

@@ -1660,6 +1660,8 @@ def phone_builds():
     from . import reports
     return {"builds": phone.builds(), "readme": phone.README,
             "measured": telemetry.by_row(), "sync": telemetry.status()["line"],
+            # 27c: by each app model's checkpoint, until a sha256 links a row
+            "checkpoints": telemetry.by_checkpoint(),
             "report": next((rid for rid, r in reports.files().items()
                             if r.get("kind") == "phone_tests"), "")}
 

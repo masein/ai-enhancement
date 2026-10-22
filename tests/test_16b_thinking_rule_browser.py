@@ -96,6 +96,10 @@ def test_the_rule_is_on_the_cards_of_the_suites_it_decides(live, page, lda):
 
 @pytest.mark.parametrize("width", WIDTHS)
 def test_the_rule_is_on_the_row_where_it_decides(live, page, lda, width):
+    # 27c: "as each runs" shows the setting with the most scores, a tie thinking on;
+    # the row the rule decides is the thinking-off one, as Thinking: off shows it
+    page.goto(live["base"] + "/")
+    page.evaluate("localStorage.setItem('bench-mt-thinking', 'off')")
     go(page, live, "tab=models&chip=mobile", "[data-lb-table]", width)
     # 27: its line says "thinking off", and its name's tooltip the rule
     cell = page.locator(f"[data-lb-table] td.model[data-model='{lda}']")

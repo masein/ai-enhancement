@@ -65,7 +65,9 @@ def test_the_calibration_line_says_thinking_off_or_on(live, page):
     assert off.get_attribute("data-fr-thinking") == "off"
     on = page.locator(f"tr[data-fr-row='{THINKING}'] [data-fr-cell='gpqa']")
     assert on.locator(".mt-n").inner_text() == "40.0" and on.get_attribute("data-fr-thinking") == "on"
-    assert "mt-sub-row" in page.locator(f"tr[data-fr-row='{THINKING}']").get_attribute("class")
+    # 27c: one score each, a tie: thinking on is the row, thinking off its sub-row
+    assert "mt-sub-row" in page.locator(f"tr[data-fr-row='{GOOD}']").get_attribute("class")
+    assert "mt-sub-row" not in page.locator(f"tr[data-fr-row='{THINKING}']").get_attribute("class")
     pub = page.locator(f"tr[data-fr-row='{GOOD}|published'] [data-fr-cell='gpqa'] .mt-n")
     assert pub.inner_text() == "38.0E"
     # Epoch's number is ranked once, on its own row

@@ -1,4 +1,4 @@
-"""27b, Part 0: the names file holds Kevin's mapping (brief 26, Part 2) — the
+"""27b and 27c, Part 0: the names file holds Kevin's mapping (brief 26, Part 2) — the
 phone app's model-001 to model-004 by name, what each is where he said, and
 no board row or sha256 yet (a row only when the file's sha256 matches its
 pin, never by name); the tiers T0 to T2 by their RAM rule; no engines. A
@@ -41,6 +41,10 @@ def test_the_names_file_holds_kevins_mapping():
         "step4000 with its non-expert weights in q8_0 instead of q5_K")
     # no board row and no sha256 until Kevin's sha256 matches a row's pin
     assert all(m["row"] == "" and m["sha256"] == "" for m in names["models"].values())
+    # 27c: whose rows on the board each is
+    assert {k: v["checkpoint"] for k, v in names["models"].items()} == {
+        "model-001": "served/Qwen3.6-35B-A3B-k4-LDA-phone-build", "model-002": "step4000",
+        "model-003": "step4000", "model-004": "step8804"}
     assert names["tiers"] == {"T0": "RAM 14 GB or more", "T1": "RAM 10 to 14 GB",
                               "T2": "RAM under 10 GB"}
     assert names["engines"] == {}
