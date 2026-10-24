@@ -928,6 +928,78 @@
     "date": "2026-07-24",
     "published_by": "Google"
    }
+  },
+  {
+   "label": "NVIDIA-Nemotron-3.5-Bolt-E4B",
+   "maker": "NVIDIA",
+   "published_by": "NVIDIA",
+   "link": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-BF16",
+   "base": "Gemma 4 E4B-it (NVIDIA's run)",
+   "line": "trained further from Gemma 4 E4B, not compressed",
+   "line_tip": "its training seed data includes IFEval prompts (the model card's data table)",
+   "facts": {
+    "base": "Gemma 4 E4B-it",
+    "kind": "4B effective (8B total)",
+    "disk": {
+     "gb": 6.18,
+     "words": "6.18 GB",
+     "how": "its 4-bit file's size (Nemotron-3.5-Bolt-E4B-Q4_K_M.gguf, 6,180,446,208 bytes), NVIDIA's file list for NVIDIA-Nemotron-3.5-Bolt-E4B-4GB",
+     "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB/tree/1db54d5b12533ff1bcaa8e42cf4c667988a1f1be"
+    },
+    "memory": {
+     "gb": 6.18,
+     "words": "6.18 GB",
+     "how": "its 4-bit file's size (Nemotron-3.5-Bolt-E4B-Q4_K_M.gguf, 6,180,446,208 bytes), NVIDIA's file list for NVIDIA-Nemotron-3.5-Bolt-E4B-4GB",
+     "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB/tree/1db54d5b12533ff1bcaa8e42cf4c667988a1f1be"
+    },
+    "phone": {
+     "none": "no phone numbers published",
+     "how": "NVIDIA's card gives none",
+     "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-BF16/blob/49843eed8db1f1c616c47af75cfd36e07aec0667/README.md"
+    },
+    "also": [
+     {
+      "benchmark": "BFCL-v3",
+      "value": "68.51",
+      "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-BF16/blob/49843eed8db1f1c616c47af75cfd36e07aec0667/README.md"
+     },
+     {
+      "benchmark": "Tau2-Bench",
+      "value": "55.10",
+      "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-BF16/blob/49843eed8db1f1c616c47af75cfd36e07aec0667/README.md"
+     }
+    ]
+   },
+   "ifbench": {
+    "from": "card",
+    "value": 63.79,
+    "card": "NVIDIA-Nemotron-3.5-Bolt-E4B-BF16 model card",
+    "model": "NVIDIA-Nemotron-3.5-Bolt-E4B",
+    "maker": "NVIDIA",
+    "benchmark": "IFBench",
+    "setting": "NVIDIA's own run under NeMo Gym, reasoning mode on, beside Gemma 4 E4B-it on the same setup; BF16 (its Q4_K_M build, NVIDIA-Nemotron-3.5-Bolt-E4B-4GB: 64.00)",
+    "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-BF16/blob/49843eed8db1f1c616c47af75cfd36e07aec0667/README.md",
+    "date": "2026-10-23",
+    "published_by": "NVIDIA"
+   }
+  },
+  {
+   "label": "Gemma 4 E4B-it (NVIDIA's run)",
+   "maker": "Google",
+   "published_by": "NVIDIA",
+   "base_only": true,
+   "ifbench": {
+    "from": "card",
+    "value": 42.84,
+    "card": "NVIDIA-Nemotron-3.5-Bolt-E4B-BF16 model card",
+    "model": "Gemma 4 E4B-it, as NVIDIA ran it",
+    "maker": "Google",
+    "benchmark": "IFBench",
+    "setting": "NVIDIA's own run under NeMo Gym, reasoning mode on, beside Gemma 4 E4B-it on the same setup; BF16 (Q4_K_M: 42.67)",
+    "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-BF16/blob/49843eed8db1f1c616c47af75cfd36e07aec0667/README.md",
+    "date": "2026-10-23",
+    "published_by": "NVIDIA"
+   }
   }
  ],
  "notes": [

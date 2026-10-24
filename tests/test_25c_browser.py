@@ -74,7 +74,8 @@ def test_the_on_device_report(live, page, width, scheme):
     assert group("ours") == ["Q4 (UD-Q4_K_XL)", "Q2 (UD-Q2_K_XL)", "step4000", "step1000"]
     assert group("open") == ["Edge0-35B-A3B-preview", "Edge0-8B-A1B-preview", "Ternary Bonsai 2 9B",
                              "Ternary Bonsai 2 4B", "Gemma 4 E4B", "Gemma 4 E2B",
-                             "Ternary Bonsai 2 2B", "Bonsai 27B (1-bit)"]
+                             "Ternary Bonsai 2 2B", "Bonsai 27B (1-bit)",
+                             "NVIDIA-Nemotron-3.5-Bolt-E4B"]                 # 27f: IFBench alone
     assert page.locator("[data-mt-empty]").get_attribute("data-mt-empty") == "1"
     # every cell says where it is from: its mark and italics, a published one's letter
     # linking its source; the source once in the row's line, linked

@@ -201,7 +201,7 @@ def score(task: str, got: dict, questions: Path, tmp: Path, model: str) -> dict:
     m = sf.marks(row, task, items=items, grades={})
     flat = [r for it in items for r in m["runs"].get(it["id"], [])]
     cut = [r for r in flat if r["ran_out"]]
-    loops = sum(1 for r in cut if fb.ends_in_loop(r["answer"]))
+    loops = sum(1 for r in cut if fb.ended_in_loop(r["answer"], True))     # 27f
     out = {"answers": len(flat), "missing": len(m["missing"]), "ran_out": len(cut),
            "loops": loops, "part": part, "unanswered": sum(1 for r in flat if r.get("unanswered")),
            "questions": len(items), "per": {}}

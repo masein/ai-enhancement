@@ -825,8 +825,9 @@ def ran_out(text: str, finish: str | None) -> bool:
 # 17e: an answer that ran out "ends in a loop" when the passage just before
 # where it was cut (LOOP_PASSAGE characters, clear of the cut itself) is
 # found LOOP_TIMES times or more in its last LOOP_WINDOW characters — the
-# last passage repeating. For information on the import's line only. 17f:
-# numbers read as one ("Step 1001…", "Step 1002…" repeat), a tail of nothing
+# last passage repeating. For information on the import's line, and (23b)
+# the kept "ended in a loop" — 27f: each on the part the answer ended in
+# alone (ended_in_loop). 17f: numbers read as one ("Step 1001…", "Step 1002…" repeat), a tail of nothing
 # but whitespace is a loop, and a passage with no words — an ARC grid of
 # equal rows, a table of equal rows, a run of zeros — never is. 17g: letters
 # as a counter read as one too, a tail of dots is a loop, and a table (rows
@@ -863,6 +864,19 @@ def ends_in_loop(text: str) -> bool:
     if not words or all(w.lower() in _COLOURS for w in inner) or _table(passage):
         return False                            # a grid (in digits or colours), a table
     return tail.count(passage) >= LOOP_TIMES
+
+
+def ended_in_loop(text: str, ran_out: bool) -> bool:
+    """27f: the loop rule on the part where the answer ended, alone — an
+    answer that finished, its reply; one that ran out of room inside its
+    thinking (a block never closed), that thinking; one that ran out in its
+    reply (or has no thinking), its reply. With thinking on, a reply drafted
+    in the thinking, checked and written out once repeats its last passage
+    three times across the two, and is no loop: on step8804's IFEval and
+    IFBench, 81 of the 82 answers the whole text flagged were that"""
+    from frontier_graders import think_split
+    reply, thoughts, unclosed = think_split(text, strip=False)
+    return ends_in_loop("\n\n".join(thoughts) if ran_out and unclosed else reply)
 
 
 def read_choice(text: str, letters: str = LETTERS) -> str | None:

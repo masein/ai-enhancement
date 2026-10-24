@@ -12,8 +12,9 @@ reads them:
   none;
 - SimpleQA Verified: right, wrong, not attempted and ran out; how often it
   tries, how often it is right when it does, and the SimpleQA paper's F;
-- loops (every benchmark): the share of answers fb.ends_in_loop flags, by the
-  board's loop rule, of all answers and of those that ran out of room.
+- loops (every benchmark): the share of answers the board's loop rule flags,
+  of all answers and of those that ran out of room — 27f: on the part each
+  ended in alone (fb.ended_in_loop).
 
 23c: speed and energy — each benchmark's seconds an answer as the board saw
 them (wall_s: the median and the 90th percentile) and its output tokens a
@@ -43,7 +44,8 @@ from . import config
 GPQA, OTIS, HLE, SQA = ("gpqa_diamond_epoch", "otis_aime_epoch", "hle_text_cais",
                         "simpleqa_epoch")
 RELIABLE = (GPQA, OTIS)
-WAY = "beyond-2"                # 23c: and each benchmark's speed
+# 23c: and each benchmark's speed; 27f: loops on the part an answer ended in
+WAY = "beyond-3"
 FEW = 20                    # a confidence bin with fewer answers is drawn faint
 # HLE_SYSTEM asks each answer for a "Confidence: N%" line
 _STATED = re.compile(r"(?im)^\W*confidence\W*:\s*\d{1,3}(?:\.\d+)?\s*%")
@@ -219,15 +221,16 @@ def simpleqa(rows: list[dict]) -> dict:
 
 
 def loops(rows: list[dict]) -> dict:
-    """the answers ending in a loop by the board's rule (fb.ends_in_loop), of
-    all and of those that ran out of room"""
+    """the answers ending in a loop by the board's rule, of all and of those
+    that ran out of room — 27f: on the part each ended in alone
+    (fb.ended_in_loop): a finished answer's reply, a cut one's thinking"""
     _scripts()
     import frontier as fb
     n = looped = out = out_looped = 0
     for row in rows:
         for run, text in zip(row["runs"], row["texts"]):
             n += 1
-            lp = fb.ends_in_loop(text)
+            lp = fb.ended_in_loop(text, bool(run.get("ran_out")))
             looped += lp
             if run.get("ran_out"):
                 out += 1
