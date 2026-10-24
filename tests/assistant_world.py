@@ -117,12 +117,22 @@ def world(tmp_path_factory=None) -> Path:
                       "tasks": ["hle_text_cais"]}])
     sid = db.add("Qwen/Qwen3-0.6B", "instruct", "standard", "masein", "a test run")
     db.update(sid, status="running")
+    LEFT["run"] = sid
     report_stats.work(say=lambda s: None)
     appmod._cache.update(key=None, payload=None, at=0.0)
     return names
 
 
+LEFT: dict = {}
+
+
 def unwind(saved_names: Path) -> None:
+    """the world's running run and rented box ended, so a later test on the
+    same live server sees neither; our names file put back"""
+    import import_frontier as imf
+    if LEFT.get("run"):
+        db.update(LEFT.pop("run"), status="done")
+    imf.boxes_path().unlink(missing_ok=True)
     telemetry.NAMES = saved_names
     telemetry._memo.update(stamp=None)
     telemetry._names_memo.update(stamp=None)
