@@ -29,13 +29,19 @@ eval_tasks/*
 !eval_tasks/reports
 # 26: our names for the phone app's ids (model, tier, engine, device)
 !eval_tasks/phone
+# 28: the assistant's names
+!eval_tasks/assistant
 logs/
 artifacts/
 service.sqlite3*
 __pycache__/
 *.pyc
 .venv/
-tests/
+tests/*
+# 28: the assistant's test bank alone — its examples and the server's evaluation read it
+!tests/fixtures
+tests/fixtures/*
+!tests/fixtures/assistant
 .github/
 pyproject.toml
 requirements-dev.txt

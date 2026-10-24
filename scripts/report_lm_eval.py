@@ -5821,6 +5821,40 @@ table.rp.pt-checks td.pt-reply { text-align:left; white-space:pre-wrap; overflow
   min-width:14rem; max-width:32rem; }
 .pt-test-head { display:flex; justify-content:space-between; align-items:center; gap:var(--sp-2); }
 .pt-test-head h2 { margin:0; min-width:0; overflow-wrap:anywhere; }
+/* 28: the assistant's panel — on the right, 380 px, over the page; a phone's whole width.
+   Below 720 px "Ask" is in Menu ▾, with the places: the bar has no room for it */
+@media (max-width:720px) { #askAct { display:none; } }
+.ask-panel { position:fixed; top:0; right:0; bottom:0; width:380px; max-width:100vw; z-index:61;
+  background:var(--surface-1); border-left:1px solid var(--border); display:flex;
+  flex-direction:column; box-shadow:-8px 0 24px rgba(0,0,0,.25); animation:pt-in .18s ease-out; }
+@media (prefers-reduced-motion: reduce) { .ask-panel { animation:none; } }
+@media (max-width:639px) { .ask-panel { width:100vw; border-left:0; } }
+.ask-head { display:flex; justify-content:space-between; align-items:center; gap:var(--sp-2);
+  padding:12px 16px; border-bottom:1px solid var(--border); }
+.ask-head h2 { margin:0; }
+.ask-head-acts { display:flex; gap:4px; align-items:center; }
+.ask-head-acts [data-ask-close] { font-size:20px; line-height:1; min-width:36px; min-height:36px; }
+.ask-msgs { flex:1; overflow-y:auto; padding:12px 16px; display:flex; flex-direction:column;
+  gap:12px; }
+.ask-empty { display:flex; flex-direction:column; gap:8px; align-items:flex-start; }
+.ask-ex { text-align:left; white-space:normal; }
+.ask-you { align-self:flex-end; max-width:85%; background:var(--accent-soft);
+  border-radius:var(--r-2); padding:6px 10px; overflow-wrap:anywhere; }
+.ask-bot { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.ask-say { margin:0; }
+.ask-text { margin:0; color:var(--text-secondary); }
+.ask-table { overflow-x:auto; max-width:100%; }
+.ask-table .mt-legend, .ask-table .mt-tint { display:none; }
+.ask-list { margin:0; padding-left:18px; }
+.ask-choices { display:flex; flex-wrap:wrap; gap:6px; }
+.ask-chart .by-panel { max-width:100%; }
+.ask-dots { grid-template-columns:minmax(0, 9rem) 1fr auto; }
+.ask-thumbs { display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
+.ask-thumbs button.on { background:var(--accent-soft); }
+.ask-note { flex:1; min-width:10rem; }
+.ask-wait { margin:0; }
+.ask-foot { display:flex; gap:8px; padding:12px 16px; border-top:1px solid var(--border); }
+.ask-in { flex:1; min-width:0; }
 /* 27: one table for every Models tab — one row, one cell, one frame */
 .mt { font-size:14px; }
 .mt-legend { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between;
@@ -12732,9 +12766,21 @@ function lbHash() {
   // 27d: the search, and Models ▾ ▸ Show
   if ((L.group || 'all') !== 'all') out.push('only=' + L.group);
   if (L.q) out.push('q=' + encodeURIComponent(L.q));
+  // 28: a sort and a Thinking ▾ a link set, kept in it (a click's sort stays out, as before)
+  const T = lbSortOf(test);
+  if (T.sort && T.sort.link) out.push('sort=' + encodeURIComponent(T.sort.key)
+    + (T.sort.dir > 0 ? ':asc' : ''));
+  if (L.thinkingLink && L.thinking && L.thinking !== 'default') out.push('thinking=' + L.thinking);
   // 16.4: the Chart's highlighted models (Benchmarks ▸ Standard's, before)
   if (L.show === 'chart' && (L.hl || []).length) out.push('hl=' + L.hl.map(encodeURIComponent).join(','));
   return out.join('&');
+}
+// 28: where a Models tab keeps its sort — Frontier's own, Latest's and
+// Everyday's tables', and Standard's (Mobile's and the exam's too) the board's
+function lbSortOf(view) {
+  if (view === 'frontier') return (state.fr = state.fr || { all: false, sort: null });
+  if (view === 'latest' || view === 'everyday') return mtS(view);
+  return state;
 }
 function lbFromHash(rest) {
   const L = lbS(), p = new URLSearchParams(rest || '');
@@ -12787,6 +12833,14 @@ function lbFromHash(rest) {
   // 27d: the search and Models ▾ ▸ Show, from the link
   L.q = p.get('q') || '';
   L.group = MT_SHOW.some(([g]) => g === p.get('only')) ? p.get('only') : 'all';
+  // 28: a sort ("sort=hle", "sort=hle:asc", best first unless asc) and Thinking ▾
+  // ("thinking=on"), as the assistant's links set them
+  const so = /^(.+?)(?::(asc|desc))?$/.exec(p.get('sort') || '');
+  if (so) lbSortOf(lbTest(L)).sort = { key: so[1], dir: so[2] === 'asc' ? 1 : -1, link: true };
+  if (MT_THINK.some(([v]) => v === p.get('thinking'))) {
+    L.thinking = p.get('thinking');
+    L.thinkingLink = true;
+  }
   const hl = list('hl').map(canonId).filter(id => !DATA || ids.has(id)).slice(0, 3);
   L.hl = hl.length ? [...new Set(hl)] : null;
   // 12m.1: the compared models, as the address names them, at most eight
@@ -24026,6 +24080,7 @@ const whoName = () => rememberedName().trim();
 function setWho(v) {
   state.rvName = v;
   try { localStorage.setItem('bench-name', v); } catch (e) { /* private mode */ }
+  askCheck();                       // 28: a new name may see "Ask", or not
 }
 
 // an action that records a name, when there is none: open the header box
@@ -29227,8 +29282,7 @@ function lbLatest(ms) {
         lbSoft(); },
       groupNotes: { ours: 'measured here, same questions' },
       foot: [el('p', { class: 'small se', 'data-latest-legend': '1', text: RP_SCORE_LEGEND
-        + ' † HLE from Epoch AI’s collection of other sources. A model card’s number has no ±. '
-        + 'Published numbers are never ranked or averaged with ours.' }),
+        + ' † HLE from Epoch AI’s collection of other sources. ' + LATEST_PUB_WORDS }),
       t.span !== 'any' && mine.length < ours.length
         ? el('p', { class: 'small se', 'data-latest-when': '1', text: `When ▾ keeps `
           + `${mine.length} of our ${ours.length} runs; the published `
@@ -29381,10 +29435,7 @@ function rpBaseSwitch(id, d) {
         'aria-checked': String(o === sel), 'data-rp-base': o, title: o,
         text: trShort(o) + (size(o) ? ` · ${(size(o) / 1e9).toFixed(1)} GB` : ''),
         onclick: () => { (RPS().base = RPS().base || {})[id] = o; navigate({}); } }))),
-    el('span', { class: 'small se', 'data-rp-base-says': '1', text: 'What follows it: instruction '
-      + 'following’s verdicts, Across training’s line against it and its dashed line, and the '
-      + `thinking-tokens line. Near the ceiling and the loop examples stay by `
-      + `${trShort(d.reference || '')}. No number changes.` }));
+    el('span', { class: 'small se', 'data-rp-base-says': '1', text: rpBaseWords(d.reference) }));
 }
 function vReport(id) {
   const R = RPS(), d = rpBased(R.data[id], id);
@@ -30060,12 +30111,7 @@ function vOnDevice(id, d, back) {
   }).filter(Boolean);
   const keep = el('div', { class: 'card', 'data-report-section': 'od-keep' },
     el('h2', { text: 'What each keeps of its own base' }),
-    el('p', { class: 'small se', text: 'Each source ran its own harness, so scores aren’t '
-      + 'comparable point for point across sources. But each ran its model beside its own '
-      + 'full-precision base on the same harness: a model’s score as a share of its base’s is the '
-      + 'fair comparison. Ours against our BF16, measured here' + (d.standIn ? ` — where our `
-        + `${d.standIn.for} hasn’t run a benchmark yet, our ${d.standIn.short} stands in for it, `
-        + 'as its panel says' : '') + '. ' + OD_LEGEND + '.' }),
+    el('p', { class: 'small se', text: odKeepWords(d.standIn) }),
     keepPanels.length ? el('div', { class: 'by-panels tr-panels' }, keepPanels)
       : el('p', { class: 'small se', text: 'No model has both its own score and its base’s yet.' }));
   const memPanels = B.map(b => {
@@ -30096,6 +30142,265 @@ function vOnDevice(id, d, back) {
 // two never disagree. A flagged test is greyed and kept out of the medians it
 // would skew, the reason on hover; a test opens to every check and its reply
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// 28: the assistant — "Ask" and ⌘K / Ctrl+K, for the names ASSISTANT_USERS
+// gives (service/assistant.py). The model picks one action; the board runs it
+// and draws the reply with its own parts: a page opened by its own link, 27's
+// cells, the reports' charts, its own help texts. The messages stay for the
+// session, in memory. The panel lives outside the page, as the testers' test
+// panel does, so a page opened from it leaves it open
+// ---------------------------------------------------------------------------
+const ASK = { on: false, checked: null, open: false, msgs: [], examples: [], waiting: false,
+  slow: false, down: false, panel: null };
+// the texts the page keeps that `explain` names (`page:` in names.json)
+const OD_KEEP_WORDS = 'Each source ran its own harness, so scores aren’t comparable point for '
+  + 'point across sources. But each ran its model beside its own full-precision base on the same '
+  + 'harness: a model’s score as a share of its base’s is the fair comparison.';
+const LATEST_PUB_WORDS = 'A model card’s number has no ±. Published numbers are never ranked or '
+  + 'averaged with ours.';
+const rpBaseWords = ref => 'What follows it: instruction following’s verdicts, Across training’s '
+  + 'line against it and its dashed line, and the thinking-tokens line. Near the ceiling and the '
+  + `loop examples stay by ${trShort(ref || '')}. No number changes.`;
+const odKeepWords = si => OD_KEEP_WORDS + ' Ours against our BF16, measured here' + (si
+  ? ` — where our ${si.for} hasn’t run a benchmark yet, our ${si.short} stands in for it, as its `
+    + 'panel says' : '') + '. ' + OD_LEGEND + '.';
+function askPageText(key) {
+  const R = RPS(), od = R.data['on-device'], sc = R.data['step-checkpoints'];
+  if (key === 'score-legend') return RP_SCORE_LEGEND;
+  if (key === 'keeps') return odKeepWords(od && od.standIn);
+  if (key === 'stand-in') {
+    if (!od) { loadAskReport('on-device'); return ''; }
+    return od.standIn ? `Our ${od.standIn.for} hasn’t run ${od.standIn.benchmarks.join(' and ')} `
+      + `yet: ours are shown as a share of our ${od.standIn.short}, standing in for `
+      + `${od.standIn.for} (${od.standIn.elsewhere}). ${od.standIn.for}’s own replaces it when it `
+      + 'comes in.' : odKeepWords(null);
+  }
+  if (key === 'baseline') return rpBaseWords(sc ? sc.reference : 'Q4 (UD-Q4_K_XL)');
+  if (key === 'published') return LATEST_PUB_WORDS;
+  return '';
+}
+// a report's data for a chart or a text, asked once; the panel redrawn when in
+function loadAskReport(id) {
+  const R = RPS();
+  if (R.data[id] || (ASK.asking || {})[id]) return;
+  (ASK.asking = ASK.asking || {})[id] = true;
+  api('api/reports/' + encodeURIComponent(id)).then(d => { R.data[id] = d; })
+    .catch(() => {}).finally(() => { ASK.asking[id] = false; askDraw(); });
+}
+// whether this name sees it: asked when the board says the assistant exists,
+// once a name
+function askCheck() {
+  const who = LIVE && DATA && DATA.assistant ? whoName() : '';
+  if (ASK.checked === who) return;
+  ASK.checked = who;
+  if (!who) { ASK.on = false; askButton(); return; }
+  api('api/assistant?by=' + encodeURIComponent(who)).then(d => {
+    ASK.on = !!d.on && ASK.checked === who;
+    ASK.examples = d.examples || [];
+    ASK.slow = !!d.busy;
+    askButton();
+  }).catch(() => { ASK.on = false; askButton(); });
+}
+function askButton() {
+  const box = document.getElementById('askAct');
+  if (!box) return;
+  if (!ASK.on) { box.replaceChildren(); if (ASK.panel) askClose(); return; }
+  if (box.firstChild) return;
+  box.append(el('button', { class: 'barpill', 'data-ask-open': '1', 'aria-keyshortcuts': 'Meta+K',
+    title: `Ask the board (${/Mac/.test(navigator.platform) ? '⌘' : 'Ctrl+'}K)`, text: 'Ask',
+    onclick: () => (ASK.panel ? askClose() : askOpen()) }));
+}
+function askOpen() {
+  if (!ASK.on) return;
+  if (!ASK.panel) {
+    ASK.panel = el('aside', { class: 'ask-panel', id: 'askPanel', role: 'dialog',
+      'aria-label': 'Ask the board', 'data-ask-panel': '1' });
+    document.body.append(ASK.panel);
+  }
+  askDraw();
+  const i = ASK.panel.querySelector('[data-ask-input]');
+  if (i) i.focus();
+}
+function askClose() {
+  if (ASK.panel) ASK.panel.remove();
+  ASK.panel = null;
+}
+// the previous question and its action, for a follow-up ("and on HLE?")
+function askPrev() {
+  const last = [...ASK.msgs].reverse().find(m => m.role === 'bot' && m.action);
+  return last ? { q: last.q, action: last.action } : null;
+}
+async function askSend(q) {
+  q = String(q || '').trim();
+  if (!q || ASK.waiting) return;
+  const prev = askPrev();
+  ASK.msgs.push({ role: 'you', q });
+  ASK.waiting = true;
+  askDraw();
+  // "slower now: a run is using the model", or down — asked while the reply comes
+  const t = setTimeout(() => api('api/assistant/state?by=' + encodeURIComponent(whoName()))
+    .then(s => { ASK.slow = !!s.busy; ASK.down = !s.up; if (ASK.waiting) askDraw(); })
+    .catch(() => {}), 1200);
+  let got;
+  try { got = await post('api/assistant/ask', { by: whoName(), q, prev }); }
+  catch (e) { got = { reply: { kind: 'down', say: String((e && e.message) || e) } }; }
+  clearTimeout(t);
+  ASK.waiting = false;
+  ASK.down = !!got.down;
+  const m = { role: 'bot', q, id: got.id, action: got.action || null, reply: got.reply || {},
+    ms: got.ms };
+  ASK.msgs.push(m);
+  if (m.reply.kind === 'open' && m.reply.link) {
+    // the board's own link: the page as any link opens it, its entry in history
+    location.hash = m.reply.link.replace(/^#/, '');
+  }
+  askDraw();
+}
+function askThumbs(m, up, note) {
+  m.thumbs = up ? 'up' : 'down';
+  if (!up && note == null) { m.asking = true; askDraw(); return; }
+  m.asking = false;
+  post('api/assistant/thumbs', { by: whoName(), id: m.id || '', up, note: note || '' })
+    .catch(() => {});
+  askDraw();
+}
+function askDraw() {
+  const P = ASK.panel;
+  if (!P) return;
+  const keep = P.querySelector('[data-ask-input]');
+  const draft = keep ? keep.value : '';
+  const list = el('div', { class: 'ask-msgs', 'data-ask-msgs': '1', 'aria-live': 'polite' },
+    ASK.msgs.length ? ASK.msgs.map(askMsg) : el('div', { class: 'ask-empty', 'data-ask-empty': '1' },
+      el('p', { class: 'small se', text: 'Ask about what the board holds, or for a page to open. '
+        + 'I read and open pages only; every number is the board’s.' }),
+      ASK.examples.map(q => el('button', { class: 'chip-btn ask-ex', 'data-ask-example': '1',
+        text: q, onclick: () => askSend(q) }))),
+    ASK.waiting ? el('p', { class: 'small se ask-wait', 'data-ask-waiting': ASK.slow ? 'slow' : '1',
+      text: ASK.down ? 'The assistant’s model isn’t answering right now.' : ASK.slow
+        ? 'Slower now: a run is using the model…' : 'Thinking…' }) : '');
+  const input = el('input', { class: 'ask-in', 'data-ask-input': '1', type: 'text', value: draft,
+    placeholder: 'Ask about the board…', 'aria-label': 'Your question', autocomplete: 'off',
+    onkeydown: e => { if (e.key === 'Enter') { const v = e.target.value; e.target.value = '';
+      askSend(v); } if (e.key === 'Escape') askClose(); } });
+  P.replaceChildren(
+    el('div', { class: 'ask-head' }, el('h2', { text: 'Ask' }),
+      el('span', { class: 'ask-head-acts' },
+        ASK.msgs.length ? el('button', { class: 'quiet', 'data-ask-clear': '1', text: 'Clear',
+          onclick: () => { ASK.msgs = []; askDraw(); } }) : '',
+        el('button', { class: 'quiet', 'data-ask-close': '1', 'aria-label': 'Close', text: '×',
+          title: 'Close (Esc)', onclick: askClose }))),
+    list,
+    el('div', { class: 'ask-foot' }, input,
+      el('button', { class: 'primary', 'data-ask-send': '1', text: 'Ask', disabled: ASK.waiting
+        ? '' : null, onclick: () => { const v = input.value; input.value = ''; askSend(v); } })));
+  list.scrollTop = list.scrollHeight;
+  if (document.activeElement === document.body || !document.activeElement) input.focus();
+}
+function askMsg(m) {
+  if (m.role === 'you') return el('div', { class: 'ask-you', 'data-ask-you': '1', text: m.q });
+  const r = m.reply || {};
+  const link = r.link ? el('a', { href: r.link, class: 'small', 'data-ask-link': r.link,
+    text: r.kind === 'open' ? 'Open it again ▸' : 'Where this is on the board ▸' }) : '';
+  return el('div', { class: 'ask-bot', 'data-ask-bot': r.kind || '1' },
+    el('p', { class: 'ask-say', 'data-ask-say': '1', text: r.say || '' }),
+    askBody(r),
+    link,
+    m.id ? el('div', { class: 'ask-thumbs' },
+      el('button', { class: 'quiet' + (m.thumbs === 'up' ? ' on' : ''), 'data-ask-up': '1',
+        'aria-label': 'Good answer', text: '👍', onclick: () => askThumbs(m, true) }),
+      el('button', { class: 'quiet' + (m.thumbs === 'down' ? ' on' : ''), 'data-ask-down': '1',
+        'aria-label': 'Not what I wanted', text: '👎', onclick: () => askThumbs(m, false) }),
+      m.asking ? el('input', { class: 'ask-note', 'data-ask-note': '1', type: 'text',
+        placeholder: 'What did you want?', onkeydown: e => { if (e.key === 'Enter')
+          askThumbs(m, false, e.target.value); } }) : '',
+      m.thumbs === 'down' && !m.asking ? el('span', { class: 'small se', text: 'Thanks — noted.' })
+        : '') : '');
+}
+function askBody(r) {
+  if (r.kind === 'table') return [askTable(r.cols, r.rows, 'ask-' + (r.measure || 'score')),
+    (r.published || []).length ? [el('p', { class: 'small se', text: 'As published:' }),
+      askTable(r.cols, r.published, 'ask-pub')] : ''];
+  if (r.kind === 'chart') return askChart(r);
+  if (r.kind === 'list') return (r.items || []).length ? el('ul', { class: 'ask-list',
+    'data-ask-list': '1' }, r.items.map(x => el('li', {}, el('b', { text: x.name }),
+      ` · ${x.where === 'rented' ? 'rented box' : 'server'}` + (x.what ? ` · ${x.what}` : '')
+      + (x.progress ? ` · ${x.progress}` : '') + (x.eta ? ` · done about ${x.eta}` : '')))) : '';
+  if (r.kind === 'text') {
+    const t = r.text || (r.page ? askPageText(r.page) : '');
+    return t ? el('p', { class: 'small ask-text', 'data-ask-text': '1', text: t }) : '';
+  }
+  if (r.kind === 'clarify') return el('div', { class: 'ask-choices', 'data-ask-choices': '1' },
+    (r.choices || []).map(c => el('button', { class: 'chip-btn', 'data-ask-choice': c.value,
+      text: c.label, onclick: () => askSend(c.label) })));
+  return '';
+}
+// 27's cells, in 27's table
+function askTable(cols, rows, view) {
+  const S = mtS(view);
+  S.sort = null;
+  const L = (c, x) => x.pub ? mtLetter('card', x.pub) : null;
+  return el('div', { class: 'ask-table' }, modelTable({ view, free: true, hkey: view,
+    attrs: { 'data-ask-table': view }, sorted: true, hideEmpty: false,
+    cols: cols.map(c => ({ key: c.key, label: c.label, full: c.label, score: true })),
+    rows: rows.map(r => {
+      const m = DATA.models.find(x => x.id === r.id || x.id === r.id + ' · thinking');
+      const base = m ? mtRowOf(m) : null;
+      return { key: r.id, name: r.name, id: base ? base.id : null, nav: base ? base.nav : null,
+        href: base ? base.href : (String(r.id).startsWith('reported/') ? '#model='
+          + encodeURIComponent(r.id) : null), mark: r.published || cols.some(c => (r.cells[c.key]
+          || {}).pub) ? 'pub' : 'here', colour: base ? base.colour : null,
+        attrs: { 'data-ask-row': r.id },
+        cells: Object.fromEntries(cols.map(c => { const x = r.cells[c.key] || {};
+          const letter = L(c, x);
+          return [c.key, x.v == null && x.text === '–' ? { v: null, why: x.why || 'not in yet',
+            attrs: { 'data-ask-cell': `${r.id}|${c.key}` } } : { v: x.v, text: x.text,
+            noLead: true, pub: letter ? { letter, tip: `${MT_LETTERS[letter] || x.pub}`
+              + (x.tip ? `: ${x.tip}` : ''), url: x.url || '' } : null,
+            tip: x.tip ? [x.tip] : null, attrs: { 'data-ask-cell': `${r.id}|${c.key}` } }]; })) };
+    }) }));
+}
+// the reports' own charts, or Scores by benchmark's dots
+function askChart(r) {
+  const R = RPS();
+  if (r.chart === 'bars') {
+    const pts = r.points || [];
+    if (!pts.length) return '';
+    const dom = rpDomain(pts);
+    return el('div', { class: 'rp-dots ask-dots', 'data-ask-chart': 'bars' }, pts.flatMap(p => [
+      el('span', { class: 'nm' + (p.ours ? ' rp-ours' : ''), title: p.name, text: p.name }),
+      rpDotSvg(p.v, p.se, p.ours ? 'var(--accent)' : 'var(--muted)', dom),
+      el('span', { class: 'v', text: p.text + (p.published ? ' (published)' : '') })]));
+  }
+  const d0 = R.data[r.report];
+  if (!d0) { loadAskReport(r.report); return el('p', { class: 'small se', text: 'Drawing…' }); }
+  const d = r.report === 'step-checkpoints' ? rpBased(d0, r.report) : d0;
+  const b = (d.benchmarks || []).find(x => x.key === r.bench);
+  if (!b) return el('p', { class: 'small se', text: 'Nothing to draw yet.' });
+  if (r.chart === 'checkpoints') {
+    const T = d.training;
+    if (!T) return el('p', { class: 'small se', text: 'Fewer than two checkpoints scored yet.' });
+    const byL = Object.fromEntries(d.ours.map(m => [m.label, m]));
+    return el('div', { class: 'ask-chart', 'data-ask-chart': 'checkpoints' }, trPanel(d, T, b, byL));
+  }
+  if (r.chart === 'size') return el('div', { class: 'ask-chart', 'data-ask-chart': 'size' },
+    rpSizeChart(d, [b]) || el('p', { class: 'small se', text: 'No sizes known yet.' }));
+  if (r.chart === 'memory') {
+    const pts = d.rows.filter(x => x.memory && x.memory.gb && (x.cells[b.key] || {}).v != null)
+      .map(x => ({ r: x, x: x.memory.gb, c: x.cells[b.key] }));
+    return el('div', { class: 'ask-chart', 'data-ask-chart': 'memory' }, pts.length
+      ? odMemPanel(b, pts) : el('p', { class: 'small se', text: 'No model has both yet.' }));
+  }
+  return '';
+}
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k'
+      && ASK.on) {
+    e.preventDefault();
+    if (ASK.panel) askClose(); else askOpen();
+  } else if (e.key === 'Escape' && ASK.panel && ASK.panel.contains(document.activeElement)) {
+    askClose();
+  }
+});
 const ptN = (v, d = 1) => v == null ? '—' : Number(v).toFixed(d);
 const ptMB = v => v == null ? '—' : `${Math.round(v).toLocaleString('en')} MB`;
 const ptS = ms => ms == null ? '—' : `${(ms / 1000).toFixed(1)} s`;
@@ -32438,6 +32743,9 @@ function renderTabs() {
     const menu = document.getElementById('menuBtn');
     if (menu) popover(menu, () => el('div', { class: 'moremenu placemenu', id: 'pop-places',
         'aria-label': 'places' },
+      // 28: "Ask", for the names it was set up for
+      ASK.on ? el('button', { role: 'menuitem', 'data-place': 'ask', class: 'placeitem',
+        text: 'Ask', onclick: () => { popClose(); askOpen(); } }) : '',
       PLACES.flatMap(([id, label, views]) => [
         el('button', { role: 'menuitem', 'data-place': id, class: 'placeitem',
           'aria-current': placeOf(state.model || state.topic ? '' : state.tab) === id
@@ -32455,6 +32763,7 @@ function renderTabs() {
   placeInk();
   renderRuns();
   renderTestAct();
+  askCheck();                       // 28: "Ask", for the names it was set up for
 }
 
 function placeInk(still) {
@@ -32911,6 +33220,7 @@ TEMPLATE = """<!doctype html>
     <div class="bar-right" id="barRight">
       <div id="runs"></div>
       <div id="testAct"></div>
+      <div id="askAct"></div>
       <div id="warnings" class="bar-checks"></div>
       <div id="who"></div>
     </div>

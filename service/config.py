@@ -367,6 +367,13 @@ OPENROUTER_MAX_TOKENS = int(os.environ.get("OPENROUTER_MAX_TOKENS", "4096"))
 # nothing asks them. The default import: each maker's REPORTED_PER_MAKER most
 # recent models, and the open models already on the board
 AA_API_KEY = os.environ.get("ARTIFICIAL_ANALYSIS_API_KEY", "")
+# 28: the chat assistant (service/assistant.py) — only the names in
+# ASSISTANT_USERS (the board's "Who are you?" names, comma-separated) see it;
+# empty, it doesn't exist. ASSISTANT_PROVIDER: served:<a served model's id>
+# (the default, the Playground's Q4), llama:<a llama-server's /v1 URL>, or
+# openrouter:<model>, for comparison only
+ASSISTANT_USERS = os.environ.get("ASSISTANT_USERS", "").strip()
+ASSISTANT_PROVIDER = os.environ.get("ASSISTANT_PROVIDER", "").strip()
 AA_URL = os.environ.get("ARTIFICIAL_ANALYSIS_URL",
                         "https://artificialanalysis.ai/api/v2/data/llms/models")
 EPOCH_URL = os.environ.get("EPOCH_URL", "https://epoch.ai/data/benchmark_data.zip")

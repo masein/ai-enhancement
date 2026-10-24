@@ -1,0 +1,256 @@
+{"id": "b001", "scenario": "tab", "q": "frontier tab, ours only, sorted by HLE", "want": {"action": "open_page", "page": "models", "view": "frontier", "only": "ours", "sort": "hle"}}
+{"id": "b002", "scenario": "tab", "q": "show the Latest table with just IFEval and IFBench", "want": {"action": "open_page", "page": "models", "view": "latest", "benchmarks": ["ifeval", "ifbench"]}}
+{"id": "b003", "scenario": "tab", "q": "standard models tested in the last 7 days", "want": {"action": "open_page", "page": "models", "view": "standard", "when": "7d"}}
+{"id": "b004", "scenario": "tab", "q": "frontier, models tested between 14 and 22 October", "want": {"action": "open_page", "page": "models", "view": "frontier", "when": "range", "from": "2026-10-14", "to": "2026-10-22"}}
+{"id": "b005", "scenario": "tab", "q": "search the models for ornith", "want": {"action": "open_page", "page": "models", "q": "ornith"}}
+{"id": "b006", "scenario": "tab", "q": "open models only, thinking off", "want": {"action": "open_page", "page": "models", "only": "open", "thinking": "off"}}
+{"id": "b007", "scenario": "tab", "q": "mobile devicemark chart", "want": {"action": "open_page", "page": "models", "view": "mobile", "group": "devicemark", "show": "chart"}}
+{"id": "b008", "scenario": "tab", "q": "open the two-builds reader for GPQA, step8804 against Q4", "want": {"action": "open_page", "page": "report", "report": "paired", "a": "served/step8804-lda-2610", "b": "served/Qwen3.6-35B-A3B-Q4-lda-2610", "benchmarks": ["gpqa"]}}
+{"id": "b009", "scenario": "tab", "q": "show me what step8804 got wrong on GPQA that Q4 got right", "want": {"action": "open_page", "page": "report", "report": "paired", "a": "served/step8804-lda-2610", "b": "served/Qwen3.6-35B-A3B-Q4-lda-2610", "benchmarks": ["gpqa"], "side": "b_better"}}
+{"id": "b010", "scenario": "tab", "q": "hide the thinking-off rows", "want": {"action": "open_page", "page": "models", "thinking": "on"}}
+{"id": "b011", "scenario": "tab", "q": "only phone builds", "want": {"action": "open_page", "page": "models", "phone_builds": true}}
+{"id": "b012", "scenario": "tab", "q": "models tested since step8804 was added", "want": {"action": "open_page", "page": "models", "when": "since_model", "since": "served/step8804-lda-2610"}}
+{"id": "b013", "scenario": "tab", "q": "open the on-device report", "want": {"action": "open_page", "page": "report", "report": "on-device"}}
+{"id": "b014", "scenario": "tab", "q": "closed models on frontier", "want": {"action": "open_page", "page": "models", "view": "frontier", "only": "closed"}}
+{"id": "b015", "scenario": "tab", "q": "latest tab sorted by gpqa", "want": {"action": "open_page", "page": "models", "view": "latest", "sort": "gpqa"}}
+{"id": "b016", "scenario": "tab", "q": "standard tab, math group", "want": {"action": "open_page", "page": "models", "view": "standard", "group": "math"}}
+{"id": "b017", "scenario": "tab", "q": "frontier with GPQA, HLE and MMLU-Pro columns", "want": {"action": "open_page", "page": "models", "view": "frontier", "benchmarks": ["gpqa", "hle", "mmlupro"]}}
+{"id": "b018", "scenario": "tab", "q": "models added this month", "want": {"action": "open_page", "page": "models", "when": "month", "date": "added"}}
+{"id": "b019", "scenario": "tab", "q": "frontier, models tested today", "want": {"action": "open_page", "page": "models", "view": "frontier", "when": "today"}}
+{"id": "b020", "scenario": "tab", "q": "show both thinking rows on frontier", "want": {"action": "open_page", "page": "models", "view": "frontier", "thinking": "both"}}
+{"id": "b021", "scenario": "tab", "q": "models tested since the newest checkpoint came", "want": {"action": "open_page", "page": "models", "when": "since_checkpoint"}}
+{"id": "b022", "scenario": "tab", "q": "search for bonsai on the latest tab", "want": {"action": "open_page", "page": "models", "view": "latest", "q": "bonsai"}}
+{"id": "b023", "scenario": "tab", "q": "frontier sorted by IFBench, lowest first", "want": {"action": "open_page", "page": "models", "view": "frontier", "sort": "ifbench", "sort_dir": "asc"}}
+{"id": "b024", "scenario": "tab", "q": "step checkpoints report with the q4 baseline", "want": {"action": "open_page", "page": "report", "report": "step-checkpoints", "base": "served/Qwen3.6-35B-A3B-Q4-lda-2610"}}
+{"id": "b025", "scenario": "tab", "q": "step checkpoints, q2 as the baseline", "want": {"action": "open_page", "page": "report", "report": "step-checkpoints", "base": "served/Qwen3.6-35B-A3B-Q2-lda-2610"}}
+{"id": "b026", "scenario": "tab", "q": "open the testers' report", "want": {"action": "open_page", "page": "report", "report": "testers"}}
+{"id": "b027", "scenario": "tab", "q": "the ran-out report for step4000 on HLE", "want": {"action": "open_page", "page": "report", "report": "ran-out-of-room", "models": ["served/step4000-lda-2610"], "benchmarks": ["hle"]}}
+{"id": "b028", "scenario": "tab", "q": "show the everyday tab", "want": {"action": "open_page", "page": "models", "view": "everyday"}}
+{"id": "b029", "scenario": "tab", "q": "mobile tab, mobile-mmlu group", "want": {"action": "open_page", "page": "models", "view": "mobile", "group": "mmlu"}}
+{"id": "b030", "scenario": "tab", "q": "open the frontier chart", "want": {"action": "open_page", "page": "models", "view": "frontier", "show": "chart"}}
+{"id": "b031", "scenario": "tab", "q": "just step8804 and Q2 on the latest tab", "want": {"action": "open_page", "page": "models", "view": "latest", "models": ["served/step8804-lda-2610", "served/Qwen3.6-35B-A3B-Q2-lda-2610"]}}
+{"id": "b032", "scenario": "tab", "q": "models tested in the last 30 days, ours only", "want": {"action": "open_page", "page": "models", "when": "30d", "only": "ours"}}
+{"id": "b033", "scenario": "tab", "q": "open runs", "want": {"action": "open_page", "page": "runs"}}
+{"id": "b034", "scenario": "tab", "q": "open the benchmarks catalogue", "want": {"action": "open_page", "page": "benchmarks"}}
+{"id": "b035", "scenario": "tab", "q": "show me the GPQA questions", "want": {"action": "open_page", "page": "benchmarks", "benchmarks": ["gpqa"]}}
+{"id": "b036", "scenario": "tab", "q": "go to the playground", "want": {"action": "open_page", "page": "playground"}}
+{"id": "b037", "scenario": "tab", "q": "take me home", "want": {"action": "open_page", "page": "home"}}
+{"id": "b038", "scenario": "tab", "q": "open improve", "want": {"action": "open_page", "page": "improve"}}
+{"id": "b039", "scenario": "model", "q": "show me step8804", "want": {"action": "open_page", "page": "model", "models": ["served/step8804-lda-2610"]}}
+{"id": "b040", "scenario": "model", "q": "open Q2's page", "want": {"action": "open_page", "page": "model", "models": ["served/Qwen3.6-35B-A3B-Q2-lda-2610"]}}
+{"id": "b041", "scenario": "model", "q": "step4000's answers on GPQA", "want": {"action": "open_page", "page": "model", "models": ["served/step4000-lda-2610"], "benchmarks": ["gpqa"]}}
+{"id": "b042", "scenario": "model", "q": "the Edge0 35B page", "want": {"action": "open_page", "page": "model", "models": ["reported/edge0/edge0-35b-a3b-preview"]}}
+{"id": "b043", "scenario": "model", "q": "open bf16", "want": {"action": "open_page", "page": "model", "models": ["served/Qwen3.6-35B-A3B-BF16-lda-2610"]}}
+{"id": "b044", "scenario": "model", "q": "page for step1000", "want": {"action": "open_page", "page": "model", "models": ["served/step1000-lda-2610"]}}
+{"id": "b045", "scenario": "model", "q": "show the phone build's page", "want": {"action": "open_page", "page": "model", "models": ["served/Qwen3.6-35B-A3B-k4-LDA-phone-build"]}}
+{"id": "b046", "scenario": "model", "q": "nemotron bolt page", "want": {"action": "open_page", "page": "model", "models": ["reported/nvidia/nvidia-nemotron-3.5-bolt-e4b"]}}
+{"id": "b047", "scenario": "model", "q": "open Claude Opus 5.5", "want": {"action": "open_page", "page": "model", "models": ["reported/anthropic/claude-opus-5.5"]}}
+{"id": "b048", "scenario": "model", "q": "take me to gemma 4 e4b", "want": {"action": "open_page", "page": "model", "models": ["reported/google/gemma-4-e4b"]}}
+{"id": "b049", "scenario": "model", "q": "show ornith's page", "want": {"action": "open_page", "page": "model", "models": ["served/Ornith-1.5-35B-A3B-Q4_K_M"]}}
+{"id": "b050", "scenario": "model", "q": "step8804's answers on IFEval", "want": {"action": "open_page", "page": "model", "models": ["served/step8804-lda-2610"], "benchmarks": ["ifeval"]}}
+{"id": "b051", "scenario": "model", "q": "step8804's HLE answers beside Q4's", "want": {"action": "open_page", "page": "model", "models": ["served/step8804-lda-2610", "served/Qwen3.6-35B-A3B-Q4-lda-2610"], "benchmarks": ["hle"]}}
+{"id": "b052", "scenario": "model", "q": "open qwen3-1.7b", "want": {"action": "open_page", "page": "model", "models": ["Qwen/Qwen3-1.7B"]}}
+{"id": "b053", "scenario": "model", "q": "the page of the q4 earlier run", "want": {"action": "open_page", "page": "model", "models": ["served/Qwen3.6-35B-A3B-Q4-original-k-8"]}}
+{"id": "b054", "scenario": "model", "q": "open ternary bonsai 2 9b", "want": {"action": "open_page", "page": "model", "models": ["reported/prismml/ternary-bonsai-2-9b"]}}
+{"id": "b055", "scenario": "model", "q": "show GPT-6 Astra", "want": {"action": "open_page", "page": "model", "models": ["reported/openai/gpt-6-astra"]}}
+{"id": "b056", "scenario": "model", "q": "edge0 8b page please", "want": {"action": "open_page", "page": "model", "models": ["reported/edge0/edge0-8b-a1b-preview"]}}
+{"id": "b057", "scenario": "model", "q": "pythia 410m", "want": {"action": "open_page", "page": "model", "models": ["EleutherAI/pythia-410m"]}}
+{"id": "b058", "scenario": "model", "q": "open the gemma 3 270m it model", "want": {"action": "open_page", "page": "model", "models": ["google/gemma-3-270m-it"]}}
+{"id": "b059", "scenario": "compare", "q": "step8804 vs step4000 on GPQA and MMLU-Pro", "want": {"action": "compare", "models": ["served/step8804-lda-2610", "served/step4000-lda-2610"], "benchmarks": ["gpqa", "mmlupro"]}}
+{"id": "b060", "scenario": "compare", "q": "compare step8804 with Q4", "want": {"action": "compare", "models": ["served/step8804-lda-2610", "served/Qwen3.6-35B-A3B-Q4-lda-2610"]}}
+{"id": "b061", "scenario": "compare", "q": "how does Bolt do against Gemma 4 E4B on IFBench", "want": {"action": "compare", "models": ["reported/nvidia/nvidia-nemotron-3.5-bolt-e4b", "reported/google/gemma-4-e4b"], "benchmarks": ["ifbench"]}}
+{"id": "b062", "scenario": "compare", "q": "step8804 against Q2 and Q4 on HLE", "want": {"action": "compare", "models": ["served/step8804-lda-2610", "served/Qwen3.6-35B-A3B-Q2-lda-2610", "served/Qwen3.6-35B-A3B-Q4-lda-2610"], "benchmarks": ["hle"]}}
+{"id": "b063", "scenario": "compare", "q": "step1000, step4000 and step8804 on OTIS", "want": {"action": "compare", "models": ["served/step1000-lda-2610", "served/step4000-lda-2610", "served/step8804-lda-2610"], "benchmarks": ["otis"]}}
+{"id": "b064", "scenario": "compare", "q": "Q2 vs BF16 on GPQA, MMLU-Pro and HLE", "want": {"action": "compare", "models": ["served/Qwen3.6-35B-A3B-Q2-lda-2610", "served/Qwen3.6-35B-A3B-BF16-lda-2610"], "benchmarks": ["gpqa", "mmlupro", "hle"]}}
+{"id": "b065", "scenario": "compare", "q": "edge0 35b vs step8804 on gpqa", "want": {"action": "compare", "models": ["reported/edge0/edge0-35b-a3b-preview", "served/step8804-lda-2610"], "benchmarks": ["gpqa"]}}
+{"id": "b066", "scenario": "compare", "q": "compare the three bonsai 2 models on IFEval", "want": {"action": "compare", "models": ["reported/prismml/ternary-bonsai-2-9b", "reported/prismml/ternary-bonsai-2-4b", "reported/prismml/ternary-bonsai-2-2b"], "benchmarks": ["ifeval"]}}
+{"id": "b067", "scenario": "compare", "q": "step4000 and Q4 on simpleqa and arc-agi-2", "want": {"action": "compare", "models": ["served/step4000-lda-2610", "served/Qwen3.6-35B-A3B-Q4-lda-2610"], "benchmarks": ["simpleqa", "arc"]}}
+{"id": "b068", "scenario": "compare", "q": "gpt-6 astra against claude opus 5.5 on hle and gpqa", "want": {"action": "compare", "models": ["reported/openai/gpt-6-astra", "reported/anthropic/claude-opus-5.5"], "benchmarks": ["hle", "gpqa"]}}
+{"id": "b069", "scenario": "compare", "q": "step8804 with thinking off vs step4000 on ifeval", "want": {"action": "compare", "models": ["served/step8804-lda-2610", "served/step4000-lda-2610"], "benchmarks": ["ifeval"], "thinking": "off"}}
+{"id": "b070", "scenario": "compare", "q": "compare what Q2 and step4000 keep of BF16 on GPQA", "want": {"action": "compare", "models": ["served/Qwen3.6-35B-A3B-Q2-lda-2610", "served/step4000-lda-2610"], "benchmarks": ["gpqa"], "measure": "keeps"}}
+{"id": "b071", "scenario": "compare", "q": "how often do step1000 and step4000 run out of room on HLE", "want": {"action": "compare", "models": ["served/step1000-lda-2610", "served/step4000-lda-2610"], "benchmarks": ["hle"], "measure": "ran_out"}}
+{"id": "b072", "scenario": "compare", "q": "loops: step4000 vs Q4 on MMLU-Pro", "want": {"action": "compare", "models": ["served/step4000-lda-2610", "served/Qwen3.6-35B-A3B-Q4-lda-2610"], "benchmarks": ["mmlupro"], "measure": "loops"}}
+{"id": "b073", "scenario": "compare", "q": "qwen3-1.7b vs gemma-3-270m-it on hellaswag and mmlu", "want": {"action": "compare", "models": ["Qwen/Qwen3-1.7B", "google/gemma-3-270m-it"], "benchmarks": ["hellaswag", "mmlu"]}}
+{"id": "b074", "scenario": "compare", "q": "ornith against step8804 on math level 5", "want": {"action": "compare", "models": ["served/Ornith-1.5-35B-A3B-Q4_K_M", "served/step8804-lda-2610"], "benchmarks": ["math"]}}
+{"id": "b075", "scenario": "compare", "q": "deepseek v4 pro vs gemini 3.8 flash on gpqa", "want": {"action": "compare", "models": ["reported/deepseek/deepseek-v4-pro-max", "reported/google/gemini-3.8-flash"], "benchmarks": ["gpqa"]}}
+{"id": "b076", "scenario": "compare", "q": "bolt, gemma e4b and gemma e2b on ifbench", "want": {"action": "compare", "models": ["reported/nvidia/nvidia-nemotron-3.5-bolt-e4b", "reported/google/gemma-4-e4b", "reported/google/gemma-4-e2b"], "benchmarks": ["ifbench"]}}
+{"id": "b077", "scenario": "best", "q": "who's best on IFEval among phone-sized models?", "want": {"action": "best_on", "benchmarks": ["ifeval"], "among": "phone"}}
+{"id": "b078", "scenario": "best", "q": "which of ours is best on GPQA?", "want": {"action": "best_on", "benchmarks": ["gpqa"], "among": "ours"}}
+{"id": "b079", "scenario": "best", "q": "best open model on HLE", "want": {"action": "best_on", "benchmarks": ["hle"], "among": "open"}}
+{"id": "b080", "scenario": "best", "q": "top 5 on MMLU-Pro", "want": {"action": "best_on", "benchmarks": ["mmlupro"], "n": 5}}
+{"id": "b081", "scenario": "best", "q": "what's the best closed model on gpqa", "want": {"action": "best_on", "benchmarks": ["gpqa"], "among": "closed"}}
+{"id": "b082", "scenario": "best", "q": "best on IFBench among phone models, top 5", "want": {"action": "best_on", "benchmarks": ["ifbench"], "among": "phone", "n": 5}}
+{"id": "b083", "scenario": "best", "q": "which checkpoint of ours does best on OTIS", "want": {"action": "best_on", "benchmarks": ["otis"], "among": "ours"}}
+{"id": "b084", "scenario": "best", "q": "highest simpleqa score", "want": {"action": "best_on", "benchmarks": ["simpleqa"]}}
+{"id": "b085", "scenario": "best", "q": "best on arc-agi-2", "want": {"action": "best_on", "benchmarks": ["arc"]}}
+{"id": "b086", "scenario": "best", "q": "top 10 on hellaswag", "want": {"action": "best_on", "benchmarks": ["hellaswag"], "n": 10}}
+{"id": "b087", "scenario": "best", "q": "best of ours on ifbench", "want": {"action": "best_on", "benchmarks": ["ifbench"], "among": "ours"}}
+{"id": "b088", "scenario": "best", "q": "who leads on math level 5", "want": {"action": "best_on", "benchmarks": ["math"]}}
+{"id": "b089", "scenario": "best", "q": "best open model on mmlu-pro, top 3", "want": {"action": "best_on", "benchmarks": ["mmlupro"], "among": "open"}}
+{"id": "b090", "scenario": "best", "q": "best phone model on gpqa", "want": {"action": "best_on", "benchmarks": ["gpqa"], "among": "phone"}}
+{"id": "b091", "scenario": "best", "q": "best on gsm8k", "want": {"action": "best_on", "benchmarks": ["gsm8k"]}}
+{"id": "b092", "scenario": "best", "q": "which closed model is best on hle", "want": {"action": "best_on", "benchmarks": ["hle"], "among": "closed"}}
+{"id": "b093", "scenario": "number", "q": "what's Q4's GPQA?", "want": {"action": "compare", "models": ["served/Qwen3.6-35B-A3B-Q4-lda-2610"], "benchmarks": ["gpqa"]}}
+{"id": "b094", "scenario": "number", "q": "step8804 IFBench score", "want": {"action": "compare", "models": ["served/step8804-lda-2610"], "benchmarks": ["ifbench"]}}
+{"id": "b095", "scenario": "number", "q": "how much of BF16 does Q2 keep on MMLU-Pro?", "want": {"action": "compare", "models": ["served/Qwen3.6-35B-A3B-Q2-lda-2610"], "benchmarks": ["mmlupro"], "measure": "keeps"}}
+{"id": "b096", "scenario": "number", "q": "how many HLE answers did step1000 run out of room on?", "want": {"action": "compare", "models": ["served/step1000-lda-2610"], "benchmarks": ["hle"], "measure": "ran_out"}}
+{"id": "b097", "scenario": "number", "q": "what did step4000 get on HLE", "want": {"action": "compare", "models": ["served/step4000-lda-2610"], "benchmarks": ["hle"]}}
+{"id": "b098", "scenario": "number", "q": "bf16's mmlu-pro", "want": {"action": "compare", "models": ["served/Qwen3.6-35B-A3B-BF16-lda-2610"], "benchmarks": ["mmlupro"]}}
+{"id": "b099", "scenario": "number", "q": "q2 otis score", "want": {"action": "compare", "models": ["served/Qwen3.6-35B-A3B-Q2-lda-2610"], "benchmarks": ["otis"]}}
+{"id": "b100", "scenario": "number", "q": "how does edge0 35b score on mmlu-pro", "want": {"action": "compare", "models": ["reported/edge0/edge0-35b-a3b-preview"], "benchmarks": ["mmlupro"]}}
+{"id": "b101", "scenario": "number", "q": "what percent of its base does bolt keep on ifbench", "want": {"action": "compare", "models": ["reported/nvidia/nvidia-nemotron-3.5-bolt-e4b"], "benchmarks": ["ifbench"], "measure": "keeps"}}
+{"id": "b102", "scenario": "number", "q": "step4000's loop share on mmlu-pro", "want": {"action": "compare", "models": ["served/step4000-lda-2610"], "benchmarks": ["mmlupro"], "measure": "loops"}}
+{"id": "b103", "scenario": "number", "q": "gemma 4 e4b ifeval", "want": {"action": "compare", "models": ["reported/google/gemma-4-e4b"], "benchmarks": ["ifeval"]}}
+{"id": "b104", "scenario": "number", "q": "claude opus 5.5 on gpqa", "want": {"action": "compare", "models": ["reported/anthropic/claude-opus-5.5"], "benchmarks": ["gpqa"]}}
+{"id": "b105", "scenario": "number", "q": "step8804's gpqa with thinking off", "want": {"action": "compare", "models": ["served/step8804-lda-2610"], "benchmarks": ["gpqa"], "thinking": "off"}}
+{"id": "b106", "scenario": "number", "q": "how often does step4000 run out of room on mmlu-pro", "want": {"action": "compare", "models": ["served/step4000-lda-2610"], "benchmarks": ["mmlupro"], "measure": "ran_out"}}
+{"id": "b107", "scenario": "number", "q": "qwen3-1.7b on mmlu", "want": {"action": "compare", "models": ["Qwen/Qwen3-1.7B"], "benchmarks": ["mmlu"]}}
+{"id": "b108", "scenario": "number", "q": "what does step8804 keep of the base on gpqa", "want": {"action": "compare", "models": ["served/step8804-lda-2610"], "benchmarks": ["gpqa"], "measure": "keeps"}}
+{"id": "b109", "scenario": "chart", "q": "chart GPQA across the checkpoints", "want": {"action": "chart", "chart": "checkpoints", "benchmarks": ["gpqa"]}}
+{"id": "b110", "scenario": "chart", "q": "bar chart of ours on HLE", "want": {"action": "chart", "chart": "bars", "benchmarks": ["hle"], "only": "ours"}}
+{"id": "b111", "scenario": "chart", "q": "IFBench against memory for the phone models", "want": {"action": "chart", "chart": "memory", "benchmarks": ["ifbench"]}}
+{"id": "b112", "scenario": "chart", "q": "plot MMLU-Pro by file size", "want": {"action": "chart", "chart": "size", "benchmarks": ["mmlupro"]}}
+{"id": "b113", "scenario": "chart", "q": "line of HLE over training", "want": {"action": "chart", "chart": "checkpoints", "benchmarks": ["hle"]}}
+{"id": "b114", "scenario": "chart", "q": "chart gpqa for every model", "want": {"action": "chart", "chart": "bars", "benchmarks": ["gpqa"]}}
+{"id": "b115", "scenario": "chart", "q": "show OTIS across the training steps", "want": {"action": "chart", "chart": "checkpoints", "benchmarks": ["otis"]}}
+{"id": "b116", "scenario": "chart", "q": "plot gpqa against memory", "want": {"action": "chart", "chart": "memory", "benchmarks": ["gpqa"]}}
+{"id": "b117", "scenario": "chart", "q": "bars of open models on mmlu-pro", "want": {"action": "chart", "chart": "bars", "benchmarks": ["mmlupro"], "only": "open"}}
+{"id": "b118", "scenario": "chart", "q": "graph ifeval by checkpoint", "want": {"action": "chart", "chart": "checkpoints", "benchmarks": ["ifeval"]}}
+{"id": "b119", "scenario": "chart", "q": "score vs file size on gpqa", "want": {"action": "chart", "chart": "size", "benchmarks": ["gpqa"]}}
+{"id": "b120", "scenario": "chart", "q": "chart step8804, step4000 and q4 on gpqa", "want": {"action": "chart", "chart": "bars", "benchmarks": ["gpqa"], "models": ["served/step8804-lda-2610", "served/step4000-lda-2610", "served/Qwen3.6-35B-A3B-Q4-lda-2610"]}}
+{"id": "b121", "scenario": "chart", "q": "closed models on hle as a chart", "want": {"action": "chart", "chart": "bars", "benchmarks": ["hle"], "only": "closed"}}
+{"id": "b122", "scenario": "chart", "q": "math level 5 across training", "want": {"action": "chart", "chart": "checkpoints", "benchmarks": ["math"]}}
+{"id": "b123", "scenario": "chart", "q": "plot mmlu-pro against memory needed", "want": {"action": "chart", "chart": "memory", "benchmarks": ["mmlupro"]}}
+{"id": "b124", "scenario": "chart", "q": "draw ifbench by file size", "want": {"action": "chart", "chart": "size", "benchmarks": ["ifbench"]}}
+{"id": "b125", "scenario": "phones", "q": "how fast is step8804 on the oneplus?", "want": {"action": "phone", "app": "step8804", "phone": "oneplus"}}
+{"id": "b126", "scenario": "phones", "q": "engine memory of step4000-denseq8 on the OnePlus 15", "want": {"action": "phone", "app": "step4000-denseq8", "phone": "OnePlus 15", "measure": "memory"}}
+{"id": "b127", "scenario": "phones", "q": "open the latest test on the OnePlus 15", "want": {"action": "open_page", "page": "report", "report": "testers", "phone": "OnePlus 15"}}
+{"id": "b128", "scenario": "phones", "q": "which phone runs step4000-denseq8 fastest?", "want": {"action": "phone", "app": "step4000-denseq8"}}
+{"id": "b129", "scenario": "phones", "q": "step8804 decode speed on phones", "want": {"action": "phone", "app": "step8804"}}
+{"id": "b130", "scenario": "phones", "q": "how hot does the galaxy get with step4000-denseq8", "want": {"action": "phone", "app": "step4000-denseq8", "phone": "galaxy", "measure": "temperature"}}
+{"id": "b131", "scenario": "phones", "q": "everything our testers measured for step8804", "want": {"action": "phone", "app": "step8804", "measure": "all"}}
+{"id": "b132", "scenario": "phones", "q": "time to first token of step8804 on the OnePlus 15", "want": {"action": "phone", "app": "step8804", "phone": "OnePlus 15", "measure": "ttft"}}
+{"id": "b133", "scenario": "phones", "q": "prefill speed of the phone build", "want": {"action": "phone", "app": "Qwen3.6-35B-A3B k4-LDA, UD-Q4_K_XL", "measure": "prefill"}}
+{"id": "b134", "scenario": "phones", "q": "what did the testers measure on the galaxy s25 ultra", "want": {"action": "phone", "phone": "galaxy s25 ultra", "measure": "all"}}
+{"id": "b135", "scenario": "phones", "q": "memory step8804 uses on the oneplus 15", "want": {"action": "phone", "app": "step8804", "phone": "OnePlus 15", "measure": "memory"}}
+{"id": "b136", "scenario": "phones", "q": "open the newest test of step4000-denseq8 on the galaxy", "want": {"action": "open_page", "page": "report", "report": "testers", "app": "step4000-denseq8", "phone": "galaxy"}}
+{"id": "b137", "scenario": "phones", "q": "decode speed on every phone", "want": {"action": "phone"}}
+{"id": "b138", "scenario": "phones", "q": "how fast is the phone build on the oneplus 15", "want": {"action": "phone", "app": "Qwen3.6-35B-A3B k4-LDA, UD-Q4_K_XL", "phone": "OnePlus 15"}}
+{"id": "b139", "scenario": "phones", "q": "step4000-denseq8 tok/s on the oneplus", "want": {"action": "phone", "app": "step4000-denseq8", "phone": "oneplus"}}
+{"id": "b140", "scenario": "phones", "q": "open the latest step8804 test", "want": {"action": "open_page", "page": "report", "report": "testers", "app": "step8804"}}
+{"id": "b141", "scenario": "boxes", "q": "what's running?", "want": {"action": "boxes"}}
+{"id": "b142", "scenario": "boxes", "q": "when does the step4000 box finish?", "want": {"action": "boxes", "which": "rented", "models": ["served/step4000-lda-2610"]}}
+{"id": "b143", "scenario": "boxes", "q": "is anything running on the server?", "want": {"action": "boxes", "which": "server"}}
+{"id": "b144", "scenario": "boxes", "q": "open Runs", "want": {"action": "open_page", "page": "runs"}}
+{"id": "b145", "scenario": "boxes", "q": "what are the rented boxes doing", "want": {"action": "boxes", "which": "rented"}}
+{"id": "b146", "scenario": "boxes", "q": "is step8804 running anywhere", "want": {"action": "boxes", "models": ["served/step8804-lda-2610"]}}
+{"id": "b147", "scenario": "boxes", "q": "any runs going right now?", "want": {"action": "boxes"}}
+{"id": "b148", "scenario": "boxes", "q": "how far along is the step4000 run", "want": {"action": "boxes", "models": ["served/step4000-lda-2610"]}}
+{"id": "b149", "scenario": "boxes", "q": "what's on the gpu box at the moment", "want": {"action": "boxes", "which": "rented"}}
+{"id": "b150", "scenario": "boxes", "q": "what is the server running", "want": {"action": "boxes", "which": "server"}}
+{"id": "b151", "scenario": "boxes", "q": "show me the runs page", "want": {"action": "open_page", "page": "runs"}}
+{"id": "b152", "scenario": "boxes", "q": "is the q4 box still going", "want": {"action": "boxes", "which": "rented", "models": ["served/Qwen3.6-35B-A3B-Q4-lda-2610"]}}
+{"id": "b153", "scenario": "boxes", "q": "status of runs", "want": {"action": "boxes"}}
+{"id": "b154", "scenario": "boxes", "q": "when will the rented runs finish", "want": {"action": "boxes", "which": "rented"}}
+{"id": "b155", "scenario": "boxes", "q": "anything queued or running for step1000", "want": {"action": "boxes", "models": ["served/step1000-lda-2610"]}}
+{"id": "b156", "scenario": "explain", "q": "what does ± mean?", "want": {"action": "explain", "topic": "se"}}
+{"id": "b157", "scenario": "explain", "q": "what is IFBench?", "want": {"action": "explain", "topic": "bench:ifbench"}}
+{"id": "b158", "scenario": "explain", "q": "what does \"near the ceiling\" mean?", "want": {"action": "explain", "topic": "ceiling"}}
+{"id": "b159", "scenario": "explain", "q": "what's the stand-in base on the on-device report?", "want": {"action": "explain", "topic": "stand_in"}}
+{"id": "b160", "scenario": "explain", "q": "what is gpqa diamond", "want": {"action": "explain", "topic": "bench:gpqa"}}
+{"id": "b161", "scenario": "explain", "q": "explain 'ended in a loop'", "want": {"action": "explain", "topic": "loops"}}
+{"id": "b162", "scenario": "explain", "q": "what does ran out of room mean", "want": {"action": "explain", "topic": "ran_out"}}
+{"id": "b163", "scenario": "explain", "q": "what's calibration error", "want": {"action": "explain", "topic": "calibration"}}
+{"id": "b164", "scenario": "explain", "q": "what does 'had it, then lost it' mean", "want": {"action": "explain", "topic": "lost"}}
+{"id": "b165", "scenario": "explain", "q": "what is the checking share", "want": {"action": "explain", "topic": "checking"}}
+{"id": "b166", "scenario": "explain", "q": "what's the baseline switch", "want": {"action": "explain", "topic": "baseline"}}
+{"id": "b167", "scenario": "explain", "q": "what does level mean in the head to head", "want": {"action": "explain", "topic": "level"}}
+{"id": "b168", "scenario": "explain", "q": "what is HLE", "want": {"action": "explain", "topic": "bench:hle"}}
+{"id": "b169", "scenario": "explain", "q": "explain what each keeps of its base", "want": {"action": "explain", "topic": "keeps"}}
+{"id": "b170", "scenario": "explain", "q": "what's churn in the two-builds report", "want": {"action": "explain", "topic": "churn"}}
+{"id": "b171", "scenario": "explain", "q": "what is SimpleQA's F", "want": {"action": "explain", "topic": "simpleqa_f"}}
+{"id": "b172", "scenario": "explain", "q": "what does second thoughts count", "want": {"action": "explain", "topic": "second_thoughts"}}
+{"id": "b173", "scenario": "explain", "q": "what is mmlu-pro", "want": {"action": "explain", "topic": "bench:mmlupro"}}
+{"id": "b174", "scenario": "explain", "q": "why are published numbers in italics", "want": {"action": "explain", "topic": "published"}}
+{"id": "b175", "scenario": "explain", "q": "what is hellaswag", "want": {"action": "explain", "topic": "bench:hellaswag"}}
+{"id": "b176", "scenario": "ambiguous", "q": "show me the qwen one", "want": {"action": "clarify", "about": "model"}}
+{"id": "b177", "scenario": "ambiguous", "q": "open the report", "want": {"action": "clarify", "about": "report"}}
+{"id": "b178", "scenario": "ambiguous", "q": "compare the two on GPQA", "want": {"action": "clarify", "about": "model"}}
+{"id": "b179", "scenario": "ambiguous", "q": "what's the score?", "want": {"action": "clarify", "about": "model"}}
+{"id": "b180", "scenario": "ambiguous", "q": "open the gemma page", "want": {"action": "clarify", "about": "model"}}
+{"id": "b181", "scenario": "ambiguous", "q": "how is the bonsai doing", "want": {"action": "clarify", "about": "model"}}
+{"id": "b182", "scenario": "ambiguous", "q": "how fast is it on the phone", "want": {"action": "clarify", "about": "model"}}
+{"id": "b183", "scenario": "ambiguous", "q": "open the edge0 model", "want": {"action": "clarify", "about": "model"}}
+{"id": "b184", "scenario": "ambiguous", "q": "show the claude one", "want": {"action": "clarify", "about": "model"}}
+{"id": "b185", "scenario": "ambiguous", "q": "compare step8804 with the other one", "want": {"action": "clarify", "about": "model"}}
+{"id": "b186", "scenario": "ambiguous", "q": "what's its gpqa", "want": {"action": "clarify", "about": "model"}}
+{"id": "b187", "scenario": "ambiguous", "q": "open the q4", "want": {"action": "clarify", "about": "model"}}
+{"id": "b188", "scenario": "ambiguous", "q": "show me the gpt model", "want": {"action": "clarify", "about": "model"}}
+{"id": "b189", "scenario": "ambiguous", "q": "which benchmark is the hard one", "want": {"action": "clarify", "about": "benchmark"}}
+{"id": "b190", "scenario": "ambiguous", "q": "open that report about phones", "want": {"action": "clarify", "about": "report"}}
+{"id": "b191", "scenario": "ambiguous", "q": "chart the arc one", "want": {"action": "clarify", "about": "benchmark"}}
+{"id": "b192", "scenario": "refused", "q": "start a run on step8804", "want": {"action": "cant", "kind": "start_run"}}
+{"id": "b193", "scenario": "refused", "q": "delete step1000", "want": {"action": "cant", "kind": "delete"}}
+{"id": "b194", "scenario": "refused", "q": "what's the weather", "want": {"action": "cant", "kind": "outside"}}
+{"id": "b195", "scenario": "refused", "q": "set the judge to GPT-5", "want": {"action": "cant", "kind": "settings"}}
+{"id": "b196", "scenario": "refused", "q": "queue Q2 on MMLU-Pro", "want": {"action": "cant", "kind": "start_run"}}
+{"id": "b197", "scenario": "refused", "q": "stop the step4000 run", "want": {"action": "cant", "kind": "stop_run"}}
+{"id": "b198", "scenario": "refused", "q": "rent a box for step8804", "want": {"action": "cant", "kind": "spend"}}
+{"id": "b199", "scenario": "refused", "q": "regrade step4000's HLE answers", "want": {"action": "cant", "kind": "grade"}}
+{"id": "b200", "scenario": "refused", "q": "upload my new checkpoint", "want": {"action": "cant", "kind": "upload"}}
+{"id": "b201", "scenario": "refused", "q": "change the openrouter key", "want": {"action": "cant", "kind": "settings"}}
+{"id": "b202", "scenario": "refused", "q": "remove the bonsai model", "want": {"action": "cant", "kind": "delete"}}
+{"id": "b203", "scenario": "refused", "q": "write a haiku about llamas", "want": {"action": "cant", "kind": "outside"}}
+{"id": "b204", "scenario": "refused", "q": "cancel all runs", "want": {"action": "cant", "kind": "stop_run"}}
+{"id": "b205", "scenario": "refused", "q": "who won the football yesterday", "want": {"action": "cant", "kind": "outside"}}
+{"id": "b206", "scenario": "refused", "q": "buy more gpu credits", "want": {"action": "cant", "kind": "spend"}}
+{"id": "b207", "scenario": "refused", "q": "test step8804 on gpqa again", "want": {"action": "cant", "kind": "start_run"}}
+{"id": "b208", "scenario": "messy", "q": "stp8804 vs q4 gpqa", "want": {"action": "compare", "models": ["served/step8804-lda-2610", "served/Qwen3.6-35B-A3B-Q4-lda-2610"], "benchmarks": ["gpqa"]}}
+{"id": "b209", "scenario": "messy", "q": "and on HLE?", "want": {"action": "compare", "models": ["served/step8804-lda-2610", "served/step4000-lda-2610"], "benchmarks": ["hle"]}, "prev": {"q": "step8804 vs step4000 on GPQA and MMLU-Pro", "action": {"action": "compare", "models": ["served/step8804-lda-2610", "served/step4000-lda-2610"], "benchmarks": ["gpqa", "mmlupro"]}}}
+{"id": "b210", "scenario": "messy", "q": "steps checkpoints report with the q4 baseline", "want": {"action": "open_page", "page": "report", "report": "step-checkpoints", "base": "served/Qwen3.6-35B-A3B-Q4-lda-2610"}}
+{"id": "b211", "scenario": "messy", "q": "FRONTIER TAB OURS ONLY", "want": {"action": "open_page", "page": "models", "view": "frontier", "only": "ours"}}
+{"id": "b212", "scenario": "messy", "q": "q2 gpqa?", "want": {"action": "compare", "models": ["served/Qwen3.6-35B-A3B-Q2-lda-2610"], "benchmarks": ["gpqa"]}}
+{"id": "b213", "scenario": "messy", "q": "and q4?", "want": {"action": "compare", "models": ["served/Qwen3.6-35B-A3B-Q4-lda-2610"], "benchmarks": ["gpqa"]}, "prev": {"q": "q2 gpqa?", "action": {"action": "compare", "models": ["served/Qwen3.6-35B-A3B-Q2-lda-2610"], "benchmarks": ["gpqa"]}}}
+{"id": "b214", "scenario": "messy", "q": "same for step1000", "want": {"action": "compare", "models": ["served/step1000-lda-2610"], "benchmarks": ["hle"]}, "prev": {"q": "what did step4000 get on HLE", "action": {"action": "compare", "models": ["served/step4000-lda-2610"], "benchmarks": ["hle"]}}}
+{"id": "b215", "scenario": "messy", "q": "and as a chart", "want": {"action": "chart", "chart": "bars", "benchmarks": ["gpqa"]}, "prev": {"q": "best on gpqa", "action": {"action": "best_on", "benchmarks": ["gpqa"]}}}
+{"id": "b216", "scenario": "messy", "q": "wats best on ifevl", "want": {"action": "best_on", "benchmarks": ["ifeval"]}}
+{"id": "b217", "scenario": "messy", "q": "8804 page", "want": {"action": "open_page", "page": "model", "models": ["served/step8804-lda-2610"]}}
+{"id": "b218", "scenario": "messy", "q": "show 8804 and 4000 on mmlu pro, and also what is ifbench", "want": {"action": "compare", "models": ["served/step8804-lda-2610", "served/step4000-lda-2610"], "benchmarks": ["mmlupro"]}}
+{"id": "b219", "scenario": "messy", "q": "latest tab pls", "want": {"action": "open_page", "page": "models", "view": "latest"}}
+{"id": "b220", "scenario": "messy", "q": "hw fast step8804 oneplus", "want": {"action": "phone", "app": "step8804", "phone": "oneplus"}}
+{"id": "b221", "scenario": "messy", "q": "only ours", "want": {"action": "open_page", "page": "models", "only": "ours"}, "prev": {"q": "frontier tab", "action": {"action": "open_page", "page": "models", "view": "frontier"}}}
+{"id": "b222", "scenario": "messy", "q": "and sort it by gpqa", "want": {"action": "open_page", "page": "models", "view": "frontier", "only": "ours", "sort": "gpqa"}, "prev": {"q": "frontier ours only", "action": {"action": "open_page", "page": "models", "view": "frontier", "only": "ours"}}}
+{"id": "b223", "scenario": "messy", "q": "gemma e4b vs bolt ifbench", "want": {"action": "compare", "models": ["reported/google/gemma-4-e4b", "reported/nvidia/nvidia-nemotron-3.5-bolt-e4b"], "benchmarks": ["ifbench"]}}
+{"id": "b224", "scenario": "messy", "q": "opn the paired report", "want": {"action": "open_page", "page": "report", "report": "paired"}}
+{"id": "b225", "scenario": "messy", "q": "whats running", "want": {"action": "boxes"}}
+{"id": "b226", "scenario": "messy", "q": "compre step 4000 and step 1000 on gpqa", "want": {"action": "compare", "models": ["served/step4000-lda-2610", "served/step1000-lda-2610"], "benchmarks": ["gpqa"]}}
+{"id": "b227", "scenario": "messy", "q": "frontier sorted by hle and only closed ones", "want": {"action": "open_page", "page": "models", "view": "frontier", "only": "closed", "sort": "hle"}}
+{"id": "b228", "scenario": "messy", "q": "and with thinking off", "want": {"action": "compare", "models": ["served/step8804-lda-2610"], "benchmarks": ["ifeval"], "thinking": "off"}, "prev": {"q": "step8804 ifeval", "action": {"action": "compare", "models": ["served/step8804-lda-2610"], "benchmarks": ["ifeval"]}}}
+{"id": "b229", "scenario": "messy", "q": "and q2?", "want": {"action": "open_page", "page": "report", "report": "step-checkpoints", "base": "served/Qwen3.6-35B-A3B-Q2-lda-2610"}, "prev": {"q": "step checkpoints with the q4 baseline", "action": {"action": "open_page", "page": "report", "report": "step-checkpoints", "base": "served/Qwen3.6-35B-A3B-Q4-lda-2610"}}}
+{"id": "b230", "scenario": "messy", "q": "now the same on mmlu-pro", "want": {"action": "chart", "chart": "checkpoints", "benchmarks": ["mmlupro"]}, "prev": {"q": "chart gpqa across the checkpoints", "action": {"action": "chart", "chart": "checkpoints", "benchmarks": ["gpqa"]}}}
+{"id": "b231", "scenario": "messy", "q": "and for the galaxy?", "want": {"action": "phone", "app": "step8804", "phone": "galaxy"}, "prev": {"q": "how fast is step8804 on the oneplus", "action": {"action": "phone", "app": "step8804", "phone": "oneplus"}}}
+{"id": "b232", "scenario": "messy", "q": "Q4 GPQA pls", "want": {"action": "compare", "models": ["served/Qwen3.6-35B-A3B-Q4-lda-2610"], "benchmarks": ["gpqa"]}}
+{"id": "b233", "scenario": "messy", "q": "whos best ifbench ours", "want": {"action": "best_on", "benchmarks": ["ifbench"], "among": "ours"}}
+{"id": "b234", "scenario": "messy", "q": "explain hle and also open the frontier tab", "want": {"action": "explain", "topic": "bench:hle"}}
+{"id": "b235", "scenario": "messy", "q": "opne bf16 page", "want": {"action": "open_page", "page": "model", "models": ["served/Qwen3.6-35B-A3B-BF16-lda-2610"]}}
+{"id": "b236", "scenario": "messy", "q": "latest tab, only ifeval column", "want": {"action": "open_page", "page": "models", "view": "latest", "benchmarks": ["ifeval"]}}
+{"id": "b237", "scenario": "messy", "q": "and top 5?", "want": {"action": "best_on", "benchmarks": ["gpqa"], "among": "ours", "n": 5}, "prev": {"q": "which of ours is best on GPQA?", "action": {"action": "best_on", "benchmarks": ["gpqa"], "among": "ours"}}}
+{"id": "b238", "scenario": "compare", "q": "step8804 vs q4 vs bf16 on gpqa and hle", "want": {"action": "compare", "models": ["served/step8804-lda-2610", "served/Qwen3.6-35B-A3B-Q4-lda-2610", "served/Qwen3.6-35B-A3B-BF16-lda-2610"], "benchmarks": ["gpqa", "hle"]}}
+{"id": "b239", "scenario": "compare", "q": "edge0 8b against gemma 4 e2b on gpqa and mmlu-pro", "want": {"action": "compare", "models": ["reported/edge0/edge0-8b-a1b-preview", "reported/google/gemma-4-e2b"], "benchmarks": ["gpqa", "mmlupro"]}}
+{"id": "b240", "scenario": "compare", "q": "phone build vs step8804 on gpqa", "want": {"action": "compare", "models": ["served/Qwen3.6-35B-A3B-k4-LDA-phone-build", "served/step8804-lda-2610"], "benchmarks": ["gpqa"]}}
+{"id": "b241", "scenario": "compare", "q": "q4 earlier run vs q4 on gpqa", "want": {"action": "compare", "models": ["served/Qwen3.6-35B-A3B-Q4-original-k-8", "served/Qwen3.6-35B-A3B-Q4-lda-2610"], "benchmarks": ["gpqa"]}}
+{"id": "b242", "scenario": "number", "q": "ornith's HLE", "want": {"action": "compare", "models": ["served/Ornith-1.5-35B-A3B-Q4_K_M"], "benchmarks": ["hle"]}}
+{"id": "b243", "scenario": "number", "q": "how many gpqa answers did step8804 run out of room on", "want": {"action": "compare", "models": ["served/step8804-lda-2610"], "benchmarks": ["gpqa"], "measure": "ran_out"}}
+{"id": "b244", "scenario": "number", "q": "bonsai 27b ifeval number", "want": {"action": "compare", "models": ["reported/prismml/bonsai-27b-1-bit"], "benchmarks": ["ifeval"]}}
+{"id": "b245", "scenario": "ambiguous", "q": "show the qwen3.6 model", "want": {"action": "clarify", "about": "model"}}
+{"id": "b246", "scenario": "ambiguous", "q": "open the step one", "want": {"action": "clarify", "about": "model"}}
+{"id": "b247", "scenario": "ambiguous", "q": "how does the ternary one do", "want": {"action": "clarify", "about": "model"}}
+{"id": "b248", "scenario": "refused", "q": "retrain step8804 on more data", "want": {"action": "cant", "kind": "start_run"}}
+{"id": "b249", "scenario": "refused", "q": "turn off the judge", "want": {"action": "cant", "kind": "settings"}}
+{"id": "b250", "scenario": "refused", "q": "tell me a joke", "want": {"action": "cant", "kind": "outside"}}
+{"id": "b251", "scenario": "boxes", "q": "how long until the hle run ends", "want": {"action": "boxes", "which": "rented"}}
+{"id": "b252", "scenario": "boxes", "q": "what runs are going on step4000", "want": {"action": "boxes", "models": ["served/step4000-lda-2610"]}}
+{"id": "b253", "scenario": "best", "q": "best of ours on mmlu-pro, top 2", "want": {"action": "best_on", "benchmarks": ["mmlupro"], "among": "ours", "n": 2}}
+{"id": "b254", "scenario": "best", "q": "which phone model is best on ifeval, top 4", "want": {"action": "best_on", "benchmarks": ["ifeval"], "among": "phone", "n": 4}}
+{"id": "b255", "scenario": "phones", "q": "ttft on the galaxy for step4000-denseq8", "want": {"action": "phone", "app": "step4000-denseq8", "phone": "galaxy", "measure": "ttft"}}
+{"id": "b256", "scenario": "phones", "q": "which phones has step8804 been tested on", "want": {"action": "phone", "app": "step8804"}}
