@@ -5612,6 +5612,10 @@ table.rp tr.rp-group td { background:var(--plane); font-weight:600; text-align:l
 .rp-status { display:block; font-size:var(--fs-1); color:var(--text-secondary); font-weight:400;
   white-space:normal; }
 .rp-picker { display:flex; flex-wrap:wrap; gap:6px; margin:var(--sp-2) 0; }
+/* 27e: the baseline switch, in the report's head */
+.rp-base { display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; margin-top:var(--sp-2); }
+.rp-base .rp-picker { margin:0; }
+.rp-base-k { font-size:var(--fs-1); font-weight:600; }
 .rp-line { font-size:var(--fs-3); margin:var(--sp-2) 0 var(--sp-3); }
 .rp-tiles { display:grid; gap:var(--sp-3);
   grid-template-columns:repeat(auto-fill, minmax(min(100%, 250px), 1fr)); }
@@ -11128,7 +11132,9 @@ function viewHash(v) {
       + (ro && ro.open ? '&open=' + encodeURIComponent(ro.open) : '')
       // 27c: an open test of our testers' phones
       + (R.id && R.pt && R.pt[R.id] && R.pt[R.id].open
-        ? '&test=' + encodeURIComponent(R.pt[R.id].open) : '');
+        ? '&test=' + encodeURIComponent(R.pt[R.id].open) : '')
+      // 27e: the baseline the viewer picked
+      + (R.id && R.base && R.base[R.id] ? '&base=' + encodeURIComponent(R.base[R.id]) : '');
   }
   // 18: an agent run's page, and a task's, so a reload and a link land on it
   if (v === 'queue' && (state.agentView || {}).key)
@@ -11185,6 +11191,13 @@ function viewOfHash(name, params) {
         ? 'b' : 'a', q: Math.max(0, (parseInt(p.get('q'), 10) || 1) - 1), subj: '', out: false } });
     // 27c: a test of our testers' phones, opened in its panel
     if (RPS().id && p.get('test')) ptState(RPS().id).open = p.get('test');
+    // 27e: the baseline picked, from its link; none is the report's default
+    if (RPS().id) {
+      const R = RPS();
+      R.base = R.base || {};
+      if (p.get('base')) R.base[R.id] = p.get('base');
+      else delete R.base[R.id];
+    }
     if (RPS().id && !p.get('side') && (p.get('model') || p.get('bench') || p.get('open') || (RPS().ro || {})[RPS().id])) {
       const S = roState(RPS().id);
       Object.assign(S, { pick: p.get('model') || S.pick, bench: p.get('bench') || '',
@@ -11313,6 +11326,11 @@ function navigate(patch) {
   // one — even a failure — is
   if (patch.tab === 'queue' && (state.tab !== 'queue' || state.model || state.topic)
       && state.pg.queue) state.pg.queue.page = 1;
+  // 27e: every way to Runs in the code is to its list — an agent run's page
+  // opens by its link alone — so an opened run closes
+  if (patch.tab === 'queue' && state.agentView && state.agentView.key)
+    Object.assign(state.agentView, { key: null, task: null, data: null, err: '', conv: null,
+      convErr: '' });
   const from = location.hash;
   // 12o.2: a place or a page left leaves a benchmark's questions
   if (('tab' in patch || 'model' in patch && patch.model) && !patch.qxOpen) state.qx.task = null;
@@ -29341,8 +29359,33 @@ function rpRanOutSpec(id, d, benches) {
   return { view: 'rp-ranout', free: true, attrs: { 'data-rp-ranout': '1' }, hkey: 'rp-ranout-' + id, cols, rows,
     sorted: true, hideEmpty: false };
 }
+// 27e: the baseline the viewer compares against — the file's first (Q2, the
+// same size as our checkpoints) unless the viewer picked another — and the
+// lines that name it, as the server worked them out for each
+function rpBased(d, id) {
+  const B = d && d.baseline;
+  if (!B) return d;
+  const want = (RPS().base || {})[id];
+  return { ...d, ...B.by[B.options.includes(want) ? want : B.default] };
+}
+function rpBaseSwitch(id, d) {
+  const B = d.baseline;
+  if (!B) return '';
+  const sel = d.baselineSel, size = o => (d.ours.find(m => m.label === o) || {}).size;
+  return el('div', { class: 'rp-base', 'data-rp-baseline': sel },
+    el('span', { class: 'rp-base-k', text: 'Baseline' }),
+    el('div', { class: 'rp-picker', role: 'radiogroup', 'aria-label': 'baseline' },
+      B.options.map(o => el('button', { class: 'chip-btn' + (o === sel ? ' on' : ''), role: 'radio',
+        'aria-checked': String(o === sel), 'data-rp-base': o, title: o,
+        text: trShort(o) + (size(o) ? ` · ${(size(o) / 1e9).toFixed(1)} GB` : ''),
+        onclick: () => { (RPS().base = RPS().base || {})[id] = o; navigate({}); } }))),
+    el('span', { class: 'small se', 'data-rp-base-says': '1', text: 'What follows it: instruction '
+      + 'following’s verdicts, Across training’s line against it and its dashed line, and the '
+      + `thinking-tokens line. Near the ceiling and the loop examples stay by `
+      + `${trShort(d.reference || '')}. No number changes.` }));
+}
 function vReport(id) {
-  const R = RPS(), d = R.data[id];
+  const R = RPS(), d = rpBased(R.data[id], id);
   if (!d && netReady()) loadReport(id);
   const back = el('a', { class: 'small backlink', href: '#tab=reports', 'data-reports-back': '1',
     text: '← Reports', onclick: e => { e.preventDefault(); rpOpen(null); } });
@@ -29377,6 +29420,7 @@ function vReport(id) {
         + 'entered' }),
       el('a', { href: S.epoch.url, target: '_blank', rel: 'noopener', 'data-credit': 'epoch',
         text: S.epoch.credit })),
+    rpBaseSwitch(id, d),
     d.page ? el('div', { class: 'rp-card-acts' }, rpPageLink(id, d.page)) : '');
   // 1. our runs — 27b: on modelTable, as Models' tables are
   const ours = el('div', { class: 'card', 'data-report-section': 'ours' },
@@ -29717,7 +29761,7 @@ function odLinkWords(url) {
 }
 const odLetter = r => mtLetter('card', r.publishedBy || r.maker);
 const odTok = v => `${Number(v).toLocaleString('en', { maximumFractionDigits: 1 })} tok/s`;
-function odScoreCell(r, b) {
+function odScoreCell(r, b, si) {
   const c = r.cells[b.key] || {}, at = { 'data-od-cell': `${r.label}|${b.key}` };
   if (c.v == null) return { v: null, why: r.ours ? 'not in yet' : 'not published', attrs: at };
   const keep = (r.retention || {})[b.key];
@@ -29726,8 +29770,13 @@ function odScoreCell(r, b) {
       || null : null,
     pub: r.ours ? null : { letter: L, tip: `${MT_LETTERS[L] || r.publishedBy}: ${c.card || ''}`,
       url: c.url || r.link || '' },
-    sub: keep != null ? `${(100 * keep).toFixed(1)}% of its base` : null, subClass: 'od-keep',
-    subAttrs: keep != null ? { 'data-od-keep': `${r.label}|${b.key}` } : {},
+    // 27e: of the stand-in, said so: "98.1% of our Q4", the whole on hover
+    sub: keep == null ? null : (r.keepOf || {})[b.key] === 'stand_in' && si
+      ? `${(100 * keep).toFixed(1)}% of our ${si.short}` : `${(100 * keep).toFixed(1)}% of its base`,
+    subClass: 'od-keep',
+    subAttrs: keep != null ? { 'data-od-keep': `${r.label}|${b.key}`,
+      ...((r.keepOf || {})[b.key] === 'stand_in' && si ? { title: si.line, 'data-od-stand-in': '1' }
+        : {}) } : {},
     tip: r.ours ? [c.how || '', 'measured here'].filter(Boolean)
       : [`${c.card || ''}: ${c.setting || ''}`, `published by ${r.publishedBy}`],
     attrs: at };
@@ -29808,12 +29857,13 @@ function odSpec(id, d) {
       colour: r.ours ? (r.colour != null ? rpColour(r) : base ? base.colour : 'var(--accent)') : null,
       name: base ? base.name : displayName({ name: r.label, published: !r.ours }),
       full: r.label + (r.kind ? `\n${r.kind}` : '') + (r.base ? `\nbase: ${r.base}` : ''),
-      line: [of ? `of ${of}` : '', r.kind || '',
+      // 27e: ours' own line ("the original, squeezed to 2 bits — our same-size baseline")
+      line: [of ? `of ${of}` : '', r.what || '', r.kind || '',
         ...(r.ours ? [] : parts.line.filter(w => !String(r.kind || '').includes(w))),
         r.ours && r.phoneBuild ? 'phone build' : '', src],
       group: r.ours ? 'ours' : mtGroup({ name: r.label }, true, r.maker),
       attrs: { 'data-od-row': r.label, 'data-od-ours': String(!!r.ours) },
-      cells: { ...Object.fromEntries(B.map(b => [b.key, odScoreCell(r, b)])),
+      cells: { ...Object.fromEntries(B.map(b => [b.key, odScoreCell(r, b, d.standIn)])),
         memory: odMemoryCell(r), phone: odPhoneCell(r) } };
   });
   return { view: 'od', attrs: { 'data-od-table': '1' }, free: true, hkey: 'od-' + id, cols, rows, groups: true,
@@ -29822,38 +29872,89 @@ function odSpec(id, d) {
       : k === 'memory' ? 1 : -1 }; render(); }, cardCols: B.slice(0, 4).map(b => b.key),
     groupNotes: { ours: 'measured here', open: 'as their makers publish them' } };
 }
-// retention: each model against its own base on the same source, a panel a benchmark
-function odKeepPanel(b, rows) {
-  const W = 340, LW = 128, LH = 34, R = 14, Tp = 12, B = 26, FS = 12;
-  const vs = rows.map(r => r.retention[b.key]);
-  const lo = Math.min(0.6, Math.floor(Math.min(...vs) * 10) / 10);
-  const hi = Math.max(1.1, Math.ceil(Math.max(...vs) * 10) / 10);
-  const H = Tp + LH * rows.length + B, L = LW + 10, pw = W - L - R;
+// retention: each model against its own base on the same source, a panel a benchmark.
+// 27e: a row of the stand-in says so under its name (wrapped to the names'
+// column, the whole on hover), the panel's note says it once; a build of ours
+// that hasn't run the benchmark is a "–", "not run yet" on hover
+function odKeepPanel(b, rows, si) {
+  const W = 340, LW = 128, LH = 34, R = 14, Tp = 12, B = 26, FS = 12, SFS = 10.5, SLH = 12;
+  const has = r => (r.retention || {})[b.key] != null;
+  const vs = rows.filter(has).map(r => r.retention[b.key]);
+  const lo = Math.min(0.6, Math.floor(Math.min(...vs, 1) * 10) / 10);
+  const hi = Math.max(1.1, Math.ceil(Math.max(...vs, 1) * 10) / 10);
+  const standIn = r => (r.keepOf || {})[b.key] === 'stand_in' && si;
+  // a build that hasn't run it says nothing of a base: its "–" says not run yet
+  const lines = r => !has(r) ? [] : odWrap(standIn(r) ? `of ${si.of}` : `of ${odBase(r.baseLabel)}`,
+    SFS, LW + 6);
+  const hs = rows.map(r => LH + SLH * Math.max(0, lines(r).length - 1));
+  const H = Tp + hs.reduce((a, h) => a + h, 0) + B, L = LW + 10, pw = W - L - R;
   const X = v => L + pw * (v - lo) / (hi - lo);
   const svg = el('svg:svg', { class: 'tr-svg', viewBox: `0 0 ${W} ${H}`, role: 'img',
     'aria-label': `${b.label}: each model's score as a share of its own base's` });
-  const step = hi - lo > 0.6 ? 0.2 : 0.1;
   for (let k = Math.ceil(lo / 0.1 - 1e-9); k * 0.1 <= hi + 1e-9; k++) {
     const v = k * 0.1, at = Math.round(v * 100);
     svg.append(el('svg:line', { x1: X(v), x2: X(v), y1: Tp, y2: H - B,
       stroke: at === 100 ? 'var(--axis)' : 'var(--grid)', 'stroke-width': at === 100 ? 1.2 : 0.5 }));
-    if (at === 100 || Math.abs(v / step - Math.round(v / step)) < 1e-6)
-      svg.append(el('svg:text', { x: X(v), y: H - B + 15, 'text-anchor': 'middle', 'font-size': FS,
-        fill: 'var(--muted)', 'data-od-keep-tick': b.key, text: `${at}%` }));
   }
+  // 27e: labelled every 10, 20, 50 or 100 points — the first step whose labels
+  // never touch (4 units apart at least); 100% always
+  const gap = 4;
+  const ticks = st => {
+    const out = [];
+    for (let k = Math.ceil(lo / st - 1e-9); k * st <= hi + 1e-9; k++) out.push(Math.round(k * st * 100));
+    if (!out.includes(100)) out.push(100);
+    return out.sort((p, q) => p - q);
+  };
+  const fits = ts => ts.every((t, i) => !i || X(t / 100) - lblWidth(`${t}%`, FS) / 2
+    - (X(ts[i - 1] / 100) + lblWidth(`${ts[i - 1]}%`, FS) / 2) >= gap);
+  const shown = [0.1, 0.2, 0.5, 1].map(ticks).find(fits) || [100];
+  // the last kept inside the panel: ended at its edge rather than cut
+  for (const at of shown) {
+    const x = X(at / 100), end = x + lblWidth(`${at}%`, FS) / 2 > W - 1;
+    svg.append(el('svg:text', { x: end ? W - 1 : x, y: H - B + 15,
+      'text-anchor': end ? 'end' : 'middle', 'font-size': FS,
+      fill: 'var(--muted)', 'data-od-keep-tick': b.key, text: `${at}%` }));
+  }
+  let y = Tp;
   rows.forEach((r, i) => {
-    const y = Tp + LH * i, v = r.retention[b.key];
+    const ls = lines(r);
     svg.append(el('svg:text', { x: 0, y: y + 13, 'font-size': FS, fill: 'var(--text-primary)',
-        text: odShort(r.label) }, el('svg:title', { text: r.label })),
-      el('svg:text', { x: 0, y: y + 26, 'font-size': 10.5, fill: 'var(--muted)',
-        'data-od-base': `${b.key}:${r.label}`, text: `of ${odBase(r.baseLabel)}` },
-        el('svg:title', { text: `of ${r.baseLabel}` })));
-    const m = odMark(r.ours, X(v), y + 16, odColour(r), { 'data-od-keep-dot': `${b.key}:${r.label}` });
-    m.append(el('svg:title', { text: `${r.label}: ${(100 * v).toFixed(1)}% of ${r.baseLabel}` }));
-    svg.append(m);
+        text: odShort(r.label) }, el('svg:title', { text: r.label })));
+    if (ls.length) svg.append(el('svg:text', { x: 0, y: y + 26, 'font-size': SFS, fill: 'var(--muted)',
+        'data-od-base': `${b.key}:${r.label}`, ...(standIn(r) ? { 'data-od-stand-in': b.key } : {}) },
+      ...ls.map((t, j) => el('svg:tspan', { x: 0, dy: j ? SLH : 0, text: t })),
+      el('svg:title', { text: standIn(r) ? si.line : `of ${r.baseLabel}` })));
+    if (has(r)) {
+      const v = r.retention[b.key];
+      const m = odMark(r.ours, X(v), y + 16, odColour(r), { 'data-od-keep-dot': `${b.key}:${r.label}` });
+      m.append(el('svg:title', { text: `${r.label}: ${(100 * v).toFixed(1)}% of `
+        + (standIn(r) ? si.line.replace(/^of /, '') : r.baseLabel) }));
+      svg.append(m);
+    } else
+      svg.append(el('svg:text', { x: L + 6, y: y + 17, 'font-size': FS, fill: 'var(--muted)',
+          'data-od-keep-none': `${b.key}:${r.label}`, text: '–' },
+        el('svg:title', { text: `${r.label}: not run yet` })));
+    y += hs[i];
   });
+  const si1 = si && rows.some(standIn);
   return el('div', { class: 'by-panel tr-panel', 'data-od-keep-panel': b.key },
-    el('h3', { text: b.label }), svg);
+    el('h3', { text: b.label }),
+    si1 ? el('p', { class: 'small se', 'data-od-stand-note': b.key, text: `Our ${si.for} hasn’t `
+      + `run ${b.label} yet: ours are shown as a share of our ${si.short}, standing in for `
+      + `${si.for}` + (si.elsewhere ? ` (${si.elsewhere})` : '') + `. ${si.for}’s own replaces it `
+      + 'when it comes in.' }) : '',
+    svg);
+}
+// a chart's small line cut into lines no wider than w, between words (one that
+// fits stays whole)
+function odWrap(text, fs, w) {
+  const out = [];
+  for (const word of String(text).split(' ')) {
+    const last = out[out.length - 1];
+    if (last != null && lblWidth(last + ' ' + word, fs) <= w) out[out.length - 1] = last + ' ' + word;
+    else out.push(word);
+  }
+  return out;
 }
 // score against the memory each needs, a panel a benchmark, log x
 // 27c: one legend for the four panels: ours each in its colour, a filled dot;
@@ -29946,16 +30047,19 @@ function vOnDevice(id, d, back) {
           r.paper ? el('span', {}, ' · ', el('a', { href: r.paper, target: '_blank',
             rel: 'noopener', text: 'its paper' })) : '')))) : '';
     })());
+  // 27e: and a "–" for a build of ours that hasn't run it, in a panel that has any
   const keepPanels = B.map(b => {
-    const rows = R.filter(r => (r.retention || {})[b.key] != null);
-    return rows.length ? odKeepPanel(b, rows) : null;
+    const rows = R.filter(r => (r.retention || {})[b.key] != null || (r.notRun || []).includes(b.key));
+    return rows.some(r => (r.retention || {})[b.key] != null) ? odKeepPanel(b, rows, d.standIn) : null;
   }).filter(Boolean);
   const keep = el('div', { class: 'card', 'data-report-section': 'od-keep' },
     el('h2', { text: 'What each keeps of its own base' }),
     el('p', { class: 'small se', text: 'Each source ran its own harness, so scores aren’t '
       + 'comparable point for point across sources. But each ran its model beside its own '
       + 'full-precision base on the same harness: a model’s score as a share of its base’s is the '
-      + 'fair comparison. Ours against our BF16, measured here. ' + OD_LEGEND + '.' }),
+      + 'fair comparison. Ours against our BF16, measured here' + (d.standIn ? ` — where our `
+        + `${d.standIn.for} hasn’t run a benchmark yet, our ${d.standIn.short} stands in for it, `
+        + 'as its panel says' : '') + '. ' + OD_LEGEND + '.' }),
     keepPanels.length ? el('div', { class: 'by-panels tr-panels' }, keepPanels)
       : el('p', { class: 'small se', text: 'No model has both its own score and its base’s yet.' }));
   const memPanels = B.map(b => {
@@ -31649,7 +31753,8 @@ function rpThinks(d, id) {
   if (!benches.length) return '';
   const sel = benches.find(b => b.key === R.thinks[id]) || benches[0];
   const T = d.thinks || {}, of = p => (T[p] || {})[sel.key];
-  const ref = d.reference, refShort = String(ref || '').split(' (')[0];
+  // 27e: beside the baseline the viewer picked
+  const ref = d.baselineSel || d.reference, refShort = String(ref || '').split(' (')[0];
   const first = d.picks.find(p => p !== ref && thSays(of(p)));
   const say = first ? `On ${sel.label}, ${first} first states the right answer ${thSays(of(first))}`
     + (ref && thSays(of(ref)) ? `; ${refShort}: ${thPct(of(ref).right.pos_median)} and `
@@ -31867,11 +31972,25 @@ const TAB_ALIASES = {
   evals: 'provenance', 'submit-queue': 'submit', models_tab: 'models', ppl: 'perplexity',
   'perplexity-loss': 'perplexity',
 };
+// 27e: a place in the top bar, or in its menu, opens its front page — when
+// already there too, whatever is open inside it: a report (its reader, its
+// test panel, its two builds), a chat, a benchmark's questions or its parts.
+// Models keeps 16.3's last view; a model's page closes. A new history entry,
+// so Back returns to what was open (its link brings it back)
+function placeFront(pid) {
+  if (pid === 'models') Object.assign(lbS(), lbRemembered());
+  if (pid === 'reports') {
+    const R = RPS();
+    if (R.id) for (const k of ['ro', 'pd', 'pt']) if (R[k]) delete R[k][R.id];
+    R.id = null;
+  }
+  if (pid === 'playground') Object.assign(state.pg, { id: null, chat: null, live: null });
+  if (pid === 'benchmarks') { state.qx.task = null; state.catOpen = {}; }
+}
 function goPlace(pid) {
   const p = PLACES.find(x => x[0] === pid);
   if (!p) return;
-  // 16.3: the viewer's last view — its test, group, and Table or Chart
-  if (pid === 'models') Object.assign(lbS(), lbRemembered());
+  placeFront(pid);
   // 16.4: Benchmarks opens on its catalogue, always
   navigate({ tab: p[2][0], model: null, topic: null });
 }

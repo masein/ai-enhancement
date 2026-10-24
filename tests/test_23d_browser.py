@@ -95,7 +95,8 @@ def test_the_scorecards_how_it_thinks(live, page, width, scheme):
     page.emulate_media(color_scheme=scheme)
     page.set_viewport_size({"width": width, "height": 1000})
     page.goto("about:blank")
-    page.goto(live["base"] + "/#tab=reports&report=step-checkpoints")
+    # 27e: beside Q4, as before — Q2, the default baseline, has no answers stored here
+    page.goto(live["base"] + "/#tab=reports&report=step-checkpoints&base=Q4%20(UD-Q4_K_XL)")
     part = page.locator("[data-th-part]")
     part.wait_for(timeout=30000)
     page.wait_for_selector("[data-th-table='gpqa']", timeout=30000)

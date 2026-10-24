@@ -149,7 +149,13 @@ def test_the_section_puts_thinking_on_and_off_side_by_side_with_its_sentence(svc
     # step4000 has no thinking-off answers: nothing said for them
     assert rows[S40]["cells"]["ifeval_google:strict"]["off"] is None
     assert rows[S40]["rowOff"] == "served/step4000-lda-2610"
+    # 27e: against the baseline picked — Q2, the default, hasn't run them here; Q4's
+    # verdicts as before
     assert F["sentence"] == (
+        "step8804 against Q2 (UD-Q2_K_XL) on IFEval: not measured yet; with thinking off, not "
+        "measured yet. step8804 against Q2 (UD-Q2_K_XL) on IFBench: not measured yet; with "
+        "thinking off, not measured yet.")
+    assert d["baseline"]["by"]["Q4 (UD-Q4_K_XL)"]["follow"]["sentence"] == (
         "step8804 against Q4 (UD-Q4_K_XL) on IFEval: lower, by 50.0 points; with thinking "
         "off, can't tell. step8804 against Q4 (UD-Q4_K_XL) on IFBench: can't tell; with "
         "thinking off, lower, by 50.0 points.")

@@ -767,7 +767,9 @@ def token_line(rep: dict, rows: list[dict], stats: dict) -> str:
     """"step4000 thinks X× as long as Q4 on GPQA Diamond and Y× on MMLU-Pro;
     over the N benchmarks both finished, it wrote A million output tokens to
     Q4's B million." — '' until both have numbers"""
-    ref = next((r for r in rows if r["label"] == rep.get("reference")), None)
+    # 27e: against the baseline the viewer picked, else the report's reference
+    ref = next((r for r in rows if r["label"] == (rep.get("baseline") or rep.get("reference"))),
+               None)
     # 23b: the first row with thinking stats on both — step8804, first, once
     # it has them; step4000 until then
     first = next((r for r in rows if r is not ref and all(
@@ -1097,6 +1099,8 @@ def report(rid: str, payload: dict | None = None, compute: bool = False, a: str 
                 c["entered_at"] = day(times.get(c["entered"]))
     models = rows + theirs
     picks = [r for r in rows if r["pick"]]
+    base = baselines(rep, rows, stats, payload.get("cells") or {}, compute)
+    by = base["by"][base["default"]] if base else {}
     return {
         "id": rid, "title": rep.get("title") or rid, "what": rep.get("what") or "",
         "benchmarks": bench_meta(rep["benchmarks"]), "ours": rows, "theirs": theirs,
@@ -1107,7 +1111,7 @@ def report(rid: str, payload: dict | None = None, compute: bool = False, a: str 
                                   if any(b["key"] == k for b in rep["benchmarks"])]},
         "standing": {p["label"]: standing(p, models, rep["benchmarks"]) for p in picks},
         "picks": [p["label"] for p in picks],
-        "tokens": stats, "tokenLine": token_line(rep, rows, stats),
+        "tokens": stats, "tokenLine": by["tokenLine"] if base else token_line(rep, rows, stats),
         # 21d: what each token column means, as the published page says it
         "tokenDefs": page_defs(rep),
         "tokenLimits": rep.get("token_limits") or {},
@@ -1129,10 +1133,13 @@ def report(rid: str, payload: dict | None = None, compute: bool = False, a: str 
         # 23d: how each thinks, the four benchmarks first_right reads
         "thinks": thinks_of(rows, rep["benchmarks"], compute), "secondWords": _second(),
         # 23e: our checkpoints across training, and the benchmarks near the ceiling
-        "training": _training(rep, rows, compute), "ceiling": _ceiling(rep, rows),
+        "training": by["training"] if base else _training(rep, rows, compute),
+        "ceiling": _ceiling(rep, rows),
         "ceilingWords": _ceiling_words(),
         # 25: instruction following, thinking on and off (service/follow.py)
-        "follow": _follow(rep, rows, payload.get("cells") or {}, compute),
+        "follow": by["follow"] if base else _follow(rep, rows, payload.get("cells") or {}, compute),
+        # 27e: the baseline the viewer compares against — Q2, the same size, or Q4
+        "baseline": base,
         # 23: the report comparing two of these rows question by question
         "paired": next((x for x, r in files().items() if r.get("kind") == "paired"
                         and (r.get("builds") or {}).get("from") == rid), None),
@@ -1197,6 +1204,30 @@ def thinks_list(rid: str, label: str, key: str, which: str) -> dict:
             "warning": ran_out.WARNING,
             "n": len(items) + (ls.get("hidden") or 0), "listed": len(items),
             "hidden": ls.get("hidden") or 0, "items": items}
+
+
+def baselines(rep: dict, rows: list[dict], stats: dict, cells: dict, compute: bool = False
+              ) -> dict | None:
+    """27e: the builds the viewer can compare against — the file's
+    `baselines`, the first the default — and, for each, the lines that name
+    it: Across training's dashed line and its line against it, instruction
+    following's question-by-question sentence, and the thinking-tokens line.
+    Every number is as kept; only which build is compared against changes.
+    Near the ceiling stays by the report's reference. None without two"""
+    have = {r["label"] for r in rows}
+    opts = [b for b in rep.get("baselines") or [] if b in have]
+    if len(opts) < 2:
+        return None
+    t = rep.get("training") if isinstance(rep.get("training"), dict) else {}
+    by = {}
+    for b in opts:
+        alt = {**rep, "baseline": b,
+               "training": {**t, "references": [b, *[x for x in t.get("references") or []
+                                                     if x not in opts]]}}
+        by[b] = {"baselineSel": b, "training": _training(alt, rows, compute),
+                 "follow": _follow(alt, rows, cells, compute),
+                 "tokenLine": token_line(alt, rows, stats)}
+    return {"options": opts, "default": opts[0], "by": by}
 
 
 def _training(rep: dict, rows: list[dict], compute: bool = False) -> dict | None:

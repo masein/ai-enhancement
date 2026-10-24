@@ -123,8 +123,9 @@ def test_retention_and_the_report(svc):
     assert d["kind"] == "on_device"
     rows = {r["label"]: r for r in d["rows"]}
     # ours, measured here, BF16 the base and not a row; theirs as published, bases not rows
+    # 27e: and Q2, our same-size baseline
     assert [r["label"] for r in d["rows"] if r["ours"]] == ["step8804", "step4000", "step1000",
-                                                           "Q4 (UD-Q4_K_XL)"]
+                                                           "Q4 (UD-Q4_K_XL)", "Q2 (UD-Q2_K_XL)"]
     assert "BF16" not in rows and not any("run)" in x for x in rows)
     e0 = rows["Edge0-35B-A3B-preview"]
     assert e0["retention"]["gpqa"] == pytest.approx(79.8 / 81.8)
@@ -187,4 +188,4 @@ def test_a_reported_model_is_never_in_an_average_or_rank(svc):
     ids = [r["id"] for r in svc.get("/api/reports").json()["reports"]]
     assert ids == ["ran-out-of-room", "step-checkpoints", "paired", "on-device", "testers"]
     assert ondevice.listing_counts(REP) == (["step8804", "step4000", "step1000",
-                                             "Q4 (UD-Q4_K_XL)"], 8)
+                                             "Q4 (UD-Q4_K_XL)", "Q2 (UD-Q2_K_XL)"], 8)  # 27e

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import statistics
 import time
 from contextlib import closing
 
@@ -121,7 +122,9 @@ def test_o4_minis_mmlu_pro_says_medium_effort(svc):
 
 def test_the_reports_list_never_builds_the_boards_numbers_and_is_quick(svc, monkeypatch):
     """2.3 s on the server: the list built the board's whole payload for
-    names and folders. With the stats kept, under 0.2 s"""
+    names and folders. With the stats kept, quick — 27e: the median of 5
+    calls under 0.5 s, so it catches a 10× slowdown, not 20 ms of a busy CI
+    box (it once took 0.218 s against 0.2)"""
     world()
     reports.loops(REPORT)
     from service import app
@@ -130,15 +133,15 @@ def test_the_reports_list_never_builds_the_boards_numbers_and_is_quick(svc, monk
         raise AssertionError("the Reports list built the board's numbers")
     monkeypatch.setattr(app, "results_payload", no)
     svc.get("/api/reports")                                     # the files read once
-    slow = 0.0
+    took = []
     for _ in range(5):
         t = time.time()
         r = svc.get("/api/reports")
-        slow = max(slow, time.time() - t)
+        took.append(time.time() - t)
         assert r.status_code == 200
     got = {x["id"]: x for x in r.json()["reports"]}
     assert got["step-checkpoints"]["others"] == 44 and got["step-checkpoints"]["changed"]  # 25b
-    assert slow < 0.2, slow
+    assert statistics.median(took) < 0.5, took
 
 
 def test_added_is_the_first_submission(svc):

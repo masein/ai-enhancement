@@ -46,7 +46,8 @@ def said(x: dict | None, has: bool) -> str:
 def sentence(rep: dict, rows: list[dict], cells: dict, compute: bool = False) -> str:
     from . import paired, training
     prep = training._paired(rep["id"])
-    ref = rep.get("reference")
+    # 27e: the baseline the viewer picked, else the report's reference
+    ref = rep.get("baseline") or rep.get("reference")
     have = {r["label"]: r for r in rows}
     out = []
     for b in rep["benchmarks"]:
@@ -60,10 +61,16 @@ def sentence(rep: dict, rows: list[dict], cells: dict, compute: bool = False) ->
         if not a or ref not in have or prep is None or a not in paired.labels(prep) \
                 or ref not in paired.labels(prep):
             continue
-        on = said(paired.kept(prep, a, ref, t, compute),
-                  bool(cell(cells, t, have[ref]["row"], how)))
+        # 27e: worked out only where both builds' answers are stored (a baseline
+        # that hasn't run it has none)
+        def stored(off: bool) -> bool:
+            return all(paired.samples(prep, x, t, off) is not None for x in (a, ref))
+        has_on = bool(cell(cells, t, have[ref]["row"], how))
+        on = said(paired.kept(prep, a, ref, t, compute) if has_on and stored(False) else None,
+                  has_on)
         has_off = all(cell(cells, t, off_row(have[x]["row"]), how) for x in (a, ref))
-        off = said(paired.kept(prep, a, ref, t, compute, off=True) if has_off else None, has_off)
+        off = said(paired.kept(prep, a, ref, t, compute, off=True) if has_off and stored(True)
+                   else None, has_off)
         out.append(f"{a} against {ref} on {b['label']}: {on}; with thinking off, {off}.")
     return " ".join(out)
 

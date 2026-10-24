@@ -68,7 +68,8 @@ def heads(page, sel: str) -> list[str]:
 
 @pytest.mark.parametrize("width,scheme", SIZES)
 def test_instruction_following_on_and_off_side_by_side(live, page, width, scheme):
-    report(page, live, width, scheme)
+    # 27e: against Q4, as before — Q2, the default baseline, hasn't run them here
+    report(page, live, width, scheme, hash_="report=step-checkpoints&base=Q4%20(UD-Q4_K_XL)")
     order = page.eval_on_selector_all("[data-report-section]",
                                       "ss => ss.map(s => s.dataset.reportSection)")
     assert order.index("scores") + 1 == order.index("follow") < order.index("beyond")

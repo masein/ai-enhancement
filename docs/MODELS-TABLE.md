@@ -208,6 +208,20 @@ thinking.
   less scores higher). Every other point is named on hover and in one legend
   above the four panels. Ours are filled dots in their own colours; Edge0,
   Bonsai and Gemma are hollow diamonds, one hue each, on every panel.
+- 27e: an axis's labels never touch. "What each keeps" labels every 10
+  points, else every 20, 50 or 100 — the first step whose labels stay 4
+  units apart, measured — with 100% always, and the last one ended at the
+  panel's edge rather than cut.
+
+## The top bar's places (27e)
+
+A place in the top bar, or in Menu ▾ on a phone, opens its front page,
+whatever is open inside it and when already there: Reports its list (the
+open report, its reader, its test panel and its two builds closed), Runs its
+list ("All runs →" closes an agent run's page), Benchmarks its catalogue,
+Playground with no chat open, Improve its first part. Models keeps 16.3's
+last view (its tab, group, Table or Chart); a model's page closes. The front
+page is a new history entry, so Back returns to what was open.
 
 ## Tests
 

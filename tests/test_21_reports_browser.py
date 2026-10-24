@@ -165,7 +165,9 @@ def test_the_list_and_the_report_open_and_the_picker_moves_the_tiles(live, page,
     assert box.evaluate("e => e.scrollTop") > 0
     cell = page.locator("[data-rp-h2h-row='GPT-4.1'] td").nth(1)
     assert "BF16 " in cell.get_attribute("title") and "GPT-4.1 66.9" in cell.get_attribute("title")
-    # 4 and 5: the stats are worked out on the server, then shown
+    # 4 and 5: the stats are worked out on the server, then shown — 27e: beside Q4,
+    # as before (Q2, the default baseline, has no answers stored here)
+    page.locator("[data-rp-base='Q4 (UD-Q4_K_XL)']").click()
     page.wait_for_selector("[data-rp-token-line]", timeout=30000)
     assert page.locator("[data-rp-token-line]").inner_text().startswith(
         "step4000 thinks ")
@@ -193,7 +195,9 @@ def test_the_list_and_the_report_open_and_the_picker_moves_the_tiles(live, page,
     page.evaluate("window.scrollTo(0, 0)")
     page.wait_for_timeout(150)
     page.screenshot(path=SCREENS / f"report-{width}.png")
-    # Back returns to the list
+    # Back returns to the list — 27e: past the baseline picked above, its own entry
+    page.go_back()
+    page.wait_for_selector("[data-rp-baseline='Q2 (UD-Q2_K_XL)']")
     page.go_back()
     page.wait_for_selector("[data-reports-list]")
     assert page.evaluate("location.hash") == "#tab=reports"

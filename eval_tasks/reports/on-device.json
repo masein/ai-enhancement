@@ -29,6 +29,12 @@
    "colour": 1
   },
   {
+   "label": "Q2 (UD-Q2_K_XL)",
+   "row": "served/Qwen3.6-35B-A3B-Q2-lda-2610 · thinking",
+   "colour": 3,
+   "line": "the original, squeezed to 2 bits — our same-size baseline"
+  },
+  {
    "label": "BF16",
    "row": "served/Qwen3.6-35B-A3B-BF16-lda-2610 · thinking",
    "colour": 2,
@@ -36,6 +42,13 @@
   }
  ],
  "ours_base": "BF16",
+ "ours_stand_in": {
+  "label": "Q4 (UD-Q4_K_XL)",
+  "benchmarks": [
+   "ifeval",
+   "ifbench"
+  ]
+ },
  "phone_builds": true,
  "benchmarks": [
   {

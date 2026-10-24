@@ -5,7 +5,7 @@ The report file (eval_tasks/reports/on-device.json, `kind: "on_device"`)
 names the rows and where each number comes from; every number is read from
 the board's own tables:
 - ours, measured here: the rows the file names (the step checkpoints and the
-  Q4 baseline), and every phone build with a score on its benchmarks or a
+  Q4 and Q2 baselines), and every phone build with a score on its benchmarks or a
   test on our testers' phones; their scores as the board has them
   (`reports.our_rows`), their file's size as the box measured it
   (`reports.build_file`), a phone speed as someone reported it by hand
@@ -18,7 +18,9 @@ the board's own tables:
 
 Retention is the fair comparison: each source ran its own harness, but each
 ran its model beside its own full-precision base on the same harness — so a
-row's score over its base's, from the same source (ours over our BF16)."""
+row's score over its base's, from the same source (ours over our BF16). 27e:
+on a benchmark our BF16 hasn't run, the file's `ours_stand_in` (our Q4)
+stands in for it, said on every row it serves, until BF16's own comes in."""
 
 from __future__ import annotations
 
@@ -83,6 +85,35 @@ def _ratio(v, base) -> float | None:
     return v / base if isinstance(v, (int, float)) and isinstance(base, (int, float)) and base else None
 
 
+def _has(cells: dict, key: str) -> bool:
+    return isinstance((cells.get(key) or {}).get("v"), (int, float))
+
+
+def stand_in(rep: dict, rows: list[dict], base_ours: dict | None) -> dict | None:
+    """27e: the build standing in for our BF16 on the benchmarks BF16 hasn't
+    run — the file's `ours_stand_in`, on those of its benchmarks it has a
+    score on — with what it keeps of BF16 on the others both have run; None
+    where BF16 has its own on every one"""
+    s = rep.get("ours_stand_in") or {}
+    row = next((r for r in rows if r["label"] == s.get("label")), None)
+    base = (base_ours or {}).get("cells") or {}
+    keys = [k for k in s.get("benchmarks") or []
+            if row and not _has(base, k) and _has(row["cells"], k)]
+    if not keys:
+        return None
+    keeps = [x for b in rep["benchmarks"] if b["key"] not in keys
+             if (x := _ratio((row["cells"].get(b["key"]) or {}).get("v"),
+                             (base.get(b["key"]) or {}).get("v"))) is not None]
+    short, of = row["label"].split(" (")[0], rep.get("ours_base")
+    lo, hi = (f"{100 * min(keeps):.1f}", f"{100 * max(keeps):.1f}") if keeps else ("", "")
+    where = f"{short} keeps {lo if lo == hi else lo + '–' + hi}% of {of} elsewhere" if keeps else ""
+    return {"label": row["label"], "short": short, "for": of, "benchmarks": keys,
+            "keeps": [min(keeps), max(keeps)] if keeps else None,
+            "of": f"our {short}, standing in for {of}", "elsewhere": where,
+            "line": f"of our {short}, standing in for {of}" + (f" ({where})" if where else ""),
+            "cells": row["cells"]}
+
+
 def _phone_of_ours(spec: dict) -> dict:
     """a phone speed of ours — only as someone typed it in from the phone,
     and said so; the board never takes its server's speed for a phone's"""
@@ -108,13 +139,17 @@ def report(rep: dict, cells: dict) -> dict:
     benches = rep["benchmarks"]
     rows = reports.our_rows(rep, cells)
     base_ours = next((r for r in rows if r["label"] == rep.get("ours_base")), None)
+    si = stand_in(rep, rows, base_ours)
     out = []
     for spec, r in zip(rep["ours"], rows):
         if spec.get("base_only"):
             continue
         gb = _gb(r.get("size"))
         sc = {b["key"]: {**r["cells"][b["key"]], "src": "here"} for b in benches}
-        base = (base_ours or {}).get("cells") or {}
+        # 27e: BF16's where it has one, else the stand-in's (never the stand-in's own row)
+        base = {**{k: si["cells"].get(k) for k in (si or {}).get("benchmarks") or []
+                   if si["label"] != r["label"]},
+                **{k: c for k, c in ((base_ours or {}).get("cells") or {}).items() if _has({k: c}, k)}}
         out.append({
             "label": r["label"], "ours": True, "colour": r.get("colour"), "row": r["row"],
             **({"step": r["step"]} if r.get("step") is not None else {}),
@@ -125,11 +160,19 @@ def report(rep: dict, cells: dict) -> dict:
             "memory": {"gb": gb, "words": f"{gb:.1f} GB",
                        "how": "the whole file, loaded on the server; not measured on a phone yet"}
             if gb else None,
+            # 27e: its line under the name ("the original, squeezed to 2 bits — …")
+            **({"what": spec["line"]} if spec.get("line") else {}),
             "phone": _phone_of_ours(spec), "testers": _testers_of(spec, measured, cps), "cells": sc,
             "retention": {} if r is base_ours else {
                 b["key"]: _ratio(sc[b["key"]].get("v"), (base.get(b["key"]) or {}).get("v"))
                 for b in benches if _ratio(sc[b["key"]].get("v"),
-                                           (base.get(b["key"]) or {}).get("v")) is not None}})
+                                           (base.get(b["key"]) or {}).get("v")) is not None},
+            # 27e: which of those are of the stand-in, and the benchmarks a named
+            # build of ours hasn't run ("–" in What each keeps, "not run yet")
+            "keepOf": {k: "stand_in" for k in (si or {}).get("benchmarks") or []
+                       if r is not base_ours and si["label"] != r["label"] and _has(sc, k)},
+            "notRun": [] if spec.get("phone_build") or r is base_ours
+            else [b["key"] for b in benches if not _has(sc, b["key"])]})
     theirs = {t["label"]: t for t in reports.their_rows(rep)}
     from . import reported
     board, al = reported.board_ids(), reported.aliases()
@@ -164,7 +207,8 @@ def report(rep: dict, cells: dict) -> dict:
                           is not None}})
     return {"id": rep["id"], "kind": KIND, "title": rep.get("title") or rep["id"],
             "what": rep.get("what") or "", "benchmarks": reports.bench_meta(benches),
-            "rows": out, "notes": rep.get("notes") or []}
+            "rows": out, "notes": rep.get("notes") or [],
+            "standIn": {k: v for k, v in si.items() if k != "cells"} if si else None}
 
 
 def listing_counts(rep: dict) -> tuple[list[str], int]:
