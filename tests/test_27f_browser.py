@@ -69,10 +69,11 @@ def test_nemotron_on_the_on_device_report(live, page, width, scheme):
                                                "(the model card's data table)")
         assert "published by NVIDIA" in row.locator("[data-mt-line]").inner_text()
         ifb = page.locator(f"[data-od-cell='{NV}|ifbench']")
-        assert ifb.locator(".mt-n").inner_text() == "63.8N"
+        assert ifb.locator(".mt-n").inner_text() == "64.0N"
+        assert "BF16: 63.79" in ifb.get_attribute("data-tip")
         assert ifb.locator("[data-card-link]").get_attribute("href") == CARD
         assert page.locator(f"[data-od-keep='{NV}|ifbench']").inner_text() == (
-            "148.9% of its base")
+            "150.0% of its base")
         for k in ("gpqa", "mmlupro", "ifeval"):
             assert page.locator(f"[data-od-cell='{NV}|{k}']").inner_text().strip() == "–", k
         assert page.locator(f"[data-od-fact='{NV}|memory'] .mt-n").inner_text().startswith(

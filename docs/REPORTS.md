@@ -287,9 +287,12 @@ and kept in `stats.json`; totals over both halves, no question listed.
   by design.
 - **Loops:** the share of answers ending in a loop by the board's rule, of
   all and of those that ran out of room. 27f: the rule reads the part where
-  the answer ended, alone (`fb.ended_in_loop`): the reply of an answer that
-  finished; the thinking of one that ran out inside it; the reply of one that
-  ran out after its thinking closed, or has none. Read on the whole text, a
+  the answer ended, alone (`fb.ended_in_loop`), decided by the reply: an
+  answer that finished, its reply; one that ran out with no reply (nothing
+  but whitespace after its thinking), its thinking; one that ran out partway
+  through its reply, that reply. A served answer's thinking comes back closed
+  even when the limit cut it mid-thought (`service/served.ask`), so the
+  closing tag can't tell where it ended. Read on the whole text, a
   reply drafted in the thinking and written out once repeated its end three
   times and was counted: 81 of the 82 step8804 answers it flagged on IFEval
   and IFBench (the questions the reader shows) were that.
@@ -320,10 +323,11 @@ are ours.
   is measured here for those, and nothing is estimated.
 - **Nemotron-3.5-Bolt-E4B (27f).** Gemma 4 E4B-it trained further by NVIDIA
   (8B total, 4B effective), released 23 Oct 2026. Its card (pinned to the
-  commit read on 24 Oct) gives IFBench alone of our four: 63.79, BF16, NVIDIA's
-  own run under NeMo Gym with reasoning on, beside Gemma 4 E4B-it's 42.84 on
-  the same setup (its base row, `base_only`); the Q4_K_M build's 64.00 and
-  42.67 are in the cells' setting, on hover. Its memory is the 4-bit file's
+  commit read on 24 Oct) gives IFBench alone of our four. The cell is the
+  Q4_K_M file's, the one its memory column is: 64.00, NVIDIA's own run under
+  NeMo Gym with reasoning on, beside Gemma 4 E4B-it's Q4_K_M 42.67 on the same
+  setup (its base row, `base_only`), so it keeps 150.0%; the BF16 pair, 63.79
+  and 42.84, is in the cells' setting, on hover. Its memory is the 4-bit file's
   size from NVIDIA's file list for NVIDIA-Nemotron-3.5-Bolt-E4B-4GB (6.18 GB,
   though the repo's name says 4GB). BFCL-v3 and Tau2-Bench are under "Also
   published". Its row's line, `line`, says it was trained further, not

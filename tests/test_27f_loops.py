@@ -1,9 +1,11 @@
-"""27f: the loop rule on the part where an answer ended, alone — a finished
-answer's reply, the thinking of one that ran out inside it, the reply of one
-that ran out after its thinking closed (or has none). A reply drafted in the
-thinking, checked and written out once is no loop: on step8804's IFEval and
-IFBench, 81 of the 82 answers the whole text flagged were that. Invented
-texts; nothing runs."""
+"""27f: the loop rule on the part where an answer ended, alone, decided by
+its reply — a finished answer's reply; the thinking of one that ran out with
+no reply; the reply of one that ran out partway through it. A served answer
+comes back with its thinking closed even when the limit cut it (service/
+served.ask), so the reply, not the closing tag, says where it ended. A reply
+drafted in the thinking, checked and written out once is no loop: on
+step8804's IFEval and IFBench, 81 of the 82 answers the whole text flagged
+were that. Invented texts; nothing runs."""
 
 from __future__ import annotations
 
@@ -33,12 +35,30 @@ def test_a_reply_drafted_in_the_thinking_is_no_loop():
     assert not fb.ends_in_loop(REPLY)
 
 
+def served(think: str, reply: str) -> str:
+    """an answer as service/served.ask stores it: the thinking always closed"""
+    return f"<think>\n{think}\n</think>\n\n{reply}"
+
+
 def test_a_thinking_loop_that_ran_out_still_is_one():
     t = "<think>\nSome steps.\n" + STUCK               # never closed: cut inside its thinking
     assert think_split(t)[2]
     assert fb.ended_in_loop(t, True)
     # and a tail of nothing but newlines, where the thinking ran out
     assert fb.ended_in_loop("<think>\nSome steps." + "\n" * 1500, True)
+
+
+def test_a_cut_thinking_the_server_closed_is_read_by_its_empty_reply():
+    """the shape of IFBench 206, step8804's real loop: the limit cut it
+    mid-thought, the server closed the block, no reply came"""
+    t = served("Some steps.\n" + STUCK, "")
+    assert not think_split(t)[2]                       # closed: the tag can't tell
+    assert fb.ended_in_loop(t, True)                   # its reply is empty: its thinking
+    assert fb.ended_in_loop(served("Some steps.\n" + STUCK, "  \n\n "), True)  # whitespace only
+    # finished with an empty reply: never read in its thinking
+    assert not fb.ended_in_loop(t, False)
+    # ran out partway through a clean reply after a looping thinking: the reply
+    assert not fb.ended_in_loop(served(STUCK, REPLY), True)
 
 
 def test_a_reply_that_loops_is_one_finished_or_cut():
@@ -62,13 +82,14 @@ def test_a_finished_answer_is_never_read_in_its_thinking():
 
 def test_the_kept_measure_reads_each_answer_s_part():
     texts = [drafted(), "<think>\nSome steps.\n" + STUCK, f"<think>\nShort.\n</think>\n\n{REPLY}",
-             REPLY + "\n" + STUCK]
-    outs = [False, True, False, True]
+             REPLY + "\n" + STUCK, served("Some steps.\n" + STUCK, "")]
+    outs = [False, True, False, True, True]
     rows = [{"runs": [{"ran_out": o}], "texts": [t]} for t, o in zip(texts, outs)]
     got = beyond.loops(rows)
-    # the draft isn't one; the thinking cut in a loop and the looping reply are
-    assert (got["answers"], got["looped"], got["ran_out"], got["ran_out_looped"]) == (4, 2, 2, 2)
-    assert got["share"] == 0.5 and got["share_of_ran_out"] == 1.0
+    # the draft isn't one; the thinking cut in a loop (closed by the server or not)
+    # and the looping reply are
+    assert (got["answers"], got["looped"], got["ran_out"], got["ran_out_looped"]) == (5, 3, 3, 3)
+    assert got["share"] == 0.6 and got["share_of_ran_out"] == 1.0
 
 
 def test_the_kept_measures_are_worked_out_again():

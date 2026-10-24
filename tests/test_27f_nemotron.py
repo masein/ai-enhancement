@@ -1,7 +1,8 @@
 """27f: NVIDIA-Nemotron-3.5-Bolt-E4B on the On-device report and Models,
 published numbers only, as 25c's: its IFBench as NVIDIA's card gives it
-(NVIDIA's own run under NeMo Gym, reasoning on), what it keeps of Gemma 4
-E4B-it on the same setup, its 4-bit file's size from NVIDIA's file list, and
+for the Q4_K_M file (NVIDIA's own run under NeMo Gym, reasoning on), what it
+keeps of Gemma 4 E4B-it's Q4_K_M on the same setup, that file's size from
+NVIDIA's file list — the score and the memory of the same file — and
 its other two numbers under "Also published" — each with its link, entered
 by masein. Its GPQA, MMLU-Pro and IFEval are dashes: the card gives none.
 Nothing is fetched; the card was read at its commit on 24 Oct."""
@@ -37,12 +38,13 @@ def svc(tmp_path, monkeypatch):
 def test_the_file_holds_the_cards_numbers_each_with_its_link():
     t = {x["label"]: x for x in REP["theirs"]}
     nv, base = t[NV], t[BASE]
-    assert nv["ifbench"]["value"] == 63.79 and base["ifbench"]["value"] == 42.84
+    assert nv["ifbench"]["value"] == 64.0 and base["ifbench"]["value"] == 42.67
     for c in (nv["ifbench"], base["ifbench"]):
         assert (c["url"], c["date"], c["published_by"]) == (CARD, "2026-10-23", "NVIDIA")
         assert "NeMo Gym" in c["setting"] and "reasoning mode on" in c["setting"]
-    # the Q4_K_M build's, on hover beside the BF16 number the cell shows
-    assert "64.00" in nv["ifbench"]["setting"] and "42.67" in base["ifbench"]["setting"]
+    # the BF16 pair, on hover beside the Q4_K_M number the cell shows
+    assert "Q4_K_M" in nv["ifbench"]["setting"] and "Q4_K_M" in base["ifbench"]["setting"]
+    assert "BF16: 63.79" in nv["ifbench"]["setting"] and "BF16: 42.84" in base["ifbench"]["setting"]
     assert not {"gpqa", "mmlupro", "ifeval"} & set(nv)            # the card gives none
     assert base["base_only"] is True and nv["base"] == BASE
     f = nv["facts"]
@@ -58,9 +60,9 @@ def test_the_file_holds_the_cards_numbers_each_with_its_link():
 def test_its_row_and_what_it_keeps_of_gemma(svc):
     rows = {r["label"]: r for r in reports.report("on-device")["rows"]}
     r = rows[NV]
-    assert r["cells"]["ifbench"]["v"] == pytest.approx(0.6379)
+    assert r["cells"]["ifbench"]["v"] == pytest.approx(0.64)
     assert all(r["cells"][k]["v"] is None for k in ("gpqa", "mmlupro", "ifeval"))
-    assert round(100 * r["retention"]["ifbench"], 1) == 148.9         # 63.79 of 42.84
+    assert round(100 * r["retention"]["ifbench"], 1) == 150.0         # 64.00 of 42.67
     assert set(r["retention"]) == {"ifbench"}
     assert (r["source"], r["publishedBy"]) == ("published by NVIDIA", "NVIDIA")
     assert r["what"] == "trained further from Gemma 4 E4B, not compressed"

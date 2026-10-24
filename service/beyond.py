@@ -223,7 +223,7 @@ def simpleqa(rows: list[dict]) -> dict:
 def loops(rows: list[dict]) -> dict:
     """the answers ending in a loop by the board's rule, of all and of those
     that ran out of room — 27f: on the part each ended in alone
-    (fb.ended_in_loop): a finished answer's reply, a cut one's thinking"""
+    (fb.ended_in_loop): the reply, or the thinking of one cut before replying"""
     _scripts()
     import frontier as fb
     n = looped = out = out_looped = 0

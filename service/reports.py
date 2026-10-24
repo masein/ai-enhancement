@@ -77,9 +77,10 @@ NOTES = [
     "least three times in the last 20,000. Other papers count loops differently, so compare "
     "these numbers only with each other. "
     # 27f: on the part where the answer ended, alone
-    "It is read on the part where the answer ended: the reply of one that finished, the "
-    "thinking of one that ran out of room there. A reply drafted in the thinking and written "
-    "out once repeats its end across the two, and isn't a loop.",
+    "It is read on the part where the answer ended: the reply of one that finished or ran out "
+    "partway through its reply, the thinking of one that ran out before replying. A reply "
+    "drafted in the thinking and written out once repeats its end across the two, and isn't "
+    "a loop.",
     # 23d: how it thinks, as the brief words them
     "First states the right answer means the first place the thinking says it clearly: \"the "
     "answer is (B)\", the right option's letter with its text, or the exact final answer on MATH "

@@ -49,9 +49,10 @@ SOURCES = {
                     "ifbench": (44.0, GEMMA)},
     "Gemma 4 E2B": {"gpqa": (43.4, None), "mmlupro": (60.0, None), "ifeval": (94.6, GEMMA),
                     "ifbench": (38.0, GEMMA)},
-    # 27f: IFBench alone, BF16, NVIDIA's run under NeMo Gym, reasoning on
-    "NVIDIA-Nemotron-3.5-Bolt-E4B": {"ifbench": (63.79, NV)},
-    "Gemma 4 E4B-it (NVIDIA's run)": {"ifbench": (42.84, NV)},
+    # 27f: IFBench alone, Q4_K_M (the file its memory is), NVIDIA's run under NeMo
+    # Gym, reasoning on
+    "NVIDIA-Nemotron-3.5-Bolt-E4B": {"ifbench": (64.0, NV)},
+    "Gemma 4 E4B-it (NVIDIA's run)": {"ifbench": (42.67, NV)},
 }
 TASK = {b["key"]: b["task"] for b in REP["benchmarks"]}
 # ours, invented: {label: {benchmark: (score, se)}}

@@ -31113,8 +31113,8 @@ async function byLoad(mid) {
 const byPct = (v, k = 0) => v == null ? '—' : (100 * v).toFixed(k) + '%';
 // 27f: on the part where the answer ended, alone
 const BY_LOOP_RULE = 'by the board’s loop rule: the last 200 characters before the end repeat '
-  + 'at least three times in the last 20,000 — read in the reply of an answer that finished, in '
-  + 'the thinking of one that ran out there';
+  + 'at least three times in the last 20,000 — read in the reply of an answer that finished or '
+  + 'ran out partway through it, in the thinking of one that ran out before replying';
 // the sentences, each measure's — on the model page and in the report's hover
 function byRelWords(r, label) {
   if (!r || !r.n) return `${label}: no question graded on every run yet.`;

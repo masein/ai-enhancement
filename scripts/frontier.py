@@ -867,16 +867,21 @@ def ends_in_loop(text: str) -> bool:
 
 
 def ended_in_loop(text: str, ran_out: bool) -> bool:
-    """27f: the loop rule on the part where the answer ended, alone — an
-    answer that finished, its reply; one that ran out of room inside its
-    thinking (a block never closed), that thinking; one that ran out in its
-    reply (or has no thinking), its reply. With thinking on, a reply drafted
-    in the thinking, checked and written out once repeats its last passage
-    three times across the two, and is no loop: on step8804's IFEval and
-    IFBench, 81 of the 82 answers the whole text flagged were that"""
+    """27f: the loop rule on the part where the answer ended, alone, decided
+    by its reply — an answer that finished: its reply; one that ran out with
+    no reply (nothing but whitespace after its thinking): its thinking; one
+    that ran out partway through its reply: that reply. A served answer's
+    thinking comes back closed even when the limit cut it mid-thought
+    (service/served.ask writes the reasoning between <think> and </think>), so
+    whether a block closed can't tell where it ended; the reply can. With
+    thinking on, a reply drafted in the thinking, checked and written out once
+    repeats its last passage three times across the two, and is no loop: on
+    step8804's IFEval and IFBench, 81 of the 82 answers the whole text
+    flagged were that"""
     from frontier_graders import think_split
     reply, thoughts, unclosed = think_split(text, strip=False)
-    return ends_in_loop("\n\n".join(thoughts) if ran_out and unclosed else reply)
+    cut_thinking = ran_out and (unclosed or not reply.strip())
+    return ends_in_loop("\n\n".join(thoughts) if cut_thinking else reply)
 
 
 def read_choice(text: str, letters: str = LETTERS) -> str | None:
