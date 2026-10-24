@@ -70,7 +70,8 @@ def test_the_on_device_report(live, page, width, scheme):
     # row with no score yet (step8804's) counted under the table
     group = lambda g: page.eval_on_selector_all(                            # noqa: E731
         f"[data-od-table] tr[data-mt-group='{g}']", "rs => rs.map(r => r.dataset.odRow)")
-    assert group("ours") == ["Q4 (UD-Q4_K_XL)", "step4000", "step1000"]
+    # 27e: and Q2, our same-size baseline
+    assert group("ours") == ["Q4 (UD-Q4_K_XL)", "Q2 (UD-Q2_K_XL)", "step4000", "step1000"]
     assert group("open") == ["Edge0-35B-A3B-preview", "Edge0-8B-A1B-preview", "Ternary Bonsai 2 9B",
                              "Ternary Bonsai 2 4B", "Gemma 4 E4B", "Gemma 4 E2B",
                              "Ternary Bonsai 2 2B", "Bonsai 27B (1-bit)"]
@@ -102,15 +103,16 @@ def test_the_on_device_report(live, page, width, scheme):
             f"[data-od-{chart}-dot]", "ds => ds.map(d => [d.dataset.od" + chart.capitalize()
             + "Dot.split(':')[1], d.tagName, d.getAttribute('fill')])")
         assert marks, chart
-        ours = {"step8804", "step4000", "step1000", "Q4 (UD-Q4_K_XL)"}
+        ours = {"step8804", "step4000", "step1000", "Q4 (UD-Q4_K_XL)", "Q2 (UD-Q2_K_XL)"}
         for label, tag, fill in marks:
             if label in ours:
                 assert tag == "circle" and fill.startswith("var(--s"), (chart, label, tag, fill)
             else:
                 assert tag == "path" and fill == "var(--surface-1)", (chart, label, tag, fill)
     assert page.locator("[data-od-keep-dot='gpqa:Edge0-35B-A3B-preview']").count() == 1
+    # 27e: a line wider than the names' column wraps between words, not into the plot
     assert page.locator("[data-od-base='gpqa:Edge0-35B-A3B-preview']").evaluate(
-        "e => e.firstChild.textContent") == (
+        "e => [...e.querySelectorAll('tspan')].map(t => t.textContent).join(' ')") == (
         "of Qwen3.6-35B-A3B fp16")
     notes = page.locator("[data-report-section='notes']").inner_text()
     assert "Edge0-35B is built from the same base as our builds" in notes

@@ -87,6 +87,10 @@
   }
  ],
  "reference": "Q4 (UD-Q4_K_XL)",
+ "baselines": [
+  "Q2 (UD-Q2_K_XL)",
+  "Q4 (UD-Q4_K_XL)"
+ ],
  "training": {
   "label": "Training steps",
   "references": [

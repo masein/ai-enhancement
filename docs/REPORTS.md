@@ -43,7 +43,16 @@ import or a grading batch.
     them, and its setting;
   - `check_14oct`, the values Epoch's data had on 14 Oct, used by the tests;
 - `loops`: the MMLU-Pro questions of the loop examples, each with a note;
-- `reference`: the model the token line compares against;
+- `reference`: the model near the ceiling is read from (it scores 90% or
+  more there) and the loop examples are set beside;
+- `baselines` (27e): the builds the viewer can compare against, the first the
+  default — Q2 (UD-Q2_K_XL), the same size as our checkpoints (12.6 GB, to
+  step4000's 13.6 and step8804's 15.8), then Q4 (22.9 GB). A switch in the
+  report's head picks one (`&base=` in the link). The lines that name a
+  baseline follow it: instruction following's question-by-question sentence,
+  Across training's line against it and its dashed line (BF16 stays beside
+  it), and the thinking-tokens line. Every number stays as it is; the server
+  works the lines out for each baseline from what the stats worker keeps;
 - `page`: the full page (below), its file in `eval_tasks/reports/pages/`, its
   starting pick and its datasets; and on a reference row, `page_status`, the
   status the page shows for it ("7–8 Oct, Qwen's card settings");
@@ -296,8 +305,10 @@ cd ~/benchmarks/aienh && time sudo docker compose exec -T bench python -m servic
 others): of the models that can run on a phone, which are best — and where
 are ours.
 
-- **Rows.** Ours, measured here: the step checkpoints and the Q4 baseline,
-  and every phone build with a score on the report's benchmarks. The others,
+- **Rows.** Ours, measured here: the step checkpoints, the Q4 baseline and
+  (27e) Q2, "the original, squeezed to 2 bits — our same-size baseline" (a
+  row's `line`), and every phone build with a score on the report's
+  benchmarks. The others,
   published: Edge0-35B and -8B, Bonsai 27B (1-bit), Ternary Bonsai 2 2B, 4B
   and 9B, and Gemma 4 E4B and E2B. Nothing is measured here for those, and
   nothing is estimated.
@@ -311,6 +322,13 @@ are ours.
   source. For a published model, that is its maker's base row
   (`base_only`), entered like the others but never a row on Models (the
   card's `report_only`). For ours, it is our BF16.
+- **A stand-in base (27e).** On a benchmark our BF16 hasn't run, the file's
+  `ours_stand_in` (our Q4, on IFEval and IFBench) stands in for it. Each row
+  it serves says so — "of our Q4, standing in for BF16 (Q4 keeps 100.0–100.3%
+  of BF16 elsewhere)", the range read from the other benchmarks both have —
+  and the panel's note says it once. When BF16's own score comes in, it
+  replaces the stand-in by itself and the line goes. A build of ours that
+  hasn't run a benchmark is a "–" in its panel, "not run yet" on hover.
 - **Where the numbers live.** Scores come from the board's own tables
   (measured) and its card entries (published). The other facts (size,
   memory, speeds, what else was published) are in the file, each with its
