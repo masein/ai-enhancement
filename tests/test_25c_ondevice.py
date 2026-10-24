@@ -23,6 +23,9 @@ B27 = ("https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit/blob/"
        "ef22f239c670078e1507f9769bcaa66657332b96/README.md")
 B2 = "https://prismml.com/news/bonsai-2-family"
 GEMMA = "https://arxiv.org/abs/2607.02770"
+# 27f: NVIDIA's card, pinned to the commit read on 24 Oct
+NV = ("https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-BF16/blob/"
+      "49843eed8db1f1c616c47af75cfd36e07aec0667/README.md")
 # the sources' own tables, as each was checked: {row: {benchmark key: (value, link)}}
 SOURCES = {
     "Edge0-35B-A3B-preview": {"gpqa": (79.8, E0), "mmlupro": (81.0, E0), "ifbench": (57.9, E0)},
@@ -46,6 +49,10 @@ SOURCES = {
                     "ifbench": (44.0, GEMMA)},
     "Gemma 4 E2B": {"gpqa": (43.4, None), "mmlupro": (60.0, None), "ifeval": (94.6, GEMMA),
                     "ifbench": (38.0, GEMMA)},
+    # 27f: IFBench alone, Q4_K_M (the file its memory is), NVIDIA's run under NeMo
+    # Gym, reasoning on
+    "NVIDIA-Nemotron-3.5-Bolt-E4B": {"ifbench": (64.0, NV)},
+    "Gemma 4 E4B-it (NVIDIA's run)": {"ifbench": (42.67, NV)},
 }
 TASK = {b["key"]: b["task"] for b in REP["benchmarks"]}
 # ours, invented: {label: {benchmark: (score, se)}}
@@ -100,7 +107,8 @@ def test_entered_by_masein_each_once_and_a_base_never_a_row(svc, capsys):
     # Edge0's 3 and 3 and its bases' 3 and 3, Bonsai 27B's 2 and its base's 2,
     # Ternary Bonsai 2's 9 and its bases' 9; Gemma 4's four each are 25b's
     # entries, the same cells: already there
-    assert "34 card numbers entered by masein, 8 already there" in out.splitlines()[-1]
+    # 27f: and NVIDIA's two IFBench numbers
+    assert "36 card numbers entered by masein, 8 already there" in out.splitlines()[-1]
     cards = [r for r in db.reported_scores() if r.get("source") == "card"]
     assert all(c["by"] == "masein" for c in cards)
     v = reported.view([])
@@ -188,4 +196,4 @@ def test_a_reported_model_is_never_in_an_average_or_rank(svc):
     ids = [r["id"] for r in svc.get("/api/reports").json()["reports"]]
     assert ids == ["ran-out-of-room", "step-checkpoints", "paired", "on-device", "testers"]
     assert ondevice.listing_counts(REP) == (["step8804", "step4000", "step1000",
-                                             "Q4 (UD-Q4_K_XL)", "Q2 (UD-Q2_K_XL)"], 8)  # 27e
+                                             "Q4 (UD-Q4_K_XL)", "Q2 (UD-Q2_K_XL)"], 9)  # 27e, 27f

@@ -201,6 +201,10 @@ def report(rep: dict, cells: dict) -> dict:
             "phone": f.get("phone") or {"none": "no phone numbers published"},
             "speed": f.get("speed") or [], "also": f.get("also") or [],
             "paper": f.get("paper") or "", "cells": sc,
+            # 27f: its own line ("trained further from Gemma 4 E4B, not compressed"),
+            # and what a reader should know of it on hover
+            **({"what": spec["line"], "whatTip": spec.get("line_tip") or ""}
+               if spec.get("line") else {}),
             "retention": {b["key"]: _ratio(sc[b["key"]].get("v"), (base.get(b["key"]) or {}).get("v"))
                           for b in benches
                           if _ratio(sc[b["key"]].get("v"), (base.get(b["key"]) or {}).get("v"))

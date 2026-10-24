@@ -900,7 +900,7 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
         cut = [r.get("answer") or "" for r in ans.values()
                if fb.ran_out(r.get("answer") or "", r.get("finish"))]
         if cut:
-            loops = sum(1 for x in cut if fb.ends_in_loop(x))
+            loops = sum(1 for x in cut if fb.ended_in_loop(x, True))       # 27f
             lines.append(f"{t}: {len(cut):,} of these {len(ans):,} answers ran out of room, "
                          f"{loops:,} of them ending in a loop (the last passage repeating) — "
                          "for information")

@@ -285,8 +285,17 @@ and kept in `stats.json`; totals over both halves, no question listed.
   paper's harmonic mean of the two. The board's score (A of all) doesn't
   change. Our prompt carries Epoch AI's "guessing game" line, so tries are high
   by design.
-- **Loops:** the share of answers ending in a loop by the board's rule
-  (`fb.ends_in_loop`), of all and of those that ran out of room.
+- **Loops:** the share of answers ending in a loop by the board's rule, of
+  all and of those that ran out of room. 27f: the rule reads the part where
+  the answer ended, alone (`fb.ended_in_loop`), decided by the reply: an
+  answer that finished, its reply; one that ran out with no reply (nothing
+  but whitespace after its thinking), its thinking; one that ran out partway
+  through its reply, that reply. A served answer's thinking comes back closed
+  even when the limit cut it mid-thought (`service/served.ask`), so the
+  closing tag can't tell where it ended. Read on the whole text, a
+  reply drafted in the thinking and written out once repeated its end three
+  times and was counted: 81 of the 82 step8804 answers it flagged on IFEval
+  and IFBench (the questions the reader shows) were that.
 
 They show on a model page's Scores tab ("Beyond the score", closed unless
 opened, its header the HLE calibration error), and on the step-checkpoints
@@ -310,8 +319,21 @@ are ours.
   row's `line`), and every phone build with a score on the report's
   benchmarks. The others,
   published: Edge0-35B and -8B, Bonsai 27B (1-bit), Ternary Bonsai 2 2B, 4B
-  and 9B, and Gemma 4 E4B and E2B. Nothing is measured here for those, and
-  nothing is estimated.
+  and 9B, Gemma 4 E4B and E2B, and (27f) NVIDIA-Nemotron-3.5-Bolt-E4B. Nothing
+  is measured here for those, and nothing is estimated.
+- **Nemotron-3.5-Bolt-E4B (27f).** Gemma 4 E4B-it trained further by NVIDIA
+  (8B total, 4B effective), released 23 Oct 2026. Its card (pinned to the
+  commit read on 24 Oct) gives IFBench alone of our four. The cell is the
+  Q4_K_M file's, the one its memory column is: 64.00, NVIDIA's own run under
+  NeMo Gym with reasoning on, beside Gemma 4 E4B-it's Q4_K_M 42.67 on the same
+  setup (its base row, `base_only`), so it keeps 150.0%; the BF16 pair, 63.79
+  and 42.84, is in the cells' setting, on hover. Its memory is the 4-bit file's
+  size from NVIDIA's file list for NVIDIA-Nemotron-3.5-Bolt-E4B-4GB (6.18 GB,
+  though the repo's name says 4GB). BFCL-v3 and Tau2-Bench are under "Also
+  published". Its row's line, `line`, says it was trained further, not
+  compressed; `line_tip`, on hover, that its training seed data includes
+  IFEval prompts (the card's data table). NVIDIA's letter is N, its family
+  colour its own.
 - **Columns.** Base model, size on disk, the memory it needs, phone speed
   (the device named, or "no phone numbers yet"), what our testers' phones
   measured (26: our phone build's decode and engine memory, per phone),

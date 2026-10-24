@@ -3245,7 +3245,7 @@ CSS = r"""
   --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
   --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948;
   /* 27c: the On-device charts' families of published models, one hue each */
-  --fam-edge0:#0e8fa3; --fam-bonsai:#a86b12; --fam-gemma:#5f7f12;
+  --fam-edge0:#0e8fa3; --fam-bonsai:#a86b12; --fam-gemma:#5f7f12; --fam-nvidia:#9c3d8f;
 }
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) .viz-root {
@@ -3261,7 +3261,7 @@ CSS = r"""
     --heat-5:color-mix(in srgb, var(--accent) 34%, var(--surface-1));
     --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
     --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
-    --fam-edge0:#35b9cc; --fam-bonsai:#d39a45; --fam-gemma:#9bbd3d;
+    --fam-edge0:#35b9cc; --fam-bonsai:#d39a45; --fam-gemma:#9bbd3d; --fam-nvidia:#d27fc8;
   --warning-text:#fab219; --critical-text:#ef6b6b;
   }
 }
@@ -3278,7 +3278,7 @@ CSS = r"""
   --heat-5:color-mix(in srgb, var(--accent) 34%, var(--surface-1));
   --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
   --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
-    --fam-edge0:#35b9cc; --fam-bonsai:#d39a45; --fam-gemma:#9bbd3d;
+    --fam-edge0:#35b9cc; --fam-bonsai:#d39a45; --fam-gemma:#9bbd3d; --fam-nvidia:#d27fc8;
   --warning-text:#fab219; --critical-text:#ef6b6b;
 }
 /* dim: slate blue-grey, softer than the near-black dark theme (the GitHub /
@@ -3297,7 +3297,7 @@ CSS = r"""
   --heat-5:color-mix(in srgb, var(--accent) 34%, var(--surface-1));
   --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
   --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
-    --fam-edge0:#35b9cc; --fam-bonsai:#d39a45; --fam-gemma:#9bbd3d;
+    --fam-edge0:#35b9cc; --fam-bonsai:#d39a45; --fam-gemma:#9bbd3d; --fam-nvidia:#d27fc8;
   --warning-text:#fab219; --critical-text:#ef6b6b;
 }
 * { box-sizing:border-box; }
@@ -5832,6 +5832,8 @@ table.rp.pt-checks td.pt-reply { text-align:left; white-space:pre-wrap; overflow
 .od-legend { display:flex; flex-wrap:wrap; gap:4px 16px; margin:6px 0 10px; color:var(--text-secondary); }
 .od-leg { display:inline-flex; align-items:center; gap:5px; }
 .od-legmark { width:14px; height:14px; flex:none; }
+/* 27f: a row's line with more on hover */
+.od-tip { text-decoration:underline dotted; text-underline-offset:2px; cursor:help; }
 /* 27b: a report's table runs its full height; it scrolls sideways only */
 .mt-box.free { max-height:none; overflow-y:hidden; }
 /* 27b: a number measured on our testers' phones, the row's dot before it */
@@ -13664,7 +13666,7 @@ function displayName(m) {
 // ---- the groups: ours, open models, closed models --------------------------
 // whether a published model's weights are open: its name says (no source
 // carries it). Kept here, one list: a Hugging Face repo, or a family known open
-const MT_OPEN_RE = /\/|gemma|gpt-oss|llama|qwen|qwq|deepseek|mistral|mixtral|\bphi-|stablelm|tinyllama|bonsai|edge0|ornith|\bling\b|granite|smollm|pythia|\bopt-|lfm|youtu|nanbeige|olmo|kimi|\bglm|minimax/i;
+const MT_OPEN_RE = /\/|gemma|gpt-oss|llama|qwen|qwq|deepseek|mistral|mixtral|\bphi-|stablelm|tinyllama|bonsai|edge0|ornith|\bling\b|granite|smollm|pythia|\bopt-|lfm|youtu|nanbeige|olmo|kimi|\bglm|minimax|nemotron/i;
 // someone else's model served or measured here as a GGUF (Ornith-1.5, Bonsai 2):
 // an open model with a filled dot, not one of ours
 const MT_OUTSIDE_RE = /^(ornith|bonsai|gemma|llama|deepseek|gpt-oss|mistral|phi|granite|smollm|pythia|qwen[23](?:\.5)?-)/i;
@@ -13724,14 +13726,14 @@ function mtLine(m, o = {}) {
 
 // ---- where a published number is from: a letter, the key under the table --
 const MT_LETTERS = { E: 'Epoch AI', Q: 'Qwen', G: 'Google', P: 'PrismML', X: 'Edge0',
-  C: 'model card', A: 'Artificial Analysis', D: 'DeviceMark' };
+  N: 'NVIDIA', C: 'model card', A: 'Artificial Analysis', D: 'DeviceMark' };
 function mtLetter(src, by = '') {
   if (src === 'epoch' || src === 'epoch_external') return 'E';
   if (src === 'aa') return 'A';
   if (src === 'devicemark') return 'D';
   const b = String(by || '').toLowerCase();
   return /qwen|alibaba/.test(b) ? 'Q' : /google/.test(b) ? 'G' : /prism/.test(b) ? 'P'
-    : /edge0/.test(b) ? 'X' : 'C';
+    : /edge0/.test(b) ? 'X' : /nvidia/.test(b) ? 'N' : 'C';             // 27f: NVIDIA
 }
 
 // ---- one column a benchmark: the names others give it, and its header ------
@@ -29725,8 +29727,9 @@ function odMark(ours, cx, cy, colour, attrs = {}) {
         'stroke-width': 1.6, 'data-od-shape': 'diamond', ...attrs });
 }
 // 27c: a published model's family, one hue on every panel; ours their own colours
+// 27f: and NVIDIA's Nemotron, before Gemma (it is trained from one)
 const OD_FAMS = [['edge0', 'Edge0', /edge0/i], ['bonsai', 'Bonsai', /prism|bonsai/i],
-  ['gemma', 'Gemma', /google|gemma/i]];
+  ['nvidia', 'NVIDIA', /nvidia|nemotron/i], ['gemma', 'Gemma', /google|gemma/i]];
 function odFamily(r) {
   if (r.ours) return null;
   const f = OD_FAMS.find(([, , re]) => re.test(`${r.publishedBy || ''} ${r.maker || ''} ${r.label}`));
@@ -29736,7 +29739,7 @@ function odFamily(r) {
 const odColour = r => r.ours ? rpColour(r) : odFamily(r).colour;
 // a chart's short name: "Edge0-35B", "Bonsai 2 9B", "Gemma E4B", "Q4"
 const odShort = label => trShort(String(label).replace(/-A\d+B-preview$/, '')
-  .replace(/^Ternary /, '').replace(/ \(1-bit\)$/, '').replace(/^Gemma 4 /, 'Gemma '));
+  .replace(/^NVIDIA-Nemotron-[\d.]+-/, 'Nemotron ').replace(/^Ternary /, '').replace(/ \(1-bit\)$/, '').replace(/^Gemma 4 /, 'Gemma '));
 // a base's name without whose run it was ("of Qwen3.5 9B"), the whole in its tooltip
 const odBase = label => String(label || '').replace(/ \([^)]*run\)$/, '')
   .replace(/, measured here$/, '');
@@ -29857,8 +29860,11 @@ function odSpec(id, d) {
       colour: r.ours ? (r.colour != null ? rpColour(r) : base ? base.colour : 'var(--accent)') : null,
       name: base ? base.name : displayName({ name: r.label, published: !r.ours }),
       full: r.label + (r.kind ? `\n${r.kind}` : '') + (r.base ? `\nbase: ${r.base}` : ''),
-      // 27e: ours' own line ("the original, squeezed to 2 bits — our same-size baseline")
-      line: [of ? `of ${of}` : '', r.what || '', r.kind || '',
+      // 27e: ours' own line ("the original, squeezed to 2 bits — our same-size baseline");
+      // 27f: a published model's own says what it is instead, the rest on hover
+      line: r.what && !r.ours ? [el('span', { class: r.whatTip ? 'od-tip' : null,
+        'data-od-what': r.label, title: r.whatTip || null, text: r.what }), src]
+        : [of ? `of ${of}` : '', r.what || '', r.kind || '',
         ...(r.ours ? [] : parts.line.filter(w => !String(r.kind || '').includes(w))),
         r.ours && r.phoneBuild ? 'phone build' : '', src],
       group: r.ours ? 'ours' : mtGroup({ name: r.label }, true, r.maker),
@@ -31105,8 +31111,10 @@ async function byLoad(mid) {
     setTimeout(() => { if (state.model === mid) byLoad(mid); }, 5000);
 }
 const byPct = (v, k = 0) => v == null ? '—' : (100 * v).toFixed(k) + '%';
+// 27f: on the part where the answer ended, alone
 const BY_LOOP_RULE = 'by the board’s loop rule: the last 200 characters before the end repeat '
-  + 'at least three times in the last 20,000';
+  + 'at least three times in the last 20,000 — read in the reply of an answer that finished or '
+  + 'ran out partway through it, in the thinking of one that ran out before replying';
 // the sentences, each measure's — on the model page and in the report's hover
 function byRelWords(r, label) {
   if (!r || !r.n) return `${label}: no question graded on every run yet.`;

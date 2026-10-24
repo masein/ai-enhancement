@@ -180,7 +180,7 @@ def test_the_charts_labels_never_meet_nor_cover_a_point(live, page, width):
     assert 0 < sum(len(p["labels"]) for p in panels) < sum(len(p["marks"]) for p in panels)
     # one legend above the four: each family once, in its hue
     fams = page.eval_on_selector_all("[data-od-leg-family]", "ls => ls.map(l => l.dataset.odLegFamily)")
-    assert fams == ["edge0", "bonsai", "gemma"]
+    assert fams == ["edge0", "bonsai", "gemma", "nvidia"]                # 27f: and Nemotron
     assert page.locator("[data-od-mem-frontier]").count() == 4
     report(page, live, "step-checkpoints", width=width, wait="[data-sz-panel]")
     sz = page.evaluate(LABELS, "[data-sz-panel]")

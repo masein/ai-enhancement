@@ -143,13 +143,15 @@ def render(slot: str, item: dict, run: dict) -> str:
     raise KeyError(slot)
 
 
-def think_split(text: str) -> tuple[str, list[str], bool]:
+def think_split(text: str, strip: bool = True) -> tuple[str, list[str], bool]:
     """18b: (the text outside every thinking block, each block's thinking,
     whether one never closed) — every block wherever it sits, not only one
     at the start; a reply that begins inside its thinking (its template
     opened <think> in the prompt: a </think> before any <think>) has that
     first part as thinking; a block never closed runs to the end. Linear:
-    found by position, never by a pattern that backtracks"""
+    found by position, never by a pattern that backtracks. 27f: `strip`
+    False keeps the reply's ends as written (the loop rule reads a tail of
+    nothing but newlines as a loop)"""
     t = text or ""
     thoughts: list[str] = []
     c, o = t.find("</think>"), t.find("<think>")
@@ -170,7 +172,8 @@ def think_split(text: str) -> tuple[str, list[str], bool]:
             break
         thoughts.append(t[o + len("<think>"):c])
         i = c + len("</think>")
-    return "".join(out).replace("</think>", "").strip(), thoughts, unclosed
+    reply = "".join(out).replace("</think>", "")
+    return (reply.strip() if strip else reply), thoughts, unclosed
 
 
 def _visible(text: str) -> str:
