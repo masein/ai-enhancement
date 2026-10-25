@@ -15,12 +15,19 @@ On the server, in the board's container, never in CI (it asks a model):
 
 --provider: served:<a served model's id>, llama:<a llama-server's /v1 URL>,
 openrouter:<model> (paid: ask first). Default: ASSISTANT_PROVIDER, else the
-Playground's Q4. It reads the board and writes nothing but its output."""
+Playground's Q4. It reads the board and writes nothing but its output and
+every answer it got, raw, to BENCH_ROOT/assistant/evals/ (internal, as the
+log is) — so a change to the grading or the board can be scored again on
+the same answers, without asking the model:
+
+    sudo docker compose exec -T bench python scripts/assistant_eval.py \
+        --rescore /results/assistant/evals/<the run's file>.jsonl"""
 
 from __future__ import annotations
 
 import argparse
 import json
+import re
 import statistics
 import sys
 import time
@@ -43,13 +50,22 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--half", default="", choices=("", "work", "held"),
                     help="one half of the bank alone (tune on work)")
     ap.add_argument("--limit", type=int, default=0)
-    ap.add_argument("--json", default="", help="also write each answer here, a line each")
+    ap.add_argument("--json", default="", help="write each answer here, a line each (default: "
+                    "BENCH_ROOT/assistant/evals/<time>-<provider>.jsonl)")
+    ap.add_argument("--rescore", default="", help="a run's answers file: resolve and grade them "
+                    "again, asking nothing")
     a = ap.parse_args(argv)
-    from service import assistant, db
+    from service import assistant, config, db
     db.init()
     prov = a.provider or assistant.provider()
     bank_path = Path(a.bank) if a.bank else assistant.BANK_FILE
     bank = [json.loads(x) for x in bank_path.read_text(encoding="utf-8").splitlines() if x.strip()]
+    kept = {}
+    if a.rescore:
+        kept = {r["id"]: r for r in (json.loads(x) for x in Path(a.rescore).read_text(
+            encoding="utf-8").splitlines() if x.strip())}
+        bank = [b for b in bank if b["id"] in kept]
+        prov = next(iter(kept.values()), {}).get("provider") or prov
     if a.only:
         bank = [b for b in bank if b["scenario"] in a.only.split(",")]
     if a.half:
@@ -60,35 +76,48 @@ def main(argv: list[str] | None = None) -> int:
     system, sch = assistant.prompt(cat), assistant.schema(cat)
     per: dict[tuple[str, str], list[bool]] = defaultdict(list)
     times, misses, tokens, rows = [], [], [], []
-    print(f"{len(bank)} questions, asked of {prov}; the prompt is {len(system):,} characters",
-          flush=True)
+    print(f"{len(bank)} questions, " + (f"{prov}'s answers kept in {a.rescore} graded again"
+                                        if a.rescore else f"asked of {prov}")
+          + f"; the prompt is {len(system):,} characters", flush=True)
     for i, b in enumerate(bank, 1):
-        user = assistant.user_message(b["q"], b.get("prev"), cat["today"], cat)
-        t0 = time.time()
-        try:
-            got = assistant.call(system, user, sch, prov)
-            raw, err = got["raw"], ""
-            if (got.get("usage") or {}).get("prompt_tokens"):
-                tokens.append(got["usage"]["prompt_tokens"])
-        except assistant.Down as e:
-            raw, err = "", f"down: {e}"
-        ms = round(1000 * (time.time() - t0))
+        if a.rescore:
+            k = kept[b["id"]]
+            raw, err, ms, tok = (k.get("raw") or "", k.get("error") or "", k.get("ms") or 0,
+                                 k.get("tokens"))
+        else:
+            user = assistant.user_message(b["q"], b.get("prev"), cat["today"], cat)
+            t0, tok = time.time(), None
+            try:
+                got = assistant.call(system, user, sch, prov)
+                raw, err = got["raw"], ""
+                tok = (got.get("usage") or {}).get("prompt_tokens")
+            except assistant.Down as e:
+                raw, err = "", f"down: {e}"
+            ms = round(1000 * (time.time() - t0))
         times.append(ms)
+        if tok:
+            tokens.append(tok)
         act = assistant.parse(raw)
-        res = assistant.resolve(act, cat, b["q"], (b.get("prev") or {}).get("q") or "") if act \
+        pv = b.get("prev") or {}
+        res = assistant.resolve(act, cat, b["q"], pv.get("q") or "", pv.get("action")) if act \
             else None
-        ok = bool(res) and assistant.same(res, b["want"], cat)
+        ok = bool(res) and assistant.same(res, b["want"], cat, b.get("prev"))
         per[(b["scenario"], b.get("half") or "work")].append(ok)
         rows.append({"id": b["id"], "scenario": b["scenario"], "half": b.get("half") or "work",
                      "q": b["q"], "ok": ok, "ms": ms, "raw": raw, "got": res, "want": b["want"],
-                     "error": err})
+                     "error": err, "provider": prov, "tokens": tok})
         if not ok:
             misses.append(rows[-1])
-        if i % 25 == 0:
+        if i % 25 == 0 and not a.rescore:
             print(f"  {i} of {len(bank)} asked", flush=True)
-    if a.json:
-        Path(a.json).write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows),
-                                encoding="utf-8")
+    if not a.rescore:
+        out = Path(a.json) if a.json else (
+            Path(config.BENCH_ROOT) / "assistant" / "evals"
+            / f"{time.strftime('%Y%m%d-%H%M')}-{re.sub(r'[^A-Za-z0-9.]+', '-', prov)[-60:]}.jsonl")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows),
+                       encoding="utf-8")
+        print(f"Every answer is kept in {out}", flush=True)
     def rate(v):
         return f"{sum(v)}/{len(v)} ({100 * sum(v) / len(v):.0f}%)" if v else "–"
     print(f"\n{prov}\n")

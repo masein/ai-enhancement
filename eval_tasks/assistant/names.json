@@ -1,5 +1,5 @@
 {
- "about": "28: the assistant's names (service/assistant.py, docs/ASSISTANT.md). models: a board id (thinking row or not) or a model's exact name -> what people call it; phones: a phone's model code -> what people call it; reports: a report's id -> its other names; benchmarks: the assistant's key -> the names people type; topics: what `explain` can say, each from the board's own words (`from`: notes:<first words of a report note>, desc:<task>, page:<a text the page keeps>); examples: a few questions and their actions, for the prompt — never the test bank's. Plain names only; this file goes to the public mirror.",
+ "about": "28: the assistant's names (service/assistant.py, docs/ASSISTANT.md). models: a board id (thinking row or not) or a model's exact name -> what people call it; phones: a phone's model code -> what people call it; reports: a report's id -> its other names; places: a place on the top bar -> its other names; benchmarks: the assistant's key -> the names people type; topics: what `explain` can say, each from the board's own words (`from`: notes:<first words of a report note>, desc:<task>, page:<a text the page keeps>); examples: a few questions and their actions, for the prompt — never the test bank's. Plain names only; this file goes to the public mirror.",
  "models": {
   "served/step8804-lda-2610": [
    "step8804",
@@ -355,13 +355,14 @@
    }
   ],
   [
-   "ran-out report for step1000",
+   "ran-out report for step1000 on MATH",
    {
     "do": {
      "action": "open_page",
      "page": "report",
      "report": "ran-out report",
-     "model": "step1000"
+     "model": "step1000",
+     "benchmark": "MATH"
     }
    }
   ],
@@ -576,6 +577,35 @@
    "ran out of room",
    "the ran-out report",
    "ran-out"
+  ]
+ },
+ "places": {
+  "home": [
+   "overview",
+   "start page",
+   "front page"
+  ],
+  "runs": [
+   "run list",
+   "the queue",
+   "jobs"
+  ],
+  "benchmarks": [
+   "catalogue",
+   "catalog",
+   "benchmark list",
+   "questions"
+  ],
+  "playground": [
+   "chat",
+   "try a model"
+  ],
+  "improve": [
+   "pipeline"
+  ],
+  "reports": [
+   "report list",
+   "all reports"
   ]
  }
 }

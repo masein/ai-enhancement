@@ -62,6 +62,10 @@ modelling's cross-entropy table (a row per task and model) keep their own.
   - Our team's builds are Ours: `local/` checkpoints, and served or GGUF
     builds that aren't someone else's model.
   - Ornith and Bonsai measured here are open models with a filled dot.
+  - Bonsai and Edge0 are on the board from their published numbers only
+    (25c). A row of theirs measured here before that says so on its line and
+    its name's hover: Bonsai 2 27B (ternary, PQ2_0), "measured here on 7 Oct,
+    before Bonsai went to published numbers only" (`PUBLISHED_ONLY`).
   - Whether a published model is open comes from one rule on its name
     (`MT_OPEN_RE`). No source carries it.
 - **Header.** The short name on the first line, never cut (GPQA, MATH L5,

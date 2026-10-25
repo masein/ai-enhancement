@@ -42,12 +42,19 @@ ACTIONS = ("open_page", "compare", "best_on", "chart", "phone", "boxes", "explai
 # model), so the two can't be mixed up
 PAGES = ("models_table", "model_page", "report", "runs", "benchmarks", "playground", "improve",
          "home")
-OTHER_PAGES = ("runs", "benchmarks", "playground", "improve", "home")
+OTHER_PAGES = ("runs", "benchmarks", "playground", "improve", "reports", "home")
+# 28d: the top bar's places, by name; their other names are names.json's
+PLACE_NAMES = {"home": "Home", "models": "Models", "runs": "Runs", "benchmarks": "Benchmarks",
+               "playground": "Playground", "improve": "Improve", "reports": "Reports"}
 VIEWS = ("latest", "standard", "frontier", "mobile", "everyday", "exam")
-# a Models tab's groups (Group ▾), by view
+# a Models tab's groups (Group ▾), by view, with the names the page gives them
 GROUPS = {"standard": ("knowledge", "commonsense", "reasoning", "math", "trust", "instruction",
                        "lm"),
           "mobile": ("devicemark", "mobileaibench", "mmlu")}
+GROUP_NAMES = {"knowledge": "Knowledge", "commonsense": "Commonsense", "reasoning": "Reasoning",
+               "math": "Math", "trust": "Trust & safety", "instruction": "Instruction & maths",
+               "lm": "Language modelling", "devicemark": "DeviceMark",
+               "mobileaibench": "MobileAIBench", "mmlu": "Mobile-MMLU"}
 ONLY = ("ours", "open", "closed")
 THINKING = ("default", "on", "off", "both")
 WHEN = ("any", "today", "7d", "30d", "month", "since_checkpoint", "since_model", "range")
@@ -92,6 +99,8 @@ OPEN_RE = re.compile(r"/|gemma|gpt-oss|llama|qwen|qwq|deepseek|mistral|mixtral|\
                      r"tinyllama|bonsai|edge0|ornith|\bling\b|granite|smollm|pythia|\bopt-|lfm|"
                      r"youtu|nanbeige|olmo|kimi|\bglm|minimax|nemotron", re.I)
 THINK = " · thinking"
+# a row's settings after its model's id: " · thinking", " · lookahead 1"
+SETTINGS_RE = re.compile(r"(?: · (?:thinking|lookahead \d+))+$")
 
 
 # ---------------------------------------------------------------------------
@@ -135,7 +144,9 @@ def norm(s: str) -> str:
 
 
 def entity_of(row: str) -> str:
-    return str(row).removesuffix(THINK)
+    """the model a row is a setting of (28d: thinking on or off, lookahead 1
+    — one model, never asked between)"""
+    return str(row).split(" · ")[0]
 
 
 def _rep_files() -> dict:
@@ -157,10 +168,12 @@ def catalog(payload: dict | None = None) -> dict:
     for m in payload.get("models") or []:
         mid = m["id"]
         e = entity_of(mid)
-        x = models.setdefault(e, {"id": e, "name": str(m.get("name") or e).removesuffix(THINK),
+        x = models.setdefault(e, {"id": e, "name": SETTINGS_RE.sub("", str(m.get("name") or e)),
                                   "rows": [], "published": False, "aliases": [],
                                   "added": None, "tested": None})
         x["rows"].append(mid)
+        if mid == e and m.get("name"):                     # the plain row's name, as written
+            x["name"] = str(m["name"])
         # the first row's added, the last row's tested
         for k, at, better in (("added", m.get("addedAt"), min), ("tested", m.get("testedAt"), max)):
             if isinstance(at, (int, float)):
@@ -316,7 +329,6 @@ def schema(cat: dict) -> dict:
     as enums. Every name — a model, benchmark, report, phone or app — is a
     string as the person wrote it: the board matches it, and asks back when
     several match"""
-    groups = sorted({g for gs in GROUPS.values() for g in gs})
     e = lambda xs: {"type": "string", "enum": list(xs)}            # noqa: E731
     name = {"type": "string"}
     names_ = {"type": "array", "items": name, "minItems": 1, "maxItems": 9}
@@ -329,7 +341,7 @@ def schema(cat: dict) -> dict:
                 "required": ["action", *(["page"] if page else []), *required],
                 "additionalProperties": False}
     actions = {"anyOf": [
-        branch("open_page", {"view": e(VIEWS), "group": e(groups), "show": e(("table", "chart")),
+        branch("open_page", {"view": e(VIEWS), "group": name, "show": e(("table", "chart")),
                              "only": e(ONLY), "search": name, "columns": names_,
                              "models": names_, "phone_builds": {"type": "boolean"},
                              "sort": name, "sort_dir": e(("desc", "asc")),
@@ -341,7 +353,7 @@ def schema(cat: dict) -> dict:
         branch("open_page", {"report": name, "a": name, "b": name, "benchmark": name,
                              "side": e(SIDES), "base": name, "model": name, "phone": name,
                              "app": name}, ["report"], page="report"),
-        branch("open_page", {"page": e(OTHER_PAGES), "benchmark": name}, ["page"]),
+        branch("open_page", {"page": name, "benchmark": name}, ["page"]),
         branch("compare", {"models": names_, "benchmarks": names_, "measure": e(MEASURES),
                            "thinking": e(THINKING)}, ["models"]),
         branch("best_on", {"benchmark": name, "among": e(AMONG),
@@ -363,21 +375,21 @@ RULES = """You turn one message about the team's model benchmark board into acti
 You never answer it yourself and never write a number: the board runs the action and shows its own numbers.
 
 Actions and their fields:
-- open_page, page=models_table: a Models tab (the tables of every model). view (latest, standard, frontier, mobile, everyday, exam) only when the message names one; group (standard: knowledge, commonsense, reasoning, math, trust, instruction, lm; mobile: devicemark, mobileaibench, mmlu); show=chart for its chart; only (ours, open, closed); search: words to search for; columns: the benchmarks to show as columns; sort: a benchmark, avg or name, with sort_dir (desc is best first, asc lowest first); thinking (on, off, both; "hide the thinking-off rows" is on); when (today, 7d, 30d, month, since_checkpoint, since_model with since, range with from and to as YYYY-MM-DD) and date (tested, or added); models: the models to show alone; phone_builds=true: only the phone builds.
-- open_page, page=model_page: one model's own page. model; benchmark opens its answers on that benchmark; beside: another model's answers beside them.
-- open_page, page=report: report. For the two-builds reader: a, b, benchmark, side (a_better: questions a got right and b wrong; b_better: b right and a wrong). For the step checkpoints: base, the baseline (Q2 or Q4). For the ran-out report: model and benchmark. For the testers' report: phone and app open the newest test's panel.
-- open_page, page=runs, benchmarks (benchmark: its questions), playground, improve or home.
-- compare: models (1 to 8) on benchmarks (none: the usual ones). measure: score (default), keeps (what it keeps of its own base), ran_out, loops. One model and one benchmark is "what's X's score". thinking only when the message says thinking.
+- open_page, page=models_table: a Models tab (the tables of every model). view (latest, standard, frontier, mobile, everyday, exam) only when the message names one; group: a group of the tab, as the message names it (Standard's Knowledge, Commonsense, Reasoning, Math, Trust & safety, Instruction & maths, Language modelling; Mobile's DeviceMark, MobileAIBench, Mobile-MMLU); show=chart for its chart; only (ours, open, closed); search: words to search for; columns: the benchmarks to show as columns; sort: a benchmark, avg or name, with sort_dir (desc is best first, asc lowest first); thinking (on, off, both; "hide the thinking-off rows" is on); when (today, 7d, 30d, month, since_checkpoint, since_model with since, range with from and to as YYYY-MM-DD) and date (tested, or added); models: the models to show alone; phone_builds=true: only the phone builds.
+- open_page, page=model_page: one model's own page, when the message asks for its page or its answers. model; benchmark opens its answers on that benchmark; beside: another model's answers beside them.
+- open_page, page=report: report. For the two-builds reader: a, b, benchmark, side (a_better: questions a got right and b wrong; b_better: b right and a wrong). For the step checkpoints: base, the baseline (Q2 or Q4). For the ran-out report: model and benchmark — both when the message names them. For the testers' report: phone and app open the newest test's panel.
+- open_page, page: any other place on the board, as the message names it (Runs, Benchmarks — "the catalogue" —, Playground, Improve, Reports, Home). benchmark: its card on Benchmarks ("the GPQA questions").
+- compare: models (1 to 8) on benchmarks (leave them out for the usual ones). measure: score (default), keeps (what it keeps of its own base), ran_out, loops. One model and one benchmark ("X's gpqa", "what did X get on Y") is compare, not its page. thinking when the message says thinking on or off.
 - best_on: benchmark; among (all, ours, open, closed, phone: the models that run on a phone); n (default 3).
-- chart: chart (bars: models on one benchmark; checkpoints: a line over our training checkpoints; size: score against file size; memory: score against the memory each needs); benchmark; only; models.
-- phone: what our testers' phones measured. app: the phone app's model; phone: the phone (none: every phone); measure: decode for "how fast", speed or tok/s (the default); prefill, ttft (time to first token), memory, temperature, all.
+- chart: chart (bars: models on one benchmark; checkpoints: a line over our training checkpoints; size: score against file size; memory: score against the memory each needs); benchmark; only (ours, open or closed, when the message says so — "the phone models" isn't ours); models.
+- phone: what our testers' phones measured. app: the phone app's model; phone: a phone the message names — leave it out for every phone ("on phones", "which phone"); measure: decode for "how fast", speed or tok/s (the default); prefill, ttft (time to first token), memory, temperature, all ("everything").
 - boxes: what is running — runs, rented boxes, the server, how long a run has left, when it finishes or ends. which (all, rented, server); model for one model's run.
-- explain: topic (a benchmark is bench:<key>).
+- explain: topic, from the topics list (a benchmark's is bench:…). "What's X", "what does X mean", "explain X" for a word the board uses is explain — also when the message names a report: then open the report as the second action.
 - clarify: only when the message names nothing at all ("it", "the two", "that one") and there is no previous action. about (model, benchmark, report, phone, other).
 - cant: anything that would change the board (start, queue, stop, delete, change a setting, spend, grade, upload) or isn't about the board. kind (start_run, stop_run, delete, settings, spend, grade, upload, outside).
 
 Rules:
-- Write every name — model, benchmark, report, phone, app — as the person wrote it ("step one", "8804", "the q4", "the arc one", "the report about phones", "the galaxy"). The board matches names and asks back when several match: never choose between them yourself, and never clarify for a name.
+- Write every name — model, benchmark, report, group, place, phone, app — in the message's own words ("step one", "8804", "the q4", "the arc one", "the report about phones", "the galaxy"), never a name from the lists below that the message doesn't use. The board matches names and asks back when several match: never choose between them yourself, and never clarify for a name.
 - Leave out every field the message doesn't ask for.
 - A follow-up: you get the previous action. Keep it, and change only what the new message changes ("and on HLE?" changes the benchmarks; "and q2?" the models).
 - Two requests in one message: "do" the first and "then" the second, each a whole action. One request: "do" alone.
@@ -392,9 +404,8 @@ def prompt(cat: dict) -> str:
         f"{m['name']}" + (f" | also: {', '.join(m['aliases'])}" if m['aliases'] else "")
         + f" | {m['group']}" + (" | phone" if m["phone"] else "")
         + (" | published" if m["published"] else "") for m in cat["models"])
-    bs = "\n".join(f"{b['key']} | {b['label']}" + (f" | also: {', '.join(b['aliases'])}"
-                                                    if b["aliases"] else "")
-                   for b in cat["benchmarks"])
+    bs = "\n".join(b["label"] + (f" | also: {', '.join(x for x in b['aliases'] if x != b['label'])}"
+                                  if b["aliases"] else "") for b in cat["benchmarks"])
     rs = "\n".join(f"{r['title']}" + (f" | also: {', '.join(r['aliases'])}" if r.get("aliases")
                                      else "") for r in cat["reports"])
     ps = "\n".join(f"{p['name']}" + (f" | {p['maker']}" if p["maker"] else "")
@@ -402,26 +413,42 @@ def prompt(cat: dict) -> str:
                    for p in cat["phones"])
     ap = "\n".join(f"{a['name']}" + (f" | also: {', '.join(a['aliases'])}" if a.get("aliases")
                                      else "") for a in cat["apps"])
+    pl = "\n".join(PLACE_NAMES[p] + (f" | also: {', '.join(x)}" if x else "")
+                   for p in OTHER_PAGES for x in [(names().get("places") or {}).get(p) or []])
     ts = "\n".join(f"{t['key']} | {t['title']}" for t in cat["topics"])
     ex = "\n".join(f"Message: {q}\nReply: {json.dumps(a, ensure_ascii=False)}"
                    for q, a in names().get("examples") or [])
-    return (RULES + f"\nModels (name | other names | group):\n{ms}\n\nBenchmarks (key | name):\n"
-            f"{bs}\n\nReports (title | other names):\n{rs}\n\nOur testers' phones (name | maker | other "
-            f"names):\n{ps}\n\nThe phone app's models:\n{ap}\n\nTopics:\n{ts}\n\nExamples:\n{ex}\n")
+    return (RULES + "\nWhat the board holds — to know what there is; a name is still written in "
+            f"the message's words:\n\nModels (name | other names | group):\n{ms}\n\nBenchmarks "
+            f"(name | other names):\n{bs}\n\nReports (title | other names):\n{rs}\n\nPlaces "
+            f"(name | other names):\n{pl}\n\nOur testers' phones (name | maker | other names):\n"
+            f"{ps}\n\nThe phone app's models:\n{ap}\n\nTopics:\n{ts}\n\nExamples:\n{ex}\n")
 
 
 def as_named(a: dict | None, cat: dict) -> dict | None:
-    """an action as the model writes it: each model by its name, not its id —
-    the previous action a follow-up keeps"""
+    """an action as the model writes it: each model, benchmark, report and
+    group by its name, not the board's id — the previous action a follow-up
+    keeps"""
     if not a:
         return None
     out = {k: v for k, v in a.items() if k not in ("candidates", "then")}
-    for k in ("model", "beside", "a", "b", "base", "since"):
-        if isinstance(out.get(k), str) and any(m["id"] == out[k] for m in cat["models"]):
-            out[k] = _label(cat, out[k])
-    if isinstance(out.get("models"), list):
-        out["models"] = [_label(cat, x) if any(m["id"] == x for m in cat["models"]) else x
-                         for x in out["models"]]
+    mids = {m["id"] for m in cat["models"]}
+    keys = {b["key"]: b["label"] for b in cat["benchmarks"]}
+    one = {"model": lambda x: _label(cat, x) if x in mids else x,
+           "bench": lambda x: keys.get(x, x)}
+    for k, kind in (("model", "model"), ("beside", "model"), ("a", "model"), ("b", "model"),
+                    ("base", "model"), ("since", "model"), ("benchmark", "bench"),
+                    ("sort", "bench"), ("models", "model"), ("benchmarks", "bench"),
+                    ("columns", "bench")):
+        if isinstance(out.get(k), str):
+            out[k] = one[kind](out[k])
+        elif isinstance(out.get(k), list):
+            out[k] = [one[kind](x) for x in out[k]]
+    if out.get("report"):
+        out["report"] = next((r["title"] for r in cat["reports"] if r["id"] == out["report"]),
+                             out["report"])
+    if out.get("group"):
+        out["group"] = GROUP_NAMES.get(out["group"], out["group"])
     return out
 
 
@@ -600,32 +627,32 @@ def _model_items(cat: dict) -> list[tuple[str, list[str]]]:
 
 
 def model_id(x, cat: dict) -> tuple[str | None, list[str]]:
-    """(the model's id, or None and the candidates: several that match, or the
-    nearest when none does)"""
+    """(the model's id, or None and the candidates: the models that match —
+    none when nothing does)"""
     ids = {m["id"] for m in cat["models"]}
     if x in ids:
         return x, []
     if isinstance(x, str) and entity_of(x) in ids:
         return entity_of(x), []
     got = _match(_bare(x), _model_items(cat))
-    return (got[0], []) if len(got) == 1 else (None, got[:6] or nearest(str(x), cat))
+    return (got[0], []) if len(got) == 1 else (None, got[:6])
+
+
+def _bench_items(cat: dict) -> list[tuple[str, list[str]]]:
+    """a benchmark by its names — 28d: not its key, so "arc" is every ARC"""
+    return [(b["key"], [b["label"], *b["aliases"]]) for b in cat["benchmarks"]]
 
 
 def nearest(term: str, cat: dict, about: str = "model") -> list[str]:
-    """a few candidates for a name: the matches, else the closest by name"""
+    """a few candidates for a name: the ones that match it (28d: never the
+    closest of those that don't)"""
     items = {"model": _model_items(cat),
-             "benchmark": [(b["key"], [b["key"], b["label"], *b["aliases"]])
-                           for b in cat["benchmarks"]],
-             "report": [(r["id"], [r["id"], r["title"]]) for r in cat["reports"]],
+             "benchmark": _bench_items(cat),
+             "report": [(r["id"], [r["id"], r["title"], *r.get("aliases", [])])
+                        for r in cat["reports"]],
              "phone": [(p["name"], [p["name"], p["maker"], p["code"], *p.get("aliases", [])])
                        for p in cat["phones"]]}.get(about) or []
-    got = _match(term, items)
-    if got:
-        return got[:6]
-    t = norm(term)
-    scored = sorted(((max((difflib.SequenceMatcher(None, t, norm(n)).ratio() for n in ns),
-                          default=0), i) for i, ns in items), reverse=True)
-    return [i for r, i in scored[:4] if r > 0.3]
+    return _match(_bare(term), items)[:6]
 
 
 def bench_key(x, cat: dict) -> str | None:
@@ -636,13 +663,8 @@ def bench_key(x, cat: dict) -> str | None:
 def bench_of(x, cat: dict) -> tuple[str | None, list[str]]:
     """the benchmark a name means, or None and the candidates ("the arc one"
     is ARC-AGI-2, ARC-Challenge and ARC-Easy: asked back)"""
-    keys = {b["key"] for b in cat["benchmarks"]}
-    if x in keys:
-        return x, []
-    got = _match(_bare(x), [(b["key"], [b["key"], b["label"], *b["aliases"]])
-                            for b in cat["benchmarks"]])
-    return (got[0], []) if len(got) == 1 else (None, got[:6] or nearest(str(x), cat,
-                                                                         "benchmark"))
+    got = _match(_bare(x), _bench_items(cat))
+    return (got[0], []) if len(got) == 1 else (None, got[:6])
 
 
 def app_name(x, cat: dict) -> tuple[str | None, list[str]]:
@@ -666,7 +688,86 @@ def report_id(x, cat: dict) -> tuple[str | None, list[str]]:
     if any(x == i for i, _ in items):
         return x, []
     got = _match(_bare(x), items)
-    return (got[0], []) if len(got) == 1 else (None, got[:6] or nearest(str(x), cat, "report"))
+    return (got[0], []) if len(got) == 1 else (None, got[:6])
+
+
+def place_of(x) -> str | None:
+    """a place on the top bar a name means: its name or another one
+    ("the benchmarks catalogue", "the GPQA questions" are Benchmarks) — the
+    longest name in the words wins"""
+    t = f" {' '.join(re.findall(r'[a-z0-9]+', str(x or '').lower()))} "
+    best = (0, None)
+    for pid, label in PLACE_NAMES.items():
+        for n in (pid, label, *((names().get("places") or {}).get(pid) or [])):
+            w = " ".join(re.findall(r"[a-z0-9]+", n.lower()))
+            if w and f" {w} " in t and len(w) > best[0]:
+                best = (len(w), pid)
+    return best[1]
+
+
+def group_of(x, view: str | None) -> tuple[str | None, str | None]:
+    """(a Models group a name means, the tab it is on): "mobile-mmlu" is
+    Mobile's Mobile-MMLU, "maths" Standard's Math"""
+    views = [view] if view in GROUPS else list(GROUPS)
+    items = [(g, [g, GROUP_NAMES[g]]) for v in views for g in GROUPS[v]]
+    got = _match(_bare(x), items)
+    if len(got) != 1:
+        return None, None
+    return got[0], next(v for v in GROUPS if got[0] in GROUPS[v])
+
+
+# 28d: what is never a name: a date, "none" or "every…", a page's name
+NOT_A_NAME = re.compile(r"^(?:\d{4}-\d{2}-\d{2}.*|today|yesterday|none|null|n/?a|nothing|any|all|"
+                        r"every|everything|every ?(?:phone|model|benchmark)s?|all (?:the )?"
+                        r"(?:phones|models|benchmarks)|(?:the )?(?:models_table|model_page|report|"
+                        r"page|tab|home|runs|benchmarks|playground|improve|reports|models))$", re.I)
+
+
+def _a_name(x) -> bool:
+    return isinstance(x, str) and bool(x.strip()) and not NOT_A_NAME.match(x.strip())
+
+
+# the words a run of the person's words neither starts nor ends with
+RUN_STOP = {"the", "a", "an", "show", "open", "me", "my", "our", "what", "whats", "how", "is",
+            "its", "it", "and", "that", "this", "about", "with", "on", "of", "for", "which",
+            "please", "pls", "vs", "versus", "to", "in", "at", "by", "did", "does", "do", "get",
+            "got", "give", "compare", "against", "one", "s", "was", "were", "has", "have", "go",
+            "chart", "find", "same", "then", "also", "only", "just", "i", "you", "we", "or"}
+
+
+def _runs(said: str, n: int = 4) -> list[str]:
+    """the runs of up to n of the person's words, longest first"""
+    ws = re.findall(r"[a-z0-9][a-z0-9.\-+_]*", said.lower())
+    out = []
+    for k in range(min(n, len(ws)), 0, -1):
+        for i in range(len(ws) - k + 1):
+            if ws[i] not in RUN_STOP and ws[i + k - 1] not in RUN_STOP:
+                out.append(" ".join(ws[i:i + k]))
+    return list(dict.fromkeys(out))
+
+
+def _as_written(x, said: str, match, drop: bool = True) -> str | None:
+    """28d: a name as the person wrote it. One the messages hold is theirs.
+    One they don't is the model's own choice: kept when some of the person's
+    words mean that one alone ("Q4 (UD-Q4_K_XL)" for "the q4"); the person's
+    words instead when they mean it among others ("Qwen3.6-35B-A3B" for "the
+    qwen3.6 model", "testers" for "the report about phones": asked back); and
+    when nothing they wrote means it, left out as if not written (a model or
+    an app) or kept (a report, benchmark or phone can be what the message
+    asks for without its name: "what step8804 got wrong that Q4 got right")"""
+    if not isinstance(x, str) or norm(x) in norm(said):
+        return x
+    target = match(x)
+    if len(target) != 1:
+        return x                      # not one thing: matched, and asked back, as written
+    among = ""
+    for run in _runs(said):
+        got = match(run)
+        if target[0] in got:
+            if len(got) == 1:
+                return x
+            among = among or run      # the longest
+    return among or (None if drop else x)
 
 
 def _bare(x) -> str:
@@ -705,6 +806,9 @@ FIELDS = {
     "clarify": ("about", "term"),
     "cant": ("kind",),
 }
+# the fields each report's link takes
+REPORT_FIELDS = {"paired": ("a", "b", "benchmark", "side"), "step-checkpoints": ("base",),
+                 "ran-out-of-room": ("model", "benchmark"), "testers": ("phone", "app")}
 DEFAULTS = {"measure": {"compare": "score", "phone": "decode"}, "among": {"best_on": "all"},
             "n": {"best_on": 3}, "which": {"boxes": "all"}, "show": {"open_page": "table"},
             "thinking": {"open_page": "default", "compare": "default", "best_on": "default"},
@@ -713,42 +817,93 @@ DEFAULTS = {"measure": {"compare": "score", "phone": "decode"}, "among": {"best_
 
 
 def _ask_back(about: str, term: str, cands: list[str], keep: dict) -> dict:
+    """several match: ask which. 28d: none does — no clarify without choices:
+    "I couldn't find it", and a search for it"""
+    if not cands:
+        return {"action": "not_found", "about": about, "term": str(term),
+                **({"then": keep["then"]} if keep.get("then") else {})}
     return {"action": "clarify", "about": about, "term": str(term), "candidates": cands,
             **({"then": keep["then"]} if keep.get("then") else {})}
 
 
-def resolve(a: dict, cat: dict, q: str = "", prev_q: str = "") -> dict:
+NAME_FIELDS = ("model", "beside", "a", "b", "base", "since", "models", "benchmark",
+               "benchmarks", "columns", "report", "phone", "app", "sort")
+
+
+def resolve(a: dict, cat: dict, q: str = "", prev_q: str = "",
+            prev_action: dict | None = None) -> dict:
     """the action as the board will run it: every model, benchmark and report
-    its id, every app its name, the fields the action (or its page) doesn't
-    take dropped, a view or thinking setting no message named left out,
-    defaults left out — or a clarify naming what it couldn't place, its
-    candidates the board's. A second action ("then") resolved the same way"""
+    its id, every app its name, a place on the top bar its page, the fields
+    the action (or its page) doesn't take dropped, a name the person didn't
+    write taken as they wrote it, a view or thinking setting no message named
+    left out, defaults left out — or a clarify naming what it couldn't place,
+    its candidates the board's, or "not found" when nothing matches. A second
+    action ("then") resolved the same way"""
     act = a.get("action")
     if act not in ACTIONS:
         return {"action": "cant", "kind": "outside"}
+    then = resolve({k: v for k, v in a["then"].items() if k != "then"}, cat, q, prev_q,
+                   prev_action) if (isinstance(a.get("then"), dict)
+                                    and a["then"].get("action") in ACTIONS) else None
     page = a.get("page") if act == "open_page" else None
-    if act == "open_page" and page not in PAGE_FIELDS and page not in OTHER_PAGES:
-        page = "models_table"
+    if act == "open_page" and page not in PAGE_FIELDS:
+        # 28d: another place, by its name as written ("the catalogue")
+        place = place_of(page) or place_of(q)
+        page = "models_table" if place == "models" else place
+        if page is None:
+            return _ask_back("page", str(a.get("page") or q), [], {"then": then})
     keep = PAGE_FIELDS.get(page) or (("benchmark",) if page else FIELDS[act])
     out: dict = {"action": act, **({"page": page} if page else {})}
     for k in keep:
         if k in a and a[k] not in (None, "", [], False):
             out[k] = a[k]
+    if page == "benchmarks" and "benchmark" not in out:
+        for r in _runs(str(a.get("page") or "")):      # "the GPQA questions": its card
+            if bench_of(r, cat)[0]:
+                out["benchmark"] = r
+                break
+    # 28d: a date, "none" or a page's name is never a model, benchmark,
+    # report, phone or app: left out, as if not written
+    for k in NAME_FIELDS:
+        if k == "sort" and out.get(k) in ("avg", "name"):
+            continue
+        if isinstance(out.get(k), list):
+            out[k] = [x for x in out[k] if _a_name(x)]
+        if k in out and not (out[k] if isinstance(out[k], list) else _a_name(out[k])):
+            out.pop(k)
+    if act == "chart" and out.get("chart", "bars") != "bars":
+        out.pop("only", None)                     # a report's chart: its own models
+        out.pop("models", None)
+    if q:
+        _written(out, cat, " ".join((q, prev_q, json.dumps(as_named(prev_action, cat) or {},
+                                                            ensure_ascii=False))))
+    if out.get("when") == "since_model" and "since" not in out:
+        out.pop("when")
     # 28c: a tab or a thinking setting neither this message nor the one before
     # names is the board's to leave out — "only ours" stays on the tab you're on
     said = f"{q} {prev_q}"
-    if "view" in out and not VIEW_WORDS.search(said):
+    if "group" in out:
+        g, v = group_of(out["group"], out.get("view"))
+        out.pop("group")
+        if g:
+            out.update(group=g, view=out.get("view") or v)
+    if "view" in out and not VIEW_WORDS.search(said) and not (
+            "group" in out and re.search(re.escape(GROUP_NAMES[out["group"]]).replace(
+                r"\-", "[- ]?"), said, re.I)):
         out.pop("view")
         out.pop("group", None)
     if "thinking" in out and not THINK_WORDS.search(said):
         out.pop("thinking")
-    if isinstance(a.get("then"), dict) and a["then"].get("action") in ACTIONS:
-        out["then"] = resolve({k: v for k, v in a["then"].items() if k != "then"}, cat, q, prev_q)
+    if then:
+        out["then"] = then
     if "report" in out:
         rid, cands = report_id(out["report"], cat)
         if rid is None:
             return _ask_back("report", out["report"], cands, out)
         out["report"] = rid
+        # 28d: the fields that report doesn't use left out ("app" on the ran-out report)
+        for k in set(PAGE_FIELDS["report"]) - {"report", *REPORT_FIELDS.get(rid, ())}:
+            out.pop(k, None)
     # models: each name the board's id; several match, or none: ask back
     if "models" in out:
         got = []
@@ -765,6 +920,10 @@ def resolve(a: dict, cat: dict, q: str = "", prev_q: str = "") -> dict:
             if mid is None:
                 return _ask_back("model", out[k], cands, out)
             out[k] = mid
+    # 28d: a phone that is no phone but the app's model ("step8804") is the app
+    if "phone" in out and not phones_of(out["phone"], cat) and "app" not in out and (
+            "app" in keep) and app_name(out["phone"], cat)[0]:
+        out["app"] = out.pop("phone")
     if "app" in out:
         got, cands = app_name(out["app"], cat)
         if got is None:
@@ -792,6 +951,12 @@ def resolve(a: dict, cat: dict, q: str = "", prev_q: str = "") -> dict:
         if key is None:
             return _ask_back("benchmark", out["sort"], cands, out)
         out["sort"] = key
+    # a name the action needs that nobody wrote: asked for
+    need = {"compare": ("models", "model"), "best_on": ("benchmark", "benchmark"),
+            "model_page": ("model", "model"), "report": ("report", "report")}.get(page or act)
+    if need and need[0] not in out:
+        act, out = "clarify", {"action": "clarify", "about": need[1],
+                               **({"then": out["then"]} if out.get("then") else {})}
     if act == "clarify":
         about = out.get("about") or "model"
         out["candidates"] = nearest(out.get("term") or "", cat, about) if out.get("term") else []
@@ -803,6 +968,44 @@ def resolve(a: dict, cat: dict, q: str = "", prev_q: str = "") -> dict:
     return defaults(out)
 
 
+def _written(out: dict, cat: dict, said: str) -> None:
+    """each name in the action as the person wrote it (_as_written)"""
+    ids = {m["id"] for m in cat["models"]}
+    items = _model_items(cat)
+
+    def model(t):
+        return [t] if t in ids else [entity_of(t)] if entity_of(t) in ids else _match(
+            _bare(t), items)
+    reps = [(r["id"], [r["id"], r["title"], *r.get("aliases", [])]) for r in cat["reports"]]
+    apps = [(x["name"], [x["name"], x["id"], *x.get("aliases", [])]) for x in cat["apps"]]
+    match = {"model": model, "bench": lambda t: _match(_bare(t), _bench_items(cat)),
+             "report": lambda t: _match(_bare(t), reps),
+             "app": lambda t: _match(str(t), apps),
+             "phone": lambda t: phones_of(t, cat)}
+    for k, kind in (("models", "model"), ("model", "model"), ("beside", "model"), ("a", "model"),
+                    ("b", "model"), ("base", "model"), ("since", "model"),
+                    ("benchmarks", "bench"), ("columns", "bench"), ("benchmark", "bench"),
+                    ("sort", "bench"), ("report", "report"), ("app", "app"), ("phone", "phone")):
+        if k not in out or (k == "sort" and out[k] in ("avg", "name")):
+            continue
+        drop = kind in ("model", "app")
+        if isinstance(out[k], list):
+            ys = [_as_written(x, said, match[kind], drop) for x in out[k]]
+            # several the person's same words mean ("the three bonsai 2 models"):
+            # the model spelt out what they wrote, kept
+            twice = {y for y in ys if y and ys.count(y) > 1 and y not in out[k]}
+            out[k] = [x if y in twice else y for x, y in zip(out[k], ys) if y]
+            out[k] = list(dict.fromkeys(out[k]))
+            if not out[k]:
+                out.pop(k)
+        else:
+            y = _as_written(out[k], said, match[kind], drop)
+            if y:
+                out[k] = y
+            else:
+                out.pop(k)
+
+
 def defaults(a: dict) -> dict:
     """the action with its defaults left out, so two that mean the same are equal"""
     act = a.get("action")
@@ -812,19 +1015,38 @@ def defaults(a: dict) -> dict:
     return out
 
 
-def same(got: dict, want: dict, cat: dict | None = None) -> bool:
-    """an evaluation's pass: the same action with the same fields, lists as
+def same(got: dict, want: dict, cat: dict | None = None, prev: dict | None = None) -> bool:
+    """an evaluation's pass, by what the person sees (28d): the same action
+    with the same fields after the board's defaults and matching, lists as
     sets; a phone as the phones it matches, a search's words as matched; a
     clarify by what it asks about (its candidates are the board's); a second
-    request offered (`then`) when the bank's has one. `want` may name others
-    that are as good (`also`)"""
+    request offered (`then`) when the bank's has one. And what looks different
+    but shows the same:
+    - boxes: every run (which=all) shows the rented ones and the server's;
+    - keeps: a base the board shows anyway beside the models (BF16 by Q2);
+    - a refusal is a refusal: its kind changes only the words;
+    - a follow-up's new models or benchmarks ("and on HLE?", "same for
+      step1000") alone, or beside what was shown (`prev`, the bank's);
+    - a Models tab a follow-up doesn't name is the tab it is on;
+    - one model on one benchmark: its page opened on that benchmark states
+      the number, as compare does.
+    `want` may name others that are as good (`also`)"""
     for w in [want, *(want.get("also") or [])]:
-        if _same(got, {k: v for k, v in w.items() if k != "also"}, cat):
+        if _same(got, {k: v for k, v in w.items() if k != "also"}, cat, prev):
             return True
     return False
 
 
-def _same(got: dict, want: dict, cat: dict | None) -> bool:
+def _bases() -> set[str]:
+    """the models the On-device report shows as a base (BF16) or a stand-in
+    for one (Q4 on IFEval and IFBench)"""
+    od = _rep_files().get("on-device") or {}
+    labs = {od.get("ours_base"), (od.get("ours_stand_in") or {}).get("label")}
+    return {entity_of(o["row"]) for o in od.get("ours") or []
+            if o.get("label") in labs or o.get("base_only")}
+
+
+def _same(got: dict, want: dict, cat: dict | None, prev: dict | None = None) -> bool:
     def key(a):
         out = {}
         for k, v in defaults(a).items():
@@ -840,8 +1062,30 @@ def _same(got: dict, want: dict, cat: dict | None) -> bool:
         if not isinstance(got.get("then"), dict) or not _same(got["then"], want["then"], cat):
             return False
     g, w = key(got), key(want)
-    if w.get("action") == "clarify":
-        return g.get("action") == "clarify" and g.get("about", "model") == w.get("about", "model")
+    if w.get("action") == "clarify":                # "not found" is its no-choices clarify
+        return g.get("action") in ("clarify", "not_found") and g.get("about", "model") == w.get(
+            "about", "model")
+    if w["action"] == g["action"] == "cant":
+        return True
+    if w["action"] == g["action"] == "boxes" and "which" not in g:
+        w.pop("which", None)
+    if w["action"] == "compare" and g.get("page") == "model_page" and "beside" not in g and (
+            len(w.get("models") or []) == 1 and len(w.get("benchmarks") or []) == 1
+            and not w.get("measure") and not w.get("thinking")):
+        g = {"action": "compare", "models": [g.get("model")],
+             **({"benchmarks": [g["benchmark"]]} if g.get("benchmark") else {})}
+    if w.get("measure") == "keeps" and g.get("measure") == "keeps" and "models" in g:
+        bases = _bases() - set(w.get("models") or [])
+        g["models"] = [m for m in g["models"] if m not in bases]
+    pa = (prev or {}).get("action") or {}
+    for k in ("models", "benchmarks", "columns"):
+        p = set(pa.get(k) or [])
+        if p and k in g and k in w and set(w[k]) != p and set(w[k]) <= set(g[k]) <= set(w[k]) | p:
+            g[k] = w[k]
+    if pa.get("page") == "models_table" and pa.get("view"):
+        for x in (g, w):
+            if x.get("page") == "models_table":
+                x.setdefault("view", pa["view"])
     return g == w
 
 
@@ -987,16 +1231,20 @@ def open_page(a: dict, cat: dict) -> dict:
         mid = a.get("model")
         if not mid:
             return clarify({"about": "model", "term": "", "candidates": []}, cat)
-        row = pick_row(cat, mid, [b["task"] for b in cat["benchmarks"]], "default")
+        b = _bench(cat, a["benchmark"]) if a.get("benchmark") else None
+        row = pick_row(cat, mid, [b["task"]] if b else [x["task"] for x in cat["benchmarks"]],
+                       "default")
         link = "#model=" + _q(row)
         said = f"Opened {_label(cat, mid)}’s page"
-        if a.get("benchmark"):
-            b = _bench(cat, a["benchmark"])
+        if b:
             link += "&answers=" + _q(b["task"])
             said += f", its answers on {b['label']}"
             if a.get("beside"):
                 link += "&vs=" + _q(pick_row(cat, a["beside"], [b["task"]], "default"))
                 said += f" beside {_label(cat, a['beside'])}"
+            else:                       # 28d: one model, one benchmark — its number
+                x = value(cat, mid, b["key"])
+                said += f": {_stated(cat, mid, x)}" if x else "; it has no score on it yet"
         return {"kind": "open", "link": link, "say": said + "."}
     if page == "report":
         return _open_report(a, cat)
@@ -1080,21 +1328,23 @@ def _phone_ok(p: dict, phone: str | None) -> bool:
                for x in (p.get("name"), p.get("maker"), p.get("code"), *al) if x)
 
 
+def _thinks(row: str) -> bool:
+    return THINK in str(row)
+
+
 def pick_row(cat: dict, mid: str, tasks: list[str], thinking: str) -> str:
     """a model's row for these benchmarks: thinking on or off when asked, else
-    the one with the most scores — a tie goes to thinking on (27c's rule)"""
+    the one with the most scores — a tie goes to thinking on (27c's rule), then
+    to the row with the fewest settings (28d: "· lookahead 1" is a setting of
+    the same model)"""
     rows = _model(cat, mid)["rows"]
-    on = [r for r in rows if r.endswith(THINK)]
-    off = [r for r in rows if not r.endswith(THINK)]
-    if thinking == "on" and on:
-        return on[0]
-    if thinking == "off" and off:
-        return off[0]
+    if thinking in ("on", "off") and any(_thinks(r) == (thinking == "on") for r in rows):
+        rows = [r for r in rows if _thinks(r) == (thinking == "on")]
     cells = cat["payload"].get("cells") or {}
 
     def n(r):
         return sum(1 for t in tasks if _num(((cells.get(t) or {}).get(r) or {}).get("v")))
-    return max(rows, key=lambda r: (n(r), r.endswith(THINK)))
+    return max(rows, key=lambda r: (n(r), _thinks(r), -r.count(" · ")))
 
 
 def _num(v) -> bool:
@@ -1151,6 +1401,19 @@ def value(cat: dict, mid: str, key: str, thinking: str = "default",
     se = c.get("se")
     return {"v": c["v"], "se": se if _num(se) else None, "row": row,
             "text": _pct(c["v"]) + (f" ± {_pct(se)}" if _num(se) else "")}
+
+
+def _stated(cat: dict, mid: str, x: dict) -> str:
+    """a number as a reply says it: with its ± and the thinking setting it was
+    measured with, or who published it"""
+    if x.get("published"):
+        by = x["published"]
+        return x["text"] + (f", as published on {by}" if by.startswith("its ")
+                            else f", as published by {by}")
+    row = x.get("row") or ""
+    if row and (_thinks(row) or len(_model(cat, mid)["rows"]) > 1):
+        return x["text"] + ", thinking " + ("on" if _thinks(row) else "off")
+    return x["text"]
 
 
 def _keeps(cat: dict, mid: str, key: str) -> dict | None:
@@ -1229,11 +1492,12 @@ def compare(a: dict, cat: dict) -> dict:
     if meas in ("keeps",):
         link = "#tab=reports&report=on-device"
     if len(ms) == 1 and len(keys) == 1:
-        c = rows[0]["cells"][keys[0]]
+        # 28d: one model on one benchmark — the reply says its number
+        x = value(cat, ms[0], keys[0], th, meas)
         say = (f"{rows[0]['name']} on {cols[0]['label']}" + (f", {what[meas]}" if what[meas]
-                                                             else "") + ":")
-        if c["v"] is None and c["text"] == "–":
-            say = f"{rows[0]['name']} has no {what[meas] or 'score'} on {cols[0]['label']} yet."
+                                                             else "") + f": {_stated(cat, ms[0], x)}."
+               if x else f"{rows[0]['name']} has no {what[meas] or 'score'} on "
+               f"{cols[0]['label']} yet.")
     else:
         say = (", ".join(r["name"] for r in rows) + " on " + ", ".join(c["label"] for c in cols)
                + (f": {what[meas]}" if what[meas] else "") + ".")
@@ -1447,8 +1711,23 @@ def cant(a: dict, cat: dict) -> dict:
     return {"kind": "text", "say": said, "text": where, "link": link}
 
 
+def not_found(a: dict, cat: dict) -> dict:
+    """28d: a name nothing on the board matches — said, and a search for it
+    where that kind of name is"""
+    term = _bare(a.get("term") or "").strip() or "that"
+    about = a.get("about") or "model"
+    link, where = {"model": ("#tab=models&q=" + _q(term), "Search Models for it ▸"),
+                   "benchmark": ("#tab=benchmarks&q=" + _q(term), "Search Benchmarks for it ▸"),
+                   "report": ("#tab=reports", "See the reports ▸"),
+                   "phone": ("#tab=reports&report=testers", "See our testers' phones ▸"),
+                   }.get(about, ("", ""))
+    return {"kind": "text", "say": f"I couldn't find “{term}”.", "text": "", "link": link,
+            "linkText": where}
+
+
 RUN = {"open_page": open_page, "compare": compare, "best_on": best_on, "chart": chart,
-       "phone": phone, "boxes": boxes, "explain": explain, "clarify": clarify, "cant": cant}
+       "phone": phone, "boxes": boxes, "explain": explain, "clarify": clarify, "cant": cant,
+       "not_found": not_found}
 
 
 def then_label(r: dict) -> str:
@@ -1511,7 +1790,7 @@ def ask(q: str, who: str, prev: dict | None = None, prov: str | None = None,
         reply = {"kind": "text", "say": "I didn't get that — could you say it another way?",
                  "text": "", "link": ""}
     else:
-        action = resolve(a, cat, q, (prev or {}).get("q") or "")
+        action = resolve(a, cat, q, (prev or {}).get("q") or "", (prev or {}).get("action"))
         reply = run({k: v for k, v in action.items() if k != "then"}, cat)
         if isinstance(action.get("then"), dict):
             # the second request: worked out now, shown when its button is pressed

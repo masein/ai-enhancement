@@ -106,6 +106,24 @@ def test_the_picker_rows_keep_their_room_and_it_opens_by_its_row(live, page, man
     assert page.errors == []
 
 
+def test_the_judge_test_answering_late_keeps_an_open_picker(live, page, many):
+    """28d: the judge test's answer redrew the whole page, so when it came
+    after a picker opened, the picker's button was a new node mid-measure —
+    the test above failed once on CI that way. Only its own card is redrawn"""
+    ai_page(page, live["base"])
+    page.wait_for_function("state.ai.models && state.ai.models.length > 80 && state.ai.jt")
+    page.locator("[data-ai-change-menu='checker']").click()
+    page.locator("#pop-ai-checker").wait_for()
+    kept = page.evaluate("""async () => {
+      const b = document.querySelector("[data-ai-change-menu='checker']");
+      state.ai.jt = null;
+      await loadJudgeTest();
+      return [b.isConnected, !!document.querySelector('#pop-ai-checker'),
+              !!document.querySelector('[data-judge-test]') && !!state.ai.jt]; }""")
+    assert kept == [True, True, True]
+    assert page.errors == []
+
+
 def test_the_picker_lists_suggested_first_then_by_price(live, page, many):
     ai_page(page, live["base"])
     page.wait_for_function("state.ai.models && state.ai.models.length > 80")

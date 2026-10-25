@@ -26,7 +26,7 @@ SCENARIOS = ("tab", "model", "compare", "best", "number", "chart", "phones", "bo
              "ambiguous", "refused", "messy")
 KIND = {"open_page": "open", "compare": "table", "best_on": "table", "chart": "chart",
         "phone": "table", "boxes": "list", "explain": "text", "clarify": "clarify",
-        "cant": "text"}
+        "cant": "text", "not_found": "text"}
 S88, S40, Q4, Q2 = (aw.S88, "served/step4000-lda-2610", "served/Qwen3.6-35B-A3B-Q4-lda-2610",
                     "served/Qwen3.6-35B-A3B-Q2-lda-2610")
 
@@ -46,15 +46,18 @@ def board(tmp_path_factory):
     mp.undo()
 
 
-def fake(want: dict):
-    """a model that answers with the action the bank expects, as {"do", "then"}"""
-    first = {k: v for k, v in want.items() if k not in ("also", "then")}
+def fake(want: dict, cat: dict | None = None):
+    """a model that answers with the action the bank expects, as {"do", "then"}
+    — 28d: with the board's names for its ids and keys, as a model writes them"""
+    named = (lambda a: assistant.as_named(a, cat)) if cat else (lambda a: a)
+    first = named({k: v for k, v in want.items() if k not in ("also", "then")})
     return lambda system, user, schema: json.dumps(
-        {"do": first, **({"then": want["then"]} if want.get("then") else {})})
+        {"do": first, **({"then": named(want["then"])} if want.get("then") else {})})
 
 
 def ask(board, b: dict) -> dict:
-    return assistant.ask(b["q"], "masein", b.get("prev"), cat=board["cat"], model=fake(b["want"]))
+    return assistant.ask(b["q"], "masein", b.get("prev"), cat=board["cat"],
+                         model=fake(b["want"], board["cat"]))
 
 
 def item(q: str) -> dict:
@@ -83,9 +86,7 @@ def test_every_bank_question_runs_as_its_action(board):
     bad = []
     for b in BANK:
         got = ask(board, b)
-        want = assistant.resolve(b["want"], board["cat"], b["q"], (b.get("prev") or {}).get("q", ""))
-        if not assistant.same(got["action"], b["want"], board["cat"]) or not assistant.same(
-                want, b["want"], board["cat"]):
+        if not assistant.same(got["action"], b["want"], board["cat"], b.get("prev")):
             bad.append((b["id"], b["q"], got["action"]))
             continue
         kind = got["reply"]["kind"]
@@ -175,9 +176,12 @@ def test_a_number_is_the_boards_cell(board):
     cells = app.results_payload()["cells"]
     got = ask(board, item("what's Q4's GPQA?"))["reply"]
     c = cells["gpqa_diamond_epoch"][Q4 + " · thinking"]
-    assert got["rows"][0]["cells"]["gpqa"]["text"] == (
-        f"{100 * c['v']:.1f} ± {100 * c['se']:.1f}")
+    text = f"{100 * c['v']:.1f} ± {100 * c['se']:.1f}"
+    assert got["rows"][0]["cells"]["gpqa"]["text"] == text
     assert got["link"].startswith("#tab=models&view=frontier&cols=gpqa&models=")
+    # 28d: one model on one benchmark — the reply says the number, its ± and
+    # the thinking setting it was measured with
+    assert got["say"] == f"{got['rows'][0]['name']} on GPQA Diamond: {text}, thinking on."
 
 
 def test_compare_tells_published_and_measured_apart(board):
@@ -252,10 +256,18 @@ def test_clarify_offers_the_nearest_and_cant_says_where(board):
 # what the model gets wrong is the board's to catch
 # ---------------------------------------------------------------------------
 
-def test_an_unknown_id_is_refused_for_a_clarify(board):
+def test_a_name_nothing_matches_is_not_found_and_offers_a_search(board):
+    """28d: never a clarify without choices — "I couldn't find it", and a
+    search for it where that kind of name is"""
+    got = assistant.ask("show gpt-9", "masein", cat=board["cat"], model=fake(
+        {"action": "open_page", "page": "model_page", "model": "gpt-9"}))
+    assert got["action"] == {"action": "not_found", "about": "model", "term": "gpt-9"}
+    assert got["reply"] == {"kind": "text", "say": "I couldn't find “gpt-9”.", "text": "",
+                            "link": "#tab=models&q=gpt-9", "linkText": "Search Models for it ▸"}
+    # an id the board doesn't have: not found either, never the nearest few
     got = assistant.ask("show gpt-9", "masein", cat=board["cat"], model=fake(
         {"action": "open_page", "page": "model_page", "model": "openai/gpt-9-ultra"}))
-    assert got["action"]["action"] == "clarify" and got["reply"]["kind"] == "clarify"
+    assert got["action"]["action"] == "not_found" and got["reply"]["kind"] == "text"
     got = assistant.ask("step 8804 vs q4", "masein", cat=board["cat"], model=fake(
         {"action": "compare", "models": ["step 8804", "the q4"], "benchmarks": ["GPQA Diamond"]}))
     assert got["action"]["models"] == [S88, Q4] and got["action"]["benchmarks"] == ["gpqa"]
@@ -316,7 +328,7 @@ def test_a_follow_up_carries_the_previous_action_by_name(board):
     assert act.startswith("Its action (keep it; change only what the new message changes): ")
     got = json.loads(act.split(": ", 1)[1])
     assert got == {"action": "compare", "models": ["step8804", "step4000"],
-                   "benchmarks": ["gpqa", "mmlupro"]}
+                   "benchmarks": ["GPQA Diamond", "MMLU-Pro"]}            # 28d: by name too
     assert u.endswith("Message: and on HLE?")
 
 
@@ -326,25 +338,32 @@ def test_a_follow_up_carries_the_previous_action_by_name(board):
 
 def test_each_action_is_strict_and_names_are_strings(board):
     """28b, 28c: a branch an action, each strict; the closed lists enums; every
-    name — model, benchmark, report, phone, app — a string; a second request a
-    whole action of the same branches"""
+    name — model, benchmark, report, phone, app, and (28d) a Models group or a
+    place on the top bar — a string; a second request a whole action of the
+    same branches"""
     sch = assistant.schema(board["cat"])
     assert sch["additionalProperties"] is False and sch["required"] == ["do"]
     assert sch["properties"]["then"] == sch["properties"]["do"]
+    places = 0
     for br in sch["properties"]["do"]["anyOf"]:
         assert br["additionalProperties"] is False
         assert "question" not in br["properties"] and "then" not in br["properties"]
-        for k in ("view", "only", "thinking", "measure", "page", "among", "chart", "kind"):
+        for k in ("view", "only", "thinking", "measure", "among", "chart", "kind"):
             p = br["properties"].get(k)
             if p:
                 assert "enum" in p or "const" in p, (br["properties"]["action"], k)
         for k in ("model", "beside", "a", "b", "base", "since", "phone", "app", "benchmark",
-                  "report", "sort"):
+                  "report", "sort", "group"):
             if k in br["properties"]:
                 assert br["properties"][k] == {"type": "string"}, k
         for k in ("models", "benchmarks", "columns"):
             if k in br["properties"]:
                 assert br["properties"][k]["items"] == {"type": "string"}, k
+        # open_page's page: a page's own const, or a place as the person names it
+        if "page" in br["properties"] and "const" not in br["properties"]["page"]:
+            assert br["properties"]["page"] == {"type": "string"}
+            places += 1
+    assert places == 1
     pages = [br["properties"]["page"] for br in sch["properties"]["do"]["anyOf"]
              if "page" in br["properties"]]
     assert {"const": "models_table", "type": "string"} in pages
@@ -364,7 +383,7 @@ def test_the_board_matches_names_and_asks_back_when_several_do(board):
     assert got["app"] == "Qwen3.6-35B-A3B k4-LDA, UD-Q4_K_XL" and got["phone"] == "the galaxy"
     assert assistant.resolve({"action": "phone", "app": "4000"}, cat)["app"] == "step4000"
     got = assistant.resolve({"action": "phone", "app": "step8804", "phone": "the pixel"}, cat)
-    assert got["action"] == "clarify" and got["about"] == "phone"
+    assert got == {"action": "not_found", "about": "phone", "term": "the pixel"}
 
 
 def test_a_second_request_is_a_whole_action_behind_a_button(board):
@@ -483,3 +502,201 @@ def test_an_ambiguous_name_as_written_is_asked_back(board, name):
     got = assistant.resolve({"action": "open_page", "page": "model_page", "model": name},
                             board["cat"])
     assert got["action"] == "clarify" and len(got["candidates"]) >= 2, (name, got)
+
+
+# ---------------------------------------------------------------------------
+# 28d: graded by what the person sees; the board's fixes from the second run
+# ---------------------------------------------------------------------------
+
+def test_the_grade_is_what_the_person_sees(board):
+    """a field at its default, a refusal's kind, a base the board shows anyway,
+    a follow-up's new models alone or beside the old, the tab a follow-up is
+    on, one model's number from its page or from compare, "not found" for a
+    clarify: each the same answer"""
+    cat = board["cat"]
+    same = assistant.same
+    # boxes: every run shows the rented ones
+    assert same({"action": "boxes"}, {"action": "boxes", "which": "rented"}, cat)
+    assert not same({"action": "boxes", "which": "server"},
+                    {"action": "boxes", "which": "rented"}, cat)
+    # a refusal is a refusal
+    assert same({"action": "cant", "kind": "start_run"}, {"action": "cant", "kind": "spend"}, cat)
+    # keeps: BF16 is the base the On-device report shows beside Q2
+    bf16 = "served/Qwen3.6-35B-A3B-BF16-lda-2610"
+    k = {"action": "compare", "models": [Q2], "benchmarks": ["mmlupro"], "measure": "keeps"}
+    assert same({**k, "models": [bf16, Q2]}, k, cat)
+    assert not same({**k, "models": [S40, Q2]}, k, cat)
+    # "and q4?": q4 alone, or beside q2, never something else as well
+    b = item("and q4?")
+    assert same({"action": "compare", "models": [Q2, Q4], "benchmarks": ["gpqa"]}, b["want"], cat,
+                b["prev"])
+    assert not same({"action": "compare", "models": [Q2, Q4, S40], "benchmarks": ["gpqa"]},
+                    b["want"], cat, b["prev"])
+    # "only ours" after "frontier tab": on the Frontier tab, named or not
+    b = item("only ours")
+    assert same({"action": "open_page", "page": "models_table", "only": "ours"}, b["want"], cat,
+                b["prev"])
+    # one model on one benchmark: its page opened there says the number too
+    w = {"action": "compare", "models": [Q4], "benchmarks": ["gpqa"]}
+    assert same({"action": "open_page", "page": "model_page", "model": Q4, "benchmark": "gpqa"},
+                w, cat)
+    assert not same({"action": "open_page", "page": "model_page", "model": Q4}, w, cat)
+    assert not same({"action": "open_page", "page": "model_page", "model": Q4, "benchmark": "gpqa"},
+                    {**w, "thinking": "off"}, cat)
+    # "I couldn't find it" is a clarify without choices
+    assert same({"action": "not_found", "about": "model", "term": "x"},
+                {"action": "clarify", "about": "model"}, cat)
+
+
+def test_settings_rows_are_one_model_and_never_asked_between(board):
+    """thinking on and off and "lookahead 1" are settings of one model: one
+    entity, its row the one with the most scores (a tie to thinking on, then
+    to the fewest settings)"""
+    from service import app
+    payload = json.loads(json.dumps(app.results_payload()))
+    look = aw.PHONE + " · thinking · lookahead 1"
+    payload["models"].append({**next(m for m in payload["models"]
+                                     if m["id"] == aw.PHONE + " · thinking"),
+                              "id": look, "name": "Qwen3.6-35B-A3B k4-LDA (phone build) · thinking"
+                              " · lookahead 1"})
+    cat = assistant.catalog(payload)
+    pb = [m for m in cat["models"] if m["id"].startswith(aw.PHONE)]
+    assert len(pb) == 1 and look in pb[0]["rows"] and "lookahead" not in pb[0]["name"]
+    assert assistant.resolve({"action": "open_page", "page": "model_page",
+                              "model": "the phone build"}, cat)["model"] == aw.PHONE
+    assert assistant.pick_row(cat, aw.PHONE, ["gpqa_diamond_epoch"], "default") == (
+        aw.PHONE + " · thinking")
+    # step8804: IFEval has both settings, a tie — thinking on; asked off, off
+    assert assistant.pick_row(cat, S88, ["ifeval_google"], "default") == S88 + " · thinking"
+    assert assistant.pick_row(cat, S88, ["ifeval_google"], "off") == S88
+
+
+def test_only_real_matches_are_asked_about(board):
+    """the nearest few by spelling are gone: a candidate matches the words;
+    a date, "none" or a page's name is never a name"""
+    cat = board["cat"]
+    assert assistant.nearest("zzqx model", cat) == []
+    # "none" is no phone: every phone
+    assert assistant.resolve({"action": "phone", "app": "step8804", "phone": "none"}, cat) == {
+        "action": "phone", "app": "step8804"}
+    # a date is no model: since none, so no since_model
+    got = assistant.resolve({"action": "open_page", "page": "models_table", "view": "frontier",
+                             "when": "since_model", "since": "2026-10-25", "only": "closed",
+                             "sort": "hle"}, cat, "frontier sorted by hle and only closed ones")
+    assert got == {"action": "open_page", "page": "models_table", "view": "frontier",
+                   "only": "closed", "sort": "hle"}
+    # a page's name is no benchmark
+    got = assistant.resolve({"action": "open_page", "page": "playground", "benchmark": "playground"},
+                            cat, "go to the playground")
+    assert got == {"action": "open_page", "page": "playground"}
+    # an app written as the phone is the app
+    got = assistant.resolve({"action": "open_page", "page": "report", "report": "testers",
+                             "phone": "step8804"}, cat, "open the latest step8804 test")
+    assert got == {"action": "open_page", "page": "report", "report": "testers",
+                   "app": "step8804"}
+
+
+def test_a_name_is_the_persons_words(board):
+    """a name the model chose that the message doesn't hold: kept when the
+    person's words mean it alone, their words when they mean several (asked
+    back), left out when nothing they wrote means it"""
+    cat = board["cat"]
+    r = assistant.resolve
+    # "the q4" means one model: the model's longer name for it is kept
+    got = r({"action": "compare", "models": ["Q4 (UD-Q4_K_XL)"],
+             "benchmarks": ["GPQA Diamond"]}, cat, "the q4 on gpqa")
+    assert got["models"] == [Q4] and got["benchmarks"] == ["gpqa"]
+    # "the report about phones" is two: the testers' title the model chose is asked back
+    got = r({"action": "open_page", "page": "report", "report": "testers"}, cat,
+            "open that report about phones")
+    assert got["action"] == "clarify" and set(got["candidates"]) == {"testers", "on-device"}
+    # "the report" alone: every report, asked
+    got = r({"action": "open_page", "page": "report", "report": "on-device"}, cat,
+            "open the report")
+    assert got["action"] == "clarify" and got["about"] == "report"
+    # a model nothing in the message means: left out, and asked for
+    got = r({"action": "compare", "models": [S88, S40], "benchmarks": ["gpqa"]}, cat,
+            "compare the two on GPQA")
+    assert got["action"] == "clarify" and got.get("about", "model") == "model"
+    # several the same words mean, spelt out by the model: kept
+    steps = ["step8804", "step4000", "step1000"]
+    got = r({"action": "compare", "models": steps, "benchmarks": ["hle"]}, cat,
+            "the step checkpoints on hle")
+    assert len(got["models"]) == 3
+    # a report the message asks for without its name: kept
+    got = r({"action": "open_page", "page": "report", "report": "two builds", "a": "step8804",
+             "b": "q4", "benchmark": "gpqa", "side": "b_better"}, cat,
+            "show me what step8804 got wrong on GPQA that Q4 got right")
+    assert got["report"] == "paired"
+    # a follow-up's names are in the action before it
+    prev = {"q": "step8804 vs step4000 on GPQA", "action": {"action": "compare",
+                                                            "models": [S88, S40],
+                                                            "benchmarks": ["gpqa"]}}
+    got = r({"action": "compare", "models": ["step8804", "step4000"], "benchmarks": ["HLE"]},
+            cat, "and on HLE?", prev["q"], prev["action"])
+    assert got["models"] == [S88, S40]
+
+
+def test_places_groups_and_the_fields_a_report_takes(board):
+    cat = board["cat"]
+    r = assistant.resolve
+    assert r({"action": "open_page", "page": "the benchmarks catalogue"}, cat,
+             "open the benchmarks catalogue") == {"action": "open_page", "page": "benchmarks"}
+    assert r({"action": "open_page", "page": "GPQA questions"}, cat,
+             "show me the GPQA questions") == {"action": "open_page", "page": "benchmarks",
+                                               "benchmark": "gpqa"}
+    assert r({"action": "open_page", "page": "the models"}, cat, "the models") == {
+        "action": "open_page", "page": "models_table"}
+    assert r({"action": "open_page", "page": "the moon"}, cat, "take me to the moon")[
+        "action"] == "not_found"
+    # a group as written, on its tab
+    assert r({"action": "open_page", "page": "models_table", "view": "mobile",
+              "group": "mobile-mmlu"}, cat, "mobile tab, mobile-mmlu group")["group"] == "mmlu"
+    got = r({"action": "open_page", "page": "models_table", "group": "Mobile-MMLU"}, cat,
+            "the mobile-mmlu group")
+    assert (got["view"], got["group"]) == ("mobile", "mmlu")
+    # the ran-out report takes a model and a benchmark, no app
+    got = r({"action": "open_page", "page": "report", "report": "ran-out report",
+             "model": "step4000", "app": "step4000"}, cat, "the ran-out report for step4000")
+    assert "app" not in got and got["model"] == S40
+    # On-device's memory chart is its own models: no "only"
+    got = r({"action": "chart", "chart": "memory", "benchmark": "IFBench", "only": "ours"}, cat,
+            "IFBench against memory for the phone models")
+    assert got == {"action": "chart", "chart": "memory", "benchmark": "ifbench"}
+
+
+def test_one_model_one_benchmark_says_its_number(board):
+    """compare or its page opened on that benchmark: the reply says the
+    number, its ± and the thinking setting — or who published it"""
+    cat = board["cat"]
+    got = assistant.run({"action": "compare", "models": [S88], "benchmarks": ["ifeval"],
+                         "thinking": "off"}, cat)
+    assert got["say"] == "step8804 on IFEval: 88.0 ± 2.0, thinking off."
+    got = assistant.run({"action": "open_page", "page": "model_page", "model": S88,
+                         "benchmark": "gpqa"}, cat)
+    assert got["say"] == "Opened step8804’s page, its answers on GPQA Diamond: 70.0 ± 2.0, " \
+        "thinking on."
+    assert got["link"] == "#model=served%2Fstep8804-lda-2610%20%C2%B7%20thinking" \
+        "&answers=gpqa_diamond_epoch"
+    e0, _ = assistant.model_id("edge0 35b", cat)
+    got = assistant.run({"action": "compare", "models": [e0], "benchmarks": ["gpqa"]}, cat)
+    assert got["say"].endswith(": 79.8, as published by Edge0.")
+
+
+def test_the_eval_keeps_every_answer_and_grades_them_again(board, monkeypatch, capsys, tmp_path):
+    """the raw answers go to a file, and --rescore grades them again on the
+    board as it is, asking no model"""
+    import assistant_eval as ev
+    b = item("what's Q4's GPQA?")
+    kept = tmp_path / "run.jsonl"
+    kept.write_text(json.dumps({"id": b["id"], "raw": json.dumps(
+        {"do": {"action": "open_page", "page": "model_page", "model": "q4",
+                "benchmark": "gpqa"}}), "ms": 500, "provider": "served:x"}) + "\n")
+
+    def never(*a, **k):
+        raise AssertionError("asked a model")
+    monkeypatch.setattr(assistant, "call", never)
+    assert ev.main(["--rescore", str(kept)]) == 0
+    out = capsys.readouterr().out
+    assert "1 questions, served:x's answers kept in" in out
+    assert "| number | 1/1 (100%) | – | 1/1 (100%) |" in out

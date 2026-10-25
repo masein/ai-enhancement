@@ -63,7 +63,7 @@
 {"id": "b063", "scenario": "compare", "half": "work", "q": "step1000, step4000 and step8804 on OTIS", "want": {"action": "compare", "models": ["served/step1000-lda-2610", "served/step4000-lda-2610", "served/step8804-lda-2610"], "benchmarks": ["otis"]}}
 {"id": "b064", "scenario": "compare", "half": "held", "q": "Q2 vs BF16 on GPQA, MMLU-Pro and HLE", "want": {"action": "compare", "models": ["served/Qwen3.6-35B-A3B-Q2-lda-2610", "served/Qwen3.6-35B-A3B-BF16-lda-2610"], "benchmarks": ["gpqa", "mmlupro", "hle"]}}
 {"id": "b065", "scenario": "compare", "half": "work", "q": "edge0 35b vs step8804 on gpqa", "want": {"action": "compare", "models": ["reported/edge0/edge0-35b-a3b-preview", "served/step8804-lda-2610"], "benchmarks": ["gpqa"]}}
-{"id": "b066", "scenario": "compare", "half": "held", "q": "compare the three bonsai 2 models on IFEval", "want": {"action": "compare", "models": ["reported/prismml/ternary-bonsai-2-9b", "reported/prismml/ternary-bonsai-2-4b", "reported/prismml/ternary-bonsai-2-2b"], "benchmarks": ["ifeval"]}}
+{"id": "b066", "scenario": "compare", "half": "held", "q": "compare the three bonsai 2 models on IFEval", "want": {"action": "compare", "models": ["reported/prismml/ternary-bonsai-2-9b", "reported/prismml/ternary-bonsai-2-4b", "reported/prismml/ternary-bonsai-2-2b"], "benchmarks": ["ifeval"], "also": [{"action": "compare", "models": ["served/Bonsai-2-27B-ternary-PQ2_0", "reported/prismml/ternary-bonsai-2-9b", "reported/prismml/ternary-bonsai-2-4b", "reported/prismml/ternary-bonsai-2-2b"], "benchmarks": ["ifeval"]}, {"action": "clarify", "about": "model"}]}}
 {"id": "b067", "scenario": "compare", "half": "work", "q": "step4000 and Q4 on simpleqa and arc-agi-2", "want": {"action": "compare", "models": ["served/step4000-lda-2610", "served/Qwen3.6-35B-A3B-Q4-lda-2610"], "benchmarks": ["simpleqa", "arc"]}}
 {"id": "b068", "scenario": "compare", "half": "held", "q": "gpt-6 astra against claude opus 5.5 on hle and gpqa", "want": {"action": "compare", "models": ["reported/openai/gpt-6-astra", "reported/anthropic/claude-opus-5.5"], "benchmarks": ["hle", "gpqa"]}}
 {"id": "b069", "scenario": "compare", "half": "work", "q": "step8804 with thinking off vs step4000 on ifeval", "want": {"action": "compare", "models": ["served/step8804-lda-2610", "served/step4000-lda-2610"], "benchmarks": ["ifeval"], "thinking": "off"}}
@@ -195,10 +195,10 @@
 {"id": "b195", "scenario": "ambiguous", "half": "work", "q": "show me the qwen one", "want": {"action": "clarify", "about": "model", "also": [{"action": "open_page", "page": "models_table", "search": "qwen"}]}}
 {"id": "b196", "scenario": "ambiguous", "half": "held", "q": "open the report", "want": {"action": "clarify", "about": "report"}}
 {"id": "b197", "scenario": "ambiguous", "half": "work", "q": "compare the two on GPQA", "want": {"action": "clarify", "about": "model"}}
-{"id": "b198", "scenario": "ambiguous", "half": "held", "q": "what's the score?", "want": {"action": "clarify", "about": "model"}}
+{"id": "b198", "scenario": "ambiguous", "half": "held", "q": "what's the score?", "want": {"action": "clarify", "about": "model", "also": [{"action": "clarify", "about": "benchmark"}]}}
 {"id": "b199", "scenario": "ambiguous", "half": "work", "q": "open the gemma page", "want": {"action": "clarify", "about": "model", "also": [{"action": "open_page", "page": "models_table", "search": "gemma"}]}}
 {"id": "b200", "scenario": "ambiguous", "half": "held", "q": "how is the bonsai doing", "want": {"action": "clarify", "about": "model", "also": [{"action": "open_page", "page": "models_table", "search": "bonsai"}]}}
-{"id": "b201", "scenario": "ambiguous", "half": "work", "q": "how fast is it on the phone", "want": {"action": "clarify", "about": "model"}}
+{"id": "b201", "scenario": "ambiguous", "half": "work", "q": "how fast is it on the phone", "want": {"action": "clarify", "about": "model", "also": [{"action": "clarify", "about": "phone"}]}}
 {"id": "b202", "scenario": "ambiguous", "half": "held", "q": "open the edge0 model", "want": {"action": "clarify", "about": "model", "also": [{"action": "open_page", "page": "models_table", "search": "edge0"}]}}
 {"id": "b203", "scenario": "ambiguous", "half": "work", "q": "show the claude one", "want": {"action": "clarify", "about": "model", "also": [{"action": "open_page", "page": "models_table", "search": "claude"}]}}
 {"id": "b204", "scenario": "ambiguous", "half": "held", "q": "compare step8804 with the other one", "want": {"action": "clarify", "about": "model"}}
@@ -210,7 +210,7 @@
 {"id": "b210", "scenario": "ambiguous", "half": "held", "q": "chart the arc one", "want": {"action": "clarify", "about": "benchmark"}}
 {"id": "b211", "scenario": "ambiguous", "half": "work", "q": "show the qwen3.6 model", "want": {"action": "clarify", "about": "model", "also": [{"action": "open_page", "page": "models_table", "search": "qwen3.6"}]}}
 {"id": "b212", "scenario": "ambiguous", "half": "held", "q": "open the step one", "want": {"action": "clarify", "about": "model", "also": [{"action": "open_page", "page": "models_table", "search": "step"}]}}
-{"id": "b213", "scenario": "ambiguous", "half": "work", "q": "how does the ternary one do", "want": {"action": "clarify", "about": "model"}}
+{"id": "b213", "scenario": "ambiguous", "half": "work", "q": "how does the ternary one do", "want": {"action": "clarify", "about": "model", "also": [{"action": "open_page", "page": "models_table", "search": "ternary"}]}}
 {"id": "b214", "scenario": "ambiguous", "half": "held", "q": "how fast is it on the galaxy", "want": {"action": "clarify", "about": "model", "also": [{"action": "phone", "phone": "galaxy"}]}}
 {"id": "b215", "scenario": "refused", "half": "work", "q": "start a run on step8804", "want": {"action": "cant", "kind": "start_run"}}
 {"id": "b216", "scenario": "refused", "half": "held", "q": "delete step1000", "want": {"action": "cant", "kind": "delete"}}
@@ -244,7 +244,7 @@
 {"id": "b244", "scenario": "messy", "half": "work", "q": "show 8804 and 4000 on mmlu pro, and also what is ifbench", "want": {"action": "compare", "models": ["served/step8804-lda-2610", "served/step4000-lda-2610"], "benchmarks": ["mmlupro"], "then": {"action": "explain", "topic": "bench:ifbench"}}}
 {"id": "b245", "scenario": "messy", "half": "held", "q": "latest tab pls", "want": {"action": "open_page", "page": "models_table", "view": "latest"}}
 {"id": "b246", "scenario": "messy", "half": "work", "q": "hw fast step8804 oneplus", "want": {"action": "phone", "app": "step8804", "phone": "oneplus"}}
-{"id": "b247", "scenario": "messy", "half": "held", "q": "only ours", "prev": {"q": "frontier tab", "action": {"action": "open_page", "page": "models_table", "view": "frontier"}}, "want": {"action": "open_page", "page": "models_table", "only": "ours"}}
+{"id": "b247", "scenario": "messy", "half": "held", "q": "only ours", "prev": {"q": "frontier tab", "action": {"action": "open_page", "page": "models_table", "view": "frontier"}}, "want": {"action": "open_page", "page": "models_table", "view": "frontier", "only": "ours"}}
 {"id": "b248", "scenario": "messy", "half": "work", "q": "and sort it by gpqa", "prev": {"q": "frontier ours only", "action": {"action": "open_page", "page": "models_table", "view": "frontier", "only": "ours"}}, "want": {"action": "open_page", "page": "models_table", "view": "frontier", "only": "ours", "sort": "gpqa"}}
 {"id": "b249", "scenario": "messy", "half": "held", "q": "gemma e4b vs bolt ifbench", "want": {"action": "compare", "models": ["reported/google/gemma-4-e4b", "reported/nvidia/nvidia-nemotron-3.5-bolt-e4b"], "benchmarks": ["ifbench"]}}
 {"id": "b250", "scenario": "messy", "half": "work", "q": "opn the paired report", "want": {"action": "open_page", "page": "report", "report": "paired"}}

@@ -14,25 +14,46 @@ model) — each with its own fields alone, the closed lists as enums. The reply
 is `{"do": an action}`, or `{"do": the first, "then": the second}` when a
 message asks two things: a second request is a whole action of the same
 branches, never free text. Every name — model, benchmark, report, phone, app —
-is a string as the person wrote it ("step one", "the arc one", "the report
-about phones", "the galaxy"): the board matches it against its names and asks
-back when several match (step1000, step4000, step8804; ARC-AGI-2, ARC-Challenge,
-ARC-Easy; the testers' and the On-device report) or none does. The model
-clarifies only when the message names nothing ("it", "the two") and there is
-no previous action. A tab or a thinking setting that neither the message nor
-the one before it names is left out — "only ours" stays on the tab you're on.
-The board then runs the action and draws the reply with its own parts. The
-model never writes a number.
+— and (28d) a Models group or a place on the top bar — is a string as the
+person wrote it ("step one", "the arc one", "the report about phones", "the
+galaxy", "mobile-mmlu", "the catalogue"): the board matches it against its
+names and asks back when several match (step1000, step4000, step8804;
+ARC-AGI-2, ARC-Challenge, ARC-Easy; the testers' and the On-device report).
+When none does, it says so — "I couldn't find “gpt-9”" — with a search for
+it, never a question without choices. The model clarifies only when the
+message names nothing ("it", "the two") and there is no previous action. A
+tab or a thinking setting that neither the message nor the one before it
+names is left out — "only ours" stays on the tab you're on. The board then
+runs the action and draws the reply with its own parts. The model never
+writes a number.
+
+**The person's words, checked (28d).** A name the model wrote that the
+messages don't hold is the model's own choice, and the board checks it
+against what the person did write: kept when some of their words mean that
+one alone ("Q4 (UD-Q4_K_XL)" for "the q4"); their words instead when those
+mean it among others, so the board asks back ("Qwen3.6-35B-A3B" for "the
+qwen3.6 model", "testers" for "the report about phones"); and a model or app
+nothing they wrote means is left out — the board asks for it when the action
+needs one ("compare the two on GPQA"). A report, benchmark or phone can be
+what the message asks for without its name ("what step8804 got wrong that Q4
+got right" is the two-builds reader), so those stay. Several names the same
+words mean ("the three bonsai 2 models") are the model spelling them out, and
+stay. A date, "none" or a page's name is never a name.
+
+**One model.** Rows that are settings of one model — thinking on or off,
+"lookahead 1" — are one model, never asked between; its row is the one with
+the most scores, a tie to thinking on (27c's rule), then to the fewest
+settings.
 
 | Action | What the board does |
 |---|---|
 | `open_page` | Builds the board's own link and opens it. `models_table`: a Models tab with its view, group, chart, Show (`only`), `search`, `columns`, sort, Thinking, When (7d, 30d, today, this month, since the newest checkpoint, since a model was added, a range) and its models or the phone builds. `model_page`: a model's page, or its answers on a benchmark beside another's. `report`: the two-builds reader on a benchmark and side, Step checkpoints' baseline (`base`), a ran-out pick, a testers' test panel (the newest of a phone and app model). Runs, Benchmarks or a benchmark's questions, Playground, Improve, Home. |
-| `compare` | 27's cells for 1 to 8 models on benchmarks: the score, what each keeps of its own base, how many ran out of room, or how many ended in a loop. Published numbers are shown as published, never ranked with ours. |
+| `compare` | 27's cells for 1 to 8 models on benchmarks: the score, what each keeps of its own base, how many ran out of room, or how many ended in a loop. Published numbers are shown as published, never ranked with ours. One model on one benchmark — here, or its page opened on that benchmark — and the reply says the number, its ± and the thinking setting ("step8804 on GPQA Diamond: 70.0 ± 2.0, thinking on"), or who published it. |
 | `best_on` | The top few measured here, within a group (ours, open, closed, phone), and the published ones listed apart. "Phone" is the On-device report's published models and our builds our testers have run on a phone. |
 | `chart` | Scores by benchmark's dots, Across training's panel, the file-size chart or On-device's memory chart. |
 | `phone` | Our testers' medians per phone and app model: decode, prefill, time to first token, engine memory, temperature. "The oneplus" is every OnePlus. |
 | `boxes` | What is running on rented boxes and on the server, and when a rented run should finish. |
-| `explain` | The board's own help text: a report's notes, a benchmark's description, or a legend the page keeps. |
+| `explain` | The board's own help text: a report's notes, a benchmark's description, or a legend the page keeps. "What's churn in the two-builds report" is explain, the report its second action. |
 | `clarify` | One question with the choices as buttons; a click asks again. |
 | `cant` | What it can't do (start, stop, delete, change, spend, grade, upload, or anything off the board) and where the button is. |
 
@@ -55,9 +76,12 @@ action, worked out with the first — is a button under the reply ("Also: Open
 On-device models") that shows it.
 
 **Names** people type are in `eval_tasks/assistant/names.json`, with the
-benchmarks' names, the topics and the examples. The board matches loosely:
-case, spaces, hyphens and dots don't count; a name inside another or a close
-one counts when only one model has it.
+benchmarks' names, the places' other names ("catalogue" is Benchmarks), the
+topics and the examples. The board matches loosely: case, spaces, hyphens and
+dots don't count; a name inside another or a close one counts when only one
+model has it. A benchmark is matched by its names, not its key, so "arc" is
+every ARC. The fields a report or chart doesn't use are left out (an app on
+the ran-out report, "only" on On-device's memory chart).
 
 ## The panel
 
@@ -96,7 +120,14 @@ message.
 - **The bank**, `tests/fixtures/assistant/queries.jsonl`: 266 questions in 12
   scenarios (16 or more each), each with the action it should produce (`also`:
   another as good — "show the qwen3.6 model" may search for it or ask back;
-  `then`: the second action it must offer). Each scenario is split in two:
+  `then`: the second action it must offer). Graded by what the person sees
+  (28d): the actions are compared after the board's defaults and matching,
+  and what looks different but shows the same passes — every run for "the
+  rented box" (boxes' `which` is all), a refusal of another kind, the base
+  (BF16) beside the model whose keep is asked, a follow-up's new models or
+  benchmarks alone or beside what was shown, a follow-up's tab left as it is,
+  one model's page on a benchmark for its number, "not found" for a clarify.
+  Each scenario is split in two:
   a **working half** (`"half": "work"`), the only one the prompt, the names and
   the schema are tuned on, and a **held-out half** (`"held"`), never looked at
   to tune; the evaluation reports both, so a high rate means more than a
@@ -112,7 +143,10 @@ message.
   asks a model the bank as the board asks it and prints the pass rate per
   scenario for each half, the reply times and every miss with what the model
   returned. Tune with `--half work`; report both halves. The target: 95%
-  overall, no scenario under 85%.
+  overall, no scenario under 85%. Every raw answer is kept in
+  `BENCH_ROOT/assistant/evals/` (internal, as the log is; the run prints the
+  file), and `--rescore <that file>` grades the answers again — after a
+  change to the board or the grading — without asking the model.
 
 ```bash
 cd ~/benchmarks/aienh && sudo docker compose exec -T bench python scripts/assistant_eval.py --provider served:served/Qwen3.6-35B-A3B-Q4-original-k-8

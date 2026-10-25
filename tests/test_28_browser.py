@@ -236,3 +236,21 @@ def test_a_models_link_keeps_its_sort_and_thinking(live, page):
     assert page.evaluate("lbS().thinking") == "off"
     assert "thinking=off" in page.evaluate("location.hash")
     assert page.errors == []
+
+
+def test_a_row_measured_before_its_family_went_to_published_numbers_says_so(live, page):
+    """28d: Bonsai and Edge0 are on the board from their published numbers only
+    (25c); a row of theirs measured here before that says so, on its line and
+    its name's hover"""
+    board_at(page, live, hash_="#tab=models")
+    page.wait_for_function("DATA && DATA.models.length")
+    got = page.evaluate("""() => {
+      const m = DATA.models.find(x => x.id.startsWith('served/'));
+      const at = Date.UTC(2026, 9, 7, 12) / 1000;
+      const b = mtRowOf({ ...m, family: 'bonsai', testedAt: at });
+      const o = mtRowOf({ ...m, family: 'qwen', testedAt: at });
+      return [b.line, b.full, o.line + o.full]; }""")
+    note = "measured here on 7 Oct, before Bonsai went to published numbers only"
+    assert note in got[0].split(" · ") and f"It was {note}." in got[1]
+    assert "published numbers only" not in got[2]
+    assert page.errors == []

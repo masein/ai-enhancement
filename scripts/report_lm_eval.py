@@ -14647,6 +14647,16 @@ const mtRuled = () => ['mobile', 'frontier'].includes(lbTest())
   || (lbTest() === 'standard' && lbS().chip === 'instruction');
 const mtRuledOff = m => !m.thinkingRow && canSwitchThinking(m.dmHome || m.id) && mtRuled();
 // a board model as a row of modelTable: its mark, name, line and group
+// 28d: the families the board shows from their published numbers only (25c);
+// a row of one measured here before that says so on its line
+const PUBLISHED_ONLY = { bonsai: 'Bonsai', edge0: 'Edge0' };
+function mtMeasuredBefore(m) {
+  const fam = PUBLISHED_ONLY[String(m.family || '').toLowerCase()];
+  if (!fam || !m.testedAt) return '';
+  const d = new Date(m.testedAt * 1000);
+  return `measured here on ${d.getDate()} ${MONTHS[d.getMonth()]}, before ${fam} went to `
+    + 'published numbers only';
+}
 function mtRowOf(m, o = {}) {
   const parts = nameParts(m.name, { measured: true, basedOn: mtBasedOn(m) });
   const group = o.group || mtGroup(m);
@@ -14660,9 +14670,10 @@ function mtRowOf(m, o = {}) {
     colour: mtColour(m), name: mtNameOf(parts), full: `${m.name}\nfamily: ${famOf(m)}\n${m.id}`
       // how a served model runs (an OpenRouter pin), as its tag's title said
       + ((mtServed(m) || {}).how ? `\n${mtServed(m).how}` : '')
-      + (mtRuledOff(m) ? '\n\nAsked with thinking off. ' + THINKING_RULE_WORDS : ''),
-    line: mtLine(m, { parts, group, maker, thinking: thinkingOf(m) || (mtRuledOff(m) ? 'off'
-      : null) }), group,
+      + (mtRuledOff(m) ? '\n\nAsked with thinking off. ' + THINKING_RULE_WORDS : '')
+      + (mtMeasuredBefore(m) ? `\n\nIt was ${mtMeasuredBefore(m)}.` : ''),
+    line: mtLine(m, { parts, group, maker, note: mtMeasuredBefore(m), thinking: thinkingOf(m)
+      || (mtRuledOff(m) ? 'off' : null) }), group,
     attrs: o.attrs || {}, cells: o.cells || {}, badges: o.badges || [] };
 }
 // 12b: Models — the Leaderboard and the Models tab, one table. A switch for
@@ -26738,7 +26749,13 @@ async function loadJudgeTest() {
     state.ai.jt = jt; state.ai.res = res;
   } catch (e) { state.ai.msg = e.message; }
   state.ai.jtAsked = false;
-  if (state.tab === 'ai') render();
+  if (state.tab !== 'ai') return;
+  // 28d: only its own card is redrawn, as the grading card is (17h) — the
+  // whole page redrawn when it answered late swapped a picker's button from
+  // under the person using it (12i.3's picker test, once)
+  const was = !state.ai.mark && document.querySelector('[data-judge-test]');
+  if (was) was.replaceWith(judgeTestCard());
+  else render();
 }
 // "$0.14" — dollars per million tokens, or a month's spend
 const usd = (v, d = 2) => v == null ? '—' : '$' + Number(v).toLocaleString('en',
@@ -30309,7 +30326,8 @@ function askMsg(m) {
   if (m.role === 'you') return el('div', { class: 'ask-you', 'data-ask-you': '1', text: m.q });
   const r = m.reply || {};
   const link = r.link ? el('a', { href: r.link, class: 'small', 'data-ask-link': r.link,
-    text: r.kind === 'open' ? 'Open it again ▸' : 'Where this is on the board ▸' }) : '';
+    text: r.linkText || (r.kind === 'open' ? 'Open it again ▸' : 'Where this is on the board ▸')
+  }) : '';
   return el('div', { class: 'ask-bot', 'data-ask-bot': r.kind || '1' },
     el('p', { class: 'ask-say', 'data-ask-say': '1', text: r.say || '' }),
     askBody(r),
@@ -30356,7 +30374,8 @@ function askTable(cols, rows, view) {
     attrs: { 'data-ask-table': view }, sorted: true, hideEmpty: false,
     cols: cols.map(c => ({ key: c.key, label: c.label, full: c.label, score: true })),
     rows: rows.map(r => {
-      const m = DATA.models.find(x => x.id === r.id || x.id === r.id + ' · thinking');
+      const m = DATA.models.find(x => x.id === r.id) || DATA.models.find(x =>
+        x.id.split(' · ')[0] === r.id);
       const base = m ? mtRowOf(m) : null;
       return { key: r.id, name: r.name, id: base ? base.id : null, nav: base ? base.nav : null,
         href: base ? base.href : (String(r.id).startsWith('reported/') ? '#model='
