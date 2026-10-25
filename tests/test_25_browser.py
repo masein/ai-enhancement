@@ -9,6 +9,7 @@ world is 21c's scorecard with test_25_board's answers scored on top."""
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -165,3 +166,23 @@ def test_the_model_page_says_the_four_numbers(live, page):
         "r => { const c = r.closest('.card').getBoundingClientRect(); return {x: c.left + "
         "scrollX, y: c.top + scrollY, width: c.width, height: c.height}; }")
     page.screenshot(path=str(SCREENS / "model-page-1280-light.png"), full_page=True, clip=box)
+
+
+def test_the_phones_answering_late_leave_the_model_page_alone(live, page):
+    """27c's phones: a served row's page asks for them, and their answer
+    redrew the whole page — the four numbers' card swapped while the test
+    above measured it, and its screenshot once had no width (CI, 25 Oct). A
+    page they change nothing on is left as it is"""
+    def late(route):
+        time.sleep(1.0)
+        route.continue_()
+    page.route("**/api/phone", late)
+    page.set_viewport_size({"width": 1280, "height": 1000})
+    page.goto("about:blank")
+    page.goto(live["base"] + "/#model=" + "served/step8804-lda-2610%20%C2%B7%20thinking")
+    page.wait_for_selector("[data-result-row='ifeval_google']", timeout=30000)
+    page.evaluate("window._card = document.querySelector(\"[data-result-row='ifeval_google']\")"
+                  ".closest('.card')")
+    page.wait_for_function("state.phone.loaded", timeout=30000)
+    assert page.evaluate("window._card.isConnected")
+    assert page.errors == []
