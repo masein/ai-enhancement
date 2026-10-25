@@ -14813,6 +14813,7 @@ function phoneTested(id) {
 async function loadPhone() {
   const P = state.phone;
   P.loading = true;
+  const was = phoneOnPage();
   try {
     const j = await api('api/phone');
     P.byId = Object.fromEntries((j.builds || []).map(b => [b.id, b.reports || []]));
@@ -14823,7 +14824,20 @@ async function loadPhone() {
     P.checkpoints = j.checkpoints || [];
   } catch (e) { /* the card says nothing is reported yet */ }
   P.loading = false; P.loaded = true;
-  render();
+  // a model page the phones change nothing on is left as it is: redrawn when
+  // they answered, every node of it was swapped from under a click (and a
+  // test measuring its card)
+  if (was == null || phoneOnPage() !== was) render();
+}
+// what the page on view shows of our testers' phones, when that is all it
+// shows of them: a model page that isn't a phone build has 27c's block, when
+// its checkpoint has phones, and nothing else of them. Any other page: null
+function phoneOnPage() {
+  const m = state.model && !state.topic && DATA && DATA.models.find(x => x.id === state.model);
+  if (!m || isPhoneRow(m) || (servedOf(m.id) || {}).phone) return null;
+  const id = m.rowOf || m.id, cps = phoneCps(id);
+  return m.id + '|' + (cps.some(e => (e.phones || []).length)
+    ? JSON.stringify([cps, phoneTested(id), state.phone.report || '']) : 'none');
 }
 // ---- 12m.2: reported scores, from outside the board ----
 // Epoch AI, Artificial Analysis and model cards. Their own endpoint
