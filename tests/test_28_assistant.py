@@ -262,8 +262,9 @@ def test_a_name_nothing_matches_is_not_found_and_offers_a_search(board):
     got = assistant.ask("show gpt-9", "masein", cat=board["cat"], model=fake(
         {"action": "open_page", "page": "model_page", "model": "gpt-9"}))
     assert got["action"] == {"action": "not_found", "about": "model", "term": "gpt-9"}
-    assert got["reply"] == {"kind": "text", "say": "I couldn't find “gpt-9”.", "text": "",
-                            "link": "#tab=models&q=gpt-9", "linkText": "Search Models for it ▸"}
+    assert {k: got["reply"][k] for k in ("kind", "say", "text", "link", "linkText")} == {
+        "kind": "text", "say": "I couldn't find “gpt-9”.", "text": "",
+        "link": "#tab=models&q=gpt-9", "linkText": "Search Models for it ▸"}
     # an id the board doesn't have: not found either, never the nearest few
     got = assistant.ask("show gpt-9", "masein", cat=board["cat"], model=fake(
         {"action": "open_page", "page": "model_page", "model": "openai/gpt-9-ultra"}))
@@ -469,12 +470,15 @@ def test_nothing_in_the_assistant_reaches_a_write():
     for bad in ("served_put", "store_boxes", "card_add", "submit(", "unlink(", "rmtree",
                 "subprocess", "requests."):
         assert bad not in src, bad
-    # the page's side: the assistant's calls are its own three, and reports' reads
+    # the page's side: the assistant's calls are its own, and reports' reads —
+    # 28g: a question to the model (abandonable), a change run on the board
     import report_lm_eval as rpt
     js = rpt.JS[rpt.JS.index("const ASK = {"):rpt.JS.index("const ptN = ")]
-    assert set(re.findall(r"post\('([^']+)'", js)) == {"api/assistant/ask", "api/assistant/thumbs"}
+    assert set(re.findall(r"post\('([^']+)'", js)) == {"api/assistant/run", "api/assistant/thumbs"}
+    assert set(re.findall(r"fetch\('([^']+)'", js)) == {"api/assistant/ask"}
     assert set(re.findall(r"api\('([^'?]+)", js)) == {"api/reports/", "api/assistant",
-                                                     "api/assistant/state"}
+                                                     "api/assistant/state",
+                                                     "api/assistant/choices"}
 
 
 def test_every_question_and_its_thumbs_are_logged(board):
@@ -489,11 +493,16 @@ def test_every_question_and_its_thumbs_are_logged(board):
     assert assistant.log_path() == Path(config.BENCH_ROOT) / "assistant" / "log.jsonl"
 
 
-def test_three_examples_from_the_bank_each_its_own_scenario():
+def test_the_examples_come_in_four_groups_two_each_from_the_bank():
+    """28g: Numbers, Pages, Phones and Runs, two at most each"""
     got = assistant.examples()
-    assert len(got) == 3
-    sc = {next(b["scenario"] for b in BANK if b["q"] == q) for q in got}
-    assert len(sc) == 3 and not sc & {"refused", "messy", "ambiguous"}
+    assert [g["title"] for g in got] == ["Numbers", "Pages", "Phones", "Runs"]
+    of = {"Numbers": {"number", "compare", "best"}, "Pages": {"tab", "model"},
+          "Phones": {"phones"}, "Runs": {"boxes"}}
+    for g in got:
+        assert 1 <= len(g["items"]) <= 2
+        assert {next(b["scenario"] for b in BANK if b["q"] == q) for q in g["items"]} <= of[
+            g["title"]]
 
 
 @pytest.mark.parametrize("name", ["the qwen one", "the gemma page", "the bonsai", "the edge0 model",
@@ -1051,3 +1060,147 @@ def test_the_thumbs_down_questions_are_the_next_banks(board, capsys):
                 and x["note"] == ""]
     assert ev.main(["--thumbs-down"]) == 0
     assert '"q": "best on gpqa"' in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# 28g: the panel's cards, chips and suggestions — the board, never the model
+# ---------------------------------------------------------------------------
+
+def test_each_card_says_what_it_did(board):
+    cat = board["cat"]
+    got = assistant.answer({"action": "compare", "models": [S88, Q4],
+                            "benchmarks": ["gpqa", "hle"]}, cat)
+    assert got["head"] == "Compared 2 models on 2 benchmarks"
+    assert got["compare"].startswith("#tab=models&view=compare&m=")
+    assert got["linkText"] == "Open in Compare ▸"
+    got = assistant.answer({"action": "open_page", "page": "models_table", "view": "frontier"},
+                           cat)
+    assert got["head"] == "Opened Models · Frontier" and got["suggest"] == []
+    got = assistant.answer({"action": "best_on", "benchmark": "gpqa", "among": "ours"}, cat)
+    assert got["head"] == "Best on GPQA Diamond of ours, measured here"
+    got = assistant.answer({"action": "explain", "topic": "bench:ifbench"}, cat)
+    assert got["from"] == "From its description on Benchmarks"
+
+
+def test_one_model_on_one_benchmark_is_a_number_card(board):
+    """the number large, its ±, measured here — the setting, the questions,
+    the runs — or who published it, and its answers"""
+    cat = board["cat"]
+    n = assistant.answer({"action": "compare", "models": [S88], "benchmarks": ["gpqa"]},
+                         cat)["number"]
+    assert (n["text"], n["se"], n["bench"]) == ("70.0", "± 2.0", "GPQA Diamond")
+    assert n["sub"].startswith("Measured here · thinking on")
+    assert n["link"].endswith("&answers=gpqa_diamond_epoch")
+    assert n["linkText"] == "Its GPQA answers ▸"
+    # a model page opened on a benchmark says it too, with the setting it took
+    n = assistant.answer({"action": "open_page", "page": "model_page", "model": S88,
+                          "benchmark": "ifeval", "thinking": "off"}, cat)["number"]
+    assert n["sub"].startswith("Measured here · thinking off")
+    e0, _ = assistant.model_id("edge0 35b", cat)
+    n = assistant.answer({"action": "compare", "models": [e0], "benchmarks": ["gpqa"]},
+                         cat)["number"]
+    assert n["sub"] == "Published by Edge0" and n["published"]
+
+
+def test_asking_back_says_why_and_offers_all_of_them(board):
+    cat = board["cat"]
+    a = assistant.resolve({"action": "compare", "models": ["the step one"], "benchmarks": ["HLE"]},
+                          cat, "how does the step one do on HLE")
+    assert a["pending"]["benchmarks"] == ["HLE"] and "pending" not in assistant.as_named(a, cat)
+    got = assistant.answer(a, cat)
+    assert got["head"] == "Which checkpoint?"
+    assert got["why"] == "“The step one” fits three of ours."
+    subs = {c["value"]: c["sub"] for c in got["choices"]}
+    assert subs["served/step8804-lda-2610"].startswith("newest")
+    assert subs["served/step1000-lda-2610"].startswith("earliest")
+    assert got["all"]["label"] == "All three, side by side"
+    assert got["all"]["action"] == {"action": "compare", "models": [
+        "served/step1000-lda-2610", S40, S88], "benchmarks": ["hle"]}
+    assert got["search"] == {"link": "#tab=models&q=step", "text": "Search “step” on Models ▸"}
+    # grading and the follow-up's prompt are as they were
+    assert assistant.same(a, {"action": "clarify", "about": "model"}, cat)
+
+
+def test_the_suggestions_are_the_boards_and_never_filler(board):
+    cat = board["cat"]
+    sug = lambda a: {s["label"]: s["action"] for s in assistant.suggestions(a, cat)}  # noqa: E731
+    got = sug({"action": "compare", "models": [S88, S40], "benchmarks": ["gpqa", "hle"]})
+    assert got["as a chart"] == {"action": "chart", "chart": "bars", "models": [S88, S40],
+                                 "benchmarks": ["gpqa", "hle"]}
+    assert got["and Q2?"]["models"] == [S88, S40, Q2]
+    assert len(got) <= 3
+    # one number: beside Q4, its answers
+    got = sug({"action": "compare", "models": [S88], "benchmarks": ["gpqa"]})
+    assert got["beside Q4"] == {"action": "compare", "models": [S88, Q4], "benchmarks": ["gpqa"]}
+    assert got["its answers"]["page"] == "model_page"
+    # a ranking: top 5, as a chart
+    got = sug({"action": "best_on", "benchmark": "gpqa", "among": "ours"})
+    assert set(got) == {"top 5", "as a chart"} and got["top 5"]["n"] == 5
+    # an opened page: none
+    assert sug({"action": "open_page", "page": "models_table", "view": "frontier"}) == {}
+    # "as a chart" draws the same models on each benchmark
+    r = assistant.run(got["as a chart"], cat)
+    assert r["kind"] == "chart"
+    r = assistant.run(sug({"action": "compare", "models": [S88, S40], "benchmarks": [
+        "gpqa", "hle"]})["as a chart"], cat)
+    assert [g["bench"] for g in r["groups"]] == ["gpqa", "hle"]
+    assert {p["id"] for g in r["groups"] for p in g["points"]} <= {S88, S40}
+
+
+def test_a_change_in_the_panel_is_checked_run_and_logged_without_the_model(board, monkeypatch):
+    """a chip, a suggestion or "All three": the action as the board holds it,
+    each field checked, run again — the model never asked — and logged with
+    the question, the action before and the action after"""
+    cat = board["cat"]
+
+    def never(*a, **k):
+        raise AssertionError("asked a model")
+    monkeypatch.setattr(assistant, "call", never)
+    assert assistant.check({"action": "compare", "models": [S88, "made/up"],
+                            "benchmarks": ["gpqa", "nope"], "measure": "bogus"}, cat) == {
+        "action": "compare", "models": [S88], "benchmarks": ["gpqa"]}
+    assert assistant.check({"action": "cant", "kind": "delete"}, cat)["kind"] == "outside"
+    assert assistant.check({"action": "open_page", "page": "models_table", "view": "frontier",
+                            "when": "7d", "sort": "otis"}, cat)["sort"] == "otis"
+    before = {"action": "compare", "models": [S88, Q4], "benchmarks": ["gpqa"]}
+    got = assistant.rerun("step8804 vs q4 on gpqa", "masein", {**before, "models": [S88]},
+                          "edit", before, "abc123")
+    assert got["action"] == {"action": "compare", "models": [S88], "benchmarks": ["gpqa"]}
+    assert got["reply"]["number"]["text"] == "70.0"
+    last = assistant.edits()[-1]
+    assert (last["q"], last["why"], last["before"], last["after"]) == (
+        "step8804 vs q4 on gpqa", "edit", before, got["action"])
+    c = board["client"]
+    r = c.post("/api/assistant/run", json={"by": "masein", "q": "x", "action": {
+        "action": "boxes"}, "why": "suggestion", "label": "x"})
+    assert r.status_code == 200 and r.json()["reply"]["kind"] == "list"
+    assert c.post("/api/assistant/run", json={"by": "someone", "action": {}}).status_code == 403
+    ch = c.get("/api/assistant/choices", params={"by": "masein"}).json()
+    assert any(m["id"] == S88 for m in ch["models"]) and ch["when"][1] == ["7d", "Last 7 days"]
+
+
+def test_a_thumbs_down_keeps_its_reason_and_the_edits_print_apart(board, capsys):
+    import assistant_eval as ev
+    got = assistant.ask("best on gpqa, top 3", "masein", cat=board["cat"],
+                        model=fake({"action": "best_on", "benchmark": "gpqa"}))
+    assistant.thumbs(got["id"], "masein", False, "as a chart", "Missed something I asked")
+    assistant.thumbs(got["id"], "masein", False, "x", "not a reason")
+    down = [x for x in assistant.thumbs_down() if x["q"] == "best on gpqa, top 3"]
+    assert down[-1]["note"] == "x" and down[-1]["reason"] == ""
+    assistant.thumbs(got["id"], "masein", False, "as a chart", "Missed something I asked")
+    down = [x for x in assistant.thumbs_down() if x["q"] == "best on gpqa, top 3"]
+    assert down[-1]["reason"] == "Missed something I asked"
+    assistant.rerun("best on gpqa, top 3", "masein", {"action": "best_on", "benchmark": "gpqa",
+                                                      "n": 5}, "suggestion", label="top 5")
+    assert ev.main(["--thumbs-down"]) == 0
+    out = capsys.readouterr().out
+    head, edits = out.split("\nEdits in the panel (")
+    assert head.startswith("Thumbs down (") and '"reason": "Missed something I asked"' in head
+    assert '"why": "suggestion", "label": "top 5"' in edits
+
+
+def test_the_status_names_the_model_and_where_it_runs(monkeypatch):
+    monkeypatch.setattr(config, "ASSISTANT_PROVIDER", "")
+    assert assistant.provider_label() == {"name": "Q4", "where": "our server"}
+    monkeypatch.setattr(config, "ASSISTANT_PROVIDER", "openrouter:anthropic/claude-sonnet-5.5")
+    assert assistant.provider_label() == {"name": "claude-sonnet-5.5", "where": "OpenRouter"}

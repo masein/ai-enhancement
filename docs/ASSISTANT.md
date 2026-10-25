@@ -115,12 +115,51 @@ phone, "the oneplus" every OnePlus.
 
 ## The panel
 
-"Ask" at the top right (in Menu ▾ on a phone), and ⌘K / Ctrl+K. A panel on
-the right, 380 px wide, over the page; a phone's whole width. Messages stay
-for the session, in memory; Clear empties them. Under each reply 👍 and 👎; 👎
-asks "What did you want?". Three example questions from the test bank when it
-is empty. While the model answers: "Thinking…", or "Slower now: a run is using
-the model…"; with the model down, the panel says so and nothing else breaks.
+28g: board E, "Ask panel — four states" (`docs/prompts/phase-28g/ask-panel-mock.dc.html`),
+built from the board's own colour tokens in every theme.
+
+- **Opening it:** "Ask" at the top right (in Menu ▾ below 720 px), and ⌘K / Ctrl+K,
+  which opens and focuses it (again: closes it). Esc closes it; ↑ in an empty box
+  brings back the last question.
+- **Its size:** 400 px over the page, or 720 px with "Wider panel", remembered in this
+  browser; a phone's whole width.
+- **The header:** "Ask", then the status — a dot and words, never colour alone: "Q4 ·
+  our server", "Q4 · slower: a run is using it", "Q4 is down" — Clear, Wider, Close.
+- **A turn:** the person's words after their initial, no bubble; then the board's
+  answer as a card. When an answer arrives, every card but the last two folds to one
+  line with "Show again". While it thinks: "Reading the board…", and Send becomes
+  Stop, which abandons the request.
+- **A card per kind of answer**, each starting with what it did in the board's words
+  and ending with the button to the page, Copy link and the thumbs:
+  - compare: models across, benchmarks down — three columns at 400 px, five at 720,
+    "+2 more · Open in Compare ▸" beyond; one benchmark is a list. 27's cells,
+    smaller (the number, a small ±, a 3 px bar; published italic with its letter; a
+    muted "–"), and a line on what's published;
+  - one model on one benchmark — from compare or its page opened on it: the number
+    large, "Measured here · thinking on · 198 questions × 4 runs" (or who published
+    it), and its answers;
+  - best_on ranked, the published listed apart; an opened page with a check and what
+    was applied; the board's chart; the testers' phones and the runs in the same
+    compact rules; a help text with where it comes from; asking back with why ("“The
+    step one” fits three of ours."), each choice's line, "All three, side by side"
+    when the action takes several, and the search; not found; what it can't do.
+- **What it understood, as chips you can change.** Each card shows the action's
+  fields: the models (×), the benchmarks ("6 benchmarks ▾"), the tab, When, Show,
+  Sort, Thinking and the measure. "+ Add" ("+ Sort, Show, Columns…" on Models)
+  offers only what that action or page takes, with the choices the page's own menus
+  give. A change runs the action again on the board — never the model — through
+  `/api/assistant/run`, which checks every field against the board; the card updates
+  in place, marked "edited". An opened page's change opens the page again.
+- **Follow-ups the board builds**, two or three above the box after an answer — a
+  comparison "as a chart", "thinking off" (or on) when the other setting has scores,
+  "and Q2?"; one number "beside Q4", "its answers"; a ranking's "top 5", "as a
+  chart". None after an opened page, and never filler. A click runs it on the board,
+  the chip's words the person's turn.
+- **👎** opens "What did you want?" in the card: four quick reasons ("Missed
+  something I asked", "Wrong model", "Wrong number", "Should have asked"), a few
+  words, Send — "Becomes a test question". 👍 just marks it.
+- **Read-only, the page left be:** chips, suggestions and "All three" call no model;
+  the panel's drawing, folding and edits never redraw or scroll the page behind it.
 
 ## Only us
 
@@ -128,11 +167,14 @@ the model…"; with the model down, the panel says so and nothing else breaks.
   Empty or missing (the default, and the mirror's): the assistant doesn't
   exist — the payload says so and the page asks nothing.
 - The API refuses everyone else (403); with nobody named, it is 404.
-- Every question, its action, its reply's kind and time, and every thumb go
-  to `BENCH_ROOT/assistant/log.jsonl` — internal, never in the mirror — so the
+- Every question, its action, its reply's kind and time, every thumb (a
+  thumbs down with its reason) and every change made in the panel (the
+  question, the action before, the action after) go to
+  `BENCH_ROOT/assistant/log.jsonl` — internal, never in the mirror — so the
   test bank grows from real misses: `scripts/assistant_eval.py --thumbs-down`
   prints the questions whose last thumb is down, with the turn before, the
-  board's action and what the person wanted — the next bank's questions.
+  board's action, the reason and what the person wanted, and the panel's
+  changes under their own heading — the next bank's questions.
 
 ## The model
 
@@ -176,7 +218,11 @@ message.
   clarify, the refusal. Also an unknown id, a reply that isn't the JSON, a
   model down, the request's schema and settings, the people allowed, the log,
   and read-only. `tests/test_28_browser.py` draws the panel at 1280 and 400,
-  light and dark.
+  light and dark; `tests/test_28g_browser.py` board E's four states at 400 px,
+  the comparison at 720 and on a 390 px phone, masein's case (no sideways
+  scroll, every header whole), five models at 400 and 720, a chip taken out or
+  added and "as a chart" with no model call, the thumbs-down form, the status
+  and Stop, and the page behind never redrawn or scrolled.
 - **Real-model** (on the server, never in CI): `scripts/assistant_eval.py`
   asks a model the bank as the board asks it and prints the pass rate per
   scenario for each half, the reply times and every miss with what the model
