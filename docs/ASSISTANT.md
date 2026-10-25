@@ -10,11 +10,19 @@ The model picks, the board does. For every message the model chooses one
 action and fills in its fields, as JSON forced into the board's schema (the
 provider's JSON-schema mode). The schema is strict: one branch an action — for
 `open_page` one a page, `models_table` (the Models tabs) or `model_page` (one
-model) — each with its own fields alone, the closed lists as enums. Model,
-phone and app names are strings as the person wrote them ("step one", "the
-galaxy", "oneplus"): the board matches them, and asks back when several match
-(step1000, step4000, step8804) or none does. It then runs the action and draws
-the reply with its own parts. The model never writes a number.
+model) — each with its own fields alone, the closed lists as enums. The reply
+is `{"do": an action}`, or `{"do": the first, "then": the second}` when a
+message asks two things: a second request is a whole action of the same
+branches, never free text. Every name — model, benchmark, report, phone, app —
+is a string as the person wrote it ("step one", "the arc one", "the report
+about phones", "the galaxy"): the board matches it against its names and asks
+back when several match (step1000, step4000, step8804; ARC-AGI-2, ARC-Challenge,
+ARC-Easy; the testers' and the On-device report) or none does. The model
+clarifies only when the message names nothing ("it", "the two") and there is
+no previous action. A tab or a thinking setting that neither the message nor
+the one before it names is left out — "only ours" stays on the tab you're on.
+The board then runs the action and draws the reply with its own parts. The
+model never writes a number.
 
 | Action | What the board does |
 |---|---|
@@ -42,8 +50,9 @@ and the message come after.
 **A follow-up** ("and on HLE?") gets the previous action, its models by name,
 with the rule to keep it and change only what the new message changes.
 
-**Two requests in one message**: the first is done, and the second — as the
-person wrote it, in `then` — is a button under the reply that asks it.
+**Two requests in one message**: the first is done, and the second — a whole
+action, worked out with the first — is a button under the reply ("Also: Open
+On-device models") that shows it.
 
 **Names** people type are in `eval_tasks/assistant/names.json`, with the
 benchmarks' names, the topics and the examples. The board matches loosely:
@@ -87,7 +96,7 @@ message.
 - **The bank**, `tests/fixtures/assistant/queries.jsonl`: 266 questions in 12
   scenarios (16 or more each), each with the action it should produce (`also`:
   another as good — "show the qwen3.6 model" may search for it or ask back;
-  `then`: a second request it must offer). Each scenario is split in two:
+  `then`: the second action it must offer). Each scenario is split in two:
   a **working half** (`"half": "work"`), the only one the prompt, the names and
   the schema are tuned on, and a **held-out half** (`"held"`), never looked at
   to tune; the evaluation reports both, so a high rate means more than a

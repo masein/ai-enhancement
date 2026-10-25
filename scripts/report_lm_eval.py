@@ -30257,6 +30257,14 @@ async function askSend(q) {
   }
   askDraw();
 }
+function askThen(m) {
+  const t = m.reply.then;
+  m.thenShown = true;
+  const n = { role: 'bot', q: t.label, id: m.id, action: t.action, reply: t.reply };
+  ASK.msgs.push(n);
+  if (t.reply.kind === 'open' && t.reply.link) location.hash = t.reply.link.replace(/^#/, '');
+  askDraw();
+}
 function askThumbs(m, up, note) {
   m.thumbs = up ? 'up' : 'down';
   if (!up && note == null) { m.asking = true; askDraw(); return; }
@@ -30305,9 +30313,10 @@ function askMsg(m) {
   return el('div', { class: 'ask-bot', 'data-ask-bot': r.kind || '1' },
     el('p', { class: 'ask-say', 'data-ask-say': '1', text: r.say || '' }),
     askBody(r),
-    // 28b: two requests in one message: the first done, the second a button
-    r.then ? el('button', { class: 'chip-btn ask-then', 'data-ask-then': '1', text: 'Also: ' + r.then,
-      onclick: () => askSend(r.then) }) : '',
+    // 28b: two requests in one message: the first done, the second a button —
+    // 28c: a whole action the board worked out with the first, shown when pressed
+    r.then && !m.thenShown ? el('button', { class: 'chip-btn ask-then', 'data-ask-then': '1',
+      text: 'Also: ' + r.then.label, onclick: () => askThen(m) }) : '',
     link,
     m.id ? el('div', { class: 'ask-thumbs' },
       el('button', { class: 'quiet' + (m.thumbs === 'up' ? ' on' : ''), 'data-ask-up': '1',

@@ -1,5 +1,5 @@
 {
- "about": "28: the assistant's names (service/assistant.py, docs/ASSISTANT.md). models: a board id (thinking row or not) or a model's exact name -> what people call it; phones: a phone's model code -> what people call it; benchmarks: the assistant's key -> the names people type; topics: what `explain` can say, each from the board's own words (`from`: notes:<first words of a report note>, desc:<task>, page:<a text the page keeps>); examples: a few questions and their actions, for the prompt — never the test bank's. Plain names only; this file goes to the public mirror.",
+ "about": "28: the assistant's names (service/assistant.py, docs/ASSISTANT.md). models: a board id (thinking row or not) or a model's exact name -> what people call it; phones: a phone's model code -> what people call it; reports: a report's id -> its other names; benchmarks: the assistant's key -> the names people type; topics: what `explain` can say, each from the board's own words (`from`: notes:<first words of a report note>, desc:<task>, page:<a text the page keeps>); examples: a few questions and their actions, for the prompt — never the test bank's. Plain names only; this file goes to the public mirror.",
  "models": {
   "served/step8804-lda-2610": [
    "step8804",
@@ -291,165 +291,238 @@
   [
    "latest tab",
    {
-    "action": "open_page",
-    "page": "models_table",
-    "view": "latest"
+    "do": {
+     "action": "open_page",
+     "page": "models_table",
+     "view": "latest"
+    }
    }
   ],
   [
    "standard tab with the math group",
    {
-    "action": "open_page",
-    "page": "models_table",
-    "view": "standard",
-    "group": "math"
+    "do": {
+     "action": "open_page",
+     "page": "models_table",
+     "view": "standard",
+     "group": "math"
+    }
    }
   ],
   [
    "frontier, closed models only, sorted by gpqa, worst first",
    {
-    "action": "open_page",
-    "page": "models_table",
-    "view": "frontier",
-    "only": "closed",
-    "sort": "gpqa",
-    "sort_dir": "asc"
+    "do": {
+     "action": "open_page",
+     "page": "models_table",
+     "view": "frontier",
+     "only": "closed",
+     "sort": "gpqa",
+     "sort_dir": "asc"
+    }
    }
   ],
   [
    "models added in the last 30 days",
    {
-    "action": "open_page",
-    "page": "models_table",
-    "when": "30d",
-    "date": "added"
+    "do": {
+     "action": "open_page",
+     "page": "models_table",
+     "when": "30d",
+     "date": "added"
+    }
    }
   ],
   [
    "find llama models",
    {
-    "action": "open_page",
-    "page": "models_table",
-    "search": "llama"
+    "do": {
+     "action": "open_page",
+     "page": "models_table",
+     "search": "llama"
+    }
    }
   ],
   [
    "open step1000's answers on MATH",
    {
-    "action": "open_page",
-    "page": "model_page",
-    "model": "step1000",
-    "benchmark": "math"
+    "do": {
+     "action": "open_page",
+     "page": "model_page",
+     "model": "step1000",
+     "benchmark": "math"
+    }
    }
   ],
   [
    "ran-out report for step1000",
    {
-    "action": "open_page",
-    "page": "report",
-    "report": "ran-out-of-room",
-    "model": "step1000"
+    "do": {
+     "action": "open_page",
+     "page": "report",
+     "report": "ran-out report",
+     "model": "step1000"
+    }
    }
   ],
   [
    "q2 against step1000 on otis and math",
    {
-    "action": "compare",
-    "models": [
-     "q2",
-     "step1000"
-    ],
-    "benchmarks": [
-     "otis",
-     "math"
-    ]
+    "do": {
+     "action": "compare",
+     "models": [
+      "q2",
+      "step1000"
+     ],
+     "benchmarks": [
+      "otis",
+      "math"
+     ]
+    }
    }
   ],
   [
    "what's step1000's loop share on HLE",
    {
-    "action": "compare",
-    "models": [
-     "step1000"
-    ],
-    "benchmarks": [
-     "hle"
-    ],
-    "measure": "loops"
+    "do": {
+     "action": "compare",
+     "models": [
+      "step1000"
+     ],
+     "benchmarks": [
+      "hle"
+     ],
+     "measure": "loops"
+    }
    }
   ],
   [
    "closed models, best on simpleqa",
    {
-    "action": "best_on",
-    "benchmark": "simpleqa",
-    "among": "closed"
+    "do": {
+     "action": "best_on",
+     "benchmark": "simpleqa",
+     "among": "closed"
+    }
    }
   ],
   [
    "line of MATH over training",
    {
-    "action": "chart",
-    "chart": "checkpoints",
-    "benchmark": "math"
+    "do": {
+     "action": "chart",
+     "chart": "checkpoints",
+     "benchmark": "MATH"
+    }
    }
   ],
   [
    "prefill speed of step4000 on the galaxy",
    {
-    "action": "phone",
-    "app": "step4000",
-    "phone": "the galaxy",
-    "measure": "prefill"
+    "do": {
+     "action": "phone",
+     "app": "step4000",
+     "phone": "the galaxy",
+     "measure": "prefill"
+    }
    }
   ],
   [
    "how long does the q2 run have left",
    {
-    "action": "boxes",
-    "model": "q2"
+    "do": {
+     "action": "boxes",
+     "model": "q2"
+    }
    }
   ],
   [
    "what does 'had it, then lost it' mean",
    {
-    "action": "explain",
-    "topic": "lost"
+    "do": {
+     "action": "explain",
+     "topic": "lost"
+    }
    }
   ],
   [
    "show me the gemma model",
    {
-    "action": "clarify",
-    "about": "model",
-    "term": "gemma"
+    "do": {
+     "action": "open_page",
+     "page": "model_page",
+     "model": "the gemma model"
+    }
    }
   ],
   [
    "q2's mmlu-pro, and open the frontier tab",
    {
-    "action": "compare",
-    "models": [
-     "q2"
-    ],
-    "benchmarks": [
-     "mmlupro"
-    ],
-    "then": "open the frontier tab"
+    "do": {
+     "action": "compare",
+     "models": [
+      "q2"
+     ],
+     "benchmarks": [
+      "mmlupro"
+     ]
+    },
+    "then": {
+     "action": "open_page",
+     "page": "models_table",
+     "view": "frontier"
+    }
+   }
+  ],
+  [
+   "how fast is step4000 on the oneplus",
+   {
+    "do": {
+     "action": "phone",
+     "app": "step4000",
+     "phone": "the oneplus"
+    }
+   }
+  ],
+  [
+   "compare step1000 with the arc one",
+   {
+    "do": {
+     "action": "compare",
+     "models": [
+      "step1000"
+     ],
+     "benchmarks": [
+      "the arc one"
+     ]
+    }
+   }
+  ],
+  [
+   "what's its score",
+   {
+    "do": {
+     "action": "clarify",
+     "about": "model"
+    }
    }
   ],
   [
    "queue step1000 on MMLU",
    {
-    "action": "cant",
-    "kind": "start_run"
+    "do": {
+     "action": "cant",
+     "kind": "start_run"
+    }
    }
   ],
   [
    "write me a poem",
    {
-    "action": "cant",
-    "kind": "outside"
+    "do": {
+     "action": "cant",
+     "kind": "outside"
+    }
    }
   ]
  ],
@@ -467,6 +540,42 @@
   ],
   "CPH2719": [
    "the other oneplus"
+  ]
+ },
+ "reports": {
+  "testers": [
+   "testers",
+   "the testers' report",
+   "our testers' phones",
+   "phone tests",
+   "the phones report",
+   "phones"
+  ],
+  "on-device": [
+   "on-device",
+   "on device",
+   "the on-device report",
+   "models on phones",
+   "phone models",
+   "phones"
+  ],
+  "paired": [
+   "paired",
+   "two builds",
+   "the two-builds report",
+   "question by question",
+   "the reader"
+  ],
+  "step-checkpoints": [
+   "step checkpoints",
+   "the scorecard",
+   "checkpoints report",
+   "step checkpoints vs popular models"
+  ],
+  "ran-out-of-room": [
+   "ran out of room",
+   "the ran-out report",
+   "ran-out"
   ]
  }
 }

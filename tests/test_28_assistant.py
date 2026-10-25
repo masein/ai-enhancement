@@ -47,8 +47,10 @@ def board(tmp_path_factory):
 
 
 def fake(want: dict):
-    """a model that answers with the action the bank expects"""
-    return lambda system, user, schema: json.dumps(want)
+    """a model that answers with the action the bank expects, as {"do", "then"}"""
+    first = {k: v for k, v in want.items() if k not in ("also", "then")}
+    return lambda system, user, schema: json.dumps(
+        {"do": first, **({"then": want["then"]} if want.get("then") else {})})
 
 
 def ask(board, b: dict) -> dict:
@@ -81,7 +83,7 @@ def test_every_bank_question_runs_as_its_action(board):
     bad = []
     for b in BANK:
         got = ask(board, b)
-        want = assistant.resolve(b["want"], board["cat"])
+        want = assistant.resolve(b["want"], board["cat"], b["q"], (b.get("prev") or {}).get("q", ""))
         if not assistant.same(got["action"], b["want"], board["cat"]) or not assistant.same(
                 want, b["want"], board["cat"]):
             bad.append((b["id"], b["q"], got["action"]))
@@ -255,7 +257,7 @@ def test_an_unknown_id_is_refused_for_a_clarify(board):
         {"action": "open_page", "page": "model_page", "model": "openai/gpt-9-ultra"}))
     assert got["action"]["action"] == "clarify" and got["reply"]["kind"] == "clarify"
     got = assistant.ask("step 8804 vs q4", "masein", cat=board["cat"], model=fake(
-        {"action": "compare", "models": ["step 8804", "q4"], "benchmarks": ["GPQA Diamond"]}))
+        {"action": "compare", "models": ["step 8804", "the q4"], "benchmarks": ["GPQA Diamond"]}))
     assert got["action"]["models"] == [S88, Q4] and got["action"]["benchmarks"] == ["gpqa"]
 
 
@@ -293,7 +295,9 @@ def test_the_request_asks_for_the_schema_thinking_off(board, monkeypatch):
     assert (b["temperature"], b["max_tokens"], b["chat_template_kwargs"]) == (
         0, 600, {"enable_thinking": False})
     sch = b["response_format"]["json_schema"]["schema"]
-    assert {br["properties"]["action"]["const"] for br in sch["anyOf"]} == set(assistant.ACTIONS)
+    assert sch["type"] == "object" and set(sch["properties"]) == {"do", "then"}
+    assert {br["properties"]["action"]["const"] for br in sch["properties"]["do"]["anyOf"]} == set(
+        assistant.ACTIONS)
     assert got["reply"]["kind"] == "list"
     # the prompt: every model by its name and benchmark the board has; today's date
     # with the message, so the system prompt is the same message to message
@@ -321,18 +325,28 @@ def test_a_follow_up_carries_the_previous_action_by_name(board):
 # ---------------------------------------------------------------------------
 
 def test_each_action_is_strict_and_names_are_strings(board):
+    """28b, 28c: a branch an action, each strict; the closed lists enums; every
+    name — model, benchmark, report, phone, app — a string; a second request a
+    whole action of the same branches"""
     sch = assistant.schema(board["cat"])
-    for br in sch["anyOf"]:
+    assert sch["additionalProperties"] is False and sch["required"] == ["do"]
+    assert sch["properties"]["then"] == sch["properties"]["do"]
+    for br in sch["properties"]["do"]["anyOf"]:
         assert br["additionalProperties"] is False
-        assert "question" not in br["properties"]
-        for k in ("view", "only", "sort", "thinking", "measure", "page", "among", "chart"):
+        assert "question" not in br["properties"] and "then" not in br["properties"]
+        for k in ("view", "only", "thinking", "measure", "page", "among", "chart", "kind"):
             p = br["properties"].get(k)
             if p:
                 assert "enum" in p or "const" in p, (br["properties"]["action"], k)
-        for k in ("model", "beside", "a", "b", "base", "since", "phone", "app"):
+        for k in ("model", "beside", "a", "b", "base", "since", "phone", "app", "benchmark",
+                  "report", "sort"):
             if k in br["properties"]:
-                assert br["properties"][k] == {"type": "string"}
-    pages = [br["properties"]["page"] for br in sch["anyOf"] if "page" in br["properties"]]
+                assert br["properties"][k] == {"type": "string"}, k
+        for k in ("models", "benchmarks", "columns"):
+            if k in br["properties"]:
+                assert br["properties"][k]["items"] == {"type": "string"}, k
+    pages = [br["properties"]["page"] for br in sch["properties"]["do"]["anyOf"]
+             if "page" in br["properties"]]
     assert {"const": "models_table", "type": "string"} in pages
     assert {"const": "model_page", "type": "string"} in pages
 
@@ -353,9 +367,46 @@ def test_the_board_matches_names_and_asks_back_when_several_do(board):
     assert got["action"] == "clarify" and got["about"] == "phone"
 
 
-def test_a_second_request_is_a_button_and_a_search_is_as_good(board):
+def test_a_second_request_is_a_whole_action_behind_a_button(board):
     got = ask(board, item("q4's gpqa and then open the on-device report"))
-    assert got["reply"]["kind"] == "table" and got["reply"]["then"] == "open the on-device report"
+    assert got["reply"]["kind"] == "table"
+    t = got["reply"]["then"]
+    assert t["label"] == "Open On-device models"
+    assert t["action"] == {"action": "open_page", "page": "report", "report": "on-device"}
+    assert t["reply"]["link"] == "#tab=reports&report=on-device"
+    # a free-text "then" is no second action
+    a = assistant.parse('{"do": {"action": "boxes"}, "then": "open runs"}')
+    assert a == {"action": "boxes"}
+
+
+def test_the_board_asks_back_for_benchmarks_and_reports_too(board):
+    cat = board["cat"]
+    got = assistant.resolve({"action": "chart", "chart": "bars", "benchmark": "the arc one"}, cat)
+    assert got["action"] == "clarify" and got["about"] == "benchmark"
+    assert set(got["candidates"]) == {"arc", "arc_challenge", "arc_easy"}
+    got = assistant.resolve({"action": "open_page", "page": "report",
+                             "report": "the report about phones"}, cat)
+    assert got["action"] == "clarify" and set(got["candidates"]) == {"testers", "on-device"}
+    got = assistant.resolve({"action": "compare", "models": ["q4"], "benchmarks": ["GPQA Diamond",
+                                                                                "math l5"]}, cat)
+    assert got["benchmarks"] == ["gpqa", "math"]
+    assert assistant.resolve({"action": "open_page", "page": "report",
+                              "report": "the two-builds report"}, cat)["report"] == "paired"
+
+
+def test_a_tab_or_thinking_no_message_names_is_left_out(board):
+    cat = board["cat"]
+    a = {"action": "open_page", "page": "models_table", "view": "latest", "only": "ours"}
+    assert assistant.resolve(a, cat, "only ours") == {
+        "action": "open_page", "page": "models_table", "only": "ours"}
+    assert assistant.resolve(a, cat, "latest tab, only ours")["view"] == "latest"
+    # a follow-up: the tab the message before named is kept
+    assert assistant.resolve(a, cat, "only ours", "the latest tab")["view"] == "latest"
+    c = {"action": "compare", "models": [S88], "benchmarks": ["gpqa"], "thinking": "on"}
+    assert "thinking" not in assistant.resolve(c, cat, "step8804 gpqa")
+    assert assistant.resolve(c, cat, "step8804 gpqa, thinking on")["thinking"] == "on"
+    link = ask(board, item("search the models for ornith"))["reply"]["link"]
+    assert link == "#tab=models&q=ornith"
     want = item("show the qwen3.6 model")["want"]
     for alt in ({"action": "clarify", "about": "model"},
                 {"action": "open_page", "page": "models_table", "search": "Qwen3.6"}):
@@ -424,3 +475,11 @@ def test_three_examples_from_the_bank_each_its_own_scenario():
     assert len(got) == 3
     sc = {next(b["scenario"] for b in BANK if b["q"] == q) for q in got}
     assert len(sc) == 3 and not sc & {"refused", "messy", "ambiguous"}
+
+
+@pytest.mark.parametrize("name", ["the qwen one", "the gemma page", "the bonsai", "the edge0 model",
+                                  "the claude one", "the gpt model", "the step one"])
+def test_an_ambiguous_name_as_written_is_asked_back(board, name):
+    got = assistant.resolve({"action": "open_page", "page": "model_page", "model": name},
+                            board["cat"])
+    assert got["action"] == "clarify" and len(got["candidates"]) >= 2, (name, got)

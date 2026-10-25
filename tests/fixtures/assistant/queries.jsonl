@@ -196,22 +196,22 @@
 {"id": "b196", "scenario": "ambiguous", "half": "held", "q": "open the report", "want": {"action": "clarify", "about": "report"}}
 {"id": "b197", "scenario": "ambiguous", "half": "work", "q": "compare the two on GPQA", "want": {"action": "clarify", "about": "model"}}
 {"id": "b198", "scenario": "ambiguous", "half": "held", "q": "what's the score?", "want": {"action": "clarify", "about": "model"}}
-{"id": "b199", "scenario": "ambiguous", "half": "work", "q": "open the gemma page", "want": {"action": "clarify", "about": "model"}}
-{"id": "b200", "scenario": "ambiguous", "half": "held", "q": "how is the bonsai doing", "want": {"action": "clarify", "about": "model"}}
+{"id": "b199", "scenario": "ambiguous", "half": "work", "q": "open the gemma page", "want": {"action": "clarify", "about": "model", "also": [{"action": "open_page", "page": "models_table", "search": "gemma"}]}}
+{"id": "b200", "scenario": "ambiguous", "half": "held", "q": "how is the bonsai doing", "want": {"action": "clarify", "about": "model", "also": [{"action": "open_page", "page": "models_table", "search": "bonsai"}]}}
 {"id": "b201", "scenario": "ambiguous", "half": "work", "q": "how fast is it on the phone", "want": {"action": "clarify", "about": "model"}}
-{"id": "b202", "scenario": "ambiguous", "half": "held", "q": "open the edge0 model", "want": {"action": "clarify", "about": "model"}}
-{"id": "b203", "scenario": "ambiguous", "half": "work", "q": "show the claude one", "want": {"action": "clarify", "about": "model"}}
+{"id": "b202", "scenario": "ambiguous", "half": "held", "q": "open the edge0 model", "want": {"action": "clarify", "about": "model", "also": [{"action": "open_page", "page": "models_table", "search": "edge0"}]}}
+{"id": "b203", "scenario": "ambiguous", "half": "work", "q": "show the claude one", "want": {"action": "clarify", "about": "model", "also": [{"action": "open_page", "page": "models_table", "search": "claude"}]}}
 {"id": "b204", "scenario": "ambiguous", "half": "held", "q": "compare step8804 with the other one", "want": {"action": "clarify", "about": "model"}}
 {"id": "b205", "scenario": "ambiguous", "half": "work", "q": "what's its gpqa", "want": {"action": "clarify", "about": "model"}}
-{"id": "b206", "scenario": "ambiguous", "half": "held", "q": "open the q4", "want": {"action": "clarify", "about": "model"}}
-{"id": "b207", "scenario": "ambiguous", "half": "work", "q": "show me the gpt model", "want": {"action": "clarify", "about": "model"}}
+{"id": "b206", "scenario": "ambiguous", "half": "held", "q": "open the q4", "want": {"action": "clarify", "about": "model", "also": [{"action": "open_page", "page": "model_page", "model": "served/Qwen3.6-35B-A3B-Q4-lda-2610"}]}}
+{"id": "b207", "scenario": "ambiguous", "half": "work", "q": "show me the gpt model", "want": {"action": "clarify", "about": "model", "also": [{"action": "open_page", "page": "models_table", "search": "gpt"}]}}
 {"id": "b208", "scenario": "ambiguous", "half": "held", "q": "which benchmark is the hard one", "want": {"action": "clarify", "about": "benchmark"}}
 {"id": "b209", "scenario": "ambiguous", "half": "work", "q": "open that report about phones", "want": {"action": "clarify", "about": "report"}}
 {"id": "b210", "scenario": "ambiguous", "half": "held", "q": "chart the arc one", "want": {"action": "clarify", "about": "benchmark"}}
 {"id": "b211", "scenario": "ambiguous", "half": "work", "q": "show the qwen3.6 model", "want": {"action": "clarify", "about": "model", "also": [{"action": "open_page", "page": "models_table", "search": "qwen3.6"}]}}
-{"id": "b212", "scenario": "ambiguous", "half": "held", "q": "open the step one", "want": {"action": "clarify", "about": "model"}}
+{"id": "b212", "scenario": "ambiguous", "half": "held", "q": "open the step one", "want": {"action": "clarify", "about": "model", "also": [{"action": "open_page", "page": "models_table", "search": "step"}]}}
 {"id": "b213", "scenario": "ambiguous", "half": "work", "q": "how does the ternary one do", "want": {"action": "clarify", "about": "model"}}
-{"id": "b214", "scenario": "ambiguous", "half": "held", "q": "how fast is it on the galaxy", "want": {"action": "clarify", "about": "model"}}
+{"id": "b214", "scenario": "ambiguous", "half": "held", "q": "how fast is it on the galaxy", "want": {"action": "clarify", "about": "model", "also": [{"action": "phone", "phone": "galaxy"}]}}
 {"id": "b215", "scenario": "refused", "half": "work", "q": "start a run on step8804", "want": {"action": "cant", "kind": "start_run"}}
 {"id": "b216", "scenario": "refused", "half": "held", "q": "delete step1000", "want": {"action": "cant", "kind": "delete"}}
 {"id": "b217", "scenario": "refused", "half": "work", "q": "what's the weather", "want": {"action": "cant", "kind": "outside"}}
@@ -241,7 +241,7 @@
 {"id": "b241", "scenario": "messy", "half": "held", "q": "and as a chart", "prev": {"q": "best on gpqa", "action": {"action": "best_on", "benchmark": "gpqa"}}, "want": {"action": "chart", "chart": "bars", "benchmark": "gpqa"}}
 {"id": "b242", "scenario": "messy", "half": "work", "q": "wats best on ifevl", "want": {"action": "best_on", "benchmark": "ifeval"}}
 {"id": "b243", "scenario": "messy", "half": "held", "q": "8804 page", "want": {"action": "open_page", "page": "model_page", "model": "served/step8804-lda-2610"}}
-{"id": "b244", "scenario": "messy", "half": "work", "q": "show 8804 and 4000 on mmlu pro, and also what is ifbench", "want": {"action": "compare", "models": ["served/step8804-lda-2610", "served/step4000-lda-2610"], "benchmarks": ["mmlupro"], "then": "what is ifbench"}}
+{"id": "b244", "scenario": "messy", "half": "work", "q": "show 8804 and 4000 on mmlu pro, and also what is ifbench", "want": {"action": "compare", "models": ["served/step8804-lda-2610", "served/step4000-lda-2610"], "benchmarks": ["mmlupro"], "then": {"action": "explain", "topic": "bench:ifbench"}}}
 {"id": "b245", "scenario": "messy", "half": "held", "q": "latest tab pls", "want": {"action": "open_page", "page": "models_table", "view": "latest"}}
 {"id": "b246", "scenario": "messy", "half": "work", "q": "hw fast step8804 oneplus", "want": {"action": "phone", "app": "step8804", "phone": "oneplus"}}
 {"id": "b247", "scenario": "messy", "half": "held", "q": "only ours", "prev": {"q": "frontier tab", "action": {"action": "open_page", "page": "models_table", "view": "frontier"}}, "want": {"action": "open_page", "page": "models_table", "only": "ours"}}
@@ -257,10 +257,10 @@
 {"id": "b257", "scenario": "messy", "half": "held", "q": "and for the galaxy?", "prev": {"q": "how fast is step8804 on the oneplus", "action": {"action": "phone", "app": "step8804", "phone": "oneplus"}}, "want": {"action": "phone", "app": "step8804", "phone": "galaxy"}}
 {"id": "b258", "scenario": "messy", "half": "work", "q": "Q4 GPQA pls", "want": {"action": "compare", "models": ["served/Qwen3.6-35B-A3B-Q4-lda-2610"], "benchmarks": ["gpqa"]}}
 {"id": "b259", "scenario": "messy", "half": "held", "q": "whos best ifbench ours", "want": {"action": "best_on", "among": "ours", "benchmark": "ifbench"}}
-{"id": "b260", "scenario": "messy", "half": "work", "q": "explain hle and also open the frontier tab", "want": {"action": "explain", "topic": "bench:hle", "then": "open the frontier tab"}}
+{"id": "b260", "scenario": "messy", "half": "work", "q": "explain hle and also open the frontier tab", "want": {"action": "explain", "topic": "bench:hle", "then": {"action": "open_page", "page": "models_table", "view": "frontier"}}}
 {"id": "b261", "scenario": "messy", "half": "held", "q": "opne bf16 page", "want": {"action": "open_page", "page": "model_page", "model": "served/Qwen3.6-35B-A3B-BF16-lda-2610"}}
 {"id": "b262", "scenario": "messy", "half": "work", "q": "latest tab, only ifeval column", "want": {"action": "open_page", "page": "models_table", "view": "latest", "columns": ["ifeval"]}}
 {"id": "b263", "scenario": "messy", "half": "held", "q": "and top 5?", "prev": {"q": "which of ours is best on GPQA?", "action": {"action": "best_on", "among": "ours", "benchmark": "gpqa"}}, "want": {"action": "best_on", "among": "ours", "n": 5, "benchmark": "gpqa"}}
-{"id": "b264", "scenario": "messy", "half": "work", "q": "q4's gpqa and then open the on-device report", "want": {"action": "compare", "models": ["served/Qwen3.6-35B-A3B-Q4-lda-2610"], "benchmarks": ["gpqa"], "then": "open the on-device report"}}
-{"id": "b265", "scenario": "messy", "half": "held", "q": "best on hle among ours, and what does near the ceiling mean", "want": {"action": "best_on", "benchmark": "hle", "among": "ours", "then": "what does near the ceiling mean"}}
-{"id": "b266", "scenario": "messy", "half": "work", "q": "open step8804 and also chart gpqa across training", "want": {"action": "open_page", "page": "model_page", "model": "served/step8804-lda-2610", "then": "chart gpqa across training"}}
+{"id": "b264", "scenario": "messy", "half": "work", "q": "q4's gpqa and then open the on-device report", "want": {"action": "compare", "models": ["served/Qwen3.6-35B-A3B-Q4-lda-2610"], "benchmarks": ["gpqa"], "then": {"action": "open_page", "page": "report", "report": "on-device"}}}
+{"id": "b265", "scenario": "messy", "half": "held", "q": "best on hle among ours, and what does near the ceiling mean", "want": {"action": "best_on", "benchmark": "hle", "among": "ours", "then": {"action": "explain", "topic": "ceiling"}}}
+{"id": "b266", "scenario": "messy", "half": "work", "q": "open step8804 and also chart gpqa across training", "want": {"action": "open_page", "page": "model_page", "model": "served/step8804-lda-2610", "then": {"action": "chart", "chart": "checkpoints", "benchmark": "gpqa"}}}

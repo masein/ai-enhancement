@@ -35,7 +35,9 @@ def fake_call(system, user, sch, prov=None):
     q = user.rsplit("Message: ", 1)[1]
     b = BANK.get(q)
     want = b["want"] if b else {"action": "open_page", "page": "model_page", "model": q}
-    return {"raw": json.dumps(want), "ms": 5, "usage": {}}
+    first = {k: v for k, v in want.items() if k not in ("also", "then")}
+    return {"raw": json.dumps({"do": first, **({"then": want["then"]} if want.get("then")
+                                               else {})}), "ms": 5, "usage": {}}
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -121,9 +123,14 @@ def test_the_panel_opens_a_page_draws_clarifies_and_refuses(live, page, width, s
     # a clarify, its choices buttons
     got = ask(page, "show me the qwen one", "clarify")
     assert got.locator("[data-ask-choice]").count() >= 2
-    # two requests in one: the first done, the second a button
+    # two requests in one: the first done, the second a whole action behind a button
     got = ask(page, "q4's gpqa and then open the on-device report", "table")
-    assert got.locator("[data-ask-then]").inner_text() == "Also: open the on-device report"
+    assert got.locator("[data-ask-then]").inner_text() == "Also: Open On-device models"
+    n = page.locator("[data-ask-bot]").count()
+    got.locator("[data-ask-then]").click()
+    page.locator("[data-ask-bot]").nth(n).wait_for()
+    page.wait_for_function("location.hash === '#tab=reports&report=on-device'")
+    assert page.locator("[data-ask-then]").count() == 0
     # a refusal, and where the button is
     got = ask(page, "start a run on step8804", "text")
     assert got.locator("[data-ask-say]").inner_text() == "I can't start or queue runs."

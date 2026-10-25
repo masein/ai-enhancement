@@ -75,7 +75,8 @@ def main(argv: list[str] | None = None) -> int:
         ms = round(1000 * (time.time() - t0))
         times.append(ms)
         act = assistant.parse(raw)
-        res = assistant.resolve(act, cat, b["q"]) if act else None
+        res = assistant.resolve(act, cat, b["q"], (b.get("prev") or {}).get("q") or "") if act \
+            else None
         ok = bool(res) and assistant.same(res, b["want"], cat)
         per[(b["scenario"], b.get("half") or "work")].append(ok)
         rows.append({"id": b["id"], "scenario": b["scenario"], "half": b.get("half") or "work",
