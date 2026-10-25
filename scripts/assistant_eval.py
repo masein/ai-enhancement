@@ -6,7 +6,8 @@ action resolved against the board and compared with the bank's. Prints the
 pass rate per scenario for each half of the bank — the working half, which
 the prompt is tuned on, and the held-out half, which it never is — the median
 and 90th-percentile reply time, the prompt's tokens, and every miss with what
-the model returned. Tune with --half work; report both.
+the model wrote (before the board matched it) and what the board made of it.
+Tune with --half work; report both.
 
 On the server, in the board's container, never in CI (it asks a model):
 
@@ -39,6 +40,16 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 TARGET, FLOOR = 0.95, 0.85
+
+
+def wrote(raw: str):
+    """what the model wrote, before the board matched anything: its JSON as
+    sent ({"do", "then"}), or None"""
+    try:
+        got = json.loads(raw or "")
+    except ValueError:
+        return None
+    return got if isinstance(got, dict) else None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -104,8 +115,9 @@ def main(argv: list[str] | None = None) -> int:
         ok = bool(res) and assistant.same(res, b["want"], cat, b.get("prev"))
         per[(b["scenario"], b.get("half") or "work")].append(ok)
         rows.append({"id": b["id"], "scenario": b["scenario"], "half": b.get("half") or "work",
-                     "q": b["q"], "ok": ok, "ms": ms, "raw": raw, "got": res, "want": b["want"],
-                     "error": err, "provider": prov, "tokens": tok})
+                     "q": b["q"], "ok": ok, "ms": ms, "raw": raw, "wrote": wrote(raw),
+                     "got": res, "want": b["want"], "error": err, "provider": prov,
+                     "tokens": tok})
         if not ok:
             misses.append(rows[-1])
         if i % 25 == 0 and not a.rescore:
@@ -147,8 +159,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\nMisses ({len(misses)}):")
         for m in misses:
             print(f"- {m['id']} [{m['scenario']}, {m['half']}] {m['q']!r}\n"
-                  f"    wanted {json.dumps(m['want'])}"
-                  f"\n    got    {json.dumps(m['got']) if m['got'] else (m['error'] or repr(m['raw'][:300]))}")
+                  f"    wanted {json.dumps(m['want'])}\n"
+                  f"    wrote  {json.dumps(m['wrote']) if m['wrote'] else repr(m['raw'][:300])}\n"
+                  f"    got    {json.dumps(m['got']) if m['got'] else (m['error'] or '–')}")
     return 0
 
 

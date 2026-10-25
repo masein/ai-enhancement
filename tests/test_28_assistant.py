@@ -700,3 +700,126 @@ def test_the_eval_keeps_every_answer_and_grades_them_again(board, monkeypatch, c
     out = capsys.readouterr().out
     assert "1 questions, served:x's answers kept in" in out
     assert "| number | 1/1 (100%) | – | 1/1 (100%) |" in out
+
+
+# ---------------------------------------------------------------------------
+# 28e: masein's notes on the third run
+# ---------------------------------------------------------------------------
+
+def test_a_group_where_a_benchmark_goes_is_the_group(board):
+    """groups are recognised before benchmarks: "mobile devicemark chart"
+    written as a chart of the benchmark "DeviceMark", or with it as a column,
+    is Mobile's DeviceMark as a chart — never "not found". A name a benchmark
+    has itself stays the benchmark ("math" is MATH Level 5)"""
+    cat = board["cat"]
+    q = "mobile devicemark chart"
+    want = {"action": "open_page", "page": "models_table", "view": "mobile",
+            "group": "devicemark", "show": "chart"}
+    for wrote in ({"action": "chart", "chart": "bars", "benchmark": "DeviceMark"},
+                  {"action": "open_page", "page": "models_table", "view": "mobile",
+                   "columns": ["DeviceMark"], "show": "chart"},
+                  {"action": "open_page", "page": "models_table", "view": "mobile",
+                   "group": "DeviceMark", "show": "chart"}):
+        assert assistant.resolve(wrote, cat, q) == want, wrote
+    got = assistant.resolve({"action": "compare", "models": ["step8804"],
+                             "benchmarks": ["Mobile-MMLU"]}, cat, "step8804 on mobile-mmlu")
+    assert got == {"action": "open_page", "page": "models_table", "view": "mobile",
+                   "group": "mmlu", "models": [S88]}
+    got = assistant.resolve({"action": "chart", "chart": "bars", "benchmark": "math"}, cat,
+                            "chart math")
+    assert got == {"action": "chart", "chart": "bars", "benchmark": "math"}
+
+
+def test_a_model_page_takes_thinking_and_states_that_rows_number(board):
+    """b111: "step8804's gpqa with thinking off" opened as its page lost the
+    setting and stated the thinking-on number. Its page takes thinking: the
+    row, the link and the number are that setting's. Beside itself is its page"""
+    cat = board["cat"]
+    a = assistant.resolve({"action": "open_page", "page": "model_page", "model": "step8804",
+                           "benchmark": "IFEval", "beside": "step8804", "thinking": "off"}, cat,
+                          "step8804's ifeval with thinking off")
+    assert a == {"action": "open_page", "page": "model_page", "model": S88, "benchmark": "ifeval",
+                 "thinking": "off"}
+    got = assistant.run(a, cat)
+    assert got["link"] == "#model=served%2Fstep8804-lda-2610&answers=ifeval_google"
+    assert got["say"] == "Opened step8804’s page, its answers on IFEval: 88.0 ± 2.0, thinking off."
+    # graded as compare with the same setting, never another
+    w = {"action": "compare", "models": [S88], "benchmarks": ["ifeval"], "thinking": "off"}
+    assert assistant.same(a, w, cat)
+    assert not assistant.same({**a, "thinking": "on"}, w, cat)
+    assert "thinking" in assistant.schema(cat)["properties"]["do"]["anyOf"][1]["properties"]
+
+
+def test_two_actions_in_the_order_the_person_wants(board):
+    """"what's X in a report": the explanation first, the report second; a
+    follow-up whose first action is the turn before's again shows the new one"""
+    cat = board["cat"]
+    got = assistant.resolve({"action": "open_page", "page": "report", "report": "on-device",
+                             "then": {"action": "explain", "topic": "stand_in"}}, cat,
+                            "what's the stand-in base on the on-device report?")
+    assert got == {"action": "explain", "topic": "stand_in",
+                   "then": {"action": "open_page", "page": "report", "report": "on-device"}}
+    b = item("and as a chart")
+    got = assistant.resolve({"action": "best_on", "benchmark": "GPQA Diamond",
+                             "then": {"action": "chart", "chart": "bars",
+                                      "benchmark": "GPQA Diamond"}}, cat, b["q"],
+                            b["prev"]["q"], b["prev"]["action"])
+    assert got == {"action": "chart", "chart": "bars", "benchmark": "gpqa"}
+    assert assistant.same(got, b["want"], cat, b["prev"])
+    # a first action that isn't the one before stays first
+    got = assistant.resolve({"action": "best_on", "benchmark": "HLE",
+                             "then": {"action": "chart", "chart": "bars", "benchmark": "HLE"}},
+                            cat, "best on hle, and as a chart")
+    assert got["action"] == "best_on" and got["then"]["action"] == "chart"
+
+
+@pytest.mark.parametrize("prev_q,prev_a,q,wrote,models", [
+    # a model named only in the message before ("and on HLE?")
+    ("step8804 vs step4000 on GPQA", {"action": "compare", "models": [S88, S40],
+                                      "benchmarks": ["gpqa"]},
+     "and on HLE?", ["step8804", "step4000"], [S88, S40]),
+    # one from the message before and one from this ("and q4?")
+    ("q2 gpqa?", {"action": "compare", "models": [Q2], "benchmarks": ["gpqa"]},
+     "and q4?", ["q2", "q4"], [Q2, Q4]),
+    # a name only the action before holds, as the model was shown it
+    ("the q4 on gpqa", {"action": "compare", "models": [Q4], "benchmarks": ["gpqa"]},
+     "and on HLE?", ["Q4 (UD-Q4_K_XL)"], [Q4]),
+])
+def test_a_follow_ups_names_count_the_earlier_turns_words(board, prev_q, prev_a, q, wrote,
+                                                          models):
+    got = assistant.resolve({"action": "compare", "models": wrote, "benchmarks": ["HLE"]},
+                            board["cat"], q, prev_q, prev_a)
+    assert got["models"] == models, got
+
+
+def test_the_eval_prints_what_the_model_wrote_for_a_miss(board, monkeypatch, capsys, tmp_path):
+    import assistant_eval as ev
+    b = item("open the frontier chart")
+    raw = json.dumps({"do": {"action": "open_page", "page": "models_table", "view": "frontier"}})
+    kept = tmp_path / "run.jsonl"
+    kept.write_text(json.dumps({"id": b["id"], "raw": raw, "ms": 400,
+                                "provider": "served:x"}) + "\n")
+    monkeypatch.setattr(assistant, "call", lambda *a, **k: (_ for _ in ()).throw(
+        AssertionError("asked a model")))
+    assert ev.main(["--rescore", str(kept)]) == 0
+    out = capsys.readouterr().out
+    assert f"    wrote  {raw}" in out
+    assert '    got    {"action": "open_page", "page": "models_table", "view": "frontier"}' in out
+
+
+@pytest.mark.parametrize("q,wrote", [
+    ("the ran-out report for step4000 on HLE", {"action": "open_page", "page": "report",
+                                                "report": "ran-out report", "model": "step4000",
+                                                "benchmark": "HLE"}),
+    ("open the frontier chart", {"action": "open_page", "page": "models_table",
+                                 "view": "frontier", "show": "chart"}),
+    ("models tested in the last 30 days, ours only", {"action": "open_page",
+                                                      "page": "models_table", "when": "30d",
+                                                      "only": "ours"}),
+])
+def test_the_board_keeps_each_field_the_model_wrote(board, q, wrote):
+    """b027, b030, b032 in the third run: the ran-out report takes its
+    benchmark, a Models tab its chart and its Show — none is dropped as a
+    field the page doesn't use, so a missing one was never written"""
+    assert assistant.same(assistant.resolve(wrote, board["cat"], q), item(q)["want"],
+                          board["cat"])

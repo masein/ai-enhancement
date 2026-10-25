@@ -348,8 +348,8 @@ def schema(cat: dict) -> dict:
                              "thinking": e(THINKING), "when": e(WHEN),
                              "from": name, "to": name, "since": name,
                              "date": e(("tested", "added"))}, page="models_table"),
-        branch("open_page", {"model": name, "benchmark": name, "beside": name}, ["model"],
-               page="model_page"),
+        branch("open_page", {"model": name, "benchmark": name, "beside": name,
+                             "thinking": e(("on", "off"))}, ["model"], page="model_page"),
         branch("open_page", {"report": name, "a": name, "b": name, "benchmark": name,
                              "side": e(SIDES), "base": name, "model": name, "phone": name,
                              "app": name}, ["report"], page="report"),
@@ -376,7 +376,7 @@ You never answer it yourself and never write a number: the board runs the action
 
 Actions and their fields:
 - open_page, page=models_table: a Models tab (the tables of every model). view (latest, standard, frontier, mobile, everyday, exam) only when the message names one; group: a group of the tab, as the message names it (Standard's Knowledge, Commonsense, Reasoning, Math, Trust & safety, Instruction & maths, Language modelling; Mobile's DeviceMark, MobileAIBench, Mobile-MMLU); show=chart for its chart; only (ours, open, closed); search: words to search for; columns: the benchmarks to show as columns; sort: a benchmark, avg or name, with sort_dir (desc is best first, asc lowest first); thinking (on, off, both; "hide the thinking-off rows" is on); when (today, 7d, 30d, month, since_checkpoint, since_model with since, range with from and to as YYYY-MM-DD) and date (tested, or added); models: the models to show alone; phone_builds=true: only the phone builds.
-- open_page, page=model_page: one model's own page, when the message asks for its page or its answers. model; benchmark opens its answers on that benchmark; beside: another model's answers beside them.
+- open_page, page=model_page: one model's own page, when the message asks for its page or its answers. model; benchmark opens its answers on that benchmark; beside: another model's answers beside them; thinking (on, off) when the message says it.
 - open_page, page=report: report. For the two-builds reader: a, b, benchmark, side (a_better: questions a got right and b wrong; b_better: b right and a wrong). For the step checkpoints: base, the baseline (Q2 or Q4). For the ran-out report: model and benchmark — both when the message names them. For the testers' report: phone and app open the newest test's panel.
 - open_page, page: any other place on the board, as the message names it (Runs, Benchmarks — "the catalogue" —, Playground, Improve, Reports, Home). benchmark: its card on Benchmarks ("the GPQA questions").
 - compare: models (1 to 8) on benchmarks (leave them out for the usual ones). measure: score (default), keeps (what it keeps of its own base), ran_out, loops. One model and one benchmark ("X's gpqa", "what did X get on Y") is compare, not its page. thinking when the message says thinking on or off.
@@ -716,6 +716,40 @@ def group_of(x, view: str | None) -> tuple[str | None, str | None]:
     return got[0], next(v for v in GROUPS if got[0] in GROUPS[v])
 
 
+def as_group(x, cat: dict) -> str | None:
+    """28e: a Models group written where a benchmark goes ("DeviceMark",
+    "Mobile-MMLU") — the group, unless a benchmark has that very name ("math"
+    is MATH Level 5)"""
+    t = norm(_bare(x))
+    if not t or any(t == norm(n) for _, ns in _bench_items(cat) for n in ns):
+        return None
+    return next((g for g in GROUP_NAMES if t in (norm(g), norm(GROUP_NAMES[g]))), None)
+
+
+def _to_group(out: dict, cat: dict) -> dict:
+    """28e: groups are recognised before benchmarks — a group in a benchmark's
+    place is that group on its Models tab: "mobile devicemark chart" is
+    Mobile's DeviceMark as a chart, a column or a sort by it the group"""
+    names = [(k, x) for k in ("benchmark", "benchmarks", "columns", "sort")
+             for x in (out.get(k) if isinstance(out.get(k), list) else [out.get(k)]) if x]
+    g = next((as_group(x, cat) for _, x in names if as_group(x, cat)), None)
+    if not g:
+        return out
+    view = next(v for v in GROUPS if g in GROUPS[v])
+    if out.get("page") == "models_table":
+        for k in ("columns", "sort"):
+            if isinstance(out.get(k), list):
+                out[k] = [x for x in out[k] if not as_group(x, cat)] or None
+            elif out.get(k) and as_group(out[k], cat):
+                out[k] = None
+        return {k: v for k, v in {**out, "group": GROUP_NAMES[g], "view": out.get("view") or view
+                                  }.items() if v is not None}
+    # another action: the group's tab, with the models it named, as a chart if it was one
+    return {"action": "open_page", "page": "models_table", "view": view, "group": GROUP_NAMES[g],
+            **({"show": "chart"} if out["action"] == "chart" else {}),
+            **({"models": out["models"]} if out.get("models") else {})}
+
+
 # 28d: what is never a name: a date, "none" or "every…", a page's name
 NOT_A_NAME = re.compile(r"^(?:\d{4}-\d{2}-\d{2}.*|today|yesterday|none|null|n/?a|nothing|any|all|"
                         r"every|everything|every ?(?:phone|model|benchmark)s?|all (?:the )?"
@@ -793,7 +827,7 @@ PAGE_FIELDS = {
     "models_table": ("view", "group", "show", "only", "search", "columns", "models",
                      "phone_builds", "sort", "sort_dir", "thinking", "when", "from", "to",
                      "since", "date"),
-    "model_page": ("model", "benchmark", "beside"),
+    "model_page": ("model", "benchmark", "beside", "thinking"),
     "report": ("report", "a", "b", "benchmark", "side", "base", "model", "phone", "app"),
 }
 FIELDS = {
@@ -879,6 +913,9 @@ def resolve(a: dict, cat: dict, q: str = "", prev_q: str = "",
                                                             ensure_ascii=False))))
     if out.get("when") == "since_model" and "since" not in out:
         out.pop("when")
+    out = _to_group(out, cat)
+    act, page = out["action"], out.get("page")
+    keep = PAGE_FIELDS.get(page) or (("benchmark",) if page else FIELDS[act])
     # 28c: a tab or a thinking setting neither this message nor the one before
     # names is the board's to leave out — "only ours" stays on the tab you're on
     said = f"{q} {prev_q}"
@@ -920,6 +957,8 @@ def resolve(a: dict, cat: dict, q: str = "", prev_q: str = "",
             if mid is None:
                 return _ask_back("model", out[k], cands, out)
             out[k] = mid
+    if out.get("beside") and out["beside"] == out.get("model"):
+        out.pop("beside")                         # 28e: itself beside itself is its page
     # 28d: a phone that is no phone but the app's model ("step8804") is the app
     if "phone" in out and not phones_of(out["phone"], cat) and "app" not in out and (
             "app" in keep) and app_name(out["phone"], cat)[0]:
@@ -965,7 +1004,19 @@ def resolve(a: dict, cat: dict, q: str = "", prev_q: str = "",
             out["candidates"] = nearest(w, cat, about)
             if out["candidates"]:
                 break
-    return defaults(out)
+    out = defaults(out)
+    t = out.get("then")
+    if isinstance(t, dict):
+        first = {k: v for k, v in out.items() if k != "then"}
+        # 28e: a follow-up whose first action is the turn before's again
+        # ("and as a chart" after "best on gpqa"): only the new one
+        if prev_action and _same(first, {k: v for k, v in prev_action.items()
+                                          if k not in ("then", "candidates")}, cat):
+            return t
+        # "what's X in the report": the explanation first, the report second
+        if first.get("page") == "report" and t.get("action") == "explain":
+            return {**t, "then": first}
+    return out
 
 
 def _written(out: dict, cat: dict, said: str) -> None:
@@ -1071,9 +1122,10 @@ def _same(got: dict, want: dict, cat: dict | None, prev: dict | None = None) -> 
         w.pop("which", None)
     if w["action"] == "compare" and g.get("page") == "model_page" and "beside" not in g and (
             len(w.get("models") or []) == 1 and len(w.get("benchmarks") or []) == 1
-            and not w.get("measure") and not w.get("thinking")):
+            and not w.get("measure")):
         g = {"action": "compare", "models": [g.get("model")],
-             **({"benchmarks": [g["benchmark"]]} if g.get("benchmark") else {})}
+             **({"benchmarks": [g["benchmark"]]} if g.get("benchmark") else {}),
+             **({"thinking": g["thinking"]} if g.get("thinking") else {})}
     if w.get("measure") == "keeps" and g.get("measure") == "keeps" and "models" in g:
         bases = _bases() - set(w.get("models") or [])
         g["models"] = [m for m in g["models"] if m not in bases]
@@ -1232,8 +1284,8 @@ def open_page(a: dict, cat: dict) -> dict:
         if not mid:
             return clarify({"about": "model", "term": "", "candidates": []}, cat)
         b = _bench(cat, a["benchmark"]) if a.get("benchmark") else None
-        row = pick_row(cat, mid, [b["task"]] if b else [x["task"] for x in cat["benchmarks"]],
-                       "default")
+        th = a.get("thinking") or "default"
+        row = pick_row(cat, mid, [b["task"]] if b else [x["task"] for x in cat["benchmarks"]], th)
         link = "#model=" + _q(row)
         said = f"Opened {_label(cat, mid)}’s page"
         if b:
@@ -1243,7 +1295,7 @@ def open_page(a: dict, cat: dict) -> dict:
                 link += "&vs=" + _q(pick_row(cat, a["beside"], [b["task"]], "default"))
                 said += f" beside {_label(cat, a['beside'])}"
             else:                       # 28d: one model, one benchmark — its number
-                x = value(cat, mid, b["key"])
+                x = value(cat, mid, b["key"], th)
                 said += f": {_stated(cat, mid, x)}" if x else "; it has no score on it yet"
         return {"kind": "open", "link": link, "say": said + "."}
     if page == "report":

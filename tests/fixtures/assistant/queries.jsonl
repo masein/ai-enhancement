@@ -159,7 +159,7 @@
 {"id": "b159", "scenario": "boxes", "half": "held", "q": "is step8804 running anywhere", "want": {"action": "boxes", "model": "served/step8804-lda-2610"}}
 {"id": "b160", "scenario": "boxes", "half": "work", "q": "any runs going right now?", "want": {"action": "boxes"}}
 {"id": "b161", "scenario": "boxes", "half": "held", "q": "how far along is the step4000 run", "want": {"action": "boxes", "model": "served/step4000-lda-2610"}}
-{"id": "b162", "scenario": "boxes", "half": "work", "q": "what's on the gpu box at the moment", "want": {"action": "boxes", "which": "rented"}}
+{"id": "b162", "scenario": "boxes", "half": "work", "q": "what's on the gpu box at the moment", "want": {"action": "boxes", "which": "rented", "also": [{"action": "boxes", "which": "server"}]}}
 {"id": "b163", "scenario": "boxes", "half": "held", "q": "what is the server running", "want": {"action": "boxes", "which": "server"}}
 {"id": "b164", "scenario": "boxes", "half": "work", "q": "show me the runs page", "want": {"action": "open_page", "page": "runs"}}
 {"id": "b165", "scenario": "boxes", "half": "held", "q": "is the q4 box still going", "want": {"action": "boxes", "which": "rented", "model": "served/Qwen3.6-35B-A3B-Q4-lda-2610"}}

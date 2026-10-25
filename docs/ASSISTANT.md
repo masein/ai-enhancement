@@ -47,7 +47,7 @@ settings.
 
 | Action | What the board does |
 |---|---|
-| `open_page` | Builds the board's own link and opens it. `models_table`: a Models tab with its view, group, chart, Show (`only`), `search`, `columns`, sort, Thinking, When (7d, 30d, today, this month, since the newest checkpoint, since a model was added, a range) and its models or the phone builds. `model_page`: a model's page, or its answers on a benchmark beside another's. `report`: the two-builds reader on a benchmark and side, Step checkpoints' baseline (`base`), a ran-out pick, a testers' test panel (the newest of a phone and app model). Runs, Benchmarks or a benchmark's questions, Playground, Improve, Home. |
+| `open_page` | Builds the board's own link and opens it. `models_table`: a Models tab with its view, group, chart, Show (`only`), `search`, `columns`, sort, Thinking, When (7d, 30d, today, this month, since the newest checkpoint, since a model was added, a range) and its models or the phone builds. `model_page`: a model's page, or its answers on a benchmark beside another's, with thinking on or off (28e: its row, its link and the number in the reply are that setting's). `report`: the two-builds reader on a benchmark and side, Step checkpoints' baseline (`base`), a ran-out pick, a testers' test panel (the newest of a phone and app model). Runs, Benchmarks or a benchmark's questions, Playground, Improve, Home. |
 | `compare` | 27's cells for 1 to 8 models on benchmarks: the score, what each keeps of its own base, how many ran out of room, or how many ended in a loop. Published numbers are shown as published, never ranked with ours. One model on one benchmark — here, or its page opened on that benchmark — and the reply says the number, its ± and the thinking setting ("step8804 on GPQA Diamond: 70.0 ± 2.0, thinking on"), or who published it. |
 | `best_on` | The top few measured here, within a group (ours, open, closed, phone), and the published ones listed apart. "Phone" is the On-device report's published models and our builds our testers have run on a phone. |
 | `chart` | Scores by benchmark's dots, Across training's panel, the file-size chart or On-device's memory chart. |
@@ -73,15 +73,21 @@ with the rule to keep it and change only what the new message changes.
 
 **Two requests in one message**: the first is done, and the second — a whole
 action, worked out with the first — is a button under the reply ("Also: Open
-On-device models") that shows it.
+On-device models") that shows it. "What's X in the report" is the
+explanation first and the report second, whichever way the model ordered
+them; a follow-up whose first action is the turn before's again ("and as a
+chart" after "best on gpqa") shows only the new one (28e).
 
 **Names** people type are in `eval_tasks/assistant/names.json`, with the
 benchmarks' names, the places' other names ("catalogue" is Benchmarks), the
 topics and the examples. The board matches loosely: case, spaces, hyphens and
 dots don't count; a name inside another or a close one counts when only one
 model has it. A benchmark is matched by its names, not its key, so "arc" is
-every ARC. The fields a report or chart doesn't use are left out (an app on
-the ran-out report, "only" on On-device's memory chart).
+every ARC. A Models group is recognised before a benchmark (28e): written
+where a benchmark goes ("mobile devicemark chart" as a chart of
+"DeviceMark"), it is that group on its tab — unless a benchmark has that very
+name ("math" is MATH Level 5). The fields a report or chart doesn't use are
+left out (an app on the ran-out report, "only" on On-device's memory chart).
 
 ## The panel
 
@@ -142,7 +148,8 @@ message.
 - **Real-model** (on the server, never in CI): `scripts/assistant_eval.py`
   asks a model the bank as the board asks it and prints the pass rate per
   scenario for each half, the reply times and every miss with what the model
-  returned. Tune with `--half work`; report both halves. The target: 95%
+  wrote, before the board matched it, and what the board made of it. Tune
+  with `--half work`; report both halves. The target: 95%
   overall, no scenario under 85%. Every raw answer is kept in
   `BENCH_ROOT/assistant/evals/` (internal, as the log is; the run prints the
   file), and `--rescore <that file>` grades the answers again — after a
