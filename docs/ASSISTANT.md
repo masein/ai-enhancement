@@ -8,14 +8,17 @@ see it. The brief is `docs/prompts/phase-28-chat-assistant.md`.
 
 The model picks, the board does. For every message the model chooses one
 action and fills in its fields, as JSON forced into the board's schema (the
-provider's JSON-schema mode). The board resolves every name against its own
-data, refuses an id it doesn't know (a clarify with the nearest few), runs
-the action and draws the reply with its own parts. The model never writes a
-number.
+provider's JSON-schema mode). The schema is strict: one branch an action — for
+`open_page` one a page, `models_table` (the Models tabs) or `model_page` (one
+model) — each with its own fields alone, the closed lists as enums. Model,
+phone and app names are strings as the person wrote them ("step one", "the
+galaxy", "oneplus"): the board matches them, and asks back when several match
+(step1000, step4000, step8804) or none does. It then runs the action and draws
+the reply with its own parts. The model never writes a number.
 
 | Action | What the board does |
 |---|---|
-| `open_page` | Builds the board's own link and opens it: a Models tab with its view, group, chart, Show (`only`), search (`q`), columns (`cols`), sort, Thinking, When (7d, 30d, today, this month, since the newest checkpoint, since a model was added, a range) and its models or the phone builds; a model's page or its answers on a benchmark; a report — the two-builds reader on a benchmark and side, Step checkpoints' baseline (`base`), a ran-out pick, a testers' test panel (the newest of a phone and app model); Runs, Benchmarks or a benchmark's questions, Playground, Improve, Home. |
+| `open_page` | Builds the board's own link and opens it. `models_table`: a Models tab with its view, group, chart, Show (`only`), `search`, `columns`, sort, Thinking, When (7d, 30d, today, this month, since the newest checkpoint, since a model was added, a range) and its models or the phone builds. `model_page`: a model's page, or its answers on a benchmark beside another's. `report`: the two-builds reader on a benchmark and side, Step checkpoints' baseline (`base`), a ran-out pick, a testers' test panel (the newest of a phone and app model). Runs, Benchmarks or a benchmark's questions, Playground, Improve, Home. |
 | `compare` | 27's cells for 1 to 8 models on benchmarks: the score, what each keeps of its own base, how many ran out of room, or how many ended in a loop. Published numbers are shown as published, never ranked with ours. |
 | `best_on` | The top few measured here, within a group (ours, open, closed, phone), and the published ones listed apart. "Phone" is the On-device report's published models and our builds our testers have run on a phone. |
 | `chart` | Scores by benchmark's dots, Across training's panel, the file-size chart or On-device's memory chart. |
@@ -29,12 +32,18 @@ Read-only by construction: every action is a read or a navigation. The
 module calls none of the board's writes, and its one outgoing request is the
 model's chat completion (`tests/test_28_assistant.py` checks both).
 
-**The prompt** is the rules, then the board's lists: each model with its id,
-name, other names and group; the benchmarks; the reports; our testers'
-phones; the phone app's models; the topics; a few examples (never the test
-bank's). It stays the same from message to message while the board does, so a
-llama-server's prompt cache keeps it; today's date, the previous question and
-its action (for a follow-up, "and on HLE?") come with the question.
+**The prompt** is the rules, then the board's lists: each model with its
+name, other names and group; the benchmarks; the reports; our testers' phones
+with their other names; the phone app's models with theirs; the topics; a few
+examples (never the test bank's). It stays the same from message to message
+while the board does, so a llama-server's prompt cache keeps it; today's date
+and the message come after.
+
+**A follow-up** ("and on HLE?") gets the previous action, its models by name,
+with the rule to keep it and change only what the new message changes.
+
+**Two requests in one message**: the first is done, and the second — as the
+person wrote it, in `then` — is a button under the reply that asks it.
 
 **Names** people type are in `eval_tasks/assistant/names.json`, with the
 benchmarks' names, the topics and the examples. The board matches loosely:
@@ -75,8 +84,14 @@ message.
 
 ## The tests
 
-- **The bank**, `tests/fixtures/assistant/queries.jsonl`: 256 questions in 12
-  scenarios (15 or more each), each with the action it should produce.
+- **The bank**, `tests/fixtures/assistant/queries.jsonl`: 266 questions in 12
+  scenarios (16 or more each), each with the action it should produce (`also`:
+  another as good — "show the qwen3.6 model" may search for it or ask back;
+  `then`: a second request it must offer). Each scenario is split in two:
+  a **working half** (`"half": "work"`), the only one the prompt, the names and
+  the schema are tuned on, and a **held-out half** (`"held"`), never looked at
+  to tune; the evaluation reports both, so a high rate means more than a
+  prompt that learned our questions.
 - **Fast** (CI), `tests/test_28_assistant.py`: a fake model answers each bank
   question with its expected action; the board must run it — the link, the
   table's values, the chart, the phones, the boxes, the help text, the
@@ -85,9 +100,10 @@ message.
   and read-only. `tests/test_28_browser.py` draws the panel at 1280 and 400,
   light and dark.
 - **Real-model** (on the server, never in CI): `scripts/assistant_eval.py`
-  asks a model the whole bank as the board asks it and prints the pass rate per
-  scenario, the reply times and every miss with what the model returned. The
-  target: 95% overall, no scenario under 85%.
+  asks a model the bank as the board asks it and prints the pass rate per
+  scenario for each half, the reply times and every miss with what the model
+  returned. Tune with `--half work`; report both halves. The target: 95%
+  overall, no scenario under 85%.
 
 ```bash
 cd ~/benchmarks/aienh && sudo docker compose exec -T bench python scripts/assistant_eval.py --provider served:served/Qwen3.6-35B-A3B-Q4-original-k-8

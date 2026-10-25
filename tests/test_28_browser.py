@@ -32,9 +32,9 @@ def fake_call(system, user, sch, prov=None):
     if CTRL["down"]:
         raise assistant.Down("connection refused")
     time.sleep(CTRL["slow"])
-    q = user.rsplit("Question: ", 1)[1]
+    q = user.rsplit("Message: ", 1)[1]
     b = BANK.get(q)
-    want = b["want"] if b else {"action": "open_page", "page": "model", "models": [q]}
+    want = b["want"] if b else {"action": "open_page", "page": "model_page", "model": q}
     return {"raw": json.dumps(want), "ms": 5, "usage": {}}
 
 
@@ -121,6 +121,9 @@ def test_the_panel_opens_a_page_draws_clarifies_and_refuses(live, page, width, s
     # a clarify, its choices buttons
     got = ask(page, "show me the qwen one", "clarify")
     assert got.locator("[data-ask-choice]").count() >= 2
+    # two requests in one: the first done, the second a button
+    got = ask(page, "q4's gpqa and then open the on-device report", "table")
+    assert got.locator("[data-ask-then]").inner_text() == "Also: open the on-device report"
     # a refusal, and where the button is
     got = ask(page, "start a run on step8804", "text")
     assert got.locator("[data-ask-say]").inner_text() == "I can't start or queue runs."

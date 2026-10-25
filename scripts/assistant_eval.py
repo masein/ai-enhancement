@@ -3,8 +3,10 @@
 bank (tests/fixtures/assistant/queries.jsonl) asked of one model, each
 question as the board asks it (the same prompt, schema and follow-up), its
 action resolved against the board and compared with the bank's. Prints the
-pass rate per scenario, the median and 90th-percentile reply time, the prompt's
-tokens, and every miss with what the model returned.
+pass rate per scenario for each half of the bank — the working half, which
+the prompt is tuned on, and the held-out half, which it never is — the median
+and 90th-percentile reply time, the prompt's tokens, and every miss with what
+the model returned. Tune with --half work; report both.
 
 On the server, in the board's container, never in CI (it asks a model):
 
@@ -38,6 +40,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--provider", default="")
     ap.add_argument("--bank", default="")
     ap.add_argument("--only", default="", help="scenarios, comma-separated")
+    ap.add_argument("--half", default="", choices=("", "work", "held"),
+                    help="one half of the bank alone (tune on work)")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--json", default="", help="also write each answer here, a line each")
     a = ap.parse_args(argv)
@@ -48,16 +52,18 @@ def main(argv: list[str] | None = None) -> int:
     bank = [json.loads(x) for x in bank_path.read_text(encoding="utf-8").splitlines() if x.strip()]
     if a.only:
         bank = [b for b in bank if b["scenario"] in a.only.split(",")]
+    if a.half:
+        bank = [b for b in bank if b.get("half") == a.half]
     if a.limit:
         bank = bank[:a.limit]
     cat = assistant.catalog()
     system, sch = assistant.prompt(cat), assistant.schema(cat)
-    per: dict[str, list[bool]] = defaultdict(list)
+    per: dict[tuple[str, str], list[bool]] = defaultdict(list)
     times, misses, tokens, rows = [], [], [], []
     print(f"{len(bank)} questions, asked of {prov}; the prompt is {len(system):,} characters",
           flush=True)
     for i, b in enumerate(bank, 1):
-        user = assistant.user_message(b["q"], b.get("prev"), cat["today"])
+        user = assistant.user_message(b["q"], b.get("prev"), cat["today"], cat)
         t0 = time.time()
         try:
             got = assistant.call(system, user, sch, prov)
@@ -69,11 +75,12 @@ def main(argv: list[str] | None = None) -> int:
         ms = round(1000 * (time.time() - t0))
         times.append(ms)
         act = assistant.parse(raw)
-        res = assistant.resolve(act, cat) if act else None
+        res = assistant.resolve(act, cat, b["q"]) if act else None
         ok = bool(res) and assistant.same(res, b["want"], cat)
-        per[b["scenario"]].append(ok)
-        rows.append({"id": b["id"], "scenario": b["scenario"], "q": b["q"], "ok": ok, "ms": ms,
-                     "raw": raw, "got": res, "want": b["want"], "error": err})
+        per[(b["scenario"], b.get("half") or "work")].append(ok)
+        rows.append({"id": b["id"], "scenario": b["scenario"], "half": b.get("half") or "work",
+                     "q": b["q"], "ok": ok, "ms": ms, "raw": raw, "got": res, "want": b["want"],
+                     "error": err})
         if not ok:
             misses.append(rows[-1])
         if i % 25 == 0:
@@ -81,28 +88,36 @@ def main(argv: list[str] | None = None) -> int:
     if a.json:
         Path(a.json).write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows),
                                 encoding="utf-8")
-    n = sum(len(v) for v in per.values())
-    passed = sum(sum(v) for v in per.values())
+    def rate(v):
+        return f"{sum(v)}/{len(v)} ({100 * sum(v) / len(v):.0f}%)" if v else "–"
     print(f"\n{prov}\n")
-    print("| Scenario | Questions | Passed | Rate |")
+    print("| Scenario | Working half | Held-out half | Both |")
     print("|---|---:|---:|---:|")
-    for sc in sorted(per, key=lambda s: [b["scenario"] for b in bank].index(s)):
-        v = per[sc]
-        print(f"| {sc} | {len(v)} | {sum(v)} | {100 * sum(v) / len(v):.0f}% |"
-              + ("  ← under 85%" if sum(v) / len(v) < FLOOR else ""))
-    print(f"| **all** | {n} | {passed} | **{100 * passed / max(n, 1):.1f}%** |")
+    scs = list(dict.fromkeys(b["scenario"] for b in bank))
+    for sc in scs:
+        w, h = per.get((sc, "work"), []), per.get((sc, "held"), [])
+        print(f"| {sc} | {rate(w)} | {rate(h)} | {rate(w + h)} |"
+              + ("  ← under 85%" if (w + h) and sum(w + h) / len(w + h) < FLOOR else ""))
+    allw = [x for (s, hf), v in per.items() if hf == "work" for x in v]
+    allh = [x for (s, hf), v in per.items() if hf == "held" for x in v]
+    print(f"| **all** | **{rate(allw)}** | **{rate(allh)}** | **{rate(allw + allh)}** |")
+    n, passed = len(allw + allh), sum(allw + allh)
     if times:
         q = sorted(times)
         print(f"\nReply time: median {statistics.median(q) / 1000:.2f} s, 90th percentile "
               f"{q[int(0.9 * (len(q) - 1))] / 1000:.2f} s"
               + (f"; the prompt {statistics.median(tokens):,.0f} tokens" if tokens else ""))
-    worst = min((sum(v) / len(v) for v in per.values()), default=0)
+    by_sc = defaultdict(list)
+    for (s, _), v in per.items():
+        by_sc[s] += v
+    worst = min((sum(v) / len(v) for v in by_sc.values()), default=0)
     print("Target: 95% overall and no scenario under 85% — "
           + ("met." if passed / max(n, 1) >= TARGET and worst >= FLOOR else "not met."))
     if misses:
         print(f"\nMisses ({len(misses)}):")
         for m in misses:
-            print(f"- {m['id']} [{m['scenario']}] {m['q']!r}\n    wanted {json.dumps(m['want'])}"
+            print(f"- {m['id']} [{m['scenario']}, {m['half']}] {m['q']!r}\n"
+                  f"    wanted {json.dumps(m['want'])}"
                   f"\n    got    {json.dumps(m['got']) if m['got'] else (m['error'] or repr(m['raw'][:300]))}")
     return 0
 

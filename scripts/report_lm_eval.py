@@ -5847,6 +5847,7 @@ table.rp.pt-checks td.pt-reply { text-align:left; white-space:pre-wrap; overflow
 .ask-table .mt-legend, .ask-table .mt-tint { display:none; }
 .ask-list { margin:0; padding-left:18px; }
 .ask-choices { display:flex; flex-wrap:wrap; gap:6px; }
+.ask-then { align-self:flex-start; text-align:left; white-space:normal; }
 .ask-chart .by-panel { max-width:100%; }
 .ask-dots { grid-template-columns:minmax(0, 9rem) 1fr auto; }
 .ask-thumbs { display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
@@ -30304,6 +30305,9 @@ function askMsg(m) {
   return el('div', { class: 'ask-bot', 'data-ask-bot': r.kind || '1' },
     el('p', { class: 'ask-say', 'data-ask-say': '1', text: r.say || '' }),
     askBody(r),
+    // 28b: two requests in one message: the first done, the second a button
+    r.then ? el('button', { class: 'chip-btn ask-then', 'data-ask-then': '1', text: 'Also: ' + r.then,
+      onclick: () => askSend(r.then) }) : '',
     link,
     m.id ? el('div', { class: 'ask-thumbs' },
       el('button', { class: 'quiet' + (m.thumbs === 'up' ? ' on' : ''), 'data-ask-up': '1',

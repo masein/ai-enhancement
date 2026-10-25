@@ -1,5 +1,5 @@
 {
- "about": "28: the assistant's names (service/assistant.py, docs/ASSISTANT.md). models: a board id (thinking row or not) or a model's exact name -> what people call it; benchmarks: the assistant's key -> the names people type; topics: what `explain` can say, each from the board's own words (`from`: notes:<first words of a report note>, desc:<task>, page:<a text the page keeps>); examples: a few questions and their actions, for the prompt — never the test bank's. Plain names only; this file goes to the public mirror.",
+ "about": "28: the assistant's names (service/assistant.py, docs/ASSISTANT.md). models: a board id (thinking row or not) or a model's exact name -> what people call it; phones: a phone's model code -> what people call it; benchmarks: the assistant's key -> the names people type; topics: what `explain` can say, each from the board's own words (`from`: notes:<first words of a report note>, desc:<task>, page:<a text the page keeps>); examples: a few questions and their actions, for the prompt — never the test bank's. Plain names only; this file goes to the public mirror.",
  "models": {
   "served/step8804-lda-2610": [
    "step8804",
@@ -292,7 +292,7 @@
    "latest tab",
    {
     "action": "open_page",
-    "page": "models",
+    "page": "models_table",
     "view": "latest"
    }
   ],
@@ -300,7 +300,7 @@
    "standard tab with the math group",
    {
     "action": "open_page",
-    "page": "models",
+    "page": "models_table",
     "view": "standard",
     "group": "math"
    }
@@ -309,7 +309,7 @@
    "frontier, closed models only, sorted by gpqa, worst first",
    {
     "action": "open_page",
-    "page": "models",
+    "page": "models_table",
     "view": "frontier",
     "only": "closed",
     "sort": "gpqa",
@@ -320,22 +320,26 @@
    "models added in the last 30 days",
    {
     "action": "open_page",
-    "page": "models",
+    "page": "models_table",
     "when": "30d",
     "date": "added"
+   }
+  ],
+  [
+   "find llama models",
+   {
+    "action": "open_page",
+    "page": "models_table",
+    "search": "llama"
    }
   ],
   [
    "open step1000's answers on MATH",
    {
     "action": "open_page",
-    "page": "model",
-    "models": [
-     "served/step1000-lda-2610"
-    ],
-    "benchmarks": [
-     "math"
-    ]
+    "page": "model_page",
+    "model": "step1000",
+    "benchmark": "math"
    }
   ],
   [
@@ -344,9 +348,7 @@
     "action": "open_page",
     "page": "report",
     "report": "ran-out-of-room",
-    "models": [
-     "served/step1000-lda-2610"
-    ]
+    "model": "step1000"
    }
   ],
   [
@@ -354,8 +356,8 @@
    {
     "action": "compare",
     "models": [
-     "served/Qwen3.6-35B-A3B-Q2-lda-2610",
-     "served/step1000-lda-2610"
+     "q2",
+     "step1000"
     ],
     "benchmarks": [
      "otis",
@@ -368,7 +370,7 @@
    {
     "action": "compare",
     "models": [
-     "served/step1000-lda-2610"
+     "step1000"
     ],
     "benchmarks": [
      "hle"
@@ -380,9 +382,7 @@
    "closed models, best on simpleqa",
    {
     "action": "best_on",
-    "benchmarks": [
-     "simpleqa"
-    ],
+    "benchmark": "simpleqa",
     "among": "closed"
    }
   ],
@@ -391,9 +391,7 @@
    {
     "action": "chart",
     "chart": "checkpoints",
-    "benchmarks": [
-     "math"
-    ]
+    "benchmark": "math"
    }
   ],
   [
@@ -401,15 +399,15 @@
    {
     "action": "phone",
     "app": "step4000",
-    "phone": "galaxy",
+    "phone": "the galaxy",
     "measure": "prefill"
    }
   ],
   [
-   "what is running on rented boxes",
+   "how long does the q2 run have left",
    {
     "action": "boxes",
-    "which": "rented"
+    "model": "q2"
    }
   ],
   [
@@ -428,6 +426,19 @@
    }
   ],
   [
+   "q2's mmlu-pro, and open the frontier tab",
+   {
+    "action": "compare",
+    "models": [
+     "q2"
+    ],
+    "benchmarks": [
+     "mmlupro"
+    ],
+    "then": "open the frontier tab"
+   }
+  ],
+  [
    "queue step1000 on MMLU",
    {
     "action": "cant",
@@ -441,5 +452,21 @@
     "kind": "outside"
    }
   ]
- ]
+ ],
+ "phones": {
+  "CPH2747": [
+   "oneplus 15",
+   "op15",
+   "the oneplus 15"
+  ],
+  "SM-S938B": [
+   "galaxy",
+   "galaxy s25",
+   "s25 ultra",
+   "the samsung"
+  ],
+  "CPH2719": [
+   "the other oneplus"
+  ]
+ }
 }

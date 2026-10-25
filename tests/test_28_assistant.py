@@ -63,10 +63,14 @@ def item(q: str) -> dict:
 # the bank
 # ---------------------------------------------------------------------------
 
-def test_the_bank_has_twelve_scenarios_of_fifteen_or_more():
+def test_the_bank_has_twelve_scenarios_of_fifteen_or_more_in_two_halves():
     assert len(BANK) >= 250
     for sc in SCENARIOS:
         assert sum(b["scenario"] == sc for b in BANK) >= 15, sc
+        # 28b: a working half to tune the prompt on, a held-out half it never is
+        w = sum(b["scenario"] == sc and b["half"] == "work" for b in BANK)
+        h = sum(b["scenario"] == sc and b["half"] == "held" for b in BANK)
+        assert w >= 7 and h >= 7 and abs(w - h) <= 1, (sc, w, h)
     assert len({b["q"] for b in BANK}) == len(BANK)                 # no question twice
     assert all(b["want"]["action"] in assistant.ACTIONS for b in BANK)
 
@@ -248,7 +252,7 @@ def test_clarify_offers_the_nearest_and_cant_says_where(board):
 
 def test_an_unknown_id_is_refused_for_a_clarify(board):
     got = assistant.ask("show gpt-9", "masein", cat=board["cat"], model=fake(
-        {"action": "open_page", "page": "model", "models": ["openai/gpt-9-ultra"]}))
+        {"action": "open_page", "page": "model_page", "model": "openai/gpt-9-ultra"}))
     assert got["action"]["action"] == "clarify" and got["reply"]["kind"] == "clarify"
     got = assistant.ask("step 8804 vs q4", "masein", cat=board["cat"], model=fake(
         {"action": "compare", "models": ["step 8804", "q4"], "benchmarks": ["GPQA Diamond"]}))
@@ -288,21 +292,76 @@ def test_the_request_asks_for_the_schema_thinking_off(board, monkeypatch):
     assert sent["url"] == "http://127.0.0.1:8091/v1/chat/completions"
     assert (b["temperature"], b["max_tokens"], b["chat_template_kwargs"]) == (
         0, 600, {"enable_thinking": False})
-    assert b["response_format"]["json_schema"]["schema"]["properties"]["action"]["enum"] == list(
-        assistant.ACTIONS)
+    sch = b["response_format"]["json_schema"]["schema"]
+    assert {br["properties"]["action"]["const"] for br in sch["anyOf"]} == set(assistant.ACTIONS)
     assert got["reply"]["kind"] == "list"
-    # the prompt: every model and benchmark the board has; today's date with the
-    # question, so the system prompt is the same message to message
+    # the prompt: every model by its name and benchmark the board has; today's date
+    # with the message, so the system prompt is the same message to message
     sysm, user = b["messages"][0]["content"], b["messages"][1]["content"]
-    assert all(m["id"] in sysm for m in board["cat"]["models"])
+    assert all(m["name"] in sysm for m in board["cat"]["models"])
     assert board["cat"]["today"] not in sysm and board["cat"]["today"] in user
 
 
-def test_a_follow_up_carries_the_previous_question(board):
+def test_a_follow_up_carries_the_previous_action_by_name(board):
+    """28b: the previous action, its models by name; keep it, change only what
+    the new message changes"""
     b = item("and on HLE?")
-    u = assistant.user_message(b["q"], b["prev"], "2026-10-24")
-    assert u.startswith("Previous question: step8804 vs step4000 on GPQA and MMLU-Pro\nIts action: ")
-    assert u.endswith("Question: and on HLE?")
+    u = assistant.user_message(b["q"], b["prev"], "2026-10-24", board["cat"])
+    head, act, *_ = u.split("\n")
+    assert head == "Previous message: step8804 vs step4000 on GPQA and MMLU-Pro"
+    assert act.startswith("Its action (keep it; change only what the new message changes): ")
+    got = json.loads(act.split(": ", 1)[1])
+    assert got == {"action": "compare", "models": ["step8804", "step4000"],
+                   "benchmarks": ["gpqa", "mmlupro"]}
+    assert u.endswith("Message: and on HLE?")
+
+
+# ---------------------------------------------------------------------------
+# 28b: the schema strict, names the board's to match, a second request a button
+# ---------------------------------------------------------------------------
+
+def test_each_action_is_strict_and_names_are_strings(board):
+    sch = assistant.schema(board["cat"])
+    for br in sch["anyOf"]:
+        assert br["additionalProperties"] is False
+        assert "question" not in br["properties"]
+        for k in ("view", "only", "sort", "thinking", "measure", "page", "among", "chart"):
+            p = br["properties"].get(k)
+            if p:
+                assert "enum" in p or "const" in p, (br["properties"]["action"], k)
+        for k in ("model", "beside", "a", "b", "base", "since", "phone", "app"):
+            if k in br["properties"]:
+                assert br["properties"][k] == {"type": "string"}
+    pages = [br["properties"]["page"] for br in sch["anyOf"] if "page" in br["properties"]]
+    assert {"const": "models_table", "type": "string"} in pages
+    assert {"const": "model_page", "type": "string"} in pages
+
+
+def test_the_board_matches_names_and_asks_back_when_several_do(board):
+    cat = board["cat"]
+    got = assistant.resolve({"action": "compare", "models": ["the q4", "8804"],
+                             "benchmarks": ["gpqa"]}, cat)
+    assert got["models"] == [Q4, S88]
+    got = assistant.resolve({"action": "open_page", "page": "model_page", "model": "step one"}, cat)
+    assert got["action"] == "clarify" and set(got["candidates"]) == {
+        S88, S40, "served/step1000-lda-2610"}
+    got = assistant.resolve({"action": "phone", "app": "the phone build", "phone": "the galaxy"},
+                            cat)
+    assert got["app"] == "Qwen3.6-35B-A3B k4-LDA, UD-Q4_K_XL" and got["phone"] == "the galaxy"
+    assert assistant.resolve({"action": "phone", "app": "4000"}, cat)["app"] == "step4000"
+    got = assistant.resolve({"action": "phone", "app": "step8804", "phone": "the pixel"}, cat)
+    assert got["action"] == "clarify" and got["about"] == "phone"
+
+
+def test_a_second_request_is_a_button_and_a_search_is_as_good(board):
+    got = ask(board, item("q4's gpqa and then open the on-device report"))
+    assert got["reply"]["kind"] == "table" and got["reply"]["then"] == "open the on-device report"
+    want = item("show the qwen3.6 model")["want"]
+    for alt in ({"action": "clarify", "about": "model"},
+                {"action": "open_page", "page": "models_table", "search": "Qwen3.6"}):
+        assert assistant.same(alt, want, board["cat"])
+    assert not assistant.same({"action": "open_page", "page": "models_table", "search": "llama"},
+                              want, board["cat"])
 
 
 # ---------------------------------------------------------------------------
