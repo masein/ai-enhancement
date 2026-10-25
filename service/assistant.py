@@ -473,6 +473,47 @@ class Down(Exception):
     """the model didn't answer"""
 
 
+class Unfit(Down):
+    """28e: the model can't take what the assistant needs (a JSON schema)"""
+
+
+# 28e: what the assistant sends OpenRouter that a model may not take; with
+# require_parameters, one a model doesn't take finds no endpoint at all (404)
+OR_OPTIONAL = ("temperature", "max_tokens", "reasoning")
+_or_params: dict = {}
+
+
+def openrouter_params(model: str, fresh: bool = False) -> set[str] | None:
+    """the request parameters OpenRouter's models API says a model takes
+    (`supported_parameters`), read once a run (an hour on the board) — None
+    when it can't say"""
+    hit = _or_params.get(model)
+    if hit and not fresh and time.time() - hit[0] < 3600:
+        return hit[1]
+    from . import ai_models
+    try:
+        data = ai_models._get("/models").get("data") or []
+    except Exception:                                       # noqa: BLE001 — sent as it is
+        return hit[1] if hit else None
+    m = next((x for x in data if model in (x.get("id"), x.get("canonical_slug"))), None)
+    ps = m.get("supported_parameters") if m else None
+    got = set(ps) if isinstance(ps, list) else None
+    _or_params[model] = (time.time(), got)
+    return got
+
+
+def openrouter_fit(model: str, fresh: bool = False) -> list[str]:
+    """the optional parameters left out for this model — or Unfit when it
+    can't take a JSON schema (response_format)"""
+    ps = openrouter_params(model, fresh)
+    if ps is None:
+        return []
+    if "response_format" not in ps:
+        raise Unfit(f"{model} doesn't take response_format on OpenRouter, so its answers can't "
+                    "be held to the assistant's schema — choose another model")
+    return [k for k in OR_OPTIONAL if k not in ps]
+
+
 def provider() -> str:
     return (config.ASSISTANT_PROVIDER or "").strip() or DEFAULT_PROVIDER
 
@@ -515,6 +556,8 @@ def call(system: str, user: str, sch: dict, prov: str | None = None) -> dict:
         body.pop("chat_template_kwargs")
         body.pop("cache_prompt")
         body["reasoning"] = {"enabled": False}
+        for k in openrouter_fit(model):                # 28e: only what the model takes
+            body.pop(k, None)
     t0 = time.time()
     try:
         st, raw = served._http("POST", base.rstrip("/") + "/chat/completions", key, body,
@@ -587,7 +630,7 @@ def parse(raw: str) -> dict | None:
 STOP = {"the", "a", "an", "one", "show", "open", "me", "my", "our", "what", "whats", "how", "is",
         "its", "it", "and", "that", "this", "about", "model", "models", "page", "compare",
         "with", "other", "two", "score", "doing", "fast", "on", "of", "for", "which", "hard",
-        "report", "build", "please", "pls", "phone", "run", "box"}
+        "report", "build", "please", "pls", "phone", "run", "box", "then"}
 
 
 def _words(term: str) -> list[str]:
@@ -595,17 +638,39 @@ def _words(term: str) -> list[str]:
             if w not in STOP and len(norm(w)) >= 2]
 
 
+def _within(t: str, name: str) -> bool:
+    """28e: a name contained in another from one of its words' starts —
+    never from inside a word, nor running on into part of a later one ("then"
+    is not in "the newest checkpoint"; "8804" is in "step8804", "step" too:
+    letters and digits are words of their own)"""
+    toks = re.findall(r"[a-z]+|[0-9]+|=+", str(name).lower())
+    s, pos, words = "".join(toks), 0, []
+    for x in toks:
+        words.append((pos, pos + len(x)))
+        pos += len(x)
+    ends = {e for _, e in words}
+    return any(s.startswith(t, b) and (b + len(t) <= e or b + len(t) in ends) for b, e in words)
+
+
 def _match(term: str, items: list[tuple[str, list[str]]]) -> list[str]:
     """the ids a name matches, loosely: exact, then contained, then close,
     then its words in one name, the first starting it ("step one" is every
-    step… model; "gemma 3 270m it" is gemma-3-270m-it)"""
+    step… model; "gemma 3 270m it" is gemma-3-270m-it). 28e: one that matches
+    nothing with an "s" stuck on ("q4s", "step4000s") is tried without it"""
+    got = _match1(term, items)
+    if not got and re.search(r"[a-z0-9]s$", str(term or "").strip().lower()):
+        got = _match1(str(term).strip()[:-1], items)
+    return got
+
+
+def _match1(term: str, items: list[tuple[str, list[str]]]) -> list[str]:
     t = norm(term)
     if not t:
         return []
     exact = [i for i, ns in items if any(norm(n) == t for n in ns)]
     if exact:
         return exact
-    part = [i for i, ns in items if any(t in norm(n) for n in ns if len(t) >= 3)]
+    part = [i for i, ns in items if len(t) >= 3 and any(_within(t, n) for n in ns)]
     if part:
         return part
     close = []
@@ -1000,7 +1065,8 @@ def resolve(a: dict, cat: dict, q: str = "", prev_q: str = "",
         about = out.get("about") or "model"
         out["candidates"] = nearest(out.get("term") or "", cat, about) if out.get("term") else []
         # no term, or one that matched nothing: a name in the message itself
-        for w in [] if out["candidates"] else _words(q):
+        # (28e: never one of the ordinary words — "then" isn't a model)
+        for w in [] if out["candidates"] else [w for w in _words(q) if w not in RUN_STOP]:
             out["candidates"] = nearest(w, cat, about)
             if out["candidates"]:
                 break

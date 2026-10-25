@@ -773,23 +773,26 @@ def test_two_actions_in_the_order_the_person_wants(board):
     assert got["action"] == "best_on" and got["then"]["action"] == "chart"
 
 
-@pytest.mark.parametrize("prev_q,prev_a,q,wrote,models", [
-    # a model named only in the message before ("and on HLE?")
-    ("step8804 vs step4000 on GPQA", {"action": "compare", "models": [S88, S40],
-                                      "benchmarks": ["gpqa"]},
-     "and on HLE?", ["step8804", "step4000"], [S88, S40]),
-    # one from the message before and one from this ("and q4?")
-    ("q2 gpqa?", {"action": "compare", "models": [Q2], "benchmarks": ["gpqa"]},
-     "and q4?", ["q2", "q4"], [Q2, Q4]),
-    # a name only the action before holds, as the model was shown it
-    ("the q4 on gpqa", {"action": "compare", "models": [Q4], "benchmarks": ["gpqa"]},
-     "and on HLE?", ["Q4 (UD-Q4_K_XL)"], [Q4]),
+@pytest.mark.parametrize("q,wrote,want", [
+    # the models and the benchmark of the turn before, and the new model
+    ("and q4?", {"models": ["Q2 (UD-Q2_K_XL)", "q4"], "benchmarks": ["GPQA Diamond"]},
+     {"models": [Q2, Q4], "benchmarks": ["gpqa"]}),
+    ("same for step1000", {"models": ["step4000", "step1000"], "benchmarks": ["HLE"]},
+     {"models": [S40, "served/step1000-lda-2610"], "benchmarks": ["hle"]}),
+    # the models and benchmarks before, and the new benchmark
+    ("and on HLE?", {"models": ["step8804", "step4000"],
+                     "benchmarks": ["GPQA Diamond", "MMLU-Pro", "HLE"]},
+     {"models": [S88, S40], "benchmarks": ["gpqa", "mmlupro", "hle"]}),
 ])
-def test_a_follow_ups_names_count_the_earlier_turns_words(board, prev_q, prev_a, q, wrote,
-                                                          models):
-    got = assistant.resolve({"action": "compare", "models": wrote, "benchmarks": ["HLE"]},
-                            board["cat"], q, prev_q, prev_a)
-    assert got["models"] == models, got
+def test_a_follow_up_keeps_what_the_turn_before_named(board, q, wrote, want):
+    """masein's condition on the name check: words from earlier turns are the
+    person's words, so a follow-up keeps the models and benchmarks named
+    before — none is left out as a name the model chose"""
+    b = item(q)
+    got = assistant.resolve({"action": "compare", **wrote}, board["cat"], b["q"],
+                            b["prev"]["q"], b["prev"]["action"])
+    assert got == {"action": "compare", **want}, got
+    assert assistant.same(got, b["want"], board["cat"], b["prev"])
 
 
 def test_the_eval_prints_what_the_model_wrote_for_a_miss(board, monkeypatch, capsys, tmp_path):
@@ -823,3 +826,108 @@ def test_the_board_keeps_each_field_the_model_wrote(board, q, wrote):
     field the page doesn't use, so a missing one was never written"""
     assert assistant.same(assistant.resolve(wrote, board["cat"], q), item(q)["want"],
                           board["cat"])
+
+
+# ---------------------------------------------------------------------------
+# 28e: the paid pass on OpenRouter, and two name-matching bugs
+# ---------------------------------------------------------------------------
+
+SONNET = "anthropic/claude-sonnet-5.5"
+
+
+def openrouter(monkeypatch, params):
+    """OpenRouter's models API with one model taking `params`, and its chat
+    completion: what was sent, kept"""
+    from service import ai_models, served
+    sent, asked = [], []
+    monkeypatch.setattr(config, "OPENROUTER_API_KEY", "sk-or-test")
+    monkeypatch.setattr(ai_models, "_get", lambda path: asked.append(path) or {"data": [
+        {"id": SONNET, "supported_parameters": params}]})
+
+    def http(method, url, key="", body=None, timeout=10.0):
+        sent.append(body)
+        return 200, json.dumps({"choices": [{"message": {"content": '{"do": {"action": "boxes"}}'}}],
+                                "usage": {"prompt_tokens": 9}}).encode()
+    monkeypatch.setattr(served, "_http", http)
+    assistant._or_params.clear()
+    return sent, asked
+
+
+def test_openrouter_is_sent_only_the_parameters_the_model_takes(board, monkeypatch):
+    """the paid pass: OpenRouter's page for the model lists response_format and
+    reasoning, not temperature — and with require_parameters one it doesn't
+    take found no endpoint (404). It is read once, and left out"""
+    sent, asked = openrouter(monkeypatch, ["max_tokens", "response_format", "structured_outputs",
+                                           "reasoning"])
+    for _ in range(2):
+        assistant.call("system", "user", {"type": "object"}, "openrouter:" + SONNET)
+    b = sent[0]
+    assert "temperature" not in b and b["max_tokens"] == 600 and b["reasoning"] == {
+        "enabled": False}
+    assert b["response_format"]["type"] == "json_schema"
+    assert b["provider"] == {"require_parameters": True}
+    assert asked == ["/models"]                             # once, not a request each
+    # a model that can't take response_format: a clear stop, not 266 refusals
+    sent, _ = openrouter(monkeypatch, ["max_tokens", "temperature"])
+    with pytest.raises(assistant.Unfit, match="doesn't take response_format"):
+        assistant.call("system", "user", {"type": "object"}, "openrouter:" + SONNET)
+    assert sent == []
+
+
+def test_the_eval_says_what_it_left_out_and_stops_on_no_schema(board, monkeypatch, capsys,
+                                                               tmp_path):
+    import assistant_eval as ev
+    openrouter(monkeypatch, ["max_tokens", "response_format", "reasoning"])
+    assert ev.main(["--provider", "openrouter:" + SONNET, "--limit", "1",
+                    "--json", str(tmp_path / "a.jsonl")]) == 0
+    assert (f"OpenRouter: {SONNET} is sent only the parameters it takes — left out: "
+            "temperature") in capsys.readouterr().out
+    openrouter(monkeypatch, ["max_tokens"])
+    assert ev.main(["--provider", "openrouter:" + SONNET, "--json",
+                    str(tmp_path / "b.jsonl")]) == 2
+    assert "Stopped before asking: " in capsys.readouterr().out
+
+
+def test_three_downs_in_a_row_stop_the_run(board, monkeypatch, capsys, tmp_path):
+    import assistant_eval as ev
+    calls = []
+
+    def down(*a, **k):
+        calls.append(1)
+        raise assistant.Down('HTTP 404: {"error": "No endpoints found"}')
+    monkeypatch.setattr(assistant, "call", down)
+    assert ev.main(["--provider", "served:x", "--json", str(tmp_path / "c.jsonl")]) == 1
+    out = capsys.readouterr().out
+    assert len(calls) == 3
+    assert "Stopped after three answers in a row didn't come (b003 the third): down: HTTP 404" \
+        in out
+
+
+@pytest.mark.parametrize("q,wrote,key,want", [
+    ("q4s gpqa", {"action": "compare", "models": ["Q4 (UD-Q4_K_XL)"],
+                  "benchmarks": ["GPQA Diamond"]}, "models", [Q4]),
+    ("step4000s answers on gpqa", {"action": "open_page", "page": "model_page",
+                                   "model": "step4000 (lda)", "benchmark": "GPQA Diamond"},
+     "model", S40),
+])
+def test_a_name_with_an_s_stuck_on_is_the_name(board, q, wrote, key, want):
+    """"q4s" matched nothing — not exact, not inside a name, too far for a
+    close one — so the model's name for it was left out and the board asked
+    for one. A run that matches nothing and ends in "s" is tried without it"""
+    assert assistant._match("q4s", assistant._model_items(board["cat"])) == [Q4]
+    got = assistant.resolve(wrote, board["cat"], q)
+    assert got[key] == want, got
+
+
+def test_ordinary_words_are_never_ask_back_candidates(board):
+    """"then" was inside "the newest checkpoint", so any message with "then"
+    could offer step8804: a name is inside another only from a word's start,
+    and an ordinary word never feeds the candidates"""
+    cat = board["cat"]
+    items = assistant._model_items(cat)
+    assert assistant._match("then", items) == []
+    assert assistant._match("newest checkpoint", items) == [S88]       # from a word's start
+    assert assistant._match("8804", items) == [S88]
+    got = assistant.resolve({"action": "clarify", "about": "model"}, cat,
+                            "compare them and then chart it")
+    assert got == {"action": "clarify", "candidates": []}

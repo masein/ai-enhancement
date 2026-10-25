@@ -82,7 +82,10 @@ chart" after "best on gpqa") shows only the new one (28e).
 benchmarks' names, the places' other names ("catalogue" is Benchmarks), the
 topics and the examples. The board matches loosely: case, spaces, hyphens and
 dots don't count; a name inside another or a close one counts when only one
-model has it. A benchmark is matched by its names, not its key, so "arc" is
+model has it — inside another only from one of its words' starts, never
+running on into part of a later word ("then" is not in "the newest
+checkpoint"), and a name with an "s" stuck on is tried without it ("q4s",
+"step4000s"; 28e). A benchmark is matched by its names, not its key, so "arc" is
 every ARC. A Models group is recognised before a benchmark (28e): written
 where a benchmark goes ("mobile devicemark chart" as a chart of
 "DeviceMark"), it is that group on its tab — unless a benchmark has that very
@@ -117,6 +120,12 @@ the model…"; with the model down, the panel says so and nothing else breaks.
 - `llama:<a llama-server's /v1 URL>` — a model of its own, e.g. the small one
   in the GPU's free memory;
 - `openrouter:<model>` — for comparison only, with the board's OpenRouter key.
+  It is sent only the parameters OpenRouter's models API says the model takes,
+  read once a run (28e): with `require_parameters`, which keeps the JSON
+  schema honoured, a parameter the model doesn't take found no endpoint at
+  all ("No endpoints found…", 404). A model that can't take `response_format`
+  is refused with a clear message; the evaluation's header says what was left
+  out.
 
 Thinking off, temperature 0, 600 tokens, the JSON schema on; one request a
 message.
@@ -153,7 +162,8 @@ message.
   overall, no scenario under 85%. Every raw answer is kept in
   `BENCH_ROOT/assistant/evals/` (internal, as the log is; the run prints the
   file), and `--rescore <that file>` grades the answers again — after a
-  change to the board or the grading — without asking the model.
+  change to the board or the grading — without asking the model. Three
+  answers in a row that don't come stop a run, with the error.
 
 ```bash
 cd ~/benchmarks/aienh && sudo docker compose exec -T bench python scripts/assistant_eval.py --provider served:served/Qwen3.6-35B-A3B-Q4-original-k-8

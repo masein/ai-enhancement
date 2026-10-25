@@ -15,7 +15,8 @@ On the server, in the board's container, never in CI (it asks a model):
         --provider served:served/Qwen3.6-35B-A3B-Q4-original-k-8
 
 --provider: served:<a served model's id>, llama:<a llama-server's /v1 URL>,
-openrouter:<model> (paid: ask first). Default: ASSISTANT_PROVIDER, else the
+openrouter:<model> (paid: ask first; sent only the parameters the model takes,
+read once for the run). Three answers in a row that don't come stop it. Default: ASSISTANT_PROVIDER, else the
 Playground's Q4. It reads the board and writes nothing but its output and
 every answer it got, raw, to BENCH_ROOT/assistant/evals/ (internal, as the
 log is) — so a change to the grading or the board can be scored again on
@@ -90,6 +91,17 @@ def main(argv: list[str] | None = None) -> int:
     print(f"{len(bank)} questions, " + (f"{prov}'s answers kept in {a.rescore} graded again"
                                         if a.rescore else f"asked of {prov}")
           + f"; the prompt is {len(system):,} characters", flush=True)
+    if prov.startswith("openrouter:") and not a.rescore:
+        # 28e: only the parameters the model takes, read once for the run
+        model = prov.split(":", 1)[1]
+        try:
+            left = assistant.openrouter_fit(model, fresh=True)
+        except assistant.Unfit as e:
+            print(f"Stopped before asking: {e}.")
+            return 2
+        print(f"OpenRouter: {model} is sent only the parameters it takes — "
+              + (f"left out: {', '.join(left)}" if left else "nothing left out"), flush=True)
+    downs = 0
     for i, b in enumerate(bank, 1):
         if a.rescore:
             k = kept[b["id"]]
@@ -105,6 +117,12 @@ def main(argv: list[str] | None = None) -> int:
             except assistant.Down as e:
                 raw, err = "", f"down: {e}"
             ms = round(1000 * (time.time() - t0))
+            # 28e: three in a row that didn't come — the model isn't there; stop
+            downs = downs + 1 if err else 0
+            if downs == 3:
+                print(f"Stopped after three answers in a row didn't come ({b['id']} the third): "
+                      f"{err}")
+                return 1
         times.append(ms)
         if tok:
             tokens.append(tok)
