@@ -98,7 +98,9 @@ checkpoint"), and a name with an "s" stuck on is tried without it ("q4s",
 every ARC; and by its Frontier group's name (28f), so "the
 instruction-following one" asks between IFEval and IFBench and "the maths
 one" between OTIS and MATH Level 5 ("math" alone is MATH Level 5). A Models
-group is recognised before a benchmark (28e): written
+group is matched among the groups of the tab asked for, by its name exactly
+or closely first ("Maths" is Standard's Math), inside a longer name only when
+nothing else matches. A Models group is recognised before a benchmark (28e): written
 where a benchmark goes ("mobile devicemark chart" as a chart of
 "DeviceMark"), it is that group on its tab — unless a benchmark has that very
 name ("math" is MATH Level 5). The fields a report or chart doesn't use are
@@ -128,7 +130,9 @@ the model…"; with the model down, the panel says so and nothing else breaks.
 - The API refuses everyone else (403); with nobody named, it is 404.
 - Every question, its action, its reply's kind and time, and every thumb go
   to `BENCH_ROOT/assistant/log.jsonl` — internal, never in the mirror — so the
-  test bank grows from real misses.
+  test bank grows from real misses: `scripts/assistant_eval.py --thumbs-down`
+  prints the questions whose last thumb is down, with the turn before, the
+  board's action and what the person wanted — the next bank's questions.
 
 ## The model
 

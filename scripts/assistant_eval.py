@@ -16,14 +16,19 @@ On the server, in the board's container, never in CI (it asks a model):
 
 --provider: served:<a served model's id>, llama:<a llama-server's /v1 URL>,
 openrouter:<model> (paid: ask first; sent only the parameters the model takes,
-read once for the run). Three answers in a row that don't come stop it. Default: ASSISTANT_PROVIDER, else the
-Playground's Q4. It reads the board and writes nothing but its output and
-every answer it got, raw, to BENCH_ROOT/assistant/evals/ (internal, as the
-log is) — so a change to the grading or the board can be scored again on
-the same answers, without asking the model:
+read once for the run). Three answers in a row that don't come stop it.
+Default: ASSISTANT_PROVIDER, else the Playground's Q4. It reads the board and
+writes nothing but its output and every answer it got, raw, to
+BENCH_ROOT/assistant/evals/ (internal, as the log is; the run prints the
+file) — so a change to the grading or the board can be scored again on the
+same answers, without asking the model:
 
     sudo docker compose exec -T bench python scripts/assistant_eval.py \
-        --rescore /results/assistant/evals/<the run's file>.jsonl"""
+        --rescore <the file the run printed>
+
+--thumbs-down prints the questions the board's log has a thumbs down on,
+with the turn before, the board's action and what the person wanted — the
+next bank's questions; it asks nothing."""
 
 from __future__ import annotations
 
@@ -66,8 +71,14 @@ def main(argv: list[str] | None = None) -> int:
                     "BENCH_ROOT/assistant/evals/<time>-<provider>.jsonl)")
     ap.add_argument("--rescore", default="", help="a run's answers file: resolve and grade them "
                     "again, asking nothing")
+    ap.add_argument("--thumbs-down", action="store_true", help="print the questions the board's "
+                    "log has a thumbs down on, a JSON line each — the next bank's; asks nothing")
     a = ap.parse_args(argv)
     from service import assistant, config, db
+    if a.thumbs_down:
+        for x in assistant.thumbs_down():
+            print(json.dumps(x, ensure_ascii=False))
+        return 0
     db.init()
     prov = a.provider or assistant.provider()
     bank_path = Path(a.bank) if a.bank else assistant.BANK_FILE

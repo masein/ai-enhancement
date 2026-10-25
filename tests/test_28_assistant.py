@@ -1016,3 +1016,38 @@ def test_the_testers_newest_test_keeps_its_model_and_the_ran_out_report_its_benc
     assert "\nRan out of room | also:" in p and "Where step4000 runs out of room" not in p
     assert "all (everything, or what the testers measured)" in p
     assert "ran_out (how many answers ran out of room" in p
+
+
+def test_a_group_is_matched_exactly_or_closely_before_inside_another(board):
+    """b016: "standard tab, math group", the model writing "Maths" (Frontier's
+    group, in the prompt since 28f) — the board took Standard's "Instruction &
+    maths", the name it sits inside. Exactly or closely first, inside another
+    only when nothing else matches, among the tab's own groups"""
+    b = item("standard tab, math group")
+    got = assistant.resolve({"action": "open_page", "page": "models_table", "view": "standard",
+                             "group": "Maths"}, board["cat"], b["q"])
+    assert got == b["want"]
+    assert assistant.group_of("Instruction & maths", "standard") == ("instruction", "standard")
+    assert assistant.group_of("instruction", "standard") == ("instruction", "standard")
+    assert assistant.group_of("maths", "mobile") == (None, None)       # not a Mobile group
+    assert assistant.group_of("mobile mmlu", None) == ("mmlu", "mobile")
+
+
+def test_the_thumbs_down_questions_are_the_next_banks(board, capsys):
+    """every question, its action and its thumbs are logged; the ones whose
+    last thumb is down are printed for the next bank, with what was wanted"""
+    import assistant_eval as ev
+    ups = assistant.ask("what's running?", "masein", cat=board["cat"],
+                        model=fake({"action": "boxes"}))
+    down = assistant.ask("best on gpqa", "masein", cat=board["cat"],
+                         model=fake({"action": "best_on", "benchmark": "gpqa"}))
+    assistant.thumbs(ups["id"], "masein", True)
+    assistant.thumbs(down["id"], "masein", True)
+    assistant.thumbs(down["id"], "masein", False, "as a chart")
+    got = [x for x in assistant.thumbs_down() if x["q"] == "best on gpqa"]
+    assert got[-1]["action"] == {"action": "best_on", "benchmark": "gpqa"}
+    assert got[-1]["note"] == "as a chart"
+    assert not [x for x in assistant.thumbs_down() if x["q"] == "what's running?"
+                and x["note"] == ""]
+    assert ev.main(["--thumbs-down"]) == 0
+    assert '"q": "best on gpqa"' in capsys.readouterr().out

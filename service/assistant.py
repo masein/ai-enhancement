@@ -784,10 +784,22 @@ def place_of(x) -> str | None:
 
 def group_of(x, view: str | None) -> tuple[str | None, str | None]:
     """(a Models group a name means, the tab it is on): "mobile-mmlu" is
-    Mobile's Mobile-MMLU, "maths" Standard's Math"""
+    Mobile's Mobile-MMLU, "maths" Standard's Math. Among the groups of the tab
+    asked for; a group's name exactly or closely first, inside a longer one
+    only when nothing else matches (28f: "Maths" was "Instruction & maths",
+    where the Frontier group's name sits inside it — b016)"""
     views = [view] if view in GROUPS else list(GROUPS)
     items = [(g, [g, GROUP_NAMES[g]]) for v in views for g in GROUPS[v]]
-    got = _match(_bare(x), items)
+    t = norm(_bare(x))
+    got = []
+    for u in (t, t[:-1] if t.endswith("s") else None):
+        got = got or [g for g, ns in items if u and any(norm(n) == u for n in ns)]
+    if not got:
+        r = {g: max(difflib.SequenceMatcher(None, t, norm(n)).ratio() for n in ns)
+             for g, ns in items}
+        best = max(r.values(), default=0)
+        got = [g for g, v in r.items() if v >= 0.84 and v == best]
+    got = got or _match(_bare(x), items)
     if len(got) != 1:
         return None, None
     return got[0], next(v for v in GROUPS if got[0] in GROUPS[v])
@@ -1990,6 +2002,23 @@ def ask(q: str, who: str, prev: dict | None = None, prov: str | None = None,
 def thumbs(mid: str, who: str, up_: bool, note: str = "") -> None:
     log({"id": str(mid)[:40], "who": who, "thumbs": "up" if up_ else "down",
          "note": (note or "").strip()[:300]})
+
+
+def thumbs_down() -> list[dict]:
+    """the questions a thumbs down was last given to, with the turn before,
+    the board's action and what the person wanted — the next bank's questions
+    (28f)"""
+    try:
+        lines = [json.loads(x) for x in log_path().read_text(encoding="utf-8").splitlines()
+                 if x.strip()]
+    except (OSError, ValueError):
+        return []
+    asked = {x["id"]: x for x in lines if x.get("id") and "q" in x}
+    last = {x["id"]: x for x in lines if x.get("id") and x.get("thumbs")}
+    return [{"q": asked[i]["q"], "prev": asked[i].get("prev"), "action": asked[i].get("action"),
+             "kind": asked[i].get("kind"), "note": t.get("note") or "", "who": t.get("who"),
+             "at": t.get("at")}
+            for i, t in last.items() if t["thumbs"] == "down" and i in asked]
 
 
 def examples(n: int = 3) -> list[str]:
