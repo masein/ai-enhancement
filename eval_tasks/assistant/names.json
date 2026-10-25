@@ -1,5 +1,5 @@
 {
- "about": "28: the assistant's names (service/assistant.py, docs/ASSISTANT.md). models: a board id (thinking row or not) or a model's exact name -> what people call it; phones: a phone's model code -> what people call it; reports: a report's id -> its other names; places: a place on the top bar -> its other names; benchmarks: the assistant's key -> the names people type; topics: what `explain` can say, each from the board's own words (`from`: notes:<first words of a report note>, desc:<task>, page:<a text the page keeps>); examples: a few questions and their actions, for the prompt — never the test bank's. Plain names only; this file goes to the public mirror.",
+ "about": "28: the assistant's names (service/assistant.py, docs/ASSISTANT.md). models: a board id (thinking row or not) or a model's exact name -> what people call it; phones: a phone's model code -> what people call it; reports: a report's id -> its other names; places: a place on the top bar -> its other names; benchmark_groups: Frontier's groups (the page's FR_GROUPS), each a name meaning every benchmark in it -> its other names and its benchmarks' keys; report_titles: a report's title as the assistant says it, where the page's names a model; benchmarks: the assistant's key -> the names people type; topics: what `explain` can say, each from the board's own words (`from`: notes:<first words of a report note>, desc:<task>, page:<a text the page keeps>); examples: a few questions and their actions, for the prompt — never the test bank's. Plain names only; this file goes to the public mirror.",
  "models": {
   "served/step8804-lda-2610": [
    "step8804",
@@ -607,5 +607,49 @@
    "report list",
    "all reports"
   ]
+ },
+ "benchmark_groups": {
+  "Knowledge & reasoning": {
+   "also": [
+    "knowledge"
+   ],
+   "benchmarks": [
+    "gpqa",
+    "hle",
+    "simpleqa",
+    "mmlupro"
+   ]
+  },
+  "Maths": {
+   "also": [
+    "maths",
+    "math ones"
+   ],
+   "benchmarks": [
+    "otis",
+    "math"
+   ]
+  },
+  "Puzzles & games": {
+   "also": [
+    "puzzles"
+   ],
+   "benchmarks": [
+    "arc"
+   ]
+  },
+  "Instruction following": {
+   "also": [
+    "instruction-following",
+    "following instructions"
+   ],
+   "benchmarks": [
+    "ifeval",
+    "ifbench"
+   ]
+  }
+ },
+ "report_titles": {
+  "ran-out-of-room": "Ran out of room"
  }
 }

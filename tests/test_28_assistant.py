@@ -931,3 +931,88 @@ def test_ordinary_words_are_never_ask_back_candidates(board):
     got = assistant.resolve({"action": "clarify", "about": "model"}, cat,
                             "compare them and then chart it")
     assert got == {"action": "clarify", "candidates": []}
+
+
+# ---------------------------------------------------------------------------
+# 28f: the patterns in the forty fresh questions
+# ---------------------------------------------------------------------------
+
+def test_a_list_the_name_check_cuts_is_asked_back(board):
+    """"compare the two checkpoints": step8804 stayed (its other names say
+    "checkpoint") and step4000 went, and the table showed one model. A list
+    the check cuts asks back between all it named"""
+    got = assistant.resolve({"action": "compare", "models": ["step8804", "step4000"],
+                             "benchmarks": ["GPQA Diamond"]}, board["cat"],
+                            "compare the two checkpoints on GPQA")
+    assert got["action"] == "clarify" and got["candidates"] == [S88, S40]
+
+
+@pytest.mark.parametrize("q,wrote,asked", [
+    ("how do they do on hle", {"action": "best_on", "benchmark": "HLE"}, True),
+    ("rank them on gpqa", {"action": "best_on", "benchmark": "GPQA Diamond"}, True),
+    ("how fast is it on the phone", {"action": "phone"}, True),
+    ("compare the two on mmlu-pro", {"action": "compare", "models": ["step8804", "step4000"],
+                                     "benchmarks": ["MMLU-Pro"]}, True),
+    # a model named: not caught
+    ("q2's hle and the ran-out report for it",
+     {"action": "compare", "models": ["q2"], "benchmarks": ["HLE"]}, False),
+    ("open the gemma 3 270m it model", {"action": "open_page", "page": "model_page",
+                                        "model": "gemma 3 270m it"}, False),
+    # a word explained, a refusal, the two-builds report: not about a model
+    ("what does 'had it, then lost it' mean", {"action": "explain", "topic": "lost"}, False),
+    ("delete it", {"action": "cant", "kind": "delete"}, False),
+    ("open the two-builds report", {"action": "open_page", "page": "report",
+                                    "report": "two-builds report"}, False),
+])
+def test_a_model_referred_to_and_never_named_is_asked_for(board, q, wrote, asked):
+    """"they", "them", "it", "the two", "the other one" with no earlier turn
+    and no model named in the message: the board asks which model, whatever
+    the action the model chose"""
+    got = assistant.resolve(wrote, board["cat"], q)
+    assert (got == {"action": "clarify", "candidates": []}) is asked, got
+    # an earlier turn is what they refer to
+    if asked:
+        prev = {"q": "step8804 vs step4000 on GPQA", "action": {
+            "action": "compare", "models": [S88, S40], "benchmarks": ["gpqa"]}}
+        assert assistant.resolve(wrote, board["cat"], q, prev["q"], prev["action"])[
+            "action"] == wrote["action"]
+
+
+def test_a_benchmark_described_by_its_group_is_asked_back(board):
+    """Frontier's groups' names mean every benchmark in them: "the
+    instruction-following one" asks between IFEval and IFBench, "the maths
+    one" between OTIS and MATH Level 5 — "math" alone is still MATH Level 5"""
+    cat = board["cat"]
+    got = assistant.resolve({"action": "chart", "chart": "bars", "benchmark": "IFEval"}, cat,
+                            "chart the instruction-following one")
+    assert got["action"] == "clarify" and set(got["candidates"]) == {"ifeval", "ifbench"}
+    got = assistant.resolve({"action": "best_on", "benchmark": "the maths one"}, cat,
+                            "best on the maths one")
+    assert set(got["candidates"]) == {"otis", "math"}
+    assert assistant.bench_key("math", cat) == "math"
+    assert "| group: Instruction following" in assistant.prompt(cat)
+
+
+def test_the_testers_newest_test_keeps_its_model_and_the_ran_out_report_its_benchmark(board):
+    """the testers' report takes the model as its app — the newest test of
+    another model is the wrong test; the ran-out report reads a benchmark
+    written as the app as its benchmark, under a title that names no model"""
+    cat = board["cat"]
+    got = assistant.resolve({"action": "open_page", "page": "report", "report": "testers",
+                             "model": "step8804", "phone": "the oneplus 15"}, cat,
+                            "open step8804's newest test on the oneplus 15")
+    assert got["app"] == "step8804" and got["phone"] == "the oneplus 15"
+    reply = assistant.run(got, cat)
+    assert "the newest test of step8804 on OnePlus 15" in reply["say"]
+    # a maker's name alone is every phone it makes; with a name, that phone
+    assert len(assistant.phones_of("the oneplus", cat)) == 2
+    assert assistant.phones_of("the oneplus 15", cat) == ["CPH2747"]
+    got = assistant.resolve({"action": "open_page", "page": "report", "report": "Ran out of room",
+                             "model": "step4000", "app": "HLE"}, cat,
+                            "the ran-out report for step4000 on HLE")
+    assert got == {"action": "open_page", "page": "report", "report": "ran-out-of-room",
+                   "model": S40, "benchmark": "hle"}
+    p = assistant.prompt(cat)
+    assert "\nRan out of room | also:" in p and "Where step4000 runs out of room" not in p
+    assert "all (everything, or what the testers measured)" in p
+    assert "ran_out (how many answers ran out of room" in p

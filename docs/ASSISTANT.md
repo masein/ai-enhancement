@@ -38,7 +38,16 @@ needs one ("compare the two on GPQA"). A report, benchmark or phone can be
 what the message asks for without its name ("what step8804 got wrong that Q4
 got right" is the two-builds reader), so those stay. Several names the same
 words mean ("the three bonsai 2 models") are the model spelling them out, and
-stay. A date, "none" or a page's name is never a name.
+stay. A date, "none" or a page's name is never a name. A list the check cuts
+— some of its models stay, some go — is never shown as what's left: the board
+asks back between all of them (28f; "compare the two checkpoints" kept only
+step8804, whose other names say "checkpoint").
+
+**A model referred to, never named (28f).** "They", "them", "it", "the two"
+or "the other one" with no earlier turn and no model named in the message:
+the board asks which model, whatever action the model chose — it answered
+anyway, with a ranking or a guess. A refusal and a word explained ("had it,
+then lost it") are left alone.
 
 **One model.** Rows that are settings of one model — thinking on or off,
 "lookahead 1" — are one model, never asked between; its row is the one with
@@ -86,11 +95,21 @@ model has it — inside another only from one of its words' starts, never
 running on into part of a later word ("then" is not in "the newest
 checkpoint"), and a name with an "s" stuck on is tried without it ("q4s",
 "step4000s"; 28e). A benchmark is matched by its names, not its key, so "arc" is
-every ARC. A Models group is recognised before a benchmark (28e): written
+every ARC; and by its Frontier group's name (28f), so "the
+instruction-following one" asks between IFEval and IFBench and "the maths
+one" between OTIS and MATH Level 5 ("math" alone is MATH Level 5). A Models
+group is recognised before a benchmark (28e): written
 where a benchmark goes ("mobile devicemark chart" as a chart of
 "DeviceMark"), it is that group on its tab — unless a benchmark has that very
 name ("math" is MATH Level 5). The fields a report or chart doesn't use are
-left out (an app on the ran-out report, "only" on On-device's memory chart).
+left out (an app on the ran-out report, "only" on On-device's memory chart) —
+after a field written in the wrong place is read as the one it is (28f): the
+testers' report takes a named model as its app, so its newest test is that
+model's, and a benchmark written as the ran-out report's app is its
+benchmark. The ran-out report is "Ran out of room" to the assistant: its
+page's title names a model, which the model copied. A phone is matched by
+its name, code or other name before its maker: "the oneplus 15" is that
+phone, "the oneplus" every OnePlus.
 
 ## The panel
 
