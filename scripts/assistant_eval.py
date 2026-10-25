@@ -27,8 +27,9 @@ same answers, without asking the model:
         --rescore <the file the run printed>
 
 --thumbs-down prints the questions the board's log has a thumbs down on,
-with the turn before, the board's action and what the person wanted — the
-next bank's questions; it asks nothing."""
+with the turn before, the board's action, the reason chosen and what the
+person wanted, and under their own heading every change made in the panel
+(a chip, a suggestion) — the next bank's questions; it asks nothing."""
 
 from __future__ import annotations
 
@@ -76,7 +77,13 @@ def main(argv: list[str] | None = None) -> int:
     a = ap.parse_args(argv)
     from service import assistant, config, db
     if a.thumbs_down:
-        for x in assistant.thumbs_down():
+        down, changed = assistant.thumbs_down(), assistant.edits()
+        print(f"Thumbs down ({len(down)}):")
+        for x in down:
+            print(json.dumps(x, ensure_ascii=False))
+        # 28g: a chip changed, a suggestion or "All three" taken — a sign of a miss
+        print(f"\nEdits in the panel ({len(changed)}):")
+        for x in changed:
             print(json.dumps(x, ensure_ascii=False))
         return 0
     db.init()

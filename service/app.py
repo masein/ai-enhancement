@@ -1713,15 +1713,24 @@ def _assistant_for(by: str) -> str:
 
 @app.get("/api/assistant")
 def assistant_hello(by: str = ""):
-    """28: whether this name sees the assistant, three example questions, and
-    whether its model is busy with a run"""
+    """28: whether this name sees the assistant, its example questions (28g:
+    in four groups), whether its model is busy with a run, and that model's
+    name for the panel's status ("Q4 · our server")"""
     from . import assistant
     if not assistant.on():
         raise HTTPException(404, "Not Found")
     if not assistant.allowed(by):
         return {"on": False}            # the page's own question: nothing to show this name
     return {"on": True, "who": by.strip(), "examples": assistant.examples(),
-            "busy": assistant.busy()}
+            "busy": assistant.busy(), "model": assistant.provider_label()}
+
+
+@app.get("/api/assistant/choices")
+def assistant_choices(by: str = ""):
+    """28g: what the panel's pickers offer, in the board's words"""
+    from . import assistant
+    _assistant_for(by)
+    return assistant.choices(assistant.catalog())
 
 
 @app.get("/api/assistant/state")
@@ -1753,18 +1762,41 @@ def assistant_ask(a: AssistantIn):
     return assistant.ask(a.q, who, prev)
 
 
+class AssistantRunIn(BaseModel):
+    by: str = ""
+    q: str = ""
+    # the answer it changes, its action before, the action after
+    of: str = ""
+    before: dict | None = None
+    action: dict = {}
+    why: str = "edit"
+    label: str = ""
+
+
+@app.post("/api/assistant/run")
+def assistant_run(a: AssistantRunIn):
+    """28g: an action changed in the panel — a chip, a suggestion, "All
+    three" — checked and run on the board. It never asks the model"""
+    from . import assistant
+    who = _assistant_for(a.by)
+    return assistant.rerun(a.q, who, a.action if isinstance(a.action, dict) else {}, a.why,
+                           a.before, a.of, a.label)
+
+
 class AssistantThumbsIn(BaseModel):
     by: str = ""
     id: str = ""
     up: bool = True
     note: str = ""
+    # 28g: a thumbs down's quick reason
+    reason: str = ""
 
 
 @app.post("/api/assistant/thumbs")
 def assistant_thumbs(a: AssistantThumbsIn):
     from . import assistant
     who = _assistant_for(a.by)
-    assistant.thumbs(a.id, who, a.up, a.note)
+    assistant.thumbs(a.id, who, a.up, a.note, a.reason)
     return {"ok": True}
 
 

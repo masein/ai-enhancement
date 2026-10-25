@@ -5821,41 +5821,223 @@ table.rp.pt-checks td.pt-reply { text-align:left; white-space:pre-wrap; overflow
   min-width:14rem; max-width:32rem; }
 .pt-test-head { display:flex; justify-content:space-between; align-items:center; gap:var(--sp-2); }
 .pt-test-head h2 { margin:0; min-width:0; overflow-wrap:anywhere; }
-/* 28: the assistant's panel — on the right, 380 px, over the page; a phone's whole width.
-   Below 720 px "Ask" is in Menu ▾, with the places: the bar has no room for it */
+/* 28: the assistant's panel — on the right, over the page; a phone's whole width.
+   Below 720 px "Ask" is in Menu ▾, with the places: the bar has no room for it.
+   28g: board E, "Ask panel — four states": 400 px (720 wide), cards, chips, the
+   board's tokens in every theme; two of its own, the panel's ground and a chip's */
 @media (max-width:720px) { #askAct { display:none; } }
-.ask-panel { position:fixed; top:0; right:0; bottom:0; width:380px; max-width:100vw; z-index:61;
-  background:var(--surface-1); border-left:1px solid var(--border); display:flex;
-  flex-direction:column; box-shadow:-8px 0 24px rgba(0,0,0,.25); animation:pt-in .18s ease-out; }
+.ask-panel { position:fixed; top:0; right:0; bottom:0; width:400px; max-width:100vw; z-index:61;
+  --ask-bg:color-mix(in srgb, var(--surface-1) 50%, var(--plane));
+  --ask-chip:color-mix(in srgb, var(--text-primary) 4%, var(--surface-1));
+  --ask-edge:color-mix(in srgb, var(--text-primary) 13%, transparent);
+  /* muted text on a chip's ground: 4.5:1 or better there, in every theme */
+  --ask-muted:color-mix(in srgb, var(--muted) 65%, var(--text-secondary));
+  background:var(--ask-bg); color:var(--text-primary); border-left:1px solid var(--border);
+  display:flex; flex-direction:column; box-shadow:-8px 0 24px rgba(0,0,0,.25);
+  font-family:var(--font-sans); animation:pt-in .18s ease-out; }
+.ask-panel.wide { width:720px; }
 @media (prefers-reduced-motion: reduce) { .ask-panel { animation:none; } }
-@media (max-width:639px) { .ask-panel { width:100vw; border-left:0; } }
-.ask-head { display:flex; justify-content:space-between; align-items:center; gap:var(--sp-2);
-  padding:12px 16px; border-bottom:1px solid var(--border); }
-.ask-head h2 { margin:0; }
-.ask-head-acts { display:flex; gap:4px; align-items:center; }
-.ask-head-acts [data-ask-close] { font-size:20px; line-height:1; min-width:36px; min-height:36px; }
-.ask-msgs { flex:1; overflow-y:auto; padding:12px 16px; display:flex; flex-direction:column;
-  gap:12px; }
-.ask-empty { display:flex; flex-direction:column; gap:8px; align-items:flex-start; }
-.ask-ex { text-align:left; white-space:normal; }
-.ask-you { align-self:flex-end; max-width:85%; background:var(--accent-soft);
-  border-radius:var(--r-2); padding:6px 10px; overflow-wrap:anywhere; }
-.ask-bot { display:flex; flex-direction:column; gap:6px; min-width:0; }
-.ask-say { margin:0; }
-.ask-text { margin:0; color:var(--text-secondary); }
-.ask-table { overflow-x:auto; max-width:100%; }
-.ask-table .mt-legend, .ask-table .mt-tint { display:none; }
-.ask-list { margin:0; padding-left:18px; }
-.ask-choices { display:flex; flex-wrap:wrap; gap:6px; }
-.ask-then { align-self:flex-start; text-align:left; white-space:normal; }
+@media (max-width:639px) { .ask-panel, .ask-panel.wide { width:100vw; border-left:0; }
+  .ask-panel [data-ask-wide] { display:none; } }
+.ask-panel button { font-family:var(--font-sans); cursor:pointer; }
+.ask-panel :focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+.ask-sp { flex:1 1 auto; }
+.ask-head { height:56px; flex:0 0 auto; display:flex; align-items:center; gap:10px;
+  padding:0 10px 0 18px; border-bottom:1px solid var(--grid); }
+.ask-title { font-weight:600; font-size:15px; }
+.ask-status { display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 9px;
+  border-radius:12px; background:var(--ask-chip); font-size:12px; color:var(--text-secondary);
+  white-space:nowrap; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.ask-sdot { width:7px; height:7px; border-radius:50%; flex:none; background:var(--live-dot); }
+.ask-status.slow .ask-sdot { background:var(--warning); }
+.ask-status.down .ask-sdot { background:var(--critical); }
+.ask-ibtn { width:36px; height:36px; flex:none; border-radius:10px; border:0; background:transparent;
+  color:var(--text-secondary); display:inline-flex; align-items:center; justify-content:center;
+  padding:0; }
+.ask-ibtn.sm { width:32px; height:32px; border-radius:9px; color:var(--muted); }
+.ask-ibtn:hover, .ask-hbtn:hover { background:var(--ask-chip); color:var(--text-primary); }
+.ask-ibtn.on { background:var(--accent-soft); color:var(--accent); }
+.ask-hbtn { height:36px; padding:0 10px; border-radius:10px; border:0; background:transparent;
+  color:var(--text-secondary); font-weight:500; font-size:13px; }
+.ask-msgs { flex:1 1 auto; overflow-y:auto; overflow-x:hidden; padding:16px; display:flex;
+  flex-direction:column; gap:14px; }
+/* empty: what it does, examples in four groups, what it can't */
+.ask-empty { flex:1 1 auto; display:flex; flex-direction:column; gap:22px; padding:12px 2px 0; }
+.ask-hello h2 { margin:0 0 6px; font-weight:600; font-size:20px; }
+.ask-hello p { margin:0; font-size:14px; line-height:1.45; color:var(--text-secondary); }
+.ask-exg { display:flex; flex-direction:column; gap:6px; }
+.ask-cap { font:600 11px var(--font-mono); letter-spacing:.06em; text-transform:uppercase;
+  color:var(--muted); }
+.ask-cap2 { font-size:12px; color:var(--muted); margin:2px 0 0; }
+.ask-ex { min-height:40px; display:flex; align-items:center; gap:10px; padding:0 12px;
+  border-radius:10px; border:1px solid var(--border); background:var(--surface-1);
+  color:var(--text-primary); font-size:14px; text-align:left; }
+.ask-ex span { flex:1 1 auto; }
+.ask-ex svg { color:var(--muted); flex:none; }
+.ask-ex:hover { border-color:var(--ask-edge); }
+.ask-only { margin:auto 0 0; font-size:12px; color:var(--muted); line-height:1.4; }
+/* a turn: the person's words after their initial, no bubble */
+.ask-you { display:flex; align-items:baseline; gap:10px; min-width:0; }
+.ask-me { flex:0 0 auto; width:22px; height:22px; border-radius:11px; align-self:center;
+  background:var(--ask-chip); color:var(--text-secondary); font-weight:600; font-size:11px;
+  display:inline-flex; align-items:center; justify-content:center; }
+.ask-q { font-size:14px; color:var(--text-primary); min-width:0; overflow-wrap:anywhere; }
+.ask-note { font-size:12px; color:var(--muted); white-space:nowrap; }
+.ask-fold { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px;
+  background:var(--surface-1); border:1px solid var(--border); }
+.ask-ftext { flex:1 1 auto; min-width:0; font-size:13px; color:var(--text-secondary);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ask-link { border:0; background:none; padding:0; font-size:13px; color:var(--accent);
+  text-decoration:none; white-space:nowrap; }
+.ask-link:hover { text-decoration:underline; }
+.ask-dot { flex:0 0 auto; width:8px; height:8px; border-radius:50%; display:inline-block; }
+.ask-dot.hollow { box-sizing:border-box; border:1.5px solid var(--muted); }
+/* a card */
+.ask-card { border-radius:14px; background:var(--surface-1); border:1px solid var(--border);
+  padding:14px; display:flex; flex-direction:column; gap:12px; min-width:0; }
+.ask-card.busy { opacity:.6; }
+.ask-headline { display:flex; align-items:center; gap:8px; min-width:0; }
+.ask-headline svg { color:var(--accent); flex:none; }
+.ask-h { font-weight:600; font-size:15px; margin:0; min-width:0; overflow-wrap:anywhere; }
+.ask-h2 { font-weight:600; font-size:13px; }
+.ask-edited { margin-left:auto; font-size:11px; color:var(--muted); border:1px solid var(--grid);
+  border-radius:6px; padding:0 5px; }
+.ask-sub { font-size:12px; color:var(--muted); margin:0; }
+.ask-text { margin:0; font-size:14px; line-height:1.45; color:var(--text-secondary); }
+.ask-why { margin:-4px 0 0; font-size:13px; color:var(--text-secondary); }
+.ask-tiny { font-size:11px; color:var(--muted); }
+/* chips: what it understood, each changeable */
+.ask-chips { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.ask-chip { height:30px; display:inline-flex; align-items:center; gap:6px; padding:0 4px 0 10px;
+  border-radius:15px; border:1px solid var(--ask-edge); background:var(--ask-chip);
+  color:var(--text-primary); font-weight:500; font-size:12px; max-width:100%; }
+.ask-cw { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:6px; }
+.ask-cbtn { border:0; background:none; color:inherit; font:inherit; padding:0 6px 0 0; height:28px;
+  white-space:nowrap; }
+.ask-x { border:0; background:none; color:var(--ask-muted); font-size:15px; line-height:1; width:22px;
+  height:22px; border-radius:11px; padding:0; }
+.ask-x:hover { color:var(--text-primary); background:var(--surface-1); }
+.ask-add { height:30px; padding:0 10px; border-radius:15px; border:1px dashed var(--ask-edge);
+  background:transparent; color:var(--text-secondary); font-weight:500; font-size:12px; }
+.ask-picker { flex:1 0 100%; border:1px solid var(--ask-edge); border-radius:12px;
+  background:var(--ask-bg); padding:8px; display:flex; flex-direction:column; gap:6px; }
+.ask-pickhead { display:flex; align-items:center; gap:6px; padding-left:4px; }
+.ask-picklist { display:flex; flex-direction:column; gap:2px; max-height:240px; overflow-y:auto; }
+.ask-opt { display:flex; align-items:center; gap:8px; min-height:34px; padding:0 8px; border:0;
+  border-radius:8px; background:transparent; color:var(--text-primary); font-size:13px;
+  text-align:left; }
+.ask-opt:hover, .ask-opt.on { background:var(--ask-chip); }
+.ask-opt.on { font-weight:600; }
+.ask-opt .ask-csub { margin-left:auto; }
+.ask-psearch { height:32px; border-radius:8px; border:1px solid var(--ask-edge);
+  background:var(--surface-1); color:var(--text-primary); padding:0 8px; font-size:13px; }
+/* compare: models across, benchmarks down — never sideways at 400 px */
+.ask-grid { width:100%; border-collapse:collapse; table-layout:fixed; font-size:13px; }
+.ask-grid th, .ask-grid td { padding:9px 0; border-bottom:1px solid var(--grid); }
+/* a benchmark in its own case and the sans — never capitals or monospace */
+.ask-grid th { text-transform:none; letter-spacing:normal; font-family:var(--font-sans);
+  white-space:normal; }
+.ask-grid td { height:auto; }
+.ask-grid tbody tr:last-child th, .ask-grid tbody tr:last-child td { border-bottom:0; }
+.ask-grid thead th { padding:6px 0 8px; text-align:right; vertical-align:bottom; font-weight:600;
+  font-size:12px; color:var(--text-primary); overflow-wrap:anywhere; }
+.ask-grid thead th.ask-bh { text-align:left; font-weight:500; color:var(--muted); width:36%; }
+.ask-panel.wide .ask-grid thead th.ask-bh { width:22%; }
+/* a model's name wraps in its column, whole, its dot before it */
+.ask-mh { display:inline; text-align:right; }
+.ask-mh .ask-dot { margin-right:6px; vertical-align:1px; }
+.ask-grid tbody th { text-align:left; font-weight:400; font-size:13px; color:var(--text-secondary);
+  vertical-align:top; overflow-wrap:anywhere; padding-right:6px; }
+.ask-grid td { text-align:right; vertical-align:top; padding-left:10px; }
+.ask-c { display:inline-flex; flex-direction:column; gap:5px; width:100%; max-width:92px;
+  vertical-align:top; }
+.ask-cn { display:flex; justify-content:flex-end; align-items:baseline; gap:3px; }
+.ask-panel .mt-n { font-size:14px; }
+.ask-panel .mt-se { font-size:10px; margin-left:1px; }
+.ask-panel .mt-src { color:var(--accent); }
+.ask-panel .mt-bar { min-width:0; width:100%; margin-top:0; }
+.ask-none { font-family:var(--font-mono); color:var(--muted); }
+.ask-pubnote { margin:0; font-size:12px; line-height:1.45; color:var(--muted); }
+.ask-letter { color:var(--accent); }
+.ask-more { margin:-4px 0 0; font-size:12px; color:var(--muted); }
+.ask-more a { color:var(--accent); text-decoration:none; }
+/* one number large */
+.ask-nhead { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-secondary); }
+.ask-big { display:flex; align-items:baseline; gap:8px; font-family:var(--font-mono);
+  font-variant-numeric:tabular-nums; }
+.ask-bn { font-size:36px; font-weight:600; line-height:1.1; }
+.ask-bse { font-size:14px; color:var(--muted); }
+.ask-bbar { display:block; height:4px; border-radius:2px; background:var(--grid); overflow:hidden; }
+.ask-bbar i { display:block; height:100%; }
+/* lists: a ranking, the published apart; runs */
+.ask-rank { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; }
+.ask-rank li { display:flex; align-items:center; gap:8px; padding:8px 0;
+  border-bottom:1px solid var(--grid); min-width:0; }
+.ask-rank li:last-child { border-bottom:0; }
+.ask-rk { width:16px; font:600 12px var(--font-mono); color:var(--muted); text-align:right; }
+.ask-rname { flex:1 1 auto; min-width:0; font-size:13px; overflow-wrap:anywhere; }
+.ask-rank .ask-c { width:92px; flex:none; }
+.ask-cgroup { display:flex; flex-direction:column; gap:4px; }
+.ask-chart { display:flex; flex-direction:column; gap:12px; }
 .ask-chart .by-panel { max-width:100%; }
 .ask-dots { grid-template-columns:minmax(0, 9rem) 1fr auto; }
-.ask-thumbs { display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
-.ask-thumbs button.on { background:var(--accent-soft); }
-.ask-note { flex:1; min-width:10rem; }
-.ask-wait { margin:0; }
-.ask-foot { display:flex; gap:8px; padding:12px 16px; border-top:1px solid var(--border); }
-.ask-in { flex:1; min-width:0; }
+/* asking back */
+.ask-choices { display:flex; flex-direction:column; gap:8px; }
+.ask-choice { min-height:46px; display:flex; align-items:center; gap:10px; padding:0 12px;
+  border-radius:10px; border:1px solid var(--ask-edge); background:var(--ask-chip);
+  color:var(--text-primary); font-weight:500; font-size:14px; text-align:left; }
+.ask-choice .ask-dot { width:9px; height:9px; }
+.ask-cname { flex:1 1 auto; min-width:0; overflow-wrap:anywhere; }
+.ask-csub { font-size:12px; font-weight:400; color:var(--ask-muted); }
+.ask-all { min-height:40px; padding:0 12px; border-radius:10px; border:1px dashed var(--ask-edge);
+  background:transparent; color:var(--text-primary); font-weight:500; font-size:13px;
+  text-align:left; }
+.ask-then { align-self:flex-start; height:30px; padding:0 11px; border-radius:15px;
+  border:1px solid var(--ask-edge); background:transparent; color:var(--text-secondary);
+  font-weight:500; font-size:12px; }
+/* the row at the end of a card */
+.ask-acts { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.ask-main { height:32px; display:inline-flex; align-items:center; padding:0 12px; border-radius:9px;
+  background:var(--ask-chip); border:1px solid var(--ask-edge); color:var(--text-primary);
+  font-weight:500; font-size:13px; text-decoration:none; }
+.ask-main:hover { border-color:var(--accent); }
+/* a thumbs down: what did you want */
+.ask-form { border-top:1px solid var(--grid); padding-top:12px; display:flex; flex-direction:column;
+  gap:10px; }
+.ask-pills { display:flex; flex-wrap:wrap; gap:6px; }
+.ask-pill, .ask-sug { height:30px; padding:0 11px; border-radius:15px; border:1px solid var(--ask-edge);
+  background:transparent; color:var(--text-secondary); font-weight:500; font-size:12px; }
+.ask-pill.on { border-color:var(--accent); background:var(--accent-soft); color:var(--text-primary); }
+.ask-sug:hover { color:var(--text-primary); border-color:var(--accent); }
+.ask-flabel { display:flex; flex-direction:column; gap:6px; font-size:12px; color:var(--muted); }
+.ask-fnote { resize:none; width:100%; border-radius:10px; border:1px solid var(--ask-edge);
+  background:var(--ask-bg); color:var(--text-primary); font:400 14px var(--font-sans);
+  padding:8px 10px; }
+.ask-facts { display:flex; align-items:center; gap:8px; }
+.ask-send { height:32px; padding:0 14px; border-radius:9px; border:0; background:var(--accent);
+  color:var(--surface-1); font-weight:600; font-size:13px; }
+/* while it thinks */
+.ask-wait { gap:10px; }
+.ask-ph { display:block; height:10px; border-radius:5px; background:var(--grid); }
+/* the foot: suggestions, then the box */
+.ask-foot { flex:0 0 auto; padding:10px 14px 14px; border-top:1px solid var(--grid);
+  display:flex; flex-direction:column; gap:10px; }
+.ask-sugs { display:flex; gap:6px; flex-wrap:wrap; }
+.ask-box { border:1px solid var(--ask-edge); border-radius:14px; background:var(--surface-1);
+  padding:10px 10px 8px 14px; display:flex; flex-direction:column; gap:6px; }
+/* one focus ring: the box's own 1.5 px accent border, nothing round the field */
+.ask-box:focus-within { border:1.5px solid var(--accent); padding:9.5px 9.5px 7.5px 13.5px; }
+.ask-in { border:0; outline:0; background:transparent; color:var(--text-primary);
+  font:400 14px var(--font-sans); padding:0; width:100%; min-width:0; box-shadow:none; }
+.ask-panel .ask-in:focus, .ask-panel .ask-in:focus-visible { outline:0; box-shadow:none; }
+.ask-in::placeholder { color:var(--muted); opacity:1; }
+.ask-boxrow { display:flex; align-items:center; gap:8px; }
+.ask-kbd { font:500 11px var(--font-mono); color:var(--muted); border:1px solid var(--grid);
+  border-radius:5px; padding:1px 5px; }
+.ask-go { width:32px; height:32px; border-radius:16px; border:0; background:var(--ask-chip);
+  color:var(--muted); display:inline-flex; align-items:center; justify-content:center; padding:0; }
+.ask-go.ready { background:var(--accent); color:var(--surface-1); }
+.ask-go.stop { background:var(--text-primary); color:var(--surface-1); }
 /* 27: one table for every Models tab — one row, one cell, one frame */
 .mt { font-size:14px; }
 .mt-legend { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between;
@@ -30180,10 +30362,16 @@ function vOnDevice(id, d, back) {
 // and draws the reply with its own parts: a page opened by its own link, 27's
 // cells, the reports' charts, its own help texts. The messages stay for the
 // session, in memory. The panel lives outside the page, as the testers' test
-// panel does, so a page opened from it leaves it open
+// panel does, so a page opened from it leaves it open.
+// 28g: board E, "Ask panel — four states" — a card per kind of answer, the
+// fields it understood as chips that run it again on the board (never the
+// model), follow-ups the board builds, a thumbs down that becomes a question
 // ---------------------------------------------------------------------------
 const ASK = { on: false, checked: null, open: false, msgs: [], examples: [], waiting: false,
-  slow: false, down: false, panel: null };
+  slow: false, down: false, panel: null, model: { name: 'Q4', where: 'our server' },
+  wide: false, ctl: null, choices: null, hist: [], end: false };
+// 28g: the wider panel, remembered in this browser
+try { ASK.wide = localStorage.getItem('ask-wide') === '1'; } catch (e) { /* narrow */ }
 // the texts the page keeps that `explain` names (`page:` in names.json)
 const OD_KEEP_WORDS = 'Each source ran its own harness, so scores aren’t comparable point for '
   + 'point across sources. But each ran its model beside its own full-precision base on the same '
@@ -30228,8 +30416,9 @@ function askCheck() {
   if (!who) { ASK.on = false; askButton(); return; }
   api('api/assistant?by=' + encodeURIComponent(who)).then(d => {
     ASK.on = !!d.on && ASK.checked === who;
-    ASK.examples = d.examples || [];
+    ASK.examples = Array.isArray(d.examples) ? d.examples : [];
     ASK.slow = !!d.busy;
+    if (d.model) ASK.model = d.model;
     askButton();
   }).catch(() => { ASK.on = false; askButton(); });
 }
@@ -30248,40 +30437,270 @@ function askOpen() {
     ASK.panel = el('aside', { class: 'ask-panel', id: 'askPanel', role: 'dialog',
       'aria-label': 'Ask the board', 'data-ask-panel': '1' });
     document.body.append(ASK.panel);
+    askState();
+    askChoices();
   }
   askDraw();
-  const i = ASK.panel.querySelector('[data-ask-input]');
-  if (i) i.focus();
+  askFocus();
 }
 function askClose() {
   if (ASK.panel) ASK.panel.remove();
   ASK.panel = null;
+}
+function askFocus() {
+  const i = ASK.panel && ASK.panel.querySelector('[data-ask-input]');
+  if (i) i.focus();
+}
+// the status: the model, and whether it answers — a dot and words, never colour alone
+function askState() {
+  api('api/assistant/state?by=' + encodeURIComponent(whoName()))
+    .then(s => { ASK.slow = !!s.busy; ASK.down = !s.up; askDraw(); }).catch(() => {});
+}
+// what the chips' pickers offer, asked once
+function askChoices() {
+  if (ASK.choices) return;
+  api('api/assistant/choices?by=' + encodeURIComponent(whoName()))
+    .then(c => { ASK.choices = c; askDraw(); }).catch(() => {});
+}
+function askWiden() {
+  ASK.wide = !ASK.wide;
+  try { localStorage.setItem('ask-wide', ASK.wide ? '1' : '0'); } catch (e) { /* this time only */ }
+  askDraw();
 }
 // the previous question and its action, for a follow-up ("and on HLE?")
 function askPrev() {
   const last = [...ASK.msgs].reverse().find(m => m.role === 'bot' && m.action);
   return last ? { q: last.q, action: last.action } : null;
 }
+const askLastBot = () => [...ASK.msgs].reverse().find(m => m.role === 'bot');
+
+// ---- 28g: the line icons, as the mock draws them --------------------------------
+const THUMB = 'M5 7.5v6H2.5v-6H5zm0 0 2.6-5c.9 0 1.6.7 1.6 1.6v2.1h3.3c.8 0 1.4.7 1.2 1.5l-.9 '
+  + '4.6c-.1.7-.7 1.2-1.4 1.2H5';
+function askIcon(name, size = 16) {
+  const svg = (w, ...kids) => el('svg:svg', { width: String(size), height: String(size),
+    viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor', 'stroke-width': String(w),
+    'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true',
+    focusable: 'false' }, ...kids);
+  const path = d => el('svg:path', { d });
+  if (name === 'wide') return svg(1.5, path('M9.5 2.5h4v4M6.5 13.5h-4v-4M13.5 2.5 9 7M2.5 13.5 7 9'));
+  if (name === 'narrow') return svg(1.5, path('M13.5 6.5h-4v-4M2.5 9.5h4v4M9.5 6.5 14 2M6.5 9.5 2 14'));
+  if (name === 'close') return svg(1.5, path('M4 4l8 8M12 4l-8 8'));
+  if (name === 'send') return svg(1.8, path('M8 13V3M4 7l4-4 4 4'));
+  if (name === 'out') return svg(1.5, path('M5 11 11 5M6 5h5v5'));
+  if (name === 'check') return svg(1.5, path('M3 8.5 6.5 12 13 4.5'));
+  if (name === 'copy') return svg(1.5, el('svg:rect', { x: '5.5', y: '5.5', width: '8', height: '8',
+    rx: '1.5' }), path('M3 10.5V4a1 1 0 0 1 1-1h6.5'));
+  if (name === 'up') return svg(1.4, path(THUMB));
+  if (name === 'down') return svg(1.4, el('svg:g', { transform: 'rotate(180 8 8)' }, path(THUMB)));
+  if (name === 'stop') return el('svg:svg', { width: '12', height: '12', viewBox: '0 0 12 12',
+    'aria-hidden': 'true', focusable: 'false' }, el('svg:rect', { x: '2', y: '2', width: '8',
+    height: '8', rx: '1.5', fill: 'currentColor' }));
+  return '';
+}
+
+// ---- a model as the panel shows it: its name, and its dot in the board's colour
+function askModel(id) {
+  const x = ((ASK.choices || {}).models || []).find(m => m.id === id);
+  const row = DATA.models.find(m => m.id === id) || DATA.models.find(m =>
+    m.id.split(' · ')[0] === id);
+  return { id, name: x ? x.name : row ? String(row.name).split(' · ')[0] : String(id).split('/').pop(),
+    published: x ? x.published : !row, colour: row ? mtColour(row) : null };
+}
+const askDot = id => {
+  const m = askModel(id);
+  return el('span', { class: 'ask-dot' + (m.colour ? '' : ' hollow'), 'aria-hidden': 'true',
+    style: m.colour ? `background:${m.colour}` : null });
+};
+const askWord = n => ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
+  'ten'][n] || String(n);
+const askChoiceWords = (list, v) => ((((ASK.choices || {})[list]) || []).find(x => x[0] === v)
+  || [v, v])[1];
+const askBenchName = k => ((((ASK.choices || {}).benchmarks) || []).find(b => b.key === k)
+  || { label: k }).label;
+
+// ---- the panel ------------------------------------------------------------------
+function askDraw() {
+  const P = ASK.panel;
+  if (!P) return;
+  const old = P.querySelector('[data-ask-input]'), draft = old ? old.value : '';
+  const act = document.activeElement, keep = act && P.contains(act) && act.dataset
+    ? act.dataset.askKeep : null;
+  const was = P.querySelector('[data-ask-msgs]'), top = was ? was.scrollTop : 0;
+  P.classList.toggle('wide', !!ASK.wide);
+  const list = el('div', { class: 'ask-msgs', 'data-ask-msgs': '1', 'aria-live': 'polite' },
+    ASK.msgs.length ? askTurns() : askEmpty(), ASK.waiting ? askWaiting() : '');
+  P.replaceChildren(askHead(), list, askFoot(draft));
+  if (ASK.end) { list.scrollTop = list.scrollHeight; ASK.end = false; } else list.scrollTop = top;
+  const again = keep && P.querySelector(`[data-ask-keep="${keep}"]`);
+  if (again) again.focus();
+  else if (!act || act === document.body) askFocus();
+}
+function askHead() {
+  const st = ASK.down ? 'down' : ASK.slow ? 'slow' : 'ok', n = ASK.model.name;
+  return el('div', { class: 'ask-head' },
+    el('span', { class: 'ask-title', text: 'Ask' }),
+    el('span', { class: 'ask-status ' + st, 'data-ask-status': st, role: 'status' },
+      el('span', { class: 'ask-sdot', 'aria-hidden': 'true' }),
+      st === 'down' ? `${n} is down` : st === 'slow' ? `${n} · slower: a run is using it`
+        : `${n} · ${ASK.model.where}`),
+    el('span', { class: 'ask-sp' }),
+    ASK.msgs.length ? el('button', { class: 'ask-hbtn', 'data-ask-clear': '1', text: 'Clear',
+      onclick: () => { ASK.msgs = []; askDraw(); } }) : '',
+    el('button', { class: 'ask-ibtn', 'data-ask-wide': ASK.wide ? 'on' : '1',
+      'aria-label': ASK.wide ? 'Narrower panel' : 'Wider panel', 'aria-pressed': String(!!ASK.wide),
+      title: ASK.wide ? 'Narrower panel' : 'Wider panel', 'data-ask-keep': 'wide',
+      onclick: askWiden }, askIcon(ASK.wide ? 'narrow' : 'wide')),
+    el('button', { class: 'ask-ibtn', 'data-ask-close': '1', 'aria-label': 'Close',
+      title: 'Close (Esc)', onclick: askClose }, askIcon('close')));
+}
+function askEmpty() {
+  return el('div', { class: 'ask-empty', 'data-ask-empty': '1' },
+    el('div', { class: 'ask-hello' }, el('h2', { text: 'Ask about the board' }),
+      el('p', { text: 'Numbers, pages, phones and runs. It shows the answer here and opens the '
+        + 'page behind it.' })),
+    ASK.examples.filter(g => (g.items || []).length).map(g => el('div', { class: 'ask-exg',
+      'data-ask-group': g.title }, el('div', { class: 'ask-cap', text: g.title }),
+      g.items.map(q => el('button', { class: 'ask-ex', 'data-ask-example': '1',
+        onclick: () => askSend(q) }, el('span', { text: q }), askIcon('out', 14))))),
+    el('p', { class: 'ask-only', text: 'It only reads and opens pages: it can’t start, stop, '
+      + 'change or spend anything.' }));
+}
+// the turns: the person's words, then the board's card; older cards fold
+function askTurns() {
+  const me = (whoName() || '?').trim().charAt(0).toUpperCase();
+  return ASK.msgs.map(m => m.role === 'you'
+    ? el('div', { class: 'ask-you', 'data-ask-you': '1' },
+      el('span', { class: 'ask-me', 'aria-hidden': 'true', text: me }),
+      el('span', { class: 'ask-q', 'data-ask-q': '1', text: m.q }),
+      m.added ? el('span', { class: 'ask-note', text: '· added to the last answer' }) : '',
+      m.stopped ? el('span', { class: 'ask-note', 'data-ask-stopped': '1', text: '· stopped' }) : '')
+    : m.folded ? askFold(m) : askCard(m));
+}
+function askFold(m) {
+  const a = m.action || {}, first = (a.models || [a.model].filter(Boolean))[0];
+  return el('div', { class: 'ask-fold', 'data-ask-fold': '1' },
+    first ? askDot(first) : el('span', { class: 'ask-dot hollow', 'aria-hidden': 'true' }),
+    el('span', { class: 'ask-ftext', text: askHeadOf(m) }),
+    el('button', { class: 'ask-link', 'data-ask-unfold': '1', text: 'Show again',
+      onclick: () => { m.folded = false; askDraw(); } }));
+}
+const askHeadOf = m => {
+  const r = m.reply || {};
+  return r.number ? `${r.number.name} · ${r.number.bench}` : r.head || r.say || m.q;
+};
+function askWaiting() {
+  return el('div', { class: 'ask-card ask-wait', 'data-ask-waiting': ASK.slow ? 'slow' : '1' },
+    el('p', { class: 'ask-sub', text: 'Reading the board…' }),
+    el('span', { class: 'ask-ph', style: 'width:70%' }), el('span', { class: 'ask-ph',
+      style: 'width:45%' }));
+}
+function askFoot(draft) {
+  const last = askLastBot();
+  const sug = !ASK.waiting && last && ASK.msgs[ASK.msgs.length - 1] === last
+    ? (last.reply.suggest || []) : [];
+  const input = el('input', { class: 'ask-in', 'data-ask-input': '1', 'data-ask-keep': 'input',
+    type: 'text', value: draft, autocomplete: 'off', 'aria-label': 'Your question',
+    placeholder: !last ? 'Ask about models, runs, phones…' : last.reply.kind === 'clarify'
+      ? 'Or type which one…' : 'Ask a follow-up…',
+    oninput: e => go.classList.toggle('ready', !!e.target.value.trim()),
+    onkeydown: e => {
+      if (e.key === 'Enter') { const v = e.target.value; e.target.value = ''; askSend(v); }
+      else if (e.key === 'Escape') askClose();
+      // ↑ in an empty box: the last question again
+      else if (e.key === 'ArrowUp' && !e.target.value && ASK.hist.length) {
+        e.preventDefault(); e.target.value = ASK.hist[ASK.hist.length - 1];
+        go.classList.add('ready');
+      }
+    } });
+  const go = ASK.waiting
+    ? el('button', { class: 'ask-go stop', 'data-ask-stop': '1', 'aria-label': 'Stop',
+      title: 'Stop', onclick: askStop }, askIcon('stop'))
+    : el('button', { class: 'ask-go' + (draft.trim() ? ' ready' : ''), 'data-ask-send': '1',
+      'aria-label': 'Send', title: 'Send', onclick: () => {
+        const v = input.value; input.value = ''; askSend(v); } }, askIcon('send'));
+  return el('div', { class: 'ask-foot' },
+    sug.length ? el('div', { class: 'ask-sugs', 'data-ask-suggest': '1' }, sug.map(s =>
+      el('button', { class: 'ask-sug', 'data-ask-sug': s.label, text: s.label,
+        onclick: () => askRun(s.action, { why: 'suggestion', label: s.label, of: last }) }))) : '',
+    el('div', { class: 'ask-box' }, input, el('div', { class: 'ask-boxrow' },
+      el('kbd', { class: 'ask-kbd', text: /Mac/.test(navigator.platform) ? '⌘K' : 'Ctrl K' }),
+      el('span', { class: 'ask-sp' }), go)));
+}
+
+// ---- asking: the model picks; Stop abandons the request ------------------------
 async function askSend(q) {
   q = String(q || '').trim();
   if (!q || ASK.waiting) return;
   const prev = askPrev();
-  ASK.msgs.push({ role: 'you', q });
+  const you = { role: 'you', q };
+  ASK.msgs.push(you);
+  ASK.hist.push(q);
   ASK.waiting = true;
+  ASK.end = true;
   askDraw();
-  // "slower now: a run is using the model", or down — asked while the reply comes
-  const t = setTimeout(() => api('api/assistant/state?by=' + encodeURIComponent(whoName()))
-    .then(s => { ASK.slow = !!s.busy; ASK.down = !s.up; if (ASK.waiting) askDraw(); })
-    .catch(() => {}), 1200);
+  // "slower: a run is using it", or down — asked while the reply comes
+  const t = setTimeout(askState, 1200);
+  const ctl = ASK.ctl = new AbortController();
   let got;
-  try { got = await post('api/assistant/ask', { by: whoName(), q, prev }); }
-  catch (e) { got = { reply: { kind: 'down', say: String((e && e.message) || e) } }; }
+  try {
+    const r = await fetch('api/assistant/ask', { method: 'POST', signal: ctl.signal,
+      headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
+      body: JSON.stringify({ by: whoName(), q, prev }) });
+    got = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(typeof got.detail === 'string' ? got.detail
+      : `the server answered HTTP ${r.status}`);
+  } catch (e) {
+    if (ctl.signal.aborted) { clearTimeout(t); return; }    // Stop: abandoned
+    got = { reply: { kind: 'down', say: String((e && e.message) || e) } };
+  }
   clearTimeout(t);
-  ASK.waiting = false;
+  if (ASK.ctl !== ctl) return;
+  ASK.ctl = null;
   ASK.down = !!got.down;
-  const m = { role: 'bot', q, id: got.id, action: got.action || null, reply: got.reply || {},
+  askAnswer(you, got);
+}
+function askStop() {
+  if (ASK.ctl) ASK.ctl.abort();
+  ASK.ctl = null;
+  ASK.waiting = false;
+  const y = [...ASK.msgs].reverse().find(m => m.role === 'you');
+  if (y) y.stopped = true;
+  askDraw();
+  askFocus();
+}
+// 28g: a suggestion, or "All three, side by side": the ready action run on
+// the board — no model — the chip's words as the person's turn
+async function askRun(action, o) {
+  if (ASK.waiting) return;
+  const you = { role: 'you', q: o.label };
+  ASK.msgs.push(you);
+  ASK.waiting = true;
+  ASK.end = true;
+  askDraw();
+  let got;
+  try {
+    got = await post('api/assistant/run', { by: whoName(), q: o.label, of: (o.of || {}).id || '',
+      before: (o.of || {}).action || null, action, why: o.why, label: o.label });
+  } catch (e) { got = { reply: { kind: 'down', say: String((e && e.message) || e) } }; }
+  askAnswer(you, got);
+}
+function askAnswer(you, got) {
+  ASK.waiting = false;
+  const before = askLastBot();
+  const m = { role: 'bot', q: you.q, id: got.id, action: got.action || null, reply: got.reply || {},
     ms: got.ms };
+  // "Ternary Bonsai 2 2B · added to the last answer"
+  const a = m.action || {}, b = (before || {}).action || {};
+  if (a.action && a.action === b.action && (a.models || []).length > (b.models || []).length
+      && (b.models || []).every(x => (a.models || []).includes(x))
+      && JSON.stringify(a.benchmarks || null) === JSON.stringify(b.benchmarks || null))
+    you.added = true;
   ASK.msgs.push(m);
+  // older answers fold: every card but the last two, to one line
+  const bots = ASK.msgs.filter(x => x.role === 'bot');
+  bots.forEach((x, i) => { x.folded = i < bots.length - 2; });
+  ASK.end = true;
   if (m.reply.kind === 'open' && m.reply.link) {
     // the board's own link: the page as any link opens it, its entry in history
     location.hash = m.reply.link.replace(/^#/, '');
@@ -30291,131 +30710,472 @@ async function askSend(q) {
 function askThen(m) {
   const t = m.reply.then;
   m.thenShown = true;
-  const n = { role: 'bot', q: t.label, id: m.id, action: t.action, reply: t.reply };
-  ASK.msgs.push(n);
-  if (t.reply.kind === 'open' && t.reply.link) location.hash = t.reply.link.replace(/^#/, '');
+  ASK.msgs.push({ role: 'you', q: t.label });
+  askAnswer(ASK.msgs[ASK.msgs.length - 1], { id: m.id, action: t.action, reply: t.reply });
+}
+// 28g: a chip changed — the same action, edited, run again on the board with
+// no model; the card updates in place, marked "edited"
+async function askEdit(m, next) {
+  m.busy = true;
+  m.pick = null;
+  askDraw();
+  try {
+    const got = await post('api/assistant/run', { by: whoName(), q: m.q, of: m.id || '',
+      before: m.action, action: next, why: 'edit' });
+    const was = m.reply.link;
+    Object.assign(m, { id: got.id, action: got.action, reply: got.reply || {}, edited: true,
+      thumbs: null, form: null });
+    if (m.reply.kind === 'open' && m.reply.link && m.reply.link !== was)
+      location.hash = m.reply.link.replace(/^#/, '');
+  } catch (e) { toast('Couldn’t change it. ' + ((e && e.message) || e), { key: 'ask' }); }
+  m.busy = false;
   askDraw();
 }
-function askThumbs(m, up, note) {
+function askThumbs(m, up, note, reason) {
   m.thumbs = up ? 'up' : 'down';
-  if (!up && note == null) { m.asking = true; askDraw(); return; }
-  m.asking = false;
-  post('api/assistant/thumbs', { by: whoName(), id: m.id || '', up, note: note || '' })
-    .catch(() => {});
+  if (!up && note == null) { m.form = { reason: null, note: '' }; askDraw(); return; }
+  m.form = null;
+  m.noted = !up;
+  post('api/assistant/thumbs', { by: whoName(), id: m.id || '', up, note: note || '',
+    reason: reason || '' }).catch(() => {});
   askDraw();
 }
-function askDraw() {
-  const P = ASK.panel;
-  if (!P) return;
-  const keep = P.querySelector('[data-ask-input]');
-  const draft = keep ? keep.value : '';
-  const list = el('div', { class: 'ask-msgs', 'data-ask-msgs': '1', 'aria-live': 'polite' },
-    ASK.msgs.length ? ASK.msgs.map(askMsg) : el('div', { class: 'ask-empty', 'data-ask-empty': '1' },
-      el('p', { class: 'small se', text: 'Ask about what the board holds, or for a page to open. '
-        + 'I read and open pages only; every number is the board’s.' }),
-      ASK.examples.map(q => el('button', { class: 'chip-btn ask-ex', 'data-ask-example': '1',
-        text: q, onclick: () => askSend(q) }))),
-    ASK.waiting ? el('p', { class: 'small se ask-wait', 'data-ask-waiting': ASK.slow ? 'slow' : '1',
-      text: ASK.down ? 'The assistant’s model isn’t answering right now.' : ASK.slow
-        ? 'Slower now: a run is using the model…' : 'Thinking…' }) : '');
-  const input = el('input', { class: 'ask-in', 'data-ask-input': '1', type: 'text', value: draft,
-    placeholder: 'Ask about the board…', 'aria-label': 'Your question', autocomplete: 'off',
-    onkeydown: e => { if (e.key === 'Enter') { const v = e.target.value; e.target.value = '';
-      askSend(v); } if (e.key === 'Escape') askClose(); } });
-  P.replaceChildren(
-    el('div', { class: 'ask-head' }, el('h2', { text: 'Ask' }),
-      el('span', { class: 'ask-head-acts' },
-        ASK.msgs.length ? el('button', { class: 'quiet', 'data-ask-clear': '1', text: 'Clear',
-          onclick: () => { ASK.msgs = []; askDraw(); } }) : '',
-        el('button', { class: 'quiet', 'data-ask-close': '1', 'aria-label': 'Close', text: '×',
-          title: 'Close (Esc)', onclick: askClose }))),
-    list,
-    el('div', { class: 'ask-foot' }, input,
-      el('button', { class: 'primary', 'data-ask-send': '1', text: 'Ask', disabled: ASK.waiting
-        ? '' : null, onclick: () => { const v = input.value; input.value = ''; askSend(v); } })));
-  list.scrollTop = list.scrollHeight;
-  if (document.activeElement === document.body || !document.activeElement) input.focus();
+function askCopy(link) {
+  const url = new URL(link, location.href).href;
+  const done = () => toast('Link copied', { key: 'ask' });
+  if (navigator.clipboard) navigator.clipboard.writeText(url).then(done, () => toast(url,
+    { key: 'ask' }));
+  else toast(url, { key: 'ask' });
 }
-function askMsg(m) {
-  if (m.role === 'you') return el('div', { class: 'ask-you', 'data-ask-you': '1', text: m.q });
-  const r = m.reply || {};
-  const link = r.link ? el('a', { href: r.link, class: 'small', 'data-ask-link': r.link,
-    text: r.linkText || (r.kind === 'open' ? 'Open it again ▸' : 'Where this is on the board ▸')
-  }) : '';
-  return el('div', { class: 'ask-bot', 'data-ask-bot': r.kind || '1' },
-    el('p', { class: 'ask-say', 'data-ask-say': '1', text: r.say || '' }),
-    askBody(r),
-    // 28b: two requests in one message: the first done, the second a button —
-    // 28c: a whole action the board worked out with the first, shown when pressed
-    r.then && !m.thenShown ? el('button', { class: 'chip-btn ask-then', 'data-ask-then': '1',
+
+// ---- one card per kind of answer ----------------------------------------------
+function askKind(m) {
+  const r = m.reply || {}, a = m.action || {};
+  if (r.kind === 'down') return 'down';
+  if (r.number && (a.action === 'compare' || a.page === 'model_page')) return 'number';
+  if (r.kind === 'clarify') return 'clarify';
+  if (r.kind === 'open') return 'open';
+  if (r.kind === 'chart') return 'chart';
+  if (r.kind === 'list') return 'boxes';
+  if (r.kind === 'table') return a.action === 'best_on' ? 'best' : a.action === 'phone' ? 'phone'
+    : 'compare';
+  if (a.action === 'explain') return 'explain';
+  if (a.action === 'not_found') return 'not_found';
+  if (a.action === 'cant') return 'cant';
+  return 'text';
+}
+function askCard(m) {
+  const r = m.reply || {}, kind = askKind(m);
+  const edited = m.edited ? el('span', { class: 'ask-edited', 'data-ask-edited': '1',
+    text: 'edited' }) : '';
+  const head = (text, icon) => el('div', { class: 'ask-headline' }, icon || '',
+    el('span', { class: 'ask-h', 'data-ask-say': '1', text }), edited);
+  const parts = ({
+    compare: () => [head(r.head || r.say), askChips(m), askGrid(m), askPubNote(r)],
+    number: () => askNumber(m, edited),
+    best: () => [head(r.head || r.say), askChips(m), askRank(r.rows || [], r, true),
+      (r.published || []).length ? [el('p', { class: 'ask-cap2', text: 'Published, never ranked '
+        + 'with ours' }), askRank(r.published, r, false)] : ''],
+    open: () => [head(r.head || r.say, askIcon('check')),
+      (m.action || {}).page === 'models_table' && askFields(m.action).some(k => (m.action || {})[k]
+        != null) ? el('p', { class: 'ask-sub', text: 'Filters applied, behind this panel:' }) : '',
+      askChips(m)],
+    chart: () => [head(r.head || r.say), askChips(m), askChart(r)],
+    phone: () => [head(r.head || r.say), askChips(m), askPhone(r)],
+    boxes: () => [head(r.head || r.say), askChips(m), askBoxes(r)],
+    explain: () => {
+      const t = r.text || (r.page ? askPageText(r.page) : '');
+      return [head(r.head || r.say), t ? el('p', { class: 'ask-text', 'data-ask-text': '1',
+        text: t }) : '', r.from ? el('p', { class: 'ask-sub', text: r.from }) : ''];
+    },
+    clarify: () => askAskBack(m),
+    not_found: () => [head(r.head || r.say)],
+    cant: () => [head(r.head || r.say), r.text ? el('p', { class: 'ask-text', 'data-ask-text': '1',
+      text: r.text }) : ''],
+    down: () => [el('p', { class: 'ask-h', 'data-ask-say': '1', text: r.say })],
+    text: () => [head(r.say || '')],
+  }[kind] || (() => [head(r.say || '')]))();
+  return el('article', { class: 'ask-card' + (m.busy ? ' busy' : ''), 'data-ask-bot': r.kind || '1',
+      'data-ask-card': kind, 'aria-busy': m.busy ? 'true' : null },
+    parts,
+    r.then && !m.thenShown ? el('button', { class: 'ask-then', 'data-ask-then': '1',
       text: 'Also: ' + r.then.label, onclick: () => askThen(m) }) : '',
-    link,
-    m.id ? el('div', { class: 'ask-thumbs' },
-      el('button', { class: 'quiet' + (m.thumbs === 'up' ? ' on' : ''), 'data-ask-up': '1',
-        'aria-label': 'Good answer', text: '👍', onclick: () => askThumbs(m, true) }),
-      el('button', { class: 'quiet' + (m.thumbs === 'down' ? ' on' : ''), 'data-ask-down': '1',
-        'aria-label': 'Not what I wanted', text: '👎', onclick: () => askThumbs(m, false) }),
-      m.asking ? el('input', { class: 'ask-note', 'data-ask-note': '1', type: 'text',
-        placeholder: 'What did you want?', onkeydown: e => { if (e.key === 'Enter')
-          askThumbs(m, false, e.target.value); } }) : '',
-      m.thumbs === 'down' && !m.asking ? el('span', { class: 'small se', text: 'Thanks — noted.' })
-        : '') : '');
+    askActs(m, kind),
+    m.form ? askForm(m) : '');
 }
-function askBody(r) {
-  if (r.kind === 'table') return [askTable(r.cols, r.rows, 'ask-' + (r.measure || 'score')),
-    (r.published || []).length ? [el('p', { class: 'small se', text: 'As published:' }),
-      askTable(r.cols, r.published, 'ask-pub')] : ''];
-  if (r.kind === 'chart') return askChart(r);
-  if (r.kind === 'list') return (r.items || []).length ? el('ul', { class: 'ask-list',
-    'data-ask-list': '1' }, r.items.map(x => el('li', {}, el('b', { text: x.name }),
-      ` · ${x.where === 'rented' ? 'rented box' : 'server'}` + (x.what ? ` · ${x.what}` : '')
-      + (x.progress ? ` · ${x.progress}` : '') + (x.eta ? ` · done about ${x.eta}` : '')))) : '';
-  if (r.kind === 'text') {
-    const t = r.text || (r.page ? askPageText(r.page) : '');
-    return t ? el('p', { class: 'small ask-text', 'data-ask-text': '1', text: t }) : '';
+// the row at the end: the main button to the page, Copy link, the thumbs
+function askActs(m, kind) {
+  const r = m.reply || {};
+  const link = kind === 'number' ? r.number.link : kind === 'compare' ? r.compare || r.link
+    : r.search && kind === 'clarify' ? '' : r.link;
+  const words = kind === 'number' ? r.number.linkText : r.linkText
+    || (kind === 'not_found' ? 'Search ▸' : 'Open it ▸');
+  const main = kind === 'open'
+    ? el('button', { class: 'ask-main', 'data-ask-main': '1', text: 'Close panel to see it',
+      onclick: askClose })
+    : link && kind !== 'clarify' && kind !== 'down'
+      ? el('a', { class: 'ask-main', 'data-ask-main': '1', href: link, text: words }) : '';
+  if (!main && !m.id) return '';
+  const thumb = up => el('button', { class: 'ask-ibtn sm' + (m.thumbs === (up ? 'up' : 'down')
+      ? ' on' : ''), 'aria-label': up ? 'Good answer' : 'Wrong answer',
+    'aria-pressed': String(m.thumbs === (up ? 'up' : 'down')), [up ? 'data-ask-up' : 'data-ask-down']:
+      '1', title: up ? 'Good answer' : 'Wrong answer',
+    onclick: () => askThumbs(m, up) }, askIcon(up ? 'up' : 'down', 15));
+  return el('div', { class: 'ask-acts' }, main,
+    link ? el('button', { class: 'ask-ibtn sm', 'aria-label': 'Copy the link', title: 'Copy the link',
+      'data-ask-copy': '1', 'data-ask-link': link, onclick: () => askCopy(link) },
+    askIcon('copy', 15)) : '',
+    el('span', { class: 'ask-sp' }),
+    m.noted && !m.form ? el('span', { class: 'ask-tiny', text: 'Thanks — noted.' }) : '',
+    m.id ? [thumb(true), thumb(false)] : '');
+}
+// 👎: what did you want — four quick reasons, a few words; it becomes a test question
+const ASK_REASONS = ['Missed something I asked', 'Wrong model', 'Wrong number', 'Should have asked'];
+function askForm(m) {
+  const F = m.form;
+  return el('div', { class: 'ask-form', 'data-ask-form': '1' },
+    el('div', { class: 'ask-h2', text: 'What did you want?' }),
+    el('div', { class: 'ask-pills', role: 'radiogroup', 'aria-label': 'What went wrong' },
+      ASK_REASONS.map(x => el('button', { class: 'ask-pill' + (F.reason === x ? ' on' : ''),
+        role: 'radio', 'aria-checked': String(F.reason === x), 'data-ask-reason': x, text: x,
+        'data-ask-keep': 'reason-' + x,
+        onclick: () => { F.reason = F.reason === x ? null : x; askDraw(); } }))),
+    el('label', { class: 'ask-flabel' }, 'In a few words',
+      el('textarea', { class: 'ask-fnote', rows: '2', 'data-ask-note': '1',
+        'data-ask-keep': 'note', oninput: e => { F.note = e.target.value; } }, F.note || '')),
+    el('div', { class: 'ask-facts' },
+      el('button', { class: 'ask-send', 'data-ask-fsend': '1', text: 'Send',
+        onclick: () => askThumbs(m, false, F.note || '', F.reason || '') }),
+      el('button', { class: 'ask-hbtn', 'data-ask-fcancel': '1', text: 'Cancel',
+        onclick: () => { m.form = null; m.thumbs = null; askDraw(); } }),
+      el('span', { class: 'ask-sp' }),
+      el('span', { class: 'ask-tiny', text: 'Becomes a test question' })));
+}
+
+// ---- compare: models across, benchmarks down; 27's cells, smaller ----------------
+function askCell(row, x, c, score) {
+  x = x || {};
+  if (x.v == null && (!x.text || x.text === '–'))
+    return el('span', { class: 'ask-none', 'data-ask-cell': `${row.id}|${c.key}`,
+      title: x.why || 'not in yet', text: '–' });
+  const letter = x.pub ? mtLetter('card', x.pub) : null;
+  const [n, se] = String(x.text || '').split(' ± ');
+  const colour = askModel(row.id).colour;
+  return el('span', { class: 'ask-c', 'data-ask-cell': `${row.id}|${c.key}`,
+      title: x.tip || (x.pub ? `published by ${x.pub}` : null) },
+    el('span', { class: 'ask-cn' }, el('span', { class: 'mt-n' + (x.pub ? ' mt-pub' : ''), text: n }),
+      letter ? el('sup', { class: 'mt-src', text: letter }) : '',
+      se ? el('span', { class: 'mt-se', text: '±' + se }) : ''),
+    score && typeof x.v === 'number' ? el('span', { class: 'mt-bar', 'aria-hidden': 'true' },
+      el('i', { style: `width:${Math.max(0, Math.min(100, 100 * x.v)).toFixed(1)}%;`
+        + `background:${x.pub || !colour ? 'var(--axis)' : colour}` })) : '');
+}
+function askGrid(m) {
+  const r = m.reply, rows = r.rows || [], cols = r.cols || [];
+  const score = (r.measure || 'score') === 'score', max = ASK.wide ? 5 : 3;
+  // one benchmark and several models: a list, models down
+  if (cols.length === 1 && rows.length > 1)
+    return el('ul', { class: 'ask-rank', 'data-ask-table': r.measure || 'score' }, rows.map(x =>
+      el('li', { 'data-ask-row': x.id }, askDot(x.id), el('span', { class: 'ask-rname',
+        text: x.name }), askCell(x, x.cells[cols[0].key], cols[0], score))));
+  const shown = rows.slice(0, max), more = rows.length - shown.length;
+  return [el('table', { class: 'ask-grid', 'data-ask-table': r.measure || 'score' },
+    el('thead', {}, el('tr', {}, el('th', { scope: 'col', class: 'ask-bh', text: 'Benchmark' }),
+      shown.map(x => el('th', { scope: 'col', 'data-ask-col': x.id }, el('span', {
+        class: 'ask-mh' }, askDot(x.id), el('span', { text: x.name })))))),
+    el('tbody', {}, cols.map(c => el('tr', { 'data-ask-brow': c.key },
+      el('th', { scope: 'row', text: c.label }),
+      shown.map(x => el('td', {}, askCell(x, x.cells[c.key], c, score))))))),
+  more > 0 ? el('p', { class: 'ask-more', 'data-ask-more': String(more) }, `+${more} more · `,
+    el('a', { href: r.compare || r.link, text: 'Open in Compare ▸' })) : ''];
+}
+// "Italic P = published by PrismML, never ranked with ours. PrismML hasn't
+// published the other five."
+function askPubNote(r) {
+  const cols = r.cols || [], by = {};
+  for (const x of r.rows || []) for (const c of cols) {
+    const cell = x.cells[c.key] || {};
+    if (cell.pub) (by[cell.pub] = by[cell.pub] || { rows: new Set() }).rows.add(x.id);
   }
-  if (r.kind === 'clarify') return el('div', { class: 'ask-choices', 'data-ask-choices': '1' },
-    (r.choices || []).map(c => el('button', { class: 'chip-btn', 'data-ask-choice': c.value,
-      text: c.label, onclick: () => askSend(c.label) })));
-  return '';
+  const names = Object.keys(by);
+  if (!names.length) return '';
+  return el('p', { class: 'ask-pubnote', 'data-ask-pubnote': '1' }, names.flatMap((who, i) => {
+    const rows = [...by[who].rows], letter = mtLetter('card', who);
+    const missing = rows.length === 1 ? cols.filter(c => ((r.rows.find(x => x.id === rows[0])
+      .cells[c.key]) || {}).v == null).length : 0;
+    return [i ? ' ' : '', 'Italic', el('span', { class: 'ask-letter', text: ' ' + letter }),
+      ` = published by ${who}, never ranked with ours.`
+      + (missing ? ` ${who} hasn’t published the other ${askWord(missing)}.` : '')];
+  }));
 }
-// 27's cells, in 27's table
-function askTable(cols, rows, view) {
-  const S = mtS(view);
-  S.sort = null;
-  const L = (c, x) => x.pub ? mtLetter('card', x.pub) : null;
-  return el('div', { class: 'ask-table' }, modelTable({ view, free: true, hkey: view,
-    attrs: { 'data-ask-table': view }, sorted: true, hideEmpty: false,
-    cols: cols.map(c => ({ key: c.key, label: c.label, full: c.label, score: true })),
-    rows: rows.map(r => {
-      const m = DATA.models.find(x => x.id === r.id) || DATA.models.find(x =>
-        x.id.split(' · ')[0] === r.id);
-      const base = m ? mtRowOf(m) : null;
-      return { key: r.id, name: r.name, id: base ? base.id : null, nav: base ? base.nav : null,
-        href: base ? base.href : (String(r.id).startsWith('reported/') ? '#model='
-          + encodeURIComponent(r.id) : null), mark: r.published || cols.some(c => (r.cells[c.key]
-          || {}).pub) ? 'pub' : 'here', colour: base ? base.colour : null,
-        attrs: { 'data-ask-row': r.id },
-        cells: Object.fromEntries(cols.map(c => { const x = r.cells[c.key] || {};
-          const letter = L(c, x);
-          return [c.key, x.v == null && x.text === '–' ? { v: null, why: x.why || 'not in yet',
-            attrs: { 'data-ask-cell': `${r.id}|${c.key}` } } : { v: x.v, text: x.text,
-            noLead: true, pub: letter ? { letter, tip: `${MT_LETTERS[letter] || x.pub}`
-              + (x.tip ? `: ${x.tip}` : ''), url: x.url || '' } : null,
-            tip: x.tip ? [x.tip] : null, attrs: { 'data-ask-cell': `${r.id}|${c.key}` } }]; })) };
-    }) }));
+// one model on one benchmark: the number large
+function askNumber(m, edited) {
+  const n = m.reply.number, colour = askModel(n.id).colour;
+  return [el('div', { class: 'ask-nhead' }, askDot(n.id), el('span', { 'data-ask-say': '1',
+      text: `${n.name} · ${n.bench}` }), edited),
+    el('div', { class: 'ask-big', 'data-ask-number': n.text },
+      el('span', { class: 'ask-bn' + (n.published ? ' mt-pub' : ''), text: n.text }),
+      n.se ? el('span', { class: 'ask-bse', text: n.se }) : ''),
+    el('span', { class: 'ask-bbar', 'aria-hidden': 'true' }, el('i', {
+      style: `width:${Math.max(0, Math.min(100, 100 * n.v)).toFixed(1)}%;`
+        + `background:${n.published || !colour ? 'var(--axis)' : colour}` })),
+    el('p', { class: 'ask-sub', 'data-ask-number-sub': '1', text: n.sub }),
+    (m.action || {}).page === 'model_page' ? el('p', { class: 'ask-sub', text: 'Its page is open '
+      + 'behind this panel.' }) : '',
+    askChips(m)];
+}
+// best_on: a ranked list, ours first; the published apart, never ranked
+function askRank(rows, r, ranked) {
+  const c = (r.cols || [])[0] || {};
+  return el('ol', { class: 'ask-rank' + (ranked ? ' ranked' : ''), 'data-ask-table':
+      ranked ? 'here' : 'pub' }, rows.map((x, i) => el('li', { 'data-ask-row': x.id },
+    ranked ? el('span', { class: 'ask-rk', text: String(x.rank || i + 1) }) : '',
+    askDot(x.id), el('span', { class: 'ask-rname', text: x.name }),
+    askCell(x, x.cells[c.key], c, true))));
+}
+// the testers' phones: the same compact rules — the measures across, the
+// pairs down, at most three columns (five wide)
+function askPhone(r) {
+  const cols = r.cols || [], max = ASK.wide ? 5 : 3, shown = cols.slice(0, max);
+  if (!(r.rows || []).length) return '';
+  return [el('table', { class: 'ask-grid', 'data-ask-table': 'phone' },
+    el('thead', {}, el('tr', {}, el('th', { scope: 'col', class: 'ask-bh', text: 'Phone and model' }),
+      shown.map(c => el('th', { scope: 'col', text: c.label })))),
+    el('tbody', {}, r.rows.map(x => el('tr', { 'data-ask-row': x.id },
+      el('th', { scope: 'row', text: x.name }), shown.map(c => el('td', {},
+        el('span', { class: 'ask-c', 'data-ask-cell': `${x.id}|${c.key}` }, el('span', {
+          class: 'mt-n' + ((x.cells[c.key] || {}).v == null ? ' ask-none' : ''),
+          text: (x.cells[c.key] || {}).text || '–' })))))))),
+  cols.length > shown.length ? el('p', { class: 'ask-more', 'data-ask-more':
+      String(cols.length - shown.length) }, `+${cols.length - shown.length} more · `,
+    el('a', { href: r.link, text: 'Open the testers’ report ▸' })) : ''];
+}
+function askBoxes(r) {
+  return (r.items || []).length ? el('ul', { class: 'ask-rank', 'data-ask-list': '1' }, r.items.map(x =>
+    el('li', {}, el('span', { class: 'ask-rname' }, el('b', { text: x.name }),
+      el('span', { class: 'ask-sub', text: ` · ${x.where === 'rented' ? 'rented box' : 'server'}`
+        + (x.what ? ` · ${x.what}` : '') })),
+    el('span', { class: 'ask-c' }, el('span', { class: 'mt-n', text: x.progress || '' }),
+      x.eta ? el('span', { class: 'ask-sub', text: `done about ${x.eta}` }) : '')))) : '';
+}
+// asking back: why, the choices with their lines, all of them, the search
+function askAskBack(m) {
+  const r = m.reply;
+  const models = (r.choices || []).length && r.choices.every(c => askModel(c.value).colour
+    || ((ASK.choices || {}).models || []).some(x => x.id === c.value));
+  return [el('div', { class: 'ask-h', 'data-ask-say': '1', text: r.head || r.say }),
+    r.why ? el('p', { class: 'ask-why', 'data-ask-why': '1', text: r.why }) : '',
+    el('div', { class: 'ask-choices', 'data-ask-choices': '1' }, (r.choices || []).map(c =>
+      el('button', { class: 'ask-choice', 'data-ask-choice': c.value, onclick: () => askSend(c.label) },
+        models ? askDot(c.value) : '', el('span', { class: 'ask-cname', text: c.label }),
+        c.sub ? el('span', { class: 'ask-csub', text: c.sub }) : ''))),
+    r.all ? el('button', { class: 'ask-all', 'data-ask-all': '1', text: r.all.label,
+      onclick: () => askRun(r.all.action, { why: 'choice', label: r.all.label, of: m }) }) : '',
+    r.search ? el('a', { class: 'ask-link', 'data-ask-search': '1', href: r.search.link,
+      text: r.search.text }) : ''];
+}
+
+// ---- 28g: what it understood, as chips you can change -------------------------
+// the fields each action (or page) shows as chips, in their order
+const ASK_FIELDS = {
+  compare: ['models', 'benchmarks', 'measure', 'thinking'],
+  best_on: ['benchmark', 'among', 'n', 'thinking'],
+  chart: ['models', 'benchmark', 'only'],
+  phone: ['app', 'phone', 'measure'],
+  boxes: ['which', 'model'],
+  models_table: ['view', 'group', 'when', 'only', 'sort', 'show', 'thinking', 'columns', 'models',
+    'search'],
+  model_page: ['model', 'benchmark', 'beside', 'thinking'],
+  report: { paired: ['a', 'b', 'benchmark', 'side'], 'step-checkpoints': ['base'],
+    'ran-out-of-room': ['model', 'benchmark'], testers: ['app', 'phone'] },
+};
+// a field the action can't do without: changed, never taken out
+const ASK_NEEDS = { compare: ['models'], best_on: ['benchmark'], model_page: ['model'] };
+const ASK_FIELD_NAMES = { models: 'Model', benchmarks: 'Benchmark', columns: 'Column',
+  benchmark: 'Benchmark', sort: 'Sort', show: 'Show', view: 'Tab', group: 'Group', when: 'When',
+  only: 'Only', thinking: 'Thinking', measure: 'Measure', search: 'Search', among: 'Among',
+  n: 'How many', app: 'App model', phone: 'Phone', which: 'Which runs', model: 'Model',
+  beside: 'Beside', base: 'Baseline', a: 'Build A', b: 'Build B', side: 'Side' };
+const ASK_LISTS = ['models', 'benchmarks', 'columns'];
+function askFields(a) {
+  if (a.action === 'open_page') {
+    const f = ASK_FIELDS[a.page];
+    return Array.isArray(f) ? f : f ? f[a.report] || [] : [];
+  }
+  return ASK_FIELDS[a.action] || [];
+}
+const askNeeded = (a, k) => (ASK_NEEDS[a.action === 'open_page' ? a.page : a.action] || [])
+  .includes(k);
+function askChipWords(a, k, v) {
+  if (k === 'view') return 'Tab: ' + askChoiceWords('views', v);
+  if (k === 'group') return 'Group: ' + (((ASK.choices || {}).groups || {})[a.view] || [])
+    .concat([[v, v]]).find(x => x[0] === v)[1];
+  if (k === 'when') {
+    const by = a.date === 'added' ? 'Added' : 'Tested';
+    if (v === 'since_model') return `${by}: since ${askModel(a.since).name} was added`;
+    if (v === 'range') return `${by}: ${a.from || '…'} to ${a.to || 'today'}`;
+    return `${by}: ${askChoiceWords('when', v).replace(/^Last/, 'last')}`;
+  }
+  if (k === 'only') return 'Only: ' + askChoiceWords('only', v).toLowerCase();
+  if (k === 'sort') return 'Sort: ' + (v === 'avg' ? 'Avg' : v === 'name' ? 'name' : askBenchName(v))
+    + (a.sort_dir === 'asc' ? ', lowest first' : '');
+  if (k === 'show') return 'Show: ' + askChoiceWords('show', v).toLowerCase();
+  if (k === 'thinking') return askChoiceWords('thinking', v);
+  if (k === 'measure') return 'Measure: ' + askChoiceWords(a.action === 'phone' ? 'phone_measure'
+    : 'measure', v).toLowerCase();
+  if (k === 'search') return `Search: ${v}`;
+  if (k === 'among') return 'Among: ' + askChoiceWords('among', v).toLowerCase();
+  if (k === 'n') return `Top ${v}`;
+  if (k === 'which') return askChoiceWords('which', v);
+  if (k === 'app') return `App: ${v}`;
+  if (k === 'phone') return `Phone: ${v}`;
+  if (k === 'side') return v === 'b_better' ? 'Where B is right' : 'Where A is right';
+  if (k === 'benchmark') return askBenchName(v);
+  if (['model', 'beside', 'base', 'a', 'b'].includes(k))
+    return (k === 'beside' ? 'beside ' : k === 'base' ? 'Baseline: ' : k === 'a' ? 'A: '
+      : k === 'b' ? 'B: ' : '') + askModel(v).name;
+  return String(v);
+}
+function askChips(m) {
+  const a = m.action || {}, fields = askFields(a);
+  if (!fields.length || !m.id) return '';
+  const chip = (words, o = {}) => el('span', { class: 'ask-chip', 'data-ask-chip': o.key },
+    o.dot || '', o.pick ? el('button', { class: 'ask-cbtn', 'aria-expanded': String(!!m.pick
+      && m.pick.field === o.pick), 'data-ask-keep': 'chip-' + o.key,
+    onclick: () => { m.pick = m.pick && m.pick.field === o.pick ? null : { field: o.pick };
+      askDraw(); } }, words + ' ▾') : el('span', { class: 'ask-cw', text: words }),
+    o.remove ? el('button', { class: 'ask-x', 'aria-label': 'Take out ' + words, title: 'Take out',
+      'data-ask-x': o.key, onclick: () => askEdit(m, o.remove()) }, '×') : '');
+  const without = (k, x) => {
+    const next = { ...a };
+    if (x === undefined) delete next[k];
+    else next[k] = next[k].filter(y => y !== x);
+    if (k === 'sort') delete next.sort_dir;
+    if (k === 'view') delete next.group;
+    if (k === 'when') { delete next.since; delete next.from; delete next.to; delete next.date; }
+    if (ASK_LISTS.includes(k) && !(next[k] || []).length) delete next[k];
+    return next;
+  };
+  const out = [];
+  for (const k of fields) {
+    const v = a[k];
+    if (v == null || v === '' || (Array.isArray(v) && !v.length)) continue;
+    if (k === 'models') {
+      for (const id of v) out.push(chip(askModel(id).name, { key: 'models:' + id, dot: askDot(id),
+        remove: v.length > 1 || !askNeeded(a, k) ? () => without(k, id) : null }));
+    } else if (k === 'benchmarks' || k === 'columns') {
+      if (v.length > 2) out.push(chip(`${v.length} ${k === 'columns' ? 'columns' : 'benchmarks'}`,
+        { key: k, pick: k }));
+      else for (const x of v) out.push(chip(askBenchName(x), { key: `${k}:${x}`,
+        remove: v.length > 1 || k === 'columns' ? () => without(k, x) : null }));
+    } else if (k === 'benchmark' && askNeeded(a, k)) {
+      out.push(chip(askBenchName(v), { key: k, pick: k }));
+    } else if (k === 'model' && askNeeded(a, k)) {
+      out.push(chip(askModel(v).name, { key: k, pick: k, dot: askDot(v) }));
+    } else {
+      out.push(chip(askChipWords(a, k, v), { key: k, dot: ['beside', 'a', 'b', 'base', 'model']
+        .includes(k) ? askDot(v) : '', remove: askNeeded(a, k) ? null : () => without(k) }));
+    }
+  }
+  const addable = fields.filter(k => ASK_LISTS.includes(k) || a[k] == null || a[k] === '');
+  return el('div', { class: 'ask-chips', 'data-ask-chips': '1' }, out,
+    addable.length ? el('button', { class: 'ask-add', 'data-ask-add': '1', 'data-ask-keep': 'add',
+      'aria-expanded': String(!!m.pick && !m.pick.field),
+      text: a.page === 'models_table' ? '+ Sort, Show, Columns…' : '+ Add',
+      onclick: () => { m.pick = m.pick && !m.pick.field ? null : { field: null }; askDraw(); } }) : '',
+    m.pick ? askPicker(m, addable) : '');
+}
+// the picker under the chips: the fields to add, or one field's choices —
+// the choices the page's own menus give (Models ▾'s models, the benchmark
+// list, When's presets, the sort list)
+function askPicker(m, addable) {
+  const a = m.action, P = m.pick, C = ASK.choices || {};
+  const close = el('button', { class: 'ask-ibtn sm', 'aria-label': 'Close the picker',
+    onclick: () => { m.pick = null; askDraw(); } }, askIcon('close', 14));
+  const opt = (words, on, run, attrs = {}) => el('button', { class: 'ask-opt' + (on ? ' on' : ''),
+    role: 'menuitemradio', 'aria-checked': String(!!on), text: words, onclick: run, ...attrs });
+  const set = (k, v) => askEdit(m, { ...a, [k]: v, ...(k === 'view' ? { group: undefined } : {}) });
+  let body;
+  if (!P.field) {
+    body = addable.map(k => opt(ASK_FIELD_NAMES[k] || k, false, () => { m.pick = { field: k };
+      askDraw(); }, { 'data-ask-field': k }));
+  } else {
+    const k = P.field, cur = a[k];
+    const list = (name, key = k) => (C[name] || []).map(([v, w]) => opt(w, cur === v,
+      () => set(key, v), { 'data-ask-opt': v }));
+    if (k === 'models' || k === 'model' || k === 'beside' || k === 'base' || k === 'a' || k === 'b') {
+      const q = (P.q || '').toLowerCase();
+      const ms = (C.models || []).filter(x => (!q || (x.name + ' ' + x.id).toLowerCase().includes(q))
+        && !(a.models || []).includes(x.id)).slice(0, 40);
+      body = [el('input', { class: 'ask-psearch', type: 'search', placeholder: 'models…',
+        'aria-label': 'search models', 'data-ask-keep': 'psearch', value: P.q || '',
+        oninput: e => { P.q = e.target.value; askDraw(); } }),
+      ...ms.map(x => el('button', { class: 'ask-opt', role: 'menuitem', 'data-ask-opt': x.id,
+        onclick: () => set(k, k === 'models' ? [...(a.models || []), x.id] : x.id) },
+      askDot(x.id), el('span', { text: x.name }), el('span', { class: 'ask-csub',
+        text: x.published ? 'published' : x.group })))];
+    } else if (k === 'benchmarks' || k === 'columns') {
+      const have = a[k] || [];
+      body = (C.benchmarks || []).filter(b => k !== 'columns' || b.frontier || a.view !== 'frontier')
+        .map(b => el('label', { class: 'ask-opt' }, el('input', { type: 'checkbox',
+          'data-ask-bench': b.key, checked: have.includes(b.key) ? '' : null,
+          onchange: e => { const next = e.target.checked ? [...have, b.key]
+            : have.filter(x => x !== b.key); if (next.length || k === 'columns')
+            askEdit(m, { ...a, [k]: next.length ? next : undefined }); } }),
+        el('span', { text: b.label })));
+    } else if (k === 'benchmark' || k === 'sort') {
+      body = [...(k === 'sort' ? [['avg', 'Avg'], ['name', 'Name']] : []),
+        ...(C.benchmarks || []).map(b => [b.key, b.label])].map(([v, w]) => opt(w, cur === v,
+        () => set(k, v), { 'data-ask-opt': v }));
+    } else if (k === 'view') body = list('views');
+    else if (k === 'group') {
+      const gs = (C.groups || {})[a.view];
+      body = gs ? gs.map(([v, w]) => opt(w, cur === v, () => set(k, v), { 'data-ask-opt': v }))
+        : [el('p', { class: 'ask-sub', text: 'Choose a tab with groups first: Standard or Mobile.' })];
+    }
+    else if (k === 'when') body = list('when');
+    else if (k === 'only') body = list('only');
+    else if (k === 'show') body = list('show');
+    else if (k === 'thinking') body = list('thinking');
+    else if (k === 'measure') body = list(a.action === 'phone' ? 'phone_measure' : 'measure');
+    else if (k === 'among') body = list('among');
+    else if (k === 'which') body = list('which');
+    else if (k === 'n') body = [3, 5, 10].map(n => opt(`Top ${n}`, cur === n, () => set(k, n)));
+    else if (k === 'side') body = [['a_better', 'Where A is right'], ['b_better', 'Where B is right']]
+      .map(([v, w]) => opt(w, cur === v, () => set(k, v)));
+    else if (k === 'app' || k === 'phone')
+      body = (C[k === 'app' ? 'apps' : 'phones'] || []).map(v => opt(v, cur === v, () => set(k, v)));
+    else if (k === 'search') body = [el('input', { class: 'ask-psearch', type: 'search',
+      placeholder: 'words to search for…', 'aria-label': 'search for', 'data-ask-keep': 'psearch',
+      onkeydown: e => { if (e.key === 'Enter' && e.target.value.trim())
+        set(k, e.target.value.trim()); } })];
+    else body = [];
+  }
+  return el('div', { class: 'ask-picker', 'data-ask-picker': P.field || 'fields', role: 'menu',
+      'aria-label': P.field ? ASK_FIELD_NAMES[P.field] || P.field : 'Add' },
+    el('div', { class: 'ask-pickhead' }, el('span', { class: 'ask-cap', text: P.field
+      ? ASK_FIELD_NAMES[P.field] || P.field : 'Add' }), el('span', { class: 'ask-sp' }), close),
+    el('div', { class: 'ask-picklist' }, body));
 }
 // the reports' own charts, or Scores by benchmark's dots
 function askChart(r) {
   const R = RPS();
   if (r.chart === 'bars') {
+    const dots = pts => {
+      const dom = rpDomain(pts);
+      return el('div', { class: 'rp-dots ask-dots' }, pts.flatMap(p => [
+        el('span', { class: 'nm' + (p.ours ? ' rp-ours' : ''), title: p.name, text: p.name }),
+        rpDotSvg(p.v, p.se, p.ours ? 'var(--accent)' : 'var(--muted)', dom),
+        el('span', { class: 'v', text: p.text + (p.published ? ' (published)' : '') })]));
+    };
+    // 28g: a comparison as a chart — its models' dots, benchmark by benchmark
+    if (r.groups) return el('div', { class: 'ask-chart', 'data-ask-chart': 'bars' },
+      r.groups.filter(g => g.points.length).map(g => el('div', { class: 'ask-cgroup',
+        'data-ask-chart-bench': g.bench }, el('div', { class: 'ask-cap2', text: g.label }),
+      dots(g.points))));
     const pts = r.points || [];
     if (!pts.length) return '';
-    const dom = rpDomain(pts);
-    return el('div', { class: 'rp-dots ask-dots', 'data-ask-chart': 'bars' }, pts.flatMap(p => [
-      el('span', { class: 'nm' + (p.ours ? ' rp-ours' : ''), title: p.name, text: p.name }),
-      rpDotSvg(p.v, p.se, p.ours ? 'var(--accent)' : 'var(--muted)', dom),
-      el('span', { class: 'v', text: p.text + (p.published ? ' (published)' : '') })]));
+    return el('div', { 'data-ask-chart': 'bars' }, dots(pts));
   }
   const d0 = R.data[r.report];
   if (!d0) { loadAskReport(r.report); return el('p', { class: 'small se', text: 'Drawing…' }); }
@@ -30438,11 +31198,16 @@ function askChart(r) {
   }
   return '';
 }
+// ⌘K / Ctrl+K opens the panel and puts the caret in it (again: closes it);
+// Esc closes it
 document.addEventListener('keydown', e => {
   if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k'
       && ASK.on) {
     e.preventDefault();
-    if (ASK.panel) askClose(); else askOpen();
+    const i = ASK.panel && ASK.panel.querySelector('[data-ask-input]');
+    if (!ASK.panel) askOpen();
+    else if (document.activeElement === i) askClose();
+    else askFocus();
   } else if (e.key === 'Escape' && ASK.panel && ASK.panel.contains(document.activeElement)) {
     askClose();
   }

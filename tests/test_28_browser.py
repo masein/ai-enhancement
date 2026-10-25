@@ -24,17 +24,40 @@ SCREENS = Path(__file__).resolve().parent / "_screens" / "phase28"
 SIZES = [(1280, "light"), (1280, "dark"), (400, "light"), (400, "dark")]
 BANK = {b["q"]: b for b in (json.loads(x) for x in assistant.BANK_FILE.read_text(
     encoding="utf-8").splitlines() if x.strip())}
-CTRL = {"slow": 0.0, "busy": False, "down": False}
+CTRL = {"slow": 0.0, "busy": False, "down": False, "calls": 0}
+SIX = ["GPQA Diamond", "OTIS Mock AIME", "MMLU-Pro", "HLE", "IFEval", "IFBench"]
+# 28g: the panel's own questions, each with what the model writes — names
+# as written (the board matches them)
+PANEL = {
+    "step8804 on the frontier benchmarks": {"action": "compare", "models": ["step8804"],
+                                            "benchmarks": SIX},
+    "Ternary Bonsai 2 2B": {"action": "compare", "models": ["step8804", "Ternary Bonsai 2 2B"],
+                            "benchmarks": SIX},
+    "q2's gpqa?": {"action": "compare", "models": ["q2"], "benchmarks": ["GPQA Diamond"]},
+    "how does the step one do on HLE": {"action": "compare", "models": ["the step one"],
+                                        "benchmarks": ["HLE"]},
+    # the miss the chips are for: "sorted by OTIS" dropped
+    "frontier, last 7 days, sorted by OTIS": {"action": "open_page", "page": "models_table",
+                                              "view": "frontier", "when": "7d"},
+    "best of ours on HLE": {"action": "best_on", "benchmark": "HLE", "among": "ours"},
+    "step8804, step4000, step1000, q4 and q2 on gpqa and hle": {"action": "compare", "models": [
+        "step8804", "step4000", "step1000", "q4", "q2"], "benchmarks": ["GPQA Diamond", "HLE"]},
+    "step8804 vs q4 on gpqa and hle": {"action": "compare", "models": ["step8804", "q4"],
+                                       "benchmarks": ["GPQA Diamond", "HLE"]},
+}
 
 
 def fake_call(system, user, sch, prov=None):
-    """the bank's action for its question; a clicked choice opens that model"""
+    """the bank's action for its question, or the panel's own; a clicked
+    choice opens that model"""
+    CTRL["calls"] += 1
     if CTRL["down"]:
         raise assistant.Down("connection refused")
     time.sleep(CTRL["slow"])
     q = user.rsplit("Message: ", 1)[1]
     b = BANK.get(q)
-    want = b["want"] if b else {"action": "open_page", "page": "model_page", "model": q}
+    want = b["want"] if b else PANEL.get(q) or {"action": "open_page", "page": "model_page",
+                                                "model": q}
     first = {k: v for k, v in want.items() if k not in ("also", "then")}
     return {"raw": json.dumps({"do": first, **({"then": want["then"]} if want.get("then")
                                                else {})}), "ms": 5, "usage": {}}
@@ -73,13 +96,19 @@ def board_at(page, live, width=1280, scheme="light", hash_="#tab=home", name="ma
     set_name(page, name)
 
 
+def answered(page, n: int):
+    """the panel's n-th answer is in (28g: older ones fold, so cards aren't counted)"""
+    page.wait_for_function(f"!ASK.waiting && ASK.msgs.filter(m => m.role === 'bot').length >= {n}",
+                           timeout=20000)
+    return page.locator("[data-ask-bot]").last
+
+
 def ask(page, q: str, kind: str):
-    n = page.locator("[data-ask-bot]").count()
+    n = page.evaluate("ASK.msgs.filter(m => m.role === 'bot').length")
     box = page.locator("[data-ask-input]")
     box.fill(q)
     box.press("Enter")
-    page.locator("[data-ask-bot]").nth(n).wait_for(timeout=20000)
-    got = page.locator("[data-ask-bot]").nth(n)
+    got = answered(page, n + 1)
     assert got.get_attribute("data-ask-bot") == kind, (q, got.get_attribute("data-ask-bot"))
     return got
 
@@ -100,41 +129,52 @@ def test_the_panel_opens_a_page_draws_clarifies_and_refuses(live, page, width, s
         page.locator("[data-place='ask']").click()
     panel = page.locator("[data-ask-panel]")
     panel.wait_for()
-    # 380 wide over the page; a phone's whole width
+    # 28g: 400 wide over the page; a phone's whole width
     w = panel.evaluate("e => e.getBoundingClientRect().width")
-    assert (w == 380) if width > 700 else (w == width), w
-    # three example questions from the bank, each its own
-    ex = page.locator("[data-ask-example]").all_inner_texts()
-    assert len(ex) == 3 and all(q in BANK for q in ex)
+    assert (w == 400) if width > 700 else (w == width), w
+    # examples in four groups, two at most each, every one the bank's
+    groups = page.locator("[data-ask-group]")
+    assert groups.count() == 4
+    assert [g.get_attribute("data-ask-group") for g in groups.all()] == [
+        "Numbers", "Pages", "Phones", "Runs"]
+    for g in groups.all():
+        qs = g.locator("[data-ask-example]").all_inner_texts()
+        assert 1 <= len(qs) <= 2 and all(q in BANK for q in qs), qs
     shot(page, f"empty-{width}-{scheme}.png")
     # a page: the board's own link, opened; the panel stays
     got = ask(page, "frontier tab, ours only, sorted by HLE", "open")
     page.wait_for_function("location.hash === '#tab=models&view=frontier&only=ours&sort=hle'")
     page.locator("[data-frontier-table]").wait_for(state="attached", timeout=20000)
-    assert got.locator("[data-ask-link]").get_attribute("href") == (
+    assert got.locator("[data-ask-copy]").get_attribute("data-ask-link") == (
         "#tab=models&view=frontier&only=ours&sort=hle")
+    assert got.locator("[data-ask-say]").inner_text() == "Opened Models · Frontier"
+    assert got.locator("[data-ask-chip]").count() == 3      # the tab, ours only, the sort
     assert panel.is_visible()
     # a chart, from Across training's own panel
     got = ask(page, "chart GPQA across the checkpoints", "chart")
     got.locator("[data-ask-chart='checkpoints'] svg").wait_for(timeout=20000)
-    # a table of 27's cells
+    # a table of 27's cells, models across and benchmarks down
     got = ask(page, "step8804 vs step4000 on GPQA and MMLU-Pro", "table")
     assert got.locator("[data-ask-table] [data-ask-cell]").count() == 4
-    # a clarify, its choices buttons
+    assert got.locator("[data-ask-col]").count() == 2
+    # a question back, its choices buttons
     got = ask(page, "show me the qwen one", "clarify")
     assert got.locator("[data-ask-choice]").count() >= 2
     # two requests in one: the first done, the second a whole action behind a button
     got = ask(page, "q4's gpqa and then open the on-device report", "table")
+    assert got.get_attribute("data-ask-card") == "number"
     assert got.locator("[data-ask-then]").inner_text() == "Also: Open On-device models"
-    n = page.locator("[data-ask-bot]").count()
+    n = page.evaluate("ASK.msgs.filter(m => m.role === 'bot').length")
     got.locator("[data-ask-then]").click()
-    page.locator("[data-ask-bot]").nth(n).wait_for()
+    answered(page, n + 1)
     page.wait_for_function("location.hash === '#tab=reports&report=on-device'")
     assert page.locator("[data-ask-then]").count() == 0
-    # a refusal, and where the button is
+    # a refusal, and the button to where it's done
     got = ask(page, "start a run on step8804", "text")
     assert got.locator("[data-ask-say]").inner_text() == "I can't start or queue runs."
-    assert got.locator("[data-ask-link]").get_attribute("href") == "#tab=runs"
+    assert got.locator("[data-ask-main]").get_attribute("href") == "#tab=runs"
+    # older answers fold: every card but the last two
+    assert page.locator("[data-ask-fold]").count() == page.locator("[data-ask-you]").count() - 2
     wide = page.evaluate("""() => [...document.querySelectorAll('body *')].filter(e => {
         const r = e.getBoundingClientRect(); return r.right > innerWidth + 1 && r.width > 0; })
         .slice(0, 8).map(e => e.tagName + '.' + e.className + ' ' + Math.round(
@@ -148,28 +188,32 @@ def test_a_choice_asks_again_and_the_thumbs_are_logged(live, page):
     page.locator("[data-ask-open]").click()
     got = ask(page, "show me the qwen one", "clarify")
     first = got.locator("[data-ask-choice]").first
-    label = first.inner_text()
+    label = first.locator(".ask-cname").inner_text()
     first.click()
-    page.locator("[data-ask-bot]").nth(1).wait_for(timeout=20000)
-    assert page.locator("[data-ask-you]").nth(1).inner_text() == label
+    answered(page, 2)
+    assert page.locator("[data-ask-q]").nth(1).inner_text() == label
     page.wait_for_function("location.hash.startsWith('#model=')")
     bot = page.locator("[data-ask-bot]").nth(1)
     bot.locator("[data-ask-up]").click()
-    assert "on" in bot.locator("[data-ask-up]").get_attribute("class")
+    assert bot.locator("[data-ask-up]").get_attribute("aria-pressed") == "true"
+    # 👎: what did you want — a reason, a few words
     bot.locator("[data-ask-down]").click()
-    note = bot.locator("[data-ask-note]")
-    note.fill("the BF16 build")
-    note.press("Enter")
+    form = bot.locator("[data-ask-form]")
+    form.locator("[data-ask-reason='Wrong model']").click()
+    assert form.locator("[data-ask-reason='Wrong model']").get_attribute("aria-checked") == "true"
+    form.locator("[data-ask-note]").fill("the BF16 build")
+    form.locator("[data-ask-fsend]").click()
     page.locator("text=Thanks — noted.").wait_for()
     time.sleep(0.3)
     lines = [json.loads(x) for x in assistant.log_path().read_text().splitlines()]
     th = [x for x in lines if x.get("thumbs")]
-    assert th[-1]["thumbs"] == "down" and th[-1]["note"] == "the BF16 build"
+    assert (th[-1]["thumbs"], th[-1]["note"], th[-1]["reason"]) == (
+        "down", "the BF16 build", "Wrong model")
     assert th[-2]["thumbs"] == "up"
     # Clear empties it
     page.locator("[data-ask-clear]").click()
     assert page.locator("[data-ask-bot]").count() == 0
-    assert page.locator("[data-ask-example]").count() == 3
+    assert page.locator("[data-ask-group]").count() == 4
     assert page.errors == []
 
 
@@ -196,10 +240,10 @@ def test_slower_while_a_run_uses_the_model_and_down(live, page):
     box.fill("what's running?")
     box.press("Enter")
     page.locator("[data-ask-waiting]").wait_for()
-    assert page.locator("[data-ask-waiting]").inner_text() == "Thinking…"
-    page.locator("[data-ask-waiting='slow']").wait_for(timeout=5000)
-    assert page.locator("[data-ask-waiting]").inner_text() == (
-        "Slower now: a run is using the model…")
+    assert page.locator("[data-ask-waiting]").inner_text().startswith("Reading the board…")
+    # 28g: the status says it — a dot and words, never colour alone
+    page.locator("[data-ask-status='slow']").wait_for(timeout=5000)
+    assert page.locator("[data-ask-status]").inner_text() == "Q4 · slower: a run is using it"
     shot(page, "slow-1280-light.png")
     page.locator("[data-ask-bot='list']").wait_for(timeout=20000)
     # down: said, and nothing else breaks
