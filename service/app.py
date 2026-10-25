@@ -454,6 +454,10 @@ def results_payload() -> dict:
                                        sizes={"entered": db.sizes_all(),
                                               "files": report.load_sizes(config.RESULTS_ROOT)})
         payload["live"] = True
+        # 28: whether the assistant exists on this board (ASSISTANT_USERS names
+        # someone) — who sees it, the page asks for its own name alone
+        from . import assistant as _assistant
+        payload["assistant"] = _assistant.on()
         # 17h: the models whose weights the board was told are public
         payload["public_weights"] = db.public_all()
         # 17j: the public file each model's page gave, and whether its check
@@ -1691,6 +1695,78 @@ def reported_view():
 # board's tables (service/reports.py). Read only: nothing here starts a run,
 # an import or a grading batch
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# 28: the chat assistant (service/assistant.py) — for the names in
+# ASSISTANT_USERS only. With none, none of it exists (404); anyone else is
+# refused (403). Its one POST asks a question: reads and links only
+# ---------------------------------------------------------------------------
+
+def _assistant_for(by: str) -> str:
+    from . import assistant
+    if not assistant.on():
+        raise HTTPException(404, "Not Found")
+    if not assistant.allowed(by):
+        raise HTTPException(403, "The assistant is only for the names it was set up for")
+    return by.strip()
+
+
+@app.get("/api/assistant")
+def assistant_hello(by: str = ""):
+    """28: whether this name sees the assistant, three example questions, and
+    whether its model is busy with a run"""
+    from . import assistant
+    if not assistant.on():
+        raise HTTPException(404, "Not Found")
+    if not assistant.allowed(by):
+        return {"on": False}            # the page's own question: nothing to show this name
+    return {"on": True, "who": by.strip(), "examples": assistant.examples(),
+            "busy": assistant.busy()}
+
+
+@app.get("/api/assistant/state")
+def assistant_state(by: str = ""):
+    """28: while a reply is coming — "slower now: a run is using the model",
+    or its model down"""
+    from . import assistant
+    _assistant_for(by)
+    return {"busy": assistant.busy(), "up": assistant.up()}
+
+
+class AssistantIn(BaseModel):
+    by: str = ""
+    q: str = ""
+    # the previous question and its action, for a follow-up ("and on HLE?")
+    prev: dict | None = None
+
+
+@app.post("/api/assistant/ask")
+def assistant_ask(a: AssistantIn):
+    from . import assistant
+    who = _assistant_for(a.by)
+    if not a.q.strip():
+        raise HTTPException(422, "Ask a question")
+    prev = a.prev if isinstance(a.prev, dict) else None
+    if prev:
+        prev = {"q": str(prev.get("q") or "")[:500],
+                "action": prev.get("action") if isinstance(prev.get("action"), dict) else None}
+    return assistant.ask(a.q, who, prev)
+
+
+class AssistantThumbsIn(BaseModel):
+    by: str = ""
+    id: str = ""
+    up: bool = True
+    note: str = ""
+
+
+@app.post("/api/assistant/thumbs")
+def assistant_thumbs(a: AssistantThumbsIn):
+    from . import assistant
+    who = _assistant_for(a.by)
+    assistant.thumbs(a.id, who, a.up, a.note)
+    return {"ok": True}
+
 
 @app.get("/api/reports")
 def reports_list():

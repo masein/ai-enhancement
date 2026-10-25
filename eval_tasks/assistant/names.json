@@ -1,0 +1,655 @@
+{
+ "about": "28: the assistant's names (service/assistant.py, docs/ASSISTANT.md). models: a board id (thinking row or not) or a model's exact name -> what people call it; phones: a phone's model code -> what people call it; reports: a report's id -> its other names; places: a place on the top bar -> its other names; benchmark_groups: Frontier's groups (the page's FR_GROUPS), each a name meaning every benchmark in it -> its other names and its benchmarks' keys; report_titles: a report's title as the assistant says it, where the page's names a model; benchmarks: the assistant's key -> the names people type; topics: what `explain` can say, each from the board's own words (`from`: notes:<first words of a report note>, desc:<task>, page:<a text the page keeps>); examples: a few questions and their actions, for the prompt — never the test bank's. Plain names only; this file goes to the public mirror.",
+ "models": {
+  "served/step8804-lda-2610": [
+   "step8804",
+   "step 8804",
+   "8804",
+   "the latest checkpoint",
+   "the newest checkpoint"
+  ],
+  "served/step4000-lda-2610": [
+   "step4000",
+   "step 4000",
+   "4000"
+  ],
+  "served/step1000-lda-2610": [
+   "step1000",
+   "step 1000",
+   "1000"
+  ],
+  "served/Qwen3.6-35B-A3B-Q4-lda-2610": [
+   "q4",
+   "Q4 (UD-Q4_K_XL)",
+   "the q4 build",
+   "q4 lda",
+   "the q4 baseline"
+  ],
+  "served/Qwen3.6-35B-A3B-Q2-lda-2610": [
+   "q2",
+   "Q2 (UD-Q2_K_XL)",
+   "the q2 build",
+   "the same-size baseline",
+   "the q2 baseline"
+  ],
+  "served/Qwen3.6-35B-A3B-BF16-lda-2610": [
+   "bf16",
+   "BF16",
+   "the full-precision original",
+   "our bf16"
+  ],
+  "served/Qwen3.6-35B-A3B-Q4-original-k-8": [
+   "Q4, earlier run",
+   "q4 earlier",
+   "q4 original",
+   "the k=8 build",
+   "the playground model"
+  ],
+  "served/Ornith-1.5-35B-A3B-Q4_K_M": [
+   "ornith",
+   "ornith 1.5",
+   "Ornith-1.5 Q4_K_M"
+  ],
+  "served/Qwen3.6-35B-A3B-k4-LDA-phone-build": [
+   "the phone build",
+   "k4-lda phone build",
+   "k4 lda",
+   "the k4-LDA phone build"
+  ],
+  "served/Bonsai-2-27B-ternary-PQ2_0": [
+   "bonsai 2 27b served",
+   "our bonsai"
+  ],
+  "NVIDIA-Nemotron-3.5-Bolt-E4B": [
+   "bolt",
+   "nemotron",
+   "nemotron bolt",
+   "bolt e4b"
+  ],
+  "Edge0-35B-A3B-preview": [
+   "edge0 35b",
+   "edge0-35b",
+   "edge0 big"
+  ],
+  "Edge0-8B-A1B-preview": [
+   "edge0 8b",
+   "edge0-8b",
+   "edge0 small"
+  ],
+  "Bonsai 27B (1-bit)": [
+   "bonsai 27b",
+   "bonsai 27b 1-bit"
+  ],
+  "Ternary Bonsai 2 9B": [
+   "bonsai 2 9b",
+   "ternary bonsai 9b"
+  ],
+  "Ternary Bonsai 2 4B": [
+   "bonsai 2 4b",
+   "ternary bonsai 4b"
+  ],
+  "Ternary Bonsai 2 2B": [
+   "bonsai 2 2b",
+   "ternary bonsai 2b"
+  ],
+  "Gemma 4 E4B": [
+   "gemma e4b",
+   "gemma 4 e4b"
+  ],
+  "Gemma 4 E2B": [
+   "gemma e2b",
+   "gemma 4 e2b"
+  ]
+ },
+ "benchmarks": {
+  "gpqa": [
+   "gpqa",
+   "gpqa diamond",
+   "GPQA Diamond"
+  ],
+  "hle": [
+   "hle",
+   "humanity's last exam",
+   "HLE"
+  ],
+  "otis": [
+   "otis",
+   "otis mock aime",
+   "aime",
+   "OTIS Mock AIME"
+  ],
+  "math": [
+   "math",
+   "math level 5",
+   "math l5",
+   "MATH Level 5"
+  ],
+  "mmlupro": [
+   "mmlu-pro",
+   "mmlu pro",
+   "MMLU-Pro"
+  ],
+  "simpleqa": [
+   "simpleqa",
+   "simpleqa verified",
+   "SimpleQA Verified"
+  ],
+  "arc": [
+   "arc-agi-2",
+   "arc agi 2",
+   "arc agi",
+   "ARC-AGI-2"
+  ],
+  "ifeval": [
+   "ifeval",
+   "if eval",
+   "IFEval"
+  ],
+  "ifbench": [
+   "ifbench",
+   "if bench",
+   "IFBench"
+  ],
+  "mmlu": [
+   "mmlu",
+   "MMLU"
+  ],
+  "hellaswag": [
+   "hellaswag",
+   "HellaSwag"
+  ],
+  "arc_challenge": [
+   "arc challenge",
+   "arc-challenge",
+   "ARC-Challenge"
+  ],
+  "arc_easy": [
+   "arc easy",
+   "arc-easy",
+   "ARC-Easy"
+  ],
+  "winogrande": [
+   "winogrande",
+   "WinoGrande"
+  ],
+  "piqa": [
+   "piqa",
+   "PIQA"
+  ],
+  "truthfulqa_mc2": [
+   "truthfulqa",
+   "truthful qa",
+   "TruthfulQA"
+  ],
+  "gsm8k": [
+   "gsm8k",
+   "gsm 8k",
+   "GSM8K"
+  ]
+ },
+ "standard": {
+  "mmlu": "MMLU",
+  "hellaswag": "HellaSwag",
+  "arc_challenge": "ARC-Challenge",
+  "arc_easy": "ARC-Easy",
+  "winogrande": "WinoGrande",
+  "piqa": "PIQA",
+  "truthfulqa_mc2": "TruthfulQA",
+  "gsm8k": "GSM8K"
+ },
+ "topics": {
+  "se": {
+   "title": "± (standard error)",
+   "from": "page:score-legend"
+  },
+  "ceiling": {
+   "title": "Near the ceiling",
+   "from": "notes:Near the ceiling"
+  },
+  "loops": {
+   "title": "Ended in a loop",
+   "from": "notes:Ended in a loop"
+  },
+  "ran_out": {
+   "title": "Ran out of room",
+   "from": "notes:Ran out of room counts as wrong"
+  },
+  "keeps": {
+   "title": "What each keeps of its own base",
+   "from": "page:keeps"
+  },
+  "stand_in": {
+   "title": "A stand-in base",
+   "from": "page:stand-in"
+  },
+  "baseline": {
+   "title": "The baseline switch",
+   "from": "page:baseline"
+  },
+  "published": {
+   "title": "Published numbers",
+   "from": "page:published"
+  },
+  "calibration": {
+   "title": "Calibration error",
+   "from": "notes:Calibration error"
+  },
+  "reliability": {
+   "title": "Always, sometimes, never",
+   "from": "notes:Always right / never right"
+  },
+  "first_right": {
+   "title": "First states the right answer",
+   "from": "notes:First states the right answer"
+  },
+  "checking": {
+   "title": "Checking share",
+   "from": "notes:Checking share"
+  },
+  "lost": {
+   "title": "Had it, then lost it",
+   "from": "notes:Had it, then lost it"
+  },
+  "second_thoughts": {
+   "title": "Second thoughts",
+   "from": "notes:Second thoughts"
+  },
+  "across_training": {
+   "title": "Across training",
+   "from": "notes:Across training"
+  },
+  "simpleqa_f": {
+   "title": "SimpleQA's tries and F",
+   "from": "notes:SimpleQA: tries and F"
+  },
+  "instruction_following": {
+   "title": "Instruction following's numbers",
+   "from": "notes:Instruction following"
+  },
+  "protocols": {
+   "title": "Our protocols",
+   "from": "notes:Protocols"
+  },
+  "reasoning_settings": {
+   "title": "Reasoning settings",
+   "from": "notes:Reasoning settings"
+  },
+  "level": {
+   "title": "Level",
+   "from": "notes:\"Level\" means"
+  },
+  "churn": {
+   "title": "Churn",
+   "from": "notes:Churn"
+  },
+  "question_by_question": {
+   "title": "Question by question",
+   "from": "notes:Why question by question"
+  }
+ },
+ "examples": [
+  [
+   "latest tab",
+   {
+    "do": {
+     "action": "open_page",
+     "page": "models_table",
+     "view": "latest"
+    }
+   }
+  ],
+  [
+   "standard tab with the math group",
+   {
+    "do": {
+     "action": "open_page",
+     "page": "models_table",
+     "view": "standard",
+     "group": "math"
+    }
+   }
+  ],
+  [
+   "frontier, closed models only, sorted by gpqa, worst first",
+   {
+    "do": {
+     "action": "open_page",
+     "page": "models_table",
+     "view": "frontier",
+     "only": "closed",
+     "sort": "gpqa",
+     "sort_dir": "asc"
+    }
+   }
+  ],
+  [
+   "models added in the last 30 days",
+   {
+    "do": {
+     "action": "open_page",
+     "page": "models_table",
+     "when": "30d",
+     "date": "added"
+    }
+   }
+  ],
+  [
+   "find llama models",
+   {
+    "do": {
+     "action": "open_page",
+     "page": "models_table",
+     "search": "llama"
+    }
+   }
+  ],
+  [
+   "open step1000's answers on MATH",
+   {
+    "do": {
+     "action": "open_page",
+     "page": "model_page",
+     "model": "step1000",
+     "benchmark": "math"
+    }
+   }
+  ],
+  [
+   "ran-out report for step1000 on MATH",
+   {
+    "do": {
+     "action": "open_page",
+     "page": "report",
+     "report": "ran-out report",
+     "model": "step1000",
+     "benchmark": "MATH"
+    }
+   }
+  ],
+  [
+   "q2 against step1000 on otis and math",
+   {
+    "do": {
+     "action": "compare",
+     "models": [
+      "q2",
+      "step1000"
+     ],
+     "benchmarks": [
+      "otis",
+      "math"
+     ]
+    }
+   }
+  ],
+  [
+   "what's step1000's loop share on HLE",
+   {
+    "do": {
+     "action": "compare",
+     "models": [
+      "step1000"
+     ],
+     "benchmarks": [
+      "hle"
+     ],
+     "measure": "loops"
+    }
+   }
+  ],
+  [
+   "closed models, best on simpleqa",
+   {
+    "do": {
+     "action": "best_on",
+     "benchmark": "simpleqa",
+     "among": "closed"
+    }
+   }
+  ],
+  [
+   "line of MATH over training",
+   {
+    "do": {
+     "action": "chart",
+     "chart": "checkpoints",
+     "benchmark": "MATH"
+    }
+   }
+  ],
+  [
+   "prefill speed of step4000 on the galaxy",
+   {
+    "do": {
+     "action": "phone",
+     "app": "step4000",
+     "phone": "the galaxy",
+     "measure": "prefill"
+    }
+   }
+  ],
+  [
+   "how long does the q2 run have left",
+   {
+    "do": {
+     "action": "boxes",
+     "model": "q2"
+    }
+   }
+  ],
+  [
+   "what does 'had it, then lost it' mean",
+   {
+    "do": {
+     "action": "explain",
+     "topic": "lost"
+    }
+   }
+  ],
+  [
+   "show me the gemma model",
+   {
+    "do": {
+     "action": "open_page",
+     "page": "model_page",
+     "model": "the gemma model"
+    }
+   }
+  ],
+  [
+   "q2's mmlu-pro, and open the frontier tab",
+   {
+    "do": {
+     "action": "compare",
+     "models": [
+      "q2"
+     ],
+     "benchmarks": [
+      "mmlupro"
+     ]
+    },
+    "then": {
+     "action": "open_page",
+     "page": "models_table",
+     "view": "frontier"
+    }
+   }
+  ],
+  [
+   "how fast is step4000 on the oneplus",
+   {
+    "do": {
+     "action": "phone",
+     "app": "step4000",
+     "phone": "the oneplus"
+    }
+   }
+  ],
+  [
+   "compare step1000 with the arc one",
+   {
+    "do": {
+     "action": "compare",
+     "models": [
+      "step1000"
+     ],
+     "benchmarks": [
+      "the arc one"
+     ]
+    }
+   }
+  ],
+  [
+   "what's its score",
+   {
+    "do": {
+     "action": "clarify",
+     "about": "model"
+    }
+   }
+  ],
+  [
+   "queue step1000 on MMLU",
+   {
+    "do": {
+     "action": "cant",
+     "kind": "start_run"
+    }
+   }
+  ],
+  [
+   "write me a poem",
+   {
+    "do": {
+     "action": "cant",
+     "kind": "outside"
+    }
+   }
+  ]
+ ],
+ "phones": {
+  "CPH2747": [
+   "oneplus 15",
+   "op15",
+   "the oneplus 15"
+  ],
+  "SM-S938B": [
+   "galaxy",
+   "galaxy s25",
+   "s25 ultra",
+   "the samsung"
+  ],
+  "CPH2719": [
+   "the other oneplus"
+  ]
+ },
+ "reports": {
+  "testers": [
+   "testers",
+   "the testers' report",
+   "our testers' phones",
+   "phone tests",
+   "the phones report",
+   "phones"
+  ],
+  "on-device": [
+   "on-device",
+   "on device",
+   "the on-device report",
+   "models on phones",
+   "phone models",
+   "phones"
+  ],
+  "paired": [
+   "paired",
+   "two builds",
+   "the two-builds report",
+   "question by question",
+   "the reader"
+  ],
+  "step-checkpoints": [
+   "step checkpoints",
+   "the scorecard",
+   "checkpoints report",
+   "step checkpoints vs popular models"
+  ],
+  "ran-out-of-room": [
+   "ran out of room",
+   "the ran-out report",
+   "ran-out"
+  ]
+ },
+ "places": {
+  "home": [
+   "overview",
+   "start page",
+   "front page"
+  ],
+  "runs": [
+   "run list",
+   "the queue",
+   "jobs"
+  ],
+  "benchmarks": [
+   "catalogue",
+   "catalog",
+   "benchmark list",
+   "questions"
+  ],
+  "playground": [
+   "chat",
+   "try a model"
+  ],
+  "improve": [
+   "pipeline"
+  ],
+  "reports": [
+   "report list",
+   "all reports"
+  ]
+ },
+ "benchmark_groups": {
+  "Knowledge & reasoning": {
+   "also": [
+    "knowledge"
+   ],
+   "benchmarks": [
+    "gpqa",
+    "hle",
+    "simpleqa",
+    "mmlupro"
+   ]
+  },
+  "Maths": {
+   "also": [
+    "maths",
+    "math ones"
+   ],
+   "benchmarks": [
+    "otis",
+    "math"
+   ]
+  },
+  "Puzzles & games": {
+   "also": [
+    "puzzles"
+   ],
+   "benchmarks": [
+    "arc"
+   ]
+  },
+  "Instruction following": {
+   "also": [
+    "instruction-following",
+    "following instructions"
+   ],
+   "benchmarks": [
+    "ifeval",
+    "ifbench"
+   ]
+  }
+ },
+ "report_titles": {
+  "ran-out-of-room": "Ran out of room"
+ }
+}

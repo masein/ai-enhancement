@@ -196,6 +196,9 @@ COPY eval_tasks/devicemark/ eval_tasks/devicemark/
 COPY eval_tasks/reports/ eval_tasks/reports/
 # 26: our names for the phone app's ids — the testers' phone checks read them
 COPY eval_tasks/phone/ eval_tasks/phone/
+# 28: the assistant's names, and its test bank (its examples and the server's evaluation)
+COPY eval_tasks/assistant/ eval_tasks/assistant/
+COPY tests/fixtures/assistant/ tests/fixtures/assistant/
 COPY FRIENDS.md ./
 
 # the same check the service runs at startup, at BUILD time: an image missing
