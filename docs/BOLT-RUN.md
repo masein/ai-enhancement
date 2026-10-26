@@ -140,7 +140,30 @@ capped, ran out, a loop), each benchmark's pace and tokens a second, whether
 the thinking came back apart (and none with thinking off), and last the
 estimate: the slots of 64K that fit, tokens a second at 8 slots, and the hours
 for both builds across the four GPUs. Nothing long starts before masein's
-yes.
+yes. Each thinking setting keeps its own folder (29.1):
+`<build>/pilot/thinking-on` and `<build>/pilot/thinking-off`, each with its
+`pilot-thinking-<on|off>.json` and a line an answer; the fetch never reads
+them. A GGUF already in `/workspace/files` with its sha256 is not fetched
+again.
+
+### dgx-03's slow link: the Q8_0 fetched ahead
+
+dgx-03 reads Hugging Face at 0.1–0.4 MB/s (the Q4_K_M's 6.2 GB took about
+90 minutes), so the Q8_0 is fetched before the full run, in a container of its
+own (no GPU; `own_box.sh stop` never touches it), resumable — the same line
+again carries on from where it stopped:
+
+```bash
+docker run -d --name evalboard-q8-fetch --user "$(id -u):$(id -g)" --cap-drop ALL --security-opt no-new-privileges -e HOME=/workspace/home -v /raid/evalboard/workspace:/workspace ghcr.io/masein/evalboard-runner:v100 python -c "from huggingface_hub import hf_hub_download as get; get('ggml-org/NVIDIA-Nemotron-3.5-Bolt-E4B-GGUF', 'NVIDIA-Nemotron-3.5-Bolt-E4B-Q8_0.gguf', revision='5f03edf5d3bdfe6859513573802d509fa46636de', local_dir='/workspace/files')"
+```
+
+`docker logs --tail 3 evalboard-q8-fetch` shows how far it is; it is done when
+the file is 8,031,245,312 bytes. Stopped, `docker rm evalboard-q8-fetch` and
+the same line carries on. Faster, where the board's server reads Hugging Face
+quickly: fetch it there and copy it into the same folder with `rsync
+--partial` (resumable too). The full run checks its sha256 against plan D's
+pin either way, and Hugging Face's client takes a copied file whose sha256
+is the published one without fetching it again.
 
 ### The full run (after masein's yes)
 

@@ -1926,8 +1926,11 @@ def _main(argv: list[str] | None = None) -> int:
             # 17c: the error's own words; the terms only when access was refused
             raise SystemExit(rb.scrub(fb.load_failed(t, e))) from None
         if a.pilot:
-            say(f"{fb.BENCH[t]['label']}: the pilot's {len(fb.pilot_items(t, config.BENCH_ROOT))} "
-                f"of its {len(items)} questions, each asked once, thinking on")
+            # 29.1: --pilot-each's number here too, as pilot_ask asks it (it said
+            # "the pilot's 20" of GPQA Diamond, then stopped at OTIS)
+            mine = fb.pilot_items(t, config.BENCH_ROOT, a.pilot_each or None)
+            say(f"{fb.BENCH[t]['label']}: the pilot's {len(mine)} of its {len(items)} questions, "
+                f"each asked once, thinking {'on' if thinking else 'off'}")
             continue
         mine = fb.shard_of(items, shard)
         say(f"{fb.BENCH[t]['label']}: {len(mine)} of its {len(items)} questions here × "

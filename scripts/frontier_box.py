@@ -669,14 +669,23 @@ def plan_at_pace(plan: str, paces: dict) -> list[str]:
     return out
 
 
+def own_pilot_folder(a: argparse.Namespace, thinking: str) -> Path:
+    """29.1: an own box's pilot, one folder a thinking setting — a folder
+    holds one setting's run, and the thinking-off step was refused in the
+    thinking-on step's"""
+    return pilot_folder(a) / f"thinking-{thinking}"
+
+
 def own_pilot_argv(a: argparse.Namespace, box: str, thinking: str, tasks: list[str]
                    ) -> list[str]:
     """29: remote_gguf.py's arguments for an own box's pilot: `tasks`, each
-    OWN_PILOT_EACH questions, thinking `thinking`, at plan D's 8 slots"""
+    OWN_PILOT_EACH questions, thinking `thinking`, at plan D's 8 slots, in
+    its own folder (29.1)"""
     step = ("pilot", tuple(tasks), "", 8)
     cmd = argv_of(box, 0, step, a)
     cmd[cmd.index("--thinking") + 1] = thinking
     at = cmd.index("--out")
+    cmd[at + 1] = str(own_pilot_folder(a, thinking))
     extra = ["--pilot-each", str(OWN_PILOT_EACH), *[x for t in ordered(tuple(tasks))
                                                      for x in ("--only", t)]]
     return cmd[:at] + extra + cmd[at:]
@@ -699,7 +708,7 @@ def run_own_pilot(a: argparse.Namespace, box: str, rt: str) -> int:
             continue
         cmd = own_pilot_argv(a, box, th, tasks)
         print("\n" + " ".join(shlex.quote(x) for x in cmd[1:]), flush=True)
-        f = pilot_folder(a) / f"pilot-thinking-{th}.json"
+        f = own_pilot_folder(a, th) / f"pilot-thinking-{th}.json"
         f.unlink(missing_ok=True)
         codes.append(subprocess.run(cmd).returncode)
         try:

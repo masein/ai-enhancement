@@ -1215,14 +1215,18 @@ def parity_items(root: Path, n: int | None = None) -> list[dict]:
 # 22: a new runtime's pilot, on one box before the others are rented — a few
 # questions of two benchmarks scored by code, thinking on, each asked once:
 # the same ones on every machine (a sample seeded by the benchmark)
-PILOT = {"seed": "frontier-pilot-22", "n": {"gpqa_diamond_epoch": 20, "mmlupro_tiger": 5}}
+PILOT = {"seed": "frontier-pilot-22", "n": {"gpqa_diamond_epoch": 20, "mmlupro_tiger": 5},
+         # 29.1: any other benchmark, when no number is given
+         "each": 5}
 
 
 def pilot_items(task: str, root: Path, each: int | None = None) -> list[dict]:
     """the pilot's questions of `task`, in the benchmark's order — 29: or
     `each` of every benchmark (an own box's pilot), picked the same way"""
     items = load(task, root)
-    n = min(each or PILOT["n"][task], len(items))
+    # 29.1: every benchmark — `each`, else the 22 pilot's number, else PILOT's "each"
+    # (OTIS has none: a KeyError stopped dgx-03's pilot before a question)
+    n = min(each or PILOT["n"].get(task) or PILOT["each"], len(items))
     pick = sorted(random.Random(f"{PILOT['seed']}:{task}").sample(range(len(items)), n))
     return [items[i] for i in pick]
 
