@@ -735,7 +735,9 @@ def test_no_tracked_file_holds_a_key_or_a_stations_address():
 def test_the_check_would_catch_one():
     made = "ssh-ed25519 " + "AAAAC3NzaC1lZDI1NTE5" + "A" * 48 + " evalboard@server"
     assert KEY.search(made) and not KEY.search("ssh-ed25519 AAAA… you@machine")
-    assert OWN_SET.search("EVALBOARD_OWN_D3=evalboard@" + ".".join(["10", "1", "2", "3"]) + ":22:/r")
+    # built here, so this file holds no such line itself
+    set_line = "EVALBOARD_OWN_D3" + "=" + "evalboard@" + ".".join(["10", "1", "2", "3"]) + ":22:/r"
+    assert OWN_SET.search(set_line)
     assert not OWN_SET.search("EVALBOARD_OWN_D3 in the server's .env")
 
 
