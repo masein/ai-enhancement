@@ -302,6 +302,15 @@ opened, its header the HLE calibration error), and on the step-checkpoints
 report: a section after "Scores by benchmark", a column "Ended in a loop" in
 "Thinking tokens" and its chart "Score against thinking".
 
+29: its speed and energy are always its card's. Every heading and sentence
+names the card ("Speed on a Tesla V100-DGXS-32GB", "Each benchmark, with 8
+answers at once on an RTX 5090"), and a row whose boxes had two kinds of card
+gets a table for each (`by_card`), never one median of both. A benchmark
+asked on our own GPUs alone (dgx-03's V100s, an import's `own_box`) says
+"own box" for its dollars, never $0. The report's "Output tok/s alone"
+column names the card on hover, and beside the number when the builds'
+cards differ.
+
 After a deploy, the worker works them out once:
 
 ```bash
@@ -334,6 +343,22 @@ are ours.
   compressed; `line_tip`, on hover, that its training seed data includes
   IFEval prompts (the card's data table). NVIDIA's letter is N, its family
   colour its own.
+- **Measured here, not ours (29).** NVIDIA Nemotron 3.5 Bolt E4B, run on our
+  own V100s (dgx-03) as our builds are: the file's `measured` rows. Its
+  Q4_K_M, "NVIDIA Nemotron 3.5 Bolt E4B · Q4_K_M" (NVIDIA's own 4-bit file,
+  the phone build), is a row of the Open group with a filled dot in NVIDIA's
+  colour, "measured here on a V100" on its line. Its base is its Q8_0,
+  measured here too and never a row (`base_only`): ggml-org's 8-bit file of
+  NVIDIA's BF16, standing in for BF16, which a V100 doesn't run natively.
+  Every share of it says so — "94.5% of our Q8_0" in the cell, "of our Q8_0,
+  standing in for BF16" on hover and in "What each keeps" — and the
+  section's note says it once (`measured_note`). Its memory is its file's,
+  as the box measured it; it joins the memory chart and is named in its
+  legend as ours are. Before its first import it has no score and no
+  memory, and is counted under the table ("not run yet" in each cell when
+  shown). NVIDIA's own row stays as published, with its own name, base and
+  numbers: the measured and the published are never one row. Its cells say
+  "limit capped by its 64K context" on hover (below).
 - **Columns.** Base model, size on disk, the memory it needs, phone speed
   (the device named, or "no phone numbers yet"), what our testers' phones
   measured (26: our phone build's decode and engine memory, per phone),

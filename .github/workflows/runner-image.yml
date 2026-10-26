@@ -10,6 +10,9 @@
 # banks, the trust sets, the judge's rubrics or an .env file is never pushed
 # (scripts/check_runner_image.py, every file in the image).
 #
+# 29: and its V100 tag (runner-v100 below): the same image with upstream
+# llama.cpp built for sm_70 at /opt/llama, for our own boxes on dgx-03.
+#
 # The mirror only: on the canonical repository the job is skipped, and its
 # token pushes nowhere. The token is this run's own GITHUB_TOKEN: no secret is
 # stored for it.
@@ -19,6 +22,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      only_v100:
+        description: "29: the V100 tag alone — built and checked; pushed only from main"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -34,7 +42,7 @@ env:
 
 jobs:
   runner-image:
-    if: github.repository == 'masein/ai-enhancement'
+    if: github.repository == 'masein/ai-enhancement' && !inputs.only_v100
     runs-on: ubuntu-latest
     # the deps stage's base image and kernels are most of it: 15.1's image
     # job built both images in under an hour
@@ -79,3 +87,47 @@ jobs:
           if [ "$v" != public ]; then
             echo "::warning::Make it public once: https://github.com/users/masein/packages/container/evalboard-runner/settings → Danger Zone → Change visibility → Public"
           fi
+
+  # 29: the V100 tag — the runner image, and upstream llama.cpp built for
+  # sm_70 under CUDA 12.8 at /opt/llama (the Dockerfile's runner-v100 stage),
+  # for our own boxes on dgx-03. Two tags, v100-<short sha> and v100, pushed
+  # from main alone: a branch's run builds and checks it, and pushes nothing.
+  # The runner image above stays as it is
+  runner-v100:
+    if: github.repository == 'masein/ai-enhancement'
+    runs-on: ubuntu-latest
+    # the runner's stages, then llama.cpp's CUDA build for one architecture
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      # two big base images (PyTorch's and CUDA's devel) in one build: room
+      # made by removing the hosted runner's toolchains this build never uses
+      - name: room on the disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          docker system prune -af >/dev/null
+          df -h / | tail -1
+      - name: the tag — the commit's short sha
+        id: tag
+        run: echo "short=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+      - name: build the V100 tag
+        run: >-
+          docker build --target runner-v100
+          --build-arg EVALBOARD_BUILD=${{ steps.tag.outputs.short }}
+          --label org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          --label org.opencontainers.image.revision=${{ github.sha }}
+          --label "org.opencontainers.image.description=evalboard's runner with llama.cpp for the V100 (sm_70)"
+          -t "$IMAGE:v100-${{ steps.tag.outputs.short }}" .
+      - name: nothing that stays on the server is in it
+        run: python3 scripts/check_runner_image.py "$IMAGE:v100-${{ steps.tag.outputs.short }}"
+      - name: its llama.cpp
+        run: docker run --rm "$IMAGE:v100-${{ steps.tag.outputs.short }}" cat /opt/llama/VERSION
+      - name: log in to ghcr.io with this run's token
+        if: github.ref == 'refs/heads/main'
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: push its tags
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker tag "$IMAGE:v100-${{ steps.tag.outputs.short }}" "$IMAGE:v100"
+          docker push "$IMAGE:v100-${{ steps.tag.outputs.short }}"
+          docker push "$IMAGE:v100"

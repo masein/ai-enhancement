@@ -61,7 +61,22 @@ modelling's cross-entropy table (a row per task and model) keep their own.
   view's headline.
   - Our team's builds are Ours: `local/` checkpoints, and served or GGUF
     builds that aren't someone else's model.
-  - Ornith and Bonsai measured here are open models with a filled dot.
+  - Ornith and Bonsai measured here are open models with a filled dot. 29:
+    and NVIDIA Nemotron 3.5 Bolt E4B's two builds measured on our V100s,
+    "NVIDIA Nemotron 3.5 Bolt E4B · Q4_K_M" and "· Q8_0" (`MT_OUTSIDE_RE`),
+    in NVIDIA's colour on every tab. A served model's name its base already
+    holds whole stays as it is ("NVIDIA Nemotron 3.5 Bolt E4B" is never
+    rewritten as NVIDIA-Nemotron-3.5-Bolt-E4B-BF16's).
+  - 29: a model whose context is smaller than our limits (Bolt's 64K,
+    `frontierCaps`): each answer's limit is the benchmark's, or what was left
+    of 65,536 after its question. Its Frontier cells say "limit capped by its
+    64K context" on hover (`data-fr-capped`), and the view says it once under
+    its column count, only while such a row is shown.
+  - 29: one model page holds a model measured here in several builds and its
+    maker's numbers (`builds`, from the report files' `measured` rows): on
+    each build's page and on the published model's, one table — each build
+    measured here (Q8_0 "standing in for BF16"), a filled dot and a plain
+    number; NVIDIA's numbers published, a ring and italics with N.
   - Bonsai and Edge0 are on the board from their published numbers only
     (25c). A row of theirs measured here before that says so on its line and
     its name's hover: Bonsai 2 27B (ternary, PQ2_0), "measured here on 7 Oct,
@@ -211,7 +226,10 @@ thinking.
   published models on the dashed best-for-their-memory line (no model needing
   less scores higher). Every other point is named on hover and in one legend
   above the four panels. Ours are filled dots in their own colours; Edge0,
-  Bonsai and Gemma are hollow diamonds, one hue each, on every panel.
+  Bonsai and Gemma are hollow diamonds, one hue each, on every panel. 29: a
+  model measured here that isn't ours (Bolt's Q4_K_M) is a filled dot in its
+  maker's hue, labelled and named in the legend as ours are; its chart name
+  is short ("Bolt E4B · Q4_K_M").
 - 27e: an axis's labels never touch. "What each keeps" labels every 10
   points, else every 20, 50 or 100 — the first step whose labels stay 4
   units apart, measured — with 100% always, and the last one ended at the

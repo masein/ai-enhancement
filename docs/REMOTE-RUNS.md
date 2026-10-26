@@ -26,6 +26,15 @@ What runs where:
 No credentials go in this file or in any script. You log in to vast.ai and
 Hugging Face yourself.
 
+**29: our own boxes.** The same runs on dgx-03's four V100s, one GPU a box
+(D3.0 … D3.3, plan D), in the image's V100 tag
+(`ghcr.io/masein/evalboard-runner:v100`, llama.cpp for sm_70 at `/opt/llama`),
+as the board's account on the station with `scripts/own_box.sh` — never on a
+GPU someone else is using, paused when someone else's process appears, no
+price ("own box"), and the station's address in the server's `.env`
+(`EVALBOARD_OWN_D3`), never here. NVIDIA Nemotron 3.5 Bolt E4B's run, step by
+step: [BOLT-RUN.md](BOLT-RUN.md).
+
 ## 0. Once
 
 **An SSH key for the server.** On the server:

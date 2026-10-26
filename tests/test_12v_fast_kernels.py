@@ -255,7 +255,10 @@ def test_the_image_fetches_installs_and_checks_them_at_build():
     # (the base image has Triton's compiler: the check builds with it). 15.1: the
     # runner stage alone installs tmux and an SSH server, for a rented GPU's session
     stages = re.split(r"(?m)^(?=FROM )", DOCKER)
-    assert not [p for p in stages if "apt-get" in p and not p.startswith("FROM deps AS runner")]
+    # 29: and the V100's llama.cpp build stage, which compiles there (nothing of it
+    # but /opt/llama reaches an image, the runner's V100 tag)
+    assert not [p for p in stages if "apt-get" in p and not p.startswith((
+        "FROM deps AS runner", "FROM nvidia/cuda:12.8.1-devel-ubuntu22.04 AS llama-v100"))]
     runner = next(p for p in stages if p.startswith("FROM deps AS runner"))
     assert re.search(r"apt-get install -y --no-install-recommends tmux openssh-server", runner)
     assert re.search(r"pip install --no-cache-dir --break-system-packages --no-deps \\\n\s+"

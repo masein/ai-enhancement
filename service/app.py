@@ -499,6 +499,9 @@ def results_payload() -> dict:
     _cache["payload"]["glance"] = reports.glance_meta()
     # 27: our rows' colours, the same on every Models tab
     _cache["payload"]["rowColours"] = reports.row_colours()
+    # 29: a model measured here in several builds, with its maker's numbers:
+    # one model page holds them, told apart
+    _cache["payload"]["builds"] = reports.model_builds()
     _cache["at"] = now
     return _cache["payload"]
 

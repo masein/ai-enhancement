@@ -141,6 +141,8 @@ def test_8_slots_fit_overrides_the_check_and_an_unread_header_is_said(box, monke
 def test_2_3_each_plan_runs_every_benchmark_once_one_line_a_box():
     import frontier_box as fbx
     for name, boxes in fbx.PLANS.items():
+        if name in fbx.OWN_PLANS:
+            continue            # 29: plan D's slots hold Bolt's 64K (tests/test_29_own_boxes.py)
         have: dict[tuple[str, str], set[int]] = {}
         of: dict[tuple[str, str], int] = {}
         parity = 0

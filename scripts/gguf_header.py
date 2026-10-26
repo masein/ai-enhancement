@@ -185,7 +185,13 @@ def _read(r: _Reader) -> dict:
 _SHAPE_SUFFIX = (".block_count", ".attention.head_count_kv", ".attention.head_count",
                  ".attention.key_length", ".attention.value_length", ".embedding_length",
                  ".full_attention_interval", ".ssm.conv_kernel", ".ssm.inner_size",
-                 ".ssm.state_size", ".ssm.group_count", ".ssm.time_step_rank")
+                 ".ssm.state_size", ".ssm.group_count", ".ssm.time_step_rank",
+                 # 29: a sliding window's layers (Gemma 4: five in six, each with a
+                 # window of 512 and heads of their own size) and layers that share
+                 # an earlier layer's cache (Gemma 3n and 4: the last 18 of 42)
+                 ".attention.sliding_window", ".attention.sliding_window_pattern",
+                 ".attention.key_length_swa", ".attention.value_length_swa",
+                 ".attention.shared_kv_layers")
 MAX_LAYERS = 4096                # a per-layer array kept: one int a layer
 
 
@@ -194,7 +200,8 @@ def _small_ints(r: _Reader, t: int):
     if t != _ARRAY:
         return r.value(t)
     et, n = r.unpack("<I"), r.count()
-    if et in _SCALAR and et not in (6, 7, 12) and n <= MAX_LAYERS:
+    # 29: and a per-layer array of booleans (sliding_window_pattern)
+    if et in _SCALAR and et not in (6, 12) and n <= MAX_LAYERS:
         return [r.unpack(_SCALAR[et]) for _ in range(n)]
     if et in _SCALAR:
         r.skip(n * struct.calcsize(_SCALAR[et]))
@@ -245,9 +252,22 @@ def shape(fh) -> dict | None:
             return None
         ssm = {k: get(f"ssm.{k}") for k in ("conv_kernel", "inner_size", "state_size",
                                               "group_count", "time_step_rank")}
+        # 29: the sliding window's layers, and the layers with a cache of their own
+        pat, win = get("attention.sliding_window_pattern"), get("attention.sliding_window")
+        swa = None
+        if isinstance(pat, list) and len(pat) == layers and isinstance(win, int) and win > 0:
+            k_swa = get("attention.key_length_swa") or k_len
+            v_swa = get("attention.value_length_swa") or v_len
+            if isinstance(k_swa, int) and isinstance(v_swa, int):
+                swa = {"window": win, "layers": [bool(x) for x in pat],
+                       "key_length": k_swa, "value_length": v_swa}
+        shared = get("attention.shared_kv_layers")
+        own_kv = layers - shared if isinstance(shared, int) and 0 < shared < layers else layers
         return {"arch": arch, "layers": layers, "kv_heads": [int(x or 0) for x in kv],
                 "key_length": k_len, "value_length": v_len,
-                "ssm": ssm if isinstance(ssm["inner_size"], int) else None}
+                "ssm": ssm if isinstance(ssm["inner_size"], int) else None,
+                **({"swa": swa} if swa else {}),
+                **({"kv_layers": own_kv} if own_kv != layers else {})}
     except (OSError, NotGguf, struct.error, UnicodeDecodeError, MemoryError, TypeError,
             ValueError, OverflowError):
         return None

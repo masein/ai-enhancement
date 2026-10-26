@@ -105,6 +105,29 @@ ARG EVALBOARD_BUILD=""
 ENV EVALBOARD_BUILD=${EVALBOARD_BUILD}
 CMD ["python", "scripts/remote_run.py", "--help"]
 
+# 29: llama-server for our own V100s (dgx-03, sm_70) — upstream llama.cpp at
+# the commit runtime card-bolt names, under CUDA 12.8 (CUDA 13 has no Volta),
+# built and packed as a box's tarball is (scripts/build_llama_v100.sh). Only
+# the V100 tag below takes it; the runner image above stays as it is.
+#     docker build --target runner-v100 -t evalboard-runner:v100 .
+FROM nvidia/cuda:12.8.1-devel-ubuntu22.04 AS llama-v100
+ARG LLAMA_COMMIT=1cf7767765b872806e1bb74cfb55614f4334f02f
+ARG LLAMA_CUDA_ARCHS=70
+RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends cmake git \
+        build-essential ca-certificates >/dev/null && rm -rf /var/lib/apt/lists/*
+COPY scripts/build_llama_v100.sh /tmp/build_llama_v100.sh
+RUN LLAMA_COMMIT="$LLAMA_COMMIT" LLAMA_CUDA_ARCHS="$LLAMA_CUDA_ARCHS" \
+        bash /tmp/build_llama_v100.sh /out/llama
+
+# 29: the runner image's V100 tag — the runner, and that llama-server at
+# /opt/llama (frontier_box.py --server-dir /opt/llama; its VERSION checked
+# against the runtime before a GGUF is fetched)
+FROM runner AS runner-v100
+COPY --from=llama-v100 /out/llama /opt/llama
+# no driver here to run it: its VERSION said, and the box runs it (--version)
+RUN test -x /opt/llama/bin/llama-server && grep -q "^build 11555$" /opt/llama/VERSION \
+    && cat /opt/llama/VERSION
+
 # the board: the service, its data and its start command — the default target,
 # what `docker compose up --build` builds
 FROM deps AS board

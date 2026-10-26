@@ -1071,6 +1071,26 @@ def ask_raw(rec: dict, text: str, s: dict) -> "Answer":
     return out
 
 
+def prompt_tokens(rec: dict, text: str, s: dict) -> int:
+    """29: the tokens a question's prompt takes, as the server will read it —
+    its own template made of the messages and the thinking switch (POST
+    /apply-template), then counted (POST /tokenize; the template writes its
+    special tokens itself). For an answer's limit under a capped context"""
+    root, key = root_of(rec["base_url"]), rec.get("key", "")
+    system = [{"role": "system", "content": s["system"]}] if s.get("system") else []
+    prompt = _post(root + "/apply-template", key, {
+        "messages": [*system, *(s.get("history") or []), {"role": "user", "content": text}],
+        **({"chat_template_kwargs": s["chat_template_kwargs"]}
+           if s.get("chat_template_kwargs") else {})}).get("prompt")
+    if not isinstance(prompt, str) or not prompt:
+        raise ItemError("/apply-template gave no prompt")
+    toks = _post(root + "/tokenize", key, {"content": prompt, "add_special": False,
+                                           "parse_special": True}).get("tokens")
+    if not isinstance(toks, list):
+        raise ItemError("/tokenize gave no tokens")
+    return len(toks)
+
+
 def answer_one(rec: dict, text: str, s: dict) -> "Answer":
     """12s: one question's answer, whatever the server makes of it. Asked; on
     an error of the question's own (a 500, a 400), once more; then without

@@ -3,7 +3,7 @@
  "kind": "on_device",
  "order": 4,
  "title": "On-device models",
- "what": "Of the models that can run on a phone, which are best — and where are ours? Ours measured here, the others as their makers publish them.",
+ "what": "Of the models that can run on a phone, which are best — and where are ours? Ours measured here, and NVIDIA Nemotron 3.5 Bolt E4B measured here too; the others as their makers publish them.",
  "ours": [
   {
    "label": "step8804",
@@ -50,6 +50,32 @@
   ]
  },
  "phone_builds": true,
+ "measured": [
+  {
+   "label": "NVIDIA Nemotron 3.5 Bolt E4B · Q4_K_M",
+   "row": "served/NVIDIA-Nemotron-3.5-Bolt-E4B-Q4_K_M · thinking",
+   "model": "NVIDIA Nemotron 3.5 Bolt E4B",
+   "maker": "NVIDIA",
+   "published": "NVIDIA-Nemotron-3.5-Bolt-E4B",
+   "card": "V100",
+   "base": "NVIDIA Nemotron 3.5 Bolt E4B · Q8_0",
+   "base_line": "our Q8_0, standing in for BF16",
+   "kind": "4B effective (8B total)",
+   "line": "NVIDIA's own 4-bit file, the phone build"
+  },
+  {
+   "label": "NVIDIA Nemotron 3.5 Bolt E4B · Q8_0",
+   "row": "served/NVIDIA-Nemotron-3.5-Bolt-E4B-Q8_0 · thinking",
+   "model": "NVIDIA Nemotron 3.5 Bolt E4B",
+   "maker": "NVIDIA",
+   "published": "NVIDIA-Nemotron-3.5-Bolt-E4B",
+   "card": "V100",
+   "base_only": true,
+   "stands_in_for": "BF16",
+   "line": "ggml-org's 8-bit file of NVIDIA's BF16, which a V100 doesn't run natively"
+  }
+ ],
+ "measured_note": "NVIDIA Nemotron 3.5 Bolt E4B is measured here too, on our V100s: its Q4_K_M (the phone build) against its Q8_0, both measured here, the Q8_0 standing in for BF16, which a V100 doesn't run natively. NVIDIA's own numbers stay its own row, as published.",
  "benchmarks": [
   {
    "key": "gpqa",

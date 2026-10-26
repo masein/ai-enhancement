@@ -45,6 +45,16 @@ under its default, or under 60% busy for a quarter of an hour — is flagged,
 with the hours replacing it would save, here and on the board's list. The
 fetch never stops or replaces a box itself.
 
+29: --own D3, our own station's boxes (plan D: D3.0 … D3.3, one GPU each),
+its address the server's own config — EVALBOARD_OWN_D3 in the environment or
+the board's .env beside this checkout, as user@address:ssh-port:work-folder
+(the folder own_box.sh mounts as each box's /workspace) — never typed, never
+printed: the station is named by its label. Its steps are read and fetched
+as a rented box's, under its work folder; it is never "safe to destroy" (an
+own box is done once every step is whole and home), never read destroyed
+when it can't be reached, and its steps go to Runs as own boxes: no price,
+and "paused" when someone else's process has the GPU.
+
 Python's standard library only: it runs on the server, outside the image.
 """
 
@@ -90,13 +100,18 @@ COMPARE = ["sudo", "docker", "compose", "exec", "-T", "bench", "python",
            "scripts/frontier_parity.py", "compare"]
 # 18e point 1: and the labels a box runs, one after another (=L1,L2)
 _BOX = re.compile(r"(?:(?P<user>[A-Za-z0-9._-]+)@)?(?P<host>[A-Za-z0-9.-]+):(?P<port>\d+)"
-                  r"(?:=(?P<labels>[A-Za-z]{1,2}\d{1,3}(?:,[A-Za-z]{1,2}\d{1,3})*))?")
+                  r"(?:=(?P<labels>[A-Za-z]{1,2}\d{1,3}(?:\.\d)?"
+                  r"(?:,[A-Za-z]{1,2}\d{1,3}(?:\.\d)?)*))?")
+# 29: our own station in the server's config — user@address:ssh-port:work-folder
+_OWN = re.compile(r"(?P<user>[A-Za-z0-9._-]+)@(?P<host>[A-Za-z0-9.:-]+):(?P<port>\d+)"
+                  r":(?P<root>/[A-Za-z0-9._/-]+)")
 _SHA = re.compile(r"(?P<model>served/[A-Za-z0-9._-]+)=(?P<sha>[0-9a-fA-F]{64})")
 _PARITY = re.compile(r"(?P<model>served/[A-Za-z0-9._-]+)=(?P<path>\S+)")
 LIST_S, COPY_S, IMPORT_S = 120, 1800, 900
 
 # what a box is asked, run there by its own Python: every bundle and parity
-# file under /workspace with its sha256, and each step's progress
+# file under /workspace with its sha256, and each step's progress — 29: under
+# ROOT, an own station's work folder (listing() sets it)
 LISTING = r'''
 import glob, hashlib, json, os
 def sha(p):
@@ -106,15 +121,15 @@ def sha(p):
             h.update(b)
     return h.hexdigest()
 out = {"bundles": [], "parity": [], "progress": [], "steps": []}
-for p in sorted(glob.glob("/workspace/**/frontier-*.tar.gz", recursive=True)):
+for p in sorted(glob.glob(ROOT + "/**/frontier-*.tar.gz", recursive=True)):
     out["bundles"].append({"path": p, "sha256": sha(p)})
-for p in sorted(glob.glob("/workspace/**/parity.jsonl", recursive=True)):
+for p in sorted(glob.glob(ROOT + "/**/parity.jsonl", recursive=True)):
     out["parity"].append({"path": p, "sha256": sha(p)})
-for d in sorted(glob.glob("/workspace/*/*/")):
-    parts = d.rstrip("/").split("/")
-    if len(parts) == 4 and parts[2] != "files" and "-" in parts[3]:
-        out["steps"].append({"build": parts[2], "step": parts[3]})
-for p in sorted(glob.glob("/workspace/**/progress.json", recursive=True)):
+for d in sorted(glob.glob(ROOT + "/*/*/")):
+    parts = os.path.relpath(d, ROOT).split("/")
+    if len(parts) == 2 and parts[0] != "files" and "-" in parts[1]:
+        out["steps"].append({"build": parts[0], "step": parts[1]})
+for p in sorted(glob.glob(ROOT + "/**/progress.json", recursive=True)):
     try:
         with open(p) as f:
             got = json.load(f)
@@ -123,14 +138,14 @@ for p in sorted(glob.glob("/workspace/**/progress.json", recursive=True)):
     if isinstance(got, dict):
         out["progress"].append({**got, "dir": os.path.dirname(p)})
 out["lines"] = []
-for p in sorted(glob.glob("/workspace/*/*.line.json")):
+for p in sorted(glob.glob(ROOT + "/*/*.line.json")):
     try:
         with open(p) as f:
             got = json.load(f)
     except (OSError, ValueError):
         continue
     if isinstance(got, dict):
-        out["lines"].append({**got, "build": p.split("/")[2]})
+        out["lines"].append({**got, "build": os.path.relpath(p, ROOT).split("/")[0]})
 print(json.dumps(out, default=str))
 '''
 
@@ -173,12 +188,46 @@ def sha256(p: Path) -> str:
     return h.hexdigest()
 
 
-def listing(box: re.Match, key: str) -> tuple[dict | None, str]:
+def field(box, k: str):
+    """29: a box's field — a box is a dict, or _BOX's match as before"""
+    return box.get(k) if isinstance(box, dict) else box.groupdict().get(k)
+
+
+def root_of(box) -> str:
+    """29: where a box's steps are — /workspace, or an own station's work folder"""
+    return field(box, "root") or "/workspace"
+
+
+def box_name(box) -> str:
+    """a box as its lines say it: its address — 29: an own station by its
+    label alone (its address is the server's config, never printed)"""
+    return field(box, "own") or f"{box['host']}:{box['port']}"
+
+
+def own_station(label: str, env: dict | None = None, dotenv: Path | None = None) -> dict:
+    """29: our own station's box, from the server's config: EVALBOARD_OWN_<label>
+    in the environment, else in the board's .env beside this checkout"""
+    var = f"EVALBOARD_OWN_{label}"
+    val = (env if env is not None else os.environ).get(var, "")
+    f = dotenv or REPO / ".env"
+    if not val and f.exists():
+        for line in f.read_text(encoding="utf-8", errors="replace").splitlines():
+            k, _, v = line.partition("=")
+            if k.strip() == var:
+                val = v.strip().strip("'\"")
+    m = _OWN.fullmatch(val.strip())
+    if not m:
+        raise SystemExit(f"--own {label}: {var} isn't set here or in {f} as "
+                         "user@address:ssh-port:work-folder (the server's own config)")
+    return {**m.groupdict(), "labels": None, "own": label}
+
+
+def listing(box, key: str) -> tuple[dict | None, str]:
     """(what the box holds, '') — or (None, why it couldn't be asked)"""
     who = f"{box['user'] or 'root'}@{box['host']}"
     code, said = run(["ssh", *ssh_opts(key, box["port"]), who,
                       "command -v python3 >/dev/null && exec python3 - || exec python -"],
-                     timeout=LIST_S, stdin=LISTING)
+                     timeout=LIST_S, stdin=f"ROOT = {root_of(box)!r}\n" + LISTING)
     if code != 0:
         return None, last(said, f"ssh exit {code}")
     try:
@@ -347,10 +396,12 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
     G6's /workspace/gemma-cal, a step started by hand). 17i: the last, whether
     the box was reached; a step given as --abandoned is left out, and said"""
     import frontier_box as fbx
-    name = f"{box['host']}:{box['port']}"
+    name, root, own = box_name(box), root_of(box), bool(field(box, "own"))
+    # 29: an own box is never destroyed: done, or not done
+    nsafe = "not done" if own else "NOT safe to destroy"
     got, why = listing(box, key)
     if got is None:
-        return False, True, [f"{name}: couldn't be asked — {why}. NOT safe to destroy"], [], False
+        return False, True, [f"{name}: couldn't be asked — {why}. {nsafe}"], [], False
     gone = set(getattr(a, "abandoned", None) or [])
     progress = [p for p in got.get("progress") or [] if isinstance(p, dict)]
     lines, problems, failed = [], [], False
@@ -360,7 +411,7 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
     got_lines = [x for x in got.get("lines") or [] if isinstance(x, dict)]
     for d in got.get("steps") or []:
         if isinstance(d, dict) and d.get("build") and d.get("step"):
-            started.setdefault(f"/workspace/{d['build']}/{d['step']}", None)
+            started.setdefault(f"{root}/{d['build']}/{d['step']}", None)
     for f in [*(got.get("bundles") or []), *(got.get("parity") or [])]:
         started.setdefault(str(Path(f["path"]).parent), None)
     for p in progress:
@@ -411,13 +462,13 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
                         "ago): stop it on the box, or leave it out of --abandoned")
     if not started and not writing:
         # 17j: its abandoned steps said to the board all the same
-        return False, False, [f"{name}: no step has started yet — NOT safe to destroy"], [
+        return False, False, [f"{name}: no step has started yet — {nsafe}"], [
             {**{k: p.get(k) for k in ("model", "thinking", "tasks", "shard", "parity",
                                       "started_at") if p.get(k) is not None},
              "state": "abandoned", "line": "", "label": str(p.get("label") or Path(str(
                  p.get("dir"))).name), "step": Path(str(p.get("dir"))).name,
              "seen_at": time.time(), "reachable": True, "safe": False,
-             "box_id": box_id(name, dest)}
+             "box_id": box_id(name, dest), **({"own": True} if own else {})}
             for p in progress if of(str(p.get("dir"))) in gone], True
     # each bundle: copied, then imported (or, with no --sha, home to import by hand)
     home: dict[str, str] = {}                       # a step's folder -> what became of its bundle
@@ -475,8 +526,8 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
     bid = box_id(name, dest)
     for f in got["parity"]:
         # /workspace/<build>/<box>-parity/parity.jsonl: the build's own folder
-        parts = Path(f["path"]).parts
-        build = parts[2] if len(parts) >= 5 else "unknown"
+        parts = Path(os.path.relpath(f["path"], root)).parts
+        build = parts[0] if len(parts) >= 3 else "unknown"
         model = f"served/{build}"
         local = dest.parent / "parity" / f"{build}-box.jsonl"
         step = str(Path(f["path"]).parent)
@@ -528,7 +579,7 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
         for label in sorted({Path(d).name.rsplit("-", 1)[0] for d in started
                              if build_of(d) == build} | set(given)):
             for step, spec in fbx.steps_of(label):
-                if f"/workspace/{build}/{step}" not in started and f"{build}/{step}" not in gone:
+                if f"{root}/{build}/{step}" not in started and f"{build}/{step}" not in gone:
                     # 18b: a step whose answers the board holds ran elsewhere
                     # (its box gone, the rest on this one): done, said. 18c
                     # point 17: only once this box's line has ended — between
@@ -576,10 +627,11 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
     rest = [f"{n_in} imported", *([f"{by_h} to import by hand"] if by_h else []),
             *([f"{n_th} refused for its thinking share and kept here"] if n_th else [])]
     lines.insert(0, f"{who}: " + (
-        ("done, safe to destroy — every step whole, every bundle here with the box's sha256 "
+        (("done" if own else "done, safe to destroy")
+         + " — every step whole, every bundle here with the box's sha256 "
          + ("and imported" if not by_h and not n_th else
             f"({', '.join(rest)}: the lines below)"))
-        if safe else "NOT safe to destroy — " + "; ".join(problems))
+        if safe else f"{nsafe} — " + "; ".join(problems))
         + (f" · abandoned: {', '.join(dropped)}" if dropped else ""))
     # 17f: each step as the board shows it on Runs — its label and progress,
     # never the box's address. 17h: a step with no label (G6's) by its folder
@@ -592,6 +644,8 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
               "label": str(p.get("label") or Path(str(p.get("dir"))).name),
               "step": Path(str(p.get("dir"))).name, "seen_at": now, "reachable": True,
               "safe": safe, "box_id": bid,
+              # 29: one of our own boxes — no price, never destroyed
+              **({"own": True} if own else {}),
               # 18c point 22: a refused import, said on Runs ("not imported yet" it read)
               **({"import_refused": why_refused[str(p.get("dir"))]}
                  if str(p.get("dir")) in why_refused else {}),
@@ -851,7 +905,7 @@ def every_s(text: str) -> float:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("boxes", nargs="+", help="each box as <host>:<port> (root@ unless "
+    ap.add_argument("boxes", nargs="*", help="each box as <host>:<port> (root@ unless "
                                               "<user>@ is given), as vast.ai's SSH line says — "
                                               "18e: and =L1,L2, the labels it runs one after "
                                               "another: safe only once every one is whole and "
@@ -868,6 +922,9 @@ def main(argv: list[str] | None = None) -> int:
                     help="17f: don't send the boxes' progress to the board (Runs' list)")
     ap.add_argument("--every", type=every_s, default=0,
                     help="17f: do it again every 3m (or 180s, 1h) until every box is done")
+    ap.add_argument("--own", action="append", default=[], metavar="STATION",
+                    help="29: our own station's boxes (D3: D3.0 … D3.3), its address and work "
+                         "folder from EVALBOARD_OWN_D3 in the server's config")
     ap.add_argument("--abandoned", action="append", default=[], metavar="BUILD/STEP",
                     help="17i: a step given up on, e.g. Qwen3.6-35B-A3B-BF16/A3-2 — left out of "
                          "its box's steps and plan, and said on its line (one each)")
@@ -887,7 +944,14 @@ def main(argv: list[str] | None = None) -> int:
         bad = [x for x in (m["labels"] or "").split(",") if x and not fbx.planned(x)]
         if bad:
             ap.error(f"{b!r}: {', '.join(bad)} isn't a box of any plan")
-        boxes.append(m)
+        boxes.append({**m.groupdict(), "root": None, "own": None})
+    # 29: our own stations, from the server's config
+    for st in a.own:
+        if not re.fullmatch(r"[A-Z]\d{1,2}", st.strip()):
+            ap.error(f"--own {st!r}: a station's label, e.g. D3")
+        boxes.append(own_station(st.strip()))
+    if not boxes:
+        ap.error("give the boxes (<host>:<port>), or --own <station>")
     shas = {}
     for s in a.sha:
         m = _SHA.fullmatch(s.strip())
@@ -952,11 +1016,12 @@ def main(argv: list[str] | None = None) -> int:
         # one, where the import refused it
         _SERVED.clear()
         for box in boxes:
-            name = f"{box['host']}:{box['port']}"
+            name = box_name(box)
             bid = box_id(name, dest)
             safe, failed, lines, steps, got = one_box(box, a, key, dest, shas, parity, seen,
                                                       verdicts)
-            e = safe_entry(bid)
+            # 29: an own box is never read destroyed
+            e = safe_entry(bid) if not field(box, "own") else None
             if not got and e:
                 # 17h: safe on an earlier round, not reached now: destroyed —
                 # done (--every ran for ever). 17j: after two rounds unreached.
@@ -983,7 +1048,7 @@ def main(argv: list[str] | None = None) -> int:
                              "NOT safe to destroy yet"]
             elif got:
                 reached.append(bid)
-                if safe:
+                if safe and not field(box, "own"):
                     was_safe[bid] = {"at": now, "missed": 0}
                 elif bid in was_safe:
                     was_safe[bid] = {"gone": True, "at": now}
@@ -1025,7 +1090,7 @@ def main(argv: list[str] | None = None) -> int:
             print(line, flush=True)
         if a.board:
             print(post_boxes([x for v in known.values() for x in v], dest,
-                             [box_id(f"{b['host']}:{b['port']}", dest) for b in boxes],
+                             [box_id(box_name(b), dest) for b in boxes],
                              reached, a.every), flush=True)
         # 17g: each build's parity verdict, a line of its own every round; one
         # that isn't the same, or couldn't be compared, is a failure. 17i: only

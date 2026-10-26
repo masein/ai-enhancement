@@ -20,7 +20,14 @@ Retention is the fair comparison: each source ran its own harness, but each
 ran its model beside its own full-precision base on the same harness — so a
 row's score over its base's, from the same source (ours over our BF16). 27e:
 on a benchmark our BF16 hasn't run, the file's `ours_stand_in` (our Q4)
-stands in for it, said on every row it serves, until BF16's own comes in."""
+stands in for it, said on every row it serves, until BF16's own comes in.
+
+29: and someone else's model measured here — the file's `measured`: NVIDIA
+Nemotron 3.5 Bolt E4B on our own V100s, its Q4_K_M (the phone build) a row,
+its Q8_0 the base it keeps a share of, "of our Q8_0, standing in for BF16"
+(a V100 doesn't run BF16 natively). Measured here, never one of ours, and
+never mixed with what NVIDIA publishes: that stays its own row, as
+published."""
 
 from __future__ import annotations
 
@@ -128,6 +135,55 @@ def _phone_of_ours(spec: dict) -> dict:
             "by_hand": r.get("by") or r.get("entered_by") or "", "date": r.get("date") or ""}
 
 
+def _measured(rep: dict, cells: dict) -> list[dict]:
+    """29: the file's `measured` rows — someone else's model, measured here:
+    each a row of the board's (its builds' scores as the board has them), its
+    base the build the file names, said in the file's words on every row it
+    serves ("of our Q8_0, standing in for BF16"); a "–" and "not run yet"
+    for a benchmark it hasn't run. Its memory is its file's, as the box
+    measured it: before its first import none, and a row with no score and no
+    memory is counted under the table, as ours are"""
+    specs = rep.get("measured") or []
+    if not specs:
+        return []
+    benches = rep["benchmarks"]
+    rows = reports.our_rows({"ours": specs, "benchmarks": benches}, cells)
+    by = {s["label"]: r for s, r in zip(specs, rows)}
+    out = []
+    for spec, r in zip(specs, rows):
+        if spec.get("base_only"):
+            continue
+        sc = {b["key"]: {**r["cells"][b["key"]], "src": "here",
+                         **({"why": "not run yet"} if r["cells"][b["key"]].get("state") == "none"
+                            else {})} for b in benches}
+        base = ((by.get(spec.get("base") or "") or {}).get("cells")) or {}
+        gb = _gb(r.get("size"))
+        how = "its GGUF, as the box measured it"
+        keeps = {b["key"]: x for b in benches
+                 if (x := _ratio(sc[b["key"]].get("v"), (base.get(b["key"]) or {}).get("v")))
+                 is not None}
+        out.append({
+            "label": r["label"], "ours": False, "measured": True, "colour": None,
+            "row": r["row"], "maker": spec.get("maker") or "",
+            "source": "measured here", "card": spec.get("card") or "",
+            "base": spec.get("base") or "", "baseLabel": spec.get("base_line") or "",
+            "kind": spec.get("kind") or "",
+            **({"what": spec["line"]} if spec.get("line") else {}),
+            # 29: its context caps each answer's limit, said on its cells
+            **({"capped": reports.capped_words(r["row"])} if reports.capped_words(r["row"])
+               else {}),
+            "disk": {"gb": gb, "words": f"{gb:.2f} GB", "how": how} if gb else None,
+            "memory": {"gb": gb, "words": f"{gb:.2f} GB",
+                       "how": f"the whole file ({how}), loaded on the server; not measured on a "
+                              "phone"} if gb else None,
+            "phone": {"none": "not measured on a phone"}, "testers": None, "cells": sc,
+            "retention": keeps,
+            # a "–" in What each keeps once it has run any (none before: no row)
+            "notRun": [b["key"] for b in benches if not _has(sc, b["key"])]
+            if any(_has(sc, b["key"]) for b in benches) else []})
+    return out
+
+
 def report(rep: dict, cells: dict) -> dict:
     """the report's payload: its rows with their facts, scores, sources and
     retention, the benchmarks and the notes"""
@@ -173,6 +229,9 @@ def report(rep: dict, cells: dict) -> dict:
                        if r is not base_ours and si["label"] != r["label"] and _has(sc, k)},
             "notRun": [] if spec.get("phone_build") or r is base_ours
             else [b["key"] for b in benches if not _has(sc, b["key"])]})
+    # 29: someone else's model, measured here — after ours, before the published
+    measured = _measured(rep, cells)
+    out += measured
     theirs = {t["label"]: t for t in reports.their_rows(rep)}
     from . import reported
     board, al = reported.board_ids(), reported.aliases()
@@ -212,10 +271,14 @@ def report(rep: dict, cells: dict) -> dict:
     return {"id": rep["id"], "kind": KIND, "title": rep.get("title") or rep["id"],
             "what": rep.get("what") or "", "benchmarks": reports.bench_meta(benches),
             "rows": out, "notes": rep.get("notes") or [],
-            "standIn": {k: v for k, v in si.items() if k != "cells"} if si else None}
+            "standIn": {k: v for k, v in si.items() if k != "cells"} if si else None,
+            # 29: what the measured rows keep a share of, said once
+            "measuredNote": (rep.get("measured_note") or "") if measured else ""}
 
 
 def listing_counts(rep: dict) -> tuple[list[str], int]:
-    """the Reports list's card: our rows shown and the others' count"""
+    """the Reports list's card: our rows shown and the others' count — 29:
+    a model measured here that isn't ours among the others"""
     ours = [o["label"] for o in rep["ours"] if not o.get("base_only")]
-    return ours, sum(1 for t in rep.get("theirs") or [] if not t.get("base_only"))
+    return ours, sum(1 for t in [*(rep.get("measured") or []), *(rep.get("theirs") or [])]
+                     if not t.get("base_only"))

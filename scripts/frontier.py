@@ -324,6 +324,63 @@ RUNTIMES = {
         # a system and a user turn, thinking on or off) the same
         "template_sha256": "f55f52930aa8bf44ab5cb85f99370fcc3c56e9a85640b812086d5330bce5d86b",
     },
+    # 29: NVIDIA Nemotron 3.5 Bolt E4B on our own V100s (dgx-03), on its card's
+    # settings — never the lda runtime: Gemma 4 E4B's architecture (gemma4),
+    # which upstream llama.cpp reads since NVIDIA's own b11459; b11555, the
+    # release card-ornith runs, built for sm_70 under CUDA 12.8 (CUDA 13 has
+    # no Volta) into the runner image's V100 tag. NVIDIA's card: temperature
+    # 1.0 and top-p 0.95 with thinking on or off; the model's shipped default,
+    # its BF16 repository's generation_config.json, adds top-k 64 (as our
+    # Gemma 4 preset has it; masein, 26 Oct); what neither sets is neutral —
+    # min-p 0, no presence or repeat penalty. Each value's source is kept in
+    # the run's settings (`sampling_from`, in setup.json). Thinking is the
+    # template's enable_thinking — its own default is off, so every request
+    # says it. Its context is 64K: each answer's limit is the benchmark's, or
+    # 65,536 less its prompt when that is smaller (`context`)
+    "card-bolt": {
+        "words": "upstream llama.cpp b11555 for the V100 (sm_70), NVIDIA's card settings for "
+                 "Nemotron 3.5 Bolt with its generation_config's top-k, the GGUF's own chat "
+                 "template, its 64K context, no reasoning budget, no speculative decoding, "
+                 "thinking on",
+        "env": {},
+        "thinking": ("on",),
+        # and off for instruction following alone, as lda-2610 (plan I)
+        "off_for": ("ifeval_google", "ifbench_test"),
+        "sampling": {"temperature": 1.0, "top_k": 64, "top_p": 0.95, "min_p": 0.0,
+                     "presence_penalty": 0.0, "repeat_penalty": 1.0},
+        # where each value comes from, kept with the run's settings
+        "sampling_from": {
+            "temperature": "NVIDIA's model card (and generation_config.json)",
+            "top_p": "NVIDIA's model card (and generation_config.json)",
+            "top_k": "generation_config.json, nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-BF16 at "
+                     "49843eed (the model's shipped default; the card sets none)",
+            "min_p": "neutral: neither the card nor generation_config.json sets it",
+            "presence_penalty": "neutral: neither the card nor generation_config.json sets it",
+            "repeat_penalty": "neutral: neither the card nor generation_config.json sets it"},
+        "flags": ["-ctk", "q8_0", "-ctv", "q8_0", "--flash-attn", "on"],
+        # what the box runs when the card refuses those (flash attention with
+        # a q8_0 cache at Bolt's 512-wide global heads on a V100 — checked at
+        # start-up, before a question): said, and recorded in the bundle
+        "attn_fallbacks": [["-ctk", "f16", "-ctv", "f16", "--flash-attn", "on"],
+                           ["-ctk", "f16", "-ctv", "f16", "--flash-attn", "off"]],
+        "build": {"repo": "ggml-org/llama.cpp", "tag": "b11555", "number": 11555,
+                  "commit": "1cf7767765b872806e1bb74cfb55614f4334f02f"},
+        "refuses_env": ("LOOKAHEAD_",),
+        # its two builds, both of NVIDIA's BF16 (nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-BF16
+        # at 49843eed): NVIDIA's own Q4_K_M, and ggml-org's Q8_0 standing in for
+        # the BF16 a V100 doesn't run natively
+        "models": {"served/NVIDIA-Nemotron-3.5-Bolt-E4B-Q4_K_M":
+                   "nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-BF16",
+                   "served/NVIDIA-Nemotron-3.5-Bolt-E4B-Q8_0":
+                   "nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-BF16"},
+        # the GGUFs' own chat template — the BF16 repository's
+        # chat_template.jinja (20,159 bytes), as NVIDIA's Q4_K_M holds it
+        # (Hugging Face's reading of both repositories' GGUF headers)
+        "template_sha256": "35b7d0641b6fb4ee41c3bc623e85bdb7d583c40f6ae9f24514ae58a9d57119f3",
+        # its context: max_position_embeddings, and the card's 64K in and out
+        "context": 65_536,
+        "card": "V100",
+    },
 }
 
 
@@ -399,14 +456,39 @@ RUNTIME_REFUSES = re.compile(r"^(--spec-[a-z-]+|--draft[a-z-]*|-md|--model-draft
                              r"--hf-repo-draft|--reasoning-budget|--moe-stream)$")
 
 
-def runtime_flags(name: str) -> list[str]:
-    """a runtime's llama-server flags: its cache and attention, then its
-    sampling as the server's defaults"""
+def runtime_flags(name: str, attn: list[str] | None = None) -> list[str]:
+    """a runtime's llama-server flags: its cache and attention (29: or one of
+    its fallbacks), then its sampling as the server's defaults"""
     rt = RUNTIMES[name]
-    out = list(rt["flags"])
+    out = list(attn if attn is not None else rt["flags"])
     for k, v in rt["sampling"].items():
         out += [SAMPLING_FLAGS[k], str(v)]
     return out
+
+
+def runtime_flag_sets(name: str) -> list[list[str]]:
+    """29: every launch a runtime allows, in the order a box tries them: its
+    own flags, then each fallback for a card that refuses them"""
+    rt = RUNTIMES[name]
+    return [runtime_flags(name, f) for f in [rt["flags"], *(rt.get("attn_fallbacks") or [])]]
+
+
+def context_cap(name: str) -> int | None:
+    """29: the context a runtime's models hold, when it is smaller than our
+    limits (Bolt's 65,536); None for no cap"""
+    return (RUNTIMES.get(name or "") or {}).get("context")
+
+
+def limit_of(budget: int, prompt_n: int | None, cap: int | None) -> int:
+    """29: an answer's token limit — the benchmark's, or, under a capped
+    context, what is left of it after the prompt when that is smaller (0 when
+    the prompt alone fills it)"""
+    if not cap or prompt_n is None:
+        return budget
+    return max(0, min(budget, cap - prompt_n))
+
+
+CAPPED_WORDS = "limit capped by its 64K context"
 
 
 SAMPLING_WORDS = {"temperature": "temperature", "top_k": "top-k", "top_p": "top-p",
@@ -426,10 +508,11 @@ def runtime_words(name: str) -> str:
             + " ".join(rt["flags"]))
 
 
-def slot_context(tasks: list[str], on: bool) -> int:
+def slot_context(tasks: list[str], on: bool, cap: int | None = None) -> int:
     """the context one llama-server slot needs for the longest of `tasks`:
-    its budget and its prompt's room"""
-    return max(BENCH[t]["budget"]["on" if on else "off"] + BENCH[t]["room"] for t in tasks)
+    its budget and its prompt's room — 29: never more than a capped context"""
+    need = max(BENCH[t]["budget"]["on" if on else "off"] + BENCH[t]["room"] for t in tasks)
+    return min(need, cap) if cap else need
 
 
 def seed_of(task: str, qid: str, epoch: int) -> int:
@@ -1135,10 +1218,11 @@ def parity_items(root: Path, n: int | None = None) -> list[dict]:
 PILOT = {"seed": "frontier-pilot-22", "n": {"gpqa_diamond_epoch": 20, "mmlupro_tiger": 5}}
 
 
-def pilot_items(task: str, root: Path) -> list[dict]:
-    """the pilot's questions of `task`, in the benchmark's order"""
+def pilot_items(task: str, root: Path, each: int | None = None) -> list[dict]:
+    """the pilot's questions of `task`, in the benchmark's order — 29: or
+    `each` of every benchmark (an own box's pilot), picked the same way"""
     items = load(task, root)
-    n = min(PILOT["n"][task], len(items))
+    n = min(each or PILOT["n"][task], len(items))
     pick = sorted(random.Random(f"{PILOT['seed']}:{task}").sample(range(len(items)), n))
     return [items[i] for i in pick]
 
