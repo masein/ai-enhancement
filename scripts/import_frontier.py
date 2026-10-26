@@ -374,6 +374,8 @@ _SETUP_TYPES = {
     # 23c: the card checks, the card's use, the box's price
     "card_checks": [dict], "gpu_use": {"wh": (int, float), "seconds": (int, float)},
     "price": {"per_hour": (int, float)},
+    # 29: one of our own GPUs, by its station, label and GPU
+    "own_box": {"station": str, "label": str, "gpu": int},
 }
 
 
@@ -435,7 +437,8 @@ def setup_problems(setup) -> list[str]:
 
 
 # 23c: what an entry keeps of its bundle's card and energy
-SPENT = ("answers", "card", "energy_wh", "server_s", "cost_usd", "price_per_hour")
+SPENT = ("answers", "card", "energy_wh", "server_s", "cost_usd", "price_per_hour",
+         "own_box")                        # 29: no price: our own GPU
 
 
 def card_of(setup: dict) -> dict | None:
@@ -477,6 +480,9 @@ def spent_of(setup: dict, task: str, answers: int) -> dict:
     if isinstance(price, (int, float)) and not isinstance(price, bool):
         out["price_per_hour"] = price
     card = card_of(setup)
+    # 29: one of our own GPUs: no price to rent — the board says "own box"
+    if isinstance(setup.get("own_box"), dict):
+        out["own_box"] = True
     return {**out, **({"card": card} if card else {})} if out or card else {}
 
 
@@ -708,9 +714,12 @@ def runtime_problem(setup: dict, rec: dict) -> str:
         env = srv.get("env") if isinstance(srv.get("env"), dict) else {}
         flags = [str(x) for x in srv.get("flags") or []]
         miss = [f"{k}={v}" for k, v in rt["env"].items() if env.get(k) != v]
-        want_flags = fb.runtime_flags(got)
-        if flags[:len(want_flags)] != want_flags:
-            miss.append("its flags " + " ".join(want_flags))
+        # 29: its flags, or one of the fallbacks its box ran when the card
+        # refused them (the bundle says which, and why)
+        sets = fb.runtime_flag_sets(got)
+        if not any(flags[:len(w)] == w for w in sets):
+            miss.append("its flags " + " ".join(sets[0])
+                        + (f" (or one of its {len(sets) - 1} fallbacks)" if len(sets) > 1 else ""))
         # 22: what the runtime never gives its server, and the llama.cpp it runs
         miss += [f"no {k}" for k in fb.runtime_env_refused(got, env)]
         built = fb.runtime_build_refused(got, srv.get("build"), srv.get("commit"),
@@ -1289,7 +1298,9 @@ def where_words(gpus: list[str], boxes: list[str]) -> str:
             count[n] = count.get(n, 0) + 1
     g = ", ".join(f"{k} × {n}" if k > 1 else n for n, k in sorted(count.items()))
     b = sorted({str(x) for x in boxes or [] if x})
-    return "rented GPU" + (f" · {g}" if g else "") + (
+    # 29: our own boxes (D3.0: a station's GPU) are ours, not rented
+    own = bool(b) and all(re.fullmatch(r"[A-Z]\d{1,2}\.\d", x) for x in b)
+    return ("our own GPU" if own else "rented GPU") + (f" · {g}" if g else "") + (
         f" · box{'es' if len(b) > 1 else ''} {', '.join(b)}" if b else "")
 
 
@@ -1353,7 +1364,9 @@ BOX_FIELDS = {"label": str, "model": str, "step": str, "thinking": str, "tasks":
               "import_refused": str,            # 18c point 22: the board's words, said on Runs
               # 23c: its card check and its card's use in words, and the
               # slow-card flag the fetch raised, with its numbers
-              "card": str, "use": str, "slow": str, "slow_why": str}
+              "card": str, "use": str, "slow": str, "slow_why": str,
+              # 29: one of our own boxes (a DGX Station's GPU): no price, never destroyed
+              "own": bool}
 QUIET_S = 45 * 60                       # a box not heard from for this long says so
 # 17g: a step done (its box safe to destroy) leaves the list this long after
 # the fetch last saw it — thirty days on it still read "done, safe to destroy"
@@ -1527,10 +1540,11 @@ def _box_read(r: dict, now: float, fbx) -> dict | None:
         try:
             steps = fbx.box_of(r["label"])
             k = int(r["step"].rsplit("-", 1)[1]) if not r["step"].endswith("parity") else 0
-            later = sum(fbx.hours(s) for s in steps[k:] if s[0] != "parity") * 3600
+            own = fbx.own_plan(r["label"])         # 29: a V100's guessed hours
+            later = sum(fbx.hours(s, own) for s in steps[k:] if s[0] != "parity") * 3600
             # 17j: and the step's own benchmarks after the one asked now
             th, _, shard, slots = steps[k - 1] if k else (None, (), "", 8)
-            in_step = sum(fbx.hours((th, (b["task"],), shard, slots)) for b in benches
+            in_step = sum(fbx.hours((th, (b["task"],), shard, slots), own) for b in benches
                           if b["state"] == "next") * 3600 if th else 0.0
         except (SystemExit, ValueError, IndexError, KeyError, TypeError):
             later = in_step = 0.0
@@ -1603,7 +1617,7 @@ def _benchmarks(r: dict, line: str, fbx) -> list[dict]:
 # 17i: a step's state in plain words, as Runs says it. 17j: spelt as a run
 # here is ("running", "done"), never "Running" beside "running"
 STATE_WORDS = {"whole": "done", "asking": "running", "starting": "loading the model",
-               "stopped": "stopped"}
+               "stopped": "stopped", "paused": "paused"}
 
 
 def _ago(seconds: float) -> str:
@@ -1624,6 +1638,9 @@ def step_status(b: dict, now: float) -> tuple[str, str]:
         return "quiet", f"stopped? no word for {_ago(b['quiet_min'] * 60)}"
     if st == "stopped":
         return "stopped", "stopped" + (f": {b['why']}" if b.get("why") else "")
+    if st == "paused":
+        # 29: our own GPU, someone else's process on it — waiting, not failed
+        return "paused", "paused" + (f": {b['why']}" if b.get("why") else "")
     key = {"whole": "done", "asking": "running", "starting": "loading"}.get(st, "loading")
     return key, STATE_WORDS.get(st, "loading the model")
 
@@ -1700,6 +1717,9 @@ def rented_runs(boxes: list[dict], now: float, posted: float | None) -> list[dic
             status, words = "running", "running"
         elif "loading" in keys:
             status, words = "loading", "loading the model"
+        elif "paused" in keys:
+            # 29: waiting for our own GPU to be free — said with why
+            status, words = "paused", next(w for k, w in st if k == "paused")
         elif keys <= {"unreached", "done"}:
             status, words = "unreached", next(w for k, w in st if k == "unreached")
         else:
@@ -1728,7 +1748,8 @@ def rented_runs(boxes: list[dict], now: float, posted: float | None) -> list[dic
         finish = max(fin) if open_ and all(
             k == "running" and f for (_, k), f in zip(open_, fin)) else None
         odd = [f"{b.get('label')} · {b.get('step')}: {w}" for b, (k, w) in zip(steps, st)
-               if k not in ("running", "done", "loading") and status in ("running", "loading")]
+               if k not in ("running", "done", "loading") and status in ("running", "loading",
+                                                                          "paused")]
         # heard: when the box last spoke — for a step gone quiet, its last
         # word (the fetch reached the box just now, and read nothing new)
         said = [(b.get("at") if k == "quiet" else b.get("heard")) or 0
@@ -1755,8 +1776,11 @@ def rented_runs(boxes: list[dict], now: float, posted: float | None) -> list[dic
                      for b, (k, _) in zip(steps, st) if b.get("slow") and k != "done"],
             **({"import_refused": refused[:300]} if refused else {}),
             "heard": heard, "behind": behind, "started_at": started[0] if started else None,
-            "where": "rented GPU · " + (f"box {labels[0]}" if len(labels) == 1 else
-                                        f"boxes {', '.join(labels)}")
+            # 29: our own GPUs said as ours — no price, never destroyed
+            **({"own": True} if any(b.get("own") for b in steps) else {}),
+            "where": ("our own GPU · " if any(b.get("own") for b in steps) else "rented GPU · ")
+                     + (f"box {labels[0]}" if len(labels) == 1 else
+                        f"boxes {', '.join(labels)}")
                      + "".join(f" · {x}" for x in mine),
             "boxes": [{"label": b.get("label"), "step": b.get("step"), "status": k,
                        "words": w, "n": b.get("n"), "of": b.get("of"), "shard": b.get("shard"),
@@ -1770,7 +1794,7 @@ def rented_runs(boxes: list[dict], now: float, posted: float | None) -> list[dic
                        "behind": bool(posted and b.get("heard") and b["heard"] < posted - 60)
                        or k in ("unreached", "quiet")}
                       for b, (k, w), h in zip(steps, st, said)]})
-    order = {"running": 0, "loading": 1, "unreached": 2, "stopped": 3, "done": 4}
+    order = {"running": 0, "loading": 1, "paused": 2, "unreached": 2, "stopped": 3, "done": 4}
     return sorted(out, key=lambda r: (order.get(r["status"], 9), r["hf_id"] or "", r["tasks"]))
 
 

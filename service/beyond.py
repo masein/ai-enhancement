@@ -414,7 +414,11 @@ def spent(d: Path) -> dict:
     a box (its speeds: the median over the boxes and the range), and each
     benchmark's watt-hours and dollars an answer over its bundles (its
     shards'): watt-hours only where every bundle has them, dollars only
-    where every box was given its price. {} for a row with none"""
+    where every box was given its price. {} for a row with none. 29: the
+    card checks a card at a time (`by_card`) — a V100's never in one median
+    with an RTX 5090's: the row's `probe` is its one card's, and none when
+    its boxes had several; and a benchmark run on our own boxes alone says so
+    (`own_box`: no price to rent, never $0)"""
     try:
         reg = json.loads((d / "frontier_imports.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -442,6 +446,9 @@ def spent(d: Path) -> dict:
                                for p in parts):
             b["usd"] = sum(p["cost_usd"] for p in parts)
             b["usd_per_answer"] = b["usd"] / n
+        # 29: on our own boxes alone (dgx-03's V100s): nothing to rent
+        if parts and all(p.get("own_box") is True for p in parts):
+            b["own_box"] = True
         if b:
             benches[t] = {**b, "answers": n, "boxes": len(parts)}
     if not cards and not benches:
@@ -449,17 +456,30 @@ def spent(d: Path) -> dict:
     _scripts()
     import import_frontier as imf
     names = sorted({imf.short_gpu(c.get("name")) for c in cards if imf.short_gpu(c.get("name"))})
-    ns = [c["together_n"] for c in cards if isinstance(c.get("together_n"), int)]
+
+    def probe(cs: list[dict]) -> dict:
+        ns = [c["together_n"] for c in cs if isinstance(c.get("together_n"), int)]
+        return {"boxes": len(cs), "probe": {k: _spread([c.get(k) for c in cs]) for k in CARD_KEYS},
+                "together_n": statistics.mode(ns) if ns else None}
+    by_card = {name: probe([c for c in cards if imf.short_gpu(c.get("name")) == name])
+               for name in names}
+    one = probe(cards)
     return {"cards": names, "boxes": len(cards),
-            "probe": {k: _spread([c.get(k) for c in cards]) for k in CARD_KEYS},
-            "together_n": statistics.mode(ns) if ns else None, "benches": benches}
+            # 29: one card's medians, never two cards' mixed
+            "probe": one["probe"] if len(names) <= 1 else {},
+            "together_n": one["together_n"], "by_card": by_card,
+            **({"own_box": True} if benches and all(b.get("own_box") for b in benches.values())
+               else {}),
+            "benches": benches}
 
 
 def report_label(mid: str) -> str | None:
-    """a row's name in a report ("step8804"), for a sentence"""
+    """a row's name in a report ("step8804"), for a sentence — 29: a model
+    measured here that isn't ours by its name there too"""
     from . import reports
     return next((o.get("label") for r in reports.files().values()
-                 for o in r.get("ours") or [] if o.get("row") == mid and o.get("label")), None)
+                 for o in [*(r.get("ours") or []), *(r.get("measured") or [])]
+                 if o.get("row") == mid and o.get("label")), None)
 
 
 def speed_of(mid: str, kept_benches: dict) -> dict | None:

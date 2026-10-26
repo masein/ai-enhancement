@@ -49,6 +49,32 @@ ANSWERS = "answers.jsonl"
 SETUP = "setup.json"
 SUB = "frontier"                     # the answers' folder in the task's
 
+# 29: on one of our own boxes, a GPU shared with colleagues — a callable that
+# says why the run should pause ('' to go on): someone else's process on the
+# card. Asked before each benchmark (fresh=True) and before each question (it
+# reads the card at most once a minute itself). Set by scripts/remote_gguf.py
+# --own; None everywhere else
+PAUSE = None
+
+
+class Paused(Exception):
+    """29: the run stopped asking because the GPU is wanted by someone else —
+    the answers in flight finished and kept, nothing else started"""
+
+    def __init__(self, done: int, total: int, why: str):
+        super().__init__(why)
+        self.done, self.total, self.why = done, total, why
+
+
+def pause_why(fresh: bool = False) -> str:
+    """29: '' to go on, else why this run pauses (PAUSE's words)"""
+    if PAUSE is None:
+        return ""
+    try:
+        return str(PAUSE(fresh) or "")
+    except Exception as e:                              # noqa: BLE001 — a card unread pauses
+        return f"the GPU couldn't be checked for other processes ({e})"
+
 
 def task_dir(row: Path, task: str) -> Path:
     return Path(row) / f"{task}_0shot" / SUB
@@ -121,6 +147,10 @@ def _setup(rec: dict, task: str, on: bool, s: dict) -> dict:
         "server": {"file": pin.get("file") or "", "size": pin.get("size"),
                    "build": pin.get("build") or ""},
         "launch": {"flags": rec.get("flags") or "", "env": rec.get("env") or ""},
+        # 29: a model whose context is smaller than our limits (Bolt's 64K):
+        # each answer's limit is in its line ("limit")
+        **({"context_cap": fb.context_cap(rec.get("runtime"))}
+           if fb.context_cap(rec.get("runtime")) else {}),
         # 17c: the launch as the import compares it — routing and speculative
         # decoding, read from the flags, the environment and "How it's
         # served" — so reordered flags, slots and context don't count
@@ -281,7 +311,10 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
         """the first EARLY answers' thinking, once there are that many"""
         if early["checked"]:
             return ""
-        got = [r["answer"] for r in read_answers(path).values() if not r.get("unanswered")]
+        # 29: never one with no room to answer at all (a prompt that filled a
+        # capped context): it has no thinking to look at
+        got = [r["answer"] for r in read_answers(path).values()
+               if not r.get("unanswered") and not r.get("no_room")]
         if len(got) < EARLY:
             return ""
         early["checked"] = True
@@ -300,14 +333,53 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
             count["n"] += 1
             return count["n"]
 
+    cap = fb.context_cap(rec.get("runtime"))
+    paused: list[str] = []
+
     def one(job) -> None:
         it, e = job
-        if halt or canceled():
+        if halt or canceled() or paused:
+            return
+        # 29: someone else's process on our own box's GPU — nothing more is
+        # started; the answers in flight finish and are kept
+        why = pause_why()
+        if why:
+            with lock:
+                if not paused:
+                    paused.append(why)
             return
         text, _ = fb.prompt(task, it)
         seed = fb.seed_of(task, it["id"], e)
         # HLE's system message, CAIS's
         si = {**s, "seed": seed, **({"system": fb.system_of(task)} if fb.system_of(task) else {})}
+        capped = {}
+        if cap:
+            # 29: a 64K context — the limit is the benchmark's, or what the
+            # context leaves after this question's prompt when that is less,
+            # kept in its line
+            try:
+                n = served.prompt_tokens(rec, text, si)
+            except served.ItemError as x:
+                with lock:
+                    failed[(it["id"], e)] = f"its prompt couldn't be counted ({x})"
+                return
+            except served._Retry as x:
+                with lock:
+                    halt.append(served.ServerStopped(0, 0, str(x), refused=(
+                        "the server didn't count a prompt's tokens (its /tokenize)")))
+                return
+            si["max_tokens"] = fb.limit_of(s["max_tokens"], n, cap)
+            capped = {"limit": si["max_tokens"],
+                      **({"capped": True} if si["max_tokens"] < s["max_tokens"] else {})}
+            if si["max_tokens"] <= 0:
+                # the prompt alone fills the context: no room to answer, so
+                # wrong — as an answer that runs out of room
+                k = write({"id": it["id"], "epoch": e, "seed": seed, "answer": "",
+                           "finish": "length", "tokens": 0, "at": round(time.time(), 3),
+                           "prompt_tokens": n, **capped, "no_room": True})
+                if progress:
+                    progress(k, total, (time.time() - t0) / max(1, k - n0))
+                return
         try:
             a = served.answer_one(rec, text, si)
         except served.ServerStopped as x:
@@ -342,7 +414,8 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
                 **(getattr(a, "timings", None) or {}),
                 **({"prompt_tokens": a.prompt_tokens}
                    if getattr(a, "prompt_tokens", None) is not None else {}),
-                **({"wall_s": a.wall_s} if getattr(a, "wall_s", None) is not None else {})}
+                **({"wall_s": a.wall_s} if getattr(a, "wall_s", None) is not None else {}),
+                **capped}
         if a.fallback:
             line["fallback"] = a.fallback
         n = write(line)
@@ -363,6 +436,10 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
     with ThreadPoolExecutor(max_workers=served.concurrency(rec)) as pool:
         list(pool.map(one, todo))
     stop_if_halted()
+    if paused:
+        # 29: the questions not started are asked when the run carries on;
+        # the ones the server failed on, then too
+        raise Paused(count["n"], total, paused[0])
     if failed and not canceled():
         # 17c: each one the server failed on is asked once more; failing
         # again, it is written as no answer — counted wrong, named in the log
@@ -1311,11 +1388,13 @@ def run(sid: int, sub: dict, rec: dict, th: dict, row: Path, log_path: Path) -> 
     # left, and every one that fits is asked: at -c 83,968 three were asked,
     # then HLE stopped the run, and two that fit never were
     ctx = (rec.get("pin") or {}).get("ctx")
-    big = [t for t in tasks if isinstance(ctx, int) and 0 < ctx < fb.slot_context([t], on)]
+    # 29: a model's own context caps what a slot needs (Bolt's 64K)
+    cap = fb.context_cap(rec.get("runtime"))
+    big = [t for t in tasks if isinstance(ctx, int) and 0 < ctx < fb.slot_context([t], on, cap)]
     if big:
         skip = (f"{', '.join(fb.BENCH[t]['label'] for t in big)}: its server's context is "
                 f"{ctx:,} tokens a slot, and thinking {'on' if on else 'off'} needs "
-                + ", ".join(f"{fb.slot_context([t], on):,}" for t in big)
+                + ", ".join(f"{fb.slot_context([t], on, cap):,}" for t in big)
                 + " (the budget and the prompt) — start it with a larger -c, or run its GGUF on "
                 "a rented GPU. " + ("Nothing was asked" if len(big) == len(tasks) else
                                     "Not asked; the rest are"))
@@ -1326,6 +1405,13 @@ def run(sid: int, sub: dict, rec: dict, th: dict, row: Path, log_path: Path) -> 
         tasks = [t for t in tasks if t not in big]
     for task in tasks:
         label = fb.BENCH[task]["label"]
+        # 29: between benchmarks, the card read again — someone else's process
+        # on our own box's GPU pauses the run before this one starts
+        why = pause_why(fresh=True)
+        if why:
+            line = f"paused before {label}: {why}; the answers are kept"
+            log(f"[frontier] {line}")
+            return "paused", " · ".join([*lines, line])
 
         def progress(n: int, total: int, each: float, label=label) -> None:
             left = (total - n) * each
@@ -1354,6 +1440,11 @@ def run(sid: int, sub: dict, rec: dict, th: dict, row: Path, log_path: Path) -> 
             line += served.KEPT_FOR_NEXT
             log(f"[frontier] {line} ({status_of(e.why)})")
             return "failed", line
+        except Paused as e:
+            line = (f"{label}: paused at {e.done:,} of {e.total:,} — {e.why}; the answers are "
+                    "kept")
+            log(f"[frontier] {line}")
+            return "paused", " · ".join([*lines, line])
         if db.cancel_requested(sid):
             return "canceled", f"{label}: stopped at {n:,} of {total:,}; the answers are kept"
         log(f"[frontier] {task}: {n:,} of {total:,} answered")

@@ -76,7 +76,8 @@ def test_the_on_device_report(live, page, width, scheme):
                              "Ternary Bonsai 2 4B", "Gemma 4 E4B", "Gemma 4 E2B",
                              "Ternary Bonsai 2 2B", "Bonsai 27B (1-bit)",
                              "NVIDIA-Nemotron-3.5-Bolt-E4B"]                 # 27f: IFBench alone
-    assert page.locator("[data-mt-empty]").get_attribute("data-mt-empty") == "1"
+    # 29: and NVIDIA Nemotron 3.5 Bolt E4B's measured Q4_K_M, not run in this world
+    assert page.locator("[data-mt-empty]").get_attribute("data-mt-empty") == "2"
     # every cell says where it is from: its mark and italics, a published one's letter
     # linking its source; the source once in the row's line, linked
     e0 = page.locator("[data-od-cell='Edge0-35B-A3B-preview|gpqa']")

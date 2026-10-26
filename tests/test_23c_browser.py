@@ -105,7 +105,9 @@ def test_the_speed_and_energy_part_draws(live, page, width, scheme):
     assert page.locator(f"[data-by-wh='{GPQA}']").inner_text() == "0.75 Wh"      # 90 Wh / 120
     assert page.locator(f"[data-by-usd='{GPQA}']").inner_text() == "$0.0045"     # $0.54 / 120
     assert page.locator(f"[data-by-wh='{HLE}']").inner_text() == "9.1 Wh"
-    assert part.locator("h4").nth(1).inner_text() == "Each benchmark, with 8 answers at once"
+    # 29: labelled with its card, as every speed is
+    assert part.locator("h4").nth(1).inner_text() == (
+        "Each benchmark, with 8 answers at once on an RTX 5090")
     # 23b's chart, its last group said: 260 graded answers, 160 left out
     left = page.locator("[data-by-cal-left]")
     assert left.inner_text() == "the error leaves out the 160 most confident answers, as CAIS’s does."
@@ -127,8 +129,9 @@ def test_the_scorecards_two_columns(live, page, width, scheme):
     sec.wait_for(timeout=30000)
     alone = page.locator(f"[data-by-cell='{S4}:alone']")
     assert alone.inner_text() == "142"
-    assert alone.get_attribute("title") == ("output tokens a second for one user: the median "
-                                            "over 3 boxes (138–145)")
+    # 29: its card said with it
+    assert alone.get_attribute("title") == ("output tokens a second for one user on an RTX 5090: "
+                                            "the median over 3 boxes (138–145)")
     assert page.locator(f"[data-by-cell='{S4}:gpqa-wh']").inner_text() == "0.75 Wh"
     for c in ("alone", "gpqa-wh"):                    # step8804: from the next run on
         x = page.locator(f"[data-by-cell='step8804:{c}']")

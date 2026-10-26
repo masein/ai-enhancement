@@ -76,6 +76,22 @@ file, and the step's watt-hours shared among its benchmarks by the seconds
 their answers took. --price, the box's dollars an hour, kept in the setup:
 the board works out dollars an answer from it, and never without it.
 
+29: --own, one GPU of our own DGX Station (a label D3.0: station D3's GPU 0,
+its container started by scripts/own_box.sh with --gpus device=0). The GPU
+is colleagues' too: the step doesn't start while another process uses it
+(scripts/gpu_free.py, the GPU named), and while it asks, someone else's
+process appearing pauses it — the answers in flight finish, nothing else
+starts, its server stops, its progress says "paused" and why, and it exits
+75 (frontier_box.py waits for the GPU to be free, then carries on). No price
+(an own box costs nothing to rent: the board says "own box"). --runtime
+card-bolt: a model whose context is 64K — each slot holds 65,536 tokens, each
+answer's limit is the benchmark's or what is left of 65,536 after its prompt
+(kept in its line), and the server's flash attention with a q8_0 cache is
+checked on the card before a question: refused, the runtime's next launch is
+run, said and recorded. --pilot-each 5: the pilot asks 5 questions of each
+benchmark given (--only; all when none), thinking on or (IFEval and IFBench)
+off.
+
 The token is typed, never on the command line (where the shell's history
 would keep it):
 
@@ -133,6 +149,16 @@ ENV = {"BENCH_ROOT": "BENCH_ROOT", "RESULTS_ROOT": "OUT_ROOT", "LOGS_DIR": "LOGS
        "SERVED_RETRY_S": "SERVED_RETRY_S", "GPU_POLL_S": "GPU_POLL_S",
        "FRONTIER_ASK_WRITTEN_OFF": "FRONTIER_ASK_WRITTEN_OFF"}
 WHERE = "a rented GPU"
+OWN_WHERE = "our own GPU"           # 29: a DGX Station's, shared with colleagues
+PAUSED = 75                         # 29: the exit of a step paused for someone else's process
+# 29: a box label on our own station — D3.0, station D3's GPU 0
+OWN_LABEL = re.compile(r"^(?P<station>[A-Z]\d{1,2})\.(?P<gpu>\d)$")
+
+
+def own_box(label: str) -> dict | None:
+    """29: {station, label, gpu} of an own box's label; None for another"""
+    m = OWN_LABEL.match(label or "")
+    return {"station": m["station"], "label": label, "gpu": int(m["gpu"])} if m else None
 
 
 def settings(out: Path, slots: int, shard: tuple[int, int] | None,
@@ -141,7 +167,8 @@ def settings(out: Path, slots: int, shard: tuple[int, int] | None,
     return {"BENCH_ROOT": bench, "RESULTS_ROOT": bench / "results", "LOGS_DIR": bench / "logs",
             "DB_PATH": bench / "service.sqlite3",
             "FRONTIER_SHARD": f"{shard[0]}/{shard[1]}" if shard else "",
-            "FRONTIER_SCORE_AFTER_RUN": False, "FRONTIER_WHERE": WHERE,
+            "FRONTIER_SCORE_AFTER_RUN": False,
+            "FRONTIER_WHERE": OWN_WHERE if STEP.get("own") else WHERE,
             "SERVED_CONCURRENCY": slots,
             # a thinking answer of 81,920 tokens (17f's limits), at a slot's pace
             "SERVED_TIMEOUT_S": int(os.environ.get("SERVED_TIMEOUT_S") or 7200),
@@ -622,12 +649,41 @@ def cache_types(flags: list[str]) -> tuple[str, str]:
     return k, v
 
 
+def _full_layers(shape: dict) -> list[int]:
+    """29: the layers whose cache holds the whole context — every layer with
+    attention, but those sharing an earlier layer's cache and those with a
+    sliding window (Gemma 4 E4B: 4 of its 42)"""
+    swa = (shape.get("swa") or {}).get("layers") or []
+    n = shape.get("kv_layers") or len(shape["kv_heads"])
+    return [i for i in range(min(n, len(shape["kv_heads"])))
+            if not (i < len(swa) and swa[i])]
+
+
 def kv_per_token(shape: dict, ctk: str, ctv: str) -> float | None:
-    """bytes of KV cache a token takes, every layer with attention"""
+    """bytes of KV cache a token takes, every layer with attention — 29: whose
+    cache holds the whole context (_full_layers)"""
     if ctk not in CACHE_BYTES or ctv not in CACHE_BYTES:
         return None
-    return sum(h * (shape["key_length"] * CACHE_BYTES[ctk]
-                    + shape["value_length"] * CACHE_BYTES[ctv]) for h in shape["kv_heads"])
+    return sum(shape["kv_heads"][i] * (shape["key_length"] * CACHE_BYTES[ctk]
+                                       + shape["value_length"] * CACHE_BYTES[ctv])
+               for i in _full_layers(shape))
+
+
+SWA_UBATCH = 512                    # 29: llama-server's -ub, kept beside a window's tokens
+
+
+def swa_per_slot(shape: dict, ctk: str, ctv: str) -> float:
+    """29: a slot's cache for the sliding window's layers — the window and a
+    batch's tokens, whatever the context (llama.cpp's iswa cache)"""
+    swa = shape.get("swa")
+    if not swa or ctk not in CACHE_BYTES or ctv not in CACHE_BYTES:
+        return 0.0
+    n = shape.get("kv_layers") or len(shape["kv_heads"])
+    per = sum(shape["kv_heads"][i] * (swa["key_length"] * CACHE_BYTES[ctk]
+                                      + swa["value_length"] * CACHE_BYTES[ctv])
+              for i in range(min(n, len(shape["kv_heads"]), len(swa["layers"])))
+              if swa["layers"][i])
+    return per * (swa["window"] + SWA_UBATCH)
 
 
 def recurrent_per_slot(shape: dict) -> float:
@@ -685,7 +741,8 @@ def kv_fit(src: str, flags: list[str], slots: int, ctx: int,
     per_token = kv_per_token(shape, ctk, ctv)
     if per_token is None:
         return None, f"the cache type {ctk}/{ctv} isn't one this check knows"
-    per_slot = (per_token + CTX_BUFFERS) * ctx + recurrent_per_slot(shape)
+    per_slot = ((per_token + CTX_BUFFERS) * ctx + recurrent_per_slot(shape)
+                + swa_per_slot(shape, ctk, ctv))
     card = memory_mib * 1024 ** 2
     fixed = fixed_bytes(shape)
     room = card - size - fixed - ROOM
@@ -753,16 +810,24 @@ def _get(url: str, timeout: float = 5) -> tuple[int, bytes]:
         return 0, b""
 
 
+def _started(s: "Server", timeout: float, say, gguf: Path) -> "Server":
+    """29: a Server, started (or SystemExit, said in its words)"""
+    s.start(timeout, say, gguf)
+    return s
+
+
 class Server:
     """llama-server on 127.0.0.1, started and stopped"""
 
     def __init__(self, srv: dict, gguf: Path, port: int, slots: int, ctx: int,
-                 flags: list[str], env: dict, log: Path):
-        self.argv = [str(srv["bin"]), "-m", str(gguf), "--host", "127.0.0.1", "--port", str(port),
+                 flags: list[str], env: dict, log: Path, host: str = "127.0.0.1"):
+        # 29: --serve binds the container's every address — its port is
+        # published on the station's loopback alone (scripts/own_box.sh serve)
+        self.argv = [str(srv["bin"]), "-m", str(gguf), "--host", host, "--port", str(port),
                      "-c", str(ctx * slots), "-np", str(slots), "-ngl", "99", "--jinja",
                      "--metrics", *flags]
         self.env, self.log, self.port = server_env(srv, env), log, port
-        self.base = f"http://127.0.0.1:{port}"
+        self.base, self.slots = f"http://127.0.0.1:{port}", slots
         self.proc: subprocess.Popen | None = None
 
     def taken(self) -> bool:
@@ -959,7 +1024,11 @@ def make_bundle(out: Path, served_as: str, thinking: bool, tasks: list[str], sta
              **({"runtime": rec["runtime"]} if rec.get("runtime") else {}),
              "based_on": rec.get("based_on") or "", "thinking": "on" if thinking else "off",
              "gguf": gguf, "server": server, "tasks": per, "gpu": rb.gpu_info(),
-             "where": WHERE, "runner": "service/runner.py → service/frontier.py, called directly",
+             "where": OWN_WHERE if STEP.get("own") else WHERE,
+             "runner": "service/runner.py → service/frontier.py, called directly",
+             # 29: one GPU of our own station — its station, label and GPU,
+             # never its address; it has no price
+             **({"own_box": dict(STEP["own"])} if STEP.get("own") else {}),
              "board_commit": board_commit(), "sessions": state.get("sessions", 1),
              # 17f: G5's box, and the runner image's tag (the board's commit it was built at)
              "box": state.get("label") or None, "image": (board_commit() or "")[:7] or None,
@@ -1021,6 +1090,13 @@ def not_apart(r: dict) -> str:
         return ""
     if r.get("fallback"):
         return "asked without the server's chat parsing (its chat endpoint failed on it twice)"
+    if r.get("thinking") == "off":
+        # 29: thinking off — none at all, apart or in the reply
+        if r.get("thinking_apart") or r.get("thinking_chars"):
+            return "thinking, with thinking off"
+        if r.get("reply_tags"):
+            return "think tags in the reply"
+        return "" if r.get("reply_chars") else "an empty reply"
     if not r.get("thinking_apart"):
         return "no thinking apart from the reply (reasoning_content empty)"
     if r.get("reply_tags"):
@@ -1028,6 +1104,129 @@ def not_apart(r: dict) -> str:
     if not r.get("reply_chars"):
         return "an empty reply"
     return ""
+
+
+def serve_here(a: argparse.Namespace, srv: dict, gguf_path: Path, gguf: dict, flags: list[str],
+               env: dict, ctx: int, out: Path, say, own: dict | None,
+               sleep=time.sleep, every: float = 30.0) -> int:
+    """29: the GGUF served on --serve's port for the board's own runner, until
+    stopped (Ctrl-C, or own_box.sh stop) — the Mobile and Standard benchmarks
+    run on the board as for any served model, over an SSH tunnel from the
+    server. On our own GPU, someone else's process stops the server (the
+    board's run stops, its answers kept) until the GPU is free again"""
+    import gpu_free
+    s = Server(srv, gguf_path, a.serve, a.slots, ctx, flags, env, out / SERVER_LOG,
+               host="0.0.0.0")
+    while True:
+        s.start(a.load_timeout, say, gguf_path)
+        gate = gpu_free.Gate(a.label, {s.proc.pid}, gpu_free.used_mib()) if own else None
+        say(f"serving {gguf['name']} (sha256 {gguf['sha256'][:16]}) on port {a.serve}: "
+            f"{a.slots} slots of {ctx:,} tokens · {' '.join(flags)}"
+            + (f" · {a.label}'s GPU read every {every:.0f} s for other processes" if gate else ""))
+        why = ""
+        while s.proc is not None and s.proc.poll() is None:
+            sleep(every)
+            why = gate(True) if gate else ""
+            if why:
+                break
+        tail = s.tail(20)
+        s.stop()
+        if not why:
+            raise SystemExit(f"llama-server stopped serving:\n{tail}")
+        say(f"{why} — the server is stopped until the GPU is free (nothing of theirs is touched)")
+        while gpu_free.busy(a.label):
+            sleep(60)
+
+
+# ---------------------------------------------------------------------------
+# 29: a runtime's attention on this card — card-bolt's flash attention with a
+# q8_0 cache at Bolt's 512-wide heads on a V100 (sm_70) is checked before a
+# question, its fallbacks after it when the card refuses it
+# ---------------------------------------------------------------------------
+
+ATTN_FILE = "attention.json"        # in the shared files folder: once a box
+ATTN_LONG, ATTN_SHORT = 4096, 256   # a long prompt alone, then short ones side by side
+
+
+def attn_probe(base: str, slots: int, alive) -> str:
+    """'' when the server reads a long prompt alone and answers several short
+    ones at once — each way its attention runs (a prompt's batch, one token,
+    a batch of slots); else why not"""
+    from concurrent.futures import ThreadPoolExecutor
+    try:
+        toks = cc.tokens_of(base)
+        cc.complete(base, cc.prompt(toks, ATTN_LONG), 32)
+        n = max(1, min(slots, 4))
+        with ThreadPoolExecutor(n) as pool:
+            list(pool.map(lambda i: cc.complete(base, cc.prompt(toks, ATTN_SHORT, 37 * (i + 1)),
+                                                64), range(n)))
+    except Exception as e:                              # noqa: BLE001 — said, the next tried
+        return f"{type(e).__name__}: {e}"[:300]
+    return "" if alive() else "llama-server stopped"
+
+
+def attn_words(flags: list[str]) -> str:
+    """"flash attention on with a q8_0 cache" """
+    k, v = cache_types(flags)
+    fa = next((flags[i + 1] for i, f in enumerate(flags[:-1]) if f in ("--flash-attn", "-fa")),
+              "auto")
+    cache = k if k == v else f"{k} keys and {v} values"
+    return f"flash attention {fa} with a {cache} cache"
+
+
+def attn_flags(rt_name: str, flags: list[str], start, files: Path, key: str, say
+               ) -> tuple[list[str], dict]:
+    """(the flags to run, what was found) — the runtime's own launch, else the
+    first fallback this card runs, each started with `start(flags)` (a Server,
+    up, or SystemExit) and probed. Kept by `key` (the build, the file, the
+    card) in the box's files folder, so the next step runs what this one found"""
+    sets = fb.runtime_flag_sets(rt_name)
+    extra = flags[len(sets[0]):] if flags[:len(sets[0])] == sets[0] else []
+    memo = files / ATTN_FILE
+    try:
+        known = json.loads(memo.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        known = {}
+    got = known.get(key) if isinstance(known, dict) else None
+    if isinstance(got, dict) and got.get("flags") in sets:
+        say(f"attention on this card: {attn_words(got['flags'])}, as checked at "
+            f"{got.get('at', '?')}" + (" — " + "; ".join(
+                f"{attn_words(r['flags'])} refused" for r in got.get("refused") or [])
+                if got.get("refused") else ""))
+        return got["flags"] + extra, got
+    refused = []
+    for fs in sets:
+        try:
+            proc = start(fs + extra)
+        except SystemExit as e:
+            refused.append({"flags": fs, "why": str(e.code)[-600:]})
+            say(f"{attn_words(fs)}: llama-server didn't start on this card — trying the next")
+            continue
+        try:
+            why = attn_probe(proc.base, proc.slots,
+                             lambda: proc.proc is not None and proc.proc.poll() is None)
+            tail = proc.tail(12) if why else ""
+        finally:
+            proc.stop()
+        if not why:
+            rec = {"flags": fs, "refused": refused,
+                   "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+            say(f"attention on this card: {attn_words(fs)} answers a {ATTN_LONG:,}-token prompt "
+                "and short ones side by side"
+                + (" — " + "; ".join(f"{attn_words(r['flags'])} refused" for r in refused)
+                   if refused else ""))
+            if isinstance(known, dict):
+                known[key] = rec
+                try:
+                    memo.write_text(json.dumps(known, indent=1), encoding="utf-8")
+                except OSError:
+                    pass
+            return fs + extra, rec
+        refused.append({"flags": fs, "why": f"{why}\n{tail}"[-600:]})
+        say(f"{attn_words(fs)} failed on this card ({why}) — trying the next")
+    raise SystemExit(f"runtime {rt_name}: none of its launches ran on this card — "
+                     + "; ".join(f"{attn_words(r['flags'])}: {r['why'].splitlines()[0][:160]}"
+                                 for r in refused) + ". Nothing was asked")
 
 
 def pilot_line(r: dict, k: int, of: int) -> str:
@@ -1061,23 +1260,28 @@ def pilot_verdict(rows: list[dict]) -> tuple[bool, str]:
                    f"{why}. Don't rent the other boxes yet")
 
 
-def pilot_ask(rec: dict, tasks: list[str], out: Path, say, slots: int) -> dict:
+def pilot_ask(rec: dict, tasks: list[str], out: Path, say, slots: int, each: int = 0,
+              on: bool = True) -> dict:
     """fb.PILOT's questions of each task, `slots` at a time, a task after the
     other: each answer's line as it lands, each task's summary, and the
-    verdict — {separated, verdict, paces}"""
+    verdict — {separated, verdict, paces}. 29: `each` questions of every task
+    instead (an own box's pilot), thinking `on` or off, each answer's limit
+    capped by the model's context as the run caps it, and whether it ended in
+    a loop (27f's rule)"""
     from concurrent.futures import ThreadPoolExecutor
 
     from service import config, served
     from service import frontier as sf
     fb.set_root(config.BENCH_ROOT)
-    dest = out / PILOT_FILE
+    dest = out / (PILOT_FILE if not each else f"pilot-thinking-{'on' if on else 'off'}.jsonl")
     dest.unlink(missing_ok=True)                # asked again, the pilot starts again
     lock = threading.Lock()
     rows: list[dict] = []
     paces: dict[str, dict] = {}
+    cap = fb.context_cap(rec.get("runtime"))
     for task in tasks:
-        items = fb.pilot_items(task, config.BENCH_ROOT)
-        s = sf.settings(rec, task, True)
+        items = fb.pilot_items(task, config.BENCH_ROOT, each or None)
+        s = sf.settings(rec, task, on)
         done = {"n": 0}
 
         def one(it: dict, task=task, s=s, n=len(items)) -> None:
@@ -1085,6 +1289,16 @@ def pilot_ask(rec: dict, tasks: list[str], out: Path, say, slots: int) -> dict:
             seed = fb.seed_of(task, it["id"], 0)
             si = {**s, "seed": seed,
                   **({"system": fb.system_of(task)} if fb.system_of(task) else {})}
+            limit = {}
+            if cap:
+                try:
+                    k = served.prompt_tokens(rec, text, si)
+                except (served.ItemError, served._Retry) as e:
+                    raise SystemExit(f"pilot: the server didn't count a prompt's tokens ({e})"
+                                     ) from None
+                si["max_tokens"] = fb.limit_of(s["max_tokens"], k, cap)
+                limit = {"prompt_tokens": k, "limit": si["max_tokens"],
+                         "capped": si["max_tokens"] < s["max_tokens"]}
             t0 = time.time()
             try:
                 a = served.answer_one(rec, text, si)
@@ -1098,6 +1312,8 @@ def pilot_ask(rec: dict, tasks: list[str], out: Path, say, slots: int) -> dict:
                 {"read": None, "ok": False, "ran_out": False}
             content = a.content or ""
             r = {"task": task, "id": str(it["id"]), "seed": seed, "seconds": round(secs, 1),
+                 "thinking": "on" if on else "off", **limit,
+                 "loop": fb.ended_in_loop(answer, fb.ran_out(answer, a.finish)),
                  "tokens": a.tokens, "finish": a.finish,
                  "thinking_chars": len(fb.thinking_of(answer)), "reply_chars": len(content.strip()),
                  "thinking_apart": bool(a.reasoning_chars),
@@ -1119,12 +1335,20 @@ def pilot_ask(rec: dict, tasks: list[str], out: Path, say, slots: int) -> dict:
         mine = [r for r in rows if r["task"] == task]
         mean = sum(r["seconds"] for r in mine) / max(1, len(mine))
         at_once = min(slots, len(mine)) or 1
+        out_toks = sum(r["tokens"] or 0 for r in mine)
         paces[task] = {"answers": len(mine), "right": sum(r["ok"] for r in mine),
                        "mean_s": round(mean, 1), "wall_s": round(wall, 1), "at_once": at_once,
                        # the box's seconds an answer, `at_once` asked side by side —
                        # what plan L's paces are (frontier_box.PACE, at 8 slots)
                        "pace_s": round(mean / at_once, 2),
-                       "ran_out": sum(r["ran_out"] for r in mine)}
+                       "ran_out": sum(r["ran_out"] for r in mine),
+                       # 29: the tokens all of them wrote, over the time they took
+                       # together — the card's tokens a second at these slots
+                       "tokens": out_toks, "tok_s": round(out_toks / wall, 1) if wall else None,
+                       "loops": sum(r["loop"] for r in mine),
+                       **({"capped": sum(bool(r.get("capped")) for r in mine),
+                           "ran_out_capped": sum(bool(r.get("capped") and r["ran_out"])
+                                                 for r in mine)} if cap else {})}
     say("")
     for task, p in paces.items():
         mine = [r for r in rows if r["task"] == task]
@@ -1132,7 +1356,13 @@ def pilot_ask(rec: dict, tasks: list[str], out: Path, say, slots: int) -> dict:
             f"{sum(r['thinking_chars'] for r in mine) // max(1, len(mine)):,} characters on "
             f"average · {p['mean_s']:.0f} s an answer, {p['at_once']} at a time ({p['wall_s']:.0f} "
             f"s for all {p['answers']}): about {p['pace_s']:.1f} s of the box's time an answer · "
-            f"{p['ran_out']} ran out of room")
+            f"{p['ran_out']} ran out of room"
+            # 29: the card's tokens a second, the loop rule, and the capped limit
+            + (f" · {p['tok_s']:,.0f} tokens a second together" if p.get("tok_s") else "")
+            + (f" · {p['loops']} ended in a loop" if p.get("loops") else "")
+            + (f" · {p['capped']} with the limit capped by the 64K context"
+               + (f", {p['ran_out_capped']} of them ran out at it" if p.get("ran_out_capped")
+                  else "") if p.get("capped") else ""))
     ok, verdict = pilot_verdict(rows)
     say(verdict)
     return {"separated": ok, "verdict": verdict, "paces": paces}
@@ -1287,6 +1517,20 @@ def _main(argv: list[str] | None = None) -> int:
                          "answer the board read, the right one, its seconds), to "
                          "--out/pilot.jsonl, and last whether the thinking and the answer came "
                          "back apart. No bundle, no progress file: the fetch never sees it")
+    ap.add_argument("--pilot-each", type=int, default=0,
+                    help="29: the pilot asks this many questions of each benchmark given "
+                         "(--only; every one when none), with --thinking on or off")
+    ap.add_argument("--serve", type=int, default=0, metavar="PORT",
+                    help="29: serve the GGUF on this port for the board's own runner (Mobile "
+                         "and Standard benchmarks over an SSH tunnel) until stopped — no "
+                         "questions asked here; with --own, stopped while someone else's "
+                         "process uses the GPU and started again once it is free")
+    ap.add_argument("--serve-context", type=int, default=16_384,
+                    help="29: --serve's context a slot (capped by the model's own)")
+    ap.add_argument("--own", action="store_true",
+                    help="29: one GPU of our own station (--label D3.0): never started while "
+                         "another process uses the GPU, paused while one does (exit 75), no "
+                         "price")
     a = ap.parse_args(argv)
     if not a.served_as.startswith("served/") or not re.fullmatch(r"served/[A-Za-z0-9._-]+",
                                                                  a.served_as):
@@ -1309,16 +1553,28 @@ def _main(argv: list[str] | None = None) -> int:
     why = fb.runtime_model_refused(a.runtime or "", a.served_as)
     if why:
         ap.error(f"--as: {why}")
-    if a.pilot and not (a.runtime and a.thinking == "on"):
+    # 29: --pilot-each asks thinking off too, of the benchmarks the runtime
+    # asks it of (its check below)
+    if a.pilot and not (a.runtime and (a.thinking == "on" or a.pilot_each)):
         ap.error("--pilot: a runtime's pilot, thinking on (--runtime, --thinking on)")
     if a.pilot and a.parity:
         ap.error("--pilot or --parity, not both")
+    if a.pilot_each and not a.pilot:
+        ap.error("--pilot-each: with --pilot")
+    if a.pilot_each < 0:
+        ap.error("--pilot-each: a number of questions, 1 or more")
+    # 29: our own GPU — its label names station and GPU, and it has no price
+    own = own_box(a.label) if a.own else None
+    if a.own and not own:
+        ap.error("--own: give the box's label, --label D3.0 (station D3's GPU 0)")
+    if a.own and a.price is not None:
+        ap.error("--own: an own box has no price (the board says \"own box\")")
     if a.runtime:
         # 20: the runtime's environment and flags, nothing typed beside them
         # that would change what it is
         rt = fb.RUNTIMES[a.runtime]
         why = fb.runtime_thinking_refused(a.runtime, a.thinking, a.only or [])
-        if why:
+        if why and not a.serve:         # 29: a served model is asked its thinking per request
             ap.error(why)
         if a.parity:
             ap.error(f"--runtime {a.runtime}: no parity questions (they ask thinking off)")
@@ -1349,13 +1605,17 @@ def _main(argv: list[str] | None = None) -> int:
     out = Path(a.out).resolve()
     thinking = a.thinking == "on"
     STEP["out"] = out
-    STEP["pilot"] = bool(a.pilot)            # 22: writes no progress file
+    # 22: writes no progress file — 29: nor does --serve (no step of a plan)
+    STEP["pilot"] = bool(a.pilot or a.serve)
+    STEP["own"] = own
     progress(out, label=a.label or "", model=a.served_as, thinking=a.thinking,
              parity=bool(a.parity), tasks=[t for t in fb.TASKS if t in (a.only or [])],
              state="starting", why="", line="", incomplete={})
-    if a.pilot and a.only:
+    if a.pilot and a.only and not a.pilot_each:
         ap.error("--pilot asks its own questions: no --only")
-    if not a.only and not a.parity and not a.pilot:
+    if a.serve and (a.pilot or a.parity or a.only):
+        ap.error("--serve asks nothing here: no --pilot, --parity or --only")
+    if not a.only and not a.parity and not a.pilot and not a.serve:
         # 17d: a box names its benchmarks, thinking on or off — every one at
         # once is more context than a card holds, and asks ARC-AGI-2 with
         # thinking off
@@ -1364,12 +1624,23 @@ def _main(argv: list[str] | None = None) -> int:
     if a.parity:
         # 17b: the parity check's questions, thinking off, whatever --thinking says
         tasks, thinking = [fb.PARITY["task"]], False
-    if a.pilot:
+    if a.pilot and not a.pilot_each:
         tasks = [t for t in fb.TASKS if t in fb.PILOT["n"]]
+    # 29: our own GPU, shared — nothing starts while another process uses it
+    if own:
+        import gpu_free
+        why = gpu_free.busy(a.label)
+        if why:
+            raise SystemExit(f"{why} — this step doesn't start while it does (nothing of "
+                             "theirs is touched). Nothing was fetched")
     # 17c: a context the card can't hold is refused here, before the download.
     # 17d: worked out from the GGUF's header, its cache type and this card;
-    # the stated --max-context only when those can't be read
-    ctx = fb.slot_context(tasks, thinking)
+    # the stated --max-context only when those can't be read. 29: a model's own
+    # context caps it (Bolt's 64K)
+    cap = fb.context_cap(a.runtime or "")
+    ctx = fb.slot_context(tasks, thinking, cap)
+    if a.serve:
+        ctx = min(a.serve_context, cap) if cap else a.serve_context
     # 17h: what is free on the card, not its total — 300 MiB in use by
     # something else left 1,271 MiB where 1,570 was promised
     card = rb.gpu_info()
@@ -1514,6 +1785,27 @@ def _main(argv: list[str] | None = None) -> int:
             **({"parts": [{"name": x.name, "sha256": h, "size": x.stat().st_size}
                           for x, h in zip(paths, shas)]} if len(paths) > 1 else {})}
     ver = version_of(srv["bin"], env)
+    # 29: a runtime with fallbacks for its attention runs the first launch
+    # this card takes (card-bolt: flash attention with a q8_0 cache, else f16,
+    # else flash attention off) — checked before anything is asked, recorded
+    attn = None
+    if a.runtime and fb.RUNTIMES[a.runtime].get("attn_fallbacks"):
+        gpu0 = rb.gpu_info()
+        flags, attn = attn_flags(
+            a.runtime, flags,
+            lambda fs: _started(Server(srv, gguf_path, a.port, a.slots, ctx, fs, extra_env,
+                                       out / SERVER_LOG), a.load_timeout, say, gguf_path),
+            files, f"{rb.sha256_file(srv['bin'])[:16]}:{sha[:16]}:{gpu0.get('name')}:"
+                   f"{a.slots}x{ctx}", say)
+        if flags[:len(fb.RUNTIMES[a.runtime]["flags"])] != fb.RUNTIMES[a.runtime]["flags"]:
+            # another cache type is another memory need: checked again
+            fit2, _ = kv_fit(a.gguf, flags, a.slots, ctx, mem)
+            if fit2 and fit2["fit"] < a.slots and not a.slots_fit:
+                raise SystemExit(f"{attn_words(flags)} — the launch this card runs — fits "
+                                 f"{fit2['fit']} slots of {ctx:,} tokens, not {a.slots}: give "
+                                 f"--slots {fit2['fit']}. Nothing was asked")
+    if a.serve:
+        return serve_here(a, srv, gguf_path, gguf, flags, extra_env, ctx, out, say, own)
     server = {"version": ver["text"], "build": ver["build"], "commit": ver["commit"],
               "binary_sha256": rb.sha256_file(srv["bin"]),
               "tarball_sha256": srv.get("tarball_sha256"),
@@ -1526,6 +1818,12 @@ def _main(argv: list[str] | None = None) -> int:
                              if version_file(srv["root"]) else {}),
                           **(ran or {})}} if a.server_dir else {}),
               **({"runtime": a.runtime} if a.runtime else {}),
+              # 29: the attention this card runs, and what it refused
+              **({"attention": {"flags": attn["flags"], "words": attn_words(attn["flags"]),
+                                "refused": [{"flags": r["flags"], "words": attn_words(r["flags"]),
+                                             "why": r["why"]} for r in attn.get("refused") or []]}}
+                 if attn else {}),
+              **({"context_cap": cap} if cap else {}),
               "flags": flags, "env": extra_env, "slots": a.slots, "slot_context": ctx,
               "argv": ["llama-server", "-m", gguf["name"], "--host", "127.0.0.1", "--port",
                        str(a.port), "-c", str(ctx * a.slots), "-np", str(a.slots), "-ngl", "99",
@@ -1687,10 +1985,34 @@ def _main(argv: list[str] | None = None) -> int:
             # said; the step goes on
             sampler.phase = "check"
             chk = {**cc.check(srv_proc.base, ctx, a.slots, say), "session": state["sessions"]}
+            if own or a.runtime and fb.RUNTIMES[a.runtime].get("card"):
+                # 29: the card named in the record, with its attention — a V100's
+                # speed is never read as a 5090's
+                chk["line"] = cc.record_line(chk, (server.get("attention") or {}).get("words")
+                                             or attn_words(flags), cc.compute_cap())
+                say(chk["line"])
             state["card_checks"] = [*(state.get("card_checks") or []), chk]
             sp.write_text(json.dumps(state, indent=1), encoding="utf-8")
             progress(out, card=chk)
             sampler.phase = "asking"
+        elif a.pilot_each:
+            # 29: an own box's pilot starts with the card check too (its
+            # probe line, the V100's), kept in pilot.json
+            server["card_check"] = cc.check(srv_proc.base, ctx, a.slots, say)
+            server["card_check"]["line"] = cc.record_line(
+                server["card_check"], (server.get("attention") or {}).get("words")
+                or attn_words(flags), cc.compute_cap())
+            say(server["card_check"]["line"])
+        if own and not a.pilot:
+            # 29: from here, someone else's process on the GPU pauses the run —
+            # this server is the step's own, and the memory the card shows now
+            # (the check's probe has run) is its own
+            import gpu_free
+            from service import frontier as sf_own
+            sf_own.PAUSE = gpu_free.Gate(a.label, {srv_proc.proc.pid}, gpu_free.used_mib())
+            say(f"{a.label}: the GPU is read for other processes before each benchmark and "
+                "every minute while asking — someone else's pauses the run (nothing of theirs "
+                "is touched)")
         if a.parity:
             from service import frontier as sf
             dest = out / "parity.jsonl"
@@ -1730,17 +2052,25 @@ def _main(argv: list[str] | None = None) -> int:
             return 0
         if a.pilot:
             # 22: the pilot's questions, a line each, and its verdict last
-            got = pilot_ask(rec, tasks, out, say, a.slots)
-            (out / PILOT_SUMMARY).write_text(json.dumps({
+            got = pilot_ask(rec, tasks, out, say, a.slots, each=a.pilot_each, on=thinking)
+            # 29: an own box's pilot keeps one file a thinking setting
+            summary = out / (PILOT_SUMMARY if not a.pilot_each else
+                             f"pilot-thinking-{'on' if thinking else 'off'}.json")
+            summary.write_text(json.dumps({
                 **got, "model": a.served_as, "runtime": a.runtime, "slots": a.slots,
                 "label": a.label or None, "gpu": gpu.get("name"),
+                "thinking": "on" if thinking else "off",
                 "gguf": {k: gguf[k] for k in ("name", "size", "sha256")},
                 "server": {k: server.get(k) for k in ("build", "commit", "binary_sha256",
-                                                      "tarball_sha256", "chat_template_sha256")},
+                                                      "tarball_sha256", "chat_template_sha256",
+                                                      "attention", "context_cap", "card_check",
+                                                      "slot_context", "kv_estimate")
+                           if server.get(k) is not None},
                 "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}, indent=1),
                 encoding="utf-8")
             return 0 if got["separated"] else 1
-        sid = db.add(a.served_as, "instruct", SUITE, a.by, "run on a rented GPU (remote_gguf.py)",
+        sid = db.add(a.served_as, "instruct", SUITE, a.by,
+                     f"run on {OWN_WHERE if own else WHERE} (remote_gguf.py)",
                      thinking=thinking, tasks=tasks if len(tasks) < len(fb.TASKS) else None)
         watch = Watch(sid, say, out=out)
         progress(out, state="asking", session_at=round(time.time()))
@@ -1778,6 +2108,14 @@ def _main(argv: list[str] | None = None) -> int:
         say(f"{t}: {x['answers']:,} of {x['of']:,} answered — run the same command again to "
             "carry on")
     why = (row.get("error") or row.get("progress") or "")[:400]
+    if status == "paused":
+        # 29: someone else's process on our own GPU — the step waits for it
+        # to go (frontier_box.py), its answers kept, and Runs says why
+        say(f"{a.label}: paused — {why}")
+        progress(out, state="paused", incomplete=incomplete, why=why,
+                 **({"bundle": {"name": path.name, "sha256": rb.sha256_file(path)}}
+                    if path else {}))
+        return PAUSED
     if not path:
         say("no task is answered whole yet: no bundle")
         progress(out, state="stopped", incomplete=incomplete, why=why or "no task is whole yet")

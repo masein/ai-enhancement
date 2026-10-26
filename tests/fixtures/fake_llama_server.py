@@ -32,7 +32,12 @@ is, it says itself: the probe gives each its own slice of the text, never
 its start (scripts/card_check.py), so a short prompt that doesn't begin
 where the text does is one of them — told by what it asks, not by when it
 comes (on a slow runner the eighth could arrive after the other seven were
-done, and was taken for one asked alone: CI's 140 among 80…87)."""
+done, and was taken for one asked alone: CI's 140 among 80…87). 29:
+/apply-template (its messages' words after a "<bos>", a token a word as
+/tokenize counts them), and FAKE_LLAMA_OUT_TOKENS=N — an answer needs N
+tokens: one given fewer (max_tokens) runs out of room, its finish "length"
+and no answer in it; FAKE_LLAMA_REFUSE_CACHE=q8_0 stops at start-up when
+asked for that cache with flash attention on."""
 
 from __future__ import annotations
 
@@ -81,6 +86,13 @@ def main() -> int:
             fh.write(json.dumps({"argv": argv, "env": {
                 k: v for k, v in os.environ.items()
                 if k.startswith(("LLAMA_", "GGML_", "LOOKAHEAD_"))}}) + "\n")
+    # 29: a card that refuses a cache type with flash attention, as a V100 at
+    # a head size its kernels lack would: the server stops as it loads
+    refuse = os.environ.get("FAKE_LLAMA_REFUSE_CACHE")
+    if refuse and refuse in argv and arg(argv, "--flash-attn", "-fa") == "on":
+        print(f"ggml_cuda_flash_attn_ext: no kernel for a {refuse} cache at this head size",
+              file=sys.stderr)
+        return 1
     model = arg(argv, "-m", "--model")
     shown = os.environ.get("FAKE_LLAMA_MODEL_PATH") or model
     status = int(os.environ.get("FAKE_LLAMA_STATUS") or 200)
@@ -172,6 +184,12 @@ def main() -> int:
                 return self._send(200, {"tokens": toks})
             if self.path == "/completion":
                 return self.completion(body)
+            if self.path == "/apply-template":
+                # 29: the prompt the template makes — what /tokenize then counts
+                words = " ".join(str(m.get("content") or "") for m in body.get("messages") or [])
+                think = (body.get("chat_template_kwargs") or {}).get("enable_thinking")
+                return self._send(status if status != 200 else 200, {
+                    "prompt": "<bos> " + ("<|think|> " if think else "") + words + " <turn|>"})
             if self.path not in ("/v1/chat/completions", "/chat/completions"):
                 return self._send(404, {"error": {"message": "not found"}})
             if status != 200:
@@ -189,6 +207,11 @@ def main() -> int:
             on = (body.get("chat_template_kwargs") or {}).get("enable_thinking") \
                 and not never_think
             msg = {"role": "assistant", "content": f"The options compared.\nANSWER: {pick}"}
+            # 29: an answer that needs more room than it was given runs out
+            need = int(os.environ.get("FAKE_LLAMA_OUT_TOKENS") or 0)
+            cut = bool(need and int(body.get("max_tokens") or 0) < need)
+            if cut:
+                msg["content"] = "The options compared, one by one, and again"
             if on and inline:
                 msg["content"] = "Weighing each option in turn.\n</think>\n\n" + msg["content"]
             elif on:
@@ -206,7 +229,8 @@ def main() -> int:
                 print(f"fake: stopping after {die_after} answers", flush=True)
                 os._exit(3)
             self._send(200, {"id": "chatcmpl-1", "object": "chat.completion",
-                             "choices": [{"index": 0, "message": msg, "finish_reason": "stop"}],
+                             "choices": [{"index": 0, "message": msg,
+                                          "finish_reason": "length" if cut else "stop"}],
                              "usage": {"prompt_tokens": 50, "completion_tokens": 12},
                              **({"timings": {"cache_n": 8, "prompt_n": 42, "prompt_ms": 31.5,
                                              "prompt_per_second": 1333.3, "predicted_n": 12,

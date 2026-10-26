@@ -54,6 +54,28 @@ settings, never the lda runtime. Its model names its runtime (fb.RUNTIMES's
 and 5 MMLU-Pro questions with the runtime, a line each, the plan's hours at
 their pace, and last whether the thinking and the answer came back apart
 (docs/ORNITH-RUN.md).
+
+29: plan D — our own boxes, one GPU of a DGX Station each (D3.0 … D3.3:
+dgx-03's four V100s), run in containers scripts/own_box.sh starts there with
+--gpus device=N. NVIDIA Nemotron 3.5 Bolt E4B on runtime card-bolt (its 64K
+context caps each answer's limit), from the runner image's V100 tag
+(--server-dir /opt/llama, upstream b11555 for sm_70). Each GPU asks a quarter
+of every benchmark, longest first, so the four end together whatever the
+V100's pace: HLE, MMLU-Pro, MATH Level 5, ARC-AGI-2, OTIS, GPQA Diamond,
+SimpleQA, then IFEval and IFBench with thinking on and with it off. A build's
+line on each GPU, Q4_K_M's first, then Q8_0's:
+
+    python scripts/frontier_box.py D3.0 --as served/NVIDIA-Nemotron-3.5-Bolt-E4B-Q4_K_M \
+        --gguf hf://nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB@<commit>/Nemotron-3.5-Bolt-E4B-Q4_K_M.gguf \
+        --server-dir /opt/llama --root /workspace
+
+The GPU is colleagues' too: a line doesn't start while another process uses
+it (the GPU named); before each step it waits for the GPU to be free, and a
+step paused by someone else's process (remote_gguf.py --own, exit 75) is
+asked again once the GPU is free — its answers kept, nothing of theirs
+touched. --pilot on D3.0: the card check, then 5 questions of every
+benchmark with thinking on and 5 of IFEval and IFBench with it off, and what
+the pace makes of the plan (docs/BOLT-RUN.md).
 """
 
 from __future__ import annotations
@@ -173,12 +195,28 @@ PLANS: dict[str, dict[str, list[Step]]] = {
         "I1": [("on", (IFEVAL, IFBENCH), "", 8), ("off", (IFEVAL, IFBENCH), "", 8)],
     },
 }
+# 29: plan D, our own boxes — a quarter of every benchmark on each of a
+# station's four GPUs, longest first (frontier_box's paces), then instruction
+# following with thinking on and off. Every slot holds Bolt's 64K
+D_ORDER = [(HLE,), (MMLU,), (MATH,), (ARC,), (OTIS,), (GPQA,), (SQA,), (IFEVAL, IFBENCH)]
+PLANS["D"] = {f"D3.{g}": [*(("on", t, f"{g + 1}/4", 8) for t in D_ORDER),
+                          ("off", (IFEVAL, IFBENCH), f"{g + 1}/4", 8)] for g in range(4)}
 # 20: the runtime a plan's boxes run, unless the line names another
 PLAN_RUNTIME = {"L": "lda-2610", "I": "lda-2610"}
+# 29: the plans run on our own GPUs: each step --own (never started or kept
+# asking while another process uses the GPU), no price
+OWN_PLANS = ("D",)
+# 29: no V100 has run a step yet — its paces are the 5090's (PACE) this many
+# times over, a guess the pilot replaces
+V100_GUESS = 2.0
 # 20: the cards a plan's build runs on — the lda tarball is built for sm_120
 # alone (the RTX 5090 and the RTX PRO 6000): a box line on any other card is
 # refused before anything is fetched
-PLAN_GPUS = {"L": ("RTX 5090", "RTX PRO 6000"), "I": ("RTX 5090", "RTX PRO 6000")}
+PLAN_GPUS = {"L": ("RTX 5090", "RTX PRO 6000"), "I": ("RTX 5090", "RTX PRO 6000"),
+             # 29: dgx-03's — the runner image's V100 tag builds for sm_70 alone
+             "D": ("V100",)}
+PLAN_SM = {"D": "sm_70"}
+PLAN_CARD_WORDS = {"D": "a V100"}
 # 20: the files a plan's boxes run, by name, and the sha256 each must have:
 # the lda tarball (teraformer/lda-2026-09-22 at a4a76a751, build 9954, sm_120,
 # CUDA 12.8, no web page), step4000's GGUF (13,592,481,632 bytes), and the
@@ -206,6 +244,18 @@ PLAN_PINS = {"L": {
         "42739874cc2ccfdb8523b23fbe52e29b2a7555c8176737ca9ca0b5d59859d41f"}}
 # 25: plan I runs the same files, checked the same
 PLAN_PINS["I"] = PLAN_PINS["L"]
+# 29: Bolt's two builds, as Hugging Face publishes them: NVIDIA's Q4_K_M
+# (nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB at 1db54d5b12533ff1, 6,180,446,208
+# bytes) and ggml-org's Q8_0 (ggml-org/NVIDIA-Nemotron-3.5-Bolt-E4B-GGUF at
+# 5f03edf5d3bdfe68, 8,031,245,312 bytes) — both of the BF16 at 49843eed. The
+# server is the image's own (/opt/llama, its VERSION checked by the runtime)
+PLAN_PINS["D"] = {
+    "Nemotron-3.5-Bolt-E4B-Q4_K_M.gguf":
+        "c8af2b8aea10a690a1d9491db744a9446660173cb38fc489612b556615a69612",
+    "NVIDIA-Nemotron-3.5-Bolt-E4B-Q8_0.gguf":
+        "64504effb9a71a991e487ac4e4cf827485e78bf577efb0a6edf67ce7e1ba84a8"}
+# 29: the pilot on an own box: this many questions of every benchmark
+OWN_PILOT_EACH = 5
 
 
 def gpu_refused(box: str, info: dict | None = None) -> str:
@@ -218,14 +268,17 @@ def gpu_refused(box: str, info: dict | None = None) -> str:
         import remote_bundle as rb
         info = rb.gpu_info()
     names = info.get("names") or ([info["name"]] if info.get("name") else [])
-    cards = " or an ".join(want)
+    plan = box[:1].upper()
+    # 29: plan D's V100s, built for sm_70
+    cards = PLAN_CARD_WORDS.get(plan) or "an " + " or an ".join(want)
     if not names:
-        return (f"{box}: no GPU could be read here (nvidia-smi) — plan {box[:1].upper()} runs "
-                f"on an {cards} only. Nothing was fetched")
+        return (f"{box}: no GPU could be read here (nvidia-smi) — plan {plan} runs "
+                f"on {cards} only. Nothing was fetched")
     bad = sorted({n for n in names if not any(w in n for w in want)})
     if bad:
-        return (f"{box}: this box has {', '.join(bad)} — plan {box[:1].upper()} runs on an "
-                f"{cards} only (its builds are for sm_120 alone). Nothing was fetched")
+        return (f"{box}: this box has {', '.join(bad)} — plan {plan} runs on "
+                f"{cards} only (its builds are for {PLAN_SM.get(plan, 'sm_120')} alone). "
+                "Nothing was fetched")
     return ""
 
 
@@ -270,37 +323,45 @@ def fits(ctx: int) -> int:
     return int(room // ((PILOT["per_token"] + rg.CTX_BUFFERS) * ctx + PILOT["recurrent"]))
 
 
-def slots_run(step: Step) -> int:
-    """the slots a step runs on a 5090: as planned, or fewer where they don't fit"""
+def slots_run(step: Step, own: bool = False) -> int:
+    """the slots a step runs on a 5090: as planned, or fewer where they don't
+    fit — 29: on our own V100s, as planned (Bolt's 64K slots: the pilot says
+    how many fit)"""
     th, tasks, _, slots = step
-    if th == "parity":
+    if th == "parity" or own:
         return slots
     return min(slots, fits(fb.slot_context(list(tasks), th == "on")))
 
 
-def hours(step: Step) -> float:
+def hours(step: Step, own: bool = False) -> float:
     """a step's hours at the pilot's paces, under the limits of 6 Oct, at the
-    slots it runs"""
+    slots it runs — 29: on our own V100s, those paces V100_GUESS times over"""
     th, tasks, shard, _ = step
     if th == "parity":
         return 2 * fb.PARITY["n"] * PACE[("off", MMLU)] / 3600
     of = fb.parse_shard(shard)[1] if shard else 1
-    run = slots_run(step)
+    run = slots_run(step, own)
     return sum(ANSWERS[t] * PACE[(th, t)] * limit_factor(th, t) * PILOT_SLOTS.get(t, 8) / run
-               for t in tasks) / of / 3600
+               for t in tasks) / of / 3600 * (V100_GUESS if own else 1)
 
 
-def words(step: Step) -> str:
+def words(step: Step, own: bool = False) -> str:
     th, tasks, shard, slots = step
     if th == "parity":
         return (f"the parity questions ({fb.PARITY['n']} of MMLU-Pro, each twice, thinking off) "
                 f"· about {hours(step):.1f} h")
-    run = slots_run(step)
+    run = slots_run(step, own)
     return (f"thinking {th} · {', '.join(fb.BENCH[t]['label'] for t in ordered(tasks))}"
             + (f" · shard {shard}" if shard else "")
             + f" · {run} slots" + (f" (of {slots}: no more fit a 5090)" if run < slots else "")
-            + f" · about {hours(step):.1f} h"
-            + (" (a guess)" if any((th, t) in GUESSED for t in tasks) else ""))
+            + f" · about {hours(step, own):.1f} h"
+            + (" (a guess: the 5090's paces ×2 until the V100's pilot)" if own else
+               " (a guess)" if any((th, t) in GUESSED for t in tasks) else ""))
+
+
+def own_plan(box: str) -> bool:
+    """29: a box of a plan run on our own GPUs (D3.0)"""
+    return box[:1].upper() in OWN_PLANS
 
 
 def step_name(box: str, k: int, step: Step) -> str:
@@ -383,6 +444,8 @@ def argv_of(box: str, k: int, step: Step, a: argparse.Namespace) -> list[str]:
         out += ["--ask-written-off"]
     if getattr(a, "price", None) is not None and th != "pilot":
         out += ["--price", f"{a.price:g}"]          # 23c: the box's dollars an hour
+    if own_plan(box):
+        out += ["--own"]                            # 29: our own GPU, shared
     if th == "parity":
         return out + ["--thinking", "off", "--slots", str(slots), "--parity",
                       "--out", str(folder(a, box, k, step))]
@@ -426,14 +489,16 @@ def flags_of(a: argparse.Namespace, box: str) -> str:
 
 def listing(plan: str) -> list[str]:
     boxes = PLANS[plan]
+    own = plan in OWN_PLANS
     lines = []
     for box, steps in boxes.items():
-        lines.append(f"{box} · about {sum(hours(s) for s in steps):.1f} h")
-        lines += [f"  {k}. {words(s)}" for k, s in enumerate(steps, 1)]
-    total = sum(hours(s) for steps in boxes.values() for s in steps)
+        lines.append(f"{box} · about {sum(hours(s, own) for s in steps):.1f} h")
+        lines += [f"  {k}. {words(s, own)}" for k, s in enumerate(steps, 1)]
+    total = sum(hours(s, own) for steps in boxes.values() for s in steps)
     lines.append(f"{len(boxes)} box{'es' if len(boxes) != 1 else ''} a build · "
                  f"{total:.1f} box-hours a build · the longest "
-                 f"{max(sum(hours(s) for s in st) for st in boxes.values()):.1f} h")
+                 f"{max(sum(hours(s, own) for s in st) for st in boxes.values()):.1f} h"
+                 + (" · our own GPUs: no price" if own else ""))
     return lines
 
 
@@ -507,6 +572,11 @@ def main(argv: list[str] | None = None) -> int:
     boxes = [x.upper() for x in [a.box, *(a.then or [])]]
     for box in boxes:
         box_of(box)                     # a label of no plan: refused before anything
+    # 29: our own GPUs take no price, and a line runs ours or rented ones
+    if any(own_plan(b) for b in boxes) and a.price is not None:
+        ap.error("--price: our own GPUs cost nothing to rent (the board says \"own box\")")
+    if len({own_plan(b) for b in boxes}) > 1:
+        ap.error("one line runs our own boxes or rented ones, not both")
     if a.pilot and len(boxes) > 1:
         ap.error("--pilot: one box's label (the box it runs on)")
     # 22: a model a runtime names runs on it alone, and the runtime its own
@@ -520,6 +590,15 @@ def main(argv: list[str] | None = None) -> int:
         why = gpu_refused(box)
         if why:
             raise SystemExit(why)
+    # 29: our own GPU, shared with colleagues: a line doesn't start while
+    # another process uses it
+    own = [b for b in boxes if own_plan(b)]
+    if own:
+        import gpu_free
+        why = gpu_free.busy(boxes[0])
+        if why:
+            raise SystemExit(f"{boxes[0]}: {why} — nothing is started while it does (nothing of "
+                             "theirs is touched). Nothing was fetched")
     if a.pilot:
         return run_pilot(a, boxes[0])
     # 18e point 1: every label after the first is queued from the start
@@ -535,6 +614,8 @@ def run_pilot(a: argparse.Namespace, box: str) -> int:
     rt = runtime_of(a, box)
     if not rt:
         raise SystemExit("--pilot: a runtime's pilot, and this line runs none (--runtime)")
+    if own_plan(box):
+        return run_own_pilot(a, box, rt)
     print(f"{box}: the pilot — " + " and ".join(
         f"{fb.PILOT['n'][t]} {fb.BENCH[t]['label']}" for t in ordered(PILOT_STEP[1]))
         + " questions, thinking on, each asked once, before the other boxes are rented",
@@ -588,6 +669,99 @@ def plan_at_pace(plan: str, paces: dict) -> list[str]:
     return out
 
 
+def own_pilot_argv(a: argparse.Namespace, box: str, thinking: str, tasks: list[str]
+                   ) -> list[str]:
+    """29: remote_gguf.py's arguments for an own box's pilot: `tasks`, each
+    OWN_PILOT_EACH questions, thinking `thinking`, at plan D's 8 slots"""
+    step = ("pilot", tuple(tasks), "", 8)
+    cmd = argv_of(box, 0, step, a)
+    cmd[cmd.index("--thinking") + 1] = thinking
+    at = cmd.index("--out")
+    extra = ["--pilot-each", str(OWN_PILOT_EACH), *[x for t in ordered(tuple(tasks))
+                                                     for x in ("--only", t)]]
+    return cmd[:at] + extra + cmd[at:]
+
+
+def run_own_pilot(a: argparse.Namespace, box: str, rt: str) -> int:
+    """29: the pilot on our own box — the card check and OWN_PILOT_EACH
+    questions of every benchmark with thinking on, then of IFEval and IFBench
+    with it off; each answer's line, whether the thinking came back apart (and
+    none with it off), each benchmark's pace, tokens a second and what ran out
+    at the capped limit, and the estimate for both builds on the station's
+    four GPUs"""
+    print(f"{box}: the pilot — {OWN_PILOT_EACH} questions of each benchmark, thinking on, "
+          "then IFEval and IFBench with thinking off", flush=True)
+    print(fb.runtime_words(rt), flush=True)
+    off = [t for t in fb.TASKS if t in (fb.RUNTIMES[rt].get("off_for") or ())]
+    got, codes = {}, []
+    for th, tasks in (("on", list(fb.TASKS)), ("off", off)):
+        if not tasks:
+            continue
+        cmd = own_pilot_argv(a, box, th, tasks)
+        print("\n" + " ".join(shlex.quote(x) for x in cmd[1:]), flush=True)
+        f = pilot_folder(a) / f"pilot-thinking-{th}.json"
+        f.unlink(missing_ok=True)
+        codes.append(subprocess.run(cmd).returncode)
+        try:
+            got[th] = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            got[th] = {}
+    if not all(isinstance(x, dict) and x.get("verdict") for x in got.values()):
+        print(f"\n{box}: the pilot didn't finish — its lines above say why; paste the same line "
+              "again to ask it again", flush=True)
+        return next((c for c in codes if c), 1)
+    print()
+    for line in own_estimate(got):
+        print(line, flush=True)
+    for th, x in got.items():
+        print(f"thinking {th}: {x['verdict']}", flush=True)
+    return 0 if all(c == 0 for c in codes) else 1
+
+
+# 29: Q8_0's pace against Q4_K_M's until its own first step — its file is
+# 1.3 times the size, and each token reads it whole: a guess
+Q8_GUESS = 8_031_245_312 / 6_180_446_208
+
+
+def own_estimate(got: dict, gpus: int = 4) -> list[str]:
+    """29: what the own box's pilot makes of the full run — each benchmark's
+    hours at its pace here (5 answers each: a rough guide), Q4_K_M's and
+    Q8_0's (at Q4_K_M's pace × Q8_GUESS), split across the station's `gpus`
+    GPUs as plan D splits them (a quarter of each on each), Q4_K_M first"""
+    on, off = (got.get(k) or {} for k in ("on", "off"))
+    srv = on.get("server") or {}
+    chk = (srv.get("card_check") or {}).get("probe") or {}
+    tog = chk.get("together") or {}
+    fit = (srv.get("kv_estimate") or {}).get("fit")
+    out = [f"the card: {(srv.get('card_check') or {}).get('card', {}).get('name') or on.get('gpu')}"
+           + (f" · {(srv.get('attention') or {}).get('words')}" if srv.get("attention") else "")
+           + (f" · each slot {srv['slot_context']:,} tokens" if srv.get("slot_context") else "")]
+    if tog.get("output_tok_s"):
+        out.append(f"tokens a second on one GPU, {tog.get('n')} at once: "
+                   f"{tog['output_tok_s']:,.0f} (the card check's probe)")
+    if fit:
+        out.append(f"slots of {srv.get('slot_context', 65536):,} tokens this card holds with "
+                   f"Q4_K_M: {fit} (from the GGUF's header and the card, 1 GB kept spare)")
+    hrs: dict[str, float] = {}
+    for th, x in (("on", on), ("off", off)):
+        for t, p in (x.get("paces") or {}).items():
+            if p.get("pace_s"):
+                hrs[f"{th}:{t}"] = ANSWERS[t] * p["pace_s"] / 3600
+                out.append(f"  {fb.BENCH[t]['label']}, thinking {th}: {p['pace_s']:.1f} s of the "
+                           f"GPU's time an answer ({p['answers']} asked, {p['at_once']} at once"
+                           + (f", {p['tok_s']:,.0f} tokens a second together" if p.get("tok_s")
+                              else "")
+                           + f") × {ANSWERS[t]:,} answers = {hrs[f'{th}:{t}']:.1f} h")
+    q4 = sum(hrs.values())
+    q8 = q4 * Q8_GUESS
+    out.append(f"the full set: Q4_K_M about {q4:.0f} GPU-hours, Q8_0 about {q8:.0f} (Q4_K_M's "
+               f"pace ×{Q8_GUESS:.2f}, a guess) — {q4 + q8:.0f} in all; a quarter of each "
+               f"benchmark on each of {gpus} GPUs: Q4_K_M done after about {q4 / gpus:.0f} h, "
+               f"both after about {(q4 + q8) / gpus:.0f} h ({(q4 + q8) / gpus / 24:.1f} days) — "
+               "from 5 answers a benchmark, a rough guide")
+    return out
+
+
 def line_state(a: argparse.Namespace, box: str, state: str) -> None:
     """18c point 17: a box line's own state, for the fetch — a step another
     box imported counts as done here only once this line has ended. 18e: and
@@ -603,15 +777,55 @@ def line_state(a: argparse.Namespace, box: str, state: str) -> None:
         pass
 
 
+PAUSED = 75                         # 29: remote_gguf.py's exit for a step paused
+WAIT_S, SAY_EVERY_S = 60.0, 3600.0  # 29: a busy GPU read this often, said this often
+
+
+def wait_free(a: argparse.Namespace, box: str, out: Path, step: Step, sleep=time.sleep) -> None:
+    """29: until our own GPU is free of anyone else's process — read every
+    WAIT_S, said when it starts and every hour, and in the step's progress
+    file ("paused", and why) so Runs shows it; nothing of theirs is touched"""
+    import gpu_free
+    why, said, t0 = gpu_free.busy(box), 0.0, time.time()
+    while why:
+        if time.time() - said >= SAY_EVERY_S:
+            waited = time.time() - t0
+            print(f"{box}: {why} — waiting for it to be free"
+                  + (f" ({waited / 3600:.1f} h so far)" if waited >= 60 else "")
+                  + "; nothing of theirs is touched", flush=True)
+            said = time.time()
+        mark(out, label=box, model=a.served_as, thinking=step[0], tasks=ordered(step[1]),
+             shard=step[2] or None, state="paused", why=f"{why} — waiting for it to be free")
+        sleep(WAIT_S)
+        why = gpu_free.busy(box)
+
+
+def mark(out: Path, **fields) -> None:
+    """29: a step's progress file, these fields merged in — as remote_gguf.py
+    writes it, for the fetch and Runs"""
+    p = out / "progress.json"
+    try:
+        out.mkdir(parents=True, exist_ok=True)
+        was = state_of(out)
+        tmp = p.with_suffix(".part")
+        tmp.write_text(json.dumps({**was, **fields, "at": round(time.time())}), encoding="utf-8")
+        tmp.replace(p)
+    except OSError:
+        pass
+
+
 def run_box(a: argparse.Namespace, box: str) -> int:
     """one label's steps, one after the other: 0 when every one is whole"""
     steps = box_of(box)
     print(f"{box}: {len(steps)} step{'s' if len(steps) > 1 else ''}, about "
-          f"{sum(hours(s) for s in steps):.1f} h at the pilot's paces", flush=True)
+          f"{sum(hours(s, own_plan(box)) for s in steps):.1f} h at the pilot's paces"
+          + (" (the 5090's ×2: a guess until the V100's pilot)" if own_plan(box) else ""),
+          flush=True)
     if runtime_of(a, box):
         print(fb.runtime_words(runtime_of(a, box)), flush=True)
     line_state(a, box, "running")
     ends = []
+    own = own_plan(box)
     for k, step in enumerate(steps, 1):
         out = folder(a, box, k, step)
         if whole(out, step, a.ask_written_off):
@@ -619,10 +833,18 @@ def run_box(a: argparse.Namespace, box: str) -> int:
             ends.append((k, step, 0, ""))
             continue
         cmd = argv_of(box, k, step, a)
-        print(f"\n{box}, step {k} of {len(steps)}: {words(step)}\n"
+        print(f"\n{box}, step {k} of {len(steps)}: {words(step, own)}\n"
               + " ".join(shlex.quote(x) for x in cmd[1:]), flush=True)
+        if own:
+            wait_free(a, box, out, step)            # 29: never started on a busy GPU
         began = time.time()
         code = subprocess.run(cmd).returncode
+        # 29: paused for someone else's process — asked again once the GPU is
+        # free, as often as it takes; the answers in flight were kept
+        while own and code == PAUSED:
+            wait_free(a, box, out, step)
+            began = time.time()
+            code = subprocess.run(cmd).returncode
         # 17g: a step left short after asking (a question the server failed on
         # with a 5xx is kept for the next run, written off after three) runs
         # again by itself, up to RUNS — a one-benchmark step had no bundle

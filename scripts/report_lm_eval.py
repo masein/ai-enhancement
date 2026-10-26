@@ -1952,6 +1952,21 @@ def frontier_bench_meta() -> dict:
     return out
 
 
+def frontier_caps_meta() -> dict:
+    """29: the models whose context is smaller than our token limits (NVIDIA
+    Nemotron 3.5 Bolt E4B's 65,536), by board id — each answer's limit the
+    benchmark's, or what was left of its context after the question: their
+    cells say so on hover, the Frontier view once"""
+    try:
+        import frontier as fb
+    except ImportError:                    # a frozen report without the scripts beside it
+        return {}
+    words = getattr(fb, "CAPPED_WORDS", "") or "limit capped by its context"
+    return {mid: {"context": rt["context"], "words": words}
+            for rt in fb.RUNTIMES.values() if rt.get("context")
+            for mid in rt.get("models") or {}}
+
+
 def shared_meta() -> dict:
     """12n.2: the credits the page says for SimpleQA Verified, and GPQA's line"""
     out = {"gpqa": {"url": GPQA_URL, "why": "GPQA Diamond's questions are never shown: the "
@@ -3136,6 +3151,8 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         # 17: the Frontier benchmarks as Epoch AI runs them — each one's name,
         # runs, budgets, scorer, and how it differs from Epoch's, in a few words
         "frontierBench": frontier_bench_meta(),
+        # 29: the models a 64K context caps each answer's limit of
+        "frontierCaps": frontier_caps_meta(),
         "mabTasks": list(MAB_TASKS),
         "mab": mab_meta(),
         "mmp": mmp_meta(by_model, cells, served),
@@ -4873,6 +4890,9 @@ tr.owncode-tr > td { background:var(--accent-soft); padding:10px 12px 12px; }
 .st-failed { color:var(--critical-text); border-color:var(--critical); }
 .st-active { color:var(--accent); border-color:var(--accent); }
 .st-muted { color:var(--muted); }
+/* 29: waiting for a GPU someone else is using — neither running nor failed */
+.st-paused { color:var(--text-secondary); border-style:dashed; border-color:var(--text-secondary); }
+.st-paused::before { content:'⏸'; margin-right:4px; }
 @keyframes pulse { 0%,100%{opacity:.35} 50%{opacity:1} }
 .st-active::before { content:'●'; margin-right:5px; animation:pulse 1.4s infinite; }
 .frm { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; }
@@ -8239,6 +8259,90 @@ function vTaint(m) {
 // here, never in an average or rank; each number as published, with its link,
 // and what it is as published: its base, its size, the memory it needs and
 // its speed, the device named
+// ---- 29: one model measured here in several builds, beside its maker's numbers
+// NVIDIA Nemotron 3.5 Bolt E4B: its Q4_K_M (the phone build) and its Q8_0
+// (standing in for BF16), both measured on our V100s, and NVIDIA's numbers as
+// published — one card on each build's page and on the published one's, told
+// apart as everywhere: measured here a filled dot and a plain number,
+// published a ring and italics with its source's letter. Never one row of two
+const buildsOf = id => (DATA.builds || []).find(g => (g.builds || []).some(b => b.id
+  === String(id || '').replace(/ · thinking$/, ''))) || null;
+const buildsOfKey = key => (DATA.builds || []).find(g => g.published
+  && g.published.key === key) || null;
+function buildsCard(g, here) {
+  repLoad();
+  const pub = g.published || null;
+  const pm = pub ? (REP().models || []).find(x => x.key === pub.key) : null;
+  const pubId = pm ? pm.id : pub ? pub.page : null;
+  const scores = pubId ? (REP().scores || []).filter(s => s.model === pubId) : [];
+  // a build's number: its thinking row's (the suite's), else its plain one's
+  const val = (b, t) => cell(t, b.id + ' · thinking') || cell(t, b.id) || null;
+  const cols = [];
+  for (const t of Object.keys(FB())) {
+    const f = FB()[t], key = mtBenchKey(f.column || f.label);
+    if (g.builds.some(b => val(b, t)) || scores.some(s => mtBenchKey(s.benchmark) === key))
+      cols.push({ key, label: (mtBench(f.label) || {}).short || f.label, full: f.label, task: t,
+        score: true });
+  }
+  for (const s of scores) {
+    const key = mtBenchKey(s.benchmark);
+    if (!cols.some(c => c.key === key))
+      cols.push({ key, label: (mtBench(s.benchmark) || {}).short || s.benchmark, full: s.benchmark,
+        score: true });
+  }
+  const card = g.card ? ` on ${byAn(g.card)}` : '';
+  const rows = g.builds.map(b => {
+    const m = DATA.models.find(x => x.id === b.id) || DATA.models.find(x => x.id === b.id
+      + ' · thinking');
+    return { key: b.id, id: m ? m.id : null, nav: m ? m.id : null,
+      href: m ? '#model=' + encodeURIComponent(m.id) : null, mark: 'here',
+      colour: odFamily({ label: g.name, maker: g.maker }).colour,
+      name: displayName({ name: b.label }), full: b.label,
+      line: [b.line, 'measured here' + card, b.standsInFor ? `standing in for ${b.standsInFor}`
+        : ''].filter(Boolean).join(' · '),
+      attrs: { 'data-builds-row': b.id, 'data-builds-here': '1',
+        ...(here && here.replace(/ · thinking$/, '') === b.id ? { 'data-builds-this': '1' } : {}) },
+      cells: Object.fromEntries(cols.map(c => {
+        const x = c.task ? val(b, c.task) : null;
+        if (!x) return [c.key, { v: null, why: c.task ? 'not run yet' : 'not measured here',
+          attrs: { 'data-builds-cell': `${b.id}|${c.key}` } }];
+        return [c.key, { v: x.v, text: (100 * x.v).toFixed(1), se: x.se ? (100 * x.se).toFixed(1)
+            : null, seV: x.se || null, lead: false,
+          tip: ['measured here' + card, ...(b.capped ? [b.capped] : [])],
+          attrs: { 'data-builds-cell': `${b.id}|${c.key}`,
+            ...(b.capped ? { 'data-builds-capped': '1' } : {}) } }];
+      })) };
+  });
+  if (pub) rows.push({ key: 'published', id: pubId, nav: pubId,
+    href: pubId ? '#model=' + encodeURIComponent(pubId) : null, mark: 'pub',
+    name: displayName({ name: pub.label, published: true }), full: pub.label,
+    line: `published by ${pub.by}`, attrs: { 'data-builds-row': 'published' },
+    cells: Object.fromEntries(cols.map(c => {
+      const sc = scores.filter(s => mtBenchKey(s.benchmark) === c.key)
+        .sort((a, b) => frRank(a) - frRank(b))[0];
+      if (!sc) return [c.key, { v: null, why: 'not published',
+        attrs: { 'data-builds-cell': `published|${c.key}` } }];
+      const L = mtLetter(sc.source, sc.published_by || pub.by);
+      return [c.key, { v: sc.unit === 'points' ? sc.value / 100 : sc.value, text: repShow(sc),
+        lead: false, pub: { letter: L, url: sc.source === 'card' ? sc.url : '',
+          tip: `${MT_LETTERS[L] || pub.by} · ${repTag(sc)}` },
+        tip: [`${repShow(sc)} · ${repTag(sc)}`, ...(sc.date ? ['as of ' + sc.date] : [])],
+        attrs: { 'data-builds-cell': `published|${c.key}` } }];
+    })) });
+  const ran = g.builds.some(b => cols.some(c => c.task && val(b, c.task)));
+  return el('div', { class: 'card', 'data-builds': g.name },
+    el('h2', { text: `${g.name}: its builds, and as ${pub ? pub.by : 'its maker'} publishes it` }),
+    el('p', { class: 'small se', 'data-builds-said': '1', text: `Measured here${card}: `
+      + g.builds.map(b => displayName({ name: b.label }).split(' · ').pop()
+        + (b.standsInFor ? ` (standing in for ${b.standsInFor})` : '')).join(' and ')
+      + (pub ? `. ${pub.by}’s own numbers are its own row, as published: another harness and `
+        + 'other settings, never mixed with ours.' : '.')
+      + (g.builds.some(b => b.capped) ? ` Its context holds 64K tokens: each answer’s limit is the `
+        + 'benchmark’s, or what was left of 65,536 after the question when that was smaller.' : '')
+      + (ran ? '' : ' Not run here yet.') }),
+    cols.length ? modelTable({ view: 'builds', attrs: { 'data-builds-table': '1' }, cols, rows,
+      hideEmpty: false, sorted: true }) : '');
+}
 function vReportedModel(id) {
   repLoad();
   const from = (history.state || {}).from, prev = from != null && from !== location.hash;
@@ -8294,7 +8398,9 @@ function vReportedModel(id) {
           a.url ? [' · ', pub(a)] : '')))] : '',
       el('p', { class: 'small se', text: 'Published numbers come from each maker’s own harness '
         + 'and settings: compare them with each other loosely, and never with a number measured '
-        + 'here as if they were one.' }))];
+        + 'here as if they were one.' })),
+    // 29: and its builds measured here, told apart
+    buildsOfKey(m.key) ? buildsCard(buildsOfKey(m.key), null) : ''].filter(Boolean);
 }
 function vModel() {
   // 25c: one known only by what its makers publish
@@ -8338,7 +8444,10 @@ function vModel() {
     : cur === 'improve' ? modelImproveTab(m)
     : cur === 'history' ? modelHistoryTab(m)
     : modelScoresTab(m, kinds);
+  // 29: a model measured here in several builds, beside its maker's numbers
+  const builds = buildsOf(m.id);
   return [back, modelHead(m, kinds), modelSitPanel(m),
+    builds ? buildsCard(builds, m.id) : null,
     strip,
     el('div', { id: 'mpanel', role: 'tabpanel', 'aria-labelledby': 'mtab-' + cur,
       'data-mtab-panel': cur }, body)].filter(Boolean);
@@ -13883,7 +13992,11 @@ function nameParts(raw, o = {}) {
   // a card's "Qwen3-30B-A3B Thinking" is Qwen3-30B-A3B, thinking on
   if (!o.measured && / Thinking$/.test(fam)) { fam = fam.replace(/ Thinking$/, ''); thinking = 'on'; }
   const full = String(o.basedOn || '').split('/').pop(), first = fam.split(' ')[0];
-  if (full && first && full !== first && full.startsWith(first + '-')) fam = full + fam.slice(first.length);
+  // 29: never a name its base already holds whole ("NVIDIA Nemotron 3.5 Bolt E4B"
+  // of NVIDIA-Nemotron-3.5-Bolt-E4B-BF16 stays as it is)
+  const flat = x => x.toLowerCase().replace(/[^a-z0-9.]+/g, ' ').trim();
+  if (full && first && full !== first && full.startsWith(first + '-')
+      && !flat(full).startsWith(flat(fam))) fam = full + fam.slice(first.length);
   // a published model's setting is its variant; ours keep an older run's tag
   if (tag && !o.measured && !variant) { variant = tag; tag = ''; }
   return { family: fam, variant: [variant, ...setup].filter(Boolean).join(' · '), tag, line,
@@ -13904,9 +14017,10 @@ function displayName(m) {
 // whether a published model's weights are open: its name says (no source
 // carries it). Kept here, one list: a Hugging Face repo, or a family known open
 const MT_OPEN_RE = /\/|gemma|gpt-oss|llama|qwen|qwq|deepseek|mistral|mixtral|\bphi-|stablelm|tinyllama|bonsai|edge0|ornith|\bling\b|granite|smollm|pythia|\bopt-|lfm|youtu|nanbeige|olmo|kimi|\bglm|minimax|nemotron/i;
-// someone else's model served or measured here as a GGUF (Ornith-1.5, Bonsai 2):
-// an open model with a filled dot, not one of ours
-const MT_OUTSIDE_RE = /^(ornith|bonsai|gemma|llama|deepseek|gpt-oss|mistral|phi|granite|smollm|pythia|qwen[23](?:\.5)?-)/i;
+// someone else's model served or measured here as a GGUF (Ornith-1.5, Bonsai 2;
+// 29: NVIDIA Nemotron 3.5 Bolt E4B on our V100s): an open model with a filled
+// dot, not one of ours
+const MT_OUTSIDE_RE = /^(ornith|bonsai|gemma|llama|deepseek|gpt-oss|mistral|phi|granite|smollm|pythia|nvidia|nemotron|qwen[23](?:\.5)?-)/i;
 const MT_GROUPS = [['ours', 'Ours'], ['open', 'Open models'], ['closed', 'Closed models']];
 // 27d: Models ▾ ▸ Show
 const MT_SHOW = [['all', 'All'], ['ours', 'Ours'], ['open', 'Open'], ['closed', 'Closed']];
@@ -13925,7 +14039,11 @@ function mtColour(m) {
   const rc = (DATA && DATA.rowColours) || {}, id = m.dmHome || m.rowOf || m.id || '';
   const base = String(id).replace(/ · thinking$/, '');
   const k = rc[id] ?? rc[base] ?? rc[base + ' · thinking'];
-  return k != null ? `var(--s${(k % 8) + 1})` : famColor(m);
+  if (k != null) return `var(--s${(k % 8) + 1})`;
+  // 29: a model measured here in several builds (Bolt): its maker's colour, as
+  // the On-device report draws it
+  const g = buildsOf(base);
+  return g ? odFamily({ label: g.name, maker: g.maker }).colour : famColor(m);
 }
 
 // ---- the line under a name -------------------------------------------------
@@ -15365,6 +15483,23 @@ function thinkingOf(m) {
   const mode = thinkingModeOf(m.id);
   return mode === 'always' ? 'on' : mode === 'switch' || mode === 'never' ? 'off' : null;
 }
+// 29: a model whose context is smaller than our limits (Bolt's 64K): each
+// answer's limit the benchmark's, or what was left after its question — its
+// cells say so on hover, the view once ({context, words}, or null)
+const frCap = m => (DATA.frontierCaps || {})[String((m && (m.rowOf || m.id)) || '')
+  .replace(/ · thinking$/, '')] || null;
+function frCapNote(ms) {
+  const capped = [...new Map(ms.filter(frCap).map(m => [displayName(m).split(' · ')[0],
+    frCap(m)])).entries()];
+  if (!capped.length) return '';
+  const names = capped.map(([n]) => n), ctx = capped[0][1].context;
+  return el('p', { class: 'small se', 'data-frontier-cap-note': '1',
+    text: `${names.join(' and ')} ${names.length > 1 ? 'hold' : 'holds'} `
+      + `${Math.round(ctx / 1024)}K tokens of context: each of its answers had the benchmark’s `
+      + `token limit, or what was left of ${ctx.toLocaleString('en')} after the question when `
+      + `that was smaller — “${capped[0][1].words}” on its cells. An answer that ran out of `
+      + 'room is wrong, as for every model.' });
+}
 // the rows: every reported model, by maker, and each model of ours with a
 // number in a column shown — only the chosen ones when Models ▾ chooses
 function frRows(cols) {
@@ -15475,8 +15610,11 @@ function lbFrontier(ms) {
       // 17f: where it ran and the Runs rows it came from, on hover
       tip: [h.tag, ...(h.where ? [`ran on ${h.where}` + ((h.runs || []).length ? ' · runs '
         + h.runs.map(x => '#' + x).join(' ') : '')] : []), ...(h.was ? [h.was] : []),
+      // 29: its context caps each answer's limit (Bolt's 64K)
+      ...(frCap(m) ? [frCap(m).words] : []),
       'ranked only with the cells measured the same way here'],
       attrs: { 'data-fr-cell': c.key, 'data-fr-here': m.id, 'data-fr-set': 'here|' + (h.set || h.tag),
+        'data-fr-capped': frCap(m) ? '1' : null,
         'data-fr-v': String(h.v), 'data-fr-lead': leads[c.key].has(m.id + '|here') ? '1' : null,
         'data-fr-thinking': thinkingOf(m) },
       notes: [h.differs ? el('div', { class: 'cellnote warn', 'data-fr-grader-differs': m.id,
@@ -15551,6 +15689,9 @@ function lbFrontier(ms) {
       `${cols.length} of the ${every.length} benchmarks reported; by default the ${dflt.length} `
       + `reported for at least half of the ${(REP().models || []).length} imported models, and `
       + 'those measured here too.'),
+    // 29: the protocol's one exception, said once — a model whose context is
+    // smaller than our limits
+    frCapNote(listed.filter(r => !r.m.reportedOnly).map(r => r.m)),
     rows.length ? modelTable({ view: 'frontier', attrs: { 'data-frontier-table': '1' }, models: true,
       cols: cols.map(asCol), rows, groups: true, colGroups: true, layout: 'frontier', hkey: 'fr',
       sort: F.sort, onSort: k => { F.sort = { key: k, dir: F.sort.key === k ? -F.sort.dir : -1 };
@@ -21822,7 +21963,7 @@ function vQueue(part = { form: true, list: true }) {
   // 17j: "no contact" is its own status, not "running" (it filed under
   // running); it is active until the box is reached or leaves the list
   const RENTED_AS = { running: 'running', loading: 'running', unreached: 'unreached',
-                      done: 'done', stopped: 'failed' };
+                      done: 'done', stopped: 'failed', paused: 'paused' };
   // 17j: sorted and paged with the other runs — by when it started, its board
   // name, its suite — and found by the words it shows
   const rentedRows = () => (((state.boxes || {}).runs) || []).map(x => ({ ...x, rented: true,
@@ -21838,6 +21979,7 @@ function vQueue(part = { form: true, list: true }) {
     const rows = [...rentedRows(), ...allRuns()].filter(r =>
       (state.qStatus === 'all'
         || (state.qStatus === 'active' ? ACTIVE_STATUS.has(r.status) || r.status === 'unreached'
+          || r.status === 'paused'
                                        : r.status === state.qStatus)) &&
       // 17f: where it ran
       (state.qWhere === 'all' || (state.qWhere === 'rented') === !!(r.where_ran || r.rented)) &&
@@ -21861,8 +22003,9 @@ function vQueue(part = { form: true, list: true }) {
       [['all', 'status: all'], ['active', 'active'], ['queued', 'queued'],
        ['done', 'done'], ['failed', 'failed'], ['canceled', 'canceled']],
       state.qStatus, v => { state.qStatus = v; rebuildQueue(); });
+  // 29: and our own GPUs (dgx-03's), not this server either
   const qWhereSel = mkSel('where filter', [['all', 'where: all'], ['here', 'this server'],
-      ['rented', 'rented GPUs']], state.qWhere, v => { state.qWhere = v; rebuildQueue(); });
+      ['rented', 'rented or own GPUs']], state.qWhere, v => { state.qWhere = v; rebuildQueue(); });
   const qToolbar = el('div', { class: 'toolbar', style: 'margin-top:2px' },
     el('input', { type: 'search', value: state.qQ, style: 'flex:1;min-width:160px',
       placeholder: 'filter: model, person, note…', 'aria-label': 'filter queue',
@@ -22050,7 +22193,12 @@ function runBar(n, of) {
   return el('div', { class: 'upbar runbar', 'data-run-bar': String(Math.round(f * 1000) / 10) },
     el('div', { class: 'upfill', style: `transform:scaleX(${f})` }));
 }
-const RENTED_CHIP = { done: 'done', stopped: 'failed', running: 'running', loading: 'running' };
+const RENTED_CHIP = { done: 'done', stopped: 'failed', running: 'running', loading: 'running',
+  paused: 'paused' };
+// 29: a run paused on one of our own GPUs — someone else's process appeared on
+// it: waiting, never failed; its why ("GPU 0 of D3 has another process …")
+const rentedPausedWhy = x => String(x.paused_why || x.why || x.status_words || '')
+  .replace(/^paused:?\s*/i, '');
 // 17j: a rented run's words, as the row shows them — its benchmarks, thinking,
 // where and status — what the list's search reads
 function rentedLabel(x) {
@@ -22081,7 +22229,7 @@ function rentedRow(x, ncols) {
       'data-box-status': b.status, title: [b.card, b.use].filter(Boolean).join(' · ') },
     `${b.label}` + (b.shard ? ` · shard ${b.shard}` : '') + ' · ',
     el('span', { class: ['stopped', 'quiet', 'unreached'].includes(b.status) ? 'warntext' : '',
-      text: b.words }),
+      'data-box-paused': b.status === 'paused' ? '1' : null, text: b.words }),
     b.n != null ? ` · ${N(b.n)} of ${N(b.of)}` : '',
     b.step_finish ? el('span', { 'data-box-task-finish': '1',
       text: ` · this part done ${rentedWhen(b.step_finish)}` }) : '',
@@ -22098,7 +22246,8 @@ function rentedRow(x, ncols) {
   const odd = x.attention || [];
   return [el('tr', { 'data-rented-run': x.id, 'data-queue-row': x.id },
     el('td', { class: 'num se qc-narrow-off', text: '—',
-      title: 'not on this server: a run on a rented GPU' }),
+      title: x.own ? 'not on this server: a run on one of our own GPUs'
+        : 'not on this server: a run on a rented GPU' }),
     el('td', { class: 'small qc-narrow-off', style: 'white-space:nowrap', text: x.started_at
       ? rel(Date.parse(x.started_at) / 1000) + ' ago' : '—' }),
     el('td', { class: 'qc-model', title: x.hf_id, 'data-run-name': x.id },
@@ -22110,8 +22259,10 @@ function rentedRow(x, ncols) {
       + (x.parity ? '' : ` · thinking ${x.thinking || '?'}`) }),
     el('td', { class: 'qc-narrow-off', text: '—' }),
     el('td', { class: 'qc-status' }, el('span', { class: x.status === 'unreached' ? 'st st-muted'
-      : stClass(RENTED_CHIP[x.status] || x.status), 'data-stage': x.status,
-      text: x.status_words })),
+      : x.status === 'paused' ? 'st st-paused' : stClass(RENTED_CHIP[x.status] || x.status),
+      'data-stage': x.status,
+      title: x.status === 'paused' ? rentedPausedWhy(x) : null,
+      text: x.status === 'paused' ? 'paused' : x.status_words })),
     el('td', { class: 'small qc-progress' }, el('div', { class: 'rented-prog' },
       // 18d point 9: one group, as a run here's count, bar and finish are
       el('span', { class: 'rented-main' },
@@ -22123,6 +22274,9 @@ function rentedRow(x, ncols) {
       !many && ((x.boxes || [])[0] || {}).box_finish && x.boxes[0].box_finish !== x.finish
         ? el('span', { class: 'se', 'data-box-finish': '1',
           text: `box free ${rentedWhen(x.boxes[0].box_finish)}` }) : '',
+      // 29: paused for someone else's process on its GPU — waiting, said with why
+      x.status === 'paused' ? el('span', { class: 'se', 'data-rented-paused': '1',
+        text: `waiting for its GPU: ${rentedPausedWhy(x)}` }) : '',
       // 18b: done on its box, its bundle not imported yet: no score, said
       x.status === 'done' ? (x.import_refused
         ? el('span', { class: 'warntext', 'data-rented-refused': '1',
@@ -22146,7 +22300,10 @@ function rentedRow(x, ncols) {
         text: `${x.boxes_n} boxes ${open ? '▾' : '▸'}`, onclick: () => {
           state.rentedOpen = { ...(state.rentedOpen || {}), [x.id]: !open };
           (state.queueRedraw || render)(); } }) : '')),
-    el('td', { class: 'num nowrap qc-narrow-off', text: '—' }), el('td', {})),
+    // 29: one of our own GPUs costs nothing to rent: "own box", never $0
+    el('td', { class: 'num nowrap qc-narrow-off', ...(x.own ? { 'data-rented-own': '1',
+      title: 'one of our own GPUs: no price to rent' } : {}), text: x.own ? 'own box' : '—' }),
+    el('td', {})),
     open ? el('tr', { class: 'rented-boxes-tr', 'data-rented-boxes': x.id },
       el('td', { colspan: String(ncols) }, el('ul', { class: 'small rented-box-lines' },
         x.boxes.map(boxLine)))) : null].filter(Boolean);
@@ -23454,7 +23611,7 @@ function rentedRunLine(x) {
         navigate({ tab: 'queue', model: null, topic: null }); } }),
     // 18d point 25: where it runs; what it asks is on its row in Runs
     el('span', { class: 'small se runwhat', title: `Frontier · ${rentedLabel(x)}`,
-      text: 'rented GPU' }),
+      text: x.own ? 'own GPU' : 'rented GPU' }),
     el('span', { class: 'small se runprog', text: x.n != null ? `${N(x.n)} of ${N(x.of)}`
       : (x.status_words || '') }));
 }
@@ -30002,9 +30159,13 @@ function odFamily(r) {
     : { key: 'other', label: r.publishedBy || 'Others', colour: 'var(--text-secondary)' };
 }
 const odColour = r => r.ours ? rpColour(r) : odFamily(r).colour;
+// 29: measured here — ours, or someone else's model on our own GPUs (Bolt on a
+// V100): a filled dot, its family's colour when it isn't ours
+const odHere = r => !!(r.ours || r.measured);
 // a chart's short name: "Edge0-35B", "Bonsai 2 9B", "Gemma E4B", "Q4"
 const odShort = label => trShort(String(label).replace(/-A\d+B-preview$/, '')
-  .replace(/^NVIDIA-Nemotron-[\d.]+-/, 'Nemotron ').replace(/^Ternary /, '').replace(/ \(1-bit\)$/, '').replace(/^Gemma 4 /, 'Gemma '));
+  .replace(/^NVIDIA-Nemotron-[\d.]+-/, 'Nemotron ').replace(/^NVIDIA Nemotron [\d.]+ Bolt /, 'Bolt ')
+  .replace(/^Ternary /, '').replace(/ \(1-bit\)$/, '').replace(/^Gemma 4 /, 'Gemma '));
 // a base's name without whose run it was ("of Qwen3.5 9B"), the whole in its tooltip
 const odBase = label => String(label || '').replace(/ \([^)]*run\)$/, '')
   .replace(/, measured here$/, '');
@@ -30031,23 +30192,30 @@ const odLetter = r => mtLetter('card', r.publishedBy || r.maker);
 const odTok = v => `${Number(v).toLocaleString('en', { maximumFractionDigits: 1 })} tok/s`;
 function odScoreCell(r, b, si) {
   const c = r.cells[b.key] || {}, at = { 'data-od-cell': `${r.label}|${b.key}` };
-  if (c.v == null) return { v: null, why: r.ours ? 'not in yet' : 'not published', attrs: at };
+  // 29: a measured row's benchmark not run yet says so, its 64K cap on hover
+  if (c.v == null) return { v: null, why: r.measured ? (c.why || 'not run yet')
+    : r.ours ? 'not in yet' : 'not published', attrs: at };
   const keep = (r.retention || {})[b.key];
-  const L = odLetter(r);
-  return { v: c.v, text: rpNum(c.v), se: r.ours && c.se ? rpNum(c.se) : null, seV: r.ours ? c.se
+  const L = odLetter(r), here = odHere(r);
+  return { v: c.v, text: rpNum(c.v), se: here && c.se ? rpNum(c.se) : null, seV: here ? c.se
       || null : null,
-    pub: r.ours ? null : { letter: L, tip: `${MT_LETTERS[L] || r.publishedBy}: ${c.card || ''}`,
+    pub: here ? null : { letter: L, tip: `${MT_LETTERS[L] || r.publishedBy}: ${c.card || ''}`,
       url: c.url || r.link || '' },
-    // 27e: of the stand-in, said so: "98.1% of our Q4", the whole on hover
+    // 27e: of the stand-in, said so: "98.1% of our Q4", the whole on hover.
+    // 29: a measured row's of its own base, "of our Q8_0", the whole on hover
     sub: keep == null ? null : (r.keepOf || {})[b.key] === 'stand_in' && si
-      ? `${(100 * keep).toFixed(1)}% of our ${si.short}` : `${(100 * keep).toFixed(1)}% of its base`,
+      ? `${(100 * keep).toFixed(1)}% of our ${si.short}`
+      : r.measured && r.baseLabel ? `${(100 * keep).toFixed(1)}% of ${r.baseLabel.split(',')[0]}`
+      : `${(100 * keep).toFixed(1)}% of its base`,
     subClass: 'od-keep',
     subAttrs: keep != null ? { 'data-od-keep': `${r.label}|${b.key}`,
       ...((r.keepOf || {})[b.key] === 'stand_in' && si ? { title: si.line, 'data-od-stand-in': '1' }
+        : r.measured && r.baseLabel ? { title: `of ${r.baseLabel}`, 'data-od-measured-base': '1' }
         : {}) } : {},
-    tip: r.ours ? [c.how || '', 'measured here'].filter(Boolean)
+    tip: here ? [c.how || '', 'measured here' + (r.card ? ` on ${byAn(r.card)}` : ''),
+      r.capped || ''].filter(Boolean)
       : [`${c.card || ''}: ${c.setting || ''}`, `published by ${r.publishedBy}`],
-    attrs: at };
+    attrs: { ...at, ...(r.capped ? { 'data-od-capped': '1' } : {}) } };
 }
 // Memory: what it needs, the size on disk under it when that differs
 function odMemoryCell(r) {
@@ -30061,7 +30229,7 @@ function odMemoryCell(r) {
   const L = odLetter(r);
   return { v: m.gb ?? null, text: m.words, noLead: true, sub: disk ? `${disk} on disk` : null,
     subClass: 'od-disk', subAttrs: disk ? { 'data-od-disk': r.label } : {},
-    pub: r.ours ? null : { letter: L, tip: `${MT_LETTERS[L] || r.publishedBy}`, url: m.url || '' },
+    pub: odHere(r) ? null : { letter: L, tip: `${MT_LETTERS[L] || r.publishedBy}`, url: m.url || '' },
     tip: [`memory it needs: ${m.words}${how(m) ? ' — ' + how(m) : ''}`,
       d && d.words ? `on disk: ${d.words}${how(d) ? ' — ' + how(d) : ''}` : ''].filter(Boolean),
     attrs: at };
@@ -30102,7 +30270,7 @@ function odSpec(id, d) {
   const S = mtS('od-' + id);
   const cols = [...B.map(b => {
     const m = mtBench(b.label) || {};
-    const n = Math.max(0, ...d.rows.filter(r => r.ours).map(r => (r.cells[b.key] || {}).answers || 0));
+    const n = Math.max(0, ...d.rows.filter(odHere).map(r => (r.cells[b.key] || {}).answers || 0));
     return { key: b.key, label: m.short || b.label, full: b.label, score: true,
       sub: [m.what, mtAskedShort(n, b)].filter(Boolean).join(' · ') };
   }),
@@ -30110,20 +30278,24 @@ function odSpec(id, d) {
   { key: 'phone', label: 'On a phone', full: 'On a phone', sub: 'decode' }];
   S.sort = S.sort && cols.some(c => c.key === S.sort.key) ? S.sort : { key: B[0].key, dir: -1 };
   const rows = d.rows.map(r => {
-    const m = r.ours ? DATA.models.find(x => x.id === r.row) : null;
+    const here = odHere(r);
+    const m = here ? DATA.models.find(x => x.id === r.row) : null;
     const base = m ? mtRowOf(m) : null;
-    const parts = nameParts(r.label, { measured: !!r.ours });
-    const of = odBaseName(r.ours ? r.base : (r.base || r.baseLabel));
-    const src = r.ours ? 'measured here' : el('span', { 'data-od-src': 'published' },
+    const parts = nameParts(r.label, { measured: here });
+    // 29: a measured row's base is its own build, said where it keeps a share of it
+    const of = r.measured ? '' : odBaseName(r.ours ? r.base : (r.base || r.baseLabel));
+    const src = here ? el('span', { 'data-od-src': 'here' }, 'measured here'
+      + (r.card ? ` on ${byAn(r.card)}` : '')) : el('span', { 'data-od-src': 'published' },
       `published by ${r.publishedBy}`, r.link ? ' · ' : '',
       r.link ? el('a', { href: r.link, target: '_blank', rel: 'noopener', 'data-od-link': '1',
         text: odLinkWords(r.link) }) : '');
     return { key: r.label, id: base ? base.id : r.page || null,
       nav: base ? base.nav : r.page || null,
       href: base ? base.href : r.page ? '#model=' + encodeURIComponent(r.page) : null,
-      mark: r.ours ? 'here' : 'pub',
-      colour: r.ours ? (r.colour != null ? rpColour(r) : base ? base.colour : 'var(--accent)') : null,
-      name: base ? base.name : displayName({ name: r.label, published: !r.ours }),
+      mark: here ? 'here' : 'pub',
+      colour: r.ours ? (r.colour != null ? rpColour(r) : base ? base.colour : 'var(--accent)')
+        : r.measured ? odColour(r) : null,
+      name: base ? base.name : displayName({ name: r.label, published: !here }),
       full: r.label + (r.kind ? `\n${r.kind}` : '') + (r.base ? `\nbase: ${r.base}` : ''),
       // 27e: ours' own line ("the original, squeezed to 2 bits — our same-size baseline");
       // 27f: a published model's own says what it is instead, the rest on hover
@@ -30132,8 +30304,9 @@ function odSpec(id, d) {
         : [of ? `of ${of}` : '', r.what || '', r.kind || '',
         ...(r.ours ? [] : parts.line.filter(w => !String(r.kind || '').includes(w))),
         r.ours && r.phoneBuild ? 'phone build' : '', src],
-      group: r.ours ? 'ours' : mtGroup({ name: r.label }, true, r.maker),
-      attrs: { 'data-od-row': r.label, 'data-od-ours': String(!!r.ours) },
+      group: r.ours ? 'ours' : r.measured ? 'open' : mtGroup({ name: r.label }, true, r.maker),
+      attrs: { 'data-od-row': r.label, 'data-od-ours': String(!!r.ours),
+        ...(r.measured ? { 'data-od-measured': '1' } : {}) },
       cells: { ...Object.fromEntries(B.map(b => [b.key, odScoreCell(r, b, d.standIn)])),
         memory: odMemoryCell(r), phone: odPhoneCell(r) } };
   });
@@ -30141,7 +30314,8 @@ function odSpec(id, d) {
     // the least memory first, the highest score or speed first
     sort: S.sort, onSort: k => { S.sort = { key: k, dir: S.sort.key === k ? -S.sort.dir
       : k === 'memory' ? 1 : -1 }; render(); }, cardCols: B.slice(0, 4).map(b => b.key),
-    groupNotes: { ours: 'measured here', open: 'as their makers publish them' } };
+    groupNotes: { ours: 'measured here', open: d.rows.some(r => r.measured)
+      ? 'as their makers publish them, or measured here' : 'as their makers publish them' } };
 }
 // retention: each model against its own base on the same source, a panel a benchmark.
 // 27e: a row of the stand-in says so under its name (wrapped to the names'
@@ -30197,7 +30371,7 @@ function odKeepPanel(b, rows, si) {
       el('svg:title', { text: standIn(r) ? si.line : `of ${r.baseLabel}` })));
     if (has(r)) {
       const v = r.retention[b.key];
-      const m = odMark(r.ours, X(v), y + 16, odColour(r), { 'data-od-keep-dot': `${b.key}:${r.label}` });
+      const m = odMark(odHere(r), X(v), y + 16, odColour(r), { 'data-od-keep-dot': `${b.key}:${r.label}` });
       m.append(el('svg:title', { text: `${r.label}: ${(100 * v).toFixed(1)}% of `
         + (standIn(r) ? si.line.replace(/^of /, '') : r.baseLabel) }));
       svg.append(m);
@@ -30232,9 +30406,10 @@ function odWrap(text, fs, w) {
 // each family of published models once, its hue, a hollow diamond, its models
 function odLegend(rows) {
   const mark = (r, colour) => el('svg:svg', { class: 'od-legmark', viewBox: '0 0 14 14',
-    'aria-hidden': 'true' }, odMark(r.ours, 7, 7, colour));
-  const ours = rows.filter(r => r.ours), fams = new Map();
-  for (const r of rows.filter(x => !x.ours)) {
+    'aria-hidden': 'true' }, odMark(odHere(r), 7, 7, colour));
+  // 29: a model measured here that isn't ours is named as ours are, a filled dot
+  const ours = rows.filter(odHere), fams = new Map();
+  for (const r of rows.filter(x => !odHere(x))) {
     const f = odFamily(r);
     if (!fams.has(f.key)) fams.set(f.key, { f, rows: [] });
     fams.get(f.key).rows.push(r);
@@ -30277,15 +30452,17 @@ function odMemPanel(b, pts) {
   const labels = [];
   for (const p of [...pts].sort((u, v) => Y(u.c.v) - Y(v.c.v))) {
     const cx = X(p.x), cy = Y(p.c.v), id = `${b.key}:${p.r.label}`;
-    const m = odMark(p.r.ours, cx, cy, odColour(p.r), { 'data-od-mem-dot': id,
+    const here = odHere(p.r);
+    const m = odMark(here, cx, cy, odColour(p.r), { 'data-od-mem-dot': id,
       'data-chart-point': id, 'data-od-best': best.has(p) ? '1' : null });
     m.append(el('svg:title', { text: `${p.r.label}: ${rpNum(p.c.v)} at ${p.r.memory.words} · `
-      + `${p.r.ours ? 'measured here' : 'published by ' + p.r.publishedBy}` }));
+      + `${here ? 'measured here' + (p.r.card ? ` on ${byAn(p.r.card)}` : '')
+        : 'published by ' + p.r.publishedBy}` }));
     svg.append(m);
-    // labelled: ours, and the published on the line; the rest named on hover
-    // and in the legend above the panels
-    labels.push({ id, cx, cy, r: p.r.ours ? 4.5 : 5.5, name: odShort(p.r.label), ours: p.r.ours,
-      label: p.r.ours || best.has(p), attrs: { 'data-od-mem-label': id } });
+    // labelled: ours (29: and a model measured here), and the published on
+    // the line; the rest named on hover and in the legend above the panels
+    labels.push({ id, cx, cy, r: here ? 4.5 : 5.5, name: odShort(p.r.label), ours: here,
+      label: here || best.has(p), attrs: { 'data-od-mem-label': id } });
   }
   chartLabels(svg, labels, { x0: L, y0: Tp, x1: L + pw, y1: Tp + ph }, { fs: FS,
     segs: line.slice(1).map((p, i) => [X(line[i].x), Y(line[i].c.v), X(p.x), Y(p.c.v)]) });
@@ -30326,6 +30503,9 @@ function vOnDevice(id, d, back) {
   const keep = el('div', { class: 'card', 'data-report-section': 'od-keep' },
     el('h2', { text: 'What each keeps of its own base' }),
     el('p', { class: 'small se', text: odKeepWords(d.standIn) }),
+    // 29: a model measured here against its own build, said once
+    d.measuredNote ? el('p', { class: 'small se', 'data-od-measured-note': '1',
+      text: d.measuredNote }) : '',
     keepPanels.length ? el('div', { class: 'by-panels tr-panels' }, keepPanels)
       : el('p', { class: 'small se', text: 'No model has both its own score and its base’s yet.' }));
   const memPanels = B.map(b => {
@@ -32445,32 +32625,45 @@ function bySpeed(sp, m, lab) {
   }
   const out = [el('p', { class: 'small', 'data-by-speed-sentence': '1', text: say })];
   const rng = x => x ? (x.n > 1 ? `${byTok(x.lo)}–${byTok(x.hi)}` : '—') : '—';
-  const rows = [['Output tok/s alone (512-token prompt)', P.alone_out],
-    ['Prompt tok/s at 512 tokens', P.alone_prompt], ['Prompt tok/s at 16,384 tokens', P.long_prompt],
-    ['Output tok/s at 16,384 tokens', P.long_out],
-    [`Output tok/s in all, ${sp.together_n || 8} at once`, P.together_out]].filter(([, x]) => x);
-  if (!dm && rows.length) out.push(el('h4', { class: 'by-sub', text: `Speed on ${card}` }),
-    el('p', { class: 'small se', text: `Its card check before each step’s first question: the `
-      + `median over ${rpN(sp.boxes)} box${sp.boxes === 1 ? '' : 'es'}, with the range. 256 tokens `
-      + 'out each, from llama-server’s own timings.' }),
-    el('div', { class: 'rp-scroll' }, el('table', { class: 'rp', 'data-by-card': '1' },
-      el('thead', {}, el('tr', {}, ['', 'Median', 'Range'].map(h => el('th', { text: h })))),
-      el('tbody', {}, rows.map(([k, x]) => el('tr', {}, el('td', { text: k }),
-        el('td', { class: 'num', text: byTok(x.median) }), el('td', { class: 'num', text: rng(x) })))))));
+  // 29: a card at a time — a V100's speeds never in one median with an RTX 5090's
+  const perCard = Object.entries(sp.by_card || {}).length > 1 ? Object.entries(sp.by_card)
+    : [[(sp.cards || [])[0] || '', { probe: P, boxes: sp.boxes, together_n: sp.together_n }]];
+  if (!dm) for (const [cname, cc] of perCard) {
+    const Q = cc.probe || {};
+    const rows = [['Output tok/s alone (512-token prompt)', Q.alone_out],
+      ['Prompt tok/s at 512 tokens', Q.alone_prompt], ['Prompt tok/s at 16,384 tokens', Q.long_prompt],
+      ['Output tok/s at 16,384 tokens', Q.long_out],
+      [`Output tok/s in all, ${cc.together_n || 8} at once`, Q.together_out]].filter(([, x]) => x);
+    if (!rows.length) continue;
+    out.push(el('h4', { class: 'by-sub', 'data-by-card-head': cname || '1',
+        text: `Speed on ${perCard.length > 1 ? byAn(cname) : card}` }),
+      el('p', { class: 'small se', text: `Its card check before each step’s first question: the `
+        + `median over ${rpN(cc.boxes)} box${cc.boxes === 1 ? '' : 'es'}, with the range. 256 tokens `
+        + 'out each, from llama-server’s own timings.' + (perCard.length > 1 ? ' Each card on its '
+        + 'own: another card is other hardware, never one median.' : '') }),
+      el('div', { class: 'rp-scroll' }, el('table', { class: 'rp', 'data-by-card': cname || '1' },
+        el('thead', {}, el('tr', {}, ['', 'Median', 'Range'].map(h => el('th', { text: h })))),
+        el('tbody', {}, rows.map(([k, x]) => el('tr', {}, el('td', { text: k }),
+          el('td', { class: 'num', text: byTok(x.median) }), el('td', { class: 'num', text: rng(x) })))))));
+  }
   const ts = Object.keys(B).filter(t => B[t].wall_median != null || B[t].out_tok_s != null
     || B[t].wh_per_answer != null);
   if (ts.length) {
-    const priced = ts.some(t => B[t].usd_per_answer != null);
+    // 29: a benchmark asked on our own boxes alone has no price to rent: "own box"
+    const own = t => !!B[t].own_box && B[t].usd_per_answer == null;
+    const priced = ts.some(t => B[t].usd_per_answer != null || own(t));
     const energy = ts.some(t => B[t].wh_per_answer != null);
     const once = [...new Set(ts.map(t => B[t].at_once).filter(Boolean))];
     out.push(el('h4', { class: 'by-sub', text: dm ? 'Each benchmark, under DeviceMark’s protocol'
-      : `Each benchmark, with ${once.length === 1 ? once[0] : 'several'} answers at once` }),
+      : `Each benchmark, with ${once.length === 1 ? once[0] : 'several'} answers at once`
+        + ((sp.cards || []).length === 1 ? ` on ${card}` : '') }),
       el('p', { class: 'small se', text: (dm ? 'Seconds an item as the board saw them, and '
         + 'llama-server’s decode tokens a second.' : 'Seconds an answer as the board saw them, and '
         + 'output tokens a second from llama-server’s timings — as the answers were asked, '
         + 'several side by side.') + (energy ? ' Energy: each step’s watt-hours, read from '
         + 'the card every five seconds, over its answers.' : '') + (priced ? ' Dollars: the '
-        + 'box’s price an hour, as its line gave it, over the time its server ran.' : '') }),
+        + 'box’s price an hour, as its line gave it, over the time its server ran' + (ts.some(own)
+          ? '; “own box” for one of our own GPUs, which costs nothing to rent' : '') + '.' : '') }),
       el('div', { class: 'rp-scroll' }, el('table', { class: 'rp', 'data-by-speed': '1' },
         el('thead', {}, el('tr', {}, ['Benchmark', 'Seconds, median', '90th percentile',
           dm ? 'Decode tok/s' : 'Output tok/s', ...(energy ? ['Energy an answer'] : []),
@@ -32482,7 +32675,8 @@ function bySpeed(sp, m, lab) {
           el('td', { class: 'num', text: byTok(B[t].out_tok_s) }),
           ...(energy ? [el('td', { class: 'num', 'data-by-wh': t, text: byWh(B[t].wh_per_answer) })] : []),
           ...(priced ? [el('td', { class: 'num', 'data-by-usd': t,
-            text: byUsd(B[t].usd_per_answer) })] : [])))))));
+            ...(own(t) ? { 'data-by-own-box': '1' } : {}),
+            text: own(t) ? 'own box' : byUsd(B[t].usd_per_answer) })] : [])))))));
   }
   return out;
 }
@@ -32936,6 +33130,7 @@ function byThinks(d, m, ts, lab) {
 // the report's section: one row per picked build, each cell's sentence on hover
 function rpBeyond(d) {
   const B = d.beyond || {}, SP = d.speed || {};
+  const cardsDiffer = new Set(Object.values(SP).map(x => x.card).filter(Boolean)).size > 1;
   const cell = (txt, tip, attr) => el('td', { class: 'num', title: tip, ...attr, text: txt });
   const NEXT = 'measured from the next run on', NOT = 'not worked out yet';
   const of = p => {
@@ -32962,8 +33157,11 @@ function rpBeyond(d) {
     ['SimpleQA F', 'sqa', x => x.s && x.s.total, (p, x) => cell(x.s && x.s.total
       ? (100 * (x.s.f || 0)).toFixed(1) : '—', x.s ? bySqaWords(x.s) : NOT, { 'data-by-cell': `${p}:f` })],
     // 23c: its card's speed alone and GPQA Diamond's energy an answer
+    // 29: its card beside it when the builds' cards differ (a V100's never read as a 5090's)
     ['Output tok/s alone', 'alone', x => x.sp.alone_out, (p, x) => cell(x.sp.alone_out
-      ? byTok(x.sp.alone_out.median) : '—', x.sp.alone_out ? `output tokens a second for one user: `
+      ? byTok(x.sp.alone_out.median) + (cardsDiffer && x.sp.card ? ` · ${x.sp.card}` : '') : '—',
+      x.sp.alone_out ? `output tokens a second for one user`
+        + (x.sp.card ? ` on ${byAn(x.sp.card)}` : '') + `: `
         + `the median over ${rpN(x.sp.alone_out.n)} box${x.sp.alone_out.n === 1 ? '' : 'es'}`
         + (x.sp.alone_out.n > 1 ? ` (${byTok(x.sp.alone_out.lo)}–${byTok(x.sp.alone_out.hi)})` : '')
         : NEXT, { 'data-by-cell': `${p}:alone` })],

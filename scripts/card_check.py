@@ -323,6 +323,51 @@ def words(rec: dict | None) -> str:
     return "card: " + " · ".join(parts) if parts else ""
 
 
+def compute_cap(run=None) -> str:
+    """29: the card's compute capability as nvidia-smi says it ("7.0" for a
+    V100) — '' when the driver can't say"""
+    try:
+        rows = _smi(["compute_cap"], run)
+    except Exception:                                   # noqa: BLE001 — unread
+        return ""
+    v = rows[0][0] if rows and rows[0] else ""
+    return v if v and v[0].isdigit() else ""
+
+
+def record_line(rec: dict | None, attention: str = "", cap: str = "") -> str:
+    """29: the card check for the record, its card named — "Tesla V100-DGXS-
+    32GB · sm_70 · 32,768 MiB · driver 580.178.04 · flash attention on with a
+    q8_0 cache · 512 tokens in at 2,345 tok/s, out at 95 alone and 520 at 8 ·
+    16,384 in at 1,890 tok/s" — so a speed is never read as another card's"""
+    if not isinstance(rec, dict):
+        return ""
+    c = rec.get("card") if isinstance(rec.get("card"), dict) else {}
+    p = rec.get("probe") if isinstance(rec.get("probe"), dict) else {}
+    a, lo, t = (p.get(k) if isinstance(p.get(k), dict) else {}
+                for k in ("alone", "long", "together"))
+    parts = [str(c.get("name") or "an unnamed card")]
+    if cap:
+        parts.append("sm_" + cap.replace(".", ""))
+    if c.get("memory_mib") is not None:
+        parts.append(f"{_n(c['memory_mib'])} MiB")
+    if c.get("driver"):
+        parts.append(f"driver {c['driver']}")
+    if attention:
+        parts.append(attention)
+    if a.get("output_tok_s") is not None:
+        parts.append(f"{_n(a.get('prompt_n'))} tokens in at {_n(a.get('prompt_tok_s'))} tok/s, "
+                     f"out at {_n(a['output_tok_s'])} alone"
+                     + (f" and {_n(t['output_tok_s'])} at {t.get('n')}"
+                        if t.get("output_tok_s") is not None else ""))
+    if lo.get("prompt_tok_s") is not None:
+        parts.append(f"{_n(lo.get('prompt_n'))} in at {_n(lo['prompt_tok_s'])} tok/s")
+    elif lo.get("skipped"):
+        parts.append(str(lo["skipped"]))
+    if rec.get("why"):
+        parts.append(str(rec["why"]))
+    return "the card: " + " · ".join(parts)
+
+
 def under_default(c: dict) -> bool:
     lim, dflt = c.get("power_limit_w"), c.get("power_default_w")
     return isinstance(lim, (int, float)) and isinstance(dflt, (int, float)) and lim < dflt - 1

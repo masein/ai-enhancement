@@ -165,6 +165,54 @@ def files() -> dict[str, dict]:
     return {k: json.loads(json.dumps(v)) for k, v in out.items()}
 
 
+def capped_words(mid: str) -> str:
+    """29: "limit capped by its 64K context" for a row whose model holds less
+    context than our limits (Bolt's 65,536: a runtime's `context`, the
+    models it names) — each answer's limit the benchmark's, or what was left
+    of the context after its prompt; '' for any other row"""
+    _scripts()
+    try:
+        import frontier as fb
+    except ImportError:
+        return ""
+    base = str(mid or "").removesuffix(" · thinking")
+    for rt in fb.RUNTIMES.values():
+        if rt.get("context") and base in (rt.get("models") or {}):
+            return getattr(fb, "CAPPED_WORDS", "") or "limit capped by its context"
+    return ""
+
+
+def model_builds() -> list[dict]:
+    """29: a model measured here in more than one build, with what its maker
+    publishes of it — the report files' `measured` rows, by the published
+    model they are builds of (NVIDIA Nemotron 3.5 Bolt E4B: its Q4_K_M and
+    its Q8_0, standing in for BF16, beside NVIDIA's numbers). One model page
+    holds them all, told apart; nothing here is a number"""
+    from . import reported
+    out: dict[str, dict] = {}
+    for rep in files().values():
+        theirs = {t["label"]: t for t in rep.get("theirs") or []}
+        for o in rep.get("measured") or []:
+            name = o.get("model") or o["label"].split(" · ")[0]
+            g = out.setdefault(name, {"name": name, "maker": o.get("maker") or "",
+                                      "card": o.get("card") or "", "builds": [],
+                                      "published": None})
+            mid = str(o.get("row") or "").removesuffix(" · thinking")
+            if mid and mid not in [b["id"] for b in g["builds"]]:
+                g["builds"].append({"id": mid, "label": o["label"], "line": o.get("line") or "",
+                                    "standsInFor": o.get("stands_in_for") or "",
+                                    "capped": capped_words(mid)})
+            pub = theirs.get(o.get("published") or "")
+            if pub and not g["published"]:
+                card = next((c for c in pub.values() if isinstance(c, dict)
+                             and c.get("from") == "card"), {})
+                k = reported.canon(reported.key(card.get("model") or pub["label"],
+                                                card.get("maker") or pub.get("maker") or ""))
+                g["published"] = {"label": pub["label"], "key": k, "page": "reported/" + k,
+                                  "by": pub.get("published_by") or pub.get("maker") or ""}
+    return list(out.values())
+
+
 def row_dir(mid: str) -> Path:
     """a board row's folder: "served/x · thinking" is served__x__thinking"""
     base = mid.removesuffix(" · thinking")
@@ -1274,7 +1322,9 @@ def speed_cols(rows: list[dict]) -> dict:
         got = {**({"alone_out": a} if a else {}),
                **({"gpqa_wh": g["wh_per_answer"]} if "wh_per_answer" in g else {})}
         if got:
-            out[r["label"]] = got
+            # 29: and its card, said beside its number — a V100's never read as a 5090's
+            out[r["label"]] = {**got, **({"card": sp["cards"][0]} if len(sp.get("cards") or [])
+                                         == 1 else {})}
     return out
 
 
