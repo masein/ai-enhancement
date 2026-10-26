@@ -543,7 +543,9 @@ def test_the_own_pilot_asks_five_of_each_on_and_ifeval_ifbench_off(monkeypatch, 
     assert [on[i + 1] for i, x in enumerate(on) if x == "--only"] == list(fb.TASKS)
     assert [off[i + 1] for i, x in enumerate(off) if x == "--only"] == ["ifeval_google",
                                                                        "ifbench_test"]
-    assert on[-1].endswith("/NVIDIA-Nemotron-3.5-Bolt-E4B-Q4_K_M/pilot")
+    # 29.1: each thinking setting in a folder of its own
+    assert on[-1].endswith("/NVIDIA-Nemotron-3.5-Bolt-E4B-Q4_K_M/pilot/thinking-on")
+    assert off[-1].endswith("/NVIDIA-Nemotron-3.5-Bolt-E4B-Q4_K_M/pilot/thinking-off")
 
 
 def test_the_own_pilots_estimate_is_both_builds_on_four_gpus():
@@ -578,6 +580,8 @@ def test_the_pilot_picks_n_of_every_benchmark(monkeypatch, tmp_path):
     got = fb.pilot_items(TASK, tmp_path, 5)
     assert len(got) == 5 and got == fb.pilot_items(TASK, tmp_path, 5)
     assert len(fb.pilot_items(TASK, tmp_path)) == 12        # the 22 pilot's 20, of 12 here
+    # 29.1: a benchmark the 22 pilot never named takes PILOT's "each" (OTIS was a KeyError)
+    assert len(fb.pilot_items("otis_aime_epoch", tmp_path)) == fb.PILOT["each"] == 5
 
 
 # ---------------------------------------------------------------------------
@@ -788,4 +792,116 @@ def test_the_runbooks_lines_are_plan_ds_with_the_pinned_files():
     assert tunnel.split()[2:4] == ["D3", "18090"]
     # no address and no token in it
     assert not re.search(r"\b\d{1,3}(\.\d{1,3}){3}\b", "\n".join(blocks))
-    assert "hf_" not in "\n".join(blocks).replace("hf://", "")
+    assert not re.search(r"\bhf_[A-Za-z0-9]{20,}", "\n".join(blocks))     # a token's shape
+
+
+# ---------------------------------------------------------------------------
+# 29.1: the own box's pilot, whole — every benchmark, both thinking settings
+# ---------------------------------------------------------------------------
+
+def every_benchmark(task: str):
+    """six invented questions of each benchmark, in the shape its prompt and
+    scorer read"""
+    k6 = range(6)
+    if task == MMLU:
+        return invented_mmlu()
+    if task == "arc_agi2_public":
+        return [{"id": f"t{k // 2}#{k % 2}", "group": f"t{k // 2}",
+                 "train": [{"input": [[1]], "output": [[2]]}], "test_input": [[3]],
+                 "answer": [[4]]} for k in k6]
+    if task == "ifeval_google":
+        return [{"id": str(1000 + k), "question": f"Invented prompt {k}.",
+                 "instructions": ["punctuation:no_comma"], "kwargs": [{}]} for k in k6]
+    if task == "ifbench_test":
+        return [{"id": str(k), "question": f"Invented prompt {k}.",
+                 "instructions": ["format:no_whitespace"], "kwargs": [{}]} for k in k6]
+    if task in ("otis_aime_epoch", "math_l5_epoch", "hle_text_cais", "simpleqa_epoch"):
+        return [{"id": f"{task[:4]}{k}", "question": f"Invented problem {k}.",
+                 "answer": "42"} for k in k6]
+    return invented()
+
+
+def test_the_own_pilot_asks_every_benchmark_with_thinking_on_and_off(bolt, monkeypatch,
+                                                                    capsys):
+    """frontier_box.py D3.0 --pilot as dgx-03 runs it, each step's remote_gguf.py
+    run here against the stand-in server: 5 of every benchmark's questions with
+    thinking on, then 5 of IFEval's and IFBench's with it off, each setting in
+    its own folder, every answer's capped limit kept, both verdicts and the
+    estimate at the end. The GGUF is fetched once, and not again"""
+    b = bolt
+    monkeypatch.setattr(fb, "_fetch", every_benchmark)
+    monkeypatch.setattr(gpu_free, "busy", lambda *x, **k: "")
+    root = b["root"] / "workspace"
+    a = fx.parser().parse_args(["D3.0", "--as", Q4, "--gguf", str(b["gguf"]), "--server",
+                                str(b["tarball"]), "--root", str(root), "--pilot"])
+    ran = []
+
+    class Done:
+        def __init__(self, code):
+            self.returncode = code
+
+    real = subprocess.run
+
+    def step(cmd, *args, **kw):
+        """the box's remote_gguf.py, run here — on a port of its own; any
+        other command (llama-server --version, nvidia-smi) as it is"""
+        if not (isinstance(cmd, list) and len(cmd) > 1 and str(cmd[1]).endswith("remote_gguf.py")):
+            return real(cmd, *args, **kw)
+        keep = {k: getattr(config, k) for k in [*rg.ENV, "OUT_DIR"]}
+        lock, env = runner.LOCK, {v: os.environ.get(v) for v in rg.ENV.values()}
+        ran.append(cmd)
+        try:
+            code = rg.main([*cmd[2:], "--port", str(free_port()), "--load-timeout", "60"])
+        except SystemExit as e:
+            code = e.code if isinstance(e.code, int) else 1
+        finally:
+            for k, v in keep.items():
+                setattr(config, k, v)
+            runner.LOCK = lock
+            for k, v in env.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+        return Done(code)
+    monkeypatch.setattr(fx.subprocess, "run", step)
+    assert fx.run_own_pilot(a, "D3.0", RT) == 0
+    out = capsys.readouterr().out
+    assert len(ran) == 2
+    on, off = (json.loads((fx.own_pilot_folder(a, th) / f"pilot-thinking-{th}.json").read_text())
+               for th in ("on", "off"))
+    assert list(on["paces"]) == list(fb.TASKS)                      # all nine
+    assert list(off["paces"]) == ["ifeval_google", "ifbench_test"]
+    assert all(p["answers"] == 5 for x in (on, off) for p in x["paces"].values())
+    assert on["separated"] and off["separated"] and on["thinking"] == "on"
+    assert off["thinking"] == "off"
+    # --pilot-each said, for each benchmark: the pilot's 5, never the 22 pilot's 20
+    log = (fx.own_pilot_folder(a, "on") / rg.OWN_LOG).read_text()
+    assert "GPQA Diamond: the pilot's 5 of its 12 questions, each asked once, thinking on" \
+        in log and "OTIS Mock AIME 2024–2025: the pilot's 5 of its 6" in log
+    assert "the pilot's 5 of its 6 questions, each asked once, thinking off" in \
+        (fx.own_pilot_folder(a, "off") / rg.OWN_LOG).read_text()
+    # every answer asked once, its capped limit kept; none with thinking off thinks
+    rows = [json.loads(x) for th in ("on", "off") for x in (
+        fx.own_pilot_folder(a, th) / f"pilot-thinking-{th}.jsonl").read_text().splitlines()]
+    assert len(rows) == 9 * 5 + 2 * 5
+    for r in rows:
+        budget = fb.BENCH[r["task"]]["budget"][r["thinking"]]
+        assert r["limit"] == min(budget, 65_536 - r["prompt_tokens"]), r["task"]
+        assert r["capped"] == (r["limit"] < budget), r["task"]
+    # the hard ones capped by the 64K, the 32K ones not
+    capped = {r["task"] for r in rows if r["capped"]}
+    assert capped == {"gpqa_diamond_epoch", "otis_aime_epoch", "math_l5_epoch", "hle_text_cais",
+                      "arc_agi2_public"}
+    assert all(not r["thinking_apart"] for r in rows if r["thinking"] == "off")
+    reqs = [r for r in requests(b) if r.get("messages")]
+    assert len(reqs) == len(rows)
+    assert {r["chat_template_kwargs"]["enable_thinking"] for r in reqs} == {True, False}
+    # the card check and the estimate, then both verdicts last
+    assert on["server"]["card_check"]["line"].startswith("the card: ")
+    assert "the full set: Q4_K_M about" in out
+    assert out.rstrip().splitlines()[-2].startswith("thinking on: Thinking and answer "
+                                                    "separated correctly")
+    assert out.rstrip().splitlines()[-1].startswith("thinking off: ")
+    # the file was fetched once, its sha256 read once, for both steps
+    assert out.count("sha256 of ") <= 1
