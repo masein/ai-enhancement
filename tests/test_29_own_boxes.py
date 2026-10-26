@@ -792,7 +792,7 @@ def test_the_runbooks_lines_are_plan_ds_with_the_pinned_files():
     assert tunnel.split()[2:4] == ["D3", "18090"]
     # no address and no token in it
     assert not re.search(r"\b\d{1,3}(\.\d{1,3}){3}\b", "\n".join(blocks))
-    assert "hf_" not in "\n".join(blocks).replace("hf://", "")
+    assert not re.search(r"\bhf_[A-Za-z0-9]{20,}", "\n".join(blocks))     # a token's shape
 
 
 # ---------------------------------------------------------------------------
