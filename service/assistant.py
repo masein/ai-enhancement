@@ -93,8 +93,9 @@ PUBLISHED_AS = (("gpqa", r"^gpqa"), ("hle", r"^hle\b|humanity.s last exam"),
                 ("arc", r"^arc-?agi-?2"))
 # the page's mtGroup: an outside model served here is open, not ours; a
 # published one open by its name, else closed
+# the page's MT_OUTSIDE_RE — 29: and NVIDIA Nemotron 3.5 Bolt E4B, measured on our V100s
 OUTSIDE_RE = re.compile(r"^(ornith|bonsai|gemma|llama|deepseek|gpt-oss|mistral|phi|granite|"
-                        r"smollm|pythia|qwen[23](?:\.5)?-)", re.I)
+                        r"smollm|pythia|nvidia|nemotron|qwen[23](?:\.5)?-)", re.I)
 OPEN_RE = re.compile(r"/|gemma|gpt-oss|llama|qwen|qwq|deepseek|mistral|mixtral|\bphi-|stablelm|"
                      r"tinyllama|bonsai|edge0|ornith|\bling\b|granite|smollm|pythia|\bopt-|lfm|"
                      r"youtu|nanbeige|olmo|kimi|\bglm|minimax|nemotron", re.I)
@@ -202,6 +203,20 @@ def catalog(payload: dict | None = None) -> dict:
     for x in models.values():
         x["group"] = _group(x)
         x["phone"] = x["id"] in phone_ours or (x["published"] and norm(x["name"]) in od_pub)
+    # 29: a published model measured here in builds of its own (NVIDIA Nemotron
+    # 3.5 Bolt E4B: its Q4_K_M and its Q8_0) — tied, never one model: "bolt" is
+    # still the published one, "bolt q4" a build (names.json)
+    from . import reports
+    for g in reports.model_builds():
+        pub = (g.get("published") or {}).get("page")
+        ids = [b["id"] for b in g["builds"] if b["id"] in models]
+        if pub in models and ids:
+            models[pub]["builds"] = ids
+        for b in g["builds"]:
+            if b["id"] in models:
+                models[b["id"]].update(build=b["label"].split(" · ")[-1],
+                                       siblings=[i for i in ids if i != b["id"]],
+                                       **({"of": pub} if pub in models else {}))
     benches = []
     std = nm.get("standard") or {}
     for b in sc.get("benchmarks") or []:
@@ -2143,6 +2158,12 @@ def suggestions(a: dict, cat: dict) -> list[dict]:
         number = (a["model"], a["benchmark"])
     if number and (a.get("measure") or "score") == "score":
         mid, key = number
+        # 29: one build of a model measured in several — beside the other
+        # (Bolt's Q4_K_M beside its Q8_0)
+        for sib in _model(cat, mid).get("siblings") or []:
+            if value(cat, sib, key):
+                add(f"beside {_model(cat, sib).get('build') or sib}",
+                    {"action": "compare", "models": [mid, sib], "benchmarks": [key]})
         if q4 and mid != q4 and value(cat, q4, key):
             add("beside Q4", {"action": "compare", "models": [mid, q4], "benchmarks": [key]})
         if act == "compare" and not _model(cat, mid)["published"]:
@@ -2172,6 +2193,18 @@ def suggestions(a: dict, cat: dict) -> list[dict]:
             add("top 5", {**a, "n": 5})
         add("as a chart", {"action": "chart", "chart": "bars", "benchmark": a["benchmark"],
                            **({"only": a["among"]} if a.get("among") in ONLY else {})})
+    # 29: a published model whose builds the board measured ("bolt"), shown
+    # with its numbers as published: first, the same beside its builds
+    ms = a.get("models") or []
+    if act == "compare" and ms and (a.get("measure") or "score") == "score":
+        withb = [x for m in ms for x in (m, *(b for b in _model(cat, m).get("builds") or []
+                                              if b not in ms))]
+        if len(withb) > len(ms):
+            pubs = [m for m in ms if _model(cat, m).get("builds")]
+            b = defaults({**{k: v for k, v in a.items() if k not in ("then", "pending")},
+                          "models": list(dict.fromkeys(withb))})
+            out.insert(0, {"label": "and its builds measured here" if len(pubs) == 1
+                           else "and their builds measured here", "action": b})
     return out[:3]
 
 

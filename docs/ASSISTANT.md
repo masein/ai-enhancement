@@ -113,6 +113,16 @@ page's title names a model, which the model copied. A phone is matched by
 its name, code or other name before its maker: "the oneplus 15" is that
 phone, "the oneplus" every OnePlus.
 
+A model measured here in builds of its own (29: NVIDIA Nemotron 3.5 Bolt
+E4B's Q4_K_M and Q8_0, on our V100s) is two models, each with its names:
+"bolt q4" is the Q4_K_M, "Bolt Q8_0" the Q8_0, and "the measured bolt" asks
+between them. "bolt" alone is still NVIDIA's published numbers, as the bank
+has it; its model page holds both builds beside them. The builds are open
+models (the page's list of others' models, `OUTSIDE_RE`, is the same as the
+Models tab's), tied to the published entry: a comparison that shows the
+published Bolt offers "and its builds measured here" first, and one build's
+number "beside Q8_0", the other build.
+
 ## The panel
 
 28g: board E, "Ask panel — four states" (`docs/prompts/phase-28g/ask-panel-mock.dc.html`),

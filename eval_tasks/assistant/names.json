@@ -66,6 +66,34 @@
    "nemotron bolt",
    "bolt e4b"
   ],
+  "served/NVIDIA-Nemotron-3.5-Bolt-E4B-Q4_K_M": [
+   "bolt q4_k_m",
+   "bolt q4",
+   "q4_k_m bolt",
+   "q4 bolt",
+   "nemotron bolt q4_k_m",
+   "bolt e4b q4_k_m",
+   "bolt's q4_k_m",
+   "bolt's q4",
+   "the measured bolt",
+   "measured bolt",
+   "bolt measured here",
+   "bolt on the v100"
+  ],
+  "served/NVIDIA-Nemotron-3.5-Bolt-E4B-Q8_0": [
+   "bolt q8_0",
+   "bolt q8",
+   "q8_0 bolt",
+   "q8 bolt",
+   "nemotron bolt q8_0",
+   "bolt e4b q8_0",
+   "bolt's q8_0",
+   "bolt's q8",
+   "the measured bolt",
+   "measured bolt",
+   "bolt measured here",
+   "bolt on the v100"
+  ],
   "Edge0-35B-A3B-preview": [
    "edge0 35b",
    "edge0-35b",
