@@ -1018,6 +1018,10 @@ def make_bundle(out: Path, served_as: str, thinking: bool, tasks: list[str], sta
                   "budget": s["max_tokens"], "family": sf.family_of(rec) or "",
                   "sampling": {k: v for k, v in s.items()
                                if k not in ("max_tokens", "chat_template_kwargs")},
+                  # 29: where each of the runtime's values comes from
+                  **({"sampling_from": fb.RUNTIMES[rec["runtime"]]["sampling_from"]}
+                     if fb.RUNTIMES.get(rec.get("runtime") or "", {}).get("sampling_from")
+                     else {}),
                   "switch": s.get("chat_template_kwargs"), **spent,
                   **(done.get(t) or {}), **({"incomplete": True} if t in incomplete else {})}
     setup = {"suite": SUITE, "protocol": fb.VERSION, "served_as": served_as,

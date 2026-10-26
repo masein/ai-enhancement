@@ -141,6 +141,10 @@ def _setup(rec: dict, task: str, on: bool, s: dict) -> dict:
         "budget": s["max_tokens"], "family": family_of(rec) or "server defaults",
         "sampling": {k: v for k, v in s.items() if k not in ("max_tokens",
                                                             "chat_template_kwargs")},
+        # 29: where each of a runtime's values comes from (Bolt's card, its
+        # generation_config.json, or neutral)
+        **({"sampling_from": (fb.RUNTIMES.get(rec.get("runtime") or "") or {})["sampling_from"]}
+           if (fb.RUNTIMES.get(rec.get("runtime") or "") or {}).get("sampling_from") else {}),
         **({"runtime": rec["runtime"]} if rec.get("runtime") else {}),
         "where": _where(), "file": pin.get("file") or "",
         # 17b: what its server serves, and how it was launched

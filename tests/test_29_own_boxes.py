@@ -119,11 +119,12 @@ def answers_of(b: dict, out: str, task: str = TASK) -> list[dict]:
 # Bolt's runtime: its card, its template, its 64K
 # ---------------------------------------------------------------------------
 
-def test_bolts_runtime_is_nvidias_card_and_neutral_values_on_upstream_b11555():
+def test_bolts_runtime_is_nvidias_card_and_shipped_defaults_on_upstream_b11555():
     rt = fb.RUNTIMES[RT]
-    # NVIDIA's card: temperature 1.0 and top-p 0.95, thinking on or off; the
-    # rest neutral — top-k off (0), min-p 0, no presence or repeat penalty
-    assert rt["sampling"] == {"temperature": 1.0, "top_k": 0, "top_p": 0.95, "min_p": 0.0,
+    # NVIDIA's card: temperature 1.0 and top-p 0.95, thinking on or off; its
+    # generation_config.json's top-k 64 (masein, 26 Oct); the rest neutral —
+    # min-p 0, no presence or repeat penalty — each value's source kept
+    assert rt["sampling"] == {"temperature": 1.0, "top_k": 64, "top_p": 0.95, "min_p": 0.0,
                               "presence_penalty": 0.0, "repeat_penalty": 1.0}
     assert rt["thinking"] == ("on",) and rt["off_for"] == ("ifeval_google", "ifbench_test")
     assert rt["flags"] == ["-ctk", "q8_0", "-ctv", "q8_0", "--flash-attn", "on"]
@@ -134,7 +135,12 @@ def test_bolts_runtime_is_nvidias_card_and_neutral_values_on_upstream_b11555():
     assert rt["template_sha256"] == \
         "35b7d0641b6fb4ee41c3bc623e85bdb7d583c40f6ae9f24514ae58a9d57119f3"
     words = fb.runtime_words(RT)
-    assert "temperature 1.0, top-k 0, top-p 0.95, min-p 0.0, presence penalty 0.0, repeat " \
+    assert set(rt["sampling_from"]) == set(rt["sampling"])
+    assert rt["sampling_from"]["top_k"].startswith("generation_config.json, "
+                                                   "nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-BF16")
+    assert rt["sampling_from"]["min_p"].startswith("neutral")
+    assert fb.runtime_flags(RT)[6:10] == ["--temp", "1.0", "--top-k", "64"]
+    assert "temperature 1.0, top-k 64, top-p 0.95, min-p 0.0, presence penalty 0.0, repeat " \
            "penalty 1.0" in words and "its 64K context" in words
     # a Bolt build runs on it alone, and it runs Bolt alone
     assert fb.runtime_of_model(Q4) == RT and fb.runtime_of_model(Q8) == RT
@@ -153,7 +159,8 @@ def test_each_request_says_the_thinking_switch_the_template_defaults_off():
     on, off = sf.settings(rec, TASK, True), sf.settings(rec, "ifeval_google", False)
     assert on["chat_template_kwargs"] == {"enable_thinking": True}
     assert off["chat_template_kwargs"] == {"enable_thinking": False}
-    assert on["top_k"] == 0 and off["temperature"] == 1.0 and sf.family_of(rec) == ""
+    assert on["top_k"] == off["top_k"] == 64 and off["temperature"] == 1.0
+    assert sf.family_of(rec) == ""
     # the budget is the benchmark's; each answer's own limit is capped below it
     assert on["max_tokens"] == 81_920
 
@@ -191,6 +198,14 @@ def test_a_box_records_each_answers_capped_limit(bolt, monkeypatch, tmp_path):
     assert all(x["capped"] is True for x in got)
     setup = json.loads((task_dir(b, "run") / "setup.json").read_text())
     assert setup["context_cap"] == 65_536 and setup["budget"] == 81_920
+    # the run's settings: top-k 64 in every request, and where each value came from
+    assert all(r["top_k"] == 64 and r["temperature"] == 1.0 and r["top_p"] == 0.95
+               for r in reqs)
+    assert setup["sampling"]["top_k"] == 64
+    assert setup["sampling_from"] == fb.RUNTIMES[RT]["sampling_from"]
+    bundle = rb.read(b["root"] / "run" / progress_of(b, "run")["bundle"]["name"])
+    assert bundle["setup"]["tasks"][TASK]["sampling_from"]["top_k"].startswith(
+        "generation_config.json")
     # the server's slots hold 64K each: -c is 3 of them
     argv = json.loads(launched.read_text().splitlines()[-1])["argv"]
     assert argv[argv.index("-c") + 1] == str(3 * 65_536)

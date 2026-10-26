@@ -329,22 +329,34 @@ RUNTIMES = {
     # which upstream llama.cpp reads since NVIDIA's own b11459; b11555, the
     # release card-ornith runs, built for sm_70 under CUDA 12.8 (CUDA 13 has
     # no Volta) into the runner image's V100 tag. NVIDIA's card: temperature
-    # 1.0 and top-p 0.95 with thinking on or off; nothing else, so top-k off
-    # (0 — the BF16 repository's generation_config.json says 64, the card
-    # doesn't), min-p 0, no presence or repeat penalty. Thinking is the
+    # 1.0 and top-p 0.95 with thinking on or off; the model's shipped default,
+    # its BF16 repository's generation_config.json, adds top-k 64 (as our
+    # Gemma 4 preset has it; masein, 26 Oct); what neither sets is neutral —
+    # min-p 0, no presence or repeat penalty. Each value's source is kept in
+    # the run's settings (`sampling_from`, in setup.json). Thinking is the
     # template's enable_thinking — its own default is off, so every request
     # says it. Its context is 64K: each answer's limit is the benchmark's, or
     # 65,536 less its prompt when that is smaller (`context`)
     "card-bolt": {
         "words": "upstream llama.cpp b11555 for the V100 (sm_70), NVIDIA's card settings for "
-                 "Nemotron 3.5 Bolt, the GGUF's own chat template, its 64K context, no "
-                 "reasoning budget, no speculative decoding, thinking on",
+                 "Nemotron 3.5 Bolt with its generation_config's top-k, the GGUF's own chat "
+                 "template, its 64K context, no reasoning budget, no speculative decoding, "
+                 "thinking on",
         "env": {},
         "thinking": ("on",),
         # and off for instruction following alone, as lda-2610 (plan I)
         "off_for": ("ifeval_google", "ifbench_test"),
-        "sampling": {"temperature": 1.0, "top_k": 0, "top_p": 0.95, "min_p": 0.0,
+        "sampling": {"temperature": 1.0, "top_k": 64, "top_p": 0.95, "min_p": 0.0,
                      "presence_penalty": 0.0, "repeat_penalty": 1.0},
+        # where each value comes from, kept with the run's settings
+        "sampling_from": {
+            "temperature": "NVIDIA's model card (and generation_config.json)",
+            "top_p": "NVIDIA's model card (and generation_config.json)",
+            "top_k": "generation_config.json, nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-BF16 at "
+                     "49843eed (the model's shipped default; the card sets none)",
+            "min_p": "neutral: neither the card nor generation_config.json sets it",
+            "presence_penalty": "neutral: neither the card nor generation_config.json sets it",
+            "repeat_penalty": "neutral: neither the card nor generation_config.json sets it"},
         "flags": ["-ctk", "q8_0", "-ctv", "q8_0", "--flash-attn", "on"],
         # what the box runs when the card refuses those (flash attention with
         # a q8_0 cache at Bolt's 512-wide global heads on a V100 — checked at

@@ -44,10 +44,12 @@ and the card's 64K in and out).
   VERSION and `--version` are checked against the runtime before a GGUF is
   fetched.
 - **Sampling:** NVIDIA's card gives temperature 1.0 and top-p 0.95 with
-  thinking on or off, and nothing else. The rest is neutral: **top-k 0 (off)**,
-  min-p 0, no presence or repeat penalty — never llama-server's defaults. (The
-  BF16 repository's `generation_config.json` says top-k 64; the card doesn't,
-  so it isn't used.)
+  thinking on or off. The model's shipped default, the BF16 repository's
+  `generation_config.json` (at `49843eed`), adds **top-k 64** (as our Gemma 4
+  preset has it); what neither sets is neutral — min-p 0, no presence or
+  repeat penalty — never llama-server's defaults. Each value's source is kept
+  in the run's settings (`sampling_from` in each benchmark's `setup.json`, in
+  the bundle).
 - **Thinking:** the chat template's `enable_thinking` (it writes `<|think|>`
   into the first system turn; the thinking comes back in
   `<|channel>thought … <channel|>`, which llama.cpp b11555 splits into
