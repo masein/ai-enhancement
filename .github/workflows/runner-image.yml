@@ -22,6 +22,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      only_v100:
+        description: "29: the V100 tag alone — built and checked; pushed only from main"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -37,7 +42,7 @@ env:
 
 jobs:
   runner-image:
-    if: github.repository == 'masein/ai-enhancement'
+    if: github.repository == 'masein/ai-enhancement' && !inputs.only_v100
     runs-on: ubuntu-latest
     # the deps stage's base image and kernels are most of it: 15.1's image
     # job built both images in under an hour
@@ -85,8 +90,9 @@ jobs:
 
   # 29: the V100 tag — the runner image, and upstream llama.cpp built for
   # sm_70 under CUDA 12.8 at /opt/llama (the Dockerfile's runner-v100 stage),
-  # for our own boxes on dgx-03. Two tags: v100-<short sha>, and v100 when the
-  # run is main's. The runner image above stays as it is
+  # for our own boxes on dgx-03. Two tags, v100-<short sha> and v100, pushed
+  # from main alone: a branch's run builds and checks it, and pushes nothing.
+  # The runner image above stays as it is
   runner-v100:
     if: github.repository == 'masein/ai-enhancement'
     runs-on: ubuntu-latest
@@ -117,11 +123,11 @@ jobs:
       - name: its llama.cpp
         run: docker run --rm "$IMAGE:v100-${{ steps.tag.outputs.short }}" cat /opt/llama/VERSION
       - name: log in to ghcr.io with this run's token
+        if: github.ref == 'refs/heads/main'
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
       - name: push its tags
+        if: github.ref == 'refs/heads/main'
         run: |
+          docker tag "$IMAGE:v100-${{ steps.tag.outputs.short }}" "$IMAGE:v100"
           docker push "$IMAGE:v100-${{ steps.tag.outputs.short }}"
-          if [ "${{ github.ref }}" = refs/heads/main ]; then
-            docker tag "$IMAGE:v100-${{ steps.tag.outputs.short }}" "$IMAGE:v100"
-            docker push "$IMAGE:v100"
-          fi
+          docker push "$IMAGE:v100"
