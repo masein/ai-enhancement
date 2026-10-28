@@ -810,6 +810,15 @@ def _get(url: str, timeout: float = 5) -> tuple[int, bytes]:
         return 0, b""
 
 
+def of_words(task: str, items: list) -> str:
+    """29.2: what a benchmark's questions are — ARC-AGI-2's its test grids,
+    167 in its 120 tasks ("5 of its 167" read as a count that didn't agree)"""
+    if fb.BENCH[task].get("aggregate") == "pass@2":
+        tasks = len({fb.group_of(task, it) for it in items})
+        return f"{len(items)} test grids (in its {tasks} tasks)"
+    return f"{len(items)} questions"
+
+
 def _started(s: "Server", timeout: float, say, gguf: Path) -> "Server":
     """29: a Server, started (or SystemExit, said in its words)"""
     s.start(timeout, say, gguf)
@@ -1915,7 +1924,7 @@ def _main(argv: list[str] | None = None) -> int:
                if server["dir"].get("version_file") else "no .git near it, and no VERSION"))
     if a.runtime:
         # 20: the runtime's every value said, the repeat penalty among them
-        say(fb.runtime_words(a.runtime))
+        say(fb.runtime_words(a.runtime, a.thinking))        # 29.2: this step's own setting
 
     # the questions, fetched before the GPU is spent: a gated set needs HF_TOKEN
     from service import config
@@ -1929,11 +1938,11 @@ def _main(argv: list[str] | None = None) -> int:
             # 29.1: --pilot-each's number here too, as pilot_ask asks it (it said
             # "the pilot's 20" of GPQA Diamond, then stopped at OTIS)
             mine = fb.pilot_items(t, config.BENCH_ROOT, a.pilot_each or None)
-            say(f"{fb.BENCH[t]['label']}: the pilot's {len(mine)} of its {len(items)} questions, "
+            say(f"{fb.BENCH[t]['label']}: the pilot's {len(mine)} of its {of_words(t, items)}, "
                 f"each asked once, thinking {'on' if thinking else 'off'}")
             continue
         mine = fb.shard_of(items, shard)
-        say(f"{fb.BENCH[t]['label']}: {len(mine)} of its {len(items)} questions here × "
+        say(f"{fb.BENCH[t]['label']}: {len(mine)} of its {of_words(t, items)} here × "
             f"{fb.BENCH[t]['epochs']} run{'s' if fb.BENCH[t]['epochs'] > 1 else ''}")
 
     srv_proc = Server(srv, gguf_path, a.port, a.slots, ctx, flags, extra_env, out / SERVER_LOG)
@@ -1965,6 +1974,44 @@ def _main(argv: list[str] | None = None) -> int:
         if want_tmpl:
             say(f"the chat template: the GGUF's own (sha256 {want_tmpl[:16]}…), as runtime "
                 f"{a.runtime} asks")
+        # 29.2: and the file's own, read out of the GGUF — the one pinned, and
+        # the one the server serves (as llama.cpp's Jinja lexer keeps it: the
+        # file's ends in a newline it drops, so the two sha256 differ)
+        rt_t = fb.RUNTIMES.get(a.runtime or "") or {}
+        if rt_t.get("template_file_sha256"):
+            import gguf_header
+            ftmpl = gguf_header.chat_template(gguf_path)
+            fsha = hashlib.sha256(ftmpl.encode("utf-8")).hexdigest() if ftmpl else None
+            server["chat_template_file_sha256"] = fsha
+            if fsha != rt_t["template_file_sha256"]:
+                raise SystemExit(f"runtime {a.runtime} runs GGUFs whose own chat template is sha256 "
+                                 f"{rt_t['template_file_sha256'][:16]}…, and {gguf_path.name}'s is "
+                                 f"{(fsha or 'none')[:16]}…: another file? Nothing was asked")
+            if tmpl != fb.as_lexed(ftmpl):
+                raise SystemExit(f"this server doesn't serve {gguf_path.name}'s own chat template "
+                                 "(its /props differs from the file's, as llama.cpp keeps it): "
+                                 "--chat-template, or a build that patches it? Nothing was asked")
+            say(f"the chat template, in the file: sha256 {fsha[:16]}…, the one pinned — and the one "
+                "this server serves (its last newline dropped, as llama.cpp keeps a template)")
+        # 29.2: the thinking switch, on this server: on writes the template's
+        # marker into the prompt, off doesn't — before a question
+        marker = rt_t.get("think_marker")
+        if marker:
+            from service import served as sv_t
+            said = {}
+            for on_ in (True, False):
+                got = sv_t._post(srv_proc.base + "/apply-template", "", {
+                    "messages": [{"role": "user", "content": "A question."}],
+                    "chat_template_kwargs": {"enable_thinking": on_}}).get("prompt")
+                said[on_] = isinstance(got, str) and marker in got
+            server["thinking_switch"] = {"marker": marker, "on": said[True], "off": said[False]}
+            if not said[True] or said[False]:
+                raise SystemExit(f"the thinking switch doesn't work on this server: with "
+                                 f"enable_thinking on the prompt {'holds' if said[True] else 'lacks'} "
+                                 f"{marker}, with it off it {'holds' if said[False] else 'lacks'} it. "
+                                 "Nothing was asked")
+            say(f"the thinking switch: enable_thinking on writes {marker} into the prompt, off "
+                "doesn't — checked on this server")
         # 17c: what its slots say of speculation — the import compares it with
         # the registered launch (a draft model under any spelling drafts)
         from service import served as sv
@@ -2070,6 +2117,8 @@ def _main(argv: list[str] | None = None) -> int:
                 "gguf": {k: gguf[k] for k in ("name", "size", "sha256")},
                 "server": {k: server.get(k) for k in ("build", "commit", "binary_sha256",
                                                       "tarball_sha256", "chat_template_sha256",
+                                                      "chat_template_file_sha256",
+                                                      "thinking_switch",
                                                       "attention", "context_cap", "card_check",
                                                       "slot_context", "kv_estimate")
                            if server.get(k) is not None},

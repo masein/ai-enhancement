@@ -282,7 +282,7 @@ LDA_REPEAT_PENALTY = 1.0
 RUNTIMES = {
     "lda-2610": {
         "words": "the team's lda branch: router norm on, no reasoning budget, no speculative "
-                 "decoding, thinking on",
+                 "decoding",
         "env": {"LOOKAHEAD_MOE_ROUTER_NORM": "1"},
         "thinking": ("on",),
         # 25: and off for instruction following alone (plan I), its sampling as
@@ -302,7 +302,7 @@ RUNTIMES = {
     # tag, any LOOKAHEAD_* variable, and a model other than its own
     "card-ornith": {
         "words": "upstream llama.cpp b11555, Ornith-1.5's card settings, the GGUF's own chat "
-                 "template, no reasoning budget, no speculative decoding, thinking on",
+                 "template, no reasoning budget, no speculative decoding",
         "env": {},
         "thinking": ("on",),
         "sampling": {"temperature": 1.0, "top_k": 20, "top_p": 0.95, "min_p": 0.0,
@@ -340,8 +340,7 @@ RUNTIMES = {
     "card-bolt": {
         "words": "upstream llama.cpp b11555 for the V100 (sm_70), NVIDIA's card settings for "
                  "Nemotron 3.5 Bolt with its generation_config's top-k, the GGUF's own chat "
-                 "template, its 64K context, no reasoning budget, no speculative decoding, "
-                 "thinking on",
+                 "template, its 64K context, no reasoning budget, no speculative decoding",
         "env": {},
         "thinking": ("on",),
         # and off for instruction following alone, as lda-2610 (plan I)
@@ -373,10 +372,17 @@ RUNTIMES = {
                    "nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-BF16",
                    "served/NVIDIA-Nemotron-3.5-Bolt-E4B-Q8_0":
                    "nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-BF16"},
-        # the GGUFs' own chat template — the BF16 repository's
-        # chat_template.jinja (20,159 bytes), as NVIDIA's Q4_K_M holds it
-        # (Hugging Face's reading of both repositories' GGUF headers)
-        "template_sha256": "35b7d0641b6fb4ee41c3bc623e85bdb7d583c40f6ae9f24514ae58a9d57119f3",
+        # the GGUFs' own chat template: in the file, the BF16 repository's
+        # chat_template.jinja (20,159 bytes, ending in a newline), as NVIDIA's
+        # Q4_K_M and ggml-org's Q8_0 hold it — and as llama-server serves it,
+        # its Jinja lexer having dropped that one trailing newline (29.2: the
+        # pilot on dgx-03 was refused comparing the file's with the server's).
+        # The box checks the file's, and that the server serves that one
+        "template_sha256": "a9729e306e331ab2f82789712b4f4ea8382ebf5df88052917c99d4abf79fd1a4",
+        "template_file_sha256": "35b7d0641b6fb4ee41c3bc623e85bdb7d583c40f6ae9f24514ae58a9d57119f3",
+        # 29.2: what its template writes for thinking on, and never for off —
+        # the switch checked on the box's server before a question
+        "think_marker": "<|think|>",
         # its context: max_position_embeddings, and the card's 64K in and out
         "context": 65_536,
         "card": "V100",
@@ -496,16 +502,24 @@ SAMPLING_WORDS = {"temperature": "temperature", "top_k": "top-k", "top_p": "top-
                   "repeat_penalty": "repeat penalty", "repeat_last_n": "repeat last-n"}
 
 
-def runtime_words(name: str) -> str:
-    """"runtime lda-2610 (…): LOOKAHEAD_MOE_ROUTER_NORM=1 · temperature 1.0,
-    top-k 20, …, repeat penalty 1.0, repeat last-n 64 · -ctk q8_0 …" — a
-    step's line says it"""
+def runtime_words(name: str, thinking: str = "on") -> str:
+    """"runtime lda-2610 (…, thinking on): LOOKAHEAD_MOE_ROUTER_NORM=1 ·
+    temperature 1.0, top-k 20, …, repeat penalty 1.0, repeat last-n 64 · -ctk
+    q8_0 …" — a step's line says it, 29.2: with the step's own thinking setting
+    (a thinking-off run's record said "thinking on")"""
     rt = RUNTIMES[name]
     env = " ".join(f"{k}={v}" for k, v in rt["env"].items())
     samp = ", ".join(f"{SAMPLING_WORDS[k]} {v}" for k, v in rt["sampling"].items())
     # 22: a runtime with no variables says so
-    return (f"runtime {name} ({rt['words']}): {env or 'no variables'} · {samp} · "
-            + " ".join(rt["flags"]))
+    return (f"runtime {name} ({rt['words']}, thinking {thinking}): {env or 'no variables'} · "
+            f"{samp} · " + " ".join(rt["flags"]))
+
+
+def as_lexed(src: str) -> str:
+    """29.2: a chat template as llama.cpp's Jinja lexer keeps it, and its
+    /props says it: \r\n and \r as \n, and one trailing newline dropped"""
+    s = src.replace("\r\n", "\n").replace("\r", "\n")
+    return s[:-1] if src.endswith("\n") else s
 
 
 def slot_context(tasks: list[str], on: bool, cap: int | None = None) -> int:

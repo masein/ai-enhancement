@@ -37,7 +37,8 @@ done, and was taken for one asked alone: CI's 140 among 80…87). 29:
 /tokenize counts them), and FAKE_LLAMA_OUT_TOKENS=N — an answer needs N
 tokens: one given fewer (max_tokens) runs out of room, its finish "length"
 and no answer in it; FAKE_LLAMA_REFUSE_CACHE=q8_0 stops at start-up when
-asked for that cache with flash attention on."""
+asked for that cache with flash attention on; FAKE_LLAMA_SWITCH=ignore a
+template whose prompt ignores enable_thinking (29.2)."""
 
 from __future__ import annotations
 
@@ -188,6 +189,9 @@ def main() -> int:
                 # 29: the prompt the template makes — what /tokenize then counts
                 words = " ".join(str(m.get("content") or "") for m in body.get("messages") or [])
                 think = (body.get("chat_template_kwargs") or {}).get("enable_thinking")
+                # 29.2: a template that ignores the switch: always the same
+                if os.environ.get("FAKE_LLAMA_SWITCH") == "ignore":
+                    think = True
                 return self._send(status if status != 200 else 200, {
                     "prompt": "<bos> " + ("<|think|> " if think else "") + words + " <turn|>"})
             if self.path not in ("/v1/chat/completions", "/chat/completions"):
