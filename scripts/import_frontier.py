@@ -728,6 +728,11 @@ def runtime_problem(setup: dict, rec: dict) -> str:
             miss.append(built)
         if rt.get("template_sha256") and srv.get("chat_template_sha256") != rt["template_sha256"]:
             miss.append(f"the GGUF's own chat template (sha256 {rt['template_sha256'][:16]}…)")
+        # 29.2: and the file's own, as the box read it out of the GGUF
+        if rt.get("template_file_sha256") and srv.get("chat_template_file_sha256") != rt[
+                "template_file_sha256"]:
+            miss.append("the GGUF's own chat template in the file (sha256 "
+                        f"{rt['template_file_sha256'][:16]}…)")
         if miss:
             return (f"its box didn't run runtime {got} as this board defines it: "
                     + "; ".join(miss) + " — the box's image and this board differ")

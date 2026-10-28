@@ -115,6 +115,31 @@ class _Reader:
         raise NotGguf(f"an unknown value type {t}")
 
 
+def chat_template(path: str | Path) -> str | None:
+    """29.2: the file's own chat template (tokenizer.chat_template), whole and
+    as the file holds it — None when it has none, or isn't a GGUF one can read"""
+    try:
+        with open(path, "rb") as fh:
+            r = _Reader(fh)
+            if r.take(4) != MAGIC or r.unpack("<I") not in (2, 3):
+                return None
+            r.count()
+            for _ in range(r.count()):
+                key, t = r.string(), r.unpack("<I")
+                if key == _PRESENT:
+                    if t != _STRING:
+                        return None
+                    n = r.unpack("<Q")
+                    if n > MAX_STR:
+                        return None
+                    return r.take(n).decode("utf-8")
+                r.value(t, keep=False)
+    except (OSError, NotGguf, struct.error, UnicodeDecodeError, MemoryError, RecursionError,
+            TypeError, ValueError, OverflowError):
+        return None
+    return None
+
+
 def read(path: str | Path) -> dict | None:
     """{arch, name, size_label, params, active_params, expert_count,
     expert_used_count, file_type, context_length, chat_template} from the

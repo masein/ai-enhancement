@@ -57,8 +57,16 @@ and the card's 64K in and out).
   template's own default is off**, so every request says it, on or off. On
   for every benchmark; off for IFEval and IFBench as well (plan I's rule).
 - **The chat template:** the GGUF's own (`--jinja`), the BF16 repository's
-  `chat_template.jinja` (sha256 `35b7d0641b6f…`), checked against the server's
-  before a question.
+  `chat_template.jinja`, which both files hold: sha256 `35b7d0641b6f…` as the
+  file holds it, ending in a newline. llama.cpp's Jinja lexer drops that one
+  trailing newline (and reads `\r\n` as `\n`), so its `/props` says the same
+  template as `a9729e306e33…` (29.2: the first pilot was refused comparing
+  the two). Before a question the box reads the template out of the GGUF and
+  checks it is the pinned one, that the server serves exactly it, and that
+  the thinking switch works on that server: `enable_thinking` on writes
+  `<|think|>` at the top of a system turn, off writes none (the template's
+  `enable_thinking | default(false)`), each said and recorded
+  (`chat_template_file_sha256`, `thinking_switch`).
 - **Its 64K context:** each slot holds 65,536 tokens. Each answer's limit is
   the benchmark's (81,920 on the hard ones), or 65,536 minus that question's
   prompt (as the server counts it) when that is smaller — kept in the answer's

@@ -41,21 +41,48 @@ RT = "card-bolt"
 Q4 = "served/NVIDIA-Nemotron-3.5-Bolt-E4B-Q4_K_M"
 Q8 = "served/NVIDIA-Nemotron-3.5-Bolt-E4B-Q8_0"
 BF16 = "nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-BF16"
-TEMPLATE = "{# Bolt's own template, invented here #}"
+# 29.2: a template as Bolt's is — longer than a header reader's cut, ending in a
+# newline the GGUF holds and llama.cpp's lexer drops (so the server serves it
+# without): TEMPLATE_FILE in the file, TEMPLATE as served
+TEMPLATE_FILE = ("{# Bolt's own template, invented here #}\n"
+                 + "{%- set enable_thinking = enable_thinking | default(false) -%}\n" * 8)
+TEMPLATE = TEMPLATE_FILE[:-1]
 V100 = "Tesla V100-DGXS-32GB"
 BUSY = "GPU 0 of D3 (Tesla V100-DGXS-32GB) has another process: pid 4242, python, 1,234 MiB"
+
+
+def gguf_with(path: Path, template: str | None) -> Path:
+    """a GGUF header — gemma4, and `template` as its tokenizer.chat_template —
+    and bytes after it, as a file a box fetches"""
+    import struct
+
+    def s_(x: str) -> bytes:
+        b = x.encode()
+        return struct.pack("<Q", len(b)) + b
+    kv = [("general.architecture", s_("gemma4")),
+          *([("tokenizer.chat_template", s_(template))] if template is not None else [])]
+    body = b"GGUF" + struct.pack("<IQQ", 3, 0, len(kv))
+    for k, v in kv:
+        body += s_(k) + struct.pack("<I", 8) + v
+    path.write_bytes(body + bytes(range(256)) * 64)
+    return path
 
 
 @pytest.fixture
 def bolt(box, card, monkeypatch):  # noqa: F811
     """a Bolt box: the stand-in says it is upstream's b11555 and serves Bolt's
-    template; GPQA Diamond's and MMLU-Pro's questions invented"""
+    template (as llama.cpp keeps it), its GGUF holding it as the file does;
+    GPQA Diamond's and MMLU-Pro's questions invented"""
     monkeypatch.setenv("FAKE_LLAMA_VERSION", VERSION_LINE)
     monkeypatch.setenv("FAKE_LLAMA_TEMPLATE", TEMPLATE)
     monkeypatch.setitem(fb.RUNTIMES[RT], "template_sha256",
                         hashlib.sha256(TEMPLATE.encode()).hexdigest())
+    monkeypatch.setitem(fb.RUNTIMES[RT], "template_file_sha256",
+                        hashlib.sha256(TEMPLATE_FILE.encode()).hexdigest())
     monkeypatch.setattr(fb, "_fetch", lambda task: invented_mmlu() if task == MMLU
                         else invented())
+    gguf_with(box["gguf"], TEMPLATE_FILE)
+    box["sha"] = hashlib.sha256(box["gguf"].read_bytes()).hexdigest()
     box["tarball"] = upstream_tarball(box["root"])
     return box
 
@@ -131,9 +158,13 @@ def test_bolts_runtime_is_nvidias_card_and_shipped_defaults_on_upstream_b11555()
     assert rt["build"]["tag"] == "b11555" and rt["build"]["commit"] == UPSTREAM
     assert rt["models"] == {Q4: BF16, Q8: BF16} and rt["context"] == 65_536
     assert rt["refuses_env"] == ("LOOKAHEAD_",) and rt["env"] == {}
-    # the GGUFs' own template: the BF16 repository's chat_template.jinja
-    assert rt["template_sha256"] == \
+    # the GGUFs' own template: the BF16 repository's chat_template.jinja in the
+    # file, and as llama-server serves it (29.2: its last newline dropped)
+    assert rt["template_file_sha256"] == \
         "35b7d0641b6fb4ee41c3bc623e85bdb7d583c40f6ae9f24514ae58a9d57119f3"
+    assert rt["template_sha256"] == \
+        "a9729e306e331ab2f82789712b4f4ea8382ebf5df88052917c99d4abf79fd1a4"
+    assert rt["think_marker"] == "<|think|>"
     words = fb.runtime_words(RT)
     assert set(rt["sampling_from"]) == set(rt["sampling"])
     assert rt["sampling_from"]["top_k"].startswith("generation_config.json, "
@@ -879,8 +910,21 @@ def test_the_own_pilot_asks_every_benchmark_with_thinking_on_and_off(bolt, monke
     log = (fx.own_pilot_folder(a, "on") / rg.OWN_LOG).read_text()
     assert "GPQA Diamond: the pilot's 5 of its 12 questions, each asked once, thinking on" \
         in log and "OTIS Mock AIME 2024–2025: the pilot's 5 of its 6" in log
-    assert "the pilot's 5 of its 6 questions, each asked once, thinking off" in \
-        (fx.own_pilot_folder(a, "off") / rg.OWN_LOG).read_text()
+    off_log = (fx.own_pilot_folder(a, "off") / rg.OWN_LOG).read_text()
+    assert "the pilot's 5 of its 6 questions, each asked once, thinking off" in off_log
+    # 29.2: each step's record says its own thinking setting
+    assert ", thinking off): no variables" in off_log and ", thinking on)" not in off_log
+    assert ", thinking on): no variables" in log
+    # ARC-AGI-2's questions said as its test grids, in its tasks
+    assert "ARC-AGI-2: the pilot's 5 of its 6 test grids (in its 3 tasks)" in log
+    # the file's template read and served, and the switch checked, before a question
+    for lg in (log, off_log):
+        assert "the chat template, in the file: sha256 " in lg
+        assert "the thinking switch: enable_thinking on writes <|think|> into the prompt, " \
+               "off doesn't" in lg
+    assert on["server"]["chat_template_file_sha256"] == \
+        hashlib.sha256(TEMPLATE_FILE.encode()).hexdigest()
+    assert on["server"]["thinking_switch"] == {"marker": "<|think|>", "on": True, "off": False}
     # every answer asked once, its capped limit kept; none with thinking off thinks
     rows = [json.loads(x) for th in ("on", "off") for x in (
         fx.own_pilot_folder(a, th) / f"pilot-thinking-{th}.jsonl").read_text().splitlines()]
@@ -905,3 +949,57 @@ def test_the_own_pilot_asks_every_benchmark_with_thinking_on_and_off(bolt, monke
     assert out.rstrip().splitlines()[-1].startswith("thinking off: ")
     # the file was fetched once, its sha256 read once, for both steps
     assert out.count("sha256 of ") <= 1
+
+
+# ---------------------------------------------------------------------------
+# 29.2: the template in the file, the one served, and the thinking switch
+# ---------------------------------------------------------------------------
+
+def test_a_template_as_llama_cpp_keeps_it(tmp_path):
+    """its lexer turns \\r\\n and \\r into \\n and drops one trailing newline —
+    what /props says; and the file's own is read whole, past a reader's cut"""
+    assert fb.as_lexed("a\n") == "a" and fb.as_lexed("a\n\n") == "a\n"
+    assert fb.as_lexed("a\r\nb\rc") == "a\nb\nc" and fb.as_lexed("abc") == "abc"
+    assert fb.as_lexed(TEMPLATE_FILE) == TEMPLATE
+    assert gh.chat_template(gguf_with(tmp_path / "t.gguf", TEMPLATE_FILE)) == TEMPLATE_FILE
+    assert len(TEMPLATE_FILE) > 256
+    assert gh.chat_template(gguf_with(tmp_path / "n.gguf", None)) is None
+    (tmp_path / "x.gguf").write_bytes(b"not a gguf")
+    assert gh.chat_template(tmp_path / "x.gguf") is None
+
+
+def test_a_box_checks_the_files_template_and_that_the_server_serves_it(bolt):
+    b = bolt
+    assert run_b(b, "tmpl") == 0
+    p = progress_of(b, "tmpl")
+    srv = rb.read(b["root"] / "tmpl" / p["bundle"]["name"])["setup"]["server"]
+    assert srv["chat_template_sha256"] == hashlib.sha256(TEMPLATE.encode()).hexdigest()
+    assert srv["chat_template_file_sha256"] == hashlib.sha256(TEMPLATE_FILE.encode()).hexdigest()
+    assert srv["thinking_switch"] == {"marker": "<|think|>", "on": True, "off": False}
+    setup = rb.read(b["root"] / "tmpl" / p["bundle"]["name"])["setup"]
+    assert imf.runtime_problem(setup, {"id": Q4, "runtime": RT}) == ""
+    # the import refuses a bundle whose file's template isn't the pinned one
+    bad = {**setup, "server": {**srv, "chat_template_file_sha256": "0" * 64}}
+    assert "in the file" in imf.runtime_problem(bad, {"id": Q4, "runtime": RT})
+
+
+@pytest.mark.parametrize("case", ["another file", "served another", "switch ignored"])
+def test_a_template_or_switch_that_isnt_the_files_is_refused_before_a_question(bolt, monkeypatch,
+                                                                              case):
+    b = bolt
+    if case == "another file":
+        gguf_with(b["gguf"], TEMPLATE_FILE + "{# changed #}\n")
+        want = "own chat template is sha256"
+    elif case == "served another":
+        other = "{# another template #}"
+        monkeypatch.setenv("FAKE_LLAMA_TEMPLATE", other)
+        monkeypatch.setitem(fb.RUNTIMES[RT], "template_sha256",
+                            hashlib.sha256(other.encode()).hexdigest())
+        want = "doesn't serve"
+    else:
+        monkeypatch.setenv("FAKE_LLAMA_SWITCH", "ignore")
+        want = "the thinking switch doesn't work on this server"
+    with pytest.raises(SystemExit) as e:
+        run_b(b, "refused")
+    assert want in str(e.value.code) and "Nothing was asked" in str(e.value.code)
+    assert not [r for r in requests(b) if r.get("messages")]
