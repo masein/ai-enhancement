@@ -1013,6 +1013,7 @@ def retention(r: dict, rows_: list[dict]) -> dict | None:
     def orig(o):
         so = o["row"].get("setup") or {}
         return (so.get("runtime") == "llama-server" and not so.get("phone")
+                and not checkpoint_of(so, o["model"])
                 and not so.get("lookahead") and bool(so.get("thinking")) == bool(su.get("thinking"))
                 and o["row"].get("version") == r["row"].get("version"))
     cands = sorted((o for o in rows_ if o is not r and orig(o)),
@@ -1212,11 +1213,22 @@ def launch_of(*texts: str) -> dict:
 # original's "k=8"
 _BUILD = re.compile(r"\bk\d+-[A-Za-z]+\b")
 _TOP_K = re.compile(r"\bk\s*[-=]?\s*(\d+)\b")
+# 30: a training checkpoint served here (step8804) is neither a phone build nor
+# the original: named by its checkpoint, and never the original a phone build's
+# share is taken of
+_CHECKPOINT = re.compile(r"\bstep\d+\b")
+
+
+def checkpoint_of(su: dict, model: str = "") -> str:
+    """a served setup's checkpoint ("step8804"), from its name, file or id; ''"""
+    m = _CHECKPOINT.search(f"{su.get('name') or ''} {su.get('file') or ''} {model}")
+    return m.group(0) if m else ""
 
 
 def setup_label(su: dict, thinking: bool, model: str = "") -> str:
     """12q.B2: a served setup as the chart names it — "phone build (k4-LDA) ·
-    MTP · thinking off"; any other row, its model"""
+    MTP · thinking off"; any other row, its model. 30: a checkpoint by its
+    checkpoint — "step8804 · thinking off" """
     if su.get("runtime") != "llama-server":
         return model + (" · thinking" if thinking else "")
     where = f"{su.get('name') or ''} {su.get('file') or ''} {model}"
@@ -1224,6 +1236,7 @@ def setup_label(su: dict, thinking: bool, model: str = "") -> str:
     k = None if b else _TOP_K.search(where)
     tag = b.group(0) if b else f"k={k.group(1)}" if k else ""
     return " · ".join(x for x in (
+        checkpoint_of(su, model) or
         ("phone build" if su.get("phone") else "original") + (f" ({tag})" if tag else ""),
         "MTP" if su.get("mtp") else "", "lookahead" if su.get("lookahead") else "",
         f"thinking {'on' if thinking else 'off'}") if x)

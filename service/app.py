@@ -658,9 +658,20 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
             raise HTTPException(422, f"not Frontier benchmarks: {', '.join(unknown)} — they are "
                                      f"{', '.join(every)}")
         chosen = [t for t in every if t in chosen]
+    elif s.suite == "mobile" and s.tasks:
+        # 30: the Mobile suite, some of its part's sets — HotpotQA and SQL with
+        # thinking on, as the row they are set beside has them
+        every = config.tasks_for_suite("mobile", part=part)
+        chosen = [t.strip() for t in s.tasks if t.strip()]
+        unknown = [t for t in chosen if t not in every]
+        if unknown:
+            raise HTTPException(422, f"not sets of this part of the Mobile suite: "
+                                     f"{', '.join(unknown)} — they are {', '.join(every)}")
+        chosen = [t for t in every if t in chosen]
     elif s.tasks:
-        raise HTTPException(422, "tasks narrows a judged run (exam topics) or a Frontier run "
-                                 "(its benchmarks) only; the other suites are fixed lists")
+        raise HTTPException(422, "tasks narrows a judged run (exam topics), a Frontier run "
+                                 "(its benchmarks) or a Mobile run (its part's sets) only; the "
+                                 "other suites are fixed lists")
     # 12f.1: a model served elsewhere — registered, and asked only what a chat
     # endpoint can answer. Its server is asked at the start of the run
     srv = served.is_served(hf_id)
@@ -1511,6 +1522,31 @@ def served_launch(model_id: str, f: LaunchIn, x_token: str = Header(default=""))
         raise HTTPException(404, str(e)) from None
     _cache.update(key=None, payload=None, at=0.0)
     return out
+
+
+class AddressIn(BaseModel):
+    base_url: str = ""
+    key: str = ""
+    how: str = ""
+    flags: str = ""
+    env: str = ""
+    by: str = ""
+
+
+@app.put("/api/served/{model_id:path}/address")
+def served_address(model_id: str, a: AddressIn, x_token: str = Header(default="")):
+    """30: a registered model's server here — one run only on rented GPUs, its
+    Mobile and DeviceMark sets asked over this board's server under its own id
+    and name. Its server is asked: the same file as the one registered, or
+    nothing changes"""
+    _check_token(x_token)
+    by = _name(a.by, "giving a model a server here")
+    try:
+        rec = served.serve_here(model_id, a.base_url, a.how, a.flags, a.env, a.key, by)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    _cache.update(key=None, payload=None, at=0.0)
+    return {"model": rec}
 
 
 class ServedFileIn(BaseModel):
