@@ -405,6 +405,55 @@ def _same_size(served: object, file: object) -> bool:
     return a > 0 and b > 0 and abs(a - b) <= 0.03 * b
 
 
+# 30: a model run only on rented GPUs, served on this board's server too — its
+# Mobile and DeviceMark sets are asked over a server here. Registering it again
+# by name made another row ("step8804 (lda runtime)" is served/step8804-lda-runtime,
+# not served/step8804-lda-2610), so it is given its server under its own id
+SERVES_ANOTHER = ("{base} serves {now} ({size}), not {was}, the file registered for {model}: "
+                  "another file. Nothing was changed.")
+RENTED_WORDS = "its runs on rented GPUs: "
+
+
+def serve_here(model_id: str, base_url: str, how: str, flags: str = "", env: str = "",
+               key: str = "", by: str = "") -> dict:
+    """a registered model's server here: checked and pinned, and the same file
+    as the one registered — by its name, and its size within 3% (the server
+    counts its weights, an import the file's bytes) — or ValueError, nothing
+    changed. Its id, name, runtime and the sha256 its file was imported with
+    stay; how it ran on rented GPUs is kept beside how it is served here"""
+    rec = get(model_id)
+    if not rec or is_openrouter(rec):
+        raise ValueError(f"no served llama-server {model_id}")
+    how = (how or "").strip()
+    if not how:
+        raise ValueError("How it's served here: the build and its flags. It is the record of "
+                         "what was tested")
+    base = (base_url or "").strip().rstrip("/")
+    _not_openrouter(base)
+    key = (key or "").strip() or rec.get("key", "")
+    p = probe(base, key)
+    now, was = pin_of(p), rec.get("pin") or {}
+    fs = rec.get("file_sha256") or {}
+    name = fs.get("name") or was.get("file")
+    if not name or now.get("file") != name or not _same_size(now.get("size"),
+                                                           fs.get("size") or was.get("size")):
+        size = now.get("size")
+        raise ValueError(SERVES_ANOTHER.format(
+            base=base, now=now.get("file") or "a file it doesn't name",
+            size=f"{size:,} bytes" if isinstance(size, int) else "its size unsaid",
+            was=name or "none", model=model_id))
+    out = dict(rec)
+    if not rec.get("base_url") and not rec.get("rented"):
+        out["rented"] = {k: rec.get(k) for k in ("how", "pin", "flags", "env", "by", "at")}
+    out.pop("rented_only", None)
+    out.update(base_url=base, key=key, how=how, pin=now, answered=p["answered"],
+               flags=(flags or "").strip(), env=(env or "").strip(),
+               speculative=p.get("speculative"), here={"by": by, "at": time.time()})
+    db.served_put(out)
+    write_meta(out)
+    return public(out)
+
+
 def set_launch(served_id: str, flags: str, env: str, how: str | None = None,
                by: str = "") -> dict:
     """12z A1: a served setup's launch flags and environment, as typed — kept
@@ -654,8 +703,11 @@ def model_dir(rec: dict) -> Path:
 
 
 def view(rec: dict) -> dict:
-    """what History and the page show: how it was served and what was pinned"""
-    return {"name": rec["name"], "base_url": rec["base_url"], "how": rec["how"],
+    """what History and the page show: how it was served and what was pinned
+    (30: and how it ran on rented GPUs, when it is served here too)"""
+    rented = (rec.get("rented") or {}).get("how")
+    return {"name": rec["name"], "base_url": rec["base_url"],
+            "how": rec["how"] + (f" · {RENTED_WORDS}{rented}" if rented else ""),
             "based_on": rec["based_on"], "thinking": rec["thinking"], "pin": rec["pin"],
             "phone": is_phone(rec),
             "gguf_path": rec.get("gguf_path") or "",
