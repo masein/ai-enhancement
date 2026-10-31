@@ -18,7 +18,7 @@ from test_12q_devicemark_model_page_browser import model_page, open_block
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase15_4"
 GOOD = "fx/good-750m"
-URL = "https://huggingface.co/datasets/masein/evalboard-devicemark-raw/tree/main/fx__good-750m__thinking"
+URL = "https://huggingface.co/datasets/Teraformer-limited/devicemark-replica-runs/tree/main/fx__good-750m__thinking"
 
 
 @pytest.fixture(scope="module", autouse=True)
