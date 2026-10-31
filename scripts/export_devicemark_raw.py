@@ -7,6 +7,7 @@ Face — as DeviceMark links every row of its board to its raw file
     python scripts/export_devicemark_raw.py --all                every DeviceMark row
     python scripts/export_devicemark_raw.py --link 212 <url> --by masein   its "raw" link
     python scripts/export_devicemark_raw.py --link 212 --unlink --by masein
+    python scripts/export_devicemark_raw.py --relink             31: every stored link, renamed
 
 One folder a row, under --out (default $BENCH_ROOT/raw-export), in public/ or
 private/. 17h: public only for a model whose page marks its weights public
@@ -61,6 +62,10 @@ RAW_NAME = dm.RAW_NAME
 NOT_HERE = ("only DeviceMark rows are exported: Everyday, the Knowledge exam, the reasoning lab, "
             "Privacy Leakage and Mobile-MMLU-Pro never leave the server")
 IN_HOUSE = re.compile(r"qwen[\s_-]*3[._-]?6", re.I)
+# 31: the public rows' repository, and the name it had until 31 Oct 2026. The
+# private repository (its name + "-private") is not public, and keeps its name
+PUBLIC_REPO = "Teraformer-limited/devicemark-replica-runs"
+_OLD_LINK = re.compile(r"(https://huggingface\.co/datasets/)[\w.-]+/evalboard-devicemark-raw(?=/|$)")
 LICENCES = {"ifeval": ("google/IFEval", "Apache-2.0"),
             "mmlu_pro": ("TIGER-Lab/MMLU-Pro", "MIT"),
             "math": ("HuggingFaceH4/MATH-500", "MIT")}
@@ -106,6 +111,10 @@ _INTERNAL_URL = re.compile(r"(?i)\b(https?://)(?:[\w-]+\.)+(?:internal|lan|local
 _HF_ACCOUNT = re.compile(r"(?i)(\bhf://|\bhuggingface\.co/(?:datasets/|models/)?|(?<![\w/])"
                          r"datasets/|(?<!\w)-hf\s+)(?!\[)([\w.-]+)/"
                          r"(?=[\w.-]*(?:private|evalboard))")
+# 31: a rented box's work folder names the box, and an imported bundle's line
+# the person who imported it
+_BOX_ROOT = re.compile(r"/workspace/[\w.-]+(?:/bench)?(?![\w.-])")
+_BUNDLE_BY = re.compile(r"(\.tar\.gz \(sha256 [0-9a-f]+\)) by [^:\n]+:")
 # 17h: the rest of what 17g's scrub let through — any IPv6 address, a port
 # after an address or in -o Port=, -p before user@host with no ssh before it,
 # a URL's user:password@ and any dotted host but Hugging Face's
@@ -150,6 +159,8 @@ def scrub(text: str, env: dict | None = None, hosts: list[str] | None = None) ->
     root = str(env.get("BENCH_ROOT") or "")
     if len(root) > 3:
         text = text.replace(root, "$BENCH_ROOT")
+    text = _BOX_ROOT.sub("$BENCH_ROOT", text)
+    text = _BUNDLE_BY.sub(lambda m: f"{m.group(1)}:", text)
     text = _HOME.sub("~", text)
     text = _ROOT_HOME.sub("~", text)
     for h in sorted({h for h in (hosts if hosts is not None else _hosts()) if len(h) >= 3},
@@ -254,7 +265,7 @@ def public_by_default(row: Path, setup: dict) -> bool:
 # and environment by name (export_safe), never its address, its port or how
 # it is served in words
 SETUP = {"model": "name", "name": "text", "runtime": "text", "file": "name", "build": "scalar",
-         "ctx": int, "quant": "name", "phone": bool, "lookahead": bool, "mtp": bool,
+         "ctx": int, "quant": "name", "phone": bool,
          "thinking": bool, "thinking_mode": "text", "battery": "text", "cap": int, "seed": int,
          "revision": "name", "dtype": "name", "where": "text", "scoring": "text",
          "reading": {"on": bool, "marks": ["text"], "opens": bool},
@@ -355,7 +366,7 @@ def readme(model: str, thinking: bool, setup: dict, scores: dict, bat: dict) -> 
     comp = scores["composite"]
     return f"""# DeviceMark raw run: {model}{' · thinking' if thinking else ''}
 
-Every item of one row on our board, as it ran: the prompt as sent, the reply and its thinking,
+Every item of one of our runs, as it ran: the prompt as sent, the reply and its thinking,
 the parsed answer and whether it is right, IFEval's rules, the tokens. The same layout as
 DeviceMark's raw files ([devicemark/results](https://huggingface.co/datasets/devicemark/results),
 `raw/`) wherever a field means the same thing.
@@ -422,7 +433,7 @@ Licences: IFEval Apache-2.0; MMLU-Pro MIT; MATH-500 MIT. The replies are the mod
 RECOMPUTE = '''#!/usr/bin/env python3
 """scores.json again, from items.jsonl: each test's score and Wilson interval,
 the composite and its item bootstrap (2,000 resamples within each test, seed
-0) — the board's own arithmetic (scripts/devicemark.py), standard library only.
+0) — standard library only.
 
     python recompute.py
 """
@@ -585,9 +596,27 @@ def set_link(row: Path, url: str | None, by: str) -> dict | None:
         return None
     if not re.match(r"^https://[\w.-]+\.[a-z]{2,}/\S+$", url):
         raise ValueError("a raw run's link is an https URL (its folder on Hugging Face)")
-    rec = {"url": url, "by": by, "at": time.time()}
+    rec = {"url": _new_name(url), "by": by, "at": time.time()}
     p.write_text(json.dumps(rec), encoding="utf-8")
     return rec
+
+
+def _new_name(url: str) -> str:
+    return _OLD_LINK.sub(lambda m: f"{m.group(1)}{PUBLIC_REPO}", url)
+
+
+def relink(out_dir: Path, say=print) -> int:
+    """31: every stored raw link moved to the repository's new name: its
+    folder, who set it and when stay. How many changed"""
+    n = 0
+    for p in sorted(out_dir.glob(f"*/{RAW_NAME}")):
+        rec = json.loads(p.read_text(encoding="utf-8"))
+        url = _new_name(rec.get("url") or "")
+        if url != rec.get("url"):
+            p.write_text(json.dumps({**rec, "url": url}), encoding="utf-8")
+            say(f"{p.parent.name}: raw → {url}")
+            n += 1
+    return n
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -598,6 +627,8 @@ def main(argv: list[str] | None = None) -> int:
     pick.add_argument("--all", action="store_true", help="every DeviceMark row")
     pick.add_argument("--link", nargs="+", metavar=("RUN", "URL"),
                       help="a run's row, and the URL of its published raw run")
+    pick.add_argument("--relink", action="store_true",
+                      help="31: every stored raw link, moved to the repository's new name")
     ap.add_argument("--unlink", action="store_true", help="with --link: take the link off")
     ap.add_argument("--by", default="", help="your name, with --link")
     ap.add_argument("--out", type=Path, default=None,
@@ -616,6 +647,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     from service import config, db
     db.init()
+    if a.relink:
+        print(f"{relink(config.OUT_DIR)} raw link(s) moved to {PUBLIC_REPO}")
+        return 0
     if a.link:
         row, _ = row_of_run(int(a.link[0]))
         if not a.by.strip():
@@ -638,7 +672,8 @@ def main(argv: list[str] | None = None) -> int:
     qs = es.private_questions(print)
     for row in rows:
         export_row(row, out, False if a.private else None, publish=publish, questions=qs)
-    print(f"{len(rows)} row(s) under {out} — upload: docs/REMOTE-RUNS.md § Publishing the raw runs")
+    print(f"{len(rows)} row(s) under {out} — upload {out / 'public'} to {PUBLIC_REPO}: "
+          "docs/REMOTE-RUNS.md § Publishing the raw runs")
     return 1 if why or qs is None else 0                # 17j: a set not loaded is a failure
 
 

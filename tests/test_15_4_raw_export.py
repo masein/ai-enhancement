@@ -158,7 +158,7 @@ def test_public_for_public_models_and_private_for_in_house_builds(svc, tmp_path,
 
 
 def test_the_raw_link_by_the_command_and_on_the_row(row, tmp_path):
-    url = "https://huggingface.co/datasets/masein/evalboard-devicemark-raw/tree/main/x"
+    url = "https://huggingface.co/datasets/Teraformer-limited/devicemark-replica-runs/tree/main/x"
     assert ex.main(["--link", str(row["id"]), url, "--by", "masein"]) == 0
     assert json.loads((row_of(QWEN) / dm.RAW_NAME).read_text())["url"] == url
     rows = {r["id"]: r for r in dm.rows(config.OUT_DIR)}
@@ -172,7 +172,7 @@ def test_the_raw_link_by_the_command_and_on_the_row(row, tmp_path):
 
 def test_the_form_sets_the_raw_link(board, row, tmp_path):  # noqa: F811
     client = board
-    url = "https://huggingface.co/datasets/masein/evalboard-devicemark-raw/tree/main/y"
+    url = "https://huggingface.co/datasets/Teraformer-limited/devicemark-replica-runs/tree/main/y"
     r = client.put("/api/devicemark/raw", json={"model": QWEN, "thinking": True, "url": url,
                                                   "by": "masein"})
     assert r.status_code == 200 and r.json()["raw"]["url"] == url

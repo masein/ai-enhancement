@@ -395,16 +395,16 @@ page marks its weights public, as above, and after the typed yes.
 **Upload: your step.** Hugging Face sets privacy per repository, so the public and private rows go to two repositories. Once:
 
 ```bash
-hf auth login
-hf repos create <you>/evalboard-devicemark-raw --repo-type dataset
-hf repos create <you>/evalboard-devicemark-raw-private --repo-type dataset --private
+read -rs HF_TOKEN && export HF_TOKEN
+hf repos create Teraformer-limited/devicemark-replica-runs --repo-type dataset
+hf repos create Teraformer-limited/evalboard-devicemark-raw-private --repo-type dataset --private
 ```
 
 Each time:
 
 ```bash
-hf upload <you>/evalboard-devicemark-raw ~/benchmarks/raw-export/public . --repo-type dataset
-hf upload <you>/evalboard-devicemark-raw-private ~/benchmarks/raw-export/private . --repo-type dataset
+hf upload Teraformer-limited/devicemark-replica-runs ~/benchmarks/raw-export/public . --repo-type dataset
+hf upload Teraformer-limited/evalboard-devicemark-raw-private ~/benchmarks/raw-export/private . --repo-type dataset
 ```
 
 **The link.** Give the row its link, either:
@@ -412,10 +412,19 @@ hf upload <you>/evalboard-devicemark-raw-private ~/benchmarks/raw-export/private
 - with
 
   ```bash
-  sudo docker compose exec -T bench python scripts/export_devicemark_raw.py --link <run id> https://huggingface.co/datasets/<you>/evalboard-devicemark-raw/tree/main/<folder> --by masein
+  sudo docker compose exec -T bench python scripts/export_devicemark_raw.py --link <run id> https://huggingface.co/datasets/Teraformer-limited/devicemark-replica-runs/tree/main/<folder> --by masein
   ```
 
 The board then shows a "raw" link on the row's card and beside the row in the On-device chart's table.
+
+**The rename (31).** The public repository was `evalboard-devicemark-raw` until
+31 Oct 2026. Once it is renamed on Hugging Face, move the links the rows already
+have (their folders, and who set them, stay; a private row's link doesn't
+change, nor does the private repository's name):
+
+```bash
+sudo docker compose exec -T bench python scripts/export_devicemark_raw.py --relink
+```
 
 # A GGUF's Frontier benchmarks on a rented GPU (17)
 
