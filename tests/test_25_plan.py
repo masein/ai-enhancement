@@ -54,13 +54,15 @@ def test_the_box_line_is_accepted_with_its_price_and_runs_each_step():
         "llama-server-lda-a4a76a7.tar.gz"]
 
 
-def test_the_lda_runtime_asks_thinking_off_of_instruction_following_alone(tmp_path, capsys):
+def test_the_lda_runtime_asks_thinking_off_of_the_benchmarks_it_names_alone(tmp_path, capsys):
     assert fb.runtime_thinking_refused("lda-2610", "on", [IFEVAL, IFBENCH]) == ""
     assert fb.runtime_thinking_refused("lda-2610", "off", [IFEVAL, IFBENCH]) == ""
     assert fb.runtime_thinking_refused("lda-2610", "off", [IFEVAL]) == ""
-    for tasks in ([IFEVAL, "gpqa_diamond_epoch"], ["mmlupro_tiger"], []):
+    # 30.1: and of GPQA Diamond, MATH Level 5 and MMLU-Pro (plan T) — never the rest
+    for tasks in ([IFEVAL, "hle_text_cais"], ["otis_aime_epoch"], []):
         assert fb.runtime_thinking_refused("lda-2610", "off", tasks) == (
-            "--runtime lda-2610 asks thinking on only (off for IFEval and IFBench alone)")
+            "--runtime lda-2610 asks thinking on only (off for GPQA Diamond, MATH Level 5, "
+            "MMLU-Pro, IFEval and IFBench alone)")
     # card-ornith names none: thinking on only, as before
     assert fb.runtime_thinking_refused("card-ornith", "off", [IFEVAL]).startswith(
         "--runtime card-ornith asks thinking on only")
@@ -68,8 +70,8 @@ def test_the_lda_runtime_asks_thinking_off_of_instruction_following_alone(tmp_pa
     with pytest.raises(SystemExit) as e:
         rg.main(["--as", "served/step8804-lda-2610", "--gguf", str(tmp_path / "x.gguf"),
                  "--server-dir", str(tmp_path), "--runtime", "lda-2610", "--thinking", "off",
-                 "--only", IFEVAL, "--only", "gpqa_diamond_epoch", "--out", str(tmp_path / "o")])
-    assert e.value.code == 2 and "off for IFEval and IFBench alone" in capsys.readouterr().err
+                 "--only", IFEVAL, "--only", "hle_text_cais", "--out", str(tmp_path / "o")])
+    assert e.value.code == 2 and "MMLU-Pro, IFEval and IFBench alone" in capsys.readouterr().err
     assert not (tmp_path / "o").exists()
 
 

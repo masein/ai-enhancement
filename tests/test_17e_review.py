@@ -170,9 +170,13 @@ def test_2_3_each_plan_runs_every_benchmark_once_one_line_a_box():
         suite = sorted(fb.FOLLOW) if name == "I" else fbx.SUITE
         want = {("on", t) for t in suite} | (set() if on_only else {
             ("off", t) for t in suite if t != fbx.ARC})
+        # 30.1: plan T, three benchmarks with thinking off alone (no parity step)
+        if name == "T":
+            want = {("off", t) for t in (fbx.GPQA, fbx.MATH, fbx.MMLU)}
         assert set(have) == want, name
         assert all(have[k] == set(range(1, of[k] + 1)) for k in have), name
-        assert parity == (0 if name in ("L", "I") else 1), name   # 17f: one box a build asks it first
+        # 17f: one box a build asks it first
+        assert parity == (0 if name in ("L", "I", "T") else 1), name
     longest = {p: max(sum(fbx.hours(s) for s in st) for st in b.values())
                for p, b in fbx.PLANS.items()}
     assert longest["A"] <= 18 and longest["B"] <= 10.5 and longest["L"] <= 6.0

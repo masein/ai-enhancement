@@ -194,6 +194,15 @@ PLANS: dict[str, dict[str, list[Step]]] = {
     "I": {
         "I1": [("on", (IFEVAL, IFBENCH), "", 8), ("off", (IFEVAL, IFBENCH), "", 8)],
     },
+    # 30.1: the whitepaper's thinking-off column on the lda runtime — GPQA
+    # Diamond, MATH Level 5 and MMLU-Pro, as the thinking-on rows were asked
+    # but with thinking off: three boxes, MMLU-Pro in halves (their answers
+    # land in the build's plain row)
+    "T": {
+        "T1": [("off", (MMLU,), "1/2", 8)],
+        "T2": [("off", (MMLU,), "2/2", 8)],
+        "T3": [("off", (GPQA, MATH), "", 8)],
+    },
 }
 # 29: plan D, our own boxes — a quarter of every benchmark on each of a
 # station's four GPUs, longest first (frontier_box's paces), then instruction
@@ -202,7 +211,7 @@ D_ORDER = [(HLE,), (MMLU,), (MATH,), (ARC,), (OTIS,), (GPQA,), (SQA,), (IFEVAL, 
 PLANS["D"] = {f"D3.{g}": [*(("on", t, f"{g + 1}/4", 8) for t in D_ORDER),
                           ("off", (IFEVAL, IFBENCH), f"{g + 1}/4", 8)] for g in range(4)}
 # 20: the runtime a plan's boxes run, unless the line names another
-PLAN_RUNTIME = {"L": "lda-2610", "I": "lda-2610"}
+PLAN_RUNTIME = {"L": "lda-2610", "I": "lda-2610", "T": "lda-2610"}
 # 29: the plans run on our own GPUs: each step --own (never started or kept
 # asking while another process uses the GPU), no price
 OWN_PLANS = ("D",)
@@ -213,6 +222,7 @@ V100_GUESS = 2.0
 # alone (the RTX 5090 and the RTX PRO 6000): a box line on any other card is
 # refused before anything is fetched
 PLAN_GPUS = {"L": ("RTX 5090", "RTX PRO 6000"), "I": ("RTX 5090", "RTX PRO 6000"),
+             "T": ("RTX 5090", "RTX PRO 6000"),
              # 29: dgx-03's — the runner image's V100 tag builds for sm_70 alone
              "D": ("V100",)}
 PLAN_SM = {"D": "sm_70"}
@@ -244,6 +254,10 @@ PLAN_PINS = {"L": {
         "42739874cc2ccfdb8523b23fbe52e29b2a7555c8176737ca9ca0b5d59859d41f"}}
 # 25: plan I runs the same files, checked the same
 PLAN_PINS["I"] = PLAN_PINS["L"]
+# 30.1: plan T runs step8804's file (15,776,378,720 bytes, in the private
+# repository at 03e8a98a5283), pinned by the sha256 its import registered
+PLAN_PINS["T"] = {**PLAN_PINS["L"], "step8804.gguf":
+                  "c7a719f8c37d85bcd24f5a0bf103323e0102938be01dea3e0992465923188f3a"}
 # 29: Bolt's two builds, as Hugging Face publishes them: NVIDIA's Q4_K_M
 # (nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB at 1db54d5b12533ff1, 6,180,446,208
 # bytes) and ggml-org's Q8_0 (ggml-org/NVIDIA-Nemotron-3.5-Bolt-E4B-GGUF at

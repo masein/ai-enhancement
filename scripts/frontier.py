@@ -286,8 +286,11 @@ RUNTIMES = {
         "env": {"LOOKAHEAD_MOE_ROUTER_NORM": "1"},
         "thinking": ("on",),
         # 25: and off for instruction following alone (plan I), its sampling as
-        # with thinking on — the same asking, the thinking switched off
-        "off_for": ("ifeval_google", "ifbench_test"),
+        # with thinking on — the same asking, the thinking switched off. 30.1:
+        # and of GPQA Diamond, MATH Level 5 and MMLU-Pro, the whitepaper's
+        # thinking-off column (plan T), at their thinking-off limits
+        "off_for": ("gpqa_diamond_epoch", "math_l5_epoch", "mmlupro_tiger", "ifeval_google",
+                    "ifbench_test"),
         "sampling": {"temperature": 1.0, "top_k": 20, "top_p": 0.95, "min_p": 0.0,
                      "presence_penalty": 1.5, "repeat_penalty": LDA_REPEAT_PENALTY,
                      "repeat_last_n": 64},
@@ -413,15 +416,17 @@ def runtime_model_refused(name: str, served_as: str) -> str:
 def runtime_thinking_refused(name: str, thinking: str, tasks: list[str]) -> str:
     """'' when runtime `name` asks `tasks` with thinking `thinking`; else why
     not — 25: a runtime may ask thinking off of some benchmarks alone
-    (lda-2610: instruction following, plan I), and of those only"""
+    (lda-2610: instruction following, plan I; 30.1: and GPQA Diamond, MATH
+    Level 5 and MMLU-Pro, plan T), and of those only"""
     rt = RUNTIMES[name]
     off_for = rt.get("off_for") or ()
     if thinking in rt["thinking"] or (thinking == "off" and tasks
                                       and set(tasks) <= set(off_for)):
         return ""
+    labels = [BENCH[t]["label"] for t in off_for]
+    said = ", ".join(labels[:-1]) + " and " + labels[-1] if len(labels) > 1 else "".join(labels)
     return (f"--runtime {name} asks thinking {' or '.join(rt['thinking'])} only"
-            + (f" (off for {' and '.join(BENCH[t]['label'] for t in off_for)} alone)"
-               if off_for else ""))
+            + (f" (off for {said} alone)" if off_for else ""))
 
 
 def runtime_env_refused(name: str, env: dict) -> list[str]:
