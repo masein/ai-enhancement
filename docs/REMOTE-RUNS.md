@@ -1502,6 +1502,36 @@ import are plan L's (L3). On the board: the step-checkpoints report's
 "Instruction following" (each build, thinking on beside off) and the
 two-builds report, each instruction ✓ or ✗ under each reply.
 
+# Thinking off: plan T (30.1)
+
+GPQA Diamond, MATH Level 5 and MMLU-Pro for step8804 with thinking off, asked
+as its thinking-on rows were (the same prompts, runs a question, runtime and
+sampling) at their thinking-off limits: 16,384, 8,192 and 8,192 tokens. The lda
+runtime asks thinking off of these three and instruction following alone.
+Three boxes, about 3.7 to 3.9 hours each at the plan's paces (11.3 box-hours)
+and half an hour each to start and fetch: **`T1`** and **`T2`** ask MMLU-Pro in
+halves, **`T3`** GPQA Diamond and MATH Level 5. The answers land in the build's
+plain row, beside its IFEval and IFBench with thinking off. On an RTX 5090 or
+RTX PRO 6000 only, from the runner image at the tag after this change. The
+file is pinned (`PLAN_PINS["T"]`).
+
+Each box, with the price vast.ai shows:
+
+```bash
+read -rs HF_TOKEN && export HF_TOKEN
+```
+
+```bash
+python scripts/frontier_box.py T1 --as served/step8804-lda-2610 --gguf hf://<you>/evalboard-private@<commit>/step8804.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-lda-a4a76a7.tar.gz --price 0.42
+```
+
+`python scripts/frontier_box.py --list T` prints the plan. The fetch and the
+import are plan L's (L3), each box with its label (`<host>:<port>=T1`). After
+the import GPQA Diamond and MMLU-Pro are scored by code. MATH Level 5's answers
+the code marks wrong wait for Epoch's model check. **Start grading sends
+everything that waits, on every grader**: read the dry run first, and press it
+only if it lists MATH Level 5 alone at a few cents.
+
 # Speed tests: the cheapest box per answer (19)
 
 Which box runs our benchmarks for the fewest dollars per answer, measured the

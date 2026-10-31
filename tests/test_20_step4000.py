@@ -242,7 +242,8 @@ def test_which_architectures_run_on_a_card():
 
 
 @pytest.mark.parametrize("more, words", [
-    (["--thinking", "off"], "thinking on only"),
+    # 30.1: GPQA Diamond may be asked with thinking off; HLE beside it may not
+    (["--thinking", "off", "--only", "hle_text_cais"], "thinking on only"),
     (["--flags", "--spec-type draft-mtp"], "--spec-type"),
     (["--flags", "--temp 0.7"], "--temp"),
     (["--flags=--moe-stream"], "--moe-stream"),
