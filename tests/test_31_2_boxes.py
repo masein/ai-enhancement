@@ -270,7 +270,7 @@ def test_u38_to_u40_ask_devicemark_on_both_paths_and_the_easy_set():
     plan = fx.PLANS["U"]
     assert plan["U38"] == [("off", (fx.DM,), "", 8), ("off", (fx.DM_FILE,), "", 8),
                            ("off", tuple(fb.EASY), "", 8)]
-    assert plan["U39"] == [("on", (fx.DM,), "", 8)]
+    assert plan["U39"][0] == ("on", (fx.DM,), "", 8)     # then the showcase (31.2b)
     assert plan["U40"] == [("off", tuple(fb.EASY), "", 8)]
     a = line("U38")
     greedy, own, easy = (fx.argv_of("U38", k, s, a) for k, s in enumerate(plan["U38"], 1))

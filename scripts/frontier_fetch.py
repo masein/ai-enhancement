@@ -122,7 +122,8 @@ def sha(p):
     return h.hexdigest()
 out = {"bundles": [], "parity": [], "progress": [], "steps": []}
 for p in sorted(glob.glob(ROOT + "/**/frontier-*.tar.gz", recursive=True)
-                + glob.glob(ROOT + "/**/devicemark-served-*.tar.gz", recursive=True)):
+                + glob.glob(ROOT + "/**/devicemark-served-*.tar.gz", recursive=True)
+                + glob.glob(ROOT + "/**/showcase-served-*.tar.gz", recursive=True)):
     out["bundles"].append({"path": p, "sha256": sha(p)})
 for p in sorted(glob.glob(ROOT + "/**/parity.jsonl", recursive=True)):
     out["parity"].append({"path": p, "sha256": sha(p)})

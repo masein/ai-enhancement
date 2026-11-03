@@ -168,6 +168,10 @@ def test_2_3_each_plan_runs_every_benchmark_once_one_line_a_box():
                     import devicemark_box
                     assert devicemark_box.CONTEXT * slots <= rg.MAX_CONTEXT
                     continue
+                if fbx.SHOWCASE in tasks:       # 31.2b: one slot of 83,968
+                    import showcase_box
+                    assert slots == 1 and showcase_box.CONTEXT <= rg.MAX_CONTEXT
+                    continue
                 assert fb.slot_context(list(tasks), th == "on") * slots <= rg.MAX_CONTEXT
         # 20: plan L asks thinking on only, and has no parity step (the
         # server it compares with is out of reach). 25: plans A, B and L run the
@@ -188,6 +192,7 @@ def test_2_3_each_plan_runs_every_benchmark_once_one_line_a_box():
             # 31.2: and DeviceMark on both paths (k3 two ways), the easy set on k3
             want |= {("off", fbx.DM), ("off", fbx.DM_FILE), ("on", fbx.DM)} | {
                 ("off", t) for t in fb.EASY}
+            want.add(("on", fbx.SHOWCASE))        # 31.2b: the showcase, on k6
         assert set(have) == want, name
         assert all(have[k] == set(range(1, of[k] + 1)) for k in have), name
         # 17f: one box a build asks it first
