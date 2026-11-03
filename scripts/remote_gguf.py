@@ -139,6 +139,9 @@ PROGRESS = "progress.json"
 OWN_LOG = "remote_gguf.log"
 GPU_FILE = "gpu.jsonl"              # 23c: the sampler's readings, in the bundle
 SERVER_LOG = "llama-server.log"
+# 31.1: a runtime of expert paths' settings check, one file a path, in --out
+CHECK_FILE = "settings-check-k{path}.json"
+CHECK_CONTEXT = 16_384              # --check's slot: the two questions and the probe
 # what this script sets itself: given in --flags, refused
 OWN_FLAGS = {"-m", "--model", "--host", "--port", "-c", "--ctx-size", "-np", "--parallel",
              "-hf", "--hf-repo", "-mu", "--model-url", "--api-key", "--api-key-file"}
@@ -910,6 +913,17 @@ class Server:
                 self.proc.wait(10)
 
 
+def last_session(path: Path) -> str:
+    """31.1: the server log's last session, from its "starting" line — the
+    start-up lines this server printed, never an earlier session's"""
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    at = [m.start() for m in re.finditer(r"(?m)^===== .* starting =====$", text)]
+    return text[at[-1]:] if at else text
+
+
 def startup_log(path: Path, limit: int = 400) -> str:
     """the server log's start, each session's, up to where it listens — what
     it loaded and how — never a request"""
@@ -1024,7 +1038,10 @@ def make_bundle(out: Path, served_as: str, thinking: bool, tasks: list[str], sta
                 spent["cost_usd"] = round(price * spent["server_s"] / 3600, 4)
         per[t] = {"protocol_version": spec["protocol_version"],
                   "revision": spec["source"]["revision"], "epochs": spec["epochs"],
-                  "budget": s["max_tokens"], "family": sf.family_of(rec) or "",
+                  "budget": s["max_tokens"],
+                  # 31.1: a path's sampling is the file's, never a family's preset
+                  "family": (f"the file's expert path k{s['expert_path']}" if "expert_path" in s
+                             else sf.family_of(rec) or ""),
                   "sampling": {k: v for k, v in s.items()
                                if k not in ("max_tokens", "chat_template_kwargs")},
                   # 29: where each of the runtime's values comes from
@@ -1540,6 +1557,12 @@ def _main(argv: list[str] | None = None) -> int:
                          "process uses the GPU and started again once it is free")
     ap.add_argument("--serve-context", type=int, default=16_384,
                     help="29: --serve's context a slot (capped by the model's own)")
+    ap.add_argument("--check", action="store_true",
+                    help="31.1: a runtime of expert paths' settings check alone (--runtime "
+                         "k3k6-2611): the server started on this --thinking's path (k6 on, k3 "
+                         "off), the file's, the server's and two answers' settings held to the "
+                         "path's, written to --out — no benchmark asked, no bundle. Each step "
+                         "of such a runtime runs it before its first question too")
     ap.add_argument("--own", action="store_true",
                     help="29: one GPU of our own station (--label D3.0): never started while "
                          "another process uses the GPU, paused while one does (exit 75), no "
@@ -1576,6 +1599,12 @@ def _main(argv: list[str] | None = None) -> int:
         ap.error("--pilot-each: with --pilot")
     if a.pilot_each < 0:
         ap.error("--pilot-each: a number of questions, 1 or more")
+    # 31.1: the settings check is a runtime of expert paths' alone, and asks nothing else
+    if a.check and not (a.runtime and fb.RUNTIMES[a.runtime].get("paths")):
+        ap.error("--check: the settings check of a runtime of expert paths (--runtime "
+                 + " or ".join(n for n, r in fb.RUNTIMES.items() if r.get("paths")) + ")")
+    if a.check and (a.pilot or a.parity or a.serve or a.only):
+        ap.error("--check asks no benchmark: no --pilot, --parity, --serve or --only")
     # 29: our own GPU — its label names station and GPU, and it has no price
     own = own_box(a.label) if a.own else None
     if a.own and not own:
@@ -1587,7 +1616,9 @@ def _main(argv: list[str] | None = None) -> int:
         # that would change what it is
         rt = fb.RUNTIMES[a.runtime]
         why = fb.runtime_thinking_refused(a.runtime, a.thinking, a.only or [])
-        if why and not a.serve:         # 29: a served model is asked its thinking per request
+        # 29: a served model is asked its thinking per request; 31.1: --check asks
+        # no benchmark, on either path
+        if why and not a.serve and not a.check:
             ap.error(why)
         if a.parity:
             ap.error(f"--runtime {a.runtime}: no parity questions (they ask thinking off)")
@@ -1599,13 +1630,19 @@ def _main(argv: list[str] | None = None) -> int:
         if rt.get("template_sha256"):
             theirs |= {"--chat-template", "--chat-template-file", "--reasoning-format",
                        "--no-jinja", "--chat-template-kwargs"}
+        # 31.1: and nothing that would replace an expert path's own
+        theirs |= set(rt.get("refuses_flags") or ())
         refused = sorted(n for n in names if fb.RUNTIME_REFUSES.match(n) or n in theirs)
         if refused:
             ap.error(f"--flags: {', '.join(refused)} — runtime {a.runtime} sets the cache, "
-                     "flash attention and the sampling, and runs no speculative decoding, no "
-                     "reasoning budget and no --moe-stream")
+                     "flash attention and "
+                     + ("takes each expert path's sampling and thinking from the file"
+                        if rt.get("paths") else "the sampling")
+                     + ", and runs no speculative decoding, no reasoning budget and no "
+                       "--moe-stream")
         clash = sorted(k for k in extra_env if k in rt["env"] or re.match(
-            r"^LLAMA_ARG_\w*(DRAFT|SPEC|REASONING|SAMPL|TEMP|TOP_|MIN_P|PENALTY|REPEAT)", k))
+            r"^LLAMA_ARG_\w*(DRAFT|SPEC|REASONING|SAMPL|TEMP|TOP_|MIN_P|PENALTY|REPEAT"
+            + ("|EXPERT|CHAT_TEMPLATE|JINJA|SLOT_SAVE" if rt.get("paths") else "") + ")", k))
         if clash:
             ap.error(f"--env: {', '.join(clash)} — runtime {a.runtime} sets its own")
         # 22: and what it never gives its server (card-ornith: the lda branch's)
@@ -1619,7 +1656,7 @@ def _main(argv: list[str] | None = None) -> int:
     thinking = a.thinking == "on"
     STEP["out"] = out
     # 22: writes no progress file — 29: nor does --serve (no step of a plan)
-    STEP["pilot"] = bool(a.pilot or a.serve)
+    STEP["pilot"] = bool(a.pilot or a.serve or a.check)       # 31.1: nor does --check
     STEP["own"] = own
     progress(out, label=a.label or "", model=a.served_as, thinking=a.thinking,
              parity=bool(a.parity), tasks=[t for t in fb.TASKS if t in (a.only or [])],
@@ -1628,7 +1665,7 @@ def _main(argv: list[str] | None = None) -> int:
         ap.error("--pilot asks its own questions: no --only")
     if a.serve and (a.pilot or a.parity or a.only):
         ap.error("--serve asks nothing here: no --pilot, --parity or --only")
-    if not a.only and not a.parity and not a.pilot and not a.serve:
+    if not a.only and not a.parity and not a.pilot and not a.serve and not a.check:
         # 17d: a box names its benchmarks, thinking on or off — every one at
         # once is more context than a card holds, and asks ARC-AGI-2 with
         # thinking off
@@ -1639,6 +1676,8 @@ def _main(argv: list[str] | None = None) -> int:
         tasks, thinking = [fb.PARITY["task"]], False
     if a.pilot and not a.pilot_each:
         tasks = [t for t in fb.TASKS if t in fb.PILOT["n"]]
+    if a.check:
+        tasks = []                  # 31.1: no benchmark — its own slot of CHECK_CONTEXT
     # 29: our own GPU, shared — nothing starts while another process uses it
     if own:
         import gpu_free
@@ -1651,7 +1690,7 @@ def _main(argv: list[str] | None = None) -> int:
     # the stated --max-context only when those can't be read. 29: a model's own
     # context caps it (Bolt's 64K)
     cap = fb.context_cap(a.runtime or "")
-    ctx = fb.slot_context(tasks, thinking, cap)
+    ctx = fb.slot_context(tasks, thinking, cap) if tasks else CHECK_CONTEXT
     if a.serve:
         ctx = min(a.serve_context, cap) if cap else a.serve_context
     # 17h: what is free on the card, not its total — 300 MiB in use by
@@ -1660,7 +1699,7 @@ def _main(argv: list[str] | None = None) -> int:
     in_use = int(card.get("memory_used_mib") or 0)
     mem = (card["memory_mib"] - in_use) if card.get("memory_mib") else None
     fit, unread = kv_fit(a.gguf, flags, a.slots, ctx, mem)
-    big = max(tasks, key=lambda t: fb.slot_context([t], thinking))
+    big = max(tasks or fb.TASKS, key=lambda t: fb.slot_context([t], thinking))
     # 17f: a step planned at 8 slots runs what the card holds, down to
     # --min-slots, and says so (HLE's 86,016 with thinking on: 7 on a 5090)
     dropped = None
@@ -1678,7 +1717,7 @@ def _main(argv: list[str] | None = None) -> int:
     if fit and fit["fit"] < a.slots and not a.slots_fit:
         gb = 1024 ** 3
         raise SystemExit(
-            f"{a.slots} slots of {ctx:,} tokens ({fb.BENCH[big]['label']}'s, thinking "
+            f"{a.slots} slots of {ctx:,} tokens ({fb.BENCH[big]['label'] if tasks else 'the check'}'s, thinking "
             f"{'on' if thinking else 'off'}) would use about {fit['used'] / gb:.1f} GB with the "
             f"{fit['file'] / gb:.1f} GB file ({fit['types']} cache, "
             f"{fit['per_token'] / 1024:.1f} KB a token from the GGUF's header; {fit['basis']}), "
@@ -1950,7 +1989,7 @@ def _main(argv: list[str] | None = None) -> int:
     rec = None
     # 23c: the card's readings from the server's start to its end (a pilot,
     # no step of a plan, takes none)
-    sampler = None if a.pilot else cc.Sampler(
+    sampler = None if (a.pilot or a.check) else cc.Sampler(
         out / GPU_FILE, report=lambda use: progress(out, use=use))
     if sampler is not None:
         sampler.start()
@@ -2012,6 +2051,27 @@ def _main(argv: list[str] | None = None) -> int:
                                  "Nothing was asked")
             say(f"the thinking switch: enable_thinking on writes {marker} into the prompt, off "
                 "doesn't — checked on this server")
+        # 31.1: a runtime of expert paths — its settings check, on this step's
+        # path, before a question: the file's values, the server's /props and
+        # start-up lines and two answers held to the path's. A mismatch stops
+        # the box (nothing is worked around); --check stops here either way
+        if a.runtime and fb.RUNTIMES[a.runtime].get("paths"):
+            import path_check
+            path = fb.path_of(a.runtime, thinking)
+            chk = path_check.check(srv_proc.base, path, gguf_path,
+                                   last_session(out / SERVER_LOG), ctx)
+            server["paths_check"] = chk
+            for ln in path_check.words(chk):
+                say(ln)
+            (out / CHECK_FILE.format(path=path)).write_text(json.dumps(chk, indent=1),
+                                                            encoding="utf-8")
+            if not chk["pass"]:
+                raise SystemExit(f"the settings check of expert path k{path} failed — "
+                                 + "; ".join(chk["mismatches"]) + ". Nothing was asked")
+            if a.check:
+                say(f"the settings check of expert path k{path} passes: "
+                    f"{out / CHECK_FILE.format(path=path)}")
+                return 0
         # 17c: what its slots say of speculation — the import compares it with
         # the registered launch (a draft model under any spelling drafts)
         from service import served as sv
@@ -2038,7 +2098,11 @@ def _main(argv: list[str] | None = None) -> int:
             # session, said in the progress file at once. A failed probe is
             # said; the step goes on
             sampler.phase = "check"
-            chk = {**cc.check(srv_proc.base, ctx, a.slots, say), "session": state["sessions"]}
+            # 31.1: on a runtime of expert paths, the speed of the box's own path
+            path_extra = ({"expert_path": fb.path_of(a.runtime, thinking)}
+                          if a.runtime and fb.RUNTIMES[a.runtime].get("paths") else None)
+            chk = {**cc.check(srv_proc.base, ctx, a.slots, say, extra=path_extra),
+                   "session": state["sessions"]}
             if own or a.runtime and fb.RUNTIMES[a.runtime].get("card"):
                 # 29: the card named in the record, with its attention — a V100's
                 # speed is never read as a 5090's

@@ -38,11 +38,20 @@ done, and was taken for one asked alone: CI's 140 among 80…87). 29:
 tokens: one given fewer (max_tokens) runs out of room, its finish "length"
 and no answer in it; FAKE_LLAMA_REFUSE_CACHE=q8_0 stops at start-up when
 asked for that cache with flash attention on; FAKE_LLAMA_SWITCH=ignore a
-template whose prompt ignores enable_thinking (29.2)."""
+template whose prompt ignores enable_thinking (29.2). 31.1: FAKE_LLAMA_PATHS=1
+serves a file of expert paths (step2388's k3 and k6): its start-up lines
+("expert path k3 (default): temp = 0.800, …"), its /props `expert_paths`, a
+request's "expert_path" choosing whether it thinks (k6) or not (k3), and
+/completion's first-token probabilities before and after its samplers
+(n_probs, post_sampling_probs), the presence penalty on k6 left off the
+prompt's tokens unless FAKE_LLAMA_PROMPT_PENALTY=1. FAKE_LLAMA_PATHS_BAD=
+"6.presence_penalty=0.5" changes a value the server reports (its /props and
+its line); FAKE_LLAMA_PATHS_LOG=0 prints no start-up lines."""
 
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import sys
@@ -51,6 +60,39 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 VERSION = "version: 6543 (abc1234)\nbuilt with cc (fake) for x86_64-linux-gnu"
+# 31.1: what a file of expert paths stores, and the server reports it applied
+PATHS = {3: {"temp": 0.8, "top_p": 0.95, "top_k": 20, "min_p": 0.0, "presence_penalty": 0.0},
+         6: {"temp": 0.8, "top_p": 0.95, "top_k": 20, "min_p": 0.0, "presence_penalty": 0.75,
+             "penalty_last_n": -1, "penalty_prompt_tokens": 0}}
+
+
+def paths_reported() -> dict:
+    """31.1: the paths' values as this server says them — FAKE_LLAMA_PATHS_BAD's changed"""
+    got = {p: dict(v) for p, v in PATHS.items()}
+    for item in (os.environ.get("FAKE_LLAMA_PATHS_BAD") or "").split(","):
+        m = re.fullmatch(r"\s*(\d+)\.(\w+)=(.+?)\s*", item)
+        if m:
+            got[int(m[1])][m[2]] = float(m[3]) if "." in m[3] else int(m[3])
+    return got
+
+
+def first_token(prompt: str, path: int) -> dict:
+    """31.1: /completion's first token, before and after the samplers — three of
+    the prompt's own tokens and three it hasn't, the presence penalty on k6
+    put on the prompt's only when FAKE_LLAMA_PROMPT_PENALTY=1"""
+    mine = []
+    for w in prompt.split():
+        t = sum(w.encode()) % 50000
+        if t not in mine:
+            mine.append(t)
+    ids = mine[:3] + [1, 2, 3]
+    raw = dict(zip(ids, [-0.4, -1.1, -1.9, -0.8, -1.3, -2.2]))
+    v = paths_reported().get(path) or PATHS[3]
+    counted = os.environ.get("FAKE_LLAMA_PROMPT_PENALTY") == "1"
+    post = {i: (x - (v["presence_penalty"] if counted and i in mine else 0)) / v["temp"]
+            for i, x in raw.items()}
+    z = math.log(sum(math.exp(x) for x in post.values()))
+    return {"before": raw, "after": {i: x - z for i, x in post.items()}}
 # 23c: the probe's timings — (prompt tok/s, output tok/s)
 PROBE = {"alone": [(9000.0, 140.0), (8000.0, 150.0), (10000.0, 120.0)],
          "long": (6000.0, 110.0), "together_prompt": 5000.0, "together_out": 80.0,
@@ -114,6 +156,13 @@ def main() -> int:
     # and how many of the eight have been asked since its warm-up
     busy = {"text": [], "alone": 0, "together": 0}
     print(f"main: loading model {os.path.basename(model)}", flush=True)
+    paths_on = os.environ.get("FAKE_LLAMA_PATHS") == "1"
+    if paths_on and os.environ.get("FAKE_LLAMA_PATHS_LOG") != "0":
+        for p, v in paths_reported().items():
+            said = ", ".join(f"{k} = {x:.3f}" if isinstance(x, float) else f"{k} = {x}"
+                             for k, x in v.items())
+            print(f"srv  load_model: expert path k{p}{' (default)' if p == 3 else ''}: {said}, "
+                  f"thinking = {'true' if p == 6 else 'false'}", flush=True)
 
     class H(BaseHTTPRequestHandler):
         def log_message(self, *a):            # quiet
@@ -140,7 +189,14 @@ def main() -> int:
                 return self._send(200, {"model_path": shown, "build_info": "b6543-abc1234",
                                         "total_slots": slots,
                                         "chat_template": template,
-                                        "default_generation_settings": {"n_ctx": ctx // slots}})
+                                        "default_generation_settings": {"n_ctx": ctx // slots},
+                                        **({"expert_paths": [
+                                            {"path": p, "default": p == 3, "thinking": p == 6,
+                                             "params": {("temperature" if k == "temp" else
+                                                         "repeat_last_n" if k == "penalty_last_n"
+                                                         else k): x for k, x in v.items()}}
+                                            for p, v in paths_reported().items()]}
+                                           if paths_on else {})})
             if self.path == "/slots":
                 drafts = os.environ.get("FAKE_LLAMA_DRAFTS") == "1"
                 return self._send(200, [{"id": i, "speculative": drafts} for i in range(slots)])
@@ -148,6 +204,19 @@ def main() -> int:
 
         def completion(self, body: dict):
             """23c: the speed probe's request — token ids in, n_predict out"""
+            if isinstance(body.get("prompt"), str) and body.get("n_probs"):
+                # 31.1: the first token's probabilities, after the samplers or before
+                got = first_token(body["prompt"], int(body.get("expert_path") or 3))
+                if body.get("post_sampling_probs"):
+                    top = [{"id": i, "token": f"t{i}", "prob": math.exp(x)}
+                           for i, x in got["after"].items()]
+                    entry = {"id": top[0]["id"], "prob": top[0]["prob"], "top_probs": top}
+                else:
+                    top = [{"id": i, "token": f"t{i}", "logprob": x}
+                           for i, x in got["before"].items()]
+                    entry = {"id": top[0]["id"], "logprob": top[0]["logprob"],
+                             "top_logprobs": top}
+                return self._send(200, {"content": "x", "completion_probabilities": [entry]})
             if probe_status != 200:
                 return self._send(probe_status, {"error": {"code": probe_status,
                                                            "message": "probe refused"}})
@@ -210,6 +279,8 @@ def main() -> int:
             pick = (next(k for k in "ABCD" if k != right) if "hard" in text else right)
             on = (body.get("chat_template_kwargs") or {}).get("enable_thinking") \
                 and not never_think
+            if paths_on and "expert_path" in body:
+                on = body["expert_path"] == 6 and not never_think      # 31.1: the path's
             msg = {"role": "assistant", "content": f"The options compared.\nANSWER: {pick}"}
             # 29: an answer that needs more room than it was given runs out
             need = int(os.environ.get("FAKE_LLAMA_OUT_TOKENS") or 0)

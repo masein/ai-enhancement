@@ -206,10 +206,10 @@ def rates(timings: dict) -> dict:
             "output_tok_s": per_s(t.get("predicted_n"), t.get("predicted_ms"))}
 
 
-def complete(base: str, ids: list[int], n_out: int = OUT) -> dict:
+def complete(base: str, ids: list[int], n_out: int = OUT, extra: dict | None = None) -> dict:
     got = _post(base, "/completion", {"prompt": ids, "n_predict": n_out, "ignore_eos": True,
                                       "cache_prompt": False, "temperature": 0, "seed": 0,
-                                      "stream": False})
+                                      "stream": False, **(extra or {})})
     r = rates(got.get("timings"))
     if r["output_tok_s"] is None:
         raise RuntimeError("/completion gave no timings")
@@ -221,13 +221,19 @@ def _median(xs: list) -> float | None:
     return round(statistics.median(xs), 2) if xs else None
 
 
-def probe(base: str, slot_ctx: int | None, slots: int, during=None) -> dict:
+def probe(base: str, slot_ctx: int | None, slots: int, during=None,
+          extra: dict | None = None) -> dict:
     """the three speeds (see the top). `during()` is called while the eight
-    are asked (the PCIe link, read under load). Raises with why"""
+    are asked (the PCIe link, read under load). Raises with why. 31.1:
+    `extra`, what each request carries besides (an expert path: the speed the
+    box's own path decodes at)"""
     t0 = time.time()
     toks = tokens_of(base)
-    complete(base, prompt(toks, 64), 16)                # a warm-up, not counted
-    alone = [complete(base, prompt(toks, SHORT)) for _ in range(ALONE_RUNS)]
+
+    def ask(ids: list[int], n_out: int = OUT) -> dict:
+        return complete(base, ids, n_out, extra) if extra else complete(base, ids, n_out)
+    ask(prompt(toks, 64), 16)                           # a warm-up, not counted
+    alone = [ask(prompt(toks, SHORT)) for _ in range(ALONE_RUNS)]
     out = {"alone": {"prompt_n": SHORT, "out_n": OUT, "runs": alone,
                      "prompt_tok_s": _median([r["prompt_tok_s"] for r in alone]),
                      "output_tok_s": _median([r["output_tok_s"] for r in alone])}}
@@ -235,21 +241,21 @@ def probe(base: str, slot_ctx: int | None, slots: int, during=None) -> dict:
         out["long"] = {"skipped": f"a slot holds {slot_ctx:,} tokens, under the "
                                   f"{LONG + OUT:,} the long prompt needs"}
     else:
-        r = complete(base, prompt(toks, LONG))
+        r = ask(prompt(toks, LONG))
         out["long"] = {"prompt_n": LONG, "out_n": OUT, "prompt_tok_s": r["prompt_tok_s"],
                        "output_tok_s": r["output_tok_s"]}
     k = max(1, min(TOGETHER, int(slots or TOGETHER)))
     got: list = [None] * k
     gate = threading.Barrier(k + 1)
 
-    def ask(i: int) -> None:
+    def at_once(i: int) -> None:
         try:
             gate.wait(30)
             # each its own slice of the text: eight prompts, not one eight times
-            got[i] = complete(base, prompt(toks, SHORT, start=37 * (i + 1)))
+            got[i] = ask(prompt(toks, SHORT, start=37 * (i + 1)))
         except Exception as e:                          # noqa: BLE001 — said below
             got[i] = e
-    th = [threading.Thread(target=ask, args=(i,), daemon=True) for i in range(k)]
+    th = [threading.Thread(target=at_once, args=(i,), daemon=True) for i in range(k)]
     for x in th:
         x.start()
     gate.wait(30)
@@ -271,13 +277,17 @@ def probe(base: str, slot_ctx: int | None, slots: int, during=None) -> dict:
     return out
 
 
-def check(base: str, slot_ctx: int | None, slots: int, say=lambda s: None, run=None) -> dict:
+def check(base: str, slot_ctx: int | None, slots: int, say=lambda s: None, run=None,
+          extra: dict | None = None) -> dict:
     """the card check: the card, then the probe. Never raises — a probe that
-    fails is said, with the card as read"""
-    rec = {"at": round(time.time()), "card": card(run), "slots": slots}
+    fails is said, with the card as read. 31.1: `extra` goes with each probe
+    request (the box's expert path), and is kept"""
+    rec = {"at": round(time.time()), "card": card(run), "slots": slots,
+           **({"extra": dict(extra)} if extra else {})}
     seen: list[dict] = []
     try:
-        rec["probe"] = probe(base, slot_ctx, slots, during=lambda: seen.append(link(run)))
+        rec["probe"] = probe(base, slot_ctx, slots, during=lambda: seen.append(link(run)),
+                             extra=extra)
     except Exception as e:                              # noqa: BLE001 — never the step's end
         rec["why"] = f"the speed probe failed: {e}"[:400]
     # the link under load, where it was read: the higher of the two readings

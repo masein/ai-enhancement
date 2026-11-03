@@ -390,7 +390,81 @@ RUNTIMES = {
         "context": 65_536,
         "card": "V100",
     },
+    # 31.1: step2388, the team's joint k3/k6 checkpoint (brief 31, 3 Nov) — one
+    # GGUF, two expert paths: k3 (3 experts a layer, no thinking: our thinking
+    # off) and k6 (6 a layer, thinking: our thinking on). Each path's sampling
+    # and thinking are stored in the file (teraformer.paths.k3.sampling.*,
+    # …k6…) and llama-server applies them itself, so nothing that samples or
+    # switches thinking is sent: a sampling flag would replace both paths'
+    # values, and a request's sampling field, chat_template_kwargs or
+    # reasoning_format the path's own. A request carries the path alone
+    # ("expert_path"), with its messages, its limit and its seed. A box serves
+    # one path, so no cached prompt crosses paths; its settings check
+    # (remote_gguf.path_check) holds the file's values, the server's /props
+    # and start-up lines and two answers to PATHS before a question.
+    # GGML_CPU_DISABLE_FUSION is the fork's own caveat for Qwen, harmless on
+    # the GPU; GGML_CUDA_DISABLE_FUSION only removes last-digit rounding
+    # differences, and is never set
+    "k3k6-2611": {
+        "words": "the team's joint k3/k6 build: one file, two expert paths, each path's sampling "
+                 "and thinking as the GGUF stores them, applied by the server and never sent; "
+                 "router norm on, no reasoning flags, no speculative decoding",
+        "env": {"LOOKAHEAD_MOE_ROUTER_NORM": "1", "GGML_CPU_DISABLE_FUSION": "1"},
+        "thinking": ("on",),
+        # k3, thinking off: the whitepaper's thinking-off set (plan T's and
+        # step8804's instruction following's)
+        "off_for": ("gpqa_diamond_epoch", "math_l5_epoch", "mmlupro_tiger", "ifeval_google",
+                    "ifbench_test"),
+        "sampling": {},
+        # our thinking setting → the expert path a request names
+        "paths": {"off": 3, "on": 6},
+        "sampling_from": {
+            "all": "the GGUF's own, per expert path (teraformer.paths.k3.sampling.* and "
+                   "teraformer.paths.k6.sampling.*), applied by llama-server: no value is sent"},
+        "flags": ["-ctk", "q8_0", "-ctv", "q8_0", "--flash-attn", "on"],
+        "refuses_env": ("GGML_CUDA_DISABLE_FUSION",),
+        # nothing that replaces a path's own: its sampling, its thinking, the
+        # path itself, and no slot saved or restored (a saved state doesn't
+        # record its path)
+        "refuses_flags": ("--temp", "--temperature", "--top-k", "--top-p", "--min-p",
+                          "--presence-penalty", "--frequency-penalty", "--repeat-penalty",
+                          "--repeat-last-n", "--samplers", "--sampling-seq", "--dry-multiplier",
+                          "--mirostat", "--reasoning", "--reasoning-format",
+                          "--reasoning-budget", "--chat-template-kwargs", "--expert-path",
+                          "--slot-save-path", "--no-jinja"),
+        "models": {"served/step2388-k3k6-2611": "Qwen/Qwen3.6-35B-A3B"},
+        # llama.cpp-teraformer at 3ad38b7cc, the copy on our server: one commit
+        # after the team's d98b64741, which changes only the README — either
+        # runs. Its local Makefile change isn't read by CMake
+        "build": {"words": "the team's llama.cpp-teraformer at 3ad38b7cc (d98b64741's code)",
+                  "commits": ("3ad38b7cc", "d98b64741"), "number": None,
+                  "changes_allowed": ("Makefile",)},
+    },
 }
+
+# 31.1: what step2388's file stores for each path (the team's, 3 Nov): what
+# the box's settings check holds the file, the server's /props and start-up
+# lines and each answer to. penalty_last_n -1 is the whole context;
+# penalty_prompt_tokens 0 leaves the prompt and the chat history out of the
+# presence penalty: it counts the reply's own tokens alone
+PATHS = {
+    3: {"temperature": 0.8, "top_p": 0.95, "top_k": 20, "min_p": 0.0, "presence_penalty": 0.0,
+        "thinking": False},
+    6: {"temperature": 0.8, "top_p": 0.95, "top_k": 20, "min_p": 0.0, "presence_penalty": 0.75,
+        "penalty_last_n": -1, "penalty_prompt_tokens": 0, "thinking": True},
+}
+# the path the file serves when a request names none
+PATH_DEFAULT = 3
+
+
+def path_of(name: str | None, thinking: bool | str) -> int | None:
+    """31.1: the expert path a runtime asks with this thinking setting (k6 on,
+    k3 off); None for a runtime with no paths"""
+    paths = (RUNTIMES.get(name or "") or {}).get("paths")
+    if not paths:
+        return None
+    key = thinking if isinstance(thinking, str) else ("on" if thinking else "off")
+    return paths.get(key)
 
 
 def runtime_of_model(served_as: str) -> str:
@@ -444,16 +518,30 @@ def runtime_build_refused(name: str, build: int | None, commit: str | None,
     if not want:
         return ""
     got = f"build {build if build is not None else '?'} ({commit or '?'})"
-    said = f"upstream llama.cpp {want['tag']} (build {want['number']}, {want['commit'][:9]})"
-    if build != want["number"] or not commit or not want["commit"].startswith(commit):
+    said = want.get("words") or (f"upstream llama.cpp {want['tag']} (build {want['number']}, "
+                                 f"{want['commit'][:9]})")
+    # 31.1: a fork's commits, each as its short hash may say it (the team's two
+    # with the same code), and no build number to hold it to
+    commits = want.get("commits") or (want["commit"],)
+
+    def same(c: str | None) -> bool:
+        return bool(c) and any(w.startswith(c) or c.startswith(w) for w in commits)
+    if (want.get("number") is not None and build != want["number"]) or not same(commit):
         return f"runtime {name} runs {said}, and this llama-server is {got}"
     vf = version_file or {}
-    if vf.get("commit") and vf["commit"] != want["commit"]:
+    if vf.get("commit") and not same(vf["commit"]):
         return (f"runtime {name} runs {said}, and this tarball's VERSION says commit "
                 f"{vf['commit'][:12]}")
     if vf.get("uncommitted_changes") == "yes":
-        return (f"runtime {name} runs {said} as released, and this tarball was built from a "
-                "tree with changes not committed (its VERSION)")
+        # 31.1: changes the runtime knows of and its build never reads (the
+        # team's Makefile), named one by one in the VERSION; any other refused
+        ok = want.get("changes_allowed") or ()
+        files = (vf.get("changed_files") or "").split()
+        if not ok or not files or any(f not in ok for f in files):
+            return (f"runtime {name} runs {said} as released, and this tarball was built from "
+                    "a tree with changes not committed (its VERSION"
+                    + (f": {', '.join(f for f in files if f not in ok) or 'unnamed'}"
+                       if ok else "") + ")")
     return ""
 
 
@@ -515,9 +603,25 @@ def runtime_words(name: str, thinking: str = "on") -> str:
     rt = RUNTIMES[name]
     env = " ".join(f"{k}={v}" for k, v in rt["env"].items())
     samp = ", ".join(f"{SAMPLING_WORDS[k]} {v}" for k, v in rt["sampling"].items())
+    # 31.1: a runtime of expert paths sends none: its path's, as the file stores them
+    path = path_of(name, thinking)
+    if path is not None:
+        samp = f"expert path k{path}: {path_words(path)} — the file's, never sent"
     # 22: a runtime with no variables says so
     return (f"runtime {name} ({rt['words']}, thinking {thinking}): {env or 'no variables'} · "
             f"{samp} · " + " ".join(rt["flags"]))
+
+
+PATH_WORDS = {**SAMPLING_WORDS, "penalty_last_n": "penalty last-n",
+              "penalty_prompt_tokens": "penalty prompt tokens"}
+
+
+def path_words(path: int, values: dict | None = None) -> str:
+    """31.1: a path's settings in words — "temperature 0.8, top-p 0.95, …,
+    thinking on"; PATHS' unless `values` are given"""
+    v = PATHS[path] if values is None else values
+    return ", ".join(f"thinking {'on' if x else 'off'}" if k == "thinking" else
+                     f"{PATH_WORDS.get(k, k)} {x}" for k, x in v.items())
 
 
 def as_lexed(src: str) -> str:

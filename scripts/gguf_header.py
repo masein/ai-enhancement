@@ -298,6 +298,47 @@ def shape(fh) -> dict | None:
         return None
 
 
+MAX_KEYS = 256                   # 31.1: the entries keys() keeps under one prefix
+MAX_ITEMS = 64                   # and an array's items: a path list is two
+
+
+def keys(path: str | Path, prefix: str) -> dict | None:
+    """31.1: every metadata entry whose key begins with `prefix`, as the file
+    holds it — a number, a boolean, a string (to MAX_KEEP characters) or a
+    short array of those (step2388's teraformer.paths.top_k is [3, 6]); any
+    other entry under it is kept as None. {} when none does; None when the
+    file isn't a GGUF one can read"""
+    try:
+        with open(path, "rb") as fh:
+            r = _Reader(fh)
+            if r.take(4) != MAGIC or r.unpack("<I") not in (2, 3):
+                return None
+            r.count()
+            out: dict = {}
+            for _ in range(r.count()):
+                key, t = r.string(), r.unpack("<I")
+                if not key.startswith(prefix) or len(out) >= MAX_KEYS:
+                    r.value(t, keep=False)
+                    continue
+                if t == _ARRAY:
+                    et, n = r.unpack("<I"), r.count()
+                    if (et in _SCALAR or et == _STRING) and n <= MAX_ITEMS:
+                        out[key] = [r.value(et) for _ in range(n)]
+                    else:
+                        if et in _SCALAR:
+                            r.skip(n * struct.calcsize(_SCALAR[et]))
+                        else:
+                            for _ in range(n):
+                                r.value(et, False, 1)
+                        out[key] = None
+                else:
+                    out[key] = r.value(t)
+            return out
+    except (OSError, NotGguf, struct.error, UnicodeDecodeError, MemoryError, RecursionError,
+            TypeError, ValueError, OverflowError):
+        return None
+
+
 def main(argv: list[str] | None = None) -> int:
     paths = argv if argv is not None else sys.argv[1:]
     if not paths:

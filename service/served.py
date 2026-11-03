@@ -727,6 +727,9 @@ def view(rec: dict) -> dict:
 def thinking_key(s: dict) -> str:
     """the thinking setting a run's questions were asked with: on, off, or
     the server's own default (nothing said)"""
+    # 31.1: an expert path's thinking is the path's own: k6 thinks, k3 doesn't
+    if s.get("expert_path") is not None:
+        return "on" if s["expert_path"] == 6 else "off"
     v = (s.get("chat_template_kwargs") or {}).get("enable_thinking")
     return "default" if v is None else "on" if v else "off"
 
@@ -1021,6 +1024,10 @@ def ask(rec: dict, text: str, s: dict) -> str:
     body = {"model": rec["pin"].get("model") or rec["name"],
             "messages": [*system, *(s.get("history") or []), {"role": "user", "content": text}],
             **{k: v for k, v in s.items() if k not in ("system", "history")}}
+    if "expert_path" in s:
+        # 31.1: a request on an expert path carries its messages, its limit,
+        # its path and its seed — nothing more, so nothing replaces the path's
+        body.pop("model")
     if is_openrouter(rec):
         body.update(_pinned_route(rec))
     base, key = _endpoint(rec)
@@ -1166,6 +1173,13 @@ def answer_one(rec: dict, text: str, s: dict) -> "Answer":
         return timed_out(e)
     except ItemError as e:
         said = str(e)
+    if "expert_path" in s:
+        # 31.1: never without the chat endpoint on an expert path — the raw
+        # completion would need its thinking said, which only the path may say
+        a = Answer("")
+        a.error = {"chat": said, "fallback": "not asked: an expert path is asked through its "
+                                             "chat endpoint alone"}
+        return a
     try:
         a = _ask_patiently(rec, text, s, ask_raw)
         a.fallback = {"error": said}
