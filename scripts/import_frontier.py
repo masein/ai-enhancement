@@ -359,7 +359,9 @@ _SETUP_TYPES = {
              "file_type": str},                     # 24b: its quant, from its header
     "server": {"build": (int, str), "commit": str, "version": str, "slots": int,
                "flags": [str], "env": dict, "argv": [str], "binary_sha256": str,
-               "tarball_sha256": str},
+               "tarball_sha256": str,
+               # 31.1: a runtime of expert paths' settings check, as its box ran it
+               "paths_check": {"path": int, "pass": bool, "mismatches": [str]}},
     "gpu": {"name": str, "count": int, "names": [str]},
     "tasks": {"*": {"protocol_version": str, "revision": str, "epochs": int, "budget": int,
                     "family": str,
@@ -733,10 +735,42 @@ def runtime_problem(setup: dict, rec: dict) -> str:
                 "template_file_sha256"]:
             miss.append("the GGUF's own chat template in the file (sha256 "
                         f"{rt['template_file_sha256'][:16]}…)")
+        # 31.1: a runtime of expert paths — its box's settings check, passed on
+        # the path of the bundle's thinking, the file storing the paths' values
+        if rt.get("paths"):
+            miss += paths_problem(got, setup)
         if miss:
             return (f"its box didn't run runtime {got} as this board defines it: "
                     + "; ".join(miss) + " — the box's image and this board differ")
     return ""
+
+
+def paths_problem(name: str, setup: dict) -> list[str]:
+    """31.1: what a bundle of a runtime of expert paths lacks of its settings
+    check: run, passed, on the path its thinking asks, with the file's values
+    the paths' (fb.PATHS) — [] when it has it all"""
+    srv = setup.get("server") if isinstance(setup.get("server"), dict) else {}
+    chk = srv.get("paths_check")
+    want = fb.path_of(name, setup.get("thinking") or "")
+    if not isinstance(chk, dict):
+        return ["its settings check (none in the bundle)"]
+    out = []
+    if chk.get("path") != want:
+        out.append(f"its settings check on expert path k{want} (the bundle's was "
+                   f"k{chk.get('path')})")
+    if chk.get("pass") is not True:
+        out.append("a settings check that passed (" + "; ".join(
+            str(m) for m in chk.get("mismatches") or ["no verdict"])[:300] + ")")
+    paths = ((chk.get("file") or {}).get("paths") or {}) if isinstance(chk.get("file"), dict) \
+        else {}
+    stored = paths.get(str(want), paths.get(want)) if isinstance(paths, dict) else None
+    # the file's own values (a float as its header keeps it: 0.8 reads 0.800000011920929)
+    import path_check
+    if want in fb.PATHS and (not isinstance(stored, dict)
+                             or path_check.compare(fb.PATHS[want], stored, "the file")):
+        out.append(f"the file's expert path k{want} as {fb.path_words(want)} (its check read "
+                   f"{stored!r})")
+    return out
 
 
 def registry(row: Path) -> dict:

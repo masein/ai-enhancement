@@ -120,6 +120,9 @@ $DOCKER run --rm -v "$work":/out "$image" chown -R "$(id -u):$(id -g)" /out
 {
   echo "commit $commit"
   echo "uncommitted_changes $([ -z "$changes" ] && echo no || echo yes)"
+  # 31.1: and which files, by name — a runtime may allow one its build never reads
+  # (the team's Makefile, which CMake doesn't use)
+  [ -z "$changes" ] || echo "changed_files $(printf '%s\n' "$changes" | awk '{print $NF}' | tr '\n' ' ' | sed 's/ *$//')"
   sed -e 's/^.*LLAMA_BUILD_NUMBER = \([0-9]*\);.*/build \1/' -e 's/^.*LLAMA_COMMIT = "\([^"]*\)";.*/build_commit \1/' "$work/build-info"
   echo "cuda_archs $archs"
   echo "cmake_args ${extra:-none}"

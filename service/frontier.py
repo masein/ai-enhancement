@@ -110,6 +110,12 @@ def settings(rec: dict, task: str, on: bool) -> dict:
     """how each question of `task` is asked: its budget, the card's sampling,
     and the thinking switch, said out loud (not to a model from OpenRouter)"""
     spec = fb.BENCH[task]
+    # 31.1: a runtime of expert paths asks with its path alone — the path's
+    # sampling and thinking are the file's, applied by the server, and any
+    # value sent would replace them
+    path = fb.path_of(rec.get("runtime"), on)
+    if path is not None:
+        return {"max_tokens": spec["budget"]["on" if on else "off"], "expert_path": path}
     s = {"max_tokens": spec["budget"]["on" if on else "off"],
          **fb.sampling(family_of(rec), on)}
     # 20: a model served with a named runtime is asked with its sampling, in
@@ -138,7 +144,10 @@ def _setup(rec: dict, task: str, on: bool, s: dict) -> dict:
         "version": fb.VERSION, "task": task, "protocol": spec["protocol"],
         "protocol_version": spec["protocol_version"], "source": spec["source"],
         "epochs": spec["epochs"], "thinking": "on" if on else "off",
-        "budget": s["max_tokens"], "family": family_of(rec) or "server defaults",
+        "budget": s["max_tokens"],
+        # 31.1: a path's sampling is the file's, never a family's preset
+        "family": (f"the file's expert path k{s['expert_path']}" if "expert_path" in s
+                   else family_of(rec) or "server defaults"),
         "sampling": {k: v for k, v in s.items() if k not in ("max_tokens",
                                                             "chat_template_kwargs")},
         # 29: where each of a runtime's values comes from (Bolt's card, its

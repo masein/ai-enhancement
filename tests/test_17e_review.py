@@ -173,10 +173,15 @@ def test_2_3_each_plan_runs_every_benchmark_once_one_line_a_box():
         # 30.1: plan T, three benchmarks with thinking off alone (no parity step)
         if name == "T":
             want = {("off", t) for t in (fbx.GPQA, fbx.MATH, fbx.MMLU)}
+        # 31.1: plan U, step2388 — the suite and instruction following on its
+        # k6 path, the whitepaper's thinking-off set on its k3 (no parity step)
+        if name == "U":
+            want = {("on", t) for t in fb.TASKS} | {
+                ("off", t) for t in (fbx.GPQA, fbx.MATH, fbx.MMLU, fbx.IFEVAL, fbx.IFBENCH)}
         assert set(have) == want, name
         assert all(have[k] == set(range(1, of[k] + 1)) for k in have), name
         # 17f: one box a build asks it first
-        assert parity == (0 if name in ("L", "I", "T") else 1), name
+        assert parity == (0 if name in ("L", "I", "T", "U") else 1), name
     longest = {p: max(sum(fbx.hours(s) for s in st) for st in b.values())
                for p, b in fbx.PLANS.items()}
     assert longest["A"] <= 18 and longest["B"] <= 10.5 and longest["L"] <= 6.0

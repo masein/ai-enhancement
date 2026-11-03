@@ -76,6 +76,17 @@ asked again once the GPU is free — its answers kept, nothing of theirs
 touched. --pilot on D3.0: the card check, then 5 questions of every
 benchmark with thinking on and 5 of IFEval and IFBench with it off, and what
 the pace makes of the plan (docs/BOLT-RUN.md).
+
+31.1: plan U — step2388, the team's joint k3/k6 checkpoint, on runtime
+k3k6-2611: one file, two expert paths, each path's sampling and thinking the
+file's own and never sent. The whitepaper's set on the k6 path (thinking on,
+U1–U34) and its thinking-off set on the k3 path (U35–U37), each box one path,
+sized at step8804's measured paces (MEASURED). Each step runs the path's
+settings check before its first question (scripts/path_check.py):
+
+    python scripts/frontier_box.py U35 --as served/step2388-k3k6-2611 \
+        --gguf hf://<you>/evalboard-private@<commit>/step2388.k3k6.gguf \
+        --server hf://<you>/evalboard-private@<commit>/llama-server-k3k6-3ad38b7.tar.gz
 """
 
 from __future__ import annotations
@@ -117,6 +128,26 @@ PACE = {
 }
 GUESSED = {("on", SQA), ("on", IFEVAL), ("on", IFBENCH), ("off", IFEVAL), ("off", IFBENCH)}
 PILOT_SLOTS = {ARC: 5}                  # the slots each pace was measured at; 8 otherwise
+
+# 31.1: step8804's box-seconds an answer, measured on plans L, I and T (runs
+# #356–#393, 20–31 Oct, RTX 5090s): each step's start to its finish, summed by
+# benchmark, under today's limits, at the plan's slots (8; ARC-AGI-2 5). Two
+# benchmarks asked in one step share its time — thinking on, GPQA Diamond and
+# MATH Level 5 by their output tokens (9,469,074 and 23,227,275); IFEval and
+# IFBench, and thinking off GPQA Diamond and MATH Level 5, by the energy the
+# import kept for each (its share of the step's seconds). The boxes' own
+# spread is wide: a ninth of HLE took 4.6 to 12.0 hours
+MEASURED = {
+    ("on", HLE): 263673 / 2158, ("on", MMLU): 112178 / 12032,
+    ("on", GPQA): 115220 * 0.28961 / 792, ("on", MATH): 115220 * 0.71039 / 1324,
+    ("on", OTIS): 49125 / 360, ("on", SQA): 5430 / 1000, ("on", ARC): 21629 / 334,
+    ("on", IFEVAL): 8079 * 0.45550 / 541, ("on", IFBENCH): 8079 * 0.54450 / 300,
+    ("off", GPQA): 11954 * 0.51013 / 792, ("off", MATH): 11954 * 0.48987 / 1324,
+    ("off", MMLU): 30978 / 12032,
+    ("off", IFEVAL): 755 * 0.57592 / 541, ("off", IFBENCH): 755 * 0.42408 / 300,
+}
+# 31.1: the plans sized at a measured pace (step8804's), not the pilot's
+PLAN_PACE = {"U": MEASURED}
 
 # 17f: what ran out of room on the pilot — (answers that ran out, of, the mean
 # answer's tokens, the limit then). The hours assume each that ran out runs
@@ -203,6 +234,25 @@ PLANS: dict[str, dict[str, list[Step]]] = {
         "T2": [("off", (MMLU,), "2/2", 8)],
         "T3": [("off", (GPQA, MATH), "", 8)],
     },
+    # 31.1: step2388 on runtime k3k6-2611 — the whitepaper's set on the k6
+    # path (thinking on, U1–U34) and its thinking-off set on the k3 path (U35–
+    # U37), as step8804's were asked. Each box serves one path, so no cached
+    # prompt crosses paths. Sized at step8804's measured paces (MEASURED) to
+    # about 4½–5 hours a box: HLE in fifteenths, MMLU-Pro and MATH Level 5
+    # with GPQA Diamond in sevenths, OTIS in thirds, ARC-AGI-2 in halves at 5
+    # slots (one with SimpleQA, one with instruction following); thinking off,
+    # plan T's three boxes with instruction following on the first
+    "U": {
+        **{f"U{i}": [("on", (HLE,), f"{i}/15", 8)] for i in range(1, 16)},
+        **{f"U{15 + i}": [("on", (MMLU,), f"{i}/7", 8)] for i in range(1, 8)},
+        **{f"U{22 + i}": [("on", (MATH, GPQA), f"{i}/7", 8)] for i in range(1, 8)},
+        **{f"U{29 + i}": [("on", (OTIS,), f"{i}/3", 8)] for i in range(1, 4)},
+        "U33": [("on", (ARC,), "1/2", 5), ("on", (SQA,), "", 8)],
+        "U34": [("on", (ARC,), "2/2", 5), ("on", (IFEVAL, IFBENCH), "", 8)],
+        "U35": [("off", (GPQA, MATH), "", 8), ("off", (IFEVAL, IFBENCH), "", 8)],
+        "U36": [("off", (MMLU,), "1/2", 8)],
+        "U37": [("off", (MMLU,), "2/2", 8)],
+    },
 }
 # 29: plan D, our own boxes — a quarter of every benchmark on each of a
 # station's four GPUs, longest first (frontier_box's paces), then instruction
@@ -211,7 +261,7 @@ D_ORDER = [(HLE,), (MMLU,), (MATH,), (ARC,), (OTIS,), (GPQA,), (SQA,), (IFEVAL, 
 PLANS["D"] = {f"D3.{g}": [*(("on", t, f"{g + 1}/4", 8) for t in D_ORDER),
                           ("off", (IFEVAL, IFBENCH), f"{g + 1}/4", 8)] for g in range(4)}
 # 20: the runtime a plan's boxes run, unless the line names another
-PLAN_RUNTIME = {"L": "lda-2610", "I": "lda-2610", "T": "lda-2610"}
+PLAN_RUNTIME = {"L": "lda-2610", "I": "lda-2610", "T": "lda-2610", "U": "k3k6-2611"}
 # 29: the plans run on our own GPUs: each step --own (never started or kept
 # asking while another process uses the GPU), no price
 OWN_PLANS = ("D",)
@@ -223,6 +273,8 @@ V100_GUESS = 2.0
 # refused before anything is fetched
 PLAN_GPUS = {"L": ("RTX 5090", "RTX PRO 6000"), "I": ("RTX 5090", "RTX PRO 6000"),
              "T": ("RTX 5090", "RTX PRO 6000"),
+             # 31.1: the k3k6 tarball, built for sm_120 as the lda one is
+             "U": ("RTX 5090", "RTX PRO 6000"),
              # 29: dgx-03's — the runner image's V100 tag builds for sm_70 alone
              "D": ("V100",)}
 PLAN_SM = {"D": "sm_70"}
@@ -258,6 +310,12 @@ PLAN_PINS["I"] = PLAN_PINS["L"]
 # repository at 03e8a98a5283), pinned by the sha256 its import registered
 PLAN_PINS["T"] = {**PLAN_PINS["L"], "step8804.gguf":
                   "c7a719f8c37d85bcd24f5a0bf103323e0102938be01dea3e0992465923188f3a"}
+# 31.1: plan U runs step2388's file (15,994,966,752 bytes, on our server at
+# ~/step2388.k3k6.gguf, the team's of 3 Nov). The k3k6 tarball is pinned here
+# once it is built (docs/REMOTE-RUNS.md, U0); until then each box checks its
+# commit against the runtime's (fb.RUNTIMES["k3k6-2611"]["build"])
+PLAN_PINS["U"] = {
+    "step2388.k3k6.gguf": "a2594a68a810ec526061f83cb88c7e469e1c3889912e8da4b1d598c72271faf6"}
 # 29: Bolt's two builds, as Hugging Face publishes them: NVIDIA's Q4_K_M
 # (nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB at 1db54d5b12533ff1, 6,180,446,208
 # bytes) and ggml-org's Q8_0 (ggml-org/NVIDIA-Nemotron-3.5-Bolt-E4B-GGUF at
@@ -347,19 +405,25 @@ def slots_run(step: Step, own: bool = False) -> int:
     return min(slots, fits(fb.slot_context(list(tasks), th == "on")))
 
 
-def hours(step: Step, own: bool = False) -> float:
+def hours(step: Step, own: bool = False, plan: str = "") -> float:
     """a step's hours at the pilot's paces, under the limits of 6 Oct, at the
-    slots it runs — 29: on our own V100s, those paces V100_GUESS times over"""
+    slots it runs — 29: on our own V100s, those paces V100_GUESS times over.
+    31.1: a plan sized at a measured pace (PLAN_PACE: plan U at step8804's),
+    at that pace, under today's limits"""
     th, tasks, shard, _ = step
     if th == "parity":
         return 2 * fb.PARITY["n"] * PACE[("off", MMLU)] / 3600
     of = fb.parse_shard(shard)[1] if shard else 1
     run = slots_run(step, own)
+    measured = PLAN_PACE.get(plan)
+    if measured:
+        return sum(ANSWERS[t] * measured[(th, t)] * PILOT_SLOTS.get(t, 8) / run
+                   for t in tasks) / of / 3600
     return sum(ANSWERS[t] * PACE[(th, t)] * limit_factor(th, t) * PILOT_SLOTS.get(t, 8) / run
                for t in tasks) / of / 3600 * (V100_GUESS if own else 1)
 
 
-def words(step: Step, own: bool = False) -> str:
+def words(step: Step, own: bool = False, plan: str = "") -> str:
     th, tasks, shard, slots = step
     if th == "parity":
         return (f"the parity questions ({fb.PARITY['n']} of MMLU-Pro, each twice, thinking off) "
@@ -368,8 +432,9 @@ def words(step: Step, own: bool = False) -> str:
     return (f"thinking {th} · {', '.join(fb.BENCH[t]['label'] for t in ordered(tasks))}"
             + (f" · shard {shard}" if shard else "")
             + f" · {run} slots" + (f" (of {slots}: no more fit a 5090)" if run < slots else "")
-            + f" · about {hours(step, own):.1f} h"
+            + f" · about {hours(step, own, plan):.1f} h"
             + (" (a guess: the 5090's paces ×2 until the V100's pilot)" if own else
+               " (step8804's measured pace)" if plan in PLAN_PACE else
                " (a guess)" if any((th, t) in GUESSED for t in tasks) else ""))
 
 
@@ -506,12 +571,12 @@ def listing(plan: str) -> list[str]:
     own = plan in OWN_PLANS
     lines = []
     for box, steps in boxes.items():
-        lines.append(f"{box} · about {sum(hours(s, own) for s in steps):.1f} h")
-        lines += [f"  {k}. {words(s, own)}" for k, s in enumerate(steps, 1)]
-    total = sum(hours(s, own) for steps in boxes.values() for s in steps)
+        lines.append(f"{box} · about {sum(hours(s, own, plan) for s in steps):.1f} h")
+        lines += [f"  {k}. {words(s, own, plan)}" for k, s in enumerate(steps, 1)]
+    total = sum(hours(s, own, plan) for steps in boxes.values() for s in steps)
     lines.append(f"{len(boxes)} box{'es' if len(boxes) != 1 else ''} a build · "
                  f"{total:.1f} box-hours a build · the longest "
-                 f"{max(sum(hours(s, own) for s in st) for st in boxes.values()):.1f} h"
+                 f"{max(sum(hours(s, own, plan) for s in st) for st in boxes.values()):.1f} h"
                  + (" · our own GPUs: no price" if own else ""))
     return lines
 
@@ -520,7 +585,8 @@ def parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("box", nargs="?", help="the box: A1 … A9, B1 … B15 (G5), L1 … L21, "
-                                           "I1 (25: instruction following)")
+                                           "I1 (25: instruction following), T1 … T3 (30.1), "
+                                           "U1 … U37 (31.1: step2388)")
     ap.add_argument("then", nargs="*", help="18e point 1: more labels, run one after another "
                                             "on this box (L1 L2): each later one's line is "
                                             "written \"queued\" at the start, so the fetch "
