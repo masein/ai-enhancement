@@ -1573,6 +1573,12 @@ def _main(argv: list[str] | None = None) -> int:
                          "benchmarks, asked as the board asks a served model (on an expert path: "
                          "greedy, no penalties; a FILE_SAMPLING id at the file's own settings), "
                          "into a bundle of its own (scripts/devicemark_box.py)")
+    ap.add_argument("--showcase", default="", metavar="QUESTIONS",
+                    help="31.2b: the whitepaper's showcase in place of the Frontier benchmarks: "
+                         "the questions file (hf://… or a path, pinned with --pin), each "
+                         "question asked once on this --thinking's expert path at the file's "
+                         "own settings, one at a time on one slot, into a bundle of its own "
+                         "(scripts/showcase_box.py)")
     ap.add_argument("--own", action="store_true",
                     help="29: one GPU of our own station (--label D3.0): never started while "
                          "another process uses the GPU, paused while one does (exit 75), no "
@@ -1615,6 +1621,16 @@ def _main(argv: list[str] | None = None) -> int:
                  + " or ".join(n for n, r in fb.RUNTIMES.items() if r.get("paths")) + ")")
     if a.check and (a.pilot or a.parity or a.serve or a.only):
         ap.error("--check asks no benchmark: no --pilot, --parity, --serve or --only")
+    # 31.2b: the showcase, on a runtime of expert paths, on its own
+    if a.showcase and (a.pilot or a.parity or a.serve or a.check or a.only or shard
+                       or a.devicemark):
+        ap.error("--showcase asks its questions alone: no --pilot, --parity, --serve, --check, "
+                 "--devicemark, --only or --shard")
+    if a.showcase and not (a.runtime and fb.RUNTIMES[a.runtime].get("paths")):
+        ap.error("--showcase: on a runtime of expert paths (--runtime "
+                 + " or ".join(n for n, r in fb.RUNTIMES.items() if r.get("paths")) + ")")
+    if a.showcase and a.slots != 1:
+        ap.error("--showcase: one slot (--slots 1), each question asked alone as step8804's were")
     # 31.2: DeviceMark's battery, whole, on its own
     if a.devicemark and (a.pilot or a.parity or a.serve or a.check or a.only or shard):
         ap.error("--devicemark asks DeviceMark's battery whole: no --pilot, --parity, --serve, "
@@ -1633,7 +1649,7 @@ def _main(argv: list[str] | None = None) -> int:
         # 29: a served model is asked its thinking per request; 31.1: --check asks
         # no benchmark, on either path; 31.2: nor does DeviceMark ask one of the
         # runtime's, and it is asked with thinking on and off
-        if why and not a.serve and not a.check and not a.devicemark:
+        if why and not a.serve and not a.check and not a.devicemark and not a.showcase:
             ap.error(why)
         if a.parity:
             ap.error(f"--runtime {a.runtime}: no parity questions (they ask thinking off)")
@@ -1675,14 +1691,14 @@ def _main(argv: list[str] | None = None) -> int:
     STEP["own"] = own
     progress(out, label=a.label or "", model=a.served_as, thinking=a.thinking,
              parity=bool(a.parity), tasks=["devicemark"] if a.devicemark else
-             [t for t in fb.ALL if t in (a.only or [])],
+             ["showcase"] if a.showcase else [t for t in fb.ALL if t in (a.only or [])],
              state="starting", why="", line="", incomplete={})
     if a.pilot and a.only and not a.pilot_each:
         ap.error("--pilot asks its own questions: no --only")
     if a.serve and (a.pilot or a.parity or a.only):
         ap.error("--serve asks nothing here: no --pilot, --parity or --only")
     if not a.only and not a.parity and not a.pilot and not a.serve and not a.check \
-            and not a.devicemark:
+            and not a.devicemark and not a.showcase:
         # 17d: a box names its benchmarks, thinking on or off — every one at
         # once is more context than a card holds, and asks ARC-AGI-2 with
         # thinking off
@@ -1698,6 +1714,9 @@ def _main(argv: list[str] | None = None) -> int:
     if a.devicemark:
         import devicemark_box as dmb
         tasks = []                  # 31.2: DeviceMark's battery — a slot of dmb.CONTEXT
+    if a.showcase:
+        import showcase_box as scb
+        tasks = []                  # 31.2b: the showcase — one slot of scb.CONTEXT
     # 29: our own GPU, shared — nothing starts while another process uses it
     if own:
         import gpu_free
@@ -1711,7 +1730,7 @@ def _main(argv: list[str] | None = None) -> int:
     # context caps it (Bolt's 64K)
     cap = fb.context_cap(a.runtime or "")
     ctx = (fb.slot_context(tasks, thinking, cap) if tasks else
-           dmb.CONTEXT if a.devicemark else CHECK_CONTEXT)
+           dmb.CONTEXT if a.devicemark else scb.CONTEXT if a.showcase else CHECK_CONTEXT)
     if a.serve:
         ctx = min(a.serve_context, cap) if cap else a.serve_context
     # 17h: what is free on the card, not its total — 300 MiB in use by
@@ -1738,7 +1757,7 @@ def _main(argv: list[str] | None = None) -> int:
     if fit and fit["fit"] < a.slots and not a.slots_fit:
         gb = 1024 ** 3
         raise SystemExit(
-            f"{a.slots} slots of {ctx:,} tokens ({fb.BENCH[big]['label'] if tasks else 'DeviceMark' if a.devicemark else 'the check'}'s, thinking "
+            f"{a.slots} slots of {ctx:,} tokens ({fb.BENCH[big]['label'] if tasks else 'DeviceMark' if a.devicemark else 'the showcase' if a.showcase else 'the check'}'s, thinking "
             f"{'on' if thinking else 'off'}) would use about {fit['used'] / gb:.1f} GB with the "
             f"{fit['file'] / gb:.1f} GB file ({fit['types']} cache, "
             f"{fit['per_token'] / 1024:.1f} KB a token from the GGUF's header; {fit['basis']}), "
@@ -1759,7 +1778,7 @@ def _main(argv: list[str] | None = None) -> int:
     from service import db, runner
     db.init()
     words = f"shard {shard[0]} of {shard[1]}" if shard else ""
-    say(f"{a.served_as} · thinking {a.thinking} · {', '.join(tasks) or ('DeviceMark' if a.devicemark else '')}"
+    say(f"{a.served_as} · thinking {a.thinking} · {', '.join(tasks) or ('DeviceMark' if a.devicemark else 'the showcase' if a.showcase else '')}"
         + (f" · {words}" if shard else "") + f" · in {out}")
 
     # the run this folder holds: one served model, one mode, one file, one shard
@@ -1930,7 +1949,8 @@ def _main(argv: list[str] | None = None) -> int:
     sp.write_text(json.dumps(state, indent=1), encoding="utf-8")
     progress(out, label=state.get("label") or "", model=a.served_as,
              thinking="on" if thinking else "off",
-             tasks=[dmb.TASK] if a.devicemark else tasks, shard=state["shard"],
+             tasks=[dmb.TASK] if a.devicemark else [scb.TASK] if a.showcase else tasks,
+             shard=state["shard"],
              parity=bool(a.parity), started_at=state["started_at"], sessions=state["sessions"],
              state="starting", line="", incomplete={}, why="")
     gpu = rb.gpu_info()
@@ -2007,6 +2027,20 @@ def _main(argv: list[str] | None = None) -> int:
             f"{fb.BENCH[t]['epochs']} run{'s' if fb.BENCH[t]['epochs'] > 1 else ''}")
     if a.devicemark:
         dmb.prepare(say)            # 31.2: its items, held to the repo's hash
+    if a.showcase:
+        # 31.2b: its questions, pinned, before the GPU is spent
+        qfile = fetch(a.showcase, files, say)
+        q_sha = rb.sha256_file(qfile)
+        why = pin_refused(qfile.name, q_sha, pins)
+        if why:
+            raise SystemExit(why)
+        try:
+            sc_qs = scb.questions(qfile)
+        except ValueError as e:
+            raise SystemExit(f"--showcase: {e}. Nothing was asked") from None
+        say(f"the showcase: {len(sc_qs)} questions ({qfile.name}, sha256 {q_sha[:16]}…), each "
+            f"asked once on expert path k{fb.path_of(a.runtime, thinking)} at the file's own "
+            f"settings, a limit of {min(scb.LIMIT, ctx - 2048):,} tokens")
 
     srv_proc = Server(srv, gguf_path, a.port, a.slots, ctx, flags, extra_env, out / SERVER_LOG)
     status = "failed"
@@ -2213,31 +2247,43 @@ def _main(argv: list[str] | None = None) -> int:
                 "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}, indent=1),
                 encoding="utf-8")
             return 0 if got["separated"] else 1
-        if a.devicemark:
-            # 31.2: the board's own DeviceMark run of a served model
-            # (service/devicemark.py), the battery whole
-            sid = db.add(a.served_as, "instruct", dmb.TASK, a.by,
-                         f"run on {OWN_WHERE if own else WHERE} (remote_gguf.py --devicemark)",
-                         thinking=thinking, part="full")
-        else:
-            sid = db.add(a.served_as, "instruct", SUITE, a.by,
-                         f"run on {OWN_WHERE if own else WHERE} (remote_gguf.py)",
-                         thinking=thinking, tasks=tasks if tasks != fb.TASKS else None)
-        watch = Watch(sid, say, out=out)
-        progress(out, state="asking", session_at=round(time.time()))
-        watch.start()
-        try:
-            runner.run_submission(db.get(sid))
-        finally:
-            watch.stop()
-            watch.tick()
+        if a.showcase:
+            # 31.2b: the showcase's questions, no run of the board's
+            progress(out, state="asking", session_at=round(time.time()))
+            n_sc, why_sc = scb.ask(srv_proc.base, sc_qs, out, fb.path_of(a.runtime, thinking),
+                                   ctx, gguf["name"], a.runtime, say)
             if sampler is not None:
                 sampler.phase = "after"
-        row = db.get(sid) or {}
-        status = row.get("status") or "failed"
-        say(f"the run: {status} · {row.get('progress') or ''}"
-            + (f" · {row['error']}" if row.get("error") and row["error"] != row.get("progress")
-               else ""))
+            status = "done" if not why_sc else "failed"
+            row = {"status": status, "progress": f"the showcase: {n_sc} of {len(sc_qs)} answered",
+                   "error": why_sc}
+            say(f"the run: {status} · {row['progress']}" + (f" · {why_sc}" if why_sc else ""))
+        else:
+            if a.devicemark:
+                # 31.2: the board's own DeviceMark run of a served model
+                # (service/devicemark.py), the battery whole
+                sid = db.add(a.served_as, "instruct", dmb.TASK, a.by,
+                             f"run on {OWN_WHERE if own else WHERE} (remote_gguf.py --devicemark)",
+                             thinking=thinking, part="full")
+            else:
+                sid = db.add(a.served_as, "instruct", SUITE, a.by,
+                             f"run on {OWN_WHERE if own else WHERE} (remote_gguf.py)",
+                             thinking=thinking, tasks=tasks if tasks != fb.TASKS else None)
+            watch = Watch(sid, say, out=out)
+            progress(out, state="asking", session_at=round(time.time()))
+            watch.start()
+            try:
+                runner.run_submission(db.get(sid))
+            finally:
+                watch.stop()
+                watch.tick()
+                if sampler is not None:
+                    sampler.phase = "after"
+            row = db.get(sid) or {}
+            status = row.get("status") or "failed"
+            say(f"the run: {status} · {row.get('progress') or ''}"
+                + (f" · {row['error']}" if row.get("error") and row["error"] != row.get("progress")
+                   else ""))
     finally:
         srv_proc.stop()
         if sampler is not None:
@@ -2255,6 +2301,8 @@ def _main(argv: list[str] | None = None) -> int:
         return 1
     path, done, incomplete = (
         dmb.make_bundle(out, a.served_as, thinking, state, gguf, server, rec) if a.devicemark
+        else scb.make_bundle(out, a.served_as, state, gguf, server, rec, sc_qs, q_sha)
+        if a.showcase
         else make_bundle(out, a.served_as, thinking, tasks, state, shard, gguf, server, rec))
     for t, x in incomplete.items():
         say(f"{t}: {x['answers']:,} of {x['of']:,} answered — run the same command again to "

@@ -1706,7 +1706,7 @@ measured paces:
 | U35 | k3 | GPQA Diamond and MATH Level 5, then IFEval and IFBench | about 3.5 h |
 | U36–U37 | k3 | MMLU-Pro in halves | about 4.3 h |
 | U38 | k3 | DeviceMark greedy; DeviceMark at the file's own settings; MMLU and GSM8K | about 5.1 h |
-| U39 | k6 | DeviceMark greedy | about 3.2 h |
+| U39 | k6 | DeviceMark greedy; then the showcase's 12 own questions (31.2b) | about 3.3 h |
 | U40 | Qwen3.6 UD-Q2_K_XL | MMLU and GSM8K | about 3.4 h |
 
 That is 40 boxes and about 184 box-hours, before each box's start and fetch
@@ -1732,6 +1732,29 @@ The import marks the answers again by the board's scoring, and refuses a
 bundle whose GGUF isn't the registered file, whose settings check didn't pass,
 whose battery isn't the board's, or whose requests sent anything else.
 
+**The showcase** (31.2b: step2388 is the whitepaper's model). U39's second
+step asks the paper's Appendix H own questions on the k6 path, as step8804's
+were asked on our server: one slot of 83,968 tokens, each question once with
+no re-rolls, its limit 81,920 tokens (the thinking counted), step8804's seed
+for each question, and the file's own settings (the request carries the path,
+never a sampling value). Each answer is kept as it arrives; a step pasted again
+asks only what has no answer. Its bundle (`showcase-served-…`) holds the
+answers with their thinking, and the fetch imports it into the showcase's own
+folder (`$BENCH_ROOT/showcase/served__step2388-k3k6-2611__thinking/own.jsonl`):
+no row of the board changes. It takes minutes (step8804's 12 took 78 s), about
+0.1 h with its server's start; if every answer ran to its limit, about 1.6 h.
+The showcase's 4 benchmark items are not asked: they come from step2388's
+stored k6 answers (run 0), drawn as before.
+
+The questions go to the box as a file in the private repository, never in this
+repository: `showcase-own12.json`, the 12 questions alone (2,559 bytes, sha256
+`978829b74ff537be8f3650c2c73799011a5b46c189964516cac2505c827047ff`, pinned in
+plan U). Upload it once, then give U39's line its commit:
+
+```bash
+hf upload <you>/evalboard-private showcase-own12.json showcase-own12.json
+```
+
 **The easy set** (31.2, internal: never a Frontier column or a whitepaper
 table): MMLU, all 14,042 test questions, and GSM8K, all 1,319, zero-shot chat
 with the same prompt and scorer for both models — the letter read on MMLU,
@@ -1753,8 +1776,14 @@ read -rs HF_TOKEN && export HF_TOKEN
 python scripts/frontier_box.py U35 --as served/step2388-k3k6-2611 --gguf hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/step2388.k3k6.gguf --server hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/llama-server-k3k6-3ad38b7.tar.gz --price 0.45
 ```
 
-Every box U1–U39 runs that line with its own label. U40 runs the Q2 file
-alone:
+Every box U1–U38 runs that line with its own label. U39 adds the showcase's
+questions file:
+
+```bash
+python scripts/frontier_box.py U39 --as served/step2388-k3k6-2611 --gguf hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/step2388.k3k6.gguf --server hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/llama-server-k3k6-3ad38b7.tar.gz --showcase hf://<you>/evalboard-private@<its commit>/showcase-own12.json --price 0.45
+```
+
+U40 runs the Q2 file alone:
 
 ```bash
 python scripts/frontier_box.py U40 --as served/Qwen3.6-35B-A3B-Q2-k3k6-2611 --gguf hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF@5bc3e238d916f48a861bac2f8a1990a0e9b7e98d/Qwen3.6-35B-A3B-UD-Q2_K_XL.gguf --server hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/llama-server-k3k6-3ad38b7.tar.gz --price 0.45

@@ -137,14 +137,14 @@ def k3k6(box, card, monkeypatch, tmp_path):  # noqa: F811
 
 
 def run_k(b: dict, out: str, *more: str, thinking: str = "on", only: bool = True,
-          gguf: Path | None = None, served_as: str = STEP) -> int:
+          gguf: Path | None = None, served_as: str = STEP, slots: int = 3) -> int:
     """remote_gguf.py as a plan U box runs it — the server's config put back after"""
     keep = {k: getattr(config, k) for k in [*rg.ENV, "OUT_DIR", "DM_ITEMS"]}
     lock, env = runner.LOCK, {v: os.environ.get(v) for v in rg.ENV.values()}
     try:
         return rg.main(["--as", served_as, "--gguf", str(gguf or b["gguf"]), "--server",
                         str(b["tarball"]), "--based-on", "Qwen/Qwen3.6-35B-A3B",
-                        "--thinking", thinking, "--slots", "3", "--port", str(free_port()),
+                        "--thinking", thinking, "--slots", str(slots), "--port", str(free_port()),
                         "--load-timeout", "60", "--runtime", RT,
                         *(["--only", TASK] if only else []), "--out", str(b["root"] / out),
                         *more])
@@ -472,7 +472,7 @@ def test_plan_u_is_the_whitepapers_set_on_k6_and_its_thinking_off_set_on_k3():
     # step8804's measured paces: no box over about 5¼ hours, 172 box-hours
     lines = fx.listing("U")
     assert round(sum(fx.hours(s, False, "U") for st in plan.values() for s in st), 1) == 172.0
-    assert lines[-1] == "40 boxes a build · 183.7 box-hours a build · the longest 5.2 h"
+    assert lines[-1] == "40 boxes a build · 183.8 box-hours a build · the longest 5.2 h"
     mine = lines[:lines.index(next(ln for ln in lines if ln.startswith("U38 ")))]
     assert all("(step8804's measured pace)" in ln for ln in mine if ln.startswith("  "))
 

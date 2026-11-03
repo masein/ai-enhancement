@@ -126,8 +126,11 @@ IFEVAL, IFBENCH = "ifeval_google", "ifbench_test"
 EASY_MMLU, GSM8K = "mmlu_chat", "gsm8k_chat"
 DM, DM_FILE = "devicemark", "devicemark_file"
 FILE_SUFFIX = "-file"
+# 31.2b: the whitepaper's showcase, its 12 own questions (remote_gguf.py --showcase)
+SHOWCASE = "showcase"
 DM_LABEL = {DM: "DeviceMark (greedy, no penalties)",
-            DM_FILE: "DeviceMark (the file's own settings, as <build>-file)"}
+            DM_FILE: "DeviceMark (the file's own settings, as <build>-file)",
+            SHOWCASE: "the showcase's 12 own questions (one slot, the file's own settings)"}
 # 25: the Frontier suite plans A, B and L each run whole; plan I runs
 # instruction following, IFEval and IFBench
 SUITE = tuple(t for t in fb.TASKS if t not in fb.FOLLOW)
@@ -145,7 +148,7 @@ PACE = {
     ("on", IFEVAL): 5.0, ("on", IFBENCH): 5.0, ("off", IFEVAL): 0.9, ("off", IFBENCH): 0.9,
 }
 GUESSED = {("on", SQA), ("on", IFEVAL), ("on", IFBENCH), ("off", IFEVAL), ("off", IFBENCH)}
-PILOT_SLOTS = {ARC: 5}                  # the slots each pace was measured at; 8 otherwise
+PILOT_SLOTS = {ARC: 5, "showcase": 1}   # the slots each pace was measured at; 8 otherwise
 
 # 31.1: step8804's box-seconds an answer, measured on plans L, I and T (runs
 # #356–#393, 20–31 Oct, RTX 5090s): each step's start to its finish, summed by
@@ -171,10 +174,15 @@ MEASURED = {
     ("off", DM): 0.88 * 3600 / 596, ("off", DM_FILE): 0.88 * 3600 / 596,
     ("on", DM): 3.24 * 3600 / 596,
     ("off", EASY_MMLU): 0.7, ("off", GSM8K): 1.8,
+    # 31.2b: the showcase — step8804's 12 answers took 78 s on our own 5090, one
+    # slot, part of the model on the CPU; with its own server's start and its
+    # settings check, about 0.1 h (if every answer ran to its 81,920 tokens, about
+    # 1.6 h at a slot's 170 tokens a second)
+    ("on", SHOWCASE): 30.0,
 }
 # 31.2: of MEASURED, the paces that are guesses or another machine's
 MEASURED_GUESSED = {("off", DM), ("off", DM_FILE), ("on", DM), ("off", EASY_MMLU),
-                    ("off", GSM8K)}
+                    ("off", GSM8K), ("on", SHOWCASE)}
 # 31.1: the plans sized at a measured pace (step8804's), not the pilot's
 PLAN_PACE = {"U": MEASURED}
 
@@ -197,6 +205,7 @@ PILOT = {"per_token": 10_880, "recurrent": 68_059_136, "file": 22_854_339_808,
 # its test grids, 167 in its 120 tasks at the pinned revision, each asked twice
 ANSWERS = {t: (167 if t == ARC else b["n"]) * b["epochs"] for t, b in fb.BENCH.items()}
 ANSWERS[DM] = ANSWERS[DM_FILE] = 596            # 31.2: DeviceMark's battery, each item once
+ANSWERS[SHOWCASE] = 12                          # 31.2b: the showcase's own questions
 PARITY_STEP = ("parity", (), "", 8)
 # 22: a runtime's pilot (fb.PILOT's questions), on the first box of a plan
 # before the others are rented — at the plan's 8 slots
@@ -289,7 +298,9 @@ PLANS: dict[str, dict[str, list[Step]]] = {
         # a server of its own
         "U38": [("off", (DM,), "", 8), ("off", (DM_FILE,), "", 8),
                 ("off", (EASY_MMLU, GSM8K), "", 8)],
-        "U39": [("on", (DM,), "", 8)],
+        # 31.2b: and the showcase, the paper's model being step2388: its 12 own
+        # questions on the k6 path, at the file's own settings, one slot
+        "U39": [("on", (DM,), "", 8), ("on", (SHOWCASE,), "", 1)],
         "U40": [("off", (EASY_MMLU, GSM8K), "", 8)],
     },
 }
@@ -363,7 +374,10 @@ PLAN_PINS["U"] = {
     "llama-server-k3k6-3ad38b7.tar.gz":
         "65dd1b90f19be00e918e558b3dbff9fc73e8ff325716ae8482a8211d9f05eb41",
     "Qwen3.6-35B-A3B-UD-Q2_K_XL.gguf":
-        "ed7cda7e38985b4fcff76475865135039641d2bfbac3c169df15ca770f37fb0c"}
+        "ed7cda7e38985b4fcff76475865135039641d2bfbac3c169df15ca770f37fb0c",
+    # 31.2b: the showcase's 12 own questions (the paper's Appendix H), as the
+    # private repository holds them: the questions alone, 2,559 bytes
+    "showcase-own12.json": "978829b74ff537be8f3650c2c73799011a5b46c189964516cac2505c827047ff"}
 # 31.2: and the commit each of its files is fetched at, when fetched from Hugging
 # Face — step2388's file and the tarball both in our private repository at
 # fe12fa27 (masein, 3 Nov), U40's in Unsloth's at 5bc3e238. A line naming
@@ -419,7 +433,8 @@ def pins_of(a: argparse.Namespace, box: str) -> list[str]:
     pins = PLAN_PINS.get(box[:1].upper()) or {}
     # a GGUF in parts: each part's, as the box fetches and hashes each
     given = [*(rg.split_parts(a.gguf) if a.gguf else []),
-             *([] if getattr(a, "server_dir", "") else [a.server])]
+             *([] if getattr(a, "server_dir", "") else [a.server]),
+             *([a.showcase] if getattr(a, "showcase", "") else [])]          # 31.2b
     return [f"{n}={pins[n]}" for n in sorted({str(x).rsplit("/", 1)[-1] for x in given if x})
             if n in pins]
 
@@ -455,12 +470,17 @@ def box_of(name: str) -> list[Step]:
 def ordered(tasks: tuple[str, ...]) -> list[str]:
     """a step's benchmarks in the order the box asks them: the suite's (31.2:
     the easy set after it, and DeviceMark's battery)"""
-    return [t for t in (*fb.ALL, DM, DM_FILE) if t in tasks]
+    return [t for t in (*fb.ALL, DM, DM_FILE, SHOWCASE) if t in tasks]
 
 
 def is_dm(step: Step) -> bool:
     """31.2: a step of DeviceMark's battery (remote_gguf.py --devicemark)"""
     return any(t in (DM, DM_FILE) for t in step[1])
+
+
+def is_showcase(step: Step) -> bool:
+    """31.2b: the showcase's step (remote_gguf.py --showcase)"""
+    return SHOWCASE in step[1]
 
 
 def label_of(t: str) -> str:
@@ -506,6 +526,8 @@ def slots_run(step: Step, own: bool = False) -> int:
     if is_dm(step):
         import devicemark_box
         return min(slots, fits(devicemark_box.CONTEXT))         # 31.2
+    if is_showcase(step):
+        return slots                                            # 31.2b: one slot
     return min(slots, fits(fb.slot_context(list(tasks), th == "on")))
 
 
@@ -538,7 +560,8 @@ def words(step: Step, own: bool = False, plan: str = "") -> str:
     guessed = any((th, t) in MEASURED_GUESSED for t in tasks)
     return (f"thinking {th} · {', '.join(label_of(t) for t in ordered(tasks))}"
             + (f" · shard {shard}" if shard else "")
-            + f" · {run} slots" + (f" (of {slots}: no more fit a 5090)" if run < slots else "")
+            + f" · {run} slot{'s' if run != 1 else ''}"
+            + (f" (of {slots}: no more fit a 5090)" if run < slots else "")
             + f" · about {hours(step, own, plan):.1f} h"
             + (" (a guess: the 5090's paces ×2 until the V100's pilot)" if own else
                " (a guess, not measured on a box yet)" if plan in PLAN_PACE and guessed else
@@ -641,6 +664,9 @@ def argv_of(box: str, k: int, step: Step, a: argparse.Namespace) -> list[str]:
         return out + ["--thinking", "on", "--slots", str(slots), "--min-slots",
                       str(max(1, slots - 1)), "--pilot", "--out", str(pilot_folder(a))]
     out += ["--thinking", th, "--slots", str(slots)]
+    if is_showcase(step):
+        # 31.2b: the showcase's questions, one slot, the line's questions file
+        return out + ["--showcase", a.showcase, "--out", str(folder(a, box, k, step))]
     if is_dm(step):
         # 31.2: DeviceMark's battery whole — at the file's own settings under
         # the build's "-file" id (fb.FILE_SAMPLING), its row of its own
@@ -737,6 +763,9 @@ def parser() -> argparse.ArgumentParser:
                          "GPQA Diamond and MMLU-Pro, thinking on, a line each and last whether "
                          "the thinking and the answer came back apart (into /workspace/<build>/"
                          "pilot, which the fetch never reads)")
+    ap.add_argument("--showcase", default="",
+                    help="31.2b: the showcase's questions file, for the box that asks it (U39): "
+                         "hf://<you>/evalboard-private@<commit>/showcase-own12.json")
     ap.add_argument("--slots-fit", action="store_true",
                     help="17g: the slots given fit this card — the memory check's estimate is "
                          "printed, and not held to")
@@ -788,6 +817,13 @@ def main(argv: list[str] | None = None) -> int:
         why = revision_refused(a, box)
         if why:
             raise SystemExit(why)
+        # 31.2b: the showcase's box takes its questions file, and only it
+        asks = any(is_showcase(st) for st in box_of(box))
+        if asks != bool(getattr(a, "showcase", "")):
+            raise SystemExit(f"{box}: " + (
+                "its last step asks the showcase's questions: give --showcase with the questions "
+                "file (hf://<you>/evalboard-private@<commit>/showcase-own12.json)" if asks else
+                "--showcase is U39's alone, the box that asks the showcase") + ". Nothing was fetched")
         if any(DM_FILE in st[1] for st in box_of(box)) and (
                 a.served_as + FILE_SUFFIX not in fb.FILE_SAMPLING):
             raise SystemExit(f"{box}: its DeviceMark step at the file's own settings runs "

@@ -64,7 +64,10 @@ SUITES = {"devicemark": {"prefix": "devicemark", "format": FORMAT,
           # 31.2: a served model's DeviceMark battery, asked on a rented box's
           # own llama-server (remote_gguf.py --devicemark), marked again on import
           "devicemark-served": {"prefix": "devicemark-served", "format": 3,
-                                "tasks": ("devicemark",)}}
+                                "tasks": ("devicemark",)},
+          # 31.2b: the whitepaper's showcase, asked on a rented box's own server
+          # (remote_gguf.py --showcase), into the showcase's own folder on import
+          "showcase-served": {"prefix": "showcase-served", "format": 4, "tasks": ("showcase",)}}
 # 17: what never travels in a bundle — a model's weights, a binary, a library
 NEVER = re.compile(r"(?i)\.(gguf|safetensors|bin|pt|pth|ckpt|so(\.\d+)*|tar|gz|zst|xz|zip)$")
 # what must be the server's, exactly, for a bundle to be imported

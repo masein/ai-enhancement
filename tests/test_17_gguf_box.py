@@ -486,6 +486,13 @@ def test_the_docs_commands_are_the_scripts_and_paste_whole():
     assert any(a.parity and a.thinking == "off" for a in args)
     # 17c: every box command fits the card, as remote_gguf.py checks first
     for a in args:
+        # 31.2/31.2b: DeviceMark's battery and the showcase have slots of their own
+        if a.devicemark or a.showcase:
+            import devicemark_box
+            import showcase_box
+            ctx = showcase_box.CONTEXT if a.showcase else devicemark_box.CONTEXT
+            assert ctx * a.slots <= a.max_context, a
+            continue
         tasks = [fb.PARITY["task"]] if a.parity else (a.only or fb.TASKS)
         on = a.thinking == "on" and not a.parity
         assert fb.slot_context(tasks, on) * a.slots <= a.max_context, a

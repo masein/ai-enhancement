@@ -249,6 +249,11 @@ def import_bundle(path: Path, by: str, say=print, file_sha: str = "", register: 
         import devicemark_box
         return devicemark_box.import_bundle(b, path, by, say, file_sha, register,
                                             public_weights=public_weights)
+    # 31.2b: the whitepaper's showcase, asked on a rented box's own server
+    if b["bundle"].get("suite") == "showcase-served":
+        import showcase_box
+        return showcase_box.import_bundle(b, path, by, say, file_sha, register,
+                                          public_weights=public_weights)
     if file_sha or register or public_weights:
         say("refused — --file-sha256 and --register are for a GGUF's bundle: a Frontier run's "
             "or a served model's DeviceMark run's")
@@ -566,7 +571,8 @@ def model_of_name(name: str) -> str:
     """the served model a Frontier bundle's file name says (bundle_name's
     "frontier-served__<name>-thinking-…"); the name itself when it isn't one.
     31.2: and a served model's DeviceMark bundle's ("devicemark-served-served__…")"""
-    m = re.match(r"^(?:frontier|devicemark-served)-(served)__(.+?)-thinking-(?:on|off)", name)
+    m = re.match(r"^(?:frontier|devicemark-served|showcase-served)-(served)__(.+?)-thinking-"
+                 r"(?:on|off)", name)
     return f"{m[1]}/{m[2]}" if m else name
 
 
