@@ -1703,7 +1703,8 @@ That is 37 boxes and 172 box-hours, before each box's start and fetch. The
 boxes' own spread is wide: on plan L a ninth of HLE took 4.6 to 12.0 hours.
 
 **One box, end to end.** Rent it as in L2: the runner image at this phase's
-tag, an RTX 5090, Disk 100 GB. Then, in tmux:
+tag, an RTX 5090, Disk 100 GB. Then, in tmux (the line's `--price` is the
+dollars an hour vast.ai shows for the box):
 
 ```bash
 cd /app
@@ -1714,7 +1715,7 @@ read -rs HF_TOKEN && export HF_TOKEN
 ```
 
 ```bash
-python scripts/frontier_box.py U35 --as served/step2388-k3k6-2611 --gguf hf://<you>/evalboard-private@<commit>/step2388.k3k6.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-k3k6-3ad38b7.tar.gz --price <its price>
+python scripts/frontier_box.py U35 --as served/step2388-k3k6-2611 --gguf hf://<you>/evalboard-private@<commit>/step2388.k3k6.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-k3k6-3ad38b7.tar.gz --price 0.45
 ```
 
 The box runs in this order:
