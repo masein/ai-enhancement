@@ -1084,7 +1084,8 @@ def make_bundle(out: Path, served_as: str, thinking: bool, tasks: list[str], sta
         bundle["shard"] = {"i": shard[0], "n": shard[1]}
     files["bundle.json"] = json.dumps(bundle, indent=1, sort_keys=True).encode("utf-8")
     # 17c: the benchmarks in the name when the box ran some of the suite
-    parts = [fb.BENCH[t]["short"] for t in tasks] if len(tasks) < len(fb.TASKS) else None
+    parts = [fb.BENCH[t]["short"] for t in tasks] if (len(tasks) < len(fb.TASKS)
+                                                     or set(tasks) - set(fb.TASKS)) else None
     path = rb.write(out / rb.bundle_name(SUITE, served_as, thinking, shard, parts), files)
     return path, done, incomplete
 
@@ -1504,7 +1505,7 @@ def _main(argv: list[str] | None = None) -> int:
                                                    "registers it (Qwen/Qwen3.6-35B-A3B): it "
                                                    "picks the model card's sampling")
     ap.add_argument("--thinking", required=True, choices=("on", "off"))
-    ap.add_argument("--only", action="append", choices=fb.TASKS,
+    ap.add_argument("--only", action="append", choices=fb.ALL,
                     help="one task (repeatable); every task when none is given")
     ap.add_argument("--out", default="remote-gguf", help="where the run and its bundle go")
     ap.add_argument("--files", default="",
@@ -1567,6 +1568,11 @@ def _main(argv: list[str] | None = None) -> int:
                          "off), the file's, the server's and two answers' settings held to the "
                          "path's, written to --out — no benchmark asked, no bundle. Each step "
                          "of such a runtime runs it before its first question too")
+    ap.add_argument("--devicemark", action="store_true",
+                    help="31.2: DeviceMark's battery (596 items) in place of the Frontier "
+                         "benchmarks, asked as the board asks a served model (on an expert path: "
+                         "greedy, no penalties; a FILE_SAMPLING id at the file's own settings), "
+                         "into a bundle of its own (scripts/devicemark_box.py)")
     ap.add_argument("--own", action="store_true",
                     help="29: one GPU of our own station (--label D3.0): never started while "
                          "another process uses the GPU, paused while one does (exit 75), no "
@@ -1609,6 +1615,10 @@ def _main(argv: list[str] | None = None) -> int:
                  + " or ".join(n for n, r in fb.RUNTIMES.items() if r.get("paths")) + ")")
     if a.check and (a.pilot or a.parity or a.serve or a.only):
         ap.error("--check asks no benchmark: no --pilot, --parity, --serve or --only")
+    # 31.2: DeviceMark's battery, whole, on its own
+    if a.devicemark and (a.pilot or a.parity or a.serve or a.check or a.only or shard):
+        ap.error("--devicemark asks DeviceMark's battery whole: no --pilot, --parity, --serve, "
+                 "--check, --only or --shard")
     # 29: our own GPU — its label names station and GPU, and it has no price
     own = own_box(a.label) if a.own else None
     if a.own and not own:
@@ -1621,8 +1631,9 @@ def _main(argv: list[str] | None = None) -> int:
         rt = fb.RUNTIMES[a.runtime]
         why = fb.runtime_thinking_refused(a.runtime, a.thinking, a.only or [])
         # 29: a served model is asked its thinking per request; 31.1: --check asks
-        # no benchmark, on either path
-        if why and not a.serve and not a.check:
+        # no benchmark, on either path; 31.2: nor does DeviceMark ask one of the
+        # runtime's, and it is asked with thinking on and off
+        if why and not a.serve and not a.check and not a.devicemark:
             ap.error(why)
         if a.parity:
             ap.error(f"--runtime {a.runtime}: no parity questions (they ask thinking off)")
@@ -1663,18 +1674,20 @@ def _main(argv: list[str] | None = None) -> int:
     STEP["pilot"] = bool(a.pilot or a.serve or a.check)       # 31.1: nor does --check
     STEP["own"] = own
     progress(out, label=a.label or "", model=a.served_as, thinking=a.thinking,
-             parity=bool(a.parity), tasks=[t for t in fb.TASKS if t in (a.only or [])],
+             parity=bool(a.parity), tasks=["devicemark"] if a.devicemark else
+             [t for t in fb.ALL if t in (a.only or [])],
              state="starting", why="", line="", incomplete={})
     if a.pilot and a.only and not a.pilot_each:
         ap.error("--pilot asks its own questions: no --only")
     if a.serve and (a.pilot or a.parity or a.only):
         ap.error("--serve asks nothing here: no --pilot, --parity or --only")
-    if not a.only and not a.parity and not a.pilot and not a.serve and not a.check:
+    if not a.only and not a.parity and not a.pilot and not a.serve and not a.check \
+            and not a.devicemark:
         # 17d: a box names its benchmarks, thinking on or off — every one at
         # once is more context than a card holds, and asks ARC-AGI-2 with
         # thinking off
         ap.error("--only: name this box's benchmarks, one --only each (G5's table)")
-    tasks = [t for t in fb.TASKS if t in (a.only or fb.TASKS)]
+    tasks = [t for t in fb.ALL if t in (a.only or fb.TASKS)]
     if a.parity:
         # 17b: the parity check's questions, thinking off, whatever --thinking says
         tasks, thinking = [fb.PARITY["task"]], False
@@ -1682,6 +1695,9 @@ def _main(argv: list[str] | None = None) -> int:
         tasks = [t for t in fb.TASKS if t in fb.PILOT["n"]]
     if a.check:
         tasks = []                  # 31.1: no benchmark — its own slot of CHECK_CONTEXT
+    if a.devicemark:
+        import devicemark_box as dmb
+        tasks = []                  # 31.2: DeviceMark's battery — a slot of dmb.CONTEXT
     # 29: our own GPU, shared — nothing starts while another process uses it
     if own:
         import gpu_free
@@ -1694,7 +1710,8 @@ def _main(argv: list[str] | None = None) -> int:
     # the stated --max-context only when those can't be read. 29: a model's own
     # context caps it (Bolt's 64K)
     cap = fb.context_cap(a.runtime or "")
-    ctx = fb.slot_context(tasks, thinking, cap) if tasks else CHECK_CONTEXT
+    ctx = (fb.slot_context(tasks, thinking, cap) if tasks else
+           dmb.CONTEXT if a.devicemark else CHECK_CONTEXT)
     if a.serve:
         ctx = min(a.serve_context, cap) if cap else a.serve_context
     # 17h: what is free on the card, not its total — 300 MiB in use by
@@ -1721,7 +1738,7 @@ def _main(argv: list[str] | None = None) -> int:
     if fit and fit["fit"] < a.slots and not a.slots_fit:
         gb = 1024 ** 3
         raise SystemExit(
-            f"{a.slots} slots of {ctx:,} tokens ({fb.BENCH[big]['label'] if tasks else 'the check'}'s, thinking "
+            f"{a.slots} slots of {ctx:,} tokens ({fb.BENCH[big]['label'] if tasks else 'DeviceMark' if a.devicemark else 'the check'}'s, thinking "
             f"{'on' if thinking else 'off'}) would use about {fit['used'] / gb:.1f} GB with the "
             f"{fit['file'] / gb:.1f} GB file ({fit['types']} cache, "
             f"{fit['per_token'] / 1024:.1f} KB a token from the GGUF's header; {fit['basis']}), "
@@ -1742,7 +1759,7 @@ def _main(argv: list[str] | None = None) -> int:
     from service import db, runner
     db.init()
     words = f"shard {shard[0]} of {shard[1]}" if shard else ""
-    say(f"{a.served_as} · thinking {a.thinking} · {', '.join(tasks)}"
+    say(f"{a.served_as} · thinking {a.thinking} · {', '.join(tasks) or ('DeviceMark' if a.devicemark else '')}"
         + (f" · {words}" if shard else "") + f" · in {out}")
 
     # the run this folder holds: one served model, one mode, one file, one shard
@@ -1912,7 +1929,8 @@ def _main(argv: list[str] | None = None) -> int:
                   **({"label": a.label} if a.label else {})})
     sp.write_text(json.dumps(state, indent=1), encoding="utf-8")
     progress(out, label=state.get("label") or "", model=a.served_as,
-             thinking="on" if thinking else "off", tasks=tasks, shard=state["shard"],
+             thinking="on" if thinking else "off",
+             tasks=[dmb.TASK] if a.devicemark else tasks, shard=state["shard"],
              parity=bool(a.parity), started_at=state["started_at"], sessions=state["sessions"],
              state="starting", line="", incomplete={}, why="")
     gpu = rb.gpu_info()
@@ -1987,6 +2005,8 @@ def _main(argv: list[str] | None = None) -> int:
         mine = fb.shard_of(items, shard)
         say(f"{fb.BENCH[t]['label']}: {len(mine)} of its {of_words(t, items)} here × "
             f"{fb.BENCH[t]['epochs']} run{'s' if fb.BENCH[t]['epochs'] > 1 else ''}")
+    if a.devicemark:
+        dmb.prepare(say)            # 31.2: its items, held to the repo's hash
 
     srv_proc = Server(srv, gguf_path, a.port, a.slots, ctx, flags, extra_env, out / SERVER_LOG)
     status = "failed"
@@ -2193,9 +2213,16 @@ def _main(argv: list[str] | None = None) -> int:
                 "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}, indent=1),
                 encoding="utf-8")
             return 0 if got["separated"] else 1
-        sid = db.add(a.served_as, "instruct", SUITE, a.by,
-                     f"run on {OWN_WHERE if own else WHERE} (remote_gguf.py)",
-                     thinking=thinking, tasks=tasks if len(tasks) < len(fb.TASKS) else None)
+        if a.devicemark:
+            # 31.2: the board's own DeviceMark run of a served model
+            # (service/devicemark.py), the battery whole
+            sid = db.add(a.served_as, "instruct", dmb.TASK, a.by,
+                         f"run on {OWN_WHERE if own else WHERE} (remote_gguf.py --devicemark)",
+                         thinking=thinking, part="full")
+        else:
+            sid = db.add(a.served_as, "instruct", SUITE, a.by,
+                         f"run on {OWN_WHERE if own else WHERE} (remote_gguf.py)",
+                         thinking=thinking, tasks=tasks if tasks != fb.TASKS else None)
         watch = Watch(sid, say, out=out)
         progress(out, state="asking", session_at=round(time.time()))
         watch.start()
@@ -2226,8 +2253,9 @@ def _main(argv: list[str] | None = None) -> int:
     if rec is None:
         progress(out, state="stopped", why="llama-server didn't come up")
         return 1
-    path, done, incomplete = make_bundle(out, a.served_as, thinking, tasks, state, shard, gguf,
-                                         server, rec)
+    path, done, incomplete = (
+        dmb.make_bundle(out, a.served_as, thinking, state, gguf, server, rec) if a.devicemark
+        else make_bundle(out, a.served_as, thinking, tasks, state, shard, gguf, server, rec))
     for t, x in incomplete.items():
         say(f"{t}: {x['answers']:,} of {x['of']:,} answered — run the same command again to "
             "carry on")
@@ -2252,7 +2280,8 @@ def _main(argv: list[str] | None = None) -> int:
     from service import config
     from service import frontier as sf
     row = config.OUT_DIR / (a.served_as.replace("/", "__") + ("__thinking" if thinking else ""))
-    off = sum(1 for t in done for r in sf.read_answers(sf.task_dir(row, t) / sf.ANSWERS).values()
+    off = sum(1 for t in done if t in fb.BENCH
+              for r in sf.read_answers(sf.task_dir(row, t) / sf.ANSWERS).values()
               if r.get("unanswered"))
     progress(out, state="stopped" if incomplete else "whole", incomplete=incomplete,
              bundle={"name": path.name, "sha256": sha}, why=why if incomplete else "",

@@ -1923,7 +1923,8 @@ def frontier_bench_meta() -> dict:
     except ImportError:                    # a frozen report without the scripts beside it
         return {}
     out = {}
-    for t, b in fb.BENCH.items():
+    # 31.2: the Frontier suite's alone — the easy set (fb.EASY) is no Frontier column
+    for t, b in ((t, fb.BENCH[t]) for t in fb.TASKS):
         runs = b["epochs"]
         ep = b.get("epoch_runs")
         rw = (f"{runs} attempts (pass@{runs})" if b.get("aggregate") == f"pass@{runs}" else

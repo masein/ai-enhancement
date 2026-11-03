@@ -90,6 +90,21 @@ def no_provider_lists():
     ai_models._endpoints = real
 
 
+@pytest.fixture(scope="session", autouse=True)
+def hle_graded_in_sync():
+    """31.2: HLE's judge is suggested through OpenRouter's Batch API now
+    (openai/o3-mini:batch, scripts/frontier_graders.py). The grading tests
+    before it grade HLE through the sync grader their stand-in for OpenRouter
+    answers, and pin its suggestion: it is the sync id here, for the whole
+    session. The batch grader's own tests read the real one: this fixture's
+    value"""
+    import frontier_graders
+    real = frontier_graders.GRADERS["hle"]["suggested"]
+    frontier_graders.GRADERS["hle"]["suggested"] = "openai/o3-mini"
+    yield real
+    frontier_graders.GRADERS["hle"]["suggested"] = real
+
+
 def hidden_env(root: Path) -> dict:
     """what a subprocess needs to read the same bank"""
     sit_hidden(root)

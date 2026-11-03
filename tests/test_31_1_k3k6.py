@@ -137,12 +137,12 @@ def k3k6(box, card, monkeypatch, tmp_path):  # noqa: F811
 
 
 def run_k(b: dict, out: str, *more: str, thinking: str = "on", only: bool = True,
-          gguf: Path | None = None) -> int:
+          gguf: Path | None = None, served_as: str = STEP) -> int:
     """remote_gguf.py as a plan U box runs it — the server's config put back after"""
-    keep = {k: getattr(config, k) for k in [*rg.ENV, "OUT_DIR"]}
+    keep = {k: getattr(config, k) for k in [*rg.ENV, "OUT_DIR", "DM_ITEMS"]}
     lock, env = runner.LOCK, {v: os.environ.get(v) for v in rg.ENV.values()}
     try:
-        return rg.main(["--as", STEP, "--gguf", str(gguf or b["gguf"]), "--server",
+        return rg.main(["--as", served_as, "--gguf", str(gguf or b["gguf"]), "--server",
                         str(b["tarball"]), "--based-on", "Qwen/Qwen3.6-35B-A3B",
                         "--thinking", thinking, "--slots", "3", "--port", str(free_port()),
                         "--load-timeout", "60", "--runtime", RT,
@@ -210,7 +210,9 @@ def test_the_runtime_sends_no_sampling_and_asks_each_path_by_its_thinking():
     # step2388 runs on this runtime alone, and the runtime runs step2388 alone
     assert fb.runtime_model_refused(RT, STEP) == ""
     assert fb.runtime_model_refused("lda-2610", STEP).startswith(f"{STEP} runs on runtime {RT}")
-    assert "runs served/step2388-k3k6-2611 alone" in fb.runtime_model_refused(
+    # 31.2: and its k3 path at the file's own settings, a row of its own
+    assert "runs served/step2388-k3k6-2611, served/step2388-k3k6-2611-file alone" in \
+        fb.runtime_model_refused(
         RT, "served/step8804-lda-2610")
 
 
@@ -448,10 +450,11 @@ def test_the_import_refuses_a_bundle_whose_check_didnt_pass(k3k6):
 # ---------------------------------------------------------------------------
 
 def test_plan_u_is_the_whitepapers_set_on_k6_and_its_thinking_off_set_on_k3():
-    plan = fx.PLANS["U"]
-    assert len(plan) == 37 and fx.PLAN_RUNTIME["U"] == RT
+    # 31.2: U38–U40, DeviceMark and the easy set, follow (test_31_2_boxes.py)
+    plan = {b: st for b, st in fx.PLANS["U"].items() if int(b[1:]) <= 37}
+    assert len(fx.PLANS["U"]) == 40 and fx.PLAN_RUNTIME["U"] == RT
     assert fx.PLAN_GPUS["U"] == fx.PLAN_GPUS["L"]                     # the sm_120 tarball's
-    assert fx.PLAN_PINS["U"] == {NAME: SHA}
+    assert fx.PLAN_PINS["U"][NAME] == SHA
     # each box one path: k3 and k6 never on the same box
     assert all(len({s[0] for s in steps}) == 1 for steps in plan.values())
     # every question of each benchmark once, in its mode: every shard of n there
@@ -465,11 +468,13 @@ def test_plan_u_is_the_whitepapers_set_on_k6_and_its_thinking_off_set_on_k3():
         assert sorted(shards) == sorted(f"{i}/{n}" if n > 1 else "" for i in range(1, n + 1)), t
     on = {t for th, t in have if th == "on"}
     off = {t for th, t in have if th == "off"}
-    assert on == set(fb.TASKS) and off == set(fb.RUNTIMES[RT]["off_for"])
-    # step8804's measured paces: no box over about 5¼ hours
+    assert on == set(fb.TASKS) and off == set(fb.RUNTIMES[RT]["off_for"]) & set(fb.TASKS)
+    # step8804's measured paces: no box over about 5¼ hours, 172 box-hours
     lines = fx.listing("U")
-    assert lines[-1] == "37 boxes a build · 172.0 box-hours a build · the longest 5.2 h"
-    assert all("(step8804's measured pace)" in ln for ln in lines if ln.startswith("  "))
+    assert round(sum(fx.hours(s, False, "U") for st in plan.values() for s in st), 1) == 172.0
+    assert lines[-1] == "40 boxes a build · 183.7 box-hours a build · the longest 5.2 h"
+    mine = lines[:lines.index(next(ln for ln in lines if ln.startswith("U38 ")))]
+    assert all("(step8804's measured pace)" in ln for ln in mine if ln.startswith("  "))
 
 
 def test_a_plan_u_line_runs_its_path_and_pins_step2388s_file():
@@ -481,14 +486,17 @@ def test_a_plan_u_line_runs_its_path_and_pins_step2388s_file():
     assert argv[argv.index("--runtime") + 1] == RT and argv[argv.index("--thinking") + 1] == "off"
     assert [argv[i + 1] for i, x in enumerate(argv) if x == "--only"] == [GPQA, MATH]
     assert argv[argv.index("--flags") + 1] == ""                       # the runtime's own
-    assert fx.pins_of(a, "U35") == [f"{NAME}={SHA}"]
+    # 31.2: and the k3k6 tarball, built on our server (U0)
+    assert fx.pins_of(a, "U35") == [
+        "llama-server-k3k6-3ad38b7.tar.gz="
+        "65dd1b90f19be00e918e558b3dbff9fc73e8ff325716ae8482a8211d9f05eb41", f"{NAME}={SHA}"]
     k6 = fx.argv_of("U1", 1, fx.box_of("U1")[0], a)
     assert k6[k6.index("--thinking") + 1] == "on" and k6[k6.index("--shard") + 1] == "1/15"
 
 
 def test_the_runbook_gives_the_check_and_a_box_end_to_end():
     text = DOC.read_text()
-    at = text.index("# step2388 on plan U (31.1)")
+    at = text.index("# step2388 on plan U (31.1")
     part = text[at:]
     assert "scripts/teraformer-expert-paths-server.py --skip-parity" in part
     assert "--runtime k3k6-2611 --thinking off --check" in part

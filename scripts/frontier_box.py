@@ -87,6 +87,16 @@ settings check before its first question (scripts/path_check.py):
     python scripts/frontier_box.py U35 --as served/step2388-k3k6-2611 \
         --gguf hf://<you>/evalboard-private@<commit>/step2388.k3k6.gguf \
         --server hf://<you>/evalboard-private@<commit>/llama-server-k3k6-3ad38b7.tar.gz
+
+31.2: U38–U40 — DeviceMark on both paths (remote_gguf.py --devicemark: greedy,
+no penalties; U38's second step the k3 path at the file's own settings, as
+served/step2388-k3k6-2611-file, a row of its own) and the easy set (MMLU and
+GSM8K, zero-shot chat) of step2388's k3 path and of the original Qwen3.6-35B-
+A3B's UD-Q2_K_XL (U40 runs that model alone, on runtime card-qwen-k3k6):
+
+    python scripts/frontier_box.py U40 --as served/Qwen3.6-35B-A3B-Q2-k3k6-2611 \
+        --gguf hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF@<commit>/Qwen3.6-35B-A3B-UD-Q2_K_XL.gguf \
+        --server hf://<you>/evalboard-private@<commit>/llama-server-k3k6-3ad38b7.tar.gz
 """
 
 from __future__ import annotations
@@ -110,6 +120,14 @@ FLAGS = "-ctk q8_0 -ctv q8_0 --flash-attn on"
 GPQA, OTIS, MATH, HLE = "gpqa_diamond_epoch", "otis_aime_epoch", "math_l5_epoch", "hle_text_cais"
 SQA, MMLU, ARC = "simpleqa_epoch", "mmlupro_tiger", "arc_agi2_public"
 IFEVAL, IFBENCH = "ifeval_google", "ifbench_test"
+# 31.2: the easy set (MMLU and GSM8K, zero-shot chat), and DeviceMark's battery
+# asked on the box's own server (remote_gguf.py --devicemark) — greedy on the
+# path, or the k3 path at the file's own settings under the build's "-file" id
+EASY_MMLU, GSM8K = "mmlu_chat", "gsm8k_chat"
+DM, DM_FILE = "devicemark", "devicemark_file"
+FILE_SUFFIX = "-file"
+DM_LABEL = {DM: "DeviceMark (greedy, no penalties)",
+            DM_FILE: "DeviceMark (the file's own settings, as <build>-file)"}
 # 25: the Frontier suite plans A, B and L each run whole; plan I runs
 # instruction following, IFEval and IFBench
 SUITE = tuple(t for t in fb.TASKS if t not in fb.FOLLOW)
@@ -145,7 +163,18 @@ MEASURED = {
     ("off", GPQA): 11954 * 0.51013 / 792, ("off", MATH): 11954 * 0.48987 / 1324,
     ("off", MMLU): 30978 / 12032,
     ("off", IFEVAL): 755 * 0.57592 / 541, ("off", IFBENCH): 755 * 0.42408 / 300,
+    # 31.2: DeviceMark — step8804's battery on our own 5090 (0.88 h thinking off,
+    # 3.24 h on, one question at a time, part of the model on the CPU), taken as
+    # a box's at 8 slots: the most it should take. The easy set, never asked
+    # yet — step8804's thinking-off MMLU-Pro pace scaled to MMLU's shorter
+    # prompts and answers, and GSM8K's working: a guess (about 3.4 h a model)
+    ("off", DM): 0.88 * 3600 / 596, ("off", DM_FILE): 0.88 * 3600 / 596,
+    ("on", DM): 3.24 * 3600 / 596,
+    ("off", EASY_MMLU): 0.7, ("off", GSM8K): 1.8,
 }
+# 31.2: of MEASURED, the paces that are guesses or another machine's
+MEASURED_GUESSED = {("off", DM), ("off", DM_FILE), ("on", DM), ("off", EASY_MMLU),
+                    ("off", GSM8K)}
 # 31.1: the plans sized at a measured pace (step8804's), not the pilot's
 PLAN_PACE = {"U": MEASURED}
 
@@ -167,6 +196,7 @@ PILOT = {"per_token": 10_880, "recurrent": 68_059_136, "file": 22_854_339_808,
 # a benchmark's answers: its questions × its runs. ARC-AGI-2's questions are
 # its test grids, 167 in its 120 tasks at the pinned revision, each asked twice
 ANSWERS = {t: (167 if t == ARC else b["n"]) * b["epochs"] for t, b in fb.BENCH.items()}
+ANSWERS[DM] = ANSWERS[DM_FILE] = 596            # 31.2: DeviceMark's battery, each item once
 PARITY_STEP = ("parity", (), "", 8)
 # 22: a runtime's pilot (fb.PILOT's questions), on the first box of a plan
 # before the others are rented — at the plan's 8 slots
@@ -252,6 +282,15 @@ PLANS: dict[str, dict[str, list[Step]]] = {
         "U35": [("off", (GPQA, MATH), "", 8), ("off", (IFEVAL, IFBENCH), "", 8)],
         "U36": [("off", (MMLU,), "1/2", 8)],
         "U37": [("off", (MMLU,), "2/2", 8)],
+        # 31.2: DeviceMark on both paths and the easy set — k3 (thinking off):
+        # DeviceMark greedy, then at the file's own settings, then MMLU and
+        # GSM8K; k6 (thinking on): DeviceMark greedy; and U40 the original
+        # Qwen3.6-35B-A3B UD-Q2_K_XL (BOX_MODELS), the easy set alone — each on
+        # a server of its own
+        "U38": [("off", (DM,), "", 8), ("off", (DM_FILE,), "", 8),
+                ("off", (EASY_MMLU, GSM8K), "", 8)],
+        "U39": [("on", (DM,), "", 8)],
+        "U40": [("off", (EASY_MMLU, GSM8K), "", 8)],
     },
 }
 # 29: plan D, our own boxes — a quarter of every benchmark on each of a
@@ -311,11 +350,31 @@ PLAN_PINS["I"] = PLAN_PINS["L"]
 PLAN_PINS["T"] = {**PLAN_PINS["L"], "step8804.gguf":
                   "c7a719f8c37d85bcd24f5a0bf103323e0102938be01dea3e0992465923188f3a"}
 # 31.1: plan U runs step2388's file (15,994,966,752 bytes, on our server at
-# ~/step2388.k3k6.gguf, the team's of 3 Nov). The k3k6 tarball is pinned here
-# once it is built (docs/REMOTE-RUNS.md, U0); until then each box checks its
-# commit against the runtime's (fb.RUNTIMES["k3k6-2611"]["build"])
+# ~/step2388.k3k6.gguf, the team's of 3 Nov). 31.2: and the k3k6 tarball,
+# built on our server with build_llama_tarball.sh (GGML_NATIVE=OFF) from
+# ~/llama.cpp-teraformer2 at 3ad38b7cc, 896 MB — every box runs it (each also
+# checks its commit against the runtime's, fb.RUNTIMES["k3k6-2611"]["build"]);
+# and U40's file, the original model's UD-Q2_K_XL as Hugging Face publishes it
+# in unsloth/Qwen3.6-35B-A3B-MTP-GGUF at 5bc3e238d916 (12,574,128,416 bytes):
+# the file step2388's teraformer.qad.reference_gguf names, and our earlier Q2
+# row's, by sha256
 PLAN_PINS["U"] = {
-    "step2388.k3k6.gguf": "a2594a68a810ec526061f83cb88c7e469e1c3889912e8da4b1d598c72271faf6"}
+    "step2388.k3k6.gguf": "a2594a68a810ec526061f83cb88c7e469e1c3889912e8da4b1d598c72271faf6",
+    "llama-server-k3k6-3ad38b7.tar.gz":
+        "65dd1b90f19be00e918e558b3dbff9fc73e8ff325716ae8482a8211d9f05eb41",
+    "Qwen3.6-35B-A3B-UD-Q2_K_XL.gguf":
+        "ed7cda7e38985b4fcff76475865135039641d2bfbac3c169df15ca770f37fb0c"}
+# 31.2: and the commit each of its files is fetched at, when fetched from Hugging
+# Face — step2388's file and the tarball both in our private repository at
+# fe12fa27 (masein, 3 Nov), U40's in Unsloth's at 5bc3e238. A line naming
+# another revision, or none, is refused before anything is fetched
+PLAN_REVISIONS = {"U": {
+    "step2388.k3k6.gguf": "fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4",
+    "llama-server-k3k6-3ad38b7.tar.gz": "fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4",
+    "Qwen3.6-35B-A3B-UD-Q2_K_XL.gguf": "5bc3e238d916f48a861bac2f8a1990a0e9b7e98d"}}
+# 31.2: the boxes that run another model than their plan's — U40 the original
+# Qwen3.6-35B-A3B's Q2 file, for the easy set beside step2388's k3 path
+BOX_MODELS = {"U40": "served/Qwen3.6-35B-A3B-Q2-k3k6-2611"}
 # 29: Bolt's two builds, as Hugging Face publishes them: NVIDIA's Q4_K_M
 # (nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB at 1db54d5b12533ff1, 6,180,446,208
 # bytes) and ggml-org's Q8_0 (ggml-org/NVIDIA-Nemotron-3.5-Bolt-E4B-GGUF at
@@ -365,6 +424,25 @@ def pins_of(a: argparse.Namespace, box: str) -> list[str]:
             if n in pins]
 
 
+def revision_refused(a: argparse.Namespace, box: str) -> str:
+    """31.2: '' when each file of the line its plan pins to a commit is fetched
+    at that commit (a path on the box is held to its sha256 alone); else why
+    not, in one line"""
+    import remote_gguf as rg
+    want = PLAN_REVISIONS.get(box[:1].upper()) or {}
+    bad = []
+    for src in (a.gguf, "" if getattr(a, "server_dir", "") else a.server):
+        m = rg._HF.match(str(src or "").strip())
+        name = str(src or "").rsplit("/", 1)[-1]
+        if not m or name not in want:
+            continue
+        if m["rev"] != want[name]:
+            bad.append(f"{name} at {m['rev'] or 'no commit'}, where plan {box[:1].upper()} "
+                       f"fetches it at {want[name]}")
+    return (f"{box}: " + "; ".join(bad) + " — give the line @<commit> as the runbook does. "
+            "Nothing was fetched") if bad else ""
+
+
 def box_of(name: str) -> list[Step]:
     plan = PLANS.get(name[:1].upper()) or {}
     steps = plan.get(name.upper())
@@ -375,8 +453,31 @@ def box_of(name: str) -> list[Step]:
 
 
 def ordered(tasks: tuple[str, ...]) -> list[str]:
-    """a step's benchmarks in the order the box asks them: the suite's"""
-    return [t for t in fb.TASKS if t in tasks]
+    """a step's benchmarks in the order the box asks them: the suite's (31.2:
+    the easy set after it, and DeviceMark's battery)"""
+    return [t for t in (*fb.ALL, DM, DM_FILE) if t in tasks]
+
+
+def is_dm(step: Step) -> bool:
+    """31.2: a step of DeviceMark's battery (remote_gguf.py --devicemark)"""
+    return any(t in (DM, DM_FILE) for t in step[1])
+
+
+def label_of(t: str) -> str:
+    return DM_LABEL.get(t) or fb.BENCH[t]["label"]
+
+
+def model_refused(box: str, served_as: str) -> str:
+    """31.2: '' when this box runs `served_as`; else why not — a box of
+    BOX_MODELS runs its model alone, and that model no other box"""
+    want = BOX_MODELS.get(box.upper())
+    if want and served_as != want:
+        return f"{box} runs {want} (the easy set beside step2388's k3 path), not {served_as}"
+    if not want and served_as in BOX_MODELS.values():
+        return (f"{served_as} runs on "
+                + ", ".join(b for b, m in BOX_MODELS.items() if m == served_as)
+                + f" alone, not on {box}")
+    return ""
 
 
 def limit_factor(th: str, t: str) -> float:
@@ -402,6 +503,9 @@ def slots_run(step: Step, own: bool = False) -> int:
     th, tasks, _, slots = step
     if th == "parity" or own:
         return slots
+    if is_dm(step):
+        import devicemark_box
+        return min(slots, fits(devicemark_box.CONTEXT))         # 31.2
     return min(slots, fits(fb.slot_context(list(tasks), th == "on")))
 
 
@@ -415,7 +519,9 @@ def hours(step: Step, own: bool = False, plan: str = "") -> float:
         return 2 * fb.PARITY["n"] * PACE[("off", MMLU)] / 3600
     of = fb.parse_shard(shard)[1] if shard else 1
     run = slots_run(step, own)
-    measured = PLAN_PACE.get(plan)
+    # 31.2: a step no pilot paced (DeviceMark, the easy set) at plan U's paces
+    measured = PLAN_PACE.get(plan) or (MEASURED if any((th, t) not in PACE for t in tasks)
+                                       else None)
     if measured:
         return sum(ANSWERS[t] * measured[(th, t)] * PILOT_SLOTS.get(t, 8) / run
                    for t in tasks) / of / 3600
@@ -429,11 +535,13 @@ def words(step: Step, own: bool = False, plan: str = "") -> str:
         return (f"the parity questions ({fb.PARITY['n']} of MMLU-Pro, each twice, thinking off) "
                 f"· about {hours(step):.1f} h")
     run = slots_run(step, own)
-    return (f"thinking {th} · {', '.join(fb.BENCH[t]['label'] for t in ordered(tasks))}"
+    guessed = any((th, t) in MEASURED_GUESSED for t in tasks)
+    return (f"thinking {th} · {', '.join(label_of(t) for t in ordered(tasks))}"
             + (f" · shard {shard}" if shard else "")
             + f" · {run} slots" + (f" (of {slots}: no more fit a 5090)" if run < slots else "")
             + f" · about {hours(step, own, plan):.1f} h"
             + (" (a guess: the 5090's paces ×2 until the V100's pilot)" if own else
+               " (a guess, not measured on a box yet)" if plan in PLAN_PACE and guessed else
                " (step8804's measured pace)" if plan in PLAN_PACE else
                " (a guess)" if any((th, t) in GUESSED for t in tasks) else ""))
 
@@ -533,6 +641,12 @@ def argv_of(box: str, k: int, step: Step, a: argparse.Namespace) -> list[str]:
         return out + ["--thinking", "on", "--slots", str(slots), "--min-slots",
                       str(max(1, slots - 1)), "--pilot", "--out", str(pilot_folder(a))]
     out += ["--thinking", th, "--slots", str(slots)]
+    if is_dm(step):
+        # 31.2: DeviceMark's battery whole — at the file's own settings under
+        # the build's "-file" id (fb.FILE_SAMPLING), its row of its own
+        if DM_FILE in tasks:
+            out[out.index("--as") + 1] = a.served_as + FILE_SUFFIX
+        return out + ["--devicemark", "--out", str(folder(a, box, k, step))]
     if slots > 1 and ARC not in tasks:
         out += ["--min-slots", str(slots - 1)]
     for t in ordered(tasks):
@@ -586,7 +700,8 @@ def parser() -> argparse.ArgumentParser:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("box", nargs="?", help="the box: A1 … A9, B1 … B15 (G5), L1 … L21, "
                                            "I1 (25: instruction following), T1 … T3 (30.1), "
-                                           "U1 … U37 (31.1: step2388)")
+                                           "U1 … U37 (31.1: step2388), U38 … U40 (31.2: "
+                                           "DeviceMark and the easy set)")
     ap.add_argument("then", nargs="*", help="18e point 1: more labels, run one after another "
                                             "on this box (L1 L2): each later one's line is "
                                             "written \"queued\" at the start, so the fetch "
@@ -665,6 +780,19 @@ def main(argv: list[str] | None = None) -> int:
         why = fb.runtime_model_refused(runtime_of(a, box), a.served_as)
         if why:
             raise SystemExit(f"{box}: {why}. Nothing was fetched")
+        # 31.2: a box of another model than its plan's (U40), and a step at the
+        # file's own settings, whose "-file" id the runtime asks so
+        why = model_refused(box, a.served_as)
+        if why:
+            raise SystemExit(f"{why}. Nothing was fetched")
+        why = revision_refused(a, box)
+        if why:
+            raise SystemExit(why)
+        if any(DM_FILE in st[1] for st in box_of(box)) and (
+                a.served_as + FILE_SUFFIX not in fb.FILE_SAMPLING):
+            raise SystemExit(f"{box}: its DeviceMark step at the file's own settings runs "
+                             f"{a.served_as + FILE_SUFFIX}, which no runtime asks so "
+                             f"({', '.join(sorted(fb.FILE_SAMPLING))}). Nothing was fetched")
     # 20: the card first — the plan's build runs on its cards alone
     for box in dict.fromkeys(boxes):
         why = gpu_refused(box)
@@ -906,8 +1034,10 @@ def mark(out: Path, **fields) -> None:
 def run_box(a: argparse.Namespace, box: str) -> int:
     """one label's steps, one after the other: 0 when every one is whole"""
     steps = box_of(box)
+    plan = box[:1].upper()
     print(f"{box}: {len(steps)} step{'s' if len(steps) > 1 else ''}, about "
-          f"{sum(hours(s, own_plan(box)) for s in steps):.1f} h at the pilot's paces"
+          f"{sum(hours(s, own_plan(box), plan) for s in steps):.1f} h at "
+          + ("its plan's measured paces" if plan in PLAN_PACE else "the pilot's paces")
           + (" (the 5090's ×2: a guess until the V100's pilot)" if own_plan(box) else ""),
           flush=True)
     if runtime_of(a, box):
@@ -922,7 +1052,7 @@ def run_box(a: argparse.Namespace, box: str) -> int:
             ends.append((k, step, 0, ""))
             continue
         cmd = argv_of(box, k, step, a)
-        print(f"\n{box}, step {k} of {len(steps)}: {words(step, own)}\n"
+        print(f"\n{box}, step {k} of {len(steps)}: {words(step, own, plan)}\n"
               + " ".join(shlex.quote(x) for x in cmd[1:]), flush=True)
         if own:
             wait_free(a, box, out, step)            # 29: never started on a busy GPU

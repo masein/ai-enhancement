@@ -46,7 +46,10 @@ request's "expert_path" choosing whether it thinks (k6) or not (k3), and
 (n_probs, post_sampling_probs), the presence penalty on k6 left off the
 prompt's tokens unless FAKE_LLAMA_PROMPT_PENALTY=1. FAKE_LLAMA_PATHS_BAD=
 "6.presence_penalty=0.5" changes a value the server reports (its /props and
-its line); FAKE_LLAMA_PATHS_LOG=0 prints no start-up lines."""
+its line); FAKE_LLAMA_PATHS_LOG=0 prints no start-up lines. 31.2: /props
+gives each path by its top_k, with the other penalties neutral in its params
+("0.repeat_penalty=1.1" changes one on both), and the default path in
+default_generation_settings; the start-up lines print thinking as 1 or 0."""
 
 from __future__ import annotations
 
@@ -71,8 +74,19 @@ def paths_reported() -> dict:
     got = {p: dict(v) for p, v in PATHS.items()}
     for item in (os.environ.get("FAKE_LLAMA_PATHS_BAD") or "").split(","):
         m = re.fullmatch(r"\s*(\d+)\.(\w+)=(.+?)\s*", item)
-        if m:
+        if m and int(m[1]) in got:
             got[int(m[1])][m[2]] = float(m[3]) if "." in m[3] else int(m[3])
+    return got
+
+
+def NEUTRAL_REPORTED() -> dict:  # noqa: N802 — read as a table
+    """31.2: the penalties beside a path's own in its /props params — neutral
+    unless FAKE_LLAMA_PATHS_BAD changes one (0.repeat_penalty=1.1: on both)"""
+    got = {"repeat_penalty": 1.0, "frequency_penalty": 0.0, "dry_multiplier": 0.0}
+    for item in (os.environ.get("FAKE_LLAMA_PATHS_BAD") or "").split(","):
+        m = re.fullmatch(r"\s*0\.(\w+)=(.+?)\s*", item)
+        if m:
+            got[m[1]] = float(m[2])
     return got
 
 
@@ -161,8 +175,9 @@ def main() -> int:
         for p, v in paths_reported().items():
             said = ", ".join(f"{k} = {x:.3f}" if isinstance(x, float) else f"{k} = {x}"
                              for k, x in v.items())
+            # 31.2: thinking as the team's server prints it, 1 or 0
             print(f"srv  load_model: expert path k{p}{' (default)' if p == 3 else ''}: {said}, "
-                  f"thinking = {'true' if p == 6 else 'false'}", flush=True)
+                  f"thinking = {1 if p == 6 else 0}", flush=True)
 
     class H(BaseHTTPRequestHandler):
         def log_message(self, *a):            # quiet
@@ -189,12 +204,21 @@ def main() -> int:
                 return self._send(200, {"model_path": shown, "build_info": "b6543-abc1234",
                                         "total_slots": slots,
                                         "chat_template": template,
-                                        "default_generation_settings": {"n_ctx": ctx // slots},
+                                        "default_generation_settings": {
+                                            "n_ctx": ctx // slots,
+                                            # 31.2: the path a request naming none gets
+                                            **({"params": {"expert_path": 3}}
+                                               if paths_on else {})},
+                                        # 31.2: each item as the team's server gives it —
+                                        # the path its top_k, its params a request's
+                                        # generation settings (the other penalties too)
                                         **({"expert_paths": [
-                                            {"path": p, "default": p == 3, "thinking": p == 6,
-                                             "params": {("temperature" if k == "temp" else
-                                                         "repeat_last_n" if k == "penalty_last_n"
-                                                         else k): x for k, x in v.items()}}
+                                            {"top_k": p, "default": p == 3, "thinking": p == 6,
+                                             "params": {
+                                                 **{k: x for k, x in NEUTRAL_REPORTED().items()},
+                                                 **{("temperature" if k == "temp" else
+                                                     "repeat_last_n" if k == "penalty_last_n"
+                                                     else k): x for k, x in v.items()}}}
                                             for p, v in paths_reported().items()]}
                                            if paths_on else {})})
             if self.path == "/slots":

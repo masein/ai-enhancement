@@ -511,31 +511,20 @@ def split_problem(gg: dict, file_sha: str) -> str:
     return ""
 
 
-def checks(b: dict, rec: dict | None, file_sha: str = "") -> list[str]:
-    """every check the bundle fails, in words; [] when it may be imported"""
-    from service import config, served
-    from service import frontier as sf
+def model_problems(b: dict, rec: dict | None, file_sha: str = "") -> tuple[list[str], bool]:
+    """31.2: what a bundle of a served model's GGUF fails of its model — the
+    model registered here, its row, its file by sha256, its launch and its
+    runtime — and whether the checks stop there. A Frontier bundle's and a
+    DeviceMark one's (devicemark_box.py) alike"""
+    from service import served
     bundle, setup = b["bundle"], b["setup"]
-    if not isinstance(bundle, dict):
-        return ["its bundle.json isn't a JSON object"]
-    bad = setup_problems(setup)
-    if bad:
-        return bad
-    want_fmt = rb.SUITES[SUITE]["format"]
-    if bundle.get("format") != want_fmt:
-        return [f"its format: the bundle's {bundle.get('format')}, this board reads {want_fmt} "
-                "for a GGUF's Frontier run"]
-    try:
-        shard = rb.shard_of_bundle(bundle)
-    except ValueError as e:
-        return [str(e)]
     model = bundle.get("model") or ""
     if not rec:
         return [f"{model or 'its model'} isn't registered on this board: give this import "
                 f"--register \"<its name>\" (a model run on rented GPUs only), or add it under "
-                "Add a model ▸ Running on a server and register its file on its page"]
+                "Add a model ▸ Running on a server and register its file on its page"], True
     if served.is_openrouter(rec):
-        return [f"{model} is a model from OpenRouter: a GGUF's answers can't go on its row"]
+        return [f"{model} is a model from OpenRouter: a GGUF's answers can't go on its row"], True
     out = []
     on = bool(bundle.get("thinking"))
     safe = model.replace("/", "__")
@@ -546,7 +535,7 @@ def checks(b: dict, rec: dict | None, file_sha: str = "") -> list[str]:
     theirs = (setup.get("gguf") or {}).get("sha256") or ""
     split = split_problem(setup.get("gguf") or {}, file_sha)
     if split:
-        return [split]
+        return [split], True
     if file_sha and have and file_sha != have:
         out.append(f"--file-sha256 {file_sha[:16]}… isn't the file registered for {model} "
                    f"({have[:16]}…)")
@@ -566,6 +555,31 @@ def checks(b: dict, rec: dict | None, file_sha: str = "") -> list[str]:
     rt = runtime_problem(setup, rec)                    # 20
     if rt:
         out.append(rt)
+    return out, False
+
+
+def checks(b: dict, rec: dict | None, file_sha: str = "") -> list[str]:
+    """every check the bundle fails, in words; [] when it may be imported"""
+    from service import config
+    from service import frontier as sf
+    bundle, setup = b["bundle"], b["setup"]
+    if not isinstance(bundle, dict):
+        return ["its bundle.json isn't a JSON object"]
+    bad = setup_problems(setup)
+    if bad:
+        return bad
+    want_fmt = rb.SUITES[SUITE]["format"]
+    if bundle.get("format") != want_fmt:
+        return [f"its format: the bundle's {bundle.get('format')}, this board reads {want_fmt} "
+                "for a GGUF's Frontier run"]
+    try:
+        shard = rb.shard_of_bundle(bundle)
+    except ValueError as e:
+        return [str(e)]
+    out, stop = model_problems(b, rec, file_sha)
+    if stop:
+        return out
+    model, on = bundle.get("model") or "", bool(bundle.get("thinking"))
     if setup.get("protocol") not in fb.ASKED_AS:          # 18c: frontier-1's asked the same
         out.append(f"the protocol: the bundle's {setup.get('protocol')}, this board's "
                    f"{fb.VERSION}")
@@ -843,7 +857,7 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             say(f"refused — {why}")
             return REFUSED
     bad = checks(b, rec or (_would_be(b, file_sha) if register else None), file_sha)
-    tasks = [t for t in fb.TASKS if t in (bundle.get("tasks") or {})]
+    tasks = [t for t in fb.ALL if t in (bundle.get("tasks") or {})]
     set_aside_for: set[str] = set()
     if not bad and shard:
         clash = shard_conflicts(reg, b, tasks, shard,
@@ -1161,7 +1175,7 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
         model, "instruct", SUITE, by,
         f"imported from a rented GPU ({gpu}){of}{f' · box {box}' if box else ''} · "
         f"{path.name}", thinking=on,
-        tasks=tasks if len(tasks) < len(fb.TASKS) else None, status=status)
+        tasks=tasks if tasks != fb.TASKS else None, status=status)
     db.update(sid, status=status)
     # 17f: the row says where it ran, and when on the box — its import's time
     # is when it was made here (created_at)
@@ -1628,7 +1642,7 @@ def _benchmarks(r: dict, line: str, fbx) -> list[dict]:
     before it (or every one, once the step is whole), 'next' for one after.
     A count the line doesn't give is the plan's (its answers, over the
     shard's parts); None without the plan"""
-    tasks = [t for t in fb.TASKS if t in set(r.get("tasks") or [])]
+    tasks = [t for t in fb.ALL if t in set(r.get("tasks") or [])]
     sh = re.fullmatch(r"(\d+)/(\d+)", str(r.get("shard") or ""))
     parts = int(sh[2]) if sh and int(sh[2]) > 0 else 1
     out, now_k = [], None

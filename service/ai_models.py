@@ -486,6 +486,17 @@ def pin(model_id: str, job: str = "pin") -> dict:
     up = [{k: v for k, v in p.items() if k != "up"} for p in providers(model_id) or [] if p["up"]]
     if not up:
         raise ValueError(f"OpenRouter lists no provider running {model_id} now")
+    # 31.2: a model served through OpenRouter's Batch API alone (…:batch) takes
+    # no one-token chat: its first provider listed up is pinned unasked, and
+    # its batch goes to that provider alone, with no fallback (llm.OpenRouterBatchAPI)
+    if model_id.endswith(":batch"):
+        prov = up[0]
+        return {"kind": "openrouter", "id": m["id"], "version": m["version"],
+                "name": m["name"], "provider": prov["tag"] or prov["name"],
+                "provider_name": prov["name"], "precision": prov["precision"],
+                "price_in": prov["price_in"] if prov["price_in"] is not None else m["price_in"],
+                "price_out": prov["price_out"] if prov["price_out"] is not None
+                else m["price_out"], "batch": True}
     # 12p.1: the first that takes a prompt it may not store or train on. 16c:
     # what OpenRouter said when one didn't — a refusal that isn't the
     # provider's own (the key's limit, OpenRouter not answering) is the same

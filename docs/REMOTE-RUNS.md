@@ -1541,7 +1541,7 @@ the code marks wrong wait for Epoch's model check. **Start grading sends
 everything that waits, on every grader**: read the dry run first, and press it
 only if it lists MATH Level 5 alone at a few cents.
 
-# step2388 on plan U (31.1)
+# step2388 on plan U (31.1, 31.2)
 
 step2388 (`step2388.k3k6.gguf`), the team's joint k3/k6 checkpoint: one file,
 two expert paths. **k3** is the default: no thinking, 3 experts a layer, our
@@ -1561,8 +1561,11 @@ them itself. So runtime `k3k6-2611` sends none of them:
 (`scripts/path_check.py`), and `--check` runs it alone. It reads:
 
 - the file's `teraformer.paths.*` entries;
-- the server's `/props` (`expert_paths`) and its start-up lines
-  (`expert path k3 (default): temp = …`);
+- the server's `/props`: each path in `expert_paths`, the default path
+  (`default_generation_settings.params.expert_path`, 3), and the penalties
+  beside each path's own, which must be neutral (repeat 1.0, frequency 0,
+  DRY 0);
+- the server's start-up lines (`expert path k3 (default): temp = …`);
 - two short answers on the step's path;
 - on k6, the first token's probabilities before and after the samplers, which
   show whether the presence penalty counts the prompt's tokens.
@@ -1578,67 +1581,59 @@ Anything else stops the box before a question and says what differed and
 where. The check goes into the step's folder (`settings-check-k6.json`) and
 its bundle, and the import refuses a bundle without a check that passed.
 
-## U0. The files, on the server
+**The files** (31.2), each pinned by its sha256, and plan U's box lines are
+refused at any other commit:
 
-**The GGUF.** Its bytes and sha256 must be 15,994,966,752 and
-`a2594a68a810ec526061f83cb88c7e469e1c3889912e8da4b1d598c72271faf6`:
+| File | Where | sha256 |
+|---|---|---|
+| step2388 | `hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/step2388.k3k6.gguf` (15,994,966,752 bytes) | `a2594a68a810ec526061f83cb88c7e469e1c3889912e8da4b1d598c72271faf6` |
+| the k3k6 tarball | `hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/llama-server-k3k6-3ad38b7.tar.gz` (896 MB; `build_llama_tarball.sh`, `GGML_NATIVE=OFF`, sm_120, from `~/llama.cpp-teraformer2` at 3ad38b7cc) | `65dd1b90f19be00e918e558b3dbff9fc73e8ff325716ae8482a8211d9f05eb41` |
+| Qwen3.6-35B-A3B UD-Q2_K_XL (U40) | `hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF@5bc3e238d916f48a861bac2f8a1990a0e9b7e98d/Qwen3.6-35B-A3B-UD-Q2_K_XL.gguf` (12,574,128,416 bytes) | `ed7cda7e38985b4fcff76475865135039641d2bfbac3c169df15ca770f37fb0c` |
 
-```bash
-stat -c %s ~/step2388.k3k6.gguf && sha256sum ~/step2388.k3k6.gguf
-```
+The Q2 file is the one step2388's `teraformer.qad.reference_gguf` names, and
+our earlier Q2 row's file (the same sha256). It runs on runtime
+`card-qwen-k3k6`: the same build and environment, thinking off at its card's
+non-thinking settings (temperature 0.7, top-p 0.8, top-k 20, min-p 0,
+presence penalty 1.5, repetition penalty 1.0) sent with every request, and its
+MTP head off (no `--spec-type`, no draft model; a server whose slots draft is
+refused). `LOOKAHEAD_MOE_ROUTER_NORM` is set on it as on every model of the
+build: it only switches on trained router norms for hoisted routes, and a
+base file has neither, so it has no effect there.
 
-**The build.** Build the tarball from the team's copy at `~/llama.cpp-teraformer2`
-(3ad38b7cc, one commit after d98b64741, README only). It is a full build in a
-folder of its own inside nvidia/cuda's 12.8 image, never a partial rebuild.
-It is built for sm_120 with `GGML_NATIVE=OFF`, not this server's
-`-march=native`. Its VERSION names the Makefile change, which CMake never
-reads; the runtime allows that change and no other:
+## U0. The files, on the server (nothing paused)
 
-```bash
-cd ~/llama.cpp-teraformer2 && git log --oneline -2 && git status --short
-```
+1. The GGUF's bytes and sha256, and the tarball's:
 
-```bash
-LLAMA_CUDA_ARCHS=120 ~/benchmarks/aienh/scripts/build_llama_tarball.sh ~/llama.cpp-teraformer2 ~/llama-server-k3k6-3ad38b7.tar.gz
-```
+   ```bash
+   stat -c %s ~/step2388.k3k6.gguf && sha256sum ~/step2388.k3k6.gguf ~/llama-server-k3k6-3ad38b7.tar.gz
+   ```
 
-Its libraries must read both variables (a count of 1 or more each):
+   They must read 15994966752, `a2594a68…71faf6` and `65dd1b90…05eb41`.
 
-```bash
-mkdir -p ~/llama-k3k6 && tar -xzf ~/llama-server-k3k6-3ad38b7.tar.gz -C ~/llama-k3k6 && cat ~/llama-k3k6/llama/VERSION && grep -c LOOKAHEAD_MOE_ROUTER_NORM ~/llama-k3k6/llama/lib/libllama.so && grep -lc GGML_CPU_DISABLE_FUSION ~/llama-k3k6/llama/lib/libggml-cpu*.so
-```
+2. The tarball unpacked, its VERSION, and both variables read by its
+   libraries (a count of 1 or more each):
 
-**Upload both** to the private repository. The tarball's sha256 (the build
-script's last line) is pinned in plan U before the first box is rented:
+   ```bash
+   mkdir -p ~/llama-k3k6 && tar -xzf ~/llama-server-k3k6-3ad38b7.tar.gz -C ~/llama-k3k6 && cat ~/llama-k3k6/llama/VERSION && grep -c LOOKAHEAD_MOE_ROUTER_NORM ~/llama-k3k6/llama/lib/libllama.so && grep -lc GGML_CPU_DISABLE_FUSION ~/llama-k3k6/llama/lib/libggml-cpu*.so
+   ```
 
-```bash
-read -rs HF_TOKEN && export HF_TOKEN
-```
+3. What step2388's and step8804's files say of sampling beside their paths
+   (`general.sampling.*`: a repeat penalty a file stores applies whatever a
+   request sends) and what step2388 was quantised from
+   (`teraformer.qad.*`). Give step8804's path if it isn't `~/step8804.gguf`:
 
-```bash
-hf upload <you>/evalboard-private ~/step2388.k3k6.gguf step2388.k3k6.gguf && hf upload <you>/evalboard-private ~/llama-server-k3k6-3ad38b7.tar.gz llama-server-k3k6-3ad38b7.tar.gz
-```
+   ```bash
+   cd ~/benchmarks/aienh && python3 -c 'import json, sys; sys.path.insert(0, "scripts"); import gguf_header as g; [print(p, json.dumps({k: v for pre in ("general.sampling.", "teraformer.qad.") for k, v in (g.keys(p, pre) or {}).items()})) for p in sys.argv[1:]]' ~/step2388.k3k6.gguf ~/step8804.gguf
+   ```
 
-## U1. The team's own server test
+   Send the two lines back. A `general.sampling.penalty_repeat` other than
+   1.0 in either file is a penalty DeviceMark's greedy doesn't send.
 
-Run `scripts/teraformer-expert-paths-server.py --skip-parity`, from the team's
-copy, with the model and server arguments its README section gives. It must
-exit 0. Run it on the CPU first, with nothing paused:
+## U1. The team's own server test, on our 5090
 
-```bash
-cd ~/llama.cpp-teraformer2 && LOOKAHEAD_MOE_ROUTER_NORM=1 python3 scripts/teraformer-expert-paths-server.py --skip-parity <the README's model and server arguments>
-```
-
-Then run it on the GPU with our flags, with Q4 paused (U2):
-
-```bash
-cd ~/llama.cpp-teraformer2 && LOOKAHEAD_MOE_ROUTER_NORM=1 python3 scripts/teraformer-expert-paths-server.py --skip-parity <the README's model and server arguments> --ngl 99 --extra "-fa on -ctk q8_0 -ctv q8_0"
-```
-
-## U2. The settings check, on our 5090
-
-This takes about ten minutes with Q4 paused. The gemma judge stays up, and
-Q4 restarts only from its note file.
+The CPU run (`--ngl 0`) passed on 3 Nov. This is the same test on the GPU,
+with our flags and the tarball's server. It needs Q4 paused; the gemma judge
+stays up, and Q4 restarts only from its note file (U2, step 5).
 
 1. Deploy the board at this phase's commit:
 
@@ -1646,14 +1641,7 @@ Q4 restarts only from its note file.
    cd ~/benchmarks/aienh && git pull origin main && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
    ```
 
-2. Put the two files where the board's container sees them (its folder is
-   mounted at the same path):
-
-   ```bash
-   mkdir -p ~/benchmarks/k3k6 && ln -f ~/step2388.k3k6.gguf ~/llama-server-k3k6-3ad38b7.tar.gz ~/benchmarks/k3k6/
-   ```
-
-3. Pause Q4 as you do. Then check the card holds only the judge, and that
+2. Pause Q4 as you do. Then check the card holds only the judge, and that
    port 8098 is free (the second line must print nothing):
 
    ```bash
@@ -1664,24 +1652,43 @@ Q4 restarts only from its note file.
    ss -ltn 'sport = :8098' | grep LISTEN
    ```
 
-4. The check of k3, then of k6. Each starts the server for its path with one
+3. The team's test. It must exit 0:
+
+   ```bash
+   cd ~/llama.cpp-teraformer2 && LOOKAHEAD_MOE_ROUTER_NORM=1 GGML_CPU_DISABLE_FUSION=1 LD_LIBRARY_PATH=$HOME/llama-k3k6/llama/lib python3 scripts/teraformer-expert-paths-server.py --skip-parity --server $HOME/llama-k3k6/llama/bin/llama-server --unified ~/step2388.k3k6.gguf --ngl 99 --extra "-fa on -ctk q8_0 -ctv q8_0" --log-dir ~/k3k6-test-logs; echo "exit $?"
+   ```
+
+## U2. The settings check, on our 5090 (Q4 still paused)
+
+About ten minutes.
+
+1. Put the two files where the board's container sees them (its folder is
+   mounted at the same path):
+
+   ```bash
+   mkdir -p ~/benchmarks/k3k6 && ln -f ~/step2388.k3k6.gguf ~/llama-server-k3k6-3ad38b7.tar.gz ~/benchmarks/k3k6/
+   ```
+
+2. The check of k3, then of k6. Each starts the server for its path with one
    slot, checks it and stops it:
 
    ```bash
-   cd ~/benchmarks/aienh && sudo docker compose exec -T bench python scripts/remote_gguf.py --as served/step2388-k3k6-2611 --gguf "$HOME/benchmarks/k3k6/step2388.k3k6.gguf" --server "$HOME/benchmarks/k3k6/llama-server-k3k6-3ad38b7.tar.gz" --runtime k3k6-2611 --thinking off --check --slots 1 --port 8098 --out "$HOME/benchmarks/k3k6/check-k3"
+   cd ~/benchmarks/aienh && sudo docker compose exec -T bench python scripts/remote_gguf.py --as served/step2388-k3k6-2611 --gguf "$HOME/benchmarks/k3k6/step2388.k3k6.gguf" --server "$HOME/benchmarks/k3k6/llama-server-k3k6-3ad38b7.tar.gz" --pin step2388.k3k6.gguf=a2594a68a810ec526061f83cb88c7e469e1c3889912e8da4b1d598c72271faf6 --pin llama-server-k3k6-3ad38b7.tar.gz=65dd1b90f19be00e918e558b3dbff9fc73e8ff325716ae8482a8211d9f05eb41 --runtime k3k6-2611 --thinking off --check --slots 1 --port 8098 --out "$HOME/benchmarks/k3k6/check-k3"
    ```
 
    ```bash
-   cd ~/benchmarks/aienh && sudo docker compose exec -T bench python scripts/remote_gguf.py --as served/step2388-k3k6-2611 --gguf "$HOME/benchmarks/k3k6/step2388.k3k6.gguf" --server "$HOME/benchmarks/k3k6/llama-server-k3k6-3ad38b7.tar.gz" --runtime k3k6-2611 --thinking on --check --slots 1 --port 8098 --out "$HOME/benchmarks/k3k6/check-k6"
+   cd ~/benchmarks/aienh && sudo docker compose exec -T bench python scripts/remote_gguf.py --as served/step2388-k3k6-2611 --gguf "$HOME/benchmarks/k3k6/step2388.k3k6.gguf" --server "$HOME/benchmarks/k3k6/llama-server-k3k6-3ad38b7.tar.gz" --pin step2388.k3k6.gguf=a2594a68a810ec526061f83cb88c7e469e1c3889912e8da4b1d598c72271faf6 --pin llama-server-k3k6-3ad38b7.tar.gz=65dd1b90f19be00e918e558b3dbff9fc73e8ff325716ae8482a8211d9f05eb41 --runtime k3k6-2611 --thinking on --check --slots 1 --port 8098 --out "$HOME/benchmarks/k3k6/check-k6"
    ```
 
    Each ends `the settings check of expert path kN passes`. The lines above
-   that are what to send back: the file's values, the server's, its two
-   start-up lines, the two answers, and on k6 the prompt-token reading. A
-   check that fails ends with each value that differed, and nothing else
-   should be run.
+   that are what to send back: the file's values, the server's (with the
+   penalties beside each path and the default path), its two start-up lines,
+   the two answers, and on k6 the prompt-token reading. A check that fails
+   ends with each value that differed, and nothing else should be run.
 
-5. Restart Q4 from its note file.
+3. Restart Q4 from its note file.
+
+The yes to rent plan U comes after this check passes.
 
 ## U3. Plan U
 
@@ -1698,9 +1705,37 @@ measured paces:
 | U34 | k6 | ARC-AGI-2 half, then IFEval and IFBench | about 5.2 h |
 | U35 | k3 | GPQA Diamond and MATH Level 5, then IFEval and IFBench | about 3.5 h |
 | U36–U37 | k3 | MMLU-Pro in halves | about 4.3 h |
+| U38 | k3 | DeviceMark greedy; DeviceMark at the file's own settings; MMLU and GSM8K | about 5.1 h |
+| U39 | k6 | DeviceMark greedy | about 3.2 h |
+| U40 | Qwen3.6 UD-Q2_K_XL | MMLU and GSM8K | about 3.4 h |
 
-That is 37 boxes and 172 box-hours, before each box's start and fetch. The
-boxes' own spread is wide: on plan L a ninth of HLE took 4.6 to 12.0 hours.
+That is 40 boxes and about 184 box-hours, before each box's start and fetch
+(about 204 with them). U38–U40's hours are guesses: DeviceMark's are
+step8804's on our own 5090, one question at a time, and the easy set has
+never run. The boxes' own spread is wide: on plan L a ninth of HLE took 4.6
+to 12.0 hours.
+
+**DeviceMark on a box** (31.2, `remote_gguf.py --devicemark`): its battery
+of 596 items, each asked once, through the board's own runner against the
+box's server, and brought home in a `devicemark-served-…` bundle that the
+fetch imports like any other. Two ways:
+
+- **Greedy, no penalties** (U38's first step, U39): each request sends
+  `temperature 0`, `presence_penalty 0` and `seed 0`, and nothing else beyond
+  `expert_path` — plain argmax on both paths, as the other replica rows ran.
+  The row records "DeviceMark's protocol: greedy, no penalties".
+- **The file's own settings** (U38's second step): the k3 path and the seed
+  alone, no sampling field. It is a row of its own,
+  `served/step2388-k3k6-2611-file`, beside the greedy one.
+
+The import marks the answers again by the board's scoring, and refuses a
+bundle whose GGUF isn't the registered file, whose settings check didn't pass,
+whose battery isn't the board's, or whose requests sent anything else.
+
+**The easy set** (31.2, internal: never a Frontier column or a whitepaper
+table): MMLU, all 14,042 test questions, and GSM8K, all 1,319, zero-shot chat
+with the same prompt and scorer for both models — the letter read on MMLU,
+the last number on GSM8K. step2388's k3 path on U38, the Q2 file on U40.
 
 **One box, end to end.** Rent it as in L2: the runner image at this phase's
 tag, an RTX 5090, Disk 100 GB. Then, in tmux (the line's `--price` is the
@@ -1715,7 +1750,14 @@ read -rs HF_TOKEN && export HF_TOKEN
 ```
 
 ```bash
-python scripts/frontier_box.py U35 --as served/step2388-k3k6-2611 --gguf hf://<you>/evalboard-private@<commit>/step2388.k3k6.gguf --server hf://<you>/evalboard-private@<commit>/llama-server-k3k6-3ad38b7.tar.gz --price 0.45
+python scripts/frontier_box.py U35 --as served/step2388-k3k6-2611 --gguf hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/step2388.k3k6.gguf --server hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/llama-server-k3k6-3ad38b7.tar.gz --price 0.45
+```
+
+Every box U1–U39 runs that line with its own label. U40 runs the Q2 file
+alone:
+
+```bash
+python scripts/frontier_box.py U40 --as served/Qwen3.6-35B-A3B-Q2-k3k6-2611 --gguf hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF@5bc3e238d916f48a861bac2f8a1990a0e9b7e98d/Qwen3.6-35B-A3B-UD-Q2_K_XL.gguf --server hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/llama-server-k3k6-3ad38b7.tar.gz --price 0.45
 ```
 
 The box runs in this order:
@@ -1725,15 +1767,28 @@ The box runs in this order:
    read.
 3. It fetches and pins the file.
 4. It prints the runtime and the path's values.
-5. It starts the server and runs the settings check.
+5. It starts the server and runs the settings check (step2388's boxes).
 6. Only after the check passes, it asks.
 
 The last lines say how each step ended. Then do the following:
 
 - **Scores:** `python scripts/score_bundle.py /workspace/step2388-k3k6-2611`.
-- **Fetch and import:** as in L3, with the box's label (`<host>:<port>=U35`).
-  k6's answers land on `served/step2388-k3k6-2611 · thinking`, k3's on
-  `served/step2388-k3k6-2611`.
+- **Fetch and import:** as in L3, with the box's label (`<host>:<port>=U35`)
+  and a `--sha` for each model: `served/step2388-k3k6-2611=a2594a68a810ec526061f83cb88c7e469e1c3889912e8da4b1d598c72271faf6`,
+  `served/step2388-k3k6-2611-file=a2594a68a810ec526061f83cb88c7e469e1c3889912e8da4b1d598c72271faf6`
+  and `served/Qwen3.6-35B-A3B-Q2-k3k6-2611=ed7cda7e38985b4fcff76475865135039641d2bfbac3c169df15ca770f37fb0c`.
+  Each model's first bundle is imported once by hand with `--register`, as
+  the fetch's line says. k6's answers land on `served/step2388-k3k6-2611 ·
+  thinking`, k3's on `served/step2388-k3k6-2611`.
+
+**Grading** (nothing is graded before masein's yes). HLE's judge is CAIS's,
+o3-mini-2025-01-31, which OpenRouter now serves through its Batch API alone
+(`openai/o3-mini:batch`, from OpenAI, at half the price). Choose it on the
+grading card as HLE's judge, pinned to OpenAI with no fallback; Start sends
+each grading batch to OpenRouter whole, and its grades land within a day
+(the card says where the batch is). step8804's HLE grades stand: it is the
+same judge. The estimate: HLE about $5.70, SimpleQA about $4.20, the MATH
+and OTIS checks under $0.10.
 
 # Speed tests: the cheapest box per answer (19)
 

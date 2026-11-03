@@ -54,6 +54,10 @@ PROBE = ("A list of words, some of them many times over: "
          + ", ".join([PROBE_WORD] * 48 + ["stone", PROBE_WORD, "cloud", PROBE_WORD])
          + ". One more word for the list:")
 TOL = 1e-4
+# 31.2: the penalties beside a path's own that would change what it samples —
+# each path's /props params must leave them neutral (DeviceMark's greedy on
+# both paths is plain argmax: temperature 0 and presence 0 sent, these none)
+NEUTRAL = {"repeat_penalty": 1.0, "frequency_penalty": 0.0, "dry_multiplier": 0.0}
 
 
 def _name(k: str) -> str:
@@ -138,6 +142,28 @@ def props_paths(props: dict) -> dict[int, dict]:
             params["thinking"] = bool(_value(th))
         out[p] = {"params": params, "default": x.get("default"), "raw": x}
     return out
+
+
+def default_of(props: dict):
+    """31.2: the path the server serves a request that names none — its /props
+    default_generation_settings.params.expert_path (3, or "k3"); None unread"""
+    g = props.get("default_generation_settings") if isinstance(props, dict) else None
+    v = ((g or {}).get("params") or {}).get("expert_path") if isinstance(g, dict) else None
+    if isinstance(v, str) and re.fullmatch(r"k?\d+", v.strip()):
+        return int(v.strip().lstrip("k"))
+    return v if isinstance(v, int) and not isinstance(v, bool) else None
+
+
+def neutral(params: dict, where: str) -> list[str]:
+    """31.2: each of NEUTRAL that `params` doesn't give, or gives otherwise"""
+    bad = []
+    for k, w in NEUTRAL.items():
+        v = (params or {}).get(k)
+        if not isinstance(v, (int, float)) or isinstance(v, bool):
+            bad.append(f"{where} gives no {k.replace('_', ' ')}")
+        elif abs(v - w) >= TOL:
+            bad.append(f"{where}: {k.replace('_', ' ')} {v!r}, not {w!r}")
+    return bad
 
 
 LINE = re.compile(r"expert path k(\d+)(\s*\(default\))?\s*:\s*(.*)$")
@@ -304,6 +330,19 @@ def check(base: str, path: int, gguf: str | Path, log_text: str,
         if srv:
             bad += compare(w, (srv.get(p) or {}).get("params") or {}, f"the server's k{p} (/props)",
                            slot_ctx)
+            # 31.2: and no other penalty on the path — DeviceMark's greedy sends
+            # temperature 0 and presence 0, and nothing else
+            raw = ((srv.get(p) or {}).get("raw") or {}).get("params")
+            bad += neutral(raw if isinstance(raw, dict) else {}, f"the server's k{p} (/props)")
+            said = (srv.get(p) or {}).get("default")
+            if isinstance(said, bool) and said != (p == fb.PATH_DEFAULT):
+                bad.append(f"the server's /props calls k{p} "
+                           + ("the default" if said else "not the default"))
+    # 31.2: the default path, as the server serves a request that names none
+    dflt = default_of(props)
+    if dflt != fb.PATH_DEFAULT:
+        bad.append(f"the server's default path (/props default_generation_settings.params."
+                   f"expert_path) is {dflt!r}, not {fb.PATH_DEFAULT}")
     lines = startup(log_text)
     for p, w in fb.PATHS.items():
         if p not in lines:
@@ -334,6 +373,10 @@ def check(base: str, path: int, gguf: str | Path, log_text: str,
                    f"about {probe.get('penalty_seen')} below the others")
     return {"path": path, "want": want, "file": file, "server": {
                 "props": {p: {k: x[k] for k in ("params", "default")} for p, x in srv.items()},
+                "default": dflt,
+                # 31.2: the penalties beside each path's own, as /props gives them
+                "neutral": {p: {k: ((x.get("raw") or {}).get("params") or {}).get(k)
+                                for k in NEUTRAL} for p, x in srv.items()},
                 "startup": lines},
             "answers": said, "prompt_penalty": probe, "pass": not bad, "mismatches": bad}
 
@@ -346,6 +389,12 @@ def words(chk: dict) -> list[str]:
     out.append(f"  the file's k{p}: {fb.path_words(p, f) if f else 'nothing stored'}")
     s = ((chk["server"]["props"] or {}).get(p) or {}).get("params") or {}
     out.append(f"  the server's k{p} (/props): {fb.path_words(p, s) if s else 'none'}")
+    n = ((chk["server"].get("neutral") or {}).get(p)) or {}
+    if n:
+        out.append(f"  beside it on k{p}: " + ", ".join(f"{k.replace('_', ' ')} {v!r}"
+                                                       for k, v in n.items()))
+    if "default" in chk["server"]:
+        out.append(f"  the server's default path: k{chk['server']['default']}")
     for q, ln in sorted((chk["server"]["startup"] or {}).items()):
         out.append(f"  start-up: {ln['line']}")
     for a in chk["answers"]:

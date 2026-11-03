@@ -287,7 +287,7 @@ def main(argv: list[str] | None = None) -> int:
                     help="where the questions are (default: each bundle's step folder's "
                          "bench/ on the box, else /workspace/files/questions)")
     a = ap.parse_args(argv)
-    shorts = {fb.BENCH[t]["short"]: t for t in fb.TASKS}
+    shorts = {fb.BENCH[t]["short"]: t for t in fb.ALL}        # 31.2: the easy set's too
     bad = [x for x in a.only if x not in shorts and x not in fb.BENCH]
     if bad:
         ap.error(f"--only: {', '.join(bad)} — one of {', '.join(shorts)}")
@@ -311,7 +311,7 @@ def main(argv: list[str] | None = None) -> int:
             by_task = score_all(read_all(paths, print), only, q, tmp, bool(a.questions))
         finally:
             restore(was)
-        for t in fb.TASKS:
+        for t in fb.ALL:
             if len(by_task.get(t) or []) > 1:
                 print()
                 print("\n".join(table(t, by_task[t])))
@@ -335,7 +335,7 @@ def score_all(got: dict, only: set, q: Path, tmp: Path,
         if len(tasks.get("_files") or {}) > 1:
             print(f"{name}: its bundles hold {len(tasks['_files'])} different files — not one "
                   "model's")
-        for t in fb.TASKS:
+        for t in fb.ALL:
             if t not in tasks or (only and t not in only):
                 continue
             try:
