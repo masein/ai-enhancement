@@ -116,6 +116,16 @@ def k3k6_tarball(root: Path, commit: str = "3ad38b7cc", changes: str = "yes",
     return tb
 
 
+@pytest.fixture(autouse=True)
+def step_kept():
+    """remote_gguf.py's step state as it was: --check marks the step a pilot's
+    (no progress file), and a later test's own rg.progress would write none"""
+    was = dict(rg.STEP)
+    yield
+    rg.STEP.clear()
+    rg.STEP.update(was)
+
+
 @pytest.fixture
 def k3k6(box, card, monkeypatch, tmp_path):  # noqa: F811
     """a box given step2388's file and the team's build, its server serving
