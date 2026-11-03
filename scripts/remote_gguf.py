@@ -1474,6 +1474,10 @@ def main(argv: list[str] | None = None) -> int:
         if STEP:
             progress(STEP["out"], state="stopped", why=f"{type(e).__name__}: {e}"[:400])
         raise
+    finally:
+        # 31.1: a step's state ends with it — a pilot's or a check's left
+        # behind kept a later progress() in this process from writing
+        STEP.clear()
 
 
 def _main(argv: list[str] | None = None) -> int:
