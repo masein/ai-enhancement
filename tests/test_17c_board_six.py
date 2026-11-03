@@ -64,7 +64,7 @@ def test_2_a_full_mobile_mmlu_runs_time_is_the_full_sets():
 def test_6_each_frontier_benchmark_says_its_set_source_and_licence():
     import frontier as fb
     meta = report.frontier_bench_meta()
-    assert set(meta) == set(fb.BENCH)
+    assert set(meta) == set(fb.TASKS)          # 31.2: the easy set is no Frontier column
     for t, m in meta.items():
         src = fb.BENCH[t]["source"]
         assert m["n"] == fb.BENCH[t]["n"] and m["licence"] == src["licence"], t

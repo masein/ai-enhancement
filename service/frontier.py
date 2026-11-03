@@ -1386,7 +1386,8 @@ def run(sid: int, sub: dict, rec: dict, th: dict, row: Path, log_path: Path) -> 
     # record keeps its tasks sorted, which asked MMLU-Pro before SimpleQA:
     # the pilot's stop by hand in MMLU-Pro left SimpleQA never asked
     chosen = set(json.loads(sub.get("tasks") or "[]") or fb.TASKS)
-    tasks = [t for t in fb.TASKS if t in chosen]
+    # 31.2: and the easy set's, after the suite's, when a box names them
+    tasks = [t for t in fb.ALL if t in chosen]
     sh = shard()
 
     def log(text: str) -> None:

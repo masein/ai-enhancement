@@ -735,7 +735,7 @@ LOCAL_REASON = "{} by a local model — not a pinned benchmark"
 # a provenance record can name the weights without another network call
 _SERVED: dict[str, dict[str, str]] = {}
 _OOM = re.compile(r"out of memory|\boom\b", re.I)
-_BATCH_ID = re.compile(r"(?:local|or)_[0-9a-f]{12}")
+_BATCH_ID = re.compile(r"(?:local|or|orb)_[0-9a-f]{12}")
 _SERVED_ASKED: dict[str, float] = {}
 
 
@@ -803,8 +803,10 @@ def plain_error(error: str, status: int | None = None) -> str:
 
 
 def batch_dir(batch_id: str) -> Path | None:
-    """a batch worked on disk (LocalOpenAI, OpenRouterChat), by its id"""
-    kind = {"or": "openrouter", "local": "local"}.get(str(batch_id).split("_")[0])
+    """a batch worked on disk (LocalOpenAI, OpenRouterChat — 31.2: and
+    OpenRouterBatchAPI's, "orb_"), by its id"""
+    kind = {"or": "openrouter", "local": "local",
+            "orb": "openrouter-batch"}.get(str(batch_id).split("_")[0])
     d = config.BENCH_ROOT / "llm_batches" / kind / batch_id if kind else None
     return d if d and _BATCH_ID.fullmatch(batch_id) and (d / "requests.jsonl").exists() else None
 
@@ -1466,6 +1468,271 @@ class OpenRouterChat(LocalOpenAI):
             db.spend_add(ai_models.ROLE_JOB.get(self.role, self.role), self.model,
                          rec["provider"], tin, tout, usd, row.get("batch_id", ""))
             return rec
+
+
+# 31.2: a model OpenRouter serves through its Batch API alone is listed with
+# this suffix (openai/o3-mini:batch: o3-mini-2025-01-31, HLE's judge)
+BATCH_SUFFIX = ":batch"
+
+
+def is_batch(pin: dict | None) -> bool:
+    """31.2: a pin of a model asked through OpenRouter's Batch API"""
+    return bool(pin) and (bool(pin.get("batch"))
+                          or str(pin.get("id") or "").endswith(BATCH_SUFFIX))
+
+
+class OpenRouterBatchAPI(OpenRouterChat):
+    """31.2: a model OpenRouter serves through its Batch API alone — the batch
+    on disk as OpenRouterChat keeps it (requests.jsonl, results.jsonl), sent
+    to OpenRouter whole as one batch of its own (POST /batches) on the pinned
+    provider with no fallback, and its results read back once OpenRouter says
+    it is done (GET /batches/<id>, asked at most every POLL_S): within a day,
+    at the batch price, which the pin carries.
+
+    Nothing is sent while the batch waits (stopped, the month's limit, a
+    pinned model that moved) or holds. A batch already out is asked after
+    whatever happens, its replies paid for, and OpenRouter cancels none: it
+    runs to its end. A reply is recorded as a sync one is (its text, finish,
+    tokens and dollars, counted against the month); a request OpenRouter
+    refused, with its status. One the batch ended without (failed, expired) is
+    never written off: the batch holds, said, and its press sends what is left
+    as a new batch. A send that may or may not have reached OpenRouter (no
+    answer, a 5xx) holds too — sent again blind, it could be paid twice.
+
+        remote.json   OpenRouter's batch now: its id, the requests in it, its
+                      status and counts as last asked, when sent and asked
+        remote-<id>.json   one that ended, kept
+    """
+    name = "openrouter-batch"
+    prefix = "orb"
+    POLL_S = 60.0                       # OpenRouter's batch asked at most this often
+    ENDED = ("completed", "failed", "expired", "cancelled")
+
+    def __init__(self, model: str, key: str, root: Path, pin: dict | None = None,
+                 role: str = "llm"):
+        super().__init__(model, key, root, pin=pin, role=role)
+        self.dir = Path(root) / "llm_batches" / "openrouter-batch"
+
+    # -- OpenRouter's batch, on disk ------------------------------------------
+
+    @staticmethod
+    def _remote(d: Path) -> dict:
+        try:
+            got = json.loads((d / "remote.json").read_text(encoding="utf-8"))
+            return got if isinstance(got, dict) else {}
+        except (OSError, ValueError):
+            return {}
+
+    @staticmethod
+    def _keep_remote(d: Path, r: dict) -> None:
+        tmp = d / "remote.json.tmp"
+        tmp.write_text(json.dumps(r), encoding="utf-8")
+        tmp.replace(d / "remote.json")
+
+    def _hold(self, batch_id: str, why: str, status: int | None = None) -> None:
+        (self.dir / batch_id / "halt.json").write_text(json.dumps(
+            {"why": why, "status": status, "at": time.time(), "n": 0, "hold": True}),
+            encoding="utf-8")
+
+    def out(self, batch_id: str) -> dict:
+        """OpenRouter's batch of this one still running ({} when none is)"""
+        return self._remote(self.dir / batch_id)
+
+    def busy(self, batch_id: str) -> bool:
+        """a batch out at OpenRouter: its replies are on their way"""
+        return bool(self.out(batch_id).get("id")) or super().busy(batch_id)
+
+    def cancel(self, batch_id: str, custom_ids, why: str) -> int:
+        """only what isn't out at OpenRouter: what is runs to its end"""
+        sent = set(self.out(batch_id).get("ids") or [])
+        return super().cancel(batch_id, [c for c in custom_ids if c not in sent], why)
+
+    def status(self, batch_id: str) -> tuple[str, str]:
+        state, detail = LocalOpenAI.status(self, batch_id)
+        if state != "pending":
+            return state, detail
+        r = self.out(batch_id)
+        if r.get("id"):
+            return state, f"{detail} · {self.remote_words(r)}"
+        why = self.waiting()
+        return state, (f"{detail} · {why}" if why else detail)
+
+    @staticmethod
+    def remote_words(r: dict) -> str:
+        c = r.get("counts") or {}
+        n = c.get("total") or len(r.get("ids") or [])
+        hours = max(0.0, (time.time() - float(r.get("sent_at") or time.time())) / 3600)
+        return (f"OpenRouter's batch {r.get('status') or 'sent'}: {int(c.get('completed') or 0):,} "
+                f"of {int(n):,} done" + (f", {int(c['failed']):,} failed" if c.get("failed") else "")
+                + f", sent {hours:.1f} h ago — results within a day")
+
+    # -- the worker: send once, then ask -----------------------------------------
+
+    def _work(self, batch_id: str, fd: int) -> None:
+        try:
+            d = self.dir / batch_id
+            r = self._remote(d)
+            if not r.get("id"):
+                self._send(batch_id, d)
+            elif time.time() - float(r.get("asked_at") or 0) >= self.POLL_S:
+                self._ask(batch_id, d, r)
+        finally:
+            os.close(fd)
+
+    def _body(self, row: dict) -> dict:
+        """a request's body as the batch carries it: no model and no provider
+        — the batch's own, beside its requests"""
+        body = {"max_tokens": min(int(row["max_tokens"]), self.max_tokens),
+                "messages": ([{"role": "system", "content": row["system"]}] if row["system"]
+                             else []) + [{"role": "user", "content": row["user"]}],
+                "usage": {"include": True}}
+        if row.get("reasoning") is not None:
+            body["reasoning"] = row["reasoning"]
+        if row.get("schema"):
+            body["response_format"] = json_schema_format(row["schema"])
+        elif row.get("json"):
+            body["response_format"] = {"type": "json_object"}
+        return body
+
+    def _send(self, batch_id: str, d: Path) -> None:
+        why = self.waiting()
+        if why:
+            self.at_wait(batch_id, why)
+            return
+        if self.halted(batch_id):
+            return
+        done = self._results(d)
+        try:
+            gone = set(json.loads((d / "cancelled.json").read_text(encoding="utf-8")))
+        except (OSError, ValueError):
+            gone = set()
+        rows = [x for x in self._requests(d) if x["custom_id"] not in done
+                and x["custom_id"] not in gone]
+        if not rows:
+            return
+        prov = self.pin.get("provider")
+        # OpenRouter reads the batch's fields before its requests (a 400
+        # otherwise): the model with its batch suffix off, the pinned provider
+        # alone with no fallback (a batch takes only and allow_fallbacks)
+        body = {"endpoint": "/v1/chat/completions", "model": self.model.removesuffix(BATCH_SUFFIX),
+                **({"provider": {"only": [prov], "allow_fallbacks": False}} if prov else {}),
+                "completion_window": "24h",
+                "requests": [{"custom_id": x["custom_id"], "body": self._body(x)} for x in rows]}
+        try:
+            _, raw = _http("POST", f"{self.base}/batches", self._h(), json.dumps(body).encode(),
+                           self.timeout)
+            got = json.loads(raw)
+            bid = str(got["id"])
+        except LLMError as e:
+            if e.status == 429:
+                return                      # too many out: asked again at the next tick
+            from . import ai_models
+            sure = e.status is not None and e.status < 500
+            self._hold(batch_id, (
+                f"waiting: OpenRouter refused the batch — {ai_models.refusal(e.status, str(e))[1]}. "
+                f"Nothing was sent; {self.HALT_PRESS or 'Carry on'} sends it again" if sure else
+                f"waiting: sending the batch to OpenRouter got no clear answer ({plain_error(str(e), e.status)}) "
+                f"— it may have reached OpenRouter: look at its Batches tab before pressing "
+                f"{self.HALT_PRESS or 'Carry on'}, which sends it again"), e.status)
+            return
+        except (ValueError, KeyError, TypeError):
+            self._hold(batch_id, "waiting: OpenRouter took the batch but its reply gave no batch id "
+                                 "— look at its Batches tab before sending it again")
+            return
+        now = time.time()
+        self._keep_remote(d, {"id": bid, "ids": [x["custom_id"] for x in rows],
+                              "status": got.get("status") or "validating",
+                              "counts": got.get("request_counts") or {},
+                              "provider": got.get("provider") or prov, "sent_at": now,
+                              "asked_at": now})
+
+    def _ask(self, batch_id: str, d: Path, r: dict) -> None:
+        r["asked_at"] = time.time()
+        try:
+            _, raw = _http("GET", f"{self.base}/batches/{r['id']}", self._h(), timeout=60)
+            got = json.loads(raw)
+        except LLMError as e:
+            r["last_error"] = plain_error(str(e), e.status)
+            self._keep_remote(d, r)
+            if e.status in (404, 410):
+                self._end(batch_id, d, r, f"OpenRouter no longer has the batch (HTTP {e.status})")
+            return
+        except ValueError:
+            self._keep_remote(d, r)
+            return
+        r.update(status=got.get("status") or r.get("status"),
+                 counts=got.get("request_counts") or r.get("counts") or {})
+        if got.get("usage"):
+            r["usage"] = got["usage"]
+        status = r["status"]
+        if status not in self.ENDED or (status == "completed" and got.get("results") is None):
+            self._keep_remote(d, r)
+            return
+        self._record(batch_id, d, r, got.get("results") or [])
+        msg = ((got.get("error") or {}).get("message") if isinstance(got.get("error"), dict)
+               else got.get("error")) or ""
+        self._end(batch_id, d, r, "" if status == "completed" else
+                  f"OpenRouter's batch {status}" + (f": {str(msg)[:200]}" if msg else ""))
+
+    def _record(self, batch_id: str, d: Path, r: dict, results: list) -> None:
+        """each result as a reply or a refusal, in results.jsonl — its dollars
+        counted against the month as a sync reply's are"""
+        from . import ai_models, db
+        have = self._results(d)
+        mine = set(r.get("ids") or [])
+        with open(d / "results.jsonl", "a", encoding="utf-8") as fh:
+            for item in results:
+                if not isinstance(item, dict):
+                    continue
+                cid = str(item.get("custom_id") or "")
+                if cid not in mine or (cid in have and not have[cid].get("cancelled")):
+                    continue
+                rec = {"custom_id": cid, "text": "", "error": "", "attempts": 1,
+                       "at": time.time(), "batch": r["id"]}
+                resp = item.get("response") if isinstance(item.get("response"), dict) else {}
+                body = resp.get("body") if isinstance(resp.get("body"), dict) else None
+                code = resp.get("status_code")
+                try:
+                    if body is None or (code is not None and int(code) >= 400):
+                        raise LookupError
+                    choice = body["choices"][0]
+                    rec["text"] = choice["message"].get("content") or ""
+                    rec["finish_reason"] = choice.get("finish_reason")
+                except (LookupError, TypeError, AttributeError, ValueError):
+                    err = item.get("error") if isinstance(item.get("error"), dict) else {}
+                    words = str(err.get("message") or (body or {}).get("error") or item.get("error")
+                                or "no reply in OpenRouter's batch")[:300]
+                    st = code if isinstance(code, int) else (err.get("code") if isinstance(
+                        err.get("code"), int) else None)
+                    rec.update(error=f"OpenRouter's batch: HTTP {st}: {words}" if st else
+                               f"OpenRouter's batch: {words}", status=st,
+                               kind=ai_models.refusal(st, words)[0])
+                    fh.write(json.dumps(rec) + "\n")
+                    continue
+                u = body.get("usage") or {}
+                tin, tout = int(u.get("prompt_tokens") or 0), int(u.get("completion_tokens") or 0)
+                usd = u.get("cost")
+                usd = float(usd) if isinstance(usd, (int, float)) and not isinstance(usd, bool) \
+                    else ai_models.cost(self.pin, tin, tout)
+                rec.update(tokens_in=tin, tokens_out=tout, usd=usd,
+                           provider=(body.get("provider") or r.get("provider")
+                                     or self.pin.get("provider_name") or ""))
+                fh.write(json.dumps(rec) + "\n")
+                db.spend_add(ai_models.ROLE_JOB.get(self.role, self.role), self.model,
+                             rec["provider"], tin, tout, usd, batch_id)
+
+    def _end(self, batch_id: str, d: Path, r: dict, why: str) -> None:
+        """OpenRouter's batch ended: kept as remote-<id>.json; what it gave no
+        result for waits, held and said, for the press that sends it again"""
+        (d / f"remote-{r['id']}.json").write_text(json.dumps(r), encoding="utf-8")
+        (d / "remote.json").unlink(missing_ok=True)
+        have = self._results(d)
+        left = [c for c in r.get("ids") or [] if c not in have]
+        if left:
+            self._hold(batch_id, f"waiting: {why or 'OpenRouter’s batch ended'} with "
+                                 f"{len(left):,} of its {len(r.get('ids') or []):,} requests "
+                                 f"unanswered — none is counted against its answer; "
+                                 f"{self.HALT_PRESS or 'Carry on'} sends them again")
 
 
 # ---------------------------------------------------------------------------

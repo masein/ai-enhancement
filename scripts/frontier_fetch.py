@@ -121,7 +121,8 @@ def sha(p):
             h.update(b)
     return h.hexdigest()
 out = {"bundles": [], "parity": [], "progress": [], "steps": []}
-for p in sorted(glob.glob(ROOT + "/**/frontier-*.tar.gz", recursive=True)):
+for p in sorted(glob.glob(ROOT + "/**/frontier-*.tar.gz", recursive=True)
+                + glob.glob(ROOT + "/**/devicemark-served-*.tar.gz", recursive=True)):
     out["bundles"].append({"path": p, "sha256": sha(p)})
 for p in sorted(glob.glob(ROOT + "/**/parity.jsonl", recursive=True)):
     out["parity"].append({"path": p, "sha256": sha(p)})
@@ -700,7 +701,7 @@ def step_of(p: dict) -> list[dict]:
     asks now"""
     import frontier_box as fbx
     fb = fbx.fb
-    tasks = [t for t in fb.TASKS if t in set(p.get("tasks") or [])]
+    tasks = [t for t in fb.ALL if t in set(p.get("tasks") or [])]            # 31.2: the easy set too
     m = _PACE.match(str(p.get("line") or "")) if p.get("state") == "asking" else None
     now = next((t for t in tasks if m and fb.BENCH[t]["label"] == m["label"]), None)
     if now is None and tasks:

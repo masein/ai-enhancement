@@ -146,7 +146,9 @@ def test_2_3_each_plan_runs_every_benchmark_once_one_line_a_box():
         have: dict[tuple[str, str], set[int]] = {}
         of: dict[tuple[str, str], int] = {}
         parity = 0
-        for steps in boxes.values():
+        for box_, steps in boxes.items():
+            if box_ in fbx.BOX_MODELS:
+                continue            # 31.2: another model's box (U40), its own set
             for th, tasks, shard, slots in steps:
                 if th == "parity":
                     parity += 1
@@ -160,7 +162,12 @@ def test_2_3_each_plan_runs_every_benchmark_once_one_line_a_box():
                 # ARC-AGI-2 alone, at 5 slots; never thinking off
                 assert (slots == 5) == (fbx.ARC in tasks) and (tasks == (fbx.ARC,)
                                                                or fbx.ARC not in tasks)
-                # every step fits the card as the box checks it
+                # every step fits the card as the box checks it — 31.2: a
+                # DeviceMark step at its own slot (devicemark_box.CONTEXT)
+                if any(t in (fbx.DM, fbx.DM_FILE) for t in tasks):
+                    import devicemark_box
+                    assert devicemark_box.CONTEXT * slots <= rg.MAX_CONTEXT
+                    continue
                 assert fb.slot_context(list(tasks), th == "on") * slots <= rg.MAX_CONTEXT
         # 20: plan L asks thinking on only, and has no parity step (the
         # server it compares with is out of reach). 25: plans A, B and L run the
@@ -178,6 +185,9 @@ def test_2_3_each_plan_runs_every_benchmark_once_one_line_a_box():
         if name == "U":
             want = {("on", t) for t in fb.TASKS} | {
                 ("off", t) for t in (fbx.GPQA, fbx.MATH, fbx.MMLU, fbx.IFEVAL, fbx.IFBENCH)}
+            # 31.2: and DeviceMark on both paths (k3 two ways), the easy set on k3
+            want |= {("off", fbx.DM), ("off", fbx.DM_FILE), ("on", fbx.DM)} | {
+                ("off", t) for t in fb.EASY}
         assert set(have) == want, name
         assert all(have[k] == set(range(1, of[k] + 1)) for k in have), name
         # 17f: one box a build asks it first

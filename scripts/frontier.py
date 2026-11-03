@@ -101,6 +101,10 @@ ARC_TEMPLATE = ("You are participating in a puzzle solving competition. You are 
                 "give a final output.\n\nRespond in the format of the training output examples\n\n"
                 "--Training Examples--\n{training_examples}\n--End of Training Examples--\n\n"
                 "--Test Input--\n{test_input}\n--End of Test Input--\n\nYour response:")
+# 31.2: GSM8K asked as a chat question, zero-shot — the last number of the
+# reply read (the easy set: step2388's k3 path beside the original model)
+GSM8K_TEMPLATE = ("Solve the following math problem step by step. Give the final answer as a "
+                  "number on the last line.\n\n{question}")
 MATH_CONFIGS = ("algebra", "counting_and_probability", "geometry", "intermediate_algebra",
                 "number_theory", "prealgebra", "precalculus")
 
@@ -236,8 +240,38 @@ BENCH: dict[str, dict] = {
                    "licence": "ODC-BY-1.0 (research use); its code Apache-2.0"},
         "n": 300, "epochs": 1, "budget": {"on": ON, "off": OFF}, "room": 1024,
         "scorer": "ifbench", "metric": "loose"},
+    # 31.2: the easy set (brief 31) — two easy benchmarks asked as chat
+    # questions, zero-shot, the same prompt and scorer for every model: the
+    # team's k3 path beside the original model it was quantised from. Internal:
+    # never in the Frontier suite (TASKS), its views or a whitepaper table
+    "mmlu_chat": {
+        "short": "mmlu", "label": "MMLU", "group": "Easy (internal)", "suite": "easy",
+        "note": "all 14,042 test questions, zero-shot chat, the letter read",
+        "protocol": "zero-shot chat: GPQA Diamond's multiple-choice prompt (Epoch AI's), the "
+                    "options in the dataset's order, ANSWER: LETTER read by Inspect's choice()",
+        "protocol_version": "board-mmlu-chat-1",
+        "source": {"hf": "cais/mmlu", "config": "all", "split": "test",
+                   "revision": "c30699e8356da336a370243923dbaf21066bb9fe", "gated": False,
+                   "licence": "MIT"},
+        "n": 14042, "epochs": 1, "budget": {"on": ON, "off": OFF}, "room": 1024,
+        "scorer": "choice"},
+    "gsm8k_chat": {
+        "short": "gsm8k", "label": "GSM8K", "group": "Easy (internal)", "suite": "easy",
+        "note": "all 1,319 test questions, zero-shot chat, the last number read",
+        "protocol": "zero-shot chat: the question and one line asking for the final answer as a "
+                    "number on the last line; the last number of the reply against the answer "
+                    "after its ####",
+        "protocol_version": "board-gsm8k-chat-1",
+        "source": {"hf": "openai/gsm8k", "config": "main", "split": "test",
+                   "revision": "740312add88f781978c0658806c59bc2815b9866", "gated": False,
+                   "licence": "MIT"},
+        "n": 1319, "epochs": 1, "budget": {"on": ON, "off": OFF}, "room": 1024,
+        "scorer": "last_number"},
 }
-TASKS = list(BENCH)
+# the Frontier suite — 31.2: the easy set beside it, never in it
+TASKS = [t for t, b in BENCH.items() if b.get("suite", "frontier") == "frontier"]
+EASY = [t for t, b in BENCH.items() if b.get("suite") == "easy"]
+ALL = TASKS + EASY
 # 25: the benchmarks a reply's instructions are checked on, and how
 FOLLOW = {t for t, b in BENCH.items() if b["scorer"] in ("ifeval", "ifbench")}
 
@@ -414,7 +448,7 @@ RUNTIMES = {
         # k3, thinking off: the whitepaper's thinking-off set (plan T's and
         # step8804's instruction following's)
         "off_for": ("gpqa_diamond_epoch", "math_l5_epoch", "mmlupro_tiger", "ifeval_google",
-                    "ifbench_test"),
+                    "ifbench_test", "mmlu_chat", "gsm8k_chat"),
         "sampling": {},
         # our thinking setting → the expert path a request names
         "paths": {"off": 3, "on": 6},
@@ -432,7 +466,10 @@ RUNTIMES = {
                           "--mirostat", "--reasoning", "--reasoning-format",
                           "--reasoning-budget", "--chat-template-kwargs", "--expert-path",
                           "--slot-save-path", "--no-jinja"),
-        "models": {"served/step2388-k3k6-2611": "Qwen/Qwen3.6-35B-A3B"},
+        # 31.2: and its k3 path at the file's own settings on DeviceMark — the
+        # same file and server, a row of its own (FILE_SAMPLING)
+        "models": {"served/step2388-k3k6-2611": "Qwen/Qwen3.6-35B-A3B",
+                   "served/step2388-k3k6-2611-file": "Qwen/Qwen3.6-35B-A3B"},
         # llama.cpp-teraformer at 3ad38b7cc, the copy on our server: one commit
         # after the team's d98b64741, which changes only the README — either
         # runs. Its local Makefile change isn't read by CMake
@@ -441,6 +478,38 @@ RUNTIMES = {
                   "changes_allowed": ("Makefile",)},
     },
 }
+
+# 31.2: the original model step2388's backbone was quantised from — Unsloth's
+# UD-Q2_K_XL of Qwen3.6-35B-A3B (its MTP repository; the file the team's
+# teraformer.qad.reference_gguf names) — on the same build, for the easy set:
+# thinking off at its card's non-thinking settings, said in every request as
+# well as the server's defaults. LOOKAHEAD_MOE_ROUTER_NORM is set as on every
+# model of this build: it switches on trained router norms for hoisted routes,
+# and a base file has neither, so it does nothing here (llama-model.cpp,
+# models/qwen35moe.cpp). Its MTP head stays off: no draft (RUNTIME_REFUSES),
+# and a server whose slots draft is refused before a question
+RUNTIMES["card-qwen-k3k6"] = {
+    "words": "the team's joint k3/k6 build running the original Qwen3.6-35B-A3B, its card's "
+             "non-thinking settings, the router norm set (no effect on a base file), its MTP head "
+             "off, no reasoning budget",
+    "env": dict(RUNTIMES["k3k6-2611"]["env"]),
+    "thinking": (),
+    "off_for": ("mmlu_chat", "gsm8k_chat"),
+    "sampling": {"temperature": 0.7, "top_k": 20, "top_p": 0.8, "min_p": 0.0,
+                 "presence_penalty": 1.5, "repeat_penalty": 1.0},
+    "sampling_from": {
+        k: "Qwen/Qwen3.6-35B-A3B's model card, its non-thinking line (temperature=0.7, "
+           "top_p=0.80, top_k=20, min_p=0.0, presence_penalty=1.5, repetition_penalty=1.0)"
+        for k in ("temperature", "top_k", "top_p", "min_p", "presence_penalty",
+                  "repeat_penalty")},
+    "flags": list(RUNTIMES["k3k6-2611"]["flags"]),
+    "refuses_env": ("GGML_CUDA_DISABLE_FUSION",),
+    "models": {"served/Qwen3.6-35B-A3B-Q2-k3k6-2611": "Qwen/Qwen3.6-35B-A3B"},
+    "build": dict(RUNTIMES["k3k6-2611"]["build"]),
+}
+# 31.2: the served ids asked on DeviceMark at the file's own settings: the
+# path alone, no sampling field — the second k3 row the brief asks for
+FILE_SAMPLING = {"served/step2388-k3k6-2611-file"}
 
 # 31.1: what step2388's file stores for each path (the team's, 3 Nov): what
 # the box's settings check holds the file, the server's /props and start-up
@@ -839,6 +908,15 @@ def _fetch_source(task: str):
         return {"items": items, "extra": {"shots": shots}}
     if task == "arc_agi2_public":
         return _arc_rows()
+    if task == "mmlu_chat":
+        # 31.2: the dataset's order; an id by its place in the test split
+        return [{"id": str(i), "question": r["question"].strip(), "options": list(r["choices"]),
+                 "answer": LETTERS[int(r["answer"])], "subject": r["subject"]}
+                for i, r in enumerate(_hf_load(task))]
+    if task == "gsm8k_chat":
+        return [{"id": str(i), "question": r["question"].strip(),
+                 "answer": r["answer"].rsplit("####", 1)[-1].strip().replace(",", "")}
+                for i, r in enumerate(_hf_load(task))]
     if task in FOLLOW:
         # 25: the prompt, its instructions and their arguments — an argument
         # the dataset leaves unset dropped, as the checkers drop it
@@ -990,6 +1068,12 @@ def prompt(task: str, item: dict) -> tuple[str, dict]:
     if task in FOLLOW:
         return item["question"], {"prompt": item["question"], "ids": item["instructions"],
                                   "kwargs": item["kwargs"]}
+    if task == "mmlu_chat":
+        text = GPQA_TEMPLATE.format(question=item["question"],
+                                    **dict(zip(LETTERS, item["options"])))
+        return text, {"key": item["answer"]}
+    if task == "gsm8k_chat":
+        return GSM8K_TEMPLATE.format(question=item["question"]), {"answer": item["answer"]}
     raise KeyError(task)
 
 
@@ -1245,6 +1329,25 @@ def read_grid(text: str):
 
 
 _HLE_ANSWER = re.compile(r"(?im)^\s*(?:exact\s+)?answer\s*:\s*(.+)$")
+# 31.2: a number as a reply writes it — a sign, thousands commas, a decimal part
+_LAST_NUMBER = re.compile(r"-?\d[\d,]*(?:\.\d+)?")
+
+
+def read_last_number(text: str) -> str | None:
+    """31.2: GSM8K's reading — the last number of the reply, its thinking
+    stripped, its commas and a trailing ".0…" dropped; None when it has none"""
+    m = _LAST_NUMBER.findall(visible(text))
+    if not m:
+        return None
+    got = m[-1].replace(",", "")
+    return got[:got.index(".")] if "." in got and not got.split(".", 1)[1].strip("0") else got
+
+
+def same_number(a: str | None, b: str | None) -> bool:
+    try:
+        return a is not None and b is not None and float(a) == float(str(b).replace(",", ""))
+    except ValueError:
+        return False
 
 
 def score(task: str, answer: str, finish: str | None, need: dict) -> dict:
@@ -1284,6 +1387,9 @@ def score(task: str, answer: str, finish: str | None, need: dict) -> dict:
             got = inf.check(kind, need["prompt"], need["ids"], need["kwargs"], visible(answer))
         return {"ok": all(got[BENCH[task]["metric"]]), "read": None, "ran_out": out,
                 "follow": {"ids": list(need["ids"]), **got}}
+    if kind == "last_number":
+        got = None if out else read_last_number(answer)
+        return {"ok": same_number(got, need["answer"]), "read": got, "ran_out": out}
     if kind == "graded":
         vis = visible(answer)
         m = _HLE_ANSWER.findall(vis) if task == "hle_text_cais" else []
@@ -1530,6 +1636,9 @@ def shown(task: str, item: dict) -> dict:
     if task == "mmlupro_tiger":
         return {"q": item["question"], "options": item["options"],
                 "reference": item["answer"], "subject": item["category"]}
+    if task == "mmlu_chat":
+        return {"q": item["question"], "options": item["options"],
+                "reference": item["answer"], "subject": item["subject"]}
     if task == "arc_agi2_public":
         tid, i = item["id"].split("#")
         return {"q": f"Task {tid}, test grid {int(i) + 1}: the test input "

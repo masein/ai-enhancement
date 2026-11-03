@@ -88,6 +88,12 @@ class GraderChat(llm.OpenRouterChat):
         return STOPPED if stopped() else super().waiting()
 
 
+class GraderBatch(GraderChat, llm.OpenRouterBatchAPI):
+    """31.2: a grader OpenRouter serves through its Batch API alone (HLE's
+    judge, o3-mini-2025-01-31: openai/o3-mini:batch) — the grader's batch
+    sent whole to its pinned provider, its replies back within a day"""
+
+
 def gdir() -> Path:
     return config.BENCH_ROOT / "frontier" / "grading"
 
@@ -479,8 +485,9 @@ def _estimate(ws: list[dict]) -> dict:
 def _backend(pin: dict) -> llm.Backend:
     if not config.OPENROUTER_API_KEY:
         raise llm.LLMError("OpenRouter has no key on this server")
-    return GraderChat(pin["id"], config.OPENROUTER_API_KEY, config.BENCH_ROOT, pin=pin,
-                      role=JOB)
+    # 31.2: a grader served through OpenRouter's Batch API alone, asked as one batch
+    cls = GraderBatch if llm.is_batch(pin) else GraderChat
+    return cls(pin["id"], config.OPENROUTER_API_KEY, config.BENCH_ROOT, pin=pin, role=JOB)
 
 
 def batch_backend(batch_id: str) -> llm.Backend:

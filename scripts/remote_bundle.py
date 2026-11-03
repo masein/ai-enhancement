@@ -60,7 +60,11 @@ FORMAT = 1                                   # DeviceMark's, from remote_run.py
 SUITES = {"devicemark": {"prefix": "devicemark", "format": FORMAT,
                          "tasks": ("dm_ifeval", "dm_mmlu_pro", "dm_math")},
           # 17: a GGUF's Frontier run, from remote_gguf.py
-          "frontier": {"prefix": "frontier", "format": 2, "tasks": tuple(_fb.TASKS)}}
+          "frontier": {"prefix": "frontier", "format": 2, "tasks": tuple(_fb.ALL)},
+          # 31.2: a served model's DeviceMark battery, asked on a rented box's
+          # own llama-server (remote_gguf.py --devicemark), marked again on import
+          "devicemark-served": {"prefix": "devicemark-served", "format": 3,
+                                "tasks": ("devicemark",)}}
 # 17: what never travels in a bundle — a model's weights, a binary, a library
 NEVER = re.compile(r"(?i)\.(gguf|safetensors|bin|pt|pth|ckpt|so(\.\d+)*|tar|gz|zst|xz|zip)$")
 # what must be the server's, exactly, for a bundle to be imported

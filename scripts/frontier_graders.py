@@ -65,7 +65,10 @@ GRADERS: dict[str, dict] = {
     "hle": {
         "label": "Humanity's Last Exam's judge", "task": "hle_text_cais",
         "prompt": "hle_judge.txt", "prompt_words": "CAIS's judge prompt",
-        "suggested": "openai/o3-mini", "owners": "o3-mini-2025-01-31",
+        # 31.2: o3-mini-2025-01-31 is served on OpenRouter through its Batch API
+        # alone now (OpenAI, half price, within a day): the judge CAIS ran, so
+        # step8804's HLE grades stand beside step2388's
+        "suggested": "openai/o3-mini:batch", "owners": "o3-mini-2025-01-31",
         "why": "the judge CAIS grades Humanity's Last Exam with",
         "does": "judges every answer against the key, yes or no",
         # o3-mini thinks before it answers: its reasoning tokens are billed, and

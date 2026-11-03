@@ -58,13 +58,48 @@ def dm():
     return devicemark
 
 
-def settings(thinking: bool, max_tokens: int | None = None) -> dict:
+def settings(thinking: bool, max_tokens: int | None = None, rec: dict | None = None) -> dict:
     """the protocol, as a request says it: greedy with a fixed seed, the cap
     (thinking included — the server counts every token it generates), and
-    the thinking switch said out loud either way"""
+    the thinking switch said out loud either way. 31.2: a model served on a
+    runtime of expert paths (`rec`'s) names its path in place of the switch,
+    and greedy is plain argmax there too: temperature 0 and no presence
+    penalty — a path's own penalty applies even at temperature 0, and the other
+    replica rows ran with none ("DeviceMark's protocol: greedy, no
+    penalties"). A served id asked at the file's own settings (FILE_SAMPLING)
+    sends its path and the seed alone"""
     d = dm()
+    path = _path(rec, thinking)
+    if path is not None:
+        if (rec or {}).get("id") in _fb().FILE_SAMPLING:
+            return {"max_tokens": int(max_tokens or d.CAP), "seed": d.SEED, "expert_path": path}
+        return {"max_tokens": int(max_tokens or d.CAP), "temperature": 0.0,
+                "presence_penalty": 0.0, "seed": d.SEED, "expert_path": path}
     return {"max_tokens": int(max_tokens or d.CAP), "temperature": 0.0, "seed": d.SEED,
             "chat_template_kwargs": {"enable_thinking": bool(thinking)}}
+
+
+def _fb():
+    """scripts/frontier.py: the runtimes"""
+    dm()                                        # puts scripts/ on the path
+    import frontier
+    return frontier
+
+
+def _path(rec: dict | None, thinking: bool) -> int | None:
+    """31.2: the expert path a served model's runtime asks with this thinking
+    setting; None for a model on no runtime of paths"""
+    return _fb().path_of((rec or {}).get("runtime"), bool(thinking)) if rec else None
+
+
+# 31.2: the protocol's words, for a run's setup and a row's record
+PROTOCOL_WORDS = {"greedy": "DeviceMark's protocol: greedy, no penalties",
+                  "file": "the file's own settings for the path: no sampling field sent"}
+
+
+def sampling_of(s: dict) -> str:
+    """31.2: which of DeviceMark's two ways a request asks — 'greedy' or 'file'"""
+    return "greedy" if "temperature" in s else "file"
 
 
 class _Retry(Exception):
@@ -118,6 +153,8 @@ def ask(rec: dict, text: str, s: dict) -> dict:
     time"""
     body = {"model": rec["pin"].get("model") or rec["name"],
             "messages": [{"role": "user", "content": text}], "stream": False, **s}
+    if "expert_path" in s:
+        body.pop("model")                       # 31.2: the path, and nothing to replace it
     base, key = _served._endpoint(rec)
     t0 = time.time()
     reply = _post(base + "/chat/completions", key, body)
@@ -219,6 +256,11 @@ def answer_item(rec: dict, text: str, s: dict) -> dict:
         return _ask_patiently(rec, text, s)
     except ItemError as e:
         said = str(e)
+    if "expert_path" in s:
+        # 31.2: never without the chat endpoint on an expert path — the raw
+        # completion would need the thinking said, which only the path says
+        return no_answer(said, "not asked: an expert path is asked through its chat endpoint "
+                               "alone")
     try:
         return {**_ask_patiently(rec, text, s, ask_raw), "raw_fallback": {"error": said}}
     except (ItemError, ValueError) as e:    # 12s: a server with no /apply-template says 404
@@ -360,9 +402,11 @@ def answer_all(rec: dict, keys: list[tuple[str, str]], items: dict, s: dict, sto
 _QUANT = re.compile(r"(?:UD-)?(?:I?Q\d(?:_[A-Z0-9]+)*|BF16|F16|F32|q\d_\w+)", re.I)
 
 
-def setup_of(rec: dict, thinking: bool, props: dict | None = None) -> dict:
+def setup_of(rec: dict, thinking: bool, props: dict | None = None,
+             s: dict | None = None) -> dict:
     """model, lookahead, MTP, thinking, quant, the server's flags as far as
-    it or its registration says them, port and battery"""
+    it or its registration says them, port and battery — 31.2: and on a
+    runtime of expert paths, the path and what each request sent, in words"""
     d = dm()
     lk = _served.launch(rec) or {}
     file = rec["pin"].get("file") or ""
@@ -376,7 +420,11 @@ def setup_of(rec: dict, thinking: bool, props: dict | None = None) -> dict:
             "lookahead": bool(lk.get("lookahead")), "mtp": bool(lk.get("mtp")),
             "launch": {"flags": rec.get("flags") or "", "env": rec.get("env") or ""},
             "thinking": bool(thinking), "server_flags": rec.get("how") or "",
-            "props": props or {}, "battery": d.VERSION, "cap": d.CAP, "seed": d.SEED}
+            "props": props or {}, "battery": d.VERSION, "cap": d.CAP, "seed": d.SEED,
+            **({"runtime_name": rec.get("runtime"), "expert_path": s["expert_path"],
+                "request": {k: v for k, v in s.items() if k != "max_tokens"},
+                "protocol_words": PROTOCOL_WORDS[sampling_of(s)]}
+               if s and "expert_path" in s else {})}
 
 
 def _props(rec: dict) -> dict:
@@ -440,7 +488,7 @@ def battery(sid: int, rec: dict, items: dict, thinking: bool, part: str,
     """the battery, or the pilot's 30 of it: asked, then scored"""
     d = dm()
     keys = d.keys_for(part)
-    s = settings(thinking)
+    s = settings(thinking, rec=rec)
     out = row_dir(rec["id"], thinking)
     store = out / (ANSWERS_NAME if part == "full" else PILOT_ANSWERS_NAME)
     label = f"devicemark {'pilot' if part == 'pilot' else 'battery'} ({len(keys)} items)"
@@ -465,7 +513,7 @@ def battery(sid: int, rec: dict, items: dict, thinking: bool, part: str,
                 f"no answer — the server said: {r['error']['chat']}; without its chat "
                 f"parsing: {r['error']['fallback']}"))
     db.update(sid, status="running", progress="devicemark · scoring the answers")
-    setup = setup_of(rec, thinking, _props(rec))
+    setup = setup_of(rec, thinking, _props(rec), s)
     # 15.7: the server splits the thinking off (its reasoning_content); read as v2
     row = d.mark(out, items, setup, got, part, reading={"on": bool(thinking)})
     if part == "pilot":
