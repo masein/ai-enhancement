@@ -102,6 +102,11 @@ import remote_bundle as rb  # noqa: E402
 SUITE = "frontier-cont"
 REFUSED = 2
 STEP2388, Q2 = "served/step2388-k3k6-2611", "served/Qwen3.6-35B-A3B-Q2-k3k6-2611"
+# 31.3e: the whitepaper's showcase (scripts/showcase_box.py) — its answers that
+# ran out of room where U39 asked them (81,920, on 917850e's image) continued
+# with step2388's k6 answers; no benchmark, its questions the pinned file's
+SHOWCASE = "showcase"
+SHOWCASE_ROOM = 2048                # beside its limit in its slot, as showcase_box
 EASY = ("mmlu_chat", "gsm8k_chat")
 # what is continued, and to what, by model and thinking: its inputs file's
 # key, its limit (thinking and answer together), its expert path, and its
@@ -115,7 +120,7 @@ SPECS = {
     (STEP2388, True): {"key": "k6", "limit": 98_304, "path": 6,
                        "tasks": ("gpqa_diamond_epoch", "otis_aime_epoch", "math_l5_epoch",
                                  "mmlupro_tiger", "arc_agi2_public", "ifeval_google",
-                                 "ifbench_test", "simpleqa_epoch", "hle_text_cais")},
+                                 "ifbench_test", "simpleqa_epoch", "hle_text_cais", SHOWCASE)},
     (STEP2388, False): {"key": "k3", "limit": 32_768, "path": 3,
                         "tasks": ("gpqa_diamond_epoch", "math_l5_epoch", "mmlupro_tiger",
                                   "ifeval_google", "ifbench_test", *EASY)},
@@ -153,7 +158,12 @@ def spec_of(model: str, on: bool) -> dict | None:
 def context(spec: dict) -> int:
     """a slot's context: the new limit, and the prompt's room of the longest
     benchmark continued (ARC-AGI-2's on k6: 131,072)"""
-    return spec["limit"] + max(fb.BENCH[t]["room"] for t in spec["tasks"])
+    return spec["limit"] + max(fb.BENCH[t]["room"] if t in fb.BENCH else SHOWCASE_ROOM
+                               for t in spec["tasks"])
+
+
+def label_of(task: str) -> str:
+    return "the showcase" if task == SHOWCASE else fb.BENCH[task]["label"]
 
 
 def asked_as(spec: dict) -> dict:
@@ -218,8 +228,9 @@ def turn(text: str, path: int) -> dict:
 
 
 def messages(task: str, text: str) -> list[dict]:
-    """the question as service/served.ask asked it"""
-    system = fb.system_of(task)
+    """the question as service/served.ask asked it — the showcase's alone, as
+    showcase_box asked it"""
+    system = fb.system_of(task) if task in fb.BENCH else None
     return [*([{"role": "system", "content": system}] if system else []),
             {"role": "user", "content": text}]
 
@@ -321,7 +332,7 @@ def continue_one(srv: Server, line: dict, item: dict, spec: dict,
     "continued", or "refused" and why)"""
     task, qid, e = line["task"], str(line["id"]), int(line["epoch"])
     path, limit = spec.get("path"), spec["limit"]
-    text, _ = fb.prompt(task, item)
+    text = item["question"] if task == SHOWCASE else fb.prompt(task, item)[0]
     msgs = messages(task, text)
     base = {"task": task, "id": qid, "epoch": e, "limit": limit,
             "was": {"sha256": answer_sha(line["answer"]), "tokens": int(line["tokens"]),
@@ -443,7 +454,8 @@ def read_input(path: Path) -> list[dict]:
             r = json.loads(x)
         except ValueError:
             raise ValueError(f"{Path(path).name}: line {k} isn't JSON") from None
-        if not (isinstance(r, dict) and r.get("task") in fb.BENCH and isinstance(r.get("answer"), str)
+        if not (isinstance(r, dict) and (r.get("task") in fb.BENCH or r.get("task") == SHOWCASE)
+                and isinstance(r.get("answer"), str)
                 and isinstance(r.get("tokens"), int) and isinstance(r.get("epoch"), int)
                 and r.get("id") is not None):
             raise ValueError(f"{Path(path).name}: line {k} isn't an answer to continue")
@@ -492,7 +504,7 @@ def kept(out: Path, name: str = DONE) -> dict[tuple[str, str, int], dict]:
 
 
 def line_words(r: dict, k: int, of: int) -> str:
-    label = fb.BENCH[r["task"]]["label"]
+    label = label_of(r["task"])
     if r["status"] != "continued":
         return f"{label} {k} of {of} (question {r['id']}, run {r['epoch']}): not continued — {r['why']}"
     return (f"{label} {k} of {of} (question {r['id']}, run {r['epoch']}): {r['was']['tokens']:,} → "
@@ -503,7 +515,8 @@ def line_words(r: dict, k: int, of: int) -> str:
 
 
 def ask(base: str, lines: list[dict], out: Path, spec: dict, slots: int, say,
-        name: str = DONE, asked: dict[str, dict] | None = None) -> tuple[int, str]:
+        name: str = DONE, asked: dict[str, dict] | None = None,
+        questions: list[dict] | None = None) -> tuple[int, str]:
     """each answer not yet continued, `slots` at a time: (kept, why it stopped
     — '' when every one is)"""
     from concurrent.futures import ThreadPoolExecutor
@@ -513,8 +526,11 @@ def ask(base: str, lines: list[dict], out: Path, spec: dict, slots: int, say,
     have = kept(out, name)
     todo = [r for r in lines if key_of(r) not in have]
     items: dict[str, dict] = {}
-    for t in sorted({r["task"] for r in todo}):
+    for t in sorted({r["task"] for r in todo} - {SHOWCASE}):
         items.update({f"{t}\0{it['id']}": it for it in fb.load(t, config.BENCH_ROOT)})
+    # 31.3e: the showcase's from its pinned questions file (showcase_box.questions)
+    items.update({f"{SHOWCASE}\0own-{q['n']}": {"id": f"own-{q['n']}", "question": q["question"]}
+                  for q in questions or []})
     if todo:
         say(f"{len(todo):,} of {len(lines):,} answers to continue here, {len(have):,} kept "
             f"already · to {limit:,} tokens" + (f" on k{spec['path']}" if spec.get("path") else "")
@@ -537,7 +553,7 @@ def ask(base: str, lines: list[dict], out: Path, spec: dict, slots: int, say,
                 got = {"status": "failed", "why": f"{type(e).__name__}: {str(e)[:300]}"}
         if got["status"] == "failed":
             with lock:
-                stop.append(f"{fb.BENCH[r['task']]['label']} question {r['id']}, run "
+                stop.append(f"{label_of(r['task'])} question {r['id']}, run "
                             f"{r['epoch']}: {got['why']}")
             return
         with lock:
@@ -594,7 +610,7 @@ def make_bundle(out: Path, served_as: str, thinking: bool, state: dict, gguf: di
     row = served_as.replace("/", "__") + ("__thinking" if thinking else "")
     files: dict[str, bytes] = {}
     tasks: dict[str, int] = {}
-    for t in [t for t in fb.ALL if any(r["task"] == t for r in mine)]:
+    for t in [t for t in (*fb.ALL, SHOWCASE) if any(r["task"] == t for r in mine)]:
         got = [r for r in mine if r["task"] == t]
         tasks[t] = len(got)
         files[f"results/{row}/{t}_0shot/frontier/{DONE}"] = "".join(
@@ -943,6 +959,12 @@ def inputs(dest: Path, say=print, models: list[str] | None = None) -> dict:
         row = config.OUT_DIR / (model.replace("/", "__") + ("__thinking" if on else ""))
         lines, by, left = [], {}, {}
         for t in spec["tasks"]:
+            if t == SHOWCASE:
+                got = showcase_inputs(row.name)          # 31.3e
+                if got is not None:
+                    lines += got[0]
+                    by[t] = got[1]
+                continue
             d = sf.task_dir(row, t)
             if not (d / sf.ANSWERS).exists():
                 continue
@@ -987,17 +1009,56 @@ def inputs(dest: Path, say=print, models: list[str] | None = None) -> dict:
             + (f" (k{spec['path']})" if spec["path"] else "") + f", to {spec['limit']:,} tokens: "
             f"{len(lines):,} answers to continue · {f} · sha256 {sha}")
         for t, n in by.items():
-            say(f"  {fb.BENCH[t]['label']}: {n['to_continue']:,} of its {n['answers']:,} answers "
+            say(f"  {label_of(t)}: {n['to_continue']:,} of its {n['answers']:,} answers "
                 f"(ran out at {n['budget']:,}: {n['ran_out']:,}"
                 + (f", continued already {n['continued_already']:,}" if n["continued_already"]
                    else "")
                 + (f", no token count {n['no_count']:,}" if n["no_count"] else "") + ")"
                 if isinstance(n["budget"], int) else
-                f"  {fb.BENCH[t]['label']}: {n['to_continue']:,} of its {n['answers']:,} answers")
+                f"  {label_of(t)}: {n['to_continue']:,} of its {n['answers']:,} answers")
         for t, why in left.items():
-            say(f"  {fb.BENCH[t]['label']}: left out — {why}")
+            say(f"  {label_of(t)}: left out — {why}")
         say(f"  at most {out[key]['most']:,} tokens to write (each to the limit)")
     return out
+
+
+def showcase_answer(r: dict) -> str:
+    """a showcase answer as service/served.ask keeps one (showcase_box.ask)"""
+    think, reply = r.get("thinking") or "", r.get("reply") or ""
+    return f"<think>\n{think}\n</think>\n\n{reply}" if think else reply
+
+
+def showcase_inputs(row: str) -> tuple[list[dict], dict] | None:
+    """31.3e: the showcase's answers that ran out of room, as the inputs file
+    holds an answer — None when its answers aren't imported here"""
+    import showcase_box as scb
+    f = scb.where(row) / "own.jsonl"
+    try:
+        rows = [json.loads(x) for x in f.read_text(encoding="utf-8").splitlines() if x.strip()]
+    except (OSError, ValueError):
+        return None
+    lines = []
+    n = {"ran_out": 0, "to_continue": 0, "continued_already": 0, "no_count": 0,
+         "answers": len(rows), "budget": None}
+    for r in rows:
+        ans = showcase_answer(r)
+        if not fb.ran_out(ans, r.get("finish")):
+            continue
+        n["ran_out"] += 1
+        n["budget"] = r.get("max_tokens")
+        if r.get("continued"):
+            n["continued_already"] += 1
+            continue
+        if not isinstance(r.get("output_tokens"), int):
+            n["no_count"] += 1
+            continue
+        n["to_continue"] += 1
+        lines.append({"task": SHOWCASE, "id": str(r.get("q")), "epoch": 0, "seed": r.get("seed"),
+                      "answer": ans, "finish": r.get("finish"), "tokens": r["output_tokens"],
+                      **({"prompt_tokens": r["prompt_tokens"]}
+                         if isinstance(r.get("prompt_tokens"), int) else {}),
+                      "budget": r.get("max_tokens"), "row": row})
+    return lines, n
 
 
 def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
@@ -1147,6 +1208,9 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
         (sd / sf.SETUP).write_text(json.dumps(tsetup, indent=1), encoding="utf-8")
         imf.keep_grades(d, sd, new)
         ready[t] = {"continued": n_new, "refused": refused, "retokenized": reread}
+    # 31.3e: the showcase's continued answers, onto its own rows (own.jsonl)
+    show = (showcase_staged(b, row_name, spec, setup, path, bad)
+            if SHOWCASE in (bundle.get("tasks") or {}) else None)
     if bad:
         shutil.rmtree(staging.parent, ignore_errors=True)
         for line in bad[:20]:
@@ -1155,7 +1219,7 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             say(f"refused — and {len(bad) - 20} more")
         say("nothing was imported")
         return REFUSED
-    if not ready:
+    if not ready and not (show and (show["n"] or show["refused"])):
         shutil.rmtree(staging.parent, ignore_errors=True)
         for x in lines:
             say(x)
@@ -1194,6 +1258,9 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             elif sc and sc.get("waiting"):
                 words.append(f"{fb.BENCH[t]['label']}: {sc['waiting']:,} answers wait for a "
                              "grade (graded once, on the final answers)")
+        if show and (show["n"] or show["refused"]):
+            lines.append(showcase_written(show, stamp))
+            words.append(f"the showcase: {show['n']:,} answers continued")
     else:
         words.append("nothing was imported; the rows are as they were, and the bundle can be "
                      "imported again")
@@ -1201,23 +1268,27 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
     line = " · ".join(words) or "imported"
     box = setup.get("box") or ""
     gpu = (setup.get("gpu") or {}).get("name") or "a GPU"
-    sid = db.add(model, "instruct", "frontier", by,
-                 f"continued to {cont['limit']:,} tokens on a rented GPU ({gpu})"
-                 + (f" · box {box}" if box else "") + f" · {path.name}", thinking=on,
-                 tasks=tasks, status=status)
-    db.update(sid, status=status, finished_at=time.time(), progress=line, error=error,
-              where_ran=imf.where_words(imf.gpu_names(setup), [box] if box else []))
-    log = config.LOGS_DIR / f"service_{sid}_{model.replace('/', '__')}.log"
-    log.parent.mkdir(parents=True, exist_ok=True)
-    log.write_text(f"===== [{sid}] imported {path.name} (sha256 {b['sha256'][:16]}): the answers "
-                   f"that ran out of room, continued to {cont['limit']:,} tokens =====\n" + b["log"]
-                   + "".join(f"\n[import] {x}" for x in lines) + f"\n[import] {line}\n",
-                   encoding="utf-8")
+    sid = None
+    if tasks:
+        # a Runs row for the benchmarks' answers — the showcase is no row of the
+        # board's, as its own import makes none
+        sid = db.add(model, "instruct", "frontier", by,
+                     f"continued to {cont['limit']:,} tokens on a rented GPU ({gpu})"
+                     + (f" · box {box}" if box else "") + f" · {path.name}", thinking=on,
+                     tasks=tasks, status=status)
+        db.update(sid, status=status, finished_at=time.time(), progress=line, error=error,
+                  where_ran=imf.where_words(imf.gpu_names(setup), [box] if box else []))
+        log = config.LOGS_DIR / f"service_{sid}_{model.replace('/', '__')}.log"
+        log.parent.mkdir(parents=True, exist_ok=True)
+        log.write_text(f"===== [{sid}] imported {path.name} (sha256 {b['sha256'][:16]}): the "
+                       f"answers that ran out of room, continued to {cont['limit']:,} tokens "
+                       "=====\n" + b["log"] + "".join(f"\n[import] {x}" for x in lines)
+                       + f"\n[import] {line}\n", encoding="utf-8")
     if status == "done":
         reg.setdefault("continued", []).append(
             {"sha256": b["sha256"], "sid": sid, "tasks": tasks, "by": by, "at": stamp,
              "bundle": path.name, "box": box, "limit": cont["limit"],
-             "answers": sum(x["continued"] for x in ready.values()),
+             "answers": sum(x["continued"] for x in ready.values()) + (show or {}).get("n", 0),
              "retokenized": sum(x["retokenized"] for x in ready.values()),
              "not_continued": sum(len(x["refused"]) for x in ready.values())})
         imf._write_registry(row, reg)
@@ -1228,8 +1299,113 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
     for x in lines:
         say(x)
     say(f"the row {model}{' · thinking' if on else ''}: {line}")
-    say(f"Runs #{sid}, its log the bundle's")
+    if sid is not None:
+        say(f"Runs #{sid}, its log the bundle's")
     return 0 if status == "done" else 1
+
+
+def showcase_staged(b: dict, row_name: str, spec: dict, setup: dict, path: Path,
+                    bad: list[str]) -> dict | None:
+    """31.3e: the showcase's continued answers onto its own rows — {file,
+    rows, n, refused, reread, limit, from} — each held as a benchmark's is:
+    on the rows, the one continued, beginning as it did; what is wrong goes
+    into `bad`"""
+    import showcase_box as scb
+    raw = b["files"].get(f"results/{row_name}/{SHOWCASE}_0shot/frontier/{DONE}")
+    try:
+        got = [json.loads(x) for x in (raw or b"").decode("utf-8").splitlines() if x.strip()]
+    except ValueError:
+        bad.append(f"the showcase: its {DONE} isn't JSON lines")
+        return None
+    f = scb.where(row_name) / "own.jsonl"
+    try:
+        rows = [json.loads(x) for x in f.read_text(encoding="utf-8").splitlines() if x.strip()]
+    except (OSError, ValueError):
+        bad.append("the showcase: its answers aren't imported here — import U39's showcase bundle "
+                   "first")
+        return None
+    by_q = {str(r.get("q")): r for r in rows}
+    n, refused, reread, frm = 0, [], 0, set()
+    for r in got:
+        q = str(r.get("id"))
+        a = by_q.get(q)
+        if a is None:
+            bad.append(f"the showcase: {q} isn't among its answers here")
+            continue
+        w = r.get("was") or {}
+        if a.get("continued"):
+            if answer_sha(showcase_answer(a)) != answer_sha(r.get("answer") or "") \
+                    or r.get("status") != "continued":
+                bad.append(f"the showcase: {q} was continued already, by another bundle")
+            continue
+        if answer_sha(showcase_answer(a)) != w.get("sha256") or a.get("output_tokens") != \
+                w.get("tokens"):
+            bad.append(f"the showcase: {q}: its answer here isn't the one continued")
+            continue
+        if r.get("status") != "continued":
+            refused.append(r)
+            continue
+        fin = r.get("answer") or ""
+        if not isinstance(r.get("tokens"), int) or continuity(
+                showcase_answer(a), fin, str(r.get("form") or ""), "", spec["path"]):
+            bad.append(f"the showcase: {q}: its continued answer doesn't begin with the one here")
+            continue
+        think, reply, _ = split(fin)
+        toks = r["tokens"]
+        frm.add(a.get("max_tokens"))
+        by_q[q] = {**a, "thinking": think, "reply": reply, "output_tokens": toks,
+                   "thinking_tokens": round(toks * len(think) / max(1, len(think) + len(reply))),
+                   "finish": r.get("finish"), "ran_out": r.get("ran_out"),
+                   "looped": r.get("loop"),
+                   "continued": {"from": {"output_tokens": a.get("output_tokens"),
+                                          "finish": a.get("finish"),
+                                          "max_tokens": a.get("max_tokens"),
+                                          "answer_sha256": w.get("sha256")},
+                                 "limit": r.get("limit"), "seed": r.get("seed"),
+                                 "max_tokens": r.get("max_tokens"),
+                                 "penalty_prompt_tokens": r.get("penalty_prompt_tokens"),
+                                 "tokens_evaluated": r.get("tokens_evaluated"),
+                                 "new_tokens": r.get("new_tokens"), "form": r.get("form"),
+                                 **({"retokenized": r["retokenized"]}
+                                    if r.get("retokenized") else {}),
+                                 "box": setup.get("box") or "", "bundle": path.name}}
+        n += 1
+        reread += bool(r.get("retokenized"))
+    return {"file": f, "old": rows, "rows": [by_q[str(r.get("q"))] for r in rows], "n": n,
+            "refused": refused, "reread": reread, "limit": spec["limit"],
+            "from": sorted(x for x in frm if isinstance(x, int)), "sha256": b["sha256"],
+            "bundle": path.name}
+
+
+def showcase_written(show: dict, stamp: str) -> str:
+    """31.3e: the showcase's rows written with their continued answers — the
+    ones before kept beside them — and what the import says of it"""
+    f = show["file"]
+    kept = f.with_name(f"own-before-continuation-{stamp}.jsonl")
+    kept.write_text(f.read_text(encoding="utf-8"), encoding="utf-8")
+    f.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in show["rows"]),
+                 encoding="utf-8")
+    reg_f = f.with_name("imports.json")
+    try:
+        reg = json.loads(reg_f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        reg = {"imports": []}
+    reg.setdefault("continued", []).append({"sha256": show["sha256"], "bundle": show["bundle"],
+                                            "at": stamp, "answers": show["n"],
+                                            "limit": show["limit"], "from": show["from"]})
+    reg_f.write_text(json.dumps(reg, indent=1), encoding="utf-8")
+    done = [r for r in show["rows"] if isinstance(r.get("continued"), dict)
+            and r["continued"].get("bundle") == show["bundle"]]
+    before = sum(int((r["continued"].get("from") or {}).get("output_tokens") or 0) for r in done)
+    after = sum(int(r.get("output_tokens") or 0) for r in done)
+    frm = "/".join(f"{x:,}" for x in show["from"]) or "?"
+    return (f"the showcase: to {show['limit']:,} tokens (from {frm}) · {show['n']:,} answers "
+            f"continued" + (f", {len(show['refused']):,} not" if show["refused"] else "")
+            + f" · {before:,} → {after:,} tokens · "
+            f"{sum(1 for r in done if r.get('ran_out')):,} still ran out · "
+            f"{sum(1 for r in done if r.get('looped')):,} ended in a loop · "
+            f"{show['reread']:,} of them re-read a few tokens differently (at most {RETOKEN_CAP})"
+            f" · its answers before are kept at {kept}")
 
 
 def _why_counts(refused: list[dict], prev) -> dict:

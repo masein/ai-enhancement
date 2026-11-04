@@ -224,10 +224,30 @@ def checks(b: dict, rec: dict | None, file_sha: str) -> list[str]:
             continue
         want = {"max_tokens": min(LIMIT, CONTEXT - 2048),
                 "seed": fb.seed_of(TASK, f"own-{n}", 0), "expert_path": path}
-        if r.get("request") != want:
+        req = r.get("request") if isinstance(r.get("request"), dict) else {}
+        # 31.3e: asked at a lower limit than the board's (U39 on 917850e's
+        # image: 81,920) — an answer that finished there is a draw at the
+        # board's limit too, and one that ran out is continued by U-cont; any
+        # other difference is refused
+        lower = (isinstance(req.get("max_tokens"), int) and not isinstance(req["max_tokens"], bool)
+                 and 0 < req["max_tokens"] < want["max_tokens"])
+        if req != want and not (lower and {**req, "max_tokens": want["max_tokens"]} == want):
             out.append(f"own-{n} was asked with {json.dumps(r.get('request'), sort_keys=True)}; "
-                       f"the showcase asks {json.dumps(want, sort_keys=True)}")
+                       f"the showcase asks {json.dumps(want, sort_keys=True)}"
+                       + (" (or the same at a lower limit)" if want["max_tokens"] > 1 else ""))
+    limits = {(r.get("request") or {}).get("max_tokens") for r in rows
+              if isinstance(r.get("request"), dict)}
+    if len(limits) > 1:
+        out.append(f"its answers were asked at {len(limits)} limits: "
+                   f"{', '.join(str(x) for x in sorted(limits, key=str))}")
     return out
+
+
+def asked_limit(rows: list[dict]) -> int | None:
+    """31.3e: the limit a showcase bundle's questions were asked at (one for
+    all, the checks hold it)"""
+    got = {(r.get("request") or {}).get("max_tokens") for r in rows}
+    return next(iter(got)) if len(got) == 1 and isinstance(next(iter(got)), int) else None
 
 
 def _rows(b: dict) -> tuple[list[dict], str]:
@@ -300,11 +320,21 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
         own.replace(d / f"own-earlier-{stamp}.jsonl")
         say(f"the earlier answers set aside: own-earlier-{stamp}.jsonl")
     own.write_text(new, encoding="utf-8")
+    at = asked_limit(rows)
+    board = min(LIMIT, CONTEXT - 2048)
     reg["imports"].append({"sha256": b["sha256"], "bundle": path.name, "by": by, "at": stamp,
                            "box": setup.get("box") or "",
-                           "gpu": (setup.get("gpu") or {}).get("name") or ""})
+                           "gpu": (setup.get("gpu") or {}).get("name") or "",
+                           # 31.3e: the limit its questions were asked at
+                           "asked_limit": at, "board_limit": board})
     (d / "imports.json").write_text(json.dumps(reg, indent=1), encoding="utf-8")
     cut = sum(1 for r in rows if r.get("ran_out"))
     say(f"the showcase: {len(rows)} answers of {model} · thinking into {own}"
         + (f" · {cut} ran out of room" if cut else "") + " — no row of the board changes")
+    if at is not None and at < board:
+        # 31.3e: said, with what happens to the ones that ran out
+        say(f"the showcase was asked at {at:,} tokens, under the board's {board:,}: the "
+            f"{len(rows) - cut} that finished stand at {board:,}; "
+            + (f"the {cut} that ran out of room go to U-cont with step2388's k6 answers "
+               f"(continue_box.py inputs), to {board:,}" if cut else "none ran out"))
     return 0
