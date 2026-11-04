@@ -166,7 +166,8 @@ def test_u39_asks_the_showcase_after_devicemark_with_its_pinned_questions():
 
 @pytest.mark.parametrize("box_, given, words", [
     ("U39", "", "its last step asks the showcase's questions: give --showcase"),
-    ("U38", "hf://me/p@abc/showcase-own12.json", "--showcase is U39's alone"),
+    # 31.3e: U39's, and U-cont's k6 boxes' for the showcase's cut answers
+    ("U38", "hf://me/p@abc/showcase-own12.json", "--showcase is U39's, and U-cont's k6 boxes'"),
 ])
 def test_the_showcase_file_goes_with_u39_alone(box_, given, words):
     argv = [box_, "--as", STEP, "--gguf", f"hf://me/p@{REV}/{NAME}",

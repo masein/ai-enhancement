@@ -21,12 +21,14 @@ import import_remote as ir
 import remote_bundle as rb
 import remote_gguf as rg
 import report_lm_eval as report
+import showcase_box as scb
 from service import config
 from service import frontier as sf
 from test_12q_devicemark_runs import svc  # noqa: F401 — svc is the fixture
 from test_17_gguf_box import HARD, N, box, requests  # noqa: F401
 from test_20_step4000 import card  # noqa: F401
 from test_31_1_k3k6 import STEP, k3k6, run_k, step_kept  # noqa: F401
+from test_31_2b_showcase import INVENTED, bundle_of, sc  # noqa: F401
 
 GPQA = "gpqa_diamond_epoch"
 ROW = "served__step2388-k3k6-2611__thinking"
@@ -573,7 +575,6 @@ def test_the_limits_words_on_a_cell():
 
 
 def test_the_showcase_asks_at_the_teams_limit_in_one_go():
-    import showcase_box as scb
     assert (scb.LIMIT, scb.CONTEXT) == (K6["limit"], K6["limit"] + 2048)
 
 
@@ -720,3 +721,106 @@ def test_answers_that_re_read_a_few_tokens_differently_are_continued_and_counted
         == (2, 1)
     setup = json.loads((d / sf.SETUP).read_text())
     assert setup["continued"]["retokenized"] == 2
+
+
+# ---------------------------------------------------------------------------
+# 31.3e: the showcase asked at a lower limit (U39 on 917850e's image), and its
+# answers that ran out continued with step2388's k6 answers
+# ---------------------------------------------------------------------------
+
+
+def test_the_showcase_asked_at_a_lower_limit_is_imported_and_its_limit_recorded(
+        sc, monkeypatch):  # noqa: F811
+    # U39 on 917850e's image: 81,920 of a slot of 83,968
+    monkeypatch.setattr(scb, "LIMIT", 81920)
+    monkeypatch.setattr(scb, "CONTEXT", 83968)
+    assert run_k(sc, "s", "--showcase", str(sc["questions"]), only=False, slots=1) == 0
+    monkeypatch.setattr(scb, "LIMIT", 98304)
+    monkeypatch.setattr(scb, "CONTEXT", 100352)
+    b = rb.read(bundle_of(sc, "s"))
+    import import_frontier as imf
+    rec = imf._would_be(b, sc["sha"])
+    assert scb.checks(b, rec, sc["sha"]) == []
+
+    def refused(**change) -> list[str]:
+        c = json.loads(json.dumps({k: v for k, v in b.items() if k != "files"}))
+        c["files"] = dict(b["files"])
+        name = f"results/{b['bundle']['row']}/{scb.ANSWERS}"
+        rows = [json.loads(x) for x in c["files"][name].decode().splitlines()]
+        rows[0]["request"] = {**rows[0]["request"], **change}
+        c["files"][name] = "".join(json.dumps(r) + "\n" for r in rows).encode()
+        return scb.checks(c, rec, sc["sha"])
+    # any other difference is still refused: a higher limit, another seed, a
+    # sampling value, one answer at another limit than the rest
+    assert any("own-1 was asked with" in x for x in refused(max_tokens=120000))
+    assert any("own-1 was asked with" in x for x in refused(seed=7))
+    assert any("own-1 was asked with" in x for x in refused(temperature=0.0))
+    assert any("asked at 2 limits" in x for x in refused(max_tokens=65536))
+    said: list[str] = []
+    assert ir.import_bundle(bundle_of(sc, "s"), "masein", said.append, sc["sha"],
+                            "step2388 (k3/k6)") == 0
+    assert ("the showcase was asked at 81,920 tokens, under the board's 98,304: the 3 that "
+            "finished stand at 98,304; none ran out") in said
+    reg = json.loads((scb.where(ROW) / "imports.json").read_text())
+    assert (reg["imports"][-1]["asked_limit"], reg["imports"][-1]["board_limit"]) == (81920, 98304)
+    # the bundle as it came: nothing in it changed
+    assert rb.read(bundle_of(sc, "s"))["sha256"] == b["sha256"]
+
+
+def test_the_showcases_answers_that_ran_out_go_through_u_cont(sc, cont, monkeypatch):  # noqa: F811
+    # asked at plan U's (shrunk) limit, every answer cut; the board's is the team's
+    monkeypatch.setattr(scb, "CONTEXT", 4096)
+    monkeypatch.setattr(scb, "LIMIT", OLD)
+    assert run_k(sc, "s", "--showcase", str(sc["questions"]), only=False, slots=1) == 0
+    monkeypatch.setattr(scb, "LIMIT", NEW)
+    said: list[str] = []
+    assert ir.import_bundle(bundle_of(sc, "s"), "masein", said.append, sc["sha"],
+                            "step2388 (k3/k6)") == 0
+    assert any("the 3 that ran out of room go to U-cont" in x for x in said)
+    f, sha = inputs_of(cont)
+    lines = cb.read_input(f)
+    assert {(r["task"], r["id"], r["tokens"], r["budget"]) for r in lines} == {
+        (cb.SHOWCASE, f"own-{n}", OLD, OLD) for n in (1, 2, 3)}
+    # its questions come from the pinned file: without it the box asks nothing
+    with pytest.raises(SystemExit, match="give --continue-questions"):
+        run_k(cont, "c0", "--continue", str(f), "--pin", f"{f.name}={sha}", only=False)
+    qsha = rb.sha256_file(sc["questions"])
+    assert run_k(cont, "c", "--continue", str(f), "--pin", f"{f.name}={sha}",
+                 "--continue-questions", str(sc["questions"]), "--pin", f"{scb.NAME}={qsha}",
+                 only=False) == 0
+    asked = cont_requests(cont)
+    assert len(asked) == 3 and all(
+        r["messages"][0] == {"role": "user", "content": x["question"]}
+        and r["max_tokens"] == NEW - OLD and r["penalty_prompt_tokens"] == OLD
+        and r["seed"] == fb.seed_of("showcase", f"own-{x['n']}+cont", 0)
+        for r, x in zip(sorted(asked, key=lambda r: r["messages"][0]["content"]),
+                        sorted(INVENTED, key=lambda x: x["question"])))
+    p = next((cont["root"] / "c").glob("frontier-cont-*.tar.gz"))
+    said.clear()
+    assert ir.import_bundle(p, "masein", said.append) == 0
+    line = next(x for x in said if x.startswith("the showcase: to"))
+    assert line.startswith(f"the showcase: to {NEW} tokens (from {OLD}) · 3 answers continued · "
+                           f"{3 * OLD} → {3 * 22} tokens · 0 still ran out")
+    own = scb.where(ROW) / "own.jsonl"
+    rows = [json.loads(x) for x in own.read_text().splitlines()]
+    assert [r["q"] for r in rows] == ["own-1", "own-2", "own-3"]
+    assert all(r["output_tokens"] == 22 and r["finish"] == "stop" and not r["ran_out"]
+               and r["max_tokens"] == OLD and r["continued"]["limit"] == NEW
+               and r["continued"]["from"]["output_tokens"] == OLD for r in rows)
+    assert list(own.parent.glob("own-before-continuation-*.jsonl"))
+    said.clear()
+    assert ir.import_bundle(p, "masein", said.append) == 0
+    assert any("imported already" in x for x in said)
+    assert cb.read_input(inputs_of(cont)[0]) == []
+
+
+def test_u_conts_k6_lines_take_the_showcases_questions_file_and_k3s_dont(capsys):
+    sha, q = "a" * 64, f"hf://o/r@{'b' * 40}/showcase-own12.json"
+    a = fx.parser().parse_args(line("C2", "--continue", "/workspace/cont-k6.jsonl",
+                                    "--continue-sha256", sha, "--showcase", q))
+    cmd = fx.argv_of("C2", 1, fx.box_of("C2")[0], a)
+    assert cmd[cmd.index("--continue-questions") + 1] == q
+    assert f"showcase-own12.json={fx.PLAN_PINS['C']['showcase-own12.json']}" in cmd
+    with pytest.raises(SystemExit, match="U-cont's k6 boxes' \\(C1–C3\\)"):
+        fx.main(line("C4", "--continue", "/workspace/cont-k3.jsonl", "--continue-sha256", sha,
+                      "--showcase", q))

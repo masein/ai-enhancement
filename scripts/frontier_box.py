@@ -776,6 +776,8 @@ def argv_of(box: str, k: int, step: Step, a: argparse.Namespace) -> list[str]:
         out += ["--continue", a.cont, "--pin", f"{name}={a.continue_sha256}",
                 # a card that holds fewer runs fewer, down to half
                 "--min-slots", str(max(1, slots // 2))]
+        if getattr(a, "showcase", ""):
+            out += ["--continue-questions", a.showcase]     # 31.3e: its pin is pins_of's
         if getattr(a, "continue_check", 0):
             return out + ["--continue-check", str(a.continue_check), "--only", GPQA,
                           "--out", str(cont_check_folder(a))]
@@ -957,13 +959,16 @@ def main(argv: list[str] | None = None) -> int:
         why = revision_refused(a, box)
         if why:
             raise SystemExit(why)
-        # 31.2b: the showcase's box takes its questions file, and only it
+        # 31.2b: the showcase's box takes its questions file — 31.3e: and
+        # U-cont's k6 boxes may, for the showcase's answers that ran out of room
         asks = any(is_showcase(st) for st in box_of(box))
-        if asks != bool(getattr(a, "showcase", "")):
+        takes = asks or any(is_cont(st) and st[0] == "on" for st in box_of(box))
+        if (asks and not getattr(a, "showcase", "")) or (getattr(a, "showcase", "") and not takes):
             raise SystemExit(f"{box}: " + (
                 "its last step asks the showcase's questions: give --showcase with the questions "
                 "file (hf://<you>/evalboard-private@<commit>/showcase-own12.json)" if asks else
-                "--showcase is U39's alone, the box that asks the showcase") + ". Nothing was fetched")
+                "--showcase is U39's, and U-cont's k6 boxes' (C1–C3) for the showcase's answers "
+                "that ran out of room") + ". Nothing was fetched")
         if any(DM_FILE in st[1] for st in box_of(box)) and (
                 a.served_as + FILE_SUFFIX not in fb.FILE_SAMPLING):
             raise SystemExit(f"{box}: its DeviceMark step at the file's own settings runs "

@@ -1588,6 +1588,10 @@ def _main(argv: list[str] | None = None) -> int:
                          "(continue_box.py inputs on the server, pinned with --pin), each answer "
                          "continued from where it stopped on this --thinking's expert path, into "
                          "a bundle of its own (scripts/continue_box.py)")
+    ap.add_argument("--continue-questions", dest="cont_questions", default="", metavar="QUESTIONS",
+                    help="31.3e: with --continue, the showcase's questions file (hf://… or a path, "
+                         "pinned with --pin) — needed when this box's share holds the showcase's "
+                         "answers that ran out of room")
     ap.add_argument("--part", default="", help="31.3: i/n — with --continue, this box's share "
                                                "of the answers, every n-th from the i-th")
     ap.add_argument("--continue-check", type=int, default=0, metavar="N",
@@ -1662,8 +1666,8 @@ def _main(argv: list[str] | None = None) -> int:
         if not cb.spec_of(a.served_as, a.thinking == "on"):
             ap.error("--continue: these answers aren't continued — "
                      + "; ".join(f"{m} thinking {'on' if on else 'off'}" for m, on in cb.SPECS))
-    if (a.part or a.continue_check) and not a.cont:
-        ap.error("--part and --continue-check: with --continue")
+    if (a.part or a.continue_check or a.cont_questions) and not a.cont:
+        ap.error("--part, --continue-check and --continue-questions: with --continue")
     if a.cont and a.only and not a.continue_check:
         ap.error("--continue continues every answer of its share: --only is for "
                  "--continue-check's benchmark")
@@ -2121,11 +2125,29 @@ def _main(argv: list[str] | None = None) -> int:
                                  f"{fb.BENCH[a.only[0]]['label']}. Nothing was asked")
         else:
             cont_lines = cb.part_of(c_all, part, c_limit)
-        for t in sorted({r["task"] for r in cont_lines}):
+        for t in sorted({r["task"] for r in cont_lines} - {cb.SHOWCASE}):
             try:
                 fb.load(t, config.BENCH_ROOT)
             except Exception as e:                      # noqa: BLE001 — said in one line
                 raise SystemExit(rb.scrub(fb.load_failed(t, e))) from None
+        # 31.3e: the showcase's answers ask its questions file, pinned
+        c_qs = None
+        if any(r["task"] == cb.SHOWCASE for r in cont_lines):
+            if not a.cont_questions:
+                raise SystemExit("--continue: this share holds the showcase's answers — give "
+                                 "--continue-questions with its questions file (hf://<you>/"
+                                 "evalboard-private@<commit>/showcase-own12.json). Nothing was "
+                                 "asked")
+            import showcase_box as scb_c
+            qf = fetch(a.cont_questions, files, say)
+            why = pin_refused(qf.name, rb.sha256_file(qf), pins)
+            if why or not pins.get(qf.name):
+                raise SystemExit(why or f"--continue-questions: give {qf.name}'s sha256 (--pin). "
+                                        "Nothing was asked")
+            try:
+                c_qs = scb_c.questions(qf)
+            except ValueError as e:
+                raise SystemExit(f"--continue-questions: {e}. Nothing was asked") from None
         say(f"the continuation: {len(cont_lines):,} of the {len(c_all):,} answers in "
             f"{cfile.name} (sha256 {c_sha[:16]}…)"
             + (f", part {part[0]} of {part[1]}" if part else "")
@@ -2347,7 +2369,8 @@ def _main(argv: list[str] | None = None) -> int:
             # (service/frontier.settings: the path alone, or the runtime's
             # sampling and thinking switch)
             from service import frontier as sf_c
-            c_asked = {t: sf_c.settings(rec, t, thinking) for t in {r["task"] for r in cont_lines}}
+            c_asked = {t: sf_c.settings(rec, t, thinking) for t in {r["task"] for r in cont_lines}
+                       if t in fb.BENCH}         # 31.3e: the showcase's, the path alone
         if a.cont and a.continue_check:
             # 31.3: the check before U-cont — penalty_prompt_tokens' test (on
             # k6, whose presence penalty it is), then the first answers of one
@@ -2359,7 +2382,7 @@ def _main(argv: list[str] | None = None) -> int:
                 for ln in cb.penalty_words(t_pen):
                     say(ln)
             n_c, why_c = cb.ask(srv_proc.base, cont_lines, out, c_spec, a.slots, lambda x: None,
-                                name=cb.CHECK, asked=c_asked)
+                                name=cb.CHECK, asked=c_asked, questions=c_qs)
             got_c = cb.kept(out, cb.CHECK)
             for r in cont_lines:
                 x = got_c.get(cb.key_of(r))
@@ -2410,7 +2433,7 @@ def _main(argv: list[str] | None = None) -> int:
                 say(x)                      # each answer's line, and the fetch's count
                 progress(out, state="asking", line=x[:300])
             n_c, why_c = cb.ask(srv_proc.base, cont_lines, out, c_spec, a.slots, said_c,
-                                asked=c_asked)
+                                asked=c_asked, questions=c_qs)
             if sampler is not None:
                 sampler.phase = "after"
             status = "done" if not why_c else "failed"

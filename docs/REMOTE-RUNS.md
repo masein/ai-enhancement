@@ -1743,7 +1743,11 @@ never a sampling value). Each answer is kept as it arrives; a step pasted again
 asks only what has no answer. Its bundle (`showcase-served-…`) holds the
 answers with their thinking, and the fetch imports it into the showcase's own
 folder (`$BENCH_ROOT/showcase/served__step2388-k3k6-2611__thinking/own.jsonl`):
-no row of the board changes. It takes minutes (step8804's 12 took 78 s), about
+no row of the board changes. 31.3e: a showcase bundle asked at a lower limit
+(U39 on 917850e's image asked 81,920) is taken too, when everything else is the
+same: the questions file, the path and each question's seed. The import
+records the limit it was asked at, and its answers that ran out of room go
+into U-cont's k6 file. It takes minutes (step8804's 12 took 78 s), about
 0.1 h with its server's start; if every answer ran to its limit, about 1.9 h.
 The showcase's 4 benchmark items are not asked: they come from step2388's
 stored k6 answers (run 0), drawn as before.
@@ -1866,7 +1870,8 @@ its path, after the settings check):
 
 1. On the server, once plan U is imported: one inputs file per model and
    thinking (`cont-k6.jsonl`, `cont-k3.jsonl`, and `cont-q2.jsonl` for the Q2's
-   easy set), of every benchmark whose answers are all in. It prints each
+   easy set), of every benchmark whose answers are all in. `cont-k6.jsonl` also
+   holds the showcase's answers that ran out of room (31.3e). It prints each
    file's sha256 and what it holds, with no question text:
 
    ```bash
@@ -1904,7 +1909,9 @@ its path, after the settings check):
    ```
 
 4. **Plan C:** the same line on each box, without `--continue-check`, with
-   `--price`. C4 takes `cont-k3.jsonl` and its sha256. C5 runs the Q2 on its
+   `--price`. C1–C3 also take `--showcase` with U39's questions file (as U39's
+   line gives it) whenever the k6 file holds the showcase's answers; a box
+   whose share holds them asks nothing without it. C4 takes `cont-k3.jsonl` and its sha256. C5 runs the Q2 on its
    own runtime (`--as served/Qwen3.6-35B-A3B-Q2-k3k6-2611`, U40's `--gguf`,
    `cont-q2.jsonl`). It is short, and can follow C4 on the same box. Each box
    continues its share and leaves a `frontier-cont-…` bundle.
