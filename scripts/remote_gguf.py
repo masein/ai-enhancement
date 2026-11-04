@@ -2372,17 +2372,39 @@ def _main(argv: list[str] | None = None) -> int:
                 "model": a.served_as, "label": a.label or None, "gpu": gpu.get("name"),
                 "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}, indent=1),
                 encoding="utf-8")
-            ok_c = (not why_c and t_pen.get("verdict") == "pass" and all(
-                (got_c.get(cb.key_of(r)) or {}).get("status") == "continued" for r in cont_lines))
-            say(f"the continuation's check: {n_c} of {len(cont_lines)} answers"
+            # 31.3c: an answer the rule leaves at its old limit (its text
+            # doesn't give back its tokens) is said apart, never a failure
+            rs = [got_c.get(cb.key_of(r)) or {} for r in cont_lines]
+            done_c = [x for x in rs if x.get("status") == "continued"]
+            rule_c = [x for x in rs if cb.left_by_rule(x)]
+            bad_c = [x for x in rs if x and x not in done_c and x not in rule_c]
+            ok_c = not why_c and not bad_c and t_pen.get("verdict") != "fail"
+            say(f"the continuation's check: {len(done_c)} of {len(cont_lines)} answers continued"
+                + (f", {len(rule_c)} left at the old limit (its text doesn't give back its "
+                   "tokens)" if rule_c else "")
+                + (f", {len(bad_c)} NOT continued as one reply" if bad_c else "")
                 + (f" — stopped: {why_c}" if why_c else "")
-                + f" · penalty_prompt_tokens' test {t_pen.get('verdict')} · "
-                + ("every answer continued as one reply" if ok_c else
-                   "NOT every answer continued as one reply — don't rent U-cont yet"))
+                + f" · penalty_prompt_tokens' window {t_pen.get('verdict')} · "
+                + ("every answer continued is one reply" if ok_c else
+                   "NOT every answer continued is one reply — don't rent U-cont yet"))
             return 0 if ok_c else 1
         if a.cont:
             # 31.3: the answers that ran out of room, continued — no run of the board's
             progress(out, state="asking", session_at=round(time.time()))
+
+            if c_path == 6 and not (out / cb.TESTS).exists():
+                # 31.3c: the tests beside every k6 box's answers — the window,
+                # and how far batching alone puts two replies apart on this
+                # card — said and kept in the bundle, never holding the step
+                try:
+                    t_run = cb.penalty_test(srv_proc.base, c_path)
+                    for ln in cb.penalty_words(t_run):
+                        say(ln)
+                except Exception as e:                  # noqa: BLE001 — said, the step goes on
+                    t_run = {"verdict": "not run", "why": f"{type(e).__name__}: {e}"[:300]}
+                    say(f"penalty_prompt_tokens' tests didn't run ({t_run['why']}) — the "
+                        "answers are asked all the same")
+                (out / cb.TESTS).write_text(json.dumps(t_run, indent=1), encoding="utf-8")
 
             def said_c(x: str) -> None:
                 say(x)                      # each answer's line, and the fetch's count

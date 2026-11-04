@@ -208,8 +208,9 @@ class Probe(cb.Server):
             return {"choices": [{"message": {"reasoning_content": "".join(words).strip(),
                                              "content": ""},
                                  "logprobs": {"content": [
-                                     {"token": w, "top_logprobs": [{"token": w, "logprob": -0.1},
-                                                                   {"token": "x", "logprob": -0.2}]}
+                                     {"token": w, "logprob": -0.1,
+                                      "top_logprobs": [{"token": w, "logprob": -0.1},
+                                                       {"token": "x", "logprob": -0.2}]}
                                      for w in words]}}],
                     "usage": {"completion_tokens": len(words),
                               "prompt_tokens": 9 + done}}
@@ -228,7 +229,8 @@ class Probe(cb.Server):
                 return {"completion_probabilities": [{"top_logprobs": [
                     {"id": i, "logprob": x} for i, x in raw.items()]}]}
             import math
-            post = {i: (x - (0.75 if i in tail else 0)) / 0.8 for i, x in raw.items()}
+            temp = float(body.get("temperature", 0.8))
+            post = {i: (x - (0.75 if i in tail else 0)) / temp for i, x in raw.items()}
             z = math.log(sum(math.exp(x) for x in post.values()))
             return {"completion_probabilities": [{"top_probs": [
                 {"id": i, "prob": math.exp(x - z)} for i, x in post.items()]}]}
@@ -239,6 +241,8 @@ class Probe(cb.Server):
 def small_probe(monkeypatch):
     monkeypatch.setattr(cb, "PENALTY_CUT", 8)
     monkeypatch.setattr(cb, "PENALTY_MORE", 10)
+    monkeypatch.setattr(cb, "FILLER_TOKENS", 30)
+    monkeypatch.setattr(cb, "FILLER_HEAD_S", 0.0)
     monkeypatch.setattr(cb, "Server", lambda base: Probe())
 
 
@@ -246,12 +250,19 @@ def test_the_penalty_test_passes_when_the_window_is_the_replys(small_probe, monk
     got = cb.penalty_test("http://probe", 6)
     assert got["verdict"] == "pass"
     assert got["greedy"]["counted"]["same_tokens"] == 10 and got["greedy"]["counted"]["read_whole"]
+    assert got["greedy"]["counted"]["max_diff"] == 0.0
     w = got["window"]
+    # its samplers opened for the probe alone: the path's top-p kept one token on C1
+    assert w["sampling"] == {"temperature": 1.0, "top_k": 0, "top_p": 1.0, "min_p": 0.0}
     assert abs(w["turn"]["turn"] - 0.75) < 1e-6 and abs(w["turn"]["question"]) < 1e-6
     assert abs(w["none"]["turn"]) < 1e-6 and abs(w["all"]["question"] - 0.75) < 1e-6
     words = cb.penalty_words(got)
-    assert words[-1] == "penalty_prompt_tokens' test: pass"
-    assert any("the same as one reply for 10 of its 10 tokens" in x for x in words)
+    assert words[-1] == "penalty_prompt_tokens' window: pass"
+    assert any("cut and continued with penalty_prompt_tokens 8 (the cut reply's): the same for "
+               "10 of 10 tokens; where they agree their log probabilities are at most 0.000 "
+               "apart" in x for x in words)
+    assert any("alone and among 8 others (batching alone): the same for 18 of 18" in x
+               for x in words)
 
 
 def test_the_penalty_test_fails_when_the_question_is_counted(small_probe, monkeypatch):
@@ -264,9 +275,48 @@ def test_where_a_continuation_parts_its_two_likeliest_are_said(small_probe, monk
     monkeypatch.setattr(cb, "Server", lambda base: Probe(part_at=3))
     got = cb.penalty_test("http://probe", 6)
     assert got["greedy"]["counted"]["same_tokens"] == 3
-    assert got["greedy"]["counted"]["parted"]["whole"] == [(" w11", -0.1), ("x", -0.2)]
-    assert any("parted where one reply's two likeliest were" in x
+    assert got["greedy"]["counted"]["parted"]["first"] == [(" w11", -0.1), ("x", -0.2)]
+    assert any("they part where the first's two likeliest were" in x
                for x in cb.penalty_words(got))
+
+
+def test_two_uncut_replies_alone_and_among_others_say_how_far_apart_batching_puts_them(
+        small_probe):
+    class Batched(Probe):
+        """the reply among others: its log probabilities 0.2 off, its 12th token another"""
+        busy = 0
+
+        def post(self, path, body, timeout=None):
+            filler = "Count from one" in body["messages"][0]["content"]
+            if filler:
+                Batched.busy += 1
+            got = super().post(path, body, timeout)
+            if path == "/v1/chat/completions" and not filler and Batched.busy:
+                for k, x in enumerate(got["choices"][0]["logprobs"]["content"]):
+                    x["logprob"] -= 0.2
+                    if k == 11:
+                        x["token"] = " other"
+            return got
+    import time as _t
+    b = cb.batching_test(Batched(), 6)
+    assert (b["fillers"], b["same_tokens"], b["of"]) == (8, 11, 18)
+    assert abs(b["max_diff"] - 0.2) < 1e-9 and abs(b["median_diff"] - 0.2) < 1e-9
+    assert b["parted"]["first"][0][0] == " w11" and _t.time()
+
+
+def test_an_answer_left_at_its_old_limit_by_the_rule_is_said_not_failed():
+    rule = {"status": "refused", "why": "the reply's text doesn't give back its 81,920 tokens "
+                                        "(open: 81,917 tokens)"}
+    assert cb.left_by_rule(rule)
+    assert not cb.left_by_rule({"status": "refused", "why": "it opens its thinking again"})
+    assert not cb.left_by_rule({"status": "continued"})
+    r = {"status": "continued", "id": "q", "epoch": 0, "was": {"tokens": 81920}, "tokens": 82407,
+         "new_tokens": 487, "ran_out": False, "limit": 98304, "form": "open",
+         "tokens_evaluated": 82290, "prompt_tokens": 370, "settings": {"seed": 1},
+         "timings": {"prompt_n": 82290, "prompt_ms": 20572.5, "predicted_n": 487,
+                     "predicted_ms": 9740.0}}
+    assert "read 82,290 tokens at 4,000 a second and wrote 487 tokens at 50 a second" in \
+        cb.check_words(r)
 
 
 # ---------------------------------------------------------------------------
@@ -283,6 +333,8 @@ def cont(k3k6, monkeypatch):  # noqa: F811
     monkeypatch.setitem(cb.SPECS[(STEP, True)], "limit", NEW)
     monkeypatch.setattr(cb, "PENALTY_CUT", 8)
     monkeypatch.setattr(cb, "PENALTY_MORE", 6)
+    monkeypatch.setattr(cb, "FILLER_TOKENS", 30)
+    monkeypatch.setattr(cb, "FILLER_HEAD_S", 0.0)
     return k3k6
 
 
@@ -342,6 +394,9 @@ def test_plan_us_cut_answers_are_continued_and_imported_with_the_old_limits_scor
     assert r["tokens_evaluated"] == r["prompt_tokens"] + OLD
     assert r["settings"]["penalty_prompt_tokens"] == OLD and r["settings"]["presence_penalty"] == 0.75
     assert got[0]["setup"]["continuation"]["limit"] == NEW
+    # 31.3c: each k6 box tested the window and batching first, kept in its bundle
+    tests = got[0]["setup"]["continuation"]["tests"]
+    assert tests["verdict"] == "pass" and tests["batching"]["fillers"] == cb.FILLERS
     # home: both imported, the row's answers the continued ones, the old limit's score on record
     paths = [p for k in (1, 2) for p in (cont["root"] / f"c{k}").glob("frontier-cont-*.tar.gz")]
     said: list[str] = []
@@ -412,7 +467,7 @@ def test_the_check_continues_the_first_answers_and_tests_the_window_with_no_bund
     assert len(got["answers"]) == 5 and all(r["status"] == "continued" for r in got["answers"])
     assert got["penalty_test"]["verdict"] == "pass"
     log = (out / rg.OWN_LOG).read_text()
-    assert "every answer continued as one reply" in log
+    assert "every answer continued is one reply" in log
     assert "applied: temperature 0.8" in log and "penalty_prompt_tokens 20" in log
     assert not list(out.glob("*.tar.gz")) and not (out / "progress.json").exists()
     # no question text in what it says

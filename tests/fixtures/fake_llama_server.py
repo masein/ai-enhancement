@@ -105,7 +105,7 @@ def tok_id(w: str) -> int:
     return sum(w.encode()) % 50000
 
 
-def counted_by(prompt: str, path: int, ppt) -> dict:
+def counted_by(prompt: str, path: int, ppt, temperature=None) -> dict:
     """31.3: /completion's first token with penalty_prompt_tokens — two of the
     prompt's first tokens, two of its last N, and two it hasn't; the presence
     penalty on k6 put on the tokens of the last N (none for 0, all for -1)"""
@@ -117,7 +117,8 @@ def counted_by(prompt: str, path: int, ppt) -> dict:
     cands = head + last + [1, 2]
     raw = dict(zip(cands, [-0.4, -1.1, -0.7, -1.5, -0.9, -1.8]))
     v = paths_reported().get(path) or PATHS[3]
-    post = {i: (x - (v["presence_penalty"] if i in tail else 0)) / v["temp"] for i, x in raw.items()}
+    temp = float(temperature) if temperature is not None else v["temp"]
+    post = {i: (x - (v["presence_penalty"] if i in tail else 0)) / temp for i, x in raw.items()}
     z = math.log(sum(math.exp(x) for x in post.values()))
     return {"before": raw, "after": {i: x - z for i, x in post.items()}}
 
@@ -409,7 +410,7 @@ def main() -> int:
                 if cont_on and isinstance(body.get("prompt"), str) and body.get("n_probs") \
                         and "penalty_prompt_tokens" in body:
                     got = counted_by(body["prompt"], int(body.get("expert_path") or 3),
-                                     body["penalty_prompt_tokens"])
+                                     body["penalty_prompt_tokens"], body.get("temperature"))
                     key = "after" if body.get("post_sampling_probs") else "before"
                     top = [{"id": i, "token": f"t{i}",
                             **({"prob": math.exp(x)} if key == "after" else {"logprob": x})}
