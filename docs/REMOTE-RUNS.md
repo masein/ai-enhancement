@@ -1879,9 +1879,22 @@ its path, after the settings check):
 
 3. **The check, on C1, before the rest is rented:** the first five GPQA
    Diamond answers of the k6 file. Each gets a line: its tokens before and
-   after, whether it finished, the checks that it is one reply, and the
-   settings the server applied. Then `penalty_prompt_tokens`' test runs, and
-   the last line is the verdict. There is no bundle.
+   after, whether it finished, the checks that it is one reply, the settings
+   the server applied, and how fast it read and wrote. Before them, three
+   tests run:
+   - **Greedy:** one reply, against it cut and continued.
+   - **Batching:** the same uncut reply alone, then among 8 others. This shows
+     how far apart batching alone puts two replies on this card (llama.cpp's
+     logits aren't bit-for-bit the same across batch sizes).
+   - **The window:** which of a continued prompt's tokens the presence
+     penalty counts. Its requests open the samplers (temperature 1, no top-k,
+     top-p or min-p), so it can tell the settings apart.
+
+   The last line counts the answers continued, any left at the old limit
+   because their text doesn't give back their tokens (the rule above, never
+   a failure), and any not continued as one reply. There is no bundle. Every
+   k6 box of plan C runs the same three tests before its answers, and keeps
+   them in its bundle; they never hold the step.
 
    ```bash
    python scripts/frontier_box.py C1 --as served/step2388-k3k6-2611 --gguf hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/step2388.k3k6.gguf --server hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/llama-server-k3k6-3ad38b7.tar.gz --continue /workspace/cont-k6.jsonl --continue-sha256 <its sha256> --continue-check 5

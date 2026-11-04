@@ -120,6 +120,8 @@ SPECS = {
 INPUT = "cont-{key}.jsonl"
 DONE = "continued.jsonl"
 CHECK = "continue-check.jsonl"
+# 31.3c: a k6 step's tests, run before its answers and kept in its bundle
+TESTS = "continue-tests.json"
 SETUP_KEY = "continuation"
 # a reply's thinking closed: what may follow </think> before the reply, the
 # model's habit first — the form whose prompt gives back the reply's tokens
@@ -574,6 +576,8 @@ def make_bundle(out: Path, served_as: str, thinking: bool, state: dict, gguf: di
              **({"price": {"per_hour": rg.price_of(state), "by": "the box line (--price)"}}
                 if rg.price_of(state) is not None else {}),
              SETUP_KEY: {"limit": spec["limit"], "path": spec["path"], "key": spec["key"],
+                         **({"tests": json.loads((out / TESTS).read_text(encoding="utf-8"))}
+                            if (out / TESTS).exists() else {}),
                          "input_sha256": input_sha,
                          "part": {"i": part[0], "n": part[1]} if part else None,
                          "answers": len(mine), "by_task": summary(mine)}}
@@ -600,62 +604,99 @@ def make_bundle(out: Path, served_as: str, thinking: bool, state: dict, gguf: di
 PENALTY_Q = ("List the prime numbers below 60, then say which of them are one more or one "
              "less than a multiple of six, and why every prime above 3 is.")
 PENALTY_CUT, PENALTY_MORE = 96, 160
+# 31.3c: the batching comparison — the same uncut reply asked alone, then among
+# this many others asked at once (a k6 continuation box runs 9 slots), each of
+# them long enough to outlast it
+FILLERS, FILLER_TOKENS = 8, 1500
+FILLER_HEAD_S = 3.0                 # the others writing when it starts
+FILLER_Q = "Count from one to three hundred in words, one number a line ({k})."
 # the window's probe: a question of one word many times, an unfinished turn of
 # another, and room for one more word — whose likeliest are both words
 PROBE_Q = ("Here is a list. Write one more word for it: "
            + ", ".join(["cloud"] * 40) + ".")
 PROBE_TURN = "The list so far, and it goes on: " + ", ".join(["river"] * 40) + ","
+# 31.3c: the probe's samplers opened, for its requests alone — temperature 1, no
+# top-k, top-p or min-p — so every candidate's probability comes back after
+# them: on C1 (4 Nov) the path's top-p 0.95 kept one token after forty
+# "river," and the probe could tell nothing. The path's presence penalty
+# stays, being nothing sent
+PROBE_SAMPLING = {"temperature": 1.0, "top_k": 0, "top_p": 1.0, "min_p": 0.0}
+PROBE_N = 100
 # a shift within this of the penalty (or of none), in logits, is it
 PROBE_TOL = 0.2
 
 
 def penalty_test(base: str, path: int) -> dict:
-    """penalty_prompt_tokens, tested twice on the box before U-cont.
+    """penalty_prompt_tokens and the continuation, tested on a k6 box — the
+    window decides; the other two are said beside it.
 
     1. Greedy, on a short example: one reply of CUT+MORE tokens, against the
        same reply cut at CUT and continued for MORE — with the cut reply's
-       tokens counted (penalty_prompt_tokens CUT) and with none (0).
-       Temperature 0 is the test's alone, so the replies can be compared; the
-       path's presence penalty stays, being nothing sent. A continued prefix
-       is read in one batch, not a token at a time, and llama.cpp's sums then
-       differ in their last digits: the two may part where two tokens are
-       nearly tied. Where each parts, its two likeliest are said.
-    2. Which of a continued prompt's tokens the penalty counts: a question of
-       one word many times, an unfinished turn of another, and the next
-       token's probabilities before the samplers and after them (path_check's
-       probe) — with penalty_prompt_tokens the turn's tokens, the turn's word
-       is the path's presence penalty down and the question's isn't; with 0
-       neither is; with -1 both are"""
+       tokens counted (penalty_prompt_tokens CUT) and with none (0). Where
+       they agree, how far apart their log probabilities are; where they
+       part, each one's two likeliest. Temperature 0 is the test's alone; the
+       path's presence penalty stays, being nothing sent.
+    2. 31.3c: batching, alone — the same uncut reply asked alone, then among
+       FILLERS others asked at once: the same measures. llama.cpp's logits
+       are "not guaranteed to be bit-for-bit identical for different batch
+       sizes (prompt processing vs. token generation)" (its server README,
+       cache_prompt); a continued prefix is read in one batch where it was
+       written a token at a time. This shows how far apart batching alone
+       puts two replies on this card and file, beside 1's.
+    3. The window: which of a continued prompt's tokens the penalty counts — a
+       question of one word many times, an unfinished turn of another, and
+       the next token's probabilities before the samplers and after them
+       (path_check's probe, the samplers opened: PROBE_SAMPLING). With
+       penalty_prompt_tokens the turn's tokens, the turn's word is the path's
+       presence penalty down and the question's isn't; with 0 neither is;
+       with -1 both are"""
     srv = Server(base)
-    out = {"greedy": greedy_test(srv, path), "window": window_test(srv, path)}
-    g, w = out["greedy"], out["window"]
-    if g.get("verdict") == "inconclusive" or w.get("verdict") == "inconclusive":
-        out["verdict"] = "inconclusive"
-    else:
-        out["verdict"] = "pass" if g.get("verdict") == "pass" and w.get("verdict") == "pass" \
-            else "fail"
+    out = {"greedy": greedy_test(srv, path), "batching": batching_test(srv, path),
+           "window": window_test(srv, path)}
+    out["verdict"] = out["window"].get("verdict") or "inconclusive"
+    return out
+
+
+def _greedy(srv: "Server", msgs: list[dict], n: int, path: int, **extra) -> dict:
+    """one greedy reply, each token's log probability and its two likeliest"""
+    r = srv.post("/v1/chat/completions", {
+        "messages": msgs, "max_tokens": n, "temperature": 0, "expert_path": path, "seed": 0,
+        "cache_prompt": False, "logprobs": True, "top_logprobs": 2, **extra})
+    ch = (r.get("choices") or [{}])[0]
+    m = ch.get("message") or {}
+    steps = ((ch.get("logprobs") or {}).get("content") or [])
+    return {"think": m.get("reasoning_content") or "", "reply": m.get("content") or "",
+            "tokens": (r.get("usage") or {}).get("completion_tokens"),
+            "prompt": (r.get("usage") or {}).get("prompt_tokens"),
+            "steps": [(s.get("token"), s.get("logprob"),
+                       [(x.get("token"), x.get("logprob")) for x in s.get("top_logprobs") or []])
+                      for s in steps]}
+
+
+def agree(a: list, b: list) -> dict:
+    """two greedy replies' steps side by side: how many tokens they agree on
+    from the start, how far apart the chosen tokens' log probabilities are
+    there (at most, and the median), and where they part each one's two
+    likeliest"""
+    same, diffs = 0, []
+    for x, y in zip(a, b):
+        if x[0] != y[0]:
+            break
+        same += 1
+        if isinstance(x[1], (int, float)) and isinstance(y[1], (int, float)):
+            diffs.append(abs(x[1] - y[1]))
+    out = {"same_tokens": same, "of": min(len(a), len(b)),
+           "max_diff": max(diffs) if diffs else None,
+           "median_diff": sorted(diffs)[len(diffs) // 2] if diffs else None}
+    if same < out["of"]:
+        out["parted"] = {"first": a[same][2][:2], "second": b[same][2][:2]}
     return out
 
 
 def greedy_test(srv: "Server", path: int) -> dict:
     q = [{"role": "user", "content": PENALTY_Q}]
-    g = {"temperature": 0, "expert_path": path, "seed": 0, "cache_prompt": False,
-         "logprobs": True, "top_logprobs": 2}
-
-    def chat(msgs, n, **extra):
-        r = srv.post("/v1/chat/completions", {"messages": msgs, "max_tokens": n, **g, **extra})
-        ch = (r.get("choices") or [{}])[0]
-        m = ch.get("message") or {}
-        steps = ((ch.get("logprobs") or {}).get("content") or [])
-        return {"think": m.get("reasoning_content") or "", "reply": m.get("content") or "",
-                "tokens": (r.get("usage") or {}).get("completion_tokens"),
-                "prompt": (r.get("usage") or {}).get("prompt_tokens"),
-                "steps": [(s.get("token"), [(x.get("token"), x.get("logprob"))
-                                            for x in s.get("top_logprobs") or []])
-                          for s in steps]}
-
-    whole = chat(q, PENALTY_CUT + PENALTY_MORE)
-    cut = chat(q, PENALTY_CUT)
+    whole = _greedy(srv, q, PENALTY_CUT + PENALTY_MORE, path)
+    cut = _greedy(srv, q, PENALTY_CUT, path)
     out = {"cut": cut["tokens"], "more": PENALTY_MORE, "whole": whole["tokens"]}
     if cut["tokens"] != PENALTY_CUT or cut["reply"] or len(whole["steps"]) <= PENALTY_CUT:
         return {**out, "verdict": "inconclusive",
@@ -664,23 +705,37 @@ def greedy_test(srv: "Server", path: int) -> dict:
                        + f"; the whole one {whole['tokens']}"}
     t = turn(cut["think"], path)
     for name, n in (("counted", PENALTY_CUT), ("none", 0)):
-        c = chat([*q, t], PENALTY_MORE, penalty_prompt_tokens=n)
-        rest = whole["steps"][PENALTY_CUT:]
-        same = 0
-        for x, y in zip(rest, c["steps"]):
-            if x[0] != y[0]:
-                break
-            same += 1
-        parts = None
-        if same < min(len(rest), len(c["steps"])):
-            parts = {"whole": rest[same][1][:2], "continued": c["steps"][same][1][:2]}
-        out[name] = {"penalty_prompt_tokens": n, "same_tokens": same, "of": len(c["steps"]),
-                     "prompt_tokens": c["prompt"], "read_whole": c["prompt"] == (
-                         (cut["prompt"] or 0) + PENALTY_CUT),
-                     **({"parted": parts} if parts else {})}
+        c = _greedy(srv, [*q, t], PENALTY_MORE, path, penalty_prompt_tokens=n)
+        out[name] = {"penalty_prompt_tokens": n, "prompt_tokens": c["prompt"],
+                     "read_whole": c["prompt"] == (cut["prompt"] or 0) + PENALTY_CUT,
+                     **agree(whole["steps"][PENALTY_CUT:], c["steps"])}
     a, b = out["counted"], out["none"]
     out["verdict"] = "pass" if a["read_whole"] and a["same_tokens"] >= b["same_tokens"] else "fail"
     return out
+
+
+def batching_test(srv: "Server", path: int) -> dict:
+    """31.3c: the same uncut greedy reply, alone and among FILLERS others"""
+    import threading as th
+    from concurrent.futures import ThreadPoolExecutor
+    q = [{"role": "user", "content": PENALTY_Q}]
+    n = PENALTY_CUT + PENALTY_MORE
+    alone = _greedy(srv, q, n, path)
+    started = th.Event()
+
+    def filler(k: int) -> None:
+        started.set()
+        try:
+            _greedy(srv, [{"role": "user", "content": FILLER_Q.format(k=k)}], FILLER_TOKENS, path)
+        except Exception:                               # noqa: BLE001 — a filler's own end
+            pass
+    with ThreadPoolExecutor(max_workers=FILLERS + 1) as pool:
+        for k in range(FILLERS):
+            pool.submit(filler, k)
+        started.wait(30)
+        time.sleep(FILLER_HEAD_S)
+        among = pool.submit(_greedy, srv, q, n, path).result()
+    return {"fillers": FILLERS, **agree(alone["steps"], among["steps"])}
 
 
 def window_test(srv: "Server", path: int) -> dict:
@@ -700,16 +755,16 @@ def window_test(srv: "Server", path: int) -> dict:
                                                   "question"}
     turn_ids, q_ids = set(ids[-n:]), set(ids[:-n])
     pen = float(fb.PATHS[path].get("presence_penalty") or 0)
-    temp = float(fb.PATHS[path]["temperature"])
-    out = {"turn_tokens": n, "presence_penalty": pen}
+    temp = float(PROBE_SAMPLING["temperature"])
+    out = {"turn_tokens": n, "presence_penalty": pen, "sampling": dict(PROBE_SAMPLING)}
     for name, ppt, want in (("turn", n, (pen, 0.0)), ("none", 0, (0.0, 0.0)),
                             ("all", -1, (pen, pen))):
         got = {}
         for after in (True, False):
-            r = srv.post("/completion", {"prompt": p1, "n_predict": 1, "n_probs": 40,
+            r = srv.post("/completion", {"prompt": p1, "n_predict": 1, "n_probs": PROBE_N,
                                          "post_sampling_probs": after, "expert_path": path,
                                          "penalty_prompt_tokens": ppt, "cache_prompt": False,
-                                         "seed": 7})
+                                         "seed": 7, **PROBE_SAMPLING})
             got[after] = path_check._probs((r.get("completion_probabilities") or [{}])[0])
         both = [i for i in got[True] if i in got[False]]
         groups = {"turn": [i for i in both if i in turn_ids and i not in q_ids],
@@ -734,8 +789,24 @@ def window_test(srv: "Server", path: int) -> dict:
             out[name]["verdict"] = "inconclusive"
     verdicts = [out[k]["verdict"] for k in ("turn", "none", "all")]
     out["verdict"] = ("fail" if "fail" in verdicts else
-                      "pass" if out["turn"]["verdict"] == "pass" else "inconclusive")
+                      "pass" if out["turn"]["verdict"] == "pass"
+                      and out["turn"].get("turn") is not None
+                      and out["turn"].get("question") is not None else "inconclusive")
     return out
+
+
+def _agree_words(x: dict) -> str:
+    def v(y):
+        return "—" if y is None else f"{y:.3f}"
+    line = (f"the same for {x.get('same_tokens')} of {x.get('of')} tokens; where they agree "
+            f"their log probabilities are at most {v(x.get('max_diff'))} apart (median "
+            f"{v(x.get('median_diff'))})")
+    if x.get("parted"):
+        a, b = x["parted"]["first"], x["parted"]["second"]
+        line += (" — they part where the first's two likeliest were "
+                 + ", ".join(f"{tok!r} {lp:.3f}" for tok, lp in a)
+                 + " and the second's " + ", ".join(f"{tok!r} {lp:.3f}" for tok, lp in b))
+    return line
 
 
 def penalty_words(t: dict) -> list[str]:
@@ -747,16 +818,12 @@ def penalty_words(t: dict) -> list[str]:
     else:
         for name, words in (("counted", f"penalty_prompt_tokens {g.get('cut')} (the cut reply's)"),
                             ("none", "penalty_prompt_tokens 0")):
-            x = g.get(name) or {}
-            line = (f"greedy, continued with {words}: the same as one reply for "
-                    f"{x.get('same_tokens')} of its {x.get('of')} tokens")
-            if x.get("parted"):
-                w, c = x["parted"]["whole"], x["parted"]["continued"]
-                line += (" — parted where one reply's two likeliest were "
-                         + ", ".join(f"{tok!r} {lp:.3f}" for tok, lp in w)
-                         + "; the continued one's " + ", ".join(f"{tok!r} {lp:.3f}"
-                                                                for tok, lp in c))
-            out.append(line)
+            out.append(f"greedy, one reply against it cut and continued with {words}: "
+                       + _agree_words(g.get(name) or {}))
+    b = t.get("batching") or {}
+    if b:
+        out.append(f"greedy, the same uncut reply alone and among {b.get('fillers')} others "
+                   "(batching alone): " + _agree_words(b))
     w = t.get("window") or {}
     if w.get("why"):
         out.append(f"the penalty's window: {w['verdict']} — {w['why']}")
@@ -765,18 +832,20 @@ def penalty_words(t: dict) -> list[str]:
         x = w.get(name)
         if not isinstance(x, dict):
             continue
+        kept = (f"{x.get('turn_kept', 0)} of the turn's, {x.get('question_kept', 0)} of the "
+                f"question's, {x.get('neither_kept', 0)} of neither")
         if "want" not in x:
             out.append(f"the penalty's window at penalty_prompt_tokens {words}: inconclusive "
-                       f"(tokens kept: {x.get('turn_kept', 0)} of the turn's, "
-                       f"{x.get('question_kept', 0)} of the question's, "
-                       f"{x.get('neither_kept', 0)} of neither)")
+                       f"(tokens kept: {kept})")
             continue
+
         def v(y):
             return "—" if y is None else f"{y:.2f}"
-        out.append(f"the penalty's window at penalty_prompt_tokens {words}: the turn's word "
+        out.append(f"the penalty's window at penalty_prompt_tokens {words}: the turn's words "
                    f"down {v(x['turn'])}, the question's {v(x['question'])} in logits (want "
-                   f"{x['want'][0]:.2f} and {x['want'][1]:.2f}): {x['verdict']}")
-    out.append(f"penalty_prompt_tokens' test: {t.get('verdict')}")
+                   f"{x['want'][0]:.2f} and {x['want'][1]:.2f}; tokens kept: {kept}): "
+                   f"{x['verdict']}")
+    out.append(f"penalty_prompt_tokens' window: {t.get('verdict')}")
     return out
 
 
@@ -791,7 +860,29 @@ def check_words(r: dict) -> str:
             + f" · {r['form']} · one reply: the prompt read {r['tokens_evaluated']:,} tokens "
             f"(question {r['prompt_tokens']:,} + reply {r['was']['tokens']:,}), its thinking "
             "and reply begin with the cut-off ones, no thinking opened again, no question "
-            "written again · applied: " + ", ".join(f"{k} {s[k]}" for k in SETTINGS if k in s))
+            "written again" + speed_words(r) + " · applied: "
+            + ", ".join(f"{k} {s[k]}" for k in SETTINGS if k in s))
+
+
+def speed_words(r: dict) -> str:
+    """31.3c: how fast the box read the prompt again and wrote the rest — what
+    U-cont's estimate guessed"""
+    t = r.get("timings") or {}
+    out = []
+    for n, ms, what in (("prompt_n", "prompt_ms", "read"), ("predicted_n", "predicted_ms",
+                                                            "wrote")):
+        if isinstance(t.get(n), (int, float)) and isinstance(t.get(ms), (int, float)) and t[ms] > 0:
+            out.append(f"{what} {t[n]:,.0f} tokens at {t[n] / t[ms] * 1000:,.0f} a second")
+        else:
+            out.append("")
+    got = " and ".join(x for x in out if x)
+    return f" · {got}" if got else ""
+
+
+def left_by_rule(r: dict) -> bool:
+    """31.3c: an answer the brief's rule leaves at its old limit — its text
+    doesn't give back its tokens — said, never a failure of the continuation"""
+    return r.get("status") == "refused" and "doesn't give back" in str(r.get("why") or "")
 
 
 # ---------------------------------------------------------------------------
