@@ -1266,6 +1266,9 @@ def limits_of(setup: dict, task: str, items: list[dict], runs: dict, flat: list[
                      task, items)
     return {"limit": setup.get("budget"), "from": cont.get("from_budget"),
             "continued": len(done), "not_continued": int(cont.get("not_continued") or 0),
+            # 31.3d: of them, those whose text read back a few tokens otherwise than
+            # the model wrote it, continued from that reading
+            "retokenized": sum(1 for r in done if r["continued"].get("retokenized")),
             "tokens_before": sum(int((r["continued"].get("from") or {}).get("tokens") or 0)
                                  for r in done),
             "tokens_after": sum(int(r.get("tokens") or 0) for r in done),

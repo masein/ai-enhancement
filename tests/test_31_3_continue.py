@@ -122,12 +122,14 @@ def test_the_form_whose_prompt_gives_back_the_replys_tokens_is_taken():
     assert got["text"] == "w1 w2\n</think>\n\nThe options"
 
 
-def test_an_answer_whose_text_doesnt_give_back_its_tokens_isnt_continued():
+def test_an_answer_whose_text_reads_back_more_than_8_tokens_off_isnt_continued():
     msgs = cb.messages(GPQA, "Which one?")
     line = {"task": GPQA, "id": "q", "epoch": 0, "answer": "<think>\nw1 w2 w3\n</think>\n\n",
-            "tokens": 5, "prompt_tokens": 4}
+            "tokens": 12, "prompt_tokens": 4}
     why = cb.prepare(Stub(), line, msgs, K6)["why"]
-    assert why.startswith("the reply's text doesn't give back its 5 tokens") and "open: 3" in why
+    assert why.startswith("the reply's text doesn't give back its 12 tokens, nor within 8 of "
+                          "them") and "open: 3" in why
+    assert cb.left_by_rule({"status": "refused", "why": why})
     # another question or template: its prompt's tokens differ
     assert "not the same question" in cb.prepare(Stub(), {**line, "prompt_tokens": 9}, msgs,
                                                  K6)["why"]
@@ -136,6 +138,26 @@ def test_an_answer_whose_text_doesnt_give_back_its_tokens_isnt_continued():
     closed = {**line, "answer": "<think>\nw1\n\n</think>\n\nThe", "tokens": 2}
     assert "the prompt isn't the question's and the reply's text" in cb.prepare(
         Stub(extra_newline=True), closed, msgs, K6)["why"]
+
+
+def test_an_answer_whose_text_reads_back_a_few_tokens_off_is_continued_from_that_reading():
+    """31.3d (masein, 4 Nov): within 8 tokens, the likeliest form — the
+    tokenizer's reading of the same text, its count the penalty's window"""
+    msgs = cb.messages(GPQA, "Which one?")
+    line = {"task": GPQA, "id": "q", "epoch": 0, "answer": "<think>\nw1 w2 w3\n</think>\n\n",
+            "tokens": 6, "prompt_tokens": 4}
+    got = cb.prepare(Stub(), line, msgs, K6)
+    assert (got["form"], got["text"], got["reply_tokens"], got["continued_tokens"]) == (
+        "open", "w1 w2 w3", 3, 7)
+    assert got["retokenized"] == {"wrote": 6, "read": 3, "diff": -3}
+    # its limit counts what the model wrote; the penalty's window what the text reads as
+    body = cb.request({**line, "tokens": 81920}, msgs, got["text"], K6, None, 81917)
+    assert (body["max_tokens"], body["penalty_prompt_tokens"]) == (98304 - 81920, 81917)
+    assert "its text reads back as 3 tokens, 3 fewer than the 6 written" in cb.retoken_words(
+        {"retokenized": got["retokenized"]})
+    # exactly 8 off is taken; the cap is the rule
+    assert cb.prepare(Stub(), {**line, "tokens": 11}, msgs, K6)["retokenized"]["diff"] == -8
+    assert cb.RETOKEN_CAP == 8
 
 
 @pytest.mark.parametrize("final, form, wrong", [
@@ -663,3 +685,38 @@ def test_the_q2s_easy_set_is_continued_to_the_same_limit_on_its_own_runtime(cont
     assert res["results"]["mmlu_chat"]["acc,none"] == 1.0
     assert res["frontier"]["limits"]["at_old_limit"]["score"] == 0.0
     assert json.loads((sf.task_dir(row, "mmlu_chat") / sf.SETUP).read_text())["budget"] == NEW
+
+
+def test_answers_that_re_read_a_few_tokens_differently_are_continued_and_counted_by_benchmark(
+        cont):
+    """31.3d: two answers the model wrote 3 tokens longer than their text reads
+    (its own splits), one 9 longer — the two continued from the text's
+    reading, the window its count, said by benchmark on the import; the third
+    left at the old limit"""
+    plan_u_row(cont)
+    d = sf.task_dir(config.OUT_DIR / ROW, GPQA)
+    rows = [json.loads(x) for x in (d / sf.ANSWERS).read_text().splitlines()]
+    for r, more in zip(rows, (3, 3, 9)):
+        r["tokens"] += more
+    (d / sf.ANSWERS).write_text("".join(json.dumps(r) + "\n" for r in rows))
+    f, sha = inputs_of(cont)
+    assert run_k(cont, "c", "--continue", str(f), "--pin", f"{f.name}={sha}", only=False) == 0
+    asked = cont_requests(cont)
+    longer = [r for r in asked if r["max_tokens"] == NEW - OLD - 3]
+    assert len(longer) == 2 and all(r["penalty_prompt_tokens"] == OLD for r in longer)
+    p = next((cont["root"] / "c").glob("frontier-cont-*.tar.gz"))
+    said: list[str] = []
+    assert ir.import_bundle(p, "masein", said.append) == 0
+    line = next(x for x in said if x.startswith("GPQA Diamond: to"))
+    assert f"{N * 4 - 1:,} answers continued, 1 not" in line
+    assert "2 of them re-read a few tokens differently (at most 8)" in line
+    now = sf.read_answers(d / sf.ANSWERS)
+    reread = [a for a in now.values() if (a.get("continued") or {}).get("retokenized")]
+    assert len(reread) == 2 and all(a["continued"]["retokenized"] == {
+        "wrote": OLD + 3, "read": OLD, "diff": -3} for a in reread)
+    assert all(a["continued"]["penalty_prompt_tokens"] == OLD for a in reread)
+    res = json.loads(next(d.glob("results_*.json")).read_text())
+    assert (res["frontier"]["limits"]["retokenized"], res["frontier"]["limits"]["not_continued"]) \
+        == (2, 1)
+    setup = json.loads((d / sf.SETUP).read_text())
+    assert setup["continued"]["retokenized"] == 2

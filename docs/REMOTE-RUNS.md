@@ -1849,8 +1849,11 @@ its path, after the settings check):
   included): the server's reply form adds a newline the model never wrote.
 - **Two checks before it is asked:** the prompt's text is the question's and
   the reply's, character for character, and its tokens are the question's and
-  the reply's as the answer counted them. An answer whose text doesn't give
-  back its tokens is said, and isn't continued.
+  the reply's as the answer counted them. A text that reads back up to 8
+  tokens more or fewer than the model wrote (31.3d) is continued from that
+  reading, with the penalty's window set to its count, and the difference is
+  kept with the answer; the import counts them by benchmark. Beyond 8, the
+  answer is said and isn't continued.
 - **Its settings:** its limit is the new limit less the tokens already
   written, and its seed is a fresh one. On k6, `penalty_prompt_tokens` is set
   to the reply's tokens, so the presence penalty counts the whole reply and
@@ -1891,7 +1894,7 @@ its path, after the settings check):
      top-p or min-p), so it can tell the settings apart.
 
    The last line counts the answers continued, any left at the old limit
-   because their text doesn't give back their tokens (the rule above, never
+   because their text reads back more than 8 tokens off (the rule above, never
    a failure), and any not continued as one reply. There is no bundle. Every
    k6 box of plan C runs the same three tests before its answers, and keeps
    them in its bundle; they never hold the step.
