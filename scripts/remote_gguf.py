@@ -290,7 +290,8 @@ def sha256_cached(path: Path, state: dict, say, shared: Path | None = None) -> s
 
 def unpack_server(tarball: Path, into: Path) -> dict:
     """the llama-server tarball, unpacked under `into` (nothing outside it,
-    no link out of it): {bin, libs, root}"""
+    no link out of it): {bin, libs, root, build_root} — `build_root` the
+    folder of its bin/ and VERSION (llama/)"""
     sha = rb.sha256_file(tarball)
     root = into / sha[:16]
     if not (root / ".unpacked").exists():
@@ -313,14 +314,15 @@ def unpack_server(tarball: Path, into: Path) -> dict:
     exe = bins[0]
     exe.chmod(exe.stat().st_mode | 0o111)
     libs = sorted({str(p.parent) for p in root.rglob("*.so*") if p.is_file() or p.is_symlink()})
-    return {"bin": exe, "libs": libs, "root": root, "tarball_sha256": sha}
+    return {"bin": exe, "libs": libs, "root": root, "build_root": exe.parent.parent,
+            "tarball_sha256": sha}
 
 
 def server_dir(path: str) -> dict:
     """20: a llama.cpp build directory on this box (--server-dir), as the team
     builds or copies it: its bin/llama-server, run with the folders holding
-    its shared libraries on LD_LIBRARY_PATH — {bin, libs, root, lib_files,
-    libs_sha256}. Refused in one line when llama-server isn't there"""
+    its shared libraries on LD_LIBRARY_PATH — {bin, libs, root, build_root,
+    lib_files, libs_sha256}. Refused in one line when llama-server isn't there"""
     root = Path(path).expanduser().resolve()
     exe = next((c for c in (root / "bin" / "llama-server", root / "llama-server")
                 if c.is_file()), None)
@@ -349,8 +351,8 @@ def server_dir(path: str) -> dict:
     # runner image's (torch's CUDA 12.8 packages), after the build's folders
     cuda = [] if any(n.startswith(("libcudart.so", "libcublas.so")) for n in files) \
         else cuda_lib_dirs()
-    return {"bin": exe, "libs": [str(d) for d in dirs] + cuda, "root": root, "lib_files": files,
-            "libs_sha256": ident, "cuda_libs": cuda}
+    return {"bin": exe, "libs": [str(d) for d in dirs] + cuda, "root": root, "build_root": root,
+            "lib_files": files, "libs_sha256": ident, "cuda_libs": cuda}
 
 
 def cuda_lib_dirs() -> list[str]:
@@ -479,9 +481,9 @@ def archs_run_on(archs: list[str], cap: int) -> bool | None:
 def check_runs_here(srv: dict, env: dict, say, what: str = "") -> dict:
     """20: --server-dir's llama-server runs on this box and this card — its
     --version answers, it lists a CUDA device, and the architectures it was
-    built for (its CMakeCache.txt) hold this card's. Refused in one line;
-    {version, devices, cuda_archs, compute_cap} when it does. 18e point 18: a
-    tarball's too, named by `what` (its file)"""
+    built for (its CMakeCache.txt, or a packed build's VERSION) hold this
+    card's. Refused in one line; {version, devices, cuda_archs, compute_cap}
+    when it does. 18e point 18: a tarball's too, named by `what` (its file)"""
     exe, where = srv["bin"], srv["root"]
     what = what or f"--server-dir {where}"
 
@@ -515,7 +517,8 @@ def check_runs_here(srv: dict, env: dict, say, what: str = "") -> dict:
                              f"(exit {r.returncode}): {first_line(listed)}")
     except (OSError, subprocess.SubprocessError):
         devices = None
-    cap, archs = compute_cap(), cuda_archs(where)
+    # a tarball's record is in its llama/, not the folder it was unpacked in
+    cap, archs = compute_cap(), cuda_archs(srv.get("build_root") or where)
     if cap and archs:
         fits = archs_run_on(archs, cap)
         if fits is False:
@@ -1857,7 +1860,7 @@ def _main(argv: list[str] | None = None) -> int:
         env = server_env(srv, extra_env)
         # 20: a tarball built for some cards only (its VERSION's cuda_archs:
         # the lda tarball's is 120) is refused on another, before it loads
-        archs, cap = cuda_archs(srv["bin"].parent.parent), compute_cap()
+        archs, cap = cuda_archs(srv["build_root"]), compute_cap()
         if archs and cap and archs_run_on(archs, cap) is False:
             raise SystemExit(f"{tb.name} is built for CUDA architectures {';'.join(archs)} (its "
                              f"VERSION), and this card is sm_{cap}: it won't run here — rent "
@@ -1889,8 +1892,8 @@ def _main(argv: list[str] | None = None) -> int:
         # and the tarball's VERSION — before the GGUF's tens of GB are fetched
         if rt.get("build"):
             v0 = version_of(srv["bin"], env)
-            why = fb.runtime_build_refused(a.runtime, v0["build"], v0["commit"], version_file(
-                srv["root"] if a.server_dir else srv["bin"].parent.parent))
+            why = fb.runtime_build_refused(a.runtime, v0["build"], v0["commit"],
+                                           version_file(srv["build_root"]))
             if why:
                 raise SystemExit(f"{why}: not the build the runtime is for. Nothing was asked")
     paths = [fetch(src, files, say) for src in split_parts(a.gguf)]

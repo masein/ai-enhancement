@@ -342,6 +342,18 @@ def test_a_tarball_for_other_cards_is_refused_before_it_loads(box, card, tmp_pat
     assert not requests(box)
 
 
+def test_a_tarballs_architectures_are_read_from_its_version(card, tmp_path):  # noqa: F811
+    """a tarball's llama/VERSION says its architectures: plan U's boxes printed
+    "not said (no CMakeCache.txt or VERSION)", read from the folder it was
+    unpacked in"""
+    tb = lda_tarball(tmp_path)
+    srv = rg.unpack_server(tb, tmp_path / "server")
+    said: list[str] = []
+    got = rg.check_runs_here(srv, rg.server_env(srv, {}), said.append, what=tb.name)
+    assert got["cuda_archs"] == ["120"] and got["compute_cap"] == 120
+    assert "· built for 120, this card sm_120" in said[0] and "not said" not in said[0]
+
+
 def test_plan_L_checks_the_card_first(monkeypatch, capsys):
     ok = {"name": "NVIDIA GeForce RTX 5090", "names": ["NVIDIA GeForce RTX 5090"]}
     pro = {"name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
