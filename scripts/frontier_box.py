@@ -103,7 +103,9 @@ their limits continued to the model team's (98,304 tokens on k6, 32,768 on
 k3): C1–C3 a third each of the k6 inputs file, C4 the k3 one, each given its
 file and the sha256 continue_box.py inputs printed for it (and C1 first, with
 --continue-check 5, the check of five GPQA Diamond answers before the rest are
-rented; docs/REMOTE-RUNS.md U4):
+rented; docs/REMOTE-RUNS.md U4). 31.3b: and C5 the original Qwen3.6 Q2's
+easy-set answers, to the same 32,768 as step2388's k3 (its own --as, U40's
+--gguf, cont-q2.jsonl):
 
     python scripts/frontier_box.py C1 --as served/step2388-k3k6-2611 \
         --gguf hf://<you>/evalboard-private@<commit>/step2388.k3k6.gguf \
@@ -143,10 +145,15 @@ SHOWCASE = "showcase"
 # 31.3: the answers plan U cut at its limits, continued to the model team's
 # (remote_gguf.py --continue, scripts/continue_box.py)
 CONT = "continue"
+# 31.3b: and the original Qwen3.6 Q2's easy set, continued to the same limit
+# as step2388's k3 (masein, 4 Nov) — on a box of its own (BOX_MODELS)
+CONT_Q2 = "continue-q2"
 DM_LABEL = {DM: "DeviceMark (greedy, no penalties)",
             DM_FILE: "DeviceMark (the file's own settings, as <build>-file)",
             SHOWCASE: "the showcase's 12 own questions (one slot, the file's own settings)",
-            CONT: "the answers that ran out of room, continued to the model team's limit"}
+            CONT: "the answers that ran out of room, continued to the model team's limit",
+            CONT_Q2: "the original Qwen3.6 Q2's easy-set answers that ran out of room, "
+                     "continued to step2388's k3 limit"}
 # 25: the Frontier suite plans A, B and L each run whole; plan I runs
 # instruction following, IFEval and IFBench
 SUITE = tuple(t for t in fb.TASKS if t not in fb.FOLLOW)
@@ -328,6 +335,9 @@ PLANS: dict[str, dict[str, list[Step]]] = {
     "C": {
         **{f"C{i}": [("on", (CONT,), f"{i}/3", 9)] for i in range(1, 4)},
         "C4": [("off", (CONT,), "", 30)],
+        # 31.3b: the original Qwen3.6 Q2's easy set, once U40 has run, to the
+        # same 32,768 (40 slots of 33,792 beside its 12.6 GB file)
+        "C5": [("off", (CONT_Q2,), "", 40)],
     },
 }
 # 29: plan D, our own boxes — a quarter of every benchmark on each of a
@@ -417,6 +427,11 @@ PLAN_REVISIONS = {"U": {
 PLAN_PINS["C"], PLAN_REVISIONS["C"] = PLAN_PINS["U"], PLAN_REVISIONS["U"]
 # 31.3: step2388's file, for the slots a continuation's 131,072 tokens leave room for
 STEP2388_FILE = 15_994_966_752
+# 31.3b: and the original Qwen3.6 Q2's, for C5's
+Q2_FILE = 12_574_128_416
+# 31.3b: whose answers each of U-cont's steps continues, and beside which file
+CONT_MODEL = {CONT: ("served/step2388-k3k6-2611", STEP2388_FILE),
+              CONT_Q2: ("served/Qwen3.6-35B-A3B-Q2-k3k6-2611", Q2_FILE)}
 # 31.3: U-cont's size, at the most — each answer continued to its limit (a loop
 # runs on to it). From what plan U's imported boxes cut, 4 Nov (masein's
 # counts): k6 GPQA Diamond 9, MATH Level 5 12, MMLU-Pro 2, OTIS 27 of two
@@ -425,9 +440,12 @@ STEP2388_FILE = 15_994_966_752
 # write, 24.6 million to read again (each prompt and its cut reply, once); k3
 # MATH Level 5 44, MMLU-Pro 87, IFEval 3, IFBench 8, and the easy set, not
 # asked yet (a guess: 45 at 4,096): 187 answers, 4,830,000 tokens, 1.9 million
-# to read. continue_box.py inputs prints the real numbers
-CONT_SIZE = {"on": {"answers": 326, "write": 8_093_696, "read": 24_600_000},
-             "off": {"answers": 187, "write": 4_830_000, "read": 1_900_000}}
+# to read. 31.3b: the Q2's easy set, not asked yet either (a guess: 30 at
+# 4,096 — short answers, its card's presence penalty 1.5). continue_box.py
+# inputs prints the real numbers
+CONT_SIZE = {("on", CONT): {"answers": 326, "write": 8_093_696, "read": 24_600_000},
+             ("off", CONT): {"answers": 187, "write": 4_830_000, "read": 1_900_000},
+             ("off", CONT_Q2): {"answers": 30, "write": 860_160, "read": 138_000}}
 # a 5090's tokens a second, 8 at a time: written — step8804's measured, about
 # 284 with thinking on over its GPQA Diamond and MATH Level 5 (MEASURED), a
 # little less at a continuation's longer contexts; k3's three experts a token
@@ -436,7 +454,9 @@ CONT_TOK_S = {"on": 220.0, "off": 330.0}
 CONT_READ_TOK_S = 2_500.0
 # 31.2: the boxes that run another model than their plan's — U40 the original
 # Qwen3.6-35B-A3B's Q2 file, for the easy set beside step2388's k3 path
-BOX_MODELS = {"U40": "served/Qwen3.6-35B-A3B-Q2-k3k6-2611"}
+BOX_MODELS = {"U40": "served/Qwen3.6-35B-A3B-Q2-k3k6-2611",
+              # 31.3b: and U-cont's box of its easy-set answers
+              "C5": "served/Qwen3.6-35B-A3B-Q2-k3k6-2611"}
 # 29: Bolt's two builds, as Hugging Face publishes them: NVIDIA's Q4_K_M
 # (nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB at 1db54d5b12533ff1, 6,180,446,208
 # bytes) and ggml-org's Q8_0 (ggml-org/NVIDIA-Nemotron-3.5-Bolt-E4B-GGUF at
@@ -518,7 +538,7 @@ def box_of(name: str) -> list[Step]:
 def ordered(tasks: tuple[str, ...]) -> list[str]:
     """a step's benchmarks in the order the box asks them: the suite's (31.2:
     the easy set after it, and DeviceMark's battery)"""
-    return [t for t in (*fb.ALL, DM, DM_FILE, SHOWCASE, CONT) if t in tasks]
+    return [t for t in (*fb.ALL, DM, DM_FILE, SHOWCASE, CONT, CONT_Q2) if t in tasks]
 
 
 def is_dm(step: Step) -> bool:
@@ -533,7 +553,15 @@ def is_showcase(step: Step) -> bool:
 
 def is_cont(step: Step) -> bool:
     """31.3: a step of U-cont's (remote_gguf.py --continue)"""
-    return CONT in step[1]
+    return any(t in CONT_MODEL for t in step[1])
+
+
+def cont_spec(step: Step) -> tuple[dict, int]:
+    """31.3b: what a U-cont step continues (continue_box.SPECS), and the file
+    its slots sit beside"""
+    import continue_box as cb
+    model, size = CONT_MODEL[next(t for t in step[1] if t in CONT_MODEL)]
+    return cb.spec_of(model, step[0] == "on"), size
 
 
 def label_of(t: str) -> str:
@@ -584,8 +612,8 @@ def slots_run(step: Step, own: bool = False) -> int:
         return slots                                            # 31.2b: one slot
     if is_cont(step):
         import continue_box as cb                               # 31.3
-        return min(slots, fits(cb.context(fb.path_of(PLAN_RUNTIME["C"], th == "on")),
-                               STEP2388_FILE))
+        spec, size = cont_spec(step)
+        return min(slots, fits(cb.context(spec), size))
     return min(slots, fits(fb.slot_context(list(tasks), th == "on")))
 
 
@@ -600,7 +628,7 @@ def hours(step: Step, own: bool = False, plan: str = "") -> float:
     of = fb.parse_shard(shard)[1] if shard else 1
     if is_cont(step):
         # 31.3: its share of what U-cont writes and reads again, at the most
-        z = CONT_SIZE[th]
+        z = CONT_SIZE[(th, next(t for t in tasks if t in CONT_MODEL))]
         return (z["write"] / CONT_TOK_S[th] + z["read"] / CONT_READ_TOK_S) / of / 3600
     run = slots_run(step, own)
     # 31.2: a step no pilot paced (DeviceMark, the easy set) at plan U's paces
@@ -622,10 +650,12 @@ def words(step: Step, own: bool = False, plan: str = "") -> str:
     guessed = any((th, t) in MEASURED_GUESSED for t in tasks)
     if is_cont(step):
         import continue_box as cb
-        k = fb.path_of(PLAN_RUNTIME["C"], th == "on")
-        return (f"thinking {th} (k{k}) · {label_of(CONT)}, {cb.LIMITS[k]:,} tokens"
+        spec, _ = cont_spec(step)
+        return (f"thinking {th}" + (f" (k{spec['path']})" if spec["path"] else "")
+                + f" · {label_of(next(t for t in tasks if t in CONT_MODEL))}, "
+                f"{spec['limit']:,} tokens"
                 + (f" · part {shard}" if shard else "") + f" · {run} slots of "
-                f"{cb.context(k):,} tokens · about {hours(step, own, plan):.1f} h at the most "
+                f"{cb.context(spec):,} tokens · about {hours(step, own, plan):.1f} h at the most "
                 f"(each answer to its limit, {CONT_TOK_S[th]:.0f} tokens a second written and "
                 f"{CONT_READ_TOK_S:,.0f} read: a guess)")
     return (f"thinking {th} · {', '.join(label_of(t) for t in ordered(tasks))}"
@@ -910,7 +940,7 @@ def main(argv: list[str] | None = None) -> int:
             ap.error(f"{box}: give --continue with its path's inputs file and --continue-sha256 "
                      "with its sha256, as continue_box.py inputs printed them")
         if not conts and (a.cont or a.continue_sha256 or a.continue_check):
-            ap.error("--continue is for U-cont's boxes alone (C1 … C4)")
+            ap.error("--continue is for U-cont's boxes alone (C1 … C5)")
     if a.continue_check and (len(boxes) > 1 or box_of(boxes[0])[0][0] != "on"):
         ap.error("--continue-check: one box of the k6 path (C1), its file cont-k6.jsonl")
     # 22: a model a runtime names runs on it alone, and the runtime its own

@@ -5,7 +5,10 @@ thinking and its answer together: 98,304 on the k6 path (thinking on) and
 32,768 on the k3 path (thinking off). Plan U asked at the whitepaper's limits
 (81,920, 65,536 and 32,768 with thinking on; 16,384, 8,192 and 4,096 off), and
 keeps them, so every shard of a benchmark is asked one way. DeviceMark keeps its
-own 4,096.
+own 4,096. 31.3b (masein, 4 Nov): the original Qwen3.6-35B-A3B Q2's easy set,
+asked beside step2388's k3 on U40 at 4,096, is continued to 32,768 too, so
+both models of the easy set run at the same limit — on its own runtime, as it
+was asked (its card's sampling and the thinking switch).
 
 An answer that finished under its old limit is a draw at the new one too — a
 limit only matters once it is reached — so only the answers that ran out of
@@ -47,12 +50,13 @@ settings check passed first, as on every step of plan U):
 Three places:
 
 1. On the server, `inputs`: the answers of a model's rows that ran out of
-   room, of every benchmark whose answers are all in — a file a path,
-   cont-k6.jsonl and cont-k3.jsonl (the answers as the row holds them, no
-   question), its sha256 for the box's line, and what each holds:
+   room, of every benchmark whose answers are all in — a file for each
+   model and thinking continued, cont-k6.jsonl, cont-k3.jsonl and
+   cont-q2.jsonl (the answers as the row holds them, no question), its
+   sha256 for the box's line, and what each holds:
 
        cd ~/benchmarks/aienh && sudo docker compose exec -T bench \\
-           python scripts/continue_box.py inputs --as served/step2388-k3k6-2611
+           python scripts/continue_box.py inputs
 
 2. On a box (frontier_box.py's plan C), remote_gguf.py --continue <file>
    --part i/n: every n-th answer of the file from the i-th, the questions
@@ -93,19 +97,27 @@ import remote_bundle as rb  # noqa: E402
 
 SUITE = "frontier-cont"
 REFUSED = 2
-# the model team's limits (Roohi, 4 Nov), thinking and answer together, by
-# expert path
-LIMITS = {6: 98_304, 3: 32_768}
-RUNTIME = "k3k6-2611"
-# what each path continues — the whitepaper's benchmarks the path asks, and
-# on k3 the easy set; never DeviceMark (its own 4,096) nor the showcase (asked
-# at the new limit on U39)
-TASKS = {6: ("gpqa_diamond_epoch", "otis_aime_epoch", "math_l5_epoch", "mmlupro_tiger",
-             "arc_agi2_public", "ifeval_google", "ifbench_test", "simpleqa_epoch",
-             "hle_text_cais"),
-         3: ("gpqa_diamond_epoch", "math_l5_epoch", "mmlupro_tiger", "ifeval_google",
-             "ifbench_test", "mmlu_chat", "gsm8k_chat")}
-INPUT = "cont-k{path}.jsonl"
+STEP2388, Q2 = "served/step2388-k3k6-2611", "served/Qwen3.6-35B-A3B-Q2-k3k6-2611"
+EASY = ("mmlu_chat", "gsm8k_chat")
+# what is continued, and to what, by model and thinking: its inputs file's
+# key, its limit (thinking and answer together), its expert path, and its
+# benchmarks. step2388 at the model team's limits (Roohi, 4 Nov): the
+# whitepaper's benchmarks each path asks, and on k3 the easy set — never
+# DeviceMark (its own 4,096) nor the showcase (asked at the new limit on
+# U39). 31.3b (masein, 4 Nov): and the original Qwen3.6-35B-A3B Q2's easy set
+# on its own runtime (card-qwen-k3k6, no path: its card's sampling sent, as it
+# was asked), so both models of the easy set run at the same limit
+SPECS = {
+    (STEP2388, True): {"key": "k6", "limit": 98_304, "path": 6,
+                       "tasks": ("gpqa_diamond_epoch", "otis_aime_epoch", "math_l5_epoch",
+                                 "mmlupro_tiger", "arc_agi2_public", "ifeval_google",
+                                 "ifbench_test", "simpleqa_epoch", "hle_text_cais")},
+    (STEP2388, False): {"key": "k3", "limit": 32_768, "path": 3,
+                        "tasks": ("gpqa_diamond_epoch", "math_l5_epoch", "mmlupro_tiger",
+                                  "ifeval_google", "ifbench_test", *EASY)},
+    (Q2, False): {"key": "q2", "limit": 32_768, "path": None, "tasks": EASY},
+}
+INPUT = "cont-{key}.jsonl"
 DONE = "continued.jsonl"
 CHECK = "continue-check.jsonl"
 SETUP_KEY = "continuation"
@@ -119,14 +131,29 @@ TRIES = 3
 QUESTION_HEAD = 80
 
 
-def context(path: int) -> int:
+def spec_of(model: str, on: bool) -> dict | None:
+    """what this model's answers with this thinking are continued to — None
+    for one that isn't continued"""
+    got = SPECS.get((model, bool(on)))
+    return {**got, "model": model, "on": bool(on)} if got else None
+
+
+def context(spec: dict) -> int:
     """a slot's context: the new limit, and the prompt's room of the longest
-    benchmark the path continues (ARC-AGI-2's on k6: 131,072)"""
-    return LIMITS[path] + max(fb.BENCH[t]["room"] for t in TASKS[path])
+    benchmark continued (ARC-AGI-2's on k6: 131,072)"""
+    return spec["limit"] + max(fb.BENCH[t]["room"] for t in spec["tasks"])
 
 
-def path_of(on: bool) -> int:
-    return fb.path_of(RUNTIME, on)
+def asked_as(spec: dict) -> dict:
+    """how a question was asked when nothing else says: on an expert path, the
+    path alone (service/frontier.settings, its limit aside)"""
+    return {"expert_path": spec["path"]} if spec.get("path") else {}
+
+
+def template_how(asked: dict) -> dict:
+    """what the template is told beside the messages: the path, or the
+    thinking switch said out loud"""
+    return {k: asked[k] for k in ("expert_path", "chat_template_kwargs") if k in asked}
 
 
 def seed_of(task: str, qid: str, epoch: int) -> int:
@@ -185,14 +212,22 @@ def messages(task: str, text: str) -> list[dict]:
             {"role": "user", "content": text}]
 
 
-def request(line: dict, msgs: list[dict], form_text: str, path: int, limit: int) -> dict:
-    """what a continuation is asked with: the messages and the unfinished
-    turn, its limit, its seed and its path — on k6 how many of the prompt's
-    last tokens are the reply's. Nothing that samples"""
-    return {"messages": [*msgs, turn(form_text, path)],
-            "max_tokens": limit - int(line["tokens"]),
+def request(line: dict, msgs: list[dict], form_text: str, spec: dict,
+            asked: dict | None = None) -> dict:
+    """what a continuation is asked with: what the question was asked with
+    (`asked`, service/frontier.settings: on an expert path the path alone,
+    nothing that samples; on the Q2's runtime its card's sampling and the
+    thinking switch, as it was asked), the messages and the unfinished turn,
+    its limit and a seed of its own — and on k6 how many of the prompt's last
+    tokens are the reply's. The Q2's requests never set penalty_prompt_tokens:
+    the server's default counts the prompt with the reply, and continued, the
+    prompt is the same text — the same setting"""
+    asked = asked_as(spec) if asked is None else asked
+    path = spec.get("path")
+    return {**{k: v for k, v in asked.items() if k != "max_tokens"},
+            "messages": [*msgs, turn(form_text, path)],
+            "max_tokens": spec["limit"] - int(line["tokens"]),
             "seed": seed_of(line["task"], str(line["id"]), int(line["epoch"])),
-            "expert_path": path,
             **({"penalty_prompt_tokens": int(line["tokens"])} if path == 6 else {})}
 
 
@@ -210,8 +245,8 @@ class Server:
         from service import served as sv
         return sv._post(self.base + path, "", body, timeout=timeout)
 
-    def template(self, msgs: list[dict], path: int) -> str:
-        got = self.post("/apply-template", {"messages": msgs, "expert_path": path}).get("prompt")
+    def template(self, msgs: list[dict], how: dict) -> str:
+        got = self.post("/apply-template", {"messages": msgs, **how}).get("prompt")
         if not isinstance(got, str) or not got:
             raise ValueError("/apply-template gave no prompt")
         return got
@@ -224,11 +259,14 @@ class Server:
         return len(got)
 
 
-def prepare(srv: Server, line: dict, msgs: list[dict], path: int) -> dict:
+def prepare(srv: Server, line: dict, msgs: list[dict], spec: dict,
+            asked: dict | None = None) -> dict:
     """the form this answer is continued in, held to its two checks — {form,
     text, prompt_tokens, continued_tokens} — or {why} when no form gives back
     the question's and the reply's tokens"""
-    p0 = srv.template(msgs, path)
+    path = spec.get("path")
+    how = template_how(asked_as(spec) if asked is None else asked)
+    p0 = srv.template(msgs, how)
     n0 = srv.count(p0)
     want0, toks = line.get("prompt_tokens"), int(line["tokens"])
     if isinstance(want0, int) and n0 != want0:
@@ -237,7 +275,7 @@ def prepare(srv: Server, line: dict, msgs: list[dict], path: int) -> dict:
     want = n0 + toks
     seen = []
     for form, text in forms(line["answer"], path):
-        p1 = srv.template([*msgs, turn(text, path)], path)
+        p1 = srv.template([*msgs, turn(text, path)], how)
         if p1 != p0 + text:
             seen.append(f"{form}: the prompt isn't the question's and the reply's text")
             continue
@@ -254,10 +292,12 @@ SETTINGS = ("temperature", "top_k", "top_p", "min_p", "presence_penalty", "frequ
             "n_predict", "expert_path")
 
 
-def continue_one(srv: Server, line: dict, item: dict, path: int, limit: int) -> dict:
+def continue_one(srv: Server, line: dict, item: dict, spec: dict,
+                 asked: dict | None = None) -> dict:
     """one answer continued: its record for continued.jsonl (status
     "continued", or "refused" and why)"""
     task, qid, e = line["task"], str(line["id"]), int(line["epoch"])
+    path, limit = spec.get("path"), spec["limit"]
     text, _ = fb.prompt(task, item)
     msgs = messages(task, text)
     base = {"task": task, "id": qid, "epoch": e, "limit": limit,
@@ -267,12 +307,12 @@ def continue_one(srv: Server, line: dict, item: dict, path: int, limit: int) -> 
     if int(line["tokens"]) >= limit:
         return {**base, "status": "refused",
                 "why": f"{line['tokens']:,} tokens already, the limit {limit:,}"}
-    prep = prepare(srv, line, msgs, path)
+    prep = prepare(srv, line, msgs, spec, asked)
     if prep.get("why"):
         return {**base, "status": "refused", "why": prep["why"]}
     # "verbose": the settings the server applied come back with the reply
     # (generation_settings), kept with each answer — it changes nothing it samples
-    body = {**request(line, msgs, prep["text"], path, limit), "stream": False, "verbose": True}
+    body = {**request(line, msgs, prep["text"], spec, asked), "stream": False, "verbose": True}
     from service import served as sv
     t0, got, why = time.time(), None, ""
     for k in range(TRIES):
@@ -424,14 +464,14 @@ def line_words(r: dict, k: int, of: int) -> str:
             + (" · ended in a loop" if r["loop"] else "") + f" · {r['seconds']:.0f} s")
 
 
-def ask(base: str, lines: list[dict], out: Path, path: int, slots: int, say,
-        name: str = DONE) -> tuple[int, str]:
+def ask(base: str, lines: list[dict], out: Path, spec: dict, slots: int, say,
+        name: str = DONE, asked: dict[str, dict] | None = None) -> tuple[int, str]:
     """each answer not yet continued, `slots` at a time: (kept, why it stopped
     — '' when every one is)"""
     from concurrent.futures import ThreadPoolExecutor
 
     from service import config
-    srv, limit = Server(base), LIMITS[path]
+    srv, limit = Server(base), spec["limit"]
     have = kept(out, name)
     todo = [r for r in lines if key_of(r) not in have]
     items: dict[str, dict] = {}
@@ -439,7 +479,8 @@ def ask(base: str, lines: list[dict], out: Path, path: int, slots: int, say,
         items.update({f"{t}\0{it['id']}": it for it in fb.load(t, config.BENCH_ROOT)})
     if todo:
         say(f"{len(todo):,} of {len(lines):,} answers to continue here, {len(have):,} kept "
-            f"already · to {limit:,} tokens on k{path}, {slots} at a time")
+            f"already · to {limit:,} tokens" + (f" on k{spec['path']}" if spec.get("path") else "")
+            + f", {slots} at a time")
     lock, stop, n = threading.Lock(), [], {"k": len(have)}
 
     def one(r: dict) -> None:
@@ -453,7 +494,7 @@ def ask(base: str, lines: list[dict], out: Path, path: int, slots: int, say,
                                            "tokens": r["tokens"]}}
         else:
             try:
-                got = continue_one(srv, r, it, path, limit)
+                got = continue_one(srv, r, it, spec, (asked or {}).get(r["task"]))
             except Exception as e:                      # noqa: BLE001 — said, the rest kept
                 got = {"status": "failed", "why": f"{type(e).__name__}: {str(e)[:300]}"}
         if got["status"] == "failed":
@@ -510,7 +551,7 @@ def make_bundle(out: Path, served_as: str, thinking: bool, state: dict, gguf: di
             x["of"] += 1
             x["answers"] += key_of(r) in have
         return None, {}, {t: x for t, x in by.items() if x["answers"] < x["of"]}
-    path = fb.path_of(rec.get("runtime"), thinking)
+    spec = spec_of(served_as, thinking)
     row = served_as.replace("/", "__") + ("__thinking" if thinking else "")
     files: dict[str, bytes] = {}
     tasks: dict[str, int] = {}
@@ -532,7 +573,8 @@ def make_bundle(out: Path, served_as: str, thinking: bool, state: dict, gguf: di
              "finished_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
              **({"price": {"per_hour": rg.price_of(state), "by": "the box line (--price)"}}
                 if rg.price_of(state) is not None else {}),
-             SETUP_KEY: {"limit": LIMITS[path], "path": path, "input_sha256": input_sha,
+             SETUP_KEY: {"limit": spec["limit"], "path": spec["path"], "key": spec["key"],
+                         "input_sha256": input_sha,
                          "part": {"i": part[0], "n": part[1]} if part else None,
                          "answers": len(mine), "by_task": summary(mine)}}
     files["run.log"] = rb.scrub(log).encode("utf-8")
@@ -648,8 +690,8 @@ def window_test(srv: "Server", path: int) -> dict:
 
     import path_check
     q = [{"role": "user", "content": PROBE_Q}]
-    p0 = srv.template(q, path)
-    p1 = srv.template([*q, turn(PROBE_TURN, path)], path)
+    p0 = srv.template(q, {"expert_path": path})
+    p1 = srv.template([*q, turn(PROBE_TURN, path)], {"expert_path": path})
     ids = srv.post("/tokenize", {"content": p1, "add_special": True,
                                  "parse_special": True}).get("tokens") or []
     n = len(ids) - srv.count(p0)
@@ -756,20 +798,23 @@ def check_words(r: dict) -> str:
 # the server: what to continue, and the import
 # ---------------------------------------------------------------------------
 
-def inputs(model: str, dest: Path, say=print) -> dict:
-    """each path's file of answers that ran out of room — those of every
-    benchmark the path continues whose answers are all in on the row, and not
-    continued yet. {path: {file, sha256, by task, left out}}"""
+def inputs(dest: Path, say=print, models: list[str] | None = None) -> dict:
+    """a file of answers that ran out of room for each model and thinking
+    continued (SPECS: step2388's k6 and k3, the Q2's easy set) — those of
+    every benchmark it continues whose answers are all in on the row, and not
+    continued yet. {key: {file, sha256, by task, left out}}"""
     from service import config
     from service import frontier as sf
     fb.set_root(config.BENCH_ROOT)
     dest.mkdir(parents=True, exist_ok=True)
     out = {}
-    for on in (True, False):
-        path = path_of(on)
+    for model, on in SPECS:
+        if models and model not in models:
+            continue
+        spec = spec_of(model, on)
         row = config.OUT_DIR / (model.replace("/", "__") + ("__thinking" if on else ""))
         lines, by, left = [], {}, {}
-        for t in TASKS[path]:
+        for t in spec["tasks"]:
             d = sf.task_dir(row, t)
             if not (d / sf.ANSWERS).exists():
                 continue
@@ -802,14 +847,16 @@ def inputs(model: str, dest: Path, say=print) -> dict:
                                  if isinstance(a.get("prompt_tokens"), int) else {}),
                               "budget": budget, "row": row.name})
             by[t] = n
-        f = dest / INPUT.format(path=path)
+        f = dest / INPUT.format(key=spec["key"])
         f.write_text("".join(json.dumps(x, ensure_ascii=False) + "\n" for x in lines),
                      encoding="utf-8")
         sha = rb.sha256_file(f)
-        out[path] = {"file": str(f), "sha256": sha, "by_task": by, "left_out": left,
-                     "answers": len(lines),
-                     "most": sum(LIMITS[path] - x["tokens"] for x in lines)}
-        say(f"k{path} (thinking {'on' if on else 'off'}), to {LIMITS[path]:,} tokens: "
+        key = spec["key"]
+        out[key] = {"file": str(f), "sha256": sha, "by_task": by, "left_out": left,
+                    "answers": len(lines),
+                    "most": sum(spec["limit"] - x["tokens"] for x in lines)}
+        say(f"{model} · thinking {'on' if on else 'off'}"
+            + (f" (k{spec['path']})" if spec["path"] else "") + f", to {spec['limit']:,} tokens: "
             f"{len(lines):,} answers to continue · {f} · sha256 {sha}")
         for t, n in by.items():
             say(f"  {fb.BENCH[t]['label']}: {n['to_continue']:,} of its {n['answers']:,} answers "
@@ -821,7 +868,7 @@ def inputs(model: str, dest: Path, say=print) -> dict:
                 f"  {fb.BENCH[t]['label']}: {n['to_continue']:,} of its {n['answers']:,} answers")
         for t, why in left.items():
             say(f"  {fb.BENCH[t]['label']}: left out — {why}")
-        say(f"  at most {out[path]['most']:,} tokens to write (each to the limit)")
+        say(f"  at most {out[key]['most']:,} tokens to write (each to the limit)")
     return out
 
 
@@ -863,11 +910,15 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
         return 0
     rec = served.get(model) if served.is_served(model) else None
     out, stop = imf.model_problems(b, rec, file_sha)
-    path_k = fb.path_of(setup.get("runtime"), on)
-    if not stop and (path_k not in LIMITS or cont.get("limit") != LIMITS[path_k]
-                     or cont.get("path") != path_k):
-        out.append(f"continued to {cont.get('limit')} tokens on k{cont.get('path')}; the "
-                   f"model team's limit on k{path_k} is {LIMITS.get(path_k)}")
+    spec = spec_of(model, on)
+    if not stop and spec is None:
+        out.append(f"{model}'s answers with thinking {'on' if on else 'off'} aren't continued "
+                   "on this board")
+    elif not stop and (cont.get("limit") != spec["limit"] or cont.get("path") != spec["path"]):
+        out.append(f"continued to {cont.get('limit')} tokens"
+                   + (f" on k{cont.get('path')}" if cont.get("path") else "")
+                   + f"; {model}'s limit here is {spec['limit']}"
+                   + (f" on k{spec['path']}" if spec["path"] else ""))
     if stop or out:
         for line in out:
             say(f"refused — {line}")
@@ -879,8 +930,8 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
     staging = config.OUT_DIR.with_name("staging") / f"{row_name}-cont-{stamp}" / row_name
     lines, ready, bad = [], {}, []
     for t in tasks:
-        if t not in TASKS.get(path_k, ()):
-            bad.append(f"{t}: not a benchmark the k{path_k} path continues")
+        if t not in spec["tasks"]:
+            bad.append(f"{t}: not a benchmark {model}'s answers are continued on")
             continue
         raw = b["files"].get(f"results/{row_name}/{t}_0shot/{sf.SUB}/{DONE}")
         try:
@@ -921,7 +972,7 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
                 continue
             fin = r.get("answer") or ""
             if not isinstance(r.get("tokens"), int) or continuity(
-                    a.get("answer") or "", fin, str(r.get("form") or ""), "", path_k):
+                    a.get("answer") or "", fin, str(r.get("form") or ""), "", spec["path"]):
                 bad.append(f"{t}: question {k[0]}, run {k[1]}: its continued answer doesn't "
                            "begin with the row's")
                 continue
@@ -1076,12 +1127,14 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    i = sub.add_parser("inputs", help="the answers that ran out of room, a file a path")
-    i.add_argument("--as", dest="served_as", default="served/step2388-k3k6-2611")
+    i = sub.add_parser("inputs", help="the answers that ran out of room, a file for each model "
+                                      "and thinking continued")
+    i.add_argument("--as", dest="served_as", action="append", default=[],
+                   help="only this model's (repeatable; default every one SPECS names)")
     i.add_argument("--out", default="", help="where the files go (default $BENCH_ROOT/u-cont)")
     a = ap.parse_args(argv)
     from service import config
-    inputs(a.served_as, Path(a.out) if a.out else config.BENCH_ROOT / "u-cont")
+    inputs(Path(a.out) if a.out else config.BENCH_ROOT / "u-cont", models=a.served_as or None)
     return 0
 
 

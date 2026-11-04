@@ -1655,9 +1655,13 @@ def _main(argv: list[str] | None = None) -> int:
                    or a.showcase):
         ap.error("--continue continues its answers alone: no --pilot, --parity, --serve, "
                  "--check, --devicemark, --showcase or --shard (--part shares them out)")
-    if a.cont and not (a.runtime and fb.RUNTIMES[a.runtime].get("paths")):
-        ap.error("--continue: on a runtime of expert paths (--runtime "
-                 + " or ".join(n for n, r in fb.RUNTIMES.items() if r.get("paths")) + ")")
+    if a.cont:
+        import continue_box as cb
+        # 31.3b: a model and thinking whose answers are continued (cb.SPECS),
+        # on its own runtime (the check above)
+        if not cb.spec_of(a.served_as, a.thinking == "on"):
+            ap.error("--continue: these answers aren't continued — "
+                     + "; ".join(f"{m} thinking {'on' if on else 'off'}" for m, on in cb.SPECS))
     if (a.part or a.continue_check) and not a.cont:
         ap.error("--part and --continue-check: with --continue")
     if a.cont and a.only and not a.continue_check:
@@ -1757,8 +1761,8 @@ def _main(argv: list[str] | None = None) -> int:
         import showcase_box as scb
         tasks = []                  # 31.2b: the showcase — one slot of scb.CONTEXT
     if a.cont:
-        import continue_box as cb
-        tasks = []                  # 31.3: the continuation — a slot of cb.context(path)
+        tasks = []                  # 31.3: the continuation — a slot of cb.context(spec)
+        c_spec = cb.spec_of(a.served_as, thinking)
     # 29: our own GPU, shared — nothing starts while another process uses it
     if own:
         import gpu_free
@@ -1773,7 +1777,7 @@ def _main(argv: list[str] | None = None) -> int:
     cap = fb.context_cap(a.runtime or "")
     ctx = (fb.slot_context(tasks, thinking, cap) if tasks else
            dmb.CONTEXT if a.devicemark else scb.CONTEXT if a.showcase else
-           cb.context(fb.path_of(a.runtime, thinking)) if a.cont else CHECK_CONTEXT)
+           cb.context(c_spec) if a.cont else CHECK_CONTEXT)
     if a.serve:
         ctx = min(a.serve_context, cap) if cap else a.serve_context
     # 17h: what is free on the card, not its total — 300 MiB in use by
@@ -2099,12 +2103,12 @@ def _main(argv: list[str] | None = None) -> int:
             c_all = cb.read_input(cfile)
         except ValueError as e:
             raise SystemExit(f"--continue: {e}. Nothing was asked") from None
-        c_path = fb.path_of(a.runtime, thinking)
+        c_path, c_limit = c_spec["path"], c_spec["limit"]
         c_row = a.served_as.replace("/", "__") + ("__thinking" if thinking else "")
-        wrong = sorted({r["task"] for r in c_all} - set(cb.TASKS[c_path]))
+        wrong = sorted({r["task"] for r in c_all} - set(c_spec["tasks"]))
         if wrong:
             raise SystemExit(f"--continue: {cfile.name} holds answers of {', '.join(wrong)}, which "
-                             f"the k{c_path} path doesn't continue — the other path's file? "
+                             f"{a.served_as}'s continuation doesn't continue — another file? "
                              "Nothing was asked")
         others = sorted({str(r.get("row")) for r in c_all} - {c_row})
         if others:
@@ -2116,7 +2120,7 @@ def _main(argv: list[str] | None = None) -> int:
                 raise SystemExit(f"--continue-check: {cfile.name} holds no answer of "
                                  f"{fb.BENCH[a.only[0]]['label']}. Nothing was asked")
         else:
-            cont_lines = cb.part_of(c_all, part, cb.LIMITS[c_path])
+            cont_lines = cb.part_of(c_all, part, c_limit)
         for t in sorted({r["task"] for r in cont_lines}):
             try:
                 fb.load(t, config.BENCH_ROOT)
@@ -2127,9 +2131,11 @@ def _main(argv: list[str] | None = None) -> int:
             + (f", part {part[0]} of {part[1]}" if part else "")
             + (f", the first {len(cont_lines)} of {fb.BENCH[a.only[0]]['label']} (the check)"
                if a.continue_check else "")
-            + f" · each continued to {cb.LIMITS[c_path]:,} tokens on expert path k{c_path}, "
-            "its seed a fresh one" + (", the penalty counting its reply's tokens "
-                                      "(penalty_prompt_tokens)" if c_path == 6 else ""))
+            + f" · each continued to {c_limit:,} tokens"
+            + (f" on expert path k{c_path}" if c_path else " as it was asked (its runtime's "
+               "sampling and thinking switch)")
+            + ", its seed a fresh one" + (", the penalty counting its reply's tokens "
+                                          "(penalty_prompt_tokens)" if c_path == 6 else ""))
 
     srv_proc = Server(srv, gguf_path, a.port, a.slots, ctx, flags, extra_env, out / SERVER_LOG)
     status = "failed"
@@ -2336,14 +2342,24 @@ def _main(argv: list[str] | None = None) -> int:
                 "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}, indent=1),
                 encoding="utf-8")
             return 0 if got["separated"] else 1
+        if a.cont:
+            # 31.3b: each benchmark's questions continued as they were asked
+            # (service/frontier.settings: the path alone, or the runtime's
+            # sampling and thinking switch)
+            from service import frontier as sf_c
+            c_asked = {t: sf_c.settings(rec, t, thinking) for t in {r["task"] for r in cont_lines}}
         if a.cont and a.continue_check:
-            # 31.3: the check before U-cont — penalty_prompt_tokens' test,
-            # then the first answers of one benchmark, a line each; no bundle
-            t_pen = cb.penalty_test(srv_proc.base, c_path)
-            for ln in cb.penalty_words(t_pen):
-                say(ln)
-            n_c, why_c = cb.ask(srv_proc.base, cont_lines, out, c_path, a.slots, lambda x: None,
-                                name=cb.CHECK)
+            # 31.3: the check before U-cont — penalty_prompt_tokens' test (on
+            # k6, whose presence penalty it is), then the first answers of one
+            # benchmark, a line each; no bundle
+            t_pen = cb.penalty_test(srv_proc.base, c_path) if c_path == 6 else {
+                "verdict": "pass", "greedy": {"why": "no presence penalty here"},
+                "window": {"why": "no presence penalty here"}}
+            if c_path == 6:
+                for ln in cb.penalty_words(t_pen):
+                    say(ln)
+            n_c, why_c = cb.ask(srv_proc.base, cont_lines, out, c_spec, a.slots, lambda x: None,
+                                name=cb.CHECK, asked=c_asked)
             got_c = cb.kept(out, cb.CHECK)
             for r in cont_lines:
                 x = got_c.get(cb.key_of(r))
@@ -2371,7 +2387,8 @@ def _main(argv: list[str] | None = None) -> int:
             def said_c(x: str) -> None:
                 say(x)                      # each answer's line, and the fetch's count
                 progress(out, state="asking", line=x[:300])
-            n_c, why_c = cb.ask(srv_proc.base, cont_lines, out, c_path, a.slots, said_c)
+            n_c, why_c = cb.ask(srv_proc.base, cont_lines, out, c_spec, a.slots, said_c,
+                                asked=c_asked)
             if sampler is not None:
                 sampler.phase = "after"
             status = "done" if not why_c else "failed"

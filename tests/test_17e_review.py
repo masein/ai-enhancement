@@ -172,10 +172,10 @@ def test_2_3_each_plan_runs_every_benchmark_once_one_line_a_box():
                     import showcase_box
                     assert slots == 1 and showcase_box.CONTEXT <= rg.MAX_CONTEXT
                     continue
-                if fbx.CONT in tasks:           # 31.3: U-cont, as many slots as fit
+                if fbx.is_cont((th, tasks, shard, slots)):     # 31.3: U-cont, as many as fit
                     import continue_box
-                    k = fb.path_of(fbx.PLAN_RUNTIME[name], th == "on")
-                    assert slots == fbx.fits(continue_box.context(k), fbx.STEP2388_FILE)
+                    spec, size = fbx.cont_spec((th, tasks, shard, slots))
+                    assert slots == fbx.fits(continue_box.context(spec), size)
                     continue
                 assert fb.slot_context(list(tasks), th == "on") * slots <= rg.MAX_CONTEXT
         # 20: plan L asks thinking on only, and has no parity step (the
