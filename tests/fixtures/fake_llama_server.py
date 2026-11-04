@@ -49,7 +49,18 @@ prompt's tokens unless FAKE_LLAMA_PROMPT_PENALTY=1. FAKE_LLAMA_PATHS_BAD=
 its line); FAKE_LLAMA_PATHS_LOG=0 prints no start-up lines. 31.2: /props
 gives each path by its top_k, with the other penalties neutral in its params
 ("0.repeat_penalty=1.1" changes one on both), and the default path in
-default_generation_settings; the start-up lines print thinking as 1 or 0."""
+default_generation_settings; the start-up lines print thinking as 1 or 0.
+31.3: FAKE_LLAMA_CONTINUE=1 writes each reply as a list of tokens, a word each
+with the space before it — thinking "w1 w2 …", then "\n</think>", then the
+reply — so many that the whole needs FAKE_LLAMA_OUT_TOKENS (default 12), and
+counts the prompt and the reply as /tokenize does; its template ends in a
+space, and a final assistant message is continued as the team's build
+continues one (its thinking written straight after the prompt; a reply
+beside it after "\n</think>\n\n"): the rest of the same reply, parsed whole
+(the thinking up to </think>, the reply after its newlines), with
+"logprobs" and "verbose" (the settings applied) when asked; /completion's
+probabilities with penalty_prompt_tokens put the presence penalty on the
+prompt's last N tokens alone (0 none, -1 all)."""
 
 from __future__ import annotations
 
@@ -88,6 +99,57 @@ def NEUTRAL_REPORTED() -> dict:  # noqa: N802 — read as a table
         if m:
             got[m[1]] = float(m[2])
     return got
+
+
+def tok_id(w: str) -> int:
+    return sum(w.encode()) % 50000
+
+
+def counted_by(prompt: str, path: int, ppt) -> dict:
+    """31.3: /completion's first token with penalty_prompt_tokens — two of the
+    prompt's first tokens, two of its last N, and two it hasn't; the presence
+    penalty on k6 put on the tokens of the last N (none for 0, all for -1)"""
+    ids = [tok_id(w) for w in prompt.split()]
+    n = int(ppt)
+    tail = set(ids) if n < 0 else set(ids[len(ids) - n:]) if n > 0 else set()
+    head = [i for i in dict.fromkeys(ids) if i not in set(ids[len(ids) - max(n, 0):])][:2]
+    last = [i for i in dict.fromkeys(reversed(ids)) if i not in set(ids[:len(ids) - max(n, 0)])][:2]
+    cands = head + last + [1, 2]
+    raw = dict(zip(cands, [-0.4, -1.1, -0.7, -1.5, -0.9, -1.8]))
+    v = paths_reported().get(path) or PATHS[3]
+    post = {i: (x - (v["presence_penalty"] if i in tail else 0)) / v["temp"] for i, x in raw.items()}
+    z = math.log(sum(math.exp(x) for x in post.values()))
+    return {"before": raw, "after": {i: x - z for i, x in post.items()}}
+
+
+CONT_REPLY = ["\n</think>", "\n\nThe", " options", " compared.", "\nANSWER:"]
+
+
+def reply_tokens(on: bool, need: int, pick: str) -> list[str]:
+    """31.3: the whole reply a question gets, as tokens — the same each time it
+    is asked, so a cut one continued is the rest of it"""
+    tail = [*(CONT_REPLY if on else CONT_REPLY[1:]), f" {pick}"]
+    if not on:
+        tail[0] = tail[0].lstrip("\n")
+    k = max(1, need - len(tail))
+    head = [f"{'w' if on else 'x'}{i + 1}" if i == 0 else f" {'w' if on else 'x'}{i + 1}"
+            for i in range(k)]
+    if not on:
+        tail[0] = " " + tail[0]
+    return head + tail
+
+
+def parsed(text: str, on: bool) -> dict:
+    """31.3: a reply as the team's parser gives it back: the thinking up to
+    </think>, the reply after up to two newlines"""
+    if not on:
+        return {"content": text}
+    if "</think>" not in text:
+        return {"reasoning_content": text, "content": ""}
+    think, rest = text.split("</think>", 1)
+    for _ in range(2):
+        rest = rest[1:] if rest.startswith("\n") else rest
+    return {"reasoning_content": think, "content": rest}
 
 
 def first_token(prompt: str, path: int) -> dict:
@@ -171,6 +233,29 @@ def main() -> int:
     busy = {"text": [], "alone": 0, "together": 0}
     print(f"main: loading model {os.path.basename(model)}", flush=True)
     paths_on = os.environ.get("FAKE_LLAMA_PATHS") == "1"
+    cont_on = os.environ.get("FAKE_LLAMA_CONTINUE") == "1"
+
+    def thinks(body: dict) -> bool:
+        if paths_on and "expert_path" in body:
+            return body["expert_path"] == 6 and not never_think
+        return bool((body.get("chat_template_kwargs") or {}).get("enable_thinking")) \
+            and not never_think
+
+    def assistant_text(m: dict, on: bool) -> str:
+        """31.3: what the team's build writes of a final assistant message"""
+        think, reply = m.get("reasoning_content") or "", m.get("content") or ""
+        if on and not reply:
+            return think
+        return (think + "\n</think>\n\n" + reply) if on else reply
+
+    def cont_prompt(body: dict) -> str:
+        msgs = body.get("messages") or []
+        on = thinks(body)
+        last = msgs[-1] if msgs else {}
+        q = msgs[:-1] if last.get("role") == "assistant" else msgs
+        words = " ".join(str(m.get("content") or "") for m in q)
+        p = "<bos> " + ("<|think|> " if on else "") + words + " <turn|> "
+        return p + (assistant_text(last, on) if last.get("role") == "assistant" else "")
     if paths_on and os.environ.get("FAKE_LLAMA_PATHS_LOG") != "0":
         for p, v in paths_reported().items():
             said = ", ".join(f"{k} = {x:.3f}" if isinstance(x, float) else f"{k} = {x}"
@@ -226,6 +311,50 @@ def main() -> int:
                 return self._send(200, [{"id": i, "speculative": drafts} for i in range(slots)])
             return self._send(404, {"error": {"message": "not found"}})
 
+        def cont_chat(self, body: dict):
+            """31.3: a reply as a list of tokens, or the rest of one continued"""
+            msgs = body.get("messages") or []
+            on = thinks(body)
+            last = msgs[-1] if msgs else {}
+            prefill = assistant_text(last, on) if last.get("role") == "assistant" else ""
+            q = [m for m in msgs if m.get("role") != "assistant"]
+            text = (q[-1] if q else {}).get("content") or ""
+            opts = dict(re.findall(r"(?m)^([ABCD])\) (.*)$", text))
+            right = next((k for k, v in opts.items() if v.startswith("right")), "A")
+            pick = (next(k for k in "ABCD" if k != right) if "hard" in text else right)
+            whole = reply_tokens(on, int(os.environ.get("FAKE_LLAMA_OUT_TOKENS") or 12), pick)
+            done = len(prefill.split())
+            if prefill and "".join(whole[:done]) != prefill:
+                whole = whole[:0] + [prefill] + [f" more{i}" for i in range(len(whole))]
+                done = 1
+            room = int(body.get("max_tokens") or 0) or len(whole)
+            new = whole[done:done + room]
+            full = "".join(whole[:done]) + "".join(new)
+            cut = done + len(new) < len(whole)
+            prompt = cont_prompt(body)
+            out = {"id": "chatcmpl-1", "object": "chat.completion",
+                   "choices": [{"index": 0, "message": {"role": "assistant", **parsed(full, on)},
+                                "finish_reason": "length" if cut else "stop",
+                                **({"logprobs": {"content": [
+                                    {"token": t, "logprob": -0.1,
+                                     "top_logprobs": [{"token": t, "logprob": -0.1},
+                                                      {"token": " other", "logprob": -2.5}]}
+                                    for t in new]}} if body.get("logprobs") else {})}],
+                   "usage": {"prompt_tokens": len(prompt.split()), "completion_tokens": len(new)}}
+            if body.get("verbose"):
+                k = int(body.get("expert_path") or 3)
+                v = paths_reported().get(k) or PATHS[3]
+                out["__verbose"] = {"generation_settings": {
+                    "temperature": body.get("temperature", v["temp"]), "top_k": v["top_k"],
+                    "top_p": v["top_p"], "min_p": v["min_p"],
+                    "presence_penalty": v["presence_penalty"], "frequency_penalty": 0.0,
+                    "repeat_penalty": 1.0, "repeat_last_n": 131072,
+                    "penalty_prompt_tokens": body.get("penalty_prompt_tokens",
+                                                      v.get("penalty_prompt_tokens", -1)),
+                    "dry_multiplier": 0.0, "seed": body.get("seed"),
+                    "n_predict": body.get("max_tokens"), "expert_path": k}}
+            return self._send(200, out)        # logged as every chat request is
+
         def completion(self, body: dict):
             """23c: the speed probe's request — token ids in, n_predict out"""
             if isinstance(body.get("prompt"), str) and body.get("n_probs"):
@@ -277,7 +406,21 @@ def main() -> int:
                     busy["text"] = toks                 # 23c: the probe's text, as asked
                 return self._send(200, {"tokens": toks})
             if self.path == "/completion":
+                if cont_on and isinstance(body.get("prompt"), str) and body.get("n_probs") \
+                        and "penalty_prompt_tokens" in body:
+                    got = counted_by(body["prompt"], int(body.get("expert_path") or 3),
+                                     body["penalty_prompt_tokens"])
+                    key = "after" if body.get("post_sampling_probs") else "before"
+                    top = [{"id": i, "token": f"t{i}",
+                            **({"prob": math.exp(x)} if key == "after" else {"logprob": x})}
+                           for i, x in got[key].items()]
+                    entry = {"id": top[0]["id"],
+                             **({"top_probs": top} if key == "after" else {"top_logprobs": top})}
+                    return self._send(200, {"content": "x", "completion_probabilities": [entry]})
                 return self.completion(body)
+            if self.path == "/apply-template" and cont_on:
+                return self._send(status if status != 200 else 200,
+                                  {"prompt": cont_prompt(body)})
             if self.path == "/apply-template":
                 # 29: the prompt the template makes — what /tokenize then counts
                 words = " ".join(str(m.get("content") or "") for m in body.get("messages") or [])
@@ -297,6 +440,8 @@ def main() -> int:
             if log:
                 with lock, open(log, "a", encoding="utf-8") as fh:
                     fh.write(json.dumps(body) + "\n")
+            if cont_on:
+                return self.cont_chat(body)
             text = (body.get("messages") or [{}])[-1].get("content") or ""
             opts = dict(re.findall(r"(?m)^([ABCD])\) (.*)$", text))
             right = next((k for k, v in opts.items() if v.startswith("right")), "A")

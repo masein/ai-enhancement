@@ -128,9 +128,13 @@ DM, DM_FILE = "devicemark", "devicemark_file"
 FILE_SUFFIX = "-file"
 # 31.2b: the whitepaper's showcase, its 12 own questions (remote_gguf.py --showcase)
 SHOWCASE = "showcase"
+# 31.3: the answers plan U cut at its limits, continued to the model team's
+# (remote_gguf.py --continue, scripts/continue_box.py)
+CONT = "continue"
 DM_LABEL = {DM: "DeviceMark (greedy, no penalties)",
             DM_FILE: "DeviceMark (the file's own settings, as <build>-file)",
-            SHOWCASE: "the showcase's 12 own questions (one slot, the file's own settings)"}
+            SHOWCASE: "the showcase's 12 own questions (one slot, the file's own settings)",
+            CONT: "the answers that ran out of room, continued to the model team's limit"}
 # 25: the Frontier suite plans A, B and L each run whole; plan I runs
 # instruction following, IFEval and IFBench
 SUITE = tuple(t for t in fb.TASKS if t not in fb.FOLLOW)
@@ -176,8 +180,8 @@ MEASURED = {
     ("off", EASY_MMLU): 0.7, ("off", GSM8K): 1.8,
     # 31.2b: the showcase — step8804's 12 answers took 78 s on our own 5090, one
     # slot, part of the model on the CPU; with its own server's start and its
-    # settings check, about 0.1 h (if every answer ran to its 81,920 tokens, about
-    # 1.6 h at a slot's 170 tokens a second)
+    # settings check, about 0.1 h (31.3: if every answer ran to its 98,304 tokens,
+    # about 1.9 h at a slot's 170 tokens a second)
     ("on", SHOWCASE): 30.0,
 }
 # 31.2: of MEASURED, the paces that are guesses or another machine's
@@ -303,6 +307,14 @@ PLANS: dict[str, dict[str, list[Step]]] = {
         "U39": [("on", (DM,), "", 8), ("on", (SHOWCASE,), "", 1)],
         "U40": [("off", (EASY_MMLU, GSM8K), "", 8)],
     },
+    # 31.3: U-cont — once plan U's boxes are done, every answer they cut at
+    # their limits, continued to the model team's (98,304 tokens on k6, 32,768
+    # on k3): k6's in thirds, the answers dealt out by the room each may
+    # still write, so the three end together; k3's on one box
+    "C": {
+        **{f"C{i}": [("on", (CONT,), f"{i}/3", 8)] for i in range(1, 4)},
+        "C4": [("off", (CONT,), "", 8)],
+    },
 }
 # 29: plan D, our own boxes — a quarter of every benchmark on each of a
 # station's four GPUs, longest first (frontier_box's paces), then instruction
@@ -311,7 +323,8 @@ D_ORDER = [(HLE,), (MMLU,), (MATH,), (ARC,), (OTIS,), (GPQA,), (SQA,), (IFEVAL, 
 PLANS["D"] = {f"D3.{g}": [*(("on", t, f"{g + 1}/4", 8) for t in D_ORDER),
                           ("off", (IFEVAL, IFBENCH), f"{g + 1}/4", 8)] for g in range(4)}
 # 20: the runtime a plan's boxes run, unless the line names another
-PLAN_RUNTIME = {"L": "lda-2610", "I": "lda-2610", "T": "lda-2610", "U": "k3k6-2611"}
+PLAN_RUNTIME = {"L": "lda-2610", "I": "lda-2610", "T": "lda-2610", "U": "k3k6-2611",
+                "C": "k3k6-2611"}
 # 29: the plans run on our own GPUs: each step --own (never started or kept
 # asking while another process uses the GPU), no price
 OWN_PLANS = ("D",)
@@ -324,7 +337,7 @@ V100_GUESS = 2.0
 PLAN_GPUS = {"L": ("RTX 5090", "RTX PRO 6000"), "I": ("RTX 5090", "RTX PRO 6000"),
              "T": ("RTX 5090", "RTX PRO 6000"),
              # 31.1: the k3k6 tarball, built for sm_120 as the lda one is
-             "U": ("RTX 5090", "RTX PRO 6000"),
+             "U": ("RTX 5090", "RTX PRO 6000"), "C": ("RTX 5090", "RTX PRO 6000"),
              # 29: dgx-03's — the runner image's V100 tag builds for sm_70 alone
              "D": ("V100",)}
 PLAN_SM = {"D": "sm_70"}
@@ -386,6 +399,27 @@ PLAN_REVISIONS = {"U": {
     "step2388.k3k6.gguf": "fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4",
     "llama-server-k3k6-3ad38b7.tar.gz": "fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4",
     "Qwen3.6-35B-A3B-UD-Q2_K_XL.gguf": "5bc3e238d916f48a861bac2f8a1990a0e9b7e98d"}}
+# 31.3: plan C runs plan U's files, fetched at the same commits
+PLAN_PINS["C"], PLAN_REVISIONS["C"] = PLAN_PINS["U"], PLAN_REVISIONS["U"]
+# 31.3: step2388's file, for the slots a continuation's 131,072 tokens leave room for
+STEP2388_FILE = 15_994_966_752
+# 31.3: U-cont's size, at the most — each answer continued to its limit (a loop
+# runs on to it). From what plan U's imported boxes cut, 4 Nov (masein's
+# counts): k6 GPQA Diamond 9, MATH Level 5 12, MMLU-Pro 2, OTIS 27 of two
+# thirds (40 for three), ARC-AGI-2 63, IFEval 7, IFBench 24, SimpleQA 19, HLE
+# 10 of one fifteenth (150 for fifteen): 326 answers, 8,093,696 tokens to
+# write, 24.6 million to read again (each prompt and its cut reply, once); k3
+# MATH Level 5 44, MMLU-Pro 87, IFEval 3, IFBench 8, and the easy set, not
+# asked yet (a guess: 45 at 4,096): 187 answers, 4,830,000 tokens, 1.9 million
+# to read. continue_box.py inputs prints the real numbers
+CONT_SIZE = {"on": {"answers": 326, "write": 8_093_696, "read": 24_600_000},
+             "off": {"answers": 187, "write": 4_830_000, "read": 1_900_000}}
+# a 5090's tokens a second, 8 at a time: written — step8804's measured, about
+# 284 with thinking on over its GPQA Diamond and MATH Level 5 (MEASURED), a
+# little less at a continuation's longer contexts; k3's three experts a token
+# faster — and read (a guess the check's timings replace)
+CONT_TOK_S = {"on": 220.0, "off": 330.0}
+CONT_READ_TOK_S = 2_500.0
 # 31.2: the boxes that run another model than their plan's — U40 the original
 # Qwen3.6-35B-A3B's Q2 file, for the easy set beside step2388's k3 path
 BOX_MODELS = {"U40": "served/Qwen3.6-35B-A3B-Q2-k3k6-2611"}
@@ -470,7 +504,7 @@ def box_of(name: str) -> list[Step]:
 def ordered(tasks: tuple[str, ...]) -> list[str]:
     """a step's benchmarks in the order the box asks them: the suite's (31.2:
     the easy set after it, and DeviceMark's battery)"""
-    return [t for t in (*fb.ALL, DM, DM_FILE, SHOWCASE) if t in tasks]
+    return [t for t in (*fb.ALL, DM, DM_FILE, SHOWCASE, CONT) if t in tasks]
 
 
 def is_dm(step: Step) -> bool:
@@ -481,6 +515,11 @@ def is_dm(step: Step) -> bool:
 def is_showcase(step: Step) -> bool:
     """31.2b: the showcase's step (remote_gguf.py --showcase)"""
     return SHOWCASE in step[1]
+
+
+def is_cont(step: Step) -> bool:
+    """31.3: a step of U-cont's (remote_gguf.py --continue)"""
+    return CONT in step[1]
 
 
 def label_of(t: str) -> str:
@@ -507,12 +546,13 @@ def limit_factor(th: str, t: str) -> float:
     return (mean + k / n * max(0, new - old)) / mean
 
 
-def fits(ctx: int) -> int:
+def fits(ctx: int, file: int | None = None) -> int:
     """the slots of `ctx` tokens the pilot's card holds, as remote_gguf.py
-    checks them: its file, CUDA's and the buffers, and the room kept spare"""
+    checks them: its file, CUDA's and the buffers, and the room kept spare —
+    31.3: beside another file of the same model when given"""
     import remote_gguf as rg
     fixed = max(0, rg.ABOVE_FILE - rg.ABOVE_FILE_SLOTS * PILOT["recurrent"])     # 17g
-    room = PILOT["card_mib"] * 1024 ** 2 - PILOT["file"] - fixed - rg.ROOM
+    room = PILOT["card_mib"] * 1024 ** 2 - (file or PILOT["file"]) - fixed - rg.ROOM
     return int(room // ((PILOT["per_token"] + rg.CTX_BUFFERS) * ctx + PILOT["recurrent"]))
 
 
@@ -528,6 +568,10 @@ def slots_run(step: Step, own: bool = False) -> int:
         return min(slots, fits(devicemark_box.CONTEXT))         # 31.2
     if is_showcase(step):
         return slots                                            # 31.2b: one slot
+    if is_cont(step):
+        import continue_box as cb                               # 31.3
+        return min(slots, fits(cb.context(fb.path_of(PLAN_RUNTIME["C"], th == "on")),
+                               STEP2388_FILE))
     return min(slots, fits(fb.slot_context(list(tasks), th == "on")))
 
 
@@ -540,6 +584,10 @@ def hours(step: Step, own: bool = False, plan: str = "") -> float:
     if th == "parity":
         return 2 * fb.PARITY["n"] * PACE[("off", MMLU)] / 3600
     of = fb.parse_shard(shard)[1] if shard else 1
+    if is_cont(step):
+        # 31.3: its share of what U-cont writes and reads again, at the most
+        z = CONT_SIZE[th]
+        return (z["write"] / CONT_TOK_S[th] + z["read"] / CONT_READ_TOK_S) / of / 3600
     run = slots_run(step, own)
     # 31.2: a step no pilot paced (DeviceMark, the easy set) at plan U's paces
     measured = PLAN_PACE.get(plan) or (MEASURED if any((th, t) not in PACE for t in tasks)
@@ -558,6 +606,14 @@ def words(step: Step, own: bool = False, plan: str = "") -> str:
                 f"· about {hours(step):.1f} h")
     run = slots_run(step, own)
     guessed = any((th, t) in MEASURED_GUESSED for t in tasks)
+    if is_cont(step):
+        import continue_box as cb
+        k = fb.path_of(PLAN_RUNTIME["C"], th == "on")
+        return (f"thinking {th} (k{k}) · {label_of(CONT)}, {cb.LIMITS[k]:,} tokens"
+                + (f" · part {shard}" if shard else "") + f" · {run} slots of "
+                f"{cb.context(k):,} tokens · about {hours(step, own, plan):.1f} h at the most "
+                f"(each answer to its limit, {CONT_TOK_S[th]:.0f} tokens a second written and "
+                f"{CONT_READ_TOK_S:,.0f} read: a guess)")
     return (f"thinking {th} · {', '.join(label_of(t) for t in ordered(tasks))}"
             + (f" · shard {shard}" if shard else "")
             + f" · {run} slot{'s' if run != 1 else ''}"
@@ -583,6 +639,12 @@ def folder(a: argparse.Namespace, box: str, k: int, step: Step) -> Path:
     beside it, never into it"""
     build = a.served_as.split("/", 1)[-1]
     return Path(a.root) / build / step_name(box, k, step)
+
+
+def cont_check_folder(a: argparse.Namespace) -> Path:
+    """31.3: the continuation's check, in the build's own folder — named with
+    no "-", so the fetch takes it for no step of a plan"""
+    return Path(a.root) / a.served_as.split("/", 1)[-1] / "contcheck"
 
 
 def pilot_folder(a: argparse.Namespace) -> Path:
@@ -664,6 +726,15 @@ def argv_of(box: str, k: int, step: Step, a: argparse.Namespace) -> list[str]:
         return out + ["--thinking", "on", "--slots", str(slots), "--min-slots",
                       str(max(1, slots - 1)), "--pilot", "--out", str(pilot_folder(a))]
     out += ["--thinking", th, "--slots", str(slots)]
+    if is_cont(step):
+        # 31.3: the line's inputs file, pinned, and this box's part of it
+        name = Path(a.cont).name
+        out += ["--continue", a.cont, "--pin", f"{name}={a.continue_sha256}"]
+        if getattr(a, "continue_check", 0):
+            return out + ["--continue-check", str(a.continue_check), "--only", GPQA,
+                          "--out", str(cont_check_folder(a))]
+        return out + (["--part", shard] if shard else []) + ["--out",
+                                                             str(folder(a, box, k, step))]
     if is_showcase(step):
         # 31.2b: the showcase's questions, one slot, the line's questions file
         return out + ["--showcase", a.showcase, "--out", str(folder(a, box, k, step))]
@@ -727,7 +798,8 @@ def parser() -> argparse.ArgumentParser:
     ap.add_argument("box", nargs="?", help="the box: A1 … A9, B1 … B15 (G5), L1 … L21, "
                                            "I1 (25: instruction following), T1 … T3 (30.1), "
                                            "U1 … U37 (31.1: step2388), U38 … U40 (31.2: "
-                                           "DeviceMark and the easy set)")
+                                           "DeviceMark and the easy set), C1 … C4 (31.3: "
+                                           "U-cont)")
     ap.add_argument("then", nargs="*", help="18e point 1: more labels, run one after another "
                                             "on this box (L1 L2): each later one's line is "
                                             "written \"queued\" at the start, so the fetch "
@@ -766,6 +838,16 @@ def parser() -> argparse.ArgumentParser:
     ap.add_argument("--showcase", default="",
                     help="31.2b: the showcase's questions file, for the box that asks it (U39): "
                          "hf://<you>/evalboard-private@<commit>/showcase-own12.json")
+    ap.add_argument("--continue", dest="cont", default="",
+                    help="31.3: U-cont's inputs file for this box's path, as continue_box.py "
+                         "inputs wrote it on the server and you copied it here "
+                         "(/workspace/cont-k6.jsonl for C1–C3, cont-k3.jsonl for C4)")
+    ap.add_argument("--continue-sha256", default="",
+                    help="31.3: that file's sha256, as continue_box.py inputs printed it")
+    ap.add_argument("--continue-check", type=int, default=0, metavar="N",
+                    help="31.3: on C1 before U-cont, the check alone — the first N GPQA Diamond "
+                         "answers of the file continued, a line each, and penalty_prompt_tokens' "
+                         "test (into /workspace/<build>/contcheck, which the fetch never reads)")
     ap.add_argument("--slots-fit", action="store_true",
                     help="17g: the slots given fit this card — the memory check's estimate is "
                          "printed, and not held to")
@@ -803,6 +885,18 @@ def main(argv: list[str] | None = None) -> int:
         ap.error("one line runs our own boxes or rented ones, not both")
     if a.pilot and len(boxes) > 1:
         ap.error("--pilot: one box's label (the box it runs on)")
+    # 31.3: U-cont's boxes take their path's inputs file and its sha256, and
+    # only they; the check runs on one box of the k6 path
+    import re as _re
+    for box in dict.fromkeys(boxes):
+        conts = [st for st in box_of(box) if is_cont(st)]
+        if conts and not (a.cont and _re.fullmatch(r"[0-9a-f]{64}", a.continue_sha256 or "")):
+            ap.error(f"{box}: give --continue with its path's inputs file and --continue-sha256 "
+                     "with its sha256, as continue_box.py inputs printed them")
+        if not conts and (a.cont or a.continue_sha256 or a.continue_check):
+            ap.error("--continue is for U-cont's boxes alone (C1 … C4)")
+    if a.continue_check and (len(boxes) > 1 or box_of(boxes[0])[0][0] != "on"):
+        ap.error("--continue-check: one box of the k6 path (C1), its file cont-k6.jsonl")
     # 22: a model a runtime names runs on it alone, and the runtime its own
     # models alone — said before anything is fetched
     for box in dict.fromkeys(boxes):
@@ -845,6 +939,8 @@ def main(argv: list[str] | None = None) -> int:
                              "theirs is touched). Nothing was fetched")
     if a.pilot:
         return run_pilot(a, boxes[0])
+    if a.continue_check:
+        return run_cont_check(a, boxes[0])
     # 18e point 1: every label after the first is queued from the start
     for box in boxes[1:]:
         line_state(a, box, "queued")
@@ -885,6 +981,19 @@ def run_pilot(a: argparse.Namespace, box: str) -> int:
         print(line, flush=True)
     print(got["verdict"], flush=True)
     return code
+
+
+def run_cont_check(a: argparse.Namespace, box: str) -> int:
+    """31.3: the check before U-cont, on its first box — remote_gguf.py
+    --continue-check: the first N GPQA Diamond answers continued, a line each,
+    and penalty_prompt_tokens' test. Its verdict is the last line"""
+    step = box_of(box)[0]
+    print(f"{box}: the continuation's check — the first {a.continue_check} GPQA Diamond answers "
+          f"of {Path(a.cont).name} continued, and penalty_prompt_tokens' test, before U-cont "
+          "is rented", flush=True)
+    cmd = argv_of(box, 1, step, a)
+    print(" ".join(shlex.quote(x) for x in cmd[1:]), flush=True)
+    return subprocess.run(cmd).returncode
 
 
 def plan_at_pace(plan: str, paces: dict) -> list[str]:

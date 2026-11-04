@@ -67,7 +67,10 @@ SUITES = {"devicemark": {"prefix": "devicemark", "format": FORMAT,
                                 "tasks": ("devicemark",)},
           # 31.2b: the whitepaper's showcase, asked on a rented box's own server
           # (remote_gguf.py --showcase), into the showcase's own folder on import
-          "showcase-served": {"prefix": "showcase-served", "format": 4, "tasks": ("showcase",)}}
+          "showcase-served": {"prefix": "showcase-served", "format": 4, "tasks": ("showcase",)},
+          # 31.3: the answers that ran out of room, continued to the model team's
+          # limit on a rented box (remote_gguf.py --continue), onto their rows
+          "frontier-cont": {"prefix": "frontier-cont", "format": 5, "tasks": tuple(_fb.ALL)}}
 # 17: what never travels in a bundle — a model's weights, a binary, a library
 NEVER = re.compile(r"(?i)\.(gguf|safetensors|bin|pt|pth|ckpt|so(\.\d+)*|tar|gz|zst|xz|zip)$")
 # what must be the server's, exactly, for a bundle to be imported
