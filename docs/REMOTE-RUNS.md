@@ -1831,6 +1831,7 @@ answer together. The whitepaper's runs use the team's limits:
 |---|---|---|
 | k6 (thinking on) | 98,304 | GPQA Diamond, OTIS Mock AIME, MATH Level 5, MMLU-Pro, IFEval, IFBench, SimpleQA Verified, HLE, ARC-AGI-2; and the showcase's 12 own questions |
 | k3 (thinking off) | 32,768 | GPQA Diamond, MATH Level 5, MMLU-Pro, IFEval, IFBench; and the easy set (MMLU, GSM8K) |
+| the original Qwen3.6 Q2 (31.3b) | 32,768 | the easy set, so both of its models run at the same limit |
 
 Plan U keeps its own limits, so every shard of a benchmark is asked the same
 way. DeviceMark keeps its 4,096. The showcase asks at 98,304 straight away
@@ -1860,16 +1861,17 @@ its path, after the settings check):
 
 **The steps.** Rent nothing before masein's yes.
 
-1. On the server, once plan U is imported: one inputs file per path, of every
-   benchmark whose answers are all in. It prints each file's sha256 and what
-   it holds, with no question text:
+1. On the server, once plan U is imported: one inputs file per model and
+   thinking (`cont-k6.jsonl`, `cont-k3.jsonl`, and `cont-q2.jsonl` for the Q2's
+   easy set), of every benchmark whose answers are all in. It prints each
+   file's sha256 and what it holds, with no question text:
 
    ```bash
    cd ~/benchmarks/aienh && sudo docker compose exec -T bench python scripts/continue_box.py inputs
    ```
 
 2. Copy each file to its boxes, from the server, with the fetch's key:
-   `cont-k6.jsonl` to C1–C3 and `cont-k3.jsonl` to C4.
+   `cont-k6.jsonl` to C1–C3, `cont-k3.jsonl` to C4 and `cont-q2.jsonl` to C5.
 
    ```bash
    scp -i ~/.ssh/id_ed25519 -P <port> ~/benchmarks/u-cont/cont-k6.jsonl root@<host>:/workspace/
@@ -1886,8 +1888,10 @@ its path, after the settings check):
    ```
 
 4. **Plan C:** the same line on each box, without `--continue-check`, with
-   `--price`. C4 takes `cont-k3.jsonl` and its sha256. Each box continues its
-   share and leaves a `frontier-cont-…` bundle.
+   `--price`. C4 takes `cont-k3.jsonl` and its sha256. C5 runs the Q2 on its
+   own runtime (`--as served/Qwen3.6-35B-A3B-Q2-k3k6-2611`, U40's `--gguf`,
+   `cont-q2.jsonl`). It is short, and can follow C4 on the same box. Each box
+   continues its share and leaves a `frontier-cont-…` bundle.
 5. **Fetch and import:** as U3. The fetch finds the bundles, and their import
    puts each continued answer on the row it came from. An import is refused
    unless the file, launch, runtime and settings check are the model's, the
@@ -1909,6 +1913,7 @@ read. Those rates are a guess, and the check's timings replace them:
 |---|---|---|---|
 | C1–C3 | k6 | a third of the k6 file, 9 slots of 131,072 tokens | about 4.3 h |
 | C4 | k3 | the k3 file, 30 slots of 36,864 tokens | about 4.3 h |
+| C5 | the Q2 | the Q2's easy-set file, 40 slots of 33,792 tokens | about 0.7 h |
 
 Each box runs as many slots as a 5090 holds beside step2388's file with the
 q8_0 cache (a card that holds fewer runs fewer, down to half).

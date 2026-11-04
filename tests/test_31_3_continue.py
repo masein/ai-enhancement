@@ -31,6 +31,11 @@ from test_31_1_k3k6 import STEP, k3k6, run_k, step_kept  # noqa: F401
 GPQA = "gpqa_diamond_epoch"
 ROW = "served__step2388-k3k6-2611__thinking"
 OLD, NEW = 20, 40               # plan U's limit and the team's, shrunk for the stand-in
+K6, K3, Q2 = cb.spec_of(STEP, True), cb.spec_of(STEP, False), cb.spec_of(cb.Q2, False)
+# 31.3b: how U40 asked the Q2 (service/frontier.settings on card-qwen-k3k6)
+Q2_ASKED = {"max_tokens": 4096, "temperature": 0.7, "top_k": 20, "top_p": 0.8, "min_p": 0.0,
+            "presence_penalty": 1.5, "repeat_penalty": 1.0,
+            "chat_template_kwargs": {"enable_thinking": False}}
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +66,7 @@ def test_the_forms_put_the_likeliest_first_and_give_back_what_the_model_wrote():
 def test_a_continuation_carries_the_turn_its_limit_seed_and_path_and_on_k6_the_window():
     line = {"task": GPQA, "id": "rec001", "epoch": 2, "tokens": 81920}
     msgs = cb.messages(GPQA, "A question?")
-    k6 = cb.request(line, msgs, "thinking so far", 6, cb.LIMITS[6])
+    k6 = cb.request(line, msgs, "thinking so far", K6)
     assert sorted(k6) == ["expert_path", "max_tokens", "messages", "penalty_prompt_tokens",
                           "seed"]
     assert k6["messages"][-1] == {"role": "assistant", "reasoning_content": "thinking so far",
@@ -70,13 +75,14 @@ def test_a_continuation_carries_the_turn_its_limit_seed_and_path_and_on_k6_the_w
         98304 - 81920, 81920, 6)
     # a fresh draw, its own seed, the same on every machine
     assert k6["seed"] == fb.seed_of(GPQA, "rec001+cont", 2) != fb.seed_of(GPQA, "rec001", 2)
-    k3 = cb.request({**line, "tokens": 8192}, msgs, "a reply so far", 3, cb.LIMITS[3])
+    k3 = cb.request({**line, "tokens": 8192}, msgs, "a reply so far", K3)
     assert sorted(k3) == ["expert_path", "max_tokens", "messages", "seed"]       # no penalty
     assert k3["messages"][-1] == {"role": "assistant", "content": "a reply so far"}
     assert k3["max_tokens"] == 32768 - 8192
     # HLE's system message, as it was asked
     assert cb.messages("hle_text_cais", "Q")[0]["role"] == "system"
-    assert (cb.LIMITS, cb.context(6), cb.context(3)) == ({6: 98304, 3: 32768}, 131072, 36864)
+    assert (K6["limit"], K3["limit"], cb.context(K6), cb.context(K3)) == (
+        98304, 32768, 131072, 36864)
 
 
 class Stub(cb.Server):
@@ -107,11 +113,11 @@ def test_the_form_whose_prompt_gives_back_the_replys_tokens_is_taken():
     p0 = "<bos> Which one? <turn|> "
     open_ = {"task": GPQA, "id": "q", "epoch": 0, "answer": "<think>\nw1 w2 w3\n</think>\n\n",
              "tokens": 3, "prompt_tokens": len(p0.split())}
-    got = cb.prepare(Stub(), open_, msgs, 6)
+    got = cb.prepare(Stub(), open_, msgs, K6)
     assert (got["form"], got["text"], got["prompt_tokens"], got["continued_tokens"]) == (
         "open", "w1 w2 w3", 4, 7)
     closed = {**open_, "answer": "<think>\nw1 w2\n\n</think>\n\nThe options", "tokens": 5}
-    got = cb.prepare(Stub(), closed, msgs, 6)
+    got = cb.prepare(Stub(), closed, msgs, K6)
     assert got["form"] == "closed, 2 newlines after </think>"
     assert got["text"] == "w1 w2\n</think>\n\nThe options"
 
@@ -120,16 +126,16 @@ def test_an_answer_whose_text_doesnt_give_back_its_tokens_isnt_continued():
     msgs = cb.messages(GPQA, "Which one?")
     line = {"task": GPQA, "id": "q", "epoch": 0, "answer": "<think>\nw1 w2 w3\n</think>\n\n",
             "tokens": 5, "prompt_tokens": 4}
-    why = cb.prepare(Stub(), line, msgs, 6)["why"]
+    why = cb.prepare(Stub(), line, msgs, K6)["why"]
     assert why.startswith("the reply's text doesn't give back its 5 tokens") and "open: 3" in why
     # another question or template: its prompt's tokens differ
     assert "not the same question" in cb.prepare(Stub(), {**line, "prompt_tokens": 9}, msgs,
-                                                 6)["why"]
+                                                 K6)["why"]
     # a server that writes a reply's turn with a newline of its own: the text
     # isn't the question's and the reply's, character for character
     closed = {**line, "answer": "<think>\nw1\n\n</think>\n\nThe", "tokens": 2}
     assert "the prompt isn't the question's and the reply's text" in cb.prepare(
-        Stub(extra_newline=True), closed, msgs, 6)["why"]
+        Stub(extra_newline=True), closed, msgs, K6)["why"]
 
 
 @pytest.mark.parametrize("final, form, wrong", [
@@ -274,7 +280,7 @@ def cont(k3k6, monkeypatch):  # noqa: F811
     monkeypatch.setenv("FAKE_LLAMA_CONTINUE", "1")
     monkeypatch.setenv("FAKE_LLAMA_OUT_TOKENS", "22")
     monkeypatch.setitem(fb.BENCH[GPQA]["budget"], "on", OLD)
-    monkeypatch.setitem(cb.LIMITS, 6, NEW)
+    monkeypatch.setitem(cb.SPECS[(STEP, True)], "limit", NEW)
     monkeypatch.setattr(cb, "PENALTY_CUT", 8)
     monkeypatch.setattr(cb, "PENALTY_MORE", 6)
     return k3k6
@@ -291,8 +297,8 @@ def plan_u_row(b: dict) -> Path:
 
 
 def inputs_of(b: dict) -> tuple[Path, str]:
-    got = cb.inputs(STEP, b["root"] / "u-cont", say=lambda x: None)
-    return Path(got[6]["file"]), got[6]["sha256"]
+    got = cb.inputs(b["root"] / "u-cont", say=lambda x: None, models=[STEP])
+    return Path(got["k6"]["file"]), got["k6"]["sha256"]
 
 
 def cont_requests(b: dict) -> list[dict]:
@@ -417,15 +423,19 @@ def test_the_check_continues_the_first_answers_and_tests_the_window_with_no_bund
 # plan C and the fetch
 # ---------------------------------------------------------------------------
 
-def test_plan_c_is_four_boxes_k6_in_thirds_and_k3_on_one():
+def test_plan_c_is_k6_in_thirds_k3_on_one_and_the_q2s_easy_set_on_its_own():
     assert {b: s for b, s in fx.PLANS["C"].items()} == {
         "C1": [("on", (fx.CONT,), "1/3", 9)], "C2": [("on", (fx.CONT,), "2/3", 9)],
-        "C3": [("on", (fx.CONT,), "3/3", 9)], "C4": [("off", (fx.CONT,), "", 30)]}
+        "C3": [("on", (fx.CONT,), "3/3", 9)], "C4": [("off", (fx.CONT,), "", 30)],
+        "C5": [("off", (fx.CONT_Q2,), "", 40)]}
     listed = fx.listing("C")
-    assert listed[-1].startswith("4 boxes a build") and "9 slots of 131,072 tokens" in listed[1]
-    assert "30 slots of 36,864 tokens" in listed[-2]
-    # as many as a 5090 holds beside step2388's file
+    assert listed[-1].startswith("5 boxes a build") and "9 slots of 131,072 tokens" in listed[1]
+    assert "30 slots of 36,864 tokens" in listed[-4]
+    assert "Q2's easy-set answers" in listed[-2] and "40 slots of 33,792 tokens" in listed[-2]
+    # as many as a 5090 holds beside each file
     assert fx.fits(131072, fx.STEP2388_FILE) == 9 and fx.fits(36864, fx.STEP2388_FILE) == 30
+    assert fx.fits(33792, fx.Q2_FILE) == 40
+    assert fx.BOX_MODELS["C5"] == cb.Q2 and fx.model_refused("C5", STEP)
     assert fx.PLAN_PINS["C"] == fx.PLAN_PINS["U"] and fx.PLAN_RUNTIME["C"] == "k3k6-2611"
 
 
@@ -487,5 +497,114 @@ def test_the_limits_words_on_a_cell():
 
 def test_the_showcase_asks_at_the_teams_limit_in_one_go():
     import showcase_box as scb
-    assert (scb.LIMIT, scb.CONTEXT) == (cb.LIMITS[6], cb.LIMITS[6] + 2048)
+    assert (scb.LIMIT, scb.CONTEXT) == (K6["limit"], K6["limit"] + 2048)
 
+
+
+# ---------------------------------------------------------------------------
+# 31.3b: the original Qwen3.6 Q2's easy set, continued to the same 32,768
+# ---------------------------------------------------------------------------
+
+def test_the_q2_is_continued_as_it_was_asked_its_cards_sampling_and_the_switch():
+    assert (Q2["key"], Q2["limit"], Q2["path"], Q2["tasks"]) == (
+        "q2", 32768, None, ("mmlu_chat", "gsm8k_chat"))
+    assert cb.spec_of(cb.Q2, True) is None and cb.context(Q2) == 33792
+    line = {"task": "mmlu_chat", "id": "q7", "epoch": 0, "tokens": 4096}
+    msgs = cb.messages("mmlu_chat", "A question?")
+    got = cb.request(line, msgs, "A reply so far", Q2, Q2_ASKED)
+    # everything it was asked with but its limit — and no window: its requests
+    # never set one, and the server's default counts the prompt with the reply
+    assert {k: v for k, v in got.items() if k not in ("messages", "max_tokens", "seed")} == {
+        k: v for k, v in Q2_ASKED.items() if k != "max_tokens"}
+    assert "penalty_prompt_tokens" not in got and "expert_path" not in got
+    assert got["messages"][-1] == {"role": "assistant", "content": "A reply so far"}
+    assert (got["max_tokens"], got["seed"]) == (32768 - 4096, fb.seed_of("mmlu_chat", "q7+cont", 0))
+
+
+def test_the_q2s_template_is_told_the_thinking_switch_not_a_path():
+    told = []
+
+    class Told(Stub):
+        def post(self, path, body, timeout=None):
+            told.append({k: v for k, v in body.items() if k not in ("messages", "content")})
+            return super().post(path, body, timeout)
+
+    msgs = cb.messages("mmlu_chat", "Which one?")
+    line = {"task": "mmlu_chat", "id": "q", "epoch": 0, "answer": "x1 x2 x3", "tokens": 3,
+            "prompt_tokens": 4}
+    got = cb.prepare(Told(), line, msgs, Q2, Q2_ASKED)
+    assert got["form"] == "reply" and got["continued_tokens"] == 7
+    assert {"chat_template_kwargs": {"enable_thinking": False}} in told
+    assert not any("expert_path" in x for x in told)
+
+
+EASY_N = 6
+
+
+def easy_invented() -> list[dict]:
+    return [{"id": f"mm{k:03d}", "question": f"Invented easy question {k}?",
+             "options": [f"right answer {k}", f"wrong {k}a", f"wrong {k}b", f"wrong {k}c"],
+             "answer": "A"} for k in range(EASY_N)]
+
+
+def run_q2(b: dict, out: str, *more: str, only: bool = True) -> int:
+    """remote_gguf.py as U40 (and C5) run the original Q2, on its own runtime"""
+    import os
+
+    keep = {k: getattr(config, k) for k in [*rg.ENV, "OUT_DIR", "DM_ITEMS"]}
+    env = {v: os.environ.get(v) for v in rg.ENV.values()}
+    from service import runner
+    lock = runner.LOCK
+    try:
+        from test_17_gguf_box import free_port
+        return rg.main(["--as", cb.Q2, "--gguf", str(b["gguf"]), "--server", str(b["tarball"]),
+                        "--based-on", "Qwen/Qwen3.6-35B-A3B", "--thinking", "off", "--slots", "3",
+                        "--port", str(free_port()), "--load-timeout", "60",
+                        "--runtime", "card-qwen-k3k6",
+                        *(["--only", "mmlu_chat"] if only else []), "--out", str(b["root"] / out),
+                        *more])
+    finally:
+        for k, v in keep.items():
+            setattr(config, k, v)
+        runner.LOCK = lock
+        for k, v in env.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+
+def test_the_q2s_easy_set_is_continued_to_the_same_limit_on_its_own_runtime(cont, monkeypatch):
+    monkeypatch.setattr(fb, "_fetch", lambda task: easy_invented() if task == "mmlu_chat"
+                        else __import__("test_17_gguf_box").invented())
+    monkeypatch.setitem(fb.BENCH["mmlu_chat"]["budget"], "off", OLD)
+    monkeypatch.setitem(cb.SPECS[(cb.Q2, False)], "limit", NEW)
+    # U40: the Q2 asked the easy set at its (shrunk) limit, every answer cut
+    assert run_q2(cont, "u40") == 0
+    got = next((cont["root"] / "u40").glob("frontier-*.tar.gz"))
+    assert ir.main([str(got), "--by", "masein", "--register", "Qwen3.6-35B-A3B Q2 (k3k6 build)",
+                    "--file-sha256", cont["sha"]]) == 0
+    row = config.OUT_DIR / "served__Qwen3.6-35B-A3B-Q2-k3k6-2611"
+    first = sf.read_answers(sf.task_dir(row, "mmlu_chat") / sf.ANSWERS)
+    assert len(first) == EASY_N and all(a["tokens"] == OLD for a in first.values())
+    made = cb.inputs(cont["root"] / "u-cont", say=lambda x: None, models=[cb.Q2])
+    f, sha = Path(made["q2"]["file"]), made["q2"]["sha256"]
+    assert f.name == "cont-q2.jsonl" and len(cb.read_input(f)) == EASY_N
+    # C5: continued as it was asked — its card's sampling and the switch, no path, no window
+    assert run_q2(cont, "c5", "--continue", str(f), "--pin", f"{f.name}={sha}", only=False) == 0
+    asked = cont_requests(cont)
+    assert len(asked) == EASY_N
+    assert all("expert_path" not in r and "penalty_prompt_tokens" not in r
+               and r["chat_template_kwargs"] == {"enable_thinking": False}
+               and r["presence_penalty"] == 1.5 and r["temperature"] == 0.7
+               and r["max_tokens"] == NEW - OLD for r in asked)
+    p = next((cont["root"] / "c5").glob("frontier-cont-*.tar.gz"))
+    assert p.name == "frontier-cont-served__Qwen3.6-35B-A3B-Q2-k3k6-2611-thinking-off.tar.gz"
+    said: list[str] = []
+    assert ir.import_bundle(p, "masein", said.append) == 0
+    now = sf.read_answers(sf.task_dir(row, "mmlu_chat") / sf.ANSWERS)
+    assert all(a["tokens"] == 22 and a["finish"] == "stop" for a in now.values())
+    res = json.loads(next(sf.task_dir(row, "mmlu_chat").glob("results_*.json")).read_text())
+    assert res["results"]["mmlu_chat"]["acc,none"] == 1.0
+    assert res["frontier"]["limits"]["at_old_limit"]["score"] == 0.0
+    assert json.loads((sf.task_dir(row, "mmlu_chat") / sf.SETUP).read_text())["budget"] == NEW

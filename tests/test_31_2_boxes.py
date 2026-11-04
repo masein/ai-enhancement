@@ -289,7 +289,7 @@ def test_u38_to_u40_ask_devicemark_on_both_paths_and_the_easy_set():
 def test_u40_runs_the_q2_file_alone_and_the_others_never_do():
     assert fx.model_refused("U40", Q2) == "" and fx.model_refused("U38", STEP) == ""
     assert "U40 runs served/Qwen3.6-35B-A3B-Q2-k3k6-2611" in fx.model_refused("U40", STEP)
-    assert "runs on U40 alone, not on U1" in fx.model_refused("U1", Q2)
+    assert "runs on U40, C5 alone, not on U1" in fx.model_refused("U1", Q2)    # 31.3b: and C5
     a = line("U40", Q2, gguf=f"hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF@{UNSLOTH}/"
                              "Qwen3.6-35B-A3B-UD-Q2_K_XL.gguf")
     assert fx.runtime_of(a, "U40") == "card-qwen-k3k6"
