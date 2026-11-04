@@ -97,6 +97,18 @@ A3B's UD-Q2_K_XL (U40 runs that model alone, on runtime card-qwen-k3k6):
     python scripts/frontier_box.py U40 --as served/Qwen3.6-35B-A3B-Q2-k3k6-2611 \
         --gguf hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF@<commit>/Qwen3.6-35B-A3B-UD-Q2_K_XL.gguf \
         --server hf://<you>/evalboard-private@<commit>/llama-server-k3k6-3ad38b7.tar.gz
+
+31.3: plan C, U-cont — once plan U's boxes are done, each answer they cut at
+their limits continued to the model team's (98,304 tokens on k6, 32,768 on
+k3): C1–C3 a third each of the k6 inputs file, C4 the k3 one, each given its
+file and the sha256 continue_box.py inputs printed for it (and C1 first, with
+--continue-check 5, the check of five GPQA Diamond answers before the rest are
+rented; docs/REMOTE-RUNS.md U4):
+
+    python scripts/frontier_box.py C1 --as served/step2388-k3k6-2611 \
+        --gguf hf://<you>/evalboard-private@<commit>/step2388.k3k6.gguf \
+        --server hf://<you>/evalboard-private@<commit>/llama-server-k3k6-3ad38b7.tar.gz \
+        --continue /workspace/cont-k6.jsonl --continue-sha256 <its sha256>
 """
 
 from __future__ import annotations
@@ -310,10 +322,12 @@ PLANS: dict[str, dict[str, list[Step]]] = {
     # 31.3: U-cont — once plan U's boxes are done, every answer they cut at
     # their limits, continued to the model team's (98,304 tokens on k6, 32,768
     # on k3): k6's in thirds, the answers dealt out by the room each may
-    # still write, so the three end together; k3's on one box
+    # still write, so the three end together; k3's on one box. As many slots
+    # as a 5090 holds beside step2388's file with the q8_0 cache: 9 of
+    # 131,072 tokens (k6, ARC-AGI-2's prompts and the new limit), 30 of 36,864
     "C": {
-        **{f"C{i}": [("on", (CONT,), f"{i}/3", 8)] for i in range(1, 4)},
-        "C4": [("off", (CONT,), "", 8)],
+        **{f"C{i}": [("on", (CONT,), f"{i}/3", 9)] for i in range(1, 4)},
+        "C4": [("off", (CONT,), "", 30)],
     },
 }
 # 29: plan D, our own boxes — a quarter of every benchmark on each of a
@@ -729,7 +743,9 @@ def argv_of(box: str, k: int, step: Step, a: argparse.Namespace) -> list[str]:
     if is_cont(step):
         # 31.3: the line's inputs file, pinned, and this box's part of it
         name = Path(a.cont).name
-        out += ["--continue", a.cont, "--pin", f"{name}={a.continue_sha256}"]
+        out += ["--continue", a.cont, "--pin", f"{name}={a.continue_sha256}",
+                # a card that holds fewer runs fewer, down to half
+                "--min-slots", str(max(1, slots // 2))]
         if getattr(a, "continue_check", 0):
             return out + ["--continue-check", str(a.continue_check), "--only", GPQA,
                           "--out", str(cont_check_folder(a))]

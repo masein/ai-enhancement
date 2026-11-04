@@ -2367,7 +2367,11 @@ def _main(argv: list[str] | None = None) -> int:
         if a.cont:
             # 31.3: the answers that ran out of room, continued — no run of the board's
             progress(out, state="asking", session_at=round(time.time()))
-            n_c, why_c = cb.ask(srv_proc.base, cont_lines, out, c_path, a.slots, say)
+
+            def said_c(x: str) -> None:
+                say(x)                      # each answer's line, and the fetch's count
+                progress(out, state="asking", line=x[:300])
+            n_c, why_c = cb.ask(srv_proc.base, cont_lines, out, c_path, a.slots, said_c)
             if sampler is not None:
                 sampler.phase = "after"
             status = "done" if not why_c else "failed"

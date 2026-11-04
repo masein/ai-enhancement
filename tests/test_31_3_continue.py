@@ -419,10 +419,13 @@ def test_the_check_continues_the_first_answers_and_tests_the_window_with_no_bund
 
 def test_plan_c_is_four_boxes_k6_in_thirds_and_k3_on_one():
     assert {b: s for b, s in fx.PLANS["C"].items()} == {
-        "C1": [("on", (fx.CONT,), "1/3", 8)], "C2": [("on", (fx.CONT,), "2/3", 8)],
-        "C3": [("on", (fx.CONT,), "3/3", 8)], "C4": [("off", (fx.CONT,), "", 8)]}
+        "C1": [("on", (fx.CONT,), "1/3", 9)], "C2": [("on", (fx.CONT,), "2/3", 9)],
+        "C3": [("on", (fx.CONT,), "3/3", 9)], "C4": [("off", (fx.CONT,), "", 30)]}
     listed = fx.listing("C")
-    assert listed[-1].startswith("4 boxes a build") and "8 slots of 131,072 tokens" in listed[1]
+    assert listed[-1].startswith("4 boxes a build") and "9 slots of 131,072 tokens" in listed[1]
+    assert "30 slots of 36,864 tokens" in listed[-2]
+    # as many as a 5090 holds beside step2388's file
+    assert fx.fits(131072, fx.STEP2388_FILE) == 9 and fx.fits(36864, fx.STEP2388_FILE) == 30
     assert fx.PLAN_PINS["C"] == fx.PLAN_PINS["U"] and fx.PLAN_RUNTIME["C"] == "k3k6-2611"
 
 
@@ -440,6 +443,7 @@ def test_a_u_cont_boxs_line_continues_its_part_of_its_paths_file():
     cmd = fx.argv_of("C1", 1, fx.box_of("C1")[0], a)
     assert cmd[cmd.index("--continue") + 1] == "/workspace/cont-k6.jsonl"
     assert f"cont-k6.jsonl={sha}" in cmd and cmd[cmd.index("--part") + 1] == "1/3"
+    assert (cmd[cmd.index("--slots") + 1], cmd[cmd.index("--min-slots") + 1]) == ("9", "4")
     assert cmd[cmd.index("--runtime") + 1] == "k3k6-2611" and cmd[cmd.index("--thinking") + 1] == "on"
     a4 = fx.parser().parse_args(line("C4", "--continue", "/workspace/cont-k3.jsonl",
                                      "--continue-sha256", sha))

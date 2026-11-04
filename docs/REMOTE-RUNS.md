@@ -1734,15 +1734,17 @@ whose battery isn't the board's, or whose requests sent anything else.
 
 **The showcase** (31.2b: step2388 is the whitepaper's model). U39's second
 step asks the paper's Appendix H own questions on the k6 path, as step8804's
-were asked on our server: one slot of 83,968 tokens, each question once with
-no re-rolls, its limit 81,920 tokens (the thinking counted), step8804's seed
+were asked on our server: one slot of 100,352 tokens, each question once with
+no re-rolls, its limit 98,304 tokens (the thinking counted: 31.3, the model
+team's limit for step2388's k6 path; U39 runs this phase's image for it, its
+line otherwise unchanged), step8804's seed
 for each question, and the file's own settings (the request carries the path,
 never a sampling value). Each answer is kept as it arrives; a step pasted again
 asks only what has no answer. Its bundle (`showcase-served-…`) holds the
 answers with their thinking, and the fetch imports it into the showcase's own
 folder (`$BENCH_ROOT/showcase/served__step2388-k3k6-2611__thinking/own.jsonl`):
 no row of the board changes. It takes minutes (step8804's 12 took 78 s), about
-0.1 h with its server's start; if every answer ran to its limit, about 1.6 h.
+0.1 h with its server's start; if every answer ran to its limit, about 1.9 h.
 The showcase's 4 benchmark items are not asked: they come from step2388's
 stored k6 answers (run 0), drawn as before.
 
@@ -1817,7 +1819,99 @@ grading card as HLE's judge, pinned to OpenAI with no fallback; Start sends
 each grading batch to OpenRouter whole, and its grades land within a day
 (the card says where the batch is). step8804's HLE grades stand: it is the
 same judge. The estimate: HLE about $5.70, SimpleQA about $4.20, the MATH
-and OTIS checks under $0.10.
+and OTIS checks under $0.10. 31.3: HLE and SimpleQA are graded once, after
+U-cont (U4), on the final answers.
+
+## U4. U-cont: step2388 at the model team's limits (31.3)
+
+The team trained step2388 to write up to 98,304 tokens, its thinking and its
+answer together. The whitepaper's runs use the team's limits:
+
+| Path | Limit | Benchmarks |
+|---|---|---|
+| k6 (thinking on) | 98,304 | GPQA Diamond, OTIS Mock AIME, MATH Level 5, MMLU-Pro, IFEval, IFBench, SimpleQA Verified, HLE, ARC-AGI-2; and the showcase's 12 own questions |
+| k3 (thinking off) | 32,768 | GPQA Diamond, MATH Level 5, MMLU-Pro, IFEval, IFBench; and the easy set (MMLU, GSM8K) |
+
+Plan U keeps its own limits, so every shard of a benchmark is asked the same
+way. DeviceMark keeps its 4,096. The showcase asks at 98,304 straight away
+(U3). Once plan U's boxes are done, every answer they cut is continued in
+plan C, U-cont. An answer that finished under its old limit is a draw at the
+new one too, so only the cut ones change.
+
+**How an answer is continued** (`scripts/continue_box.py`, on a box serving
+its path, after the settings check):
+
+- **The request:** the question as it was asked, then the cut reply as the
+  assistant's unfinished turn, exactly as written. The team's server writes
+  that turn's thinking straight after its `<think>\n`. A reply whose thinking
+  had closed goes in whole as the turn's thinking (its `</think>` and reply
+  included): the server's reply form adds a newline the model never wrote.
+- **Two checks before it is asked:** the prompt's text is the question's and
+  the reply's, character for character, and its tokens are the question's and
+  the reply's as the answer counted them. An answer whose text doesn't give
+  back its tokens is said, and isn't continued.
+- **Its settings:** its limit is the new limit less the tokens already
+  written, and its seed is a fresh one. On k6, `penalty_prompt_tokens` is set
+  to the reply's tokens, so the presence penalty counts the whole reply and
+  never the question. No sampling value is sent.
+- **The reply** comes back whole. It must begin with the cut one, with no
+  thinking opened again and no question written again. The loop rule and
+  "ran out of room" apply to the whole continued answer.
+
+**The steps.** Rent nothing before masein's yes.
+
+1. On the server, once plan U is imported: one inputs file per path, of every
+   benchmark whose answers are all in. It prints each file's sha256 and what
+   it holds, with no question text:
+
+   ```bash
+   cd ~/benchmarks/aienh && sudo docker compose exec -T bench python scripts/continue_box.py inputs
+   ```
+
+2. Copy each file to its boxes, from the server, with the fetch's key:
+   `cont-k6.jsonl` to C1–C3 and `cont-k3.jsonl` to C4.
+
+   ```bash
+   scp -i ~/.ssh/id_ed25519 -P <port> ~/benchmarks/u-cont/cont-k6.jsonl root@<host>:/workspace/
+   ```
+
+3. **The check, on C1, before the rest is rented:** the first five GPQA
+   Diamond answers of the k6 file. Each gets a line: its tokens before and
+   after, whether it finished, the checks that it is one reply, and the
+   settings the server applied. Then `penalty_prompt_tokens`' test runs, and
+   the last line is the verdict. There is no bundle.
+
+   ```bash
+   python scripts/frontier_box.py C1 --as served/step2388-k3k6-2611 --gguf hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/step2388.k3k6.gguf --server hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/llama-server-k3k6-3ad38b7.tar.gz --continue /workspace/cont-k6.jsonl --continue-sha256 <its sha256> --continue-check 5
+   ```
+
+4. **Plan C:** the same line on each box, without `--continue-check`, with
+   `--price`. C4 takes `cont-k3.jsonl` and its sha256. Each box continues its
+   share and leaves a `frontier-cont-…` bundle.
+5. **Fetch and import:** as U3. The fetch finds the bundles, and their import
+   puts each continued answer on the row it came from. An import is refused
+   unless the file, launch, runtime and settings check are the model's, the
+   benchmark's answers are all in, and each answer began as the row's.
+
+**What the import says, per benchmark:** the new limit and the old one, how
+many answers were continued (and how many weren't, and why), their tokens
+before and after, how many still ran out, the loops, and the score at either
+limit. The row's answers before are kept beside it (`earlier/`), and the
+original bundles are untouched. The board shows the new limit's score. The
+old limit's score stays on the cell's line and in the results' `limits`: the
+same answers with each continued one counted wrong, as it was.
+
+**Its size** (`frontier_box.py --list C`). This is the most it could take,
+each answer to its limit, at 220 tokens a second written (k3 330) and 2,500
+read. Those rates are a guess, and the check's timings replace them:
+
+| Boxes | Path | What | Each box |
+|---|---|---|---|
+| C1–C3 | k6 | a third of the k6 file, 9 slots of 131,072 tokens | about 4.3 h |
+| C4 | k3 | the k3 file, 30 slots of 36,864 tokens | about 4.3 h |
+
+Each box runs as many slots as a 5090 holds beside step2388's file with the
+q8_0 cache (a card that holds fewer runs fewer, down to half).
 
 # Speed tests: the cheapest box per answer (19)
 
