@@ -168,9 +168,14 @@ def test_2_3_each_plan_runs_every_benchmark_once_one_line_a_box():
                     import devicemark_box
                     assert devicemark_box.CONTEXT * slots <= rg.MAX_CONTEXT
                     continue
-                if fbx.SHOWCASE in tasks:       # 31.2b: one slot of 83,968
+                if fbx.SHOWCASE in tasks:       # 31.2b: one slot of 100,352 (31.3)
                     import showcase_box
                     assert slots == 1 and showcase_box.CONTEXT <= rg.MAX_CONTEXT
+                    continue
+                if fbx.CONT in tasks:           # 31.3: U-cont, as many slots as fit
+                    import continue_box
+                    k = fb.path_of(fbx.PLAN_RUNTIME[name], th == "on")
+                    assert slots == fbx.fits(continue_box.context(k), fbx.STEP2388_FILE)
                     continue
                 assert fb.slot_context(list(tasks), th == "on") * slots <= rg.MAX_CONTEXT
         # 20: plan L asks thinking on only, and has no parity step (the
@@ -193,10 +198,13 @@ def test_2_3_each_plan_runs_every_benchmark_once_one_line_a_box():
             want |= {("off", fbx.DM), ("off", fbx.DM_FILE), ("on", fbx.DM)} | {
                 ("off", t) for t in fb.EASY}
             want.add(("on", fbx.SHOWCASE))        # 31.2b: the showcase, on k6
+        # 31.3: plan C, U-cont — each path's cut answers continued, k6 in thirds
+        if name == "C":
+            want = {("on", fbx.CONT), ("off", fbx.CONT)}
         assert set(have) == want, name
         assert all(have[k] == set(range(1, of[k] + 1)) for k in have), name
         # 17f: one box a build asks it first
-        assert parity == (0 if name in ("L", "I", "T", "U") else 1), name
+        assert parity == (0 if name in ("L", "I", "T", "U", "C") else 1), name
     longest = {p: max(sum(fbx.hours(s) for s in st) for st in b.values())
                for p, b in fbx.PLANS.items()}
     assert longest["A"] <= 18 and longest["B"] <= 10.5 and longest["L"] <= 6.0

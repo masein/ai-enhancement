@@ -1833,6 +1833,7 @@ def frontier_how(d: dict | None) -> str | None:
                                      (d.get("ungraded"), "its grader gave no grade, counted "
                                                          "wrong"))
         if isinstance(n, int) and n)
+    counts += limits_words(d.get("limits"))
     code = d.get("code") or {}
     alone = (f"code alone {100 * code['score']:.1f}" if isinstance(code.get("score"), (int, float))
              else "")
@@ -1859,6 +1860,24 @@ def frontier_how(d: dict | None) -> str | None:
             return (f"code, then Epoch AI's model check by {who}{end} · {alone}".rstrip(" ·")
                     + counts)
     return "by code" + counts
+
+
+def limits_words(lim) -> str:
+    """31.3: a benchmark whose answers that ran out of room were continued to
+    a longer limit — the limit, the answers continued, and the score at the
+    old one, on record beside the cell's"""
+    if not isinstance(lim, dict) or not isinstance(lim.get("limit"), int):
+        return ""
+    old = lim.get("at_old_limit") or {}
+    sc = old.get("score")
+    frm = lim.get("from")
+    return (f" · its {lim.get('continued') or 0:,} answers that ran out of room at "
+            f"{frm:,} tokens continued to {lim['limit']:,}" if isinstance(frm, int) else
+            f" · continued to {lim['limit']:,} tokens") + (
+        f" ({lim['not_continued']:,} not)" if lim.get("not_continued") else "") + (
+        f", {lim['still_ran_out']:,} still ran out" if lim.get("still_ran_out") else "") + (
+        f" · at {frm:,}: {100 * sc:.1f} ± {100 * (old.get('se') or 0):.1f}"
+        if isinstance(sc, (int, float)) and isinstance(frm, int) else "")
 
 
 def frontier_was(d: dict | None) -> str:
@@ -2564,6 +2583,11 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
                     # for its line — a report reads them from here
                     "answers": ((run.get("frontier") or {}).get(task) or {}).get("answers"),
                     "ranOut": ((run.get("frontier") or {}).get(task) or {}).get("ran_out"),
+                    # 31.3: continued to a longer limit — the old limit's score
+                    # on record beside it
+                    **({"limits": ((run.get("frontier") or {}).get(task) or {})["limits"]}
+                       if isinstance(((run.get("frontier") or {}).get(task) or {})
+                                     .get("limits"), dict) else {}),
                     # 25: instruction following's four numbers, for its section
                     **({"follow": ((run.get("frontier") or {}).get(task) or {})["follow"]}
                        if ((run.get("frontier") or {}).get(task) or {}).get("follow") else {}),

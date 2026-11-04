@@ -290,7 +290,8 @@ def sha256_cached(path: Path, state: dict, say, shared: Path | None = None) -> s
 
 def unpack_server(tarball: Path, into: Path) -> dict:
     """the llama-server tarball, unpacked under `into` (nothing outside it,
-    no link out of it): {bin, libs, root}"""
+    no link out of it): {bin, libs, root, build_root} — `build_root` the
+    folder of its bin/ and VERSION (llama/)"""
     sha = rb.sha256_file(tarball)
     root = into / sha[:16]
     if not (root / ".unpacked").exists():
@@ -313,14 +314,15 @@ def unpack_server(tarball: Path, into: Path) -> dict:
     exe = bins[0]
     exe.chmod(exe.stat().st_mode | 0o111)
     libs = sorted({str(p.parent) for p in root.rglob("*.so*") if p.is_file() or p.is_symlink()})
-    return {"bin": exe, "libs": libs, "root": root, "tarball_sha256": sha}
+    return {"bin": exe, "libs": libs, "root": root, "build_root": exe.parent.parent,
+            "tarball_sha256": sha}
 
 
 def server_dir(path: str) -> dict:
     """20: a llama.cpp build directory on this box (--server-dir), as the team
     builds or copies it: its bin/llama-server, run with the folders holding
-    its shared libraries on LD_LIBRARY_PATH — {bin, libs, root, lib_files,
-    libs_sha256}. Refused in one line when llama-server isn't there"""
+    its shared libraries on LD_LIBRARY_PATH — {bin, libs, root, build_root,
+    lib_files, libs_sha256}. Refused in one line when llama-server isn't there"""
     root = Path(path).expanduser().resolve()
     exe = next((c for c in (root / "bin" / "llama-server", root / "llama-server")
                 if c.is_file()), None)
@@ -349,8 +351,8 @@ def server_dir(path: str) -> dict:
     # runner image's (torch's CUDA 12.8 packages), after the build's folders
     cuda = [] if any(n.startswith(("libcudart.so", "libcublas.so")) for n in files) \
         else cuda_lib_dirs()
-    return {"bin": exe, "libs": [str(d) for d in dirs] + cuda, "root": root, "lib_files": files,
-            "libs_sha256": ident, "cuda_libs": cuda}
+    return {"bin": exe, "libs": [str(d) for d in dirs] + cuda, "root": root, "build_root": root,
+            "lib_files": files, "libs_sha256": ident, "cuda_libs": cuda}
 
 
 def cuda_lib_dirs() -> list[str]:
@@ -479,9 +481,9 @@ def archs_run_on(archs: list[str], cap: int) -> bool | None:
 def check_runs_here(srv: dict, env: dict, say, what: str = "") -> dict:
     """20: --server-dir's llama-server runs on this box and this card — its
     --version answers, it lists a CUDA device, and the architectures it was
-    built for (its CMakeCache.txt) hold this card's. Refused in one line;
-    {version, devices, cuda_archs, compute_cap} when it does. 18e point 18: a
-    tarball's too, named by `what` (its file)"""
+    built for (its CMakeCache.txt, or a packed build's VERSION) hold this
+    card's. Refused in one line; {version, devices, cuda_archs, compute_cap}
+    when it does. 18e point 18: a tarball's too, named by `what` (its file)"""
     exe, where = srv["bin"], srv["root"]
     what = what or f"--server-dir {where}"
 
@@ -515,7 +517,8 @@ def check_runs_here(srv: dict, env: dict, say, what: str = "") -> dict:
                              f"(exit {r.returncode}): {first_line(listed)}")
     except (OSError, subprocess.SubprocessError):
         devices = None
-    cap, archs = compute_cap(), cuda_archs(where)
+    # a tarball's record is in its llama/, not the folder it was unpacked in
+    cap, archs = compute_cap(), cuda_archs(srv.get("build_root") or where)
     if cap and archs:
         fits = archs_run_on(archs, cap)
         if fits is False:
@@ -1579,6 +1582,18 @@ def _main(argv: list[str] | None = None) -> int:
                          "question asked once on this --thinking's expert path at the file's "
                          "own settings, one at a time on one slot, into a bundle of its own "
                          "(scripts/showcase_box.py)")
+    ap.add_argument("--continue", dest="cont", default="", metavar="ANSWERS",
+                    help="31.3: the answers that ran out of room, continued to the model "
+                         "team's limit in place of the Frontier benchmarks: the inputs file "
+                         "(continue_box.py inputs on the server, pinned with --pin), each answer "
+                         "continued from where it stopped on this --thinking's expert path, into "
+                         "a bundle of its own (scripts/continue_box.py)")
+    ap.add_argument("--part", default="", help="31.3: i/n — with --continue, this box's share "
+                                               "of the answers, every n-th from the i-th")
+    ap.add_argument("--continue-check", type=int, default=0, metavar="N",
+                    help="31.3: with --continue, the check before U-cont — the first N answers "
+                         "of the benchmark --only names, a line each, and penalty_prompt_tokens' "
+                         "test; no bundle, no progress file")
     ap.add_argument("--own", action="store_true",
                     help="29: one GPU of our own station (--label D3.0): never started while "
                          "another process uses the GPU, paused while one does (exit 75), no "
@@ -1631,6 +1646,27 @@ def _main(argv: list[str] | None = None) -> int:
                  + " or ".join(n for n, r in fb.RUNTIMES.items() if r.get("paths")) + ")")
     if a.showcase and a.slots != 1:
         ap.error("--showcase: one slot (--slots 1), each question asked alone as step8804's were")
+    # 31.3: the answers that ran out of room, continued, on their own
+    try:
+        part = fb.parse_shard(a.part)
+    except ValueError as e:
+        ap.error(f"--part: {e}")
+    if a.cont and (a.pilot or a.parity or a.serve or a.check or shard or a.devicemark
+                   or a.showcase):
+        ap.error("--continue continues its answers alone: no --pilot, --parity, --serve, "
+                 "--check, --devicemark, --showcase or --shard (--part shares them out)")
+    if a.cont and not (a.runtime and fb.RUNTIMES[a.runtime].get("paths")):
+        ap.error("--continue: on a runtime of expert paths (--runtime "
+                 + " or ".join(n for n, r in fb.RUNTIMES.items() if r.get("paths")) + ")")
+    if (a.part or a.continue_check) and not a.cont:
+        ap.error("--part and --continue-check: with --continue")
+    if a.cont and a.only and not a.continue_check:
+        ap.error("--continue continues every answer of its share: --only is for "
+                 "--continue-check's benchmark")
+    if a.continue_check and (len(a.only or []) != 1 or a.part):
+        ap.error("--continue-check N: one benchmark's first N answers (one --only), no --part")
+    if a.continue_check < 0:
+        ap.error("--continue-check: a number of answers, 1 or more")
     # 31.2: DeviceMark's battery, whole, on its own
     if a.devicemark and (a.pilot or a.parity or a.serve or a.check or a.only or shard):
         ap.error("--devicemark asks DeviceMark's battery whole: no --pilot, --parity, --serve, "
@@ -1649,7 +1685,8 @@ def _main(argv: list[str] | None = None) -> int:
         # 29: a served model is asked its thinking per request; 31.1: --check asks
         # no benchmark, on either path; 31.2: nor does DeviceMark ask one of the
         # runtime's, and it is asked with thinking on and off
-        if why and not a.serve and not a.check and not a.devicemark and not a.showcase:
+        if why and not a.serve and not a.check and not a.devicemark and not a.showcase \
+                and not (a.cont and not a.continue_check):
             ap.error(why)
         if a.parity:
             ap.error(f"--runtime {a.runtime}: no parity questions (they ask thinking off)")
@@ -1687,18 +1724,20 @@ def _main(argv: list[str] | None = None) -> int:
     thinking = a.thinking == "on"
     STEP["out"] = out
     # 22: writes no progress file — 29: nor does --serve (no step of a plan)
-    STEP["pilot"] = bool(a.pilot or a.serve or a.check)       # 31.1: nor does --check
+    STEP["pilot"] = bool(a.pilot or a.serve or a.check       # 31.1: nor does --check
+                         or a.continue_check)                # 31.3: nor the continuation's check
     STEP["own"] = own
     progress(out, label=a.label or "", model=a.served_as, thinking=a.thinking,
              parity=bool(a.parity), tasks=["devicemark"] if a.devicemark else
-             ["showcase"] if a.showcase else [t for t in fb.ALL if t in (a.only or [])],
+             ["showcase"] if a.showcase else ["continue"] if a.cont else
+             [t for t in fb.ALL if t in (a.only or [])],
              state="starting", why="", line="", incomplete={})
     if a.pilot and a.only and not a.pilot_each:
         ap.error("--pilot asks its own questions: no --only")
     if a.serve and (a.pilot or a.parity or a.only):
         ap.error("--serve asks nothing here: no --pilot, --parity or --only")
     if not a.only and not a.parity and not a.pilot and not a.serve and not a.check \
-            and not a.devicemark and not a.showcase:
+            and not a.devicemark and not a.showcase and not a.cont:
         # 17d: a box names its benchmarks, thinking on or off — every one at
         # once is more context than a card holds, and asks ARC-AGI-2 with
         # thinking off
@@ -1717,6 +1756,9 @@ def _main(argv: list[str] | None = None) -> int:
     if a.showcase:
         import showcase_box as scb
         tasks = []                  # 31.2b: the showcase — one slot of scb.CONTEXT
+    if a.cont:
+        import continue_box as cb
+        tasks = []                  # 31.3: the continuation — a slot of cb.context(path)
     # 29: our own GPU, shared — nothing starts while another process uses it
     if own:
         import gpu_free
@@ -1730,7 +1772,8 @@ def _main(argv: list[str] | None = None) -> int:
     # context caps it (Bolt's 64K)
     cap = fb.context_cap(a.runtime or "")
     ctx = (fb.slot_context(tasks, thinking, cap) if tasks else
-           dmb.CONTEXT if a.devicemark else scb.CONTEXT if a.showcase else CHECK_CONTEXT)
+           dmb.CONTEXT if a.devicemark else scb.CONTEXT if a.showcase else
+           cb.context(fb.path_of(a.runtime, thinking)) if a.cont else CHECK_CONTEXT)
     if a.serve:
         ctx = min(a.serve_context, cap) if cap else a.serve_context
     # 17h: what is free on the card, not its total — 300 MiB in use by
@@ -1757,7 +1800,7 @@ def _main(argv: list[str] | None = None) -> int:
     if fit and fit["fit"] < a.slots and not a.slots_fit:
         gb = 1024 ** 3
         raise SystemExit(
-            f"{a.slots} slots of {ctx:,} tokens ({fb.BENCH[big]['label'] if tasks else 'DeviceMark' if a.devicemark else 'the showcase' if a.showcase else 'the check'}'s, thinking "
+            f"{a.slots} slots of {ctx:,} tokens ({fb.BENCH[big]['label'] if tasks else 'DeviceMark' if a.devicemark else 'the showcase' if a.showcase else 'the continuation' if a.cont else 'the check'}'s, thinking "
             f"{'on' if thinking else 'off'}) would use about {fit['used'] / gb:.1f} GB with the "
             f"{fit['file'] / gb:.1f} GB file ({fit['types']} cache, "
             f"{fit['per_token'] / 1024:.1f} KB a token from the GGUF's header; {fit['basis']}), "
@@ -1778,7 +1821,7 @@ def _main(argv: list[str] | None = None) -> int:
     from service import db, runner
     db.init()
     words = f"shard {shard[0]} of {shard[1]}" if shard else ""
-    say(f"{a.served_as} · thinking {a.thinking} · {', '.join(tasks) or ('DeviceMark' if a.devicemark else 'the showcase' if a.showcase else '')}"
+    say(f"{a.served_as} · thinking {a.thinking} · {', '.join(tasks) or ('DeviceMark' if a.devicemark else 'the showcase' if a.showcase else 'the answers that ran out of room, continued' if a.cont else '')}"
         + (f" · {words}" if shard else "") + f" · in {out}")
 
     # the run this folder holds: one served model, one mode, one file, one shard
@@ -1817,7 +1860,7 @@ def _main(argv: list[str] | None = None) -> int:
         env = server_env(srv, extra_env)
         # 20: a tarball built for some cards only (its VERSION's cuda_archs:
         # the lda tarball's is 120) is refused on another, before it loads
-        archs, cap = cuda_archs(srv["bin"].parent.parent), compute_cap()
+        archs, cap = cuda_archs(srv["build_root"]), compute_cap()
         if archs and cap and archs_run_on(archs, cap) is False:
             raise SystemExit(f"{tb.name} is built for CUDA architectures {';'.join(archs)} (its "
                              f"VERSION), and this card is sm_{cap}: it won't run here — rent "
@@ -1849,8 +1892,8 @@ def _main(argv: list[str] | None = None) -> int:
         # and the tarball's VERSION — before the GGUF's tens of GB are fetched
         if rt.get("build"):
             v0 = version_of(srv["bin"], env)
-            why = fb.runtime_build_refused(a.runtime, v0["build"], v0["commit"], version_file(
-                srv["root"] if a.server_dir else srv["bin"].parent.parent))
+            why = fb.runtime_build_refused(a.runtime, v0["build"], v0["commit"],
+                                           version_file(srv["build_root"]))
             if why:
                 raise SystemExit(f"{why}: not the build the runtime is for. Nothing was asked")
     paths = [fetch(src, files, say) for src in split_parts(a.gguf)]
@@ -1949,7 +1992,8 @@ def _main(argv: list[str] | None = None) -> int:
     sp.write_text(json.dumps(state, indent=1), encoding="utf-8")
     progress(out, label=state.get("label") or "", model=a.served_as,
              thinking="on" if thinking else "off",
-             tasks=[dmb.TASK] if a.devicemark else [scb.TASK] if a.showcase else tasks,
+             tasks=[dmb.TASK] if a.devicemark else [scb.TASK] if a.showcase else
+             ["continue"] if a.cont else tasks,
              shard=state["shard"],
              parity=bool(a.parity), started_at=state["started_at"], sessions=state["sessions"],
              state="starting", line="", incomplete={}, why="")
@@ -2041,13 +2085,58 @@ def _main(argv: list[str] | None = None) -> int:
         say(f"the showcase: {len(sc_qs)} questions ({qfile.name}, sha256 {q_sha[:16]}…), each "
             f"asked once on expert path k{fb.path_of(a.runtime, thinking)} at the file's own "
             f"settings, a limit of {min(scb.LIMIT, ctx - 2048):,} tokens")
+    if a.cont:
+        # 31.3: its answers, pinned, and their questions, before the GPU is spent
+        cfile = fetch(a.cont, files, say)
+        c_sha = rb.sha256_file(cfile)
+        if not pins.get(cfile.name):
+            raise SystemExit(f"--continue: give {cfile.name}'s sha256 as continue_box.py inputs "
+                             f"printed it (--pin {cfile.name}=<sha256>). Nothing was asked")
+        why = pin_refused(cfile.name, c_sha, pins)
+        if why:
+            raise SystemExit(why)
+        try:
+            c_all = cb.read_input(cfile)
+        except ValueError as e:
+            raise SystemExit(f"--continue: {e}. Nothing was asked") from None
+        c_path = fb.path_of(a.runtime, thinking)
+        c_row = a.served_as.replace("/", "__") + ("__thinking" if thinking else "")
+        wrong = sorted({r["task"] for r in c_all} - set(cb.TASKS[c_path]))
+        if wrong:
+            raise SystemExit(f"--continue: {cfile.name} holds answers of {', '.join(wrong)}, which "
+                             f"the k{c_path} path doesn't continue — the other path's file? "
+                             "Nothing was asked")
+        others = sorted({str(r.get("row")) for r in c_all} - {c_row})
+        if others:
+            raise SystemExit(f"--continue: {cfile.name} holds answers of {', '.join(others)}, not "
+                             f"of {c_row} (--as, --thinking). Nothing was asked")
+        if a.continue_check:
+            cont_lines = [r for r in c_all if r["task"] == a.only[0]][:a.continue_check]
+            if not cont_lines:
+                raise SystemExit(f"--continue-check: {cfile.name} holds no answer of "
+                                 f"{fb.BENCH[a.only[0]]['label']}. Nothing was asked")
+        else:
+            cont_lines = cb.part_of(c_all, part, cb.LIMITS[c_path])
+        for t in sorted({r["task"] for r in cont_lines}):
+            try:
+                fb.load(t, config.BENCH_ROOT)
+            except Exception as e:                      # noqa: BLE001 — said in one line
+                raise SystemExit(rb.scrub(fb.load_failed(t, e))) from None
+        say(f"the continuation: {len(cont_lines):,} of the {len(c_all):,} answers in "
+            f"{cfile.name} (sha256 {c_sha[:16]}…)"
+            + (f", part {part[0]} of {part[1]}" if part else "")
+            + (f", the first {len(cont_lines)} of {fb.BENCH[a.only[0]]['label']} (the check)"
+               if a.continue_check else "")
+            + f" · each continued to {cb.LIMITS[c_path]:,} tokens on expert path k{c_path}, "
+            "its seed a fresh one" + (", the penalty counting its reply's tokens "
+                                      "(penalty_prompt_tokens)" if c_path == 6 else ""))
 
     srv_proc = Server(srv, gguf_path, a.port, a.slots, ctx, flags, extra_env, out / SERVER_LOG)
     status = "failed"
     rec = None
     # 23c: the card's readings from the server's start to its end (a pilot,
     # no step of a plan, takes none)
-    sampler = None if (a.pilot or a.check) else cc.Sampler(
+    sampler = None if (a.pilot or a.check or a.continue_check) else cc.Sampler(
         out / GPU_FILE, report=lambda use: progress(out, use=use))
     if sampler is not None:
         sampler.start()
@@ -2247,7 +2336,49 @@ def _main(argv: list[str] | None = None) -> int:
                 "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}, indent=1),
                 encoding="utf-8")
             return 0 if got["separated"] else 1
-        if a.showcase:
+        if a.cont and a.continue_check:
+            # 31.3: the check before U-cont — penalty_prompt_tokens' test,
+            # then the first answers of one benchmark, a line each; no bundle
+            t_pen = cb.penalty_test(srv_proc.base, c_path)
+            for ln in cb.penalty_words(t_pen):
+                say(ln)
+            n_c, why_c = cb.ask(srv_proc.base, cont_lines, out, c_path, a.slots, lambda x: None,
+                                name=cb.CHECK)
+            got_c = cb.kept(out, cb.CHECK)
+            for r in cont_lines:
+                x = got_c.get(cb.key_of(r))
+                if x:
+                    say(cb.check_words(x))
+            (out / "continue-check.json").write_text(json.dumps({
+                "penalty_test": t_pen, "answers": [
+                    {k: v for k, v in got_c[cb.key_of(r)].items() if k != "answer"}
+                    for r in cont_lines if cb.key_of(r) in got_c],
+                "model": a.served_as, "label": a.label or None, "gpu": gpu.get("name"),
+                "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}, indent=1),
+                encoding="utf-8")
+            ok_c = (not why_c and t_pen.get("verdict") == "pass" and all(
+                (got_c.get(cb.key_of(r)) or {}).get("status") == "continued" for r in cont_lines))
+            say(f"the continuation's check: {n_c} of {len(cont_lines)} answers"
+                + (f" — stopped: {why_c}" if why_c else "")
+                + f" · penalty_prompt_tokens' test {t_pen.get('verdict')} · "
+                + ("every answer continued as one reply" if ok_c else
+                   "NOT every answer continued as one reply — don't rent U-cont yet"))
+            return 0 if ok_c else 1
+        if a.cont:
+            # 31.3: the answers that ran out of room, continued — no run of the board's
+            progress(out, state="asking", session_at=round(time.time()))
+
+            def said_c(x: str) -> None:
+                say(x)                      # each answer's line, and the fetch's count
+                progress(out, state="asking", line=x[:300])
+            n_c, why_c = cb.ask(srv_proc.base, cont_lines, out, c_path, a.slots, said_c)
+            if sampler is not None:
+                sampler.phase = "after"
+            status = "done" if not why_c else "failed"
+            row = {"status": status, "error": why_c,
+                   "progress": f"the continuation: {n_c:,} of {len(cont_lines):,} answers"}
+            say(f"the run: {status} · {row['progress']}" + (f" · {why_c}" if why_c else ""))
+        elif a.showcase:
             # 31.2b: the showcase's questions, no run of the board's
             progress(out, state="asking", session_at=round(time.time()))
             n_sc, why_sc = scb.ask(srv_proc.base, sc_qs, out, fb.path_of(a.runtime, thinking),
@@ -2303,6 +2434,9 @@ def _main(argv: list[str] | None = None) -> int:
         dmb.make_bundle(out, a.served_as, thinking, state, gguf, server, rec) if a.devicemark
         else scb.make_bundle(out, a.served_as, state, gguf, server, rec, sc_qs, q_sha)
         if a.showcase
+        else cb.make_bundle(out, a.served_as, thinking, state, gguf, server, rec, cont_lines,
+                            c_sha, part)
+        if a.cont
         else make_bundle(out, a.served_as, thinking, tasks, state, shard, gguf, server, rec))
     for t, x in incomplete.items():
         say(f"{t}: {x['answers']:,} of {x['of']:,} answered — run the same command again to "

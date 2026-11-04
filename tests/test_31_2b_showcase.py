@@ -57,7 +57,7 @@ def test_the_showcase_is_asked_on_k6_once_each_at_the_files_own_settings(sc):
     assert all(sorted(r) == ["expert_path", "max_tokens", "messages", "seed", "stream"]
                for r in asked)
     assert [(r["expert_path"], r["max_tokens"], r["seed"]) for r in asked] == [
-        (6, 81920, fb.seed_of("showcase", f"own-{n}", 0)) for n in (1, 2, 3)]
+        (6, 98304, fb.seed_of("showcase", f"own-{n}", 0)) for n in (1, 2, 3)]
     assert fb.seed_of("showcase", "own-1", 0) == 1683674005           # step8804's own-1
     assert all(r["messages"] == [{"role": "user", "content": x["question"]}]
                for r, x in zip(asked, INVENTED))
@@ -67,7 +67,7 @@ def test_the_showcase_is_asked_on_k6_once_each_at_the_files_own_settings(sc):
     assert [r["q"] for r in rows] == ["own-1", "own-2", "own-3"]
     r = rows[0]
     assert (r["model"], r["context"], r["max_tokens"], r["expert_path"]) == (
-        "the Masein model", 83968, 81920, 6)
+        "the Masein model", 100352, 98304, 6)
     assert r["sampling"].startswith("the file's own for the path: temperature 0.8")
     assert {"thinking", "reply", "output_tokens", "thinking_tokens", "finish", "ran_out",
             "looped", "seconds", "prompt_tokens", "seed", "date", "file"} <= set(r)

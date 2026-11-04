@@ -10,8 +10,9 @@ never from the repo: it holds the 12 questions and nothing else. Each question
 is asked once, one at a time on one slot, no re-rolls:
 
 - the messages: the question alone, as the user's;
-- the request: its limit (81,920 tokens, the thinking counted: the slot's
-  83,968 less 2,048, as step8804's), its seed (frontier.seed_of("showcase",
+- the request: its limit (98,304 tokens, the thinking counted: the slot's
+  100,352 less 2,048 — 31.3: the model team's limit for step2388's k6 path,
+  where step8804's was 81,920 of 83,968), its seed (frontier.seed_of("showcase",
   "own-<n>", 0), step8804's), and the expert path: the path's own sampling and
   thinking, the file's, never sent;
 - each answer kept the moment it arrives (showcase-own.jsonl): a step pasted
@@ -48,8 +49,10 @@ import remote_bundle as rb  # noqa: E402
 SUITE = "showcase-served"
 TASK = "showcase"
 REFUSED = 2
-CONTEXT = 83_968                    # a slot's, as step8804's showcase server's
-LIMIT = 81_920                      # its answer limit, the thinking counted
+# 31.3: the model team's limit on the k6 path, 98,304 (step8804's showcase:
+# 81,920 of a slot of 83,968), and the same 2,048 beside it
+CONTEXT = 100_352                   # a slot's
+LIMIT = 98_304                      # its answer limit, the thinking counted
 ANSWERS = "showcase-own.jsonl"
 NAME = "showcase-own12.json"        # the questions file, as the private repository holds it
 MODEL_WORDS = "the Masein model"

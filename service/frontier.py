@@ -721,6 +721,10 @@ def marks(row: Path, task: str, items: list[dict] | None = None,
                 "ungraded": bool(ungraded and ok is False and not sc["ok"]), "grade": g,
                 # 25: each instruction asked, followed or not, strict and loose
                 **({"follow": sc["follow"]} if sc.get("follow") else {}),
+                # 31.3: an answer continued past the limit it ran out of room at
+                # (scripts/continue_box.py): what it was there
+                **({"continued": a["continued"]}
+                   if index is None and isinstance(a.get("continued"), dict) else {}),
                 **({"chars": a.get("chars")} if index is not None else {})})
     return {"runs": runs, "missing": missing, "items": items}
 
@@ -1203,6 +1207,10 @@ def score_task(row: Path, task: str, rec: dict, log=print, runs_log: bool = True
               # 17d: and a score with an answer its grader gave no grade isn't final
               **({"final": False} if out["state"] == "not final" else {}),
               **({"look": {"done": looked, "waiting": waiting}} if spec.get("look") else {})}
+    if isinstance(setup.get("continued"), dict):
+        # 31.3: answers continued to a longer limit — the board's score is the
+        # new limit's; the old limit's stays on record beside it
+        detail["limits"] = limits_of(setup, task, items, runs, flat, page, out)
     if task in fb.FOLLOW:
         # 25: the four numbers IFEval and IFBench report — the board's is one of
         # them (`metric`), the others said beside it
@@ -1239,6 +1247,36 @@ def score_task(row: Path, task: str, rec: dict, log=print, runs_log: bool = True
         from . import report_stats
         report_stats.wake_quietly()
     return {**page, **detail, "epochs": spec["epochs"]}
+
+
+def limits_of(setup: dict, task: str, items: list[dict], runs: dict, flat: list[dict],
+              page: dict | None, out: dict) -> dict:
+    """31.3: a benchmark whose answers that ran out of room were continued to a
+    longer limit (scripts/continue_box.py) — its limit and the one before, the
+    answers continued (and not), their tokens before and after, how many still
+    ran out and ended in a loop, and its score at either limit: at the old, the
+    same answers with each continued one wrong, as it was (it ran out)"""
+    cont = setup["continued"]
+    done = [r for r in flat if isinstance(r.get("continued"), dict)]
+    field = "code_ok" if out.get("waiting") and not fb.BENCH[task].get("grader") else "ok"
+    old = None
+    if page is not None:
+        old = _share({q: [0.0 if isinstance(r.get("continued"), dict) else
+                          (1.0 if r[field] else 0.0) for r in rs] for q, rs in runs.items()},
+                     task, items)
+    return {"limit": setup.get("budget"), "from": cont.get("from_budget"),
+            "continued": len(done), "not_continued": int(cont.get("not_continued") or 0),
+            "tokens_before": sum(int((r["continued"].get("from") or {}).get("tokens") or 0)
+                                 for r in done),
+            "tokens_after": sum(int(r.get("tokens") or 0) for r in done),
+            "still_ran_out": sum(1 for r in done if r["ran_out"]),
+            "loops": sum(1 for r in done
+                         if fb.ended_in_loop(r.get("answer") or "", bool(r["ran_out"]))),
+            "at_old_limit": {"score": (old or {}).get("score"), "se": (old or {}).get("se"),
+                             "ran_out": sum(1 for r in flat if r["ran_out"]) + len(done)
+                             - sum(1 for r in done if r["ran_out"])},
+            "at_new_limit": {"score": (page or {}).get("score"), "se": (page or {}).get("se"),
+                             "ran_out": sum(1 for r in flat if r["ran_out"])}}
 
 
 def outcome(spec: dict, flat: list[dict], d: Path, known: dict | None = None) -> dict:
