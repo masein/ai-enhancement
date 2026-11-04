@@ -31,8 +31,12 @@ settings check passed first, as on every step of plan U):
   two checks before anything is asked: its text is the question's prompt and
   the reply, character for character, and its tokens are the question's and
   the reply's as the answer counted them (usage.prompt_tokens and
-  completion_tokens). Text that doesn't give back the reply's tokens is said,
-  and that answer isn't continued;
+  completion_tokens). 31.3d (masein, 4 Nov): text that reads back up to 8
+  tokens otherwise than the model wrote — it split a few tokens otherwise than
+  the tokenizer does — is continued from the tokenizer's reading, the
+  penalty's window that reading's count, the difference kept with the answer
+  and counted by benchmark on the import; more than 8, and it isn't
+  continued, and is said;
 - the request: its limit (the new limit less the tokens already written), a
   seed of its own (a fresh draw: fb.seed_of(task, "<id>+cont", run)), the
   expert path — and on k6, penalty_prompt_tokens: the reply's tokens. The
@@ -131,6 +135,12 @@ CLOSES = ("</think>\n\n", "</think>\n", "</think>")
 TRIES = 3
 # what a continued reply must not hold of the question: its first characters
 QUESTION_HEAD = 80
+# 31.3d (masein, 4 Nov): a reply whose exact text reads back up to this many
+# tokens more or fewer than the model wrote — it split a few tokens otherwise
+# than the tokenizer does (C1: 81,917 of 81,920) — is continued from the
+# tokenizer's reading of the same text, the penalty's window that reading's
+# count, and the difference kept with the answer; more, and it isn't
+RETOKEN_CAP = 8
 
 
 def spec_of(model: str, on: bool) -> dict | None:
@@ -215,7 +225,7 @@ def messages(task: str, text: str) -> list[dict]:
 
 
 def request(line: dict, msgs: list[dict], form_text: str, spec: dict,
-            asked: dict | None = None) -> dict:
+            asked: dict | None = None, window: int | None = None) -> dict:
     """what a continuation is asked with: what the question was asked with
     (`asked`, service/frontier.settings: on an expert path the path alone,
     nothing that samples; on the Q2's runtime its card's sampling and the
@@ -223,14 +233,17 @@ def request(line: dict, msgs: list[dict], form_text: str, spec: dict,
     its limit and a seed of its own — and on k6 how many of the prompt's last
     tokens are the reply's. The Q2's requests never set penalty_prompt_tokens:
     the server's default counts the prompt with the reply, and continued, the
-    prompt is the same text — the same setting"""
+    prompt is the same text — the same setting. 31.3d: `window`, the reply's
+    tokens as the tokenizer reads its text, when that isn't what the model
+    wrote"""
     asked = asked_as(spec) if asked is None else asked
     path = spec.get("path")
     return {**{k: v for k, v in asked.items() if k != "max_tokens"},
             "messages": [*msgs, turn(form_text, path)],
             "max_tokens": spec["limit"] - int(line["tokens"]),
             "seed": seed_of(line["task"], str(line["id"]), int(line["epoch"])),
-            **({"penalty_prompt_tokens": int(line["tokens"])} if path == 6 else {})}
+            **({"penalty_prompt_tokens": int(line["tokens"]) if window is None else window}
+               if path == 6 else {})}
 
 
 # ---------------------------------------------------------------------------
@@ -264,8 +277,10 @@ class Server:
 def prepare(srv: Server, line: dict, msgs: list[dict], spec: dict,
             asked: dict | None = None) -> dict:
     """the form this answer is continued in, held to its two checks — {form,
-    text, prompt_tokens, continued_tokens} — or {why} when no form gives back
-    the question's and the reply's tokens"""
+    text, prompt_tokens, continued_tokens, reply_tokens} — or {why} when no
+    form gives back the question's and the reply's tokens. 31.3d: when none
+    does exactly, the likeliest form whose text reads back within RETOKEN_CAP
+    tokens of the reply's, with {retokenized: {wrote, read, diff}}"""
     path = spec.get("path")
     how = template_how(asked_as(spec) if asked is None else asked)
     p0 = srv.template(msgs, how)
@@ -275,18 +290,24 @@ def prepare(srv: Server, line: dict, msgs: list[dict], spec: dict,
         return {"why": f"the question's prompt is {n0:,} tokens here, {want0:,} when it was "
                        "asked: not the same question or template"}
     want = n0 + toks
-    seen = []
+    seen, near = [], None
     for form, text in forms(line["answer"], path):
         p1 = srv.template([*msgs, turn(text, path)], how)
         if p1 != p0 + text:
             seen.append(f"{form}: the prompt isn't the question's and the reply's text")
             continue
         n1 = srv.count(p1)
+        got = {"form": form, "text": text, "prompt_tokens": n0, "continued_tokens": n1,
+               "reply_tokens": n1 - n0}
         if n1 == want:
-            return {"form": form, "text": text, "prompt_tokens": n0, "continued_tokens": n1}
+            return got
+        if near is None and abs(n1 - want) <= RETOKEN_CAP:
+            near = {**got, "retokenized": {"wrote": toks, "read": n1 - n0, "diff": n1 - want}}
         seen.append(f"{form}: {n1 - n0:,} tokens")
-    return {"why": f"the reply's text doesn't give back its {toks:,} tokens ("
-                   + "; ".join(seen) + ")"}
+    if near is not None:
+        return near
+    return {"why": f"the reply's text doesn't give back its {toks:,} tokens, nor within "
+                   f"{RETOKEN_CAP} of them (" + "; ".join(seen) + ")"}
 
 
 SETTINGS = ("temperature", "top_k", "top_p", "min_p", "presence_penalty", "frequency_penalty",
@@ -314,7 +335,8 @@ def continue_one(srv: Server, line: dict, item: dict, spec: dict,
         return {**base, "status": "refused", "why": prep["why"]}
     # "verbose": the settings the server applied come back with the reply
     # (generation_settings), kept with each answer — it changes nothing it samples
-    body = {**request(line, msgs, prep["text"], spec, asked), "stream": False, "verbose": True}
+    body = {**request(line, msgs, prep["text"], spec, asked, prep.get("reply_tokens")),
+            "stream": False, "verbose": True}
     from service import served as sv
     t0, got, why = time.time(), None, ""
     for k in range(TRIES):
@@ -358,10 +380,23 @@ def continue_one(srv: Server, line: dict, item: dict, spec: dict,
            **({"timings": {k: v for k, v in (got.get("timings") or {}).items()
                            if k in ("prompt_n", "prompt_ms", "predicted_n", "predicted_ms",
                                     "cache_n")}} if isinstance(got.get("timings"), dict) else {}),
+           # 31.3d: its text read back otherwise than the model wrote it
+           **({"retokenized": prep["retokenized"]} if prep.get("retokenized") else {}),
            "answer": final}
     if checks:
         rec["why"] = "; ".join(checks)
     return rec
+
+
+def retoken_words(r: dict) -> str:
+    """31.3d: an answer whose text reads back a few tokens otherwise, in words"""
+    x = r.get("retokenized") or {}
+    if not x:
+        return ""
+    d = int(x.get("diff") or 0)
+    return (f" · its text reads back as {x.get('read'):,} tokens, {abs(d)} "
+            f"{'fewer' if d < 0 else 'more'} than the {x.get('wrote'):,} written: continued from "
+            "that reading, the penalty's window its count")
 
 
 def continuity(was: str, final: str, form: str, question: str, path: int) -> list[str]:
@@ -463,7 +498,8 @@ def line_words(r: dict, k: int, of: int) -> str:
     return (f"{label} {k} of {of} (question {r['id']}, run {r['epoch']}): {r['was']['tokens']:,} → "
             f"{r['tokens']:,} tokens · " + ("finished" if not r["ran_out"] else
                                             f"ran out at {r['limit']:,}")
-            + (" · ended in a loop" if r["loop"] else "") + f" · {r['seconds']:.0f} s")
+            + (" · ended in a loop" if r["loop"] else "") + f" · {r['seconds']:.0f} s"
+            + retoken_words(r))
 
 
 def ask(base: str, lines: list[dict], out: Path, spec: dict, slots: int, say,
@@ -522,7 +558,7 @@ def summary(rows: list[dict]) -> dict:
     for r in rows:
         s = out.setdefault(r["task"], {"continued": 0, "refused": 0, "tokens_before": 0,
                                        "tokens_after": 0, "still_ran_out": 0, "loops": 0,
-                                       "finished": 0, "why": {}})
+                                       "finished": 0, "retokenized": 0, "why": {}})
         if r["status"] != "continued":
             s["refused"] += 1
             w = str(r.get("why") or "")[:120]
@@ -534,6 +570,7 @@ def summary(rows: list[dict]) -> dict:
         s["still_ran_out"] += bool(r["ran_out"])
         s["finished"] += not r["ran_out"]
         s["loops"] += bool(r["loop"])
+        s["retokenized"] += bool(r.get("retokenized"))
     return out
 
 
@@ -860,7 +897,7 @@ def check_words(r: dict) -> str:
             + f" · {r['form']} · one reply: the prompt read {r['tokens_evaluated']:,} tokens "
             f"(question {r['prompt_tokens']:,} + reply {r['was']['tokens']:,}), its thinking "
             "and reply begin with the cut-off ones, no thinking opened again, no question "
-            "written again" + speed_words(r) + " · applied: "
+            "written again" + retoken_words(r) + speed_words(r) + " · applied: "
             + ", ".join(f"{k} {s[k]}" for k in SETTINGS if k in s))
 
 
@@ -1038,7 +1075,7 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             continue
         have = sf.read_answers(d / sf.ANSWERS)
         new = dict(have)
-        n_new, refused = 0, []
+        n_new, refused, reread = 0, [], 0
         for r in got:
             k = (str(r.get("id")), int(r.get("epoch", -1)))
             a = have.get(k)
@@ -1076,10 +1113,13 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
                                     "penalty_prompt_tokens": r.get("penalty_prompt_tokens"),
                                     "tokens_evaluated": r.get("tokens_evaluated"),
                                     "new_tokens": r.get("new_tokens"), "form": r.get("form"),
+                                    **({"retokenized": r["retokenized"]}
+                                       if r.get("retokenized") else {}),
                                     "settings": r.get("settings") or {},
                                     "box": setup.get("box") or "", "bundle": path.name,
                                     **({"timings": r["timings"]} if r.get("timings") else {})}}
             n_new += 1
+            reread += bool(r.get("retokenized"))
         if not n_new and not refused:
             lines.append(f"{t}: its continued answers are on the row already — nothing changed")
             continue
@@ -1092,6 +1132,8 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             "from_budget": prev.get("from_budget") or tsetup.get("budget"),
             "limit": cont["limit"],
             "answers": int(prev.get("answers") or 0) + n_new,
+            # 31.3d: of them, those whose text read back a few tokens otherwise
+            "retokenized": int(prev.get("retokenized") or 0) + reread,
             "not_continued": int(prev.get("not_continued") or 0) + len(refused),
             "not_continued_why": _why_counts(refused, prev.get("not_continued_why")),
             "bundles": [*(prev.get("bundles") or []), {"bundle": path.name,
@@ -1104,7 +1146,7 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
                                              for k in sorted(new)), encoding="utf-8")
         (sd / sf.SETUP).write_text(json.dumps(tsetup, indent=1), encoding="utf-8")
         imf.keep_grades(d, sd, new)
-        ready[t] = {"continued": n_new, "refused": refused}
+        ready[t] = {"continued": n_new, "refused": refused, "retokenized": reread}
     if bad:
         shutil.rmtree(staging.parent, ignore_errors=True)
         for line in bad[:20]:
@@ -1141,7 +1183,8 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             shutil.move(str(sf.task_dir(staging, t)), str(dest))
             sc = scored.get(t) or {}
             lim = sc.get("limits") or {}
-            lines.append(limits_line(t, lim, x["continued"], len(x["refused"]), before)
+            lines.append(limits_line(t, lim, x["continued"], len(x["refused"]), before,
+                                     x["retokenized"])
                          + (f" · the answers before are kept at {kept_at}" if kept_at else ""))
             for r in x["refused"][:5]:
                 lines.append(f"{t}: question {r.get('id')}, run {r.get('epoch')} not continued — "
@@ -1175,6 +1218,7 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
             {"sha256": b["sha256"], "sid": sid, "tasks": tasks, "by": by, "at": stamp,
              "bundle": path.name, "box": box, "limit": cont["limit"],
              "answers": sum(x["continued"] for x in ready.values()),
+             "retokenized": sum(x["retokenized"] for x in ready.values()),
              "not_continued": sum(len(x["refused"]) for x in ready.values())})
         imf._write_registry(row, reg)
         for t in ready:
@@ -1196,7 +1240,8 @@ def _why_counts(refused: list[dict], prev) -> dict:
     return out
 
 
-def limits_line(t: str, lim: dict, n: int, refused: int, before: dict | None) -> str:
+def limits_line(t: str, lim: dict, n: int, refused: int, before: dict | None,
+                reread: int = 0) -> str:
     """what the import says of a benchmark: its new limit, the answers
     continued, their tokens, the still cut and the loops, and its score at
     either limit"""
@@ -1208,6 +1253,8 @@ def limits_line(t: str, lim: dict, n: int, refused: int, before: dict | None) ->
                 f"{100 * x['score']:.1f} ± {100 * (x.get('se') or 0):.1f}")
     return (f"{label}: to {lim.get('limit') or 0:,} tokens (from {lim.get('from') or 0:,}) · "
             f"{n:,} answers continued" + (f", {refused:,} not" if refused else "")
+            # 31.3d: those whose text read back a few tokens otherwise, every time said
+            + f" · {reread:,} of them re-read a few tokens differently (at most {RETOKEN_CAP})"
             + f" · {lim.get('tokens_before') or 0:,} → {lim.get('tokens_after') or 0:,} tokens · "
             f"{lim.get('still_ran_out') or 0:,} still ran out · {lim.get('loops') or 0:,} ended "
             f"in a loop · at {lim.get('from') or 0:,}: {sc(old)} · at {lim.get('limit') or 0:,}: "
