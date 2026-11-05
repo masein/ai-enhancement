@@ -52,7 +52,10 @@ OVER = """box => {
         const x = r.right - dx, y = r.top + r.height * f;
         if (x <= r.left) continue;
         const hit = document.elementFromPoint(x, y);
-        if (!hit || !tr.contains(hit) || pinned(hit) !== nm) {
+        // a tooltip or the page's own overlays float above the table: only
+        // the table's own cells are held to it
+        if (!hit || !box.contains(hit)) continue;
+        if (!tr.contains(hit) || pinned(hit) !== nm) {
           const td = hit && hit.closest('td, th');
           out.push({ row: tr.dataset.mtRow, at: [Math.round(x), Math.round(y)],
             top: td ? (td.className || td.tagName) + ' ' + (td.textContent || '').trim().slice(0, 24)
