@@ -76,7 +76,7 @@ def made_up(d: Path, n: int = 200) -> None:
     (d / "drift").mkdir(exist_ok=True)
     (d / "drift" / "box.jsonl").write_text("".join(json.dumps(r) + "\n" for r in drift))
     (d / "imports.json").write_text(json.dumps({"imports": [
-        {"bundle": "switch-served-…-chats-shard-1-of-10.tar.gz", "what": "chats", "part": "1/10",
+        {"bundle": "switch-served-…-chats-shard-1-of-20.tar.gz", "what": "chats", "part": "1/20",
          "chats": n, "at": "2026-11-06T10-00-00", "gpu": "NVIDIA GeForce RTX 5090"},
         {"bundle": "switch-served-…-drift.tar.gz", "what": "drift", "part": None, "chats": 48,
          "at": "2026-11-06T10-05-00", "gpu": "NVIDIA GeForce RTX 5090"}]}))

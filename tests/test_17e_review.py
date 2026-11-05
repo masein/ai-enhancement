@@ -205,7 +205,7 @@ def test_2_3_each_plan_runs_every_benchmark_once_one_line_a_box():
         # 31.3: plan C, U-cont — each path's cut answers continued, k6 in thirds
         if name == "C":
             want = {("on", fbx.CONT), ("off", fbx.CONT)}
-        # 32: plan S, the switch experiment — Part 2's chats in tenths, Part 1 whole
+        # 32: plan S, the switch experiment — Part 2's chats in twentieths, Part 1 whole
         if name == "S":
             want = {("on", fbx.SWITCH), ("on", fbx.DRIFT)}
         assert set(have) == want, name

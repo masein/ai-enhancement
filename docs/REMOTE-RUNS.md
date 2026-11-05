@@ -1984,7 +1984,7 @@ round trip is measured (below). The server's line `expert path kA -> kB:
 keeping N cached tokens` counts the slot's whole memory; `cache_n` counts
 what is reused.
 
-**Part 2, the chats (S1–S10).** 2,000 chats of five turns, the facts placed
+**Part 2, the chats (S1–S20).** 2,000 chats of five turns, the facts placed
 so each recall reads them from the other path's memory:
 
 1. k3: a number (the locker code, a), and an MMLU question;
@@ -2030,7 +2030,7 @@ average about 15,000 tokens; a chat whose prompt and the next turn's limit
 outgrow the slot stops there in both arms, counted by turn — in practice the
 chats whose turn 3 ran out of room (about 1%).
 
-**Part 1, drift (S11).** 200 chats built on the server from step2388's own
+**Part 1, drift (S21).** 200 chats built on the server from step2388's own
 stored k3 replies (MMLU, GSM8K), 50 each at about 1k, 4k, 16k and 48k tokens
 of memory, in both directions. Five runs of the last turn on the target
 path Y, each forced along A's own greedy reply:
@@ -2064,9 +2064,16 @@ cd ~/benchmarks/aienh && LLAMA_CUDA_ARCHS=120 scripts/build_llama_tarball.sh ~/l
 hf upload <you>/evalboard-private ~/llama-server-k3k6r-917f3d9.tar.gz llama-server-k3k6r-917f3d9.tar.gz
 ```
 
-Its sha256 and the upload's commit go in `frontier_box.PLAN_PINS["S"]` and
-`PLAN_REVISIONS["S"]`. Until then every line of plan S is refused before
-anything is fetched.
+Pinned (32.3, masein 5 Nov) in `frontier_box.PLAN_PINS["S"]` and
+`PLAN_REVISIONS["S"]`: 938,665,085 bytes, sha256
+`be1ba7e967f19afd5f2a835a83cc9d04e151d9a3bb733733a4a69483838b33bf`, in the private repository at
+`884b970e978ef821d5006bc7bff6bedfd3f84a41`. Its VERSION: commit
+`917f3d91152142e952b7ea128980faa75ba7934b`, nothing uncommitted,
+`cuda_archs 120`, CUDA 12.8 (`nvidia/cuda:12.8.1-devel-ubuntu22.04`), built
+2026-11-05T09:13:51Z. Its `build 20` is only the commit count of the shallow
+clone it was built from: the box holds the build to its commit, never to a
+build number. A line naming another commit for it is refused before anything
+is fetched.
 
 **The steps.** Rent nothing before masein's yes, and not before plan C.
 
@@ -2093,12 +2100,13 @@ anything is fetched.
    was as said. There is no bundle:
 
    ```bash
-   python scripts/frontier_box.py S1 --as served/step2388-k3k6r-0411 --gguf hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/step2388.k3k6.gguf --server hf://<you>/evalboard-private@<its commit>/llama-server-k3k6r-917f3d9.tar.gz --switch /workspace/switch-inputs.jsonl --switch-sha256 <its sha256> --switch-check 5
+   python scripts/frontier_box.py S1 --as served/step2388-k3k6r-0411 --gguf hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/step2388.k3k6.gguf --server hf://<you>/evalboard-private@884b970e978ef821d5006bc7bff6bedfd3f84a41/llama-server-k3k6r-917f3d9.tar.gz --switch /workspace/switch-inputs.jsonl --switch-sha256 <its sha256> --switch-check 5
    ```
 
 4. **Plan S:** the same line on each box, without `--switch-check`, with
-   `--price`. S1–S10 run a tenth of the chats each (6 slots of 196,608: three
-   chats at a time, each in a pair of slots), S11 Part 1 (18 slots of 65,536).
+   `--price`. S1–S20 run 100 chats each, every twentieth (6 slots of 196,608:
+   three chats at a time, each in a pair of slots), S21 Part 1 (18 slots of
+   65,536).
    Each box leaves a `switch-served-…` bundle.
 5. **Fetch and import:** as U4, with `--sha served/step2388-k3k6r-0411=a2594a68a810ec526061f83cb88c7e469e1c3889912e8da4b1d598c72271faf6`.
    The experiment is no row of the board: its bundles need no `--register`.
@@ -2111,8 +2119,8 @@ turn and arm (score, B − A with McNemar's p, loops, ran out, no answer,
 wrong recalls, length, `cache_n`, `prompt_n` and the round trip; turn 3 also
 by question), and Part 1 by memory size, direction and run.
 
-**Its size** (`frontier_box.py --list S`): about 11.9 h on each of S1–S10 and
-5 h on S11, about 124 box-hours, at plan U's paces (a guess the check's
+**Its size** (`frontier_box.py --list S`): about 6 h on each of S1–S20 and
+5 h on S21, about 124 box-hours, at plan U's paces (a guess the check's
 timings replace).
 
 # Speed tests: the cheapest box per answer (19)

@@ -113,15 +113,15 @@ easy-set answers, to the same 32,768 as step2388's k3 (its own --as, U40's
         --continue /workspace/cont-k6.jsonl --continue-sha256 <its sha256>
 
 32: plan S, switching mode mid-chat with the memory kept (scripts/switch_box.py)
-— on runtime k3k6r-0411, the team's research build: S1–S10 a tenth each of
-Part 2's chats, S11 Part 1's drift, each given the inputs file and the sha256
+— on runtime k3k6r-0411, the team's research build: S1–S20 a twentieth each
+of Part 2's chats (100), S21 Part 1's drift, each given the inputs file and the sha256
 switch_box.py inputs printed for it (and S1 first, with --switch-check 5, the
-check before the rest are rented; docs/REMOTE-RUNS.md S). Refused until the
-research tarball is pinned (PLAN_PINS["S"]):
+check before the rest are rented; docs/REMOTE-RUNS.md S). The research
+tarball is pinned (PLAN_PINS["S"]), fetched at its own commit:
 
     python scripts/frontier_box.py S1 --as served/step2388-k3k6r-0411 \
         --gguf hf://<you>/evalboard-private@<commit>/step2388.k3k6.gguf \
-        --server hf://<you>/evalboard-private@<commit>/llama-server-k3k6r-917f3d9.tar.gz \
+        --server hf://<you>/evalboard-private@<its commit>/llama-server-k3k6r-917f3d9.tar.gz \
         --switch /workspace/switch-inputs.jsonl --switch-sha256 <its sha256>
 """
 
@@ -358,14 +358,16 @@ PLANS: dict[str, dict[str, list[Step]]] = {
     },
 }
 # 32: plan S, switching mode mid-chat with the memory kept (brief 32, after
-# plan C): Part 2's 2,000 chats in tenths, and Part 1's 200 chats in both
+# plan C): Part 2's 2,000 chats in twentieths — 100 a box, about 6 h (masein,
+# 5 Nov: half the wall clock of tenths, and less lost if a box dies) — and
+# Part 1's 200 chats in both
 # directions on one box, 18 slots of 65,536 (three jobs of five runs). 32.2:
 # the thinking kept in the chat, a chat's slot 196,608 tokens (turn 3's k6
 # reply stays for turn 5's): 6 fit a 5090 — three chats, each in a pair of
 # slots (arm A and arm B). The check before it is rented: S1's line with
 # --switch-check 5
-PLANS["S"] = {**{f"S{i}": [("on", (SWITCH,), f"{i}/10", 6)] for i in range(1, 11)},
-              "S11": [("on", (DRIFT,), "", 18)]}
+PLANS["S"] = {**{f"S{i}": [("on", (SWITCH,), f"{i}/20", 6)] for i in range(1, 21)},
+              "S21": [("on", (DRIFT,), "", 18)]}
 # 29: plan D, our own boxes — a quarter of every benchmark on each of a
 # station's four GPUs, longest first (frontier_box's paces), then instruction
 # following with thinking on and off. Every slot holds Bolt's 64K
@@ -455,13 +457,19 @@ PLAN_REVISIONS = {"U": {
 PLAN_PINS["C"], PLAN_REVISIONS["C"] = PLAN_PINS["U"], PLAN_REVISIONS["U"]
 # 32: plan S runs step2388's file as plan U pins it, and the team's research
 # build (teraformer/lda-k3k6-research at 917f3d911) packed by
-# build_llama_tarball.sh on our server as 3ad38b7cc's was. Its sha256 and the
-# private repository's commit are masein's to give once it is uploaded: until
-# then (None) every line of plan S is refused before anything is fetched
+# build_llama_tarball.sh on our server as 3ad38b7cc's was. A pin of None
+# refuses every line of the plan before anything is fetched. 32.3 (masein,
+# 5 Nov): 938,665,085 bytes, in our private repository at 884b970e; its
+# VERSION commit 917f3d91152142e952b7ea128980faa75ba7934b, nothing
+# uncommitted, cuda_archs 120, CUDA 12.8 (nvidia/cuda:12.8.1-devel-ubuntu22.04),
+# built 2026-11-05T09:13:51Z. Its "build 20" is the commit count of the
+# shallow clone it was built from: the runtime holds the build to its commit
+# alone (fb.RUNTIMES["k3k6r-0411"]["build"], no number)
 TARBALL_S = "llama-server-k3k6r-917f3d9.tar.gz"
-PLAN_PINS["S"] = {"step2388.k3k6.gguf": PLAN_PINS["U"]["step2388.k3k6.gguf"], TARBALL_S: None}
+PLAN_PINS["S"] = {"step2388.k3k6.gguf": PLAN_PINS["U"]["step2388.k3k6.gguf"],
+                  TARBALL_S: "be1ba7e967f19afd5f2a835a83cc9d04e151d9a3bb733733a4a69483838b33bf"}
 PLAN_REVISIONS["S"] = {"step2388.k3k6.gguf": PLAN_REVISIONS["U"]["step2388.k3k6.gguf"],
-                       TARBALL_S: None}
+                       TARBALL_S: "884b970e978ef821d5006bc7bff6bedfd3f84a41"}
 # 31.3: step2388's file, for the slots a continuation's 131,072 tokens leave room for
 STEP2388_FILE = 15_994_966_752
 # 31.3b: and the original Qwen3.6 Q2's, for C5's
@@ -937,7 +945,7 @@ def parser() -> argparse.ArgumentParser:
                                            "I1 (25: instruction following), T1 … T3 (30.1), "
                                            "U1 … U37 (31.1: step2388), U38 … U40 (31.2: "
                                            "DeviceMark and the easy set), C1 … C5 (31.3: "
-                                           "U-cont), S1 … S11 (32: switching mode mid-chat)")
+                                           "U-cont), S1 … S21 (32: switching mode mid-chat)")
     ap.add_argument("then", nargs="*", help="18e point 1: more labels, run one after another "
                                             "on this box (L1 L2): each later one's line is "
                                             "written \"queued\" at the start, so the fetch "
@@ -1050,7 +1058,7 @@ def main(argv: list[str] | None = None) -> int:
             ap.error(f"{box}: give --switch with plan S's inputs file and --switch-sha256 with "
                      "its sha256, as switch_box.py inputs printed them")
         if not sws and (a.switch or a.switch_sha256 or a.switch_check):
-            ap.error("--switch is for plan S's boxes alone (S1 … S11)")
+            ap.error("--switch is for plan S's boxes alone (S1 … S21)")
         unpinned = [n for n, v in (PLAN_PINS.get(box[:1]) or {}).items() if v is None]
         if unpinned:
             raise SystemExit(f"{box}: plan {box[:1]}'s {', '.join(unpinned)} isn't pinned yet — "

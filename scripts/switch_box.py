@@ -30,7 +30,7 @@ What the source says, and what each check here holds the server to:
 - The server's line "expert path kA -> kB: keeping N cached tokens" counts
   the slot's whole memory; cache_n counts what is reused.
 
-Part 2, the chats (S1–S10): Kevin's five turns, graded by script, the facts
+Part 2, the chats (S1–S20): Kevin's five turns, graded by script, the facts
 placed so each recall reads them from the other path's memory:
 1. k3: a number to remember (the locker code, a), and an MMLU question.
 2. k3: another number (the crates, b), and a GSM8K question.
@@ -54,7 +54,7 @@ cached_tokens and the server's line; a turn whose memory isn't what its arm
 says is reported and not counted. Turn 1 is a placebo (both memories
 empty), turn 2 nearly one (the reply decoded in A, replayed in B).
 
-Part 1, drift (S11): for each conversation and direction X→Y, five runs of
+Part 1, drift (S21): for each conversation and direction X→Y, five runs of
 its last turn on Y, each forced along A's own greedy reply (the reference):
 - A: Y reads everything fresh — the reference, its first 512 tokens;
 - A′: the same again in another slot (the GPU's own run-to-run noise);
