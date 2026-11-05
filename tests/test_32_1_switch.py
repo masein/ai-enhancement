@@ -1,21 +1,26 @@
-"""32.1 and 32.2 (brief 32): switching mode mid-chat with the memory kept —
-the team's keep_cache_across_paths measured on step2388, on runtime
-k3k6r-0411 (the team's research build run as the apps run it: every earlier
-reply's thinking kept in the chat, 4 checkpoints a slot, no prompt cache in
-host memory). Part 2: five-turn chats in two arms, the switch off (A) and on
-(B), the same text and seed a turn, A's reply replayed in B's slot on the
-path that wrote it, each reply's round trip measured; Part 1: five runs of a
-chat's last turn forced along the reference. The server is the stand-in
+"""32.1, 32.2 and 32.4 (brief 32, Kevin and Roohi's review): switching mode
+mid-chat with the memory kept — the team's keep_cache_across_paths measured
+on step2388, on runtime k3k6r-0411 (the team's research build run as the
+apps run it: the history each earlier reply's content alone, never its
+thinking, --reasoning-preserve, 4 checkpoints a slot, no prompt cache in
+host memory, a conversation capped at 16,384 tokens). Part 2: five-turn
+chats in two arms, the switch off (A) and on (B), the same text and seed a
+turn, A's reply replayed in B's slot as A's server generated it (its token
+ids), each reply's round trip measured — a k3 reply kept to its end, a k6
+reply rolled back to its question; Part 1: five runs of a chat's last turn
+forced along the reference, 48k a stress test. The server is the stand-in
 (tests/fixtures/fake_llama_server.py, FAKE_LLAMA_MEMORY=1: each slot's
-memory kept as the team's server keeps it, the path's line in its log, the
-thinking kept with --reasoning-preserve, a GSM8K reply that doesn't come back
-as it was written, and a memory another path computed answering a little
-differently); the questions invented; nothing is fetched, no model runs."""
+memory kept as the team's server keeps it, the path's line in its log, an
+earlier reply without its thinking written with an empty think block, a
+GSM8K reply that doesn't come back as it was written, and a memory another
+path computed answering a little differently); the questions invented;
+nothing is fetched, no model runs."""
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import tarfile
 from pathlib import Path
@@ -63,7 +68,9 @@ def invented(task: str) -> list[dict]:
 
 
 def stored_replies() -> None:
-    """step2388's k3 answers to MMLU and GSM8K, as plan U's import keeps them"""
+    """step2388's k3 answers to MMLU and GSM8K, as plan U's import keeps them
+    — 32.4: and its k6 answers to GPQA Diamond (4 runs) and MATH Level 5:
+    rec0's all within 10,240 tokens, one of rec1's not; x5 ran out"""
     row = config.OUT_DIR / "served__step2388-k3k6-2611"
     for task, pre in (("mmlu_chat", "m"), ("gsm8k_chat", "g")):
         d = sf.task_dir(row, task)
@@ -72,6 +79,18 @@ def stored_replies() -> None:
             {"id": f"{pre}{k}", "epoch": 0, "finish": "stop",
              "answer": f"Stored reply {pre}{k}, worked through.\nANSWER: A"}) + "\n"
             for k in range(N)), encoding="utf-8")
+    k6 = config.OUT_DIR / "served__step2388-k3k6-2611__thinking"
+    runs = {"gpqa_diamond_epoch": [("rec0", e, 4000 + 1000 * e, "stop") for e in range(4)]
+            + [("rec1", e, 12_000 if e == 2 else 3000, "stop") for e in range(4)],
+            "math_l5_epoch": [(f"x{k}", 0, 2000 + 1000 * k, "stop" if k < 5 else "length")
+                              for k in range(N)]}
+    for task, rows in runs.items():
+        d = sf.task_dir(k6, task)
+        d.mkdir(parents=True, exist_ok=True)
+        (d / sf.ANSWERS).write_text("".join(json.dumps(
+            {"id": q, "epoch": e, "finish": f, "tokens": n,
+             "answer": "<think>\nworked\n</think>\n\nANSWER: A" if f == "stop" else "<think>\n"})
+            + "\n" for q, e, n, f in rows), encoding="utf-8")
 
 
 @pytest.fixture
@@ -207,18 +226,18 @@ def test_the_facts_are_scored_exactly_and_their_sum_by_its_value():
     assert loose["ok"] and not loose["lowest_terms"]
     assert not sw.compute_score("ANSWER: 33", "stop", f)["ok"]
     assert sw.compute_score("no answer line", "stop", f)["no_answer"]
-    # 32.2: the facts placed so each recall reads them from the other path's
-    # memory — a and b in turns 1–2 (k3), used in turn 5 (k6); the courier and
-    # the gate in turn 3 (k6), recalled in turn 4 (k3)
+    # 32.4: the facts all read by k3 — nothing k6 reads outlives its turn in
+    # the apps' memory: a in turn 1, b, the courier and the gate in turn 2;
+    # a and b used on k6 (turn 5), the courier and gate recalled on k3 (turn 4)
     line = {"facts": f, "mmlu": "m0", "gsm8k": "g0", "hard": {"task": "math_l5_epoch", "id": "x0"}}
     items = {t: {x["id"]: x for x in invented(t)} for t in ("mmlu_chat", "gsm8k_chat",
                                                             "math_l5_epoch")}
     t1, t2, t3 = (sw.turn_text(t, line, items) for t in (1, 2, 3))
     assert "locker code is 482" in t1 and "36 crates" in t2
-    assert "Odile" in t3 and "gate number is 27" in t3
-    assert not any(w in t1 + t2 for w in ("Odile", "gate")) and "482" not in t3
+    assert "courier's name is Odile" in t2 and "gate number is 27" in t2
+    assert not any(w in t1 for w in ("Odile", "gate", "crates"))
     assert t1.endswith(fb.prompt("mmlu_chat", items["mmlu_chat"]["m0"])[0])
-    assert t3.endswith(fb.prompt("math_l5_epoch", items["math_l5_epoch"]["x0"])[0])
+    assert t3 == fb.prompt("math_l5_epoch", items["math_l5_epoch"]["x0"])[0]   # no fact
     assert (sw.turn_text(4, line, items), sw.turn_text(5, line, items)) == (sw.RECALL, sw.COMPUTE)
     assert [sw.TURNS[t - 1] for t in (1, 2, 3, 4, 5)] == [3, 3, 6, 3, 6]
 
@@ -254,24 +273,36 @@ def test_each_arms_memory_is_held_to_what_the_source_says():
     clear = {"kind": "clearing", "from": 3, "to": 6, "n": 900, "text": "…"}
     assert sw.memory_why(1, 3, None, "B", {"cache_n": 0, "line": None}, 0) == ""
     assert "turn 1 began with 12" in sw.memory_why(1, 3, None, "A", {"cache_n": 12}, 0)
-    # 32.2, the thinking kept: on the same path the prompt extends the memory
-    # exactly — A's to the turn's question (its probe read it), no line
+    # on the same path A's memory to the turn's question (its probe read it)
     assert sw.memory_why(2, 3, 3, "A", {"cache_n": 79, "line": None}, 79) == ""
-    assert "where the memory held 79" in sw.memory_why(2, 3, 3, "A", {"cache_n": 77}, 79)
-    # a switch: A cleared and read again; B kept it all, to the previous reply's end
-    assert sw.memory_why(3, 6, 3, "A", {"cache_n": 0, "line": clear}, 143) == ""
+    assert "where the apps' memory came back to 79" in sw.memory_why(2, 3, 3, "A",
+                                                                     {"cache_n": 77}, 79)
+    # a switch: A cleared and read again; B kept what A's probe found
+    assert sw.memory_why(3, 6, 3, "A", {"cache_n": 0, "line": clear}, 0) == ""
     assert "no \"clearing\" line" in sw.memory_why(3, 6, 3, "A", {"cache_n": 0, "line": None},
-                                                   143)
+                                                   0)
     assert sw.memory_why(3, 6, 3, "B", {"cache_n": 141, "line": keep}, 141) == ""
-    assert "where the memory held 141" in sw.memory_why(3, 6, 3, "B",
-                                                        {"cache_n": 85, "line": keep}, 141)
+    assert "came back to 141" in sw.memory_why(3, 6, 3, "B", {"cache_n": 85, "line": keep}, 141)
     assert "no \"keeping\" line" in sw.memory_why(3, 6, 3, "B", {"cache_n": 141, "line": clear},
                                                   141)
-    # a reply's round trip, as A's probe saw it
-    assert sw.round_trip({"cache_n": 141}, 141, 85) == {
-        "cache_n": 141, "end": 141, "exact": True, "rolled_back": 0, "before_question": False}
-    back = sw.round_trip({"cache_n": 60}, 141, 85)
-    assert (back["exact"], back["rolled_back"], back["before_question"]) == (False, 81, True)
+    back = {**keep, "from": 6, "to": 3}
+    assert "A's probe gave no cache_n" in sw.memory_why(4, 3, 6, "B",
+                                                        {"cache_n": 85, "line": back}, None)
+    # 32.4: a reply's round trip, as the apps' next request reads it — a k3
+    # reply kept to its end, a k6 reply rolled back to its question
+    assert sw.round_trip({"cache_n": 141}, 141, 85, 3) == {
+        "cache_n": 141, "end": 141, "start": 85, "path": 3, "came_back": "to its end",
+        "as_apps": True, "rolled_back": 0}
+    k6 = sw.round_trip({"cache_n": 85}, 141, 85, 6)
+    assert (k6["came_back"], k6["as_apps"], k6["rolled_back"]) == ("to its question", True, 56)
+    k3 = sw.round_trip({"cache_n": 85}, 141, 85, 3)
+    assert (k3["came_back"], k3["as_apps"]) == ("to its question", False)
+    assert sw.round_trip({"cache_n": 100}, 141, 85, 6)["came_back"] == "elsewhere"
+    # an earlier reply's thinking found in a prompt
+    assert sw.thinking_in("… <think>\nLet me weigh the options first.\n</think> …",
+                          "Let me weigh the options first.")
+    assert not sw.thinking_in("<think>\n\n</think>\n\nA reply.", "Let me weigh it.")
+    assert not sw.thinking_in("anything", "")
 
 
 # ---------------------------------------------------------------------------
@@ -284,9 +315,13 @@ def test_the_inputs_hold_ids_facts_and_stored_replies_and_no_question_text(sb):
     drift = [x for x in lines if x["part"] == "drift"]
     assert [x["chat"] for x in chats] == [0, 1, 2, 3] and len(drift) == 2
     assert all(x["facts"] == sw.facts_of(x["chat"]) for x in chats)
-    # turn 3: each GPQA Diamond question 3 times, MATH Level 5 after; no question text
-    hard = [x["hard"]["task"] for x in chats]
-    assert set(hard) == {"gpqa_diamond_epoch"}
+    # turn 3: 32.4 — the questions whose k6 replies in plan U all finished
+    # within 10,240 tokens (rec0, not rec1; x0–x4, not x5, which ran out),
+    # each GPQA Diamond one 3 times, MATH Level 5 after; no question text
+    hard = [(x["hard"]["task"], x["hard"]["id"]) for x in chats]
+    assert sorted(hard).count(("gpqa_diamond_epoch", "rec0")) == 3
+    assert all(q not in ("rec1", "x5") for _, q in hard)
+    assert sum(1 for t, _ in hard if t == "math_l5_epoch") == 1
     raw = sb["inputs"].read_text()
     assert "Invented" not in raw and "Stored reply" in raw
     # Part 1: each history step2388's stored exchanges, each once, stacked past
@@ -297,6 +332,10 @@ def test_the_inputs_hold_ids_facts_and_stored_replies_and_no_question_text(sb):
     assert len(drift[1]["history"]) > len(drift[0]["history"]) >= 2
     meta = json.loads((sw.where() / sw.INPUTS_META).read_text())
     assert meta["sha256"] == rb.sha256_file(sb["inputs"]) == sb["inputs_sha"]
+    pool = meta["hard_pool"]
+    assert (pool["gpqa_diamond_epoch"], pool["math_l5_epoch"]) == (
+        {"questions": 1, "of": 2}, {"questions": 5, "of": N})
+    assert (pool["max"], pool["replies"], pool["median"]) == (10_240, 4 + 5, 5000)
     # the same inputs on every run
     again = sw.inputs(sb["root"] / "again", say=lambda x: None, n_chats=4, bins=(30, 90),
                       per_bin=1)
@@ -312,26 +351,36 @@ def test_the_check_shows_every_turns_memory_and_passes(sb, capsys):
     out = capsys.readouterr().out
     turns = [x for x in out.splitlines() if x.startswith("chat ") and " · turn " in x]
     assert len(turns) == 2 * 5 * 2
-    # 32.2: the thinking kept, said before a question; then each arm's memory
-    # to the token: B's every later turn the chat to the previous reply's end
-    assert "the thinking kept: an earlier reply's thinking is in the next prompt on k6 and k3" \
+    # 32.4: the history as the apps send it, said before a question; then each
+    # arm's memory to the token: B's every later turn what A's probe found
+    assert ("the history as the apps send it: an earlier reply without its thinking is written "
+            "with an empty think block on k6 and k3") in out
+    assert "the earlier thinking out of every prompt: no reply's thinking in the next turn's ✓" \
         in out
     # at each switch, A re-read (its line, nothing reused) and B kept the chat
     a3 = next(x for x in turns if x.startswith("chat 0 · turn 3") and " · A:" in x)
     b3 = next(x for x in turns if x.startswith("chat 0 · turn 3") and " · B:" in x)
-    assert "cache_n 0 (expected 0)," in a3 and "expert path k3 -> k6: clearing" in a3 \
+    assert "cache_n 0 (expected 0) ·" in a3 and "expert path k3 -> k6: clearing" in a3 \
         and "re-read ✓" in a3
     assert "expert path k3 -> k6: keeping" in b3 and "kept ✓" in b3
     for x in turns:
-        exp = int(x.split("(expected ")[1].split(")")[0].replace(",", ""))
+        exp = int(re.search(r"\(expected ([\d,]+)", x)[1].replace(",", ""))
         assert x.split(": cache_n ")[1].startswith(f"{exp} ")
     assert all("NOT as said" not in x for x in turns)
-    # each reply read again by the next request: token for token, but the
-    # GSM8K reply, whose end the template trims — rolled back to its question
-    trips = [x for x in out.splitlines() if "read again by the next request" in x]
+    # the k6→k3 switch: B kept only what k3 built — to the start of question 3
+    b4 = next(x for x in turns if x.startswith("chat 0 · turn 4") and " · B:" in x)
+    assert "expert path k6 -> k3: keeping" in b4 and "as A's probe found" in b4
+    # each reply as the apps' next request reads it: a k3 reply kept to its
+    # end (but a GSM8K reply whose end the template trims — the stand-in's
+    # odd answers), a k6 reply rolled back to the start of its question
+    lines = {x["chat"]: x for x in sw.read_input(sb["inputs"]) if x["part"] == "chats"}
+    trims = {c: (int(lines[c]["gsm8k"][1:]) + 10) % 2 == 1 for c in (0, 1)}
+    trips = [x for x in out.splitlines() if "as the apps' next request reads it" in x]
     assert len(trips) == 2 * 5
-    assert all(("NOT token for token" in x) == (" reply 2 " in x) for x in trips), "\n".join(trips)
-    assert all("further than its question" not in x for x in trips)
+    for x in trips:
+        k6, c = "(k6)" in x, int(x.split()[1])
+        assert ("rolled back to the start of its question" in x) == k6, x
+        assert x.endswith("✓") == (" reply 2 " not in x or not trims[c]), x
     drift = [x for x in out.splitlines() if x.startswith("drift chat")]
     assert len(drift) == 4 and all(x.endswith("✓") for x in drift)
     assert "the switch check: every memory as said" in out
@@ -350,7 +399,9 @@ def test_part_2_asks_both_arms_the_same_text_and_seed_and_imports_marked_again(s
     assert len(chats) == 2 * 5 * 2
     for r in chats:
         assert set(r) - {"messages", "keep_cache_across_paths"} == sw.CHAT_KEYS
-        assert r["max_tokens"] == sw.LIMITS[r["expert_path"]]
+        assert (r["logprobs"], r["top_logprobs"]) == (True, 1)
+        # 32.4: the history as the apps send it — no reply's thinking, ever
+        assert not any("reasoning_content" in m for m in r["messages"])
     by = {}
     for r in chats:
         by.setdefault((r["seed"], r["expert_path"]), []).append(r)
@@ -359,10 +410,8 @@ def test_part_2_asks_both_arms_the_same_text_and_seed_and_imports_marked_again(s
         a, b = sorted(pair, key=lambda x: "keep_cache_across_paths" in x)
         assert a["messages"] == b["messages"] and "keep_cache_across_paths" not in a
         assert b["keep_cache_across_paths"] is True and a["id_slot"] != b["id_slot"]
-    # 32.2: each earlier reply sent back with its thinking (turn 3's, on k6)
     t5 = next(r for r in chats if r["expert_path"] == 6 and len(r["messages"]) == 9)
-    assert t5["messages"][5]["reasoning_content"] == "Thinking it through."
-    assert "reasoning_content" not in t5["messages"][3]                  # a k3 reply
+    assert "Thinking it through." not in json.dumps(t5["messages"])
     # B's replays and A's probes: the chat as token ids, one token, nothing else
     reads = [r for r in requests(sb) if r.get("n_predict") == 1 and "message_delimiters" in r
              and "n_probs" not in r]
@@ -376,27 +425,46 @@ def test_part_2_asks_both_arms_the_same_text_and_seed_and_imports_marked_again(s
     s = json.loads((sw.where() / sw.SUMMARY).read_text())
     t = {x["turn"]: x for x in s["part2"]["turns"]}
     assert s["part2"]["chats"] == 2 and all(x["not_counted"] == 0 for x in t.values())
-    # the placebo turns agree; the recall of what k6 read, on k3 from a memory
-    # k6 computed, comes back wrong in B (the stand-in's courier); a and b, read
-    # by k3, used on k6, right in both
+    # the placebo turns agree. Turn 4, the recall on k3 after the k6 turn:
+    # chat 2's reply 2 came back as written, so B kept memory k3 built alone
+    # — right, the control; chat 0's didn't (its odd answer, trimmed), so turn
+    # 3 rolled back to before question 2, k6 read the courier and the gate
+    # again, and the stand-in's mixed memory recalls them wrong. Turn 5, a and
+    # b read by k3 and used on k6: the stand-in's sum wrong in B
     assert t[1]["arms"]["A"]["score"] == t[1]["arms"]["B"]["score"] == 100.0
     assert t[2]["paired"]["only_a"] == t[2]["paired"]["only_b"] == 0
-    assert (t[4]["arms"]["A"]["score"], t[4]["arms"]["B"]["score"]) == (100.0, 0.0)
-    assert t[4]["arms"]["B"]["wrong_recalls"] == 2 and t[4]["paired"]["only_a"] == 2
-    assert t[5]["arms"]["A"]["score"] == t[5]["arms"]["B"]["score"] == 100.0
+    assert (t[4]["arms"]["A"]["score"], t[4]["arms"]["B"]["score"]) == (100.0, 50.0)
+    sp = t[4]["by_reply_2"]
+    assert (sp["k3_alone"]["n"], sp["k3_alone"]["only_a"]) == (1, 0)
+    assert (sp["k6_read_turn_2"]["n"], sp["k6_read_turn_2"]["only_a"]) == (1, 1)
+    assert (t[5]["arms"]["A"]["score"], t[5]["arms"]["B"]["score"]) == (100.0, 0.0)
+    assert t[5]["paired"]["only_a"] == 2
     assert t[3]["switch"] and t[3]["arms"]["B"]["cache_n"] > 0 == t[3]["arms"]["A"]["cache_n"]
     assert "clustered" in t[3]
-    # each reply's round trip: token for token but the GSM8K reply (turn 2)
-    assert [(x["turn"], x["round_trip"]["exact"], x["round_trip"]["rolled_back"])
-            for x in s["part2"]["turns"]] == [(1, 2, 0), (2, 0, 2), (3, 2, 0), (4, 2, 0), (5, 2, 0)]
-    assert t[2]["round_trip"]["before_question"] == 0
-    # B's new path reads only the new message: its memory the whole chat before
+    # each reply's round trip, as the apps' next request reads it: all as the
+    # apps' history makes it, but chat 0's GSM8K reply (turn 2)
+    assert [(x["turn"], x["round_trip"]["as_apps"], x["round_trip"]["otherwise"])
+            for x in s["part2"]["turns"]] == [(1, 2, 0), (2, 1, 1), (3, 2, 0), (4, 2, 0), (5, 2, 0)]
+    assert t[3]["round_trip"]["came_back"]["to its question"] == 2
+    # each turn's limit what is left of 16,384
     rows = [json.loads(x) for x in
             rb.read(path)["files"]["results/switch/chats.jsonl"].decode().splitlines()]
     for r in rows:
+        for tr in r["turns"]:
+            assert tr["room"] == sw.APP_CONTEXT - tr["prompt"] == \
+                tr["arms"]["A"]["request"]["max_tokens"]
+    # B's memory each later turn what A's probe found: after a k3 reply its
+    # end, after a k6 reply the start of its question (turn 4: only what k3
+    # built is kept)
+    for r in rows:
         for tr in r["turns"][1:]:
-            assert tr["arms"]["B"]["cache_n"] == tr["expected"]["B"] == r["turns"][
-                tr["turn"] - 2]["probe"]["end"]
+            before = r["turns"][tr["turn"] - 2]
+            assert tr["arms"]["B"]["cache_n"] == tr["expected"]["B"] == before["probe"]["cache_n"]
+        assert r["turns"][3]["arms"]["B"]["cache_n"] == r["turns"][2]["start"]
+        assert r["turns"][2]["arms"]["B"]["cache_n"] == r["turns"][1]["probe"]["cache_n"]
+        # B's replay held A's reply as generated: one token short of it
+        rep = r["turns"][0]["replay"]
+        assert rep["tokens"] == r["turns"][0]["prompt"] + r["turns"][0]["arms"]["A"]["tokens"]
     # a second import changes nothing
     code, said = imported(path)
     assert code == 0 and any("imported already" in x for x in said)
@@ -434,6 +502,11 @@ def test_part_1_forces_each_run_along_the_reference(sb, svc, monkeypatch):  # no
     s = json.loads((sw.where() / sw.SUMMARY).read_text())
     assert s["part1"]["jobs"] == 4 and len(s["part1"]["rows"]) == 4
     assert "greedy, no penalties" in s["part1"]["protocol"]
+    # 32.4: 48k is the stress test, apart
+    assert not any(x["stress"] for x in s["part1"]["rows"])
+    monkeypatch.setattr(sw, "STRESS_BINS", (90,))
+    s = sw.summarise(sw.where())
+    assert [(x["bin"], x["stress"]) for x in s["part1"]["rows"]][::2] == [(30, False), (90, True)]
 
 
 def test_the_import_refuses_what_wasnt_asked_as_the_experiment_asks(sb, svc, tmp_path,  # noqa: F811
@@ -511,12 +584,12 @@ def test_plan_s_runs_the_pinned_tarball_at_its_commit_and_each_box_its_share(mon
     argv = got["S1"][0]
     for want in (["--runtime", RT], ["--switch", "/workspace/switch-inputs.jsonl"],
                  ["--pin", f"switch-inputs.jsonl={'b' * 64}"], ["--switch-part", "chats"],
-                 ["--part", "1/20"], ["--slots", "6"], ["--thinking", "on"],
+                 ["--part", "1/8"], ["--slots", "16"], ["--thinking", "on"],
                  ["--pin", f"{fx.TARBALL_S}={TARBALL_SHA}"]):
         assert " ".join(want) in " ".join(argv)
-    assert fx.main(["S21", *line[1:]]) == 0
-    assert "--switch-part drift" in " ".join(got["S21"][0]) and "--part" not in got["S21"][0]
-    assert "--slots 18" in " ".join(got["S21"][0])
+    assert fx.main(["S9", *line[1:]]) == 0
+    assert "--switch-part drift" in " ".join(got["S9"][0]) and "--part" not in got["S9"][0]
+    assert "--slots 18" in " ".join(got["S9"][0])
     # the check on S1, into a folder the fetch never reads
     monkeypatch.setattr(fx.subprocess, "run", lambda cmd: got.setdefault("check", cmd) and
                         type("R", (), {"returncode": 0}))
@@ -530,10 +603,11 @@ def test_plan_s_runs_the_pinned_tarball_at_its_commit_and_each_box_its_share(mon
     with pytest.raises(SystemExit):
         fx.main(line[:5 + 2])
     assert "give --switch with plan S's inputs file" in capsys.readouterr().err
-    # its size: twenty boxes of chats, one of drift
+    # its size: 32.4, the chats at the apps' 16,384 tokens — eight boxes of
+    # 250 (16 slots, about 4.2 h each), the drift on S9
     assert [x.split(" · ")[0] for x in fx.listing("S") if x.startswith("S")][:2] == ["S1", "S2"]
-    # 32.3: the chats over 20 boxes of 100 (about 6 h each), the drift on S21
-    assert fx.listing("S")[-1] == "21 boxes a build · 124.4 box-hours a build · the longest 6.0 h"
+    assert "16 slots of 16,384 tokens" in "\n".join(fx.listing("S"))
+    assert fx.listing("S")[-1] == "9 boxes a build · 38.3 box-hours a build · the longest 5.0 h"
 
 
 def test_the_fetch_imports_the_experiments_bundles_with_no_register():
@@ -546,8 +620,9 @@ def test_the_fetch_imports_the_experiments_bundles_with_no_register():
 def test_the_runbook_gives_plan_s_and_its_check():
     doc = DOC.read_text(encoding="utf-8")
     sec = doc[doc.index("# S. Switching mode mid-chat (32)"):]
-    for want in ("switch_box.py inputs", "--switch-check 5", "S21", "--cache-ram 0",
+    for want in ("switch_box.py inputs", "--switch-check 5", "S9", "--cache-ram 0",
                  "--reasoning-preserve", "--ctx-checkpoints 4", "Not tested: chats saved to disk",
+                 "16,384", "10,240", "stress test", "never its thinking", "Roohi",
                  "keep_cache_across_paths", "llama-server-k3k6r-917f3d9.tar.gz",
                  "Part 1's protocol: greedy, no penalties", "Switching mode mid-chat"):
         assert want in sec, want
@@ -566,19 +641,36 @@ def test_the_bundle_never_holds_a_secret_or_a_binary(sb):
     st = b["setup"]
     assert st["runtime"] == RT and st["server"]["flags"][-2:] == ["--cache-ram", "0"]
     assert set(st["server"]["paths_checks"]) == {"6", "3"}
-    assert st["server"]["preserve_check"] == {"pass": True, "kept": {"6": True, "3": True},
-                                              "warned": False}
+    assert st["server"]["history_check"] == {"pass": True, "empty_block": {"6": True, "3": True},
+                                             "warned": False}
+    assert (st["switch"]["app_context"], st["switch"]["hard_max"]) == (16_384, 10_240)
     assert st["switch"]["inputs_sha256"] == sb["inputs_sha"]
     shutil.rmtree(sb["root"] / "s3")
 
 
-def test_a_server_that_keeps_no_earlier_thinking_asks_nothing(sb, monkeypatch, capsys):
-    # 32.2: a template that drops the thinking, the flag notwithstanding — the
-    # server says so at start-up, and the next prompt holds no earlier thinking
+def test_a_server_that_writes_no_empty_block_asks_nothing(sb, monkeypatch, capsys):
+    # a template that ignores --reasoning-preserve (and says so at start-up)
+    # writes an earlier reply without its block: every reply, k3's too, would
+    # roll the memory back — not the apps' history
     monkeypatch.setenv("FAKE_LLAMA_PRESERVE", "off")
     with pytest.raises(SystemExit) as e:
         run_s(sb, "nopreserve", "--switch-part", "chats", "--part", "1/2")
-    assert "the earlier thinking isn't kept in the chat" in str(e.value)
+    assert "this server doesn't write the history as the apps send it" in str(e.value)
     out = capsys.readouterr().out
-    assert "the thinking NOT kept: the server says --reasoning-preserve has no effect" in out
+    assert "the history NOT as the apps': the server says --reasoning-preserve has no effect" in out
     assert not [r for r in requests(sb) if "id_slot" in r and "messages" in r]
+
+
+def test_an_earlier_replys_thinking_in_the_history_stops_the_box(sb, monkeypatch, capsys):
+    # 32.4: a server that leaves a reply's thinking in its content — sent
+    # back, the history would carry it: the box stops at the first, no chat
+    # started after it, no bundle
+    monkeypatch.setenv("FAKE_LLAMA_THINK_IN_CONTENT", "1")
+    assert run_s(sb, "thinkin", "--switch-part", "chats", "--part", "1/2", slots=2) != 0
+    out = capsys.readouterr().out
+    assert "stopped: chat 0: reply 3's content holds its thinking — the history isn't the apps'" \
+        in out
+    turn3 = [r for r in requests(sb) if "messages" in r and "id_slot" in r
+             and r["expert_path"] == 6]
+    assert len(turn3) == 2                          # chat 0's turn 3, both arms; nothing after
+    assert not bundle_at(sb, "thinkin", "chats", (1, 2)).exists()

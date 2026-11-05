@@ -1953,87 +1953,116 @@ It runs after plan C, and nothing is rented before masein's yes.
 field `keep_cache_across_paths` changes a request on our CUDA boxes, and only
 when it is sent. Runtime `k3k6r-0411` is k3k6-2611 in every other way
 (step2388's file, the same two variables, no sampling flag, each path's
-settings the file's), run as the apps run it (Kevin, 5 Nov):
+settings the file's), run as the apps run it (Kevin, 5 Nov; Kevin and
+Roohi's review of the plan, 5 Nov):
 
-- `--reasoning-preserve`: every earlier reply's thinking stays in the chat
-  the server renders. It sets the template's `preserve_thinking`, which
-  step2388's template supports: plan U's servers said so at start-up
-  ("chat template supports preserving reasoning"). Each box checks it again
-  before a question, on both paths, and stops if the thinking isn't kept.
+- **The history without the thinking:** each earlier reply goes back with
+  its content alone, never its thinking (no `reasoning_content`).
+- `--reasoning-preserve`: the apps' flag. With it, step2388's template
+  writes such a reply as `<think>\n\n</think>\n\n` and its content (trimmed):
+  an empty block where k6's thinking was, exactly as k3 wrote its own. Each
+  box checks that before a question, on both paths, and stops if it isn't
+  so. Before every turn it also checks that no earlier reply's thinking is
+  in the prompt (in the history, or left in a reply's content by a server
+  that doesn't parse it out), and stops the run if it is.
 - `--ctx-checkpoints 4`: 4 checkpoints a slot.
 - `--cache-ram 0`: no prompt cache in host memory, which with the switch on
   would hand a slot a memory saved from another chat. Off, a slot holds only
   its own chat.
+- **The apps' cap:** a conversation is capped at 16,384 tokens of context.
+  Each turn's limit is what is left of it, and a chat's slot is 16,384.
 
 None changes a single answer; each changes what a slot's memory holds. Both
 paths run on one server, each chat pinned to its own slot.
 
 Not tested: chats saved to disk and restored (the apps' slot files).
 
-**What the memory holds.** Each turn the whole chat is rendered again, and
-the server reuses its memory as far as the new prompt extends it. With the
-thinking kept, an earlier reply is written as `<think>`, its thinking
-(trimmed), `</think>` and its reply (trimmed); a k3 reply with k3's empty
-block. That is the text the model wrote, so the new prompt extends the
-memory and nothing is read again: the new path continues from the other
-path's own writing. A reply whose text doesn't come back token for token
-(whitespace the template trims, or tokens the tokenizer splits otherwise
-than the model wrote them) rolls the memory back to the latest of its 4
-checkpoints before the difference, and the rest is read again. Each reply's
-round trip is measured (below). The server's line `expert path kA -> kB:
-keeping N cached tokens` counts the slot's whole memory; `cache_n` counts
-what is reused.
+**What the memory holds.** Each turn the whole chat is sent again, and the
+server reuses its memory as far as the new prompt extends it.
+- **After a k3 reply,** the next prompt extends the memory to the reply's
+  end: k3's empty block and its reply are what k3 wrote.
+- **After a k6 reply,** it doesn't. The memory holds the reply's thinking,
+  the next prompt an empty block where it was, and the server rolls the
+  memory back to its latest checkpoint before that: the one at the start of
+  the turn's question. A request makes a checkpoint at its last user message
+  every time (server-context.cpp).
+- **So nothing k6 reads or writes outlives its turn,** but for the end of
+  the previous reply and the line after it (two tokens), which a k6 turn
+  reads first.
+- **What k6 borrows is memory k3 built,** and what k3 borrows back after a
+  k6 turn is memory k3 built too, where the k3 reply before the k6 turn came
+  back as written. A k3 reply that didn't (whitespace the template trims)
+  rolls the k6 turn back to before its own question, and k6 reads that
+  exchange again; then what k3 borrows back holds it, read by k6.
 
-**Part 2, the chats (S1–S20).** 2,000 chats of five turns, the facts placed
-so each recall reads them from the other path's memory:
+Each reply's round trip is measured (below). The server's line `expert path
+kA -> kB: keeping N cached tokens` counts the slot's whole memory; `cache_n`
+counts what is reused.
+
+**Part 2, the chats (S1–S8).** 2,000 chats of five turns. The facts are all
+read by k3: nothing k6 reads outlives its turn in the apps' memory.
 
 1. k3: a number (the locker code, a), and an MMLU question;
-2. k3: another number (the crates, b), and a GSM8K question;
-3. k6: a courier's name and a gate number, and a GPQA Diamond question (each
-   up to three times) or MATH Level 5;
-4. k3: the courier and the gate recalled, each scored exactly — read by k6;
-5. k6: (a × b) / (a + b), a fraction in lowest terms — a and b read by k3.
+2. k3: three more facts (the crates, b; a courier's name; a gate number),
+   and a GSM8K question;
+3. k6: a GPQA Diamond question (each up to three times) or MATH Level 5, one
+   whose k6 replies in plan U all finished within 10,240 tokens, so most
+   finish in the room the chat leaves (about 13,000). Those that still run
+   out are counted. `switch_box.py inputs` prints how many questions qualify
+   and the median of their plan U replies;
+4. k3: the courier and the gate recalled, each scored exactly. This is the
+   k6-to-k3 switch, where the apps keep only k3's memory: a control. It is
+   reported apart for the chats whose reply 2 didn't come back as written;
+5. k6: (a × b) / (a + b), a fraction in lowest terms. a and b were read by
+   k3 and are used on k6: memory one path built and the other uses.
 
 Arm A (the switch off, the team's default) writes the chat. Arm B (the
 switch on) runs beside it in a slot of its own, each turn with the same
-messages (A's earlier replies, sent back with their thinking) and the same
-seed. Before each turn, A's previous reply is replayed in B's slot on the
-path that wrote it, so B's memory holds exactly what a real switching chat
-would, and only the memory differs. Each request carries its messages, its
-limit (k6 98,304, k3 32,768), its seed, its path and its slot; B's also
-`keep_cache_across_paths`. Nothing else: no sampling value, no reasoning
-field, no `chat_template_kwargs`. B's replays and A's probes send the chat as
-token ids and nothing else.
+messages (A's earlier replies' content) and the same seed.
+- **B's replay:** before each turn, A's previous reply is replayed in B's
+  slot as A's server generated it: its prompt and the reply's own token ids,
+  thinking included, on the path that wrote it. The turn's request, sent the
+  apps' way, then rolls B's memory back as the apps' would.
+- **What a request carries:** its messages, its limit (what is left of
+  16,384), its seed, its path and its slot, and its tokens back (`logprobs`,
+  the likeliest one). Asking for the tokens reads the logits and changes
+  nothing sampled: sampling stays on the CPU, as the runtime sets no
+  `--backend-sampling`. B's request also carries `keep_cache_across_paths`.
+- **Nothing else:** no sampling value, no reasoning field, no
+  `chat_template_kwargs`. B's replays and A's probes send token ids and
+  nothing else.
 
-What each turn's memory must be, `cache_n` (the rest is `prompt_n`):
+What each turn's memory must be, `cache_n` (the rest is `prompt_n`). "As A's
+probe found" is the apps' next request read on A's own memory, which B's
+holds too:
 
 | Turn | Path | Arm A | Arm B |
 |---|---|---|---|
 | 1 | k3 | 0 | 0 |
-| 2 | k3 | the chat to question 2 (reply 1 as written) | the chat to the end of reply 1 (replayed on k3) |
-| 3 | k3 → k6 | "clearing", 0: k6 reads it all, both replies too | "keeping", the chat to the end of reply 2, all of it computed by k3; k6 reads only question 3 |
-| 4 | k6 → k3 | "clearing", 0 | "keeping", to the end of reply 3, its thinking computed by k6 |
-| 5 | k3 → k6 | "clearing", 0 | "keeping", to the end of reply 4 |
+| 2 | k3 | the chat to question 2 (its probe read it) | as A's probe found: the end of reply 1 (a k3 reply) |
+| 3 | k3 → k6 | "clearing", 0: k6 reads it all | "keeping", as A's probe found: the end of reply 2, all of it computed by k3 |
+| 4 | k6 → k3 | "clearing", 0 | "keeping", as A's probe found: the start of question 3 (reply 3's thinking isn't in the history), all k3 built but two tokens |
+| 5 | k3 → k6 | "clearing", 0 | "keeping", as A's probe found: the end of reply 4, all k3 built but two tokens |
 
 A turn whose memory isn't that is reported, not counted. Turn 1 is a placebo
 (both memories empty), turn 2 nearly one (the reply decoded in A, replayed in
 B). **The round trip:** after each reply, A's slot reads the chat to the next
 question on the same path, as the apps' next request does. The report gives,
-per turn, how many replies came back token for token, and for the rest how
-far the memory rolled back and how often further than its question.
+per turn, how many replies came back as the apps' history makes them (a k3
+reply kept to its end, a k6 reply rolled back to the start of its question),
+and for the rest where the memory came back to and how far it rolled back.
 
-**The slots.** The thinking stays in the chat, so turn 3's k6 reply (up to
-98,304 tokens) is there when turn 5 (k6, another 98,304) starts: a chat's
-slot is 196,608 tokens, 6 on a 5090 with the q8_0 cache (three chats, each in
-a pair of slots). step2388's k6 replies to GPQA Diamond and MATH Level 5
-average about 15,000 tokens; a chat whose prompt and the next turn's limit
-outgrow the slot stops there in both arms, counted by turn — in practice the
-chats whose turn 3 ran out of room (about 1%).
+**The slots.** Without the thinking in the history the chat grows by its
+replies' content alone. A chat's slot is the apps' 16,384 tokens, and a 5090
+holds about 60 beside the file. Each chat box runs 16, eight chats at a time,
+each in a pair of slots. A chat whose prompt fills the 16,384 stops there in
+both arms, counted by turn.
 
-**Part 1, drift (S21).** 200 chats built on the server from step2388's own
+**Part 1, drift (S9).** 200 chats built on the server from step2388's own
 stored k3 replies (MMLU, GSM8K), 50 each at about 1k, 4k, 16k and 48k tokens
-of memory, in both directions. Five runs of the last turn on the target
-path Y, each forced along A's own greedy reply:
+of memory, in both directions. The main sizes are 1k, 4k and 16k. 48k is a
+stress test, beyond the apps' cap, and is reported apart. Five runs of the
+last turn on the target path Y, each forced along A's own greedy reply:
 
 - A: Y reads everything fresh; its first 512 tokens are the reference;
 - A′: A again in another slot (the GPU's own noise);
@@ -2041,6 +2070,10 @@ path Y, each forced along A's own greedy reply:
   (the memory continued, no switch);
 - B: the same on the other path X, then the last turn on Y, switch on;
 - F: X reads everything fresh (the full gap between the paths).
+
+The histories are step2388's k3 replies, which the apps keep to their end:
+k3→k6 is a memory the apps hold. k6→k3 isn't (no k6 memory outlives its
+turn), and it bounds what keeping k6's memory would do.
 
 Part 1's protocol: greedy, no penalties (`temperature` 0,
 `presence_penalty` 0, `seed` 0, as DeviceMark's), the 20 likeliest tokens'
@@ -2051,6 +2084,25 @@ goes on from the reference's own text; the rollback to the last question
 keeps the run's memory. Against A, by memory size and direction: the first
 token's KL, the mean KL a token, flips a 1,000 tokens and the token of the
 first flip.
+
+**Not in this run: the mechanistic measure (Roohi).** The same memory plus a
+new prompt, and the resulting states compared under k3 and k6 (cosine
+similarity of the recurrent states, the full-attention layers' keys and
+values of the new prompt, and the last hidden state). With the team's build:
+- **Saving the states:** a runtime that allows `--slot-save-path` (this one
+  refuses it), and the slot saves of llama-server, which write a slot's
+  whole memory, the recurrent state included.
+- **The same memory twice:** the memory computed once and restored into two
+  slots, then the new prompt read on k3 in one and k6 in the other, and each
+  saved. The memory computed on each path fresh, and the same path twice
+  (the GPU's own noise), saved too.
+- **Our code, in our repository:** a reader of the saved files,
+  comparing them on the box and keeping only the numbers.
+
+About a GPU-hour a size, about $1 at plan S's price, and two to three days
+of work. A 16k memory's save is about 250 MB, so the files are compared and
+deleted on the box. If the team's build doesn't save the recurrent state, a
+dump of each layer's state is the team's to add in their own tree.
 
 **The tarball** (masein, from his Mac, no token on the server): the branch
 at 917f3d911 on the server at `~/llama.cpp-k3k6-research`, then built as
@@ -2077,9 +2129,11 @@ is fetched.
 
 **The steps.** Rent nothing before masein's yes, and not before plan C.
 
-1. On the server: the inputs file, `switch-inputs.jsonl` (question ids, the
-   invented facts, step2388's stored replies; no question text). It prints
-   its sha256 and what it holds:
+1. On the server, the board deployed at this PR's merge: the inputs file,
+   `switch-inputs.jsonl`. It holds question ids, the invented facts, turn 3's
+   questions as chosen from plan U's k6 replies, and step2388's stored
+   replies; no question text. It prints its sha256, what it holds, and turn
+   3's pool:
 
    ```bash
    cd ~/benchmarks/aienh && sudo docker compose exec -T bench python scripts/switch_box.py inputs
@@ -2091,37 +2145,43 @@ is fetched.
    scp -i ~/.ssh/id_ed25519 -P <port> ~/benchmarks/switch/switch-inputs.jsonl root@<host>:/workspace/
    ```
 
-3. **The check, on S1, before the rest is rented:** the thinking kept (both
-   paths), then Part 2's first five chats through both arms at 4,096 tokens
-   a turn (the memory, not the scores), each reply's round trip, then Part
-   1's first chat of each memory size, both ways. A line a turn and arm:
-   `cache_n` against what it must be, `prompt_n`, `cached_tokens` and the
-   server's line, no question text. The last line says whether every memory
-   was as said. There is no bundle:
+3. **The check, on S1, before the rest is rented.** It runs:
+   - the apps' history first (both paths);
+   - then Part 2's first five chats through both arms, each turn's limit at
+     most 4,096 tokens (the memory, not the scores), and each reply's round
+     trip;
+   - then Part 1's first chat of each memory size, both ways.
+
+   It prints a line for each turn and arm: `cache_n` against what it must
+   be, the turn's limit, `prompt_n`, `cached_tokens` and the server's line;
+   no question text. The last line says whether every memory was as said and
+   no earlier thinking was in a prompt. There is no bundle:
 
    ```bash
    python scripts/frontier_box.py S1 --as served/step2388-k3k6r-0411 --gguf hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/step2388.k3k6.gguf --server hf://<you>/evalboard-private@884b970e978ef821d5006bc7bff6bedfd3f84a41/llama-server-k3k6r-917f3d9.tar.gz --switch /workspace/switch-inputs.jsonl --switch-sha256 <its sha256> --switch-check 5
    ```
 
 4. **Plan S:** the same line on each box, without `--switch-check`, with
-   `--price`. S1–S20 run 100 chats each, every twentieth (6 slots of 196,608:
-   three chats at a time, each in a pair of slots), S21 Part 1 (18 slots of
+   `--price`. S1–S8 run 250 chats each, every eighth (16 slots of 16,384:
+   eight chats at a time, each in a pair of slots), S9 Part 1 (18 slots of
    65,536).
    Each box leaves a `switch-served-…` bundle.
 5. **Fetch and import:** as U4, with `--sha served/step2388-k3k6r-0411=a2594a68a810ec526061f83cb88c7e469e1c3889912e8da4b1d598c72271faf6`.
    The experiment is no row of the board: its bundles need no `--register`.
    The import marks every answer again by the board's scorers, refuses a
-   bundle whose file, build, runtime, settings checks, inputs or requests
-   aren't the experiment's, and keeps the summary the report reads.
+   bundle whose file, build, runtime, settings checks, history check, inputs
+   or requests aren't the experiment's, and keeps the summary the report
+   reads.
 
-**On the board:** Reports ▸ "Switching mode mid-chat", internal. Part 2 by
-turn and arm (score, B − A with McNemar's p, loops, ran out, no answer,
-wrong recalls, length, `cache_n`, `prompt_n` and the round trip; turn 3 also
-by question), and Part 1 by memory size, direction and run.
+**On the board:** Reports ▸ "Switching mode mid-chat", internal. It shows:
+- **Part 2 by turn and arm:** score, B − A with McNemar's p, loops, ran out,
+  no answer, wrong recalls, length, `cache_n`, `prompt_n` and the round trip;
+  turn 3 also by question, and turn 4 by reply 2's round trip;
+- **Part 1** by memory size, direction and run, 48k apart as a stress test.
 
-**Its size** (`frontier_box.py --list S`): about 6 h on each of S1–S20 and
-5 h on S21, about 124 box-hours, at plan U's paces (a guess the check's
-timings replace).
+**Its size** (`frontier_box.py --list S`): about 4.2 h on each of S1–S8 and
+5.0 h on S9, 38.3 box-hours (about 43 with each box's start), at about
+60 box-seconds a chat: a guess the check's timings replace.
 
 # Speed tests: the cheapest box per answer (19)
 

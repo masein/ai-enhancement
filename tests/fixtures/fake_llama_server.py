@@ -77,7 +77,11 @@ k3 reply with k3's empty block), so a reply comes back as it was written —
 but for a reply ending in TRIMMED, which the template drops (a reply whose
 text doesn't come back, and rolls the memory back); --ctx-checkpoints N
 keeps N checkpoints a slot; the last token a request writes is never in the
-memory, as the server keeps it."""
+memory, as the server keeps it. 32.4: a chat reply's token ids, its end
+marker too, under logprobs; each kept token's path, and a memory "mixed" only
+where another path computed MIXED_MIN of them (its recall and its sum wrong);
+FAKE_LLAMA_THINK_IN_CONTENT=1 a server that leaves a reply's thinking in its
+content."""
 
 from __future__ import annotations
 
@@ -198,10 +202,11 @@ PROBE = {"alone": [(9000.0, 140.0), (8000.0, 150.0), (10000.0, 120.0)],
 N_BATCH, N_UBATCH, MIN_STEP, MAX_CHECKPOINTS = 2048, 512, 8192, 32
 USER, ASSISTANT, END = "<|im_start|>user", "<|im_start|>assistant", "<|im_end|>"
 GEN = {6: [ASSISTANT, "<think>"], 3: [ASSISTANT, "<think>", "</think>"]}
-# a slot whose memory another path computed: every this-many tokens of a
-# /completion the likeliest two change places, and a recalled fact comes back
-# wrong (the ship)
+# a slot whose memory another path computed (at least MIXED_MIN of its kept
+# tokens): every this-many tokens of a /completion the likeliest two change
+# places, a recalled fact comes back wrong (the ship), and so does a sum
 MIXED_EVERY = 5
+MIXED_MIN = 8
 
 
 def mem_id(w: str) -> int:
@@ -232,16 +237,21 @@ def mem_words(msgs: list[dict], path: int, preserve: bool = False) -> list[str]:
 
 
 class Memory:
-    """one slot's memory: its tokens, the path that computed them, whether
-    another path computed part of them, and its checkpoints (each the tokens
-    before it)"""
+    """one slot's memory: its tokens, the path that computed each one, and its
+    checkpoints (each the tokens before it)"""
 
     def __init__(self, keep: int = MAX_CHECKPOINTS):
         self.tokens: list[int] = []
+        self.by: list[int] = []
         self.path = 0
-        self.mixed = False
         self.cps: list[int] = []
         self.keep = keep
+
+    @property
+    def mixed(self) -> bool:
+        """32.4: another path than this request's computed MIXED_MIN or more of
+        the tokens kept"""
+        return sum(1 for p in self.by if p != self.path) >= MIXED_MIN
 
     def launch(self, sid: int, path: int, keep: bool) -> None:
         """launch_slot_with_task: a path change keeps the memory (with
@@ -250,14 +260,18 @@ class Memory:
             print(f"slot launch_slot_: id {sid:2d} | task -1 | expert path k{self.path} -> "
                   f"k{path}: keeping {len(self.tokens)} cached tokens (keep_cache_across_paths)",
                   flush=True)
-            self.mixed = self.mixed or bool(self.tokens)
         elif self.path != path:
             if self.tokens:
                 print(f"slot launch_slot_: id {sid:2d} | task -1 | expert path k{self.path} -> "
                       f"k{path}: clearing {len(self.tokens)} cached tokens", flush=True)
-            self.tokens, self.mixed = [], False
+            self.tokens, self.by = [], []
             self.cps = []
         self.path = path
+
+    def write(self, toks: list[int]) -> None:
+        """what this request's path writes into the memory"""
+        self.tokens = self.tokens + toks
+        self.by = self.by + [self.path] * len(toks)
 
     def reuse(self, prompt: list[int]) -> int:
         """the tokens reused: up to where the prompt parts from the memory,
@@ -267,18 +281,18 @@ class Memory:
         while n < min(len(self.tokens), len(prompt)) and self.tokens[n] == prompt[n]:
             n += 1
         if n == 0:
-            self.tokens, self.cps, self.mixed = [], [], False
+            self.tokens, self.by, self.cps = [], [], []
             return 0
         thold = n if n < len(prompt) else n - 1
         if len(self.tokens) - 1 >= thold:
             got = next((c for c in reversed(self.cps) if c - 1 <= n and (c - 1 < thold or c == 1)),
                        None)
             if got is None:
-                self.tokens, self.cps, self.mixed = [], [], False
+                self.tokens, self.by, self.cps = [], [], []
                 return 0
             n = got
         self.cps = [c for c in self.cps if c - 1 <= n]
-        self.tokens = self.tokens[:n]
+        self.tokens, self.by = self.tokens[:n], self.by[:n]
         return n
 
     def read(self, prompt: list[int], user_starts: set[int]) -> None:
@@ -302,7 +316,7 @@ class Memory:
                              or start > self.cps[-1] + MIN_STEP)
             if make:
                 self.cps = (self.cps + [start])[-self.keep:]
-        self.tokens = list(prompt)
+        self.write(list(prompt[len(self.tokens):]))
 
 
 def user_starts_of(prompt: list[int], delim: list[int]) -> set[int]:
@@ -325,15 +339,17 @@ def mem_reply(msgs: list[dict], path: int, mixed: bool) -> tuple[str, str]:
     if "(a × b) / (a + b)" in q:
         a, b = int(facts["code"] or 0), int(facts["crates"] or 0)
         f = fractions.Fraction(a * b, a + b) if a + b else fractions.Fraction(0)
-        return think, f"Worked out.\nANSWER: {f.numerator}/{f.denominator}"
+        return think, f"Worked out.\nANSWER: {f.numerator + int(mixed)}/{f.denominator}"
     opts = dict(re.findall(r"(?m)^([A-J])\) (.*)$", q))
     if opts:
         right = next((k for k, v in opts.items() if v.startswith("right")), "A")
         return think, f"The options compared.\nANSWER: {right}"
     m = re.search(r"\(answer (-?\d+)\)", q)
-    # a GSM8K reply ends in a word the template drops: it doesn't come back
-    return think, f"Worked through it.\nANSWER: {m[1] if m else 0}" + (
-        f" {TRIMMED}" if "Solve the following math problem" in q else "")
+    # a GSM8K reply ends in a word the template drops: it doesn't come back —
+    # 32.4: one whose answer is odd, so a chat's reply 2 comes back or not
+    n = int(m[1]) if m else 0
+    return think, f"Worked through it.\nANSWER: {n}" + (
+        f" {TRIMMED}" if "Solve the following math problem" in q and n % 2 else "")
 
 
 def mem_next(path: int, last: int, k: int, mixed: bool) -> list[tuple[int, float]]:
@@ -603,7 +619,7 @@ def main() -> int:
                     probs.append({"id": top[0][0], "logprob": math.log(top[0][1]),
                                   "top_logprobs": [{"id": t, "logprob": math.log(p)}
                                                    for t, p in top[:int(body.get("n_probs") or 0)]]})
-                m.tokens = m.tokens + out[:-1]          # the last one written is never read
+                m.write(out[:-1])                       # the last one written is never read
             return self._send(200, {"content": " ".join(f"t{t}" for t in out), "tokens": out,
                                     "completion_probabilities": probs if body.get("n_probs") else [],
                                     "stop": True, "tokens_evaluated": len(prompt),
@@ -626,16 +642,25 @@ def main() -> int:
                 cut = bool(limit) and len(words) > limit
                 if cut:
                     words = (think.split() * limit)[:limit] if think else words[:limit]
-                m.tokens = m.tokens + [tok_id(w) for w in words]
+                # 32.4: its tokens as generated, the end marker too when it
+                # finished; the last one written is never read
+                gen = [tok_id(w) for w in words] + ([] if cut else [tok_id(END)])
+                m.write(gen[:-1])
             if cut:
                 msg = ({"role": "assistant", "reasoning_content": " ".join(words), "content": ""}
                        if think else {"role": "assistant", "content": " ".join(words)})
+            elif think and os.environ.get("FAKE_LLAMA_THINK_IN_CONTENT") == "1":
+                # 32.4: a server that doesn't parse the thinking out of the reply
+                msg = {"role": "assistant", "content": f"{think} </think> {reply}"}
             else:
                 msg = {"role": "assistant", "content": reply,
                        **({"reasoning_content": think} if think else {})}
             return self._send(200, {
                 "id": "chatcmpl-1", "object": "chat.completion",
-                "choices": [{"index": 0, "message": msg, "finish_reason": "length" if cut else "stop"}],
+                "choices": [{"index": 0, "message": msg, "finish_reason": "length" if cut else "stop",
+                             **({"logprobs": {"content": [{"id": t, "logprob": -0.1}
+                                                          for t in gen]}}
+                                if body.get("logprobs") else {})}],
                 "usage": {"prompt_tokens": len(prompt), "completion_tokens": len(words),
                           "prompt_tokens_details": {"cached_tokens": n_past}},
                 "timings": {"cache_n": n_past, "prompt_n": len(prompt) - n_past,
