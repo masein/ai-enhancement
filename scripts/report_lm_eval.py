@@ -29476,7 +29476,10 @@ function vReports() {
         'data-report-card': r.id,
         onclick: e => { e.preventDefault(); rpOpen(r.id); } },
       el('h3', {}, r.title, r.insight ? el('span', { class: 'badge ro-badge',
-        'data-report-insight': r.id, text: 'Insight only' }) : ''),
+        'data-report-insight': r.id, text: 'Insight only' }) : '',
+        // 32: an experiment for the apps, never a row of the board
+        r.internal ? el('span', { class: 'badge ro-badge', 'data-report-internal': r.id,
+          text: 'Internal' }) : ''),
       el('p', { text: r.what }),
       el('p', { class: 'small', 'data-report-models': r.id,
         // 26: the testers' phone checks say what is in, not whose
@@ -29849,6 +29852,8 @@ function vReport(id) {
   if (d.kind === 'on_device') return vOnDevice(id, d, back);
   // 26: our testers' phone checks
   if (d.kind === 'phone_tests') return vPhoneTests(id, d, back);
+  // 32: switching mode mid-chat, internal
+  if (d.kind === 'switch') return vSwitch(id, d, back);
   const benches = d.benchmarks, compared = benches.filter(b => b.compare);
   // 23b: opened on the first pick with a score — step8804 first in the
   // picker, step4000 shown until it is scored
@@ -31749,6 +31754,102 @@ function vPhoneTests(id, d, back) {
     }, 0);
   }
   return [back, head, table, per, failed].filter(Boolean);
+}
+// ---------------------------------------------------------------------------
+// 32: switching mode mid-chat — the switch experiment's summary as its import
+// keeps it: Part 2 by turn and arm, Part 1 by memory size, direction and run.
+// Numbers only, no question text
+// ---------------------------------------------------------------------------
+const swN = v => v == null ? '—' : Math.round(Number(v)).toLocaleString('en');
+const swPct = v => v == null ? '—' : Number(v).toFixed(1) + '%';
+const swP = v => v == null ? '—' : v < 0.001 ? '<0.001' : Number(v).toFixed(3);
+const swKl = v => v == null ? '—' : Number(v).toFixed(4);
+function swDiff(x) {
+  if (!x || x.diff == null) return '—';
+  const f = v => (v > 0 ? '+' : '') + v.toFixed(1);
+  return `${f(x.diff)} (${f(x.ci[0])} to ${f(x.ci[1])})`;
+}
+function vSwitch(id, d, back) {
+  const p2 = d.part2, p1 = d.part1;
+  const tile = (k, label, v, note) => el('div', { class: 'tile', 'data-sw-tile': k },
+    el('div', { class: 'label', text: label }), el('div', { class: 'value', text: String(v) }),
+    note ? el('div', { class: 'note', text: note }) : '');
+  const notCounted = p2 ? p2.turns.reduce((a, t) => a + t.not_counted, 0) : 0;
+  const head = el('div', { class: 'card', 'data-report': id },
+    el('h2', {}, d.title, el('span', { class: 'badge ro-badge', text: 'Internal' })),
+    el('p', { class: 'sub', text: d.what }),
+    el('p', { class: 'small se', 'data-sw-source': '1', text: d.sources.ours.words }),
+    el('div', { class: 'tiles', 'data-sw-tiles': '1' },
+      tile('chats', 'Chats (Part 2)', swN(p2 ? p2.chats : 0)),
+      tile('drift', 'Drift runs (Part 1)', swN(p1 ? p1.jobs : 0)),
+      tile('not-counted', 'Turns not counted', swN(notCounted),
+        'memory not as the arm says')));
+  if (!p2 && !p1) return [back, head, el('div', { class: 'card', 'data-sw-none': '1' },
+    el('p', { class: 'small', text: 'Nothing imported yet: plan S runs after plan C.' }))];
+  const arm = (t, a, k) => (t.arms[a] || {})[k];
+  const part2 = p2 && p2.chats ? el('div', { class: 'card', 'data-report-section': 'sw-part2' },
+    el('h2', { text: 'Part 2: five-turn chats, both arms' }),
+    el('p', { class: 'small se', text: 'A: the memory cleared at each switch (the team’s '
+      + 'default). B: kept from the other path. B − A in points with its 95% interval; '
+      + 'McNemar’s exact p on the chats only one arm got right.' }),
+    el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-sw-turns': '1' },
+      el('thead', {}, el('tr', {}, ['Turn', 'Path', 'Counted', 'A', 'B', 'B − A', 'p',
+        'Loops A / B', 'Ran out A / B', 'No answer A / B', 'Tokens A / B (median)',
+        'cache_n A / B', 'prompt_n A / B'].map(h => el('th', { text: h })))),
+      el('tbody', {}, p2.turns.map(t => el('tr', { 'data-sw-turn': t.turn },
+        el('td', {}, el('b', { text: String(t.turn) }), ' · ' + t.words),
+        el('td', { text: (t.switch ? 'switch to ' : '') + 'k' + t.path }),
+        el('td', { class: 'num', text: swN(arm(t, 'A', 'n'))
+          + (t.not_counted ? ` (${swN(t.not_counted)} not)` : '') }),
+        el('td', { class: 'num', 'data-sw-a': t.turn, text: swPct(arm(t, 'A', 'score')) }),
+        el('td', { class: 'num', 'data-sw-b': t.turn, text: swPct(arm(t, 'B', 'score')) }),
+        el('td', { class: 'num', text: swDiff(t.paired) }),
+        el('td', { class: 'num', 'data-sw-p': t.turn, text: swP(t.paired.p) }),
+        el('td', { class: 'num', text: `${swN(arm(t, 'A', 'loops'))} / ${swN(arm(t, 'B', 'loops'))}` }),
+        el('td', { class: 'num', text: `${swN(arm(t, 'A', 'ran_out'))} / ${swN(arm(t, 'B', 'ran_out'))}` }),
+        el('td', { class: 'num', text: `${swN(arm(t, 'A', 'no_answer'))} / ${swN(arm(t, 'B', 'no_answer'))}` }),
+        el('td', { class: 'num', text: `${swN(arm(t, 'A', 'tokens'))} / ${swN(arm(t, 'B', 'tokens'))}` }),
+        el('td', { class: 'num', text: `${swN(arm(t, 'A', 'cache_n'))} / ${swN(arm(t, 'B', 'cache_n'))}` }),
+        el('td', { class: 'num', text: `${swN(arm(t, 'A', 'prompt_n'))} / ${swN(arm(t, 'B', 'prompt_n'))}` })))))),
+    el('ul', { class: 'rp-notes', 'data-sw-more': '1' },
+      el('li', { text: `Loops at the two switches to k6, pooled: A ${swN(p2.switch_k6_loops.only_a)} `
+        + `alone, B ${swN(p2.switch_k6_loops.only_b)} alone, of ${swN(p2.switch_k6_loops.n)} `
+        + `pairs · p ${swP(p2.switch_k6_loops.p)}` }),
+      ...p2.turns.filter(t => t.turn === 4).map(t => el('li', { text: 'Wrong recalls (facts, '
+        + `of four a chat): A ${swN(arm(t, 'A', 'wrong_recalls'))}, `
+        + `B ${swN(arm(t, 'B', 'wrong_recalls'))}` })),
+      ...p2.turns.filter(t => t.clustered).map(t => el('li', { text: 'Turn 3 by question '
+        + `(${swN(t.clustered.questions)} questions): B more right on `
+        + `${swN(t.clustered.b_more)}, A on ${swN(t.clustered.a_more)} · p ${swP(t.clustered.p)}` })),
+      ...Object.entries(p2.stopped || {}).map(([k, v]) => el('li', {
+        text: `${swN(v)} chats stopped at ${k}: the chat and its limit outgrow the slot` })),
+      el('li', { text: p2.protocol }))) : null;
+  const part1 = p1 && p1.jobs ? el('div', { class: 'card', 'data-report-section': 'sw-part1' },
+    el('h2', { text: 'Part 1: drift at the switch' }),
+    el('p', { class: 'small se', text: 'Each run forced along A’s own reply (the reference), '
+      + 'against it: the first token’s KL, the mean KL a token, flips a 1,000 tokens (where the '
+      + 'run’s own pick differs) and the median token of the first flip. A′ is the GPU’s own '
+      + 'noise, N the rollback with no switch, F the other path read fresh: B sits between.' }),
+    el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-sw-drift': '1' },
+      el('thead', {}, el('tr', {}, ['Memory', 'Direction', 'Run', 'Chats', 'First-token KL',
+        'Mean KL', 'Flips / 1,000', 'First flip'].map(h => el('th', { text: h })))),
+      el('tbody', {}, p1.rows.flatMap(r => Object.entries(r.runs).map(([k, x], i) =>
+        el('tr', { 'data-sw-drift-row': `${r.bin}|${r.direction}|${k}` },
+          el('td', { text: i ? '' : `about ${swN(r.bin)} (median ${swN(r.memory)})` }),
+          el('td', { text: i ? '' : r.direction }),
+          el('td', { text: p1.runs[k] || k }),
+          el('td', { class: 'num', text: swN(x.n) + (x.not_counted ? ` (${swN(x.not_counted)} not)` : '') }),
+          el('td', { class: 'num', text: swKl(x.first_kl) }),
+          el('td', { class: 'num', text: swKl(x.mean_kl) }),
+          el('td', { class: 'num', text: x.flips_per_1000 == null ? '—' : x.flips_per_1000.toFixed(1) }),
+          el('td', { class: 'num', text: swN(x.first_flip) }))))))),
+    el('p', { class: 'small se', text: p1.protocol })) : null;
+  const notes = el('div', { class: 'card', 'data-report-section': 'sw-notes' },
+    el('h2', { text: 'How to read it' }),
+    el('ul', { class: 'rp-notes' }, d.notes.map(n => el('li', { text: n }))),
+    d.imports.length ? el('p', { class: 'small se', text: 'Imported: ' + d.imports.map(x =>
+      `${x.what}${x.part ? ' ' + x.part : ''} (${swN(x.chats)}, ${x.gpu || 'a GPU'})`).join(' · ') }) : '');
+  return [back, head, part2, part1, notes].filter(Boolean);
 }
 // ---------------------------------------------------------------------------
 // 21b: a report of the answers our models ran out of room on — for insight

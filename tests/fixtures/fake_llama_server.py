@@ -60,7 +60,18 @@ beside it after "\n</think>\n\n"): the rest of the same reply, parsed whole
 (the thinking up to </think>, the reply after its newlines), with
 "logprobs" and "verbose" (the settings applied) when asked; /completion's
 probabilities with penalty_prompt_tokens put the presence penalty on the
-prompt's last N tokens alone (0 none, -1 all)."""
+prompt's last N tokens alone (0 none, -1 all). 32: FAKE_LLAMA_MEMORY=1 keeps
+each slot's memory as the team's research build does (Memory below): a
+request pinned to its slot (id_slot), the chat template's words a token each
+(Qwen's turns, an earlier reply's thinking dropped, the path's generation
+prompt), the memory reused up to where the prompt parts from it and rolled
+back to the latest checkpoint before that, checkpoints where the server
+makes them, a path change cleared — or kept with keep_cache_across_paths,
+said in the server's own log line — and each response's cache_n, prompt_n
+and cached_tokens. It answers the switch experiment's turns (a choice, a
+number, the facts it was told, their (a×b)/(a+b)), and /completion with
+token ids greedily with n_probs; a slot whose memory another path computed
+answers a little differently (MIXED_EVERY)."""
 
 from __future__ import annotations
 
@@ -176,6 +187,148 @@ PROBE = {"alone": [(9000.0, 140.0), (8000.0, 150.0), (10000.0, 120.0)],
          "warm": (7000.0, 100.0)}
 
 
+# 32: the team's research build's memory, as its server-context.cpp keeps it
+# (FAKE_LLAMA_MEMORY=1) — written from its rules, not from scripts/switch_box.py
+N_BATCH, N_UBATCH, MIN_STEP, MAX_CHECKPOINTS = 2048, 512, 8192, 32
+USER, ASSISTANT, END = "<|im_start|>user", "<|im_start|>assistant", "<|im_end|>"
+GEN = {6: [ASSISTANT, "<think>"], 3: [ASSISTANT, "<think>", "</think>"]}
+# a slot whose memory another path computed: every this-many tokens of a
+# /completion the likeliest two change places, and a recalled fact comes back
+# wrong (the ship)
+MIXED_EVERY = 5
+
+
+def mem_id(w: str) -> int:
+    """a generated token's id (a prompt's words are /tokenize's, tok_id)"""
+    import hashlib
+    return int(hashlib.sha256(w.encode()).hexdigest()[:7], 16)
+
+
+def mem_words(msgs: list[dict], path: int) -> list[str]:
+    """Qwen's chat template, a word a token: each turn between its markers, an
+    earlier reply's content alone (its thinking dropped), then the path's
+    generation prompt"""
+    out = []
+    for m in msgs:
+        out += [f"<|im_start|>{m.get('role')}", *str(m.get("content") or "").split(), END]
+    return out + GEN.get(path, GEN[3])
+
+
+class Memory:
+    """one slot's memory: its tokens, the path that computed them, whether
+    another path computed part of them, and its checkpoints (each the tokens
+    before it)"""
+
+    def __init__(self):
+        self.tokens: list[int] = []
+        self.path = 0
+        self.mixed = False
+        self.cps: list[int] = []
+
+    def launch(self, sid: int, path: int, keep: bool) -> None:
+        """launch_slot_with_task: a path change keeps the memory (with
+        keep_cache_across_paths) or clears it, said in the server's line"""
+        if self.path != path and keep:
+            print(f"slot launch_slot_: id {sid:2d} | task -1 | expert path k{self.path} -> "
+                  f"k{path}: keeping {len(self.tokens)} cached tokens (keep_cache_across_paths)",
+                  flush=True)
+            self.mixed = self.mixed or bool(self.tokens)
+        elif self.path != path:
+            if self.tokens:
+                print(f"slot launch_slot_: id {sid:2d} | task -1 | expert path k{self.path} -> "
+                      f"k{path}: clearing {len(self.tokens)} cached tokens", flush=True)
+            self.tokens, self.mixed = [], False
+            self.cps = []
+        self.path = path
+
+    def reuse(self, prompt: list[int]) -> int:
+        """the tokens reused: up to where the prompt parts from the memory,
+        rolled back to the latest checkpoint before that (the recurrent state
+        can't go back part-way), none when there is no such checkpoint"""
+        n = 0
+        while n < min(len(self.tokens), len(prompt)) and self.tokens[n] == prompt[n]:
+            n += 1
+        if n == 0:
+            self.tokens, self.cps, self.mixed = [], [], False
+            return 0
+        thold = n if n < len(prompt) else n - 1
+        if len(self.tokens) - 1 >= thold:
+            got = next((c for c in reversed(self.cps) if c - 1 <= n and (c - 1 < thold or c == 1)),
+                       None)
+            if got is None:
+                self.tokens, self.cps, self.mixed = [], [], False
+                return 0
+            n = got
+        self.cps = [c for c in self.cps if c - 1 <= n]
+        self.tokens = self.tokens[:n]
+        return n
+
+    def read(self, prompt: list[int], user_starts: set[int]) -> None:
+        """the prompt from the memory's end, in batches broken where the
+        server breaks them, a checkpoint made at a batch's start where it
+        makes one"""
+        last_user = max(user_starts) if user_starts else -1
+        pos, size = len(self.tokens), len(prompt)
+        while pos < size:
+            start = pos
+            while pos < size and pos - start < N_BATCH:
+                pos += 1
+                if pos in user_starts and (pos == last_user or not self.cps
+                                           or pos > self.cps[-1] + MIN_STEP):
+                    break
+                if size - pos in (min(N_BATCH, 4 + N_UBATCH), 4):
+                    break
+            near_end = size < pos + N_UBATCH
+            make = start > 0 and (pos == size or start in user_starts or near_end)
+            make = make and (not self.cps or start == last_user
+                             or start > self.cps[-1] + MIN_STEP)
+            if make:
+                self.cps = (self.cps + [start])[-MAX_CHECKPOINTS:]
+        self.tokens = list(prompt)
+
+
+def user_starts_of(prompt: list[int], delim: list[int]) -> set[int]:
+    return {i for i in range(len(prompt)) if delim and prompt[i:i + len(delim)] == delim}
+
+
+def mem_reply(msgs: list[dict], path: int, mixed: bool) -> tuple[str, str]:
+    """(thinking, reply) to the switch experiment's last turn: a choice, a
+    number, the facts it was told, or their (a×b)/(a+b)"""
+    import fractions
+    said = " ".join(str(m.get("content") or "") for m in msgs if m.get("role") == "user")
+    q = str(msgs[-1].get("content") or "")
+    think = "Thinking it through." if path == 6 else ""
+    facts = {k: (re.findall(p, said) or [""])[-1] for k, p in (
+        ("courier", r"courier's name is (\w+)"), ("code", r"locker code is (\d+)"),
+        ("ship", r"ship is called the (\w+)"), ("crates", r"carries (\d+) crates"))}
+    if "Write them out now" in q:
+        ship = (facts["ship"] + "x") if mixed else facts["ship"]
+        return think, (f"courier: {facts['courier']}\nlocker code: {facts['code']}\n"
+                       f"ship: {ship}\ncrates: {facts['crates']}")
+    if "(a × b) / (a + b)" in q:
+        a, b = int(facts["code"] or 0), int(facts["crates"] or 0)
+        f = fractions.Fraction(a * b, a + b) if a + b else fractions.Fraction(0)
+        return think, f"Worked out.\nANSWER: {f.numerator}/{f.denominator}"
+    opts = dict(re.findall(r"(?m)^([A-J])\) (.*)$", q))
+    if opts:
+        right = next((k for k, v in opts.items() if v.startswith("right")), "A")
+        return think, f"The options compared.\nANSWER: {right}"
+    m = re.search(r"\(answer (-?\d+)\)", q)
+    return think, f"Worked through it.\nANSWER: {m[1] if m else 0}"
+
+
+def mem_next(path: int, last: int, k: int, mixed: bool) -> list[tuple[int, float]]:
+    """/completion's next token after `last`, its 20 likeliest — the path's
+    own; a mixed memory swaps the first two every MIXED_EVERY tokens"""
+    base = [(mem_id(f"{path}:{last}:{j}"), 0.0) for j in range(20)]
+    probs = [0.5 / (j + 1) for j in range(20)]
+    z = sum(probs)
+    top = [(t, p / z) for (t, _), p in zip(base, probs)]
+    if mixed and k % MIXED_EVERY == MIXED_EVERY - 1:
+        top[0], top[1] = (top[1][0], top[0][1]), (top[0][0], top[1][1])
+    return top
+
+
 def arg(argv: list[str], *names: str, default: str = "") -> str:
     for i, a in enumerate(argv):
         if a in names and i + 1 < len(argv):
@@ -235,6 +388,8 @@ def main() -> int:
     print(f"main: loading model {os.path.basename(model)}", flush=True)
     paths_on = os.environ.get("FAKE_LLAMA_PATHS") == "1"
     cont_on = os.environ.get("FAKE_LLAMA_CONTINUE") == "1"
+    mem_on = os.environ.get("FAKE_LLAMA_MEMORY") == "1"
+    memories = [Memory() for _ in range(slots)]
 
     def thinks(body: dict) -> bool:
         if paths_on and "expert_path" in body:
@@ -398,8 +553,85 @@ def main() -> int:
                                                 "predicted_ms": out / tg * 1000,
                                                 "predicted_per_second": tg}})
 
+        def mem_slot(self, body: dict) -> tuple[int, Memory]:
+            sid = int(body.get("id_slot", 0) if body.get("id_slot", -1) != -1 else 0)
+            return sid, memories[sid]
+
+        def mem_completion(self, body: dict):
+            """32: /completion with token ids, on the slot's memory, greedy"""
+            prompt = [int(x) for x in body["prompt"]]
+            path = int(body.get("expert_path") or 3)
+            delim = next(([tok_id(w) for w in str(d.get("delimiter") or "").split()]
+                          for d in body.get("message_delimiters") or []
+                          if d.get("role") == "user"), [])
+            sid, m = self.mem_slot(body)
+            with lock:
+                m.launch(sid, path, bool(body.get("keep_cache_across_paths")))
+                n_past = m.reuse(prompt)
+                m.read(prompt, user_starts_of(prompt, delim))
+                out, probs = [], []
+                for k in range(int(body.get("n_predict") or 16)):
+                    last = (prompt + out)[-1]
+                    top = mem_next(path, last, len(prompt) + k, m.mixed)
+                    out.append(top[0][0])
+                    probs.append({"id": top[0][0], "logprob": math.log(top[0][1]),
+                                  "top_logprobs": [{"id": t, "logprob": math.log(p)}
+                                                   for t, p in top[:int(body.get("n_probs") or 0)]]})
+                m.tokens = m.tokens + out
+            return self._send(200, {"content": " ".join(f"t{t}" for t in out), "tokens": out,
+                                    "completion_probabilities": probs if body.get("n_probs") else [],
+                                    "stop": True, "tokens_evaluated": len(prompt),
+                                    "timings": {"cache_n": n_past, "prompt_n": len(prompt) - n_past,
+                                                "predicted_n": len(out)}})
+
+        def mem_chat(self, body: dict):
+            """32: a chat turn on the slot's memory"""
+            msgs = body.get("messages") or []
+            path = int(body.get("expert_path") or 3)
+            prompt = [tok_id(w) for w in mem_words(msgs, path)]
+            sid, m = self.mem_slot(body)
+            with lock:
+                m.launch(sid, path, bool(body.get("keep_cache_across_paths")))
+                n_past = m.reuse(prompt)
+                m.read(prompt, {i for i, t in enumerate(prompt) if t == tok_id(USER)})
+                think, reply = mem_reply(msgs, path, m.mixed)
+                words = ([*think.split(), "</think>"] if think else []) + reply.split()
+                limit = int(body.get("max_tokens") or 0)
+                cut = bool(limit) and len(words) > limit
+                if cut:
+                    words = (think.split() * limit)[:limit] if think else words[:limit]
+                m.tokens = m.tokens + [tok_id(w) for w in words]
+            if cut:
+                msg = ({"role": "assistant", "reasoning_content": " ".join(words), "content": ""}
+                       if think else {"role": "assistant", "content": " ".join(words)})
+            else:
+                msg = {"role": "assistant", "content": reply,
+                       **({"reasoning_content": think} if think else {})}
+            return self._send(200, {
+                "id": "chatcmpl-1", "object": "chat.completion",
+                "choices": [{"index": 0, "message": msg, "finish_reason": "length" if cut else "stop"}],
+                "usage": {"prompt_tokens": len(prompt), "completion_tokens": len(words),
+                          "prompt_tokens_details": {"cached_tokens": n_past}},
+                "timings": {"cache_n": n_past, "prompt_n": len(prompt) - n_past,
+                            "predicted_n": len(words)}})
+
         def do_POST(self):
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)))
+            if mem_on and self.path == "/apply-template":
+                return self._send(200, {"prompt": " ".join(mem_words(
+                    body.get("messages") or [], int(body.get("expert_path") or 3)))})
+            if mem_on and self.path == "/completion" and isinstance(body.get("prompt"), list) \
+                    and "id_slot" in body:
+                if log:
+                    with lock, open(log, "a", encoding="utf-8") as fh:
+                        fh.write(json.dumps({**body, "prompt": len(body["prompt"])}) + "\n")
+                return self.mem_completion(body)
+            if mem_on and self.path in ("/v1/chat/completions", "/chat/completions") \
+                    and "id_slot" in body:
+                if log:
+                    with lock, open(log, "a", encoding="utf-8") as fh:
+                        fh.write(json.dumps(body) + "\n")
+                return self.mem_chat(body)
             if self.path == "/tokenize":
                 text = str(body.get("content") or "")
                 toks = [sum(w.encode()) % 50000 for w in text.split()]

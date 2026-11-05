@@ -259,6 +259,11 @@ def import_bundle(path: Path, by: str, say=print, file_sha: str = "", register: 
         import continue_box
         return continue_box.import_bundle(b, path, by, say, file_sha, register,
                                           public_weights=public_weights)
+    # 32: the switch experiment's chats or drift runs — no row of the board's
+    if b["bundle"].get("suite") == "switch-served":
+        import switch_box
+        return switch_box.import_bundle(b, path, by, say, file_sha, register,
+                                        public_weights=public_weights)
     if file_sha or register or public_weights:
         say("refused — --file-sha256 and --register are for a GGUF's bundle: a Frontier run's "
             "or a served model's DeviceMark run's")
@@ -576,8 +581,10 @@ def model_of_name(name: str) -> str:
     """the served model a Frontier bundle's file name says (bundle_name's
     "frontier-served__<name>-thinking-…"); the name itself when it isn't one.
     31.2: and a served model's DeviceMark bundle's ("devicemark-served-served__…"). 31.3:
-    and a continuation's ("frontier-cont-served__…")"""
-    m = re.match(r"^(?:frontier-cont|frontier|devicemark-served|showcase-served)-(served)__(.+?)"
+    and a continuation's ("frontier-cont-served__…"). 32: and the switch experiment's
+    ("switch-served-served__…")"""
+    m = re.match(r"^(?:frontier-cont|frontier|devicemark-served|showcase-served|switch-served)"
+                 r"-(served)__(.+?)"
                  r"-thinking-"
                  r"(?:on|off)", name)
     return f"{m[1]}/{m[2]}" if m else name

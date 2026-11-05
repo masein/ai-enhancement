@@ -111,6 +111,18 @@ easy-set answers, to the same 32,768 as step2388's k3 (its own --as, U40's
         --gguf hf://<you>/evalboard-private@<commit>/step2388.k3k6.gguf \
         --server hf://<you>/evalboard-private@<commit>/llama-server-k3k6-3ad38b7.tar.gz \
         --continue /workspace/cont-k6.jsonl --continue-sha256 <its sha256>
+
+32: plan S, switching mode mid-chat with the memory kept (scripts/switch_box.py)
+— on runtime k3k6r-0411, the team's research build: S1–S10 a tenth each of
+Part 2's chats, S11 Part 1's drift, each given the inputs file and the sha256
+switch_box.py inputs printed for it (and S1 first, with --switch-check 5, the
+check before the rest are rented; docs/REMOTE-RUNS.md S). Refused until the
+research tarball is pinned (PLAN_PINS["S"]):
+
+    python scripts/frontier_box.py S1 --as served/step2388-k3k6r-0411 \
+        --gguf hf://<you>/evalboard-private@<commit>/step2388.k3k6.gguf \
+        --server hf://<you>/evalboard-private@<commit>/llama-server-k3k6r-917f3d9.tar.gz \
+        --switch /workspace/switch-inputs.jsonl --switch-sha256 <its sha256>
 """
 
 from __future__ import annotations
@@ -148,12 +160,17 @@ CONT = "continue"
 # 31.3b: and the original Qwen3.6 Q2's easy set, continued to the same limit
 # as step2388's k3 (masein, 4 Nov) — on a box of its own (BOX_MODELS)
 CONT_Q2 = "continue-q2"
+# 32: the switch experiment (remote_gguf.py --switch, scripts/switch_box.py):
+# Part 2's chats, and Part 1's drift
+SWITCH, DRIFT = "switch-chats", "switch-drift"
 DM_LABEL = {DM: "DeviceMark (greedy, no penalties)",
             DM_FILE: "DeviceMark (the file's own settings, as <build>-file)",
             SHOWCASE: "the showcase's 12 own questions (one slot, the file's own settings)",
             CONT: "the answers that ran out of room, continued to the model team's limit",
             CONT_Q2: "the original Qwen3.6 Q2's easy-set answers that ran out of room, "
-                     "continued to step2388's k3 limit"}
+                     "continued to step2388's k3 limit",
+            SWITCH: "switching mode mid-chat, Part 2: five-turn chats in both arms",
+            DRIFT: "switching mode mid-chat, Part 1: drift, five runs forced along the reference"}
 # 25: the Frontier suite plans A, B and L each run whole; plan I runs
 # instruction following, IFEval and IFBench
 SUITE = tuple(t for t in fb.TASKS if t not in fb.FOLLOW)
@@ -340,6 +357,13 @@ PLANS: dict[str, dict[str, list[Step]]] = {
         "C5": [("off", (CONT_Q2,), "", 40)],
     },
 }
+# 32: plan S, switching mode mid-chat with the memory kept (brief 32, after
+# plan C): Part 2's 2,000 chats in tenths, 10 slots of 114,688 tokens (five
+# chats, each in a pair of slots: arm A and arm B), and Part 1's 200 chats in
+# both directions on one box, 18 slots of 65,536 (three jobs of five runs).
+# The check before it is rented: S1's line with --switch-check 5
+PLANS["S"] = {**{f"S{i}": [("on", (SWITCH,), f"{i}/10", 10)] for i in range(1, 11)},
+              "S11": [("on", (DRIFT,), "", 18)]}
 # 29: plan D, our own boxes — a quarter of every benchmark on each of a
 # station's four GPUs, longest first (frontier_box's paces), then instruction
 # following with thinking on and off. Every slot holds Bolt's 64K
@@ -348,7 +372,7 @@ PLANS["D"] = {f"D3.{g}": [*(("on", t, f"{g + 1}/4", 8) for t in D_ORDER),
                           ("off", (IFEVAL, IFBENCH), f"{g + 1}/4", 8)] for g in range(4)}
 # 20: the runtime a plan's boxes run, unless the line names another
 PLAN_RUNTIME = {"L": "lda-2610", "I": "lda-2610", "T": "lda-2610", "U": "k3k6-2611",
-                "C": "k3k6-2611"}
+                "C": "k3k6-2611", "S": "k3k6r-0411"}
 # 29: the plans run on our own GPUs: each step --own (never started or kept
 # asking while another process uses the GPU), no price
 OWN_PLANS = ("D",)
@@ -362,6 +386,8 @@ PLAN_GPUS = {"L": ("RTX 5090", "RTX PRO 6000"), "I": ("RTX 5090", "RTX PRO 6000"
              "T": ("RTX 5090", "RTX PRO 6000"),
              # 31.1: the k3k6 tarball, built for sm_120 as the lda one is
              "U": ("RTX 5090", "RTX PRO 6000"), "C": ("RTX 5090", "RTX PRO 6000"),
+             # 32: the research tarball, built for sm_120 as the k3k6 one
+             "S": ("RTX 5090", "RTX PRO 6000"),
              # 29: dgx-03's — the runner image's V100 tag builds for sm_70 alone
              "D": ("V100",)}
 PLAN_SM = {"D": "sm_70"}
@@ -425,6 +451,15 @@ PLAN_REVISIONS = {"U": {
     "Qwen3.6-35B-A3B-UD-Q2_K_XL.gguf": "5bc3e238d916f48a861bac2f8a1990a0e9b7e98d"}}
 # 31.3: plan C runs plan U's files, fetched at the same commits
 PLAN_PINS["C"], PLAN_REVISIONS["C"] = PLAN_PINS["U"], PLAN_REVISIONS["U"]
+# 32: plan S runs step2388's file as plan U pins it, and the team's research
+# build (teraformer/lda-k3k6-research at 917f3d911) packed by
+# build_llama_tarball.sh on our server as 3ad38b7cc's was. Its sha256 and the
+# private repository's commit are masein's to give once it is uploaded: until
+# then (None) every line of plan S is refused before anything is fetched
+TARBALL_S = "llama-server-k3k6r-917f3d9.tar.gz"
+PLAN_PINS["S"] = {"step2388.k3k6.gguf": PLAN_PINS["U"]["step2388.k3k6.gguf"], TARBALL_S: None}
+PLAN_REVISIONS["S"] = {"step2388.k3k6.gguf": PLAN_REVISIONS["U"]["step2388.k3k6.gguf"],
+                       TARBALL_S: None}
 # 31.3: step2388's file, for the slots a continuation's 131,072 tokens leave room for
 STEP2388_FILE = 15_994_966_752
 # 31.3b: and the original Qwen3.6 Q2's, for C5's
@@ -452,6 +487,13 @@ CONT_SIZE = {("on", CONT): {"answers": 326, "write": 8_093_696, "read": 24_600_0
 # faster — and read (a guess the check's timings replace)
 CONT_TOK_S = {"on": 220.0, "off": 330.0}
 CONT_READ_TOK_S = 2_500.0
+# 32: plan S's hours a box, at plan U's paces (step8804's measured, 8 slots):
+# a chat's five turns in both arms about 171 box-seconds (its two k6 turns,
+# GPQA Diamond or MATH Level 5 then the facts' sum, most of it; the k3 turns
+# a second or two each; the chat read again at each switch in arm A), and a
+# drift job's five runs about 45 (their reads, at 1k to 48k tokens of memory,
+# and 512 tokens each forced). A guess the check's timings replace
+SWITCH_PACE = {SWITCH: 171.0, DRIFT: 45.0}
 # 31.2: the boxes that run another model than their plan's — U40 the original
 # Qwen3.6-35B-A3B's Q2 file, for the easy set beside step2388's k3 path
 BOX_MODELS = {"U40": "served/Qwen3.6-35B-A3B-Q2-k3k6-2611",
@@ -538,7 +580,8 @@ def box_of(name: str) -> list[Step]:
 def ordered(tasks: tuple[str, ...]) -> list[str]:
     """a step's benchmarks in the order the box asks them: the suite's (31.2:
     the easy set after it, and DeviceMark's battery)"""
-    return [t for t in (*fb.ALL, DM, DM_FILE, SHOWCASE, CONT, CONT_Q2) if t in tasks]
+    return [t for t in (*fb.ALL, DM, DM_FILE, SHOWCASE, CONT, CONT_Q2, SWITCH, DRIFT)
+            if t in tasks]
 
 
 def is_dm(step: Step) -> bool:
@@ -554,6 +597,16 @@ def is_showcase(step: Step) -> bool:
 def is_cont(step: Step) -> bool:
     """31.3: a step of U-cont's (remote_gguf.py --continue)"""
     return any(t in CONT_MODEL for t in step[1])
+
+
+def is_switch(step: Step) -> bool:
+    """32: a step of the switch experiment's (remote_gguf.py --switch)"""
+    return any(t in (SWITCH, DRIFT) for t in step[1])
+
+
+def switch_context(step: Step) -> int:
+    import switch_box as sw
+    return sw.DRIFT_CONTEXT if DRIFT in step[1] else sw.CHATS_CONTEXT
 
 
 def cont_spec(step: Step) -> tuple[dict, int]:
@@ -614,6 +667,8 @@ def slots_run(step: Step, own: bool = False) -> int:
         import continue_box as cb                               # 31.3
         spec, size = cont_spec(step)
         return min(slots, fits(cb.context(spec), size))
+    if is_switch(step):
+        return min(slots, fits(switch_context(step), STEP2388_FILE))     # 32
     return min(slots, fits(fb.slot_context(list(tasks), th == "on")))
 
 
@@ -626,6 +681,11 @@ def hours(step: Step, own: bool = False, plan: str = "") -> float:
     if th == "parity":
         return 2 * fb.PARITY["n"] * PACE[("off", MMLU)] / 3600
     of = fb.parse_shard(shard)[1] if shard else 1
+    if is_switch(step):
+        # 32: its chats, or its drift jobs (each chat both ways), at plan U's paces
+        import switch_box as sw
+        n = sw.N_CHATS / (of or 1) if SWITCH in tasks else 2 * len(sw.BINS) * sw.PER_BIN
+        return n * SWITCH_PACE[next(t for t in tasks if t in SWITCH_PACE)] / 3600
     if is_cont(step):
         # 31.3: its share of what U-cont writes and reads again, at the most
         z = CONT_SIZE[(th, next(t for t in tasks if t in CONT_MODEL))]
@@ -648,6 +708,13 @@ def words(step: Step, own: bool = False, plan: str = "") -> str:
                 f"· about {hours(step):.1f} h")
     run = slots_run(step, own)
     guessed = any((th, t) in MEASURED_GUESSED for t in tasks)
+    if is_switch(step):
+        # 32: both paths on one server, whatever the step's thinking says
+        return (f"{label_of(next(t for t in tasks if t in (SWITCH, DRIFT)))}"
+                + (f" · part {shard}" if shard else "")
+                + f" · {run} slots of {switch_context(step):,} tokens · runtime "
+                f"{PLAN_RUNTIME['S']}, k3 and k6 on one server · about "
+                f"{hours(step, own, plan):.1f} h (plan U's paces: a guess)")
     if is_cont(step):
         import continue_box as cb
         spec, _ = cont_spec(step)
@@ -683,6 +750,12 @@ def folder(a: argparse.Namespace, box: str, k: int, step: Step) -> Path:
     beside it, never into it"""
     build = a.served_as.split("/", 1)[-1]
     return Path(a.root) / build / step_name(box, k, step)
+
+
+def switch_check_folder(a: argparse.Namespace) -> Path:
+    """32: the switch experiment's check, in the build's own folder — named
+    with no "-", so the fetch takes it for no step of a plan"""
+    return Path(a.root) / a.served_as.split("/", 1)[-1] / "switchcheck"
 
 
 def cont_check_folder(a: argparse.Namespace) -> Path:
@@ -783,6 +856,17 @@ def argv_of(box: str, k: int, step: Step, a: argparse.Namespace) -> list[str]:
                           "--out", str(cont_check_folder(a))]
         return out + (["--part", shard] if shard else []) + ["--out",
                                                              str(folder(a, box, k, step))]
+    if is_switch(step):
+        # 32: the line's inputs file, pinned, and this box's part of it — both
+        # paths on one server: --thinking on names the card check's path alone
+        name = Path(a.switch).name
+        out += ["--switch", a.switch, "--pin", f"{name}={a.switch_sha256}",
+                "--min-slots", str(max(2, slots // 2))]
+        if getattr(a, "switch_check", 0):
+            return out + ["--switch-check", str(a.switch_check),
+                          "--out", str(switch_check_folder(a))]
+        return out + ["--switch-part", "chats" if SWITCH in tasks else "drift"] + (
+            ["--part", shard] if shard else []) + ["--out", str(folder(a, box, k, step))]
     if is_showcase(step):
         # 31.2b: the showcase's questions, one slot, the line's questions file
         return out + ["--showcase", a.showcase, "--out", str(folder(a, box, k, step))]
@@ -846,8 +930,8 @@ def parser() -> argparse.ArgumentParser:
     ap.add_argument("box", nargs="?", help="the box: A1 … A9, B1 … B15 (G5), L1 … L21, "
                                            "I1 (25: instruction following), T1 … T3 (30.1), "
                                            "U1 … U37 (31.1: step2388), U38 … U40 (31.2: "
-                                           "DeviceMark and the easy set), C1 … C4 (31.3: "
-                                           "U-cont)")
+                                           "DeviceMark and the easy set), C1 … C5 (31.3: "
+                                           "U-cont), S1 … S11 (32: switching mode mid-chat)")
     ap.add_argument("then", nargs="*", help="18e point 1: more labels, run one after another "
                                             "on this box (L1 L2): each later one's line is "
                                             "written \"queued\" at the start, so the fetch "
@@ -896,6 +980,15 @@ def parser() -> argparse.ArgumentParser:
                     help="31.3: on C1 before U-cont, the check alone — the first N GPQA Diamond "
                          "answers of the file continued, a line each, and penalty_prompt_tokens' "
                          "test (into /workspace/<build>/contcheck, which the fetch never reads)")
+    ap.add_argument("--switch", default="",
+                    help="32: plan S's inputs file, as switch_box.py inputs wrote it on the "
+                         "server and you copied it here (/workspace/switch-inputs.jsonl)")
+    ap.add_argument("--switch-sha256", default="",
+                    help="32: that file's sha256, as switch_box.py inputs printed it")
+    ap.add_argument("--switch-check", type=int, default=0, metavar="N",
+                    help="32: on S1 before plan S, the check alone — Part 2's first N chats "
+                         "through both arms and Part 1's first of each memory size, a line each "
+                         "(into /workspace/<build>/switchcheck, which the fetch never reads)")
     ap.add_argument("--slots-fit", action="store_true",
                     help="17g: the slots given fit this card — the memory check's estimate is "
                          "printed, and not held to")
@@ -943,6 +1036,23 @@ def main(argv: list[str] | None = None) -> int:
                      "with its sha256, as continue_box.py inputs printed them")
         if not conts and (a.cont or a.continue_sha256 or a.continue_check):
             ap.error("--continue is for U-cont's boxes alone (C1 … C5)")
+    # 32: plan S's boxes take the inputs file and its sha256, and only they;
+    # and nothing of plan S runs before its tarball is pinned
+    for box in dict.fromkeys(boxes):
+        sws = [st for st in box_of(box) if is_switch(st)]
+        if sws and not (a.switch and _re.fullmatch(r"[0-9a-f]{64}", a.switch_sha256 or "")):
+            ap.error(f"{box}: give --switch with plan S's inputs file and --switch-sha256 with "
+                     "its sha256, as switch_box.py inputs printed them")
+        if not sws and (a.switch or a.switch_sha256 or a.switch_check):
+            ap.error("--switch is for plan S's boxes alone (S1 … S11)")
+        unpinned = [n for n, v in (PLAN_PINS.get(box[:1]) or {}).items() if v is None]
+        if unpinned:
+            raise SystemExit(f"{box}: plan {box[:1]}'s {', '.join(unpinned)} isn't pinned yet — "
+                             "its sha256 and the private repository's commit go in "
+                             f"frontier_box.PLAN_PINS['{box[:1]}'] and PLAN_REVISIONS once it is "
+                             "uploaded. Nothing was fetched")
+    if a.switch_check and (len(boxes) > 1 or DRIFT in box_of(boxes[0])[0][1]):
+        ap.error("--switch-check: one box of plan S's chats (S1)")
     if a.continue_check and (len(boxes) > 1 or box_of(boxes[0])[0][0] != "on"):
         ap.error("--continue-check: one box of the k6 path (C1), its file cont-k6.jsonl")
     # 22: a model a runtime names runs on it alone, and the runtime its own
@@ -992,6 +1102,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_pilot(a, boxes[0])
     if a.continue_check:
         return run_cont_check(a, boxes[0])
+    if a.switch_check:
+        return run_switch_check(a, boxes[0])
     # 18e point 1: every label after the first is queued from the start
     for box in boxes[1:]:
         line_state(a, box, "queued")
@@ -1042,6 +1154,19 @@ def run_cont_check(a: argparse.Namespace, box: str) -> int:
     print(f"{box}: the continuation's check — the first {a.continue_check} GPQA Diamond answers "
           f"of {Path(a.cont).name} continued, and penalty_prompt_tokens' test, before U-cont "
           "is rented", flush=True)
+    cmd = argv_of(box, 1, step, a)
+    print(" ".join(shlex.quote(x) for x in cmd[1:]), flush=True)
+    return subprocess.run(cmd).returncode
+
+
+def run_switch_check(a: argparse.Namespace, box: str) -> int:
+    """32: the check before plan S, on its first box — remote_gguf.py
+    --switch-check: a line a turn and arm, cache_n, prompt_n and the server's
+    line, no question text. Its verdict is the last line"""
+    step = box_of(box)[0]
+    print(f"{box}: the switch experiment's check — Part 2's first {a.switch_check} chats in both "
+          "arms, and Part 1's first chat of each memory size, before plan S is rented",
+          flush=True)
     cmd = argv_of(box, 1, step, a)
     print(" ".join(shlex.quote(x) for x in cmd[1:]), flush=True)
     return subprocess.run(cmd).returncode

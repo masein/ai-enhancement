@@ -1,0 +1,9 @@
+{
+  "id": "switching-mode",
+  "kind": "switch",
+  "order": 6,
+  "title": "Switching mode mid-chat",
+  "what": "Internal, for the apps: step2388 on the team's research build, a chat switching between k3 and k6 with the memory cleared (the team's default) or kept from the other path. Part 2 scores five-turn chats in both arms; Part 1 measures how far the next tokens drift. Not a row of the board's tables, not in the whitepaper.",
+  "ours": [],
+  "benchmarks": []
+}

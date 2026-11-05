@@ -177,6 +177,10 @@ def test_2_3_each_plan_runs_every_benchmark_once_one_line_a_box():
                     spec, size = fbx.cont_spec((th, tasks, shard, slots))
                     assert slots == fbx.fits(continue_box.context(spec), size)
                     continue
+                if fbx.is_switch((th, tasks, shard, slots)):   # 32: plan S, as many as fit
+                    assert slots == fbx.fits(fbx.switch_context((th, tasks, shard, slots)),
+                                             fbx.STEP2388_FILE)
+                    continue
                 assert fb.slot_context(list(tasks), th == "on") * slots <= rg.MAX_CONTEXT
         # 20: plan L asks thinking on only, and has no parity step (the
         # server it compares with is out of reach). 25: plans A, B and L run the
@@ -201,10 +205,13 @@ def test_2_3_each_plan_runs_every_benchmark_once_one_line_a_box():
         # 31.3: plan C, U-cont — each path's cut answers continued, k6 in thirds
         if name == "C":
             want = {("on", fbx.CONT), ("off", fbx.CONT)}
+        # 32: plan S, the switch experiment — Part 2's chats in tenths, Part 1 whole
+        if name == "S":
+            want = {("on", fbx.SWITCH), ("on", fbx.DRIFT)}
         assert set(have) == want, name
         assert all(have[k] == set(range(1, of[k] + 1)) for k in have), name
         # 17f: one box a build asks it first
-        assert parity == (0 if name in ("L", "I", "T", "U", "C") else 1), name
+        assert parity == (0 if name in ("L", "I", "T", "U", "C", "S") else 1), name
     longest = {p: max(sum(fbx.hours(s) for s in st) for st in b.values())
                for p, b in fbx.PLANS.items()}
     assert longest["A"] <= 18 and longest["B"] <= 10.5 and longest["L"] <= 6.0
