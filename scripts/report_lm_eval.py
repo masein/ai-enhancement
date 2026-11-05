@@ -27718,9 +27718,13 @@ function frontierGradingCard() {
           text: `${n(r.reused)} grades it gave before are used again` }) : '',
         // 17h: nothing to send — what Start leaves the score as, said first
         r.after ? el('div', { class: 'small ' + (r.after_state === 'final' ? 'se' : 'warntext'),
-          'data-frontier-after': r.after_state, text: `Start makes its score: ${r.after}` }) : ''),
+          'data-frontier-after': r.after_state, text: `Start makes its score: ${r.after}` }) : '',
+        // 5 Nov: its grader's model gone — not sent, its answers left as they are
+        r.waits ? el('div', { class: 'small warntext', 'data-frontier-not-sent': r.slot,
+          text: r.waits }) : ''),
       el('td', { text: r.model }), el('td', { class: 'num', text: n(r.answers) }),
-      el('td', { class: 'num', text: r.usd == null ? 'once pinned' : usd(r.usd) }))))))
+      el('td', { class: 'num', text: r.waits ? 'not sent' : r.usd == null ? 'once pinned'
+        : usd(r.usd) }))))))
     : el('p', { class: 'small se', 'data-frontier-estimate': '0',
       text: H.answers ? `Nothing new waits for a grader: ${n(H.answers)} answer`
         + `${H.answers === 1 ? ' is' : 's are'} held in the batches out, unsent — about `
