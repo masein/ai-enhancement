@@ -6213,6 +6213,16 @@ table.mt-table tr.mt-group th { background:var(--plane); font-family:var(--font-
 table.mt-table tr.mt-sub-row td.mt-subname { padding-left:36px; }
 table.mt-table tr.mt-sub-row td { border-bottom-style:dashed; }
 table.mt-table tr.mt-row:hover > td { background:var(--accent-soft); }
+/* the pinned cells stay opaque in every state: a row's tint is laid over the
+   surface, never see-through — the hovered row's showed the cell scrolled
+   under its name (the sorted column's, its highlight and number) */
+table.mt-table tr.mt-row:hover > td.mt-name, table.mt-table tr.mt-row:hover > td.mt-rank,
+table.mt-table tr.pt-on > td.mt-name, table.mt-table tr.pt-on > td.mt-rank,
+table.lb tr.clickrow:hover > td.model, table.lb tr.clickrow:hover > td.rank,
+table.lb tr.clickrow:hover > td.pin {
+  background:linear-gradient(var(--accent-soft), var(--accent-soft)), var(--surface-1); }
+/* a group's heading at the left edge of what is in view, as the names are */
+table.mt-table tr.mt-group th > .mt-gpin { position:sticky; left:12px; display:inline-block; }
 table.mt-table td.tcell:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
 .mt-n { font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:14px;
   font-weight:400; }
@@ -14822,8 +14832,9 @@ function modelTable(spec) {
   const tbody = el('tbody', {});
   for (const [g, label, rs] of sections) {
     if (g) tbody.append(el('tr', { class: 'mt-group', 'data-mt-group-head': g },
-      el('th', { colspan: String(ncols), scope: 'colgroup' }, el('span', { text: label }),
-        gnote(g) ? el('span', { class: 'mt-gnote', 'data-mt-gnote': g, text: gnote(g) }) : '')));
+      el('th', { colspan: String(ncols), scope: 'colgroup' }, el('span', { class: 'mt-gpin' },
+        el('span', { text: label }),
+        gnote(g) ? el('span', { class: 'mt-gnote', 'data-mt-gnote': g, text: gnote(g) }) : ''))));
     for (const r of rs) {
       tbody.append(tr(r));
       for (const k of r.children || []) tbody.append(tr(k, true));
