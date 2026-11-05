@@ -1,8 +1,9 @@
-"""32.1 in a real browser, at 1280 and 400 px, light and dark: Reports ▸
-"Switching mode mid-chat", internal — empty until plan S is imported, then
-its tiles, Part 2 by turn and arm (B − A with McNemar's p, loops, ran out,
-no answer, length, cache_n and prompt_n; turn 3 by question, the wrong
-recalls) and Part 1 by memory size, direction and run. The summary is the
+"""32.1 and 32.2 in a real browser, at 1280 and 400 px, light and dark:
+Reports ▸ "Switching mode mid-chat", internal — empty until plan S is
+imported, then its tiles, Part 2 by turn and arm (B − A with McNemar's p,
+loops, ran out, no answer, length, cache_n, prompt_n and each reply's round
+trip; turn 3 by question, the wrong recalls, the replies that came back
+otherwise) and Part 1 by memory size, direction and run. The summary is the
 import's own (switch_box.summarise) over made-up chats and drift runs; no
 question text anywhere."""
 
@@ -49,8 +50,13 @@ def made_up(d: Path, n: int = 200) -> None:
             p = {1: 0.88, 2: 0.95, 3: 0.62, 4: 0.97, 5: 0.9}[t]
             a = arm(rng, p, path, 0 if switch else 400 * (t - 1), 900 + 300 * t, t)
             b = arm(rng, p - (0.03 if t in (3, 4) else 0), path, 380 * (t - 1), 220, t)
+            # 32.2: one GSM8K reply in eight comes back otherwise, rolled back
+            back = t == 2 and i % 8 == 0
             turns.append({"turn": t, "path": path, "from": sw.TURNS[t - 2] if t > 1 else None,
                           "arms": {"A": a, "B": b},
+                          "probe": {"exact": not back, "rolled_back": 240 if back else 0,
+                                    "before_question": False, "end": 1000, "cache_n": 760
+                                    if back else 1000},
                           "memory": {"A": "", "B": "" if rng.random() > 0.005 else "no line"}})
         rows.append({"chat": i, "turns": turns, "stopped": ""})
     (d / "chats").mkdir(exist_ok=True)
@@ -113,6 +119,11 @@ def test_the_report_shows_both_parts_from_the_summary_kept(live, page, width, sc
     more = page.inner_text("[data-sw-more]")
     assert "Loops at the two switches to k6, pooled" in more and "Wrong recalls" in more
     assert "Turn 3 by question" in more
+    # 32.2: each reply's round trip, and those that came back otherwise
+    assert page.inner_text("[data-sw-trip='1']") == "200 of 200"
+    assert page.inner_text("[data-sw-trip='2']") == "175 of 200"
+    assert "Reply 2 came back otherwise 25 times: rolled back 240 tokens (median)" in more
+    assert "Not tested: chats saved to disk" in page.inner_text("[data-report-section='sw-notes']")
     assert "rec1" not in page.inner_text("body")                # no question ids or text
     assert no_sideways(page), "the page scrolls sideways"
     assert page.errors == []

@@ -31795,7 +31795,7 @@ function vSwitch(id, d, back) {
     el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-sw-turns': '1' },
       el('thead', {}, el('tr', {}, ['Turn', 'Path', 'Counted', 'A', 'B', 'B − A', 'p',
         'Loops A / B', 'Ran out A / B', 'No answer A / B', 'Tokens A / B (median)',
-        'cache_n A / B', 'prompt_n A / B'].map(h => el('th', { text: h })))),
+        'cache_n A / B', 'prompt_n A / B', 'Round trip'].map(h => el('th', { text: h })))),
       el('tbody', {}, p2.turns.map(t => el('tr', { 'data-sw-turn': t.turn },
         el('td', {}, el('b', { text: String(t.turn) }), ' · ' + t.words),
         el('td', { text: (t.switch ? 'switch to ' : '') + 'k' + t.path }),
@@ -31810,17 +31810,25 @@ function vSwitch(id, d, back) {
         el('td', { class: 'num', text: `${swN(arm(t, 'A', 'no_answer'))} / ${swN(arm(t, 'B', 'no_answer'))}` }),
         el('td', { class: 'num', text: `${swN(arm(t, 'A', 'tokens'))} / ${swN(arm(t, 'B', 'tokens'))}` }),
         el('td', { class: 'num', text: `${swN(arm(t, 'A', 'cache_n'))} / ${swN(arm(t, 'B', 'cache_n'))}` }),
-        el('td', { class: 'num', text: `${swN(arm(t, 'A', 'prompt_n'))} / ${swN(arm(t, 'B', 'prompt_n'))}` })))))),
+        el('td', { class: 'num', text: `${swN(arm(t, 'A', 'prompt_n'))} / ${swN(arm(t, 'B', 'prompt_n'))}` }),
+        // 32.2: the reply read again by the next request, token for token or not
+        el('td', { class: 'num', 'data-sw-trip': t.turn, text: t.round_trip
+          ? `${swN(t.round_trip.exact)} of ${swN(t.round_trip.measured)}` : '—' })))))),
     el('ul', { class: 'rp-notes', 'data-sw-more': '1' },
       el('li', { text: `Loops at the two switches to k6, pooled: A ${swN(p2.switch_k6_loops.only_a)} `
         + `alone, B ${swN(p2.switch_k6_loops.only_b)} alone, of ${swN(p2.switch_k6_loops.n)} `
         + `pairs · p ${swP(p2.switch_k6_loops.p)}` }),
       ...p2.turns.filter(t => t.turn === 4).map(t => el('li', { text: 'Wrong recalls (facts, '
-        + `of four a chat): A ${swN(arm(t, 'A', 'wrong_recalls'))}, `
+        + `of two a chat): A ${swN(arm(t, 'A', 'wrong_recalls'))}, `
         + `B ${swN(arm(t, 'B', 'wrong_recalls'))}` })),
       ...p2.turns.filter(t => t.clustered).map(t => el('li', { text: 'Turn 3 by question '
         + `(${swN(t.clustered.questions)} questions): B more right on `
         + `${swN(t.clustered.b_more)}, A on ${swN(t.clustered.a_more)} · p ${swP(t.clustered.p)}` })),
+      ...p2.turns.filter(t => t.round_trip && t.round_trip.rolled_back).map(t => el('li', {
+        'data-sw-rolled': t.turn, text: `Reply ${t.turn} came back otherwise ${swN(t.round_trip.rolled_back)} `
+          + `times: rolled back ${swN(t.round_trip.median_back)} tokens (median)`
+          + (t.round_trip.before_question ? `, ${swN(t.round_trip.before_question)} of them further `
+            + 'than its question' : '') })),
       ...Object.entries(p2.stopped || {}).map(([k, v]) => el('li', {
         text: `${swN(v)} chats stopped at ${k}: the chat and its limit outgrow the slot` })),
       el('li', { text: p2.protocol }))) : null;
@@ -31829,7 +31837,8 @@ function vSwitch(id, d, back) {
     el('p', { class: 'small se', text: 'Each run forced along A’s own reply (the reference), '
       + 'against it: the first token’s KL, the mean KL a token, flips a 1,000 tokens (where the '
       + 'run’s own pick differs) and the median token of the first flip. A′ is the GPU’s own '
-      + 'noise, N the rollback with no switch, F the other path read fresh: B sits between.' }),
+      + 'noise, N the memory continued with no switch, F the other path read fresh: B sits '
+      + 'between.' }),
     el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-sw-drift': '1' },
       el('thead', {}, el('tr', {}, ['Memory', 'Direction', 'Run', 'Chats', 'First-token KL',
         'Mean KL', 'Flips / 1,000', 'First flip'].map(h => el('th', { text: h })))),

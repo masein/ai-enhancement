@@ -1,13 +1,16 @@
-"""32.1 (brief 32): switching mode mid-chat with the memory kept — the team's
-keep_cache_across_paths measured on step2388, on runtime k3k6r-0411 (the
-team's research build, the prompt cache in host memory off). Part 2: five-
-turn chats in two arms, the switch off (A) and on (B), the same text and seed
-a turn; Part 1: five runs of a chat's last turn forced along the reference.
-The server is the stand-in (tests/fixtures/fake_llama_server.py,
-FAKE_LLAMA_MEMORY=1: each slot's memory kept as the team's server keeps it,
-the path's line in its log, and a memory another path computed answering a
-little differently); the questions invented; nothing is fetched, no model
-runs."""
+"""32.1 and 32.2 (brief 32): switching mode mid-chat with the memory kept —
+the team's keep_cache_across_paths measured on step2388, on runtime
+k3k6r-0411 (the team's research build run as the apps run it: every earlier
+reply's thinking kept in the chat, 4 checkpoints a slot, no prompt cache in
+host memory). Part 2: five-turn chats in two arms, the switch off (A) and on
+(B), the same text and seed a turn, A's reply replayed in B's slot on the
+path that wrote it, each reply's round trip measured; Part 1: five runs of a
+chat's last turn forced along the reference. The server is the stand-in
+(tests/fixtures/fake_llama_server.py, FAKE_LLAMA_MEMORY=1: each slot's
+memory kept as the team's server keeps it, the path's line in its log, the
+thinking kept with --reasoning-preserve, a GSM8K reply that doesn't come back
+as it was written, and a memory another path computed answering a little
+differently); the questions invented; nothing is fetched, no model runs."""
 
 from __future__ import annotations
 
@@ -129,7 +132,9 @@ def imported(path: Path) -> tuple[int, list[str]]:
 
 def test_the_runtime_is_k3k6_2611s_with_the_prompt_cache_in_host_memory_off():
     rt, was = fb.RUNTIMES[RT], fb.RUNTIMES["k3k6-2611"]
-    assert rt["flags"] == [*was["flags"], "--cache-ram", "0"]
+    # 32.2: as the apps run it — the thinking kept, 4 checkpoints a slot
+    assert rt["flags"] == [*was["flags"], "--reasoning-preserve", "--ctx-checkpoints", "4",
+                           "--cache-ram", "0"]
     assert rt["env"] == was["env"] == {"LOOKAHEAD_MOE_ROUTER_NORM": "1",
                                        "GGML_CPU_DISABLE_FUSION": "1"}
     assert (rt["sampling"], rt["paths"], rt["refuses_flags"]) == (
@@ -177,16 +182,15 @@ def test_the_research_runtime_asks_the_experiment_alone(tmp_path, capsys, more, 
 # ---------------------------------------------------------------------------
 
 def test_the_facts_are_scored_exactly_and_their_sum_by_its_value():
-    f = {"courier": "Odile", "code": 482, "ship": "Marrow", "crates": 36}
+    f = {"code": 482, "crates": 36, "courier": "Odile", "gate": 27}
     assert sw.facts_of(7) == sw.facts_of(7) != sw.facts_of(8)
+    assert set(sw.facts_of(7)) == {"code", "crates", "courier", "gate"}
     assert sw.compute_answer(f) == sw.fractions.Fraction(482 * 36, 518)
-    ok = "courier: Odile\nlocker code: 482\nship: Marrow\ncrates: 36"
-    assert sw.recall_score(ok, "stop", f)["ok"]
-    # its own markdown, and "the" before the ship's name, read as the same
-    assert sw.recall_score("**courier:** odile\n- locker code: **482**\nship: the Marrow\n"
-                           "crates: 36.", "stop", f)["ok"]
-    got = sw.recall_score("courier: Odile\nlocker code: 428\nship: Marrow\ncrates: 36", "stop", f)
-    assert (got["ok"], got["wrong"], got["no_answer"]) == (False, ["code"], False)
+    assert sw.recall_score("courier: Odile\ngate: 27", "stop", f)["ok"]
+    # its own markdown, "the" before the name, "gate number" read as the same
+    assert sw.recall_score("**courier:** the odile\n- gate number: **27**.", "stop", f)["ok"]
+    got = sw.recall_score("courier: Odile\ngate: 72", "stop", f)
+    assert (got["ok"], got["wrong"], got["no_answer"]) == (False, ["gate"], False)
     assert sw.recall_score("I don't remember.", "stop", f)["no_answer"]
     cut = sw.recall_score("<think>\nlet me see", "length", f)
     assert (cut["ok"], cut["ran_out"], cut["wrong"]) == (False, True, [])
@@ -198,17 +202,20 @@ def test_the_facts_are_scored_exactly_and_their_sum_by_its_value():
     assert loose["ok"] and not loose["lowest_terms"]
     assert not sw.compute_score("ANSWER: 33", "stop", f)["ok"]
     assert sw.compute_score("no answer line", "stop", f)["no_answer"]
-    # the messages: two facts in each of the first two turns, the question after
+    # 32.2: the facts placed so each recall reads them from the other path's
+    # memory — a and b in turns 1–2 (k3), used in turn 5 (k6); the courier and
+    # the gate in turn 3 (k6), recalled in turn 4 (k3)
     line = {"facts": f, "mmlu": "m0", "gsm8k": "g0", "hard": {"task": "math_l5_epoch", "id": "x0"}}
     items = {t: {x["id"]: x for x in invented(t)} for t in ("mmlu_chat", "gsm8k_chat",
                                                             "math_l5_epoch")}
-    t1, t2 = sw.turn_text(1, line, items), sw.turn_text(2, line, items)
-    assert t1.startswith("Please remember two things") and "Odile" in t1 and "482" in t1
-    assert "Marrow" not in t1 and "Marrow" in t2 and "36 crates" in t2
+    t1, t2, t3 = (sw.turn_text(t, line, items) for t in (1, 2, 3))
+    assert "locker code is 482" in t1 and "36 crates" in t2
+    assert "Odile" in t3 and "gate number is 27" in t3
+    assert not any(w in t1 + t2 for w in ("Odile", "gate")) and "482" not in t3
     assert t1.endswith(fb.prompt("mmlu_chat", items["mmlu_chat"]["m0"])[0])
-    assert sw.turn_text(3, line, items) == fb.prompt("math_l5_epoch",
-                                                     items["math_l5_epoch"]["x0"])[0]
+    assert t3.endswith(fb.prompt("math_l5_epoch", items["math_l5_epoch"]["x0"])[0])
     assert (sw.turn_text(4, line, items), sw.turn_text(5, line, items)) == (sw.RECALL, sw.COMPUTE)
+    assert [sw.TURNS[t - 1] for t in (1, 2, 3, 4, 5)] == [3, 3, 6, 3, 6]
 
 
 def test_mcnemar_the_paired_difference_and_the_clustered_test():
@@ -240,21 +247,26 @@ def test_the_kl_is_over_the_references_twenty_and_the_rest():
 def test_each_arms_memory_is_held_to_what_the_source_says():
     keep = {"kind": "keeping", "from": 3, "to": 6, "n": 900, "text": "…"}
     clear = {"kind": "clearing", "from": 3, "to": 6, "n": 900, "text": "…"}
-    assert sw.memory_why(1, 3, None, "B", {"cache_n": 0, "line": None}, None, 0) == ""
-    assert "turn 1 began with 12" in sw.memory_why(1, 3, None, "A", {"cache_n": 12}, None, 0)
-    # turn 2: the same path, the memory reused, no line
-    assert sw.memory_why(2, 3, 3, "A", {"cache_n": 77, "line": None}, 0, 79) == ""
-    # a switch: A cleared and read again, B kept the chat up to the previous question
-    assert sw.memory_why(3, 6, 3, "A", {"cache_n": 0, "line": clear}, 85, 143) == ""
+    assert sw.memory_why(1, 3, None, "B", {"cache_n": 0, "line": None}, 0) == ""
+    assert "turn 1 began with 12" in sw.memory_why(1, 3, None, "A", {"cache_n": 12}, 0)
+    # 32.2, the thinking kept: on the same path the prompt extends the memory
+    # exactly — A's to the turn's question (its probe read it), no line
+    assert sw.memory_why(2, 3, 3, "A", {"cache_n": 79, "line": None}, 79) == ""
+    assert "where the memory held 79" in sw.memory_why(2, 3, 3, "A", {"cache_n": 77}, 79)
+    # a switch: A cleared and read again; B kept it all, to the previous reply's end
+    assert sw.memory_why(3, 6, 3, "A", {"cache_n": 0, "line": clear}, 143) == ""
     assert "no \"clearing\" line" in sw.memory_why(3, 6, 3, "A", {"cache_n": 0, "line": None},
-                                                   85, 143)
-    assert sw.memory_why(3, 6, 3, "B", {"cache_n": 85, "line": keep}, 85, 143) == ""
-    assert "not between the previous question's start (85)" in sw.memory_why(
-        3, 6, 3, "B", {"cache_n": 40, "line": keep}, 85, 143)
-    assert "no \"keeping\" line" in sw.memory_why(3, 6, 3, "B", {"cache_n": 85, "line": clear},
-                                                  85, 143)
-    assert sw.expected_rollback(2, 81, 0) == 77 and sw.expected_rollback(2, 2000, 0) == 1484
-    assert sw.expected_rollback(4, 300, 144) == 144
+                                                   143)
+    assert sw.memory_why(3, 6, 3, "B", {"cache_n": 141, "line": keep}, 141) == ""
+    assert "where the memory held 141" in sw.memory_why(3, 6, 3, "B",
+                                                        {"cache_n": 85, "line": keep}, 141)
+    assert "no \"keeping\" line" in sw.memory_why(3, 6, 3, "B", {"cache_n": 141, "line": clear},
+                                                  141)
+    # a reply's round trip, as A's probe saw it
+    assert sw.round_trip({"cache_n": 141}, 141, 85) == {
+        "cache_n": 141, "end": 141, "exact": True, "rolled_back": 0, "before_question": False}
+    back = sw.round_trip({"cache_n": 60}, 141, 85)
+    assert (back["exact"], back["rolled_back"], back["before_question"]) == (False, 81, True)
 
 
 # ---------------------------------------------------------------------------
@@ -295,16 +307,26 @@ def test_the_check_shows_every_turns_memory_and_passes(sb, capsys):
     out = capsys.readouterr().out
     turns = [x for x in out.splitlines() if x.startswith("chat ") and " · turn " in x]
     assert len(turns) == 2 * 5 * 2
+    # 32.2: the thinking kept, said before a question; then each arm's memory
+    # to the token: B's every later turn the chat to the previous reply's end
+    assert "the thinking kept: an earlier reply's thinking is in the next prompt on k6 and k3" \
+        in out
     # at each switch, A re-read (its line, nothing reused) and B kept the chat
     a3 = next(x for x in turns if x.startswith("chat 0 · turn 3") and " · A:" in x)
     b3 = next(x for x in turns if x.startswith("chat 0 · turn 3") and " · B:" in x)
-    assert "cache_n 0," in a3 and "expert path k3 -> k6: clearing" in a3 and "re-read ✓" in a3
+    assert "cache_n 0 (expected 0)," in a3 and "expert path k3 -> k6: clearing" in a3 \
+        and "re-read ✓" in a3
     assert "expert path k3 -> k6: keeping" in b3 and "kept ✓" in b3
-    exp = int(b3.split("(expected ")[1].split(")")[0].replace(",", ""))
-    assert f"cache_n {exp} " in b3
+    for x in turns:
+        exp = int(x.split("(expected ")[1].split(")")[0].replace(",", ""))
+        assert x.split(": cache_n ")[1].startswith(f"{exp} ")
     assert all("NOT as said" not in x for x in turns)
-    # the same turns as token ids give the chat way's memory
-    assert out.count("— the chat way's ✓") == 2
+    # each reply read again by the next request: token for token, but the
+    # GSM8K reply, whose end the template trims — rolled back to its question
+    trips = [x for x in out.splitlines() if "read again by the next request" in x]
+    assert len(trips) == 2 * 5
+    assert all(("NOT token for token" in x) == (" reply 2 " in x) for x in trips), "\n".join(trips)
+    assert all("further than its question" not in x for x in trips)
     drift = [x for x in out.splitlines() if x.startswith("drift chat")]
     assert len(drift) == 4 and all(x.endswith("✓") for x in drift)
     assert "the switch check: every memory as said" in out
@@ -332,6 +354,16 @@ def test_part_2_asks_both_arms_the_same_text_and_seed_and_imports_marked_again(s
         a, b = sorted(pair, key=lambda x: "keep_cache_across_paths" in x)
         assert a["messages"] == b["messages"] and "keep_cache_across_paths" not in a
         assert b["keep_cache_across_paths"] is True and a["id_slot"] != b["id_slot"]
+    # 32.2: each earlier reply sent back with its thinking (turn 3's, on k6)
+    t5 = next(r for r in chats if r["expert_path"] == 6 and len(r["messages"]) == 9)
+    assert t5["messages"][5]["reasoning_content"] == "Thinking it through."
+    assert "reasoning_content" not in t5["messages"][3]                  # a k3 reply
+    # B's replays and A's probes: the chat as token ids, one token, nothing else
+    reads = [r for r in requests(sb) if r.get("n_predict") == 1 and "message_delimiters" in r
+             and "n_probs" not in r]
+    assert len(reads) == 2 * (4 * 2 + 1)
+    assert all(set(r) == {"prompt", "n_predict", "expert_path", "id_slot", "cache_prompt",
+                          "message_delimiters"} for r in reads)
     path = bundle_at(sb, "s1", "chats", (1, 2))
     assert path.exists()
     code, said = imported(path)
@@ -339,8 +371,9 @@ def test_part_2_asks_both_arms_the_same_text_and_seed_and_imports_marked_again(s
     s = json.loads((sw.where() / sw.SUMMARY).read_text())
     t = {x["turn"]: x for x in s["part2"]["turns"]}
     assert s["part2"]["chats"] == 2 and all(x["not_counted"] == 0 for x in t.values())
-    # the placebo turns agree; the recall from a memory another path computed
-    # comes back wrong in B (the stand-in's ship), and the test sees it
+    # the placebo turns agree; the recall of what k6 read, on k3 from a memory
+    # k6 computed, comes back wrong in B (the stand-in's courier); a and b, read
+    # by k3, used on k6, right in both
     assert t[1]["arms"]["A"]["score"] == t[1]["arms"]["B"]["score"] == 100.0
     assert t[2]["paired"]["only_a"] == t[2]["paired"]["only_b"] == 0
     assert (t[4]["arms"]["A"]["score"], t[4]["arms"]["B"]["score"]) == (100.0, 0.0)
@@ -348,6 +381,17 @@ def test_part_2_asks_both_arms_the_same_text_and_seed_and_imports_marked_again(s
     assert t[5]["arms"]["A"]["score"] == t[5]["arms"]["B"]["score"] == 100.0
     assert t[3]["switch"] and t[3]["arms"]["B"]["cache_n"] > 0 == t[3]["arms"]["A"]["cache_n"]
     assert "clustered" in t[3]
+    # each reply's round trip: token for token but the GSM8K reply (turn 2)
+    assert [(x["turn"], x["round_trip"]["exact"], x["round_trip"]["rolled_back"])
+            for x in s["part2"]["turns"]] == [(1, 2, 0), (2, 0, 2), (3, 2, 0), (4, 2, 0), (5, 2, 0)]
+    assert t[2]["round_trip"]["before_question"] == 0
+    # B's new path reads only the new message: its memory the whole chat before
+    rows = [json.loads(x) for x in
+            rb.read(path)["files"]["results/switch/chats.jsonl"].decode().splitlines()]
+    for r in rows:
+        for tr in r["turns"][1:]:
+            assert tr["arms"]["B"]["cache_n"] == tr["expected"]["B"] == r["turns"][
+                tr["turn"] - 2]["probe"]["end"]
     # a second import changes nothing
     code, said = imported(path)
     assert code == 0 and any("imported already" in x for x in said)
@@ -371,8 +415,8 @@ def test_part_1_forces_each_run_along_the_reference(sb, svc, monkeypatch):  # no
     for r in rows:
         runs = r["runs"]
         assert all(v["memory"] == "" for v in runs.values()) and r["ref"]["memory"] == ""
-        # B kept the chat up to the previous question, read by the other path
-        assert r["memory"] == r["s_prev"] > 0
+        # B kept the chat to the end of its previous reply, read by the other path
+        assert r["memory"] == r["e_prev"] > 0 and r["e_prev"] < r["s_last"]
         assert runs["B"]["requests"][0]["line"]["kind"] == "keeping"
         # A′ and N are the reference again; B parts from it now and then; F
         # (the other path, fresh) almost everywhere
@@ -446,7 +490,7 @@ def test_plan_s_is_refused_until_its_tarball_is_pinned_then_runs_its_share(monke
     argv = got["S1"][0]
     for want in (["--runtime", RT], ["--switch", "/workspace/switch-inputs.jsonl"],
                  ["--pin", f"switch-inputs.jsonl={'b' * 64}"], ["--switch-part", "chats"],
-                 ["--part", "1/10"], ["--slots", "10"], ["--thinking", "on"],
+                 ["--part", "1/10"], ["--slots", "6"], ["--thinking", "on"],
                  ["--pin", f"{fx.TARBALL_S}={'c' * 64}"]):
         assert " ".join(want) in " ".join(argv)
     assert fx.main(["S11", *line[1:]]) == 0
@@ -467,7 +511,7 @@ def test_plan_s_is_refused_until_its_tarball_is_pinned_then_runs_its_share(monke
     assert "give --switch with plan S's inputs file" in capsys.readouterr().err
     # its size: ten boxes of chats, one of drift
     assert [x.split(" · ")[0] for x in fx.listing("S") if x.startswith("S")][:2] == ["S1", "S2"]
-    assert fx.listing("S")[-1].startswith("11 boxes a build · 100.0 box-hours")
+    assert fx.listing("S")[-1].startswith("11 boxes a build · 124.4 box-hours")
 
 
 def test_the_fetch_imports_the_experiments_bundles_with_no_register():
@@ -481,6 +525,7 @@ def test_the_runbook_gives_plan_s_and_its_check():
     doc = DOC.read_text(encoding="utf-8")
     sec = doc[doc.index("# S. Switching mode mid-chat (32)"):]
     for want in ("switch_box.py inputs", "--switch-check 5", "S11", "--cache-ram 0",
+                 "--reasoning-preserve", "--ctx-checkpoints 4", "Not tested: chats saved to disk",
                  "keep_cache_across_paths", "llama-server-k3k6r-917f3d9.tar.gz",
                  "Part 1's protocol: greedy, no penalties", "Switching mode mid-chat"):
         assert want in sec, want
@@ -499,5 +544,19 @@ def test_the_bundle_never_holds_a_secret_or_a_binary(sb):
     st = b["setup"]
     assert st["runtime"] == RT and st["server"]["flags"][-2:] == ["--cache-ram", "0"]
     assert set(st["server"]["paths_checks"]) == {"6", "3"}
+    assert st["server"]["preserve_check"] == {"pass": True, "kept": {"6": True, "3": True},
+                                              "warned": False}
     assert st["switch"]["inputs_sha256"] == sb["inputs_sha"]
     shutil.rmtree(sb["root"] / "s3")
+
+
+def test_a_server_that_keeps_no_earlier_thinking_asks_nothing(sb, monkeypatch, capsys):
+    # 32.2: a template that drops the thinking, the flag notwithstanding — the
+    # server says so at start-up, and the next prompt holds no earlier thinking
+    monkeypatch.setenv("FAKE_LLAMA_PRESERVE", "off")
+    with pytest.raises(SystemExit) as e:
+        run_s(sb, "nopreserve", "--switch-part", "chats", "--part", "1/2")
+    assert "the earlier thinking isn't kept in the chat" in str(e.value)
+    out = capsys.readouterr().out
+    assert "the thinking NOT kept: the server says --reasoning-preserve has no effect" in out
+    assert not [r for r in requests(sb) if "id_slot" in r and "messages" in r]
