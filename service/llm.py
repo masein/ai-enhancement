@@ -101,6 +101,8 @@ class Result:
     # whole error before its words are cut to 400 characters
     status: int | None = None
     kind: str = ""
+    # 5 Nov: and its plain words, read from the whole error too
+    said: str = ""
 
 
 def prompt_sha(*parts: str) -> str:
@@ -863,6 +865,7 @@ def tally(batch_id: str, d: Path | None = None, retry_s: float | None = None) ->
     out = {"sent": len(ids), "answered": sum(1 for r in got if not r.get("error")),
            "failed": len(bad), "cancelled": sum(1 for r in got if r.get("cancelled")),
            "first_error": bad[0]["error"] if bad else "",
+           "first_said": said_of(bad[0]) if bad else "",
            "status": bad[0].get("status") if bad else None,
            "first_at": ats[0] if ats else None, "last_at": ats[-1] if ats else None,
            "recent": ats[-50:]}
@@ -887,7 +890,8 @@ def batch_line(t: dict | None, error: str = "") -> str:
         bits.append(f"{n(left)} not answered")
     line = " · ".join(bits)
     if t.get("failed"):
-        line += f". The first failure: {plain_error(t['first_error'], t.get('status'))}"
+        line += ". The first failure: " + (t.get("first_said")
+                                           or plain_error(t["first_error"], t.get("status")))
     elif error:
         line += f". {plain_error(error)}"
     if t.get("halted"):
@@ -900,12 +904,30 @@ def refusal_kind(rec: dict) -> str:
     return rec.get("kind") or ai_models.refusal(rec.get("status"), rec.get("error", ""))[0]
 
 
+def said_of(rec: dict) -> str:
+    """a request's refusal in plain words: as read from its whole error
+    (`said`), else from the part of it kept"""
+    return rec.get("said") or plain_error(rec.get("error", ""), rec.get("status"))
+
+
 def _refused(rec: dict, e: "LLMError") -> dict:
     """17f: a request's error kept with its status and its kind, read from the
-    whole error — then its words cut to 400 characters"""
+    whole error — then its words cut to 400 characters. 5 Nov (masein): and
+    its plain words read from the whole error too (`said`), and OpenRouter's
+    own message kept where the cut would lose it — a key-limit 403's came
+    after the 400 kept, and its batch said only "OpenRouter refused it (HTTP
+    403)" while it waited at the key's limit"""
     from . import ai_models
-    return {**rec, "error": str(e)[:400], "status": e.status,
-            "kind": ai_models.refusal(e.status, str(e))[0], "at": time.time()}
+    full = str(e)
+    kind, said = ai_models.refusal(e.status, full)
+    msg, _ = ai_models._error_of(full)
+    kept = full[:400]
+    if msg and msg not in kept:
+        # its message alone, as OpenRouter's error body still: read the same
+        kept = (full.split("{", 1)[0] + json.dumps({"error": {"code": e.status,
+                                                              "message": msg}}))[:400]
+    return {**rec, "error": kept, "status": e.status, "kind": kind, "said": said,
+            "at": time.time()}
 
 
 class LocalOpenAI(Backend):
@@ -1103,7 +1125,11 @@ class LocalOpenAI(Backend):
         self._ensure_worker(batch_id)
 
     def _halt(self, batch_id: str, rec: dict, n: int, first: bool = False) -> None:
-        said = plain_error(rec.get("error", ""), rec.get("status"))
+        from . import ai_models
+        said = said_of(rec)
+        # 5 Nov: at the key's own limit, what OpenRouter last said of the key
+        st = ai_models.key_state() if refusal_kind(rec) == "limit" else ""
+        said += f" ({st})" if st else ""
         why = (f"waiting: {n} requests in a row were all refused — {said}. Nothing was counted "
                "against the answers: change what it refuses (the model, its provider), then "
                "Start again" if first else
@@ -1150,7 +1176,8 @@ class LocalOpenAI(Backend):
                            f"{sum(c in res for c in ids)}/{len(ids)} done")
         return {c: Result(text=res[c].get("text") or "", error=res[c].get("error") or "",
                           finish=res[c].get("finish_reason") or "",
-                          status=res[c].get("status"), kind=res[c].get("kind") or "")
+                          status=res[c].get("status"), kind=res[c].get("kind") or "",
+                          said=res[c].get("said") or "")
                 for c in ids}
 
     # -- the worker ----------------------------------------------------------
