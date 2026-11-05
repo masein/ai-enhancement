@@ -490,12 +490,12 @@ def test_plan_s_is_refused_until_its_tarball_is_pinned_then_runs_its_share(monke
     argv = got["S1"][0]
     for want in (["--runtime", RT], ["--switch", "/workspace/switch-inputs.jsonl"],
                  ["--pin", f"switch-inputs.jsonl={'b' * 64}"], ["--switch-part", "chats"],
-                 ["--part", "1/10"], ["--slots", "6"], ["--thinking", "on"],
+                 ["--part", "1/20"], ["--slots", "6"], ["--thinking", "on"],
                  ["--pin", f"{fx.TARBALL_S}={'c' * 64}"]):
         assert " ".join(want) in " ".join(argv)
-    assert fx.main(["S11", *line[1:]]) == 0
-    assert "--switch-part drift" in " ".join(got["S11"][0]) and "--part" not in got["S11"][0]
-    assert "--slots 18" in " ".join(got["S11"][0])
+    assert fx.main(["S21", *line[1:]]) == 0
+    assert "--switch-part drift" in " ".join(got["S21"][0]) and "--part" not in got["S21"][0]
+    assert "--slots 18" in " ".join(got["S21"][0])
     # the check on S1, into a folder the fetch never reads
     monkeypatch.setattr(fx.subprocess, "run", lambda cmd: got.setdefault("check", cmd) and
                         type("R", (), {"returncode": 0}))
@@ -509,9 +509,10 @@ def test_plan_s_is_refused_until_its_tarball_is_pinned_then_runs_its_share(monke
     with pytest.raises(SystemExit):
         fx.main(line[:5 + 2])
     assert "give --switch with plan S's inputs file" in capsys.readouterr().err
-    # its size: ten boxes of chats, one of drift
+    # its size: twenty boxes of chats, one of drift
     assert [x.split(" · ")[0] for x in fx.listing("S") if x.startswith("S")][:2] == ["S1", "S2"]
-    assert fx.listing("S")[-1].startswith("11 boxes a build · 124.4 box-hours")
+    # 32.3: the chats over 20 boxes of 100 (about 6 h each), the drift on S21
+    assert fx.listing("S")[-1] == "21 boxes a build · 124.4 box-hours a build · the longest 6.0 h"
 
 
 def test_the_fetch_imports_the_experiments_bundles_with_no_register():
@@ -524,7 +525,7 @@ def test_the_fetch_imports_the_experiments_bundles_with_no_register():
 def test_the_runbook_gives_plan_s_and_its_check():
     doc = DOC.read_text(encoding="utf-8")
     sec = doc[doc.index("# S. Switching mode mid-chat (32)"):]
-    for want in ("switch_box.py inputs", "--switch-check 5", "S11", "--cache-ram 0",
+    for want in ("switch_box.py inputs", "--switch-check 5", "S21", "--cache-ram 0",
                  "--reasoning-preserve", "--ctx-checkpoints 4", "Not tested: chats saved to disk",
                  "keep_cache_across_paths", "llama-server-k3k6r-917f3d9.tar.gz",
                  "Part 1's protocol: greedy, no penalties", "Switching mode mid-chat"):

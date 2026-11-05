@@ -2489,7 +2489,7 @@ def _main(argv: list[str] | None = None) -> int:
                               a.switch_check)
             say("the switch check: " + ("every memory as said — arm A re-read at every switch, "
                                         "arm B kept the conversation up to the previous "
-                                        "question, the token ids' way the chat's: rent S1–S11"
+                                        "question, the token ids' way the chat's: rent S1–S21"
                                         if ok else "NOT every memory as said — don't rent "
                                         "plan S yet") + f" · {out / sw.CHECK}")
             return 0 if ok else 1

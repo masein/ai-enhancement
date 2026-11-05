@@ -113,8 +113,8 @@ easy-set answers, to the same 32,768 as step2388's k3 (its own --as, U40's
         --continue /workspace/cont-k6.jsonl --continue-sha256 <its sha256>
 
 32: plan S, switching mode mid-chat with the memory kept (scripts/switch_box.py)
-— on runtime k3k6r-0411, the team's research build: S1–S10 a tenth each of
-Part 2's chats, S11 Part 1's drift, each given the inputs file and the sha256
+— on runtime k3k6r-0411, the team's research build: S1–S20 a twentieth each
+of Part 2's chats (100), S21 Part 1's drift, each given the inputs file and the sha256
 switch_box.py inputs printed for it (and S1 first, with --switch-check 5, the
 check before the rest are rented; docs/REMOTE-RUNS.md S). Refused until the
 research tarball is pinned (PLAN_PINS["S"]):
@@ -358,14 +358,16 @@ PLANS: dict[str, dict[str, list[Step]]] = {
     },
 }
 # 32: plan S, switching mode mid-chat with the memory kept (brief 32, after
-# plan C): Part 2's 2,000 chats in tenths, and Part 1's 200 chats in both
+# plan C): Part 2's 2,000 chats in twentieths — 100 a box, about 6 h (masein,
+# 5 Nov: half the wall clock of tenths, and less lost if a box dies) — and
+# Part 1's 200 chats in both
 # directions on one box, 18 slots of 65,536 (three jobs of five runs). 32.2:
 # the thinking kept in the chat, a chat's slot 196,608 tokens (turn 3's k6
 # reply stays for turn 5's): 6 fit a 5090 — three chats, each in a pair of
 # slots (arm A and arm B). The check before it is rented: S1's line with
 # --switch-check 5
-PLANS["S"] = {**{f"S{i}": [("on", (SWITCH,), f"{i}/10", 6)] for i in range(1, 11)},
-              "S11": [("on", (DRIFT,), "", 18)]}
+PLANS["S"] = {**{f"S{i}": [("on", (SWITCH,), f"{i}/20", 6)] for i in range(1, 21)},
+              "S21": [("on", (DRIFT,), "", 18)]}
 # 29: plan D, our own boxes — a quarter of every benchmark on each of a
 # station's four GPUs, longest first (frontier_box's paces), then instruction
 # following with thinking on and off. Every slot holds Bolt's 64K
@@ -937,7 +939,7 @@ def parser() -> argparse.ArgumentParser:
                                            "I1 (25: instruction following), T1 … T3 (30.1), "
                                            "U1 … U37 (31.1: step2388), U38 … U40 (31.2: "
                                            "DeviceMark and the easy set), C1 … C5 (31.3: "
-                                           "U-cont), S1 … S11 (32: switching mode mid-chat)")
+                                           "U-cont), S1 … S21 (32: switching mode mid-chat)")
     ap.add_argument("then", nargs="*", help="18e point 1: more labels, run one after another "
                                             "on this box (L1 L2): each later one's line is "
                                             "written \"queued\" at the start, so the fetch "
@@ -1050,7 +1052,7 @@ def main(argv: list[str] | None = None) -> int:
             ap.error(f"{box}: give --switch with plan S's inputs file and --switch-sha256 with "
                      "its sha256, as switch_box.py inputs printed them")
         if not sws and (a.switch or a.switch_sha256 or a.switch_check):
-            ap.error("--switch is for plan S's boxes alone (S1 … S11)")
+            ap.error("--switch is for plan S's boxes alone (S1 … S21)")
         unpinned = [n for n, v in (PLAN_PINS.get(box[:1]) or {}).items() if v is None]
         if unpinned:
             raise SystemExit(f"{box}: plan {box[:1]}'s {', '.join(unpinned)} isn't pinned yet — "

@@ -1984,7 +1984,7 @@ round trip is measured (below). The server's line `expert path kA -> kB:
 keeping N cached tokens` counts the slot's whole memory; `cache_n` counts
 what is reused.
 
-**Part 2, the chats (S1–S10).** 2,000 chats of five turns, the facts placed
+**Part 2, the chats (S1–S20).** 2,000 chats of five turns, the facts placed
 so each recall reads them from the other path's memory:
 
 1. k3: a number (the locker code, a), and an MMLU question;
@@ -2030,7 +2030,7 @@ average about 15,000 tokens; a chat whose prompt and the next turn's limit
 outgrow the slot stops there in both arms, counted by turn — in practice the
 chats whose turn 3 ran out of room (about 1%).
 
-**Part 1, drift (S11).** 200 chats built on the server from step2388's own
+**Part 1, drift (S21).** 200 chats built on the server from step2388's own
 stored k3 replies (MMLU, GSM8K), 50 each at about 1k, 4k, 16k and 48k tokens
 of memory, in both directions. Five runs of the last turn on the target
 path Y, each forced along A's own greedy reply:
@@ -2097,8 +2097,9 @@ anything is fetched.
    ```
 
 4. **Plan S:** the same line on each box, without `--switch-check`, with
-   `--price`. S1–S10 run a tenth of the chats each (6 slots of 196,608: three
-   chats at a time, each in a pair of slots), S11 Part 1 (18 slots of 65,536).
+   `--price`. S1–S20 run 100 chats each, every twentieth (6 slots of 196,608:
+   three chats at a time, each in a pair of slots), S21 Part 1 (18 slots of
+   65,536).
    Each box leaves a `switch-served-…` bundle.
 5. **Fetch and import:** as U4, with `--sha served/step2388-k3k6r-0411=a2594a68a810ec526061f83cb88c7e469e1c3889912e8da4b1d598c72271faf6`.
    The experiment is no row of the board: its bundles need no `--register`.
@@ -2111,8 +2112,8 @@ turn and arm (score, B − A with McNemar's p, loops, ran out, no answer,
 wrong recalls, length, `cache_n`, `prompt_n` and the round trip; turn 3 also
 by question), and Part 1 by memory size, direction and run.
 
-**Its size** (`frontier_box.py --list S`): about 11.9 h on each of S1–S10 and
-5 h on S11, about 124 box-hours, at plan U's paces (a guess the check's
+**Its size** (`frontier_box.py --list S`): about 6 h on each of S1–S20 and
+5 h on S21, about 124 box-hours, at plan U's paces (a guess the check's
 timings replace).
 
 # Speed tests: the cheapest box per answer (19)
