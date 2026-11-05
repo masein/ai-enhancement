@@ -143,6 +143,11 @@ def test_the_runtime_is_k3k6_2611s_with_the_prompt_cache_in_host_memory_off():
     assert rt["build"]["commits"] == ("917f3d911",)
     # the research build at its commit, and nothing else
     assert fb.runtime_build_refused(RT, None, "917f3d9115", {"commit": "917f3d911521"}) == ""
+    # 32.3: the tarball as built — "build 20", the shallow clone's commit count,
+    # is never held to anything: its commit is what identifies it
+    assert fb.runtime_build_refused(RT, 20, "917f3d9", {
+        "commit": "917f3d91152142e952b7ea128980faa75ba7934b", "uncommitted_changes": "no",
+        "build": "20", "cuda_archs": "120"}) == ""
     assert "runs the team's llama.cpp-teraformer at 917f3d911" in fb.runtime_build_refused(
         RT, None, "3ad38b7cc")
     # the board's model runs on its own runtime alone, the experiment's on this one
@@ -471,16 +476,32 @@ def test_the_import_refuses_what_wasnt_asked_as_the_experiment_asks(sb, svc, tmp
 # plan S, the fetch and the runbook
 # ---------------------------------------------------------------------------
 
-def test_plan_s_is_refused_until_its_tarball_is_pinned_then_runs_its_share(monkeypatch, capsys):
+TARBALL_SHA = "be1ba7e967f19afd5f2a835a83cc9d04e151d9a3bb733733a4a69483838b33bf"
+TARBALL_REV = "884b970e978ef821d5006bc7bff6bedfd3f84a41"
+
+
+def test_plan_s_runs_the_pinned_tarball_at_its_commit_and_each_box_its_share(monkeypatch,
+                                                                              capsys):
+    # 32.3: the research tarball as masein uploaded it (5 Nov) — its sha256
+    # and the private repository's commit; step2388's file at plan U's
+    assert (fx.PLAN_PINS["S"][fx.TARBALL_S], fx.PLAN_REVISIONS["S"][fx.TARBALL_S]) == (
+        TARBALL_SHA, TARBALL_REV)
+    assert fx.PLAN_PINS["S"]["step2388.k3k6.gguf"] == fx.PLAN_PINS["U"]["step2388.k3k6.gguf"]
     line = ["S1", "--as", SERVED, "--gguf",
             "hf://o/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/step2388.k3k6.gguf",
-            "--server", f"hf://o/evalboard-private@{'a' * 40}/{fx.TARBALL_S}",
+            "--server", f"hf://o/evalboard-private@{TARBALL_REV}/{fx.TARBALL_S}",
             "--switch", "/workspace/switch-inputs.jsonl", "--switch-sha256", "b" * 64]
+    # the tarball at another commit: refused before anything is fetched
+    with pytest.raises(SystemExit) as e:
+        fx.main([*line[:5], "--server", f"hf://o/evalboard-private@{'a' * 40}/{fx.TARBALL_S}",
+                 *line[7:]])
+    assert f"{fx.TARBALL_S} at {'a' * 40}, where plan S fetches it at {TARBALL_REV}" in str(e.value)
+    # and a pin taken away refuses the whole plan
+    monkeypatch.setitem(fx.PLAN_PINS, "S", {**fx.PLAN_PINS["S"], fx.TARBALL_S: None})
     with pytest.raises(SystemExit) as e:
         fx.main(line)
     assert f"plan S's {fx.TARBALL_S} isn't pinned yet" in str(e.value)
-    monkeypatch.setitem(fx.PLAN_PINS, "S", {**fx.PLAN_PINS["S"], fx.TARBALL_S: "c" * 64})
-    monkeypatch.setitem(fx.PLAN_REVISIONS, "S", {**fx.PLAN_REVISIONS["S"], fx.TARBALL_S: "a" * 40})
+    monkeypatch.setitem(fx.PLAN_PINS, "S", {**fx.PLAN_PINS["S"], fx.TARBALL_S: TARBALL_SHA})
     monkeypatch.setattr(fx, "gpu_refused", lambda label: "")
     got = {}
     monkeypatch.setattr(fx, "run_box", lambda a, label: got.setdefault(label, [
@@ -491,7 +512,7 @@ def test_plan_s_is_refused_until_its_tarball_is_pinned_then_runs_its_share(monke
     for want in (["--runtime", RT], ["--switch", "/workspace/switch-inputs.jsonl"],
                  ["--pin", f"switch-inputs.jsonl={'b' * 64}"], ["--switch-part", "chats"],
                  ["--part", "1/20"], ["--slots", "6"], ["--thinking", "on"],
-                 ["--pin", f"{fx.TARBALL_S}={'c' * 64}"]):
+                 ["--pin", f"{fx.TARBALL_S}={TARBALL_SHA}"]):
         assert " ".join(want) in " ".join(argv)
     assert fx.main(["S21", *line[1:]]) == 0
     assert "--switch-part drift" in " ".join(got["S21"][0]) and "--part" not in got["S21"][0]

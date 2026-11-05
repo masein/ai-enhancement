@@ -116,12 +116,12 @@ easy-set answers, to the same 32,768 as step2388's k3 (its own --as, U40's
 — on runtime k3k6r-0411, the team's research build: S1–S20 a twentieth each
 of Part 2's chats (100), S21 Part 1's drift, each given the inputs file and the sha256
 switch_box.py inputs printed for it (and S1 first, with --switch-check 5, the
-check before the rest are rented; docs/REMOTE-RUNS.md S). Refused until the
-research tarball is pinned (PLAN_PINS["S"]):
+check before the rest are rented; docs/REMOTE-RUNS.md S). The research
+tarball is pinned (PLAN_PINS["S"]), fetched at its own commit:
 
     python scripts/frontier_box.py S1 --as served/step2388-k3k6r-0411 \
         --gguf hf://<you>/evalboard-private@<commit>/step2388.k3k6.gguf \
-        --server hf://<you>/evalboard-private@<commit>/llama-server-k3k6r-917f3d9.tar.gz \
+        --server hf://<you>/evalboard-private@<its commit>/llama-server-k3k6r-917f3d9.tar.gz \
         --switch /workspace/switch-inputs.jsonl --switch-sha256 <its sha256>
 """
 
@@ -457,13 +457,19 @@ PLAN_REVISIONS = {"U": {
 PLAN_PINS["C"], PLAN_REVISIONS["C"] = PLAN_PINS["U"], PLAN_REVISIONS["U"]
 # 32: plan S runs step2388's file as plan U pins it, and the team's research
 # build (teraformer/lda-k3k6-research at 917f3d911) packed by
-# build_llama_tarball.sh on our server as 3ad38b7cc's was. Its sha256 and the
-# private repository's commit are masein's to give once it is uploaded: until
-# then (None) every line of plan S is refused before anything is fetched
+# build_llama_tarball.sh on our server as 3ad38b7cc's was. A pin of None
+# refuses every line of the plan before anything is fetched. 32.3 (masein,
+# 5 Nov): 938,665,085 bytes, in our private repository at 884b970e; its
+# VERSION commit 917f3d91152142e952b7ea128980faa75ba7934b, nothing
+# uncommitted, cuda_archs 120, CUDA 12.8 (nvidia/cuda:12.8.1-devel-ubuntu22.04),
+# built 2026-11-05T09:13:51Z. Its "build 20" is the commit count of the
+# shallow clone it was built from: the runtime holds the build to its commit
+# alone (fb.RUNTIMES["k3k6r-0411"]["build"], no number)
 TARBALL_S = "llama-server-k3k6r-917f3d9.tar.gz"
-PLAN_PINS["S"] = {"step2388.k3k6.gguf": PLAN_PINS["U"]["step2388.k3k6.gguf"], TARBALL_S: None}
+PLAN_PINS["S"] = {"step2388.k3k6.gguf": PLAN_PINS["U"]["step2388.k3k6.gguf"],
+                  TARBALL_S: "be1ba7e967f19afd5f2a835a83cc9d04e151d9a3bb733733a4a69483838b33bf"}
 PLAN_REVISIONS["S"] = {"step2388.k3k6.gguf": PLAN_REVISIONS["U"]["step2388.k3k6.gguf"],
-                       TARBALL_S: None}
+                       TARBALL_S: "884b970e978ef821d5006bc7bff6bedfd3f84a41"}
 # 31.3: step2388's file, for the slots a continuation's 131,072 tokens leave room for
 STEP2388_FILE = 15_994_966_752
 # 31.3b: and the original Qwen3.6 Q2's, for C5's

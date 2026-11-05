@@ -2064,9 +2064,16 @@ cd ~/benchmarks/aienh && LLAMA_CUDA_ARCHS=120 scripts/build_llama_tarball.sh ~/l
 hf upload <you>/evalboard-private ~/llama-server-k3k6r-917f3d9.tar.gz llama-server-k3k6r-917f3d9.tar.gz
 ```
 
-Its sha256 and the upload's commit go in `frontier_box.PLAN_PINS["S"]` and
-`PLAN_REVISIONS["S"]`. Until then every line of plan S is refused before
-anything is fetched.
+Pinned (32.3, masein 5 Nov) in `frontier_box.PLAN_PINS["S"]` and
+`PLAN_REVISIONS["S"]`: 938,665,085 bytes, sha256
+`be1ba7e967f19afd5f2a835a83cc9d04e151d9a3bb733733a4a69483838b33bf`, in the private repository at
+`884b970e978ef821d5006bc7bff6bedfd3f84a41`. Its VERSION: commit
+`917f3d91152142e952b7ea128980faa75ba7934b`, nothing uncommitted,
+`cuda_archs 120`, CUDA 12.8 (`nvidia/cuda:12.8.1-devel-ubuntu22.04`), built
+2026-11-05T09:13:51Z. Its `build 20` is only the commit count of the shallow
+clone it was built from: the box holds the build to its commit, never to a
+build number. A line naming another commit for it is refused before anything
+is fetched.
 
 **The steps.** Rent nothing before masein's yes, and not before plan C.
 
@@ -2093,7 +2100,7 @@ anything is fetched.
    was as said. There is no bundle:
 
    ```bash
-   python scripts/frontier_box.py S1 --as served/step2388-k3k6r-0411 --gguf hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/step2388.k3k6.gguf --server hf://<you>/evalboard-private@<its commit>/llama-server-k3k6r-917f3d9.tar.gz --switch /workspace/switch-inputs.jsonl --switch-sha256 <its sha256> --switch-check 5
+   python scripts/frontier_box.py S1 --as served/step2388-k3k6r-0411 --gguf hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/step2388.k3k6.gguf --server hf://<you>/evalboard-private@884b970e978ef821d5006bc7bff6bedfd3f84a41/llama-server-k3k6r-917f3d9.tar.gz --switch /workspace/switch-inputs.jsonl --switch-sha256 <its sha256> --switch-check 5
    ```
 
 4. **Plan S:** the same line on each box, without `--switch-check`, with
