@@ -2241,8 +2241,9 @@ def _main(argv: list[str] | None = None) -> int:
                if a.switch_part == "chats" else
                f"Part 1: {len(s_lines):,} chats, both directions, five runs each forced along "
                f"the reference's {sw.REF_TOKENS} tokens")
-            + f" · the limits k6 {sw.LIMITS[6]:,}, k3 {sw.LIMITS[3]:,}; each path's settings "
-            "the file's, never sent")
+            + (f" · each turn's limit what is left of the apps' {sw.APP_CONTEXT:,} tokens"
+               if a.switch_part != "drift" else "") + "; each path's settings the file's, "
+            "never sent")
 
     srv_proc = Server(srv, gguf_path, a.port, a.slots, ctx, flags, extra_env, out / SERVER_LOG)
     status = "failed"
@@ -2330,16 +2331,17 @@ def _main(argv: list[str] | None = None) -> int:
                 if not chk["pass"]:
                     raise SystemExit(f"the settings check of expert path k{path} failed — "
                                      + "; ".join(chk["mismatches"]) + ". Nothing was asked")
-            # 32.2: and the thinking kept in the chat, as the apps keep it
+            # 32.4: and the history as the apps send it — an earlier reply
+            # without its thinking written with an empty think block
             # (--reasoning-preserve with the file's own template) — or nothing
             # is asked
-            pc = sw.preserve_check(srv_proc.base, last_session(out / SERVER_LOG))
-            server["preserve_check"] = pc
-            say(sw.preserve_words(pc, server.get("chat_template_sha256")))
+            pc = sw.history_check(srv_proc.base, last_session(out / SERVER_LOG))
+            server["history_check"] = pc
+            say(sw.history_words(pc, server.get("chat_template_sha256")))
             if not pc["pass"]:
-                raise SystemExit("the earlier thinking isn't kept in the chat this server "
-                                 "renders — the experiment measures a chat that keeps it. "
-                                 "Nothing was asked")
+                raise SystemExit("this server doesn't write the history as the apps send it (an "
+                                 "earlier reply without its thinking, an empty think block where "
+                                 "it was). Nothing was asked")
         elif a.runtime and fb.RUNTIMES[a.runtime].get("paths"):
             import path_check
             path = fb.path_of(a.runtime, thinking)
@@ -2488,8 +2490,10 @@ def _main(argv: list[str] | None = None) -> int:
             ok = sw.run_check(srv_proc.base, s_lines, out, a.slots, say, out / SERVER_LOG,
                               a.switch_check)
             say("the switch check: " + ("every memory as said — arm A re-read at every switch, "
-                                        "arm B kept the conversation up to the previous "
-                                        "question, the token ids' way the chat's: rent S1–S21"
+                                        "arm B's memory came back as the apps' next request "
+                                        "brought A's (a k3 reply kept to its end, a k6 reply "
+                                        "rolled back to its question), and no earlier thinking "
+                                        "in a prompt: rent S1–S9"
                                         if ok else "NOT every memory as said — don't rent "
                                         "plan S yet") + f" · {out / sw.CHECK}")
             return 0 if ok else 1

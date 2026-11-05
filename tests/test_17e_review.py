@@ -178,8 +178,11 @@ def test_2_3_each_plan_runs_every_benchmark_once_one_line_a_box():
                     assert slots == fbx.fits(continue_box.context(spec), size)
                     continue
                 if fbx.is_switch((th, tasks, shard, slots)):   # 32: plan S, as many as fit
-                    assert slots == fbx.fits(fbx.switch_context((th, tasks, shard, slots)),
-                                             fbx.STEP2388_FILE)
+                    room = fbx.fits(fbx.switch_context((th, tasks, shard, slots)),
+                                    fbx.STEP2388_FILE)
+                    # 32.4: the chats at the apps' 16,384, 16 of the 60 that
+                    # fit — eight chats at a time, the pace plan C measured
+                    assert slots == (16 if fbx.SWITCH in tasks else room) <= room
                     continue
                 assert fb.slot_context(list(tasks), th == "on") * slots <= rg.MAX_CONTEXT
         # 20: plan L asks thinking on only, and has no parity step (the
@@ -205,7 +208,7 @@ def test_2_3_each_plan_runs_every_benchmark_once_one_line_a_box():
         # 31.3: plan C, U-cont — each path's cut answers continued, k6 in thirds
         if name == "C":
             want = {("on", fbx.CONT), ("off", fbx.CONT)}
-        # 32: plan S, the switch experiment — Part 2's chats in twentieths, Part 1 whole
+        # 32: plan S, the switch experiment — Part 2's chats in eighths, Part 1 whole
         if name == "S":
             want = {("on", fbx.SWITCH), ("on", fbx.DRIFT)}
         assert set(have) == want, name

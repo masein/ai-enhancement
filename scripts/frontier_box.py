@@ -113,8 +113,8 @@ easy-set answers, to the same 32,768 as step2388's k3 (its own --as, U40's
         --continue /workspace/cont-k6.jsonl --continue-sha256 <its sha256>
 
 32: plan S, switching mode mid-chat with the memory kept (scripts/switch_box.py)
-— on runtime k3k6r-0411, the team's research build: S1–S20 a twentieth each
-of Part 2's chats (100), S21 Part 1's drift, each given the inputs file and the sha256
+— on runtime k3k6r-0411, the team's research build: S1–S8 an eighth each
+of Part 2's chats (250), S9 Part 1's drift, each given the inputs file and the sha256
 switch_box.py inputs printed for it (and S1 first, with --switch-check 5, the
 check before the rest are rented; docs/REMOTE-RUNS.md S). The research
 tarball is pinned (PLAN_PINS["S"]), fetched at its own commit:
@@ -358,16 +358,17 @@ PLANS: dict[str, dict[str, list[Step]]] = {
     },
 }
 # 32: plan S, switching mode mid-chat with the memory kept (brief 32, after
-# plan C): Part 2's 2,000 chats in twentieths — 100 a box, about 6 h (masein,
-# 5 Nov: half the wall clock of tenths, and less lost if a box dies) — and
-# Part 1's 200 chats in both
-# directions on one box, 18 slots of 65,536 (three jobs of five runs). 32.2:
-# the thinking kept in the chat, a chat's slot 196,608 tokens (turn 3's k6
-# reply stays for turn 5's): 6 fit a 5090 — three chats, each in a pair of
-# slots (arm A and arm B). The check before it is rented: S1's line with
-# --switch-check 5
-PLANS["S"] = {**{f"S{i}": [("on", (SWITCH,), f"{i}/20", 6)] for i in range(1, 21)},
-              "S21": [("on", (DRIFT,), "", 18)]}
+# plan C): Part 2's 2,000 chats shared out over boxes of about 6 h at most
+# (masein, 5 Nov: less lost if a box dies), and Part 1's 200 chats in both
+# directions on one box, 18 slots of 65,536 (three jobs of five runs). 32.4
+# (Kevin and Roohi's review): the chats capped at the apps' 16,384 tokens,
+# no thinking in the history — a chat's slot 16,384, the 5090 holding about
+# 60 beside the file; 16 a box, eight chats at a time (each in a pair of
+# slots, arm A and arm B), where plan C's boxes measured 383 tokens a second
+# at eight. An eighth of the chats a box, 250, about 4.2 h. The check before
+# it is rented: S1's line with --switch-check 5
+PLANS["S"] = {**{f"S{i}": [("on", (SWITCH,), f"{i}/8", 16)] for i in range(1, 9)},
+              "S9": [("on", (DRIFT,), "", 18)]}
 # 29: plan D, our own boxes — a quarter of every benchmark on each of a
 # station's four GPUs, longest first (frontier_box's paces), then instruction
 # following with thinking on and off. Every slot holds Bolt's 64K
@@ -497,17 +498,15 @@ CONT_SIZE = {("on", CONT): {"answers": 326, "write": 8_093_696, "read": 24_600_0
 # faster — and read (a guess the check's timings replace)
 CONT_TOK_S = {"on": 220.0, "off": 330.0}
 CONT_READ_TOK_S = 2_500.0
-# 32: plan S's hours a box, at plan U's paces (step8804's measured, 8 slots):
-# a chat's five turns in both arms about 171 box-seconds (its two k6 turns,
-# GPQA Diamond or MATH Level 5 then the facts' sum, most of it; the k3 turns
-# a second or two each; the chat read again at each switch in arm A), and a
-# drift job's five runs about 45 (their reads, at 1k to 48k tokens of memory,
-# and 512 tokens each forced). 32.2: six sequences at a time where eight
-# were paced (about 1.2 times the box-time an answer), turn 3's thinking
-# (about 15,000 tokens, step2388's GPQA Diamond and MATH Level 5 means) read
-# again in arm A at turns 4 and 5 and replayed in arm B: about 215. A guess
-# the check's timings replace
-SWITCH_PACE = {SWITCH: 215.0, DRIFT: 45.0}
+# 32: plan S's hours a box. A drift job's five runs about 45 box-seconds
+# (their reads, at 1k to 48k tokens of memory, and 512 tokens each forced).
+# 32.4: a chat's five turns in both arms about 60 — about 17,500 tokens
+# written (turn 3, k6, about 6,000 an arm: its questions' k6 replies in plan U
+# finished within 10,240, `inputs` prints their median; turn 5, k6, about
+# 2,000; the k3 turns about 750 together) at plan C's 383 a second, and
+# about 25,000 read (arm A's three re-reads, arm B's replays, the probes) at
+# about 2,500. A guess the check's timings replace
+SWITCH_PACE = {SWITCH: 60.0, DRIFT: 45.0}
 # 31.2: the boxes that run another model than their plan's — U40 the original
 # Qwen3.6-35B-A3B's Q2 file, for the easy set beside step2388's k3 path
 BOX_MODELS = {"U40": "served/Qwen3.6-35B-A3B-Q2-k3k6-2611",
@@ -945,7 +944,7 @@ def parser() -> argparse.ArgumentParser:
                                            "I1 (25: instruction following), T1 … T3 (30.1), "
                                            "U1 … U37 (31.1: step2388), U38 … U40 (31.2: "
                                            "DeviceMark and the easy set), C1 … C5 (31.3: "
-                                           "U-cont), S1 … S21 (32: switching mode mid-chat)")
+                                           "U-cont), S1 … S9 (32: switching mode mid-chat)")
     ap.add_argument("then", nargs="*", help="18e point 1: more labels, run one after another "
                                             "on this box (L1 L2): each later one's line is "
                                             "written \"queued\" at the start, so the fetch "
@@ -1058,7 +1057,7 @@ def main(argv: list[str] | None = None) -> int:
             ap.error(f"{box}: give --switch with plan S's inputs file and --switch-sha256 with "
                      "its sha256, as switch_box.py inputs printed them")
         if not sws and (a.switch or a.switch_sha256 or a.switch_check):
-            ap.error("--switch is for plan S's boxes alone (S1 … S21)")
+            ap.error("--switch is for plan S's boxes alone (S1 … S9)")
         unpinned = [n for n, v in (PLAN_PINS.get(box[:1]) or {}).items() if v is None]
         if unpinned:
             raise SystemExit(f"{box}: plan {box[:1]}'s {', '.join(unpinned)} isn't pinned yet — "

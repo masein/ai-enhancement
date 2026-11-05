@@ -1,11 +1,12 @@
-"""32.1 and 32.2 in a real browser, at 1280 and 400 px, light and dark:
+"""32.1, 32.2 and 32.4 in a real browser, at 1280 and 400 px, light and dark:
 Reports ▸ "Switching mode mid-chat", internal — empty until plan S is
 imported, then its tiles, Part 2 by turn and arm (B − A with McNemar's p,
 loops, ran out, no answer, length, cache_n, prompt_n and each reply's round
-trip; turn 3 by question, the wrong recalls, the replies that came back
-otherwise) and Part 1 by memory size, direction and run. The summary is the
-import's own (switch_box.summarise) over made-up chats and drift runs; no
-question text anywhere."""
+trip as the apps' next request reads it; turn 3 by question, the wrong
+recalls, turn 4 by reply 2, the replies that came back otherwise, the apps'
+16,384-token cap) and Part 1 by memory size, direction and run, 48k a stress
+test apart. The summary is the import's own (switch_box.summarise) over
+made-up chats and drift runs; no question text anywhere."""
 
 from __future__ import annotations
 
@@ -50,13 +51,16 @@ def made_up(d: Path, n: int = 200) -> None:
             p = {1: 0.88, 2: 0.95, 3: 0.62, 4: 0.97, 5: 0.9}[t]
             a = arm(rng, p, path, 0 if switch else 400 * (t - 1), 900 + 300 * t, t)
             b = arm(rng, p - (0.03 if t in (3, 4) else 0), path, 380 * (t - 1), 220, t)
-            # 32.2: one GSM8K reply in eight comes back otherwise, rolled back
+            # 32.4: a k3 reply kept to its end, a k6 reply rolled back to its
+            # question — but one GSM8K reply in eight, which comes back otherwise
             back = t == 2 and i % 8 == 0
+            k6 = path == 6
             turns.append({"turn": t, "path": path, "from": sw.TURNS[t - 2] if t > 1 else None,
-                          "arms": {"A": a, "B": b},
-                          "probe": {"exact": not back, "rolled_back": 240 if back else 0,
-                                    "before_question": False, "end": 1000, "cache_n": 760
-                                    if back else 1000},
+                          "arms": {"A": a, "B": b}, "room": 16_384 - 900 - 300 * t,
+                          "probe": {"came_back": "to its question" if k6 or back else "to its end",
+                                    "as_apps": not back, "rolled_back": 9000 if k6 else 240
+                                    if back else 0, "end": 1000, "start": 760,
+                                    "cache_n": 760 if k6 or back else 1000},
                           "memory": {"A": "", "B": "" if rng.random() > 0.005 else "no line"}})
         rows.append({"chat": i, "turns": turns, "stopped": ""})
     (d / "chats").mkdir(exist_ok=True)
@@ -76,7 +80,7 @@ def made_up(d: Path, n: int = 200) -> None:
     (d / "drift").mkdir(exist_ok=True)
     (d / "drift" / "box.jsonl").write_text("".join(json.dumps(r) + "\n" for r in drift))
     (d / "imports.json").write_text(json.dumps({"imports": [
-        {"bundle": "switch-served-…-chats-shard-1-of-20.tar.gz", "what": "chats", "part": "1/20",
+        {"bundle": "switch-served-…-chats-shard-1-of-8.tar.gz", "what": "chats", "part": "1/8",
          "chats": n, "at": "2026-11-06T10-00-00", "gpu": "NVIDIA GeForce RTX 5090"},
         {"bundle": "switch-served-…-drift.tar.gz", "what": "drift", "part": None, "chats": 48,
          "at": "2026-11-06T10-05-00", "gpu": "NVIDIA GeForce RTX 5090"}]}))
@@ -122,7 +126,17 @@ def test_the_report_shows_both_parts_from_the_summary_kept(live, page, width, sc
     # 32.2: each reply's round trip, and those that came back otherwise
     assert page.inner_text("[data-sw-trip='1']") == "200 of 200"
     assert page.inner_text("[data-sw-trip='2']") == "175 of 200"
-    assert "Reply 2 came back otherwise 25 times: rolled back 240 tokens (median)" in more
+    assert page.inner_text("[data-sw-trip='3']") == "200 of 200"
+    assert ("Reply 2 came back otherwise 25 times: to its question 25; rolled back 240 tokens "
+            "(median)") in more
+    # 32.4: turn 4 by reply 2, the apps' cap, and 48k a stress test apart
+    split = page.inner_text("[data-sw-split='4']")
+    assert split.startswith("Turn 4 by reply 2: where it came back as written, B kept k3’s "
+                            "memory alone — 17")             # of 175, those counted
+    assert "where it didn’t, k6 had read turn 2 again — 25 chats" in split
+    assert "the apps’ 16,384 tokens" in page.inner_text("[data-sw-cap]")
+    assert page.inner_text("[data-sw-stress]") == "Stress test: beyond the apps’ 16,384-token cap"
+    assert "stress test" in page.inner_text("[data-sw-drift-row='49152|k3→k6|A2']")
     assert "Not tested: chats saved to disk" in page.inner_text("[data-report-section='sw-notes']")
     assert "rec1" not in page.inner_text("body")                # no question ids or text
     assert no_sideways(page), "the page scrolls sideways"

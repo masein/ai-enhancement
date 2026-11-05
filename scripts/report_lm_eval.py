@@ -31818,7 +31818,7 @@ function vSwitch(id, d, back) {
     el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-sw-turns': '1' },
       el('thead', {}, el('tr', {}, ['Turn', 'Path', 'Counted', 'A', 'B', 'B − A', 'p',
         'Loops A / B', 'Ran out A / B', 'No answer A / B', 'Tokens A / B (median)',
-        'cache_n A / B', 'prompt_n A / B', 'Round trip'].map(h => el('th', { text: h })))),
+        'cache_n A / B', 'prompt_n A / B', 'Round trip, as the apps’'].map(h => el('th', { text: h })))),
       el('tbody', {}, p2.turns.map(t => el('tr', { 'data-sw-turn': t.turn },
         el('td', {}, el('b', { text: String(t.turn) }), ' · ' + t.words),
         el('td', { text: (t.switch ? 'switch to ' : '') + 'k' + t.path }),
@@ -31834,9 +31834,10 @@ function vSwitch(id, d, back) {
         el('td', { class: 'num', text: `${swN(arm(t, 'A', 'tokens'))} / ${swN(arm(t, 'B', 'tokens'))}` }),
         el('td', { class: 'num', text: `${swN(arm(t, 'A', 'cache_n'))} / ${swN(arm(t, 'B', 'cache_n'))}` }),
         el('td', { class: 'num', text: `${swN(arm(t, 'A', 'prompt_n'))} / ${swN(arm(t, 'B', 'prompt_n'))}` }),
-        // 32.2: the reply read again by the next request, token for token or not
+        // 32.4: the reply as the apps' next request reads it — a k3 reply
+        // kept to its end, a k6 reply rolled back to its question — or not
         el('td', { class: 'num', 'data-sw-trip': t.turn, text: t.round_trip
-          ? `${swN(t.round_trip.exact)} of ${swN(t.round_trip.measured)}` : '—' })))))),
+          ? `${swN(t.round_trip.as_apps)} of ${swN(t.round_trip.measured)}` : '—' })))))),
     el('ul', { class: 'rp-notes', 'data-sw-more': '1' },
       el('li', { text: `Loops at the two switches to k6, pooled: A ${swN(p2.switch_k6_loops.only_a)} `
         + `alone, B ${swN(p2.switch_k6_loops.only_b)} alone, of ${swN(p2.switch_k6_loops.n)} `
@@ -31847,13 +31848,26 @@ function vSwitch(id, d, back) {
       ...p2.turns.filter(t => t.clustered).map(t => el('li', { text: 'Turn 3 by question '
         + `(${swN(t.clustered.questions)} questions): B more right on `
         + `${swN(t.clustered.b_more)}, A on ${swN(t.clustered.a_more)} · p ${swP(t.clustered.p)}` })),
-      ...p2.turns.filter(t => t.round_trip && t.round_trip.rolled_back).map(t => el('li', {
-        'data-sw-rolled': t.turn, text: `Reply ${t.turn} came back otherwise ${swN(t.round_trip.rolled_back)} `
-          + `times: rolled back ${swN(t.round_trip.median_back)} tokens (median)`
-          + (t.round_trip.before_question ? `, ${swN(t.round_trip.before_question)} of them further `
-            + 'than its question' : '') })),
+      // 32.4: turn 4 apart where reply 2 didn't come back as written (k6 read
+      // turn 2 again at turn 3, the courier and the gate with it)
+      ...p2.turns.filter(t => t.by_reply_2).map(t => el('li', { 'data-sw-split': '4',
+        text: 'Turn 4 by reply 2: where it came back as written, B kept k3’s memory alone — '
+          + `${swN(t.by_reply_2.k3_alone.n)} chats, B − A ${swDiff(t.by_reply_2.k3_alone)}, p `
+          + `${swP(t.by_reply_2.k3_alone.p)}; where it didn’t, k6 had read turn 2 again — `
+          + `${swN(t.by_reply_2.k6_read_turn_2.n)} chats, B − A `
+          + `${swDiff(t.by_reply_2.k6_read_turn_2)}, p ${swP(t.by_reply_2.k6_read_turn_2.p)}` })),
+      ...p2.turns.filter(t => t.round_trip && t.round_trip.otherwise).map(t => el('li', {
+        'data-sw-rolled': t.turn, text: `Reply ${t.turn} came back otherwise `
+          + `${swN(t.round_trip.otherwise)} times: `
+          + Object.entries(t.round_trip.otherwise_came_back || {})
+            .filter(([, v]) => v).map(([k, v]) => `${k} ${swN(v)}`).join(', ')
+          + `; rolled back ${swN(t.round_trip.median_back)} tokens (median)` })),
       ...Object.entries(p2.stopped || {}).map(([k, v]) => el('li', {
-        text: `${swN(v)} chats stopped at ${k}: the chat and its limit outgrow the slot` })),
+        text: `${swN(v)} chats stopped at ${k}: the chat fills the apps’ `
+          + `${swN(p2.app_context)} tokens` })),
+      p2.app_context ? el('li', { 'data-sw-cap': '1', text: 'Each turn’s limit what is left of '
+        + `the apps’ ${swN(p2.app_context)} tokens; turn 3’s questions those whose k6 replies `
+        + `in plan U finished within ${swN(p2.hard_max)} tokens` }) : '',
       el('li', { text: p2.protocol }))) : null;
   const part1 = p1 && p1.jobs ? el('div', { class: 'card', 'data-report-section': 'sw-part1' },
     el('h2', { text: 'Part 1: drift at the switch' }),
@@ -31865,16 +31879,23 @@ function vSwitch(id, d, back) {
     el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-sw-drift': '1' },
       el('thead', {}, el('tr', {}, ['Memory', 'Direction', 'Run', 'Chats', 'First-token KL',
         'Mean KL', 'Flips / 1,000', 'First flip'].map(h => el('th', { text: h })))),
-      el('tbody', {}, p1.rows.flatMap(r => Object.entries(r.runs).map(([k, x], i) =>
+      // 32.4: 48k a stress test, after the main sizes, said
+      el('tbody', {}, [...p1.rows.filter(r => !r.stress), ...p1.rows.filter(r => r.stress)]
+        .flatMap((r, j, all) => [
+          r.stress && !(all[j - 1] || {}).stress ? el('tr', { 'data-sw-stress': '1' },
+            el('td', { colspan: 8, class: 'small' }, el('b', { text: 'Stress test: beyond the '
+              + 'apps’ 16,384-token cap' }))) : null,
+          ...Object.entries(r.runs).map(([k, x], i) =>
         el('tr', { 'data-sw-drift-row': `${r.bin}|${r.direction}|${k}` },
-          el('td', { text: i ? '' : `about ${swN(r.bin)} (median ${swN(r.memory)})` }),
+          el('td', { text: i ? '' : `about ${swN(r.bin)} (median ${swN(r.memory)})`
+            + (r.stress ? ' · stress test' : '') }),
           el('td', { text: i ? '' : r.direction }),
           el('td', { text: p1.runs[k] || k }),
           el('td', { class: 'num', text: swN(x.n) + (x.not_counted ? ` (${swN(x.not_counted)} not)` : '') }),
           el('td', { class: 'num', text: swKl(x.first_kl) }),
           el('td', { class: 'num', text: swKl(x.mean_kl) }),
           el('td', { class: 'num', text: x.flips_per_1000 == null ? '—' : x.flips_per_1000.toFixed(1) }),
-          el('td', { class: 'num', text: swN(x.first_flip) }))))))),
+          el('td', { class: 'num', text: swN(x.first_flip) })))].filter(Boolean))))),
     el('p', { class: 'small se', text: p1.protocol })) : null;
   const notes = el('div', { class: 'card', 'data-report-section': 'sw-notes' },
     el('h2', { text: 'How to read it' }),
