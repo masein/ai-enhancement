@@ -71,7 +71,13 @@ said in the server's own log line — and each response's cache_n, prompt_n
 and cached_tokens. It answers the switch experiment's turns (a choice, a
 number, the facts it was told, their (a×b)/(a+b)), and /completion with
 token ids greedily with n_probs; a slot whose memory another path computed
-answers a little differently (MIXED_EVERY)."""
+answers a little differently (MIXED_EVERY). 32.2: started with
+--reasoning-preserve, an earlier reply is written with its thinking (each
+k3 reply with k3's empty block), so a reply comes back as it was written —
+but for a reply ending in TRIMMED, which the template drops (a reply whose
+text doesn't come back, and rolls the memory back); --ctx-checkpoints N
+keeps N checkpoints a slot; the last token a request writes is never in the
+memory, as the server keeps it."""
 
 from __future__ import annotations
 
@@ -204,13 +210,24 @@ def mem_id(w: str) -> int:
     return int(hashlib.sha256(w.encode()).hexdigest()[:7], 16)
 
 
-def mem_words(msgs: list[dict], path: int) -> list[str]:
+# a reply's last word the template drops (as Qwen's trims a reply's end)
+TRIMMED = "⏎"
+
+
+def mem_words(msgs: list[dict], path: int, preserve: bool = False) -> list[str]:
     """Qwen's chat template, a word a token: each turn between its markers, an
-    earlier reply's content alone (its thinking dropped), then the path's
-    generation prompt"""
+    earlier reply's content alone (its thinking dropped) — 32.2: or, with the
+    thinking kept, "<think>", its thinking, "</think>" and its content (k3's
+    empty block too), the content trimmed — then the path's generation prompt"""
     out = []
     for m in msgs:
-        out += [f"<|im_start|>{m.get('role')}", *str(m.get("content") or "").split(), END]
+        words = str(m.get("content") or "").split()
+        if m.get("role") == "assistant" and preserve:
+            words = words[:-1] if words and words[-1] == TRIMMED else words
+            out += [ASSISTANT, "<think>", *str(m.get("reasoning_content") or "").split(),
+                    "</think>", *words, END]
+            continue
+        out += [f"<|im_start|>{m.get('role')}", *words, END]
     return out + GEN.get(path, GEN[3])
 
 
@@ -219,11 +236,12 @@ class Memory:
     another path computed part of them, and its checkpoints (each the tokens
     before it)"""
 
-    def __init__(self):
+    def __init__(self, keep: int = MAX_CHECKPOINTS):
         self.tokens: list[int] = []
         self.path = 0
         self.mixed = False
         self.cps: list[int] = []
+        self.keep = keep
 
     def launch(self, sid: int, path: int, keep: bool) -> None:
         """launch_slot_with_task: a path change keeps the memory (with
@@ -283,7 +301,7 @@ class Memory:
             make = make and (not self.cps or start == last_user
                              or start > self.cps[-1] + MIN_STEP)
             if make:
-                self.cps = (self.cps + [start])[-MAX_CHECKPOINTS:]
+                self.cps = (self.cps + [start])[-self.keep:]
         self.tokens = list(prompt)
 
 
@@ -300,11 +318,10 @@ def mem_reply(msgs: list[dict], path: int, mixed: bool) -> tuple[str, str]:
     think = "Thinking it through." if path == 6 else ""
     facts = {k: (re.findall(p, said) or [""])[-1] for k, p in (
         ("courier", r"courier's name is (\w+)"), ("code", r"locker code is (\d+)"),
-        ("ship", r"ship is called the (\w+)"), ("crates", r"carries (\d+) crates"))}
+        ("gate", r"gate number is (\d+)"), ("crates", r"has (\d+) crates"))}
     if "Write them out now" in q:
-        ship = (facts["ship"] + "x") if mixed else facts["ship"]
-        return think, (f"courier: {facts['courier']}\nlocker code: {facts['code']}\n"
-                       f"ship: {ship}\ncrates: {facts['crates']}")
+        courier = (facts["courier"] + "x") if mixed else facts["courier"]
+        return think, f"courier: {courier}\ngate: {facts['gate']}"
     if "(a × b) / (a + b)" in q:
         a, b = int(facts["code"] or 0), int(facts["crates"] or 0)
         f = fractions.Fraction(a * b, a + b) if a + b else fractions.Fraction(0)
@@ -314,7 +331,9 @@ def mem_reply(msgs: list[dict], path: int, mixed: bool) -> tuple[str, str]:
         right = next((k for k, v in opts.items() if v.startswith("right")), "A")
         return think, f"The options compared.\nANSWER: {right}"
     m = re.search(r"\(answer (-?\d+)\)", q)
-    return think, f"Worked through it.\nANSWER: {m[1] if m else 0}"
+    # a GSM8K reply ends in a word the template drops: it doesn't come back
+    return think, f"Worked through it.\nANSWER: {m[1] if m else 0}" + (
+        f" {TRIMMED}" if "Solve the following math problem" in q else "")
 
 
 def mem_next(path: int, last: int, k: int, mixed: bool) -> list[tuple[int, float]]:
@@ -389,7 +408,14 @@ def main() -> int:
     paths_on = os.environ.get("FAKE_LLAMA_PATHS") == "1"
     cont_on = os.environ.get("FAKE_LLAMA_CONTINUE") == "1"
     mem_on = os.environ.get("FAKE_LLAMA_MEMORY") == "1"
-    memories = [Memory() for _ in range(slots)]
+    # FAKE_LLAMA_PRESERVE=off: a template that keeps no earlier thinking, the
+    # flag notwithstanding (and the server says so at start-up)
+    preserve = "--reasoning-preserve" in argv and os.environ.get("FAKE_LLAMA_PRESERVE") != "off"
+    if "--reasoning-preserve" in argv and not preserve:
+        print("srv          init: chat template does NOT support preserving reasoning, "
+              "--reasoning-preserve has no effect", flush=True)
+    memories = [Memory(int(arg(argv, "--ctx-checkpoints", "-ctxcp", default=str(MAX_CHECKPOINTS))))
+                for _ in range(slots)]
 
     def thinks(body: dict) -> bool:
         if paths_on and "expert_path" in body:
@@ -577,7 +603,7 @@ def main() -> int:
                     probs.append({"id": top[0][0], "logprob": math.log(top[0][1]),
                                   "top_logprobs": [{"id": t, "logprob": math.log(p)}
                                                    for t, p in top[:int(body.get("n_probs") or 0)]]})
-                m.tokens = m.tokens + out
+                m.tokens = m.tokens + out[:-1]          # the last one written is never read
             return self._send(200, {"content": " ".join(f"t{t}" for t in out), "tokens": out,
                                     "completion_probabilities": probs if body.get("n_probs") else [],
                                     "stop": True, "tokens_evaluated": len(prompt),
@@ -588,7 +614,7 @@ def main() -> int:
             """32: a chat turn on the slot's memory"""
             msgs = body.get("messages") or []
             path = int(body.get("expert_path") or 3)
-            prompt = [tok_id(w) for w in mem_words(msgs, path)]
+            prompt = [tok_id(w) for w in mem_words(msgs, path, preserve)]
             sid, m = self.mem_slot(body)
             with lock:
                 m.launch(sid, path, bool(body.get("keep_cache_across_paths")))
@@ -619,7 +645,7 @@ def main() -> int:
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)))
             if mem_on and self.path == "/apply-template":
                 return self._send(200, {"prompt": " ".join(mem_words(
-                    body.get("messages") or [], int(body.get("expert_path") or 3)))})
+                    body.get("messages") or [], int(body.get("expert_path") or 3), preserve))})
             if mem_on and self.path == "/completion" and isinstance(body.get("prompt"), list) \
                     and "id_slot" in body:
                 if log:

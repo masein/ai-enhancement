@@ -358,11 +358,13 @@ PLANS: dict[str, dict[str, list[Step]]] = {
     },
 }
 # 32: plan S, switching mode mid-chat with the memory kept (brief 32, after
-# plan C): Part 2's 2,000 chats in tenths, 10 slots of 114,688 tokens (five
-# chats, each in a pair of slots: arm A and arm B), and Part 1's 200 chats in
-# both directions on one box, 18 slots of 65,536 (three jobs of five runs).
-# The check before it is rented: S1's line with --switch-check 5
-PLANS["S"] = {**{f"S{i}": [("on", (SWITCH,), f"{i}/10", 10)] for i in range(1, 11)},
+# plan C): Part 2's 2,000 chats in tenths, and Part 1's 200 chats in both
+# directions on one box, 18 slots of 65,536 (three jobs of five runs). 32.2:
+# the thinking kept in the chat, a chat's slot 196,608 tokens (turn 3's k6
+# reply stays for turn 5's): 6 fit a 5090 — three chats, each in a pair of
+# slots (arm A and arm B). The check before it is rented: S1's line with
+# --switch-check 5
+PLANS["S"] = {**{f"S{i}": [("on", (SWITCH,), f"{i}/10", 6)] for i in range(1, 11)},
               "S11": [("on", (DRIFT,), "", 18)]}
 # 29: plan D, our own boxes — a quarter of every benchmark on each of a
 # station's four GPUs, longest first (frontier_box's paces), then instruction
@@ -492,8 +494,12 @@ CONT_READ_TOK_S = 2_500.0
 # GPQA Diamond or MATH Level 5 then the facts' sum, most of it; the k3 turns
 # a second or two each; the chat read again at each switch in arm A), and a
 # drift job's five runs about 45 (their reads, at 1k to 48k tokens of memory,
-# and 512 tokens each forced). A guess the check's timings replace
-SWITCH_PACE = {SWITCH: 171.0, DRIFT: 45.0}
+# and 512 tokens each forced). 32.2: six sequences at a time where eight
+# were paced (about 1.2 times the box-time an answer), turn 3's thinking
+# (about 15,000 tokens, step2388's GPQA Diamond and MATH Level 5 means) read
+# again in arm A at turns 4 and 5 and replayed in arm B: about 215. A guess
+# the check's timings replace
+SWITCH_PACE = {SWITCH: 215.0, DRIFT: 45.0}
 # 31.2: the boxes that run another model than their plan's — U40 the original
 # Qwen3.6-35B-A3B's Q2 file, for the easy set beside step2388's k3 path
 BOX_MODELS = {"U40": "served/Qwen3.6-35B-A3B-Q2-k3k6-2611",

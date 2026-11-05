@@ -525,14 +525,21 @@ FILE_SAMPLING = {"served/step2388-k3k6-2611-file"}
 # one server, each conversation pinned to its slot: the experiment's alone,
 # never a row of the board ("experiment"), so the board's checks and steps
 # that name the runtimes of expert paths leave it out
+# 32.2 (masein, 5 Nov — Kevin: the apps): and as the apps run it — every
+# earlier reply's thinking kept in the chat (--reasoning-preserve: the
+# template's preserve_thinking, which step2388's template supports, as plan
+# U's servers said at start-up), and 4 checkpoints a slot (--ctx-checkpoints
+# 4). Neither changes a single answer; both change what a slot's memory holds
 RUNTIMES["k3k6r-0411"] = {
     **{k: v for k, v in RUNTIMES["k3k6-2611"].items() if k not in ("models", "build")},
-    "words": "the team's research build of the joint k3/k6 engine (keep_cache_across_paths): one "
-             "file, two expert paths on one server, each path's sampling and thinking as the GGUF "
-             "stores them, never sent; router norm on, no reasoning flags, no speculative "
-             "decoding, no prompt cache in host memory",
+    "words": "the team's research build of the joint k3/k6 engine (keep_cache_across_paths), run "
+             "as the apps run it: one file, two expert paths on one server, each path's sampling "
+             "and thinking as the GGUF stores them, never sent; router norm on, every earlier "
+             "reply's thinking kept in the chat, 4 checkpoints a slot, no speculative decoding, "
+             "no prompt cache in host memory",
     "env": dict(RUNTIMES["k3k6-2611"]["env"]),
-    "flags": [*RUNTIMES["k3k6-2611"]["flags"], "--cache-ram", "0"],
+    "flags": [*RUNTIMES["k3k6-2611"]["flags"], "--reasoning-preserve", "--ctx-checkpoints", "4",
+              "--cache-ram", "0"],
     "experiment": "switch",
     "models": {"served/step2388-k3k6r-0411": "Qwen/Qwen3.6-35B-A3B"},
     "build": {"words": "the team's llama.cpp-teraformer at 917f3d911 (teraformer/lda-k3k6-research)",

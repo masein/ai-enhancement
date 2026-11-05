@@ -2330,6 +2330,16 @@ def _main(argv: list[str] | None = None) -> int:
                 if not chk["pass"]:
                     raise SystemExit(f"the settings check of expert path k{path} failed — "
                                      + "; ".join(chk["mismatches"]) + ". Nothing was asked")
+            # 32.2: and the thinking kept in the chat, as the apps keep it
+            # (--reasoning-preserve with the file's own template) — or nothing
+            # is asked
+            pc = sw.preserve_check(srv_proc.base, last_session(out / SERVER_LOG))
+            server["preserve_check"] = pc
+            say(sw.preserve_words(pc, server.get("chat_template_sha256")))
+            if not pc["pass"]:
+                raise SystemExit("the earlier thinking isn't kept in the chat this server "
+                                 "renders — the experiment measures a chat that keeps it. "
+                                 "Nothing was asked")
         elif a.runtime and fb.RUNTIMES[a.runtime].get("paths"):
             import path_check
             path = fb.path_of(a.runtime, thinking)

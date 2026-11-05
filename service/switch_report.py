@@ -18,24 +18,34 @@ from . import config
 
 KIND = "switch"
 NOTES = [
+    "Run as the apps run it (Kevin, 5 Nov): each turn the whole chat rendered again, the memory "
+    "reused as far as the new prompt extends it, every earlier reply's thinking kept in the chat "
+    "(--reasoning-preserve), 4 checkpoints a slot (--ctx-checkpoints 4), no prompt cache in host "
+    "memory.",
     "Arm A is the team's default: on a path change the server clears the slot's memory and the "
-    "new path reads the whole chat again. Arm B sends keep_cache_across_paths: the new path "
-    "continues from the memory the other path computed. Both arms see the same text in every "
-    "turn — arm A's earlier replies — with the same seed, so only the memory differs.",
-    "What arm B keeps: the chat template drops each earlier reply's thinking, so the server rolls "
-    "back to the start of the previous question. The previous reply is always read by the new "
-    "path; the memory kept is the chat before the previous question.",
-    "A turn counts only when its memory was what the arm says: arm A cleared at a switch (the "
-    "server's \"clearing\" line, nothing reused), arm B kept it (its \"keeping\" line, and at "
-    "least the chat up to the previous question reused). Turns that weren't are counted apart, "
-    "not scored.",
-    "Turns 1 and 2 run on k3 with the same memory in both arms: a placebo, their difference "
-    "should be noise.",
+    "new path reads the whole chat again, earlier thinking included. Arm B sends "
+    "keep_cache_across_paths: the new path continues from the memory the other path computed, "
+    "and reads only the new message. Both arms see the same text in every turn — arm A's earlier "
+    "replies, thinking included — with the same seed. Before each turn arm A's previous reply is "
+    "replayed in arm B's slot on the path that wrote it, so only the memory differs.",
+    "The facts: a and b are read by k3 (turns 1–2) and used on k6 (turn 5); the courier and the "
+    "gate are read by k6 (turn 3) and recalled on k3 (turn 4).",
+    "A turn counts only when its memory was what the arm says: nothing at turn 1; later, arm A's "
+    "to the new question on the same path and nothing after a switch (the server's \"clearing\" "
+    "line), arm B's to the end of the previous reply (its \"keeping\" line at a switch). Turns "
+    "that weren't are counted apart, not scored.",
+    "Round trip: after each reply, arm A's slot reads the chat to the next question on the same "
+    "path, as the apps' next request does. Token for token means the reply came back as the model "
+    "wrote it and nothing was read again; otherwise the memory rolled back to the latest of its 4 "
+    "checkpoints before the difference.",
+    "Turn 1 is a placebo, both memories empty; turn 2 nearly one (the reply decoded in arm A, "
+    "replayed in arm B).",
     "Loops use the board's rule (the last 200 characters before the end repeat at least three "
     "times in the last 20,000). Turns 1–3 are scored by the board's own scorers; turn 4 by each "
     "fact exactly, turn 5 by the value of (a × b) / (a + b).",
     "McNemar's exact test is on the chats one arm got right and the other didn't. Turn 3 asks "
     "each GPQA Diamond question up to three times; its clustered line tests by question.",
+    "Not tested: chats saved to disk and restored (the apps' slot files).",
 ]
 
 

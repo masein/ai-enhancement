@@ -3,49 +3,65 @@
 keep_cache_across_paths measured on step2388 (brief 32, plan S). An internal
 experiment for the apps: never a row of the board, never in the whitepaper.
 
-The build is the team's research branch (runtime k3k6r-0411, frontier.py):
-both expert paths on one server, each conversation pinned to its own slot,
-no prompt cache in host memory. A request's `keep_cache_across_paths`
-decides what a path change does to the slot's memory: off (the team's
-default, exact) the server clears it and the new path reads the whole
-prompt again; on, the new path continues from the memory the other path
-computed — the full-attention layers' KV cache and the linear-attention
-layers' running state.
+The build is the team's research branch (runtime k3k6r-0411, frontier.py),
+run as the apps run it (Kevin, 5 Nov): each turn the whole chat rendered
+again, the memory reused as far as the prompt extends it, every earlier
+reply's thinking kept in the history (--reasoning-preserve), 4 checkpoints a
+slot (--ctx-checkpoints 4), no prompt cache in host memory. Both expert
+paths on one server, each chat pinned to its own slot. A request's
+`keep_cache_across_paths` decides what a path change does to the slot's
+memory: off (the team's default, exact) the server clears it and the new
+path reads the whole chat again; on, the new path continues from the memory
+the other path computed — the full-attention layers' KV cache and the
+linear-attention layers' running state.
 
 What the source says, and what each check here holds the server to:
-- The chat template drops every earlier turn's thinking, so a new prompt
-  parts from the memory where the previous reply begins, and the server
-  rolls back to its latest checkpoint before that: the start of the previous
-  question (made on every request), or on turn 2 a checkpoint near the end
-  of the first prompt. The previous reply is never in the memory kept: the
-  new path reads it itself. What it keeps is the conversation up to the
-  previous question, computed by the paths that read it.
+- --reasoning-preserve sets the template's preserve_thinking (common/arg.cpp,
+  jinja::caps_apply_preserve_reasoning); step2388's template, as plan U's
+  servers said at start-up, supports it. It writes each earlier reply as
+  "<think>\n" + its thinking (trimmed) + "\n</think>\n\n" + its reply
+  (trimmed) — a k3 reply with the empty block k3's generation prompt holds
+  — so a reply re-rendered is the text the model wrote, and the next prompt
+  extends the memory: nothing rolls back. A reply whose re-render differs
+  (whitespace the template trims, or tokens the tokenizer splits otherwise
+  than the model wrote them) rolls the memory back to the latest of its 4
+  checkpoints before that point, and the path reads the rest again. Each
+  reply's round trip is measured (A's probe).
 - The server's line "expert path kA -> kB: keeping N cached tokens" counts
-  the slot's whole memory, not what survives the rollback; cache_n does.
+  the slot's whole memory; cache_n counts what is reused.
 
-Part 2, the chats (S1–S10): Kevin's five turns, graded by script.
-1. k3: two facts to remember (a name and a number), and an MMLU question.
-2. k3: two more facts, and a GSM8K question.
-3. k6: a GPQA Diamond or MATH Level 5 question — the k3-to-k6 switch.
-4. k3: the four facts recalled, scored exactly — the k6-to-k3 switch. In arm
-   B the second two were read by k6.
-5. k6: (a × b) / (a + b) of a number from turn 1 and one from turn 2, a
-   fraction in lowest terms — the k3-to-k6 switch again.
-Arm A (the switch off) is the writing pass: its replies are the history of
-both arms. Arm B (the switch on) runs beside it, in a slot of its own, each
-turn with the same messages (A's earlier replies) and the same seed. B's own
-reply never stays in its memory (the rollback), so its memory is what a real
-switching chat would hold for that text, and only the memory differs. Each
-turn records cache_n, prompt_n, cached_tokens and the server's line; a
-switch where A didn't re-read, or B didn't keep, is reported and not
-counted. Turns 1–2 hold the same memory in both arms: a placebo.
+Part 2, the chats (S1–S10): Kevin's five turns, graded by script, the facts
+placed so each recall reads them from the other path's memory:
+1. k3: a number to remember (the locker code, a), and an MMLU question.
+2. k3: another number (the crates, b), and a GSM8K question.
+3. k6: two things to remember (a courier's name, a gate number), and a GPQA
+   Diamond or MATH Level 5 question — the k3-to-k6 switch.
+4. k3: the courier and the gate recalled, exactly — read by k6, recalled on
+   k3: the k6-to-k3 switch.
+5. k6: (a × b) / (a + b), a fraction in lowest terms — a and b read by k3,
+   used on k6: the k3-to-k6 switch again.
+Arm A (the switch off) is the writing pass: its replies, thinking included,
+are the history of both arms. Arm B (the switch on) runs beside it in a slot
+of its own, each turn with the same messages and seed. Before each turn,
+A's previous reply is replayed in B's slot on the path that wrote it (B's
+own reply rolled back), so B's memory holds exactly what a real switching
+chat would: the same text as A's, each reply computed by the path that
+wrote it, and only the memory differs. After each turn, A's slot reads the
+chat to the next question on the same path — the probe: what the apps' next
+request does, which says whether the reply came back token for token, and
+how far it rolled back if not. Each turn records cache_n, prompt_n,
+cached_tokens and the server's line; a turn whose memory isn't what its arm
+says is reported and not counted. Turn 1 is a placebo (both memories
+empty), turn 2 nearly one (the reply decoded in A, replayed in B).
 
 Part 1, drift (S11): for each conversation and direction X→Y, five runs of
 its last turn on Y, each forced along A's own greedy reply (the reference):
 - A: Y reads everything fresh — the reference, its first 512 tokens;
 - A′: the same again in another slot (the GPU's own run-to-run noise);
-- N: the previous turn on Y, then the last on Y (B's rollback, no switch);
-- B: the previous turn on X, then the last on Y with the switch on;
+- N: the chat to the end of its previous reply on Y, then the last turn on
+  Y (the memory continued, no switch);
+- B: the chat to the end of its previous reply on X, then the last turn on
+  Y with the switch on;
 - F: X reads everything fresh (the full gap between the paths).
 Part 1's protocol, as DeviceMark's: greedy, no penalties — temperature 0,
 presence_penalty 0, seed 0 — the 20 likeliest tokens' probabilities before
@@ -56,6 +72,8 @@ reference's own text: the rollback to the last question keeps the run's
 memory. Measured against A: the first token's KL, the mean KL per token,
 flips per 1,000 tokens and tokens to the first flip, by memory size and
 direction.
+
+Not tested: chats saved to disk and restored (the apps' slot files).
 
 On the server: `switch_box.py inputs` writes the inputs file (question ids,
 the invented facts, step2388's stored replies for Part 1's histories — no
@@ -97,10 +115,12 @@ STEP2388 = "served/step2388-k3k6-2611"          # whose stored replies Part 1's 
 TASK_KEY = "switch"                              # the seeds' name
 # the model team's limits, as the paper's runs (31d)
 LIMITS = {3: 32_768, 6: 98_304}
-# Part 2: each turn's path, and its slot — a k6 turn's limit and 16,384 for
-# the chat before it (a chat that outgrows it stops in both arms, counted)
+# Part 2: each turn's path, and its slot — a k6 turn's limit twice: with the
+# thinking kept, turn 3's reply (k6, up to 98,304) stays in the chat that
+# turn 5 (k6, another 98,304) continues. A chat whose prompt and the turn's
+# limit outgrow it stops there in both arms, counted (turn 3 ran out, mostly)
 TURNS = (3, 3, 6, 3, 6)
-CHATS_CONTEXT = 114_688
+CHATS_CONTEXT = 196_608
 # Part 1: memory up to about 48k, the last question and 512 tokens
 DRIFT_CONTEXT = 65_536
 N_CHATS = 2_000
@@ -110,7 +130,7 @@ REF_TOKENS = 512
 N_PROBS = 20
 CHUNK = 32                                      # a forced run's tokens a request
 RUNS = ("A2", "N", "B", "F")
-RUN_WORDS = {"A2": "A′ (A again)", "N": "N (rollback, no switch)", "B": "B (switch, kept)",
+RUN_WORDS = {"A2": "A′ (A again)", "N": "N (continued, no switch)", "B": "B (switch, kept)",
              "F": "F (the other path, fresh)"}
 # Part 1's protocol: DeviceMark's greedy, no penalties
 GREEDY = {"temperature": 0.0, "presence_penalty": 0.0, "seed": 0}
@@ -118,6 +138,14 @@ GREEDY = {"temperature": 0.0, "presence_penalty": 0.0, "seed": 0}
 # (common/chat.cpp): the user's start is where a checkpoint goes
 DELIMITERS = [{"role": "assistant", "delimiter": "<|im_start|>assistant"},
               {"role": "user", "delimiter": "<|im_start|>user"}]
+# a turn's end marker, as Qwen's template writes it after each message
+END = "<|im_end|>"
+# the template step2388 serves, if it is one of Qwen3.6-35B-A3B's own (their
+# sha256 as llama.cpp keeps them): the same writing of a reply in both
+QWEN36_TEMPLATES = {"55d4931433fe502b794226ee7f4d206a6bdd436ac9f80eb7d8ebb4c639f9ea0c":
+                    "Unsloth's Qwen3.6-35B-A3B GGUF (5bc3e238)",
+                    "e84f32a23fdda27689f868aa4a1a5621f41133e51a48d7f3efcbea2839574259":
+                    "Qwen/Qwen3.6-35B-A3B's chat_template.jinja"}
 # the check before plan S is rented: Part 2's first chats at this limit a
 # turn (the memory, not the scores), Part 1's first chat of each memory size
 CHECK_LIMIT = 4_096
@@ -141,24 +169,29 @@ COURIERS = ("Odile", "Bram", "Tamsin", "Ilya", "Marisol", "Kofi", "Henrike", "An
             "Teodor", "Saoirse", "Lucan", "Wren", "Jovan", "Esme", "Rafferty", "Yusra", "Cormac",
             "Linnea", "Dashiell", "Ines", "Gideon", "Paloma", "Soren", "Amara", "Florian",
             "Noor", "Casimir", "Thea", "Benedikt")
-SHIPS = ("Marrow", "Kestrel", "Halcyon", "Lodestar", "Bramble", "Cormorant", "Tidewell",
-         "Saltire", "Morrow", "Fenwick", "Larkspur", "Gannet", "Quillon", "Starling", "Ember",
-         "Thistle", "Petrel", "Orrery", "Wayfarer", "Cinder", "Haddock", "Juniper", "Meridian",
-         "Osprey", "Rowan", "Skerry", "Tamarisk", "Vesper", "Wrenna", "Zephyr")
-FACTS_1 = ("Please remember two things for later in our conversation: the courier's name is "
-           "{courier}, and the locker code is {code}. You don't need to repeat them now.\n\n")
-FACTS_2 = ("Two more things to remember for later: the ship is called the {ship}, and it carries "
-           "{crates} crates. You don't need to repeat them now.\n\n")
-RECALL = ("Earlier in our conversation I asked you to remember four things. Write them out now, "
-          "one a line, in exactly this form:\ncourier: <name>\nlocker code: <number>\n"
-          "ship: <name>\ncrates: <number>")
+# brief 32's update (masein, 5 Nov): each recall reads its facts from the
+# other path's memory — a and b read by k3 (turns 1–2) and used on k6 (turn
+# 5), the courier and the gate read by k6 (turn 3) and recalled on k3 (turn 4)
+FACTS_1 = ("Please remember a number for later in our conversation: the locker code is {code}. "
+           "You don't need to repeat it now.\n\n")
+FACTS_2 = ("One more number to remember for later: the delivery has {crates} crates. You don't "
+           "need to repeat it now.\n\n")
+FACTS_3 = ("Two more things to remember for later: the courier's name is {courier}, and the gate "
+           "number is {gate}. You don't need to repeat them now.\n\n")
+RECALL = ("Earlier in our conversation I asked you to remember a courier's name and a gate "
+          "number. Write them out now, one a line, in exactly this form:\ncourier: <name>\n"
+          "gate: <number>")
 COMPUTE = ("Take the locker code (call it a) and the number of crates (call it b) from earlier in "
            "our conversation. Work out (a × b) / (a + b), and give it as a fraction in lowest "
            "terms. The last line of your response should be of the form 'ANSWER: p/q' (or "
            "'ANSWER: n' if it is a whole number).")
-TURN_WORDS = {1: "facts and an MMLU question", 2: "facts and a GSM8K question",
-              3: "GPQA Diamond or MATH Level 5", 4: "the facts recalled",
-              5: "(a × b) / (a + b) of the facts"}
+# what follows the last turn, so its reply's round trip is measured too
+CLOSING = "Thank you."
+TURN_WORDS = {1: "a number and an MMLU question", 2: "a number and a GSM8K question",
+              3: "a name and a number, and GPQA Diamond or MATH Level 5",
+              4: "the name and number recalled (read by k6)",
+              5: "(a × b) / (a + b) of the numbers (read by k3)"}
+RECALLED = ("courier", "gate")
 
 
 # ---------------------------------------------------------------------------
@@ -167,9 +200,9 @@ TURN_WORDS = {1: "facts and an MMLU question", 2: "facts and a GSM8K question",
 
 def facts_of(chat: int) -> dict:
     """the four facts a chat is told, the same on every machine"""
-    rng = random.Random(f"switch-32:facts:{chat}")
-    return {"courier": rng.choice(COURIERS), "code": rng.randint(101, 999),
-            "ship": rng.choice(SHIPS), "crates": rng.randint(11, 99)}
+    rng = random.Random(f"switch-32.2:facts:{chat}")
+    return {"code": rng.randint(101, 999), "crates": rng.randint(11, 99),
+            "courier": rng.choice(COURIERS), "gate": rng.randint(10, 99)}
 
 
 def compute_answer(f: dict) -> fractions.Fraction:
@@ -197,7 +230,7 @@ def turn_text(t: int, line: dict, items: dict) -> str:
                                                items["gsm8k_chat"][line["gsm8k"]])[0]
     if t == 3:
         h = line["hard"]
-        return fb.prompt(h["task"], items[h["task"]][h["id"]])[0]
+        return FACTS_3.format(**f) + fb.prompt(h["task"], items[h["task"]][h["id"]])[0]
     return RECALL if t == 4 else COMPUTE
 
 
@@ -207,14 +240,13 @@ def as_answer(think: str, reply: str) -> str:
 
 
 _FACT = {k: re.compile(rf"(?im)^[\s*_`-]*{w}[\s*_`]*:[\s*_`]*([^\n*_`]+?)[\s*_`.]*$")
-         for k, w in (("courier", "courier"), ("code", "locker code"), ("ship", "ship"),
-                      ("crates", "crates"))}
+         for k, w in (("courier", "courier"), ("gate", "gate(?: number)?"))}
 _FRACTION = re.compile(r"(?i)ANSWER\s*:\s*\**\s*(-?\d+)\s*(?:/\s*(\d+))?")
 
 
 def recall_score(answer: str, finish: str | None, f: dict) -> dict:
-    """turn 4: each fact read off its own line, exactly — a name as told
-    (case aside), a number as told"""
+    """turn 4: the courier and the gate, each read off its own line, exactly —
+    a name as told (case aside), a number as told"""
     out = fb.ran_out(answer, finish)
     vis = fb.visible(answer) if not out else ""
     read, wrong = {}, []
@@ -223,7 +255,7 @@ def recall_score(answer: str, finish: str | None, f: dict) -> dict:
         got = m[-1].strip() if m else None
         read[k] = got
         want = str(f[k])
-        ok = got is not None and (re.sub(r"[^0-9]", "", got) == want if k in ("code", "crates")
+        ok = got is not None and (re.sub(r"[^0-9]", "", got) == want if k == "gate"
                                   else got.strip().lower().removeprefix("the ") == want.lower())
         if not ok:
             wrong.append(k)
@@ -446,6 +478,7 @@ class Srv:
         self.log = log
         self._delim: list[int] | None = None
         self._wipe: list[int] | None = None
+        self._end: list[int] | None = None
 
     def post(self, path: str, body: dict, timeout: float | None = None) -> dict:
         from service import served as sv
@@ -479,6 +512,17 @@ class Srv:
             self._delim = self.tokens(DELIMITERS[1]["delimiter"])
         d = self._delim
         return [i for i in range(len(toks)) if d and toks[i:i + len(d)] == d]
+
+    def reply_end(self, toks: list[int], start: int) -> int:
+        """where the reply before the question at `start` ends: its end
+        marker, which the model's memory never holds (it stops on it)"""
+        if self._end is None:
+            self._end = self.tokens(END)
+        e = self._end
+        for i in range(start - len(e), -1, -1):
+            if toks[i:i + len(e)] == e:
+                return i
+        raise RuntimeError("no reply's end before the question")
 
     def wipe(self, slot: int, path: int) -> None:
         """a slot emptied before a chat or a run starts in it: a short prompt
@@ -532,54 +576,97 @@ def common(a: list[int], b: list[int]) -> int:
 
 
 # ---------------------------------------------------------------------------
+# the thinking kept: checked on the box before anything is asked
+# ---------------------------------------------------------------------------
+
+PRESERVE_MARK = "Reasoning that stays in the chat."
+
+
+def preserve_check(base: str, log_text: str) -> dict:
+    """does this server keep an earlier reply's thinking in the chat it
+    renders (--reasoning-preserve, with the file's own template)? On both
+    paths, an earlier reply's thinking must be in the next prompt, and the
+    server must not have said at start-up that the flag has no effect"""
+    srv = Srv(base)
+    msgs = [{"role": "user", "content": "A first question."},
+            {"role": "assistant", "content": "A first reply.", "reasoning_content": PRESERVE_MARK},
+            {"role": "user", "content": "A second question."}]
+    kept_ = {}
+    for p in (6, 3):
+        got = srv.post("/apply-template", {"messages": msgs, "expert_path": p}).get("prompt")
+        kept_[str(p)] = isinstance(got, str) and PRESERVE_MARK in got
+    warned = "does NOT support preserving reasoning" in (log_text or "")
+    return {"pass": all(kept_.values()) and not warned, "kept": kept_, "warned": warned}
+
+
+def preserve_words(c: dict, tmpl_sha: str | None) -> str:
+    return ("the thinking kept: an earlier reply's thinking is in the next prompt on k6 and k3"
+            if c["pass"] else
+            "the thinking NOT kept: " + ("the server says --reasoning-preserve has no effect "
+                                         "with this template; " if c["warned"] else "")
+            + "an earlier reply's thinking " + ", ".join(
+                f"{'is' if v else 'is not'} in the next prompt on k{k}" for k, v in c["kept"].items()))\
+        + f" · the template: {QWEN36_TEMPLATES.get(tmpl_sha or '', 'another than Qwen3.6-35B-A3B’s')}"\
+        + (f" (sha256 {tmpl_sha[:16]}…)" if tmpl_sha else "")
+
+
+# ---------------------------------------------------------------------------
 # Part 2: the chats, both arms
 # ---------------------------------------------------------------------------
 
-def memory_why(t: int, path: int, prev: int | None, arm: str, got: dict, s_prev: int | None,
-               n_common: int) -> str:
-    """'' when the turn's memory is what its arm says: fresh on turn 1; on a
-    turn on the same path, the memory reused; at a switch, A re-read (cleared,
-    nothing reused) and B kept (the line, and the conversation up to the
-    previous question at least) — else why not"""
+def memory_why(t: int, path: int, prev: int | None, arm: str, got: dict, want: int) -> str:
+    """'' when the turn's memory is what its arm says — else why not. Turn 1
+    fresh. Later, the prompt extends the memory exactly (nothing rolls
+    back): A's to the turn's question (its probe read that far), B's to the
+    end of the previous reply (replayed); at a switch A re-read (its
+    "clearing" line, nothing reused) and B kept (its "keeping" line)"""
     c, line = got.get("cache_n"), got.get("line")
     if not isinstance(c, int):
         return "the server gave no cache_n"
     if t == 1:
         return "" if c == 0 else f"turn 1 began with {c:,} tokens of memory"
-    if path == prev:
-        if line:
-            return f"a path line on a turn on the same path: {line['text']}"
-        return "" if 0 < c <= n_common else f"cache_n {c:,} on a turn on the same path"
-    if arm == "A":
+    if path != prev and arm == "A":
         if not line or line["kind"] != "clearing" or (line["from"], line["to"]) != (prev, path):
             return "no \"clearing\" line at the switch"
         return "" if c == 0 else f"cache_n {c:,} after the memory was cleared"
-    if not line or line["kind"] != "keeping" or (line["from"], line["to"]) != (prev, path):
+    if path != prev and (not line or line["kind"] != "keeping"
+                         or (line["from"], line["to"]) != (prev, path)):
         return "no \"keeping\" line at the switch"
-    if s_prev is None or not s_prev <= c <= n_common:
-        return (f"cache_n {c:,}, not between the previous question's start "
-                f"({s_prev if s_prev is not None else '?'}) and where the prompt parts from "
-                f"the memory ({n_common:,})")
-    return ""
+    if path == prev and line:
+        return f"a path line on a turn on the same path: {line['text']}"
+    return "" if c == want else f"cache_n {c:,}, where the memory held {want:,}"
 
 
-def expected_rollback(t: int, prev_len: int, s_prev: int | None) -> int | None:
-    """where the server's rule rolls back to: turn 2 the checkpoint near the
-    first prompt's end (4 tokens before it, or 4 + 512 for a prompt longer
-    than that), a later turn the previous question's start"""
-    if t == 1:
-        return 0
-    if t == 2:
-        return prev_len - 516 if prev_len > 520 else prev_len - 4
-    return s_prev
+def read_to(srv: Srv, toks: list[int], path: int, slot: int) -> dict:
+    """a slot reads these tokens on this path and writes one (never kept):
+    B's replay of A's reply, and A's probe — no sampling value, the chat's
+    message delimiters so checkpoints fall as a chat's request makes them"""
+    d = srv.post("/completion", {"prompt": toks, "n_predict": 1, "expert_path": path,
+                                 "id_slot": slot, "cache_prompt": True,
+                                 "message_delimiters": DELIMITERS})
+    return _timings(d)
+
+
+def round_trip(probe: dict, end: int, start: int | None) -> dict:
+    """a reply's round trip, as A's probe saw it: the memory reused to the
+    reply's end (exact), or rolled back — how far, and whether further than
+    the reply's own question"""
+    c = probe.get("cache_n")
+    if not isinstance(c, int):
+        return {"cache_n": c, "end": end, "exact": None}
+    return {"cache_n": c, "end": end, "exact": c >= end, "rolled_back": max(end - c, 0),
+            "before_question": start is not None and c < start}
 
 
 def one_chat(srv: Srv, line: dict, items: dict, slots: tuple[int, int],
              limit: int | None = None, context: int = CHATS_CONTEXT) -> dict:
-    """a chat's five turns, arm A and arm B side by side"""
+    """a chat's five turns, arm A and arm B side by side. Before each turn
+    after the first: A's probe of the previous reply (its round trip) and its
+    replay in B's slot, each on the path that wrote it"""
     hist: list[dict] = []
     turns, stopped = [], ""
-    prev_path, prev_toks, s_prev = None, None, None
+    prev_path, prev_start = None, None
+    a_slot, b_slot = slots
     for sl in slots:
         srv.wipe(sl, TURNS[0])
     with cf.ThreadPoolExecutor(2) as pool:
@@ -591,11 +678,18 @@ def one_chat(srv: Srv, line: dict, items: dict, slots: tuple[int, int],
                 stopped = (f"turn {t}: the chat ({len(toks):,} tokens) and its limit ({lim:,}) "
                            f"outgrow the slot's {context:,}")
                 break
-            starts = srv.user_starts(toks)
-            n_common = common(prev_toks, toks) if prev_toks else 0
+            start = srv.user_starts(toks)[-1]
+            want = {"A": 0, "B": 0}
+            if t > 1:
+                end = srv.reply_end(toks, start)
+                fa = pool.submit(read_to, srv, toks[:start], prev_path, a_slot)
+                fb_ = pool.submit(read_to, srv, toks[:end], prev_path, b_slot)
+                turns[-1]["probe"] = round_trip(fa.result(), end, prev_start)
+                turns[-1]["replay"] = fb_.result()
+                want = {"A": start, "B": end}
             base = {"max_tokens": lim, "seed": seed_of(line["chat"], t), "expert_path": path}
-            bodies = {"A": {**base, "id_slot": slots[0]},
-                      "B": {**base, "id_slot": slots[1], "keep_cache_across_paths": True}}
+            bodies = {"A": {**base, "id_slot": a_slot},
+                      "B": {**base, "id_slot": b_slot, "keep_cache_across_paths": True}}
 
             def ask(arm: str, body: dict) -> dict:
                 at = srv.mark()
@@ -612,25 +706,26 @@ def one_chat(srv: Srv, line: dict, items: dict, slots: tuple[int, int],
                         "seconds": round(time.time() - t0, 1), "think": think, "reply": reply}
             futs = {arm: pool.submit(ask, arm, body) for arm, body in bodies.items()}
             got = {arm: f.result() for arm, f in futs.items()}
-            mem = {arm: memory_why(t, path, prev_path, arm, got[arm], s_prev, n_common)
-                   for arm in got}
-            if t == 2 and not any(mem.values()) and got["A"]["cache_n"] != got["B"]["cache_n"]:
-                mem["B"] = (f"turn 2 reused {got['B']['cache_n']:,} tokens in B and "
-                            f"{got['A']['cache_n']:,} in A, where both hold the same memory")
+            mem = {arm: memory_why(t, path, prev_path, arm, got[arm], want[arm]) for arm in got}
+            think_a = got["A"]["think"]
             for arm in got:
                 ans = as_answer(got[arm].pop("think"), got[arm]["reply"])
                 got[arm]["answer"] = ans
                 got[arm]["score"] = score_turn(t, line, items, ans, got[arm]["finish"])
                 got[arm]["same_prompt"] = got[arm]["prompt_tokens"] == len(toks)
             turns.append({"turn": t, "path": path, "from": prev_path, "prompt": len(toks),
-                          "user_start_prev": s_prev, "common": n_common,
-                          "expected": expected_rollback(t, len(prev_toks or []), s_prev),
-                          "arms": got, "memory": mem})
-            # the history both arms see next: A's reply as the server gave it
-            # (its thinking apart), sent back as the apps send it
-            hist = msgs + [{"role": "assistant", "content": got["A"]["reply"]}]
-            prev_path, prev_toks = path, toks
-            s_prev = starts[-1] if starts else None
+                          "start": start, "expected": want, "arms": got, "memory": mem})
+            # the history both arms see next: A's reply as the server gave it,
+            # its thinking apart and sent back with it, as the apps send it
+            hist = msgs + [{"role": "assistant", "content": got["A"]["reply"],
+                            **({"reasoning_content": think_a} if think_a else {})}]
+            prev_path, prev_start = path, start
+        if turns and not stopped:
+            # the last reply's round trip: the chat to a closing message
+            toks = srv.prompt(hist + [{"role": "user", "content": CLOSING}], prev_path)
+            start = srv.user_starts(toks)[-1]
+            turns[-1]["probe"] = round_trip(read_to(srv, toks[:start], prev_path, a_slot),
+                                            srv.reply_end(toks, start), prev_start)
     return {"chat": line["chat"], "slots": list(slots), "turns": turns, "stopped": stopped,
             **({"limit": limit} if limit else {})}
 
@@ -789,23 +884,22 @@ def forced(srv: Srv, toks: list[int], ref: list[int], path: int, slot: int,
 def one_drift(srv: Srv, line: dict, items: dict, xy: tuple[int, int], slots: list[int],
               ref_n: int | None = None) -> dict:
     """one chat and direction X→Y: the reference, then A′, N, B and F forced
-    along it"""
+    along it. N and B first read the chat to the end of its previous reply
+    (the thinking kept, nothing rolls back): N on Y, B on X"""
     x, y = xy
     hist = history_msgs(line, items)
-    prev = hist[:-1]                                       # up to the previous question
     last = hist + [{"role": "user", "content": fb.prompt(line["last"]["task"], items[
         line["last"]["task"]][line["last"]["id"]])[0]}]
-    p_prev = {p: srv.prompt(prev, p) for p in (x, y)}
     p_last = srv.prompt(last, y)
-    s_prev = (srv.user_starts(p_prev[y]) or [None])[-1]
-    s_last = (srv.user_starts(p_last) or [None])[-1]
+    s_last = srv.user_starts(p_last)[-1]
+    e_prev = srv.reply_end(p_last, s_last)
     a, a2, f, nn, b = slots
     for sl, p in ((a, y), (a2, y), (f, x), (nn, y), (b, x)):
         srv.wipe(sl, p)
     with cf.ThreadPoolExecutor(3) as pool:
         ref_f = pool.submit(completion, srv, p_last, y, a, ref_n or REF_TOKENS)
-        n1 = pool.submit(completion, srv, p_prev[y], y, nn, 1)
-        b1 = pool.submit(completion, srv, p_prev[x], x, b, 1)
+        n1 = pool.submit(completion, srv, p_last[:e_prev], y, nn, 1)
+        b1 = pool.submit(completion, srv, p_last[:e_prev], x, b, 1)
         ref, n1, b1 = ref_f.result(), n1.result(), b1.result()
     r_toks, r_dists = ref["tokens"], ref["probs"]
     with cf.ThreadPoolExecutor(4) as pool:
@@ -814,13 +908,12 @@ def one_drift(srv: Srv, line: dict, items: dict, xy: tuple[int, int], slots: lis
                 "N": pool.submit(forced, srv, p_last, r_toks, y, nn),
                 "B": pool.submit(forced, srv, p_last, r_toks, y, b, True)}
         runs = {k: v.result() for k, v in futs.items()}
-    n_common = {k: common(p_prev[x if k == "B" else y], p_last) for k in ("N", "B")}
     out = {}
     for k, r in runs.items():
         ks = [kl(p, q) for p, q in zip(r_dists, r["dists"])]
         kv = [v for v in ks if v is not None]
         why = drift_memory_why(k, r, n1 if k == "N" else b1 if k == "B" else None, x, y,
-                               s_prev, s_last, n_common.get(k, 0))
+                               e_prev, s_last)
         out[k] = {"memory": why, "first_kl": ks[0] if ks else None,
                   "mean_kl": statistics.fmean(kv) if kv else None,
                   "kl": [round(v, 5) if v is not None else None for v in ks],
@@ -832,7 +925,7 @@ def one_drift(srv: Srv, line: dict, items: dict, xy: tuple[int, int], slots: lis
                                    for k2 in ("cache_n", "prompt_n", "line", "sent")}}
                      if k in ("N", "B") else {})}
     return {"chat": line["chat"], "bin": line["bin"], "direction": f"k{x}→k{y}", "x": x, "y": y,
-            "s_prev": s_prev, "s_last": s_last, "prompt": len(p_last),
+            "e_prev": e_prev, "s_last": s_last, "prompt": len(p_last),
             "memory": runs["B"]["requests"][0]["cache_n"] if runs["B"]["requests"] else None,
             "ref": {"tokens": len(r_toks), "cache_n": ref["cache_n"], "sent": ref["sent"],
                     "memory": "" if ref["cache_n"] == 0 else
@@ -840,12 +933,12 @@ def one_drift(srv: Srv, line: dict, items: dict, xy: tuple[int, int], slots: lis
             "runs": out}
 
 
-def drift_memory_why(k: str, r: dict, before: dict | None, x: int, y: int, s_prev, s_last,
-                     n_common: int) -> str:
+def drift_memory_why(k: str, r: dict, before: dict | None, x: int, y: int, e_prev: int,
+                     s_last: int) -> str:
     """'' when a run's memory is what it says: A′ and F fresh; N and B the
-    previous turn's (fresh on its path, then the conversation up to the
-    previous question kept — B's by the other path, said in its line); every
-    later request of a run back to the last question at least"""
+    chat to the end of its previous reply (fresh, read on Y and on X), then
+    continued exactly — B's by the other path, said in its line; every later
+    request of a run back to the last question at least"""
     reqs = r["requests"]
     if not reqs:
         return "no request"
@@ -861,8 +954,8 @@ def drift_memory_why(k: str, r: dict, before: dict | None, x: int, y: int, s_pre
             return "no \"keeping\" line at the switch"
         if k == "N" and line:
             return f"a path line on the same path: {line['text']}"
-        if s_prev is None or not isinstance(c0, int) or not s_prev <= c0 <= n_common:
-            return f"cache_n {c0}, not from the previous question's start ({s_prev}) on"
+        if c0 != e_prev:
+            return f"cache_n {c0}, where the memory held the chat's {e_prev:,} tokens"
     for q in reqs[1:]:
         if not isinstance(q["cache_n"], int) or s_last is None or q["cache_n"] < s_last:
             return (f"a later request reused {q['cache_n']} tokens, not the conversation up to "
@@ -903,9 +996,10 @@ def drift_words(r: dict) -> str:
 def run_check(base: str, lines: list[dict], out: Path, slots: int, say, log: Path | None,
               n: int = 5) -> bool:
     """Part 2's first n chats through both arms at CHECK_LIMIT a turn, a line
-    a turn and arm; the same turns again as token ids on /completion; Part
-    1's first chat of each memory size both ways, CHECK_REF tokens forced.
-    No question text. True when every memory is as said"""
+    a turn and arm, and each reply's round trip (A's probe); Part 1's first
+    chat of each memory size both ways, CHECK_REF tokens forced. No question
+    text. True when every memory is as said (a reply that comes back
+    otherwise is said, never a failure: it is what is measured)"""
     if slots < 5:
         raise ValueError(f"the check runs Part 1 too, five slots a chat: {slots} given")
     srv = Srv(base, log)
@@ -933,28 +1027,20 @@ def run_check(base: str, lines: list[dict], out: Path, slots: int, say, log: Pat
             for arm in ("A", "B"):
                 g, why = tr["arms"][arm], tr["memory"][arm]
                 bad += bool(why)
+                switch = bool(tr["from"]) and tr["from"] != tr["path"]
+                exp = 0 if switch and arm == "A" else tr["expected"][arm]
                 say(f"chat {x['chat']} · turn {tr['turn']} ({TURN_WORDS[tr['turn']]}, "
-                    + (f"k{tr['from']} → k{tr['path']}" if tr["from"] and tr["from"] != tr["path"]
-                       else f"k{tr['path']}") + f") · {arm}: cache_n {g['cache_n']}"
-                    + (f" (expected {tr['expected']:,})" if arm == "B" and isinstance(
-                        tr["expected"], int) else "")
-                    + f", prompt_n {g['prompt_n']}, cached_tokens {g['cached_tokens']}"
+                    + (f"k{tr['from']} → k{tr['path']}" if switch else f"k{tr['path']}")
+                    + f") · {arm}: cache_n {g['cache_n']} (expected {exp:,}), prompt_n "
+                    f"{g['prompt_n']}, cached_tokens {g['cached_tokens']}"
                     + (f" · \"{g['line']['text']}\"" if g["line"] else " · no path line")
                     + (" · " + ("re-read" if arm == "A" else "kept") + " ✓"
-                       if tr["from"] and tr["from"] != tr["path"] and not why else "")
+                       if switch and not why else "")
                     + (f" · NOT as said: {why}" if why else ""))
+            say(probe_words(x["chat"], tr))
         if r["stopped"]:
             say(f"chat {x['chat']}: stopped — {r['stopped']}")
         rows.append(r)
-    # the same turns as token ids, in the chat's own B slot emptied first
-    for k, r in enumerate(rows):
-        ids = raw_turns(srv, r, chats[k], items, r["slots"][1])
-        same = [a == b for a, b in zip(ids, [tr["arms"]["B"]["cache_n"] for tr in r["turns"]])]
-        bad += not all(same)
-        say(f"chat {r['chat']} · the same turns as token ids (/completion, its delimiters): "
-            f"cache_n " + ", ".join(f"turn {i + 1} {c}" for i, c in enumerate(ids))
-            + (" — the chat way's ✓" if all(same) else " — NOT the chat way's "
-               + str([tr["arms"]["B"]["cache_n"] for tr in r["turns"]])))
     _, why = run_jobs([(x, d) for x in drift for d in ("k3→k6", "k6→k3")], slots // 5,
                       lambda job, w: one_drift(srv, job[0], items,
                                                (3, 6) if job[1] == "k3→k6" else (6, 3),
@@ -976,8 +1062,9 @@ def run_check(base: str, lines: list[dict], out: Path, slots: int, say, log: Pat
             bad += bool(whys)
             bl = r["runs"]["B"]["requests"][0]["line"] if r["runs"]["B"]["requests"] else None
             say(f"drift chat {x['chat']} (about {x['bin']:,} tokens) {d} · A fresh "
-                f"{r['ref']['cache_n']} · B kept {r['memory']} from the previous question at "
-                f"{r['s_prev']}" + (f" · \"{bl['text']}\"" if bl else " · no path line")
+                f"{r['ref']['cache_n']} · B kept {r['memory']} (the chat to its previous "
+                f"reply's end, {r['e_prev']})" + (f" · \"{bl['text']}\"" if bl else
+                                                  " · no path line")
                 + " · N kept " + str(r["runs"]["N"]["requests"][0]["cache_n"]
                                       if r["runs"]["N"]["requests"] else None)
                 + " · flips per 1,000 " + ", ".join(
@@ -991,18 +1078,16 @@ def run_check(base: str, lines: list[dict], out: Path, slots: int, say, log: Pat
     return bad == 0
 
 
-def raw_turns(srv: Srv, r: dict, line: dict, items: dict, slot: int) -> list[int | None]:
-    """a chat's turns again as token ids, each read and one token written, B's
-    way (the switch on), in a slot emptied first: each turn's cache_n"""
-    hist, out = [], []
-    srv.wipe(slot, TURNS[0])
-    for tr in r["turns"]:
-        msgs = hist + [{"role": "user", "content": turn_text(tr["turn"], line, items)}]
-        d = completion(srv, srv.prompt(msgs, tr["path"]), tr["path"], slot, 1, keep=True,
-                       due=tr["from"] is not None and tr["from"] != tr["path"])
-        out.append(d["cache_n"])
-        hist = msgs + [{"role": "assistant", "content": tr["arms"]["A"]["reply"]}]
-    return out
+def probe_words(chat: int, tr: dict) -> str:
+    """a reply's round trip, as A's probe saw it"""
+    p = tr.get("probe")
+    head = f"chat {chat} · reply {tr['turn']} (k{tr['path']}), read again by the next request"
+    if not p or p.get("exact") is None:
+        return head + ": not measured"
+    if p["exact"]:
+        return head + f": token for token — the memory reused to its end ({p['end']:,}) ✓"
+    return (head + f": NOT token for token — rolled back {p['rolled_back']:,} tokens, to "
+            f"{p['cache_n']:,}" + (", further than its question" if p["before_question"] else ""))
 
 
 # ---------------------------------------------------------------------------
@@ -1051,10 +1136,12 @@ def make_bundle(out: Path, served_as: str, run_state: dict, gguf: dict, server: 
 
 def protocol_words(what: str) -> str:
     if what == "chats":
-        return ("Part 2: each turn's messages, its limit (k6 98,304, k3 32,768), its seed and its "
-                "expert path, pinned to its slot; arm B also keep_cache_across_paths. No sampling "
-                "value, no reasoning field, no chat_template_kwargs: each path's own settings, the "
-                "file's")
+        return ("Part 2: each turn's messages (each earlier reply sent back with its thinking, "
+                "kept in the chat by --reasoning-preserve), its limit (k6 98,304, k3 32,768), its "
+                "seed and its expert path, pinned to its slot; arm B also keep_cache_across_paths. "
+                "No sampling value, no reasoning field, no chat_template_kwargs: each path's own "
+                "settings, the file's. B's replays and A's probes: the chat as token ids, one "
+                "token written, nothing else sent")
     return ("Part 1's protocol: greedy, no penalties (temperature 0, presence_penalty 0, seed 0, as "
             "DeviceMark's), the 20 likeliest tokens' probabilities before sampling (n_probs 20), "
             "the prompt as token ids on /completion with the chat's message delimiters; each run "
@@ -1110,6 +1197,8 @@ def checks(b: dict, file_sha: str) -> list[str]:
         c = (srv.get("paths_checks") or {}).get(str(p)) or {}
         if c.get("pass") is not True:
             out.append(f"the settings check of expert path k{p} didn't pass")
+    if (srv.get("preserve_check") or {}).get("pass") is not True:
+        out.append("its server didn't keep the earlier thinking (the preserve check)")
     try:
         meta = json.loads((where() / INPUTS_META).read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -1333,7 +1422,13 @@ def summarise(d: Path) -> dict:
         if TURNS[t - 1] == 6 and t > 1 and TURNS[t - 2] != 6:
             loops_k6["A"] += a_lp
             loops_k6["B"] += b_lp
-        turns.append({"turn": t, "path": TURNS[t - 1], "words": TURN_WORDS[t],
+        probes = [tr.get("probe") or {} for tr, _ in rows]
+        probes = [x for x in probes if x.get("exact") is not None]
+        back = [x for x in probes if not x["exact"]]
+        trip = {"measured": len(probes), "exact": len(probes) - len(back),
+                "rolled_back": len(back), "median_back": _median([x["rolled_back"] for x in back]),
+                "before_question": sum(1 for x in back if x.get("before_question"))}
+        turns.append({"turn": t, "path": TURNS[t - 1], "words": TURN_WORDS[t], "round_trip": trip,
                       "switch": t > 1 and TURNS[t - 1] != TURNS[t - 2],
                       "reached": len(rows), "not_counted": len(rows) - len(counted),
                       "arms": arms, "paired": paired(a_ok, b_ok), "loops": paired(a_lp, b_lp),
