@@ -291,7 +291,7 @@ def _landed(p: dict) -> dict:
         return {}
     return {c: llm.Result(text=r.get("text") or "", error=r.get("error") or "",
                           finish=r.get("finish_reason") or "", status=r.get("status"),
-                          kind=r.get("kind") or "")
+                          kind=r.get("kind") or "", said=r.get("said") or "")
             for c, r in llm.LocalOpenAI._results(d).items() if not r.get("cancelled")}
 
 
@@ -578,13 +578,55 @@ def _one_start():
             os.close(fd)
 
 
+PRESS = "press.json"
+
+
+def last_press() -> dict | None:
+    """5 Nov: the last Start or Carry on — who, when, and what it did or why it
+    was refused — kept for the card (a toast said it, and was gone)"""
+    try:
+        return json.loads((gdir() / PRESS).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def _pressed(by: str, what: str, words: str, refused: bool = False) -> None:
+    gdir().mkdir(parents=True, exist_ok=True)
+    (gdir() / PRESS).write_text(json.dumps({"by": by, "what": what, "words": words,
+                                            "refused": refused, "at": time.time()}),
+                                encoding="utf-8")
+
+
+def press_words(got: dict) -> str:
+    """what a press did, in one line"""
+    n = sum(x["n"] for x in got.get("sent") or [])
+    parts = [f"sent {n:,} answer{'' if n == 1 else 's'} to their graders" if n
+             else "nothing new to send"]
+    if got.get("taken"):
+        parts.append("took " + ", ".join(f"{x}’s batch" for x in got["taken"]) + " up again")
+    if got.get("moved"):
+        parts.append(f"{got['moved']:,} moved to the grader chosen now")
+    if got.get("skipped"):
+        parts.append("not sent: " + "; ".join(got["skipped"]))
+    return " · ".join(parts)
+
+
 def start(by: str, partial: bool = False) -> dict:
     """masein's Start, after the dry run: each grader with answers to see
     pinned, the stop lifted, and what waits sent. Started again, it carries on.
     17b: what waits is listed inside the lock — a second press finds the
-    first one's batches out, and sends nothing twice"""
+    first one's batches out, and sends nothing twice. 5 Nov: what it did, or
+    why it was refused, kept for the card"""
     with _one_start():
-        return _start(by, partial)
+        what = "Carry on" if stopped() or any((llm.tally(p["batch_id"]) or {}).get("halted")
+                                              for p in pending()) else "Start"
+        try:
+            got = _start(by, partial)
+        except ValueError as e:
+            _pressed(by, what, f"refused — {e}. Nothing was sent", refused=True)
+            raise
+        _pressed(by, what, press_words(got))
+        return got
 
 
 def _start(by: str, partial: bool = False) -> dict:
@@ -668,9 +710,12 @@ def _start(by: str, partial: bool = False) -> dict:
         if bid:
             sent.append({"batch_id": bid, "slot": w["slot"], "task": w["task"],
                          "model": w["model"], "n": len(w["items"])})
+    taken = []
     for p in pending():                       # a stopped or halted batch takes up again
         if p["slot"] in lost:
             continue                          # its grader gone, it holds
+        if (llm.tally(p["batch_id"]) or {}).get("halted"):
+            taken.append(fg.GRADERS[p["slot"]]["label"])
         try:
             be = batch_backend(p["batch_id"])
             be.resume(p["batch_id"])
@@ -678,7 +723,7 @@ def _start(by: str, partial: bool = False) -> dict:
         except llm.LLMError:
             pass
     return {"sent": sent, "pending": len(pending()), "moved": n_moved,
-            **({"skipped": skipped} if skipped else {}),
+            **({"skipped": skipped} if skipped else {}), **({"taken": taken} if taken else {}),
             **({"held": [{"row": r, "task": t, "at": v} for (r, t), v in hold.items()]}
                if hold else {})}
 
@@ -1059,7 +1104,9 @@ def _apply(g: dict, d: Path, slot: str, pin: dict, meta: dict, items: dict,
                 continue                # the answer changed while out: graded again
             if res.error and res.error.startswith("cancelled"):
                 continue                # 17c: never sent: it waits for the next Start
-            why = llm.plain_error(res.error) if res.error else ""
+            # 5 Nov: its words as read from the whole error (a key-limit 403's
+            # came after the part kept)
+            why = (res.said or llm.plain_error(res.error, res.status)) if res.error else ""
             got = None if why else fg.read(slot, res.text, items.get(qid) or {})
             if got is not None and res.finish == "length" and not fg.whole_verdict(slot,
                                                                                   res.text):
@@ -1189,11 +1236,15 @@ def last_failed() -> list[dict]:
 
 
 def _unsent(p: dict) -> int:
-    """a batch's answers not yet answered, failed or cancelled"""
+    """a batch's answers not yet answered, failed or cancelled — 5 Nov: nor
+    out at OpenRouter's Batch API"""
     tl = llm.tally(p["batch_id"])
     if not tl:
         return len(p.get("keys") or [])
-    return max(0, tl["sent"] - tl["answered"] - tl.get("failed", 0) - tl.get("cancelled", 0))
+    d = llm.batch_dir(p["batch_id"])
+    out = len(llm.OpenRouterBatchAPI._remote(d).get("ids") or []) if d else 0
+    return max(0, tl["sent"] - tl["answered"] - tl.get("failed", 0) - tl.get("cancelled", 0)
+               - out)
 
 
 CARRY = "Carry on sends the rest."
@@ -1241,8 +1292,11 @@ def waits() -> list[dict]:
 
 def held() -> dict:
     """17c: what the batches out still have to send, and about what it costs
-    — what Carry on sends, beside the dry run's new answers"""
-    n, usd, known = 0, 0.0, True
+    — what Carry on sends, beside the dry run's new answers. 5 Nov (masein):
+    never what is out at OpenRouter's Batch API already — HLE's two batches
+    out were counted as Carry on's — that is `out`: what OpenRouter charges
+    for them as they finish, at the same price"""
+    sums = {"held": [0, 0.0, True], "out": [0, 0.0, True]}
     for x in pending():
         if _moving(x):
             continue                        # 17h: the dry run prices it, at the grader now
@@ -1250,19 +1304,43 @@ def held() -> dict:
         if d is None:
             continue
         landed = set(llm.LocalOpenAI._results(d))
-        unsent = [r for r in llm.LocalOpenAI._requests(d) if r["custom_id"] not in landed]
-        if not unsent:
-            continue
+        remote = set(llm.OpenRouterBatchAPI._remote(d).get("ids") or [])
+        left = [r for r in llm.LocalOpenAI._requests(d) if r["custom_id"] not in landed]
         pin = x.get("pin") or {}
-        tin = sum(len(r.get("user") or "") for r in unsent) // CHARS_A_TOKEN
-        tout = len(unsent) * out_tokens(x["slot"], pin)[0]
         pi, po = _price(pin)
-        n += len(unsent)
-        if pi is None or po is None:
-            known = False
-        else:
-            usd += (tin * pi + tout * po) / 1e6
-    return {"answers": n, "usd": round(usd, 4), "usd_known": known}
+        for k, rows in (("held", [r for r in left if r["custom_id"] not in remote]),
+                        ("out", [r for r in left if r["custom_id"] in remote])):
+            if not rows:
+                continue
+            tin = sum(len(r.get("user") or "") for r in rows) // CHARS_A_TOKEN
+            tout = len(rows) * out_tokens(x["slot"], pin)[0]
+            sums[k][0] += len(rows)
+            if pi is None or po is None:
+                sums[k][2] = False
+            else:
+                sums[k][1] += (tin * pi + tout * po) / 1e6
+    (n, usd, known), (on, ousd, oknown) = sums["held"], sums["out"]
+    return {"answers": n, "usd": round(usd, 4), "usd_known": known,
+            "out": {"answers": on, "usd": round(ousd, 4), "usd_known": oknown}}
+
+
+def key_warning(est: dict, h: dict) -> str:
+    """the OpenRouter key's own limit against everything this grading still
+    costs — Start's new answers, what Carry on sends, and the batches out at
+    OpenRouter's Batch API — '' while the key covers them (5 Nov: it counted
+    Start's alone, and said nothing with the key at its limit and $47 to go)"""
+    parts = [("Start’s new answers", est.get("usd")), ("what Carry on sends", h.get("usd")),
+             ("the batches out at OpenRouter", (h.get("out") or {}).get("usd"))]
+    total = sum(float(v or 0) for _, v in parts)
+    left = (ai_models.key_allowance() or {}).get("remaining")
+    if left is None or total <= 0 or total <= float(left):
+        return ""
+    st = ai_models.key_state()
+    return (f"About ${total:,.2f} — " + ", ".join(f"{w} ${float(v):,.2f}" for w, v in parts
+                                                   if v)
+            + f" — is more than the OpenRouter key may still spend (${float(left):,.2f}"
+            + (f": {st}" if st else "") + "): raise the key’s limit on OpenRouter first, or "
+            "what is sent stops where the key runs out")
 
 
 def refusals() -> list[dict]:
@@ -1382,6 +1460,7 @@ def regrade_row(row_name: str, task: str, by: str, undo: bool = False) -> dict:
 def status() -> dict:
     """the AI models page's card: the graders, the dry run, the run"""
     est = estimate()
+    h = held()
     return {"graders": [{"slot": s, "label": g["label"], "does": g["does"], "why": g["why"],
                          "task": g["task"], "benchmark": fb.BENCH[g["task"]]["label"],
                          "suggested": g["suggested"], "owners": g["owners"],
@@ -1396,14 +1475,15 @@ def status() -> dict:
                          "gone": ai_models.provider_gone(chosen(s) or {})}
                         for s, g in fg.GRADERS.items()],
             "estimate": est,
-            "key_warning": ai_models.more_than_key(est.get("usd")),
+            "key_warning": key_warning(est, h),
             "running": [{"slot": p["slot"], "task": p["task"], "model": p["model"],
                          "n": len(p.get("keys") or []), "progress": _progress(p)}
                         for p in pending()],
             "refused": refusals(),
             "stopped": stopped(),
             "waits": waits(),
-            "held": held(),
+            "held": h,
+            "last_press": last_press(),
             "tries": GRADE_TRIES,
             "last": last_failed(),
             "probe_words": PROBE_WORDS,

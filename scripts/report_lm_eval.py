@@ -27762,7 +27762,9 @@ function frontierGradingCard() {
         text: ` (at most ${usd(E.usd_max)}, were every reply to use its cap and every answer `
           + `be asked its ${G.tries || 3} times)` }) : '',
       ` · this month ${usd(E.spent)} of ${usd(E.limit)} spent`) : '',
-    G.key_warning && E.answers ? el('p', { class: 'warn small', 'data-frontier-key-warning': '1',
+    // 5 Nov: what Carry on sends and the batches out at OpenRouter count too —
+    // said with nothing new for Start as well
+    G.key_warning ? el('p', { class: 'warn small', 'data-frontier-key-warning': '1',
       text: G.key_warning }) : '',
     // 17i: more than the month has left — what is left, what this costs, and
     // that it stops part-way, before anything is sent
@@ -27792,6 +27794,12 @@ function frontierGradingCard() {
       running && !stopped ? el('button', { class: 'quiet', 'data-frontier-stop': '1',
         text: busy === 'stop' ? 'Stopping…' : 'Stop', disabled: busy ? '' : null,
         onclick: () => frontierGradingAct('stop') }) : '') : '',
+    // 5 Nov: the last press, what it did or why it was refused — kept (a toast
+    // said it, and was gone before it was read)
+    G.last_press ? el('p', { class: 'small ' + (G.last_press.refused ? 'warntext' : 'se'),
+      'data-frontier-last-press': G.last_press.refused ? 'refused' : 'done',
+      text: `Last press: ${G.last_press.what}, ${whenFull(G.last_press.at)}, by `
+        + `${G.last_press.by} — ${G.last_press.words}` }) : '',
     waits.length ? el('div', { class: 'small', 'data-frontier-waits': String(waits.length) },
       // 17c: each reason with what Carry on does about it — or can't
       ...waits.map(w => el('p', { class: 'small warntext', 'data-frontier-wait': '1',

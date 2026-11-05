@@ -281,7 +281,9 @@ def refusal(status: int | None, text: str) -> tuple[str, str]:
     may not store — only when OpenRouter says so), key, rate, unreached,
     down, answer (17h: refused for what was sent: too long, flagged), refused"""
     msg, meta = _error_of(text)
-    low = f"{msg} {json.dumps(meta)}".lower()
+    # 5 Nov: a flagged prompt's own words ("credit card") are never OpenRouter's
+    # about the key
+    low = f"{msg} {json.dumps({k: v for k, v in meta.items() if k != 'flagged_input'})}".lower()
     if status is None:
         if "no response within" in str(text) or "timed out" in str(text).lower():
             return "unreached", "OpenRouter didn’t answer in time"
@@ -675,6 +677,16 @@ def key_allowance() -> dict | None:
         if _KEY["got"] is None:
             return {"why": _KEY["why"]} if _KEY["why"] else None
         return {**_KEY["got"], "at": _KEY["at"], **({"why": _KEY["why"]} if _KEY["why"] else {})}
+
+
+def key_state() -> str:
+    """5 Nov: the key's own limit in words, as OpenRouter last said it — ''
+    for a key with none, or before it is known"""
+    k = key_allowance() or {}
+    if k.get("limit") is None or k.get("remaining") is None:
+        return ""
+    return (f"the key has used ${float(k.get('usage') or 0):,.2f} of its "
+            f"${float(k['limit']):,.2f} limit")
 
 
 def more_than_key(usd: float | None) -> str:
