@@ -413,6 +413,13 @@ def test_20_a_refused_carry_on_leaves_the_stop(gsvc, monkeypatch):  # noqa: F811
         time.sleep(0.05)
     fgr.stop("masein")
     gate.set()
+    # 5 Nov: the other grader's batch ended first — with only the moved one's
+    # left, Carry on has nothing it can send (with more, it sends that)
+    end = time.time() + 10
+    while time.time() < end and any(p["slot"] != "simpleqa" for p in fgr.pending()):
+        from service import llm_poller
+        llm_poller.tick()
+        time.sleep(0.05)
     monkeypatch.setattr(ai_models, "drifted",
                         lambda pin: "moved" if (pin or {}).get("id") == GPT else "")
     with pytest.raises(ValueError, match="moved"):

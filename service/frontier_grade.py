@@ -354,7 +354,17 @@ def estimate() -> dict:
     """the dry run: each grader's answers, tokens and cost for what waits.
     Nothing is sent"""
     hold = held_rows()
-    est = _estimate(waiting(view=True, hold=hold, light=True))
+    ws = waiting(view=True, hold=hold, light=True)
+    # 5 Nov: a grader whose chosen model is gone — its rows shown, not sent, and
+    # left out of what Start costs
+    lost = {s: why for s in {w["slot"] for w in ws} for why in [gone(s)] if why}
+    est = _estimate([w for w in ws if w["slot"] not in lost])
+    for w in ws:
+        if w["slot"] in lost and w["items"]:
+            est["rows"].append({"slot": w["slot"], "task": w["task"],
+                                "label": fb.BENCH[w["task"]]["label"], "model": w["model"],
+                                "answers": len(w["items"]), "usd": None,
+                                "waits": _gone_words(lost[w["slot"]], len(w["items"]))})
     try:
         est.update(over_limit=ai_models.over_limit(), limit=ai_models.limit(),
                    spent=round(db.spend_this_month(), 2))
@@ -497,6 +507,22 @@ def batch_backend(batch_id: str) -> llm.Backend:
         raise llm.LLMError(f"the grading batch {batch_id} has no record: {e}") from None
 
 
+def gone(slot: str) -> str:
+    """5 Nov (masein): why the grader chosen for `slot` can't be sent to
+    now — its model, version or provider gone from OpenRouter (HLE's judge,
+    o3-mini-2025-01-31, which OpenAI shut down on 23 Oct) — '' when it can,
+    or when none is chosen yet (Start pins the suggestion)"""
+    c = chosen(slot)
+    return ai_models.drifted(c) if c else ""
+
+
+def _gone_words(why: str, n: int) -> str:
+    """a gone grader's answers, left as they are by Start, in words"""
+    return (f"Not sent: {why}. Its {n:,} answer{'' if n == 1 else 's'} wait as they are — none "
+            "marked ungraded or counted wrong — and Start sends them once a model is chosen "
+            "for it again")
+
+
 def _pinned(slot: str, by: str) -> dict:
     c = chosen(slot)
     if c:
@@ -567,8 +593,13 @@ def _start(by: str, partial: bool = False) -> dict:
     if why:
         raise ValueError(why)
     # everything checked before anything changes — 17d: before the stop is
-    # lifted too, so a refused Start leaves a stopped grading stopped
-    moved = [(p, why) for p in pending() for why in [_moving(p)] if why]
+    # lifted too, so a refused Start leaves a stopped grading stopped. 5 Nov: a
+    # grader whose chosen model is gone holds its own benchmark alone — its
+    # answers and its batches out left as they are — and Start sends the
+    # others (HLE's judge gone, Start refused SimpleQA, MATH and OTIS too)
+    lost = {s: why for s in fg.GRADERS for why in [gone(s)] if why}
+    moved = [(p, why) for p in pending() if p["slot"] not in lost
+             for why in [_moving(p)] if why]
     # 17i: a moved batch with replies still on their way: its row waits for
     # them, said — Start waited 30 s, then switched under them, and the same
     # answers were paid again at the grader chosen now
@@ -577,6 +608,14 @@ def _start(by: str, partial: bool = False) -> dict:
     # (its own grades back, a whole regrade, a top-up) — decided before
     # anything changes, done once the stop is lifted
     work = [w for w in waiting(view=True, hold=hold) if w["items"]]
+    skipped = [f"{fg.GRADERS[s]['label']}: {lost[s]}"
+               for s in sorted({w["slot"] for w in work} | {p["slot"] for p in pending()})
+               if s in lost]
+    work = [w for w in work if w["slot"] not in lost]
+    # nothing it can send or carry on: refused, said, the stop left as it is
+    if skipped and not work and not moved and not any(p["slot"] not in lost
+                                                      for p in pending()):
+        raise ValueError("; ".join(skipped))
     # 17i: the month's limit — what this Start costs against what is left,
     # before anything is sent
     if not partial:
@@ -603,13 +642,12 @@ def _start(by: str, partial: bool = False) -> dict:
             _close(p["batch_id"])
     for slot in fg.GRADERS:
         pin = pins.get(slot) or chosen(slot)
-        if pin:
+        if pin and slot not in lost:
             _reset_tries(slot, pin, hold)
     work = waiting(hold=hold)
-    skipped = []
     # 17e: a slot new to the work — another's batch landed with replies to ask
     # again while this waited — pinned now; one whose pin moved waits, said
-    new_slots = sorted({w["slot"] for w in work} - set(pins))
+    new_slots = sorted({w["slot"] for w in work} - set(pins) - set(lost))
     for slot in new_slots:
         pin = _pinned(slot, by)
         drift = ai_models.drifted(pin)
@@ -631,6 +669,8 @@ def _start(by: str, partial: bool = False) -> dict:
             sent.append({"batch_id": bid, "slot": w["slot"], "task": w["task"],
                          "model": w["model"], "n": len(w["items"])})
     for p in pending():                       # a stopped or halted batch takes up again
+        if p["slot"] in lost:
+            continue                          # its grader gone, it holds
         try:
             be = batch_backend(p["batch_id"])
             be.resume(p["batch_id"])
