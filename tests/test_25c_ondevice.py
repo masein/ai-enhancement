@@ -192,9 +192,11 @@ def test_a_reported_model_is_never_in_an_average_or_rank(svc):
     got = svc.get("/api/reported").json()
     e0 = next(m for m in got["models"] if m["name"] == "Edge0-35B-A3B-preview")
     assert e0["id"].startswith("reported/") and e0["measured"] is None
-    # the Reports list: the fourth, after the others (26: our testers' phones after it)
+    # the Reports list: the fourth, after the others (26: our testers' phones after it;
+    # 32: and switching mode mid-chat, internal, last)
     ids = [r["id"] for r in svc.get("/api/reports").json()["reports"]]
-    assert ids == ["ran-out-of-room", "step-checkpoints", "paired", "on-device", "testers"]
+    assert ids == ["ran-out-of-room", "step-checkpoints", "paired", "on-device", "testers",
+                   "switching-mode"]
     # 29: and NVIDIA Nemotron 3.5 Bolt E4B's Q4_K_M, measured here, among the others
     assert ondevice.listing_counts(REP) == (["step8804", "step4000", "step1000",
                                              "Q4 (UD-Q4_K_XL)", "Q2 (UD-Q2_K_XL)"], 10)

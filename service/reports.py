@@ -1105,6 +1105,10 @@ def report(rid: str, payload: dict | None = None, compute: bool = False, a: str 
         # 26: our testers' phone checks, from Kevin's telemetry (service/telemetry.py)
         from . import telemetry
         return telemetry.report(rep)
+    if rep.get("kind") == "switch":
+        # 32: switching mode mid-chat, the summary its import keeps (service/switch_report.py)
+        from . import switch_report
+        return switch_report.report(rep)
     if payload is None:
         from . import app
         payload = app.results_payload()
@@ -1437,6 +1441,13 @@ def listing(payload: dict | None = None) -> list[dict]:
             out.append({"id": rid, "title": rep.get("title") or rid,
                         "what": rep.get("what") or "", "ours": [], "others": 0,
                         **telemetry.listing_line()})
+            continue
+        if rep.get("kind") == "switch":
+            # 32: internal, the experiment's own summary
+            from . import switch_report
+            out.append({"id": rid, "title": rep.get("title") or rid,
+                        "what": rep.get("what") or "", "ours": [], "others": 0,
+                        "internal": True, **switch_report.listing_line()})
             continue
         rows = our_rows(rep, (payload or {}).get("cells") or {})
         if rep.get("kind") == "ran_out":

@@ -70,7 +70,12 @@ SUITES = {"devicemark": {"prefix": "devicemark", "format": FORMAT,
           "showcase-served": {"prefix": "showcase-served", "format": 4, "tasks": ("showcase",)},
           # 31.3: the answers that ran out of room, continued to the model team's
           # limit on a rented box (remote_gguf.py --continue), onto their rows
-          "frontier-cont": {"prefix": "frontier-cont", "format": 5, "tasks": tuple(_fb.ALL)}}
+          "frontier-cont": {"prefix": "frontier-cont", "format": 5, "tasks": tuple(_fb.ALL)},
+          # 32: the switch experiment's chats or drift runs on a rented box
+          # (remote_gguf.py --switch), into $BENCH_ROOT/switch on import
+          "switch-served": {"prefix": "switch-served", "format": 6,
+                            "tasks": ("mmlu_chat", "gsm8k_chat", "gpqa_diamond_epoch",
+                                      "math_l5_epoch")}}
 # 17: what never travels in a bundle — a model's weights, a binary, a library
 NEVER = re.compile(r"(?i)\.(gguf|safetensors|bin|pt|pth|ckpt|so(\.\d+)*|tar|gz|zst|xz|zip)$")
 # what must be the server's, exactly, for a bundle to be imported

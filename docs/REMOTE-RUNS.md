@@ -1941,6 +1941,140 @@ read. Those rates are a guess, and the check's timings replace them:
 Each box runs as many slots as a 5090 holds beside step2388's file with the
 q8_0 cache (a card that holds fewer runs fewer, down to half).
 
+# S. Switching mode mid-chat (32)
+
+An internal experiment for the apps, never a row of the board and never in
+the whitepaper. The model team found that a chat can switch from k3 to k6
+without throwing away the memory k3 built. Plan S measures what that costs.
+It runs after plan C, and nothing is rented before masein's yes.
+
+**The build:** the team's research branch `teraformer/lda-k3k6-research` at
+`917f3d911521`. It is 3ad38b7cc and five commits, of which only the request
+field `keep_cache_across_paths` changes a request on our CUDA boxes, and only
+when it is sent. Runtime `k3k6r-0411` is k3k6-2611 in every other way:
+step2388's file, the same two variables, no sampling flag, no reasoning
+flag, each path's settings the file's. One flag more, `--cache-ram 0`. The
+server's prompt cache in host memory would, with the switch on, hand a slot
+a memory saved from another chat whenever a quarter of it matched. Off, a
+slot holds only its own chat. It changes no answer, only which memory a
+slot starts from. Both paths run on one server, each chat pinned to its own
+slot.
+
+**What the switch keeps.** Each earlier reply's thinking is dropped by the
+chat template, so the next prompt parts from the memory where the previous
+reply begins. The server then rolls back to its latest checkpoint before
+that point, which is the start of the previous question. The previous reply
+is never in the memory kept: the new path reads it itself. What it keeps is
+the chat before the previous question, computed by the paths that read it.
+The server's line `expert path kA -> kB: keeping N cached tokens` counts the
+slot's whole memory, not what survives; `cache_n` does.
+
+**Part 2, the chats (S1–S10).** 2,000 chats of five turns:
+
+1. k3: two facts (a name and a number), and an MMLU question;
+2. k3: two more facts, and a GSM8K question;
+3. k6: a GPQA Diamond question (each up to three times) or MATH Level 5;
+4. k3: the four facts recalled, each scored exactly;
+5. k6: (a × b) / (a + b) of the turn-1 number and the turn-2 number, a
+   fraction in lowest terms.
+
+Arm A (the switch off, the team's default) writes the chat. Arm B (the
+switch on) runs beside it in a slot of its own, each turn with the same
+messages (A's earlier replies) and the same seed, so only the memory
+differs. Each request carries its messages, its limit (k6 98,304, k3
+32,768), its seed, its path and its slot; B's also `keep_cache_across_paths`.
+Nothing else: no sampling value, no reasoning field, no
+`chat_template_kwargs`. Each turn records `cache_n`, `prompt_n`,
+`cached_tokens` and the server's line. At a switch, a turn counts only when
+A re-read (its "clearing" line, nothing reused) and B kept the chat (its
+"keeping" line, and at least the chat up to the previous question reused).
+A turn that isn't is reported, not counted. Turns 1–2 hold the same memory
+in both arms: a placebo. A chat whose prompt and limit outgrow the slot's
+114,688 tokens stops there in both arms, counted.
+
+**Part 1, drift (S11).** 200 chats built on the server from step2388's own
+stored k3 replies (MMLU, GSM8K), 50 each at about 1k, 4k, 16k and 48k tokens
+of memory, in both directions. Five runs of the last turn on the target
+path Y, each forced along A's own greedy reply:
+
+- A: Y reads everything fresh; its first 512 tokens are the reference;
+- A′: A again in another slot (the GPU's own noise);
+- N: the previous turn on Y, then the last on Y (B's rollback, no switch);
+- B: the previous turn on the other path X, then the last on Y, switch on;
+- F: X reads everything fresh (the full gap between the paths).
+
+Part 1's protocol: greedy, no penalties (`temperature` 0,
+`presence_penalty` 0, `seed` 0, as DeviceMark's), the 20 likeliest tokens'
+probabilities before sampling (`n_probs` 20), on `/completion` with the
+prompt as token ids and the chat's message delimiters, so checkpoints fall
+as in a chat. Where a run's pick parts from the reference, its next request
+goes on from the reference's own text; the rollback to the last question
+keeps the run's memory. Against A, by memory size and direction: the first
+token's KL, the mean KL a token, flips a 1,000 tokens and the token of the
+first flip.
+
+**The tarball** (masein, from his Mac, no token on the server): the branch
+at 917f3d911 on the server at `~/llama.cpp-k3k6-research`, then built as
+3ad38b7cc's was, and uploaded:
+
+```bash
+cd ~/benchmarks/aienh && LLAMA_CUDA_ARCHS=120 scripts/build_llama_tarball.sh ~/llama.cpp-k3k6-research ~/llama-server-k3k6r-917f3d9.tar.gz
+```
+
+```bash
+hf upload <you>/evalboard-private ~/llama-server-k3k6r-917f3d9.tar.gz llama-server-k3k6r-917f3d9.tar.gz
+```
+
+Its sha256 and the upload's commit go in `frontier_box.PLAN_PINS["S"]` and
+`PLAN_REVISIONS["S"]`. Until then every line of plan S is refused before
+anything is fetched.
+
+**The steps.** Rent nothing before masein's yes, and not before plan C.
+
+1. On the server: the inputs file, `switch-inputs.jsonl` (question ids, the
+   invented facts, step2388's stored replies; no question text). It prints
+   its sha256 and what it holds:
+
+   ```bash
+   cd ~/benchmarks/aienh && sudo docker compose exec -T bench python scripts/switch_box.py inputs
+   ```
+
+2. Copy it to each box from the server, as U-cont's files:
+
+   ```bash
+   scp -i ~/.ssh/id_ed25519 -P <port> ~/benchmarks/switch/switch-inputs.jsonl root@<host>:/workspace/
+   ```
+
+3. **The check, on S1, before the rest is rented:** Part 2's first five
+   chats through both arms at 4,096 tokens a turn (the memory, not the
+   scores), then the same turns as token ids, then Part 1's first chat of
+   each memory size, both ways. A line a turn and arm: `cache_n`,
+   `prompt_n`, `cached_tokens` and the server's line, no question text. The
+   last line says whether every memory was as said. There is no bundle:
+
+   ```bash
+   python scripts/frontier_box.py S1 --as served/step2388-k3k6r-0411 --gguf hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/step2388.k3k6.gguf --server hf://<you>/evalboard-private@<its commit>/llama-server-k3k6r-917f3d9.tar.gz --switch /workspace/switch-inputs.jsonl --switch-sha256 <its sha256> --switch-check 5
+   ```
+
+4. **Plan S:** the same line on each box, without `--switch-check`, with
+   `--price`. S1–S10 run a tenth of the chats each (10 slots of 114,688: five
+   chats at a time, each in a pair of slots), S11 Part 1 (18 slots of 65,536).
+   Each box leaves a `switch-served-…` bundle.
+5. **Fetch and import:** as U4, with `--sha served/step2388-k3k6r-0411=a2594a68a810ec526061f83cb88c7e469e1c3889912e8da4b1d598c72271faf6`.
+   The experiment is no row of the board: its bundles need no `--register`.
+   The import marks every answer again by the board's scorers, refuses a
+   bundle whose file, build, runtime, settings checks, inputs or requests
+   aren't the experiment's, and keeps the summary the report reads.
+
+**On the board:** Reports ▸ "Switching mode mid-chat", internal. Part 2 by
+turn and arm (score, B − A with McNemar's p, loops, ran out, no answer,
+wrong recalls, length, `cache_n` and `prompt_n`; turn 3 also by question),
+and Part 1 by memory size, direction and run.
+
+**Its size** (`frontier_box.py --list S`): about 9.5 h on each of S1–S10 and
+5 h on S11, about 100 box-hours, at plan U's paces (a guess the check's
+timings replace).
+
 # Speed tests: the cheapest box per answer (19)
 
 Which box runs our benchmarks for the fewest dollars per answer, measured the

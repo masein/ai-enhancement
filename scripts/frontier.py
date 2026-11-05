@@ -511,6 +511,34 @@ RUNTIMES["card-qwen-k3k6"] = {
 # path alone, no sampling field — the second k3 row the brief asks for
 FILE_SAMPLING = {"served/step2388-k3k6-2611-file"}
 
+# 32: switching mode mid-chat with the memory kept (scripts/switch_box.py) —
+# the team's research branch (teraformer/lda-k3k6-research at 917f3d911:
+# 3ad38b7cc and five commits, of which only the request field
+# keep_cache_across_paths changes a request on CUDA, and only when sent),
+# step2388's file, k3k6-2611 in every other way: the same variables, no
+# sampling flag, no reasoning flag, each path's settings the file's. One
+# flag more: --cache-ram 0. The server's prompt cache in host memory (8 GiB
+# by default) would, with the switch on, hand a slot a memory saved from
+# another conversation whenever a quarter of it matched
+# (server_prompt_cache::load); off, a slot holds only its own conversation.
+# It changes no answer, only which memory a slot starts from. Both paths on
+# one server, each conversation pinned to its slot: the experiment's alone,
+# never a row of the board ("experiment"), so the board's checks and steps
+# that name the runtimes of expert paths leave it out
+RUNTIMES["k3k6r-0411"] = {
+    **{k: v for k, v in RUNTIMES["k3k6-2611"].items() if k not in ("models", "build")},
+    "words": "the team's research build of the joint k3/k6 engine (keep_cache_across_paths): one "
+             "file, two expert paths on one server, each path's sampling and thinking as the GGUF "
+             "stores them, never sent; router norm on, no reasoning flags, no speculative "
+             "decoding, no prompt cache in host memory",
+    "env": dict(RUNTIMES["k3k6-2611"]["env"]),
+    "flags": [*RUNTIMES["k3k6-2611"]["flags"], "--cache-ram", "0"],
+    "experiment": "switch",
+    "models": {"served/step2388-k3k6r-0411": "Qwen/Qwen3.6-35B-A3B"},
+    "build": {"words": "the team's llama.cpp-teraformer at 917f3d911 (teraformer/lda-k3k6-research)",
+              "commits": ("917f3d911",), "number": None},
+}
+
 # 31.1: what step2388's file stores for each path (the team's, 3 Nov): what
 # the box's settings check holds the file, the server's /props and start-up
 # lines and each answer to. penalty_last_n -1 is the whole context;

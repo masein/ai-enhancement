@@ -123,7 +123,8 @@ def sha(p):
 out = {"bundles": [], "parity": [], "progress": [], "steps": []}
 for p in sorted(glob.glob(ROOT + "/**/frontier-*.tar.gz", recursive=True)
                 + glob.glob(ROOT + "/**/devicemark-served-*.tar.gz", recursive=True)
-                + glob.glob(ROOT + "/**/showcase-served-*.tar.gz", recursive=True)):
+                + glob.glob(ROOT + "/**/showcase-served-*.tar.gz", recursive=True)
+                + glob.glob(ROOT + "/**/switch-served-*.tar.gz", recursive=True)):
     out["bundles"].append({"path": p, "sha256": sha(p)})
 for p in sorted(glob.glob(ROOT + "/**/parity.jsonl", recursive=True)):
     out["parity"].append({"path": p, "sha256": sha(p)})
@@ -488,7 +489,10 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
             failed = True
             continue
         model = model_of(here)
-        if model in shas and serves(model) is False:
+        # 32: the switch experiment's model is no row the board serves: its
+        # bundles are imported with its file's sha256 alone
+        exp = experiment(model)
+        if model in shas and not exp and serves(model) is False:
             # 17j: --sha for a model the board doesn't serve yet: every round's
             # import was refused ("add it under Add a model"), and the line to
             # type stopped being printed — it is, with --register
@@ -499,7 +503,8 @@ def one_box(box: re.Match, a: argparse.Namespace, key: str, dest: Path,
             continue
         if model not in shas:
             lines.append(f"  {here.name}: {words} — home; no --sha for {model or 'its model'}: "
-                         "import it by hand: " + by_hand(here, a.by, serves(model), model))
+                         "import it by hand: " + by_hand(here, a.by, True if exp else serves(model),
+                                                         model))
             home[step] = "by hand"
             continue
         if seen.get(here.name) == b["sha256"]:
@@ -814,6 +819,14 @@ def keep_sudo(every: float = 120.0) -> None:
 
 
 _SERVED: dict = {}
+
+
+def experiment(model: str) -> bool:
+    """32: a model only an experiment's runtime runs (the switch experiment's):
+    never a row of the board"""
+    import frontier as fb
+    rt = fb.runtime_of_model(model)
+    return bool(rt and fb.RUNTIMES[rt].get("experiment"))
 
 
 def serves(model: str) -> bool | None:

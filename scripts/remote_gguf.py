@@ -1593,11 +1593,23 @@ def _main(argv: list[str] | None = None) -> int:
                          "pinned with --pin) — needed when this box's share holds the showcase's "
                          "answers that ran out of room")
     ap.add_argument("--part", default="", help="31.3: i/n — with --continue, this box's share "
-                                               "of the answers, every n-th from the i-th")
+                                               "of the answers, every n-th from the i-th; 32: "
+                                               "with --switch, of the chats")
     ap.add_argument("--continue-check", type=int, default=0, metavar="N",
                     help="31.3: with --continue, the check before U-cont — the first N answers "
                          "of the benchmark --only names, a line each, and penalty_prompt_tokens' "
                          "test; no bundle, no progress file")
+    ap.add_argument("--switch", default="", metavar="INPUTS",
+                    help="32: the switch experiment (scripts/switch_box.py) on runtime "
+                         "k3k6r-0411 — its inputs file (switch_box.py inputs on the server, "
+                         "pinned with --pin), into a bundle of its own")
+    ap.add_argument("--switch-part", default="", choices=("", "chats", "drift"),
+                    help="32: with --switch, what this step runs: Part 2's chats (--part i/n) "
+                         "or Part 1's drift")
+    ap.add_argument("--switch-check", type=int, default=0, metavar="N",
+                    help="32: with --switch, the check before plan S — Part 2's first N chats "
+                         "through both arms and Part 1's first of each memory size, a line "
+                         "each; no bundle, no progress file")
     ap.add_argument("--own", action="store_true",
                     help="29: one GPU of our own station (--label D3.0): never started while "
                          "another process uses the GPU, paused while one does (exit 75), no "
@@ -1635,9 +1647,11 @@ def _main(argv: list[str] | None = None) -> int:
     if a.pilot_each < 0:
         ap.error("--pilot-each: a number of questions, 1 or more")
     # 31.1: the settings check is a runtime of expert paths' alone, and asks nothing else
-    if a.check and not (a.runtime and fb.RUNTIMES[a.runtime].get("paths")):
+    if a.check and not (a.runtime and fb.RUNTIMES[a.runtime].get("paths")
+                        and not fb.RUNTIMES[a.runtime].get("experiment")):
         ap.error("--check: the settings check of a runtime of expert paths (--runtime "
-                 + " or ".join(n for n, r in fb.RUNTIMES.items() if r.get("paths")) + ")")
+                 + " or ".join(n for n, r in fb.RUNTIMES.items()
+                               if r.get("paths") and not r.get("experiment")) + ")")
     if a.check and (a.pilot or a.parity or a.serve or a.only):
         ap.error("--check asks no benchmark: no --pilot, --parity, --serve or --only")
     # 31.2b: the showcase, on a runtime of expert paths, on its own
@@ -1645,9 +1659,11 @@ def _main(argv: list[str] | None = None) -> int:
                        or a.devicemark):
         ap.error("--showcase asks its questions alone: no --pilot, --parity, --serve, --check, "
                  "--devicemark, --only or --shard")
-    if a.showcase and not (a.runtime and fb.RUNTIMES[a.runtime].get("paths")):
+    if a.showcase and not (a.runtime and fb.RUNTIMES[a.runtime].get("paths")
+                           and not fb.RUNTIMES[a.runtime].get("experiment")):
         ap.error("--showcase: on a runtime of expert paths (--runtime "
-                 + " or ".join(n for n, r in fb.RUNTIMES.items() if r.get("paths")) + ")")
+                 + " or ".join(n for n, r in fb.RUNTIMES.items()
+                               if r.get("paths") and not r.get("experiment")) + ")")
     if a.showcase and a.slots != 1:
         ap.error("--showcase: one slot (--slots 1), each question asked alone as step8804's were")
     # 31.3: the answers that ran out of room, continued, on their own
@@ -1666,7 +1682,7 @@ def _main(argv: list[str] | None = None) -> int:
         if not cb.spec_of(a.served_as, a.thinking == "on"):
             ap.error("--continue: these answers aren't continued — "
                      + "; ".join(f"{m} thinking {'on' if on else 'off'}" for m, on in cb.SPECS))
-    if (a.part or a.continue_check or a.cont_questions) and not a.cont:
+    if (a.part and not a.switch or a.continue_check or a.cont_questions) and not a.cont:
         ap.error("--part, --continue-check and --continue-questions: with --continue")
     if a.cont and a.only and not a.continue_check:
         ap.error("--continue continues every answer of its share: --only is for "
@@ -1675,6 +1691,32 @@ def _main(argv: list[str] | None = None) -> int:
         ap.error("--continue-check N: one benchmark's first N answers (one --only), no --part")
     if a.continue_check < 0:
         ap.error("--continue-check: a number of answers, 1 or more")
+    # 32: the switch experiment, on its own runtime, on its own — and that
+    # runtime asks nothing else
+    exp = (fb.RUNTIMES.get(a.runtime or "") or {}).get("experiment")
+    if exp and not a.switch:
+        ap.error(f"runtime {a.runtime} is the switch experiment's alone: give --switch "
+                 "(frontier_box.py's plan S)")
+    if a.switch and exp != "switch":
+        ap.error("--switch: on runtime " + " or ".join(
+            n for n, r in fb.RUNTIMES.items() if r.get("experiment") == "switch"))
+    if a.switch and (a.pilot or a.parity or a.serve or a.check or a.only or shard
+                     or a.devicemark or a.showcase or a.cont):
+        ap.error("--switch runs the experiment alone: no --pilot, --parity, --serve, --check, "
+                 "--only, --shard, --devicemark, --showcase or --continue")
+    if (a.switch_part or a.switch_check) and not a.switch:
+        ap.error("--switch-part and --switch-check: with --switch")
+    if a.switch and not a.switch_check and not a.switch_part:
+        ap.error("--switch: give --switch-part chats (with --part i/n) or drift")
+    if a.switch and (a.switch_check and (a.part or a.switch_part)
+                     or a.switch_part == "drift" and a.part):
+        ap.error("--part shares out the chats (--switch-part chats); the check takes neither")
+    if a.switch_check < 0:
+        ap.error("--switch-check: a number of chats, 1 or more")
+    if a.switch and a.slots < (5 if a.switch_check or a.switch_part == "drift" else 2):
+        ap.error("--switch: a chat runs in two slots (its two arms), a drift job in five "
+                 "(the check runs both): give --slots " + ("5" if a.switch_part != "chats"
+                                                           else "2") + " or more")
     # 31.2: DeviceMark's battery, whole, on its own
     if a.devicemark and (a.pilot or a.parity or a.serve or a.check or a.only or shard):
         ap.error("--devicemark asks DeviceMark's battery whole: no --pilot, --parity, --serve, "
@@ -1694,7 +1736,7 @@ def _main(argv: list[str] | None = None) -> int:
         # no benchmark, on either path; 31.2: nor does DeviceMark ask one of the
         # runtime's, and it is asked with thinking on and off
         if why and not a.serve and not a.check and not a.devicemark and not a.showcase \
-                and not (a.cont and not a.continue_check):
+                and not (a.cont and not a.continue_check) and not a.switch:
             ap.error(why)
         if a.parity:
             ap.error(f"--runtime {a.runtime}: no parity questions (they ask thinking off)")
@@ -1733,19 +1775,20 @@ def _main(argv: list[str] | None = None) -> int:
     STEP["out"] = out
     # 22: writes no progress file — 29: nor does --serve (no step of a plan)
     STEP["pilot"] = bool(a.pilot or a.serve or a.check       # 31.1: nor does --check
-                         or a.continue_check)                # 31.3: nor the continuation's check
+                         or a.continue_check                 # 31.3: nor the continuation's check
+                         or a.switch_check)                  # 32: nor the switch's
     STEP["own"] = own
     progress(out, label=a.label or "", model=a.served_as, thinking=a.thinking,
              parity=bool(a.parity), tasks=["devicemark"] if a.devicemark else
              ["showcase"] if a.showcase else ["continue"] if a.cont else
-             [t for t in fb.ALL if t in (a.only or [])],
+             ["switch"] if a.switch else [t for t in fb.ALL if t in (a.only or [])],
              state="starting", why="", line="", incomplete={})
     if a.pilot and a.only and not a.pilot_each:
         ap.error("--pilot asks its own questions: no --only")
     if a.serve and (a.pilot or a.parity or a.only):
         ap.error("--serve asks nothing here: no --pilot, --parity or --only")
     if not a.only and not a.parity and not a.pilot and not a.serve and not a.check \
-            and not a.devicemark and not a.showcase and not a.cont:
+            and not a.devicemark and not a.showcase and not a.cont and not a.switch:
         # 17d: a box names its benchmarks, thinking on or off — every one at
         # once is more context than a card holds, and asks ARC-AGI-2 with
         # thinking off
@@ -1767,6 +1810,9 @@ def _main(argv: list[str] | None = None) -> int:
     if a.cont:
         tasks = []                  # 31.3: the continuation — a slot of cb.context(spec)
         c_spec = cb.spec_of(a.served_as, thinking)
+    if a.switch:
+        import switch_box as sw
+        tasks = []                  # 32: the experiment — its chats' slot, or drift's
     # 29: our own GPU, shared — nothing starts while another process uses it
     if own:
         import gpu_free
@@ -1781,7 +1827,9 @@ def _main(argv: list[str] | None = None) -> int:
     cap = fb.context_cap(a.runtime or "")
     ctx = (fb.slot_context(tasks, thinking, cap) if tasks else
            dmb.CONTEXT if a.devicemark else scb.CONTEXT if a.showcase else
-           cb.context(c_spec) if a.cont else CHECK_CONTEXT)
+           cb.context(c_spec) if a.cont else
+           (sw.DRIFT_CONTEXT if a.switch_part == "drift" else sw.CHATS_CONTEXT) if a.switch
+           else CHECK_CONTEXT)
     if a.serve:
         ctx = min(a.serve_context, cap) if cap else a.serve_context
     # 17h: what is free on the card, not its total — 300 MiB in use by
@@ -1808,7 +1856,7 @@ def _main(argv: list[str] | None = None) -> int:
     if fit and fit["fit"] < a.slots and not a.slots_fit:
         gb = 1024 ** 3
         raise SystemExit(
-            f"{a.slots} slots of {ctx:,} tokens ({fb.BENCH[big]['label'] if tasks else 'DeviceMark' if a.devicemark else 'the showcase' if a.showcase else 'the continuation' if a.cont else 'the check'}'s, thinking "
+            f"{a.slots} slots of {ctx:,} tokens ({fb.BENCH[big]['label'] if tasks else 'DeviceMark' if a.devicemark else 'the showcase' if a.showcase else 'the continuation' if a.cont else 'the switch experiment' if a.switch else 'the check'}'s, thinking "
             f"{'on' if thinking else 'off'}) would use about {fit['used'] / gb:.1f} GB with the "
             f"{fit['file'] / gb:.1f} GB file ({fit['types']} cache, "
             f"{fit['per_token'] / 1024:.1f} KB a token from the GGUF's header; {fit['basis']}), "
@@ -1829,7 +1877,7 @@ def _main(argv: list[str] | None = None) -> int:
     from service import db, runner
     db.init()
     words = f"shard {shard[0]} of {shard[1]}" if shard else ""
-    say(f"{a.served_as} · thinking {a.thinking} · {', '.join(tasks) or ('DeviceMark' if a.devicemark else 'the showcase' if a.showcase else 'the answers that ran out of room, continued' if a.cont else '')}"
+    say(f"{a.served_as} · thinking {a.thinking} · {', '.join(tasks) or ('DeviceMark' if a.devicemark else 'the showcase' if a.showcase else 'the answers that ran out of room, continued' if a.cont else 'the switch experiment (' + (a.switch_part or 'its check') + ')' if a.switch else '')}"
         + (f" · {words}" if shard else "") + f" · in {out}")
 
     # the run this folder holds: one served model, one mode, one file, one shard
@@ -2001,7 +2049,7 @@ def _main(argv: list[str] | None = None) -> int:
     progress(out, label=state.get("label") or "", model=a.served_as,
              thinking="on" if thinking else "off",
              tasks=[dmb.TASK] if a.devicemark else [scb.TASK] if a.showcase else
-             ["continue"] if a.cont else tasks,
+             ["continue"] if a.cont else ["switch"] if a.switch else tasks,
              shard=state["shard"],
              parity=bool(a.parity), started_at=state["started_at"], sessions=state["sessions"],
              state="starting", line="", incomplete={}, why="")
@@ -2159,12 +2207,49 @@ def _main(argv: list[str] | None = None) -> int:
             + ", its seed a fresh one" + (", the penalty counting its reply's tokens "
                                           "(penalty_prompt_tokens)" if c_path == 6 else ""))
 
+    if a.switch:
+        # 32: its inputs, pinned, and their questions, before the GPU is spent
+        sfile = fetch(a.switch, files, say)
+        s_sha = rb.sha256_file(sfile)
+        if not pins.get(sfile.name):
+            raise SystemExit(f"--switch: give {sfile.name}'s sha256 as switch_box.py inputs "
+                             f"printed it (--pin {sfile.name}=<sha256>). Nothing was asked")
+        why = pin_refused(sfile.name, s_sha, pins)
+        if why:
+            raise SystemExit(why)
+        try:
+            s_all = sw.read_input(sfile)
+        except ValueError as e:
+            raise SystemExit(f"--switch: {e}. Nothing was asked") from None
+        s_lines = s_all if a.switch_check else sw.share(s_all, a.switch_part, part)
+        if not s_lines:
+            raise SystemExit(f"--switch: {sfile.name} holds no {a.switch_part or 'chat'} for "
+                             "this step. Nothing was asked")
+        for t in sw.tasks_of(s_lines):
+            try:
+                fb.load(t, config.BENCH_ROOT)
+            except Exception as e:                      # noqa: BLE001 — said in one line
+                raise SystemExit(rb.scrub(fb.load_failed(t, e))) from None
+        n_chats = sum(1 for x in s_lines if x["part"] == "chats")
+        say(f"the switch experiment: {sfile.name} (sha256 {s_sha[:16]}…) · "
+            + (f"the check: Part 2's first {a.switch_check} chats at {sw.CHECK_LIMIT:,} tokens a "
+               "turn, both arms, and Part 1's first chat of each memory size"
+               if a.switch_check else
+               f"Part 2: {n_chats:,} chats" + (f", part {part[0]} of {part[1]}" if part else "")
+               + ", five turns each (k3, k3, k6, k3, k6) in arm A (the switch off) and arm B "
+               "(on), each pinned to its slot"
+               if a.switch_part == "chats" else
+               f"Part 1: {len(s_lines):,} chats, both directions, five runs each forced along "
+               f"the reference's {sw.REF_TOKENS} tokens")
+            + f" · the limits k6 {sw.LIMITS[6]:,}, k3 {sw.LIMITS[3]:,}; each path's settings "
+            "the file's, never sent")
+
     srv_proc = Server(srv, gguf_path, a.port, a.slots, ctx, flags, extra_env, out / SERVER_LOG)
     status = "failed"
     rec = None
     # 23c: the card's readings from the server's start to its end (a pilot,
     # no step of a plan, takes none)
-    sampler = None if (a.pilot or a.check or a.continue_check) else cc.Sampler(
+    sampler = None if (a.pilot or a.check or a.continue_check or a.switch_check) else cc.Sampler(
         out / GPU_FILE, report=lambda use: progress(out, use=use))
     if sampler is not None:
         sampler.start()
@@ -2230,7 +2315,22 @@ def _main(argv: list[str] | None = None) -> int:
         # path, before a question: the file's values, the server's /props and
         # start-up lines and two answers held to the path's. A mismatch stops
         # the box (nothing is worked around); --check stops here either way
-        if a.runtime and fb.RUNTIMES[a.runtime].get("paths"):
+        if a.switch:
+            # 32: both paths serve here — each one's settings check, k6 then k3
+            import path_check
+            server["paths_checks"] = {}
+            for path in (6, 3):
+                chk = path_check.check(srv_proc.base, path, gguf_path,
+                                       last_session(out / SERVER_LOG), ctx)
+                server["paths_checks"][str(path)] = chk
+                for ln in path_check.words(chk):
+                    say(ln)
+                (out / CHECK_FILE.format(path=path)).write_text(json.dumps(chk, indent=1),
+                                                                encoding="utf-8")
+                if not chk["pass"]:
+                    raise SystemExit(f"the settings check of expert path k{path} failed — "
+                                     + "; ".join(chk["mismatches"]) + ". Nothing was asked")
+        elif a.runtime and fb.RUNTIMES[a.runtime].get("paths"):
             import path_check
             path = fb.path_of(a.runtime, thinking)
             chk = path_check.check(srv_proc.base, path, gguf_path,
@@ -2263,7 +2363,9 @@ def _main(argv: list[str] | None = None) -> int:
             raise SystemExit(f"runtime {a.runtime} runs no speculative decoding, and this "
                              "server's slots say they draft tokens (its /slots): a GGUF with a "
                              "draft head, or a launch with a draft model? Nothing was asked")
-        rec = register_here(a.served_as, a.served_as.split("/", 1)[1], a.based_on,
+        # 32: the experiment is no row of the board: nothing registered here
+        rec = {"runtime": a.runtime} if a.switch else register_here(
+                            a.served_as, a.served_as.split("/", 1)[1], a.based_on,
                             srv_proc.base, thinking,
                             f"llama.cpp {ver['build'] or '?'} on {gpu.get('name') or 'a GPU'}: "
                             + " ".join(server["argv"]), flags, extra_env, a.runtime,
@@ -2371,7 +2473,34 @@ def _main(argv: list[str] | None = None) -> int:
             from service import frontier as sf_c
             c_asked = {t: sf_c.settings(rec, t, thinking) for t in {r["task"] for r in cont_lines}
                        if t in fb.BENCH}         # 31.3e: the showcase's, the path alone
-        if a.cont and a.continue_check:
+        if a.switch and a.switch_check:
+            # 32: the check before plan S — a line a turn and arm, no bundle
+            ok = sw.run_check(srv_proc.base, s_lines, out, a.slots, say, out / SERVER_LOG,
+                              a.switch_check)
+            say("the switch check: " + ("every memory as said — arm A re-read at every switch, "
+                                        "arm B kept the conversation up to the previous "
+                                        "question, the token ids' way the chat's: rent S1–S11"
+                                        if ok else "NOT every memory as said — don't rent "
+                                        "plan S yet") + f" · {out / sw.CHECK}")
+            return 0 if ok else 1
+        if a.switch:
+            # 32: the experiment's chats or drift runs — no run of the board's
+            progress(out, state="asking", session_at=round(time.time()))
+
+            def said_s(x: str) -> None:
+                say(x)
+                progress(out, state="asking", line=x[:300])
+            run_s = sw.run_chats if a.switch_part == "chats" else sw.run_drift
+            n_s, why_s = run_s(srv_proc.base, s_lines, out, a.slots, said_s, out / SERVER_LOG)
+            if sampler is not None:
+                sampler.phase = "after"
+            of_s = len(s_lines) * (1 if a.switch_part == "chats" else 2)
+            status = "done" if not why_s else "failed"
+            row = {"status": status, "error": why_s,
+                   "progress": f"the switch experiment: {n_s:,} of {of_s:,} "
+                               + ("chats" if a.switch_part == "chats" else "drift runs")}
+            say(f"the run: {status} · {row['progress']}" + (f" · {why_s}" if why_s else ""))
+        elif a.cont and a.continue_check:
             # 31.3: the check before U-cont — penalty_prompt_tokens' test (on
             # k6, whose presence penalty it is), then the first answers of one
             # benchmark, a line each; no bundle
@@ -2411,7 +2540,7 @@ def _main(argv: list[str] | None = None) -> int:
                 + ("every answer continued is one reply" if ok_c else
                    "NOT every answer continued is one reply — don't rent U-cont yet"))
             return 0 if ok_c else 1
-        if a.cont:
+        elif a.cont:
             # 31.3: the answers that ran out of room, continued — no run of the board's
             progress(out, state="asking", session_at=round(time.time()))
 
@@ -2499,6 +2628,9 @@ def _main(argv: list[str] | None = None) -> int:
         else cb.make_bundle(out, a.served_as, thinking, state, gguf, server, rec, cont_lines,
                             c_sha, part)
         if a.cont
+        else sw.make_bundle(out, a.served_as, state, gguf, server, a.switch_part, s_lines, s_sha,
+                            part)
+        if a.switch
         else make_bundle(out, a.served_as, thinking, tasks, state, shard, gguf, server, rec))
     for t, x in incomplete.items():
         say(f"{t}: {x['answers']:,} of {x['of']:,} answered — run the same command again to "
