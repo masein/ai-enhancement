@@ -66,7 +66,7 @@ def made_up(d: Path, n: int = 200) -> None:
     (d / "chats").mkdir(exist_ok=True)
     (d / "chats" / "box.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
     drift = []
-    for b, mem in zip(sw.BINS, (1100, 4300, 16800, 49900)):
+    for b, mem in zip(sw.BINS, (1100, 4300, 15200, 49900)):
         for k in range(6):
             for dirn in ("k3→k6", "k6→k3"):
                 runs = {}
@@ -76,7 +76,10 @@ def made_up(d: Path, n: int = 200) -> None:
                     runs[run] = {"memory": "", "first_kl": kl * 2, "mean_kl": kl, "flips": fl,
                                  "positions": 512, "first_flip": fl[0] if fl else None}
                 drift.append({"chat": k, "bin": b, "direction": dirn, "memory": mem,
-                              "ref": {"memory": ""}, "runs": runs})
+                              "ref": {"memory": ""}, "runs": runs,
+                              # 32.5: the size fitted to the apps' cap
+                              **({"fits_app": True, "dropped": 3, "prompt": mem + 600}
+                                 if b in sw.APP_FIT_BINS else {})})
     (d / "drift").mkdir(exist_ok=True)
     (d / "drift" / "box.jsonl").write_text("".join(json.dumps(r) + "\n" for r in drift))
     (d / "imports.json").write_text(json.dumps({"imports": [
@@ -137,6 +140,9 @@ def test_the_report_shows_both_parts_from_the_summary_kept(live, page, width, sc
     assert "the apps’ 16,384 tokens" in page.inner_text("[data-sw-cap]")
     assert page.inner_text("[data-sw-stress]") == "Stress test: beyond the apps’ 16,384-token cap"
     assert "stress test" in page.inner_text("[data-sw-drift-row='49152|k3→k6|A2']")
+    # 32.5: the largest memory that fits the apps' cap, and how many fit it
+    assert page.inner_text("[data-sw-drift-row='15500|k3→k6|A2'] td") == (
+        "about 15,500 (median 15,200) · 6 of 6 fit the apps’ 16,384")
     assert "Not tested: chats saved to disk" in page.inner_text("[data-report-section='sw-notes']")
     assert "rec1" not in page.inner_text("body")                # no question ids or text
     assert no_sideways(page), "the page scrolls sideways"

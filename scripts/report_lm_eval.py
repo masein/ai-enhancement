@@ -31888,7 +31888,9 @@ function vSwitch(id, d, back) {
           ...Object.entries(r.runs).map(([k, x], i) =>
         el('tr', { 'data-sw-drift-row': `${r.bin}|${r.direction}|${k}` },
           el('td', { text: i ? '' : `about ${swN(r.bin)} (median ${swN(r.memory)})`
-            + (r.stress ? ' · stress test' : '') }),
+            + (r.stress ? ' · stress test' : '')
+            // 32.5: the size fitted to the apps' cap, how many fit it
+            + (r.fit ? ` · ${swN(r.fit.fits)} of ${swN(r.chats)} fit the apps’ 16,384` : '') }),
           el('td', { text: i ? '' : r.direction }),
           el('td', { text: p1.runs[k] || k }),
           el('td', { class: 'num', text: swN(x.n) + (x.not_counted ? ` (${swN(x.not_counted)} not)` : '') }),

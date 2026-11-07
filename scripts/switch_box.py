@@ -73,8 +73,10 @@ its last turn on Y, each forced along A's own greedy reply (the reference):
 - B: the chat to the end of its previous reply on X, then the last turn on
   Y with the switch on;
 - F: X reads everything fresh (the full gap between the paths).
-About 1k, 4k and 16k tokens of memory are the main sizes; 48k is a stress
-test, reported apart. The histories are step2388's k3 replies, which the
+About 1k and 4k tokens of memory, and the largest memory that fits the apps'
+16,384 with the last question and the 512-token reference (about 15,500: its
+oldest exchanges dropped on the box until it fits), are the main sizes; 48k
+is a stress test, reported apart. The check runs in Part 1's slots (65,536). The histories are step2388's k3 replies, which the
 apps keep to their end, so k3→k6 is a memory the apps hold; k6→k3 isn't (no
 k6 memory outlives its turn) and bounds what keeping k6's would do.
 Part 1's protocol, as DeviceMark's: greedy, no penalties — temperature 0,
@@ -138,11 +140,17 @@ CHATS_CONTEXT = APP_CONTEXT
 # this many tokens, so that most finish in the room the chat leaves (about
 # 13,000); how many still run out is counted
 HARD_MAX = 10_240
-# Part 1: memory up to about 48k, the last question and 512 tokens
+# Part 1: memory up to about 48k, the last question and 512 tokens — the check
+# runs in these slots too (32.5: in the chats' 16,384 its 16k memory didn't fit)
 DRIFT_CONTEXT = 65_536
 N_CHATS = 2_000
-BINS = (1_024, 4_096, 16_384, 49_152)
-# 48k: a stress test, reported apart from the main sizes (1k, 4k, 16k)
+# Part 1's memory sizes (masein, 6 Nov): about 1k and 4k; the largest memory that
+# fits the apps' 16,384 with the last question and the 512-token reference
+# reply (about 15,500: stacked past the cap here, its oldest exchanges dropped
+# on the box until it fits, token for token); and 48k, a stress test beyond
+# the apps' cap, reported apart from the main sizes
+BINS = (1_024, 4_096, 15_500, 49_152)
+APP_FIT_BINS = (15_500,)
 STRESS_BINS = (49_152,)
 PER_BIN = 50
 REF_TOKENS = 512
@@ -420,6 +428,9 @@ def inputs(dest: Path, say=print, n_chats: int = N_CHATS, bins: tuple = BINS,
     drng.shuffle(pool)
     k, chat, drift = 0, 0, []
     for b in bins:
+        # 32.5: a size fitted to the apps' cap is stacked past it (tokens
+        # guessed here), and cut to fit on the box
+        target = int(APP_CONTEXT * 1.15) if b in APP_FIT_BINS else b
         for _ in range(per_bin):
             hist, before = [], 0
             while True:
@@ -431,7 +442,7 @@ def inputs(dest: Path, say=print, n_chats: int = N_CHATS, bins: tuple = BINS,
                 k += 1
                 text = fb.prompt(task, items[task][q])[0]
                 hist.append({"task": task, "id": q, "reply": reply})
-                if before >= b:
+                if before >= target:
                     break                       # the previous turn, after the memory
                 before += _tokens_about(text) + _tokens_about(reply)
             drift.append({"part": "drift", "chat": chat, "bin": b, "history": hist})
@@ -1020,9 +1031,20 @@ def one_drift(srv: Srv, line: dict, items: dict, xy: tuple[int, int], slots: lis
     (the thinking kept, nothing rolls back): N on Y, B on X"""
     x, y = xy
     hist = history_msgs(line, items)
-    last = hist + [{"role": "user", "content": fb.prompt(line["last"]["task"], items[
-        line["last"]["task"]][line["last"]["id"]])[0]}]
-    p_last = srv.prompt(last, y)
+    ask = {"role": "user", "content": fb.prompt(line["last"]["task"], items[
+        line["last"]["task"]][line["last"]["id"]])[0]}
+    p_last = srv.prompt(hist + [ask], y)
+    dropped = 0
+    if line["bin"] in APP_FIT_BINS:
+        # 32.5: the largest memory that fits the apps' cap with the last
+        # question and the reference reply: its oldest exchanges dropped, one
+        # at a time, the previous one always kept — held to the longer of the
+        # two paths' prompts, so both directions keep the same memory
+        def longest(h: list[dict]) -> int:
+            return max(len(srv.prompt(h + [ask], p)) for p in (3, 6))
+        while longest(hist) + REF_TOKENS > APP_CONTEXT and len(hist) > 2:
+            hist, dropped = hist[2:], dropped + 1
+        p_last = srv.prompt(hist + [ask], y)
     s_last = srv.user_starts(p_last)[-1]
     e_prev = srv.reply_end(p_last, s_last)
     a, a2, f, nn, b = slots
@@ -1058,6 +1080,8 @@ def one_drift(srv: Srv, line: dict, items: dict, xy: tuple[int, int], slots: lis
                      if k in ("N", "B") else {})}
     return {"chat": line["chat"], "bin": line["bin"], "direction": f"k{x}→k{y}", "x": x, "y": y,
             "e_prev": e_prev, "s_last": s_last, "prompt": len(p_last),
+            **({"dropped": dropped, "fits_app": len(p_last) + REF_TOKENS <= APP_CONTEXT}
+               if line["bin"] in APP_FIT_BINS else {}),
             "memory": runs["B"]["requests"][0]["cache_n"] if runs["B"]["requests"] else None,
             "ref": {"tokens": len(r_toks), "cache_n": ref["cache_n"], "sent": ref["sent"],
                     "memory": "" if ref["cache_n"] == 0 else
@@ -1197,9 +1221,16 @@ def run_check(base: str, lines: list[dict], out: Path, slots: int, say, log: Pat
             whys = {k: v["memory"] for k, v in r["runs"].items() if v["memory"]}
             if r["ref"]["memory"]:
                 whys["A"] = r["ref"]["memory"]
+            # 32.5: a size fitted to the apps' cap that doesn't fit it
+            if r.get("fits_app") is False:
+                whys["fit"] = (f"{r['prompt'] + REF_TOKENS:,} tokens with the reference, past "
+                               f"the apps' {APP_CONTEXT:,}")
             bad += bool(whys)
             bl = r["runs"]["B"]["requests"][0]["line"] if r["runs"]["B"]["requests"] else None
-            say(f"drift chat {x['chat']} (about {x['bin']:,} tokens) {d} · A fresh "
+            fit = (f" · fits the apps' {APP_CONTEXT:,} with the last question and the "
+                   f"{REF_TOKENS}-token reference: {r['prompt'] + REF_TOKENS:,} (the oldest "
+                   f"{r['dropped']} exchanges dropped)" if "fits_app" in r else "")
+            say(f"drift chat {x['chat']} (about {x['bin']:,} tokens) {d}{fit} · A fresh "
                 f"{r['ref']['cache_n']} · B kept {r['memory']} (the chat to its previous "
                 f"reply's end, {r['e_prev']})" + (f" · \"{bl['text']}\"" if bl else
                                                   " · no path line")
@@ -1624,6 +1655,12 @@ def summarise(d: Path) -> dict:
                                                   else x["positions"] for x in ok])}
             part1.append({"bin": b, "direction": dirn, "chats": len(rs),
                           "memory": _median([r.get("memory") for r in rs]), "runs": runs,
+                          # 32.5: fitted to the apps' cap: how many fit, how much dropped
+                          **({"fit": {"fits": sum(1 for r in rs if r.get("fits_app")),
+                                      "dropped": _median([r.get("dropped") for r in rs]),
+                                      "total": _median([r["prompt"] + REF_TOKENS for r in rs
+                                                        if isinstance(r.get("prompt"), int)])}}
+                             if b in APP_FIT_BINS else {}),
                           # 48k: a stress test, apart from the main sizes
                           "stress": b in STRESS_BINS})
     s = {"at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
