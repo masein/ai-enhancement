@@ -38,12 +38,14 @@ WARNING = ("For insight only — not for training. These are benchmark questions
            "and how the loop happens.")
 WITHHELD_LINE = "[a line quoting the question, withheld]"
 HOW_READ = ("Counted only where the thinking states it clearly: \"the answer is (E)\", the right "
-            "option's letter with its text (not where it copies out the list of options: two other "
-            "options written within 600 characters), or the exact final answer on MATH Level 5 and OTIS. "
-            "The token is where that first came, as a share of the answer's characters times its "
-            "output tokens. Not read on HLE, SimpleQA and ARC-AGI-2.")
+            "option's letter with its text (not beside another option written out within 600 "
+            "characters, where it is listing or comparing them), or the exact final answer on MATH "
+            "Level 5 and OTIS; never in a sentence that asks, supposes or weighs it (\"is the answer "
+            "(E)?\", \"if the answer is (E)\", \"(D) or (E)\"). A rule of thumb: checked by hand, it "
+            "misses many statements made in other words. The token is where that first came, as a share "
+            "of the answer's characters times its output tokens. Not read on HLE, SimpleQA and ARC-AGI-2.")
 LIST_Q = 200                    # a question's first characters in the list: two lines
-RULE = "first-right-2"          # 33: first_right leaves restated option lists out; kept lists redone
+RULE = "first-right-3"          # 33g: first_right as the hand check left it; kept lists redone
 
 
 def _scripts() -> None:
@@ -113,15 +115,45 @@ def repeated(text: str, at_least: int = 3) -> list[str]:
     return [x for x, n in c.most_common(40) if n >= at_least]
 
 
-_LETTER = r"\(?\**\s*([A-J])\s*\**\)?(?![A-Za-z0-9])"
+# 33g (masein, 7 Nov): the paper's hand check of 71 answers found this rule counting
+# questions ("is there any chance the answer is (D)?"), conditionals ("if the answer is
+# (B), …"), alternatives ("(A) or (C)"), two options compared, and the article "a" read
+# as option (A); and missing OTIS answers stored with a leading zero (026), fractions
+# written a/b, "the final answer seems to be 870" and "So 132 is the answer". A letter
+# is a capital, and a sentence that asks, supposes or weighs an answer doesn't state it
+_LETTER = r"\(?\**\s*((?-i:[A-J]))\s*\**\)?(?![A-Za-z0-9])"
 _SAYS = re.compile(r"(?i)\b(?:the\s+)?(?:final\s+|correct\s+|right\s+)?answer\s*"
-                   r"(?:is|would be|should be|must be|:|=)\s*(?:option\s+)?" + _LETTER)
+                   r"(?:is|should be|must be|:|=)\s*(?:option\s+)?" + _LETTER)
+_HEDGE = re.compile(r"(?i)\b(?:if|whether|maybe|perhaps|chance|possib\w*|could|would|might|"
+                    r"suppose|assum\w*|unless)\b")
+_STOP = re.compile(r"[.!?](?=\s|$)|\n")
+_ALT = re.compile(r"\s*(?:,\s*)?(?:or|/)\s*\(?\**[A-J]\b")
+_MATH_SAYS = (re.compile(r"(?i)\b(?:final\s+)?(?:answer|result|solution)\s*(?:is|seems\s+to\s+be|:|=)"
+                         r"\s*(?:definitely\s+)?\$?([^\n$]{1,60})"),
+              re.compile(r"(?i)(?:^|[\s(])\$?([^\s$]{1,40}?)\$?\s+is\s+the\s+(?:final\s+)?answer\b"))
+
+
+def said(text: str, start: int, end: int) -> bool:
+    """33g: whether text[start:end] stands in a sentence that states it: not a
+    question, nothing before it in the sentence that supposes or weighs it, and
+    not one of two answers offered ("(A) or (C)")"""
+    head = max([m.end() for m in _STOP.finditer(text, 0, start)] or [0])
+    stop = _STOP.search(text, end)
+    if stop and text[stop.start()] == "?":
+        return False
+    if _HEDGE.search(text, head, start):
+        return False
+    return not _ALT.match(text, end)
 
 
 def _norm_math(s: str) -> str:
     s = re.sub(r"\\(?:left|right|displaystyle|!|,|;|:)", "", str(s))
     s = re.sub(r"\\[dt]frac", r"\\frac", s)
-    return re.sub(r"[\s$]", "", s).rstrip(".")
+    s = re.sub(r"\\(?:text|mbox|mathrm)\s*\{([^{}]*)\}", r"\1", s)
+    s = re.sub(r"\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}", r"\1/\2", s)
+    s = re.sub(r"\\frac(\d)(\d)", r"\1/\2", s)
+    s = re.sub(r"[\s$]", "", s).rstrip(".")
+    return s.lstrip("0") if re.fullmatch(r"0+\d+", s) else s
 
 
 def right_of(task: str, item: dict) -> dict:
@@ -147,12 +179,12 @@ def right_words(task: str, item: dict) -> str:
     return f"({r['letter']}) {r['text']}" if "letter" in r else r["answer"]
 
 
-# 33 (masein, 7 Nov): a letter with its option's text inside a restated option
-# list — LIST_OTHERS of the question's other options, each as letter and text,
-# within LIST_NEAR characters of it — is the thinking copying out the list, not
-# stating an answer, and doesn't count. "The answer is (E)" always counts
+# 33 (masein, 7 Nov): a letter with its option's text beside LIST_OTHERS of the
+# question's other options, each as letter and text, within LIST_NEAR characters of
+# it, is the thinking copying out the list (33) or comparing two options (33g: one is
+# enough), not stating an answer, and doesn't count. "The answer is (E)" counts
 LIST_NEAR = 600
-LIST_OTHERS = 2
+LIST_OTHERS = 1
 
 
 def _options(task: str, item: dict) -> list[tuple[str, str]]:
@@ -171,20 +203,20 @@ def _option_pat(letter: str, text: str) -> str | None:
     opt = re.sub(r"\s+", " ", text).strip()[:40]
     if len(opt) < 3:
         return None
-    return (r"\(?\b" + re.escape(letter) + r"\)?\s*[.:)\-–]?\s*"
-            + r"\s+".join(re.escape(w) for w in opt.split()))
+    return (r"\(?\b" + re.escape(letter) + r"\)?\s*[.:)\-–]?\s*(?i:"
+            + r"\s+".join(re.escape(w) for w in opt.split()) + ")")
 
 
 def in_a_list(task: str, item: dict, text: str, start: int, end: int) -> bool:
     """33: whether the option written at text[start:end] stands among
     LIST_OTHERS or more of the question's other options, each written out,
-    within LIST_NEAR characters: a restated option list"""
+    within LIST_NEAR characters: a restated option list, or (33g) two compared"""
     r = right_of(task, item)
     window = text[max(0, start - LIST_NEAR):end + LIST_NEAR]
     near = 0
     for letter, words in _options(task, item):
         pat = _option_pat(letter, words) if letter != r["letter"] else None
-        if pat and re.search(pat, window, re.I):
+        if pat and re.search(pat, window):
             near += 1
             if near >= LIST_OTHERS:
                 return True
@@ -194,18 +226,21 @@ def in_a_list(task: str, item: dict, text: str, start: int, end: int) -> bool:
 def first_right(task: str, item: dict | None, text: str) -> int | None:
     """the first place the thinking clearly states the right answer: "the
     answer is (E)", the right option's letter with its text — not where the
-    thinking copies out the option list (33: in_a_list) — or the exact final
-    answer on MATH and OTIS. None when it never does — or on a benchmark this
-    isn't read on"""
+    thinking copies out the option list or compares two (33: in_a_list) — or
+    the exact final answer on MATH and OTIS; never in a sentence that asks,
+    supposes or weighs it (33g: said). None when it never does — or on a
+    benchmark this isn't read on"""
     if not item or not text:
         return None
     if task in ("mmlupro_tiger", "gpqa_diamond_epoch"):
         r = right_of(task, item)
-        hits = [m.start() for m in _SAYS.finditer(text) if m.group(1) == r["letter"]]
+        hits = [m.start() for m in _SAYS.finditer(text)
+                if m.group(1) == r["letter"] and said(text, m.start(), m.end())]
         pat = _option_pat(r["letter"], r["text"])
         if pat:
-            hits += [m.start() for m in re.finditer(pat, text, re.I)
-                     if not in_a_list(task, item, text, m.start(), m.end())]
+            hits += [m.start() for m in re.finditer(pat, text)
+                     if not in_a_list(task, item, text, m.start(), m.end())
+                     and said(text, m.start(), m.end())]
         return min(hits) if hits else None
     if task in ("math_l5_epoch", "otis_aime_epoch"):
         want = _norm_math(right_of(task, item)["answer"])
@@ -217,12 +252,15 @@ def first_right(task: str, item: dict | None, text: str) -> int | None:
             while j < len(text) and depth:
                 depth += {"{": 1, "}": -1}.get(text[j], 0)
                 j += 1
-            if _norm_math(text[m.end():j - 1]) == want:
+            if _norm_math(text[m.end():j - 1]) == want and said(text, m.start(), j):
                 hits.append(m.start())
-        for m in re.finditer(r"(?i)\b(?:final\s+)?answer\s*(?:is|:|=)\s*\$?([^\n$]{1,60})", text):
-            got = _norm_math(re.split(r"(?<=\S)[.,;](?:\s|$)", m.group(1).strip())[0])
-            if got == want:
-                hits.append(m.start())
+        for rx in _MATH_SAYS:
+            for m in rx.finditer(text):
+                parts = re.split(r"(?<=\S)[.,;](?:\s|$)", m.group(1).strip(), maxsplit=1)
+                if len(parts) > 1 and re.match(r"\s*[-+\d\\($]", parts[1]):
+                    continue                    # a list of answers ("2, -1"), not the one
+                if _norm_math(parts[0]) == want and said(text, m.start(), m.end()):
+                    hits.append(m.start())
         return min(hits) if hits else None
     return None
 

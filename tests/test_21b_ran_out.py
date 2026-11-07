@@ -186,10 +186,9 @@ def test_a_restated_option_list_is_not_a_statement():
                  "C. invented option C\nE. invented option E")
     at = ran_out.first_right(MMLU, item, said)
     assert at is not None and said[at:].startswith("The answer is (E)")
-    # one other option beside it is a comparison, not a list
+    # 33g: one other option beside it is two compared, not a statement either
     two = think("Either (D) invented option D or (E) invented option E; (E) holds.")
-    at = ran_out.first_right(MMLU, item, two)
-    assert at is not None and two[at:].startswith("(E) invented option E")
+    assert ran_out.first_right(MMLU, item, two) is None
     # GPQA: its options in the prompt's seeded order, the same rule
     ran_out._scripts()
     import frontier as fb
@@ -205,7 +204,48 @@ def test_a_restated_option_list_is_not_a_statement():
     assert ran_out.first_right(MATH, ITEMS[MATH][0], "So \\boxed{\\frac{1}{2}} it is.") is not None
     # what a page keeps under the old rule is worked out again
     assert ran_out.RULE in ran_out._key(None, None, MMLU)
-    assert thinks.WAY == "thinks-3"
+    assert thinks.WAY == "thinks-4"
+
+
+def test_a_sentence_that_asks_supposes_or_weighs_states_nothing():
+    """33g (masein, 7 Nov): each kind of hit the paper's hand check of 71 answers
+    found counted wrongly, and each kind of statement it found missed"""
+    item = ITEMS[MMLU][0]                                       # the key is (E)
+    far = "\n" + LOOP + "\n"                                    # 2,500 characters apart
+    for t in ("Is there any chance the answer is (E)? No.",           # a question
+              "But maybe the intended answer is E or D? It reads oddly.",
+              "Could it be (E) invented option E? Unlikely.",
+              "If the answer is (E), it links the two.",                # a conditional
+              "If I were wrong about the rate, the answer would be (E).",
+              "So the answer must be E or C.",                         # two offered
+              "Let's look at the possibility of (E) invented option E.",
+              "Let's assume the answer is (E) for now."):
+        assert ran_out.first_right(MMLU, item, think(t + far)) is None, t
+    for t in ("Counting: 7 bits. So the answer is (E).",                # statements still count
+              "This matches option E: invented option E.",
+              "The answer is E.",
+              "I was wrong earlier. The answer is (E)."):
+        at = ran_out.first_right(MMLU, item, think(t + far))
+        assert at is not None, t
+    # a capital letter only: the article "a" isn't option (A)
+    valid = {"id": "v", "options": ["Valid", "Invalid", "Sound", "Unsound"], "answer": "A",
+             "category": "philosophy"}
+    assert ran_out.first_right(MMLU, valid, think("So we have a valid counterexample." + far)) is None
+    assert ran_out.first_right(MMLU, valid, think("So the argument is (A) Valid." + far)) is not None
+    # "the answer is a function of …" isn't (A) either
+    assert ran_out.first_right(MMLU, valid, think("The answer is a function of the premises." + far)) is None
+    # OTIS: stored with a leading zero; "seems to be" and "is the answer" read
+    otis = {"id": "o", "answer": "026"}
+    for t in ("The answer is 26.", "Final Answer seems to be 26.", "So 26 is the answer."):
+        assert ran_out.first_right("otis_aime_epoch", otis, think(t + far)) is not None, t
+    assert ran_out.first_right("otis_aime_epoch", otis, think("Maybe the answer is 26? Check." + far)) is None
+    # MATH: a fraction written a/b; a list of values isn't the one
+    half = {"id": "m", "answer": "\\dfrac{49}{54}"}
+    assert ran_out.first_right(MATH, half, think("ANSWER: 49/54" + far)) is not None
+    two = {"id": "t", "answer": "2"}
+    assert ran_out.first_right(MATH, two, think("ANSWER: 2, -1" + far)) is None
+    assert ran_out.first_right(MATH, two, think("ANSWER: 2. Done." + far)) is not None
+    assert ran_out.RULE == "first-right-3"
 
 
 def test_the_list_says_where_and_at_which_token(svc):
