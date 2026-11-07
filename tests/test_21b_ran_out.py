@@ -17,7 +17,7 @@ import pytest
 
 import frontier as fb
 from conftest import make_service
-from service import config, ran_out, reported, reports
+from service import config, ran_out, reported, reports, thinks
 
 ROOT = Path(__file__).resolve().parent.parent
 REP = json.loads((reported.REPORTS_DIR / "ran-out-of-room.json").read_text())
@@ -164,6 +164,48 @@ def test_had_the_right_answer_reads_clear_statements_only():
     assert ran_out.first_right(MATH, m, "the answer is \\frac{1}{3}") is None
     # never read on HLE, SimpleQA or ARC-AGI-2
     assert ran_out.first_right("hle_text_cais", {"answer": "x"}, "the answer is x") is None
+
+
+def test_a_restated_option_list_is_not_a_statement():
+    """33 (masein, 7 Nov): the right option's letter with its text, copied out
+    among the question's other options, is the thinking restating the list,
+    not stating an answer — the paper's Table 6 rule, the board's too"""
+    item = ITEMS[MMLU][0]                                       # the key is (E)
+    listed = think("The options are:\n"
+                   + "\n".join(f"{c}. {o}" for c, o in zip("ABCDEFGHIJ", OPTS))
+                   + "\nLet me work through them.\n" + LOOP)
+    assert ran_out.first_right(MMLU, item, listed) is None
+    assert ran_out.in_a_list(MMLU, item, listed, listed.index("E. invented"),
+                             listed.index("E. invented") + 21)
+    # stated after the list, far from it: counted there, not where it was listed
+    later = listed + "\nSo (E) invented option E fits."
+    at = ran_out.first_right(MMLU, item, later)
+    assert at is not None and later[at:].startswith("(E) invented option E")
+    # "the answer is (E)" counts even amid the list
+    said = think("A. invented option A\nB. invented option B\nThe answer is (E).\n"
+                 "C. invented option C\nE. invented option E")
+    at = ran_out.first_right(MMLU, item, said)
+    assert at is not None and said[at:].startswith("The answer is (E)")
+    # one other option beside it is a comparison, not a list
+    two = think("Either (D) invented option D or (E) invented option E; (E) holds.")
+    at = ran_out.first_right(MMLU, item, two)
+    assert at is not None and two[at:].startswith("(E) invented option E")
+    # GPQA: its options in the prompt's seeded order, the same rule
+    ran_out._scripts()
+    import frontier as fb
+    g = ITEMS[GPQA][0]
+    opts = fb.order_of(GPQA, g)
+    letter = fb.LETTERS[opts.index(g["right"])]
+    glist = think("\n".join(f"({c}) {o}" for c, o in zip(fb.LETTERS, opts)) + "\n" + LOOP)
+    assert ran_out.first_right(GPQA, g, glist) is None
+    gsaid = glist + f"\nSo ({letter}) {g['right']}."
+    at = ran_out.first_right(GPQA, g, gsaid)
+    assert at is not None and gsaid[at:].startswith(f"({letter}) {g['right']}")
+    # MATH has no options: unchanged
+    assert ran_out.first_right(MATH, ITEMS[MATH][0], "So \\boxed{\\frac{1}{2}} it is.") is not None
+    # what a page keeps under the old rule is worked out again
+    assert ran_out.RULE in ran_out._key(None, None, MMLU)
+    assert thinks.WAY == "thinks-3"
 
 
 def test_the_list_says_where_and_at_which_token(svc):
