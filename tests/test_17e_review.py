@@ -184,7 +184,9 @@ def test_2_3_each_plan_runs_every_benchmark_once_one_line_a_box():
                     # fit — eight chats at a time, the pace plan C measured
                     assert slots == (16 if fbx.SWITCH in tasks else room) <= room
                     continue
-                assert fb.slot_context(list(tasks), th == "on") * slots <= rg.MAX_CONTEXT
+                # 34: a plan's runtime sizes its slots (plan P's at the apps' limits)
+                assert fb.slot_context(list(tasks), th == "on", runtime=fbx.PLAN_RUNTIME.get(
+                    name)) * slots <= rg.MAX_CONTEXT
         # 20: plan L asks thinking on only, and has no parity step (the
         # server it compares with is out of reach). 25: plans A, B and L run the
         # Frontier suite; plan I instruction following, on then off, on the
@@ -211,10 +213,14 @@ def test_2_3_each_plan_runs_every_benchmark_once_one_line_a_box():
         # 32: plan S, the switch experiment — Part 2's chats in eighths, Part 1 whole
         if name == "S":
             want = {("on", fbx.SWITCH), ("on", fbx.DRIFT)}
+        # 34: plan P, the whitepaper's six benchmarks at the apps' limits, both paths
+        if name == "P":
+            want = {(th, t) for th in ("on", "off") for t in (
+                fbx.GPQA, fbx.MMLU, fbx.MATH, fbx.OTIS, fbx.IFEVAL, fbx.IFBENCH)}
         assert set(have) == want, name
         assert all(have[k] == set(range(1, of[k] + 1)) for k in have), name
         # 17f: one box a build asks it first
-        assert parity == (0 if name in ("L", "I", "T", "U", "C", "S") else 1), name
+        assert parity == (0 if name in ("L", "I", "T", "U", "C", "S", "P") else 1), name
     longest = {p: max(sum(fbx.hours(s) for s in st) for st in b.values())
                for p, b in fbx.PLANS.items()}
     assert longest["A"] <= 18 and longest["B"] <= 10.5 and longest["L"] <= 6.0

@@ -1654,6 +1654,10 @@ def _main(argv: list[str] | None = None) -> int:
                                if r.get("paths") and not r.get("experiment")) + ")")
     if a.check and (a.pilot or a.parity or a.serve or a.only):
         ap.error("--check asks no benchmark: no --pilot, --parity, --serve or --only")
+    # 34: a runtime of the apps' limits asks the Frontier benchmarks alone
+    if fb.app_of(a.runtime) and (a.showcase or a.devicemark or a.cont):
+        ap.error(f"--runtime {a.runtime} asks the Frontier benchmarks under the apps' limits "
+                 "alone: no --showcase, --devicemark or --continue")
     # 31.2b: the showcase, on a runtime of expert paths, on its own
     if a.showcase and (a.pilot or a.parity or a.serve or a.check or a.only or shard
                        or a.devicemark):
@@ -1663,7 +1667,8 @@ def _main(argv: list[str] | None = None) -> int:
                            and not fb.RUNTIMES[a.runtime].get("experiment")):
         ap.error("--showcase: on a runtime of expert paths (--runtime "
                  + " or ".join(n for n, r in fb.RUNTIMES.items()
-                               if r.get("paths") and not r.get("experiment")) + ")")
+                               if r.get("paths") and not r.get("experiment")
+                               and not r.get("app")) + ")")
     if a.showcase and a.slots != 1:
         ap.error("--showcase: one slot (--slots 1), each question asked alone as step8804's were")
     # 31.3: the answers that ran out of room, continued, on their own
@@ -1825,7 +1830,7 @@ def _main(argv: list[str] | None = None) -> int:
     # the stated --max-context only when those can't be read. 29: a model's own
     # context caps it (Bolt's 64K)
     cap = fb.context_cap(a.runtime or "")
-    ctx = (fb.slot_context(tasks, thinking, cap) if tasks else
+    ctx = (fb.slot_context(tasks, thinking, cap, runtime=a.runtime) if tasks else
            dmb.CONTEXT if a.devicemark else scb.CONTEXT if a.showcase else
            cb.context(c_spec) if a.cont else
            # 32.5: the check runs Part 1 too, whose memory reaches 48k: its
@@ -1841,7 +1846,7 @@ def _main(argv: list[str] | None = None) -> int:
     in_use = int(card.get("memory_used_mib") or 0)
     mem = (card["memory_mib"] - in_use) if card.get("memory_mib") else None
     fit, unread = kv_fit(a.gguf, flags, a.slots, ctx, mem)
-    big = max(tasks or fb.TASKS, key=lambda t: fb.slot_context([t], thinking))
+    big = max(tasks or fb.TASKS, key=lambda t: fb.slot_context([t], thinking, runtime=a.runtime))
     # 17f: a step planned at 8 slots runs what the card holds, down to
     # --min-slots, and says so (HLE's 86,016 with thinking on: 7 on a 5090)
     dropped = None
@@ -2358,6 +2363,16 @@ def _main(argv: list[str] | None = None) -> int:
             if not chk["pass"]:
                 raise SystemExit(f"the settings check of expert path k{path} failed — "
                                  + "; ".join(chk["mismatches"]) + ". Nothing was asked")
+            # 34: under the apps' limits, the thinking budget held by this
+            # server before a question, or the box stops
+            app = fb.app_of(a.runtime)
+            if app and thinking:
+                import app_check
+                ac = app_check.check(srv_proc.base, path, app["room"])
+                server["app_check"] = ac
+                say(app_check.words(ac))
+                if not ac["pass"]:
+                    raise SystemExit(app_check.words(ac) + ". Nothing was asked")
             if a.check:
                 say(f"the settings check of expert path k{path} passes: "
                     f"{out / CHECK_FILE.format(path=path)}")

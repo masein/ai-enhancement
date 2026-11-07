@@ -1014,6 +1014,9 @@ class Answer(str):
     timings: dict | None = None
     prompt_tokens: int | None = None
     wall_s: float | None = None
+    # 34: under the apps' limits — its thinking's and reply's tokens, whether the
+    # thinking reached the budget, and the reply's cut when it ran past its limit
+    app: dict | None = None
 
 
 def ask(rec: dict, text: str, s: dict) -> str:
@@ -1023,7 +1026,7 @@ def ask(rec: dict, text: str, s: dict) -> str:
     # 14.1: MT-Bench's second turn — the conversation so far before the question
     body = {"model": rec["pin"].get("model") or rec["name"],
             "messages": [*system, *(s.get("history") or []), {"role": "user", "content": text}],
-            **{k: v for k, v in s.items() if k not in ("system", "history")}}
+            **{k: v for k, v in s.items() if k not in ("system", "history", "reply_limit")}}
     if "expert_path" in s:
         # 31.1: a request on an expert path carries its messages, its limit,
         # its path and its seed — nothing more, so nothing replaces the path's
@@ -1040,6 +1043,11 @@ def ask(rec: dict, text: str, s: dict) -> str:
     text = msg.get("content") or ""
     # llama-server says reasoning_content; OpenRouter says reasoning (12m.3)
     think = msg.get("reasoning_content") or msg.get("reasoning") or ""
+    # 34: the apps' limits — the thinking the server held to its budget, counted;
+    # the reply cut at its limit, as the apps stop it
+    app = None
+    if ("thinking_budget_tokens" in s or s.get("reply_limit")) and not is_openrouter(rec):
+        text, app = app_limits(rec, think, text, s)
     out = Answer(f"<think>\n{think}\n</think>\n\n{text}" if think else text)
     out.reasoning_chars, out.content = len(think), text
     used = (reply.get("usage") or {}).get("completion_tokens")
@@ -1048,6 +1056,10 @@ def ask(rec: dict, text: str, s: dict) -> str:
     out.provider = str(reply.get("provider") or "")
     out.finish = choice.get("finish_reason") if isinstance(choice.get("finish_reason"), str) \
         else None
+    if app is not None:
+        out.app = app
+        if app.get("reply_cut"):
+            out.finish = "length"           # cut at the apps' limit: it ran out of room
     t = reply.get("timings") or {}
     if isinstance(t.get("draft_n"), (int, float)) and t["draft_n"] > 0:
         out.draft = {"n": int(t["draft_n"]), "accepted": int(t.get("draft_n_accepted") or 0)}
@@ -1057,6 +1069,46 @@ def ask(rec: dict, text: str, s: dict) -> str:
     out.prompt_tokens = int(pt) if isinstance(pt, (int, float)) and pt >= 0 else None
     out.wall_s = round(wall, 3)
     return out
+
+
+def _pieces(rec: dict, text: str) -> list:
+    """34: a text's tokens as the server counts them, each with its piece"""
+    got = _post(root_of(rec["base_url"]) + "/tokenize", rec.get("key", ""),
+                {"content": text, "add_special": False, "parse_special": False,
+                 "with_pieces": True}).get("tokens")
+    if not isinstance(got, list):
+        raise ItemError("/tokenize gave no tokens")
+    return got
+
+
+def _piece_bytes(p) -> bytes:
+    """a token's piece: text, or (a character split across tokens) its bytes"""
+    p = p.get("piece") if isinstance(p, dict) else p
+    if isinstance(p, str):
+        return p.encode("utf-8")
+    if isinstance(p, list):
+        return bytes(int(x) & 255 for x in p)
+    return b""
+
+
+def app_limits(rec: dict, think: str, text: str, s: dict) -> tuple[str, dict]:
+    """34: one answer under the apps' limits — its thinking's tokens and whether
+    they reached the budget the server held them to (thinking_budget_tokens),
+    and its reply: kept whole within reply_limit tokens, else cut there, as the
+    apps stop it. Counted by the server's /tokenize, as the reply re-reads"""
+    toks = _pieces(rec, text) if text else []
+    n_think = len(_pieces(rec, think)) if think else 0
+    app = {"thinking_tokens": n_think, "reply_tokens": len(toks)}
+    if s.get("thinking_budget_tokens") is not None:
+        app["budget"] = int(s["thinking_budget_tokens"])
+        app["budget_reached"] = n_think >= app["budget"]
+    limit = int(s.get("reply_limit") or 0)
+    if limit:
+        app["reply_limit"] = limit
+        if len(toks) > limit:
+            text = b"".join(_piece_bytes(p) for p in toks[:limit]).decode("utf-8", "ignore")
+            app["reply_cut"] = True
+    return text, app
 
 
 def timeout_for(s: dict) -> float:
