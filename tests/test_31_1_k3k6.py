@@ -421,7 +421,9 @@ def test_the_check_is_for_a_runtime_of_paths_and_asks_nothing_else(tmp_path, cap
             rg.main(["--gguf", str(tmp_path / NAME), "--server", str(tmp_path / "t.tgz"),
                      "--thinking", "on", "--check", "--out", str(tmp_path / "o"), *more])
     err = capsys.readouterr().err
-    assert "--check: the settings check of a runtime of expert paths (--runtime k3k6-2611)" in err
+    # 34: or the same runtime at the apps' limits
+    assert ("--check: the settings check of a runtime of expert paths (--runtime k3k6-2611 or "
+            "k3k6-2611-app)") in err
     assert "--check asks no benchmark" in err
 
 

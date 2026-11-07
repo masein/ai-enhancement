@@ -369,6 +369,36 @@ PLANS: dict[str, dict[str, list[Step]]] = {
 # it is rented: S1's line with --switch-check 5
 PLANS["S"] = {**{f"S{i}": [("on", (SWITCH,), f"{i}/8", 16)] for i in range(1, 9)},
               "S9": [("on", (DRIFT,), "", 18)]}
+# 34: plan P, the paper's six benchmarks under the apps' limits (runtime
+# k3k6-2611-app: the thinking stopped at 1,024 tokens by the server, the reply
+# cut at 2,048), both paths: MMLU-Pro with thinking on in thirds, the other five
+# on one box; with thinking off, MMLU-Pro on one box and the rest on another.
+# A slot needs the limits and the prompt alone (8,192 holds every one), so 16 a
+# box. Sized at APP_PACE, a guess until the first box says
+PLANS["P"] = {
+    **{f"P{i}": [("on", (MMLU,), f"{i}/3", 16)] for i in range(1, 4)},
+    "P4": [("on", (GPQA, MATH, OTIS, IFEVAL, IFBENCH), "", 16)],
+    "P5": [("off", (MMLU,), "", 16)],
+    "P6": [("off", (GPQA, MATH, OTIS, IFEVAL, IFBENCH), "", 16)],
+}
+# 34: a box's seconds an answer under the apps' limits, as hours() reads a pace
+# (at 8 slots): the tokens an answer writes (thinking on, the budget's 1,024
+# and a reply of 300 to 700; off, the stored reply cut at 2,048) at plan U's
+# measured 8-slot rates, 580 tokens a second on k6 and 1,000 on k3 (Table B2's
+# machines), and its prompt read at 2,500 — at 16 slots taken as no faster than
+# 8 (×16/8), so the hours are the most it should take. A guess: no box has run
+# under these limits yet
+APP_WRITE = {("on", GPQA): 1424, ("on", MMLU): 1324, ("on", MATH): 1524, ("on", OTIS): 1524,
+             ("on", IFEVAL): 1724, ("on", IFBENCH): 1724,
+             ("off", GPQA): 1756, ("off", MMLU): 838, ("off", MATH): 1354, ("off", OTIS): 1900,
+             ("off", IFEVAL): 316, ("off", IFBENCH): 435}
+APP_PROMPT = {GPQA: 350, MMLU: 1250, MATH: 150, OTIS: 250, IFEVAL: 100, IFBENCH: 150}
+APP_TOK_S = {"on": 580.0, "off": 1000.0}
+APP_PACE = {(th, t): (n / APP_TOK_S[th] + APP_PROMPT[t] / 2_500.0) * 16 / 8
+            for (th, t), n in APP_WRITE.items()}
+PLAN_PACE["P"] = APP_PACE
+# the plans whose every pace is a guess
+GUESSED_PLANS = {"P"}
 # 29: plan D, our own boxes — a quarter of every benchmark on each of a
 # station's four GPUs, longest first (frontier_box's paces), then instruction
 # following with thinking on and off. Every slot holds Bolt's 64K
@@ -377,7 +407,7 @@ PLANS["D"] = {f"D3.{g}": [*(("on", t, f"{g + 1}/4", 8) for t in D_ORDER),
                           ("off", (IFEVAL, IFBENCH), f"{g + 1}/4", 8)] for g in range(4)}
 # 20: the runtime a plan's boxes run, unless the line names another
 PLAN_RUNTIME = {"L": "lda-2610", "I": "lda-2610", "T": "lda-2610", "U": "k3k6-2611",
-                "C": "k3k6-2611", "S": "k3k6r-0411"}
+                "C": "k3k6-2611", "S": "k3k6r-0411", "P": "k3k6-2611-app"}
 # 29: the plans run on our own GPUs: each step --own (never started or kept
 # asking while another process uses the GPU), no price
 OWN_PLANS = ("D",)
@@ -392,7 +422,7 @@ PLAN_GPUS = {"L": ("RTX 5090", "RTX PRO 6000"), "I": ("RTX 5090", "RTX PRO 6000"
              # 31.1: the k3k6 tarball, built for sm_120 as the lda one is
              "U": ("RTX 5090", "RTX PRO 6000"), "C": ("RTX 5090", "RTX PRO 6000"),
              # 32: the research tarball, built for sm_120 as the k3k6 one
-             "S": ("RTX 5090", "RTX PRO 6000"),
+             "S": ("RTX 5090", "RTX PRO 6000"), "P": ("RTX 5090", "RTX PRO 6000"),
              # 29: dgx-03's — the runner image's V100 tag builds for sm_70 alone
              "D": ("V100",)}
 PLAN_SM = {"D": "sm_70"}
@@ -456,6 +486,8 @@ PLAN_REVISIONS = {"U": {
     "Qwen3.6-35B-A3B-UD-Q2_K_XL.gguf": "5bc3e238d916f48a861bac2f8a1990a0e9b7e98d"}}
 # 31.3: plan C runs plan U's files, fetched at the same commits
 PLAN_PINS["C"], PLAN_REVISIONS["C"] = PLAN_PINS["U"], PLAN_REVISIONS["U"]
+# 34: plan P serves plan U's file and server
+PLAN_PINS["P"], PLAN_REVISIONS["P"] = PLAN_PINS["U"], PLAN_REVISIONS["U"]
 # 32: plan S runs step2388's file as plan U pins it, and the team's research
 # build (teraformer/lda-k3k6-research at 917f3d911) packed by
 # build_llama_tarball.sh on our server as 3ad38b7cc's was. A pin of None
@@ -664,7 +696,7 @@ def fits(ctx: int, file: int | None = None) -> int:
     return int(room // ((PILOT["per_token"] + rg.CTX_BUFFERS) * ctx + PILOT["recurrent"]))
 
 
-def slots_run(step: Step, own: bool = False) -> int:
+def slots_run(step: Step, own: bool = False, plan: str = "") -> int:
     """the slots a step runs on a 5090: as planned, or fewer where they don't
     fit — 29: on our own V100s, as planned (Bolt's 64K slots: the pilot says
     how many fit)"""
@@ -682,7 +714,8 @@ def slots_run(step: Step, own: bool = False) -> int:
         return min(slots, fits(cb.context(spec), size))
     if is_switch(step):
         return min(slots, fits(switch_context(step), STEP2388_FILE))     # 32
-    return min(slots, fits(fb.slot_context(list(tasks), th == "on")))
+    return min(slots, fits(fb.slot_context(list(tasks), th == "on",
+                                           runtime=PLAN_RUNTIME.get(plan))))
 
 
 def hours(step: Step, own: bool = False, plan: str = "") -> float:
@@ -703,7 +736,7 @@ def hours(step: Step, own: bool = False, plan: str = "") -> float:
         # 31.3: its share of what U-cont writes and reads again, at the most
         z = CONT_SIZE[(th, next(t for t in tasks if t in CONT_MODEL))]
         return (z["write"] / CONT_TOK_S[th] + z["read"] / CONT_READ_TOK_S) / of / 3600
-    run = slots_run(step, own)
+    run = slots_run(step, own, plan)
     # 31.2: a step no pilot paced (DeviceMark, the easy set) at plan U's paces
     measured = PLAN_PACE.get(plan) or (MEASURED if any((th, t) not in PACE for t in tasks)
                                        else None)
@@ -719,8 +752,8 @@ def words(step: Step, own: bool = False, plan: str = "") -> str:
     if th == "parity":
         return (f"the parity questions ({fb.PARITY['n']} of MMLU-Pro, each twice, thinking off) "
                 f"· about {hours(step):.1f} h")
-    run = slots_run(step, own)
-    guessed = any((th, t) in MEASURED_GUESSED for t in tasks)
+    run = slots_run(step, own, plan)
+    guessed = plan in GUESSED_PLANS or any((th, t) in MEASURED_GUESSED for t in tasks)
     if is_switch(step):
         # 32: both paths on one server, whatever the step's thinking says
         return (f"{label_of(next(t for t in tasks if t in (SWITCH, DRIFT)))}"
@@ -944,7 +977,8 @@ def parser() -> argparse.ArgumentParser:
                                            "I1 (25: instruction following), T1 … T3 (30.1), "
                                            "U1 … U37 (31.1: step2388), U38 … U40 (31.2: "
                                            "DeviceMark and the easy set), C1 … C5 (31.3: "
-                                           "U-cont), S1 … S9 (32: switching mode mid-chat)")
+                                           "U-cont), S1 … S9 (32: switching mode mid-chat), "
+                                           "P1 … P6 (34: the apps' limits)")
     ap.add_argument("then", nargs="*", help="18e point 1: more labels, run one after another "
                                             "on this box (L1 L2): each later one's line is "
                                             "written \"queued\" at the start, so the fetch "
@@ -1074,6 +1108,12 @@ def main(argv: list[str] | None = None) -> int:
         why = fb.runtime_model_refused(runtime_of(a, box), a.served_as)
         if why:
             raise SystemExit(f"{box}: {why}. Nothing was fetched")
+        # 34: a box of plan P asks under the apps' limits, and no other box does
+        if (box[:1].upper() == "P") != bool(fb.app_of(runtime_of(a, box))):
+            raise SystemExit(f"{box}: plan P's boxes, and they alone, ask under the apps' limits "
+                             f"(runtime {PLAN_RUNTIME['P']}, --as "
+                             f"{next(iter(fb.RUNTIMES[PLAN_RUNTIME['P']]['models']))}); this line "
+                             f"runs {runtime_of(a, box) or 'no named runtime'}. Nothing was fetched")
         # 31.2: a box of another model than its plan's (U40), and a step at the
         # file's own settings, whose "-file" id the runtime asks so
         why = model_refused(box, a.served_as)

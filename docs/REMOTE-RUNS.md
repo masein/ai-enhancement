@@ -2189,6 +2189,88 @@ is fetched.
 5.0 h on S9, 38.3 box-hours (about 43 with each box's start), at about
 60 box-seconds a chat: a guess the check's timings replace.
 
+# P. The apps' limits: plan P (34)
+
+The whitepaper's six benchmarks (GPQA Diamond, MMLU-Pro, MATH Level 5, OTIS
+Mock AIME, IFEval and IFBench) asked of step2388 as the apps ask it (Kevin's
+Section 3.4): thinking stopped at 1,024 tokens, the reply at 2,048, within
+16,384 tokens of context. Both modes, every question once. Nothing is rented
+before masein's yes; plan P's boxes are rented with plan S's.
+
+**Runtime `k3k6-2611-app`** is k3k6-2611 in every other way: step2388's file,
+the k3k6 tarball, the same flags and two variables, each path's sampling the
+file's, nothing sampling in a request. Its model is
+`served/step2388-k3k6-2611-app`, so its rows never mix with plan U's.
+
+- **Thinking on (k6):** each request sends `"thinking_budget_tokens": 1024`.
+  The build's reasoning-budget sampler counts from the start of the thinking
+  and forces its end at 1,024, and the reply follows. The request's limit is
+  3,100 (1,024, 2,048 and 28 for the forced end). When the answer comes back,
+  the board counts the reply with the server's `/tokenize` and cuts it at
+  2,048 tokens, as the apps stop it; a cut answer is marked as one that ran
+  out of room.
+- **Thinking off (k3):** 2,048 is the request's limit.
+- **Each answer records** its thinking's and reply's tokens, whether the
+  thinking reached the budget, and whether the reply was cut.
+- **The context:** a slot needs the limits and the prompt alone (7,196 at
+  most, MMLU-Pro with thinking on), so the apps' 16,384 never binds, and a
+  box runs 16 slots.
+
+**Assumed until Kevin says otherwise** (masein, 7 Nov; the paper states
+them): the apps add no message when the thinking budget runs out, count their
+2,048 on the reply alone, and sample as the file stores.
+
+**The budget check.** Before its first question, a k6 box asks one question
+that thinks long with a budget of 64 tokens (`scripts/app_check.py`). It
+passes when the thinking came back within the budget and the forced end, with
+a reply after it. Otherwise the box stops and nothing is asked. The check goes
+into the bundle, and the import refuses a thinking-on bundle without a check
+that passed.
+
+## P1. The boxes
+
+`python scripts/frontier_box.py --list P` prints the plan. Its hours are a
+guess: the tokens an answer writes at plan U's measured 8-slot rates (580
+tokens a second on k6, 1,000 on k3), with 16 slots taken as no faster than 8.
+
+| Box | Path | Benchmarks | Each box |
+|---|---|---|---|
+| P1–P3 | k6 | MMLU-Pro in thirds | about 3.1 h |
+| P4 | k6 | GPQA Diamond, OTIS Mock AIME, MATH Level 5, IFEval, IFBench | about 2.5 h |
+| P5 | k3 | MMLU-Pro | about 4.5 h |
+| P6 | k3 | the other five | about 1.2 h |
+
+That is 6 boxes and about 17.5 box-hours, before each box's start and fetch
+(about half an hour each on plan U).
+
+Rent each as in L2: the runner image at this phase's tag, an RTX 5090, Disk
+100 GB. Then, in tmux:
+
+```bash
+cd /app
+```
+
+```bash
+read -rs HF_TOKEN && export HF_TOKEN
+```
+
+```bash
+python scripts/frontier_box.py P1 --as served/step2388-k3k6-2611-app --gguf hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/step2388.k3k6.gguf --server hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/llama-server-k3k6-3ad38b7.tar.gz --price 0.45
+```
+
+Every box P1–P6 runs that line with its own label. A plan P line with plan
+U's model, or a plan U line with this one, is refused before anything is
+fetched.
+
+## P2. Fetch and import
+
+As in L3, with the box's label (`<host>:<port>=P1`) and
+`--sha served/step2388-k3k6-2611-app=a2594a68a810ec526061f83cb88c7e469e1c3889912e8da4b1d598c72271faf6`.
+The model's first bundle is imported once by hand with `--register`, as the
+fetch's line says. k6's answers land on `served/step2388-k3k6-2611-app ·
+thinking`, k3's on `served/step2388-k3k6-2611-app`. MATH Level 5's and OTIS's
+checks are graded as plan U's, after masein's yes.
+
 # Speed tests: the cheapest box per answer (19)
 
 Which box runs our benchmarks for the fewest dollars per answer, measured the

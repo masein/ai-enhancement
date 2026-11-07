@@ -81,7 +81,11 @@ memory, as the server keeps it. 32.4: a chat reply's token ids, its end
 marker too, under logprobs; each kept token's path, and a memory "mixed" only
 where another path computed MIXED_MIN of them (its recall and its sum wrong);
 FAKE_LLAMA_THINK_IN_CONTENT=1 a server that leaves a reply's thinking in its
-content."""
+content. 34: /tokenize with_pieces gives each token's piece, its space before
+it; FAKE_LLAMA_THINK_WORDS=N thinks N words (t1 t2 …) when a request sends
+thinking_budget_tokens, held to it unless FAKE_LLAMA_BUDGET=ignore, and cut at its
+max_tokens with no reply when it runs there; FAKE_LLAMA_REPLY_WORDS=N writes N
+words (r1 r2 …) before the answer line, cut where max_tokens runs out."""
 
 from __future__ import annotations
 
@@ -685,6 +689,10 @@ def main() -> int:
                 return self.mem_chat(body)
             if self.path == "/tokenize":
                 text = str(body.get("content") or "")
+                if body.get("with_pieces"):
+                    # 34: each token and its piece, as llama-server gives them
+                    return self._send(200, {"tokens": [{"id": tok_id(w.strip()), "piece": w}
+                                                       for w in re.findall(r"\s*\S+", text)]})
                 toks = [sum(w.encode()) % 50000 for w in text.split()]
                 with lock:
                     busy["text"] = toks                 # 23c: the probe's text, as asked
@@ -740,10 +748,28 @@ def main() -> int:
             cut = bool(need and int(body.get("max_tokens") or 0) < need)
             if cut:
                 msg["content"] = "The options compared, one by one, and again"
-            if on and inline:
+            # 34: a long reply, and long thinking held to the request's budget
+            room = int(body.get("max_tokens") or 0)
+            pad = int(os.environ.get("FAKE_LLAMA_REPLY_WORDS") or 0)
+            if pad:
+                msg["content"] = " ".join(f"r{i + 1}" for i in range(pad)) + "\n" + msg["content"]
+            think_n = int(os.environ.get("FAKE_LLAMA_THINK_WORDS") or 0)
+            if on and think_n and not inline and "thinking_budget_tokens" in body:
+                words = [f"t{i + 1}" for i in range(think_n)]
+                budget = body.get("thinking_budget_tokens")
+                if budget is not None and os.environ.get("FAKE_LLAMA_BUDGET") != "ignore":
+                    words = words[:int(budget)]
+                msg["reasoning_content"] = " ".join(words)
+                if room and len(words) >= room:
+                    msg["reasoning_content"] = " ".join(words[:room])
+                    msg["content"], cut = "", True
+                room = max(0, room - len(words)) if room else 0
+            elif on and inline:
                 msg["content"] = "Weighing each option in turn.\n</think>\n\n" + msg["content"]
             elif on:
                 msg["reasoning_content"] = "Weighing each option in turn."
+            if pad and room and len(msg["content"].split()) > room:
+                msg["content"], cut = " ".join(msg["content"].split()[:room]), True
             with lock:
                 count["n"] += 1
                 n = count["n"]

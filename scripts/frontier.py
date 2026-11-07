@@ -546,6 +546,40 @@ RUNTIMES["k3k6r-0411"] = {
               "commits": ("917f3d911",), "number": None},
 }
 
+# 34 (masein, 7 Nov): plan P — the paper's six benchmarks under the apps'
+# limits (Kevin's Section 3.4): with thinking on, the server stops the thinking
+# at 1,024 tokens (thinking_budget_tokens: its reasoning-budget sampler forces
+# the end of thinking) and the reply is cut at 2,048 tokens when it comes back;
+# with thinking off, 2,048 is the request's limit. Assumed until Kevin says
+# otherwise: the apps add no message when the budget runs out, count their
+# 2,048 on the reply alone, and sample as the file stores. The same server,
+# file, flags and paths as k3k6-2611, and a model of its own, so its rows never
+# mix with the server-limit runs
+APP_THINK, APP_REPLY = 1024, 2048
+APP_ROOM = 28                   # the forced end of thinking, and a split character finished
+RUNTIMES["k3k6-2611-app"] = {
+    **{k: v for k, v in RUNTIMES["k3k6-2611"].items() if k not in ("models", "words", "off_for")},
+    "words": "the team's joint k3/k6 build as k3k6-2611, asked with the apps' limits: the "
+             "thinking stopped by the server at 1,024 tokens (its reasoning budget, the end of "
+             "thinking forced, no message) and the reply cut at 2,048; the file's own sampling",
+    "env": dict(RUNTIMES["k3k6-2611"]["env"]),
+    "flags": list(RUNTIMES["k3k6-2611"]["flags"]),
+    "off_for": ("gpqa_diamond_epoch", "math_l5_epoch", "mmlupro_tiger", "otis_aime_epoch",
+                "ifeval_google", "ifbench_test"),
+    "app": {"thinking_budget": APP_THINK, "reply": APP_REPLY, "room": APP_ROOM,
+            "assumed": "the apps add no message when the thinking budget runs out, count their "
+                       "2,048 on the reply alone, and sample as the file stores (masein, 7 Nov; "
+                       "Kevin to confirm)"},
+    "models": {"served/step2388-k3k6-2611-app": "Qwen/Qwen3.6-35B-A3B"},
+    "build": dict(RUNTIMES["k3k6-2611"]["build"]),
+}
+
+
+def app_of(runtime: str | None) -> dict | None:
+    """34: the apps' limits a runtime asks with — None for one asked at the
+    benchmarks' own limits"""
+    return (RUNTIMES.get(runtime or "") or {}).get("app")
+
 # 31.1: what step2388's file stores for each path (the team's, 3 Nov): what
 # the box's settings check holds the file, the server's /props and start-up
 # lines and each answer to. penalty_last_n -1 is the whole context;
@@ -735,10 +769,17 @@ def as_lexed(src: str) -> str:
     return s[:-1] if src.endswith("\n") else s
 
 
-def slot_context(tasks: list[str], on: bool, cap: int | None = None) -> int:
+def slot_context(tasks: list[str], on: bool, cap: int | None = None,
+                 runtime: str | None = None) -> int:
     """the context one llama-server slot needs for the longest of `tasks`:
-    its budget and its prompt's room — 29: never more than a capped context"""
-    need = max(BENCH[t]["budget"]["on" if on else "off"] + BENCH[t]["room"] for t in tasks)
+    its budget and its prompt's room — 29: never more than a capped context.
+    34: under the apps' limits (a runtime's app), their limit, not the budget"""
+    app = app_of(runtime)
+    if app:
+        limit = app["thinking_budget"] + app["reply"] + app["room"] if on else app["reply"]
+        need = max(limit + BENCH[t]["room"] for t in tasks)
+    else:
+        need = max(BENCH[t]["budget"]["on" if on else "off"] + BENCH[t]["room"] for t in tasks)
     return min(need, cap) if cap else need
 
 

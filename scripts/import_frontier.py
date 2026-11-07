@@ -361,7 +361,9 @@ _SETUP_TYPES = {
                "flags": [str], "env": dict, "argv": [str], "binary_sha256": str,
                "tarball_sha256": str,
                # 31.1: a runtime of expert paths' settings check, as its box ran it
-               "paths_check": {"path": int, "pass": bool, "mismatches": [str]}},
+               "paths_check": {"path": int, "pass": bool, "mismatches": [str]},
+               # 34: under the apps' limits, its check that the server held the budget
+               "app_check": {"budget": int, "thinking_tokens": int, "pass": bool, "why": str}},
     "gpu": {"name": str, "count": int, "names": [str]},
     "tasks": {"*": {"protocol_version": str, "revision": str, "epochs": int, "budget": int,
                     "family": str,
@@ -753,6 +755,12 @@ def runtime_problem(setup: dict, rec: dict) -> str:
         # the path of the bundle's thinking, the file storing the paths' values
         if rt.get("paths"):
             miss += paths_problem(got, setup)
+        # 34: under the apps' limits, the box's check that its server held the
+        # thinking budget, passed (with thinking off no budget is sent)
+        if rt.get("app") and setup.get("thinking") == "on":
+            ac = srv.get("app_check")
+            if not isinstance(ac, dict) or ac.get("pass") is not True:
+                miss.append("its check that the server held the thinking budget, passed")
         if miss:
             return (f"its box didn't run runtime {got} as this board defines it: "
                     + "; ".join(miss) + " — the box's image and this board differ")

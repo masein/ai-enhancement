@@ -114,6 +114,17 @@ def settings(rec: dict, task: str, on: bool) -> dict:
     # sampling and thinking are the file's, applied by the server, and any
     # value sent would replace them
     path = fb.path_of(rec.get("runtime"), on)
+    app = fb.app_of(rec.get("runtime"))
+    if path is not None and app:
+        # 34: the apps' limits — with thinking on, the server stops the thinking
+        # at its budget and the reply is cut at its limit when it comes back
+        # (reply_limit, never sent); with it off, the reply's limit is the
+        # request's. The same for every benchmark
+        if on:
+            return {"max_tokens": app["thinking_budget"] + app["reply"] + app["room"],
+                    "expert_path": path, "thinking_budget_tokens": app["thinking_budget"],
+                    "reply_limit": app["reply"]}
+        return {"max_tokens": app["reply"], "expert_path": path}
     if path is not None:
         return {"max_tokens": spec["budget"]["on" if on else "off"], "expert_path": path}
     s = {"max_tokens": spec["budget"]["on" if on else "off"],
@@ -428,6 +439,8 @@ def ask_task(rec: dict, task: str, row: Path, on: bool, progress=None,
                 **({"prompt_tokens": a.prompt_tokens}
                    if getattr(a, "prompt_tokens", None) is not None else {}),
                 **({"wall_s": a.wall_s} if getattr(a, "wall_s", None) is not None else {}),
+                # 34: under the apps' limits, its tokens and cut
+                **({"app": a.app} if getattr(a, "app", None) else {}),
                 **capped}
         if a.fallback:
             line["fallback"] = a.fallback
@@ -1445,11 +1458,13 @@ def run(sid: int, sub: dict, rec: dict, th: dict, row: Path, log_path: Path) -> 
     ctx = (rec.get("pin") or {}).get("ctx")
     # 29: a model's own context caps what a slot needs (Bolt's 64K)
     cap = fb.context_cap(rec.get("runtime"))
-    big = [t for t in tasks if isinstance(ctx, int) and 0 < ctx < fb.slot_context([t], on, cap)]
+    rt = rec.get("runtime")
+    big = [t for t in tasks
+           if isinstance(ctx, int) and 0 < ctx < fb.slot_context([t], on, cap, runtime=rt)]
     if big:
         skip = (f"{', '.join(fb.BENCH[t]['label'] for t in big)}: its server's context is "
                 f"{ctx:,} tokens a slot, and thinking {'on' if on else 'off'} needs "
-                + ", ".join(f"{fb.slot_context([t], on, cap):,}" for t in big)
+                + ", ".join(f"{fb.slot_context([t], on, cap, runtime=rt):,}" for t in big)
                 + " (the budget and the prompt) — start it with a larger -c, or run its GGUF on "
                 "a rented GPU. " + ("Nothing was asked" if len(big) == len(tasks) else
                                     "Not asked; the rest are"))
