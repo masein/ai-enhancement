@@ -84,9 +84,10 @@ NOTES = [
     # 23d: how it thinks, as the brief words them
     "First states the right answer means the first place the thinking says it clearly: \"the "
     "answer is (B)\", the right option's letter with its text, or the exact final answer on MATH "
-    "Level 5 and OTIS — the rule the ran-out report uses. A model that only weighs an option "
-    "(\"maybe (B)?\") doesn't count; one that states it and then checks it does. Not read on "
-    "HLE, SimpleQA and ARC-AGI-2.",
+    "Level 5 and OTIS — the rule the ran-out report uses. A letter with its text inside the list of "
+    "options copied out (two other options written within 600 characters) doesn't count, and "
+    "neither does a model that only weighs an option (\"maybe (B)?\"); one that states it and "
+    "then checks it does. Not read on HLE, SimpleQA and ARC-AGI-2.",
     "Checking share is how much of a right answer comes after the model first stated it: "
     "re-checking, or second-guessing. Some checking is good; a lot of it is what makes answers "
     "long and sometimes run out of room (Chen et al. 2024, \"Do NOT Think That Much for "

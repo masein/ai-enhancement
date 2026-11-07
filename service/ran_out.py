@@ -38,10 +38,12 @@ WARNING = ("For insight only — not for training. These are benchmark questions
            "and how the loop happens.")
 WITHHELD_LINE = "[a line quoting the question, withheld]"
 HOW_READ = ("Counted only where the thinking states it clearly: \"the answer is (E)\", the right "
-            "option's letter with its text, or the exact final answer on MATH Level 5 and OTIS. "
+            "option's letter with its text (not where it copies out the list of options: two other "
+            "options written within 600 characters), or the exact final answer on MATH Level 5 and OTIS. "
             "The token is where that first came, as a share of the answer's characters times its "
             "output tokens. Not read on HLE, SimpleQA and ARC-AGI-2.")
 LIST_Q = 200                    # a question's first characters in the list: two lines
+RULE = "first-right-2"          # 33: first_right leaves restated option lists out; kept lists redone
 
 
 def _scripts() -> None:
@@ -145,21 +147,65 @@ def right_words(task: str, item: dict) -> str:
     return f"({r['letter']}) {r['text']}" if "letter" in r else r["answer"]
 
 
+# 33 (masein, 7 Nov): a letter with its option's text inside a restated option
+# list — LIST_OTHERS of the question's other options, each as letter and text,
+# within LIST_NEAR characters of it — is the thinking copying out the list, not
+# stating an answer, and doesn't count. "The answer is (E)" always counts
+LIST_NEAR = 600
+LIST_OTHERS = 2
+
+
+def _options(task: str, item: dict) -> list[tuple[str, str]]:
+    """the question's options as (letter, text), in the order the prompt gave them"""
+    _scripts()
+    import frontier as fb
+    if task == "gpqa_diamond_epoch":
+        return [(fb.LETTERS[i], str(o)) for i, o in enumerate(fb.order_of(task, item))]
+    if task == "mmlupro_tiger":
+        return [(fb.MMLU_PRO_LETTERS[i], str(o)) for i, o in enumerate(item.get("options") or [])]
+    return []
+
+
+def _option_pat(letter: str, text: str) -> str | None:
+    """an option written out: its letter, then its text's first 40 characters"""
+    opt = re.sub(r"\s+", " ", text).strip()[:40]
+    if len(opt) < 3:
+        return None
+    return (r"\(?\b" + re.escape(letter) + r"\)?\s*[.:)\-–]?\s*"
+            + r"\s+".join(re.escape(w) for w in opt.split()))
+
+
+def in_a_list(task: str, item: dict, text: str, start: int, end: int) -> bool:
+    """33: whether the option written at text[start:end] stands among
+    LIST_OTHERS or more of the question's other options, each written out,
+    within LIST_NEAR characters: a restated option list"""
+    r = right_of(task, item)
+    window = text[max(0, start - LIST_NEAR):end + LIST_NEAR]
+    near = 0
+    for letter, words in _options(task, item):
+        pat = _option_pat(letter, words) if letter != r["letter"] else None
+        if pat and re.search(pat, window, re.I):
+            near += 1
+            if near >= LIST_OTHERS:
+                return True
+    return False
+
+
 def first_right(task: str, item: dict | None, text: str) -> int | None:
     """the first place the thinking clearly states the right answer: "the
-    answer is (E)", the right option's letter with its text, or the exact
-    final answer on MATH and OTIS. None when it never does — or on a
-    benchmark this isn't read on"""
+    answer is (E)", the right option's letter with its text — not where the
+    thinking copies out the option list (33: in_a_list) — or the exact final
+    answer on MATH and OTIS. None when it never does — or on a benchmark this
+    isn't read on"""
     if not item or not text:
         return None
     if task in ("mmlupro_tiger", "gpqa_diamond_epoch"):
         r = right_of(task, item)
         hits = [m.start() for m in _SAYS.finditer(text) if m.group(1) == r["letter"]]
-        opt = re.sub(r"\s+", " ", r["text"]).strip()[:40]
-        if len(opt) >= 3:
-            pat = (r"\(?\b" + re.escape(r["letter"]) + r"\)?\s*[.:)\-–]?\s*"
-                   + r"\s+".join(re.escape(w) for w in opt.split()))
-            hits += [m.start() for m in re.finditer(pat, text, re.I)]
+        pat = _option_pat(r["letter"], r["text"])
+        if pat:
+            hits += [m.start() for m in re.finditer(pat, text, re.I)
+                     if not in_a_list(task, item, text, m.start(), m.end())]
         return min(hits) if hits else None
     if task in ("math_l5_epoch", "otis_aime_epoch"):
         want = _norm_math(right_of(task, item)["answer"])
@@ -225,7 +271,7 @@ def _key(me: Path | None, other: Path | None, task: str) -> str:
     """the files a list reads: the two models' answers and the questions"""
     from . import report_stats as rs
     from . import reports
-    return "|".join([rs.identity(me), rs.identity(other),
+    return "|".join([RULE, rs.identity(me), rs.identity(other),
                      rs.identity(reports.items_file(task))])
 
 

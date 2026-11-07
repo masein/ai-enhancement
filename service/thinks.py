@@ -41,7 +41,7 @@ import sys
 from pathlib import Path
 
 TASKS = ("gpqa_diamond_epoch", "mmlupro_tiger", "math_l5_epoch", "otis_aime_epoch")
-WAY = "thinks-2"                # 23e: and the answers behind two of its numbers
+WAY = "thinks-3"                # 23e: the answers behind two numbers; 33: option lists left out
 # "second thoughts": these words at the start of a sentence — named on the page
 SECOND = ("Wait", "Alternatively", "Hmm", "Actually")
 # a sentence's start: the text's or a line's, or after . ! or ? — then any

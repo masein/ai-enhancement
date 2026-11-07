@@ -224,4 +224,4 @@ def test_the_notes_as_the_brief_words_them():
     assert ("Near the ceiling marks a benchmark where our reference build scores 90% or more. "
             "There, a few questions decide the difference.") in reports.NOTES
     assert f"{training.CEILING:.0%}" == "90%"
-    assert thinks.WAY == "thinks-2"
+    assert thinks.WAY == "thinks-3"         # 33: first_right leaves option lists out
