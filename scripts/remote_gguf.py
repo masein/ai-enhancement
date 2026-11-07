@@ -1828,7 +1828,10 @@ def _main(argv: list[str] | None = None) -> int:
     ctx = (fb.slot_context(tasks, thinking, cap) if tasks else
            dmb.CONTEXT if a.devicemark else scb.CONTEXT if a.showcase else
            cb.context(c_spec) if a.cont else
-           (sw.DRIFT_CONTEXT if a.switch_part == "drift" else sw.CHATS_CONTEXT) if a.switch
+           # 32.5: the check runs Part 1 too, whose memory reaches 48k: its
+           # slots are Part 1's (the chats keep the apps' cap by their limits)
+           (sw.DRIFT_CONTEXT if a.switch_part == "drift" or a.switch_check else sw.CHATS_CONTEXT)
+           if a.switch
            else CHECK_CONTEXT)
     if a.serve:
         ctx = min(a.serve_context, cap) if cap else a.serve_context

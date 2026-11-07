@@ -2059,8 +2059,12 @@ each in a pair of slots. A chat whose prompt fills the 16,384 stops there in
 both arms, counted by turn.
 
 **Part 1, drift (S9).** 200 chats built on the server from step2388's own
-stored k3 replies (MMLU, GSM8K), 50 each at about 1k, 4k, 16k and 48k tokens
-of memory, in both directions. The main sizes are 1k, 4k and 16k. 48k is a
+stored k3 replies (MMLU, GSM8K), 50 each at about 1k, 4k, 15.5k and 48k tokens
+of memory, in both directions. The main sizes are 1k, 4k and about 15.5k: the
+largest memory that fits the apps' 16,384 with the last question and the
+512-token reference reply, its oldest exchanges dropped on the box until it
+fits (the same for both directions; the check and the report say how many
+were dropped and how long each chat came out). 48k is a
 stress test, beyond the apps' cap, and is reported apart. Five runs of the
 last turn on the target path Y, each forced along A's own greedy reply:
 
@@ -2146,6 +2150,8 @@ is fetched.
    ```
 
 3. **The check, on S1, before the rest is rented.** It runs:
+   - in Part 1's slots (65,536), since its 48k memory needs them; the chats keep
+     the apps' 16,384 by their limits;
    - the apps' history first (both paths);
    - then Part 2's first five chats through both arms, each turn's limit at
      most 4,096 tokens (the memory, not the scores), and each reply's round

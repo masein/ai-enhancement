@@ -59,7 +59,9 @@ NOTES = [
     "McNemar's exact test is on the chats one arm got right and the other didn't. Turn 3 asks a "
     "question more than once (each GPQA Diamond one up to three times); its clustered line tests "
     "by question.",
-    "Part 1's main sizes are about 1k, 4k and 16k tokens of memory; 48k is a stress test, beyond "
+    "Part 1's main sizes are about 1k and 4k tokens of memory, and the largest memory that fits "
+    "the apps' 16,384 with the last question and the 512-token reference reply (about 15,500; "
+    "each chat's oldest exchanges dropped until it fits); 48k is a stress test, beyond "
     "the apps' 16,384. Its histories are step2388's k3 replies, which the apps keep to their end: "
     "k3→k6 is a memory the apps hold; k6→k3 isn't (no k6 memory outlives its turn) and bounds "
     "what keeping k6's would do.",

@@ -349,6 +349,9 @@ def test_the_inputs_hold_ids_facts_and_stored_replies_and_no_question_text(sb):
 def test_the_check_shows_every_turns_memory_and_passes(sb, capsys):
     assert run_s(sb, "chk", "--switch-check", "2", slots=6) == 0
     out = capsys.readouterr().out
+    # 32.5: the check runs Part 1 too, in Part 1's slots (its 48k memory needs
+    # them; on S1's 16,384 its 16k memory didn't fit)
+    assert f"6 slots of {sw.DRIFT_CONTEXT:,} tokens" in out
     turns = [x for x in out.splitlines() if x.startswith("chat ") and " · turn " in x]
     assert len(turns) == 2 * 5 * 2
     # 32.4: the history as the apps send it, said before a question; then each
@@ -507,6 +510,39 @@ def test_part_1_forces_each_run_along_the_reference(sb, svc, monkeypatch):  # no
     monkeypatch.setattr(sw, "STRESS_BINS", (90,))
     s = sw.summarise(sw.where())
     assert [(x["bin"], x["stress"]) for x in s["part1"]["rows"]][::2] == [(30, False), (90, True)]
+
+
+def test_the_size_fitted_to_the_apps_cap_drops_its_oldest_exchanges_until_it_fits(
+        sb, monkeypatch, capsys):
+    # 32.5 (masein, 6 Nov): the largest memory that fits the apps' cap with the
+    # last question and the 512-token reference — stacked past it on the
+    # server, cut on the box, the same in both directions (here the cap and
+    # the reference shrunk, words for tokens)
+    monkeypatch.setattr(sw, "APP_FIT_BINS", (90,))
+    monkeypatch.setattr(sw, "APP_CONTEXT", 160)
+    monkeypatch.setattr(sw, "REF_TOKENS", 24)
+    meta = sw.inputs(sw.where(), say=lambda x: None, n_chats=4, bins=(30, 90), per_bin=1)
+    fitted = {**sb, "inputs": Path(meta["file"]), "inputs_sha": meta["sha256"]}
+    assert run_s(fitted, "fit", "--switch-part", "drift", slots=5) == 0
+    rows = [json.loads(x) for x in rb.read(bundle_at(fitted, "fit", "drift"))["files"][
+        "results/switch/drift.jsonl"].decode().splitlines()]
+    fit = [r for r in rows if r["bin"] == 90]
+    assert len(fit) == 2 and all(r["fits_app"] for r in fit)
+    assert all(r["prompt"] + 24 <= 160 for r in fit)
+    assert fit[0]["dropped"] == fit[1]["dropped"] >= 1        # both directions alike
+    assert fit[0]["e_prev"] == fit[1]["e_prev"]
+    assert all("fits_app" not in r for r in rows if r["bin"] == 30)
+    code, said = imported(bundle_at(fitted, "fit", "drift"))
+    assert code == 0, said
+    s = json.loads((sw.where() / sw.SUMMARY).read_text())
+    assert [x["fit"]["fits"] for x in s["part1"]["rows"] if x["bin"] == 90] == [1, 1]
+    # the check says so, and holds a chat that doesn't fit as not as said
+    assert run_s(fitted, "fitchk", "--switch-check", "1", slots=5) == 0
+    out = capsys.readouterr().out
+    assert "fits the apps' 160 with the last question and the 24-token reference" in out
+    monkeypatch.setattr(sw, "APP_CONTEXT", 40)               # nothing fits now
+    assert run_s(fitted, "fitchk2", "--switch-check", "1", slots=5) == 1
+    assert "past the apps' 40" in capsys.readouterr().out
 
 
 def test_the_import_refuses_what_wasnt_asked_as_the_experiment_asks(sb, svc, tmp_path,  # noqa: F811
