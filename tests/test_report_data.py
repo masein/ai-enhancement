@@ -238,3 +238,13 @@ def test_the_upload_sends_nothing_with_a_tbd_or_without_the_private_terms(tmp_pa
     assert upload.main(["--dry-run", "--folder", str(d), "--private", str(tmp_path / "gone.json"),
                         "--trial"]) == 1
     assert "the private terms" in capsys.readouterr().out
+
+
+def test_a_line_separator_inside_a_jsonl_string_is_part_of_its_record(tmp_path):
+    """U+2028 is legal inside a JSON string; a model's answer can hold one, and the scan
+    reads a JSONL file by its newlines alone"""
+    d, priv = folder(tmp_path)
+    (d / "logs" / "mmlu-pro-thinking-on.jsonl").write_text(json.dumps(
+        {"benchmark": "MMLU-Pro", "question_id": "7", "final_answer": "one\u2028two\u0085three",
+         "grade": {"right": True}}, ensure_ascii=False) + "\n", encoding="utf-8")
+    assert scan.main([str(d), "--private", str(priv)]) == 0
