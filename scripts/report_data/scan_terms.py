@@ -65,7 +65,8 @@ def pieces(f: Path):
             for i, c in enumerate(r):
                 yield r[0], rows[0][i] if i < len(rows[0]) else "", c
     elif f.suffix == ".jsonl":
-        for n, line in enumerate(t.splitlines(), 1):
+        # newlines only: a JSON string may hold U+2028 and other line separators
+        for n, line in enumerate(t.split("\n"), 1):
             if not line.strip():
                 continue
             rec = json.loads(line)
