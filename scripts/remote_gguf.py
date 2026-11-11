@@ -1663,11 +1663,12 @@ def _main(argv: list[str] | None = None) -> int:
                        or a.devicemark):
         ap.error("--showcase asks its questions alone: no --pilot, --parity, --serve, --check, "
                  "--devicemark, --only or --shard")
-    if a.showcase and not (a.runtime and fb.RUNTIMES[a.runtime].get("paths")
+    # r20: one whose thinking-on path asks it (not Medium's, thinking off alone)
+    if a.showcase and not (a.runtime and "on" in (fb.RUNTIMES[a.runtime].get("paths") or {})
                            and not fb.RUNTIMES[a.runtime].get("experiment")):
         ap.error("--showcase: on a runtime of expert paths (--runtime "
                  + " or ".join(n for n, r in fb.RUNTIMES.items()
-                               if r.get("paths") and not r.get("experiment")
+                               if "on" in (r.get("paths") or {}) and not r.get("experiment")
                                and not r.get("app")) + ")")
     if a.showcase and a.slots != 1:
         ap.error("--showcase: one slot (--slots 1), each question asked alone as step8804's were")
