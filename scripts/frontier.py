@@ -507,6 +507,42 @@ RUNTIMES["card-qwen-k3k6"] = {
     "models": {"served/Qwen3.6-35B-A3B-Q2-k3k6-2611": "Qwen/Qwen3.6-35B-A3B"},
     "build": dict(RUNTIMES["k3k6-2611"]["build"]),
 }
+# r20 (masein, 11 Nov): Qwen3.5-9B on GPQA Diamond under our protocol, its
+# published 81.7 beside our 82.7 made like for like — the 4-bit file Pipette
+# and Table G1 name (Unsloth's Q4_K_M, unsloth/Qwen3.5-9B-GGUF at 3885219b),
+# on the same build as step2388's runs, thinking on at its card's settings for
+# general tasks in thinking mode (said in every request as well as the
+# server's defaults, as the showcase asked it), 4 runs of the 198 questions
+# and up to 98,304 tokens an answer: the Masein model's final limit, asked at
+# once (step2388's first runs stopped at 81,920 and were continued)
+RUNTIMES["card-qwen35-9b-k3k6"] = {
+    "words": "the team's joint k3/k6 build running Qwen3.5-9B (Unsloth's Q4_K_M), its card's "
+             "thinking settings for general tasks, no reasoning budget, no speculative decoding",
+    "env": dict(RUNTIMES["k3k6-2611"]["env"]),
+    "thinking": ("on",),
+    "off_for": (),
+    "sampling": {"temperature": 1.0, "top_k": 20, "top_p": 0.95, "min_p": 0.0,
+                 "presence_penalty": 1.5, "repeat_penalty": 1.0},
+    "sampling_from": {
+        k: "Qwen/Qwen3.5-9B's model card, its thinking mode for general tasks (temperature=1.0, "
+           "top_p=0.95, top_k=20, min_p=0.0, presence_penalty=1.5, repetition_penalty=1.0)"
+        for k in ("temperature", "top_k", "top_p", "min_p", "presence_penalty",
+                  "repeat_penalty")},
+    "budgets": {"gpqa_diamond_epoch": {"on": 98304}},
+    "flags": list(RUNTIMES["k3k6-2611"]["flags"]),
+    "refuses_env": ("GGML_CUDA_DISABLE_FUSION",),
+    "models": {"served/Qwen3.5-9B-Q4_K_M-k3k6-2611": "Qwen/Qwen3.5-9B"},
+    "build": dict(RUNTIMES["k3k6-2611"]["build"]),
+}
+
+
+def budget_of(task: str, on: bool, runtime: str | None = None) -> int:
+    """a task's limit an answer: the benchmark's, or the runtime's own (r20:
+    Qwen3.5-9B's GPQA Diamond at 98,304)"""
+    own = ((RUNTIMES.get(runtime or "") or {}).get("budgets") or {}).get(task) or {}
+    return int(own.get("on" if on else "off") or BENCH[task]["budget"]["on" if on else "off"])
+
+
 # 31.2: the served ids asked on DeviceMark at the file's own settings: the
 # path alone, no sampling field — the second k3 row the brief asks for
 FILE_SAMPLING = {"served/step2388-k3k6-2611-file"}
@@ -826,7 +862,7 @@ def slot_context(tasks: list[str], on: bool, cap: int | None = None,
         limit = app["thinking_budget"] + app["reply"] + app["room"] if on else app["reply"]
         need = max(limit + BENCH[t]["room"] for t in tasks)
     else:
-        need = max(BENCH[t]["budget"]["on" if on else "off"] + BENCH[t]["room"] for t in tasks)
+        need = max(budget_of(t, on, runtime) + BENCH[t]["room"] for t in tasks)
     return min(need, cap) if cap else need
 
 

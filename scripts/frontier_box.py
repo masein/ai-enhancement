@@ -423,8 +423,15 @@ PLAN_PACE["M"] = MEDIUM_PACE
 # tokens a second, its prompt at 2,500)
 PLANS["H"] = {"H1": [("on", (DM,), "", 8)]}
 PLAN_PACE["H"] = {("on", DM): 1524 / 580.0 + 200 / 2_500.0}
+# r20 (masein, 11 Nov): plan Q, Qwen3.5-9B on GPQA Diamond (runtime
+# card-qwen35-9b-k3k6: its card's thinking settings, up to 98,304 tokens an
+# answer), the 198 questions in halves, each half's 4 runs on one box, 8 slots.
+# Sized at a guess of 15,000 tokens an answer (the Masein model's mean is
+# 18,599) at 650 tokens a second over 8 slots (the showcase: 192 on one)
+PLANS["Q"] = {"Q1": [("on", (GPQA,), "1/2", 8)], "Q2": [("on", (GPQA,), "2/2", 8)]}
+PLAN_PACE["Q"] = {("on", GPQA): 15_000 / 650.0 + 350 / 2_500.0}
 # the plans whose every pace is a guess
-GUESSED_PLANS = {"P", "M", "H"}
+GUESSED_PLANS = {"P", "M", "H", "Q"}
 # 29: plan D, our own boxes — a quarter of every benchmark on each of a
 # station's four GPUs, longest first (frontier_box's paces), then instruction
 # following with thinking on and off. Every slot holds Bolt's 64K
@@ -434,7 +441,7 @@ PLANS["D"] = {f"D3.{g}": [*(("on", t, f"{g + 1}/4", 8) for t in D_ORDER),
 # 20: the runtime a plan's boxes run, unless the line names another
 PLAN_RUNTIME = {"L": "lda-2610", "I": "lda-2610", "T": "lda-2610", "U": "k3k6-2611",
                 "C": "k3k6-2611", "S": "k3k6r-0411", "P": "k3k6-2611-app",
-                "M": "k3k6-2611-medium", "H": "k3k6-2611-app"}
+                "M": "k3k6-2611-medium", "H": "k3k6-2611-app", "Q": "card-qwen35-9b-k3k6"}
 # 29: the plans run on our own GPUs: each step --own (never started or kept
 # asking while another process uses the GPU), no price
 OWN_PLANS = ("D",)
@@ -451,6 +458,7 @@ PLAN_GPUS = {"L": ("RTX 5090", "RTX PRO 6000"), "I": ("RTX 5090", "RTX PRO 6000"
              # 32: the research tarball, built for sm_120 as the k3k6 one
              "S": ("RTX 5090", "RTX PRO 6000"), "P": ("RTX 5090", "RTX PRO 6000"),
              "M": ("RTX 5090", "RTX PRO 6000"), "H": ("RTX 5090", "RTX PRO 6000"),
+             "Q": ("RTX 5090", "RTX PRO 6000"),
              # 29: dgx-03's — the runner image's V100 tag builds for sm_70 alone
              "D": ("V100",)}
 PLAN_SM = {"D": "sm_70"}
@@ -519,6 +527,14 @@ PLAN_PINS["P"], PLAN_REVISIONS["P"] = PLAN_PINS["U"], PLAN_REVISIONS["U"]
 # r20: plan M serves plan U's file and server too
 PLAN_PINS["M"], PLAN_REVISIONS["M"] = PLAN_PINS["U"], PLAN_REVISIONS["U"]
 PLAN_PINS["H"], PLAN_REVISIONS["H"] = PLAN_PINS["U"], PLAN_REVISIONS["U"]
+# r20: plan Q's file as Hugging Face publishes it in unsloth/Qwen3.5-9B-GGUF at
+# 3885219b6810 (5,680,522,464 bytes, the 5.68 GB of Table G1), and plan U's server
+PLAN_PINS["Q"] = {
+    "Qwen3.5-9B-Q4_K_M.gguf": "03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8",
+    "llama-server-k3k6-3ad38b7.tar.gz": PLAN_PINS["U"]["llama-server-k3k6-3ad38b7.tar.gz"]}
+PLAN_REVISIONS["Q"] = {
+    "Qwen3.5-9B-Q4_K_M.gguf": "3885219b6810b007914f3a7950a8d1b469d598a5",
+    "llama-server-k3k6-3ad38b7.tar.gz": PLAN_REVISIONS["U"]["llama-server-k3k6-3ad38b7.tar.gz"]}
 # 32: plan S runs step2388's file as plan U pins it, and the team's research
 # build (teraformer/lda-k3k6-research at 917f3d911) packed by
 # build_llama_tarball.sh on our server as 3ad38b7cc's was. A pin of None
@@ -573,6 +589,8 @@ SWITCH_PACE = {SWITCH: 60.0, DRIFT: 45.0}
 # 31.2: the boxes that run another model than their plan's — U40 the original
 # Qwen3.6-35B-A3B's Q2 file, for the easy set beside step2388's k3 path
 BOX_MODELS = {"U40": "served/Qwen3.6-35B-A3B-Q2-k3k6-2611",
+              # r20: plan Q's boxes, Qwen3.5-9B alone
+              "Q1": "served/Qwen3.5-9B-Q4_K_M-k3k6-2611", "Q2": "served/Qwen3.5-9B-Q4_K_M-k3k6-2611",
               # 31.3b: and U-cont's box of its easy-set answers
               "C5": "served/Qwen3.6-35B-A3B-Q2-k3k6-2611"}
 # 29: Bolt's two builds, as Hugging Face publishes them: NVIDIA's Q4_K_M
@@ -702,7 +720,8 @@ def model_refused(box: str, served_as: str) -> str:
     BOX_MODELS runs its model alone, and that model no other box"""
     want = BOX_MODELS.get(box.upper())
     if want and served_as != want:
-        return f"{box} runs {want} (the easy set beside step2388's k3 path), not {served_as}"
+        return f"{box} runs {want}" + ("" if want.startswith("served/Qwen3.5-9B") else
+                                       " (the easy set beside step2388's k3 path)") + f", not {served_as}"
     if not want and served_as in BOX_MODELS.values():
         return (f"{served_as} runs on "
                 + ", ".join(b for b, m in BOX_MODELS.items() if m == served_as)
@@ -1011,7 +1030,7 @@ def parser() -> argparse.ArgumentParser:
                                            "U-cont), S1 … S9 (32: switching mode mid-chat), "
                                            "P1 … P6 (34: the apps' limits), M1 … M4 (r20: the app's "
                                            "Medium mode), H1 (r20: High on DeviceMark at the apps' "
-                                           "limits)")
+                                           "limits), Q1 Q2 (r20: Qwen3.5-9B on GPQA Diamond)")
     ap.add_argument("then", nargs="*", help="18e point 1: more labels, run one after another "
                                             "on this box (L1 L2): each later one's line is "
                                             "written \"queued\" at the start, so the fetch "
