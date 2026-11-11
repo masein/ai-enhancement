@@ -575,6 +575,53 @@ RUNTIMES["k3k6-2611-app"] = {
 }
 
 
+# r20 (masein, 11 Nov): the app's Medium mode — thinking off on the 6-expert
+# path, never run before. The same file, server, flags and paths as k3k6-2611;
+# each request names path 6 and says, as well, thinking off and no presence
+# penalty: the thinking-off runs' sampling (path 3's), the expert count alone
+# changed. The server takes path 6's stored values as the base and a value the
+# request sends over it (server-context.cpp, server-common.cpp at 3ad38b7cc);
+# path 6's temperature, top-p, top-k and min-p are path 3's already. A model of
+# its own, so its rows never mix with Instant's or High's
+MEDIUM_SEND = {"chat_template_kwargs": {"enable_thinking": False}, "presence_penalty": 0.0}
+RUNTIMES["k3k6-2611-medium"] = {
+    **{k: v for k, v in RUNTIMES["k3k6-2611"].items()
+       if k not in ("models", "words", "off_for", "thinking", "paths")},
+    "words": "the team's joint k3/k6 build as k3k6-2611, asked in the app's Medium mode: the "
+             "6-expert path with thinking off and no presence penalty, said in each request; the "
+             "rest of the path's sampling the file's",
+    "env": dict(RUNTIMES["k3k6-2611"]["env"]),
+    "flags": list(RUNTIMES["k3k6-2611"]["flags"]),
+    "thinking": (),
+    "off_for": ("gpqa_diamond_epoch", "math_l5_epoch", "mmlupro_tiger", "ifeval_google",
+                "ifbench_test"),
+    "paths": {"off": 6},
+    "send": MEDIUM_SEND,
+    "mode": "Medium",
+    "models": {"served/step2388-k3k6-2611-medium": "Qwen/Qwen3.6-35B-A3B"},
+    "build": dict(RUNTIMES["k3k6-2611"]["build"]),
+}
+
+
+def send_of(runtime: str | None) -> dict:
+    """r20: what a runtime of expert paths says in each request besides its path
+    (Medium: thinking off, presence penalty 0) — {} for one that sends nothing"""
+    return dict((RUNTIMES.get(runtime or "") or {}).get("send") or {})
+
+
+def path_expects(runtime: str | None, path: int) -> dict:
+    """r20: what a path's answers must show on this runtime — the file's values
+    (PATHS), with what the runtime sends over them: Medium's path 6 doesn't
+    think and has no presence penalty"""
+    want = dict(PATHS[path])
+    send = send_of(runtime)
+    kw = send.get("chat_template_kwargs") or {}
+    if "enable_thinking" in kw:
+        want["thinking"] = bool(kw["enable_thinking"])
+    want.update({k: v for k, v in send.items() if k in want and k != "chat_template_kwargs"})
+    return want
+
+
 def app_of(runtime: str | None) -> dict | None:
     """34: the apps' limits a runtime asks with — None for one asked at the
     benchmarks' own limits"""

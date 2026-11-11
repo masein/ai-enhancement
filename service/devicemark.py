@@ -73,8 +73,9 @@ def settings(thinking: bool, max_tokens: int | None = None, rec: dict | None = N
     if path is not None:
         if (rec or {}).get("id") in _fb().FILE_SAMPLING:
             return {"max_tokens": int(max_tokens or d.CAP), "seed": d.SEED, "expert_path": path}
-        return {"max_tokens": int(max_tokens or d.CAP), "temperature": 0.0,
-                "presence_penalty": 0.0, "seed": d.SEED, "expert_path": path}
+        # r20: and what its runtime says beside the path (Medium: thinking off)
+        return {**_fb().send_of((rec or {}).get("runtime")), "max_tokens": int(max_tokens or d.CAP),
+                "temperature": 0.0, "presence_penalty": 0.0, "seed": d.SEED, "expert_path": path}
     return {"max_tokens": int(max_tokens or d.CAP), "temperature": 0.0, "seed": d.SEED,
             "chat_template_kwargs": {"enable_thinking": bool(thinking)}}
 

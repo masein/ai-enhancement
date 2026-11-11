@@ -1663,11 +1663,12 @@ def _main(argv: list[str] | None = None) -> int:
                        or a.devicemark):
         ap.error("--showcase asks its questions alone: no --pilot, --parity, --serve, --check, "
                  "--devicemark, --only or --shard")
-    if a.showcase and not (a.runtime and fb.RUNTIMES[a.runtime].get("paths")
+    # r20: one whose thinking-on path asks it (not Medium's, thinking off alone)
+    if a.showcase and not (a.runtime and "on" in (fb.RUNTIMES[a.runtime].get("paths") or {})
                            and not fb.RUNTIMES[a.runtime].get("experiment")):
         ap.error("--showcase: on a runtime of expert paths (--runtime "
                  + " or ".join(n for n, r in fb.RUNTIMES.items()
-                               if r.get("paths") and not r.get("experiment")
+                               if "on" in (r.get("paths") or {}) and not r.get("experiment")
                                and not r.get("app")) + ")")
     if a.showcase and a.slots != 1:
         ap.error("--showcase: one slot (--slots 1), each question asked alone as step8804's were")
@@ -2354,7 +2355,7 @@ def _main(argv: list[str] | None = None) -> int:
             import path_check
             path = fb.path_of(a.runtime, thinking)
             chk = path_check.check(srv_proc.base, path, gguf_path,
-                                   last_session(out / SERVER_LOG), ctx)
+                                   last_session(out / SERVER_LOG), ctx, runtime=a.runtime)
             server["paths_check"] = chk
             for ln in path_check.words(chk):
                 say(ln)
@@ -2406,7 +2407,7 @@ def _main(argv: list[str] | None = None) -> int:
             # said; the step goes on
             sampler.phase = "check"
             # 31.1: on a runtime of expert paths, the speed of the box's own path
-            path_extra = ({"expert_path": fb.path_of(a.runtime, thinking)}
+            path_extra = ({"expert_path": fb.path_of(a.runtime, thinking), **fb.send_of(a.runtime)}
                           if a.runtime and fb.RUNTIMES[a.runtime].get("paths") else None)
             chk = {**cc.check(srv_proc.base, ctx, a.slots, say, extra=path_extra),
                    "session": state["sessions"]}

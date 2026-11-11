@@ -179,7 +179,7 @@ def test_the_runtime_is_k3k6_2611s_with_the_prompt_cache_in_host_memory_off():
     (["--only", "gpqa_diamond_epoch"], "runtime k3k6r-0411 is the switch experiment's alone"),
     # the board's settings check keeps its words: the runtimes of its rows
     (["--check"], "--check: the settings check of a runtime of expert paths (--runtime "
-                  "k3k6-2611 or k3k6-2611-app)"),
+                  "k3k6-2611 or k3k6-2611-app or k3k6-2611-medium)"),
     (["--switch", "x.jsonl", "--switch-part", "chats", "--runtime", "k3k6-2611",
       "--as", "served/step2388-k3k6-2611"], "--switch: on runtime k3k6r-0411"),
     (["--switch", "x.jsonl"], "--switch: give --switch-part chats"),

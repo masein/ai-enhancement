@@ -2271,6 +2271,68 @@ fetch's line says. k6's answers land on `served/step2388-k3k6-2611-app ·
 thinking`, k3's on `served/step2388-k3k6-2611-app`. MATH Level 5's and OTIS's
 checks are graded as plan U's, after masein's yes.
 
+# M. The app's Medium mode: plan M (r20)
+
+The app has three modes: Instant (thinking off, 3 routed experts a layer),
+Medium (thinking off, 6) and High (thinking on, 6). Instant and High are plan
+U's two paths; Medium was never run. Plan M asks it on everything the
+thinking-off runs asked — GPQA Diamond (4 runs), MMLU-Pro, IFEval, IFBench,
+MATH Level 5 and DeviceMark's battery — at the thinking-off limits. masein's
+yes, 11 Nov.
+
+**Runtime `k3k6-2611-medium`** is k3k6-2611 in every other way: step2388's
+file, the k3k6 tarball, the same flags and two variables. Each request names
+path 6 and says, as well, `"chat_template_kwargs": {"enable_thinking": false}`
+and `"presence_penalty": 0`: the thinking-off runs' sampling (path 3's), the
+expert count alone changed. The server takes path 6's stored values as the
+base and a request's value over it; path 6's temperature, top-p, top-k and
+min-p are path 3's already. DeviceMark's requests are greedy as ever, and say
+thinking off too. Its model is `served/step2388-k3k6-2611-medium`.
+
+**The settings check** holds the file, `/props` and the start-up lines to the
+stored values as on plan U, and its two answers to what Medium asks: no
+thinking block on path 6. A box whose server thinks anyway stops before a
+question, and the import refuses a bundle without the check passed.
+
+## M1. The boxes
+
+`python scripts/frontier_box.py --list M` prints the plan. Its hours are a
+guess: Instant's stored answer lengths at Instant's 8-slot rates (1,000 tokens
+a second written, 2,500 read) times 194.7 / 229.0, the 6-expert path's speed
+against the 3-expert path's alone (Table B2).
+
+| Box | Benchmarks | Each box |
+|---|---|---|
+| M1–M2 | MMLU-Pro in halves | about 3.3 h |
+| M3 | GPQA Diamond, MATH Level 5 | about 2.1 h |
+| M4 | IFEval, IFBench, then DeviceMark | about 0.4 h |
+
+Rent each as in L2: the runner image at this phase's tag, an RTX 5090, Disk
+100 GB. Then, in tmux:
+
+```bash
+cd /app
+```
+
+```bash
+read -rs HF_TOKEN && export HF_TOKEN
+```
+
+```bash
+python scripts/frontier_box.py M1 --as served/step2388-k3k6-2611-medium --gguf hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/step2388.k3k6.gguf --server hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/llama-server-k3k6-3ad38b7.tar.gz --price 0.45
+```
+
+Every box M1–M4 runs that line with its own label. A plan M line with another
+plan's model, or another plan's line with this one, is refused before
+anything is fetched.
+
+## M2. Fetch and import
+
+As in L3, with the box's label (`<host>:<port>=M1`) and
+`--sha served/step2388-k3k6-2611-medium=a2594a68a810ec526061f83cb88c7e469e1c3889912e8da4b1d598c72271faf6`.
+The model's first bundle is imported once by hand with `--register`, as the
+fetch's line says. MATH Level 5's model check is graded as plan U's.
+
 # Speed tests: the cheapest box per answer (19)
 
 Which box runs our benchmarks for the fewest dollars per answer, measured the

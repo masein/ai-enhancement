@@ -126,7 +126,10 @@ def settings(rec: dict, task: str, on: bool) -> dict:
                     "reply_limit": app["reply"]}
         return {"max_tokens": app["reply"], "expert_path": path}
     if path is not None:
-        return {"max_tokens": spec["budget"]["on" if on else "off"], "expert_path": path}
+        # r20: and what the runtime says beside its path (Medium: thinking off,
+        # no presence penalty)
+        return {"max_tokens": spec["budget"]["on" if on else "off"], "expert_path": path,
+                **fb.send_of(rec.get("runtime"))}
     s = {"max_tokens": spec["budget"]["on" if on else "off"],
          **fb.sampling(family_of(rec), on)}
     # 20: a model served with a named runtime is asked with its sampling, in
