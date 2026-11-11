@@ -3,6 +3,7 @@ for internal terms, and the upload's checks before anything is sent (no network 
 import csv
 import importlib.util
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -177,6 +178,92 @@ def test_a_figure_the_script_doesnt_know_stops_it(paper, tmp_path):
                      encoding="utf-8")
     with pytest.raises(SystemExit, match="Figure 11 is new"):
         build.main([str(tmp_path / "out"), str(paper)])
+
+
+SPEED_ROW = "| Qwen3.5-4B, thinking off | us (replica) | 80.1 \\[76.6, 83.4\\] |\n"
+SPEED_FIG = ("\n&#91;embedded content: Figure 1. Fast and right. DeviceMark composite against writing speed "
+             "on a phone (Table 12). Source: Table 12.\\]\n")
+
+
+def speed_paper(paper):
+    """the fixture with a replica row for Qwen3.5-4B and the speed chart as Figure 1"""
+    text = PAPER.replace("| Qwen3.5-4B (int8) |", SPEED_ROW + "| Qwen3.5-4B (int8) |", 1) + SPEED_FIG
+    paper.write_text(text, encoding="utf-8")
+    return paper
+
+
+def speeds_file(tmp_path, **change):
+    """figure-1.csv as the figure script writes it; change={model: {column: value}}"""
+    pip = "Pipette leaderboard, Galaxy S26 Ultra (12 GB): Qwen3.5-4B q4_k_m"
+    rows = [{"model": "Masein model", "mode": "thinking off", "devicemark_composite": "84.4", "ci95_low": "81.4",
+             "ci95_high": "87.3", "score_source": build.OURS, "speed_tok_s": "16.0",
+             "speed_source": "Teraformer's app on a OnePlus 15 (Table 1)", "speed_credit": build.OURS},
+            {"model": "Qwen3.5-4B", "mode": "thinking off", "devicemark_composite": "80.1", "ci95_low": "76.6",
+             "ci95_high": "83.4", "score_source": build.OURS + " (replica)", "speed_tok_s": "15",
+             "speed_source": pip, "speed_credit": build.PIPETTE},
+            {"model": "Qwen3.5-4B (int8)", "mode": "", "devicemark_composite": "26.1", "ci95_low": "22.4",
+             "ci95_high": "29.9", "score_source": build.DEVICEMARK, "speed_tok_s": "", "speed_source": "",
+             "speed_credit": ""}]
+    for r in rows:
+        r.update(change.get(r["model"], {}))
+    f = tmp_path / "figure-1.csv"
+    with open(f, "w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=build.SPEED_HEAD, lineterminator="\n")
+        w.writeheader()
+        w.writerows(rows)
+    return f
+
+
+def test_the_speed_chart_takes_its_scores_from_table_12_and_keeps_pipettes_notice(paper, tmp_path):
+    # Figure 1 plots our DeviceMark scores against speeds from two setups: each score must
+    # be the one Table 12 prints, a Pipette speed must carry the notice Pipette's licence
+    # asks for, and our own speed must be the one the paper prints
+    speed_paper(paper)
+    out = tmp_path / "paper-data"
+    assert build.main([str(out), str(paper), "--speeds", str(speeds_file(tmp_path))]) == 0
+    f1 = rows(out / "figure-1.csv")
+    assert f1[1][:7] == ["Masein model, thinking off", "84.4", "81.4", "87.3", build.OURS, "16.0",
+                         "Teraformer's app on a OnePlus 15 (Table 1)"]
+    assert f1[2][5] == "15" and f1[2][7] == build.PIPETTE
+    assert f1[3][:5] == ["Qwen3.5-4B (int8)", "26.1", "22.4", "29.9", build.DEVICEMARK]
+    for change, says in (({"Qwen3.5-4B": {"devicemark_composite": "80.4"}}, "Table 12 prints 80.1"),
+                         ({"Qwen3.5-4B": {"speed_credit": "Pipette"}}, "must carry its notice"),
+                         ({"Masein model": {"speed_tok_s": "16.5"}}, "16.5 tokens/s is not in the paper")):
+        with pytest.raises(SystemExit, match=says):
+            build.main([str(tmp_path / "x"), str(paper), "--speeds", str(speeds_file(tmp_path, **change))])
+
+
+def test_a_renumbered_paper_needs_no_change_to_the_build(paper, tmp_path):
+    # round 19 put a new figure first and moved the rest down one: figures are known by
+    # their captions, so each file follows the paper's new number and keeps its contents
+    old = tmp_path / "old"
+    build.main([str(old), str(paper)])
+    text = re.sub(r"embedded content: Figure (\d+)\.",
+                  lambda m: f"embedded content: Figure {int(m.group(1)) + 1}.", PAPER)
+    paper.write_text(text.replace("| Qwen3.5-4B (int8) |", SPEED_ROW + "| Qwen3.5-4B (int8) |", 1)
+                     + SPEED_FIG, encoding="utf-8")
+    new = tmp_path / "new"
+    assert build.main([str(new), str(paper), "--speeds", str(speeds_file(tmp_path))]) == 0
+    assert sorted(p.name for p in new.glob("figure-*.csv")) == ["figure-1.csv", "figure-11.csv", "figure-4.csv",
+                                                                "figure-5.csv", "figure-6.csv"]
+    for n in (3, 4, 5):
+        assert rows(new / f"figure-{n + 1}.csv") == rows(old / f"figure-{n}.csv")
+    ix = {r[0]: r for r in rows(new / "index.csv")[1:]}
+    assert ix["figure-4.csv"][1] == "Figure 4" and ix["figure-1.csv"][2] == "Fast and right."
+
+
+def test_figure_ones_speeds_come_from_its_file_so_new_timings_need_one_rebuild(tmp_path):
+    # timings on the OnePlus 15 can replace Pipette's: a speed in figure-1.csv wins,
+    # and a row without one falls back to the value the script carries
+    pytest.importorskip("matplotlib")
+    figs = load("make_figures")
+    f = tmp_path / "figure-1.csv"
+    f.write_text("model,mode,speed_tok_s,speed_source\nQwen3.5-4B,thinking off,14.2,OnePlus 15, timed\n"
+                 "LFM2.5-1.2B,,,\n".replace("OnePlus 15, timed", '"OnePlus 15, timed"'), encoding="utf-8")
+    got = figs.speeds(tmp_path)
+    assert got["Qwen3.5-4B, thinking off"] == ("14.2", "OnePlus 15, timed")
+    assert got["LFM2.5-1.2B"][0] == "68" and got["LFM2.5-1.2B"][1].startswith("Pipette")
+    assert got["Masein model, thinking off"][0] == "16.0"
 
 
 def test_a_tbd_stops_the_build_and_trial_lists_the_files_that_carry_one(paper, tmp_path, capsys):

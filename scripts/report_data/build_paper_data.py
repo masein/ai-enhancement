@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """paper-data/ for the report's public data repository, built from the paper itself.
 
-    python3 build_paper_data.py <out folder> <paper.md> [--figures <dir>] [--trial]
+    python3 build_paper_data.py <out folder> <paper.md> [--figures <dir>] [--speeds <csv>] [--trial]
 
 Every table in the paper becomes table-<its number>.csv (the untitled table under Key
 numbers, key-numbers.csv) and every figure with data figure-<its number>.csv. The numbers
@@ -9,12 +9,15 @@ come from the paper's own tables and captions, and each file takes its name from
 paper's own numbering, so a round that renumbers tables, or changes a value in a table,
 only needs this run again.
 
-Three figures need what the paper doesn't print: Epoch AI's release dates (Figure 1),
-which models a chart names or groups (Figures 6 and 8) and the on-device chart's points
-(Figure 9). They read them from --figures (default: round13-figures beside this paper),
-and every score taken from there is checked against the paper's tables: a score the
-paper doesn't print the same way stops the build. Figures are told apart by their
-captions, not their numbers; a figure this script doesn't know stops it too.
+Some figures need what the paper doesn't print: Epoch AI's release dates (the timeline),
+which models a chart names or groups (the GPQA Diamond lanes and the 21-row grid), the
+on-device chart's points, and the writing speeds of the DeviceMark-against-speed chart.
+They read them from --figures (default: round13-figures beside this paper) and, for the
+speeds, from --speeds (default: figures-r19/figure-1.csv beside this paper, which the
+figure script writes). Every score taken from there is checked against the paper's
+tables: a score the paper doesn't print the same way stops the build. Figures are told
+apart by phrases of their captions, not by their numbers, so a round that renumbers the
+figures needs no change here; a figure this script doesn't know stops it.
 
 Cells keep the paper's values as printed, with thousands separators dropped from
 numbers. A "76.1 ± 2.3" cell becomes a value and an SE column, "[79.7, 86.0]" a low and a
@@ -37,6 +40,11 @@ from datetime import datetime
 from pathlib import Path
 
 EPOCH = "Epoch AI Benchmarking Hub, CC BY 4.0"
+PIPETTE = ("Pipette (Liquid AI), Galaxy S26 Ultra leaderboard, data as of 5 Nov 2026. Copyright 2026 "
+           "Liquid AI, Inc. Pipette Data License v1.0, https://pipette.liquid.ai/data-license. "
+           "Provided as-is, without warranties. Values reproduced unmodified.")
+SPEED_HEAD = ["model", "mode", "devicemark_composite", "ci95_low", "ci95_high", "score_source", "speed_tok_s",
+              "speed_source", "speed_credit"]
 OURS = "measured by Teraformer"
 DEVICEMARK = "DeviceMark (devicemark.github.io), CC BY 4.0, published"
 MAKER = "published by the model's maker or NVIDIA, as the row says"
@@ -347,13 +355,13 @@ def dates_for(rows: list[dict], data: list[dict], dec: int) -> list[str]:
         if len(c) > 1:
             c = [e for e in c if norm(e["model"]) == norm(model_part(r["label"]))] or c
         if len({e["released"] for e in c}) != 1:
-            raise SystemExit(f"Figure 1: can't tell which Epoch row {r['label']} is ({len(c)} found)")
+            raise SystemExit(f"the timeline: can't tell which Epoch row {r['label']} is ({len(c)} found)")
         out.append(c[0]["released"] or "")
     return out
 
 
 def fig_release(p: Paper, cap: str, src: Path) -> tuple[list[str], list[list[str]]]:
-    rec = json.loads((src / "epoch-recompute.json").read_text(encoding="utf-8"))["benchmarks"]
+    rec = json.loads((src.figures / "epoch-recompute.json").read_text(encoding="utf-8"))["benchmarks"]
     at = re.search(r"plotted at (\d{1,2} \w+ \d{4})", cap)
     day = datetime.strptime(at.group(1), "%d %b %Y").strftime("%Y-%m-%d")
     out = []
@@ -415,7 +423,7 @@ def fig_ranout(p: Paper, cap: str, src: Path):
 
 
 def fig_gpqa(p: Paper, cap: str, src: Path):
-    extra = json.loads((src / "figure-extras.json").read_text(encoding="utf-8"))
+    extra = json.loads((src.figures / "figure-extras.json").read_text(encoding="utf-8"))
     named = {norm(x) for x in extra["figure-6 labelled"]}
     v, se = p.masein("GPQA Diamond")
     out = [["Masein model, thinking on", v, se, "", "", "", "yes", OURS]]
@@ -424,7 +432,7 @@ def fig_gpqa(p: Paper, cap: str, src: Path):
                     "yes" if r["dagger"] else "",
                     "yes" if norm(model_part(r["label"])) in named else "", EPOCH])
     if sum(1 for r in out if r[6]) != len(named) + 1:
-        raise SystemExit("Figure 6: not every labelled model is in the GPQA Diamond list")
+        raise SystemExit("the GPQA Diamond lanes: not every labelled model is in the GPQA Diamond list")
     return ["Model (setting)", "Score (%)", "SE", "Verdict (Masein model … the model)",
             "Within a quarter of a combined SE of the line (‡)", "Below high effort (†)",
             "Labelled on the chart", "Source"], out
@@ -443,7 +451,7 @@ def fig_counts(p: Paper, cap: str, src: Path):
 
 
 def fig_grid(p: Paper, cap: str, src: Path):
-    grid = list(csv.reader(open(src / "figure-8.csv", encoding="utf-8")))[1:]
+    grid = list(csv.reader(open(src.figures / "figure-8.csv", encoding="utf-8")))[1:]
     benches = [("GPQA Diamond", 2), ("OTIS Mock AIME", 5), ("MATH Level 5", 8)]
     lists = {b: epoch_rows(p.epoch(b)) for b, _ in benches}
     dec = {"GPQA Diamond": 1, "OTIS Mock AIME": 1, "MATH Level 5": 2}
@@ -460,7 +468,7 @@ def fig_grid(p: Paper, cap: str, src: Path):
             want = f"{float(g[k]):.{dec[b]}f}"
             hit = [r for r in lists[b] if r["v"] == want and norm(model_part(r["label"])).startswith(norm(g[1]))]
             if len(hit) != 1:
-                raise SystemExit(f"Figure 8: {g[1]} on {b} at {want} is {len(hit)} rows of the paper's list")
+                raise SystemExit(f"the 21-row grid: {g[1]} on {b} at {want} is {len(hit)} rows of the paper's list")
             r = hit[0]
             setting = re.search(r"\(([^()]*)\)$", r["label"])
             row += [r["v"], r["se"], setting.group(1) if setting else "",
@@ -475,7 +483,7 @@ def fig_grid(p: Paper, cap: str, src: Path):
 def fig_size(p: Paper, cap: str, src: Path):
     t = p.find("on-device models", lambda t: len(t["head"]) > 1
                and t["head"][1] == "File size and memory it runs at")
-    pts = list(csv.DictReader(open(src / "figure-9.csv", encoding="utf-8")))
+    pts = list(csv.DictReader(open(src.figures / "figure-9.csv", encoding="utf-8")))
     names = {"Bolt": "Nemotron 3.5 Bolt E4B (Bolt)", "Qwen3.5-4B, measured by NVIDIA":
              "Qwen3.5-4B, measured by NVIDIA"}
     cols = {h: t["head"].index(h) for h in ("GPQA Diamond", "MMLU-Pro", "IFEval", "IFBench")}
@@ -485,11 +493,11 @@ def fig_size(p: Paper, cap: str, src: Path):
         nm = names.get(x["Model"], x["Model"])
         raw = next((r for r in t["rows"] if clean(r[0]).startswith(nm)), None)
         if raw is None:
-            raise SystemExit(f"Figure 9: {x['Model']} is not a row of Table G1")
+            raise SystemExit(f"the on-device chart: {x['Model']} is not a row of Table G1")
         size = x["Size (GB)"]
         shown = {"1.0": "1 GB", "2.0": "2.0 GB"}.get(size, f"{float(size):g} GB")
         if shown not in clean(raw[1]) and x["Model"] not in names:
-            raise SystemExit(f"Figure 9: {x['Model']}'s {shown} is not in Table G1")
+            raise SystemExit(f"the on-device chart: {x['Model']}'s {shown} is not in Table G1")
         row = [x["Model"], size]
         for h in ("GPQA Diamond", "MMLU-Pro", "IFEval", "IFBench"):
             v = x[h]
@@ -497,7 +505,7 @@ def fig_size(p: Paper, cap: str, src: Path):
                 cell = clean(raw[cols[h]])
                 printed = next((s for s in re.findall(NUM, cell) if float(s) == float(v)), None)
                 if printed is None:
-                    raise SystemExit(f"Figure 9: {x['Model']}'s {h} {v} is not in Table G1 ({cell})")
+                    raise SystemExit(f"the on-device chart: {x['Model']}'s {h} {v} is not in Table G1 ({cell})")
                 v = printed
             row += [v, ""]
         out.append(row + [x["Plotted"], MAKER])
@@ -517,18 +525,81 @@ def fig_devicemark(p: Paper, cap: str, src: Path):
     return ["Model", "Run by", "Composite", "95% low", "95% high", "Source"], out
 
 
-FIGURES = [  # a phrase of the caption, and what builds the figure's data
-    ("by release date", fig_release),
-    ("How one question becomes a score", None),
-    ("right on every run, on some runs and on none", fig_reliability),
-    ("Mean thinking tokens per finished answer", fig_thinking),
-    ("share of answers that ran out of room at the final limit", fig_ranout),
-    ("Each dot is one model's best-scoring Epoch run", fig_gpqa),
-    ("The bars count the models", fig_counts),
-    ("one model per row", fig_grid),
-    ("Score against file size", fig_size),
-    ("DeviceMark composite with its 95% range", fig_devicemark),
+def fig_speed(p: Paper, cap: str, src):
+    """DeviceMark composite against writing speed on a phone: each score must be Table 12's
+    as printed; a Pipette speed must carry Pipette's notice, and the Masein model's must be
+    the one the key numbers print"""
+    f = src.speeds
+    if not f.exists():
+        raise SystemExit(f"the speed chart: {f} is missing (the figure script writes it)")
+    rows = list(csv.DictReader(open(f, encoding="utf-8")))
+    if not rows or list(rows[0].keys()) != SPEED_HEAD:
+        raise SystemExit(f"the speed chart: {f} doesn't have the columns {', '.join(SPEED_HEAD)}")
+    t = p.find("DeviceMark's rows", lambda t: any(h.startswith("Composite") for h in t["head"]))
+    k = next(i for i, h in enumerate(t["head"]) if h.startswith("Composite"))
+    by = {clean(r[0]): r for r in t["rows"]}
+    ours = [r for x in p.tabs for r in x["rows"] if clean(r[0]).startswith("Writing speed on a phone")]
+    out = []
+    for r in rows:
+        name = r["model"] + (f", {r['mode']}" if r["mode"] else "")
+        raw = by.get(name)
+        if raw is None:
+            raise SystemExit(f"the speed chart: {name} is not a row of {t['name']}")
+        m = RANGE.match(clean(raw[k]))
+        if (num(m.group(1)), num(m.group(2)), num(m.group(3))) != (r["devicemark_composite"], r["ci95_low"],
+                                                                   r["ci95_high"]):
+            raise SystemExit(f"the speed chart: {name} is plotted at {r['devicemark_composite']} "
+                             f"[{r['ci95_low']}, {r['ci95_high']}]; {t['name']} prints {clean(raw[k])}")
+        if italic(raw[k]):
+            if r["speed_tok_s"]:
+                raise SystemExit(f"the speed chart: {name} is a published row and has no speed")
+            out.append([name, num(m.group(1)), num(m.group(2)), num(m.group(3)), DEVICEMARK, "", "", ""])
+            continue
+        if not r["speed_tok_s"] or not is_num(r["speed_tok_s"]):
+            raise SystemExit(f"the speed chart: {name} has no speed")
+        if r["speed_source"].startswith("Pipette"):
+            if r["speed_credit"] != PIPETTE:
+                raise SystemExit(f"the speed chart: {name}'s speed is Pipette's and must carry its notice")
+        elif r["speed_credit"] != OURS:
+            raise SystemExit(f"the speed chart: {name}'s speed is not Pipette's, so it is {OURS}")
+        if name.startswith("Masein model") and not any(r["speed_tok_s"] in numbers_in(" ".join(x)) for x in ours):
+            raise SystemExit(f"the speed chart: the Masein model's {r['speed_tok_s']} tokens/s is not in the "
+                             "paper's writing-speed row")
+        out.append([name, num(m.group(1)), num(m.group(2)), num(m.group(3)), OURS, r["speed_tok_s"],
+                    r["speed_source"], r["speed_credit"]])
+    return ["Model", "DeviceMark composite", "95% low", "95% high", "Score: whose", "Writing speed (tokens/s)",
+            "Speed: how it was measured", "Speed: whose"], out
+
+
+def is_speed_chart(cap: str) -> bool:
+    return "writing speed" in cap.lower() and "DeviceMark" in cap
+
+
+FIGURES = [  # phrases of the caption (any one will do), and what builds the figure's data
+    ((is_speed_chart,), fig_speed),
+    (("by release date",), fig_release),
+    (("How one question becomes a score",), None),
+    (("right on every run, on some runs and on none",), fig_reliability),
+    (("Mean thinking tokens per finished answer",), fig_thinking),
+    (("share of answers that ran out of room at the final limit",), fig_ranout),
+    (("Each dot is one model's best-scoring Epoch run", "in the lane of its verdict"), fig_gpqa),
+    (("The bars count the models", "Each bar counts the models"), fig_counts),
+    (("one model per row",), fig_grid),
+    (("Score against file size",), fig_size),
+    (("DeviceMark composite with its 95% range",), fig_devicemark),
 ]
+
+
+def builder(cap: str):
+    for keys, fn in FIGURES:
+        if any(k(cap) if callable(k) else k in cap for k in keys):
+            return fn
+    return "?"
+
+
+class Sources:
+    def __init__(self, figures: Path, speeds: Path):
+        self.figures, self.speeds = figures, speeds
 
 
 # ---------------------------------------------------------------------------
@@ -565,13 +636,15 @@ def write(path: Path, head: list[str], rows: list[list[str]]) -> None:
 def main(argv: list[str]) -> int:
     trial = "--trial" in argv
     args = [a for a in argv if a != "--trial"]
-    src = None
-    if "--figures" in args:
-        i = args.index("--figures")
-        src = Path(args[i + 1])
-        del args[i:i + 2]
+    opt = {}
+    for flag in ("--figures", "--speeds"):
+        if flag in args:
+            i = args.index(flag)
+            opt[flag] = Path(args[i + 1])
+            del args[i:i + 2]
     out, paper = Path(args[0]), Path(args[1])
-    src = src or paper.parent / "round13-figures"
+    src = Sources(opt.get("--figures", paper.parent / "round13-figures"),
+                  opt.get("--speeds", paper.parent / "figures-r19" / "figure-1.csv"))
     lines = published_text(paper.read_text(encoding="utf-8"))
     left = tbds(lines)
     if left:
@@ -589,7 +662,7 @@ def main(argv: list[str]) -> int:
                       first_sentence(t["caption"]) if t["caption"] else "The report's key numbers."])
     p = Paper(tabs)
     for n, cap in figures(lines):
-        fn = next((f for key, f in FIGURES if key in cap), "?")
+        fn = builder(cap)
         if fn == "?":
             raise SystemExit(f"Figure {n} is new to this script: {cap[:90]}")
         if fn is None:
