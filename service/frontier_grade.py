@@ -711,14 +711,20 @@ def _start(by: str, partial: bool = False) -> dict:
             sent.append({"batch_id": bid, "slot": w["slot"], "task": w["task"],
                          "model": w["model"], "n": len(w["items"])})
     taken = []
+    new = {s["batch_id"] for s in sent}
     for p in pending():                       # a stopped or halted batch takes up again
         if p["slot"] in lost:
             continue                          # its grader gone, it holds
-        if (llm.tally(p["batch_id"]) or {}).get("halted"):
+        # 11 Nov: one sent by this Start runs already (_submit started it); a
+        # refusal run it hit in the meantime is its own halt, never lifted here —
+        # lifted, the batch neither waited nor sent, and said nothing
+        mine = p["batch_id"] in new
+        if not mine and (llm.tally(p["batch_id"]) or {}).get("halted"):
             taken.append(fg.GRADERS[p["slot"]]["label"])
         try:
             be = batch_backend(p["batch_id"])
-            be.resume(p["batch_id"])
+            if not mine:
+                be.resume(p["batch_id"])
             be.status(p["batch_id"])
         except llm.LLMError:
             pass
