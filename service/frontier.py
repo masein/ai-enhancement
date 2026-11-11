@@ -130,7 +130,7 @@ def settings(rec: dict, task: str, on: bool) -> dict:
         # no presence penalty)
         return {"max_tokens": spec["budget"]["on" if on else "off"], "expert_path": path,
                 **fb.send_of(rec.get("runtime"))}
-    s = {"max_tokens": spec["budget"]["on" if on else "off"],
+    s = {"max_tokens": fb.budget_of(task, on, rec.get("runtime")),
          **fb.sampling(family_of(rec), on)}
     # 20: a model served with a named runtime is asked with its sampling, in
     # each request as well as the server's defaults (min-p among them)

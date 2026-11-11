@@ -2333,6 +2333,50 @@ As in L3, with the box's label (`<host>:<port>=M1`) and
 The model's first bundle is imported once by hand with `--register`, as the
 fetch's line says. MATH Level 5's model check is graded as plan U's.
 
+# H. High on DeviceMark as the app runs it: plan H (r20)
+
+DeviceMark's battery (596 items) asked of step2388's 6-expert path with
+thinking on, as the app asks it: greedy (DeviceMark's protocol), the thinking
+stopped by the server at 1,024 tokens (`thinking_budget_tokens`, as plan P)
+and the reply cut at 2,048 when it comes back. The request's limit is 3,100,
+inside DeviceMark's cap of 4,096. The box runs plan P's budget check before
+its first item, and the import refuses a bundle without it passed. The row is
+`served/step2388-k3k6-2611-app · thinking`; the 45.2 row stays as it is.
+masein's yes, 11 Nov.
+
+```bash
+python scripts/frontier_box.py H1 --as served/step2388-k3k6-2611-app --gguf hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/step2388.k3k6.gguf --server hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/llama-server-k3k6-3ad38b7.tar.gz --price 0.45
+```
+
+Fetch and import as plan P's boxes, with `<host>:<port>=H1`.
+
+# Q. Qwen3.5-9B on GPQA Diamond: plan Q (r20)
+
+Qwen3.5-9B under our protocol, to set its published 81.7 beside the Masein
+model's 82.7 like for like: GPQA Diamond, thinking on, 4 runs of the 198
+questions, up to 98,304 tokens an answer (the Masein model's final limit,
+asked at once). The file is the 4-bit one Pipette and Table G1 name:
+`Qwen3.5-9B-Q4_K_M.gguf` in `unsloth/Qwen3.5-9B-GGUF` at
+`3885219b6810b007914f3a7950a8d1b469d598a5` (5,680,522,464 bytes, sha256
+`03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8`), on the
+same build as step2388's runs. **Runtime `card-qwen35-9b-k3k6`** asks at its
+card's thinking settings for general tasks (temperature 1.0, top-p 0.95,
+top-k 20, min-p 0, presence penalty 1.5, repetition penalty 1.0), said in
+every request. masein's yes, 11 Nov.
+
+| Box | Questions | Each box |
+|---|---|---|
+| Q1 | GPQA Diamond, the first half, 4 runs | about 2.5 h (a guess) |
+| Q2 | GPQA Diamond, the second half, 4 runs | about 2.5 h (a guess) |
+
+```bash
+python scripts/frontier_box.py Q1 --as served/Qwen3.5-9B-Q4_K_M-k3k6-2611 --gguf hf://unsloth/Qwen3.5-9B-GGUF@3885219b6810b007914f3a7950a8d1b469d598a5/Qwen3.5-9B-Q4_K_M.gguf --server hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/llama-server-k3k6-3ad38b7.tar.gz --price 0.45
+```
+
+Fetch and import as L3, with `<host>:<port>=Q1` and
+`--sha served/Qwen3.5-9B-Q4_K_M-k3k6-2611=03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8`.
+GPQA Diamond is graded by code: no paid API.
+
 # Speed tests: the cheapest box per answer (19)
 
 Which box runs our benchmarks for the fewest dollars per answer, measured the
