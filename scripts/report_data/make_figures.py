@@ -5,7 +5,8 @@
 
 <data dir> holds epoch-recompute.json (Epoch AI's lists with every verdict), figure-8.csv
 (the 21-row grid) and figure-10.csv (DeviceMark's 27 rows). <fonts dir> holds
-texgyreheros-regular.otf and texgyreheros-bold.otf. <out dir> gets figure-N.pdf,
+texgyreheros-regular.otf and texgyreheros-bold.otf; their TrueType versions are written to
+<fonts dir>/ttf/ and those are the ones embedded. <out dir> gets figure-N.pdf,
 figure-N.png (220 dpi) and figure-N.csv for N = 1 to 11, and contact-sheet.png.
 
 Figure 1's speeds are read from <out dir>/figure-1.csv when it is there (speed_tok_s and
@@ -17,7 +18,7 @@ text width; one colour, one meaning, in every figure; text in ink or muted grey 
 legends in one row above the plot; filled marks are measured by us and hollow ones
 published by someone else; squares are runs below high effort (†) and rings verdicts
 within a quarter of a combined standard error of the line (‡); error bars only where the
-paper gives a 95% range. Every figure is checked before it is saved: no label overlaps
+paper gives one or its scores give one (score ± 1.96 × SE). Every figure is checked before it is saved: no label overlaps
 another label, a point, a line or an error bar, nothing leaves the page, no text is under
 8.5 pt, and the numbers the captions state are the numbers drawn."""
 from __future__ import annotations
@@ -156,9 +157,50 @@ def label_of(r: dict) -> str:
 # style and checks
 # ---------------------------------------------------------------------------
 
+def truetype(otf: Path, ttf: Path) -> Path:
+    """the OTF's CFF outlines as TrueType quadratics (fontTools' otf2ttf recipe with cu2qu,
+    error at most 1 font unit in 1,000): with pdf.fonttype 42 the PDF then embeds a
+    TrueType font in its TrueType slot, never CFF outlines there. Names, metrics and
+    advance widths are the font's own; written once, and again only when the OTF is newer"""
+    if ttf.exists() and ttf.stat().st_mtime >= otf.stat().st_mtime:
+        return ttf
+    from fontTools.pens.cu2quPen import Cu2QuPen
+    from fontTools.pens.ttGlyphPen import TTGlyphPen
+    from fontTools.ttLib import TTFont, newTable
+    f = TTFont(otf, recalcTimestamp=False)
+    order, gs = f.getGlyphOrder(), f.getGlyphSet()
+    f["loca"] = newTable("loca")
+    f["glyf"] = glyf = newTable("glyf")
+    glyf.glyphOrder, glyf.glyphs = order, {}
+    for g in order:
+        pen = TTGlyphPen(gs)
+        gs[g].draw(Cu2QuPen(pen, 1.0, reverse_direction=True))
+        glyf.glyphs[g] = pen.glyph()
+    del f["CFF "]
+    if "VORG" in f:
+        del f["VORG"]
+    glyf.compile(f)
+    for g, gl in glyf.glyphs.items():
+        if hasattr(gl, "xMin"):
+            f["hmtx"][g] = (f["hmtx"][g][0], gl.xMin)
+    f["maxp"] = maxp = newTable("maxp")
+    maxp.tableVersion = 0x00010000
+    maxp.maxZones, maxp.maxTwilightPoints, maxp.maxStorage, maxp.maxFunctionDefs = 1, 0, 0, 0
+    maxp.maxInstructionDefs, maxp.maxStackElements, maxp.maxSizeOfInstructions = 0, 0, 0
+    maxp.maxComponentElements = max(len(getattr(gl, "components", [])) for gl in glyf.glyphs.values())
+    maxp.compile(f)
+    post = f["post"]
+    post.formatType, post.extraNames, post.mapping, post.glyphOrder = 2.0, [], {}, order
+    f["head"].glyphDataFormat = 0
+    f.sfntVersion = "\000\001\000\000"
+    ttf.parent.mkdir(parents=True, exist_ok=True)
+    f.save(ttf)
+    return ttf
+
+
 def setup(fonts: Path) -> None:
-    for f in ("texgyreheros-regular.otf", "texgyreheros-bold.otf"):
-        font_manager.fontManager.addfont(str(fonts / f))
+    for f in ("texgyreheros-regular", "texgyreheros-bold"):
+        font_manager.fontManager.addfont(str(truetype(fonts / f"{f}.otf", fonts / "ttf" / f"{f}.ttf")))
     plt.rcParams.update({
         "font.family": "TeX Gyre Heros", "font.size": SMALL, "text.color": INK,
         "pdf.fonttype": 42, "ps.fonttype": 42, "axes.unicode_minus": True,
@@ -189,11 +231,11 @@ def tidy(ax, grid: str = "both") -> None:
     ax.set_axisbelow(True)
 
 
-def legend_row(fig, handles, labels, top: float = 0.06, left: float = 0.0):
+def legend_row(fig, handles, labels, top: float = 0.06, left: float = 0.0, spacing: float = 1.6):
     """one row of legend above everything, no frame, `top` in from the figure's top edge"""
     w, h = fig.get_size_inches()
     return fig.legend(handles, labels, loc="upper left", bbox_to_anchor=(left / w, 1 - top / h), ncol=len(labels),
-                      frameon=False, borderaxespad=0)
+                      frameon=False, borderaxespad=0, columnspacing=spacing)
 
 
 def mark(colour, hollow=False, marker="o", size=5.0, line=None, err=False):
@@ -464,6 +506,7 @@ def fig2(E: dict, P: dict):
                    edgecolor=CONTEXT, lw=0.7, zorder=2)
         ax.axhline(mz["v"], color=BLUE, lw=1.0, ls=(0, (4, 2.5)), zorder=2)
         mx = X(date(2026, 11, 7))
+        ax.errorbar([mx], [mz["v"]], yerr=1.96 * mz["se"], fmt="none", ecolor=BLUE, zorder=4, **EBAR)
         ax.scatter([mx], [mz["v"]], s=34, color=BLUE, edgecolor="white", lw=0.7, zorder=5)
         # the Masein model's line, labelled at its left end
         t = text(ax, X(date(2023, 1, 20)), mz["v"], f"Masein model: {mz['v']:.1f}", fontweight="bold",
@@ -472,6 +515,7 @@ def fig2(E: dict, P: dict):
             0, (2 if b == "gpqa" else -2.5) / 72, fig.dpi_scale_trans))
         if b == "gpqa":
             ox = X(d(o1["released"]))
+            ax.errorbar([ox], [o1["value"]], yerr=1.96 * o1["se"], fmt="none", ecolor=ORANGE, zorder=5, **EBAR)
             s = ax.scatter([ox], [o1["value"]], s=26, facecolor="white", edgecolor=ORANGE, lw=1.1, zorder=6)
             s.set_gid("o1")
             lx, ly = X(date(2023, 3, 1)), 70.5
@@ -481,15 +525,17 @@ def fig2(E: dict, P: dict):
             leader(ax, (bb.x1 + 10, ly + 2.5), (ox - 16, o1["value"]), "o1")
         for r in rows:
             rows_out.append([title, label_of(r), r["released"], f"{r['value']:.2f}", f"{r['se']:.2f}",
-                             "yes" if r["dagger"] else "", "labelled" if r is o1 else "", EPOCH])
+                             "yes" if r["dagger"] else "",
+                             "labelled; bar: 95% range, score ± 1.96 × SE" if r is o1 else "", EPOCH])
         rows_out.append([title, "Masein model, thinking on", "2026-11-07", f"{mz['v']:.2f}", f"{mz['se']:.2f}", "",
-                         "plotted at the date of our runs", OURS])
+                         "plotted at the date of our runs; bar: 95% range, score ± 1.96 × SE", OURS])
     axs[0].tick_params(labelbottom=True)
     fig.text(0.1 / WIDTH, (0.42 + 3.0 + 1.78) / 2 / 5.25, "Score (%)", rotation=90, ha="left", va="center",
              color=MUTED, fontsize=SMALL)
     legend_row(fig, [mark(CONTEXT, hollow=True, size=4.2), mark(CONTEXT, hollow=True, marker="s", size=4.2),
                      Line2D([], [], color=INK, lw=0.9), mark(BLUE, size=5.5)],
-               ["Epoch AI run", "below high effort (†)", "best so far", "Masein model, measured here"], left=0.55)
+               ["Epoch AI run", "below high effort (†)", "best so far", "Masein model, measured here (95% range)"],
+               left=0.02, spacing=1.1)
     ck = Checker("2")
     head = ["Benchmark", "Model (setting)", "Released", "Score (%)", "SE", "Below high effort (†)", "Note", "Source"]
     return fig, head, rows_out, ck
@@ -921,7 +967,7 @@ def fig10(E: dict, P: dict):
     POS = {"GPQA": {"Ternary Bonsai 2 2B": (5.5, -3.5, "left"), "Gemma 4 E2B": (5.5, 7, "left"),
                     "Ternary Bonsai 2 4B": (5.5, 0, "left"), "Ternary Bonsai 2 9B": (-5.5, 0, "right"),
                     "Gemma 4 E4B": (5.5, -5.5, "left"), "Qwen3.5-4B": (-5.5, 0, "right"), "Edge0-8B": (5.5, -3, "left"),
-                    "Qwen3.5-9B": (-5.5, 4, "right"), "Edge0-35B": (-5.5, -7, "right")},
+                    "Qwen3.5-9B": (-5.5, 4, "right"), "Edge0-35B": (0, -9, "center")},
            "IFBench": {"Ternary Bonsai 2 2B": (5.5, 0, "left"), "Gemma 4 E2B": (5.5, 0, "left"),
                        "Ternary Bonsai 2 4B": ("x", -1.40, 15, "left"), "Ternary Bonsai 2 9B": (-5.5, -9.6, "right"),
                        "Gemma 4 E4B": (5.5, 0, "left"), "Qwen3.5-4B": (0, 9, "center"),
@@ -930,7 +976,8 @@ def fig10(E: dict, P: dict):
                        "Edge0-35B": (-5.5, -9.6, "right"), "Ternary Bonsai 2 27B": (-5.5, 0, "right")}}
     axs = [axes_in(fig, 0.5, 4.72, 5.9, 1.25), axes_in(fig, 0.5, 3.02, 5.9, 1.25)]
     rows_out = []
-    for ax, (panel, k, lo, hi, me_v) in zip(axs, (("GPQA", 2, 30, 90, MZ["gpqa"]["v"]), ("IFBench", 5, 35, 75, 63.7))):
+    for ax, (panel, k, lo, hi, me_v, me_se) in zip(axs, (("GPQA", 2, 30, 90, MZ["gpqa"]["v"], MZ["gpqa"]["se"]),
+                                                         ("IFBench", 5, 35, 75, 63.7, 2.8))):
         ax.set_title("GPQA Diamond" if panel == "GPQA" else "IFBench")
         ax.set_xlim(s0, s1)
         ax.set_ylim(lo, hi)
@@ -958,12 +1005,15 @@ def fig10(E: dict, P: dict):
             rows_out.append([nm, s, panel, f"{v:g}" if v != 66.67 else "66.67", "published by " + {
                 "Edge0": "Edge0", "Qwen": "Qwen (Alibaba)", "PrismML": "PrismML", "Google": "Google",
                 "Liquid AI": "Liquid AI", "NVIDIA": "NVIDIA"}.get(next((g[6] for g in ON_DEVICE if g[0] == nm), "NVIDIA"))])
+        ax.errorbar([X(MASEIN_SIZE)], [me_v], yerr=1.96 * me_se, fmt="none", ecolor=BLUE, zorder=4, **EBAR)
         sc = ax.scatter([X(MASEIN_SIZE)], [me_v], s=40, color=BLUE, edgecolor="white", lw=0.7, zorder=5)
         sc.set_gid("me" + panel)
-        t = ax.annotate(f"{me_v:.1f} Masein model", (X(MASEIN_SIZE), me_v), xytext=(0, 7), textcoords="offset points",
+        t = ax.annotate(f"{me_v:.1f} Masein model", (X(MASEIN_SIZE), me_v + 1.96 * me_se), xytext=(0, 4),
+                        textcoords="offset points",
                         ha="center", va="bottom", fontweight="bold", fontsize=SMALL, color=INK)
         t.set_gid("me" + panel)
-        rows_out.append(["Masein model", MASEIN_SIZE, panel, f"{me_v:.1f}", OURS])
+        rows_out.append(["Masein model", MASEIN_SIZE, panel, f"{me_v:.1f}",
+                         OURS + f"; bar: 95% range, {me_v - 1.96 * me_se:.1f} to {me_v + 1.96 * me_se:.1f}"])
     axs[1].set_xlabel("File or deployed size, GB (log scale)")
     fig.text(0.04 / WIDTH, (3.02 + 4.72 + 1.25) / 2 / H, "Score (%)", rotation=90, ha="left", va="center",
              color=MUTED, fontsize=SMALL)
@@ -998,7 +1048,8 @@ def fig10(E: dict, P: dict):
         tab.plot([-2, WIDTH * 72 + 2], [y + rh, y + rh], color=GRID, lw=0.6, gid="no-check", clip_on=False)
         y += rh
     legend_row(fig, [mark(BLUE, size=5.5), mark(ORANGE, hollow=True, size=4.6)],
-               ["Masein model, measured by us", "published, each under its publisher's own harness"], left=0.5)
+               ["Masein model, measured by us (95% range)", "published, each under its publisher's own harness"],
+               left=0.5)
     above_gpqa = [g for g in ON_DEVICE if g[2] is not None and g[2] > 82.7]
     above_ifb = sorted([g[5] for g in ON_DEVICE if g[5] is not None and g[5] > 63.7] + [NV_QWEN4B[2]])
     assert not above_gpqa and above_ifb == [64.0, 64.5, 66.67, 74.0], above_ifb   # + Bolt's 16-bit 63.79, not plotted
