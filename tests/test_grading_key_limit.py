@@ -150,3 +150,42 @@ def test_what_is_out_at_openrouters_batch_api_is_no_longer_carry_ons(svc, monkey
         f"About ${est['usd'] + usd:,.2f} — Start’s new answers ${est['usd']:,.2f}, the batches "
         f"out at OpenRouter ${usd:,.2f} — is more than the OpenRouter key may still spend "
         "($0.00: the key has used $336.15 of its $250.00 limit)")
+
+
+def test_a_batch_that_halts_while_start_is_still_going_keeps_its_halt(svc, monkeypatch):  # noqa: F811
+    # 11 Nov (CI on #302): Start sends a batch, then takes up again every halted batch
+    # — and took up the one it had just sent, when its worker met the run of refusals
+    # first (a busy machine): the halt was lifted, the worker had ended, and the card
+    # said "0 of 5 · $0.00 so far" for good. Forced here: each new batch halts before
+    # _submit returns
+    monkeypatch.setattr(config, "OPENROUTER_CONCURRENCY", 1)
+    monkeypatch.setattr(fgr.GraderChat, "HALT_AFTER", 3)
+    monkeypatch.setattr(ai_models, "key_allowance", lambda: dict(KEY))
+
+    def http(method, url, headers, body=None, timeout=60.0):
+        if json.loads(body)["model"] == GPT:
+            raise llm.LLMError(f"POST {url}: HTTP 403: {LATE}", status=403)
+        return 200, json.dumps({"choices": [{"message": {"content": "No"},
+                                             "finish_reason": "stop"}],
+                                "usage": {"prompt_tokens": 100, "completion_tokens": 1}}).encode()
+    monkeypatch.setattr(llm, "_http", http)
+    submit = fgr._submit
+
+    def submit_and_wait(w, pin, by):
+        bid = submit(w, pin, by)
+        end = time.time() + 15
+        while bid and w["slot"] == "simpleqa" and time.time() < end \
+                and not (llm.tally(bid) or {}).get("halted"):
+            time.sleep(0.02)
+        return bid
+    monkeypatch.setattr(fgr, "_submit", submit_and_wait)
+    got = fgr.start("masein")
+    sqa = next(p for p in fgr.pending() if p["slot"] == "simpleqa")
+    assert sqa["batch_id"] in {s["batch_id"] for s in got["sent"]}
+    assert (llm.tally(sqa["batch_id"]) or {}).get("halted", "").startswith(
+        "waiting: OpenRouter refused 3 requests in a row")
+    assert "taken" not in got                 # nothing was taken up: it was all new
+    # its batches' workers done before the test's folder goes (none left writing)
+    end = time.time() + 15
+    while time.time() < end and any(fgr._working(p["batch_id"]) for p in fgr.pending()):
+        time.sleep(0.05)
