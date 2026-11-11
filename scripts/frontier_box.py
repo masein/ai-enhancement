@@ -416,8 +416,15 @@ MEDIUM_TOK_S = 1000.0 * 194.7 / 229.0
 MEDIUM_PACE = {("off", t): n / MEDIUM_TOK_S + MEDIUM_PROMPT[t] / (2_500.0 * 194.7 / 229.0)
                for t, n in MEDIUM_WRITE.items()}
 PLAN_PACE["M"] = MEDIUM_PACE
+# r20 (masein, 11 Nov): plan H, High on DeviceMark's battery as the app runs it
+# (runtime k3k6-2611-app, thinking on: greedy, the thinking stopped at 1,024
+# tokens, the reply cut at 2,048) — one box, 8 slots. Sized at plan P's guess
+# for a thinking-on answer (1,024 of thinking and about 500 of reply at 580
+# tokens a second, its prompt at 2,500)
+PLANS["H"] = {"H1": [("on", (DM,), "", 8)]}
+PLAN_PACE["H"] = {("on", DM): 1524 / 580.0 + 200 / 2_500.0}
 # the plans whose every pace is a guess
-GUESSED_PLANS = {"P", "M"}
+GUESSED_PLANS = {"P", "M", "H"}
 # 29: plan D, our own boxes — a quarter of every benchmark on each of a
 # station's four GPUs, longest first (frontier_box's paces), then instruction
 # following with thinking on and off. Every slot holds Bolt's 64K
@@ -427,7 +434,7 @@ PLANS["D"] = {f"D3.{g}": [*(("on", t, f"{g + 1}/4", 8) for t in D_ORDER),
 # 20: the runtime a plan's boxes run, unless the line names another
 PLAN_RUNTIME = {"L": "lda-2610", "I": "lda-2610", "T": "lda-2610", "U": "k3k6-2611",
                 "C": "k3k6-2611", "S": "k3k6r-0411", "P": "k3k6-2611-app",
-                "M": "k3k6-2611-medium"}
+                "M": "k3k6-2611-medium", "H": "k3k6-2611-app"}
 # 29: the plans run on our own GPUs: each step --own (never started or kept
 # asking while another process uses the GPU), no price
 OWN_PLANS = ("D",)
@@ -443,7 +450,7 @@ PLAN_GPUS = {"L": ("RTX 5090", "RTX PRO 6000"), "I": ("RTX 5090", "RTX PRO 6000"
              "U": ("RTX 5090", "RTX PRO 6000"), "C": ("RTX 5090", "RTX PRO 6000"),
              # 32: the research tarball, built for sm_120 as the k3k6 one
              "S": ("RTX 5090", "RTX PRO 6000"), "P": ("RTX 5090", "RTX PRO 6000"),
-             "M": ("RTX 5090", "RTX PRO 6000"),
+             "M": ("RTX 5090", "RTX PRO 6000"), "H": ("RTX 5090", "RTX PRO 6000"),
              # 29: dgx-03's — the runner image's V100 tag builds for sm_70 alone
              "D": ("V100",)}
 PLAN_SM = {"D": "sm_70"}
@@ -511,6 +518,7 @@ PLAN_PINS["C"], PLAN_REVISIONS["C"] = PLAN_PINS["U"], PLAN_REVISIONS["U"]
 PLAN_PINS["P"], PLAN_REVISIONS["P"] = PLAN_PINS["U"], PLAN_REVISIONS["U"]
 # r20: plan M serves plan U's file and server too
 PLAN_PINS["M"], PLAN_REVISIONS["M"] = PLAN_PINS["U"], PLAN_REVISIONS["U"]
+PLAN_PINS["H"], PLAN_REVISIONS["H"] = PLAN_PINS["U"], PLAN_REVISIONS["U"]
 # 32: plan S runs step2388's file as plan U pins it, and the team's research
 # build (teraformer/lda-k3k6-research at 917f3d911) packed by
 # build_llama_tarball.sh on our server as 3ad38b7cc's was. A pin of None
@@ -1002,7 +1010,8 @@ def parser() -> argparse.ArgumentParser:
                                            "DeviceMark and the easy set), C1 … C5 (31.3: "
                                            "U-cont), S1 … S9 (32: switching mode mid-chat), "
                                            "P1 … P6 (34: the apps' limits), M1 … M4 (r20: the app's "
-                                           "Medium mode)")
+                                           "Medium mode), H1 (r20: High on DeviceMark at the apps' "
+                                           "limits)")
     ap.add_argument("then", nargs="*", help="18e point 1: more labels, run one after another "
                                             "on this box (L1 L2): each later one's line is "
                                             "written \"queued\" at the start, so the fetch "
@@ -1133,8 +1142,9 @@ def main(argv: list[str] | None = None) -> int:
         if why:
             raise SystemExit(f"{box}: {why}. Nothing was fetched")
         # 34: a box of plan P asks under the apps' limits, and no other box does
-        if (box[:1].upper() == "P") != bool(fb.app_of(runtime_of(a, box))):
-            raise SystemExit(f"{box}: plan P's boxes, and they alone, ask under the apps' limits "
+        # (r20: but plan H's, High on DeviceMark as the app runs it)
+        if (box[:1].upper() in ("P", "H")) != bool(fb.app_of(runtime_of(a, box))):
+            raise SystemExit(f"{box}: plan P's and H's boxes, and they alone, ask under the apps' limits "
                              f"(runtime {PLAN_RUNTIME['P']}, --as "
                              f"{next(iter(fb.RUNTIMES[PLAN_RUNTIME['P']]['models']))}); this line "
                              f"runs {runtime_of(a, box) or 'no named runtime'}. Nothing was fetched")

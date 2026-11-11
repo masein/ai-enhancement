@@ -70,6 +70,15 @@ def settings(thinking: bool, max_tokens: int | None = None, rec: dict | None = N
     sends its path and the seed alone"""
     d = dm()
     path = _path(rec, thinking)
+    app = _fb().app_of((rec or {}).get("runtime"))
+    if path is not None and app and thinking:
+        # r20 (masein, 11 Nov): High as the app runs it — greedy, the thinking
+        # stopped by the server at 1,024 tokens (its reasoning budget) and the
+        # reply cut at 2,048 when it comes back (reply_limit, never sent); the
+        # request's limit 3,100, inside DeviceMark's cap of 4,096
+        return {"max_tokens": app["thinking_budget"] + app["reply"] + app["room"],
+                "temperature": 0.0, "presence_penalty": 0.0, "seed": d.SEED, "expert_path": path,
+                "thinking_budget_tokens": app["thinking_budget"], "reply_limit": app["reply"]}
     if path is not None:
         if (rec or {}).get("id") in _fb().FILE_SAMPLING:
             return {"max_tokens": int(max_tokens or d.CAP), "seed": d.SEED, "expert_path": path}
@@ -153,7 +162,8 @@ def ask(rec: dict, text: str, s: dict) -> dict:
     server says both — whether the cap cut it, its decode speed and its wall
     time"""
     body = {"model": rec["pin"].get("model") or rec["name"],
-            "messages": [{"role": "user", "content": text}], "stream": False, **s}
+            "messages": [{"role": "user", "content": text}], "stream": False,
+            **{k: v for k, v in s.items() if k != "reply_limit"}}
     if "expert_path" in s:
         body.pop("model")                       # 31.2: the path, and nothing to replace it
     base, key = _served._endpoint(rec)
@@ -166,6 +176,11 @@ def ask(rec: dict, text: str, s: dict) -> dict:
     think = msg.get("reasoning_content") or msg.get("reasoning") or ""
     if not think and "<think>" in content:
         think, content = dm().split_thinking(content)
+    # r20: the apps' limits — the thinking the server held to its budget,
+    # counted; the reply cut at its limit, as the app stops it
+    app = None
+    if s.get("reply_limit") or "thinking_budget_tokens" in s:
+        content, app = _served.app_limits(rec, think, content, s)
     usage = reply.get("usage") if isinstance(reply.get("usage"), dict) else {}
     t = reply.get("timings") if isinstance(reply.get("timings"), dict) else {}
     gen = _int(usage.get("completion_tokens"))
@@ -187,9 +202,12 @@ def ask(rec: dict, text: str, s: dict) -> dict:
            "gen_tokens": gen, "think_tokens": thought,
            "answer_tokens": gen - thought if gen is not None and thought is not None else None,
            "finish": finish,
-           "capped": finish == "length" or bool(gen is not None and gen >= s["max_tokens"]),
+           "capped": finish == "length" or bool(gen is not None and gen >= s["max_tokens"])
+           or bool(app and app.get("reply_cut")),
            "decode_tok_s": _float(t.get("predicted_per_second")),
            "wall_s": round(wall, 3)}
+    if app:
+        out["app"] = app
     if _int(t.get("draft_n")):
         out["draft"] = {"n": _int(t["draft_n"]), "accepted": _int(t.get("draft_n_accepted")) or 0}
     return out

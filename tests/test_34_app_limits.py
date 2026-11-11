@@ -309,7 +309,7 @@ def test_a_plan_p_line_runs_the_app_runtime_on_plan_us_files():
 
 @pytest.mark.parametrize("label, model", [("P1", STEP), ("U35", APP)])
 def test_plan_ps_boxes_alone_ask_at_the_apps_limits(label, model):
-    with pytest.raises(SystemExit, match="plan P's boxes, and they alone, ask under the apps"):
+    with pytest.raises(SystemExit, match="plan P's and H's boxes, and they alone, ask under the apps"):
         fx.main([label, "--as", model, "--gguf", f"hf://me/p@c/{NAME}", "--server",
                  "hf://me/p@c/llama-server-k3k6-3ad38b7.tar.gz", "--price", "0.45"])
 
@@ -324,11 +324,14 @@ def test_the_runbook_gives_plan_ps_line_and_its_assumptions():
     assert "2,048 on the reply alone" in part and "sample as the file stores" in part
 
 
-@pytest.mark.parametrize("more", [["--showcase", "own.json", "--slots", "1"],
-                                  ["--devicemark"], ["--continue", "cont-k6.jsonl"]])
-def test_the_app_runtime_asks_the_frontier_benchmarks_alone(tmp_path, capsys, more):
+@pytest.mark.parametrize("more, thinking", [(["--showcase", "own.json", "--slots", "1"], "on"),
+                                            (["--continue", "cont-k6.jsonl"], "on"),
+                                            (["--devicemark"], "off")])
+def test_the_app_runtime_asks_the_frontier_benchmarks_alone(tmp_path, capsys, more, thinking):
+    # r20: and DeviceMark with thinking on (plan H), never with it off
     with pytest.raises(SystemExit):
         run_k({"gguf": tmp_path / NAME, "tarball": tmp_path / "t.tgz", "root": tmp_path}, "x",
-              "--runtime", RT, *more, served_as=APP, only=False)
-    assert ("--runtime k3k6-2611-app asks the Frontier benchmarks under the apps' limits alone: "
-            "no --showcase, --devicemark or --continue") in capsys.readouterr().err
+              "--runtime", RT, *more, served_as=APP, only=False, thinking=thinking)
+    assert ("--runtime k3k6-2611-app asks the Frontier benchmarks under the apps' limits, and "
+            "DeviceMark with --thinking on, alone: no --showcase or --continue") in \
+        capsys.readouterr().err

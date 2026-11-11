@@ -1655,9 +1655,10 @@ def _main(argv: list[str] | None = None) -> int:
     if a.check and (a.pilot or a.parity or a.serve or a.only):
         ap.error("--check asks no benchmark: no --pilot, --parity, --serve or --only")
     # 34: a runtime of the apps' limits asks the Frontier benchmarks alone
-    if fb.app_of(a.runtime) and (a.showcase or a.devicemark or a.cont):
-        ap.error(f"--runtime {a.runtime} asks the Frontier benchmarks under the apps' limits "
-                 "alone: no --showcase, --devicemark or --continue")
+    # r20: and DeviceMark with thinking on (High as the app runs it, plan H)
+    if fb.app_of(a.runtime) and (a.showcase or a.cont or a.devicemark and a.thinking != "on"):
+        ap.error(f"--runtime {a.runtime} asks the Frontier benchmarks under the apps' limits, "
+                 "and DeviceMark with --thinking on, alone: no --showcase or --continue")
     # 31.2b: the showcase, on a runtime of expert paths, on its own
     if a.showcase and (a.pilot or a.parity or a.serve or a.check or a.only or shard
                        or a.devicemark):
