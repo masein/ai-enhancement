@@ -2354,7 +2354,7 @@ def _main(argv: list[str] | None = None) -> int:
             import path_check
             path = fb.path_of(a.runtime, thinking)
             chk = path_check.check(srv_proc.base, path, gguf_path,
-                                   last_session(out / SERVER_LOG), ctx)
+                                   last_session(out / SERVER_LOG), ctx, runtime=a.runtime)
             server["paths_check"] = chk
             for ln in path_check.words(chk):
                 say(ln)
@@ -2406,7 +2406,7 @@ def _main(argv: list[str] | None = None) -> int:
             # said; the step goes on
             sampler.phase = "check"
             # 31.1: on a runtime of expert paths, the speed of the box's own path
-            path_extra = ({"expert_path": fb.path_of(a.runtime, thinking)}
+            path_extra = ({"expert_path": fb.path_of(a.runtime, thinking), **fb.send_of(a.runtime)}
                           if a.runtime and fb.RUNTIMES[a.runtime].get("paths") else None)
             chk = {**cc.check(srv_proc.base, ctx, a.slots, say, extra=path_extra),
                    "session": state["sessions"]}

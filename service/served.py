@@ -1030,6 +1030,8 @@ def ask(rec: dict, text: str, s: dict) -> str:
     if "expert_path" in s:
         # 31.1: a request on an expert path carries its messages, its limit,
         # its path and its seed — nothing more, so nothing replaces the path's
+        # (r20: but what its runtime says beside the path, Medium's thinking off
+        # and presence penalty 0)
         body.pop("model")
     if is_openrouter(rec):
         body.update(_pinned_route(rec))

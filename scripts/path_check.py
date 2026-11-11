@@ -225,14 +225,14 @@ def _get(base: str, path: str) -> dict:
         return {}
 
 
-def answers(base: str, path: int) -> list[dict]:
+def answers(base: str, path: int, send: dict | None = None) -> list[dict]:
     """the two questions on `path`, each carrying its messages, its room and the
-    path alone: did it think, what it said, and its generation_settings when
-    the build returns them"""
+    path alone (r20: and what the runtime sends beside it): did it think, what
+    it said, and its generation_settings when the build returns them"""
     out = []
     for q in QUESTIONS:
         body = {"messages": [{"role": "user", "content": q}], "max_tokens": ROOM[path],
-                "expert_path": path}
+                "expert_path": path, **(send or {})}
         got = _post(base, "/v1/chat/completions", body)
         ch = (got.get("choices") or [{}])[0]
         msg = ch.get("message") or {}
@@ -304,10 +304,15 @@ def prompt_penalty(base: str, path: int, want: dict) -> dict:
 
 
 def check(base: str, path: int, gguf: str | Path, log_text: str,
-          slot_ctx: int | None = None) -> dict:
+          slot_ctx: int | None = None, runtime: str | None = None) -> dict:
     """the settings check on a server started for `path`: every reading, and
-    "pass" with the mismatches (none on a pass)"""
+    "pass" with the mismatches (none on a pass). r20: the file, /props and the
+    start-up lines are held to the path's stored values; the two answers to
+    what `runtime` asks of the path (fb.path_expects: Medium's path 6 doesn't
+    think, and has no presence penalty)"""
     want = fb.PATHS[path]
+    send = fb.send_of(runtime)
+    asked = fb.path_expects(runtime, path)
     bad: list[str] = []
     file = stored(gguf)
     if file is None:
@@ -355,23 +360,25 @@ def check(base: str, path: int, gguf: str | Path, log_text: str,
         bad += compare(w, lines[p]["values"], f"the server's start-up line for k{p}",
                        slot_ctx, all_of=False)
     try:
-        said = answers(base, path)
+        said = answers(base, path, send)
     except (RuntimeError, OSError, ValueError) as e:
         said = []
         bad.append(f"the two questions on k{path} weren't answered: {e}")
     for k, a in enumerate(said, 1):
-        if a["thinking"] != want["thinking"]:
+        if a["thinking"] != asked["thinking"]:
             bad.append(f"question {k} on k{path}: "
-                       + ("no thinking block, where k6 thinks" if want["thinking"] else
-                          "a thinking block, where k3 doesn't think"))
+                       + (f"no thinking block, where k{path} thinks" if asked["thinking"] else
+                          f"a thinking block, where k{path} "
+                          + ("is asked not to think" if send else "doesn't think")))
         if "generation_settings" in a:
-            bad += compare(want, a["generation_settings"],
+            bad += compare(asked, a["generation_settings"],
                            f"question {k}'s generation_settings", slot_ctx, all_of=False)
-    probe = prompt_penalty(base, path, want) if want.get("presence_penalty") else None
+    probe = prompt_penalty(base, path, want) if asked.get("presence_penalty") else None
     if probe and probe["verdict"] == "counted":
         bad.append(f"on k{path} the presence penalty counts the prompt's tokens: they came back "
                    f"about {probe.get('penalty_seen')} below the others")
-    return {"path": path, "want": want, "file": file, "server": {
+    return {"path": path, "want": want, **({"sent": send, "asked": asked} if send else {}),
+            "file": file, "server": {
                 "props": {p: {k: x[k] for k in ("params", "default")} for p, x in srv.items()},
                 "default": dflt,
                 # 31.2: the penalties beside each path's own, as /props gives them

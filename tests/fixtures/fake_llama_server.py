@@ -438,10 +438,15 @@ def main() -> int:
                 for _ in range(slots)]
 
     def thinks(body: dict) -> bool:
+        kw = body.get("chat_template_kwargs") or {}
         if paths_on and "expert_path" in body:
-            return body["expert_path"] == 6 and not never_think
-        return bool((body.get("chat_template_kwargs") or {}).get("enable_thinking")) \
-            and not never_think
+            # as the team's server: the path says whether it thinks, and a
+            # request's enable_thinking over it (r20: Medium, path 6 not thinking)
+            # (FAKE_LLAMA_PATH_ALONE=1: a server that lets the path alone decide)
+            on = kw["enable_thinking"] if "enable_thinking" in kw and not os.environ.get(
+                "FAKE_LLAMA_PATH_ALONE") else body["expert_path"] == 6
+            return bool(on) and not never_think
+        return bool(kw.get("enable_thinking")) and not never_think
 
     def assistant_text(m: dict, on: bool) -> str:
         """31.3: what the team's build writes of a final assistant message"""
@@ -738,10 +743,7 @@ def main() -> int:
             opts = dict(re.findall(r"(?m)^([ABCD])\) (.*)$", text))
             right = next((k for k, v in opts.items() if v.startswith("right")), "A")
             pick = (next(k for k in "ABCD" if k != right) if "hard" in text else right)
-            on = (body.get("chat_template_kwargs") or {}).get("enable_thinking") \
-                and not never_think
-            if paths_on and "expert_path" in body:
-                on = body["expert_path"] == 6 and not never_think      # 31.1: the path's
+            on = thinks(body)          # 31.1: the path's; r20: a request's enable_thinking over it
             msg = {"role": "assistant", "content": f"The options compared.\nANSWER: {pick}"}
             # 29: an answer that needs more room than it was given runs out
             need = int(os.environ.get("FAKE_LLAMA_OUT_TOKENS") or 0)

@@ -397,8 +397,27 @@ APP_TOK_S = {"on": 580.0, "off": 1000.0}
 APP_PACE = {(th, t): (n / APP_TOK_S[th] + APP_PROMPT[t] / 2_500.0) * 16 / 8
             for (th, t), n in APP_WRITE.items()}
 PLAN_PACE["P"] = APP_PACE
+# r20 (masein, 11 Nov): plan M, the app's Medium mode (runtime k3k6-2611-medium:
+# the 6-expert path, thinking off) on everything the thinking-off runs asked —
+# MMLU-Pro in halves, GPQA Diamond with MATH Level 5, and IFEval, IFBench and
+# DeviceMark's battery together — at the thinking-off limits, 8 slots a box.
+# Sized from Instant's stored answers (their mean length) at Instant's 8-slot
+# rates (1,000 tokens a second written, 2,500 read) times 194.7 / 229.0, the
+# 6-expert path's speed against the 3-expert path's alone (Table B2): a guess
+PLANS["M"] = {
+    "M1": [("off", (MMLU,), "1/2", 8)],
+    "M2": [("off", (MMLU,), "2/2", 8)],
+    "M3": [("off", (GPQA, MATH), "", 8)],
+    "M4": [("off", (IFEVAL, IFBENCH), "", 8), ("off", (DM,), "", 8)],
+}
+MEDIUM_WRITE = {GPQA: 3967, MMLU: 1161, MATH: 2296, IFEVAL: 443, IFBENCH: 1091, DM: 700}
+MEDIUM_PROMPT = {GPQA: 250, MMLU: 1300, MATH: 150, IFEVAL: 100, IFBENCH: 150, DM: 200}
+MEDIUM_TOK_S = 1000.0 * 194.7 / 229.0
+MEDIUM_PACE = {("off", t): n / MEDIUM_TOK_S + MEDIUM_PROMPT[t] / (2_500.0 * 194.7 / 229.0)
+               for t, n in MEDIUM_WRITE.items()}
+PLAN_PACE["M"] = MEDIUM_PACE
 # the plans whose every pace is a guess
-GUESSED_PLANS = {"P"}
+GUESSED_PLANS = {"P", "M"}
 # 29: plan D, our own boxes — a quarter of every benchmark on each of a
 # station's four GPUs, longest first (frontier_box's paces), then instruction
 # following with thinking on and off. Every slot holds Bolt's 64K
@@ -407,7 +426,8 @@ PLANS["D"] = {f"D3.{g}": [*(("on", t, f"{g + 1}/4", 8) for t in D_ORDER),
                           ("off", (IFEVAL, IFBENCH), f"{g + 1}/4", 8)] for g in range(4)}
 # 20: the runtime a plan's boxes run, unless the line names another
 PLAN_RUNTIME = {"L": "lda-2610", "I": "lda-2610", "T": "lda-2610", "U": "k3k6-2611",
-                "C": "k3k6-2611", "S": "k3k6r-0411", "P": "k3k6-2611-app"}
+                "C": "k3k6-2611", "S": "k3k6r-0411", "P": "k3k6-2611-app",
+                "M": "k3k6-2611-medium"}
 # 29: the plans run on our own GPUs: each step --own (never started or kept
 # asking while another process uses the GPU), no price
 OWN_PLANS = ("D",)
@@ -423,6 +443,7 @@ PLAN_GPUS = {"L": ("RTX 5090", "RTX PRO 6000"), "I": ("RTX 5090", "RTX PRO 6000"
              "U": ("RTX 5090", "RTX PRO 6000"), "C": ("RTX 5090", "RTX PRO 6000"),
              # 32: the research tarball, built for sm_120 as the k3k6 one
              "S": ("RTX 5090", "RTX PRO 6000"), "P": ("RTX 5090", "RTX PRO 6000"),
+             "M": ("RTX 5090", "RTX PRO 6000"),
              # 29: dgx-03's — the runner image's V100 tag builds for sm_70 alone
              "D": ("V100",)}
 PLAN_SM = {"D": "sm_70"}
@@ -488,6 +509,8 @@ PLAN_REVISIONS = {"U": {
 PLAN_PINS["C"], PLAN_REVISIONS["C"] = PLAN_PINS["U"], PLAN_REVISIONS["U"]
 # 34: plan P serves plan U's file and server
 PLAN_PINS["P"], PLAN_REVISIONS["P"] = PLAN_PINS["U"], PLAN_REVISIONS["U"]
+# r20: plan M serves plan U's file and server too
+PLAN_PINS["M"], PLAN_REVISIONS["M"] = PLAN_PINS["U"], PLAN_REVISIONS["U"]
 # 32: plan S runs step2388's file as plan U pins it, and the team's research
 # build (teraformer/lda-k3k6-research at 917f3d911) packed by
 # build_llama_tarball.sh on our server as 3ad38b7cc's was. A pin of None
@@ -978,7 +1001,8 @@ def parser() -> argparse.ArgumentParser:
                                            "U1 … U37 (31.1: step2388), U38 … U40 (31.2: "
                                            "DeviceMark and the easy set), C1 … C5 (31.3: "
                                            "U-cont), S1 … S9 (32: switching mode mid-chat), "
-                                           "P1 … P6 (34: the apps' limits)")
+                                           "P1 … P6 (34: the apps' limits), M1 … M4 (r20: the app's "
+                                           "Medium mode)")
     ap.add_argument("then", nargs="*", help="18e point 1: more labels, run one after another "
                                             "on this box (L1 L2): each later one's line is "
                                             "written \"queued\" at the start, so the fetch "
@@ -1113,6 +1137,12 @@ def main(argv: list[str] | None = None) -> int:
             raise SystemExit(f"{box}: plan P's boxes, and they alone, ask under the apps' limits "
                              f"(runtime {PLAN_RUNTIME['P']}, --as "
                              f"{next(iter(fb.RUNTIMES[PLAN_RUNTIME['P']]['models']))}); this line "
+                             f"runs {runtime_of(a, box) or 'no named runtime'}. Nothing was fetched")
+        # r20: a box of plan M asks in the app's Medium mode, and no other box does
+        if (box[:1].upper() == "M") != (runtime_of(a, box) == PLAN_RUNTIME["M"]):
+            raise SystemExit(f"{box}: plan M's boxes, and they alone, ask in the app's Medium mode "
+                             f"(runtime {PLAN_RUNTIME['M']}, --as "
+                             f"{next(iter(fb.RUNTIMES[PLAN_RUNTIME['M']]['models']))}); this line "
                              f"runs {runtime_of(a, box) or 'no named runtime'}. Nothing was fetched")
         # 31.2: a box of another model than its plan's (U40), and a step at the
         # file's own settings, whose "-file" id the runtime asks so
