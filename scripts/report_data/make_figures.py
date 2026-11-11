@@ -374,7 +374,7 @@ def leader(ax, xy0, xy1, gid, **kw):
 
 
 # ---------------------------------------------------------------------------
-# Figure 1: DeviceMark composite against writing speed on a phone
+# Figure 1: DeviceMark composite against token generation throughput on a phone
 # ---------------------------------------------------------------------------
 
 def speeds(out: Path) -> dict:
@@ -437,7 +437,7 @@ def fig1(data: Path, out: Path, P: dict):
             t = ax.annotate(label, at, xytext=(dx, dy), textcoords="offset points", ha=ha, va=va,
                             fontsize=SMALL, color=INK)
         t.set_gid("pt:" + label)
-    ax.set_xlabel("Writing speed on a phone (tokens per second)")
+    ax.set_xlabel("Token generation throughput on a phone (tokens per second)")
     ax.set_ylabel("DeviceMark composite (%)\nmean of MMLU-Pro, MATH and IFEval")
     fig.text(0.78 / WIDTH + 5.62 / WIDTH / 2, 0.08 / 3.9, "Speeds come from different phones and setups; see caption.",
              ha="center", va="bottom", fontsize=SMALL, color=MUTED)

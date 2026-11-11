@@ -181,7 +181,7 @@ def test_a_figure_the_script_doesnt_know_stops_it(paper, tmp_path):
 
 
 SPEED_ROW = "| Qwen3.5-4B, thinking off | us (replica) | 80.1 \\[76.6, 83.4\\] |\n"
-SPEED_FIG = ("\n&#91;embedded content: Figure 1. Fast and right. DeviceMark composite against writing speed "
+SPEED_FIG = ("\n&#91;embedded content: Figure 1. Fast and right. DeviceMark composite against token generation throughput "
              "on a phone (Table 12). Source: Table 12.\\]\n")
 
 

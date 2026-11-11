@@ -11,7 +11,7 @@ only needs this run again.
 
 Some figures need what the paper doesn't print: Epoch AI's release dates (the timeline),
 which models a chart names or groups (the GPQA Diamond lanes and the 21-row grid), the
-on-device chart's points, and the writing speeds of the DeviceMark-against-speed chart.
+on-device chart's points, and the throughputs of the DeviceMark-against-throughput chart.
 They read them from --figures (default: round13-figures beside this paper) and, for the
 speeds, from --speeds (default: figures-r19/figure-1.csv beside this paper, which the
 figure script writes). Every score taken from there is checked against the paper's
@@ -526,7 +526,7 @@ def fig_devicemark(p: Paper, cap: str, src: Path):
 
 
 def fig_speed(p: Paper, cap: str, src):
-    """DeviceMark composite against writing speed on a phone: each score must be Table 12's
+    """DeviceMark composite against token generation throughput on a phone: each score must be Table 12's
     as printed; a Pipette speed must carry Pipette's notice, and the Masein model's must be
     the one the key numbers print"""
     f = src.speeds
@@ -538,7 +538,8 @@ def fig_speed(p: Paper, cap: str, src):
     t = p.find("DeviceMark's rows", lambda t: any(h.startswith("Composite") for h in t["head"]))
     k = next(i for i, h in enumerate(t["head"]) if h.startswith("Composite"))
     by = {clean(r[0]): r for r in t["rows"]}
-    ours = [r for x in p.tabs for r in x["rows"] if clean(r[0]).startswith("Writing speed on a phone")]
+    ours = [r for x in p.tabs for r in x["rows"]
+            if clean(r[0]).startswith(("Writing speed on a phone", "Token generation throughput on a phone"))]
     out = []
     for r in rows:
         name = r["model"] + (f", {r['mode']}" if r["mode"] else "")
@@ -564,15 +565,15 @@ def fig_speed(p: Paper, cap: str, src):
             raise SystemExit(f"the speed chart: {name}'s speed is not Pipette's, so it is {OURS}")
         if name.startswith("Masein model") and not any(r["speed_tok_s"] in numbers_in(" ".join(x)) for x in ours):
             raise SystemExit(f"the speed chart: the Masein model's {r['speed_tok_s']} tokens/s is not in the "
-                             "paper's writing-speed row")
+                             "paper's throughput row")
         out.append([name, num(m.group(1)), num(m.group(2)), num(m.group(3)), OURS, r["speed_tok_s"],
                     r["speed_source"], r["speed_credit"]])
-    return ["Model", "DeviceMark composite", "95% low", "95% high", "Score: whose", "Writing speed (tokens/s)",
+    return ["Model", "DeviceMark composite", "95% low", "95% high", "Score: whose", "Token generation throughput (tokens/s)",
             "Speed: how it was measured", "Speed: whose"], out
 
 
 def is_speed_chart(cap: str) -> bool:
-    return "writing speed" in cap.lower() and "DeviceMark" in cap
+    return "token generation throughput" in cap.lower() and "DeviceMark" in cap
 
 
 FIGURES = [  # phrases of the caption (any one will do), and what builds the figure's data
