@@ -391,9 +391,14 @@ def llm_tally(p: dict) -> dict | None:
     return llm.tally(p["batch_id"])
 
 
-def test_20_a_refused_carry_on_leaves_the_stop(gsvc, monkeypatch):  # noqa: F811
+@pytest.mark.parametrize("other_s", [0.0, 0.5])
+def test_20_a_refused_carry_on_leaves_the_stop(gsvc, monkeypatch, other_s):  # noqa: F811
     """after Stop the grader moved, Carry on was refused — and the poller then
-    sent the other grader's held requests"""
+    sent the other grader's held requests. 12 Nov: the other grader's batch
+    has every reply before Stop, as the case says ("ended first"). Each batch
+    sends its own requests and holds the rest at a Stop: pressed while the
+    other's were still going (a loaded machine, or `other_s` a reply), its
+    batch stayed out, Carry on had it to send, and nothing was refused"""
     import threading
     from service import ai_models
     from service import frontier_grade as fgr
@@ -405,12 +410,20 @@ def test_20_a_refused_carry_on_leaves_the_stop(gsvc, monkeypatch):  # noqa: F811
         seen.append(model)
         if model == GPT and seen.count(GPT) == 1:
             gate.wait(10)
+        elif model != GPT:
+            time.sleep(other_s)
         return plain(model, row)
+
+    def other_landed() -> bool:
+        # the other grader's batch has every reply, or has ended already
+        return all(fgr.batch_backend(p["batch_id"]).status(p["batch_id"])[0] == "done"
+                   for p in fgr.pending() if p["slot"] != "simpleqa")
     stub(monkeypatch, answer)
     fgr.start("masein")
     end = time.time() + 10
-    while time.time() < end and GPT not in seen:
+    while time.time() < end and not (GPT in seen and other_landed()):
         time.sleep(0.05)
+    assert GPT in seen and other_landed()
     fgr.stop("masein")
     gate.set()
     # 5 Nov: the other grader's batch ended first — with only the moved one's

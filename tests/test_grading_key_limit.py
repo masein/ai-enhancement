@@ -60,8 +60,19 @@ def test_a_flagged_prompt_that_mentions_credit_is_never_the_keys_limit():
     assert kind == "answer" and "flagged" in said
 
 
+def others_landed(slot: str) -> bool:
+    """every other grader's batch has every reply, or has ended already"""
+    return all(fgr.batch_backend(p["batch_id"]).status(p["batch_id"])[0] == "done"
+               for p in fgr.pending() if p["slot"] != slot)
+
+
+@pytest.mark.parametrize("other_s", [0.0, 0.5])
 def test_a_batch_at_the_keys_limit_says_so_and_the_card_warns_of_what_carry_on_sends(
-        svc, monkeypatch):  # noqa: F811
+        svc, monkeypatch, other_s):  # noqa: F811
+    # 12 Nov: the card is read once SimpleQA's batch has halted and MATH's
+    # check has every reply, as the case is — read while MATH's second request
+    # was still to go (a loaded machine, or `other_s` a reply), its card also
+    # counted that one among what is still to send (6, not 5)
     monkeypatch.setattr(config, "OPENROUTER_CONCURRENCY", 1)
     monkeypatch.setattr(fgr.GraderChat, "HALT_AFTER", 3)
     monkeypatch.setattr(ai_models, "key_allowance", lambda: dict(KEY))
@@ -70,6 +81,7 @@ def test_a_batch_at_the_keys_limit_says_so_and_the_card_warns_of_what_carry_on_s
         req = json.loads(body)
         if req["model"] == GPT:
             raise llm.LLMError(f"POST {url}: HTTP 403: {LATE}", status=403)
+        time.sleep(other_s)
         return 200, json.dumps({"choices": [{"message": {"content": "No"},
                                              "finish_reason": "stop"}],
                                 "usage": {"prompt_tokens": 100, "completion_tokens": 1}}).encode()
@@ -77,8 +89,10 @@ def test_a_batch_at_the_keys_limit_says_so_and_the_card_warns_of_what_carry_on_s
     fgr.start("masein")
     sqa = next(p for p in fgr.pending() if p["slot"] == "simpleqa")
     end = time.time() + 15
-    while time.time() < end and not (llm.tally(sqa["batch_id"]) or {}).get("halted"):
+    while time.time() < end and not ((llm.tally(sqa["batch_id"]) or {}).get("halted")
+                                     and others_landed("simpleqa")):
         time.sleep(0.05)
+    assert others_landed("simpleqa")
     page = svc.get("/api/frontier/grading").json()
     line = next(r["progress"] for r in page["running"] if r["slot"] == "simpleqa")
     assert line.endswith("waiting: OpenRouter refused 3 requests in a row — " + LIMIT_WORDS
