@@ -102,6 +102,9 @@ import remote_bundle as rb  # noqa: E402
 SUITE = "frontier-cont"
 REFUSED = 2
 STEP2388, Q2 = "served/step2388-k3k6-2611", "served/Qwen3.6-35B-A3B-Q2-k3k6-2611"
+# r20 (masein, 12 Nov): the app's Medium mode — step2388 on path 6 with thinking
+# off (runtime k3k6-2611-medium), asked at the thinking-off limits on plan M
+MEDIUM = "served/step2388-k3k6-2611-medium"
 # 31.3e: the whitepaper's showcase (scripts/showcase_box.py) — its answers that
 # ran out of room where U39 asked them (81,920, on 917850e's image) continued
 # with step2388's k6 answers; no benchmark, its questions the pinned file's
@@ -125,6 +128,13 @@ SPECS = {
                         "tasks": ("gpqa_diamond_epoch", "math_l5_epoch", "mmlupro_tiger",
                                   "ifeval_google", "ifbench_test", *EASY)},
     (Q2, False): {"key": "q2", "limit": 32_768, "path": None, "tasks": EASY},
+    # r20 (masein, 12 Nov): Medium's answers that ran out of room, continued as
+    # Instant's (k3's) were, so the three modes are on one protocol — on path
+    # 6 with thinking off and no presence penalty, said in each request as
+    # Medium asked them (service/frontier.settings); its answers replies, as k3's
+    (MEDIUM, False): {"key": "medium", "limit": 32_768, "path": 6,
+                      "tasks": ("gpqa_diamond_epoch", "math_l5_epoch", "mmlupro_tiger",
+                                "ifeval_google", "ifbench_test")},
 }
 INPUT = "cont-{key}.jsonl"
 DONE = "continued.jsonl"
@@ -153,6 +163,18 @@ def spec_of(model: str, on: bool) -> dict | None:
     for one that isn't continued"""
     got = SPECS.get((model, bool(on)))
     return {**got, "model": model, "on": bool(on)} if got else None
+
+
+def thinks(spec: dict) -> bool:
+    """r20: whether this spec's answers think — k6's do (path 6, thinking on);
+    k3's, the Q2's and Medium's (path 6, thinking off) are replies"""
+    return spec.get("path") == 6 and bool(spec.get("on", True))
+
+
+def form_path(spec: dict) -> int | None:
+    """the path whose answer form (forms, turn, continuity) a spec's answers
+    take: k6's when they think, a reply's (None) when they don't"""
+    return 6 if thinks(spec) else None
 
 
 def context(spec: dict) -> int:
@@ -248,7 +270,7 @@ def request(line: dict, msgs: list[dict], form_text: str, spec: dict,
     tokens as the tokenizer reads its text, when that isn't what the model
     wrote"""
     asked = asked_as(spec) if asked is None else asked
-    path = spec.get("path")
+    path = form_path(spec)              # r20: Medium's path 6 writes a reply, as k3
     return {**{k: v for k, v in asked.items() if k != "max_tokens"},
             "messages": [*msgs, turn(form_text, path)],
             "max_tokens": spec["limit"] - int(line["tokens"]),
@@ -292,7 +314,7 @@ def prepare(srv: Server, line: dict, msgs: list[dict], spec: dict,
     form gives back the question's and the reply's tokens. 31.3d: when none
     does exactly, the likeliest form whose text reads back within RETOKEN_CAP
     tokens of the reply's, with {retokenized: {wrote, read, diff}}"""
-    path = spec.get("path")
+    path = form_path(spec)
     how = template_how(asked_as(spec) if asked is None else asked)
     p0 = srv.template(msgs, how)
     n0 = srv.count(p0)
@@ -331,7 +353,7 @@ def continue_one(srv: Server, line: dict, item: dict, spec: dict,
     """one answer continued: its record for continued.jsonl (status
     "continued", or "refused" and why)"""
     task, qid, e = line["task"], str(line["id"]), int(line["epoch"])
-    path, limit = spec.get("path"), spec["limit"]
+    path, limit = form_path(spec), spec["limit"]
     text = item["question"] if task == SHOWCASE else fb.prompt(task, item)[0]
     msgs = messages(task, text)
     base = {"task": task, "id": qid, "epoch": e, "limit": limit,
@@ -944,7 +966,7 @@ def left_by_rule(r: dict) -> bool:
 
 def inputs(dest: Path, say=print, models: list[str] | None = None) -> dict:
     """a file of answers that ran out of room for each model and thinking
-    continued (SPECS: step2388's k6 and k3, the Q2's easy set) — those of
+    continued (SPECS: step2388's k6 and k3, the Q2's easy set, r20 Medium) — those of
     every benchmark it continues whose answers are all in on the row, and not
     continued yet. {key: {file, sha256, by task, left out}}"""
     from service import config
@@ -1161,7 +1183,7 @@ def import_bundle(b: dict, path: Path, by: str, say=print, file_sha: str = "",
                 continue
             fin = r.get("answer") or ""
             if not isinstance(r.get("tokens"), int) or continuity(
-                    a.get("answer") or "", fin, str(r.get("form") or ""), "", spec["path"]):
+                    a.get("answer") or "", fin, str(r.get("form") or ""), "", form_path(spec)):
                 bad.append(f"{t}: question {k[0]}, run {k[1]}: its continued answer doesn't "
                            "begin with the row's")
                 continue
@@ -1347,7 +1369,7 @@ def showcase_staged(b: dict, row_name: str, spec: dict, setup: dict, path: Path,
             continue
         fin = r.get("answer") or ""
         if not isinstance(r.get("tokens"), int) or continuity(
-                showcase_answer(a), fin, str(r.get("form") or ""), "", spec["path"]):
+                showcase_answer(a), fin, str(r.get("form") or ""), "", form_path(spec)):
             bad.append(f"the showcase: {q}: its continued answer doesn't begin with the one here")
             continue
         think, reply, _ = split(fin)

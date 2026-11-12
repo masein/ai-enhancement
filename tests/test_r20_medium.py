@@ -92,7 +92,9 @@ def test_plan_m_asks_the_thinking_off_set_once_8_slots_a_box():
     assert fx.PLAN_RUNTIME["M"] == RT and fx.PLAN_GPUS["M"] == fx.PLAN_GPUS["U"]
     assert fx.PLAN_PINS["M"] == fx.PLAN_PINS["U"] and fx.PLAN_PINS["M"][NAME] == SHA
     have: dict = {}
-    for steps in plan.values():
+    for label, steps in plan.items():
+        if label == "M5":                   # 12 Nov: its answers that ran out, continued
+            continue
         for th, tasks, shard, slots in steps:
             assert th == "off" and slots == 8
             for t in tasks:
@@ -100,8 +102,9 @@ def test_plan_m_asks_the_thinking_off_set_once_8_slots_a_box():
     assert set(have) == {*OFF, fx.DM} and sorted(have[MMLU]) == ["1/2", "2/2"]
     assert all(have[t] == [""] for t in have if t != MMLU)
     lines = fx.listing("M")
-    assert lines[-1].startswith("4 boxes a build") and "box-hours a build" in lines[-1]
-    assert all("(a guess, not measured on a box yet)" in ln for ln in lines if ln.startswith("  "))
+    assert lines[-1].startswith("5 boxes a build") and "box-hours a build" in lines[-1]
+    assert all("(a guess, not measured on a box yet)" in ln or "at the most" in ln
+               for ln in lines if ln.startswith("  "))
 
 
 @pytest.mark.parametrize("label, model", [("M1", STEP), ("U35", MED)])

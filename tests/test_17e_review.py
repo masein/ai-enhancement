@@ -220,7 +220,7 @@ def test_2_3_each_plan_runs_every_benchmark_once_one_line_a_box():
         # r20: plan M, the app's Medium mode on the thinking-off set and DeviceMark
         if name == "M":
             want = {("off", t) for t in (fbx.GPQA, fbx.MATH, fbx.MMLU, fbx.IFEVAL, fbx.IFBENCH,
-                                         fbx.DM)}
+                                         fbx.DM, fbx.CONT_MEDIUM)}     # 12 Nov: M5
         # r20: plan H, High on DeviceMark as the app runs it
         if name == "H":
             want = {("on", fbx.DM)}

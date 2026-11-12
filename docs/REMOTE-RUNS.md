@@ -2333,6 +2333,49 @@ As in L3, with the box's label (`<host>:<port>=M1`) and
 The model's first bundle is imported once by hand with `--register`, as the
 fetch's line says. MATH Level 5's model check is graded as plan U's.
 
+## M3. Medium's answers that ran out of room, continued (M5)
+
+Instant's answers that ran out of room at the thinking-off limits were
+continued to 32,768 tokens in U-cont (U4, box C4), and its scores are those.
+Plan M asked Medium at the plain limits, so on MMLU-Pro, MATH Level 5, IFEval
+and IFBench the two weren't on one protocol. Box M5 continues Medium's the
+same way (masein's yes, 12 Nov): 155 answers on the imported rows (MMLU-Pro
+98 and MATH Level 5 43 at 8,192, IFEval 2 and IFBench 12 at 4,096; GPQA
+Diamond none), each from where it stopped to 32,768, on Medium's own runtime.
+
+- **Each request** is what Medium asked: path 6, `"chat_template_kwargs":
+  {"enable_thinking": false}` and `"presence_penalty": 0`, with the cut reply
+  as the assistant's unfinished turn, its limit (32,768 less the tokens
+  written) and a fresh seed. Medium's answers are replies, as k3's: no
+  penalty window and no penalty tests (those are k6's, whose answers think).
+- **The settings check** runs first, as on M1–M4, and the import refuses a
+  bundle without it passed, or from another runtime.
+
+1. On the server, Medium's inputs file alone (it prints its sha256 and what
+   it holds, with no question text):
+
+   ```bash
+   cd ~/benchmarks/aienh && sudo docker compose exec -T bench python scripts/continue_box.py inputs --as served/step2388-k3k6-2611-medium
+   ```
+
+2. Rent one box as M1–M4 (the runner image at this phase's tag, an RTX 5090,
+   Disk 100 GB). Copy the file to it, from the server, with the fetch's key:
+
+   ```bash
+   scp -i ~/.ssh/id_ed25519 -P <port> ~/benchmarks/u-cont/cont-medium.jsonl root@<host>:/workspace/
+   ```
+
+3. On the box, in tmux (`cd /app`, then the token):
+
+   ```bash
+   python scripts/frontier_box.py M5 --as served/step2388-k3k6-2611-medium --gguf hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/step2388.k3k6.gguf --server hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/llama-server-k3k6-3ad38b7.tar.gz --continue /workspace/cont-medium.jsonl --continue-sha256 <its sha256> --price 0.45
+   ```
+
+4. **Fetch and import** as M2, with `<host>:<port>=M5`: the bundle
+   (`frontier-cont-served__step2388-k3k6-2611-medium-thinking-off.tar.gz`)
+   goes onto Medium's rows. The board then shows the 32,768 limit's scores,
+   and each cell keeps the plain limit's beside them, as Instant's do.
+
 # H. High on DeviceMark as the app runs it: plan H (r20)
 
 DeviceMark's battery (596 items) asked of step2388's 6-expert path with
