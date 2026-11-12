@@ -109,7 +109,6 @@ def family_of(rec: dict) -> str:
 def settings(rec: dict, task: str, on: bool) -> dict:
     """how each question of `task` is asked: its budget, the card's sampling,
     and the thinking switch, said out loud (not to a model from OpenRouter)"""
-    spec = fb.BENCH[task]
     # 31.1: a runtime of expert paths asks with its path alone — the path's
     # sampling and thinking are the file's, applied by the server, and any
     # value sent would replace them
@@ -126,8 +125,12 @@ def settings(rec: dict, task: str, on: bool) -> dict:
                     "reply_limit": app["reply"]}
         return {"max_tokens": app["reply"], "expert_path": path}
     if path is not None:
-        return {"max_tokens": spec["budget"]["on" if on else "off"], "expert_path": path}
-    s = {"max_tokens": spec["budget"]["on" if on else "off"],
+        # r20: and what the runtime says beside its path (Medium: thinking off,
+        # its row's presence penalty); 12 Nov: its own limit where it has one
+        # (Medium at 0.75: Instant's final 32,768, at once)
+        return {"max_tokens": fb.budget_of(task, on, rec.get("runtime")), "expert_path": path,
+                **fb.send_of(rec.get("runtime"))}
+    s = {"max_tokens": fb.budget_of(task, on, rec.get("runtime")),
          **fb.sampling(family_of(rec), on)}
     # 20: a model served with a named runtime is asked with its sampling, in
     # each request as well as the server's defaults (min-p among them)

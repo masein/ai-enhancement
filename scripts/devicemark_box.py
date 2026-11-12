@@ -267,6 +267,13 @@ def checks(b: dict, rec: dict | None, file_sha: str, battery: dict) -> list[str]
     if (dm_.get("cap"), dm_.get("seed")) != (d.CAP, d.SEED):
         out.append(f"asked with a cap of {dm_.get('cap')} and seed {dm_.get('seed')}; "
                    f"DeviceMark's are {d.CAP} and {d.SEED}")
+    # r20: High at the apps' limits — the box's check that its server held the
+    # thinking budget, passed
+    import frontier as fb
+    if fb.app_of(rec.get("runtime")) and on:
+        ac = (setup.get("server") or {}).get("app_check")
+        if not isinstance(ac, dict) or ac.get("pass") is not True:
+            out.append("its check that the server held the thinking budget, passed")
     want = sdm.settings(on, rec=rec)
     if dm_.get("request") != want:
         out.append(f"each request sent {json.dumps(dm_.get('request'), sort_keys=True)}; this "

@@ -60,8 +60,19 @@ def test_a_flagged_prompt_that_mentions_credit_is_never_the_keys_limit():
     assert kind == "answer" and "flagged" in said
 
 
+def others_landed(slot: str) -> bool:
+    """every other grader's batch has every reply, or has ended already"""
+    return all(fgr.batch_backend(p["batch_id"]).status(p["batch_id"])[0] == "done"
+               for p in fgr.pending() if p["slot"] != slot)
+
+
+@pytest.mark.parametrize("other_s", [0.0, 0.5])
 def test_a_batch_at_the_keys_limit_says_so_and_the_card_warns_of_what_carry_on_sends(
-        svc, monkeypatch):  # noqa: F811
+        svc, monkeypatch, other_s):  # noqa: F811
+    # 12 Nov: the card is read once SimpleQA's batch has halted and MATH's
+    # check has every reply, as the case is — read while MATH's second request
+    # was still to go (a loaded machine, or `other_s` a reply), its card also
+    # counted that one among what is still to send (6, not 5)
     monkeypatch.setattr(config, "OPENROUTER_CONCURRENCY", 1)
     monkeypatch.setattr(fgr.GraderChat, "HALT_AFTER", 3)
     monkeypatch.setattr(ai_models, "key_allowance", lambda: dict(KEY))
@@ -70,6 +81,7 @@ def test_a_batch_at_the_keys_limit_says_so_and_the_card_warns_of_what_carry_on_s
         req = json.loads(body)
         if req["model"] == GPT:
             raise llm.LLMError(f"POST {url}: HTTP 403: {LATE}", status=403)
+        time.sleep(other_s)
         return 200, json.dumps({"choices": [{"message": {"content": "No"},
                                              "finish_reason": "stop"}],
                                 "usage": {"prompt_tokens": 100, "completion_tokens": 1}}).encode()
@@ -77,8 +89,10 @@ def test_a_batch_at_the_keys_limit_says_so_and_the_card_warns_of_what_carry_on_s
     fgr.start("masein")
     sqa = next(p for p in fgr.pending() if p["slot"] == "simpleqa")
     end = time.time() + 15
-    while time.time() < end and not (llm.tally(sqa["batch_id"]) or {}).get("halted"):
+    while time.time() < end and not ((llm.tally(sqa["batch_id"]) or {}).get("halted")
+                                     and others_landed("simpleqa")):
         time.sleep(0.05)
+    assert others_landed("simpleqa")
     page = svc.get("/api/frontier/grading").json()
     line = next(r["progress"] for r in page["running"] if r["slot"] == "simpleqa")
     assert line.endswith("waiting: OpenRouter refused 3 requests in a row — " + LIMIT_WORDS
@@ -150,3 +164,42 @@ def test_what_is_out_at_openrouters_batch_api_is_no_longer_carry_ons(svc, monkey
         f"About ${est['usd'] + usd:,.2f} — Start’s new answers ${est['usd']:,.2f}, the batches "
         f"out at OpenRouter ${usd:,.2f} — is more than the OpenRouter key may still spend "
         "($0.00: the key has used $336.15 of its $250.00 limit)")
+
+
+def test_a_batch_that_halts_while_start_is_still_going_keeps_its_halt(svc, monkeypatch):  # noqa: F811
+    # 11 Nov (CI on #302): Start sends a batch, then takes up again every halted batch
+    # — and took up the one it had just sent, when its worker met the run of refusals
+    # first (a busy machine): the halt was lifted, the worker had ended, and the card
+    # said "0 of 5 · $0.00 so far" for good. Forced here: each new batch halts before
+    # _submit returns
+    monkeypatch.setattr(config, "OPENROUTER_CONCURRENCY", 1)
+    monkeypatch.setattr(fgr.GraderChat, "HALT_AFTER", 3)
+    monkeypatch.setattr(ai_models, "key_allowance", lambda: dict(KEY))
+
+    def http(method, url, headers, body=None, timeout=60.0):
+        if json.loads(body)["model"] == GPT:
+            raise llm.LLMError(f"POST {url}: HTTP 403: {LATE}", status=403)
+        return 200, json.dumps({"choices": [{"message": {"content": "No"},
+                                             "finish_reason": "stop"}],
+                                "usage": {"prompt_tokens": 100, "completion_tokens": 1}}).encode()
+    monkeypatch.setattr(llm, "_http", http)
+    submit = fgr._submit
+
+    def submit_and_wait(w, pin, by):
+        bid = submit(w, pin, by)
+        end = time.time() + 15
+        while bid and w["slot"] == "simpleqa" and time.time() < end \
+                and not (llm.tally(bid) or {}).get("halted"):
+            time.sleep(0.02)
+        return bid
+    monkeypatch.setattr(fgr, "_submit", submit_and_wait)
+    got = fgr.start("masein")
+    sqa = next(p for p in fgr.pending() if p["slot"] == "simpleqa")
+    assert sqa["batch_id"] in {s["batch_id"] for s in got["sent"]}
+    assert (llm.tally(sqa["batch_id"]) or {}).get("halted", "").startswith(
+        "waiting: OpenRouter refused 3 requests in a row")
+    assert "taken" not in got                 # nothing was taken up: it was all new
+    # its batches' workers done before the test's folder goes (none left writing)
+    end = time.time() + 15
+    while time.time() < end and any(fgr._working(p["batch_id"]) for p in fgr.pending()):
+        time.sleep(0.05)

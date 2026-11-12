@@ -507,6 +507,42 @@ RUNTIMES["card-qwen-k3k6"] = {
     "models": {"served/Qwen3.6-35B-A3B-Q2-k3k6-2611": "Qwen/Qwen3.6-35B-A3B"},
     "build": dict(RUNTIMES["k3k6-2611"]["build"]),
 }
+# r20 (masein, 11 Nov): Qwen3.5-9B on GPQA Diamond under our protocol, its
+# published 81.7 beside our 82.7 made like for like — the 4-bit file Pipette
+# and Table G1 name (Unsloth's Q4_K_M, unsloth/Qwen3.5-9B-GGUF at 3885219b),
+# on the same build as step2388's runs, thinking on at its card's settings for
+# general tasks in thinking mode (said in every request as well as the
+# server's defaults, as the showcase asked it), 4 runs of the 198 questions
+# and up to 98,304 tokens an answer: the Masein model's final limit, asked at
+# once (step2388's first runs stopped at 81,920 and were continued)
+RUNTIMES["card-qwen35-9b-k3k6"] = {
+    "words": "the team's joint k3/k6 build running Qwen3.5-9B (Unsloth's Q4_K_M), its card's "
+             "thinking settings for general tasks, no reasoning budget, no speculative decoding",
+    "env": dict(RUNTIMES["k3k6-2611"]["env"]),
+    "thinking": ("on",),
+    "off_for": (),
+    "sampling": {"temperature": 1.0, "top_k": 20, "top_p": 0.95, "min_p": 0.0,
+                 "presence_penalty": 1.5, "repeat_penalty": 1.0},
+    "sampling_from": {
+        k: "Qwen/Qwen3.5-9B's model card, its thinking mode for general tasks (temperature=1.0, "
+           "top_p=0.95, top_k=20, min_p=0.0, presence_penalty=1.5, repetition_penalty=1.0)"
+        for k in ("temperature", "top_k", "top_p", "min_p", "presence_penalty",
+                  "repeat_penalty")},
+    "budgets": {"gpqa_diamond_epoch": {"on": 98304}},
+    "flags": list(RUNTIMES["k3k6-2611"]["flags"]),
+    "refuses_env": ("GGML_CUDA_DISABLE_FUSION",),
+    "models": {"served/Qwen3.5-9B-Q4_K_M-k3k6-2611": "Qwen/Qwen3.5-9B"},
+    "build": dict(RUNTIMES["k3k6-2611"]["build"]),
+}
+
+
+def budget_of(task: str, on: bool, runtime: str | None = None) -> int:
+    """a task's limit an answer: the benchmark's, or the runtime's own (r20:
+    Qwen3.5-9B's GPQA Diamond at 98,304)"""
+    own = ((RUNTIMES.get(runtime or "") or {}).get("budgets") or {}).get(task) or {}
+    return int(own.get("on" if on else "off") or BENCH[task]["budget"]["on" if on else "off"])
+
+
 # 31.2: the served ids asked on DeviceMark at the file's own settings: the
 # path alone, no sampling field — the second k3 row the brief asks for
 FILE_SAMPLING = {"served/step2388-k3k6-2611-file"}
@@ -573,6 +609,88 @@ RUNTIMES["k3k6-2611-app"] = {
     "models": {"served/step2388-k3k6-2611-app": "Qwen/Qwen3.6-35B-A3B"},
     "build": dict(RUNTIMES["k3k6-2611"]["build"]),
 }
+
+
+# r20 (masein, 11 Nov): the app's Medium mode — thinking off on the 6-expert
+# path, never run before. The same file, server, flags and paths as k3k6-2611;
+# each request names path 6 and says, as well, thinking off and the runtime's
+# own presence penalty. The server takes path 6's stored values as the base and
+# a value the request sends over it (server-context.cpp, server-common.cpp at
+# 3ad38b7cc); path 6's temperature, top-p, top-k and min-p are path 3's already.
+# A model of its own, so its rows never mix with Instant's or High's.
+# 12 Nov (masein): the presence penalty is a setting of each Medium runtime row
+# (`presence_penalty`): k3k6-2611-medium says 0 (the thinking-off runs' sampling,
+# as the r20 brief asked; plan M), k3k6-2611-medium-075 says 0.75 (High's, path
+# 6's stored value: the app's Medium as Kevin's section 3 has it; plan N) — a
+# run at another value is another row, its answers never mixed with these
+MEDIUM_TASKS = ("gpqa_diamond_epoch", "math_l5_epoch", "mmlupro_tiger", "ifeval_google",
+                "ifbench_test")
+# Instant's final limit with thinking off (U-cont continued its answers that ran
+# out to it): plan N asks at it at once, as plan Q and the showcase asked theirs
+MEDIUM_FINAL = 32_768
+
+
+def medium_send(presence_penalty: float) -> dict:
+    """what a Medium request says beside its path: thinking off, and its
+    runtime row's presence penalty"""
+    return {"chat_template_kwargs": {"enable_thinking": False},
+            "presence_penalty": float(presence_penalty)}
+
+
+def medium_runtime(presence_penalty: float, model: str, words: str, **more) -> dict:
+    """a Medium runtime row: k3k6-2611 in every other way, path 6 with thinking
+    off, its presence penalty its own"""
+    return {
+        **{k: v for k, v in RUNTIMES["k3k6-2611"].items()
+           if k not in ("models", "words", "off_for", "thinking", "paths")},
+        "words": words,
+        "env": dict(RUNTIMES["k3k6-2611"]["env"]),
+        "flags": list(RUNTIMES["k3k6-2611"]["flags"]),
+        "thinking": (),
+        "off_for": MEDIUM_TASKS,
+        "paths": {"off": 6},
+        "presence_penalty": float(presence_penalty),
+        "send": medium_send(presence_penalty),
+        "mode": "Medium",
+        "models": {model: "Qwen/Qwen3.6-35B-A3B"},
+        "build": dict(RUNTIMES["k3k6-2611"]["build"]),
+        **more,
+    }
+
+
+MEDIUM_SEND = medium_send(0.0)
+RUNTIMES["k3k6-2611-medium"] = medium_runtime(
+    0.0, "served/step2388-k3k6-2611-medium",
+    "the team's joint k3/k6 build as k3k6-2611, asked in the app's Medium mode: the "
+    "6-expert path with thinking off and no presence penalty, said in each request; the "
+    "rest of the path's sampling the file's")
+RUNTIMES["k3k6-2611-medium-075"] = medium_runtime(
+    0.75, "served/step2388-k3k6-2611-medium-075",
+    "the team's joint k3/k6 build as k3k6-2611, asked in the app's Medium mode: the "
+    "6-expert path with thinking off and presence penalty 0.75 (High's), said in each "
+    "request; the rest of the path's sampling the file's; asked at Instant's final limit, "
+    f"{MEDIUM_FINAL:,} tokens, at once",
+    budgets={t: {"off": MEDIUM_FINAL} for t in MEDIUM_TASKS})
+
+
+def send_of(runtime: str | None) -> dict:
+    """r20: what a runtime of expert paths says in each request besides its path
+    (Medium: thinking off, its row's presence penalty) — {} for one that sends
+    nothing"""
+    return dict((RUNTIMES.get(runtime or "") or {}).get("send") or {})
+
+
+def path_expects(runtime: str | None, path: int) -> dict:
+    """r20: what a path's answers must show on this runtime — the file's values
+    (PATHS), with what the runtime sends over them: Medium's path 6 doesn't
+    think, and its presence penalty is its row's"""
+    want = dict(PATHS[path])
+    send = send_of(runtime)
+    kw = send.get("chat_template_kwargs") or {}
+    if "enable_thinking" in kw:
+        want["thinking"] = bool(kw["enable_thinking"])
+    want.update({k: v for k, v in send.items() if k in want and k != "chat_template_kwargs"})
+    return want
 
 
 def app_of(runtime: str | None) -> dict | None:
@@ -779,7 +897,7 @@ def slot_context(tasks: list[str], on: bool, cap: int | None = None,
         limit = app["thinking_budget"] + app["reply"] + app["room"] if on else app["reply"]
         need = max(limit + BENCH[t]["room"] for t in tasks)
     else:
-        need = max(BENCH[t]["budget"]["on" if on else "off"] + BENCH[t]["room"] for t in tasks)
+        need = max(budget_of(t, on, runtime) + BENCH[t]["room"] for t in tasks)
     return min(need, cap) if cap else need
 
 

@@ -1655,19 +1655,21 @@ def _main(argv: list[str] | None = None) -> int:
     if a.check and (a.pilot or a.parity or a.serve or a.only):
         ap.error("--check asks no benchmark: no --pilot, --parity, --serve or --only")
     # 34: a runtime of the apps' limits asks the Frontier benchmarks alone
-    if fb.app_of(a.runtime) and (a.showcase or a.devicemark or a.cont):
-        ap.error(f"--runtime {a.runtime} asks the Frontier benchmarks under the apps' limits "
-                 "alone: no --showcase, --devicemark or --continue")
+    # r20: and DeviceMark with thinking on (High as the app runs it, plan H)
+    if fb.app_of(a.runtime) and (a.showcase or a.cont or a.devicemark and a.thinking != "on"):
+        ap.error(f"--runtime {a.runtime} asks the Frontier benchmarks under the apps' limits, "
+                 "and DeviceMark with --thinking on, alone: no --showcase or --continue")
     # 31.2b: the showcase, on a runtime of expert paths, on its own
     if a.showcase and (a.pilot or a.parity or a.serve or a.check or a.only or shard
                        or a.devicemark):
         ap.error("--showcase asks its questions alone: no --pilot, --parity, --serve, --check, "
                  "--devicemark, --only or --shard")
-    if a.showcase and not (a.runtime and fb.RUNTIMES[a.runtime].get("paths")
+    # r20: one whose thinking-on path asks it (not Medium's, thinking off alone)
+    if a.showcase and not (a.runtime and "on" in (fb.RUNTIMES[a.runtime].get("paths") or {})
                            and not fb.RUNTIMES[a.runtime].get("experiment")):
         ap.error("--showcase: on a runtime of expert paths (--runtime "
                  + " or ".join(n for n, r in fb.RUNTIMES.items()
-                               if r.get("paths") and not r.get("experiment")
+                               if "on" in (r.get("paths") or {}) and not r.get("experiment")
                                and not r.get("app")) + ")")
     if a.showcase and a.slots != 1:
         ap.error("--showcase: one slot (--slots 1), each question asked alone as step8804's were")
@@ -2164,6 +2166,10 @@ def _main(argv: list[str] | None = None) -> int:
         except ValueError as e:
             raise SystemExit(f"--continue: {e}. Nothing was asked") from None
         c_path, c_limit = c_spec["path"], c_spec["limit"]
+        # r20: the penalty's window and its tests are k6's, whose answers think
+        # and whose presence penalty counts them; Medium's path 6 doesn't think
+        # and says no presence penalty, as k3
+        c_thinks = cb.thinks(c_spec)
         c_row = a.served_as.replace("/", "__") + ("__thinking" if thinking else "")
         wrong = sorted({r["task"] for r in c_all} - set(c_spec["tasks"]))
         if wrong:
@@ -2212,8 +2218,9 @@ def _main(argv: list[str] | None = None) -> int:
             + f" · each continued to {c_limit:,} tokens"
             + (f" on expert path k{c_path}" if c_path else " as it was asked (its runtime's "
                "sampling and thinking switch)")
+            + (" with thinking off, as it was asked" if c_path == 6 and not c_thinks else "")
             + ", its seed a fresh one" + (", the penalty counting its reply's tokens "
-                                          "(penalty_prompt_tokens)" if c_path == 6 else ""))
+                                          "(penalty_prompt_tokens)" if c_thinks else ""))
 
     if a.switch:
         # 32: its inputs, pinned, and their questions, before the GPU is spent
@@ -2354,7 +2361,7 @@ def _main(argv: list[str] | None = None) -> int:
             import path_check
             path = fb.path_of(a.runtime, thinking)
             chk = path_check.check(srv_proc.base, path, gguf_path,
-                                   last_session(out / SERVER_LOG), ctx)
+                                   last_session(out / SERVER_LOG), ctx, runtime=a.runtime)
             server["paths_check"] = chk
             for ln in path_check.words(chk):
                 say(ln)
@@ -2406,7 +2413,7 @@ def _main(argv: list[str] | None = None) -> int:
             # said; the step goes on
             sampler.phase = "check"
             # 31.1: on a runtime of expert paths, the speed of the box's own path
-            path_extra = ({"expert_path": fb.path_of(a.runtime, thinking)}
+            path_extra = ({"expert_path": fb.path_of(a.runtime, thinking), **fb.send_of(a.runtime)}
                           if a.runtime and fb.RUNTIMES[a.runtime].get("paths") else None)
             chk = {**cc.check(srv_proc.base, ctx, a.slots, say, extra=path_extra),
                    "session": state["sessions"]}
@@ -2536,10 +2543,10 @@ def _main(argv: list[str] | None = None) -> int:
             # 31.3: the check before U-cont — penalty_prompt_tokens' test (on
             # k6, whose presence penalty it is), then the first answers of one
             # benchmark, a line each; no bundle
-            t_pen = cb.penalty_test(srv_proc.base, c_path) if c_path == 6 else {
+            t_pen = cb.penalty_test(srv_proc.base, c_path) if c_thinks else {
                 "verdict": "pass", "greedy": {"why": "no presence penalty here"},
                 "window": {"why": "no presence penalty here"}}
-            if c_path == 6:
+            if c_thinks:
                 for ln in cb.penalty_words(t_pen):
                     say(ln)
             n_c, why_c = cb.ask(srv_proc.base, cont_lines, out, c_spec, a.slots, lambda x: None,
@@ -2576,7 +2583,7 @@ def _main(argv: list[str] | None = None) -> int:
             # 31.3: the answers that ran out of room, continued — no run of the board's
             progress(out, state="asking", session_at=round(time.time()))
 
-            if c_path == 6 and not (out / cb.TESTS).exists():
+            if c_thinks and not (out / cb.TESTS).exists():
                 # 31.3c: the tests beside every k6 box's answers — the window,
                 # and how far batching alone puts two replies apart on this
                 # card — said and kept in the bundle, never holding the step

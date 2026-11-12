@@ -2271,6 +2271,211 @@ fetch's line says. k6's answers land on `served/step2388-k3k6-2611-app ·
 thinking`, k3's on `served/step2388-k3k6-2611-app`. MATH Level 5's and OTIS's
 checks are graded as plan U's, after masein's yes.
 
+# M. The app's Medium mode: plan M (r20)
+
+The app has three modes: Instant (thinking off, 3 routed experts a layer),
+Medium (thinking off, 6) and High (thinking on, 6). Instant and High are plan
+U's two paths; Medium was never run. Plan M asks it on everything the
+thinking-off runs asked — GPQA Diamond (4 runs), MMLU-Pro, IFEval, IFBench,
+MATH Level 5 and DeviceMark's battery — at the thinking-off limits. masein's
+yes, 11 Nov.
+
+**Runtime `k3k6-2611-medium`** is k3k6-2611 in every other way: step2388's
+file, the k3k6 tarball, the same flags and two variables. Each request names
+path 6 and says, as well, `"chat_template_kwargs": {"enable_thinking": false}`
+and `"presence_penalty": 0`: the thinking-off runs' sampling (path 3's), the
+expert count alone changed. The server takes path 6's stored values as the
+base and a request's value over it; path 6's temperature, top-p, top-k and
+min-p are path 3's already. DeviceMark's requests are greedy as ever, and say
+thinking off too. Its model is `served/step2388-k3k6-2611-medium`.
+
+**The settings check** holds the file, `/props` and the start-up lines to the
+stored values as on plan U, and its two answers to what Medium asks: no
+thinking block on path 6. A box whose server thinks anyway stops before a
+question, and the import refuses a bundle without the check passed.
+
+## M1. The boxes
+
+`python scripts/frontier_box.py --list M` prints the plan. Its hours are a
+guess: Instant's stored answer lengths at Instant's 8-slot rates (1,000 tokens
+a second written, 2,500 read) times 194.7 / 229.0, the 6-expert path's speed
+against the 3-expert path's alone (Table B2).
+
+| Box | Benchmarks | Each box |
+|---|---|---|
+| M1–M2 | MMLU-Pro in halves | about 3.3 h |
+| M3 | GPQA Diamond, MATH Level 5 | about 2.1 h |
+| M4 | IFEval, IFBench, then DeviceMark | about 0.4 h |
+
+Rent each as in L2: the runner image at this phase's tag, an RTX 5090, Disk
+100 GB. Then, in tmux:
+
+```bash
+cd /app
+```
+
+```bash
+read -rs HF_TOKEN && export HF_TOKEN
+```
+
+```bash
+python scripts/frontier_box.py M1 --as served/step2388-k3k6-2611-medium --gguf hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/step2388.k3k6.gguf --server hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/llama-server-k3k6-3ad38b7.tar.gz --price 0.45
+```
+
+Every box M1–M4 runs that line with its own label. A plan M line with another
+plan's model, or another plan's line with this one, is refused before
+anything is fetched.
+
+## M2. Fetch and import
+
+As in L3, with the box's label (`<host>:<port>=M1`) and
+`--sha served/step2388-k3k6-2611-medium=a2594a68a810ec526061f83cb88c7e469e1c3889912e8da4b1d598c72271faf6`.
+The model's first bundle is imported once by hand with `--register`, as the
+fetch's line says. MATH Level 5's model check is graded as plan U's.
+
+## M3. Medium's answers that ran out of room, continued (M5)
+
+Instant's answers that ran out of room at the thinking-off limits were
+continued to 32,768 tokens in U-cont (U4, box C4), and its scores are those.
+Plan M asked Medium at the plain limits, so on MMLU-Pro, MATH Level 5, IFEval
+and IFBench the two weren't on one protocol. Box M5 continues Medium's the
+same way (masein's yes, 12 Nov): 155 answers on the imported rows (MMLU-Pro
+98 and MATH Level 5 43 at 8,192, IFEval 2 and IFBench 12 at 4,096; GPQA
+Diamond none), each from where it stopped to 32,768, on Medium's own runtime.
+
+- **Each request** is what Medium asked: path 6, `"chat_template_kwargs":
+  {"enable_thinking": false}` and `"presence_penalty": 0`, with the cut reply
+  as the assistant's unfinished turn, its limit (32,768 less the tokens
+  written) and a fresh seed. Medium's answers are replies, as k3's: no
+  penalty window and no penalty tests (those are k6's, whose answers think).
+- **The settings check** runs first, as on M1–M4, and the import refuses a
+  bundle without it passed, or from another runtime.
+
+1. On the server, Medium's inputs file alone (it prints its sha256 and what
+   it holds, with no question text):
+
+   ```bash
+   cd ~/benchmarks/aienh && sudo docker compose exec -T bench python scripts/continue_box.py inputs --as served/step2388-k3k6-2611-medium
+   ```
+
+2. Rent one box as M1–M4 (the runner image at this phase's tag, an RTX 5090,
+   Disk 100 GB). Copy the file to it, from the server, with the fetch's key:
+
+   ```bash
+   scp -i ~/.ssh/id_ed25519 -P <port> ~/benchmarks/u-cont/cont-medium.jsonl root@<host>:/workspace/
+   ```
+
+3. On the box, in tmux (`cd /app`, then the token):
+
+   ```bash
+   python scripts/frontier_box.py M5 --as served/step2388-k3k6-2611-medium --gguf hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/step2388.k3k6.gguf --server hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/llama-server-k3k6-3ad38b7.tar.gz --continue /workspace/cont-medium.jsonl --continue-sha256 <its sha256> --price 0.45
+   ```
+
+4. **Fetch and import** as M2, with `<host>:<port>=M5`: the bundle
+   (`frontier-cont-served__step2388-k3k6-2611-medium-thinking-off.tar.gz`)
+   goes onto Medium's rows. The board then shows the 32,768 limit's scores,
+   and each cell keeps the plain limit's beside them, as Instant's do.
+
+# N. Medium at presence penalty 0.75: plan N (r20)
+
+Kevin's section 3 says the app runs Medium with presence penalty 0.75, the
+same as High; plan M asked it with 0, the thinking-off runs' sampling. Which
+number Medium uses is Roohi's and Dr Amin's to decide. With 0, plan M stands
+and M5 continues its answers that ran out (M3). With 0.75, plan N asks
+Medium again in full. Nothing is rented before masein says which.
+
+**Runtime `k3k6-2611-medium-075`** is `k3k6-2611-medium` in every way but its
+presence penalty, a setting of each Medium runtime row: each request names
+path 6 and says `"chat_template_kwargs": {"enable_thinking": false}` and
+`"presence_penalty": 0.75` (path 6's own stored value, High's). The rest of
+the sampling is the path's, as Medium's. Its model is
+`served/step2388-k3k6-2611-medium-075`, a row of its own: a run at another
+value is another row, never mixed with this one or Medium's at 0.
+
+**The limit is Instant's final one, 32,768, at once.** Instant was asked at
+the thinking-off limits and its answers that ran out were continued to 32,768
+(U4). An answer that finishes under the old limit is a draw at the new one
+too, and a continued one carries on from where it stopped as one reply at the
+new limit would, so plan N asks each answer at 32,768 straight away, as plan Q
+and the showcase asked theirs. The continuation is built in: an answer that
+would have run out at 8,192 simply carries on in the same reply. No second
+box, no inputs file, and no penalty window to set for a continued reply
+(which at 0.75 would count the cut reply's tokens). The score at the old limit
+can be read from each answer's tokens (an answer longer than it counted
+wrong), as the re-count reads GPQA Diamond's.
+
+**DeviceMark isn't asked again.** Its requests are greedy with no presence
+penalty on every row (DeviceMark's protocol), so a 0.75 row sends DeviceMark
+exactly the requests M4 sent; M4's row is Medium's DeviceMark either way.
+
+| Box | Benchmarks | Each box |
+|---|---|---|
+| N1–N2 | MMLU-Pro in halves | about 2.6 h |
+| N3 | GPQA Diamond (4 runs), MATH Level 5, IFEval, IFBench | about 2.6 h |
+
+Paced at plan M's boxes as they ran, with the answers M ran out on writing on
+as Instant's continued ones did (`frontier_box.py --list N`). Rent each as M1
+(the runner image at this phase's tag, an RTX 5090, Disk 100 GB), then in
+tmux `cd /app`, the token, and:
+
+```bash
+python scripts/frontier_box.py N1 --as served/step2388-k3k6-2611-medium-075 --gguf hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/step2388.k3k6.gguf --server hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/llama-server-k3k6-3ad38b7.tar.gz --price 0.45
+```
+
+N2 and N3: the same line with their own label. Fetch and import as M2, with
+`<host>:<port>=N1` and so on and
+`--sha served/step2388-k3k6-2611-medium-075=a2594a68a810ec526061f83cb88c7e469e1c3889912e8da4b1d598c72271faf6`.
+The model's first bundle is imported once by hand, as the fetch's line says,
+with:
+
+`--register "step2388 Medium, presence 0.75 (k3k6 runtime)"`
+
+MATH Level 5's model check is graded as plan M's, after masein's Start.
+
+# H. High on DeviceMark as the app runs it: plan H (r20)
+
+DeviceMark's battery (596 items) asked of step2388's 6-expert path with
+thinking on, as the app asks it: greedy (DeviceMark's protocol), the thinking
+stopped by the server at 1,024 tokens (`thinking_budget_tokens`, as plan P)
+and the reply cut at 2,048 when it comes back. The request's limit is 3,100,
+inside DeviceMark's cap of 4,096. The box runs plan P's budget check before
+its first item, and the import refuses a bundle without it passed. The row is
+`served/step2388-k3k6-2611-app · thinking`; the 45.2 row stays as it is.
+masein's yes, 11 Nov.
+
+```bash
+python scripts/frontier_box.py H1 --as served/step2388-k3k6-2611-app --gguf hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/step2388.k3k6.gguf --server hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/llama-server-k3k6-3ad38b7.tar.gz --price 0.45
+```
+
+Fetch and import as plan P's boxes, with `<host>:<port>=H1`.
+
+# Q. Qwen3.5-9B on GPQA Diamond: plan Q (r20)
+
+Qwen3.5-9B under our protocol, to set its published 81.7 beside the Masein
+model's 82.7 like for like: GPQA Diamond, thinking on, 4 runs of the 198
+questions, up to 98,304 tokens an answer (the Masein model's final limit,
+asked at once). The file is the 4-bit one Pipette and Table G1 name:
+`Qwen3.5-9B-Q4_K_M.gguf` in `unsloth/Qwen3.5-9B-GGUF` at
+`3885219b6810b007914f3a7950a8d1b469d598a5` (5,680,522,464 bytes, sha256
+`03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8`), on the
+same build as step2388's runs. **Runtime `card-qwen35-9b-k3k6`** asks at its
+card's thinking settings for general tasks (temperature 1.0, top-p 0.95,
+top-k 20, min-p 0, presence penalty 1.5, repetition penalty 1.0), said in
+every request. masein's yes, 11 Nov.
+
+| Box | Questions | Each box |
+|---|---|---|
+| Q1 | GPQA Diamond, the first half, 4 runs | about 2.5 h (a guess) |
+| Q2 | GPQA Diamond, the second half, 4 runs | about 2.5 h (a guess) |
+
+```bash
+python scripts/frontier_box.py Q1 --as served/Qwen3.5-9B-Q4_K_M-k3k6-2611 --gguf hf://unsloth/Qwen3.5-9B-GGUF@3885219b6810b007914f3a7950a8d1b469d598a5/Qwen3.5-9B-Q4_K_M.gguf --server hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/llama-server-k3k6-3ad38b7.tar.gz --price 0.45
+```
+
+Fetch and import as L3, with `<host>:<port>=Q1` and
+`--sha served/Qwen3.5-9B-Q4_K_M-k3k6-2611=03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8`.
+GPQA Diamond is graded by code: no paid API.
+
 # Speed tests: the cheapest box per answer (19)
 
 Which box runs our benchmarks for the fewest dollars per answer, measured the
