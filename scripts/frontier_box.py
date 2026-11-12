@@ -160,6 +160,9 @@ CONT = "continue"
 # 31.3b: and the original Qwen3.6 Q2's easy set, continued to the same limit
 # as step2388's k3 (masein, 4 Nov) — on a box of its own (BOX_MODELS)
 CONT_Q2 = "continue-q2"
+# r20 (masein, 12 Nov): and Medium's answers that ran out of room (plan M, box
+# M5), continued to 32,768 as Instant's were, on Medium's own runtime
+CONT_MEDIUM = "continue-medium"
 # 32: the switch experiment (remote_gguf.py --switch, scripts/switch_box.py):
 # Part 2's chats, and Part 1's drift
 SWITCH, DRIFT = "switch-chats", "switch-drift"
@@ -169,6 +172,8 @@ DM_LABEL = {DM: "DeviceMark (greedy, no penalties)",
             CONT: "the answers that ran out of room, continued to the model team's limit",
             CONT_Q2: "the original Qwen3.6 Q2's easy-set answers that ran out of room, "
                      "continued to step2388's k3 limit",
+            CONT_MEDIUM: "Medium's answers that ran out of room, continued as "
+                         "Instant's were",
             SWITCH: "switching mode mid-chat, Part 2: five-turn chats in both arms",
             DRIFT: "switching mode mid-chat, Part 1: drift, five runs forced along the reference"}
 # 25: the Frontier suite plans A, B and L each run whole; plan I runs
@@ -409,6 +414,10 @@ PLANS["M"] = {
     "M2": [("off", (MMLU,), "2/2", 8)],
     "M3": [("off", (GPQA, MATH), "", 8)],
     "M4": [("off", (IFEVAL, IFBENCH), "", 8), ("off", (DM,), "", 8)],
+    # r20 (masein, 12 Nov): Medium's answers that ran out of room continued to
+    # 32,768, as U-cont's C4 continued Instant's — so the three modes are on
+    # one protocol. As many slots as C4's
+    "M5": [("off", (CONT_MEDIUM,), "", 30)],
 }
 MEDIUM_WRITE = {GPQA: 3967, MMLU: 1161, MATH: 2296, IFEVAL: 443, IFBENCH: 1091, DM: 700}
 MEDIUM_PROMPT = {GPQA: 250, MMLU: 1300, MATH: 150, IFEVAL: 100, IFBENCH: 150, DM: 200}
@@ -556,7 +565,8 @@ STEP2388_FILE = 15_994_966_752
 Q2_FILE = 12_574_128_416
 # 31.3b: whose answers each of U-cont's steps continues, and beside which file
 CONT_MODEL = {CONT: ("served/step2388-k3k6-2611", STEP2388_FILE),
-              CONT_Q2: ("served/Qwen3.6-35B-A3B-Q2-k3k6-2611", Q2_FILE)}
+              CONT_Q2: ("served/Qwen3.6-35B-A3B-Q2-k3k6-2611", Q2_FILE),
+              CONT_MEDIUM: ("served/step2388-k3k6-2611-medium", STEP2388_FILE)}
 # 31.3: U-cont's size, at the most — each answer continued to its limit (a loop
 # runs on to it). From what plan U's imported boxes cut, 4 Nov (masein's
 # counts): k6 GPQA Diamond 9, MATH Level 5 12, MMLU-Pro 2, OTIS 27 of two
@@ -570,12 +580,19 @@ CONT_MODEL = {CONT: ("served/step2388-k3k6-2611", STEP2388_FILE),
 # inputs prints the real numbers
 CONT_SIZE = {("on", CONT): {"answers": 326, "write": 8_093_696, "read": 24_600_000},
              ("off", CONT): {"answers": 187, "write": 4_830_000, "read": 1_900_000},
-             ("off", CONT_Q2): {"answers": 30, "write": 860_160, "read": 138_000}}
+             ("off", CONT_Q2): {"answers": 30, "write": 860_160, "read": 138_000},
+             # r20: Medium's, from its imported rows (12 Nov): MMLU-Pro 98 and MATH
+             # Level 5 43 at 8,192, IFEval 2 and IFBench 12 at 4,096 — 155 answers,
+             # 3,866,624 tokens to write at the most, about 1.35 million to read
+             ("off", CONT_MEDIUM): {"answers": 155, "write": 3_866_624, "read": 1_350_000}}
 # a 5090's tokens a second, 8 at a time: written — step8804's measured, about
 # 284 with thinking on over its GPQA Diamond and MATH Level 5 (MEASURED), a
 # little less at a continuation's longer contexts; k3's three experts a token
 # faster — and read (a guess the check's timings replace)
 CONT_TOK_S = {"on": 220.0, "off": 330.0}
+# r20: Medium writes on path 6 — k3's guess times the 6-expert path's speed
+# against the 3-expert path's alone (194.7 / 229.0, Table B2), as plan M's paces
+CONT_TOK_S_OF = {CONT_MEDIUM: 330.0 * 194.7 / 229.0}
 CONT_READ_TOK_S = 2_500.0
 # 32: plan S's hours a box. A drift job's five runs about 45 box-seconds
 # (their reads, at 1k to 48k tokens of memory, and 512 tokens each forced).
@@ -715,6 +732,12 @@ def label_of(t: str) -> str:
     return DM_LABEL.get(t) or fb.BENCH[t]["label"]
 
 
+def cont_tok_s(th: str, c: str) -> float:
+    """a continuation's tokens a second written, a guess: its own (Medium's
+    path 6), or its thinking's"""
+    return CONT_TOK_S_OF.get(c, CONT_TOK_S[th])
+
+
 def model_refused(box: str, served_as: str) -> str:
     """31.2: '' when this box runs `served_as`; else why not — a box of
     BOX_MODELS runs its model alone, and that model no other box"""
@@ -784,8 +807,9 @@ def hours(step: Step, own: bool = False, plan: str = "") -> float:
         return n * SWITCH_PACE[next(t for t in tasks if t in SWITCH_PACE)] / 3600
     if is_cont(step):
         # 31.3: its share of what U-cont writes and reads again, at the most
-        z = CONT_SIZE[(th, next(t for t in tasks if t in CONT_MODEL))]
-        return (z["write"] / CONT_TOK_S[th] + z["read"] / CONT_READ_TOK_S) / of / 3600
+        c = next(t for t in tasks if t in CONT_MODEL)
+        z = CONT_SIZE[(th, c)]
+        return (z["write"] / cont_tok_s(th, c) + z["read"] / CONT_READ_TOK_S) / of / 3600
     run = slots_run(step, own, plan)
     # 31.2: a step no pilot paced (DeviceMark, the easy set) at plan U's paces
     measured = PLAN_PACE.get(plan) or (MEASURED if any((th, t) not in PACE for t in tasks)
@@ -819,7 +843,9 @@ def words(step: Step, own: bool = False, plan: str = "") -> str:
                 f"{spec['limit']:,} tokens"
                 + (f" · part {shard}" if shard else "") + f" · {run} slots of "
                 f"{cb.context(spec):,} tokens · about {hours(step, own, plan):.1f} h at the most "
-                f"(each answer to its limit, {CONT_TOK_S[th]:.0f} tokens a second written and "
+                f"(each answer to its limit, "
+                f"{cont_tok_s(th, next(t for t in tasks if t in CONT_MODEL)):.0f} tokens a second "
+                "written and "
                 f"{CONT_READ_TOK_S:,.0f} read: a guess)")
     return (f"thinking {th} · {', '.join(label_of(t) for t in ordered(tasks))}"
             + (f" · shard {shard}" if shard else "")

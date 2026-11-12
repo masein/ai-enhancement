@@ -554,7 +554,9 @@ def main() -> int:
                 out["__verbose"] = {"generation_settings": {
                     "temperature": body.get("temperature", v["temp"]), "top_k": v["top_k"],
                     "top_p": v["top_p"], "min_p": v["min_p"],
-                    "presence_penalty": v["presence_penalty"], "frequency_penalty": 0.0,
+                    # r20: a request's value over the path's, as the team's server
+                    "presence_penalty": body.get("presence_penalty", v["presence_penalty"]),
+                    "frequency_penalty": 0.0,
                     "repeat_penalty": 1.0, "repeat_last_n": 131072,
                     "penalty_prompt_tokens": body.get("penalty_prompt_tokens",
                                                       v.get("penalty_prompt_tokens", -1)),

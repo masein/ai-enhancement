@@ -2166,6 +2166,10 @@ def _main(argv: list[str] | None = None) -> int:
         except ValueError as e:
             raise SystemExit(f"--continue: {e}. Nothing was asked") from None
         c_path, c_limit = c_spec["path"], c_spec["limit"]
+        # r20: the penalty's window and its tests are k6's, whose answers think
+        # and whose presence penalty counts them; Medium's path 6 doesn't think
+        # and says no presence penalty, as k3
+        c_thinks = cb.thinks(c_spec)
         c_row = a.served_as.replace("/", "__") + ("__thinking" if thinking else "")
         wrong = sorted({r["task"] for r in c_all} - set(c_spec["tasks"]))
         if wrong:
@@ -2214,8 +2218,9 @@ def _main(argv: list[str] | None = None) -> int:
             + f" · each continued to {c_limit:,} tokens"
             + (f" on expert path k{c_path}" if c_path else " as it was asked (its runtime's "
                "sampling and thinking switch)")
+            + (" with thinking off, as it was asked" if c_path == 6 and not c_thinks else "")
             + ", its seed a fresh one" + (", the penalty counting its reply's tokens "
-                                          "(penalty_prompt_tokens)" if c_path == 6 else ""))
+                                          "(penalty_prompt_tokens)" if c_thinks else ""))
 
     if a.switch:
         # 32: its inputs, pinned, and their questions, before the GPU is spent
@@ -2538,10 +2543,10 @@ def _main(argv: list[str] | None = None) -> int:
             # 31.3: the check before U-cont — penalty_prompt_tokens' test (on
             # k6, whose presence penalty it is), then the first answers of one
             # benchmark, a line each; no bundle
-            t_pen = cb.penalty_test(srv_proc.base, c_path) if c_path == 6 else {
+            t_pen = cb.penalty_test(srv_proc.base, c_path) if c_thinks else {
                 "verdict": "pass", "greedy": {"why": "no presence penalty here"},
                 "window": {"why": "no presence penalty here"}}
-            if c_path == 6:
+            if c_thinks:
                 for ln in cb.penalty_words(t_pen):
                     say(ln)
             n_c, why_c = cb.ask(srv_proc.base, cont_lines, out, c_spec, a.slots, lambda x: None,
@@ -2578,7 +2583,7 @@ def _main(argv: list[str] | None = None) -> int:
             # 31.3: the answers that ran out of room, continued — no run of the board's
             progress(out, state="asking", session_at=round(time.time()))
 
-            if c_path == 6 and not (out / cb.TESTS).exists():
+            if c_thinks and not (out / cb.TESTS).exists():
                 # 31.3c: the tests beside every k6 box's answers — the window,
                 # and how far batching alone puts two replies apart on this
                 # card — said and kept in the bundle, never holding the step
