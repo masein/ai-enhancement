@@ -439,8 +439,31 @@ PLAN_PACE["H"] = {("on", DM): 1524 / 580.0 + 200 / 2_500.0}
 # 18,599) at 650 tokens a second over 8 slots (the showcase: 192 on one)
 PLANS["Q"] = {"Q1": [("on", (GPQA,), "1/2", 8)], "Q2": [("on", (GPQA,), "2/2", 8)]}
 PLAN_PACE["Q"] = {("on", GPQA): 15_000 / 650.0 + 350 / 2_500.0}
+# r20 (masein, 12 Nov): plan N, Medium at presence penalty 0.75 (runtime
+# k3k6-2611-medium-075, High's penalty: the app's Medium as Kevin's section 3
+# has it) — the thinking-off set again, asked at Instant's final limit, 32,768,
+# at once: an answer that would have run out at the old limit carries on in the
+# same reply, as U-cont's continuation is built to match, so no second box and
+# no penalty window for a continued reply. DeviceMark isn't asked: its requests
+# are greedy with no presence penalty on either Medium row, the same as M4's.
+# Three boxes: MMLU-Pro in halves, the rest on one. Paced at plan M's boxes as
+# they ran (12 Nov, box-seconds an answer at 8 slots: MMLU-Pro 1.56, GPQA
+# Diamond 5.55, MATH Level 5 3.0, IFEval 0.47, IFBench 1.15), with the answers
+# M ran out on (98, 0, 43, 2, 12) writing on as Instant's continued ones did
+# (about 985, 1,850, 19,700 and 21,700 tokens more) at plan M's 797 tokens a
+# second over 8 slots — a guess for 0.75
+PLANS["N"] = {
+    "N1": [("off", (MMLU,), "1/2", 8)],
+    "N2": [("off", (MMLU,), "2/2", 8)],
+    "N3": [("off", (GPQA, MATH, IFEVAL, IFBENCH), "", 8)],
+}
+MEDIUM_RAN = {MMLU: (98, 985), GPQA: (0, 0), MATH: (43, 1850), IFEVAL: (2, 19_700),
+              IFBENCH: (12, 21_700)}
+MEDIUM_RAN_PACE = {MMLU: 1.56, GPQA: 5.55, MATH: 3.0, IFEVAL: 0.47, IFBENCH: 1.15}
+PLAN_PACE["N"] = {("off", t): MEDIUM_RAN_PACE[t] + n * more / 797.0 / ANSWERS[t]
+                  for t, (n, more) in MEDIUM_RAN.items()}
 # the plans whose every pace is a guess
-GUESSED_PLANS = {"P", "M", "H", "Q"}
+GUESSED_PLANS = {"P", "M", "H", "Q", "N"}
 # 29: plan D, our own boxes — a quarter of every benchmark on each of a
 # station's four GPUs, longest first (frontier_box's paces), then instruction
 # following with thinking on and off. Every slot holds Bolt's 64K
@@ -450,7 +473,8 @@ PLANS["D"] = {f"D3.{g}": [*(("on", t, f"{g + 1}/4", 8) for t in D_ORDER),
 # 20: the runtime a plan's boxes run, unless the line names another
 PLAN_RUNTIME = {"L": "lda-2610", "I": "lda-2610", "T": "lda-2610", "U": "k3k6-2611",
                 "C": "k3k6-2611", "S": "k3k6r-0411", "P": "k3k6-2611-app",
-                "M": "k3k6-2611-medium", "H": "k3k6-2611-app", "Q": "card-qwen35-9b-k3k6"}
+                "M": "k3k6-2611-medium", "H": "k3k6-2611-app", "Q": "card-qwen35-9b-k3k6",
+                "N": "k3k6-2611-medium-075"}
 # 29: the plans run on our own GPUs: each step --own (never started or kept
 # asking while another process uses the GPU), no price
 OWN_PLANS = ("D",)
@@ -467,7 +491,7 @@ PLAN_GPUS = {"L": ("RTX 5090", "RTX PRO 6000"), "I": ("RTX 5090", "RTX PRO 6000"
              # 32: the research tarball, built for sm_120 as the k3k6 one
              "S": ("RTX 5090", "RTX PRO 6000"), "P": ("RTX 5090", "RTX PRO 6000"),
              "M": ("RTX 5090", "RTX PRO 6000"), "H": ("RTX 5090", "RTX PRO 6000"),
-             "Q": ("RTX 5090", "RTX PRO 6000"),
+             "Q": ("RTX 5090", "RTX PRO 6000"), "N": ("RTX 5090", "RTX PRO 6000"),
              # 29: dgx-03's — the runner image's V100 tag builds for sm_70 alone
              "D": ("V100",)}
 PLAN_SM = {"D": "sm_70"}
@@ -536,6 +560,7 @@ PLAN_PINS["P"], PLAN_REVISIONS["P"] = PLAN_PINS["U"], PLAN_REVISIONS["U"]
 # r20: plan M serves plan U's file and server too
 PLAN_PINS["M"], PLAN_REVISIONS["M"] = PLAN_PINS["U"], PLAN_REVISIONS["U"]
 PLAN_PINS["H"], PLAN_REVISIONS["H"] = PLAN_PINS["U"], PLAN_REVISIONS["U"]
+PLAN_PINS["N"], PLAN_REVISIONS["N"] = PLAN_PINS["U"], PLAN_REVISIONS["U"]
 # r20: plan Q's file as Hugging Face publishes it in unsloth/Qwen3.5-9B-GGUF at
 # 3885219b6810 (5,680,522,464 bytes, the 5.68 GB of Table G1), and plan U's server
 PLAN_PINS["Q"] = {
@@ -1193,12 +1218,16 @@ def main(argv: list[str] | None = None) -> int:
                              f"(runtime {PLAN_RUNTIME['P']}, --as "
                              f"{next(iter(fb.RUNTIMES[PLAN_RUNTIME['P']]['models']))}); this line "
                              f"runs {runtime_of(a, box) or 'no named runtime'}. Nothing was fetched")
-        # r20: a box of plan M asks in the app's Medium mode, and no other box does
-        if (box[:1].upper() == "M") != (runtime_of(a, box) == PLAN_RUNTIME["M"]):
-            raise SystemExit(f"{box}: plan M's boxes, and they alone, ask in the app's Medium mode "
-                             f"(runtime {PLAN_RUNTIME['M']}, --as "
-                             f"{next(iter(fb.RUNTIMES[PLAN_RUNTIME['M']]['models']))}); this line "
-                             f"runs {runtime_of(a, box) or 'no named runtime'}. Nothing was fetched")
+        # r20: a box of plan M asks in the app's Medium mode, and no other box
+        # does; 12 Nov: plan N's at presence penalty 0.75, and no other box does
+        for plan, how in (("M", "in the app's Medium mode"),
+                          ("N", "in the app's Medium mode at presence penalty 0.75")):
+            if (box[:1].upper() == plan) != (runtime_of(a, box) == PLAN_RUNTIME[plan]):
+                raise SystemExit(f"{box}: plan {plan}'s boxes, and they alone, ask {how} "
+                                 f"(runtime {PLAN_RUNTIME[plan]}, --as "
+                                 f"{next(iter(fb.RUNTIMES[PLAN_RUNTIME[plan]]['models']))}); this "
+                                 f"line runs {runtime_of(a, box) or 'no named runtime'}. Nothing "
+                                 "was fetched")
         # 31.2: a box of another model than its plan's (U40), and a step at the
         # file's own settings, whose "-file" id the runtime asks so
         why = model_refused(box, a.served_as)

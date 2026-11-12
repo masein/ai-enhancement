@@ -613,42 +613,77 @@ RUNTIMES["k3k6-2611-app"] = {
 
 # r20 (masein, 11 Nov): the app's Medium mode — thinking off on the 6-expert
 # path, never run before. The same file, server, flags and paths as k3k6-2611;
-# each request names path 6 and says, as well, thinking off and no presence
-# penalty: the thinking-off runs' sampling (path 3's), the expert count alone
-# changed. The server takes path 6's stored values as the base and a value the
-# request sends over it (server-context.cpp, server-common.cpp at 3ad38b7cc);
-# path 6's temperature, top-p, top-k and min-p are path 3's already. A model of
-# its own, so its rows never mix with Instant's or High's
-MEDIUM_SEND = {"chat_template_kwargs": {"enable_thinking": False}, "presence_penalty": 0.0}
-RUNTIMES["k3k6-2611-medium"] = {
-    **{k: v for k, v in RUNTIMES["k3k6-2611"].items()
-       if k not in ("models", "words", "off_for", "thinking", "paths")},
-    "words": "the team's joint k3/k6 build as k3k6-2611, asked in the app's Medium mode: the "
-             "6-expert path with thinking off and no presence penalty, said in each request; the "
-             "rest of the path's sampling the file's",
-    "env": dict(RUNTIMES["k3k6-2611"]["env"]),
-    "flags": list(RUNTIMES["k3k6-2611"]["flags"]),
-    "thinking": (),
-    "off_for": ("gpqa_diamond_epoch", "math_l5_epoch", "mmlupro_tiger", "ifeval_google",
-                "ifbench_test"),
-    "paths": {"off": 6},
-    "send": MEDIUM_SEND,
-    "mode": "Medium",
-    "models": {"served/step2388-k3k6-2611-medium": "Qwen/Qwen3.6-35B-A3B"},
-    "build": dict(RUNTIMES["k3k6-2611"]["build"]),
-}
+# each request names path 6 and says, as well, thinking off and the runtime's
+# own presence penalty. The server takes path 6's stored values as the base and
+# a value the request sends over it (server-context.cpp, server-common.cpp at
+# 3ad38b7cc); path 6's temperature, top-p, top-k and min-p are path 3's already.
+# A model of its own, so its rows never mix with Instant's or High's.
+# 12 Nov (masein): the presence penalty is a setting of each Medium runtime row
+# (`presence_penalty`): k3k6-2611-medium says 0 (the thinking-off runs' sampling,
+# as the r20 brief asked; plan M), k3k6-2611-medium-075 says 0.75 (High's, path
+# 6's stored value: the app's Medium as Kevin's section 3 has it; plan N) — a
+# run at another value is another row, its answers never mixed with these
+MEDIUM_TASKS = ("gpqa_diamond_epoch", "math_l5_epoch", "mmlupro_tiger", "ifeval_google",
+                "ifbench_test")
+# Instant's final limit with thinking off (U-cont continued its answers that ran
+# out to it): plan N asks at it at once, as plan Q and the showcase asked theirs
+MEDIUM_FINAL = 32_768
+
+
+def medium_send(presence_penalty: float) -> dict:
+    """what a Medium request says beside its path: thinking off, and its
+    runtime row's presence penalty"""
+    return {"chat_template_kwargs": {"enable_thinking": False},
+            "presence_penalty": float(presence_penalty)}
+
+
+def medium_runtime(presence_penalty: float, model: str, words: str, **more) -> dict:
+    """a Medium runtime row: k3k6-2611 in every other way, path 6 with thinking
+    off, its presence penalty its own"""
+    return {
+        **{k: v for k, v in RUNTIMES["k3k6-2611"].items()
+           if k not in ("models", "words", "off_for", "thinking", "paths")},
+        "words": words,
+        "env": dict(RUNTIMES["k3k6-2611"]["env"]),
+        "flags": list(RUNTIMES["k3k6-2611"]["flags"]),
+        "thinking": (),
+        "off_for": MEDIUM_TASKS,
+        "paths": {"off": 6},
+        "presence_penalty": float(presence_penalty),
+        "send": medium_send(presence_penalty),
+        "mode": "Medium",
+        "models": {model: "Qwen/Qwen3.6-35B-A3B"},
+        "build": dict(RUNTIMES["k3k6-2611"]["build"]),
+        **more,
+    }
+
+
+MEDIUM_SEND = medium_send(0.0)
+RUNTIMES["k3k6-2611-medium"] = medium_runtime(
+    0.0, "served/step2388-k3k6-2611-medium",
+    "the team's joint k3/k6 build as k3k6-2611, asked in the app's Medium mode: the "
+    "6-expert path with thinking off and no presence penalty, said in each request; the "
+    "rest of the path's sampling the file's")
+RUNTIMES["k3k6-2611-medium-075"] = medium_runtime(
+    0.75, "served/step2388-k3k6-2611-medium-075",
+    "the team's joint k3/k6 build as k3k6-2611, asked in the app's Medium mode: the "
+    "6-expert path with thinking off and presence penalty 0.75 (High's), said in each "
+    "request; the rest of the path's sampling the file's; asked at Instant's final limit, "
+    f"{MEDIUM_FINAL:,} tokens, at once",
+    budgets={t: {"off": MEDIUM_FINAL} for t in MEDIUM_TASKS})
 
 
 def send_of(runtime: str | None) -> dict:
     """r20: what a runtime of expert paths says in each request besides its path
-    (Medium: thinking off, presence penalty 0) — {} for one that sends nothing"""
+    (Medium: thinking off, its row's presence penalty) — {} for one that sends
+    nothing"""
     return dict((RUNTIMES.get(runtime or "") or {}).get("send") or {})
 
 
 def path_expects(runtime: str | None, path: int) -> dict:
     """r20: what a path's answers must show on this runtime — the file's values
     (PATHS), with what the runtime sends over them: Medium's path 6 doesn't
-    think and has no presence penalty"""
+    think, and its presence penalty is its row's"""
     want = dict(PATHS[path])
     send = send_of(runtime)
     kw = send.get("chat_template_kwargs") or {}

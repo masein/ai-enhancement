@@ -2376,6 +2376,62 @@ Diamond none), each from where it stopped to 32,768, on Medium's own runtime.
    goes onto Medium's rows. The board then shows the 32,768 limit's scores,
    and each cell keeps the plain limit's beside them, as Instant's do.
 
+# N. Medium at presence penalty 0.75: plan N (r20)
+
+Kevin's section 3 says the app runs Medium with presence penalty 0.75, the
+same as High; plan M asked it with 0, the thinking-off runs' sampling. Which
+number Medium uses is Roohi's and Dr Amin's to decide. With 0, plan M stands
+and M5 continues its answers that ran out (M3). With 0.75, plan N asks
+Medium again in full. Nothing is rented before masein says which.
+
+**Runtime `k3k6-2611-medium-075`** is `k3k6-2611-medium` in every way but its
+presence penalty, a setting of each Medium runtime row: each request names
+path 6 and says `"chat_template_kwargs": {"enable_thinking": false}` and
+`"presence_penalty": 0.75` (path 6's own stored value, High's). The rest of
+the sampling is the path's, as Medium's. Its model is
+`served/step2388-k3k6-2611-medium-075`, a row of its own: a run at another
+value is another row, never mixed with this one or Medium's at 0.
+
+**The limit is Instant's final one, 32,768, at once.** Instant was asked at
+the thinking-off limits and its answers that ran out were continued to 32,768
+(U4). An answer that finishes under the old limit is a draw at the new one
+too, and a continued one carries on from where it stopped as one reply at the
+new limit would, so plan N asks each answer at 32,768 straight away, as plan Q
+and the showcase asked theirs. The continuation is built in: an answer that
+would have run out at 8,192 simply carries on in the same reply. No second
+box, no inputs file, and no penalty window to set for a continued reply
+(which at 0.75 would count the cut reply's tokens). The score at the old limit
+can be read from each answer's tokens (an answer longer than it counted
+wrong), as the re-count reads GPQA Diamond's.
+
+**DeviceMark isn't asked again.** Its requests are greedy with no presence
+penalty on every row (DeviceMark's protocol), so a 0.75 row sends DeviceMark
+exactly the requests M4 sent; M4's row is Medium's DeviceMark either way.
+
+| Box | Benchmarks | Each box |
+|---|---|---|
+| N1–N2 | MMLU-Pro in halves | about 2.6 h |
+| N3 | GPQA Diamond (4 runs), MATH Level 5, IFEval, IFBench | about 2.6 h |
+
+Paced at plan M's boxes as they ran, with the answers M ran out on writing on
+as Instant's continued ones did (`frontier_box.py --list N`). Rent each as M1
+(the runner image at this phase's tag, an RTX 5090, Disk 100 GB), then in
+tmux `cd /app`, the token, and:
+
+```bash
+python scripts/frontier_box.py N1 --as served/step2388-k3k6-2611-medium-075 --gguf hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/step2388.k3k6.gguf --server hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/llama-server-k3k6-3ad38b7.tar.gz --price 0.45
+```
+
+N2 and N3: the same line with their own label. Fetch and import as M2, with
+`<host>:<port>=N1` and so on and
+`--sha served/step2388-k3k6-2611-medium-075=a2594a68a810ec526061f83cb88c7e469e1c3889912e8da4b1d598c72271faf6`.
+The model's first bundle is imported once by hand, as the fetch's line says,
+with:
+
+`--register "step2388 Medium, presence 0.75 (k3k6 runtime)"`
+
+MATH Level 5's model check is graded as plan M's, after masein's Start.
+
 # H. High on DeviceMark as the app runs it: plan H (r20)
 
 DeviceMark's battery (596 items) asked of step2388's 6-expert path with
