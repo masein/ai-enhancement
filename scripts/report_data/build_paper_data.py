@@ -525,10 +525,32 @@ def fig_devicemark(p: Paper, cap: str, src: Path):
     return ["Model", "Run by", "Composite", "95% low", "95% high", "Source"], out
 
 
+# r22 (12 Nov): Figure 1 plots the Masein model in Instant mode, at the OnePlus 15's
+# short-chat median in the key numbers' throughput row for that mode
+THROUGHPUT_ROW = ("Token generation throughput on a phone", "Instant mode")
+SHORT_CHATS = re.compile(r"OnePlus 15(?: \([^)]*\))?: (\d+(?:\.\d+)?)(?: \([^)]*\))? in short chats")
+
+
+def masein_speed(p: Paper) -> str:
+    """the OnePlus 15's short-chat median in the key numbers' row "Token generation
+    throughput on a phone (…), Instant mode"."""
+    head, mode = THROUGHPUT_ROW
+    got = [r for x in p.tabs for r in x["rows"]
+           if clean(r[0]).startswith(head) and clean(r[0]).endswith(mode)]
+    if len(got) != 1:
+        raise SystemExit(f"the speed chart: the key numbers have {len(got)} rows \"{head} (…), {mode}\"; "
+                         "the Masein model's throughput is read from one")
+    m = SHORT_CHATS.search(clean(got[0][1]))
+    if m is None:
+        raise SystemExit(f"the speed chart: the key numbers' throughput row for {mode} gives no "
+                         "OnePlus 15 median in short chats")
+    return num(m.group(1))
+
+
 def fig_speed(p: Paper, cap: str, src):
     """DeviceMark composite against token generation throughput on a phone: each score must be Table 12's
     as printed; a Pipette speed must carry Pipette's notice, and the Masein model's must be
-    the one the key numbers print"""
+    the OnePlus 15's short-chat median the key numbers print for Instant mode"""
     f = src.speeds
     if not f.exists():
         raise SystemExit(f"the speed chart: {f} is missing (the figure script writes it)")
@@ -538,8 +560,6 @@ def fig_speed(p: Paper, cap: str, src):
     t = p.find("DeviceMark's rows", lambda t: any(h.startswith("Composite") for h in t["head"]))
     k = next(i for i, h in enumerate(t["head"]) if h.startswith("Composite"))
     by = {clean(r[0]): r for r in t["rows"]}
-    ours = [r for x in p.tabs for r in x["rows"]
-            if clean(r[0]).startswith(("Writing speed on a phone", "Token generation throughput on a phone"))]
     out = []
     for r in rows:
         name = r["model"] + (f", {r['mode']}" if r["mode"] else "")
@@ -563,9 +583,13 @@ def fig_speed(p: Paper, cap: str, src):
                 raise SystemExit(f"the speed chart: {name}'s speed is Pipette's and must carry its notice")
         elif r["speed_credit"] != OURS:
             raise SystemExit(f"the speed chart: {name}'s speed is not Pipette's, so it is {OURS}")
-        if name.startswith("Masein model") and not any(r["speed_tok_s"] in numbers_in(" ".join(x)) for x in ours):
-            raise SystemExit(f"the speed chart: the Masein model's {r['speed_tok_s']} tokens/s is not in the "
-                             "paper's throughput row")
+        if name.startswith("Masein model"):
+            want, mode = masein_speed(p), THROUGHPUT_ROW[1]
+            if num(r["speed_tok_s"]) != want:
+                raise SystemExit(f"the speed chart: the Masein model is plotted at {r['speed_tok_s']} tokens/s; "
+                                 f"the key numbers print {want} for {mode} on the OnePlus 15 in short chats")
+            if mode not in r["speed_source"]:
+                raise SystemExit(f"the speed chart: the Masein model's speed_source must say it is {mode}'s")
         out.append([name, num(m.group(1)), num(m.group(2)), num(m.group(3)), OURS, r["speed_tok_s"],
                     r["speed_source"], r["speed_credit"]])
     return ["Model", "DeviceMark composite", "95% low", "95% high", "Score: whose", "Token generation throughput (tokens/s)",

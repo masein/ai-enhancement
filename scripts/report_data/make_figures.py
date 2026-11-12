@@ -107,8 +107,12 @@ PIPETTE_SPEED = {"Qwen3.5-0.8B": 74, "LFM2.5-1.2B-Instruct": 68, "granite-4.0-h-
 PIPETTE_HOW = ("Pipette leaderboard, Galaxy S26 Ultra (12 GB): {name} q4_k_m, llama.cpp b11988 on the CPU "
                "(android-arm64-v8a), 1,024 input tokens, decode over 100 output tokens; Pipette shows "
                "whole numbers")
-MASEIN_SPEED = ("16.0", "Teraformer's app on a OnePlus 15 (16 GB), thinking off, short chats, median "
-                      "(Table 1); measured by the app's developers")
+# r22 (12 Nov): the key numbers' throughput row for Instant mode, the OnePlus 15 in short chats
+MASEIN_SPEED = ("15.2", "Teraformer's app on a OnePlus 15 (16 GB), Instant mode, short chats, median, on the "
+                        "16.0 GB file (key numbers; Section 3); measured by the app's developers")
+# a point drawn under another name than its Table 12 row's (which figure-1.csv keeps): the
+# app's mode for the Masein model's thinking-off row
+SHOWN = {"Masein model, thinking off": "Masein model, Instant"}
 CLOUD = ["Gemini Flash (cloud)", "Gemini Pro (cloud)"]
 
 # Figure 7 (GPQA Diamond lanes): the models the text names
@@ -384,7 +388,11 @@ def speeds(out: Path) -> dict:
     if f.exists():
         for r in csv.DictReader(open(f, encoding="utf-8")):
             if r.get("speed_tok_s"):
-                got[r["model"] + (f", {r['mode']}" if r["mode"] else "")] = (r["speed_tok_s"], r["speed_source"])
+                name = r["model"] + (f", {r['mode']}" if r["mode"] else "")
+                # r22: a speed under a name no point has would be dropped without a word
+                if name not in {label for label, _, _ in SPEED_ROWS}:
+                    raise SystemExit(f"figure-1.csv: {name} has a speed, but no point of Figure 1 is {name}")
+                got[name] = (r["speed_tok_s"], r["speed_source"])
     for label, _, pip in SPEED_ROWS:
         if label not in got:
             got[label] = MASEIN_SPEED if pip is None else (str(PIPETTE_SPEED[pip]), PIPETTE_HOW.format(name=pip))
@@ -428,7 +436,8 @@ def fig1(data: Path, out: Path, P: dict):
         sc = ax.scatter([x], [y], s=62 if me else 30, color=col, edgecolor="white", lw=0.8, zorder=4)
         sc.set_gid("pt:" + label)
         if me:
-            t = ax.annotate(f"{label}: {y:.1f} at {xs} tokens/s", (x, y), xytext=(8, 0), textcoords="offset points",
+            t = ax.annotate(f"{SHOWN.get(label, label)}: {y:.1f} at {xs} tokens/s", (x, y), xytext=(8, 0),
+                            textcoords="offset points",
                             ha="left", va="center", fontsize=SMALL, fontweight="bold", color=INK)
         else:
             spec = place[label]

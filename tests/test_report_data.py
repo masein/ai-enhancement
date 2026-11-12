@@ -40,7 +40,7 @@ Text.
 | Measure | Masein model (measured here) | How it compares |
 | --- | --- | --- |
 | GPQA Diamond (%), thinking on / off | 82.7 ± 2.2 / 75.3 ± 2.4 | Thinking on: level with o1 (*76.8*) |
-| Writing speed on a phone (decode, tokens/s), thinking off | OnePlus 15: 16.0 (15.0 to 16.6) | No verdict |
+| Token generation throughput on a phone (decode, tokens/s), Instant mode | OnePlus 15 (16 GB): 15.2 in short chats, 7.3 with 14,000 tokens of context. Medium mode, preliminary: 12.6 in short chats | No verdict |
 
 **Table 5.** The Masein model, measured here, in both modes: score (%) ± standard error.
 
@@ -131,7 +131,8 @@ def test_each_table_and_figure_is_a_file_named_by_the_papers_own_numbers(paper, 
     # key numbers: one row per mode, and a row that isn't a score stays as printed
     k = rows(out / "key-numbers.csv")
     assert [r[1:4] for r in k[1:3]] == [["thinking on", "82.7", "2.2"], ["thinking off", "75.3", "2.4"]]
-    assert k[3][2] == "OnePlus 15: 16.0 (15.0 to 16.6)"
+    assert k[3][2] == ("OnePlus 15 (16 GB): 15.2 in short chats, 7.3 with 14,000 tokens of context. Medium mode, "
+                       "preliminary: 12.6 in short chats")
     # the index names each file's caption
     ix = {r[0]: r for r in rows(out / "index.csv")[1:]}
     assert ix["table-8.csv"][1:] == ["Table 8", "Answers that ran out of room at the final limit."]
@@ -196,8 +197,9 @@ def speeds_file(tmp_path, **change):
     """figure-1.csv as the figure script writes it; change={model: {column: value}}"""
     pip = "Pipette leaderboard, Galaxy S26 Ultra (12 GB): Qwen3.5-4B q4_k_m"
     rows = [{"model": "Masein model", "mode": "thinking off", "devicemark_composite": "84.4", "ci95_low": "81.4",
-             "ci95_high": "87.3", "score_source": build.OURS, "speed_tok_s": "16.0",
-             "speed_source": "Teraformer's app on a OnePlus 15 (Table 1)", "speed_credit": build.OURS},
+             "ci95_high": "87.3", "score_source": build.OURS, "speed_tok_s": "15.2",
+             "speed_source": "Teraformer's app on a OnePlus 15, Instant mode, short chats (key numbers)",
+             "speed_credit": build.OURS},
             {"model": "Qwen3.5-4B", "mode": "thinking off", "devicemark_composite": "80.1", "ci95_low": "76.6",
              "ci95_high": "83.4", "score_source": build.OURS + " (replica)", "speed_tok_s": "15",
              "speed_source": pip, "speed_credit": build.PIPETTE},
@@ -217,20 +219,34 @@ def speeds_file(tmp_path, **change):
 def test_the_speed_chart_takes_its_scores_from_table_12_and_keeps_pipettes_notice(paper, tmp_path):
     # Figure 1 plots our DeviceMark scores against speeds from two setups: each score must
     # be the one Table 12 prints, a Pipette speed must carry the notice Pipette's licence
-    # asks for, and our own speed must be the one the paper prints
+    # asks for, and our own speed must be the OnePlus 15's short-chat median that the key
+    # numbers print for Instant mode (r22) — not another number of that row
     speed_paper(paper)
     out = tmp_path / "paper-data"
     assert build.main([str(out), str(paper), "--speeds", str(speeds_file(tmp_path))]) == 0
     f1 = rows(out / "figure-1.csv")
-    assert f1[1][:7] == ["Masein model, thinking off", "84.4", "81.4", "87.3", build.OURS, "16.0",
-                         "Teraformer's app on a OnePlus 15 (Table 1)"]
+    assert f1[1][:7] == ["Masein model, thinking off", "84.4", "81.4", "87.3", build.OURS, "15.2",
+                         "Teraformer's app on a OnePlus 15, Instant mode, short chats (key numbers)"]
     assert f1[2][5] == "15" and f1[2][7] == build.PIPETTE
     assert f1[3][:5] == ["Qwen3.5-4B (int8)", "26.1", "22.4", "29.9", build.DEVICEMARK]
     for change, says in (({"Qwen3.5-4B": {"devicemark_composite": "80.4"}}, "Table 12 prints 80.1"),
                          ({"Qwen3.5-4B": {"speed_credit": "Pipette"}}, "must carry its notice"),
-                         ({"Masein model": {"speed_tok_s": "16.5"}}, "16.5 tokens/s is not in the paper")):
+                         ({"Masein model": {"speed_tok_s": "16.0"}}, "plotted at 16.0 tokens/s; the key numbers "
+                          "print 15.2 for Instant mode"),
+                         ({"Masein model": {"speed_tok_s": "7.3"}}, "plotted at 7.3 tokens/s"),
+                         ({"Masein model": {"speed_tok_s": "12.6"}}, "plotted at 12.6 tokens/s"),
+                         ({"Masein model": {"speed_source": "Teraformer's app on a OnePlus 15"}},
+                          "must say it is Instant mode's")):
         with pytest.raises(SystemExit, match=says):
             build.main([str(tmp_path / "x"), str(paper), "--speeds", str(speeds_file(tmp_path, **change))])
+    # the throughput row must be Instant mode's, and must give the OnePlus 15 in short chats
+    text = paper.read_text(encoding="utf-8")
+    for old, new, says in (("), Instant mode |", "), thinking off |", "have 0 rows"),
+                           ("OnePlus 15 (16 GB): 15.2 in short chats", "OnePlus 15 (16 GB): 15.2 at 1,000 tokens",
+                            "gives no OnePlus 15 median in short chats")):
+        paper.write_text(text.replace(old, new, 1), encoding="utf-8")
+        with pytest.raises(SystemExit, match=re.escape(says)):
+            build.main([str(tmp_path / "y"), str(paper), "--speeds", str(speeds_file(tmp_path))])
 
 
 def test_a_renumbered_paper_needs_no_change_to_the_build(paper, tmp_path):
@@ -263,7 +279,11 @@ def test_figure_ones_speeds_come_from_its_file_so_new_timings_need_one_rebuild(t
     got = figs.speeds(tmp_path)
     assert got["Qwen3.5-4B, thinking off"] == ("14.2", "OnePlus 15, timed")
     assert got["LFM2.5-1.2B"][0] == "68" and got["LFM2.5-1.2B"][1].startswith("Pipette")
-    assert got["Masein model, thinking off"][0] == "16.0"
+    assert got["Masein model, thinking off"][0] == "15.2" and "Instant mode" in got["Masein model, thinking off"][1]
+    # r22: a speed under a name no point has stops the build, instead of being dropped
+    f.write_text("model,mode,speed_tok_s,speed_source\nMasein model,Instant,15.2,key numbers\n", encoding="utf-8")
+    with pytest.raises(SystemExit, match="no point of Figure 1 is Masein model, Instant"):
+        figs.speeds(tmp_path)
 
 
 def test_a_tbd_stops_the_build_and_trial_lists_the_files_that_carry_one(paper, tmp_path, capsys):
