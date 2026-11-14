@@ -14,7 +14,9 @@ private/. 17h: public only for a model whose page marks its weights public
 (DeviceMark's calibration models: mark them there) — 17i: the mark decides,
 never the name — and only after a typed yes to the list the export prints,
 with SCRUB_HOSTS and SCRUB_ACCOUNTS given; --private keeps every row private. Upload is masein's step
-(docs/REMOTE-RUNS.md § Publishing the raw runs).
+(docs/REMOTE-RUNS.md § Publishing the raw runs). r25: a row already published in the public
+repository (its raw link) that would go to private/ — its model not marked public, or public/
+refused — stops the export before it writes anything, and says which and why.
 
   items.jsonl    a line an item: the test and its key; the prompt as sent; the
                  reply and the thinking; the parsed answer and the dataset's,
@@ -599,6 +601,40 @@ def _new_name(url: str) -> str:
     return _OLD_LINK.sub(lambda m: f"{m.group(1)}{PUBLIC_REPO}", url)
 
 
+def on_public_repo(row: Path) -> bool:
+    """r25 (14 Nov): the row is published in the public repository — its raw link (the
+    board's "raw" link, set by --link or the form) is a folder of PUBLIC_REPO. Its old name
+    counts; the private repository, whose name has "-private", never does"""
+    try:
+        url = json.loads((row / RAW_NAME).read_text(encoding="utf-8")).get("url") or ""
+    except (OSError, ValueError, AttributeError):
+        return False
+    return _new_name(str(url)).startswith(f"https://huggingface.co/datasets/{PUBLIC_REPO}/")
+
+
+def published_but_private(rows: list[Path], setups: dict, why: str) -> str:
+    """r25 (masein, 14 Nov): '' when no row published in the public repository would go to
+    private/; else why the export stops before writing anything. A re-export put all 27
+    rows in private/ without a word: the 13 public ones' models had never been marked
+    public (17h's mark, 7 Oct, came after 15.4's name rule had published them), and the
+    scrub's names weren't given"""
+    published = [r for r in rows if on_public_repo(r)]
+    unmarked = [r for r in published if not public_by_default(r, setups[r])]
+    if not unmarked and not (published and why):
+        return ""
+    lines = [f"stopped, nothing written: {len(unmarked or published)} row(s) published in "
+             f"{PUBLIC_REPO} (their raw link) would go to private/:"]
+    lines += [f"  {r.name}" for r in (unmarked or published)]
+    if unmarked:
+        models = sorted({model_of(r) for r in unmarked})
+        lines.append("their models aren't marked public on the board: mark each one's weights "
+                     "public on its page (" + ", ".join(models) + ")")
+    if published and why:
+        lines.append(why)
+    lines.append("Or pass --private, to write every row to private/.")
+    return "\n".join(lines)
+
+
 def relink(out_dir: Path, say=print) -> int:
     """31: every stored raw link moved to the repository's new name: its
     folder, who set it and when stay. How many changed"""
@@ -655,11 +691,20 @@ def main(argv: list[str] | None = None) -> int:
     out = a.out or (config.BENCH_ROOT / "raw-export")
     rows = [row_of_run(a.run)[0]] if a.run else all_rows()
     import export_safe as es
-    would = [] if a.private else [model_of(r) for r in rows if public_by_default(r, json.loads(
-        (r / dm.OUT_NAME).read_text(encoding="utf-8")).get("setup") or {})]
-    why = es.refused_public() if would else ""
+    setups = {r: json.loads((r / dm.OUT_NAME).read_text(encoding="utf-8")).get("setup") or {}
+              for r in rows}
+    would = [] if a.private else [model_of(r) for r in rows if public_by_default(r, setups[r])]
+    refused_now = "" if a.private else es.refused_public()
+    # r25: a row published in the public repository never goes to private/ without a word
+    stop = "" if a.private else published_but_private(rows, setups, refused_now)
+    if stop:
+        print(stop)
+        return 2
+    why = refused_now if would else ""
     if why:
         print(why)
+    if not would and not a.private:
+        print("no row's model is marked public on the board: every row goes to private/")
     publish = not why and es.confirm(would)
     if would and not publish and not why:
         print("not published: those rows go to private/")

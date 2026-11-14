@@ -286,6 +286,16 @@ every run to `private/`, and exits 1) when either variable isn't given, when
 a value given is too short to be a name (`x`, `,`), or when this server's own
 name isn't in `SCRUB_HOSTS` (the container's own name isn't it).
 
+**A published row never goes to `private/` quietly** (r25, 14 Nov). When a row
+is already published in `Teraformer-limited/devicemark-replica-runs` (its raw
+link) and this export would write it to `private/` — its model isn't marked
+public on its page, or `public/` is refused as above — the export stops before
+writing anything, names those rows and says why. `--private` writes every row
+to `private/` on purpose. On 14 Nov a re-export put all 27 rows in `private/`
+without a word: the 13 published rows' models had never been marked (they were
+published in early October by 15.4's name rule, before 17h's mark of 7 Oct), and neither
+variable was given.
+
 **Folder names** (18b): a Frontier run's folder is `frontier-run-<its Runs
 number>`; a DeviceMark row's is its row's name, unless the scrub would
 change it (a model named after an address): then `devicemark-<a hash>`.
