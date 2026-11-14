@@ -96,6 +96,8 @@ PARAMS_MASEIN = "34.8B / 2.3B or 2.7B"            # Table F4
 # Figure 1: each model in its higher-scoring mode on our DeviceMark replica (Table 12), and
 # the speed it writes at on a phone. Label, its figure-10.csv row, its Pipette name.
 SPEED_ROWS = [("Masein model, thinking off", "Masein model, thinking off", None),
+              ("Masein model, Medium", None, None),
+              ("Masein model, High at the app's limits", None, None),
               ("Qwen3.5-4B, thinking off", "Qwen3.5-4B, thinking off", "Qwen3.5-4B"),
               ("Gemma 4 E2B, thinking on", "gemma-4-E2B-it, thinking on", "gemma-4-E2B-it"),
               ("LFM2.5-1.2B", "LFM2.5-1.2B-Instruct, thinking off", "LFM2.5-1.2B-Instruct"),
@@ -110,9 +112,21 @@ PIPETTE_HOW = ("Pipette leaderboard, Galaxy S26 Ultra (12 GB): {name} q4_k_m, ll
 # r22 (12 Nov): the key numbers' throughput row for Instant mode, the OnePlus 15 in short chats
 MASEIN_SPEED = ("15.2", "Teraformer's app on a OnePlus 15 (16 GB), Instant mode, short chats, median, on the "
                         "16.0 GB file (key numbers; Section 3); measured by the app's developers")
+# r22 (14 Nov, masein): the Masein model's other modes, scored on the replica on 12 Nov and not
+# in figure-10.csv: Medium at its preliminary short-chat median on the OnePlus 15 (Table 1);
+# High at the app's limits has no speed until the app's own short-chat number comes (not the
+# shell's, which runs faster than the app), so its row is kept in figure-1.csv and not drawn
+MEDIUM_SPEED = ("12.6", "Teraformer's app on a OnePlus 15 (16 GB), Medium mode, short chats, median, "
+                        "preliminary (Table 1); measured by the app's developers")
+OWN_SCORES = {"Masein model, Medium": ("84.6", "81.6", "87.3"),
+              "Masein model, High at the app's limits": ("78.7", "75.4", "82.0")}
+OWN_SPEEDS = {"Masein model, thinking off": MASEIN_SPEED, "Masein model, Medium": MEDIUM_SPEED}
 # a point drawn under another name than its Table 12 row's (which figure-1.csv keeps): the
 # app's mode for the Masein model's thinking-off row
-SHOWN = {"Masein model, thinking off": "Masein model, Instant"}
+SHOWN = {"Masein model, thinking off": "Masein model, Instant",
+         "Masein model, Medium": "Masein model, Medium (preliminary)"}
+# a Masein point whose label goes up, at this height (Figure 1's y axis)
+MINE_UP = {"Masein model, Medium": 98.2}
 CLOUD = ["Gemini Flash (cloud)", "Gemini Pro (cloud)"]
 
 # Figure 7 (GPQA Diamond lanes): the models the text names
@@ -395,7 +409,11 @@ def speeds(out: Path) -> dict:
                 got[name] = (r["speed_tok_s"], r["speed_source"])
     for label, _, pip in SPEED_ROWS:
         if label not in got:
-            got[label] = MASEIN_SPEED if pip is None else (str(PIPETTE_SPEED[pip]), PIPETTE_HOW.format(name=pip))
+            mine = OWN_SPEEDS.get(label)
+            if pip is not None:
+                got[label] = (str(PIPETTE_SPEED[pip]), PIPETTE_HOW.format(name=pip))
+            elif mine:
+                got[label] = mine
     return got
 
 
@@ -404,12 +422,17 @@ def fig1(data: Path, out: Path, P: dict):
     sp = speeds(out)
     pts = []
     for label, key, pip in SPEED_ROWS:
-        r = dm[key]
-        base = key.split(",")[0]
-        others = [o for k, o in dm.items() if k.split(",")[0] == base and k != key and o["Kind"] != "published"]
-        assert all(float(o["Composite"]) < float(r["Composite"]) for o in others), (key, "not its higher-scoring mode")
-        pts.append((label, sp[label][0], float(r["Composite"]), float(r["95% low"]), float(r["95% high"]),
-                    sp[label][1], OURS + (" (replica)" if pip else "")))
+        if key is None:                       # r22: a Masein mode figure-10.csv doesn't have
+            v, lo, hi = (float(x) for x in OWN_SCORES[label])
+        else:
+            r = dm[key]
+            base = key.split(",")[0]
+            others = [o for k, o in dm.items() if k.split(",")[0] == base and k != key and o["Kind"] != "published"]
+            assert all(float(o["Composite"]) < float(r["Composite"]) for o in others), (key, "not its higher-scoring mode")
+            v, lo, hi = float(r["Composite"]), float(r["95% low"]), float(r["95% high"])
+        # r22: a row with no speed yet (High) is kept in figure-1.csv and not drawn
+        xs, how = sp.get(label, ("", ""))
+        pts.append((label, xs, v, lo, hi, how, OURS + (" (replica)" if pip else "")))
     clouds = [(c, float(dm[c]["Composite"])) for c in CLOUD]
     fig = figure(3.9)
     ax = axes_in(fig, 0.78, 0.72, 5.62, 2.84)
@@ -427,17 +450,29 @@ def fig1(data: Path, out: Path, P: dict):
              "LFM2.5-1.2B": ("hi", 0, 3, "center", "bottom"), "Qwen3.5-2B, thinking off": (5, 0, "left", "center"),
              "granite-4.0-h-1b": (5, 0, "left", "center"), "Qwen3.5-0.8B, thinking off": (-5, 0, "right", "center")}
     for label, xs, y, lo, hi, _, _ in pts:
+        if not xs:
+            continue
         x = float(xs)
         me = label.startswith("Masein")
         col = BLUE if me else ORANGE
-        e = ax.errorbar([x], [y], yerr=[[y - lo], [hi - y]], fmt="none", ecolor=col, zorder=3, **EBAR)
+        # r22: the other models' bars and points are drawn over the Masein model's points, so a
+        # bar that runs behind one (Qwen3.5-4B's, beside Instant) still shows
+        e = ax.errorbar([x], [y], yerr=[[y - lo], [hi - y]], fmt="none", ecolor=col, zorder=3 if me else 5, **EBAR)
         for part in e.lines[1] + tuple(e.lines[2]):
             part.set_gid("pt:" + label)
-        sc = ax.scatter([x], [y], s=62 if me else 30, color=col, edgecolor="white", lw=0.8, zorder=4)
+        sc = ax.scatter([x], [y], s=62 if me else 30, color=col, edgecolor="white", lw=0.8, zorder=4 if me else 6)
         sc.set_gid("pt:" + label)
-        if me:
-            t = ax.annotate(f"{SHOWN.get(label, label)}: {y:.1f} at {xs} tokens/s", (x, y), xytext=(8, 0),
-                            textcoords="offset points",
+        words = f"{SHOWN.get(label, label)}: {y:.1f} at {xs} tokens/s"
+        if me and label in MINE_UP:
+            # r22: Medium sits left of Instant, Qwen3.5-4B's and Instant's bars between them and
+            # the free space on the right: its label goes above the cloud lines, a leader up from
+            # its bar
+            ytext = MINE_UP[label]
+            leader(ax, (x, hi + 0.6), (x, ytext - 1.2), "pt:" + label)
+            t = ax.annotate(words, (x, ytext), xytext=(-2, 0), textcoords="offset points",
+                            ha="left", va="center", fontsize=SMALL, fontweight="bold", color=INK)
+        elif me:
+            t = ax.annotate(words, (x, y), xytext=(8, 0), textcoords="offset points",
                             ha="left", va="center", fontsize=SMALL, fontweight="bold", color=INK)
         else:
             spec = place[label]
@@ -453,7 +488,7 @@ def fig1(data: Path, out: Path, P: dict):
     legend_row(fig, [mark(BLUE, size=6.5), mark(ORANGE, size=5), mark(GREEN, line=(0, (4, 2.5)))],
                ["Masein model (95% range)", "other models, scored by us (95% range)", "cloud model"], left=0.78)
     rows = [[lab.split(", ")[0], (lab.split(", ")[1] if ", " in lab else ""), f"{y:.1f}", f"{lo:.1f}", f"{hi:.1f}",
-             src_s, x, how, PIPETTE if how.startswith("Pipette") else OURS]
+             src_s, x, how, PIPETTE if how.startswith("Pipette") else OURS if x else ""]
             for lab, x, y, lo, hi, how, src_s in pts]
     rows += [[c, "", f"{v:.1f}", dm[c]["95% low"], dm[c]["95% high"], DEVICEMARK, "", "", ""] for c, v in clouds]
     head = ["model", "mode", "devicemark_composite", "ci95_low", "ci95_high", "score_source", "speed_tok_s",

@@ -514,6 +514,15 @@ def fig_size(p: Paper, cap: str, src: Path):
             "Plotted in", "Source"], out
 
 
+def run_by_us(t: dict, raw: list[str]) -> bool:
+    """r22 (masein, 14 Nov): Table 12 says who ran each row in words, in its "Run by" column
+    ("us (replica)" or "DeviceMark"); since r18 no table sets anything in italics"""
+    k = next((i for i, h in enumerate(t["head"]) if clean(h) == "Run by"), None)
+    if k is None:
+        raise SystemExit(f"{t['name']} has no \"Run by\" column to say whose each row is")
+    return clean(raw[k]).startswith("us")
+
+
 def fig_devicemark(p: Paper, cap: str, src: Path):
     t = p.find("DeviceMark's rows", lambda t: any(h.startswith("Composite") for h in t["head"]))
     k = next(i for i, h in enumerate(t["head"]) if h.startswith("Composite"))
@@ -521,36 +530,46 @@ def fig_devicemark(p: Paper, cap: str, src: Path):
     for raw in t["rows"]:
         m = RANGE.match(clean(raw[k]))
         out.append([clean(raw[0]), clean(raw[1]), num(m.group(1)), num(m.group(2)), num(m.group(3)),
-                    DEVICEMARK if italic(raw[k]) else OURS + " (replica)"])
+                    OURS + " (replica)" if run_by_us(t, raw) else DEVICEMARK])
     return ["Model", "Run by", "Composite", "95% low", "95% high", "Source"], out
 
 
-# r22 (12 Nov): Figure 1 plots the Masein model in Instant mode, at the OnePlus 15's
-# short-chat median in the key numbers' throughput row for that mode
-THROUGHPUT_ROW = ("Token generation throughput on a phone", "Instant mode")
+# r22 (12 and 14 Nov): Figure 1 plots the Masein model's modes, each at the OnePlus 15's
+# short-chat median the key numbers print for it: Instant in its own row, "Token generation
+# throughput on a phone (…), Instant mode"; another mode in a throughput row's words, as r22's
+# "Medium mode, preliminary: 12.6 and 9.7 in short chats", whose first number is the OnePlus
+# 15's (the row gives the OnePlus 15 first). A mode with no speed yet (High) is kept unplotted
+THROUGHPUT = "Token generation throughput on a phone"
+APP_MODES = ("Instant", "Medium", "High")
 SHORT_CHATS = re.compile(r"OnePlus 15(?: \([^)]*\))?: (\d+(?:\.\d+)?)(?: \([^)]*\))? in short chats")
 
 
-def masein_speed(p: Paper) -> str:
-    """the OnePlus 15's short-chat median in the key numbers' row "Token generation
-    throughput on a phone (…), Instant mode"."""
-    head, mode = THROUGHPUT_ROW
-    got = [r for x in p.tabs for r in x["rows"]
-           if clean(r[0]).startswith(head) and clean(r[0]).endswith(mode)]
-    if len(got) != 1:
-        raise SystemExit(f"the speed chart: the key numbers have {len(got)} rows \"{head} (…), {mode}\"; "
-                         "the Masein model's throughput is read from one")
-    m = SHORT_CHATS.search(clean(got[0][1]))
-    if m is None:
-        raise SystemExit(f"the speed chart: the key numbers' throughput row for {mode} gives no "
-                         "OnePlus 15 median in short chats")
-    return num(m.group(1))
+def masein_speed(p: Paper, mode: str) -> tuple[str, bool]:
+    """(the OnePlus 15's short-chat median the key numbers print for the mode, and whether they
+    call it preliminary)"""
+    rows = [r for x in p.tabs for r in x["rows"] if clean(r[0]).startswith(THROUGHPUT)]
+    own = [r for r in rows if clean(r[0]).endswith(f"{mode} mode")]
+    if len(own) > 1:
+        raise SystemExit(f"the speed chart: the key numbers have {len(own)} rows \"{THROUGHPUT} (…), "
+                         f"{mode} mode\"; the Masein model's throughput is read from one")
+    if own:
+        m = SHORT_CHATS.search(clean(own[0][1]))
+        if m is None:
+            raise SystemExit(f"the speed chart: the key numbers' throughput row for {mode} mode gives no "
+                             "OnePlus 15 median in short chats")
+        return num(m.group(1)), "preliminary" in clean(own[0][0]).lower()
+    said = [m for r in rows for m in re.finditer(
+        rf"{mode} mode(, preliminary)?: (\d+(?:\.\d+)?)(?:(?!\. [A-Z])[^;|])*? in short chats", clean(r[1]))]
+    if len(said) != 1:
+        raise SystemExit(f"the speed chart: the key numbers give {mode} mode's short-chat throughput "
+                         f"{len(said)} times; the Masein model's is read from one")
+    return num(said[0].group(2)), bool(said[0].group(1))
 
 
 def fig_speed(p: Paper, cap: str, src):
     """DeviceMark composite against token generation throughput on a phone: each score must be Table 12's
-    as printed; a Pipette speed must carry Pipette's notice, and the Masein model's must be
-    the OnePlus 15's short-chat median the key numbers print for Instant mode"""
+    as printed; a Pipette speed must carry Pipette's notice, and each of the Masein model's must
+    be the OnePlus 15's short-chat median the key numbers print for its mode"""
     f = src.speeds
     if not f.exists():
         raise SystemExit(f"the speed chart: {f} is missing (the figure script writes it)")
@@ -571,10 +590,15 @@ def fig_speed(p: Paper, cap: str, src):
                                                                    r["ci95_high"]):
             raise SystemExit(f"the speed chart: {name} is plotted at {r['devicemark_composite']} "
                              f"[{r['ci95_low']}, {r['ci95_high']}]; {t['name']} prints {clean(raw[k])}")
-        if italic(raw[k]):
+        if not run_by_us(t, raw):
             if r["speed_tok_s"]:
                 raise SystemExit(f"the speed chart: {name} is a published row and has no speed")
             out.append([name, num(m.group(1)), num(m.group(2)), num(m.group(3)), DEVICEMARK, "", "", ""])
+            continue
+        mine = name.startswith("Masein model")
+        if mine and not (r["speed_tok_s"] or r["speed_source"] or r["speed_credit"]):
+            # r22: a mode whose throughput isn't measured yet: its score, no speed, not plotted
+            out.append([name, num(m.group(1)), num(m.group(2)), num(m.group(3)), OURS, "", "", ""])
             continue
         if not r["speed_tok_s"] or not is_num(r["speed_tok_s"]):
             raise SystemExit(f"the speed chart: {name} has no speed")
@@ -583,13 +607,18 @@ def fig_speed(p: Paper, cap: str, src):
                 raise SystemExit(f"the speed chart: {name}'s speed is Pipette's and must carry its notice")
         elif r["speed_credit"] != OURS:
             raise SystemExit(f"the speed chart: {name}'s speed is not Pipette's, so it is {OURS}")
-        if name.startswith("Masein model"):
-            want, mode = masein_speed(p), THROUGHPUT_ROW[1]
+        if mine:
+            modes = [x for x in APP_MODES if f"{x} mode" in r["speed_source"]]
+            if len(modes) != 1:
+                raise SystemExit(f"the speed chart: {name}'s speed_source must name its mode, one of "
+                                 f"{', '.join(x + ' mode' for x in APP_MODES)}")
+            want, early = masein_speed(p, modes[0])
             if num(r["speed_tok_s"]) != want:
-                raise SystemExit(f"the speed chart: the Masein model is plotted at {r['speed_tok_s']} tokens/s; "
-                                 f"the key numbers print {want} for {mode} on the OnePlus 15 in short chats")
-            if mode not in r["speed_source"]:
-                raise SystemExit(f"the speed chart: the Masein model's speed_source must say it is {mode}'s")
+                raise SystemExit(f"the speed chart: {name} is plotted at {r['speed_tok_s']} tokens/s; the key "
+                                 f"numbers print {want} for {modes[0]} mode on the OnePlus 15 in short chats")
+            if early and "preliminary" not in r["speed_source"]:
+                raise SystemExit(f"the speed chart: the key numbers call {modes[0]} mode's throughput "
+                                 f"preliminary, and {name}'s speed_source must say so")
         out.append([name, num(m.group(1)), num(m.group(2)), num(m.group(3)), OURS, r["speed_tok_s"],
                     r["speed_source"], r["speed_credit"]])
     return ["Model", "DeviceMark composite", "95% low", "95% high", "Score: whose", "Token generation throughput (tokens/s)",
