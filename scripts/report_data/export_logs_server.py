@@ -49,6 +49,14 @@ TERMS = {"checkpoint name": r"(?i)\bstep[-_]?\d{3,}\b", "step": r"(?i)\bstep\b",
          "k3k6": r"(?i)\bk3k6\b|\bk[36]\b",
          "board": r"(?i)\bboard\b",
          "box names": r"(?i)\bdgx-?0?\d\b|\bteraformer-5090|\bvast\.ai\b",
+         # r25 (14 Nov): runtime details stay in internal docs, as scan_terms.py's
+         "runtime switches": r"LLAMA_MOE_ROUTE_\w+|GGML_CPU_DISABLE_FUSION|LOOKAHEAD_MOE_ROUTER_NORM",
+         "environment variables": r"\b(?!(?:I?Q\d|PQ\d|TQ\d|PTQ\d)\w*)[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b",
+         "server argv": r"\bllama-server\b|(?<![\w-])--(?:jinja|metrics|no-mmap|n-cpu-moe|flash-attn|"
+                        r"ctx-size|cache-type-[kv]|parallel|n-gpu-layers|host|port|threads|spec-type|"
+                        r"reasoning-budget|reasoning-format|chat-template(?:-file|-kwargs)?)\b|"
+                        r"(?<![\w-])-(?:ngl|ctk|ctv|np|fa)\b",
+         "served model ids": r"\bserved(?:/|__)[A-Za-z0-9][\w.-]*",
          "IP addresses": r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
          "paths": r"/home/[a-z]+|/Users/[a-z]+|/workspace/"}
 # people's names are scanned on the Mac, from a list kept out of the repository

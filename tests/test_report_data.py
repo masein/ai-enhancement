@@ -391,6 +391,30 @@ def test_the_scan_fails_our_own_text_and_only_reports_the_benchmarks(tmp_path, c
     assert scan.main([str(d), "--private", str(priv), "--allow", str(allow)]) == 0
 
 
+@pytest.mark.parametrize("text, term", [
+    ("It ran with LOOKAHEAD_MOE_ROUTER_NORM set.", "runtime switches"),
+    ("LLAMA_MOE_ROUTE_MODE was local.", "runtime switches"),
+    ("GGML_CPU_DISABLE_FUSION held.", "runtime switches"),
+    ("launched as llama-server with its defaults", "server argv"),
+    ("flags: --jinja --metrics", "server argv"),
+    ("all layers on the GPU (-ngl 99)", "server argv"),
+    ("-ctk q8_0 -ctv q8_0", "server argv"),
+    ("env CUDA_VISIBLE_DEVICES=0", "launch env"),
+    ("the row served/step2388-k3k6-2611-medium", "served model ids"),
+    ("its folder served__Qwen3.6-35B-A3B-Q4-lda-2610", "served model ids"),
+])
+def test_runtime_details_are_internal_terms(tmp_path, capsys, text, term):
+    # r25 (masein and Roohi, 14 Nov): the runtime's switches, the server's command line and
+    # launch environment, and our serving ids stay in internal docs; the report's own words
+    # for them ("lookahead routing on", "flash attention on") are fine
+    d, priv = folder(tmp_path, "Lookahead routing on; flash attention on; all layers on the GPU.\n")
+    assert scan.main([str(d), "--private", str(priv)]) == 0
+    (d / "README.md").write_text(text + "\n", encoding="utf-8")
+    assert scan.main([str(d), "--private", str(priv)]) == 1
+    out = capsys.readouterr().out
+    assert f"{term}: 1" in out or f"{term}: 2" in out, out
+
+
 def test_the_upload_sends_nothing_with_a_tbd_or_without_the_private_terms(tmp_path, capsys):
     d, priv = folder(tmp_path, "Counts: [TBD from the logs export]\n")
     args = ["--dry-run", "--folder", str(d), "--private", str(priv), "--allow", str(tmp_path / "none")]
