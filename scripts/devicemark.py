@@ -1189,6 +1189,12 @@ def pair(ours: list[dict], theirs: list[dict]) -> None:
 # lookahead, and "MTP-GGUF" in a file's name is not MTP
 _ENV_TOKEN = re.compile(r"\b([A-Z][A-Z0-9_]*)=([A-Za-z0-9_.:/+-]+)")
 ROUTE_MODE, ROUTE_LOOKAHEAD = "LLAMA_MOE_ROUTE_MODE", "LLAMA_MOE_ROUTE_LOOKAHEAD"
+# r25 (Roohi, 14 Nov): LOOKAHEAD_MOE_ROUTER_NORM=1 turns lookahead routing on (one layer
+# ahead) — a newer switch than LLAMA_MOE_ROUTE_MODE=lookahead, in the team's builds that
+# read it (every step2388 and step8804 run sets it). Before, only the old switch was read,
+# so those runs were recorded with lookahead False: their rows are labelled by their launch
+# as registered now, never by that record
+ROUTER_NORM = "LOOKAHEAD_MOE_ROUTER_NORM"
 
 
 def launch_of(*texts: str) -> dict:
@@ -1204,9 +1210,10 @@ def launch_of(*texts: str) -> dict:
         elif t == "--spec-type" and i + 1 < len(toks):
             spec = toks[i + 1]
     mode = env.get(ROUTE_MODE, "").lower()
-    return {"lookahead": mode == "lookahead" and env.get(ROUTE_LOOKAHEAD, "1") != "0",
+    return {"lookahead": ((mode == "lookahead" and env.get(ROUTE_LOOKAHEAD, "1") != "0")
+                          or env.get(ROUTER_NORM, "0") != "0"),
             "mtp": bool(spec) and "mtp" in spec.lower(),
-            "said": spec is not None or ROUTE_MODE in env}
+            "said": spec is not None or ROUTE_MODE in env or ROUTER_NORM in env}
 
 
 # the build a served setup is: "k4-LDA" in a phone build's name or file, an

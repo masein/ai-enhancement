@@ -266,8 +266,14 @@ def crowd(live):
     for mid, (su, _) in CROWD.items():
         _row(out, mid, acc, {**SERVED, "mtp": False, "name": "Qwen3.6 " + mid.split("/")[1], **su})
     _row(out, "served/C-mtp", acc, {**SERVED, "phone": True, "name": "Qwen3.6 C-mtp"}, thinking=True)
+    # r25: a checkpoint, recorded with lookahead False before LOOKAHEAD_MOE_ROUTER_NORM was read
+    # as lookahead — apart from the crowd
+    _row(out, "served/C-step", {"ifeval": 0.55, "mmlu_pro": 0.5, "math": 0.6},
+         {**SERVED, "mtp": False, "phone": False, "lookahead": False, "name": "step2388 (k3k6 runtime)",
+          "server_flags": "step2388.k3k6.gguf: llama-server -ngl 99 · GGML_CPU_DISABLE_FUSION=1 "
+                          "LOOKAHEAD_MOE_ROUTER_NORM=1"})
     yield out
-    for mid in CROWD:
+    for mid in [*CROWD, "served/C-step"]:
         for d in out.glob(mid.replace("/", "__") + "*"):
             shutil.rmtree(d, ignore_errors=True)
 
@@ -290,7 +296,9 @@ def test_our_crowded_lines_have_short_names_apart_and_inside(live, page, crowd, 
     mine = {x["id"]: x["t"] for x in got["ls"] if x["id"].startswith("served/C-")}
     assert mine == {"served/C-plain": "plain", "served/C-la": "lookahead", "served/C-mtp": "MTP",
                     "served/C-la-mtp": "lookahead + MTP", "served/C-orig": "original",
-                    "served/C-mtp · thinking": "MTP · thinking"}
+                    "served/C-mtp · thinking": "MTP · thinking",
+                    # r25: a checkpoint by its checkpoint, never "original", and lookahead on
+                    "served/C-step": "step2388 · lookahead"}
     # what each short name stands for, under the chart
     key = page.locator("[data-dm-key]").inner_text()
     assert "lookahead + MTP = phone build · MTP · lookahead · thinking off" in key
