@@ -77,12 +77,6 @@ def clean(c: str) -> str:
     return re.sub(r"(?<![\w*])\*([^*]+)\*(?![\w*])", r"\1", c).strip()
 
 
-def italic(c: str) -> bool:
-    """a cell set in italics as a whole: not measured by us"""
-    c = c.strip()
-    return bool(re.fullmatch(r"\*[^*].*\*", c)) and not c.startswith("**")
-
-
 def tables(lines: list[str]) -> list[dict]:
     """each table with its caption: {name, part, caption, head, rows (raw cells)}"""
     out, cap, name, part, i = [], "", None, 0, 0
@@ -168,14 +162,14 @@ def split_columns(head: list[str], rows: list[list[str]]) -> tuple[list[str], li
 
 
 def credit(caption: str) -> str:
-    """whose numbers a table's italic cells are, from its caption"""
-    if "DeviceMark's published" in caption:
+    """whose a table's other numbers are, from its caption"""
+    if "DeviceMark's published" in caption or "run by DeviceMark" in caption:
         return DEVICEMARK
     if "as published" in caption:
         return MAKER
     if "Epoch" in caption:
         return EPOCH
-    return "not measured by us (italic in the report)"
+    return "not measured by us"
 
 
 # ---------------------------------------------------------------------------
@@ -183,7 +177,8 @@ def credit(caption: str) -> str:
 # ---------------------------------------------------------------------------
 
 EPOCH_LIST = ["Model (setting)", "Epoch score", "Verdict", "Gap (95% range)"]
-MODES = re.compile(r"^(.*), thinking (on / off|off / on|on|off)$")
+# a key number's modes: "thinking on / off" (to r22) or the app's, "High / Medium / Instant" (r23)
+MODES = re.compile(r"^(.*), (thinking (?:on / off|off / on|on|off)|(?:High|Medium|Instant)(?: / (?:High|Medium|Instant))*)$")
 
 
 def epoch_list(t: dict) -> tuple[list[str], list[list[str]]]:
@@ -200,7 +195,7 @@ def epoch_list(t: dict) -> tuple[list[str], list[list[str]]]:
                     num(m.group(1)) if m else num(score) if is_num(score) else score,
                     num(m.group(2)) if m else "", verdict.replace(" ‡", ""),
                     "yes" if "‡" in verdict else "", *gaps,
-                    EPOCH if italic(raw[1]) else OURS])
+                    OURS if masein_row(raw[0]) else EPOCH])
     return h, out
 
 
@@ -235,20 +230,47 @@ def key_numbers(t: dict) -> tuple[list[str], list[list[str]]]:
     for raw in t["rows"]:
         measure, value, compare = (clean(c) for c in raw)
         m = MODES.match(measure)
-        modes = ["thinking " + x for x in m.group(2).split(" / ")] if m else [""]
+        modes = ([("thinking " + x if m.group(2).startswith("thinking") else x)
+                  for x in m.group(2).removeprefix("thinking ").split(" / ")] if m else [""])
         scores = value.split(" / ")
         parsed = [PM.match(s) or RANGE.match(s) for s in scores]
         if not m or len(scores) != len(modes) or not all(parsed):
             out.append([m.group(1) if m else measure, modes[0] if len(modes) == 1 else "",
                         value, "", "", "", compare])
             continue
-        about = "thinking off" if compare.startswith("Thinking off") else "thinking on"
+        # the comparison is about the mode it starts with ("High: …", "Thinking off: …"), else
+        # the first (thinking on, or High)
+        about = next((x for x in modes if compare.lower().startswith(x.lower() + ":")
+                      or compare.lower().startswith(x.lower() + " ")),
+                     "thinking on" if "thinking on" in modes else modes[0])
         for mode, s in zip(modes, scores):
             pm, rng = PM.match(s), RANGE.match(s)
             out.append([m.group(1), mode, num((pm or rng).group(1)), num(pm.group(2)) if pm else "",
                         num(rng.group(2)) if rng else "", num(rng.group(3)) if rng else "",
                         compare if mode == about or len(modes) == 1 else ""])
     return h, out
+
+
+def masein_row(label: str) -> bool:
+    return clean(label).startswith("Masein model")
+
+
+def whose(t: dict) -> tuple[list[int], list[bool]]:
+    """r22 (masein): the columns, or else the rows, of a table that are someone else's numbers,
+    from the paper's words — r18 took italics out of every table. A "Run by" column says it
+    row by row ("us (replica)" or "DeviceMark", Table 12); a caption that says the other
+    models' columns are not measured by us (Table 9) makes every column but the Masein
+    model's theirs; one that says the other rows' numbers are as published, none measured by
+    us (Table G1), every row but the Masein model's"""
+    head, cap = t["head"], " ".join(t["caption"].split())
+    if "Run by" in head:
+        k = head.index("Run by")
+        return [], [not clean(r[k]).startswith("us") for r in t["rows"]]
+    if re.search(r"columns? (?:are|is) [^.]*not measured by us", cap):
+        return [k for k in range(1, len(head)) if not head[k].startswith("Masein model")], []
+    if re.search(r"none measured by us|not measured by us", cap) and head[0].startswith("Model"):
+        return [], [not masein_row(r[0]) for r in t["rows"]]
+    return [], []
 
 
 def table_file(t: dict) -> tuple[str, list[str], list[list[str]]]:
@@ -265,15 +287,11 @@ def table_file(t: dict) -> tuple[str, list[str], list[list[str]]]:
     if vcols:
         return stem, *verdict_grid(t, vcols)
     rows = [[clean(c) for c in r] for r in raw]
-    ital = [[italic(c) for c in r] for r in raw]
     h, out = split_columns(head, rows)
     who = credit(t["caption"])
-    by_col = [k for k in range(1, len(head)) if any(r[k] for r in ital if k < len(r))
-              and all(r[k] or not clean(rr[k]) or clean(rr[k]) == "–"
-                      for r, rr in zip(ital, raw) if k < len(r))]
-    by_row = [any(r[1:]) or r[0] for r in ital]
+    by_col, by_row = whose(t)
     pub = re.search(r"\*Published: ([^*]+?)\.?\*", t["caption"])
-    if by_col and all(k in by_col for r in ital for k, x in enumerate(r) if x):
+    if by_col:
         # columns that are all someone else's (Table 9): say so in their headings
         names = [head[k] for k in by_col]
         h = [x + f" [{who}]" if any(x == n or x.startswith(n + ", ") for n in names) else x
@@ -319,19 +337,27 @@ class Paper:
         return self.find(f"Epoch's {bench} list", lambda t: t["head"] == EPOCH_LIST
                          and t["caption"].startswith(bench + ","))
 
+    def top(self) -> str:
+        """the mode the Masein model's scores beside Epoch's are in: High (r23's Table 5) or,
+        before, thinking on"""
+        return "High" if any("High (%)" in t["head"] for t in self.tabs) else "thinking on"
+
     def masein(self, bench: str) -> tuple[str, str]:
-        """the Masein model's thinking-on score and SE as the scores table prints them"""
-        t = self.find("the scores in both modes", lambda t: "Thinking on (%)" in t["head"])
-        k = t["head"].index("Thinking on (%)")
+        """the Masein model's High (thinking-on) score and SE as the scores table prints them"""
+        col = "High (%)" if self.top() == "High" else "Thinking on (%)"
+        t = self.find("the scores in its modes", lambda t: col in t["head"])
+        k = t["head"].index(col)
         r = next(r for r in t["rows"] if clean(r[0]).startswith(bench))
         m = PM.match(clean(r[k]))
         return num(m.group(1)), num(m.group(2))
 
 
 def epoch_rows(t: dict) -> list[dict]:
+    """Epoch's rows of an Epoch list: every row but the Masein model's own (r22, masein: r18
+    took italics out of every table)"""
     out = []
     for raw in t["rows"]:
-        if not italic(raw[1]):
+        if masein_row(raw[0]):
             continue
         label, score, verdict, gap = (clean(c) for c in raw)
         m = PM.match(score)
@@ -367,7 +393,7 @@ def fig_release(p: Paper, cap: str, src: Path) -> tuple[list[str], list[list[str
     out = []
     for bench, key, dec in (("GPQA Diamond", "gpqa", 1), ("MATH Level 5", "math", 2)):
         v, se = p.masein(bench)
-        out.append([bench, "Masein model, thinking on", day, v, se, "",
+        out.append([bench, f"Masein model, {p.top()}", day, v, se, "",
                     OURS + " (plotted at the date of our runs)"])
         rows = epoch_rows(p.epoch(bench))
         for r, d in zip(rows, dates_for(rows, rec[key]["rows"], dec)):
@@ -426,7 +452,7 @@ def fig_gpqa(p: Paper, cap: str, src: Path):
     extra = json.loads((src.figures / "figure-extras.json").read_text(encoding="utf-8"))
     named = {norm(x) for x in extra["figure-6 labelled"]}
     v, se = p.masein("GPQA Diamond")
-    out = [["Masein model, thinking on", v, se, "", "", "", "yes", OURS]]
+    out = [[f"Masein model, {p.top()}", v, se, "", "", "", "yes", OURS]]
     for r in epoch_rows(p.epoch("GPQA Diamond")):
         out.append([r["label"], r["v"], r["se"], r["verdict"], "yes" if r["ddagger"] else "",
                     "yes" if r["dagger"] else "",
@@ -460,7 +486,7 @@ def fig_grid(p: Paper, cap: str, src: Path):
         row = [g[0], g[1]]
         for b, k in benches:
             if g[0] == "Subject":
-                row += [*p.masein(b), "thinking on", ""]
+                row += [*p.masein(b), p.top(), ""]
                 continue
             if not g[k]:
                 row += ["", "", "", "not run by Epoch"]
@@ -582,6 +608,10 @@ def fig_speed(p: Paper, cap: str, src):
     out = []
     for r in rows:
         name = r["model"] + (f", {r['mode']}" if r["mode"] else "")
+        if name.startswith("Masein model") and not (r["speed_tok_s"] or r["speed_source"] or r["speed_credit"]):
+            # r23 (masein, 14 Nov): a mode not plotted yet (High, until the app's own number) isn't
+            # checked against the paper or written: its score goes in when it is drawn
+            continue
         raw = by.get(name)
         if raw is None:
             raise SystemExit(f"the speed chart: {name} is not a row of {t['name']}")
@@ -596,10 +626,6 @@ def fig_speed(p: Paper, cap: str, src):
             out.append([name, num(m.group(1)), num(m.group(2)), num(m.group(3)), DEVICEMARK, "", "", ""])
             continue
         mine = name.startswith("Masein model")
-        if mine and not (r["speed_tok_s"] or r["speed_source"] or r["speed_credit"]):
-            # r22: a mode whose throughput isn't measured yet: its score, no speed, not plotted
-            out.append([name, num(m.group(1)), num(m.group(2)), num(m.group(3)), OURS, "", "", ""])
-            continue
         if not r["speed_tok_s"] or not is_num(r["speed_tok_s"]):
             raise SystemExit(f"the speed chart: {name} has no speed")
         if r["speed_source"].startswith("Pipette"):

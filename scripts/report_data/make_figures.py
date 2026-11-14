@@ -93,11 +93,12 @@ MASEIN_ON_DEVICE = {"GPQA Diamond": "82.7 ± 2.2", "MMLU-Pro": "83.0 ± 0.3", "I
 MASEIN_SIZE = 16.0
 PARAMS_MASEIN = "34.8B / 2.3B or 2.7B"            # Table F4
 
-# Figure 1: each model in its higher-scoring mode on our DeviceMark replica (Table 12), and
-# the speed it writes at on a phone. Label, its figure-10.csv row, its Pipette name.
-SPEED_ROWS = [("Masein model, thinking off", "Masein model, thinking off", None),
-              ("Masein model, Medium", None, None),
-              ("Masein model, High at the app's limits", None, None),
+# Figure 1: each other model in its higher-scoring mode on our DeviceMark replica (Table 12), the
+# Masein model in its modes, and the speed each writes at on a phone. Label (Table 12's row name,
+# which figure-1.csv keeps), its DeviceMark row (dm_rows), its Pipette name.
+SPEED_ROWS = [("Masein model, Instant", "Masein model, Instant", None),
+              ("Masein model, Medium", "Masein model, Medium", None),
+              ("Masein model, High", None, None),
               ("Qwen3.5-4B, thinking off", "Qwen3.5-4B, thinking off", "Qwen3.5-4B"),
               ("Gemma 4 E2B, thinking on", "gemma-4-E2B-it, thinking on", "gemma-4-E2B-it"),
               ("LFM2.5-1.2B", "LFM2.5-1.2B-Instruct, thinking off", "LFM2.5-1.2B-Instruct"),
@@ -112,21 +113,25 @@ PIPETTE_HOW = ("Pipette leaderboard, Galaxy S26 Ultra (12 GB): {name} q4_k_m, ll
 # r22 (12 Nov): the key numbers' throughput row for Instant mode, the OnePlus 15 in short chats
 MASEIN_SPEED = ("15.2", "Teraformer's app on a OnePlus 15 (16 GB), Instant mode, short chats, median, on the "
                         "16.0 GB file (key numbers; Section 3); measured by the app's developers")
-# r22 (14 Nov, masein): the Masein model's other modes, scored on the replica on 12 Nov and not
-# in figure-10.csv: Medium at its preliminary short-chat median on the OnePlus 15 (Table 1);
-# High at the app's limits has no speed until the app's own short-chat number comes (not the
-# shell's, which runs faster than the app), so its row is kept in figure-1.csv and not drawn
+# r22 (14 Nov, masein): Medium at its preliminary short-chat median on the OnePlus 15 (Table 1)
 MEDIUM_SPEED = ("12.6", "Teraformer's app on a OnePlus 15 (16 GB), Medium mode, short chats, median, "
                         "preliminary (Table 1); measured by the app's developers")
-OWN_SCORES = {"Masein model, Medium": ("84.6", "81.6", "87.3"),
-              "Masein model, High at the app's limits": ("78.7", "75.4", "82.0")}
-OWN_SPEEDS = {"Masein model, thinking off": MASEIN_SPEED, "Masein model, Medium": MEDIUM_SPEED}
-# a point drawn under another name than its Table 12 row's (which figure-1.csv keeps): the
-# app's mode for the Masein model's thinking-off row
-SHOWN = {"Masein model, thinking off": "Masein model, Instant",
-         "Masein model, Medium": "Masein model, Medium (preliminary)"}
+OWN_SPEEDS = {"Masein model, Instant": MASEIN_SPEED, "Masein model, Medium": MEDIUM_SPEED}
+# High at the app's limits (12 Nov), not Table 12's High row (the replica's 4,096-token cap): kept
+# in figure-1.csv with no speed and not drawn until the app's own short-chat number comes (not
+# the shell's, which runs faster than the app); its score goes in the paper when it is drawn
+OWN_SCORES = {"Masein model, High": ("78.7", "75.4", "82.0")}
+# a point drawn under another name than its Table 12 row's
+SHOWN = {"Masein model, Medium": "Masein model, Medium (preliminary)"}
 # a Masein point whose label goes up, at this height (Figure 1's y axis)
 MINE_UP = {"Masein model, Medium": 98.2}
+# r23 (14 Nov): figure-10.csv (round 13's DeviceMark rows) under Table 12's names, with Medium's
+# replica row of 12 Nov (M4; the replica asks greedily with no presence penalty, so it stands
+# for Medium at 0.75 too): 28 rows
+DM_RENAMED = {"Masein model, thinking off": "Masein model, Instant", "Masein model, thinking on": "Masein model, High"}
+DM_ADDED = [{"Model": "Masein model, Medium", "Kind": "Masein", "Composite": "84.6", "95% low": "81.6",
+             "95% high": "87.3", "Verdict vs Masein off": "", "Verdict vs Masein on": "",
+             "Source": "measured by Teraformer"}]
 CLOUD = ["Gemini Flash (cloud)", "Gemini Pro (cloud)"]
 
 # Figure 7 (GPQA Diamond lanes): the models the text names
@@ -417,8 +422,17 @@ def speeds(out: Path) -> dict:
     return got
 
 
+def dm_rows(data: Path) -> list[dict]:
+    """DeviceMark's rows as Table 12 names them (r23), Medium's added"""
+    rows = list(csv.DictReader(open(data / "figure-10.csv", encoding="utf-8")))
+    for r in rows:
+        r["Model"] = DM_RENAMED.get(r["Model"], r["Model"])
+    assert not {r["Model"] for r in rows} & {r["Model"] for r in DM_ADDED}
+    return rows + [dict(r) for r in DM_ADDED]
+
+
 def fig1(data: Path, out: Path, P: dict):
-    dm = {r["Model"]: r for r in csv.DictReader(open(data / "figure-10.csv", encoding="utf-8"))}
+    dm = {r["Model"]: r for r in dm_rows(data)}
     sp = speeds(out)
     pts = []
     for label, key, pip in SPEED_ROWS:
@@ -428,7 +442,8 @@ def fig1(data: Path, out: Path, P: dict):
             r = dm[key]
             base = key.split(",")[0]
             others = [o for k, o in dm.items() if k.split(",")[0] == base and k != key and o["Kind"] != "published"]
-            assert all(float(o["Composite"]) < float(r["Composite"]) for o in others), (key, "not its higher-scoring mode")
+            assert base == "Masein model" or all(float(o["Composite"]) < float(r["Composite"]) for o in others), \
+                (key, "not its higher-scoring mode")
             v, lo, hi = float(r["Composite"]), float(r["95% low"]), float(r["95% high"])
         # r22: a row with no speed yet (High) is kept in figure-1.csv and not drawn
         xs, how = sp.get(label, ("", ""))
@@ -1106,11 +1121,11 @@ def fig10(E: dict, P: dict):
 # ---------------------------------------------------------------------------
 
 def fig11(data: Path, P: dict):
-    rows = list(csv.DictReader(open(data / "figure-10.csv", encoding="utf-8")))
+    rows = dm_rows(data)
     rep = sorted([r for r in rows if r["Kind"] in ("Masein", "replica")], key=lambda r: -float(r["Composite"]))
     pub = sorted([r for r in rows if r["Kind"] == "published"], key=lambda r: -float(r["Composite"]))
-    assert len(rows) == 27
-    off = next(r for r in rows if r["Model"] == "Masein model, thinking off")
+    assert len(rows) == 28
+    off = next(r for r in rows if r["Model"] == "Masein model, Instant")
     assert off["Composite"] == "84.4" and sum(float(r["Composite"]) > 84.4 for r in pub) == 2
     rh, gh = 13.2, 16.0
     H = 26 + gh * 2 + rh * (len(rep) + len(pub)) + 6 + 34
@@ -1157,7 +1172,7 @@ def fig11(data: Path, P: dict):
     legend_row(fig, [mark(BLUE, size=5.5), mark(ORANGE, size=4.8), mark(ORANGE, hollow=True, size=4.6),
                      mark(GREEN, hollow=True, size=4.6)],
                ["Masein model", "replica, measured by us", "published by DeviceMark", "cloud model, published"])
-    head = ["Model", "Kind", "Composite", "95% low", "95% high", "Verdict vs the Masein model, thinking off", "Source"]
+    head = ["Model", "Kind", "Composite", "95% low", "95% high", "Verdict vs the Masein model, Instant", "Source"]
     return fig, head, out, Checker("11")
 
 
