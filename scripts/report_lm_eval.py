@@ -15759,10 +15759,13 @@ function dmLoad(force) {
 // 12z C4: a line of ours by its setup alone — original / plain / MTP /
 // lookahead / lookahead + MTP, and "· thinking" — short and never alike; the
 // chart's key and the hover give the whole label
-function dmShort(su, thinking, model) {
+// r25: a checkpoint (step2388) isn't the original: it goes by its checkpoint, as the server's
+// label for it begins
+function dmShort(su, thinking, model, label) {
   if (su.runtime !== 'llama-server') return String(model).split('/').pop() + (thinking ? ' · thinking' : '');
   const how = [su.lookahead ? 'lookahead' : '', su.mtp ? 'MTP' : ''].filter(Boolean).join(' + ');
-  return (su.phone ? how || 'plain' : 'original' + (how ? ` · ${how}` : ''))
+  const ck = /^(step\d+)\b/.exec(label || '');
+  return (su.phone ? how || 'plain' : (ck ? ck[1] : 'original') + (how ? ` · ${how}` : ''))
     + (thinking ? ' · thinking' : '');
 }
 function dmOurs(r) {
@@ -15770,7 +15773,7 @@ function dmOurs(r) {
   const name = (su.runtime === 'llama-server' && su.name ? su.name : r.model)
     + (r.thinking ? ' · thinking' : '');
   return { id: r.id, name, label: r.label || name, external: false,
-    short: dmShort(su, r.thinking, r.model),
+    short: dmShort(su, r.thinking, r.model, r.label),
     kind: su.runtime === 'llama-server' ? 'served' : 'hf',
     composite: r.row.composite, benches: r.row.benches, answered_pct: r.row.answered_pct,
     median_tokens: r.row.median_tokens, time_frontier: r.row.time_frontier, device: r.device,
