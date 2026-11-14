@@ -402,9 +402,11 @@ def test_18_no_key_survives_in_the_exported_setup(box, tmp_path, monkeypatch):  
                    "api-key", "API_KEY"):
         assert secret not in out, secret                    # 0adb522: through, whole
     got = json.loads(out)["tasks"][TASK]
-    assert got["launch"] == {"flags": ["-ctk", "q8_0", "--flash-attn", "on"],
-                             "env": {"LLAMA_MOE_ROUTE_MODE": "lookahead"}}
-    assert got["launch_setup"]["answers"] == ["-ctv", "q8_0"]
+    # r25 (masein and Roohi, 14 Nov): runtime details stay internal — the launch's flags and
+    # environment, and the speculative-decoding flags' names, never go out at all
+    assert "launch" not in got and set(got.get("launch_setup") or {}) <= {"drafts"}
+    for detail in ("LLAMA_MOE_ROUTE_MODE", "-ctk", "-ctv", "--flash-attn", "q8_0"):
+        assert detail not in out, detail
 
 
 def test_19_publishing_waits_for_a_typed_yes_to_the_list(box, tmp_path, monkeypatch, capsys):  # noqa: F811

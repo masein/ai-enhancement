@@ -9,7 +9,9 @@ question's middle); here everything not on a list is left out, and said.
 - Launch flags and the environment: `flags()` keeps the llama-server flags in
   FLAGS, each value a plain token (17i: TAKES take one, SWITCHES never);
   `env()` the variables ENV_NAMES allows, never one whose name holds KEY,
-  TOKEN, SECRET or PASS — 17i: a value only for a name in ENV_VALUES.
+  TOKEN, SECRET or PASS — 17i: a value only for a name in ENV_VALUES. r25
+  (masein and Roohi, 14 Nov): runtime details stay internal, so the raw-run
+  exports no longer write a launch at all and call neither.
 - Log lines: `log_lines()` keeps only lines in one of LOG_SHAPES — 17i: each
   a fixed form with typed slots, none holding a "/" but the run's own model,
   a step's folder on the box and a path here, so none carries a repository —
@@ -315,8 +317,8 @@ LOG_SHAPES = {
     "a sha256 worked out": rf"{_T} sha256 of {_FILE} \({_N} GB\)…",
     "the memory check": rf"{_T} (?:memory, from |memory not worked out: |{_N} slots of {_N} "
                         rf"tokens would leave ){_W}{{1,600}}",
-    "the server's variables": rf"{_T} not given to llama-server: [A-Z0-9_, ]{{1,300}}, set in "
-                              rf"this shell — {_W}{{1,300}}",
+    # r25 (masein and Roohi, 14 Nov): no shape for "not given to llama-server: <its variables>,
+    # set in this shell" — it names runtime switches, which stay internal
     "progress": rf"{_T} · {_W}{{1,300}}",
     "a DeviceMark task's progress": rf"{_T} [\w-]{{1,40}}  \d+/(?:\d+|\?) · {_W}{{1,300}}",
     "the parity questions": rf"{_T} parity {_N} of {_N}",

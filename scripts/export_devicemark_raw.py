@@ -261,9 +261,9 @@ def public_by_default(row: Path, setup: dict) -> bool:
     return es.public(model_of(row))
 
 
-# 17h: the setup record as it may go out, field by field — its launch's flags
-# and environment by name (export_safe), never its address, its port or how
-# it is served in words
+# 17h: the setup record as it may go out, field by field — never its address, its port or
+# how it is served in words. r25 (masein and Roohi, 14 Nov): nor its launch's flags and
+# environment, which stay internal
 SETUP = {"model": "name", "name": "text", "runtime": "text", "file": "name", "build": "scalar",
          "ctx": int, "quant": "name", "phone": bool,
          "thinking": bool, "thinking_mode": "text", "battery": "text", "cap": int, "seed": int,
@@ -273,16 +273,10 @@ SETUP = {"model": "name", "name": "text", "runtime": "text", "file": "name", "bu
          "battery_hashes": {"*": "name"}, "runs": [int], "provisional": "text"}
 
 
-def setup_out(setup: dict) -> tuple[dict, int]:
-    """the setup that may go out, and how many launch flags or variables were
-    left out"""
+def setup_out(setup: dict) -> dict:
+    """the setup that may go out — r25: without its launch's flags and environment"""
     import export_safe as es
-    out = es.pick(setup, SETUP) or {}
-    launch = setup.get("launch") if isinstance(setup.get("launch"), dict) else {}
-    fl, l1 = es.flags(launch.get("flags"))
-    ev, l2 = es.env(launch.get("env"))
-    out["launch"] = {"flags": fl, "env": ev}
-    return out, l1 + l2
+    return es.pick(setup, SETUP) or {}
 
 
 def runs_of(row: Path) -> list[dict]:
@@ -559,10 +553,10 @@ def export_row(row: Path, out: Path, public: bool | None = None, runs: list[dict
     import export_safe as es
     es.twin(dest, say)
     runs = runs_of(row) if runs is None else runs
-    full_setup, left = setup_out({**setup, "model": model, "battery": dm.VERSION,
-                                  "battery_hashes": dm.battery_hashes(items_src)
-                                  if items_src else None,
-                                  "runs": [r["id"] for r in runs]})
+    full_setup = setup_out({**setup, "model": model, "battery": dm.VERSION,
+                            "battery_hashes": dm.battery_hashes(items_src)
+                            if items_src else None,
+                            "runs": [r["id"] for r in runs]})
     # 17h: the runner's own lines only. 17i: checked against every gated and
     # private set all the same — a log holds whatever the box ran
     if questions is ... or questions is es.UNLOADED:
@@ -576,8 +570,8 @@ def export_row(row: Path, out: Path, public: bool | None = None, runs: list[dict
         "log.txt": scrub("\n".join(lines) + "\n"),
         "recompute.py": RECOMPUTE,
         "README.md": scrub(readme(model, thinking, full_setup, scores, dm.battery())
-                           + "\nWritten by a list of what may go out, field by field"
-                           + (f" ({left} launch flags or variables left out)" if left else "")
+                           + "\nWritten by a list of what may go out, field by field, "
+                             "the server's launch left out"
                            + "; the log holds only the runner's own lines"
                            + (": " + "; ".join(f"{n} left out ({w})" for w, n in out_.items())
                               if out_ else "") + ".\n")}
