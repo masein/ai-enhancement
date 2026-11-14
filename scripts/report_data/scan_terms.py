@@ -34,6 +34,14 @@ TERMS = {
     "LOOKAHEAD": r"LOOKAHEAD\w*",
     # an environment variable's name; a file's quantisation label (Q4_K_M, PQ2_0) isn't one
     "environment variables": r"\b(?!(?:I?Q\d|PQ\d|TQ\d|PTQ\d)\w*)[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b",
+    # r25 (masein and Roohi, 14 Nov): runtime details stay in internal docs — the runtime's
+    # switches by name, the server's command line and launch environment, and our serving ids
+    "runtime switches": r"LLAMA_MOE_ROUTE_\w+|GGML_CPU_DISABLE_FUSION|LOOKAHEAD_MOE_ROUTER_NORM",
+    "server argv": r"\bllama-server\b|(?<![\w-])--(?:jinja|metrics|no-mmap|n-cpu-moe|flash-attn|ctx-size|"
+                   r"cache-type-[kv]|parallel|n-gpu-layers|host|port|threads|spec-type|reasoning-budget|"
+                   r"reasoning-format|chat-template(?:-file|-kwargs)?)\b|(?<![\w-])-(?:ngl|ctk|ctv|np|fa)\b",
+    "launch env": r"\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+=\S+",
+    "served model ids": r"\bserved(?:/|__)[A-Za-z0-9][\w.-]*",
     "evalboard": r"(?i)evalboard", "board": r"(?i)\bboard\b",
     "IP addresses": r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
     "home paths": r"/home/[a-z]+|/Users/[a-z]+|/workspace/|/data-\d+",
