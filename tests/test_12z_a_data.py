@@ -73,10 +73,36 @@ FIVE = [
     ("-ngl 99 --spec-type draft-mtp", False, True, True),
     ("--spec-type=draft-mtp", False, True, True),
     ("--spec-type ngram", False, False, True),
+    # r25 (Roohi, 14 Nov): the newer switch, as every step2388 and step8804 run sets it
+    ("GGML_CPU_DISABLE_FUSION=1 LOOKAHEAD_MOE_ROUTER_NORM=1", True, False, True),
+    ("LOOKAHEAD_MOE_ROUTER_NORM=0", False, False, True),
 ])
 def test_lookahead_and_mtp_are_read_from_flags_and_environment_never_words(text, lookahead,
                                                                            mtp, said):
     assert dm.launch_of(text) == {"lookahead": lookahead, "mtp": mtp, "said": said}
+
+
+def test_a_run_recorded_before_the_newer_switch_was_read_is_labelled_lookahead(svc):  # noqa: F811
+    # r25: LOOKAHEAD_MOE_ROUTER_NORM=1 turns lookahead routing on. step2388's runs recorded
+    # lookahead False (only LLAMA_MOE_ROUTE_MODE was read then); its row is labelled by its
+    # launch as registered, so nothing reads that record as lookahead off
+    fake = FakeServer()
+    try:
+        rec = served.register({"name": "step2388 (k3k6 runtime)", "base_url": fake.base,
+                               "how": "step2388.k3k6.gguf on rented GPUs", "flags": "-ngl 99",
+                               "env": "GGML_CPU_DISABLE_FUSION=1 LOOKAHEAD_MOE_ROUTER_NORM=1",
+                               "thinking": "off", "phone": False,
+                               "based_on": "Qwen/Qwen3.6-35B-A3B"}, ME)
+        _row(config.OUT_DIR, rec["id"], ACC, {**SERVED, "lookahead": False, "mtp": False, "phone": False,
+                                             "name": "step2388 (k3k6 runtime)"})
+        row = {r["id"]: r for r in svc.get("/api/devicemark").json()["rows"]}[rec["id"]]
+        assert row["row"]["setup"]["lookahead"] is True
+        assert row["label"] == "step2388 · lookahead · thinking off"
+        assert row["retention"] is None                 # a checkpoint is never a phone build's original
+        su = sdm.setup_of(served.get(rec["id"]), False)       # and a new run records it on
+        assert su["lookahead"] is True and dm.setup_label(su, False) == "step2388 · lookahead · thinking off"
+    finally:
+        fake.close()
 
 
 def _five(out, fake: FakeServer) -> dict[str, str]:
