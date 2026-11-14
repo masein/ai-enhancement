@@ -1443,9 +1443,17 @@ def run_submission(sub: dict) -> None:
     trust_dir = config.BENCH_ROOT / "remote" / "trust-tasks" if remote else config.TRUST_TASKS_DIR
     sq_dir = config.BENCH_ROOT / "remote" / "simpleqa-tasks" if remote else config.SIMPLEQA_TASKS_DIR
     mab_dir = config.BENCH_ROOT / "remote" / "mab-tasks" if remote else config.MAB_TASKS_DIR
+    # r25 (masein, 14 Nov): a served model's launch as registered when its run starts here —
+    # its flags and environment, and "How it's served" — kept in the run's record, as a
+    # DeviceMark run's setup keeps it, so a run on this server can be checked later as a
+    # box's bundle can (whose server.env the import keeps). Not in the run's log, which has
+    # gone out with exports; nothing for a model on OpenRouter, which has no launch
+    launch = ({"launch": json.dumps({"flags": rec.get("flags") or "", "env": rec.get("env") or "",
+                                     "how": rec.get("how") or ""})}
+              if rec and not _served.is_openrouter(rec) else {})
     db.update(sid, kind=kind, params=meta["params"], vocab=meta["vocab"],
               batch=meta["batch"], need_gb=meta["need_gb"],
-              arch=json.dumps(meta.get("archinfo") or {}),
+              arch=json.dumps(meta.get("archinfo") or {}), **launch,
               progress=f"preflight ok · batch={meta['batch']} · "
                        f"needs ~{meta['need_gb']:g} GB" if not rec else
                        f"preflight ok · via OpenRouter: {rec['pin']['version']} · this run "

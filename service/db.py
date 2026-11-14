@@ -373,7 +373,7 @@ _COLS = ["id", "hf_id", "kind", "suite", "submitter", "note", "status", "progres
          "error", "params", "vocab", "batch", "need_gb", "created_at", "started_at",
          "finished_at", "gpu_seconds", "arch", "allow_remote_code", "load_missing",
          "tasks", "judge_batch", "reuse_note", "bank_version", "thinking", "subset", "bbq_all",
-         "part", "pair", "where_ran"]
+         "part", "pair", "where_ran", "launch"]
 
 
 def _conn() -> sqlite3.Connection:
@@ -417,7 +417,11 @@ def init(startup: bool = False) -> None:
                      "ALTER TABLE submissions ADD COLUMN pair TEXT DEFAULT ''",
                      # 17f: where a run ran — '' on this server; an import's box
                      # ("rented GPU · RTX 5090 · box A3"), never its address
-                     "ALTER TABLE submissions ADD COLUMN where_ran TEXT DEFAULT ''"):
+                     "ALTER TABLE submissions ADD COLUMN where_ran TEXT DEFAULT ''",
+                     # r25: a served model's launch as registered when its run started
+                     # here (JSON: flags, env, how) — '' for a run before this, an
+                     # import, or a model on OpenRouter
+                     "ALTER TABLE submissions ADD COLUMN launch TEXT DEFAULT ''"):
             try:
                 c.execute(stmt)
             except sqlite3.OperationalError:
