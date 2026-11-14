@@ -40,7 +40,7 @@ Text.
 | Measure | Masein model (measured here) | How it compares |
 | --- | --- | --- |
 | GPQA Diamond (%), High / Medium / Instant | 82.7 ± 2.2 / 80.1 ± 2.4 / 75.3 ± 2.4 | High: level with o1 (76.8) |
-| Token generation throughput on a phone (decode, tokens/s), Instant mode | OnePlus 15 (16 GB): 15.2 in short chats, 7.3 with 14,000 tokens of context. Medium mode, preliminary: 12.6 in short chats | No verdict |
+| Token generation throughput on a phone (decode, tokens/s), Instant mode | OnePlus 15 (16 GB): 15.2 in short chats, 7.3 with 14,000 tokens of context; iPhone 17 Pro Max (12 GB): 11.4 in short chats. Medium mode, preliminary: 12.6 and 9.7 in short chats | No verdict |
 
 **Table 5.** The Masein model, measured here, in its three modes: score (%) ± standard error.
 
@@ -142,8 +142,8 @@ def test_each_table_and_figure_is_a_file_named_by_the_papers_own_numbers(paper, 
     assert [r[1:4] for r in k[1:4]] == [["High", "82.7", "2.2"], ["Medium", "80.1", "2.4"],
                                         ["Instant", "75.3", "2.4"]]
     assert [r[-1] for r in k[1:4]] == ["High: level with o1 (76.8)", "", ""]
-    assert k[4][2] == ("OnePlus 15 (16 GB): 15.2 in short chats, 7.3 with 14,000 tokens of context. Medium mode, "
-                       "preliminary: 12.6 in short chats")
+    assert k[4][2] == ("OnePlus 15 (16 GB): 15.2 in short chats, 7.3 with 14,000 tokens of context; iPhone 17 Pro "
+                       "Max (12 GB): 11.4 in short chats. Medium mode, preliminary: 12.6 and 9.7 in short chats")
     # the index names each file's caption
     ix = {r[0]: r for r in rows(out / "index.csv")[1:]}
     assert ix["table-8.csv"][1:] == ["Table 8", "Answers that ran out of room at the final limit."]
@@ -213,21 +213,21 @@ def speed_paper(paper):
 
 def speeds_file(tmp_path, **change):
     """figure-1.csv as the figure script writes it; change={"model, mode": {column: value}}"""
-    pip = "Pipette leaderboard, Galaxy S26 Ultra (12 GB): Qwen3.5-4B q4_k_m"
+    dm = "DeviceMark leaderboard, iPhone 17 Pro: Qwen3.5-4B int8hu on Core AI, decode tokens/s"
     rows = [{"model": "Masein model", "mode": "Instant", "devicemark_composite": "84.4", "ci95_low": "81.4",
-             "ci95_high": "87.3", "score_source": build.OURS, "speed_tok_s": "15.2",
-             "speed_source": "Teraformer's app on a OnePlus 15, Instant mode, short chats (key numbers)",
+             "ci95_high": "87.3", "score_source": build.OURS, "speed_tok_s": "11.4",
+             "speed_source": "Teraformer's app on an iPhone 17 Pro Max, Instant mode, short chats (Table 1)",
              "speed_credit": build.OURS},
             {"model": "Masein model", "mode": "Medium", "devicemark_composite": "84.6", "ci95_low": "81.6",
-             "ci95_high": "87.3", "score_source": build.OURS, "speed_tok_s": "12.6",
-             "speed_source": "Teraformer's app on a OnePlus 15, Medium mode, short chats, preliminary (Table 1)",
+             "ci95_high": "87.3", "score_source": build.OURS, "speed_tok_s": "9.7",
+             "speed_source": "Teraformer's app on an iPhone 17 Pro Max, Medium mode, short chats, preliminary (Table 1)",
              "speed_credit": build.OURS},
             {"model": "Masein model", "mode": "High", "devicemark_composite": "78.7",
              "ci95_low": "75.4", "ci95_high": "82.0", "score_source": build.OURS, "speed_tok_s": "",
              "speed_source": "", "speed_credit": ""},
             {"model": "Qwen3.5-4B", "mode": "thinking off", "devicemark_composite": "80.1", "ci95_low": "76.6",
-             "ci95_high": "83.4", "score_source": build.OURS + " (replica)", "speed_tok_s": "15",
-             "speed_source": pip, "speed_credit": build.PIPETTE},
+             "ci95_high": "83.4", "score_source": build.OURS + " (replica)", "speed_tok_s": "10.8",
+             "speed_source": dm, "speed_credit": build.DEVICEMARK},
             {"model": "Qwen3.5-4B (int8)", "mode": "", "devicemark_composite": "26.1", "ci95_low": "22.4",
              "ci95_high": "29.9", "score_source": build.DEVICEMARK, "speed_tok_s": "", "speed_source": "",
              "speed_credit": ""}]
@@ -241,42 +241,45 @@ def speeds_file(tmp_path, **change):
     return f
 
 
-def test_the_speed_chart_takes_its_scores_from_table_12_and_keeps_pipettes_notice(paper, tmp_path):
+def test_the_speed_chart_takes_its_scores_from_table_12_and_its_speeds_from_devicemark(paper, tmp_path):
     # Figure 1 plots our DeviceMark scores against speeds from two setups: each score must
-    # be the one Table 12 prints, a Pipette speed must carry the notice Pipette's licence
-    # asks for, and each of the Masein model's speeds must be the OnePlus 15's short-chat
-    # median the key numbers print for its mode (r22): Instant's in its own row, Medium's,
-    # preliminary, in that row's words — not another number of the row. High, not measured
-    # in the app yet, keeps its score and no speed
+    # be the one Table 12 prints; another model's speed must be DeviceMark's iPhone 17 Pro
+    # number, as the repo's copy of its board gives it, and credited to DeviceMark (r25: no
+    # Pipette numbers); each of the Masein model's must be the iPhone 17 Pro Max's short-chat
+    # median the key numbers print for its mode — Instant's in its own row, Medium's,
+    # preliminary, in that row's words — not another number of the row. High, not measured in
+    # the app yet, is skipped
     speed_paper(paper)
     out = tmp_path / "paper-data"
     assert build.main([str(out), str(paper), "--speeds", str(speeds_file(tmp_path))]) == 0
     f1 = rows(out / "figure-1.csv")
-    assert f1[1][:7] == ["Masein model, Instant", "84.4", "81.4", "87.3", build.OURS, "15.2",
-                         "Teraformer's app on a OnePlus 15, Instant mode, short chats (key numbers)"]
-    assert f1[2][:6] == ["Masein model, Medium", "84.6", "81.6", "87.3", build.OURS, "12.6"]
-    # r23: High, not plotted until the app's own number comes, is neither checked against the
-    # paper (its 78.7 is not Table 12's High row) nor written
-    assert f1[3][5] == "15" and f1[3][7] == build.PIPETTE
+    assert f1[1][:7] == ["Masein model, Instant", "84.4", "81.4", "87.3", build.OURS, "11.4",
+                         "Teraformer's app on an iPhone 17 Pro Max, Instant mode, short chats (Table 1)"]
+    assert f1[2][:6] == ["Masein model, Medium", "84.6", "81.6", "87.3", build.OURS, "9.7"]
+    assert f1[3][5] == "10.8" and f1[3][7] == build.DEVICEMARK
     assert f1[4][:5] == ["Qwen3.5-4B (int8)", "26.1", "22.4", "29.9", build.DEVICEMARK]
     assert len(f1) == 5
-    off, med, high = "Masein model, Instant", "Masein model, Medium", "Masein model, High"
-    for change, says in (({"Qwen3.5-4B, thinking off": {"devicemark_composite": "80.4"}}, "Table 12 prints 80.1"),
-                         ({"Qwen3.5-4B, thinking off": {"speed_credit": "Pipette"}}, "must carry its notice"),
-                         ({"Qwen3.5-4B, thinking off": {"speed_tok_s": ""}}, "Qwen3.5-4B, thinking off has no speed"),
-                         ({off: {"speed_tok_s": "16.0"}}, "plotted at 16.0 tokens/s; the key numbers print 15.2 "
-                          "for Instant mode"),
+    assert not [c for r in f1 for c in r if "Pipette" in c or "Galaxy" in c]
+    off, med, high, qwen = ("Masein model, Instant", "Masein model, Medium", "Masein model, High",
+                            "Qwen3.5-4B, thinking off")
+    for change, says in (({qwen: {"devicemark_composite": "80.4"}}, "Table 12 prints 80.1"),
+                         ({qwen: {"speed_credit": "Pipette"}}, "must be DeviceMark's"),
+                         ({qwen: {"speed_source": "Pipette leaderboard, Galaxy S26 Ultra"}}, "must be DeviceMark's"),
+                         ({qwen: {"speed_tok_s": "15"}}, "plotted at 15 tokens/s; DeviceMark's board gives 10.8"),
+                         ({qwen: {"speed_tok_s": ""}}, "Qwen3.5-4B, thinking off has no speed"),
+                         ({off: {"speed_tok_s": "15.2"}}, "plotted at 15.2 tokens/s; the key numbers print 11.4 "
+                          "for Instant mode on the iPhone 17 Pro Max"),
                          ({off: {"speed_tok_s": "7.3"}}, "plotted at 7.3 tokens/s"),
-                         ({off: {"speed_tok_s": "12.6"}}, "plotted at 12.6 tokens/s"),
-                         ({off: {"speed_source": "Teraformer's app on a OnePlus 15"}}, "must name its mode"),
-                         ({med: {"speed_tok_s": "12.0"}}, "plotted at 12.0 tokens/s; the key numbers print 12.6 "
+                         ({off: {"speed_source": "Teraformer's app on an iPhone 17 Pro Max"}}, "must name its mode"),
+                         ({off: {"speed_source": "Teraformer's app, Instant mode"}}, "must name the phone"),
+                         ({med: {"speed_tok_s": "12.6"}}, "plotted at 12.6 tokens/s; the key numbers print 9.7 "
                           "for Medium mode"),
-                         ({med: {"speed_source": "Teraformer's app on a OnePlus 15, Medium mode"}},
+                         ({med: {"speed_source": "Teraformer's app on an iPhone 17 Pro Max, Medium mode"}},
                           "call Medium mode's throughput preliminary"),
-                         ({high: {"speed_tok_s": "13.3", "speed_source": "a shell on a OnePlus 15, High mode",
+                         ({high: {"speed_tok_s": "13.3", "speed_source": "iPhone 17 Pro Max, High mode",
                                   "speed_credit": build.OURS}}, "Table 12 prints 45.2"),
                          ({high: {"devicemark_composite": "45.2", "ci95_low": "41.4", "ci95_high": "49.6",
-                                  "speed_tok_s": "13.3", "speed_source": "a shell on a OnePlus 15, High mode",
+                                  "speed_tok_s": "13.3", "speed_source": "iPhone 17 Pro Max, High mode",
                                   "speed_credit": build.OURS}},
                           "give High mode's short-chat throughput 0 times"),
                          ({"Qwen3.5-4B (int8)": {"speed_tok_s": "20"}}, "is a published row and has no speed")):
@@ -285,14 +288,12 @@ def test_the_speed_chart_takes_its_scores_from_table_12_and_keeps_pipettes_notic
     text = paper.read_text(encoding="utf-8")
     # r22: whose a row is, Table 12 says in words ("Run by"); since r18 no table has italics
     assert "*" not in "".join(ln for ln in text.splitlines() if "DeviceMark |" in ln)
-    assert build.main([str(tmp_path / "plain"), str(paper), "--speeds", str(speeds_file(tmp_path))]) == 0
-    assert rows(tmp_path / "plain" / "figure-1.csv")[4][4] == build.DEVICEMARK
-    # each mode's throughput must be printed once, and the OnePlus 15 in short chats
+    # each mode's throughput must be printed once, with the iPhone 17 Pro Max in short chats
     for old, new, says in (("), Instant mode |", "), thinking off |", "give Instant mode's short-chat throughput 0 times"),
-                           ("OnePlus 15 (16 GB): 15.2 in short chats", "OnePlus 15 (16 GB): 15.2 at 1,000 tokens",
-                            "gives no OnePlus 15 median in short chats"),
-                           ("Medium mode, preliminary: 12.6 in short chats", "Medium mode, preliminary: 12.6 at 2,000 tokens",
-                            "give Medium mode's short-chat throughput 0 times"),
+                           ("iPhone 17 Pro Max (12 GB): 11.4 in short chats", "iPhone 17 Pro Max (12 GB): 11.4 at 1,000 tokens",
+                            "gives no iPhone 17 Pro Max median in short chats"),
+                           ("Medium mode, preliminary: 12.6 and 9.7 in short chats", "Medium mode, preliminary: 12.6 in short chats",
+                            "give Medium mode 1 short-chat numbers for 2 phones"),
                            ("| Masein model, Medium |", "| Masein model, Medium mode |", "Masein model, Medium is not a row")):
         paper.write_text(text.replace(old, new, 1), encoding="utf-8")
         with pytest.raises(SystemExit, match=re.escape(says)):
@@ -319,8 +320,8 @@ def test_a_renumbered_paper_needs_no_change_to_the_build(paper, tmp_path):
 
 
 def test_figure_ones_speeds_come_from_its_file_so_new_timings_need_one_rebuild(tmp_path):
-    # timings on the OnePlus 15 can replace Pipette's: a speed in figure-1.csv wins,
-    # and a row without one falls back to the value the script carries
+    # new timings need one rebuild: a speed in figure-1.csv wins, and a row without one falls
+    # back to DeviceMark's board (r25) or, for the Masein model, the value the script carries
     pytest.importorskip("matplotlib")
     figs = load("make_figures")
     f = tmp_path / "figure-1.csv"
@@ -328,10 +329,11 @@ def test_figure_ones_speeds_come_from_its_file_so_new_timings_need_one_rebuild(t
                  "LFM2.5-1.2B,,,\n".replace("OnePlus 15, timed", '"OnePlus 15, timed"'), encoding="utf-8")
     got = figs.speeds(tmp_path)
     assert got["Qwen3.5-4B, thinking off"] == ("14.2", "OnePlus 15, timed")
-    assert got["LFM2.5-1.2B"][0] == "68" and got["LFM2.5-1.2B"][1].startswith("Pipette")
-    assert got["Masein model, Instant"][0] == "15.2" and "Instant mode" in got["Masein model, Instant"][1]
-    # r22: Medium's preliminary 12.6; High has no speed until the app's own number comes
-    assert got["Masein model, Medium"][0] == "12.6" and "preliminary" in got["Masein model, Medium"][1]
+    assert got["LFM2.5-1.2B"][0] == "45.5" and got["LFM2.5-1.2B"][1].startswith("DeviceMark leaderboard, iPhone 17 Pro")
+    assert got["Masein model, Instant"][0] == "11.4" and "iPhone 17 Pro Max" in got["Masein model, Instant"][1]
+    # Medium's preliminary 9.7; High has no speed until the app's own number comes
+    assert got["Masein model, Medium"][0] == "9.7" and "preliminary" in got["Masein model, Medium"][1]
+    assert not [x for v in got.values() for x in v if "Pipette" in x or "Galaxy" in x]
     assert "Masein model, High" not in got
     # r22: a speed under a name no point has stops the build, instead of being dropped
     f.write_text("model,mode,speed_tok_s,speed_source\nMasein model,thinking off,15.2,key numbers\n", encoding="utf-8")

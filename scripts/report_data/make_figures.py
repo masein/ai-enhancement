@@ -10,8 +10,10 @@ texgyreheros-regular.otf and texgyreheros-bold.otf; their TrueType versions are 
 figure-N.png (220 dpi) and figure-N.csv for N = 1 to 11, and contact-sheet.png.
 
 Figure 1's speeds are read from <out dir>/figure-1.csv when it is there (speed_tok_s and
-speed_source, by model and mode), so that new timings replace Pipette's with one rebuild;
-without it, the file is written from Pipette's leaderboard values below.
+speed_source, by model and mode), so that new timings need one rebuild; without it, the
+other models' come from DeviceMark's published board as the repo keeps it
+(eval_tasks/devicemark/board-snapshot.json: decode tokens/s on an iPhone 17 Pro) and the
+Masein model's from the values below.
 
 The style: TeX Gyre Heros at 8.5 pt (panel titles 9.5 pt bold), 6.5 in wide, the paper's
 text width; one colour, one meaning, in every figure; text in ink or muted grey only;
@@ -58,9 +60,8 @@ BLUE25, ORANGE25, BLUE45 = tint(BLUE, 0.25), tint(ORANGE, 0.25), tint(BLUE, 0.45
 EPOCH = "Epoch AI Benchmarking Hub, CC BY 4.0, imported 7 Nov 2026"
 DEVICEMARK = "DeviceMark, devicemark.github.io, CC BY 4.0"
 OURS = "measured by Teraformer"
-PIPETTE = ("Pipette (Liquid AI), Galaxy S26 Ultra leaderboard, data as of 5 Nov 2026. Copyright 2026 "
-           "Liquid AI, Inc. Pipette Data License v1.0, https://pipette.liquid.ai/data-license. "
-           "Provided as-is, without warranties. Values reproduced unmodified.")
+# r25 (14 Nov): the other models' speeds are DeviceMark's (CC BY 4.0), as the data build credits them
+DM_SPEED_CREDIT = "DeviceMark (devicemark.github.io), CC BY 4.0, published"
 
 # ---------------------------------------------------------------------------
 # the numbers the figures plot that are not in the data files: each as the paper prints it
@@ -95,27 +96,27 @@ PARAMS_MASEIN = "34.8B / 2.3B or 2.7B"            # Table F4
 
 # Figure 1: each other model in its higher-scoring mode on our DeviceMark replica (Table 12), the
 # Masein model in its modes, and the speed each writes at on a phone. Label (Table 12's row name,
-# which figure-1.csv keeps), its DeviceMark row (dm_rows), its Pipette name.
+# which figure-1.csv keeps), its DeviceMark row (dm_rows), its name on DeviceMark's board.
+# r25 (14 Nov, masein): the eight models we ran on the replica, each in its higher-scoring mode,
+# at DeviceMark's published decode speed on an iPhone 17 Pro (CC BY 4.0)
 SPEED_ROWS = [("Masein model, Instant", "Masein model, Instant", None),
               ("Masein model, Medium", "Masein model, Medium", None),
               ("Masein model, High", None, None),
               ("Qwen3.5-4B, thinking off", "Qwen3.5-4B, thinking off", "Qwen3.5-4B"),
-              ("Gemma 4 E2B, thinking on", "gemma-4-E2B-it, thinking on", "gemma-4-E2B-it"),
-              ("LFM2.5-1.2B", "LFM2.5-1.2B-Instruct, thinking off", "LFM2.5-1.2B-Instruct"),
+              ("Gemma 4 E2B, thinking on", "gemma-4-E2B-it, thinking on", "Gemma 4 E2B"),
+              ("Youtu-LLM-2B, thinking off", "Youtu-LLM-2B, thinking off", "Youtu-LLM-2B"),
+              ("LFM2.5-1.2B", "LFM2.5-1.2B-Instruct, thinking off", "LFM2.5-1.2B"),
               ("Qwen3.5-2B, thinking off", "Qwen3.5-2B, thinking off", "Qwen3.5-2B"),
-              ("granite-4.0-h-1b", "granite-4.0-h-1b, thinking off", "granite-4.0-h-1b"),
+              ("granite-4.0-h-1b", "granite-4.0-h-1b, thinking off", "Granite-4.0-H-1B"),
+              ("Nanbeige4.1-3B", "Nanbeige4.1-3B, thinking off", "Nanbeige4.1-3B"),
               ("Qwen3.5-0.8B, thinking off", "Qwen3.5-0.8B, thinking off", "Qwen3.5-0.8B")]
-PIPETTE_SPEED = {"Qwen3.5-0.8B": 74, "LFM2.5-1.2B-Instruct": 68, "granite-4.0-h-1b": 49, "Qwen3.5-2B": 38,
-                 "gemma-4-E2B-it": 29, "Qwen3.5-4B": 15}
-PIPETTE_HOW = ("Pipette leaderboard, Galaxy S26 Ultra (12 GB): {name} q4_k_m, llama.cpp b11988 on the CPU "
-               "(android-arm64-v8a), 1,024 input tokens, decode over 100 output tokens; Pipette shows "
-               "whole numbers")
-# r22 (12 Nov): the key numbers' throughput row for Instant mode, the OnePlus 15 in short chats
-MASEIN_SPEED = ("15.2", "Teraformer's app on a OnePlus 15 (16 GB), Instant mode, short chats, median, on the "
-                        "16.0 GB file (key numbers; Section 3); measured by the app's developers")
-# r22 (14 Nov, masein): Medium at its preliminary short-chat median on the OnePlus 15 (Table 1)
-MEDIUM_SPEED = ("12.6", "Teraformer's app on a OnePlus 15 (16 GB), Medium mode, short chats, median, "
-                        "preliminary (Table 1); measured by the app's developers")
+SNAPSHOT = Path(__file__).resolve().parents[2] / "eval_tasks" / "devicemark" / "board-snapshot.json"
+RUNTIME_WORDS = {"coreai": "Core AI", "litertlm": "LiteRT-LM"}
+# r25 (14 Nov, masein): the Masein model on the iPhone 17 Pro Max, the app's short-chat medians (Table 1)
+MASEIN_SPEED = ("11.4", "Teraformer's app on an iPhone 17 Pro Max (12 GB), Instant mode, short chats, median, "
+                        "on the 16.0 GB file (Table 1); measured by the app's developers")
+MEDIUM_SPEED = ("9.7", "Teraformer's app on an iPhone 17 Pro Max (12 GB), Medium mode, short chats, median, "
+                       "preliminary (Table 1); measured by the app's developers")
 OWN_SPEEDS = {"Masein model, Instant": MASEIN_SPEED, "Masein model, Medium": MEDIUM_SPEED}
 # High at the app's limits (12 Nov), not Table 12's High row (the replica's 4,096-token cap): kept
 # in figure-1.csv with no speed and not drawn until the app's own short-chat number comes (not
@@ -401,7 +402,7 @@ def leader(ax, xy0, xy1, gid, **kw):
 # ---------------------------------------------------------------------------
 
 def speeds(out: Path) -> dict:
-    """label -> (speed, source); the file, when it is there, wins over Pipette's values"""
+    """label -> (speed, source); the file, when it is there, wins over DeviceMark's board"""
     got = {}
     f = out / "figure-1.csv"
     if f.exists():
@@ -412,14 +413,27 @@ def speeds(out: Path) -> dict:
                 if name not in {label for label, _, _ in SPEED_ROWS}:
                     raise SystemExit(f"figure-1.csv: {name} has a speed, but no point of Figure 1 is {name}")
                 got[name] = (r["speed_tok_s"], r["speed_source"])
-    for label, _, pip in SPEED_ROWS:
+    for label, _, dmname in SPEED_ROWS:
         if label not in got:
             mine = OWN_SPEEDS.get(label)
-            if pip is not None:
-                got[label] = (str(PIPETTE_SPEED[pip]), PIPETTE_HOW.format(name=pip))
+            if dmname is not None:
+                got[label] = dm_speed(dmname)
             elif mine:
                 got[label] = mine
     return got
+
+
+def dm_speed(name: str) -> tuple[str, str]:
+    """(speed, source): the model's decode tokens/s on DeviceMark's board as the repo keeps it"""
+    from email.utils import parsedate_to_datetime
+    snap = json.loads(SNAPSHOT.read_text(encoding="utf-8"))
+    got = [r for r in snap["rows"] if r["model"] == name and r.get("iphone_tok_s") is not None]
+    assert len(got) == 1, (name, "is not once on DeviceMark's board with an iPhone speed")
+    r, day = got[0], parsedate_to_datetime(snap["last_modified"])
+    return (f"{r['iphone_tok_s']:g}",
+            f"DeviceMark leaderboard, {snap['device']}: {r['model']} {r['quant']} on "
+            f"{RUNTIME_WORDS.get(r['native_runtime'], r['native_runtime'])}, decode tokens/s, warm, a 128-token "
+            f"prompt and 256 decoded tokens, as published (data as of {day.day} {day:%b %Y})")
 
 
 def dm_rows(data: Path) -> list[dict]:
@@ -452,7 +466,7 @@ def fig1(data: Path, out: Path, P: dict):
     fig = figure(3.9)
     ax = axes_in(fig, 0.78, 0.72, 5.62, 2.84)
     ax.set_xlim(0, 80)
-    ax.set_ylim(35, 100)
+    ax.set_ylim(25, 100)                          # r25: Nanbeige4.1-3B's range reaches 30.3
     tidy(ax)
     for (c, v), va, dy in zip(clouds, ("bottom", "top"), (2.5, -2.5)):
         ax.axhline(v, color=GREEN, lw=1.1, ls=(0, (4, 2.5)), zorder=1)
@@ -460,10 +474,16 @@ def fig1(data: Path, out: Path, P: dict):
                  transform=ax.transData)
         t.set_position((79.6, v))
         t.set_transform(ax.transData + matplotlib.transforms.ScaledTranslation(0, dy / 72, fig.dpi_scale_trans))
+    # r25: (where from: "lo"/"hi" a bar's end, else the point; offset in points; alignment), or
+    # ("at", x, y): the label's left end at those data values, a leader from the point
     place = {"Qwen3.5-4B, thinking off": ("lo", 0, -3, "center", "top"),
              "Gemma 4 E2B, thinking on": (5, 0, "left", "center"),
-             "LFM2.5-1.2B": ("hi", 0, 3, "center", "bottom"), "Qwen3.5-2B, thinking off": (5, 0, "left", "center"),
-             "granite-4.0-h-1b": (5, 0, "left", "center"), "Qwen3.5-0.8B, thinking off": (-5, 0, "right", "center")}
+             "Youtu-LLM-2B, thinking off": (-5, 0, "right", "center"),
+             "LFM2.5-1.2B": (5, 0, "left", "center"),
+             "Qwen3.5-2B, thinking off": ("at", 32.5, 74.0),
+             "granite-4.0-h-1b": (5, 0, "left", "center"),
+             "Nanbeige4.1-3B": (5, 0, "left", "center"),
+             "Qwen3.5-0.8B, thinking off": (-5, 0, "right", "center")}
     for label, xs, y, lo, hi, _, _ in pts:
         if not xs:
             continue
@@ -489,6 +509,10 @@ def fig1(data: Path, out: Path, P: dict):
         elif me:
             t = ax.annotate(words, (x, y), xytext=(8, 0), textcoords="offset points",
                             ha="left", va="center", fontsize=SMALL, fontweight="bold", color=INK)
+        elif place[label][0] == "at":
+            _, lx, ly = place[label]
+            leader(ax, (x + 0.7, y + 0.8), (lx - 0.4, ly - 0.6), "pt:" + label)
+            t = ax.annotate(label, (lx, ly), ha="left", va="center", fontsize=SMALL, color=INK)
         else:
             spec = place[label]
             at = (x, {"lo": lo, "hi": hi}[spec[0]]) if spec[0] in ("lo", "hi") else (x, y)
@@ -503,7 +527,7 @@ def fig1(data: Path, out: Path, P: dict):
     legend_row(fig, [mark(BLUE, size=6.5), mark(ORANGE, size=5), mark(GREEN, line=(0, (4, 2.5)))],
                ["Masein model (95% range)", "other models, scored by us (95% range)", "cloud model"], left=0.78)
     rows = [[lab.split(", ")[0], (lab.split(", ")[1] if ", " in lab else ""), f"{y:.1f}", f"{lo:.1f}", f"{hi:.1f}",
-             src_s, x, how, PIPETTE if how.startswith("Pipette") else OURS if x else ""]
+             src_s, x, how, DM_SPEED_CREDIT if how.startswith("DeviceMark") else OURS if x else ""]
             for lab, x, y, lo, hi, how, src_s in pts]
     rows += [[c, "", f"{v:.1f}", dm[c]["95% low"], dm[c]["95% high"], DEVICEMARK, "", "", ""] for c, v in clouds]
     head = ["model", "mode", "devicemark_composite", "ci95_low", "ci95_high", "score_source", "speed_tok_s",

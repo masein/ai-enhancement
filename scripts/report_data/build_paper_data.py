@@ -40,9 +40,6 @@ from datetime import datetime
 from pathlib import Path
 
 EPOCH = "Epoch AI Benchmarking Hub, CC BY 4.0"
-PIPETTE = ("Pipette (Liquid AI), Galaxy S26 Ultra leaderboard, data as of 5 Nov 2026. Copyright 2026 "
-           "Liquid AI, Inc. Pipette Data License v1.0, https://pipette.liquid.ai/data-license. "
-           "Provided as-is, without warranties. Values reproduced unmodified.")
 SPEED_HEAD = ["model", "mode", "devicemark_composite", "ci95_low", "ci95_high", "score_source", "speed_tok_s",
               "speed_source", "speed_credit"]
 OURS = "measured by Teraformer"
@@ -560,19 +557,25 @@ def fig_devicemark(p: Paper, cap: str, src: Path):
     return ["Model", "Run by", "Composite", "95% low", "95% high", "Source"], out
 
 
-# r22 (12 and 14 Nov): Figure 1 plots the Masein model's modes, each at the OnePlus 15's
-# short-chat median the key numbers print for it: Instant in its own row, "Token generation
-# throughput on a phone (…), Instant mode"; another mode in a throughput row's words, as r22's
-# "Medium mode, preliminary: 12.6 and 9.7 in short chats", whose first number is the OnePlus
-# 15's (the row gives the OnePlus 15 first). A mode with no speed yet (High) is kept unplotted
+# r22–r25 (12 and 14 Nov): Figure 1 plots the Masein model's modes, each at the short-chat
+# median the key numbers print for it on PHONE — r25: the iPhone 17 Pro Max, the phone family
+# of the other models' speeds: Instant in its own row, "Token generation throughput on a phone
+# (…), Instant mode"; another mode in a throughput row's words, as "Medium mode, preliminary:
+# 12.6 and 9.7 in short chats", its numbers in the order the row names the phones. A mode with
+# no speed yet (High) is kept unplotted
 THROUGHPUT = "Token generation throughput on a phone"
 APP_MODES = ("Instant", "Medium", "High")
-SHORT_CHATS = re.compile(r"OnePlus 15(?: \([^)]*\))?: (\d+(?:\.\d+)?)(?: \([^)]*\))? in short chats")
+PHONE = "iPhone 17 Pro Max"
+PHONES = re.compile(r"(OnePlus 15|iPhone 17 Pro Max)(?: \([^)]*\))?: ")
+SHORT_CHATS = re.compile(re.escape(PHONE) + r"(?: \([^)]*\))?: (\d+(?:\.\d+)?)(?: \([^)]*\))? in short chats")
+# r25 (masein): the other models' speeds are DeviceMark's published decode tokens/s on an iPhone
+# 17 Pro (CC BY 4.0), each the one on DeviceMark's board as the repo keeps it
+BOARD = Path(__file__).resolve().parents[2] / "eval_tasks" / "devicemark" / "board-snapshot.json"
 
 
 def masein_speed(p: Paper, mode: str) -> tuple[str, bool]:
-    """(the OnePlus 15's short-chat median the key numbers print for the mode, and whether they
-    call it preliminary)"""
+    """(the iPhone 17 Pro Max's short-chat median the key numbers print for the mode, and whether
+    they call it preliminary)"""
     rows = [r for x in p.tabs for r in x["rows"] if clean(r[0]).startswith(THROUGHPUT)]
     own = [r for r in rows if clean(r[0]).endswith(f"{mode} mode")]
     if len(own) > 1:
@@ -582,20 +585,40 @@ def masein_speed(p: Paper, mode: str) -> tuple[str, bool]:
         m = SHORT_CHATS.search(clean(own[0][1]))
         if m is None:
             raise SystemExit(f"the speed chart: the key numbers' throughput row for {mode} mode gives no "
-                             "OnePlus 15 median in short chats")
+                             f"{PHONE} median in short chats")
         return num(m.group(1)), "preliminary" in clean(own[0][0]).lower()
-    said = [m for r in rows for m in re.finditer(
-        rf"{mode} mode(, preliminary)?: (\d+(?:\.\d+)?)(?:(?!\. [A-Z])[^;|])*? in short chats", clean(r[1]))]
+    said = [(r, m) for r in rows for m in re.finditer(
+        rf"{mode} mode(, preliminary)?: (\d+(?:\.\d+)?(?: and \d+(?:\.\d+)?)*)(?:(?!\. [A-Z])[^;|])*? "
+        r"in short chats", clean(r[1]))]
     if len(said) != 1:
         raise SystemExit(f"the speed chart: the key numbers give {mode} mode's short-chat throughput "
                          f"{len(said)} times; the Masein model's is read from one")
-    return num(said[0].group(2)), bool(said[0].group(1))
+    r, m = said[0]
+    phones = [x.group(1) for x in PHONES.finditer(clean(r[1]))]
+    values = m.group(2).split(" and ")
+    if len(values) != len(phones) or PHONE not in phones:
+        raise SystemExit(f"the speed chart: the key numbers give {mode} mode {len(values)} short-chat "
+                         f"numbers for {len(phones)} phones; which is the {PHONE}'s can't be told")
+    return num(values[phones.index(PHONE)]), bool(m.group(1))
+
+
+def board_speed(model: str) -> float:
+    """the model's decode tokens/s on DeviceMark's board (the repo's copy, eval_tasks/devicemark)"""
+    if not BOARD.exists():
+        raise SystemExit(f"the speed chart: DeviceMark's board ({BOARD}) is missing")
+    got = [r["iphone_tok_s"] for r in json.loads(BOARD.read_text(encoding="utf-8"))["rows"]
+           if r["model"].lower() == model.lower() and r.get("iphone_tok_s") is not None]
+    if len(got) != 1:
+        raise SystemExit(f"the speed chart: {model} is {len(got)} times on DeviceMark's board with an "
+                         "iPhone speed, not once")
+    return float(got[0])
 
 
 def fig_speed(p: Paper, cap: str, src):
     """DeviceMark composite against token generation throughput on a phone: each score must be Table 12's
-    as printed; a Pipette speed must carry Pipette's notice, and each of the Masein model's must
-    be the OnePlus 15's short-chat median the key numbers print for its mode"""
+    as printed; another model's speed must be DeviceMark's, as its board gives it and credited,
+    and each of the Masein model's must be the iPhone 17 Pro Max's short-chat median the key
+    numbers print for its mode"""
     f = src.speeds
     if not f.exists():
         raise SystemExit(f"the speed chart: {f} is missing (the figure script writes it)")
@@ -628,12 +651,18 @@ def fig_speed(p: Paper, cap: str, src):
         mine = name.startswith("Masein model")
         if not r["speed_tok_s"] or not is_num(r["speed_tok_s"]):
             raise SystemExit(f"the speed chart: {name} has no speed")
-        if r["speed_source"].startswith("Pipette"):
-            if r["speed_credit"] != PIPETTE:
-                raise SystemExit(f"the speed chart: {name}'s speed is Pipette's and must carry its notice")
+        if not mine:
+            if not (r["speed_source"].startswith("DeviceMark") and r["speed_credit"] == DEVICEMARK):
+                raise SystemExit(f"the speed chart: {name}'s speed must be DeviceMark's, credited "
+                                 f"\"{DEVICEMARK}\"")
+            if float(r["speed_tok_s"]) != board_speed(r["model"]):
+                raise SystemExit(f"the speed chart: {name} is plotted at {r['speed_tok_s']} tokens/s; "
+                                 f"DeviceMark's board gives {board_speed(r['model']):g}")
         elif r["speed_credit"] != OURS:
-            raise SystemExit(f"the speed chart: {name}'s speed is not Pipette's, so it is {OURS}")
+            raise SystemExit(f"the speed chart: {name}'s speed is the app's, so it is {OURS}")
         if mine:
+            if PHONE not in r["speed_source"]:
+                raise SystemExit(f"the speed chart: {name}'s speed_source must name the phone, {PHONE}")
             modes = [x for x in APP_MODES if f"{x} mode" in r["speed_source"]]
             if len(modes) != 1:
                 raise SystemExit(f"the speed chart: {name}'s speed_source must name its mode, one of "
@@ -641,7 +670,7 @@ def fig_speed(p: Paper, cap: str, src):
             want, early = masein_speed(p, modes[0])
             if num(r["speed_tok_s"]) != want:
                 raise SystemExit(f"the speed chart: {name} is plotted at {r['speed_tok_s']} tokens/s; the key "
-                                 f"numbers print {want} for {modes[0]} mode on the OnePlus 15 in short chats")
+                                 f"numbers print {want} for {modes[0]} mode on the {PHONE} in short chats")
             if early and "preliminary" not in r["speed_source"]:
                 raise SystemExit(f"the speed chart: the key numbers call {modes[0]} mode's throughput "
                                  f"preliminary, and {name}'s speed_source must say so")
