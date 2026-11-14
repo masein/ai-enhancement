@@ -11,7 +11,8 @@ runs and the runs imported from rented boxes alike, each saying where it ran.
 One folder a run, under $BENCH_ROOT/raw-export/private/ (or public/):
 - setup.json: the model, where it ran ("this server", or "rented GPU · RTX 5090
   · box A3"), the box's times, sessions, image and GGUF, and each benchmark's
-  setup (protocol, revision, budget, sampling, launch);
+  setup (protocol, revision, budget, sampling) — r25: never its server's launch,
+  the flags and environment it was started with, which stay internal;
 - scores.json: each benchmark's score as the board scored it, its grader and
   where;
 - items.jsonl: one line an answer this run brought (17g: an import's shard
@@ -27,7 +28,7 @@ One folder a run, under $BENCH_ROOT/raw-export/private/ (or public/):
 - README.md.
 
 17h: written by a list of what may go out, field by field (scripts/
-export_safe.py) — the launch's flags and environment by name, the log only
+export_safe.py) — r25: no launch flags or environment at all, the log only
 the runner's own lines, never one quoting a gated question (and no log when
 the questions can't be loaded to check it) — then scrubbed as DeviceMark's
 are. Public only for a model whose page marks its weights public (or an
@@ -75,7 +76,9 @@ def row_of(r: dict) -> Path:
 
 
 # 17h: what each file may hold, field by field — anything else is left out
-# (export_safe.pick). The launch's flags and environment by name, never whole
+# (export_safe.pick). r25 (masein and Roohi, 14 Nov): runtime details stay internal, so
+# the server's launch — its flags and environment, and the speculative-decoding flags' names
+# — never goes out; whether its slots drafted tokens does
 SETUP_TASK = {"version": es.TEXT, "task": es.NAME, "protocol": es.TEXT,
               "protocol_version": es.TEXT,
               "source": {"hf": es.NAME, "config": es.NAME, "split": es.NAME,
@@ -83,7 +86,7 @@ SETUP_TASK = {"version": es.TEXT, "task": es.NAME, "protocol": es.TEXT,
               "epochs": int, "thinking": es.TEXT, "budget": int, "family": es.TEXT,
               "sampling": {"*": float}, "where": es.WHERE, "file": es.NAME,
               "server": {"file": es.NAME, "size": int, "build": es.TEXT},
-              "launch_setup": {"spec": [es.NAME], "drafts": bool},
+              "launch_setup": {"drafts": bool},
               "shard": {"i": int, "n": int}}
 BOX = {"box": es.NAME, "image": es.NAME, "gpu": es.TEXT, "gguf_sha256": es.NAME,
        "bundle": es.NAME, "sha256": es.NAME, "started_at": es.TEXT, "finished_at": es.TEXT,
@@ -102,20 +105,9 @@ SCORE = {"alias": es.NAME, "acc,none": float, "acc_stderr,none": float,
                       "final": bool, "look": {"done": int, "waiting": int}, "runs": [int]}}
 
 
-def task_setup(t: dict) -> tuple[dict, int]:
-    """a task's setup as it may go out, and how many of its launch's flags and
-    variables were left out"""
-    out = es.pick(t, SETUP_TASK) or {}
-    launch = t.get("launch") if isinstance(t.get("launch"), dict) else {}
-    ls = t.get("launch_setup") if isinstance(t.get("launch_setup"), dict) else {}
-    fl, l1 = es.flags(launch.get("flags"))
-    ev, l2 = es.env(launch.get("env"))
-    ev2, l3 = es.env(ls.get("env") or {})
-    an, l4 = es.flags(ls.get("answers") or [])
-    out["launch"] = {"flags": fl, "env": {**ev2, **ev}}
-    if an:
-        out.setdefault("launch_setup", {})["answers"] = an
-    return out, l1 + l2 + l3 + l4
+def task_setup(t: dict) -> dict:
+    """a task's setup as it may go out — r25: without its launch's flags and environment"""
+    return es.pick(t, SETUP_TASK) or {}
 
 
 def known_public(r: dict) -> bool:
@@ -179,15 +171,14 @@ def export_run(sid: int, out: Path, public: bool | None = None,
     rented = imf.rented_of(sid) or {}
     reg = imf.registry(row)
     where = es.where_of(r.get("where_ran") or "this server")     # 17j: from the list
-    per_setup, scores, items, notes, left_launch = {}, {}, [], {}, 0
+    per_setup, scores, items, notes = {}, {}, [], {}
     for t in tasks:
         d = sf.task_dir(row, t)
         try:
             raw = json.loads((d / sf.SETUP).read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        per_setup[t], n = task_setup(raw)
-        left_launch += n
+        per_setup[t] = task_setup(raw)
         res = sorted(d.glob("results_*.json"))
         if res:
             blob = json.loads(res[-1].read_text(encoding="utf-8"))
@@ -245,7 +236,7 @@ def export_run(sid: int, out: Path, public: bool | None = None,
         + "".join(f"\n{fb.BENCH[t]['label']}: no answers from this run — {w}.\n"
                   for t, w in notes.items())
         + "\nWritten by a list of what may go out, field by field; everything else left out"
-        + (f" ({left_launch} launch flags or variables)" if left_launch else "") + ". "
+        + ", the server's launch among it. "
         + "The log holds only the runner's own lines"
         + (": " + "; ".join(f"{n} left out ({w})" for w, n in left.items()) if left else "")
         + ". ")

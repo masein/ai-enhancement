@@ -63,6 +63,6 @@ def test_nothing_written_for_every_row_says_board_or_evalboard():
 
 
 def test_a_setup_goes_out_without_the_serving_switches():
-    out, _ = ex.setup_out({"model": "a/b", "lookahead": False, "mtp": False, "cap": 4096})
+    out = ex.setup_out({"model": "a/b", "lookahead": False, "mtp": False, "cap": 4096})
     assert out["model"] == "a/b" and out["cap"] == 4096
     assert "lookahead" not in out and "mtp" not in out
