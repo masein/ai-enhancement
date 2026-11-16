@@ -838,6 +838,49 @@ def check_app_limits(p: Paper, path: Path | None) -> None:
                              f"({path.name}) gives {want[key]}")
 
 
+# r31 (masein, 16 Nov): the unnumbered figure under the abstract — GPQA Diamond, the Masein model's
+# three modes among three of Epoch's models — as the figure script writes it, figure-abstract.csv
+# beside figure-1.csv. Each row is traced to the scores table (the md's Table 5, printed 7) or
+# Epoch's GPQA Diamond list (Table F1): its score and SE as printed there, its 95% range ±1.96 SE of
+# those, the rows highest first
+ABSTRACT = "figure-abstract.csv"
+ABSTRACT_HEAD = ["Model (setting)", "GPQA Diamond (%)", "SE", "95% low", "95% high", "In the report", "Source"]
+
+
+def fig_abstract(p: Paper, f: Path) -> tuple[list[str], list[list[str]]]:
+    rows = list(csv.reader(open(f, encoding="utf-8")))
+    if not rows or rows[0] != ABSTRACT_HEAD:
+        raise SystemExit(f"the figure under the abstract: {f.name} doesn't have the columns "
+                         f"{', '.join(ABSTRACT_HEAD)}")
+    epoch = {r["label"]: r for r in epoch_rows(p.epoch("GPQA Diamond"))}
+    out, last = [], None
+    for r in rows[1:]:
+        name, v, se, lo, hi, where, who = r
+        m = re.fullmatch(r"Masein model, (High|Medium|Instant)", name)
+        if m:
+            want, table, kind = p.masein("GPQA Diamond", m.group(1)), "Table 5", OURS
+        elif name in epoch:
+            want, table, kind = (epoch[name]["v"], epoch[name]["se"]), "Table F1", EPOCH
+        else:
+            raise SystemExit(f"the figure under the abstract: {name} is neither a mode in the scores table "
+                             "nor a row of Table F1")
+        if (v, se) != want:
+            raise SystemExit(f"the figure under the abstract: {name} is drawn at {v} ± {se}; {table} prints "
+                             f"{want[0]} ± {want[1]}")
+        span = (f"{float(v) - 1.96 * float(se):.1f}", f"{float(v) + 1.96 * float(se):.1f}")
+        if (lo, hi) != span:
+            raise SystemExit(f"the figure under the abstract: {name}'s bar is {lo} to {hi}, not ±1.96 SE of "
+                             f"what {table} prints ({span[0]} to {span[1]})")
+        if where != table or not who.startswith(kind.split(",")[0]):
+            raise SystemExit(f"the figure under the abstract: {name} says {where!r}, {who!r}; it is {table}'s, "
+                             f"{kind}")
+        if last is not None and float(v) > last:
+            raise SystemExit(f"the figure under the abstract: {name} is out of order (highest first)")
+        last = float(v)
+        out.append([name, v, se, lo, hi, table, kind])
+    return ABSTRACT_HEAD, out
+
+
 def check_phone_speeds(p: Paper, his: list[dict]) -> None:
     """r29: each mode's iPhone short-chat speed the key numbers print is the decode median of
     Kevin's short-chat table (tab:phone-modes) — the number Figure 1 plots and credits to it"""
@@ -1058,6 +1101,15 @@ def main(argv: list[str]) -> int:
             continue
         built.append((f"figure-{n}", *fn(p, cap, src)))
         index.append([f"figure-{n}.csv", f"Figure {n}", first_sentence(cap)])
+    # r31: the figure under the abstract, unnumbered, when the figure script's file is there
+    absf = src.speeds.parent / ABSTRACT
+    if absf.exists():
+        built.append(("figure-abstract", *fig_abstract(p, absf)))
+        index.append([ABSTRACT, "The figure under the abstract", "GPQA Diamond: the Masein model's three modes "
+                      "among three of Epoch AI's models, each score with its 95% range."])
+    else:
+        print(f"no {ABSTRACT} beside {src.speeds.name} ({src.speeds.parent}): the figure under the abstract "
+              "is not built")
     out.mkdir(parents=True, exist_ok=True)
     for f in out.glob("*.csv"):
         f.unlink()

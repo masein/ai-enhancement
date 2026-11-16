@@ -1250,6 +1250,58 @@ def fig11(data: Path, P: dict):
 
 
 # ---------------------------------------------------------------------------
+# The figure under the abstract (r31, masein, 16 Nov): unnumbered. GPQA Diamond, the Masein
+# model's three modes among three of Epoch's models, one row each, the highest at the top.
+# Values and SEs as the report prints them (Table 5; Table F1), the bars ±1.96 SE of those
+# ---------------------------------------------------------------------------
+
+ABSTRACT_EPOCH = [("Gemini 3.5 Flash-Lite", "high"), ("o4-mini", "high"), ("GPT-5 mini", "high")]
+DARK = "#4A4A4A"                               # the other models' dots: dark grey
+
+
+def fig_abstract(E: dict, P: dict):
+    mz = E["masein"]["gpqa"]
+    rows = [("Masein model, High", True, mz["v"], mz["se"], "Table 5")]
+    rows += [(f"Masein model, {m}", True, v, se, "Table 5") for m, (v, se) in GPQA_MODES.items()]
+    by = {(r["model"], r["setting"]): r for r in E["benchmarks"]["gpqa"]["rows"]}
+    for m, s in ABSTRACT_EPOCH:
+        r = by[(m, s)]
+        rows.append((f"{m} ({s})", False, r["value"], r["se"], "Table F1"))
+    # as printed: one decimal, then the bar
+    rows = sorted(((nm, me, round(v, 1), round(se, 1), src) for nm, me, v, se, src in rows), key=lambda r: -r[2])
+    H = 2.2
+    left, right, bottom, top = 1.95, 0.42, 0.44, 0.10
+    fig = figure(H)
+    ax = axes_in(fig, left, bottom, WIDTH - left - right, H - bottom - top)
+    ax.set_xlim(65, 90)
+    ax.set_ylim(len(rows) - 0.5, -0.5)
+    ax.set_xticks(range(65, 91, 5))
+    ax.set_yticks([])
+    tidy(ax, "x")
+    for side in ("top", "right", "left"):
+        ax.spines[side].set_visible(False)
+    ax.set_xlabel("GPQA Diamond (%)")
+    out = []
+    for i, (name, me, v, se, src) in enumerate(rows):
+        lo, hi = round(v - 1.96 * se, 1), round(v + 1.96 * se, 1)
+        gid = "pt:" + name
+        e = ax.errorbar([v], [i], xerr=[[v - lo], [hi - v]], fmt="none", ecolor=BLUE if me else AXIS, zorder=3,
+                        **EBAR)
+        for part in e.lines[1] + tuple(e.lines[2]):
+            part.set_gid(gid)
+        sc = ax.scatter([v], [i], s=34 if me else 26, facecolor=BLUE if me else "white",
+                        edgecolor="white" if me else DARK, lw=0.6 if me else 1.0, zorder=4)
+        sc.set_gid(gid)
+        text(ax, 64.4, i, name, ha="right", va="center", fontweight="bold" if me else "normal", gid=gid,
+             clip_on=False)
+        text(ax, hi + 0.4, i, f"{v:.1f}", va="center", color=INK if me else MUTED,
+             fontweight="bold" if me else "normal", gid=gid, clip_on=False)
+        out.append([name, f"{v:.1f}", f"{se:.1f}", f"{lo:.1f}", f"{hi:.1f}", src, OURS if me else EPOCH])
+    head = ["Model (setting)", "GPQA Diamond (%)", "SE", "95% low", "95% high", "In the report", "Source"]
+    return fig, head, out, Checker("abstract")
+
+
+# ---------------------------------------------------------------------------
 
 def contact_sheet(out: Path, n: int = 11) -> None:
     from PIL import Image, ImageDraw, ImageFont
@@ -1283,12 +1335,13 @@ def main(argv: list[str]) -> int:
     problems: dict = {}
     made = [(1, fig1(data, out, problems)), (2, fig2(E, problems)), (3, fig3(problems)), (4, fig4(problems)),
             (5, fig5(problems)), (6, fig6(problems)), (7, fig7(E, problems)), (8, fig8(E, problems)),
-            (9, fig9(E, data, problems)), (10, fig10(E, problems)), (11, fig11(data, problems))]
+            (9, fig9(E, data, problems)), (10, fig10(E, problems)), (11, fig11(data, problems)),
+            ("abstract", fig_abstract(E, problems))]                 # r31: the one under the abstract
     for n, (fig, head, rows, ck) in made:
         save(fig, out, n, head, rows, ck, problems)
     contact_sheet(out)
     bad = {n: p for n, p in problems.items() if p}
-    for n in sorted(problems):
+    for n in sorted(problems, key=lambda k: (isinstance(k, str), k if isinstance(k, int) else 0, str(k))):
         print(f"figure-{n}: " + ("ok" if not problems[n] else f"{len(problems[n])} problems"))
         for p in problems[n]:
             print("   ", p)

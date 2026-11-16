@@ -785,3 +785,62 @@ def test_r31_the_out_of_room_caption_reads_in_high_mode_wording(paper, tmp_path)
     assert build.main([str(tmp_path / "new"), str(paper)]) == 0
     assert rows(tmp_path / "new" / "figure-5.csv") == rows(tmp_path / "old" / "figure-5.csv")
     assert sorted(r[0] for r in rows(tmp_path / "new" / "figure-5.csv")[1:]) == ["GPQA Diamond", "IFBench"]
+
+
+# ---------------------------------------------------------------------------
+# r31 (masein, 16 Nov): the unnumbered figure under the abstract, from the figure script's
+# figure-abstract.csv beside figure-1.csv, each row traced to Table 5 or Table F1
+# ---------------------------------------------------------------------------
+
+ABS_ROWS = [["Masein model, High", "82.7", "2.2", "78.4", "87.0", "Table 5", build.OURS],
+            ["Masein model, Medium", "80.1", "2.4", "75.4", "84.8", "Table 5", build.OURS],
+            ["Grok 3 mini (low)", "76.3", "3.0", "70.4", "82.2", "Table F1",
+             "Epoch AI Benchmarking Hub, CC BY 4.0, imported 7 Nov 2026"],
+            ["Masein model, Instant", "75.3", "2.4", "70.6", "80.0", "Table 5", build.OURS]]
+
+
+def abstract_file(tmp_path, rows=ABS_ROWS) -> Path:
+    f = tmp_path / "figure-abstract.csv"
+    with open(f, "w", newline="", encoding="utf-8") as fh:
+        w = csv.writer(fh, lineterminator="\n")
+        w.writerow(build.ABSTRACT_HEAD)
+        w.writerows(rows)
+    return tmp_path / "figure-1.csv"                     # the build looks beside figure-1.csv
+
+
+def test_r31_the_figure_under_the_abstract_is_traced_to_table_5_and_table_f1(paper, tmp_path):
+    out = tmp_path / "paper-data"
+    assert build.main([str(out), str(paper), "--speeds", str(abstract_file(tmp_path))]) == 0
+    got = rows(out / "figure-abstract.csv")
+    assert got[0] == build.ABSTRACT_HEAD
+    assert got[3] == ["Grok 3 mini (low)", "76.3", "3.0", "70.4", "82.2", "Table F1", build.EPOCH]
+    assert [r[0] for r in got[1:]] == [r[0] for r in ABS_ROWS]
+    ix = {r[0]: r[1:] for r in rows(out / "index.csv")}
+    assert ix["figure-abstract.csv"][0] == "The figure under the abstract"
+
+
+@pytest.mark.parametrize("change,says", [
+    ({0: {1: "82.8"}}, "Masein model, High is drawn at 82.8 ± 2.2; Table 5 prints 82.7 ± 2.2"),
+    ({2: {2: "2.9"}}, "Grok 3 mini (low) is drawn at 76.3 ± 2.9; Table F1 prints 76.3 ± 3.0"),
+    ({2: {0: "Grok 4 (high)"}}, "Grok 4 (high) is neither a mode in the scores table nor a row of Table F1"),
+    ({3: {4: "80.2"}}, "Masein model, Instant's bar is 70.6 to 80.2, not ±1.96 SE"),
+    ({1: {5: "Table F1"}}, "Masein model, Medium says 'Table F1'"),
+    ({"swap": (1, 2)}, "is out of order (highest first)"),
+])
+def test_r31_an_abstract_figure_row_that_isnt_the_reports_stops_the_build(paper, tmp_path, change, says):
+    rs = [list(r) for r in ABS_ROWS]
+    for k, v in change.items():
+        if k == "swap":
+            rs[v[0]], rs[v[1]] = rs[v[1]], rs[v[0]]
+        else:
+            for col, val in v.items():
+                rs[k][col] = val
+    with pytest.raises(SystemExit, match=re.escape(says)):
+        build.main([str(tmp_path / "out"), str(paper), "--speeds", str(abstract_file(tmp_path, rs))])
+
+
+def test_r31_with_no_abstract_figure_file_the_rest_builds_and_it_says_so(paper, tmp_path, capsys):
+    out = tmp_path / "paper-data"
+    assert build.main([str(out), str(paper), "--speeds", str(tmp_path / "figure-1.csv")]) == 0
+    assert "no figure-abstract.csv beside figure-1.csv" in capsys.readouterr().out
+    assert not (out / "figure-abstract.csv").exists() and (out / "table-5.csv").exists()
