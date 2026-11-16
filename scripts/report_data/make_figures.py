@@ -89,8 +89,6 @@ ON_DEVICE = [  # Table G1: name, size GB, GPQA Diamond, MMLU-Pro, IFEval, IFBenc
     ("LFM3-1.7B", 1.0, None, None, 96.66, None, "Liquid AI"),
     ("Bolt", 6.18, None, None, None, 64.00, "NVIDIA")]
 NV_QWEN4B = ("Qwen3.5-4B, measured by NVIDIA", 2.74, 66.67)
-MASEIN_ON_DEVICE = {"GPQA Diamond": "82.7 ± 2.2", "MMLU-Pro": "83.0 ± 0.3", "IFEval": "90.6 ± 1.3",
-                    "IFBench": "63.7 ± 2.8"}
 MASEIN_SIZE = 16.0
 PARAMS_MASEIN = "34.8B / 2.3B or 2.7B"            # Table F4
 
@@ -1085,12 +1083,14 @@ def fig9(E: dict, data: Path, P: dict):
 
 
 # ---------------------------------------------------------------------------
-# Figure 10: on-device scores against size, and the scorecard
+# Figure 10: on-device scores against size. r34 (masein, 16 Nov): the scorecard under the two
+# panels is gone (Table G1 has its numbers); the panels are as they were, the figure shorter by
+# the scorecard's 2.55 in
 # ---------------------------------------------------------------------------
 
 def fig10(E: dict, P: dict):
     MZ = E["masein"]
-    H = 6.55
+    H = 4.0
     fig = figure(H)
     s0, s1 = math.log2(0.35), math.log2(40)
     X = lambda s: math.log2(s)
@@ -1104,7 +1104,7 @@ def fig10(E: dict, P: dict):
                        "Qwen3.5-4B, measured by NVIDIA": (-5.5, 4, "right"), "Bonsai 27B (1-bit)": (5.5, -7, "left"),
                        "Edge0-8B": (5.5, 8.5, "left"), "Qwen3.5-9B": (0, 9, "center"), "Bolt": (5.5, -3, "left"),
                        "Edge0-35B": (-5.5, -9.6, "right"), "Ternary Bonsai 2 27B": (-5.5, 0, "right")}}
-    axs = [axes_in(fig, 0.5, 4.72, 5.9, 1.25), axes_in(fig, 0.5, 3.02, 5.9, 1.25)]
+    axs = [axes_in(fig, 0.5, 2.17, 5.9, 1.25), axes_in(fig, 0.5, 0.47, 5.9, 1.25)]
     rows_out = []
     for ax, (panel, k, lo, hi, me_v, me_se) in zip(axs, (("GPQA", 2, 30, 90, MZ["gpqa"]["v"], MZ["gpqa"]["se"]),
                                                          ("IFBench", 5, 35, 75, 63.7, 2.8))):
@@ -1145,38 +1145,8 @@ def fig10(E: dict, P: dict):
         rows_out.append(["Masein model", MASEIN_SIZE, panel, f"{me_v:.1f}",
                          OURS + f"; bar: 95% range, {me_v - 1.96 * me_se:.1f} to {me_v + 1.96 * me_se:.1f}"])
     axs[1].set_xlabel("File or deployed size, GB (log scale)")
-    fig.text(0.04 / WIDTH, (3.02 + 4.72 + 1.25) / 2 / H, "Score (%)", rotation=90, ha="left", va="center",
+    fig.text(0.04 / WIDTH, (0.47 + 2.17 + 1.25) / 2 / H, "Score (%)", rotation=90, ha="left", va="center",
              color=MUTED, fontsize=SMALL)
-    # the scorecard
-    tab = fig.add_axes([0, 0, 1, 2.55 / H])
-    th = 2.55 * 72
-    tab.set_xlim(0, WIDTH * 72)
-    tab.set_ylim(th, 0)
-    tab.axis("off")
-    cx = [0, 150, 222, 290, 352, 410, 468]
-    heads = ["Scores (%)", "Size", "GPQA Diamond", "MMLU-Pro", "IFEval", "IFBench", "Source"]
-    al = ["left", "right", "center", "center", "center", "center", "right"]
-    y = 4.0
-    for i, hd in enumerate(heads):
-        text(tab, cx[i], y + 6, hd, ha=al[i], va="center", fontweight="bold", gid="inside")
-    y += 13
-    rh = 11.6
-    tab.add_patch(Rectangle((-2, y), WIDTH * 72 + 4, rh, fc=BLUE25, lw=0, clip_on=False))
-    me = ["Masein model", "16.0 GB", *MASEIN_ON_DEVICE.values(), "ours"]
-    for i, v in enumerate(me):
-        text(tab, cx[i], y + rh / 2, v, ha=al[i], va="center", fontweight="bold" if i != 6 else "normal", gid="inside")
-    y += rh
-    for nm, s, g, mm, ie, ib, src in ON_DEVICE:
-        size = {1.0: "about 1 GB", 2.0: "2.0 GB"}.get(s, f"{s:g} GB")
-        cells = [nm if nm != "Bolt" else "Nemotron 3.5 Bolt E4B", size, g, mm, ie, ib, src]
-        for i, v in enumerate(cells):
-            if i in (2, 3, 4, 5):
-                vv = "–" if v is None else (f"{v:.2f}" if v in (96.66, 64.00, 91.31, 74.00) else f"{v:.1f}")
-                text(tab, cx[i], y + rh / 2, vv, ha="center", va="center", color=MUTED, gid="inside")
-            else:
-                text(tab, cx[i], y + rh / 2, v, ha=al[i], va="center", color=INK if i == 0 else MUTED, gid="inside")
-        tab.plot([-2, WIDTH * 72 + 2], [y + rh, y + rh], color=GRID, lw=0.6, gid="no-check", clip_on=False)
-        y += rh
     legend_row(fig, [mark(BLUE, size=5.5), mark(ORANGE, hollow=True, size=4.6)],
                ["Masein model, measured by us (95% range)", "published, each under its publisher's own harness"],
                left=0.5)
