@@ -512,9 +512,10 @@ class Paper:
         before, thinking on"""
         return "High" if any("High (%)" in t["head"] for t in self.tabs) else "thinking on"
 
-    def masein(self, bench: str) -> tuple[str, str]:
-        """the Masein model's High (thinking-on) score and SE as the scores table prints them"""
-        col = "High (%)" if self.top() == "High" else "Thinking on (%)"
+    def masein(self, bench: str, mode: str | None = None) -> tuple[str, str]:
+        """the Masein model's High (thinking-on) score and SE as the scores table prints them — r29:
+        or another mode's, by its column"""
+        col = f"{mode} (%)" if mode else "High (%)" if self.top() == "High" else "Thinking on (%)"
         t = self.find("the scores in its modes", lambda t: col in t["head"])
         k = t["head"].index(col)
         r = next(r for r in t["rows"] if clean(r[0]).startswith(bench))
@@ -623,11 +624,18 @@ def fig_gpqa(p: Paper, cap: str, src: Path):
     named = {norm(x) for x in extra["figure-6 labelled"]}
     v, se = p.masein("GPQA Diamond")
     out = [[f"Masein model, {p.top()}", v, se, "", "", "", "yes", OURS]]
+    # r29 (16 Nov, masein): Medium and Instant are reference lines beside High's, with no verdict —
+    # the scores table's (the md's Table 5, printed 7) and Section 4.4's
+    modes = [m for m in ("Medium", "Instant") if p.top() == "High"]
+    for m in modes:
+        mv, mse = p.masein("GPQA Diamond", m)
+        out.append([f"Masein model, {m} (a reference line, no verdict)", mv, mse, "", "", "", "yes",
+                    f"{OURS} (Table 5, Section 4.4)"])
     for r in epoch_rows(p.epoch("GPQA Diamond")):
         out.append([r["label"], r["v"], r["se"], r["verdict"], "yes" if r["ddagger"] else "",
                     "yes" if r["dagger"] else "",
                     "yes" if norm(model_part(r["label"])) in named else "", EPOCH])
-    if sum(1 for r in out if r[6]) != len(named) + 1:
+    if sum(1 for r in out if r[6]) != len(named) + 1 + len(modes):
         raise SystemExit("the GPQA Diamond lanes: not every labelled model is in the GPQA Diamond list")
     return ["Model (setting)", "Score (%)", "SE", "Verdict (Masein model … the model)",
             "Within a quarter of a combined SE of the line (‡)", "Below high effort (†)",

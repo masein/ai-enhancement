@@ -153,6 +153,9 @@ DM_ADDED = [{"Model": "Masein model, Medium", "Kind": "Masein", "Composite": "84
              "Source": "measured by Teraformer"}]
 CLOUD = ["Gemini Flash (cloud)", "Gemini Pro (cloud)"]
 
+# Figure 7 (GPQA Diamond lanes): r29 (16 Nov, masein) Medium and Instant as reference lines beside
+# High's — the md's Table 5 (printed Table 7) and Section 4.4; the lanes stay High's verdicts
+GPQA_MODES = {"Medium": (80.1, 2.4), "Instant": (75.3, 2.4)}
 # Figure 7 (GPQA Diamond lanes): the models the text names
 NAMED_GPQA = ["o1", "o3-mini", "o4-mini", "Qwen 3.6 35B-A3B", "GPT-5 mini", "Claude Haiku 4.5", "Gemini 4 Argon",
               "GPT-6 Astra", "Claude Sonnet 5.5", "DeepSeek V4.1 Flash 1017"]
@@ -885,11 +888,22 @@ def fig7(E: dict, P: dict):
     mx = mz["v"]
     ln, = ax.plot([mx, mx], [-4, total], color=BLUE, lw=1.2, zorder=4, clip_on=False)
     ln.set_gid("masein-line")
+    # r29: Medium and Instant under the swarm, dashed, thinner and lighter; no verdicts or counts.
+    # Their labels stand upright from the top of the first lane, each just right of its line, under
+    # High's label (2.6 points from Medium's line) and above the first lane's leaders, which run lower
+    top0 = lay[0][4]
+    for mode, (v, se) in GPQA_MODES.items():
+        ml, = ax.plot([v, v], [0, total], color=BLUE, lw=0.8, ls=(0, (3.5, 2.5)), alpha=0.5, zorder=2)
+        ml.set_gid("masein-line:" + mode)
+        text(ax, v + 0.45, top0 + 4, f"{mode} {v:.1f}", rotation=90, ha="left", va="top", color=BLUE,
+             alpha=0.85, gid="masein-label:" + mode)
     lab = text(ax, mx, -6, f"Masein model {mz['v']:.1f} ± {mz['se']:.1f} (measured here)", ha="center", va="bottom",
                fontweight="bold", clip_on=False)
     # labels in the empty part of each lane, with short leaders
-    PLACE = {"Gemini 4 Argon": (80, 0), "GPT-6 Astra": (80, 1), "Claude Sonnet 5.5": (80, 2),
-             "DeepSeek V4.1 Flash 1017": (80, 3),
+    # r29: the top lane's labels end left of Instant's line (75.3), as the level lane's do, so no
+    # reference line runs through them
+    PLACE = {"Gemini 4 Argon": (73.5, 0), "GPT-6 Astra": (73.5, 1), "Claude Sonnet 5.5": (73.5, 2),
+             "DeepSeek V4.1 Flash 1017": (73.5, 3),
              "o4-mini": (73.5, 0), "o3-mini": (73.5, 1), "o1": (73.5, 2), "Qwen 3.6 35B-A3B": (73.5, 3),
              "GPT-5 mini": (84.0, 2), "Claude Haiku 4.5": (84.0, 0)}
     order = {}
@@ -902,7 +916,9 @@ def fig7(E: dict, P: dict):
     for m, (x, py, r, key, y0, h) in named.items():
         at, k = PLACE[m]
         lab_s = label_of(r) + (" ‡" if r["ddagger"] else "")
-        ty = y0 + 22 + k * 11.5
+        # r29: the first lane's labels three rows lower, so their leaders pass under the reference
+        # lines' labels
+        ty = y0 + 22 + (k + (3 if key == "lower than" else 0)) * 11.5
         gid = "pt:" + r["model"]
         if key != "higher than":
             text(ax, at, ty, lab_s, ha="right", va="center", gid=gid)
@@ -916,6 +932,9 @@ def fig7(E: dict, P: dict):
                ["an Epoch AI model, its best-scoring run", "below high effort (†)", "borderline verdict (‡)"],
                left=0.1)
     out = [["Masein model (measured here)", "", f"{mz['v']:.2f}", f"{mz['se']:.2f}", "", "", "", "yes", "", OURS]]
+    # r29: Medium and Instant, reference lines with no verdict (the md's Table 5, printed 7; Section 4.4)
+    out += [[f"Masein model, {mode} (measured here)", "", f"{v:.2f}", f"{se:.2f}", "", "", "", "yes", "",
+             f"{OURS} (Table 7, Section 4.4)"] for mode, (v, se) in GPQA_MODES.items()]
     for r in sorted(rows, key=lambda r: -r["value"]):
         out.append([name_of(r), setting_words(r["setting"]), f"{r['value']:.2f}", f"{r['se']:.2f}", r["verdict"],
                     "‡" if r["ddagger"] else "", "†" if r["dagger"] else "", "yes" if r["model"] in NAMED_GPQA else "",

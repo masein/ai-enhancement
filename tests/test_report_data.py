@@ -754,3 +754,21 @@ def test_r29_an_app_limits_row_that_isnt_its_recuts_stops_the_build(tmp_path, ho
         args += ["--app-limits", str(res)]
     with pytest.raises(SystemExit, match=re.escape(says)):
         build.main(args)
+
+
+def test_r29_the_gpqa_lanes_carry_medium_and_instant_as_reference_lines_with_no_verdict(paper, tmp_path):
+    # Figure 7's data: High's line (its verdicts are the lanes), then Medium and Instant from the
+    # scores table, no verdict, with their source — the md's Table 5 and Section 4.4
+    figs = tmp_path / "figs"
+    figs.mkdir()
+    (figs / "figure-extras.json").write_text(json.dumps({"figure-6 labelled": ["Grok 3 mini"]}), encoding="utf-8")
+    paper.write_text(PAPER + "\n&#91;embedded content: Figure 6. GPQA Diamond's lanes. Each dot is one model's "
+                     "best-scoring Epoch run, in the lane of its verdict. Source: Table F1.\\]\n", encoding="utf-8")
+    out = tmp_path / "paper-data"
+    assert build.main([str(out), str(paper), "--figures", str(figs)]) == 0
+    f = rows(out / "figure-6.csv")
+    assert f[1][:3] == ["Masein model, High", "82.7", "2.2"] and f[1][3] == ""
+    assert f[2] == ["Masein model, Medium (a reference line, no verdict)", "80.1", "2.4", "", "", "", "yes",
+                    f"{build.OURS} (Table 5, Section 4.4)"]
+    assert f[3][:3] == ["Masein model, Instant (a reference line, no verdict)", "75.3", "2.4"]
+    assert f[4][0].startswith("Grok 3 mini") and f[4][3] == "level with"
