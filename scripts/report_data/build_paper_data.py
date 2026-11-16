@@ -121,14 +121,25 @@ REF_LIST = re.compile(r"\b(Tables?) ((?:P?\d+|[A-Z]\d+[a-z]?)(?:(?:, and |, | an
 class Numbers:
     """the md's table numbers as LaTeX prints them"""
 
-    def __init__(self, lines: list[str], tabs: list[dict]):
+    def __init__(self, lines: list[str], tabs: list[dict], his: list[dict] | None = None):
+        """`his`: Kevin's file's tables in its order (kevin_tables), or None when not given"""
         outside = [x for x in lines if not x.startswith("|")]
         text = "\n".join(outside)
         kevin_refs = [int(n) for m in REF_LIST.finditer(text) for n in re.findall(r"P(\d+)", m.group(2))]
-        self.kevin = max(kevin_refs) if kevin_refs else 0
+        self.named = max(kevin_refs) if kevin_refs else 0          # P1 to P<named> in the text
         in3 = [x for x in tabs if x["section"].startswith(KEVIN_SECTION)]
-        self.stand_in = sorted({x["name"] for x in in3 if re.fullmatch(r"Table \d+", x["name"])})
-        self.theirs = sorted({x["name"] for x in in3 if re.fullmatch(r"Table P\d+", x["name"])})
+        self.stand_in = sorted({x["name"] for x in in3 if re.fullmatch(r"Table P?\d+", x["name"])})
+        # his tables print 1 to n in his file's order; a P the text names is the one its label is
+        self.his, self.order = his, {}
+        if self.named and his is not None:
+            labels = [x["label"] for x in his]
+            for k in range(1, self.named + 1):
+                lab = KEVIN_LABELS.get(f"P{k}")
+                if lab not in labels:
+                    raise SystemExit(f"Kevin's file has no {lab or f'label for P{k}'} (the text's "
+                                     f"Table P{k}): nothing written")
+                self.order[f"P{k}"] = str(labels.index(lab) + 1)
+        self.kevin = len(his) if self.named and his is not None else self.named
         self.shift, self.first = 0, 1
         if not self.kevin:
             self.stand_in = []
@@ -150,7 +161,7 @@ class Numbers:
 
     def number(self, n: str) -> str:
         if n.startswith("P"):
-            return n[1:] if self.kevin else n
+            return self.order.get(n, n[1:]) if self.kevin else n
         if not n.isdigit() or not self.kevin:
             return n
         if int(n) < self.first:
@@ -168,6 +179,103 @@ class Numbers:
             return s
         return REF_LIST.sub(lambda m: m.group(1) + " " + re.sub(
             r"P?\d+(?![a-z\d])|[A-Z]\d+[a-z]?", lambda k: self.number(k.group(0)), m.group(2)), s)
+
+
+# r29 (masein, 16 Nov): Kevin's five tables, read straight from his own file (on-the-phone.tex,
+# downloaded from Overleaf, refreshed on release day), never from the md. The md's main text
+# names them P1 to P5, each by its label as overleaf_build.py links them; LaTeX numbers them in
+# the order his file has them. A label missing, or a row that doesn't parse, stops the build
+KEVIN_LABELS = {"P1": "tab:phone-modes", "P2": "tab:phone-memory", "P3": "tab:context-instant",
+                "P4": "tab:context-medium", "P5": "tab:context-high"}
+LATEX_NUM = re.compile(r"[\d,]*\.?\d+")
+
+
+def braced(s: str, i: int) -> tuple[str, int]:
+    """the text of the {…} group that opens at s[i], and the index after it"""
+    if s[i] != "{":
+        raise ValueError(f"no group at {s[i:i + 30]!r}")
+    depth, j = 0, i
+    while j < len(s):
+        depth += {"{": 1, "}": -1}.get(s[j], 0)
+        if depth == 0:
+            return s[i + 1:j], j + 1
+        j += 1
+    raise ValueError(f"a group never closed: {s[i:i + 40]!r}")
+
+
+def latex_words(s: str) -> str:
+    """a cell or a caption as it prints: dashes, spaces, %, °C, a bold or italic group's words"""
+    s = re.sub(r"\\(?:textbf|textit|emph|mbox)\{([^{}]*)\}", r"\1", s)
+    s = re.sub(r"\\(?:ref\*?|label)\{[^{}]*\}", "", s)
+    for a, b in (("---", "—"), ("--", "–"), ("~", " "), ("\\%", "%"), ("$^\\circ$C", "°C"),
+                 ("\\,", " "), ("``", "“"), ("''", "”")):
+        s = s.replace(a, b)
+    s = re.sub(r"\$([^$]*)\$", r"\1", s)
+    return " ".join(s.replace("{", "").replace("}", "").split())
+
+
+def latex_cells(row: str) -> list[str]:
+    """a tabular row's cells, a \\multicolumn{n}{…}{text} as n cells of its text"""
+    out = []
+    for c in re.split(r"(?<!\\)&", row):
+        m = re.match(r"\s*\\multicolumn\{(\d+)\}\{[^}]*\}", c)
+        if m:
+            text, _ = braced(c, m.end())
+            out += [latex_words(text)] * int(m.group(1))
+        else:
+            out.append(latex_words(c))
+    return out
+
+
+def kevin_tables(path: Path) -> list[dict]:
+    """each labelled table in Kevin's file, in its order: {label, caption, head, rows}"""
+    src = re.sub(r"(?<!\\)%.*", "", path.read_text(encoding="utf-8"))
+    out = []
+    for blk in re.findall(r"\\begin\{table\}(.*?)\\end\{table\}", src, re.S):
+        lab = re.search(r"\\label\{([^}]*)\}", blk)
+        cap = blk.find("\\caption{")
+        tab = re.search(r"\\begin\{tabular\}", blk)
+        if not (lab and cap >= 0 and tab):
+            raise SystemExit(f"Kevin's file: a table without its label, caption or tabular "
+                             f"({(lab.group(1) if lab else blk.strip()[:60])!r})")
+        caption = latex_words(braced(blk, cap + len("\\caption"))[0])
+        spec, k = braced(blk, tab.end())
+        cols = re.findall(r"[lcr]", spec)
+        body = blk[k:blk.index("\\end{tabular}")]
+        head_part, _, rows_part = body.partition("\\midrule")
+        if not rows_part:
+            raise SystemExit(f"Kevin's file: {lab.group(1)} has no \\midrule under its header")
+
+        def lines(part):
+            part = re.sub(r"\\(?:toprule|midrule|bottomrule)|\\cmidrule(?:\([^)]*\))?\{[^}]*\}", "", part)
+            return [x.strip() for x in re.split(r"\\\\", part) if x.strip()]
+        names = [""] * len(cols)
+        for raw in lines(head_part):
+            h = latex_cells(raw)
+            if len(h) != len(cols):
+                raise SystemExit(f"Kevin's file: {lab.group(1)}'s header has {len(h)} cells for "
+                                 f"{len(cols)} columns")
+            for j, c in enumerate(h):
+                if c and not names[j]:
+                    names[j] = c
+                elif c:                                    # a unit under its name, a name under its group
+                    names[j] = f"{names[j]} {c}" if c.startswith("(") else f"{names[j]}, {c}"
+        rows, above = [], []
+        for x in lines(rows_part):
+            cells = latex_cells(x)
+            if len(cells) != len(cols):
+                raise SystemExit(f"Kevin's file: a row of {lab.group(1)} has {len(cells)} cells for "
+                                 f"{len(cols)} columns: {x[:80]!r}")
+            for j, (c, kind) in enumerate(zip(cells, cols)):
+                if kind == "l" and not c and above and all(not y for y in cells[:j]):
+                    cells[j] = above[j]                    # the device, said once a group
+                if kind == "r" and not (LATEX_NUM.fullmatch(c) or c == "–"):
+                    raise SystemExit(f"Kevin's file: {lab.group(1)}'s {names[j]!r} has {c!r}, not a "
+                                     f"number: {x[:80]!r}")
+            rows.append(cells)
+            above = cells
+        out.append({"label": lab.group(1), "caption": caption, "head": names, "rows": rows})
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -675,6 +783,25 @@ def masein_speed(p: Paper, mode: str) -> tuple[str, bool]:
     return num(values[phones.index(PHONE)]), "preliminary" in (m.group(1) or "")
 
 
+def check_phone_speeds(p: Paper, his: list[dict]) -> None:
+    """r29: each mode's iPhone short-chat speed the key numbers print is the decode median of
+    Kevin's short-chat table (tab:phone-modes) — the number Figure 1 plots and credits to it"""
+    t = next((x for x in his if x["label"] == KEVIN_LABELS["P1"]), None)
+    col = next((k for k, h in enumerate(t["head"]) if h.startswith("Decode")), None) if t else None
+    if t is None or col is None or "Mode" not in t["head"]:
+        raise SystemExit(f"Kevin's file: {KEVIN_LABELS['P1']} has no Device, Mode and Decode columns")
+    mode_col = t["head"].index("Mode")
+    for mode in APP_MODES:
+        try:
+            want, _ = masein_speed(p, mode)
+        except SystemExit:
+            continue                                # a mode the key numbers give no speed for
+        got = [r[col] for r in t["rows"] if r[0] == PHONE and r[mode_col] == mode]
+        if len(got) != 1 or num(got[0]) != want:
+            raise SystemExit(f"the key numbers print {want} tokens/s for {mode} mode on the {PHONE}; "
+                             f"Kevin's short-chat table has {got or 'no row'}")
+
+
 def board_speed(model: str) -> float:
     """the model's decode tokens/s on DeviceMark's board (the repo's copy, eval_tasks/devicemark)"""
     if not BOARD.exists():
@@ -822,7 +949,7 @@ def main(argv: list[str]) -> int:
     trial = "--trial" in argv
     args = [a for a in argv if a != "--trial"]
     opt = {}
-    for flag in ("--figures", "--speeds"):
+    for flag in ("--figures", "--speeds", "--phone-tex"):
         if flag in args:
             i = args.index(flag)
             opt[flag] = Path(args[i + 1])
@@ -838,19 +965,24 @@ def main(argv: list[str]) -> int:
             print("stopped: nothing written. Fill every TBD in the paper, then build again")
             return 1
     tabs = tables(lines)
-    nums = Numbers(lines, tabs)
+    his = kevin_tables(opt["--phone-tex"]) if "--phone-tex" in opt else None
+    nums = Numbers(lines, tabs, his)
     if nums.stand_in:
         print(f"Section 3 is Kevin's own file in LaTeX: the md's {', '.join(nums.stand_in)} there "
               "stand in for it and print nowhere, so they are not built")
-    if nums.kevin and len(nums.theirs) < nums.kevin:
-        print(f"Kevin's Tables P1 to P{nums.kevin} (printed 1 to {nums.kevin}) are in his file, not in "
-              f"the md: no table-1 to table-{nums.kevin}" + ("" if trial else "."))
+    if nums.named and his is None:
+        print(f"Kevin's Tables P1 to P{nums.named} (printed 1 to {nums.named}) are read from his own "
+              f"file, and none was given: no table-1 to table-{nums.named}" + ("" if trial else "."))
         if not trial:
-            print("stopped: nothing written. Put his tables in the md's Section 3 as Tables P1 to "
-                  f"P{nums.kevin}, or leave them out on purpose with --trial")
+            print("stopped: nothing written. Give his file (on-the-phone.tex, from Overleaf) with "
+                  "--phone-tex, or leave his tables out on purpose with --trial")
             return 1
     tabs = [x for x in tabs if not nums.skipped(x)]
     built, index = [], []
+    # his tables, as his file prints them, numbered 1 to n in its order
+    for i, x in enumerate(his if nums.named and his else []):
+        built.append((f"table-{i + 1}", x["head"], x["rows"]))
+        index.append([f"table-{i + 1}.csv", f"Table {i + 1}", first_sentence(x["caption"])])
     for t in tabs:
         printed = {**t, "name": nums.name(t["name"])}
         stem, h, rows = table_file(printed)
@@ -859,6 +991,8 @@ def main(argv: list[str]) -> int:
         index.append([f"{stem}.csv", printed["name"] + (", its second part" if t["part"] > 1 else ""),
                       first_sentence(t["caption"]) if t["caption"] else "The report's key numbers."])
     p = Paper(tabs)
+    if nums.named and his:
+        check_phone_speeds(p, his)
     for n, cap in figures(lines):
         fn = builder(cap)
         if fn == "?":
