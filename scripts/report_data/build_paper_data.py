@@ -982,7 +982,8 @@ def fig_speed(p: Paper, cap: str, src):
 
 
 def is_speed_chart(cap: str) -> bool:
-    return "token generation throughput" in cap.lower() and "DeviceMark" in cap
+    # r35: "…84.4 on the DeviceMark replica at 11.4 tokens per second on an iPhone 17 Pro Max…"
+    return any(k in cap.lower() for k in ("token generation throughput", "tokens per second")) and "DeviceMark" in cap
 
 
 FIGURES = [  # phrases of the caption (any one will do), and what builds the figure's data
@@ -994,7 +995,7 @@ FIGURES = [  # phrases of the caption (any one will do), and what builds the fig
     (("share of answers that ran out of room at the final limit",), fig_ranout),
     (("Each dot is one model's best-scoring Epoch run", "in the lane of its verdict"), fig_gpqa),
     (("The bars count the models", "Each bar counts the models"), fig_counts),
-    (("one model per row",), fig_grid),
+    (("one model per row", "Each cell is the model's best-scoring Epoch run"), fig_grid),   # r35: the second
     (("Score against file size",), fig_size),
     (("DeviceMark composite with its 95% range",), fig_devicemark),
 ]

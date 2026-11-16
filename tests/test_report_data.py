@@ -922,3 +922,21 @@ def test_r31_the_ring_rule_finds_a_dot_whose_ring_covers_anothers_colour_and_the
         got = figs.Checker("t", floor=floor, rings=rings).run(fig)
         assert [p.split(":")[0] for p in got] == want, (gap, rings, floor, got)
         figs.plt.close(fig)
+
+
+def test_r35_the_shorter_captions_still_pick_figure_1s_and_figure_9s_builders():
+    # r35 (16 Nov): Figure 1 drops "token generation throughput" ("…on the DeviceMark replica at
+    # 11.4 tokens per second…") and Figure 9 drops "one model per row" ("Rows: … Each cell is the
+    # model's best-scoring Epoch run…"); each old wording still works, and nothing else is caught
+    f1 = ("In Instant mode, the Masein model scores 84.4 on the DeviceMark replica at 11.4 tokens per second on "
+          "an iPhone 17 Pro Max; in Medium mode, 84.6 at 9.2.")
+    assert build.builder(f1) is build.fig_speed
+    assert build.builder("its token generation throughput on an iPhone, DeviceMark replica") is build.fig_speed
+    assert build.builder("Speed in tokens per second on a phone.") == "?"            # no DeviceMark: not Figure 1
+    f9 = ("Rows: 12 well-known models, chosen in advance as widely known, not by their verdicts. Each cell is the "
+          "model's best-scoring Epoch run (Tables F1 to F3).")
+    assert build.builder(f9) is build.fig_grid
+    assert build.builder("21 rows, one model per row.") is build.fig_grid
+    # Figure 7's "one model's best-scoring Epoch run, in the lane of its verdict" stays Figure 7's
+    f7 = "Each hollow circle is one model's best-scoring Epoch run, in the lane of its verdict against the Masein model's"
+    assert build.builder(f7) is build.fig_gpqa

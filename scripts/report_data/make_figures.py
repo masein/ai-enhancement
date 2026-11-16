@@ -632,7 +632,7 @@ def fig2(E: dict, P: dict):
         rows = sorted([r for r in B[b]["rows"] if r["released"]], key=lambda r: (r["released"], -r["value"]))
         if b == "math":
             last = max(d(r["released"]) for r in rows)
-            ax.axvspan(X(last) + 12, X(t1), color="#F2F2F2", zorder=0, lw=0)
+            ax.axvspan(X(last) + 12, X(t1), color="#F8F8F8", zorder=0, lw=0)   # r35: half #F2F2F2's shade
             t = text(ax, (X(last) + 12 + X(t1)) / 2, 6, "not run by Epoch", ha="center", va="bottom", color=MUTED)
         best, path = None, []
         for r in rows:
@@ -1029,6 +1029,9 @@ def glyph(ax, x, y, kind, size=5.2, colour=INK):
     return ln
 
 
+NP, NP_LINE = {"not published": "n/p"}, 12.0           # r35: n/p, and the legend line that says so
+
+
 def fig9(E: dict, data: Path, P: dict):
     B = E["benchmarks"]
     grid = list(csv.reader(open(data / "figure-8.csv", encoding="utf-8")))[1:]
@@ -1038,7 +1041,7 @@ def fig9(E: dict, data: Path, P: dict):
     for r in grid[1:]:
         if not groups or groups[-1] != r[0]:
             groups.append(r[0])
-    H = 22 + 26 + 18 + len(grid[1:]) * rh + len(groups) * ghead + 4
+    H = 22 + NP_LINE + 26 + 18 + len(grid[1:]) * rh + len(groups) * ghead + 4
     fig = figure(H / 72)
     ax = fig.add_axes([0, 0, 1, 1])
     W = WIDTH * 72
@@ -1056,7 +1059,9 @@ def fig9(E: dict, data: Path, P: dict):
         t = text(ax, lx + 21, y + 6.5, lab, va="center", gid="inside")
         lx = t.get_window_extent(fig.canvas.get_renderer()).transformed(ax.transData.inverted()).x1 + 16
     text(ax, lx, y + 6.5, "–  not run by Epoch", va="center", color=MUTED, gid="inside")
-    y += 22
+    # r35: the legend's second line, under "not run by Epoch" (one row would leave the page)
+    text(ax, lx, y + 6.5 + NP_LINE, "n/p  not published by its maker", va="center", color=MUTED, gid="inside")
+    y += 22 + NP_LINE
     for c, (l1, l2) in zip(cols, (("GPQA", "Diamond"), ("OTIS Mock", "AIME"), ("MATH", "Level 5"))):
         text(ax, c + cw / 2, y + 5, l1, ha="center", va="center", fontweight="bold", gid="inside")
         text(ax, c + cw / 2, y + 16, l2, ha="center", va="center", fontweight="bold", gid="inside")
@@ -1103,7 +1108,8 @@ def fig9(E: dict, data: Path, P: dict):
                 text(ax, c + cw / 2, y + rh / 2, "–", ha="center", va="center", color=MUTED, gid="inside")
                 line += ["", "", "not run"]
         par = PAR.get(r[1], r[14])
-        text(ax, px, y + rh / 2, par, ha="center", va="center", color=MUTED, gid="inside")
+        # r35: drawn as "n/p", which the legend explains; the CSV keeps the words
+        text(ax, px, y + rh / 2, NP.get(par, par), ha="center", va="center", color=MUTED, gid="inside")
         out.append(line + [par, EPOCH])
         y += rh
     assert len(grid[1:]) == 21 and ddag == 4, (len(grid[1:]), ddag)
