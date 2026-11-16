@@ -493,6 +493,13 @@ def test_the_docs_commands_are_the_scripts_and_paste_whole():
             ctx = showcase_box.CONTEXT if a.showcase else devicemark_box.CONTEXT
             assert ctx * a.slots <= a.max_context, a
             continue
+        # r35: plan O's small models — the box's memory check, from each GGUF's
+        # header, holds their slots (remote_gguf.py reads it first; this cap,
+        # sized for the Masein model's file, is its fallback when no header is
+        # read), as PLANS["O"] sizes them, never --slots-fit
+        if a.label in fbx.PLANS["O"]:
+            assert a.slots == fbx.PLANS["O"][a.label][0][3] and not a.slots_fit, a
+            continue
         tasks = [fb.PARITY["task"]] if a.parity else (a.only or fb.TASKS)
         on = a.thinking == "on" and not a.parity
         assert fb.slot_context(tasks, on) * a.slots <= a.max_context, a

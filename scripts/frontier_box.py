@@ -255,6 +255,9 @@ PARITY_STEP = ("parity", (), "", 8)
 # 22: a runtime's pilot (fb.PILOT's questions), on the first box of a plan
 # before the others are rented — at the plan's 8 slots
 PILOT_STEP = ("pilot", tuple(fb.PILOT["n"]), "", 8)
+# r35: a plan's own pilot — this many questions of each of its box's benchmarks,
+# at the box's slots (remote_gguf.py --pilot-each), in place of PILOT_STEP's
+PLAN_PILOT = {"O": 32}
 # 22: a 5090 on vast.ai, an hour, for the pilot's sum
 BOX_PRICE = 0.50
 RUNS = 3                    # 17g: a step's runs on its own (service/frontier.WRITE_OFF_RUNS)
@@ -439,6 +442,25 @@ PLAN_PACE["H"] = {("on", DM): 1524 / 580.0 + 200 / 2_500.0}
 # 18,599) at 650 tokens a second over 8 slots (the showcase: 192 on one)
 PLANS["Q"] = {"Q1": [("on", (GPQA,), "1/2", 8)], "Q2": [("on", (GPQA,), "2/2", 8)]}
 PLAN_PACE["Q"] = {("on", GPQA): 15_000 / 650.0 + 350 / 2_500.0}
+# r35 (masein, 16 Nov): plan O, the on-device pilot — Qwen3.5-4B, Gemma 4 E4B
+# and Gemma 4 E2B on GPQA Diamond and MMLU-Pro under our protocol (runtimes
+# card-qwen35-4b-k3k6 and card-gemma4-k3k6: each card's thinking settings, up
+# to 98,304 tokens an answer on both), one box a model. masein's yes is for the
+# pilot alone: 32 questions of each benchmark (PLAN_PILOT) at the box's slots,
+# a line each with its tokens and seconds, then each benchmark's tokens a second
+# together — so a line of plan O without --pilot is refused. The steps below
+# are what a full run would ask, for --list's hours only, at a guess of the
+# 4B's lengths (16,000 tokens a GPQA Diamond answer, 6,000 a MMLU-Pro one) at
+# 700 tokens a second over the box's slots, its prompts at 8,600. Slots: the 4B
+# has the 9B's attention (8 full layers of 4 heads of 256), which held 8 slots in
+# 22,454 MiB on Q1, so 12 fit; Gemma 4 keeps its own cache in 4 (E4B) and 2 (E2B)
+# global layers, the rest shared or a 512-token window, so 16 fit with room.
+# The box sets its slots from its file's header (--list's are a guess)
+PLANS["O"] = {"O1": [("on", (GPQA, MMLU), "", 12)],
+              "O2": [("on", (GPQA, MMLU), "", 16)],
+              "O3": [("on", (GPQA, MMLU), "", 16)]}
+PLAN_PACE["O"] = {("on", GPQA): 16_000 / 700.0 + 350 / 8_600.0,
+                  ("on", MMLU): 6_000 / 700.0 + 2_500 / 8_600.0}
 # r20 (masein, 12 Nov): plan N, Medium at presence penalty 0.75 (runtime
 # k3k6-2611-medium-075, High's penalty: the app's Medium as Kevin's section 3
 # has it) — the thinking-off set again, asked at Instant's final limit, 32,768,
@@ -463,7 +485,7 @@ MEDIUM_RAN_PACE = {MMLU: 1.56, GPQA: 5.55, MATH: 3.0, IFEVAL: 0.47, IFBENCH: 1.1
 PLAN_PACE["N"] = {("off", t): MEDIUM_RAN_PACE[t] + n * more / 797.0 / ANSWERS[t]
                   for t, (n, more) in MEDIUM_RAN.items()}
 # the plans whose every pace is a guess
-GUESSED_PLANS = {"P", "M", "H", "Q", "N"}
+GUESSED_PLANS = {"P", "M", "H", "Q", "N", "O"}
 # 29: plan D, our own boxes — a quarter of every benchmark on each of a
 # station's four GPUs, longest first (frontier_box's paces), then instruction
 # following with thinking on and off. Every slot holds Bolt's 64K
@@ -474,7 +496,9 @@ PLANS["D"] = {f"D3.{g}": [*(("on", t, f"{g + 1}/4", 8) for t in D_ORDER),
 PLAN_RUNTIME = {"L": "lda-2610", "I": "lda-2610", "T": "lda-2610", "U": "k3k6-2611",
                 "C": "k3k6-2611", "S": "k3k6r-0411", "P": "k3k6-2611-app",
                 "M": "k3k6-2611-medium", "H": "k3k6-2611-app", "Q": "card-qwen35-9b-k3k6",
-                "N": "k3k6-2611-medium-075"}
+                "N": "k3k6-2611-medium-075",
+                # r35: O1's; O2's and O3's models run card-gemma4-k3k6 (runtime_of)
+                "O": "card-qwen35-4b-k3k6"}
 # 29: the plans run on our own GPUs: each step --own (never started or kept
 # asking while another process uses the GPU), no price
 OWN_PLANS = ("D",)
@@ -492,6 +516,7 @@ PLAN_GPUS = {"L": ("RTX 5090", "RTX PRO 6000"), "I": ("RTX 5090", "RTX PRO 6000"
              "S": ("RTX 5090", "RTX PRO 6000"), "P": ("RTX 5090", "RTX PRO 6000"),
              "M": ("RTX 5090", "RTX PRO 6000"), "H": ("RTX 5090", "RTX PRO 6000"),
              "Q": ("RTX 5090", "RTX PRO 6000"), "N": ("RTX 5090", "RTX PRO 6000"),
+             "O": ("RTX 5090", "RTX PRO 6000"),
              # 29: dgx-03's — the runner image's V100 tag builds for sm_70 alone
              "D": ("V100",)}
 PLAN_SM = {"D": "sm_70"}
@@ -569,6 +594,22 @@ PLAN_PINS["Q"] = {
 PLAN_REVISIONS["Q"] = {
     "Qwen3.5-9B-Q4_K_M.gguf": "3885219b6810b007914f3a7950a8d1b469d598a5",
     "llama-server-k3k6-3ad38b7.tar.gz": PLAN_REVISIONS["U"]["llama-server-k3k6-3ad38b7.tar.gz"]}
+# r35: plan O's files as Hugging Face publishes them, read 16 Nov from each
+# repository's LFS listing at its commit: Qwen3.5-4B's in unsloth/Qwen3.5-4B-GGUF
+# at e87f1764 (2,740,937,888 bytes, Table G1's 2.74 GB), Gemma 4 E4B's in
+# unsloth/gemma-4-E4B-it-GGUF at bfc15c38 (4,977,171,584) and E2B's in
+# unsloth/gemma-4-E2B-it-GGUF at 0314792d (3,106,738,272); and plan U's server
+TARBALL_U = "llama-server-k3k6-3ad38b7.tar.gz"
+PLAN_PINS["O"] = {
+    "Qwen3.5-4B-Q4_K_M.gguf": "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
+    "gemma-4-E4B-it-Q4_K_M.gguf": "85a896a047553e842f25297ee5b031d64ff30147d9c4af17b1e4b394cd1fab87",
+    "gemma-4-E2B-it-Q4_K_M.gguf": "740185b21d22ceb83a11c3aa62ad5842ef32c70f6096d756bbee85a1e4ec34b8",
+    TARBALL_U: PLAN_PINS["U"][TARBALL_U]}
+PLAN_REVISIONS["O"] = {
+    "Qwen3.5-4B-Q4_K_M.gguf": "e87f176479d0855a907a41277aca2f8ee7a09523",
+    "gemma-4-E4B-it-Q4_K_M.gguf": "bfc15c382204943c3a8fff0c750b94ae2364d7a3",
+    "gemma-4-E2B-it-Q4_K_M.gguf": "0314792d7f1f7e229411f620751375812bb9faf2",
+    TARBALL_U: PLAN_REVISIONS["U"][TARBALL_U]}
 # 32: plan S runs step2388's file as plan U pins it, and the team's research
 # build (teraformer/lda-k3k6-research at 917f3d911) packed by
 # build_llama_tarball.sh on our server as 3ad38b7cc's was. A pin of None
@@ -634,7 +675,11 @@ BOX_MODELS = {"U40": "served/Qwen3.6-35B-A3B-Q2-k3k6-2611",
               # r20: plan Q's boxes, Qwen3.5-9B alone
               "Q1": "served/Qwen3.5-9B-Q4_K_M-k3k6-2611", "Q2": "served/Qwen3.5-9B-Q4_K_M-k3k6-2611",
               # 31.3b: and U-cont's box of its easy-set answers
-              "C5": "served/Qwen3.6-35B-A3B-Q2-k3k6-2611"}
+              "C5": "served/Qwen3.6-35B-A3B-Q2-k3k6-2611",
+              # r35: plan O's boxes, a model each
+              "O1": "served/Qwen3.5-4B-Q4_K_M-k3k6-2611",
+              "O2": "served/gemma-4-E4B-it-Q4_K_M-k3k6-2611",
+              "O3": "served/gemma-4-E2B-it-Q4_K_M-k3k6-2611"}
 # 29: Bolt's two builds, as Hugging Face publishes them: NVIDIA's Q4_K_M
 # (nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB at 1db54d5b12533ff1, 6,180,446,208
 # bytes) and ggml-org's Q8_0 (ggml-org/NVIDIA-Nemotron-3.5-Bolt-E4B-GGUF at
@@ -768,7 +813,7 @@ def model_refused(box: str, served_as: str) -> str:
     BOX_MODELS runs its model alone, and that model no other box"""
     want = BOX_MODELS.get(box.upper())
     if want and served_as != want:
-        return f"{box} runs {want}" + ("" if want.startswith("served/Qwen3.5-9B") else
+        return f"{box} runs {want}" + ("" if box.upper() not in ("U40", "C5") else
                                        " (the easy set beside step2388's k3 path)") + f", not {served_as}"
     if not want and served_as in BOX_MODELS.values():
         return (f"{served_as} runs on "
@@ -986,9 +1031,13 @@ def argv_of(box: str, k: int, step: Step, a: argparse.Namespace) -> list[str]:
         return out + ["--thinking", "off", "--slots", str(slots), "--parity",
                       "--out", str(folder(a, box, k, step))]
     if th == "pilot":
-        # 22: at the plan's slots, so its pace is the plan's
+        # 22: at the plan's slots, so its pace is the plan's — r35: a plan's own
+        # pilot names its benchmarks and how many of each
+        each = PLAN_PILOT.get(box[:1].upper())
+        own_q = (["--pilot-each", str(each), *(x for t in tasks for x in ("--only", t))]
+                 if each else [])
         return out + ["--thinking", "on", "--slots", str(slots), "--min-slots",
-                      str(max(1, slots - 1)), "--pilot", "--out", str(pilot_folder(a))]
+                      str(max(1, slots - 1)), "--pilot", *own_q, "--out", str(pilot_folder(a))]
     out += ["--thinking", th, "--slots", str(slots)]
     if is_cont(step):
         # 31.3: the line's inputs file, pinned, and this box's part of it
@@ -1176,6 +1225,10 @@ def main(argv: list[str] | None = None) -> int:
         ap.error("one line runs our own boxes or rented ones, not both")
     if a.pilot and len(boxes) > 1:
         ap.error("--pilot: one box's label (the box it runs on)")
+    # r35: masein's yes for plan O is its pilot alone
+    if any(b[:1].upper() in PLAN_PILOT for b in boxes) and not a.pilot:
+        ap.error("plan O runs its pilot alone (masein's yes, 16 Nov): add --pilot. Nothing was "
+                 "fetched")
     # 31.3: U-cont's boxes take their path's inputs file and its sha256, and
     # only they; the check runs on one box of the k6 path
     import re as _re
@@ -1278,6 +1331,15 @@ def main(argv: list[str] | None = None) -> int:
     return 0 if all(c == 0 for c in codes) else 1
 
 
+def pilot_step(box: str) -> Step:
+    """22: the pilot's step — r35: a plan's own (PLAN_PILOT), its box's
+    benchmarks at its box's slots"""
+    if box[:1].upper() not in PLAN_PILOT:
+        return PILOT_STEP
+    _, tasks, _, slots = box_of(box)[0]
+    return ("pilot", tasks, "", slots)
+
+
 def run_pilot(a: argparse.Namespace, box: str) -> int:
     """22: a runtime's pilot on this box — remote_gguf.py --pilot, then what
     its pace makes of the plan, and its verdict again as the last line"""
@@ -1286,14 +1348,17 @@ def run_pilot(a: argparse.Namespace, box: str) -> int:
         raise SystemExit("--pilot: a runtime's pilot, and this line runs none (--runtime)")
     if own_plan(box):
         return run_own_pilot(a, box, rt)
+    each = PLAN_PILOT.get(box[:1].upper())
+    step = pilot_step(box)
     print(f"{box}: the pilot — " + " and ".join(
-        f"{fb.PILOT['n'][t]} {fb.BENCH[t]['label']}" for t in ordered(PILOT_STEP[1]))
+        f"{each or fb.PILOT['n'][t]} {fb.BENCH[t]['label']}" for t in ordered(step[1]))
         + " questions, thinking on, each asked once, before the other boxes are rented",
         flush=True)
     print(fb.runtime_words(rt), flush=True)
-    cmd = argv_of(box, 0, PILOT_STEP, a)
+    cmd = argv_of(box, 0, step, a)
     print(" ".join(shlex.quote(x) for x in cmd[1:]), flush=True)
-    summary = pilot_folder(a) / "pilot.json"
+    # r35: remote_gguf.py --pilot-each keeps its summary under the thinking setting's name
+    summary = pilot_folder(a) / ("pilot-thinking-on.json" if each else "pilot.json")
     summary.unlink(missing_ok=True)             # only this pilot's is read after
     code = subprocess.run(cmd).returncode
     try:
@@ -1307,10 +1372,27 @@ def run_pilot(a: argparse.Namespace, box: str) -> int:
               "the same line again to ask it again", flush=True)
         return code or 1
     print()
-    for line in plan_at_pace(box[:1].upper(), got.get("paces") or {}):
+    lines = (plan_pilot_lines(got.get("paces") or {}) if each else
+             plan_at_pace(box[:1].upper(), got.get("paces") or {}))
+    for line in lines:
         print(line, flush=True)
     print(got["verdict"], flush=True)
     return code
+
+
+def plan_pilot_lines(paces: dict) -> list[str]:
+    """r35: a plan's own pilot, measured — each benchmark's tokens an answer and
+    the card's tokens a second at the box's slots; the full run's hours are
+    worked out from its file (pilot-thinking-on.jsonl), not guessed here"""
+    out = []
+    for t in ordered(tuple(paces)):
+        p = paces[t] or {}
+        n = p.get("answers") or 0
+        out.append(f"{fb.BENCH[t]['label']}: {n} answers, about {(p.get('tokens') or 0) / max(1, n):,.0f} "
+                   f"tokens an answer, {p.get('tok_s') or 0:,.0f} tokens a second together at "
+                   f"{p.get('at_once')} at a time · {p.get('ran_out', 0)} ran out of room · "
+                   f"{p.get('loops', 0)} ended in a loop")
+    return out
 
 
 def run_cont_check(a: argparse.Namespace, box: str) -> int:

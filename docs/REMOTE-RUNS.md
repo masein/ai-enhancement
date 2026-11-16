@@ -2500,6 +2500,54 @@ Fetch and import as L3, with `<host>:<port>=Q1` and
 `--sha served/Qwen3.5-9B-Q4_K_M-k3k6-2611=03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8`.
 GPQA Diamond is graded by code: no paid API.
 
+# O. On-device models: plan O's pilot (r35)
+
+The on-device models of Table G1 under our protocol, on GPQA Diamond and
+MMLU-Pro: thinking on at each card's settings, up to 98,304 tokens an answer
+on both (the Masein model's final limit, asked at once), on the same build as
+step2388's runs. **masein's yes, 16 Nov, is for the pilot alone**: one box a
+model, 32 questions of each benchmark, each asked once, at the box's slots. A
+line of plan O without `--pilot` is refused. It measures each model's tokens
+an answer and the card's tokens a second, for the full run's estimate, before
+anything more is rented.
+
+| Box | Model and file | Runtime | Slots |
+|---|---|---|---|
+| O1 | Qwen3.5-4B: `Qwen3.5-4B-Q4_K_M.gguf` in `unsloth/Qwen3.5-4B-GGUF` at `e87f176479d0855a907a41277aca2f8ee7a09523` (2,740,937,888 bytes, sha256 `00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4`) | `card-qwen35-4b-k3k6`: its card's thinking settings for general tasks (temperature 1.0, top-p 0.95, top-k 20, min-p 0, presence penalty 1.5, repetition penalty 1.0) | 12 |
+| O2 | Gemma 4 E4B: `gemma-4-E4B-it-Q4_K_M.gguf` in `unsloth/gemma-4-E4B-it-GGUF` at `bfc15c382204943c3a8fff0c750b94ae2364d7a3` (4,977,171,584 bytes, sha256 `85a896a047553e842f25297ee5b031d64ff30147d9c4af17b1e4b394cd1fab87`) | `card-gemma4-k3k6`: Google's card settings (temperature 1.0, top-p 0.95, top-k 64; min-p 0 and no penalties, neutral) | 16 |
+| O3 | Gemma 4 E2B: `gemma-4-E2B-it-Q4_K_M.gguf` in `unsloth/gemma-4-E2B-it-GGUF` at `0314792d7f1f7e229411f620751375812bb9faf2` (3,106,738,272 bytes, sha256 `740185b21d22ceb83a11c3aa62ad5842ef32c70f6096d756bbee85a1e4ec34b8`) | `card-gemma4-k3k6` | 16 |
+
+Gemma 4's sizes in Table G1 (2.3 GB, 0.8 GB) are Google's own mobile format,
+which llama.cpp doesn't read: these GGUFs stand in, and a printed row would
+say so. No Gemma file has run on our build yet. Its start says whether it
+loads, which attention this card takes (flash attention with a q8_0 cache,
+else f16, else no flash attention), and that `enable_thinking` writes
+`<|think|>` into the prompt, before a question. Each pilot line ends with
+whether the thinking and the answer came back apart.
+
+Each box: the template `ghcr.io/masein/evalboard-runner:<main's sha>`, an RTX
+5090, Disk 50 GB, `cd /app`, `read -rs HF_TOKEN && export HF_TOKEN`, then its
+line in tmux. About 0.5 h a box with its start (an estimate).
+
+```bash
+python scripts/frontier_box.py O1 --as served/Qwen3.5-4B-Q4_K_M-k3k6-2611 --gguf hf://unsloth/Qwen3.5-4B-GGUF@e87f176479d0855a907a41277aca2f8ee7a09523/Qwen3.5-4B-Q4_K_M.gguf --server hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/llama-server-k3k6-3ad38b7.tar.gz --pilot
+```
+
+```bash
+python scripts/frontier_box.py O2 --as served/gemma-4-E4B-it-Q4_K_M-k3k6-2611 --gguf hf://unsloth/gemma-4-E4B-it-GGUF@bfc15c382204943c3a8fff0c750b94ae2364d7a3/gemma-4-E4B-it-Q4_K_M.gguf --server hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/llama-server-k3k6-3ad38b7.tar.gz --pilot
+```
+
+```bash
+python scripts/frontier_box.py O3 --as served/gemma-4-E2B-it-Q4_K_M-k3k6-2611 --gguf hf://unsloth/gemma-4-E2B-it-GGUF@0314792d7f1f7e229411f620751375812bb9faf2/gemma-4-E2B-it-Q4_K_M.gguf --server hf://<you>/evalboard-private@fe12fa27825b3a0cc6cde3dedec3e838bd3e6de4/llama-server-k3k6-3ad38b7.tar.gz --pilot
+```
+
+A pilot is never fetched or imported (no bundle). Its two files,
+`/workspace/<model>/pilot/pilot-thinking-on.jsonl` (a line an answer: its
+tokens, seconds, finish, whether it ran out or looped, the answer) and
+`pilot-thinking-on.json` (each benchmark's tokens a second together, the
+card check, the file and server), are copied to the Mac by `scp`, read-only.
+GPQA Diamond and MMLU-Pro are graded by code: no paid API.
+
 # Speed tests: the cheapest box per answer (19)
 
 Which box runs our benchmarks for the fewest dollars per answer, measured the
