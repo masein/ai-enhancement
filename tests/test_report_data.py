@@ -772,3 +772,16 @@ def test_r29_the_gpqa_lanes_carry_medium_and_instant_as_reference_lines_with_no_
                     f"{build.OURS} (Table 5, Section 4.4)"]
     assert f[3][:3] == ["Masein model, Instant (a reference line, no verdict)", "75.3", "2.4"]
     assert f[4][0].startswith("Grok 3 mini") and f[4][3] == "level with"
+
+
+def test_r31_the_out_of_room_caption_reads_in_high_mode_wording(paper, tmp_path):
+    # r31: "…at the final limit, in High mode (thinking on), on GPQA Diamond and IFBench; …" names
+    # the same benchmarks as "…at the final limit, thinking on, on GPQA Diamond and IFBench; …"
+    old = "at the final limit, thinking on, on GPQA Diamond and IFBench;"
+    assert PAPER.count(old) == 1
+    assert build.main([str(tmp_path / "old"), str(paper)]) == 0
+    paper.write_text(PAPER.replace(old, "at the final limit, in High mode (thinking on), on GPQA Diamond and "
+                                        "IFBench;"), encoding="utf-8")
+    assert build.main([str(tmp_path / "new"), str(paper)]) == 0
+    assert rows(tmp_path / "new" / "figure-5.csv") == rows(tmp_path / "old" / "figure-5.csv")
+    assert sorted(r[0] for r in rows(tmp_path / "new" / "figure-5.csv")[1:]) == ["GPQA Diamond", "IFBench"]

@@ -600,7 +600,8 @@ def fig_thinking(p: Paper, cap: str, src: Path):
 
 def fig_ranout(p: Paper, cap: str, src: Path):
     t = p.find("ran out and looped", lambda t: t["head"][:2] == ["Benchmark", "Ran out of room"])
-    names = re.search(r"thinking on, on (.*?);", cap).group(1)
+    # r31 (16 Nov): "in High mode (thinking on), on …" as well as "thinking on, on …"
+    names = re.search(r"thinking on\)?, on (.*?);", cap).group(1)
     names = [x.strip() for x in re.split(r", | and ", names)]
     out = []
     for raw in t["rows"]:
