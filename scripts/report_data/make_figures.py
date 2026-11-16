@@ -112,18 +112,20 @@ SPEED_ROWS = [("Masein model, Instant", "Masein model, Instant", None),
               ("Qwen3.5-0.8B, thinking off", "Qwen3.5-0.8B, thinking off", "Qwen3.5-0.8B")]
 SNAPSHOT = Path(__file__).resolve().parents[2] / "eval_tasks" / "devicemark" / "board-snapshot.json"
 RUNTIME_WORDS = {"coreai": "Core AI", "litertlm": "LiteRT-LM"}
-# r25 (14 Nov, masein): the Masein model on the iPhone 17 Pro Max, the app's short-chat medians (Table 1)
+# r25 (14 Nov, masein): the Masein model on the iPhone 17 Pro Max, the app's short-chat medians.
+# r29 (16 Nov, masein): Medium final at 9.2 (Kevin's Table P1 in the md, printed Table 1; the data
+# build prints the number LaTeX gives)
 MASEIN_SPEED = ("11.4", "Teraformer's app on an iPhone 17 Pro Max (12 GB), Instant mode, short chats, median, "
-                        "on the 16.0 GB file (Table 1); measured by the app's developers")
-MEDIUM_SPEED = ("9.7", "Teraformer's app on an iPhone 17 Pro Max (12 GB), Medium mode, short chats, median, "
-                       "preliminary (Table 1); measured by the app's developers")
+                        "on the 16.0 GB file (Table P1); measured by the app's developers")
+MEDIUM_SPEED = ("9.2", "Teraformer's app on an iPhone 17 Pro Max (12 GB), Medium mode, short chats, median, "
+                       "on the 16.0 GB file (Table P1); measured by the app's developers")
 OWN_SPEEDS = {"Masein model, Instant": MASEIN_SPEED, "Masein model, Medium": MEDIUM_SPEED}
 # High at the app's limits (12 Nov), not Table 12's High row (the replica's 4,096-token cap): kept
 # in figure-1.csv with no speed and not drawn until the app's own short-chat number comes (not
 # the shell's, which runs faster than the app); its score goes in the paper when it is drawn
 OWN_SCORES = {"Masein model, High": ("78.7", "75.4", "82.0")}
-# a point drawn under another name than its Table 12 row's
-SHOWN = {"Masein model, Medium": "Masein model, Medium (preliminary)"}
+# a point drawn under another name than its Table 12 row's (r29: none; Medium is final)
+SHOWN: dict = {}
 # a Masein point whose label goes up, at this height (Figure 1's y axis)
 MINE_UP = {"Masein model, Medium": 98.2}
 # r23 (14 Nov): figure-10.csv (round 13's DeviceMark rows) under Table 12's names, with Medium's
