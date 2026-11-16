@@ -996,7 +996,7 @@ FIGURES = [  # phrases of the caption (any one will do), and what builds the fig
     (("Each dot is one model's best-scoring Epoch run", "in the lane of its verdict"), fig_gpqa),
     (("The bars count the models", "Each bar counts the models"), fig_counts),
     (("one model per row", "Each cell is the model's best-scoring Epoch run"), fig_grid),   # r35: the second
-    (("Score against file size",), fig_size),
+    (("Score against file size", "Score against deployed file size"), fig_size),   # r34: "deployed"
     (("DeviceMark composite with its 95% range",), fig_devicemark),
 ]
 
