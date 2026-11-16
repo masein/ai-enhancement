@@ -98,6 +98,8 @@ Text.
 | **Masein model (measured here)** | **82.7 ± 2.2** | this report |
 | Qwen3.5-9B | 81.7 | Qwen's card, Feb 2026 |
 
+&#91;embedded content: Figure 1. A placeholder. How one question becomes a score, before the speed chart takes its place. Source: Section 4.\\]
+
 &#91;embedded content: Figure 2. A grader marks every answer. How one question becomes a score. Source: Section 4.\\]
 
 &#91;embedded content: Figure 3. Some questions are right on some runs. The share right on every run, on some runs and on none, for 198 GPQA Diamond questions (4 runs each: 141, 44 and 13 questions). Source: ours.\\]
@@ -106,7 +108,7 @@ Text.
 
 &#91;embedded content: Figure 5. Out of room: 5.0% of IFBench's answers. The share of answers that ran out of room at the final limit, thinking on, on GPQA Diamond and IFBench; limits in Table 4. Source: Table 8.\\]
 
-&#91;embedded content: Figure 10. DeviceMark. DeviceMark composite with its 95% range for all rows of Table 12. Source: Table 12.\\]
+&#91;embedded content: Figure 6. DeviceMark. DeviceMark composite with its 95% range for all rows of Table 12. Source: Table 12.\\]
 """
 
 
@@ -127,7 +129,7 @@ def test_each_table_and_figure_is_a_file_named_by_the_papers_own_numbers(paper, 
     got = sorted(p.name for p in out.glob("*.csv"))
     assert got == sorted(["key-numbers.csv", "table-5.csv", "table-7.csv", "table-8.csv",
                           "table-9.csv", "table-10.csv", "table-12.csv", "table-f1.csv", "table-g1.csv",
-                          "figure-3.csv", "figure-4.csv", "figure-5.csv", "figure-10.csv",
+                          "figure-3.csv", "figure-4.csv", "figure-5.csv", "figure-6.csv",
                           "index.csv"])
     # the cells as printed: a score and its SE apart, a "right / wrong" pair apart,
     # thousands separators gone, nothing re-rounded
@@ -148,7 +150,7 @@ def test_each_table_and_figure_is_a_file_named_by_the_papers_own_numbers(paper, 
     # the index names each file's caption
     ix = {r[0]: r for r in rows(out / "index.csv")[1:]}
     assert ix["table-8.csv"][1:] == ["Table 8", "Answers that ran out of room at the final limit."]
-    assert ix["figure-10.csv"][1] == "Figure 10"
+    assert ix["figure-6.csv"][1] == "Figure 6"
 
 
 def test_numbers_we_didnt_measure_are_marked_as_theirs(paper, tmp_path):
@@ -183,7 +185,7 @@ def test_figures_come_from_the_tables_and_captions_they_print(paper, tmp_path):
     assert rows(out / "figure-4.csv")[1] == ["GPQA Diamond", "655", "130", "15649", "24995"]
     assert [r[0] for r in rows(out / "figure-5.csv")[1:]] == ["IFBench", "GPQA Diamond"]
     assert rows(out / "figure-5.csv")[1][3] == "5.0"
-    assert rows(out / "figure-10.csv")[3][2:] == ["26.1", "22.4", "29.9", build.DEVICEMARK]
+    assert rows(out / "figure-6.csv")[3][2:] == ["26.1", "22.4", "29.9", build.DEVICEMARK]
 
 
 def test_a_caption_that_disagrees_with_its_table_stops_the_build(paper, tmp_path):
@@ -205,9 +207,17 @@ SPEED_FIG = ("\n&#91;embedded content: Figure 1. Fast and right. DeviceMark comp
              "on a phone (Table 12). Source: Table 12.\\]\n")
 
 
+def with_speed_fig(text: str) -> str:
+    """r37: the speed chart as Figure 1, in the placeholder's place — LaTeX numbers a figure by
+    its place among them, and the paper's Figure 1 comes first"""
+    a = text.index("&#91;embedded content: Figure 1. A placeholder.")
+    b = text.index("\n", a)
+    return text[:a] + SPEED_FIG.strip("\n") + text[b:]
+
+
 def speed_paper(paper):
     """the fixture with a replica row for Qwen3.5-4B and the speed chart as Figure 1"""
-    text = PAPER.replace("| Qwen3.5-4B (int8) |", SPEED_ROW + "| Qwen3.5-4B (int8) |", 1) + SPEED_FIG
+    text = with_speed_fig(PAPER.replace("| Qwen3.5-4B (int8) |", SPEED_ROW + "| Qwen3.5-4B (int8) |", 1))
     paper.write_text(text, encoding="utf-8")
     return paper
 
@@ -308,12 +318,14 @@ def test_a_renumbered_paper_needs_no_change_to_the_build(paper, tmp_path):
     build.main([str(old), str(paper)])
     text = re.sub(r"embedded content: Figure (\d+)\.",
                   lambda m: f"embedded content: Figure {int(m.group(1)) + 1}.", PAPER)
-    paper.write_text(text.replace("| Qwen3.5-4B (int8) |", SPEED_ROW + "| Qwen3.5-4B (int8) |", 1)
-                     + SPEED_FIG, encoding="utf-8")
+    a = text.index("&#91;embedded content: Figure 2. A placeholder.")
+    text = text[:a] + SPEED_FIG.strip("\n") + "\n\n" + text[a:]       # the new one first
+    paper.write_text(text.replace("| Qwen3.5-4B (int8) |", SPEED_ROW + "| Qwen3.5-4B (int8) |", 1),
+                     encoding="utf-8")
     new = tmp_path / "new"
     assert build.main([str(new), str(paper), "--speeds", str(speeds_file(tmp_path))]) == 0
-    assert sorted(p.name for p in new.glob("figure-*.csv")) == ["figure-1.csv", "figure-11.csv", "figure-4.csv",
-                                                                "figure-5.csv", "figure-6.csv"]
+    assert sorted(p.name for p in new.glob("figure-*.csv")) == ["figure-1.csv", "figure-4.csv", "figure-5.csv",
+                                                                "figure-6.csv", "figure-7.csv"]
     for n in (3, 4, 5):
         assert rows(new / f"figure-{n + 1}.csv") == rows(old / f"figure-{n}.csv")
     ix = {r[0]: r for r in rows(new / "index.csv")[1:]}
@@ -715,7 +727,7 @@ APP_NAME = "Masein model, High, at the app's limits"
 def app_paper(tmp_path) -> Path:
     a = PAPER.index("**Table 12.**")
     b = PAPER.index("**Table F1.**")
-    text = PAPER[:a] + T12_FULL + "\n" + PAPER[b:] + SPEED_FIG
+    text = with_speed_fig(PAPER[:a] + T12_FULL + "\n" + PAPER[b:])
     old_row = next(x for x in text.split("\n") if x.startswith("| Token generation throughput"))
     p = tmp_path / "paper-app.md"
     p.write_text(text.replace(old_row, R29_SPEED.replace(" (Section 3)", "")), encoding="utf-8")
@@ -792,11 +804,11 @@ def test_r29_the_gpqa_lanes_carry_medium_and_instant_as_reference_lines_with_no_
     figs = tmp_path / "figs"
     figs.mkdir()
     (figs / "figure-extras.json").write_text(json.dumps({"figure-6 labelled": ["Grok 3 mini"]}), encoding="utf-8")
-    paper.write_text(PAPER + "\n&#91;embedded content: Figure 6. GPQA Diamond's lanes. Each dot is one model's "
+    paper.write_text(PAPER + "\n&#91;embedded content: Figure 7. GPQA Diamond's lanes. Each dot is one model's "
                      "best-scoring Epoch run, in the lane of its verdict. Source: Table F1.\\]\n", encoding="utf-8")
     out = tmp_path / "paper-data"
     assert build.main([str(out), str(paper), "--figures", str(figs)]) == 0
-    f = rows(out / "figure-6.csv")
+    f = rows(out / "figure-7.csv")                      # r37: after the fixture's six, it prints as 7
     assert f[1][:3] == ["Masein model, High", "82.7", "2.2"] and f[1][3] == ""
     assert f[2] == ["Masein model, Medium (a reference line, no verdict)", "80.1", "2.4", "", "", "", "yes",
                     f"{build.OURS} (Table 5, Section 4.4)"]
@@ -970,3 +982,236 @@ def test_r35_the_shorter_captions_still_pick_figure_1s_and_figure_9s_builders():
     # Figure 7's "one model's best-scoring Epoch run, in the lane of its verdict" stays Figure 7's
     f7 = "Each hollow circle is one model's best-scoring Epoch run, in the lane of its verdict against the Masein model's"
     assert build.builder(f7) is build.fig_gpqa
+
+
+# ---------------------------------------------------------------------------
+# r37 (masein, 16 Nov): figures numbered as LaTeX prints them, in their order in the paper, and
+# three new ones (md ids 12 to 14), each held to its sources, its caption and the figure drawn
+# ---------------------------------------------------------------------------
+
+def test_r37_figures_print_in_their_order_and_what_goes_out_names_them_so(paper, tmp_path):
+    old = tmp_path / "old"
+    paper.write_text(PAPER.replace("Answers that ran out of room at the final limit.",
+                                   "Answers that ran out of room at the final limit (Figures 3 and 5)."),
+                     encoding="utf-8")
+    assert build.main([str(old), str(paper)]) == 0
+    # md Figure 5 moved before Figure 3: it prints as Figure 3, and 3 and 4 as 4 and 5
+    text = paper.read_text(encoding="utf-8")
+    f5 = next(x for x in text.split("\n") if x.startswith("&#91;embedded content: Figure 5."))
+    text = text.replace("\n" + f5 + "\n", "\n").replace("&#91;embedded content: Figure 3.", f5 + "\n\n&#91;embedded content: Figure 3.")
+    paper.write_text(text, encoding="utf-8")
+    new = tmp_path / "new"
+    assert build.main([str(new), str(paper)]) == 0
+    assert rows(new / "figure-3.csv") == rows(old / "figure-5.csv")
+    assert rows(new / "figure-4.csv") == rows(old / "figure-3.csv")
+    assert rows(new / "figure-5.csv") == rows(old / "figure-4.csv")
+    assert rows(new / "figure-6.csv") == rows(old / "figure-6.csv")
+    ix = {r[0]: r for r in rows(new / "index.csv")[1:]}
+    assert ix["figure-3.csv"][1:] == ["Figure 3", "Out of room: 5.0% of IFBench's answers."]
+    # a reference prints as LaTeX prints it: the md's Figures 3 and 5 are now 4 and 3
+    assert ix["table-8.csv"][2] == "Answers that ran out of room at the final limit (Figures 4 and 3)."
+
+
+@pytest.mark.parametrize("s, says", [("as Figures 2 to 4 show", "a range of figures, 'Figures 2 to 4'"),
+                                     ("see Figure 9", "the text names Figure 9, which the paper doesn't have")])
+def test_r37_a_range_of_figures_or_one_the_paper_hasnt_stops_the_build(s, says):
+    figs = build.FigNumbers([("1", ""), ("3", ""), ("2", ""), ("4", "")])
+    assert figs.text("Figures 1, 2 and 3; Figure 4") == "Figures 1, 3 and 2; Figure 4"
+    with pytest.raises(SystemExit, match=re.escape(says)):
+        figs.text(s)
+
+
+def tensors_tsv(path: Path) -> Path:
+    """a file's header as read: 2 layers of 4 routed experts (6,000,000 bytes an expert in both),
+    a mode's own copies of 200,000 bytes each, an embedding table of 1,000 rows"""
+    rows_ = [("token_embd.weight", "Q8_0", "2048×1000", 2048000, 1000000),
+             ("output.weight", "Q8_0", "2048×1000", 2048000, 2000000000),
+             ("blk.0.attn_qkv.weight", "Q8_0", "2048×4096", 8388608, 137800000)]
+    for k in (0, 1):
+        rows_ += [(f"blk.{k}.ffn_{x}_exps.weight", "Q4_K", "2048×512×4", 4194304, 4000000) for x in ("gate", "up", "down")]
+        rows_ += [(f"blk.{k}.ffn_gate_inp.{m}.weight", "F32", "2048×4", 8192, 100000) for m in ("k3", "k6")]
+    path.write_text("name\ttype\tshape (ggml order, ne0 first)\telements\tbytes\n"
+                    + "".join("\t".join(map(str, r)) + "\n" for r in rows_), encoding="utf-8")
+    return path
+
+
+def drawn_csv(folder: Path, md_id: str, head: list[str], body: list[list[str]]) -> None:
+    with open(folder / f"figure-{md_id}.csv", "w", newline="", encoding="utf-8") as fh:
+        w = csv.writer(fh, lineterminator="\n")
+        w.writerow(head)
+        w.writerows(body)
+
+
+EXPERT_TEXT = ("With 3 or 6 experts per layer, a token reads 18 or 36 MB of routed-expert weights from the file; "
+               "with 8, the number its base model uses, it would read 48 MB (Figure 12). Everything else a token "
+               "reads, about 2.14 GB counting one row of the embedding table, is the same size with 3 or 6 experts.")
+EXPERT_CAP = ("In Instant mode, with 3 routed experts per layer, a token reads 18 MB of routed-expert weights from the "
+              "file, 63% less than the 48 MB its base model's 8 experts would read; in Medium and High, with 6, it "
+              "reads 36 MB, 25% less. Everything else a token reads, about 2.14 GB counting one row of the embedding "
+              "table, is the same in every mode.")
+EXPERT_DRAWN = [["Instant", "3", "18000000", "18", "63", "x"], ["Medium and High", "6", "36000000", "36", "25", "x"],
+                ["Base model, Qwen3.6-35B-A3B", "8", "48000000", "48", "", "x"]]
+
+
+def experts_src(tmp_path, drawn=EXPERT_DRAWN):
+    tensors_tsv(tmp_path / build.TENSORS)
+    drawn_csv(tmp_path, "12", build.EXPERTS_HEAD, drawn)
+    return build.Sources(tmp_path, tmp_path / "figure-1.csv")
+
+
+def test_r37_figure_12_is_the_files_expert_bytes_as_section_2_1_and_its_caption_say(tmp_path):
+    p = build.Paper([], ["## 2.1", EXPERT_TEXT])
+    head, out = build.fig_experts(p, EXPERT_CAP, experts_src(tmp_path))
+    assert head == build.EXPERTS_HEAD
+    assert [r[:5] for r in out] == [x[:5] for x in EXPERT_DRAWN] + [
+        ["Everything else a token reads, in every mode (one row of the embedding table)", "", "2138001000", "", ""]]
+    # 3 of 8 experts is 62.5% less, which the paper prints as 63
+    assert build.half_up(62.5) == "63" and build.half_up(2.138001, 2) == "2.14"
+
+
+@pytest.mark.parametrize("change, says", [
+    ({"text": ("18 or 36 MB", "18 or 37 MB")}, "Section 2.1 doesn't say '18 or 36 MB'"),
+    ({"cap": ("63% less", "62% less")}, "its caption doesn't say '63% less than the 48 MB'"),
+    ({"cap": ("2.14 GB", "2.15 GB")}, "its caption doesn't say '2.14 GB'"),
+    ({"cap": ("25% less.", "25% less, and 40 MB with 7.")}, "its caption names 40 MB"),
+    ({"drawn": (1, 3, "37")}, "the figure script drew"),
+])
+def test_r37_figure_12_stops_when_the_text_caption_or_drawing_disagree_with_the_file(tmp_path, change, says):
+    text, cap, d = EXPERT_TEXT, EXPERT_CAP, [list(r) for r in EXPERT_DRAWN]
+    if "text" in change:
+        text = text.replace(*change["text"])
+    if "cap" in change:
+        cap = cap.replace(*change["cap"])
+    if "drawn" in change:
+        r, c, v = change["drawn"]
+        d[r][c] = v
+    with pytest.raises(SystemExit, match=re.escape(says)):
+        build.fig_experts(build.Paper([], [text]), cap, experts_src(tmp_path, d))
+
+
+MODES_JSON = {"benchmarks": [{"name": "IFBench", "answers": 300, "High": 191, "Medium": 100, "Instant": 99},
+                             {"name": "GPQA Diamond", "answers": 792, "High": 655, "Medium": 634, "Instant": 596}]}
+MODES_CAP = ("Thinking adds most to instruction following: on IFBench High scores 63.7 against 33.3 at best with "
+             "thinking off. On GPQA Diamond it adds 2.7 points. The right-hand column is High minus the better of "
+             "Medium and Instant. Source: Table 5.")
+MODES_DRAWN = [["IFBench", "300", "191", "100", "99", "63.7", "33.3", "33.0", "+30.3", "x"],
+               ["GPQA Diamond", "792", "655", "634", "596", "82.7", "80.1", "75.3", "+2.7", "x"]]
+
+
+def modes_src(tmp_path, data=MODES_JSON, drawn=MODES_DRAWN):
+    (tmp_path / build.MODES_FILE).write_text(json.dumps(data), encoding="utf-8")
+    drawn_csv(tmp_path, "13", build.MODES_HEAD, drawn)
+    return build.Sources(tmp_path, tmp_path / "figure-1.csv")
+
+
+def paper_of(text: str) -> "build.Paper":
+    return build.Paper(build.tables(text.split("\n")))
+
+
+def test_r37_figure_13_is_high_over_the_better_thinking_off_mode_from_unrounded_shares(tmp_path):
+    head, out = build.fig_modes(paper_of(PAPER), MODES_CAP, modes_src(tmp_path))
+    assert head == build.MODES_HEAD
+    # from the counts: 91 of 300 is 30.33 (the printed 63.7 and 33.3 would give 30.4); 21 of 792 is 2.65
+    assert [r[:9] for r in out] == [x[:9] for x in MODES_DRAWN]
+
+
+@pytest.mark.parametrize("change, says", [
+    ({"count": ("IFBench", "Medium", 101)}, "IFBench, Medium: 101 of 300 is 33.67%; the scores table prints 33.3"),
+    ({"cap": ("63.7 against 33.3", "63.7 against 33.0")}, "its caption doesn't say '63.7 against 33.3' for IFBench"),
+    ({"cap": ("adds 2.7 points", "adds 2.6 points")}, "its caption doesn't say 'adds 2.7 points'"),
+    ({"drop": "GPQA Diamond"}, "the scores table runs GPQA Diamond, IFBench in all three modes"),
+    ({"drawn": (0, 8, "+30.4")}, "the figure script drew"),
+])
+def test_r37_figure_13_stops_when_a_count_the_caption_or_the_drawing_disagree(tmp_path, change, says):
+    data, cap, d = json.loads(json.dumps(MODES_JSON)), MODES_CAP, [list(r) for r in MODES_DRAWN]
+    if "count" in change:
+        name, mode, v = change["count"]
+        next(b for b in data["benchmarks"] if b["name"] == name)[mode] = v
+    if "cap" in change:
+        cap = cap.replace(*change["cap"])
+    if "drop" in change:
+        data["benchmarks"] = [b for b in data["benchmarks"] if b["name"] != change["drop"]]
+    if "drawn" in change:
+        r, c, v = change["drawn"]
+        d[r][c] = v
+    with pytest.raises(SystemExit, match=re.escape(says)):
+        build.fig_modes(paper_of(PAPER), cap, modes_src(tmp_path, data, d))
+
+
+PRICE_TABLE = """**Table 11.** List price per million tokens. *Published: OpenRouter model pages, read 29 Oct 2026 (GPT-6.1 Sol and GPT-6 Astra: read 1 Nov 2026).*
+
+| Model (OpenRouter id) | Input ($ per million tokens) | Output ($ per million tokens) |
+| --- | --- | --- |
+| Masein model on the phone | no per-token charge | no per-token charge |
+| openai/gpt-6-astra | 10.00 | 50.00 |
+| openai/gpt-5-mini | 0.25 | 2.00 |
+| openai/gpt-6.1-sol | 2.00 | 10.00 |
+| anthropic/claude-sonnet-5.5 | 2.00 | 10.00 |
+"""
+PRICE_CAP = ("Hosted models' output list prices run from $2.00 to $50 per million tokens; the Masein model runs on the "
+             "phone with no per-token charge.")
+PRICE_DRAWN = [["Masein model, on the phone", "", "no per-token charge", "x"],
+               ["GPT-5 mini", "openai/gpt-5-mini", "2.00", "x"], ["GPT-6.1 Sol", "openai/gpt-6.1-sol", "10.00", "x"],
+               ["Claude Sonnet 5.5", "anthropic/claude-sonnet-5.5", "10.00", "x"],
+               ["GPT-6 Astra", "openai/gpt-6-astra", "50.00", "x"]]
+
+
+def prices_src(tmp_path, drawn=PRICE_DRAWN):
+    drawn_csv(tmp_path, "14", build.PRICES_HEAD, drawn)
+    return build.Sources(tmp_path, tmp_path / "figure-1.csv")
+
+
+def test_r37_figure_14_is_the_price_tables_output_prices_lowest_first_ties_as_the_table_has_them(tmp_path):
+    head, out = build.fig_prices(paper_of(PRICE_TABLE), PRICE_CAP, prices_src(tmp_path))
+    assert head == build.PRICES_HEAD and [r[:3] for r in out] == [x[:3] for x in PRICE_DRAWN]
+    assert out[0][3] == "Table 11" and out[2][3] == "OpenRouter model page, read 1 Nov 2026 (Table 11)"
+    assert out[1][3] == "OpenRouter model page, read 29 Oct 2026 (Table 11)"
+
+
+@pytest.mark.parametrize("change, says", [
+    ({"table": ("openai/gpt-5-mini |", "openai/gpt-5-nano |")}, "no name for openai/gpt-5-nano"),
+    ({"cap": ("$2.00", "$0.60")}, "its caption doesn't say '$2.00'"),
+    ({"table": ("(GPT-6.1 Sol and GPT-6 Astra: read 1 Nov 2026)", "")}, "the price table's caption doesn't say 1 Nov 2026"),
+    ({"drawn": (2, 2, "12.00")}, "the figure script drew"),
+])
+def test_r37_figure_14_stops_when_the_table_caption_or_drawing_disagree(tmp_path, change, says):
+    table, cap, d = PRICE_TABLE, PRICE_CAP, [list(r) for r in PRICE_DRAWN]
+    if "table" in change:
+        table = table.replace(*change["table"])
+    if "cap" in change:
+        cap = cap.replace(*change["cap"])
+    if "drawn" in change:
+        r, c, v = change["drawn"]
+        d[r][c] = v
+    with pytest.raises(SystemExit, match=re.escape(says)):
+        build.fig_prices(paper_of(table), cap, prices_src(tmp_path, d))
+
+
+def test_r37_a_new_figure_with_no_drawing_beside_figure_1_stops_the_build(tmp_path):
+    with pytest.raises(SystemExit, match=re.escape("Figure 14: no figure-14.csv beside figure-1.csv")):
+        build.fig_prices(paper_of(PRICE_TABLE), PRICE_CAP, build.Sources(tmp_path, tmp_path / "figure-1.csv"))
+
+
+def test_r37_the_three_new_figures_draw_what_their_csvs_say(tmp_path):
+    pytest.importorskip("matplotlib")
+    from matplotlib.collections import PathCollection
+    from matplotlib.colors import to_hex
+    figs = load("make_figures")
+    tensors_tsv(tmp_path / "step2388-tensors.tsv")
+    (tmp_path / "modes-scores.json").write_text(json.dumps(MODES_JSON), encoding="utf-8")
+    fig, head, out, _ = figs.fig12(tmp_path, {})
+    assert head == build.EXPERTS_HEAD and [r[:5] for r in out] == [x[:5] for x in EXPERT_DRAWN]
+    assert {t.get_text() for t in fig.axes[0].texts} >= {"18 MB", "36 MB", "48 MB", "63% less than the base model",
+                                                          "25% less than the base model"}
+    figs.plt.close(fig)
+    fig, head, out, _ = figs.fig13(tmp_path, {})
+    assert head == build.MODES_HEAD and [r[:9] for r in out] == [x[:9] for x in MODES_DRAWN]   # top to bottom
+    dots = [c for c in fig.axes[0].collections if isinstance(c, PathCollection) and c.get_gid() != "legend"]
+    assert {to_hex(c.get_facecolor()[0]).upper() for c in dots} == {"#9EBAEA", "#6E98E0", "#386CC4"}
+    assert {"+30.3", "+2.7", "63.7", "82.7"} <= {t.get_text() for t in fig.axes[0].texts}
+    figs.plt.close(fig)
+    fig, head, out, _ = figs.fig14({})
+    assert head == build.PRICES_HEAD and out[0][2] == "no per-token charge"
+    assert [float(r[2]) for r in out[1:]] == sorted(float(r[2]) for r in out[1:]) and len(out) == 9
+    assert [r[0] for r in out[1:]] == list(build.PRICE_NAMES.values())
+    figs.plt.close(fig)
