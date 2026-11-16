@@ -815,4 +815,3 @@ def test_r31_the_out_of_room_caption_reads_in_high_mode_wording(paper, tmp_path)
     assert build.main([str(tmp_path / "new"), str(paper)]) == 0
     assert rows(tmp_path / "new" / "figure-5.csv") == rows(tmp_path / "old" / "figure-5.csv")
     assert sorted(r[0] for r in rows(tmp_path / "new" / "figure-5.csv")[1:]) == ["GPQA Diamond", "IFBench"]
-
