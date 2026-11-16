@@ -218,7 +218,10 @@ def export_run(sid: int, out: Path, public: bool | None = None,
                                if log.exists() else "", questions, models=[r["hf_id"]])
     (dest / "setup.json").write_text(es.dumps(dmx.scrub_obj(setup)), encoding="utf-8")
     (dest / "scores.json").write_text(es.dumps(dmx.scrub_obj(scores)), encoding="utf-8")
-    (dest / "items.jsonl").write_text("".join(json.dumps(dmx.scrub_obj(x), ensure_ascii=False)
+    # 16 Nov (masein): a model's answer loses only exact matches of our own names
+    names = dmx.own_names()
+    (dest / "items.jsonl").write_text("".join(json.dumps(dmx.scrub_item(x, names=names, fields=("answer",)),
+                                                         ensure_ascii=False)
                                               + "\n" for x in items), encoding="utf-8")
     (dest / "log.txt").write_text(dmx.scrub("\n".join(lines) + ("\n" if lines else "")),
                                   encoding="utf-8")

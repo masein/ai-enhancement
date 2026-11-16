@@ -127,6 +127,7 @@ _O_PORT = re.compile(r"(?i)(-o\s*Port\s*=?\s*)\d{2,5}")
 _P_USER = re.compile(r"(-p\s+)\d{2,5}(\s+[\w.-]+@)")
 _URL_USER = re.compile(r"(?i)\b(https?://)[^\s/@:]+(?::[^\s/@]*)?@")
 _ANY_HOST = re.compile(r"(?i)\b(https?://)(?!huggingface\.co\b|\[)([\w-]+(?:\.[\w-]+)+)")
+NUMBER = re.compile(r"[\d.]+")                  # 16 Nov: never a host's name
 WHAT_THE_SCRUB_REMOVES = (
     "API keys and tokens: the environment's secrets by value, and anything key-shaped "
     "(hf_…, sk-…, sk-or-v1-…, gh?_…, AKIA…, xox?-…, AIza…, a key-shaped value assigned to "
@@ -143,7 +144,9 @@ WHAT_THE_SCRUB_REMOVES = (
     "a key given as a flag (--api-key, --hf-token, --token …) or named x-token, SUBMIT_TOKEN, "
     "OPENROUTER_API_KEY or HF_TOKEN, whatever its value",
     "a URL's internal host (*.internal, *.lan, *.local, …), and the Hugging Face account a "
-    "private repo is kept under (hf://<account>/…-private, and any in SCRUB_ACCOUNTS)")
+    "private repo is kept under (hf://<account>/…-private, and any in SCRUB_ACCOUNTS)",
+    "in a dataset's prompt and a model's answer and thinking, only exact matches of our own "
+    "host names, addresses and accounts, and our secrets by value: nothing else there changes")
 
 
 def scrub(text: str, env: dict | None = None, hosts: list[str] | None = None) -> str:
@@ -165,8 +168,8 @@ def scrub(text: str, env: dict | None = None, hosts: list[str] | None = None) ->
     text = _BUNDLE_BY.sub(lambda m: f"{m.group(1)}:", text)
     text = _HOME.sub("~", text)
     text = _ROOT_HOME.sub("~", text)
-    for h in sorted({h for h in (hosts if hosts is not None else _hosts()) if len(h) >= 3},
-                    key=len, reverse=True):
+    for h in sorted({h for h in (hosts if hosts is not None else _hosts())
+                     if len(h) >= 3 and not NUMBER.fullmatch(h)}, key=len, reverse=True):
         text = re.sub(rf"(?<![\w-]){re.escape(h)}(?![\w-])", "[host]", text, flags=re.I)
     # 17g: the Hugging Face accounts SCRUB_ACCOUNTS names, wherever they stand.
     # 17j: and those the export worked out (where the models were fetched from)
@@ -197,22 +200,66 @@ def _hosts() -> list[str]:
     """this machine's name, and any SCRUB_HOSTS names (comma-separated): the
     server's own, when the container's name isn't it. 17j: and the names the
     export worked out — the hosts the board's settings name, the names it was
-    opened by"""
+    opened by. 16 Nov: as export_safe accepts them — never an address or a number (a 100.x
+    address read raw here made "100" a host)"""
     import export_safe as es
-    names = [socket.gethostname() or ""] + os.environ.get("SCRUB_HOSTS", "").split(",")
-    return [x for n in names if n.strip() for x in (n.strip(), n.strip().split(".")[0])] \
-        + es.scrub_names()["hosts"]
+    me = socket.gethostname() or ""
+    return [h for h in [me, me.split(".")[0], *es.scrub_names()["hosts"]]
+            if len(h) >= 3 and not NUMBER.fullmatch(h)]
 
 
-def scrub_obj(obj, **kw):
-    """a JSON value, every string in it scrubbed"""
+# 16 Nov (masein): a dataset's prompt and a model's words are text we didn't write. There the
+# scrub replaces only exact matches of our own names — host names, addresses, accounts — and
+# our secrets by value. The generic rules (any URL's host, user@host, any address) rewrote
+# them: an IFEval prompt's Wikipedia link, a CV's example email. They stay for our own fields
+TEXT_FIELDS = ("prompt", "thinking", "answer", "parsed", "gold")
+
+
+def own_names() -> dict:
+    """our own host names, addresses and accounts, as the scrub takes them exactly"""
+    import export_safe as es
+    got = es.scrub_names()
+    return {"hosts": [h for h in got["hosts"] if len(h) >= 3 and not NUMBER.fullmatch(h)],
+            "addresses": list(got.get("addresses") or []),
+            "accounts": sorted({a.strip() for a in [*got["accounts"],
+                                                    *os.environ.get("SCRUB_ACCOUNTS", "").split(",")]
+                                if len(a.strip()) >= 3})}
+
+
+def scrub_text(text: str, env: dict | None = None, names: dict | None = None) -> str:
+    """a dataset's prompt or a model's answer: our secrets by value, and exact matches of our
+    own host names, addresses and accounts. Nothing else changes"""
+    env = os.environ if env is None else env
+    names = own_names() if names is None else names
+    text = rb.scrub(text, env)
+    for h in sorted(set(names.get("hosts") or []), key=len, reverse=True):
+        text = re.sub(rf"(?<![\w-]){re.escape(h)}(?![\w-])", "[host]", text, flags=re.I)
+    for a in sorted(set(names.get("addresses") or []), key=len, reverse=True):
+        text = re.sub(rf"(?<![\w.:]){re.escape(a)}(?![\w:]|\.\d)", "[address]", text, flags=re.I)
+    for acct in sorted(set(names.get("accounts") or []), key=len, reverse=True):
+        text = re.sub(rf"(?<![\w-]){re.escape(acct)}(?![\w-])", "[account]", text, flags=re.I)
+    return text
+
+
+def scrub_item(item: dict, env: dict | None = None, names: dict | None = None,
+               fields=TEXT_FIELDS) -> dict:
+    """an item: its dataset's and its model's text by scrub_text, every other field (ours) by
+    the whole scrub"""
+    names = own_names() if names is None else names
+    return {k: (scrub_obj(v, fn=lambda s: scrub_text(s, env, names)) if k in fields
+                else scrub_obj(v, env=env) if env is not None else scrub_obj(v))
+            for k, v in item.items()}
+
+
+def scrub_obj(obj, fn=None, **kw):
+    """a JSON value, every string in it scrubbed (by `fn`, or the whole scrub)"""
+    fn = fn or (lambda s: scrub(s, **kw))
     if isinstance(obj, str):
-        return scrub(obj, **kw)
+        return fn(obj)
     if isinstance(obj, dict):
-        return {scrub(k, **kw) if isinstance(k, str) else k: scrub_obj(v, **kw)
-                for k, v in obj.items()}
+        return {fn(k) if isinstance(k, str) else k: scrub_obj(v, fn) for k, v in obj.items()}
     if isinstance(obj, list):
-        return [scrub_obj(v, **kw) for v in obj]
+        return [scrub_obj(v, fn) for v in obj]
     return obj
 
 
@@ -270,7 +317,10 @@ SETUP = {"model": "name", "name": "text", "runtime": "text", "file": "name", "bu
          "ctx": int, "quant": "name", "phone": bool,
          "thinking": bool, "thinking_mode": "text", "battery": "text", "cap": int, "seed": int,
          "revision": "name", "dtype": "name", "where": "text", "scoring": "text",
-         "reading": {"on": bool, "marks": ["text"], "opens": bool},
+         # 16 Nov (masein): the thinking marks kept (TEXT has no "<"), and the rented boxes'
+         # part of a run — its GPU, bundle, sha256 and shards — as the published rows have them
+         "reading": {"on": bool, "marks": ["mark"], "opens": bool},
+         "remote": {"*": {"gpu": "text", "bundle": "name", "sha256": "name", "shards": int}},
          "props": {"build": "scalar", "n_ctx": int, "total_slots": int, "speculative": int},
          "battery_hashes": {"*": "name"}, "runs": [int], "provisional": "text"}
 
@@ -565,8 +615,10 @@ def export_row(row: Path, out: Path, public: bool | None = None, runs: list[dict
         questions = es.private_questions(say)      # 17j: None, one couldn't be, never again
     lines, out_ = es.log_lines(log_of(row, runs), questions,
                                models=[model, *(r.get("hf_id") or "" for r in runs)])
+    names = own_names()                             # 16 Nov: exact, in the items' text
     files = {
-        "items.jsonl": "".join(json.dumps(scrub_obj(i), ensure_ascii=False) + "\n" for i in items),
+        "items.jsonl": "".join(json.dumps(scrub_item(i, names=names), ensure_ascii=False) + "\n"
+                               for i in items),
         "setup.json": json.dumps(scrub_obj(full_setup), indent=1, ensure_ascii=False),
         "scores.json": json.dumps(scores, indent=1),
         "log.txt": scrub("\n".join(lines) + "\n"),

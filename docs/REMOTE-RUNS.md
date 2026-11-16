@@ -275,7 +275,21 @@ container, the host name is the container's. `SCRUB_ACCOUNTS` (17g) gives
 the Hugging Face accounts to remove wherever they name a path (the account
 the builds and the llama-server tarball are kept under). **18b: both must
 be given** — give `SCRUB_HOSTS` the server's own name and the tailnet's
-name for it. The export adds what it works out itself — the container's
+name for it. **Names only** (16 Nov): an address or a number in
+`SCRUB_HOSTS` is refused, and `public/` with it. Addresses have their own
+rule, and a 100.x address given there once made "100" a host name, which
+turned every "100" in a release into `[host]`.
+
+**A dataset's prompt and a model's answer** (16 Nov). In an item's
+`prompt`, `thinking`, `answer`, `parsed` and `gold` (a Frontier run's
+`answer`), the scrub replaces only exact matches of our own names: the host
+names above, the addresses the board's settings name, the accounts, and our
+secrets by value. The generic rules (any URL's host but Hugging Face's,
+`user@host`, any address) rewrote public text there, such as a Wikipedia
+link in an IFEval prompt or the example email in a model's CV. They still
+apply to our own fields: setup, paths and log lines. `setup.json` keeps the
+row's thinking marks (`reading.marks`) and the rented boxes' part of the run
+(`remote`: GPU, bundle, sha256, shards). The export adds what it works out itself — the container's
 name, the dotted hosts the board's settings name (the judge's, a served
 model's), and the accounts of the repositories its models were fetched from
 (but a checked public file's) — and prints `will remove: hosts …; accounts
