@@ -1,6 +1,7 @@
 """The report's public data repository: paper-data/ built from the paper itself, the scan
 for internal terms, and the upload's checks before anything is sent (no network here)."""
 import csv
+import hashlib
 import importlib.util
 import json
 import re
@@ -659,3 +660,97 @@ def test_r29_figure_one_cant_call_a_final_speed_preliminary(paper, tmp_path):
     with pytest.raises(SystemExit, match="calls it preliminary, and the key numbers don't"):
         build.main([str(tmp_path / "again"), str(paper), "--speeds", str(speeds_file(
             tmp_path, **{"Masein model, Medium": {"speed_tok_s": "9.2"}}))])
+
+
+# ---------------------------------------------------------------------------
+# r29 (masein, 16 Nov): High at the app's limits — H1 re-cut at 2,048 tokens in total — is a row
+# of Table 12 and a point of Figure 1 (at High's 8.5 on the iPhone), traced to the re-cut's own
+# result (recut-result.json) and the run records beside it
+# ---------------------------------------------------------------------------
+
+T12_FULL = """**Table 12.** DeviceMark, all 29 rows. Rows run by DeviceMark are its published leaderboard.
+
+| Model | Run by | Composite \\[95% range\\] | IFEval (DeviceMark's measure) | MMLU-Pro (draw) | MATH (draw) | Answered |
+| --- | --- | --- | --- | --- | --- | --- |
+| **Masein model, Instant** | **us (replica)** | **84.4 \\[81.4, 87.3\\]** | **86.4** | **74.0** | **93.0** | **97%** |
+| **Masein model, Medium** | **us (replica)** | **84.6 \\[81.6, 87.3\\]** | **85.3** | **74.5** | **94.0** | **97%** |
+| **Masein model, High** | **us (replica)** | **45.2 \\[41.4, 49.6\\]** | **79.2** | **26.5** | **30.0** | **56%** |
+| **Masein model, High, at the app's limits** | **us (replica)** | **72.4 \\[68.5, 76.2\\]** | **73.2** | **68.9** | **75.0** | **77%** |
+| Qwen3.5-4B, thinking off | us (replica) | 80.1 \\[76.6, 83.4\\] | 85.9 | 69.4 | 85.0 | 94% |
+| Qwen3.5-4B (int8) | DeviceMark | 26.1 \\[22.4, 29.9\\] | 30.0 | 20.0 | 28.3 | 60% |
+"""
+APP_NAME = "Masein model, High, at the app's limits"
+
+
+def app_paper(tmp_path) -> Path:
+    a = PAPER.index("**Table 12.**")
+    b = PAPER.index("**Table F1.**")
+    text = PAPER[:a] + T12_FULL + "\n" + PAPER[b:] + SPEED_FIG
+    old_row = next(x for x in text.split("\n") if x.startswith("| Token generation throughput"))
+    p = tmp_path / "paper-app.md"
+    p.write_text(text.replace(old_row, R29_SPEED.replace(" (Section 3)", "")), encoding="utf-8")
+    return p
+
+
+def recut_result(tmp_path, **change) -> Path:
+    d = tmp_path / "h1-recut"
+    d.mkdir(exist_ok=True)
+    recs = {}
+    for what, name in (("answers", "recut-answers.jsonl"), ("items", "recut-items.jsonl")):
+        data = b'{"bench": "math", "key": "a"}\n{"bench": "ifeval", "key": "1"}\n'
+        (d / name).write_bytes(data)
+        recs[what] = {"file": name, "n": 2, "sha256": hashlib.sha256(data).hexdigest()}
+    res = {"row": APP_NAME, "records": recs,
+           "after": {"composite": {"value": 0.7237, "ci": [0.6853, 0.7618]}, "answered_pct": 0.7685,
+                     "benches": {"ifeval": {"acc": 0.7324}, "mmlu_pro": {"acc": 0.6888}, "math": {"acc": 0.75}}}}
+    res.update(change)
+    f = d / "recut-result.json"
+    f.write_text(json.dumps(res), encoding="utf-8")
+    return f
+
+
+def app_speeds(tmp_path):
+    final = "Teraformer's app on an iPhone 17 Pro Max, Medium mode, short chats (Table 1)"
+    return speeds_file(tmp_path, **{
+        "Masein model, Medium": {"speed_tok_s": "9.2", "speed_source": final},
+        "Masein model, High": {"mode": "High, at the app's limits", "devicemark_composite": "72.4",
+                               "ci95_low": "68.5", "ci95_high": "76.2", "speed_tok_s": "8.5",
+                               "speed_source": "Teraformer's app on an iPhone 17 Pro Max, High mode, thinking "
+                                               "included, short chats (Table 1)", "speed_credit": build.OURS}})
+
+
+def test_r29_the_app_limits_row_is_traced_to_its_recut_and_plotted_at_highs_speed(tmp_path):
+    out = tmp_path / "paper-data"
+    assert build.main([str(out), str(app_paper(tmp_path)), "--speeds", str(app_speeds(tmp_path)),
+                       "--app-limits", str(recut_result(tmp_path))]) == 0
+    f1 = {r[0]: r for r in rows(out / "figure-1.csv")}
+    assert f1[APP_NAME][1:6] == ["72.4", "68.5", "76.2", build.OURS, "8.5"]
+    t12 = {r[0]: r for r in rows(out / "table-12.csv")}
+    assert APP_NAME in t12
+
+
+@pytest.mark.parametrize("how,says", [
+    ("no file", "give its re-cut's result (recut-result.json) with --app-limits"),
+    ("answered", "Answered prints 78%; the re-cut (recut-result.json) gives 77%"),
+    ("composite", "prints 72.4 [68.5, 76.2]; the re-cut (recut-result.json) gives 72.5 [68.5, 76.2]"),
+    ("records", "its items records (recut-items.jsonl) are not the ones it names"),
+    ("row", "is the result for 'Masein model, High', not"),
+])
+def test_r29_an_app_limits_row_that_isnt_its_recuts_stops_the_build(tmp_path, how, says):
+    paper = app_paper(tmp_path)
+    res = recut_result(tmp_path)
+    if how == "answered":
+        paper.write_text(paper.read_text(encoding="utf-8").replace("**75.0** | **77%**", "**75.0** | **78%**"),
+                         encoding="utf-8")
+    if how == "composite":
+        res = recut_result(tmp_path, after={**json.loads(res.read_text())["after"],
+                                            "composite": {"value": 0.7246, "ci": [0.6853, 0.7618]}})
+    if how == "records":
+        (res.parent / "recut-items.jsonl").write_bytes(b'{"bench": "math", "key": "b"}\n{"bench": "ifeval", "key": "1"}\n')
+    if how == "row":
+        res = recut_result(tmp_path, row="Masein model, High")
+    args = [str(tmp_path / "out"), str(paper), "--speeds", str(app_speeds(tmp_path))]
+    if how != "no file":
+        args += ["--app-limits", str(res)]
+    with pytest.raises(SystemExit, match=re.escape(says)):
+        build.main(args)
