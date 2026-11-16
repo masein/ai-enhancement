@@ -76,8 +76,10 @@ def clean(c: str) -> str:
 
 def tables(lines: list[str]) -> list[dict]:
     """each table with its caption: {name, part, caption, head, rows (raw cells)}"""
-    out, cap, name, part, i = [], "", None, 0, 0
+    out, cap, name, part, i, section = [], "", None, 0, 0, ""
     while i < len(lines):
+        if lines[i].startswith("## "):
+            section = lines[i][3:].strip()
         m = re.match(r"\*\*(Table [A-Z]?\d+[a-z]?)\.\*\* ?(.*)", lines[i])
         if m:
             name, cap, part = m.group(1), m.group(2), 0
@@ -88,7 +90,8 @@ def tables(lines: list[str]) -> list[dict]:
             rows = [raw_cells(r) for r in lines[i:j]]
             part += 1
             out.append({"name": name or "Key numbers", "part": part if name else 1,
-                        "caption": cap, "head": [clean(c) for c in rows[0]], "rows": rows[2:]})
+                        "caption": cap, "head": [clean(c) for c in rows[0]], "rows": rows[2:],
+                        "section": section})
             i = j
             continue
         if lines[i].startswith("#"):
@@ -104,6 +107,67 @@ def figures(lines: list[str]) -> list[tuple[str, str]]:
         if m:
             out.append((m.group(1), clean(m.group(2))))
     return out
+
+
+# r29 (masein, 16 Nov): LaTeX numbers the tables, and the files go by the numbers it prints.
+# Section 3 is Kevin's own file there: its five tables are the md's "Table P1" to "P5" in the main
+# text, and print as Tables 1 to 5. The md's own Section 3 stands in for his file, and its tables
+# print nowhere. The md's main-text tables come after, in order: its Tables 4 to 12 print as 6 to
+# 14. Appendix tables keep their letters. A paper whose text names no "Table P" keeps its numbers
+KEVIN_SECTION = "3. "
+REF_LIST = re.compile(r"\b(Tables?) ((?:P?\d+|[A-Z]\d+[a-z]?)(?:(?:, and |, | and | to |–)(?:P?\d+|[A-Z]\d+[a-z]?))*)")
+
+
+class Numbers:
+    """the md's table numbers as LaTeX prints them"""
+
+    def __init__(self, lines: list[str], tabs: list[dict]):
+        outside = [x for x in lines if not x.startswith("|")]
+        text = "\n".join(outside)
+        kevin_refs = [int(n) for m in REF_LIST.finditer(text) for n in re.findall(r"P(\d+)", m.group(2))]
+        self.kevin = max(kevin_refs) if kevin_refs else 0
+        in3 = [x for x in tabs if x["section"].startswith(KEVIN_SECTION)]
+        self.stand_in = sorted({x["name"] for x in in3 if re.fullmatch(r"Table \d+", x["name"])})
+        self.theirs = sorted({x["name"] for x in in3 if re.fullmatch(r"Table P\d+", x["name"])})
+        self.shift, self.first = 0, 1
+        if not self.kevin:
+            self.stand_in = []
+            return
+        main = []
+        for x in tabs:
+            m = re.fullmatch(r"Table (\d+)", x["name"])
+            if m and not x["section"].startswith(KEVIN_SECTION) and int(m.group(1)) not in main:
+                main.append(int(m.group(1)))
+        self.first = main[0] if main else 1
+        if main != list(range(self.first, self.first + len(main))):
+            raise SystemExit(f"the md's main-text tables are numbered {main}: LaTeX numbers them in "
+                             f"order after Kevin's {self.kevin}, so they must run with no gap")
+        self.shift = self.kevin - (self.first - 1)
+
+    def skipped(self, t: dict) -> bool:
+        """a table of the md's Section 3 when it stands in for Kevin's file: printed nowhere"""
+        return bool(self.kevin) and t["name"] in self.stand_in and t["section"].startswith(KEVIN_SECTION)
+
+    def number(self, n: str) -> str:
+        if n.startswith("P"):
+            return n[1:] if self.kevin else n
+        if not n.isdigit() or not self.kevin:
+            return n
+        if int(n) < self.first:
+            raise SystemExit(f"the text names Table {n}, which stands in Section 3 for Kevin's file "
+                             "and prints nowhere")
+        return str(int(n) + self.shift)
+
+    def name(self, name: str) -> str:
+        m = re.fullmatch(r"Table (P?\d+)", name)
+        return f"Table {self.number(m.group(1))}" if m else name
+
+    def text(self, s: str) -> str:
+        """a cell or a caption with its table references as printed"""
+        if not self.kevin or "Table" not in s:
+            return s
+        return REF_LIST.sub(lambda m: m.group(1) + " " + re.sub(
+            r"P?\d+(?![a-z\d])|[A-Z]\d+[a-z]?", lambda k: self.number(k.group(0)), m.group(2)), s)
 
 
 # ---------------------------------------------------------------------------
@@ -590,6 +654,15 @@ def masein_speed(p: Paper, mode: str) -> tuple[str, bool]:
     said = [(r, m) for r in rows for m in re.finditer(
         rf"{mode} mode(, preliminary)?: (\d+(?:\.\d+)?(?: and \d+(?:\.\d+)?)*)(?:(?!\. [A-Z])[^;|])*? "
         r"in short chats", clean(r[1]))]
+    # r29 (16 Nov): "In short chats, Medium mode: 12.6 and 9.2; High mode, thinking included: 10.2 and
+    # 8.5" — one sentence, a clause a mode, whatever each clause says of its mode
+    for r in rows:
+        for s in re.finditer(r"In short chats, (.*?)(?:\.(?=\s|$)|$)", clean(r[1])):
+            for clause in s.group(1).split("; "):
+                m = re.fullmatch(rf"{mode} mode(, [^:]*preliminary[^:]*|, [^:]+)?: "
+                                 r"(\d+(?:\.\d+)?(?: and \d+(?:\.\d+)?)*)", clause.strip())
+                if m:
+                    said.append((r, m))
     if len(said) != 1:
         raise SystemExit(f"the speed chart: the key numbers give {mode} mode's short-chat throughput "
                          f"{len(said)} times; the Masein model's is read from one")
@@ -599,7 +672,7 @@ def masein_speed(p: Paper, mode: str) -> tuple[str, bool]:
     if len(values) != len(phones) or PHONE not in phones:
         raise SystemExit(f"the speed chart: the key numbers give {mode} mode {len(values)} short-chat "
                          f"numbers for {len(phones)} phones; which is the {PHONE}'s can't be told")
-    return num(values[phones.index(PHONE)]), bool(m.group(1))
+    return num(values[phones.index(PHONE)]), "preliminary" in (m.group(1) or "")
 
 
 def board_speed(model: str) -> float:
@@ -674,6 +747,9 @@ def fig_speed(p: Paper, cap: str, src):
             if early and "preliminary" not in r["speed_source"]:
                 raise SystemExit(f"the speed chart: the key numbers call {modes[0]} mode's throughput "
                                  f"preliminary, and {name}'s speed_source must say so")
+            if not early and "preliminary" in r["speed_source"]:
+                raise SystemExit(f"the speed chart: {name}'s speed_source calls it preliminary, and the "
+                                 f"key numbers don't: {modes[0]} mode's throughput is final")
         out.append([name, num(m.group(1)), num(m.group(2)), num(m.group(3)), OURS, r["speed_tok_s"],
                     r["speed_source"], r["speed_credit"]])
     return ["Model", "DeviceMark composite", "95% low", "95% high", "Score: whose", "Token generation throughput (tokens/s)",
@@ -762,12 +838,25 @@ def main(argv: list[str]) -> int:
             print("stopped: nothing written. Fill every TBD in the paper, then build again")
             return 1
     tabs = tables(lines)
+    nums = Numbers(lines, tabs)
+    if nums.stand_in:
+        print(f"Section 3 is Kevin's own file in LaTeX: the md's {', '.join(nums.stand_in)} there "
+              "stand in for it and print nowhere, so they are not built")
+    if nums.kevin and len(nums.theirs) < nums.kevin:
+        print(f"Kevin's Tables P1 to P{nums.kevin} (printed 1 to {nums.kevin}) are in his file, not in "
+              f"the md: no table-1 to table-{nums.kevin}" + ("" if trial else "."))
+        if not trial:
+            print("stopped: nothing written. Put his tables in the md's Section 3 as Tables P1 to "
+                  f"P{nums.kevin}, or leave them out on purpose with --trial")
+            return 1
+    tabs = [x for x in tabs if not nums.skipped(x)]
     built, index = [], []
     for t in tabs:
-        stem, h, rows = table_file(t)
+        printed = {**t, "name": nums.name(t["name"])}
+        stem, h, rows = table_file(printed)
         check_table(stem, t, rows)
         built.append((stem, h, rows))
-        index.append([f"{stem}.csv", t["name"] + (", its second part" if t["part"] > 1 else ""),
+        index.append([f"{stem}.csv", printed["name"] + (", its second part" if t["part"] > 1 else ""),
                       first_sentence(t["caption"]) if t["caption"] else "The report's key numbers."])
     p = Paper(tabs)
     for n, cap in figures(lines):
@@ -782,10 +871,12 @@ def main(argv: list[str]) -> int:
     out.mkdir(parents=True, exist_ok=True)
     for f in out.glob("*.csv"):
         f.unlink()
+    # r29: every table reference in what goes out, as LaTeX prints it
     for stem, h, rows in built:
-        write(out / f"{stem}.csv", h, rows)
+        write(out / f"{stem}.csv", [nums.text(x) for x in h], [[nums.text(x) for x in r] for r in rows])
+    # the name is the printed one already; the caption's sentence is the md's
     write(out / "index.csv", ["File", "In the report", "What it holds (the caption's first sentence)"],
-          index)
+          [[f, name, nums.text(said)] for f, name, said in index])
     print(f"{len(built)} files in {out}: " + ", ".join(s for s, _, _ in built))
     tbd = [s for s, h, rows in built if any("TBD" in c for r in [h, *rows] for c in r)]
     if tbd:

@@ -434,3 +434,155 @@ def test_a_line_separator_inside_a_jsonl_string_is_part_of_its_record(tmp_path):
         {"benchmark": "MMLU-Pro", "question_id": "7", "final_answer": "one\u2028two\u0085three",
          "grade": {"right": True}}, ensure_ascii=False) + "\n", encoding="utf-8")
     assert scan.main([str(d), "--private", str(priv)]) == 0
+
+
+# ---------------------------------------------------------------------------
+# r29 (masein, 16 Nov): LaTeX numbers the tables. Section 3 is Kevin's own file, whose five
+# tables the md's text calls P1 to P5 (printed 1 to 5); the md's own Section 3 stands in for it
+# and prints nowhere; the md's Tables 4 on print two higher. The files go by the printed numbers
+# ---------------------------------------------------------------------------
+
+R29_SPEED = ("| Token generation throughput on a phone (decode, tokens/s), Instant mode | OnePlus 15 (16 GB): "
+             "15.2 in short chats, 7.3 with 14,000 tokens of context; iPhone 17 Pro Max (12 GB): 11.4 in short "
+             "chats, 12.4 with 14,000 tokens of context. In short chats, Medium mode: 12.6 and 9.2; High mode, "
+             "thinking included: 10.2 and 8.5 | No verdict (Section 3) |")
+STAND_IN = """## 3. On-device inference
+
+**Table 1.** Short-chat performance; provisional.
+
+| Phone | Decode |
+| --- | --- |
+| OnePlus 15 | 15.2 |
+
+**Table 2.** Context-length scaling; provisional.
+
+| Context | Decode |
+| --- | --- |
+| 2,000 | 14.0 |
+
+**Table 3.** Accuracy kept at a limit.
+
+| Limit | Score |
+| --- | --- |
+| 2,048 | 70.1 |
+"""
+R29 = f"""# A report: its title
+
+## Abstract
+
+The phones in Table P1, and all of Kevin's in Tables P1 to P5.
+
+## Key numbers
+
+| Measure | Masein model (measured here) | How it compares |
+| --- | --- | --- |
+| GPQA Diamond (%), High / Medium / Instant | 82.7 ± 2.2 / 80.1 ± 2.4 / 75.3 ± 2.4 | High: level with o1 (76.8) |
+{R29_SPEED}
+
+{STAND_IN}
+## 4. Capabilities
+
+**Table 4.** The protocol per benchmark, its scores in Table 5.
+
+| Benchmark | Limit |
+| --- | --- |
+| GPQA Diamond | 98,304 |
+
+**Table 5.** The scores, with the limits of Table 4 and Tables 5, F1 and F3 beside them.
+
+| Benchmark | Score |
+| --- | --- |
+| GPQA Diamond | 82.7 |
+
+**Table 6.** List prices, as in Tables 4 and 5.
+
+| Model | Price |
+| --- | --- |
+| o1 | 15.0 |
+
+## Appendix F
+
+**Table F1.** GPQA Diamond, as Table 5 has it.
+
+| Model | Score |
+| --- | --- |
+| o1 | 76.8 |
+"""
+
+
+def r29(tmp_path, text=R29):
+    p = tmp_path / "paper-r29.md"
+    p.write_text(text, encoding="utf-8")
+    return p
+
+
+def test_r29_the_files_and_their_references_go_by_the_numbers_latex_prints(tmp_path, capsys):
+    out = tmp_path / "paper-data"
+    assert build.main([str(out), str(r29(tmp_path)), "--trial"]) == 0
+    said = capsys.readouterr().out
+    assert "the md's Table 1, Table 2, Table 3 there stand in for it" in said
+    assert "Kevin's Tables P1 to P5 (printed 1 to 5) are in his file, not in the md" in said
+    got = sorted(p.name for p in out.iterdir())
+    assert got == ["index.csv", "key-numbers.csv", "table-6.csv", "table-7.csv", "table-8.csv", "table-f1.csv"]
+    ix = {r[0]: r[1:] for r in rows(out / "index.csv")}
+    assert ix["table-6.csv"] == ["Table 6", "The protocol per benchmark, its scores in Table 7."]
+    assert ix["table-7.csv"] == ["Table 7", "The scores, with the limits of Table 6 and Tables 7, F1 and F3 "
+                                            "beside them."]
+    assert ix["table-8.csv"] == ["Table 8", "List prices, as in Tables 6 and 7."]
+    assert ix["table-f1.csv"] == ["Table F1", "GPQA Diamond, as Table 7 has it."]
+    # a release build stops: the printed Tables 1 to 5 have no file
+    assert build.main([str(tmp_path / "release"), str(r29(tmp_path))]) == 1
+    assert "stopped: nothing written. Put his tables in the md's Section 3" in capsys.readouterr().out
+    assert not (tmp_path / "release").exists()
+
+
+def test_r29_kevins_tables_in_the_md_print_as_tables_1_to_5(tmp_path):
+    his = "## 3. On-device inference\n\n" + "".join(
+        f"**Table P{k}.** Kevin's table {k}, as Table 4 sets it up.\n\n| Phone | Decode |\n| --- | --- |\n"
+        f"| OnePlus 15 | 1{k}.5 |\n\n" for k in range(1, 6))
+    out = tmp_path / "paper-data"
+    assert build.main([str(out), str(r29(tmp_path, R29.replace(STAND_IN, his)))]) == 0
+    assert sorted(p.name for p in out.glob("table-*.csv")) == sorted(
+        [f"table-{k}.csv" for k in range(1, 9)] + ["table-f1.csv"])
+    ix = {r[0]: r[1:] for r in rows(out / "index.csv")}
+    assert ix["table-3.csv"] == ["Table 3", "Kevin's table 3, as Table 6 sets it up."]
+    assert rows(out / "table-3.csv")[1] == ["OnePlus 15", "13.5"]
+
+
+def test_r29_a_gap_in_the_main_text_tables_stops_the_build(tmp_path):
+    with pytest.raises(SystemExit, match="so they must run with no gap"):
+        build.main([str(tmp_path / "out"), str(r29(tmp_path, R29.replace("**Table 6.**", "**Table 7.**"))),
+                    "--trial"])
+
+
+def test_r29_a_paper_with_no_table_p_keeps_its_own_numbers(paper, tmp_path):
+    # the fixture above names no "Table P": nothing is renumbered and nothing is skipped
+    out = tmp_path / "paper-data"
+    assert build.main([str(out), str(paper)]) == 0
+    assert (out / "table-5.csv").exists() and (out / "table-12.csv").exists()
+
+
+def test_r29_the_speed_row_gives_each_mode_its_iphone_number():
+    lines = R29.split("\n")
+    p = build.Paper(build.tables(lines))
+    assert build.masein_speed(p, "Instant") == ("11.4", False)
+    assert build.masein_speed(p, "Medium") == ("9.2", False)
+    assert build.masein_speed(p, "High") == ("8.5", False)
+    # r25's wording still reads, preliminary with it
+    old = build.Paper(build.tables(PAPER.split("\n")))
+    assert build.masein_speed(old, "Medium") == ("9.7", True)
+
+
+def test_r29_figure_one_cant_call_a_final_speed_preliminary(paper, tmp_path):
+    speed_paper(paper)
+    text = paper.read_text(encoding="utf-8")
+    old_row = next(x for x in text.split("\n") if x.startswith("| Token generation throughput"))
+    paper.write_text(text.replace(old_row, R29_SPEED.replace(" (Section 3)", "")), encoding="utf-8")
+    final = "Teraformer's app on an iPhone 17 Pro Max, Medium mode, short chats (Table 1)"
+    out = tmp_path / "paper-data"
+    assert build.main([str(out), str(paper), "--speeds", str(speeds_file(
+        tmp_path, **{"Masein model, Medium": {"speed_tok_s": "9.2", "speed_source": final}}))]) == 0
+    assert rows(out / "figure-1.csv")[2][:6] == ["Masein model, Medium", "84.6", "81.6", "87.3", build.OURS, "9.2"]
+    with pytest.raises(SystemExit, match="calls it preliminary, and the key numbers don't"):
+        build.main([str(tmp_path / "again"), str(paper), "--speeds", str(speeds_file(
+            tmp_path, **{"Masein model, Medium": {"speed_tok_s": "9.2"}}))])
