@@ -51,6 +51,10 @@ import urllib.parse
 # ---------------------------------------------------------------------------
 
 TEXT, NAME, ANY, SCALAR, WHERE = "text", "name", "any", "scalar", "where"
+# 16 Nov (masein): a model's thinking marks, as the row's reading records them — <think>,
+# </think>, Gemma's <|channel> and <channel|> — kept in setup.json; TEXT has no "<"
+MARK = "mark"
+_MARK = re.compile(r"</?\|?[A-Za-z_][\w-]{0,30}\|?>")
 _KEY = re.compile(r"[\w.,+@ -]{1,80}")
 _TEXT = re.compile(r"[\w .,:;()/+%·–—'’-]{0,200}", re.U)
 _NAME = re.compile(r"[\w.+@-]{1,160}(/[\w.+@-]{1,160}){0,2}")
@@ -94,6 +98,8 @@ def _ok_str(v: str, kind: str) -> bool:
         return len(v) <= 2000
     if kind == NAME:
         return bool(_NAME.fullmatch(v))
+    if kind == MARK:
+        return bool(_MARK.fullmatch(v))
     return bool(_TEXT.fullmatch(v))
 
 
@@ -123,7 +129,7 @@ def pick(obj, schema):
         return obj if isinstance(obj, str) and _ok_str(obj, TEXT) else None
     if schema == WHERE:
         return where_of(obj) if isinstance(obj, str) else None
-    if schema in (TEXT, NAME, ANY):
+    if schema in (TEXT, NAME, ANY, MARK):
         return obj if isinstance(obj, str) and _ok_str(obj, schema) else None
     if schema is float:
         return obj if isinstance(obj, (int, float)) and not isinstance(obj, bool) else None
@@ -728,6 +734,11 @@ _ACCOUNT_NAME = re.compile(r"[A-Za-z0-9][\w.-]*")
 _OWN_HOST = re.compile(r"(?i)[a-z0-9_-]+|.+\.(?:internal|local|localdomain|lan|home|corp|"
                        r"intranet|private|docker|ts\.net)")
 _NOT_HOSTS = {"localhost", "host.docker.internal"}
+# 16 Nov (masein): a number is never a host's name. A 100.x address given in SCRUB_HOSTS made
+# its first label, "100", a host, and every "100" in a release's prompts, answers, logs and
+# READMEs became [host]. An address is no host's name either: SCRUB_HOSTS refuses one
+NUMBER = re.compile(r"[\d.]+")
+_IP = re.compile(r"(?:\d{1,3}\.){3}\d{1,3}|[0-9a-fA-F:]*:[0-9a-fA-F:]*")
 _HF_REPO = re.compile(r"(?i)(?:\bhf://|\bhuggingface\.co/(?:models/|datasets/)?)"
                       r"([A-Za-z0-9][\w.-]*)/([\w.-]+)")
 _names: dict = {}
@@ -740,7 +751,10 @@ def _given(var: str, ok: re.Pattern, what: str) -> tuple[list[str], list[str]]:
     for v in (x.strip() for x in raw.split(",")):
         if not v:
             continue
-        if len(v) < NAME_MIN:
+        if var == "SCRUB_HOSTS" and (NUMBER.fullmatch(v) or _IP.fullmatch(v)):
+            bad.append(f'{var}: "{v}" is an address or a number, not a host\'s name — give the '
+                       "server's names only; addresses are scrubbed by their own rule")
+        elif len(v) < NAME_MIN:
             bad.append(f'{var}: "{v}" is too short to be {what}')
         elif not ok.fullmatch(v):
             bad.append(f'{var}: "{v}" isn\'t {what}')
@@ -787,6 +801,26 @@ def _worked_out() -> tuple[list[str], list[str]]:
                 and "." in h:
             hosts.add(h)
     return sorted(hosts), sorted(accts)
+
+
+def own_addresses() -> list[str]:
+    """16 Nov: the addresses the board's own settings name (its *_URL variables, its local
+    base URL, the served models' base URLs) — ours, so a dataset's prompt or a model's answer
+    loses one only where it is exactly that; never a loopback or unspecified one"""
+    urls = [v for k, v in os.environ.items() if k.endswith("_URL") and isinstance(v, str)]
+    try:
+        from service import config, db
+        urls.append(config.LOCAL_BASE_URL)
+        urls += [str(r.get("base_url") or "") for r in
+                 (db.served_all() if config.DB_PATH.exists() else [])]
+    except Exception:                                   # noqa: BLE001 — what the environment says
+        pass
+    out = set()
+    for u in urls:
+        h = _host(u)
+        if h and _IP.fullmatch(h) and not h.startswith(("127.", "0.")) and h not in ("::1", "::"):
+            out.add(h)
+    return sorted(out)
 
 
 def undotted_names() -> list[str]:
@@ -844,7 +878,9 @@ def scrub_names() -> dict:
                         "out only add to it")
     all_accts = sorted({*accts, *found}, key=str.lower)
     names = [x for h in [*hosts, *own, me] if h for x in (h, h.split(".")[0])]
-    out = {"hosts": sorted({h for h in names if len(h) >= NAME_MIN}, key=str.lower),
+    out = {"hosts": sorted({h for h in names if len(h) >= NAME_MIN and not NUMBER.fullmatch(h)},
+                           key=str.lower),
+           "addresses": own_addresses(),
            "accounts": [a for a in all_accts if len(a) >= 2],
            "server": server, "problems": problems}
     _names.update(key=key, value=out)
