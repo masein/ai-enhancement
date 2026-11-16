@@ -228,12 +228,13 @@ def test_2_3_each_plan_runs_every_benchmark_once_one_line_a_box():
         if name == "H":
             want = {("on", fbx.DM)}
         # r20: plan Q, Qwen3.5-9B's boxes alone (BOX_MODELS): nothing of step2388's
-        if name == "Q":
+        # r35: plan O's the same — Qwen3.5-4B's and Gemma 4's boxes alone
+        if name in ("Q", "O"):
             want = set()
         assert set(have) == want, name
         assert all(have[k] == set(range(1, of[k] + 1)) for k in have), name
         # 17f: one box a build asks it first
-        assert parity == (0 if name in ("L", "I", "T", "U", "C", "S", "P", "M", "H", "Q", "N")
+        assert parity == (0 if name in ("L", "I", "T", "U", "C", "S", "P", "M", "H", "Q", "N", "O")
                           else 1), name
     longest = {p: max(sum(fbx.hours(s) for s in st) for st in b.values())
                for p, b in fbx.PLANS.items()}
