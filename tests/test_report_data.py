@@ -521,7 +521,7 @@ def test_r29_the_files_and_their_references_go_by_the_numbers_latex_prints(tmp_p
     assert build.main([str(out), str(r29(tmp_path)), "--trial"]) == 0
     said = capsys.readouterr().out
     assert "the md's Table 1, Table 2, Table 3 there stand in for it" in said
-    assert "Kevin's Tables P1 to P5 (printed 1 to 5) are in his file, not in the md" in said
+    assert "Kevin's Tables P1 to P5 (printed 1 to 5) are read from his own file, and none was given" in said
     got = sorted(p.name for p in out.iterdir())
     assert got == ["index.csv", "key-numbers.csv", "table-6.csv", "table-7.csv", "table-8.csv", "table-f1.csv"]
     ix = {r[0]: r[1:] for r in rows(out / "index.csv")}
@@ -532,21 +532,94 @@ def test_r29_the_files_and_their_references_go_by_the_numbers_latex_prints(tmp_p
     assert ix["table-f1.csv"] == ["Table F1", "GPQA Diamond, as Table 7 has it."]
     # a release build stops: the printed Tables 1 to 5 have no file
     assert build.main([str(tmp_path / "release"), str(r29(tmp_path))]) == 1
-    assert "stopped: nothing written. Put his tables in the md's Section 3" in capsys.readouterr().out
+    assert "stopped: nothing written. Give his file (on-the-phone.tex, from Overleaf) with --phone-tex" in \
+        capsys.readouterr().out
     assert not (tmp_path / "release").exists()
 
 
-def test_r29_kevins_tables_in_the_md_print_as_tables_1_to_5(tmp_path):
-    his = "## 3. On-device inference\n\n" + "".join(
-        f"**Table P{k}.** Kevin's table {k}, as Table 4 sets it up.\n\n| Phone | Decode |\n| --- | --- |\n"
-        f"| OnePlus 15 | 1{k}.5 |\n\n" for k in range(1, 6))
+def tex_table(label: str, caption: str, spec: str, head: str, rows: list[str]) -> str:
+    return ("\\begin{table}[!htbp]\n\\centering\n\\caption{" + caption + "}\n\\label{" + label + "}\n"
+            "\\footnotesize\n\\begin{tabular}{" + spec + "}\n\\toprule\n" + head + "\n\\midrule\n"
+            + "\n".join(rows) + "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n")
+
+
+GROUPS = ("& \\multicolumn{3}{c}{OnePlus 15} & \\multicolumn{3}{c}{iPhone 17 Pro Max} \\\\\n"
+          "\\cmidrule(lr){2-4}\\cmidrule(lr){5-7}\n"
+          "Context & Prefill & TTFT (s) & Decode & Prefill & TTFT (s) & Decode \\\\")
+HIS = {
+    "tab:phone-modes": tex_table(
+        "tab:phone-modes", "Short-chat inference performance. Values are medians of five runs.", "llrrrr",
+        "Device & Mode & Prefill & Decode & TTFT & TTFA \\\\\n& & (tok/s) & (tok/s) & (s) & (s) \\\\",
+        ["OnePlus 15\n & Instant & 53.6 & 15.2 & 14.69 & 14.69 \\\\",
+         " & Medium  & 32.6 & 12.6 & 23.82 & 23.82 \\\\",
+         " & High    & 23.9 & 10.2 & 42.82 & 145.5 \\\\", "\\midrule",
+         "iPhone 17 Pro Max\n & Instant & 43.7 & 11.4 & 17.68 & 17.68 \\\\",
+         " & Medium  & 21.2 & 9.2  & 36.73 & 36.73 \\\\",
+         " & High    & 23.0 & 8.5  & 43.70 & 158.2 \\\\"]),
+    "tab:phone-memory": tex_table(
+        "tab:phone-memory", "Runtime memory by mode, in GB. Counters differ by system.", "llrrr",
+        "Device & Mode & Reported & Incl. mapped & Available \\\\",
+        ["OnePlus 15\n & Instant & 6.71 & -- & 4.00 \\\\", "iPhone 17 Pro Max\n & Instant & 2.86 & 5.06 & 3.59 \\\\"]),
+    **{f"tab:context-{m}": tex_table(f"tab:context-{m}", f"{m.title()}-mode context scaling. Medians.",
+                                    "lrrrrrr", GROUPS, ["2K  & 51.8 & 39.7  & 13.1 & 54.5 & 37.8  & 12.3 \\\\",
+                                                        "14K & 16.9 & 828.4 & 7.3  & 40.8 & 342.6 & 12.4 \\\\"])
+       for m in ("instant", "medium", "high")},
+}
+
+
+def his_file(tmp_path, order=tuple(HIS), change=None) -> Path:
+    f = tmp_path / "on-the-phone.tex"
+    text = "\\subsection{3. On-device inference}\n% a comment & \\\\ never read\n" + "\n".join(HIS[k] for k in order)
+    for a, b in (change or {}).items():
+        assert a in text, a
+        text = text.replace(a, b)
+    f.write_text(text, encoding="utf-8")
+    return f
+
+
+def test_r29_kevins_tables_come_from_his_file_as_tables_1_to_5(tmp_path):
     out = tmp_path / "paper-data"
-    assert build.main([str(out), str(r29(tmp_path, R29.replace(STAND_IN, his)))]) == 0
+    assert build.main([str(out), str(r29(tmp_path, R29.replace(R29_SPEED, R29_SPEED.replace(" (Section 3)", "")))),
+                       "--phone-tex", str(his_file(tmp_path))]) == 0
     assert sorted(p.name for p in out.glob("table-*.csv")) == sorted(
         [f"table-{k}.csv" for k in range(1, 9)] + ["table-f1.csv"])
+    t1 = rows(out / "table-1.csv")
+    assert t1[0] == ["Device", "Mode", "Prefill (tok/s)", "Decode (tok/s)", "TTFT (s)", "TTFA (s)"]
+    assert t1[4] == ["iPhone 17 Pro Max", "Instant", "43.7", "11.4", "17.68", "17.68"]   # said once a group
+    assert rows(out / "table-2.csv")[1] == ["OnePlus 15", "Instant", "6.71", "–", "4.00"]
+    assert rows(out / "table-3.csv")[0] == ["Context", "OnePlus 15, Prefill", "OnePlus 15, TTFT (s)",
+                                           "OnePlus 15, Decode", "iPhone 17 Pro Max, Prefill",
+                                           "iPhone 17 Pro Max, TTFT (s)", "iPhone 17 Pro Max, Decode"]
     ix = {r[0]: r[1:] for r in rows(out / "index.csv")}
-    assert ix["table-3.csv"] == ["Table 3", "Kevin's table 3, as Table 6 sets it up."]
-    assert rows(out / "table-3.csv")[1] == ["OnePlus 15", "13.5"]
+    assert ix["table-1.csv"] == ["Table 1", "Short-chat inference performance."]
+    assert ix["table-5.csv"] == ["Table 5", "High-mode context scaling."]
+    assert ix["table-6.csv"][0] == "Table 6"
+
+
+def test_r29_his_tables_print_in_his_files_order(tmp_path):
+    # LaTeX numbers his tables as his file has them; the text's P2 is his memory table wherever it is
+    paper = r29(tmp_path, R29.replace("its scores in Table 5", "its memory in Table P2"))
+    order = ("tab:phone-modes", "tab:context-instant", "tab:phone-memory", "tab:context-medium", "tab:context-high")
+    out = tmp_path / "paper-data"
+    assert build.main([str(out), str(paper), "--phone-tex", str(his_file(tmp_path, order))]) == 0
+    ix = {r[0]: r[1:] for r in rows(out / "index.csv")}
+    assert ix["table-3.csv"] == ["Table 3", "Runtime memory by mode, in GB."]
+    assert ix["table-6.csv"] == ["Table 6", "The protocol per benchmark, its memory in Table 3."]
+
+
+@pytest.mark.parametrize("change,says", [
+    ({"\\label{tab:phone-memory}": "\\label{tab:memory}"}, "Kevin's file has no tab:phone-memory"),
+    ({" & Medium  & 32.6 & 12.6": " & Medium  & n/a & 12.6"}, "'Prefill (tok/s)' has 'n/a', not a number"),
+    ({" & High    & 23.9 & 10.2 & 42.82 & 145.5": " & High    & 23.9 & 10.2 & 42.82"}, "has 5 cells for 6 columns"),
+    ({"\\label{tab:context-high}\n": ""}, "a table without its label"),
+    # the key numbers' iPhone speed is the one Figure 1 credits to his table
+    ({" & Medium  & 21.2 & 9.2 ": " & Medium  & 21.2 & 9.4 "}, "Kevin's short-chat table has ['9.4']"),
+])
+def test_r29_a_label_missing_or_a_row_that_doesnt_parse_stops_the_build(tmp_path, change, says):
+    with pytest.raises(SystemExit, match=re.escape(says)):
+        build.main([str(tmp_path / "out"), str(r29(tmp_path)), "--phone-tex", str(his_file(tmp_path, change=change)),
+                    "--trial"])
+    assert not (tmp_path / "out").exists()
 
 
 def test_r29_a_gap_in_the_main_text_tables_stops_the_build(tmp_path):
