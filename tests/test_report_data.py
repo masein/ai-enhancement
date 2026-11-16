@@ -342,6 +342,36 @@ def test_figure_ones_speeds_come_from_its_file_so_new_timings_need_one_rebuild(t
         figs.speeds(tmp_path)
 
 
+def test_r34_the_on_device_caption_says_deployed_file_size_and_still_builds_the_on_device_chart():
+    # r34 (16 Nov): Figure 10's caption reads "Score against deployed file size (log scale)"; the
+    # build stopped on it as a figure new to the script. The old wording still works; others don't
+    r34 = ("In High mode, no on-device model in Table G1 publishes a GPQA Diamond score numerically above "
+           "the Masein model's measured 82.7; five publish IFBench scores numerically above its 63.7. "
+           "Score against deployed file size (log scale). Filled: the Masein model, measured by us.")
+    assert build.builder(r34) is build.fig_size
+    assert build.builder("Score against file size for on-device models, with a scorecard beneath.") is build.fig_size
+    assert build.builder("Score against the size of the deployed file.") == "?"
+
+
+def test_r34_figure_10_has_its_two_panels_as_before_and_no_scorecard():
+    pytest.importorskip("matplotlib")
+    figs = load("make_figures")
+    fig, head, rows_out, _ = figs.fig10({"masein": {"gpqa": {"v": 82.7020202020202, "se": 2.215041706693907}}}, {})
+    w, h = fig.get_size_inches()
+    assert (w, h) == (6.5, 4.0)                                    # 6.55 in less the scorecard's 2.55
+    assert len(fig.axes) == 2                                      # the two panels; the scorecard's axes gone
+    # each panel 5.9 x 1.25 in, as far from the figure's top as before (0.58 and 2.28 in)
+    for ax, title, top in zip(fig.axes, ("GPQA Diamond", "IFBench"), (0.58, 2.28)):
+        x0, y0, aw, ah = ax.get_position().bounds
+        assert ax.get_title() == title
+        assert (round(aw * w, 6), round(ah * h, 6), round(h - (y0 + ah) * h, 6)) == (5.9, 1.25, top)
+    texts = [t.get_text() for t in fig.findobj(figs.matplotlib.text.Text)]
+    assert not {"Scores (%)", "MMLU-Pro", "IFEval", "16.0 GB", "ours"} & set(texts)
+    assert "82.7 Masein model" in texts and "63.7 Masein model" in texts
+    assert head == ["Model", "Size (GB)", "Panel", "Score (%)", "Source"] and len(rows_out) == 10 + 14   # its CSV as before
+    figs.plt.close(fig)
+
+
 def test_a_tbd_stops_the_build_and_trial_lists_the_files_that_carry_one(paper, tmp_path, capsys):
     paper.write_text(PAPER.replace("| 7 of 792 | 5 of 792 |", "| 7 of 792 | \\[TBD K1: count\\] |"),
                      encoding="utf-8")
@@ -785,3 +815,158 @@ def test_r31_the_out_of_room_caption_reads_in_high_mode_wording(paper, tmp_path)
     assert build.main([str(tmp_path / "new"), str(paper)]) == 0
     assert rows(tmp_path / "new" / "figure-5.csv") == rows(tmp_path / "old" / "figure-5.csv")
     assert sorted(r[0] for r in rows(tmp_path / "new" / "figure-5.csv")[1:]) == ["GPQA Diamond", "IFBench"]
+
+
+# ---------------------------------------------------------------------------
+# r31 (masein, 16 Nov): the unnumbered figure under the abstract, from the figure script's
+# figure-abstract.csv beside figure-1.csv, each row traced to Table 5 or Table F1
+# ---------------------------------------------------------------------------
+
+ABS_ROWS = [["Masein model, High", "82.7", "2.2", "78.4", "87.0", "Table 5", build.OURS],
+            ["Masein model, Medium", "80.1", "2.4", "75.4", "84.8", "Table 5", build.OURS],
+            ["Grok 3 mini (low)", "76.3", "3.0", "70.4", "82.2", "Table F1",
+             "Epoch AI Benchmarking Hub, CC BY 4.0, imported 7 Nov 2026"],
+            ["Masein model, Instant", "75.3", "2.4", "70.6", "80.0", "Table 5", build.OURS]]
+
+
+def abstract_file(tmp_path, rows=ABS_ROWS) -> Path:
+    f = tmp_path / "figure-abstract.csv"
+    with open(f, "w", newline="", encoding="utf-8") as fh:
+        w = csv.writer(fh, lineterminator="\n")
+        w.writerow(build.ABSTRACT_HEAD)
+        w.writerows(rows)
+    return tmp_path / "figure-1.csv"                     # the build looks beside figure-1.csv
+
+
+def test_r31_the_figure_under_the_abstract_is_traced_to_table_5_and_table_f1(paper, tmp_path):
+    out = tmp_path / "paper-data"
+    assert build.main([str(out), str(paper), "--speeds", str(abstract_file(tmp_path))]) == 0
+    got = rows(out / "figure-abstract.csv")
+    assert got[0] == build.ABSTRACT_HEAD
+    assert got[3] == ["Grok 3 mini (low)", "76.3", "3.0", "70.4", "82.2", "Table F1", build.EPOCH]
+    assert [r[0] for r in got[1:]] == [r[0] for r in ABS_ROWS]
+    ix = {r[0]: r[1:] for r in rows(out / "index.csv")}
+    assert ix["figure-abstract.csv"][0] == "The figure under the abstract"
+
+
+@pytest.mark.parametrize("change,says", [
+    ({0: {1: "82.8"}}, "Masein model, High is drawn at 82.8 ± 2.2; Table 5 prints 82.7 ± 2.2"),
+    ({2: {2: "2.9"}}, "Grok 3 mini (low) is drawn at 76.3 ± 2.9; Table F1 prints 76.3 ± 3.0"),
+    ({2: {0: "Grok 4 (high)"}}, "Grok 4 (high) is neither a mode in the scores table nor a row of Table F1"),
+    ({3: {4: "80.2"}}, "Masein model, Instant's bar is 70.6 to 80.2, not ±1.96 SE"),
+    ({1: {5: "Table F1"}}, "Masein model, Medium says 'Table F1'"),
+    ({"swap": (1, 2)}, "is out of order (highest first)"),
+])
+def test_r31_an_abstract_figure_row_that_isnt_the_reports_stops_the_build(paper, tmp_path, change, says):
+    rs = [list(r) for r in ABS_ROWS]
+    for k, v in change.items():
+        if k == "swap":
+            rs[v[0]], rs[v[1]] = rs[v[1]], rs[v[0]]
+        else:
+            for col, val in v.items():
+                rs[k][col] = val
+    with pytest.raises(SystemExit, match=re.escape(says)):
+        build.main([str(tmp_path / "out"), str(paper), "--speeds", str(abstract_file(tmp_path, rs))])
+
+
+def test_r31_with_no_abstract_figure_file_the_rest_builds_and_it_says_so(paper, tmp_path, capsys):
+    out = tmp_path / "paper-data"
+    assert build.main([str(out), str(paper), "--speeds", str(tmp_path / "figure-1.csv")]) == 0
+    assert "no figure-abstract.csv beside figure-1.csv" in capsys.readouterr().out
+    assert not (out / "figure-abstract.csv").exists() and (out / "table-5.csv").exists()
+
+
+# r31 (masein, 16 Nov, design B): the figure under the abstract drawn as one number line, its
+# data and CSV as before; the figure checker's 7.5 pt floor for it and its ring rule
+
+ABS_E = {"masein": {"gpqa": {"v": 82.7020202020202, "se": 2.215041706693907}},
+         "benchmarks": {"gpqa": {"rows": [
+             {"model": "Gemini 3.5 Flash-Lite", "setting": "high", "value": 83.33333333333334, "se": 2.6552207828215257},
+             {"model": "o4-mini", "setting": "high", "value": 79.60858585858585, "se": 2.4034764096121957},
+             {"model": "GPT-5 mini", "setting": "high", "value": 75.0, "se": 2.2767295427113803},
+             {"model": "o3", "setting": "high", "value": 82.0, "se": 2.5}]}}}
+
+
+def test_r31_the_abstract_figure_is_one_number_line_and_its_csv_is_as_before():
+    pytest.importorskip("matplotlib")
+    from matplotlib.collections import LineCollection, PathCollection
+    from matplotlib.colors import to_hex
+    figs = load("make_figures")
+    fig, head, out, ck = figs.fig_abstract(ABS_E, {})
+    E = "Epoch AI Benchmarking Hub, CC BY 4.0, imported 7 Nov 2026"
+    assert out == [["Gemini 3.5 Flash-Lite (high)", "83.3", "2.7", "78.0", "88.6", "Table F1", E],
+                   ["Masein model, High", "82.7", "2.2", "78.4", "87.0", "Table 5", "measured by Teraformer"],
+                   ["Masein model, Medium", "80.1", "2.4", "75.4", "84.8", "Table 5", "measured by Teraformer"],
+                   ["o4-mini (high)", "79.6", "2.4", "74.9", "84.3", "Table F1", E],
+                   ["Masein model, Instant", "75.3", "2.4", "70.6", "80.0", "Table 5", "measured by Teraformer"],
+                   ["GPT-5 mini (high)", "75.0", "2.3", "70.5", "79.5", "Table F1", E]]
+    assert head == ["Model (setting)", "GPQA Diamond (%)", "SE", "95% low", "95% high", "In the report", "Source"]
+    assert tuple(fig.get_size_inches()) == (6.5, 1.5)
+    (ax,) = fig.axes
+    assert not ax.axison                                            # no frame, no y axis
+    dots = {c.get_gid(): (c.get_offsets()[0][0], to_hex(c.get_facecolor()[0]).upper(), c.get_zorder())
+            for c in ax.collections if isinstance(c, PathCollection)}
+    assert dots == {"pt:Gemini 3.5 Flash-Lite (high)": (83.3, "#E07040", 5), "pt:High": (82.7, "#386CC4", 4),
+                    "pt:Medium": (80.1, "#6E98E0", 4), "pt:o4-mini (high)": (79.6, "#52AA7C", 5),
+                    "pt:Instant": (75.3, "#9EBAEA", 4), "pt:GPT-5 mini (high)": (75.0, "#E4A338", 5)}
+    # no error bars: the one line collection is the track, Instant to High, light blue to darker
+    (track,) = [c for c in ax.collections if isinstance(c, LineCollection)]
+    segs = track.get_segments()
+    assert track.get_gid() == "track" and segs[0][0][0] == 75.3 and abs(segs[-1][-1][0] - 82.7) < 1e-9
+    assert to_hex(track.get_colors()[0]).upper() == "#C5D6F2" and to_hex(track.get_colors()[-1]).upper() == "#8BACE6"
+    lines = [ln.get_xydata().tolist() for ln in ax.get_lines()]
+    assert [[73.4, 0.0], [85.4, 0.0]] in lines                     # the axis line
+    T = {t.get_text(): t for t in ax.texts}
+    assert [s for s in T if s.isdigit()] == ["74", "76", "78", "80", "82", "84"]
+    assert T["74"].get_fontsize() == 7.5 and T["Masein model"].get_fontsize() == 7.5
+    # the modes above the line, the other three below, each name and score in its place
+    for name, y, score in (("Instant", 0.55, "#8EA7D3"), ("Medium", 0.55, "#6389CA"), ("High", 0.55, "#3261B0"),
+                           ("GPT-5 mini (high)", -0.56, "#C28B30"), ("o4-mini (high)", -0.56, "#469069"),
+                           ("Gemini 3.5 Flash-Lite (high)", -0.56, "#BE5F36")):
+        x = dots["pt:" + name][0]
+        assert T[name].get_position() == (x, y)
+        assert to_hex(T[f"{x:.1f}"].get_color()).upper() == score
+    assert ck.floor == 7.5 and ck.rings
+    figs.plt.close(fig)
+
+
+def test_r31_the_ring_rule_finds_a_dot_whose_ring_covers_anothers_colour_and_the_floor_is_per_figure():
+    pytest.importorskip("matplotlib")
+    figs = load("make_figures")
+
+    def two_dots(gap_units):
+        fig = figs.figure(1.0)
+        ax = figs.axes_in(fig, 0.0, 0.0, 6.5, 1.0)
+        ax.set_xlim(0, 6.5 * 72)                                    # one unit a point
+        ax.set_ylim(-36, 36)
+        ax.axis("off")
+        for i, x in enumerate((100, 100 + gap_units)):
+            ax.scatter([x], [0], s=95, edgecolor="white", linewidth=1.6).set_gid(f"pt:{i}")
+        figs.text(ax, 300, 20, "small", fontsize=7.5)
+        return fig
+
+    # 9.75 pt dots with 1.6 pt rings: a ring reaches the other's colour under 4.07 + 5.67 = 9.75 pt apart
+    for gap, rings, floor, want in ((9.0, True, 7.5, ["dots overlap"]), (10.4, True, 7.5, []),
+                                    (9.0, False, 7.5, []), (10.4, True, figs.SMALL, ["under 8.5 pt"])):
+        fig = two_dots(gap)
+        got = figs.Checker("t", floor=floor, rings=rings).run(fig)
+        assert [p.split(":")[0] for p in got] == want, (gap, rings, floor, got)
+        figs.plt.close(fig)
+
+
+def test_r35_the_shorter_captions_still_pick_figure_1s_and_figure_9s_builders():
+    # r35 (16 Nov): Figure 1 drops "token generation throughput" ("…on the DeviceMark replica at
+    # 11.4 tokens per second…") and Figure 9 drops "one model per row" ("Rows: … Each cell is the
+    # model's best-scoring Epoch run…"); each old wording still works, and nothing else is caught
+    f1 = ("In Instant mode, the Masein model scores 84.4 on the DeviceMark replica at 11.4 tokens per second on "
+          "an iPhone 17 Pro Max; in Medium mode, 84.6 at 9.2.")
+    assert build.builder(f1) is build.fig_speed
+    assert build.builder("its token generation throughput on an iPhone, DeviceMark replica") is build.fig_speed
+    assert build.builder("Speed in tokens per second on a phone.") == "?"            # no DeviceMark: not Figure 1
+    f9 = ("Rows: 12 well-known models, chosen in advance as widely known, not by their verdicts. Each cell is the "
+          "model's best-scoring Epoch run (Tables F1 to F3).")
+    assert build.builder(f9) is build.fig_grid
+    assert build.builder("21 rows, one model per row.") is build.fig_grid
+    # Figure 7's "one model's best-scoring Epoch run, in the lane of its verdict" stays Figure 7's
+    f7 = "Each hollow circle is one model's best-scoring Epoch run, in the lane of its verdict against the Masein model's"
+    assert build.builder(f7) is build.fig_gpqa
