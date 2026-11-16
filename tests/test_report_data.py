@@ -844,3 +844,81 @@ def test_r31_with_no_abstract_figure_file_the_rest_builds_and_it_says_so(paper, 
     assert build.main([str(out), str(paper), "--speeds", str(tmp_path / "figure-1.csv")]) == 0
     assert "no figure-abstract.csv beside figure-1.csv" in capsys.readouterr().out
     assert not (out / "figure-abstract.csv").exists() and (out / "table-5.csv").exists()
+
+
+# r31 (masein, 16 Nov, design B): the figure under the abstract drawn as one number line, its
+# data and CSV as before; the figure checker's 7.5 pt floor for it and its ring rule
+
+ABS_E = {"masein": {"gpqa": {"v": 82.7020202020202, "se": 2.215041706693907}},
+         "benchmarks": {"gpqa": {"rows": [
+             {"model": "Gemini 3.5 Flash-Lite", "setting": "high", "value": 83.33333333333334, "se": 2.6552207828215257},
+             {"model": "o4-mini", "setting": "high", "value": 79.60858585858585, "se": 2.4034764096121957},
+             {"model": "GPT-5 mini", "setting": "high", "value": 75.0, "se": 2.2767295427113803},
+             {"model": "o3", "setting": "high", "value": 82.0, "se": 2.5}]}}}
+
+
+def test_r31_the_abstract_figure_is_one_number_line_and_its_csv_is_as_before():
+    pytest.importorskip("matplotlib")
+    from matplotlib.collections import LineCollection, PathCollection
+    from matplotlib.colors import to_hex
+    figs = load("make_figures")
+    fig, head, out, ck = figs.fig_abstract(ABS_E, {})
+    E = "Epoch AI Benchmarking Hub, CC BY 4.0, imported 7 Nov 2026"
+    assert out == [["Gemini 3.5 Flash-Lite (high)", "83.3", "2.7", "78.0", "88.6", "Table F1", E],
+                   ["Masein model, High", "82.7", "2.2", "78.4", "87.0", "Table 5", "measured by Teraformer"],
+                   ["Masein model, Medium", "80.1", "2.4", "75.4", "84.8", "Table 5", "measured by Teraformer"],
+                   ["o4-mini (high)", "79.6", "2.4", "74.9", "84.3", "Table F1", E],
+                   ["Masein model, Instant", "75.3", "2.4", "70.6", "80.0", "Table 5", "measured by Teraformer"],
+                   ["GPT-5 mini (high)", "75.0", "2.3", "70.5", "79.5", "Table F1", E]]
+    assert head == ["Model (setting)", "GPQA Diamond (%)", "SE", "95% low", "95% high", "In the report", "Source"]
+    assert tuple(fig.get_size_inches()) == (6.5, 1.5)
+    (ax,) = fig.axes
+    assert not ax.axison                                            # no frame, no y axis
+    dots = {c.get_gid(): (c.get_offsets()[0][0], to_hex(c.get_facecolor()[0]).upper(), c.get_zorder())
+            for c in ax.collections if isinstance(c, PathCollection)}
+    assert dots == {"pt:Gemini 3.5 Flash-Lite (high)": (83.3, "#E07040", 5), "pt:High": (82.7, "#386CC4", 4),
+                    "pt:Medium": (80.1, "#6E98E0", 4), "pt:o4-mini (high)": (79.6, "#52AA7C", 5),
+                    "pt:Instant": (75.3, "#9EBAEA", 4), "pt:GPT-5 mini (high)": (75.0, "#E4A338", 5)}
+    # no error bars: the one line collection is the track, Instant to High, light blue to darker
+    (track,) = [c for c in ax.collections if isinstance(c, LineCollection)]
+    segs = track.get_segments()
+    assert track.get_gid() == "track" and segs[0][0][0] == 75.3 and abs(segs[-1][-1][0] - 82.7) < 1e-9
+    assert to_hex(track.get_colors()[0]).upper() == "#C5D6F2" and to_hex(track.get_colors()[-1]).upper() == "#8BACE6"
+    lines = [ln.get_xydata().tolist() for ln in ax.get_lines()]
+    assert [[73.4, 0.0], [85.4, 0.0]] in lines                     # the axis line
+    T = {t.get_text(): t for t in ax.texts}
+    assert [s for s in T if s.isdigit()] == ["74", "76", "78", "80", "82", "84"]
+    assert T["74"].get_fontsize() == 7.5 and T["Masein model"].get_fontsize() == 7.5
+    # the modes above the line, the other three below, each name and score in its place
+    for name, y, score in (("Instant", 0.55, "#8EA7D3"), ("Medium", 0.55, "#6389CA"), ("High", 0.55, "#3261B0"),
+                           ("GPT-5 mini (high)", -0.56, "#C28B30"), ("o4-mini (high)", -0.56, "#469069"),
+                           ("Gemini 3.5 Flash-Lite (high)", -0.56, "#BE5F36")):
+        x = dots["pt:" + name][0]
+        assert T[name].get_position() == (x, y)
+        assert to_hex(T[f"{x:.1f}"].get_color()).upper() == score
+    assert ck.floor == 7.5 and ck.rings
+    figs.plt.close(fig)
+
+
+def test_r31_the_ring_rule_finds_a_dot_whose_ring_covers_anothers_colour_and_the_floor_is_per_figure():
+    pytest.importorskip("matplotlib")
+    figs = load("make_figures")
+
+    def two_dots(gap_units):
+        fig = figs.figure(1.0)
+        ax = figs.axes_in(fig, 0.0, 0.0, 6.5, 1.0)
+        ax.set_xlim(0, 6.5 * 72)                                    # one unit a point
+        ax.set_ylim(-36, 36)
+        ax.axis("off")
+        for i, x in enumerate((100, 100 + gap_units)):
+            ax.scatter([x], [0], s=95, edgecolor="white", linewidth=1.6).set_gid(f"pt:{i}")
+        figs.text(ax, 300, 20, "small", fontsize=7.5)
+        return fig
+
+    # 9.75 pt dots with 1.6 pt rings: a ring reaches the other's colour under 4.07 + 5.67 = 9.75 pt apart
+    for gap, rings, floor, want in ((9.0, True, 7.5, ["dots overlap"]), (10.4, True, 7.5, []),
+                                    (9.0, False, 7.5, []), (10.4, True, figs.SMALL, ["under 8.5 pt"])):
+        fig = two_dots(gap)
+        got = figs.Checker("t", floor=floor, rings=rings).run(fig)
+        assert [p.split(":")[0] for p in got] == want, (gap, rings, floor, got)
+        figs.plt.close(fig)
