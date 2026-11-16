@@ -342,6 +342,36 @@ def test_figure_ones_speeds_come_from_its_file_so_new_timings_need_one_rebuild(t
         figs.speeds(tmp_path)
 
 
+def test_r34_the_on_device_caption_says_deployed_file_size_and_still_builds_the_on_device_chart():
+    # r34 (16 Nov): Figure 10's caption reads "Score against deployed file size (log scale)"; the
+    # build stopped on it as a figure new to the script. The old wording still works; others don't
+    r34 = ("In High mode, no on-device model in Table G1 publishes a GPQA Diamond score numerically above "
+           "the Masein model's measured 82.7; five publish IFBench scores numerically above its 63.7. "
+           "Score against deployed file size (log scale). Filled: the Masein model, measured by us.")
+    assert build.builder(r34) is build.fig_size
+    assert build.builder("Score against file size for on-device models, with a scorecard beneath.") is build.fig_size
+    assert build.builder("Score against the size of the deployed file.") == "?"
+
+
+def test_r34_figure_10_has_its_two_panels_as_before_and_no_scorecard():
+    pytest.importorskip("matplotlib")
+    figs = load("make_figures")
+    fig, head, rows_out, _ = figs.fig10({"masein": {"gpqa": {"v": 82.7020202020202, "se": 2.215041706693907}}}, {})
+    w, h = fig.get_size_inches()
+    assert (w, h) == (6.5, 4.0)                                    # 6.55 in less the scorecard's 2.55
+    assert len(fig.axes) == 2                                      # the two panels; the scorecard's axes gone
+    # each panel 5.9 x 1.25 in, as far from the figure's top as before (0.58 and 2.28 in)
+    for ax, title, top in zip(fig.axes, ("GPQA Diamond", "IFBench"), (0.58, 2.28)):
+        x0, y0, aw, ah = ax.get_position().bounds
+        assert ax.get_title() == title
+        assert (round(aw * w, 6), round(ah * h, 6), round(h - (y0 + ah) * h, 6)) == (5.9, 1.25, top)
+    texts = [t.get_text() for t in fig.findobj(figs.matplotlib.text.Text)]
+    assert not {"Scores (%)", "MMLU-Pro", "IFEval", "16.0 GB", "ours"} & set(texts)
+    assert "82.7 Masein model" in texts and "63.7 Masein model" in texts
+    assert head == ["Model", "Size (GB)", "Panel", "Score (%)", "Source"] and len(rows_out) == 10 + 14   # its CSV as before
+    figs.plt.close(fig)
+
+
 def test_a_tbd_stops_the_build_and_trial_lists_the_files_that_carry_one(paper, tmp_path, capsys):
     paper.write_text(PAPER.replace("| 7 of 792 | 5 of 792 |", "| 7 of 792 | \\[TBD K1: count\\] |"),
                      encoding="utf-8")
@@ -786,32 +816,3 @@ def test_r31_the_out_of_room_caption_reads_in_high_mode_wording(paper, tmp_path)
     assert rows(tmp_path / "new" / "figure-5.csv") == rows(tmp_path / "old" / "figure-5.csv")
     assert sorted(r[0] for r in rows(tmp_path / "new" / "figure-5.csv")[1:]) == ["GPQA Diamond", "IFBench"]
 
-
-def test_r34_the_on_device_caption_says_deployed_file_size_and_still_builds_the_on_device_chart():
-    # r34 (16 Nov): Figure 10's caption reads "Score against deployed file size (log scale)"; the
-    # build stopped on it as a figure new to the script. The old wording still works; others don't
-    r34 = ("In High mode, no on-device model in Table G1 publishes a GPQA Diamond score numerically above "
-           "the Masein model's measured 82.7; five publish IFBench scores numerically above its 63.7. "
-           "Score against deployed file size (log scale). Filled: the Masein model, measured by us.")
-    assert build.builder(r34) is build.fig_size
-    assert build.builder("Score against file size for on-device models, with a scorecard beneath.") is build.fig_size
-    assert build.builder("Score against the size of the deployed file.") == "?"
-
-
-def test_r34_figure_10_has_its_two_panels_as_before_and_no_scorecard():
-    pytest.importorskip("matplotlib")
-    figs = load("make_figures")
-    fig, head, rows_out, _ = figs.fig10({"masein": {"gpqa": {"v": 82.7020202020202, "se": 2.215041706693907}}}, {})
-    w, h = fig.get_size_inches()
-    assert (w, h) == (6.5, 4.0)                                    # 6.55 in less the scorecard's 2.55
-    assert len(fig.axes) == 2                                      # the two panels; the scorecard's axes gone
-    # each panel 5.9 x 1.25 in, as far from the figure's top as before (0.58 and 2.28 in)
-    for ax, title, top in zip(fig.axes, ("GPQA Diamond", "IFBench"), (0.58, 2.28)):
-        x0, y0, aw, ah = ax.get_position().bounds
-        assert ax.get_title() == title
-        assert (round(aw * w, 6), round(ah * h, 6), round(h - (y0 + ah) * h, 6)) == (5.9, 1.25, top)
-    texts = [t.get_text() for t in fig.findobj(figs.matplotlib.text.Text)]
-    assert not {"Scores (%)", "MMLU-Pro", "IFEval", "16.0 GB", "ours"} & set(texts)
-    assert "82.7 Masein model" in texts and "63.7 Masein model" in texts
-    assert head == ["Model", "Size (GB)", "Panel", "Score (%)", "Source"] and len(rows_out) == 10 + 14   # its CSV as before
-    figs.plt.close(fig)
