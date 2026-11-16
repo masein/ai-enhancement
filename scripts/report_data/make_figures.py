@@ -101,7 +101,7 @@ PARAMS_MASEIN = "34.8B / 2.3B or 2.7B"            # Table F4
 # at DeviceMark's published decode speed on an iPhone 17 Pro (CC BY 4.0)
 SPEED_ROWS = [("Masein model, Instant", "Masein model, Instant", None),
               ("Masein model, Medium", "Masein model, Medium", None),
-              ("Masein model, High", None, None),
+              ("Masein model, High, at the app's limits", None, None),
               ("Qwen3.5-4B, thinking off", "Qwen3.5-4B, thinking off", "Qwen3.5-4B"),
               ("Gemma 4 E2B, thinking on", "gemma-4-E2B-it, thinking on", "Gemma 4 E2B"),
               ("Youtu-LLM-2B, thinking off", "Youtu-LLM-2B, thinking off", "Youtu-LLM-2B"),
@@ -119,24 +119,43 @@ MASEIN_SPEED = ("11.4", "Teraformer's app on an iPhone 17 Pro Max (12 GB), Insta
                         "on the 16.0 GB file (Table P1); measured by the app's developers")
 MEDIUM_SPEED = ("9.2", "Teraformer's app on an iPhone 17 Pro Max (12 GB), Medium mode, short chats, median, "
                        "on the 16.0 GB file (Table P1); measured by the app's developers")
-OWN_SPEEDS = {"Masein model, Instant": MASEIN_SPEED, "Masein model, Medium": MEDIUM_SPEED}
+# r29 (16 Nov, masein): High in the app, thinking included (his Table P1's iPhone row)
+HIGH_SPEED = ("8.5", "Teraformer's app on an iPhone 17 Pro Max (12 GB), High mode, thinking included, short chats, "
+                     "median, on the 16.0 GB file (Table P1); measured by the app's developers")
+OWN_SPEEDS = {"Masein model, Instant": MASEIN_SPEED, "Masein model, Medium": MEDIUM_SPEED,
+              "Masein model, High, at the app's limits": HIGH_SPEED}
 # High at the app's limits (12 Nov), not Table 12's High row (the replica's 4,096-token cap): kept
 # in figure-1.csv with no speed and not drawn until the app's own short-chat number comes (not
 # the shell's, which runs faster than the app); its score goes in the paper when it is drawn
-OWN_SCORES = {"Masein model, High": ("78.7", "75.4", "82.0")}
+# r29 (16 Nov, masein): High at the app's limits is H1 re-cut at 2,048 tokens in total, thinking
+# included (Kevin's Section 3.7), and graded again — docs/whitepaper-data/h1-recut/recut-result.json,
+# which the data build checks Table 12's row against. The other rows ran with DeviceMark's
+# 4,096-token cap, so no verdict is drawn for it
+APP_LIMITS = "at the app's limits"
+OWN_SCORES = {"Masein model, High, at the app's limits": ("72.4", "68.5", "76.2")}
 # a point drawn under another name than its Table 12 row's (r29: none; Medium is final)
 SHOWN: dict = {}
 # a Masein point whose label goes up, at this height (Figure 1's y axis)
 MINE_UP = {"Masein model, Medium": 98.2}
+# r29: one whose label goes down, its left end at (x, y), a leader from its bar: the band under
+# y = 49 is free from one side to the other
+MINE_DOWN = {"Masein model, High, at the app's limits": (1.0, 45.5)}
 # r23 (14 Nov): figure-10.csv (round 13's DeviceMark rows) under Table 12's names, with Medium's
 # replica row of 12 Nov (M4; the replica asks greedily with no presence penalty, so it stands
 # for Medium at 0.75 too): 28 rows
 DM_RENAMED = {"Masein model, thinking off": "Masein model, Instant", "Masein model, thinking on": "Masein model, High"}
 DM_ADDED = [{"Model": "Masein model, Medium", "Kind": "Masein", "Composite": "84.6", "95% low": "81.6",
              "95% high": "87.3", "Verdict vs Masein off": "", "Verdict vs Masein on": "",
+             "Source": "measured by Teraformer"},
+            # r29 (16 Nov): the app's limits, from the re-cut (OWN_SCORES): 29 rows
+            {"Model": "Masein model, High, at the app's limits", "Kind": "Masein", "Composite": "72.4",
+             "95% low": "68.5", "95% high": "76.2", "Verdict vs Masein off": "", "Verdict vs Masein on": "",
              "Source": "measured by Teraformer"}]
 CLOUD = ["Gemini Flash (cloud)", "Gemini Pro (cloud)"]
 
+# Figure 7 (GPQA Diamond lanes): r29 (16 Nov, masein) Medium and Instant as reference lines beside
+# High's — the md's Table 5 (printed Table 7) and Section 4.4; the lanes stay High's verdicts
+GPQA_MODES = {"Medium": (80.1, 2.4), "Instant": (75.3, 2.4)}
 # Figure 7 (GPQA Diamond lanes): the models the text names
 NAMED_GPQA = ["o1", "o3-mini", "o4-mini", "Qwen 3.6 35B-A3B", "GPT-5 mini", "Claude Haiku 4.5", "Gemini 4 Argon",
               "GPT-6 Astra", "Claude Sonnet 5.5", "DeepSeek V4.1 Flash 1017"]
@@ -478,11 +497,14 @@ def fig1(data: Path, out: Path, P: dict):
         t.set_transform(ax.transData + matplotlib.transforms.ScaledTranslation(0, dy / 72, fig.dpi_scale_trans))
     # r25: (where from: "lo"/"hi" a bar's end, else the point; offset in points; alignment), or
     # ("at", x, y): the label's left end at those data values, a leader from the point
-    place = {"Qwen3.5-4B, thinking off": ("lo", 0, -3, "center", "top"),
+    # r29: High at the app's limits sits under Qwen3.5-4B, and its leader runs down past where
+    # Youtu-LLM-2B's label was: Qwen3.5-4B's goes right of its point, Youtu-LLM-2B's up right of its
+    # bar, Qwen3.5-2B's right of the others
+    place = {"Qwen3.5-4B, thinking off": (6, -4, "left", "center"),
              "Gemma 4 E2B, thinking on": (5, 0, "left", "center"),
-             "Youtu-LLM-2B, thinking off": (-5, 0, "right", "center"),
+             "Youtu-LLM-2B, thinking off": ("at", 25.0, 72.4),
              "LFM2.5-1.2B": (5, 0, "left", "center"),
-             "Qwen3.5-2B, thinking off": ("at", 32.5, 74.0),
+             "Qwen3.5-2B, thinking off": ("at", 47.5, 57.0),
              "granite-4.0-h-1b": (5, 0, "left", "center"),
              "Nanbeige4.1-3B": (5, 0, "left", "center"),
              "Qwen3.5-0.8B, thinking off": (-5, 0, "right", "center")}
@@ -497,7 +519,9 @@ def fig1(data: Path, out: Path, P: dict):
         e = ax.errorbar([x], [y], yerr=[[y - lo], [hi - y]], fmt="none", ecolor=col, zorder=3 if me else 5, **EBAR)
         for part in e.lines[1] + tuple(e.lines[2]):
             part.set_gid("pt:" + label)
-        sc = ax.scatter([x], [y], s=62 if me else 30, color=col, edgecolor="white", lw=0.8, zorder=4 if me else 6)
+        app = label.endswith(APP_LIMITS)
+        sc = ax.scatter([x], [y], s=(56 if app else 62) if me else 30, color=col, edgecolor="white", lw=0.8,
+                        marker="D" if app else "o", zorder=4 if me else 6)
         sc.set_gid("pt:" + label)
         words = f"{SHOWN.get(label, label)}: {y:.1f} at {xs} tokens/s"
         if me and label in MINE_UP:
@@ -508,6 +532,11 @@ def fig1(data: Path, out: Path, P: dict):
             leader(ax, (x, hi + 0.6), (x, ytext - 1.2), "pt:" + label)
             t = ax.annotate(words, (x, ytext), xytext=(-2, 0), textcoords="offset points",
                             ha="left", va="center", fontsize=SMALL, fontweight="bold", color=INK)
+        elif me and label in MINE_DOWN:
+            lx, ly = MINE_DOWN[label]
+            leader(ax, (x, lo - 0.6), (x, ly + 1.8), "pt:" + label)
+            t = ax.annotate(words, (lx, ly), ha="left", va="center", fontsize=SMALL, fontweight="bold",
+                            color=INK)
         elif me:
             t = ax.annotate(words, (x, y), xytext=(8, 0), textcoords="offset points",
                             ha="left", va="center", fontsize=SMALL, fontweight="bold", color=INK)
@@ -528,7 +557,7 @@ def fig1(data: Path, out: Path, P: dict):
              ha="center", va="bottom", fontsize=SMALL, color=MUTED)
     legend_row(fig, [mark(BLUE, size=6.5), mark(ORANGE, size=5), mark(GREEN, line=(0, (4, 2.5)))],
                ["Masein model (95% range)", "other models, scored by us (95% range)", "cloud model"], left=0.78)
-    rows = [[lab.split(", ")[0], (lab.split(", ")[1] if ", " in lab else ""), f"{y:.1f}", f"{lo:.1f}", f"{hi:.1f}",
+    rows = [[lab.split(", ")[0], (lab.split(", ", 1)[1] if ", " in lab else ""), f"{y:.1f}", f"{lo:.1f}", f"{hi:.1f}",
              src_s, x, how, DM_SPEED_CREDIT if how.startswith("DeviceMark") else OURS if x else ""]
             for lab, x, y, lo, hi, how, src_s in pts]
     rows += [[c, "", f"{v:.1f}", dm[c]["95% low"], dm[c]["95% high"], DEVICEMARK, "", "", ""] for c, v in clouds]
@@ -859,11 +888,22 @@ def fig7(E: dict, P: dict):
     mx = mz["v"]
     ln, = ax.plot([mx, mx], [-4, total], color=BLUE, lw=1.2, zorder=4, clip_on=False)
     ln.set_gid("masein-line")
+    # r29: Medium and Instant under the swarm, dashed, thinner and lighter; no verdicts or counts.
+    # Their labels stand upright from the top of the first lane, each just right of its line, under
+    # High's label (2.6 points from Medium's line) and above the first lane's leaders, which run lower
+    top0 = lay[0][4]
+    for mode, (v, se) in GPQA_MODES.items():
+        ml, = ax.plot([v, v], [0, total], color=BLUE, lw=0.8, ls=(0, (3.5, 2.5)), alpha=0.5, zorder=2)
+        ml.set_gid("masein-line:" + mode)
+        text(ax, v + 0.45, top0 + 4, f"{mode} {v:.1f}", rotation=90, ha="left", va="top", color=BLUE,
+             alpha=0.85, gid="masein-label:" + mode)
     lab = text(ax, mx, -6, f"Masein model {mz['v']:.1f} ± {mz['se']:.1f} (measured here)", ha="center", va="bottom",
                fontweight="bold", clip_on=False)
     # labels in the empty part of each lane, with short leaders
-    PLACE = {"Gemini 4 Argon": (80, 0), "GPT-6 Astra": (80, 1), "Claude Sonnet 5.5": (80, 2),
-             "DeepSeek V4.1 Flash 1017": (80, 3),
+    # r29: the top lane's labels end left of Instant's line (75.3), as the level lane's do, so no
+    # reference line runs through them
+    PLACE = {"Gemini 4 Argon": (73.5, 0), "GPT-6 Astra": (73.5, 1), "Claude Sonnet 5.5": (73.5, 2),
+             "DeepSeek V4.1 Flash 1017": (73.5, 3),
              "o4-mini": (73.5, 0), "o3-mini": (73.5, 1), "o1": (73.5, 2), "Qwen 3.6 35B-A3B": (73.5, 3),
              "GPT-5 mini": (84.0, 2), "Claude Haiku 4.5": (84.0, 0)}
     order = {}
@@ -876,7 +916,9 @@ def fig7(E: dict, P: dict):
     for m, (x, py, r, key, y0, h) in named.items():
         at, k = PLACE[m]
         lab_s = label_of(r) + (" ‡" if r["ddagger"] else "")
-        ty = y0 + 22 + k * 11.5
+        # r29: the first lane's labels three rows lower, so their leaders pass under the reference
+        # lines' labels
+        ty = y0 + 22 + (k + (3 if key == "lower than" else 0)) * 11.5
         gid = "pt:" + r["model"]
         if key != "higher than":
             text(ax, at, ty, lab_s, ha="right", va="center", gid=gid)
@@ -890,6 +932,9 @@ def fig7(E: dict, P: dict):
                ["an Epoch AI model, its best-scoring run", "below high effort (†)", "borderline verdict (‡)"],
                left=0.1)
     out = [["Masein model (measured here)", "", f"{mz['v']:.2f}", f"{mz['se']:.2f}", "", "", "", "yes", "", OURS]]
+    # r29: Medium and Instant, reference lines with no verdict (the md's Table 5, printed 7; Section 4.4)
+    out += [[f"Masein model, {mode} (measured here)", "", f"{v:.2f}", f"{se:.2f}", "", "", "", "yes", "",
+             f"{OURS} (Table 7, Section 4.4)"] for mode, (v, se) in GPQA_MODES.items()]
     for r in sorted(rows, key=lambda r: -r["value"]):
         out.append([name_of(r), setting_words(r["setting"]), f"{r['value']:.2f}", f"{r['se']:.2f}", r["verdict"],
                     "‡" if r["ddagger"] else "", "†" if r["dagger"] else "", "yes" if r["model"] in NAMED_GPQA else "",
@@ -1150,13 +1195,13 @@ def fig11(data: Path, P: dict):
     rows = dm_rows(data)
     rep = sorted([r for r in rows if r["Kind"] in ("Masein", "replica")], key=lambda r: -float(r["Composite"]))
     pub = sorted([r for r in rows if r["Kind"] == "published"], key=lambda r: -float(r["Composite"]))
-    assert len(rows) == 28
+    assert len(rows) == 29
     off = next(r for r in rows if r["Model"] == "Masein model, Instant")
     assert off["Composite"] == "84.4" and sum(float(r["Composite"]) > 84.4 for r in pub) == 2
     rh, gh = 13.2, 16.0
     H = 26 + gh * 2 + rh * (len(rep) + len(pub)) + 6 + 34
     fig = figure(H / 72)
-    left = 1.95
+    left = 2.45                                # r29: room for "…, High, at the app's limits"
     plot_h = (H - 26 - 34) / 72
     ax = axes_in(fig, left, 34 / 72, 6.5 - left - 0.42, plot_h)
     total = plot_h * 72
@@ -1186,8 +1231,10 @@ def fig11(data: Path, P: dict):
             for part in e.lines[1] + tuple(e.lines[2]):
                 part.set_gid(gid)
             hollow = r["Kind"] == "published"
-            sc = ax.scatter([v], [cy], s=36 if me else 22, facecolor="white" if hollow else col,
-                            edgecolor=col if hollow else "white", lw=1.0 if hollow else 0.6, zorder=4)
+            app = name.endswith(APP_LIMITS)
+            sc = ax.scatter([v], [cy], s=(32 if app else 36) if me else 22, facecolor="white" if hollow else col,
+                            edgecolor=col if hollow else "white", lw=1.0 if hollow else 0.6,
+                            marker="D" if app else "o", zorder=4)
             sc.set_gid(gid)
             text(ax, hi + 1.6, cy, f"{v:.1f}", va="center", color=INK if me else MUTED,
                  fontweight="bold" if me else "normal", gid=gid)

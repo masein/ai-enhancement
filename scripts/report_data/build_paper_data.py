@@ -32,6 +32,7 @@ lists each file that carries one."""
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import re
 import sys
@@ -511,9 +512,10 @@ class Paper:
         before, thinking on"""
         return "High" if any("High (%)" in t["head"] for t in self.tabs) else "thinking on"
 
-    def masein(self, bench: str) -> tuple[str, str]:
-        """the Masein model's High (thinking-on) score and SE as the scores table prints them"""
-        col = "High (%)" if self.top() == "High" else "Thinking on (%)"
+    def masein(self, bench: str, mode: str | None = None) -> tuple[str, str]:
+        """the Masein model's High (thinking-on) score and SE as the scores table prints them — r29:
+        or another mode's, by its column"""
+        col = f"{mode} (%)" if mode else "High (%)" if self.top() == "High" else "Thinking on (%)"
         t = self.find("the scores in its modes", lambda t: col in t["head"])
         k = t["head"].index(col)
         r = next(r for r in t["rows"] if clean(r[0]).startswith(bench))
@@ -622,11 +624,18 @@ def fig_gpqa(p: Paper, cap: str, src: Path):
     named = {norm(x) for x in extra["figure-6 labelled"]}
     v, se = p.masein("GPQA Diamond")
     out = [[f"Masein model, {p.top()}", v, se, "", "", "", "yes", OURS]]
+    # r29 (16 Nov, masein): Medium and Instant are reference lines beside High's, with no verdict —
+    # the scores table's (the md's Table 5, printed 7) and Section 4.4's
+    modes = [m for m in ("Medium", "Instant") if p.top() == "High"]
+    for m in modes:
+        mv, mse = p.masein("GPQA Diamond", m)
+        out.append([f"Masein model, {m} (a reference line, no verdict)", mv, mse, "", "", "", "yes",
+                    f"{OURS} (Table 5, Section 4.4)"])
     for r in epoch_rows(p.epoch("GPQA Diamond")):
         out.append([r["label"], r["v"], r["se"], r["verdict"], "yes" if r["ddagger"] else "",
                     "yes" if r["dagger"] else "",
                     "yes" if norm(model_part(r["label"])) in named else "", EPOCH])
-    if sum(1 for r in out if r[6]) != len(named) + 1:
+    if sum(1 for r in out if r[6]) != len(named) + 1 + len(modes):
         raise SystemExit("the GPQA Diamond lanes: not every labelled model is in the GPQA Diamond list")
     return ["Model (setting)", "Score (%)", "SE", "Verdict (Masein model … the model)",
             "Within a quarter of a combined SE of the line (‡)", "Below high effort (†)",
@@ -781,6 +790,51 @@ def masein_speed(p: Paper, mode: str) -> tuple[str, bool]:
         raise SystemExit(f"the speed chart: the key numbers give {mode} mode {len(values)} short-chat "
                          f"numbers for {len(phones)} phones; which is the {PHONE}'s can't be told")
     return num(values[phones.index(PHONE)]), "preliminary" in (m.group(1) or "")
+
+
+# r29 (masein, 16 Nov): Table 12's row at the app's limits is H1 re-cut at 2,048 tokens in total
+# (docs/whitepaper-data/h1-recut). The build traces it to the re-cut's own result, recut-result.json,
+# whose run records lie beside it: the row's name, composite and range, three subscores and
+# answered share must be the result's, and the records the ones it names
+APP_ROW = "at the app's limits"
+APP_COLUMNS = (("Composite", "composite"), ("IFEval", "ifeval"), ("MMLU-Pro", "mmlu_pro"), ("MATH", "math"),
+               ("Answered", "answered"))
+
+
+def check_app_limits(p: Paper, path: Path | None) -> None:
+    dm = [x for x in p.tabs if any(h.startswith("Composite") for h in x["head"])]
+    rows = [r for x in dm for r in x["rows"] if clean(r[0]).endswith(APP_ROW)]
+    if not rows:
+        return
+    t = p.find("DeviceMark's rows", lambda x: x in dm)
+    name = clean(rows[0][0])
+    if len(rows) > 1:
+        raise SystemExit(f"{t['name']} has {len(rows)} rows at the app's limits; the re-cut gives one")
+    if path is None:
+        raise SystemExit(f"{t['name']} has {name}: give its re-cut's result (recut-result.json) with "
+                         "--app-limits")
+    res = json.loads(path.read_text(encoding="utf-8"))
+    if res.get("row") != name:
+        raise SystemExit(f"{path.name} is the result for {res.get('row')!r}, not {name!r}")
+    for what, rec in (res.get("records") or {}).items():
+        f = path.parent / rec["file"]
+        data = f.read_bytes() if f.exists() else b""
+        if hashlib.sha256(data).hexdigest() != rec["sha256"] or data.count(b"\n") != rec["n"]:
+            raise SystemExit(f"{path.name}: its {what} records ({rec['file']}) are not the ones it names")
+    if not res.get("records"):
+        raise SystemExit(f"{path.name} names no run records")
+    a = res["after"]
+    c = a["composite"]
+    want = {"composite": f"{100 * c['value']:.1f} [{100 * c['ci'][0]:.1f}, {100 * c['ci'][1]:.1f}]",
+            "answered": f"{100 * a['answered_pct']:.0f}%",
+            **{b: f"{100 * a['benches'][b]['acc']:.1f}" for b in ("ifeval", "mmlu_pro", "math")}}
+    for head, key in APP_COLUMNS:
+        k = next((i for i, h in enumerate(t["head"]) if h.startswith(head)), None)
+        if k is None:
+            raise SystemExit(f"{t['name']} has no {head} column to check {name} against")
+        if clean(rows[0][k]) != want[key]:
+            raise SystemExit(f"{t['name']}'s {name}: {t['head'][k]} prints {clean(rows[0][k])}; the re-cut "
+                             f"({path.name}) gives {want[key]}")
 
 
 def check_phone_speeds(p: Paper, his: list[dict]) -> None:
@@ -949,7 +1003,7 @@ def main(argv: list[str]) -> int:
     trial = "--trial" in argv
     args = [a for a in argv if a != "--trial"]
     opt = {}
-    for flag in ("--figures", "--speeds", "--phone-tex"):
+    for flag in ("--figures", "--speeds", "--phone-tex", "--app-limits"):
         if flag in args:
             i = args.index(flag)
             opt[flag] = Path(args[i + 1])
@@ -993,6 +1047,7 @@ def main(argv: list[str]) -> int:
     p = Paper(tabs)
     if nums.named and his:
         check_phone_speeds(p, his)
+    check_app_limits(p, opt.get("--app-limits"))
     for n, cap in figures(lines):
         fn = builder(cap)
         if fn == "?":
