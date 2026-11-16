@@ -534,6 +534,71 @@ RUNTIMES["card-qwen35-9b-k3k6"] = {
     "models": {"served/Qwen3.5-9B-Q4_K_M-k3k6-2611": "Qwen/Qwen3.5-9B"},
     "build": dict(RUNTIMES["k3k6-2611"]["build"]),
 }
+# r35 (masein, 16 Nov): plan O's pilot — on-device models of Table G1 under our
+# protocol on GPQA Diamond and MMLU-Pro, each the 4-bit GGUF Unsloth publishes,
+# on the same build as step2388's runs, thinking on at its card's settings, up
+# to 98,304 tokens an answer on both, asked at once. Qwen3.5-4B's is the file
+# Table G1 names (unsloth/Qwen3.5-4B-GGUF at e87f1764, 2,740,937,888 bytes);
+# its card's thinking line for general tasks is the 9B's word for word
+# (Qwen/Qwen3.5-4B at 851bf6e8, the revision the DeviceMark replica ran)
+QWEN35_4B_CARD = ("Qwen/Qwen3.5-4B's model card at 851bf6e8, its thinking mode for general tasks "
+                  "(temperature=1.0, top_p=0.95, top_k=20, min_p=0.0, presence_penalty=1.5, "
+                  "repetition_penalty=1.0)")
+ON_DEVICE_BUDGETS = {"gpqa_diamond_epoch": {"on": 98304}, "mmlupro_tiger": {"on": 98304}}
+RUNTIMES["card-qwen35-4b-k3k6"] = {
+    "words": "the team's joint k3/k6 build running Qwen3.5-4B (Unsloth's Q4_K_M), its card's "
+             "thinking settings for general tasks, no reasoning budget, no speculative decoding",
+    "env": dict(RUNTIMES["k3k6-2611"]["env"]),
+    "thinking": ("on",),
+    "off_for": (),
+    "sampling": dict(RUNTIMES["card-qwen35-9b-k3k6"]["sampling"]),
+    "sampling_from": {k: QWEN35_4B_CARD for k in RUNTIMES["card-qwen35-9b-k3k6"]["sampling"]},
+    "budgets": {k: dict(v) for k, v in ON_DEVICE_BUDGETS.items()},
+    "flags": list(RUNTIMES["k3k6-2611"]["flags"]),
+    "refuses_env": ("GGML_CUDA_DISABLE_FUSION",),
+    "models": {"served/Qwen3.5-4B-Q4_K_M-k3k6-2611": "Qwen/Qwen3.5-4B"},
+    "build": dict(RUNTIMES["k3k6-2611"]["build"]),
+}
+# r35: Gemma 4 E4B and E2B — Table G1's sizes for them (2.3 GB, 0.8 GB) are
+# Google's own mobile format, which llama.cpp doesn't read, so the 4-bit GGUF
+# of each stands in: unsloth/gemma-4-E4B-it-GGUF at bfc15c38 (4,977,171,584
+# bytes, the file Appendix H ran) and unsloth/gemma-4-E2B-it-GGUF at 0314792d
+# (3,106,738,272 bytes). Architecture gemma4, which our build's source has, but
+# no Gemma file has run on it yet: the box's start says. Google's cards (google/
+# gemma-4-E4B-it at 4ecc2ba6, google/gemma-4-E2B-it at 4adf1574) give one
+# sampling for every use, temperature 1.0, top-p 0.95, top-k 64, and so do their
+# generation_config.json; what neither sets is neutral. Thinking is the
+# template's enable_thinking, which writes <|think|> at the system prompt's
+# start (the cards' trigger) — checked on the box's server before a question,
+# as Bolt's (Gemma 4 E4B's architecture) is. Both files hold the same template
+# and a context of 131,072. Flash attention with a q8_0 cache at Gemma 4's
+# 512-wide global heads is checked at start-up, f16 or no flash attention the
+# fallbacks, as card-bolt's
+GEMMA4_CARD = ("Google's model cards (google/gemma-4-E4B-it at 4ecc2ba6, google/gemma-4-E2B-it "
+               "at 4adf1574: temperature=1.0, top_p=0.95, top_k=64 for every use) and their "
+               "generation_config.json")
+GEMMA4_NEUTRAL = "neutral: neither the cards nor generation_config.json set it"
+RUNTIMES["card-gemma4-k3k6"] = {
+    "words": "the team's joint k3/k6 build running Gemma 4 E4B and E2B (Unsloth's Q4_K_M), "
+             "Google's card settings, the GGUF's own chat template, no reasoning budget, no "
+             "speculative decoding",
+    "env": dict(RUNTIMES["k3k6-2611"]["env"]),
+    "thinking": ("on",),
+    "off_for": (),
+    "sampling": {"temperature": 1.0, "top_k": 64, "top_p": 0.95, "min_p": 0.0,
+                 "presence_penalty": 0.0, "repeat_penalty": 1.0},
+    "sampling_from": {"temperature": GEMMA4_CARD, "top_p": GEMMA4_CARD, "top_k": GEMMA4_CARD,
+                      "min_p": GEMMA4_NEUTRAL, "presence_penalty": GEMMA4_NEUTRAL,
+                      "repeat_penalty": GEMMA4_NEUTRAL},
+    "budgets": {k: dict(v) for k, v in ON_DEVICE_BUDGETS.items()},
+    "flags": list(RUNTIMES["k3k6-2611"]["flags"]),
+    "attn_fallbacks": [list(f) for f in RUNTIMES["card-bolt"]["attn_fallbacks"]],
+    "refuses_env": ("GGML_CUDA_DISABLE_FUSION",),
+    "think_marker": "<|think|>",
+    "models": {"served/gemma-4-E4B-it-Q4_K_M-k3k6-2611": "google/gemma-4-E4B-it",
+               "served/gemma-4-E2B-it-Q4_K_M-k3k6-2611": "google/gemma-4-E2B-it"},
+    "build": dict(RUNTIMES["k3k6-2611"]["build"]),
+}
 
 
 def budget_of(task: str, on: bool, runtime: str | None = None) -> int:
