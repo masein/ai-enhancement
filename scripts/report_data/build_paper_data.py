@@ -48,6 +48,37 @@ DEVICEMARK = "DeviceMark (devicemark.github.io), CC BY 4.0, published"
 MAKER = "published by the model's maker or NVIDIA, as the row says"
 
 
+# r37 (masein, 16 Nov): LaTeX numbers the figures in print order, as it does the tables: a
+# figure prints as its caption's place among the md's figures, whatever its md id (the files the
+# figure script draws keep their ids). What goes out names each figure as printed
+FIG_REF = re.compile(r"\b(Figures?) (\d+(?:(?:, and |, | and )\d+)*)\b(?! (?:to|–) ?\d)")
+FIG_RANGE = re.compile(r"\bFigures? \d+ ?(?:to|–) ?\d+")
+
+
+class FigNumbers:
+    """the md's figure ids as LaTeX prints them: their order in the paper"""
+
+    def __init__(self, caps: list[tuple[str, str]]):
+        self.order = {n: str(k) for k, (n, _) in enumerate(caps, 1)}
+
+    def number(self, n: str) -> str:
+        if n not in self.order:
+            raise SystemExit(f"the text names Figure {n}, which the paper doesn't have")
+        return self.order[n]
+
+    def text(self, s: str) -> str:
+        """a cell or a caption with its figure references as printed — a range ("Figures 2 to 5")
+        would need its own reading in print order, so it stops the build"""
+        if "Figure" not in s:
+            return s
+        r = FIG_RANGE.search(s)
+        if r:
+            raise SystemExit(f"a range of figures, {r.group(0)!r}: in print order a range of md ids "
+                             "isn't a range, so write the figures out")
+        return FIG_REF.sub(lambda m: m.group(1) + " " + re.sub(r"\d+", lambda k: self.number(k.group(0)),
+                                                              m.group(2)), s)
+
+
 # ---------------------------------------------------------------------------
 # reading the paper
 # ---------------------------------------------------------------------------
@@ -494,8 +525,8 @@ def model_part(label: str) -> str:
 
 
 class Paper:
-    def __init__(self, tabs: list[dict]):
-        self.tabs = tabs
+    def __init__(self, tabs: list[dict], lines: list[str] | None = None):
+        self.tabs, self.lines = tabs, lines or []
 
     def find(self, what: str, test) -> dict:
         got = [t for t in self.tabs if test(t)]
@@ -981,6 +1012,181 @@ def fig_speed(p: Paper, cap: str, src):
             "Speed: how it was measured", "Speed: whose"], out
 
 
+# r37 (masein, 16 Nov): three figures, md ids 12 to 14. Each is built from its own sources here,
+# its caption (and for Figure 12 Section 2.1's text) held to them, and the figure script's CSV
+# for it — the numbers it drew, beside figure-1.csv as the abstract figure's is — held to the same
+
+def drawn(src: Path | Sources, md_id: str, head: list[str]) -> list[list[str]]:
+    """the figure script's CSV of md Figure `md_id`, beside figure-1.csv: its rows under `head`"""
+    f = src.speeds.parent / f"figure-{md_id}.csv"
+    if not f.exists():
+        raise SystemExit(f"Figure {md_id}: no figure-{md_id}.csv beside {src.speeds.name} "
+                         f"({src.speeds.parent}) — the figure script's numbers, which this build checks")
+    rows = list(csv.reader(open(f, encoding="utf-8")))
+    if not rows or rows[0] != head:
+        raise SystemExit(f"Figure {md_id}: {f.name} doesn't have the columns {', '.join(head)}")
+    return rows[1:]
+
+
+def half_up(x: float, places: int = 0) -> str:
+    """as the paper rounds: 62.5 is 63"""
+    from decimal import ROUND_HALF_UP, Decimal
+    q = Decimal(1).scaleb(-places)
+    return str(Decimal(repr(x)).quantize(q, rounding=ROUND_HALF_UP))
+
+
+# Figure 12: the routed-expert weights a token reads, from the evaluated file's tensor sizes
+TENSORS = "step2388-tensors.tsv"
+EXPERT_MODES = [("Instant", 3), ("Medium and High", 6), ("Base model, Qwen3.6-35B-A3B", 8)]
+EXPERTS_HEAD = ["Mode", "Experts per layer", "Routed-expert weights read per token (bytes)",
+                "Routed-expert weights read per token (MB)", "Less than the base model (%)", "Source"]
+
+
+def expert_reads(tsv: Path) -> dict:
+    """from the file's header as read (name, type, shape, elements, bytes a tensor): one routed
+    expert's bytes in every layer, and what a token reads besides — every other tensor, one
+    mode's own copies (.k3 or .k6, the same size), one row of token_embd for the whole table"""
+    rows = list(csv.DictReader(open(tsv, encoding="utf-8"), delimiter="\t"))
+    size = {r["name"]: int(r["bytes"]) for r in rows}
+    shape = {r["name"]: r["shape (ggml order, ne0 first)"] for r in rows}
+    exps = [n for n in size if re.fullmatch(r"blk\.\d+\.ffn_(gate|up|down)_exps\.weight", n)]
+    layers = {n.split(".")[1] for n in exps}
+    counts = {int(shape[n].split("×")[-1]) for n in exps}
+    if len(exps) != 3 * len(layers) or len(counts) != 1:
+        raise SystemExit(f"{tsv.name}: the routed experts aren't 3 tensors a layer of one expert count")
+    (n_exp,) = counts
+    routed = sum(size[n] for n in exps)
+    if routed % n_exp:
+        raise SystemExit(f"{tsv.name}: the routed experts' {routed:,} bytes don't split into {n_exp}")
+    k6 = sum(v for n, v in size.items() if ".k6." in n or n.endswith(".k6"))
+    k3 = sum(v for n, v in size.items() if ".k3." in n or n.endswith(".k3"))
+    if k3 != k6:
+        raise SystemExit(f"{tsv.name}: the two modes' own copies differ ({k3:,} and {k6:,} bytes)")
+    vocab = int(shape["token_embd.weight"].split("×")[-1])
+    row = size["token_embd.weight"] // vocab
+    rest = sum(size.values()) - routed - k3 - size["token_embd.weight"] + row
+    return {"per_expert": routed // n_exp, "experts": n_exp, "layers": len(layers), "rest": rest}
+
+
+def fig_experts(p: Paper, cap: str, src: Sources):
+    r = expert_reads(src.figures / TENSORS)
+    base = 8 * r["per_expert"]
+    out, said = [], {}
+    for mode, k in EXPERT_MODES:
+        b = k * r["per_expert"]
+        mb, less = half_up(b / 1e6), "" if k == 8 else half_up(100 * (1 - b / base))
+        said[k] = (mb, less)
+        out.append([mode, str(k), str(b), mb, less, "the evaluated file's tensor sizes, Section 2.1"])
+    gb = half_up(r["rest"] / 1e9, 2)
+    # the text (Section 2.1), the caption and the figure say the same
+    text = " ".join(p.lines)
+    for want in (f"{said[3][0]} or {said[6][0]} MB", f"{said[8][0]} MB", f"about {gb} GB"):
+        if want not in text:
+            raise SystemExit(f"Figure 12: Section 2.1 doesn't say {want!r}, which the file's tensor sizes give")
+    for want in (f"{said[3][0]} MB", f"{said[3][1]}% less than the {said[8][0]} MB", f"{said[6][0]} MB",
+                 f"{said[6][1]}% less", f"{gb} GB"):
+        if want not in cap:
+            raise SystemExit(f"Figure 12: its caption doesn't say {want!r}, which the file's tensor sizes give")
+    other = sorted(set(re.findall(r"(\d+) MB", cap)) - {said[k][0] for k in (3, 6, 8)})
+    if other:
+        raise SystemExit(f"Figure 12: its caption names {', '.join(other)} MB, which the file's tensor sizes don't give")
+    got = [x[:5] for x in drawn(src, "12", EXPERTS_HEAD)]
+    if got != [x[:5] for x in out]:
+        raise SystemExit(f"Figure 12: the figure script drew {got}; the file's tensor sizes give "
+                         f"{[x[:5] for x in out]}")
+    out.append(["Everything else a token reads, in every mode (one row of the embedding table)", "",
+                str(r["rest"]), "", "", f"the evaluated file's tensor sizes, Section 2.1 (about {gb} GB)"])
+    return EXPERTS_HEAD, out
+
+
+# Figure 13: what thinking adds — the three modes on the five benchmarks run in all three, from
+# right answers whose shares round to Table 5's printed scores; High over the better of the
+# two thinking-off modes from the unrounded shares, printed to one decimal
+MODES_FILE = "modes-scores.json"
+THREE_MODES = ("High", "Medium", "Instant")
+MODES_HEAD = ["Benchmark", "Answers", "High, right", "Medium, right", "Instant, right", "High (%)", "Medium (%)",
+              "Instant (%)", "High over the best thinking-off (points)", "Source"]
+
+
+def fig_modes(p: Paper, cap: str, src: Sources):
+    data = json.loads((src.figures / MODES_FILE).read_text(encoding="utf-8"))["benchmarks"]
+    t = p.find("the scores in its modes", lambda t: all(f"{m} (%)" in t["head"] for m in THREE_MODES))
+    in_all = [clean(r[0]) for r in t["rows"] if not clean(r[0]).startswith("DeviceMark")
+              and all(PM.match(clean(r[t["head"].index(f"{m} (%)")])) for m in THREE_MODES)]
+    if sorted(b["name"] for b in data) != sorted(in_all):
+        raise SystemExit(f"Figure 13: {MODES_FILE} has {', '.join(b['name'] for b in data)}; the scores table "
+                         f"runs {', '.join(in_all)} in all three modes")
+    out, gains = [], {}
+    for b in data:
+        share = {m: 100 * b[m] / b["answers"] for m in THREE_MODES}
+        for m in THREE_MODES:
+            printed = p.masein(b["name"], m)[0]
+            if f"{share[m]:.1f}" != printed:
+                raise SystemExit(f"Figure 13: {b['name']}, {m}: {b[m]} of {b['answers']} is {share[m]:.2f}%; "
+                                 f"the scores table prints {printed}")
+        gains[b["name"]] = share["High"] - max(share["Medium"], share["Instant"])
+        out.append([b["name"], str(b["answers"]), *(str(b[m]) for m in THREE_MODES), *(f"{share[m]:.1f}" for m in THREE_MODES),
+                    f"{gains[b['name']]:+.1f}", f"{OURS}, Table 5"])
+    # the caption's numbers: instruction following, then the range of the other three
+    best = {b["name"]: max(b["Medium"], b["Instant"]) / b["answers"] * 100 for b in data}
+    high = {b["name"]: b["High"] / b["answers"] * 100 for b in data}
+    follow = [n for n in ("IFBench", "IFEval") if n in gains]
+    for name in follow:
+        want = f"{high[name]:.1f} against {best[name]:.1f}"
+        if want not in cap:
+            raise SystemExit(f"Figure 13: its caption doesn't say {want!r} for {name}")
+    rest = [g for n, g in gains.items() if n not in follow]
+    lo, hi = f"{min(rest):.1f}", f"{max(rest):.1f}"
+    want = f"adds {lo} points" if lo == hi else f"adds {lo} to {hi} points"
+    if want not in cap:
+        raise SystemExit(f"Figure 13: its caption doesn't say {want!r}, the other three's gains")
+    got = drawn(src, "13", MODES_HEAD)
+    if [x[:9] for x in got] != [x[:9] for x in out]:
+        raise SystemExit(f"Figure 13: the figure script drew {[x[:9] for x in got]}; Table 5's counts give "
+                         f"{[x[:9] for x in out]}")
+    return MODES_HEAD, out
+
+
+# Figure 14: the hosted models' output list prices (Table 11's), lowest first, under the names the
+# figure gives them; the Masein model's row first, as the table has it
+PRICE_NAMES = {"deepseek/deepseek-v4.1-flash-1017": "DeepSeek V4.1 Flash", "openai/gpt-5-mini": "GPT-5 mini",
+               "openai/o4-mini": "o4-mini", "anthropic/claude-sonnet-5.5": "Claude Sonnet 5.5",
+               "openai/gpt-6.1-sol": "GPT-6.1 Sol", "google/gemini-4-argon": "Gemini 4 Argon",
+               "anthropic/claude-opus-5.5": "Claude Opus 5.5", "openai/gpt-6-astra": "GPT-6 Astra"}
+PRICES_HEAD = ["Model", "OpenRouter id", "Output ($ per million tokens)", "Source"]
+NO_CHARGE = "no per-token charge"
+
+
+def fig_prices(p: Paper, cap: str, src: Sources):
+    t = p.find("the list prices", lambda t: t["head"][:1] == ["Model (OpenRouter id)"]
+               and "Output ($ per million tokens)" in t["head"])
+    k = t["head"].index("Output ($ per million tokens)")
+    rows = [(clean(r[0]), clean(r[k])) for r in t["rows"]]
+    mine = [r for r in rows if r[1] == NO_CHARGE]
+    hosted = [r for r in rows if r[1] != NO_CHARGE]
+    if len(mine) != 1 or not mine[0][0].startswith("Masein model"):
+        raise SystemExit("Figure 14: the price table has no one Masein model row with no per-token charge")
+    unnamed = [i for i, _ in hosted if i not in PRICE_NAMES]
+    if unnamed:
+        raise SystemExit(f"Figure 14: no name for {', '.join(unnamed)} (PRICE_NAMES)")
+    read = {i: "1 Nov 2026" if i in ("openai/gpt-6.1-sol", "openai/gpt-6-astra") else "29 Oct 2026" for i, _ in hosted}
+    for d in set(read.values()):
+        if d.replace(" 2026", "") not in t["caption"]:
+            raise SystemExit(f"Figure 14: the price table's caption doesn't say {d}, when its prices were read")
+    hosted = sorted(hosted, key=lambda r: float(r[1]))          # lowest first; ties as the table has them
+    out = [["Masein model, on the phone", "", NO_CHARGE, "Table 11"]]
+    out += [[PRICE_NAMES[i], i, v, f"OpenRouter model page, read {read[i]} (Table 11)"] for i, v in hosted]
+    lo, hi = float(hosted[0][1]), float(hosted[-1][1])
+    for want in (f"${lo:.2f}", f"${hi:g}", NO_CHARGE):
+        if want not in cap:
+            raise SystemExit(f"Figure 14: its caption doesn't say {want!r}, as the price table gives it")
+    got = drawn(src, "14", PRICES_HEAD)
+    if [x[:3] for x in got] != [x[:3] for x in out]:
+        raise SystemExit(f"Figure 14: the figure script drew {[x[:3] for x in got]}; the price table gives "
+                         f"{[x[:3] for x in out]}")
+    return PRICES_HEAD, out
+
+
 def is_speed_chart(cap: str) -> bool:
     # r35: "…84.4 on the DeviceMark replica at 11.4 tokens per second on an iPhone 17 Pro Max…"
     return any(k in cap.lower() for k in ("token generation throughput", "tokens per second")) and "DeviceMark" in cap
@@ -998,6 +1204,10 @@ FIGURES = [  # phrases of the caption (any one will do), and what builds the fig
     (("one model per row", "Each cell is the model's best-scoring Epoch run"), fig_grid),   # r35: the second
     (("Score against file size", "Score against deployed file size"), fig_size),   # r34: "deployed"
     (("DeviceMark composite with its 95% range",), fig_devicemark),
+    # r37: md ids 12 to 14
+    (("of routed-expert weights from the file",), fig_experts),
+    (("High minus the better of Medium and Instant",), fig_modes),
+    (("output list prices",), fig_prices),
 ]
 
 
@@ -1089,19 +1299,22 @@ def main(argv: list[str]) -> int:
         built.append((stem, h, rows))
         index.append([f"{stem}.csv", printed["name"] + (", its second part" if t["part"] > 1 else ""),
                       first_sentence(t["caption"]) if t["caption"] else "The report's key numbers."])
-    p = Paper(tabs)
+    p = Paper(tabs, lines)
     if nums.named and his:
         check_phone_speeds(p, his)
     check_app_limits(p, opt.get("--app-limits"))
-    for n, cap in figures(lines):
+    caps = figures(lines)
+    figs = FigNumbers(caps)
+    for n, cap in caps:
         fn = builder(cap)
         if fn == "?":
             raise SystemExit(f"Figure {n} is new to this script: {cap[:90]}")
+        pn = figs.number(n)
         if fn is None:
-            print(f"figure-{n}: a diagram, no data")
+            print(f"figure-{pn}: a diagram, no data" + (f" (the md's Figure {n})" if pn != n else ""))
             continue
-        built.append((f"figure-{n}", *fn(p, cap, src)))
-        index.append([f"figure-{n}.csv", f"Figure {n}", first_sentence(cap)])
+        built.append((f"figure-{pn}", *fn(p, cap, src)))
+        index.append([f"figure-{pn}.csv", f"Figure {pn}", first_sentence(cap)])
     # r31: the figure under the abstract, unnumbered, when the figure script's file is there
     absf = src.speeds.parent / ABSTRACT
     if absf.exists():
@@ -1114,12 +1327,14 @@ def main(argv: list[str]) -> int:
     out.mkdir(parents=True, exist_ok=True)
     for f in out.glob("*.csv"):
         f.unlink()
-    # r29: every table reference in what goes out, as LaTeX prints it
+    # r29: every table reference in what goes out, as LaTeX prints it — r37: and every figure's
+    def printed_refs(s: str) -> str:
+        return figs.text(nums.text(s))
     for stem, h, rows in built:
-        write(out / f"{stem}.csv", [nums.text(x) for x in h], [[nums.text(x) for x in r] for r in rows])
+        write(out / f"{stem}.csv", [printed_refs(x) for x in h], [[printed_refs(x) for x in r] for r in rows])
     # the name is the printed one already; the caption's sentence is the md's
     write(out / "index.csv", ["File", "In the report", "What it holds (the caption's first sentence)"],
-          [[f, name, nums.text(said)] for f, name, said in index])
+          [[f, name, printed_refs(said)] for f, name, said in index])
     print(f"{len(built)} files in {out}: " + ", ".join(s for s, _, _ in built))
     tbd = [s for s, h, rows in built if any("TBD" in c for r in [h, *rows] for c in r)]
     if tbd:

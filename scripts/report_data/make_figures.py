@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The report's eleven figures in the house style of round 19 (11 Nov 2026).
+"""The report's fourteen figures in the house style of round 19 (11 Nov 2026), by their md ids.
 
     python3 make_figures.py <data dir> <fonts dir> <out dir>
 
@@ -7,7 +7,9 @@
 (the 21-row grid) and figure-10.csv (DeviceMark's 27 rows). <fonts dir> holds
 texgyreheros-regular.otf and texgyreheros-bold.otf; their TrueType versions are written to
 <fonts dir>/ttf/ and those are the ones embedded. <out dir> gets figure-N.pdf,
-figure-N.png (220 dpi) and figure-N.csv for N = 1 to 11, and contact-sheet.png.
+figure-N.png (220 dpi) and figure-N.csv for N = 1 to 14, and contact-sheet.png. r37: Figures
+12 to 14 read step2388-tensors.tsv (the evaluated file's header: each tensor's type, shape and
+bytes) and modes-scores.json (the right answers in each mode) from <data dir> too.
 
 Figure 1's speeds are read from <out dir>/figure-1.csv when it is there (speed_tok_s and
 speed_source, by model and mode), so that new timings need one rebuild; without it, the
@@ -30,8 +32,10 @@ from __future__ import annotations
 import csv
 import json
 import math
+import re
 import sys
 from datetime import date
+from decimal import ROUND_HALF_UP, Decimal
 from itertools import combinations
 from pathlib import Path
 
@@ -56,6 +60,12 @@ def tint(colour: str, share: float) -> str:
     """the colour mixed with white: share 1 is the colour, 0 is white"""
     c = [int(colour[i:i + 2], 16) for i in (1, 3, 5)]
     return "#" + "".join(f"{round(255 - (255 - x) * share):02X}" for x in c)
+
+
+def shade(colour: str, share: float) -> str:
+    """r37: the colour darkened: share 1 is the colour, 0 is black"""
+    c = [int(colour[i:i + 2], 16) for i in (1, 3, 5)]
+    return "#" + "".join(f"{round(x * share):02X}" for x in c)
 
 
 BLUE25, ORANGE25, BLUE45 = tint(BLUE, 0.25), tint(ORANGE, 0.25), tint(BLUE, 0.45)
@@ -1333,13 +1343,152 @@ def fig_abstract(E: dict, P: dict):
 
 
 # ---------------------------------------------------------------------------
+# r37 (masein, 16 Nov): Figures 12 to 14 (md ids; they print as 3, 5 and 13), after his
+# mock-ups B1, A2 and C1, in this script's style: no text under 8.5 pt
+# ---------------------------------------------------------------------------
 
-def contact_sheet(out: Path, n: int = 11) -> None:
+MODE_BLUES = {m: ABSTRACT_COLOURS[m][0] for m in ("Instant", "Medium", "High")}   # the abstract chart's
+EXPERT_MODES = [("Instant", 3, MODE_BLUES["Instant"]), ("Medium and High", 6, MODE_BLUES["High"]),
+                ("Base model,\nQwen3.6-35B-A3B", 8, LEVEL)]
+
+
+def expert_bytes(tsv: Path) -> int:
+    """one routed expert's bytes in every layer: the file's three routed-expert tensors a layer
+    (gate, up, down; each holding every expert), over its experts"""
+    rows = list(csv.DictReader(open(tsv, encoding="utf-8"), delimiter="\t"))
+    exps = [r for r in rows if re.fullmatch(r"blk\.\d+\.ffn_(gate|up|down)_exps\.weight", r["name"])]
+    (n,) = {int(r["shape (ggml order, ne0 first)"].split("×")[-1]) for r in exps}
+    return sum(int(r["bytes"]) for r in exps) // n
+
+
+def fig12(data: Path, P: dict):
+    """routed-expert weights a token reads, by experts a layer (Section 2.1)"""
+    one = expert_bytes(data / "step2388-tensors.tsv")
+    base = 8 * one
+    fig = figure(1.9)
+    ax = fig.add_axes([0.01, 0.1, 0.98, 0.88])
+    ax.set_xlim(-155, 560)
+    ax.set_ylim(-0.6, len(EXPERT_MODES) - 0.4)
+    ax.axis("off")
+    out = []
+    for k, (name, n, c) in enumerate(EXPERT_MODES):
+        y, b = len(EXPERT_MODES) - 1 - k, n * one
+        mb = int(Decimal(b / 1e6).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+        less = int(Decimal(100 * (1 - b / base)).quantize(Decimal(1), rounding=ROUND_HALF_UP)) if n < 8 else None
+        me = c != LEVEL
+        ax.add_patch(FancyBboxPatch((0, y - 0.28), mb, 0.56, boxstyle="round,pad=0,rounding_size=0.28",
+                                    mutation_aspect=1 / 180, facecolor=c, edgecolor="none"))
+        text(ax, mb + 8, y, f"{mb} MB", va="center", fontsize=9, fontweight="bold",
+             color=shade(c, 0.75) if me else MUTED)
+        text(ax, -150, y + 0.12, name, va="center", fontweight="bold" if me else "normal",
+             color=INK if me else MUTED, linespacing=1.0)
+        for s in range(8):
+            ax.add_patch(Rectangle((-150 + s * 13, y - 0.33), 10, 0.2, facecolor=c if s < n else "#EEEEEE",
+                                   edgecolor="none"))
+        if less is not None:
+            text(ax, 555, y, f"{less}% less than the base model", ha="right", va="center", color=MUTED)
+        out.append([name.replace("\n", " "), str(n), str(b), str(mb), "" if less is None else str(less),
+                    "the evaluated file's tensor sizes, Section 2.1"])
+    text(ax, 0, -0.62, "Routed-expert weights read per token (MB)", va="top", color=MUTED)
+    head = ["Mode", "Experts per layer", "Routed-expert weights read per token (bytes)",
+            "Routed-expert weights read per token (MB)", "Less than the base model (%)", "Source"]
+    return fig, head, out, Checker("12")
+
+
+def fig13(data: Path, P: dict):
+    """what thinking adds: the three modes on the five benchmarks run in all three, from the
+    right answers (Table 5's scores, unrounded), and High over the better thinking-off mode"""
+    bench = json.loads((data / "modes-scores.json").read_text(encoding="utf-8"))["benchmarks"]
+    fig = figure(2.45)
+    ax = fig.add_axes([0.17, 0.17, 0.82, 0.80])
+    rows = list(reversed(bench))
+    out = []
+    for y, b in enumerate(rows):
+        v = {m: 100 * b[m] / b["answers"] for m in ("Instant", "Medium", "High")}
+        lo, hi = min(v.values()), max(v.values())
+        gid = "pt:" + b["name"]
+        ln, = ax.plot([lo, hi], [y, y], color=BLUE25, lw=7, solid_capstyle="round", zorder=1)
+        ln.set_gid("no-check")
+        for m, s in (("Instant", 46), ("Medium", 46), ("High", 60)):
+            sc = ax.scatter([v[m]], [y], s=s, color=MODE_BLUES[m], zorder=3, edgecolor="white", linewidth=1.3)
+            sc.set_gid(gid)
+        gain = v["High"] - max(v["Medium"], v["Instant"])
+        text(ax, 28, y, b["name"], ha="right", va="center", clip_on=False)
+        text(ax, 112.5, y, f"+{gain:.1f}", ha="right", va="center", fontweight="bold", color=MODE_BLUES["High"],
+             clip_on=False)
+        text(ax, hi + 1.4, y, f"{v['High']:.1f}", va="center", fontweight="bold", color=MODE_BLUES["High"])
+        out.insert(0, [b["name"], str(b["answers"]), *(str(b[m]) for m in ("High", "Medium", "Instant")),
+                       *(f"{v[m]:.1f}" for m in ("High", "Medium", "Instant")), f"{gain:+.1f}",
+                       f"{OURS} (Table 5)"])                 # the CSV top to bottom, as the figure
+    text(ax, 112.5, len(rows) - 0.35, "High over the\nbest thinking-off", ha="right", va="bottom",
+         color=MUTED, clip_on=False)
+    lx = 30
+    for m in ("Instant", "Medium", "High"):
+        sc = ax.scatter([lx], [len(rows) - 0.1], s=40, color=MODE_BLUES[m], edgecolor="white", linewidth=1.2,
+                        clip_on=False)
+        sc.set_gid("legend")
+        t = text(ax, lx + 1.2, len(rows) - 0.1, m, va="center")
+        bb = t.get_window_extent(fig.canvas.get_renderer()).transformed(ax.transData.inverted())
+        lx = bb.x1 + 4.5
+    ax.set_xlim(30, 113)
+    ax.set_ylim(-0.6, len(rows) + 0.2)
+    ax.set_yticks([])
+    ax.set_xticks(range(30, 101, 10))
+    tidy(ax, "x")
+    ax.spines["left"].set_visible(False)
+    ax.set_xlabel("Score (%)")
+    head = ["Benchmark", "Answers", "High, right", "Medium, right", "Instant, right", "High (%)", "Medium (%)",
+            "Instant (%)", "High over the best thinking-off (points)", "Source"]
+    return fig, head, out, Checker("13")
+
+
+# r37: Table 11's hosted rows as it prints them (OpenRouter id, output $ per million tokens), under
+# the names Figure 14 gives them
+PRICES = [("DeepSeek V4.1 Flash", "deepseek/deepseek-v4.1-flash-1017", "0.60"),
+          ("GPT-5 mini", "openai/gpt-5-mini", "2.00"), ("o4-mini", "openai/o4-mini", "4.40"),
+          ("Claude Sonnet 5.5", "anthropic/claude-sonnet-5.5", "10.00"),
+          ("GPT-6.1 Sol", "openai/gpt-6.1-sol", "10.00"), ("Gemini 4 Argon", "google/gemini-4-argon", "10.00"),
+          ("Claude Opus 5.5", "anthropic/claude-opus-5.5", "20.00"), ("GPT-6 Astra", "openai/gpt-6-astra", "50.00")]
+
+
+def fig14(P: dict):
+    """the hosted models' output list prices, lowest first, and the Masein model's row on top"""
+    rows = [("Masein model, on the phone", "", None)] + sorted(PRICES, key=lambda r: float(r[2]))
+    fig = figure(2.6)
+    ax = fig.add_axes([0.3, 0.17, 0.68, 0.81])
+    out = []
+    for k, (name, rid, price) in enumerate(rows):
+        y = len(rows) - 1 - k
+        if price is None:
+            text(ax, -1.2, y, name, ha="right", va="center", fontweight="bold", color=BLUE, clip_on=False)
+            text(ax, 0.6, y, "no per-token charge", va="center", fontweight="bold", color=BLUE)
+            out.append([name, "", "no per-token charge", "Table 11"])
+            continue
+        o = float(price)
+        ax.add_patch(FancyBboxPatch((0, y - 0.3), o, 0.6, boxstyle="round,pad=0,rounding_size=0.3",
+                                    mutation_aspect=0.06, facecolor=LEVEL, edgecolor="none"))
+        text(ax, -1.2, y, name, ha="right", va="center", clip_on=False)
+        text(ax, o + 0.8, y, f"${o:.2f}", va="center", color=MUTED)
+        out.append([name, rid, price, "OpenRouter model page (Table 11)"])
+    ax.set_xlim(0, 56)
+    ax.set_ylim(-0.6, len(rows) - 0.4)
+    ax.set_yticks([])
+    ax.set_xticks(range(0, 51, 10))
+    ax.set_xticklabels([f"${x}" for x in range(0, 51, 10)])
+    tidy(ax, "x")
+    ax.spines["left"].set_visible(False)
+    ax.set_xlabel("Output list price per million tokens (OpenRouter, read 29 Oct and 1 Nov 2026)")
+    return fig, ["Model", "OpenRouter id", "Output ($ per million tokens)", "Source"], out, Checker("14")
+
+
+# ---------------------------------------------------------------------------
+
+def contact_sheet(out: Path, n: int = 14) -> None:
     from PIL import Image, ImageDraw, ImageFont
     ims = [Image.open(out / f"figure-{i}.png").convert("RGB") for i in range(1, n + 1)]
     colw, gap, pad, labh = 1430, 60, 60, 70
     font = ImageFont.truetype(str(FONTS / "texgyreheros-bold.otf"), 40)
-    cols = [[0, 2, 4, 6, 8, 10], [1, 3, 5, 7, 9]]
+    cols = [list(range(0, n, 2)), list(range(1, n, 2))]
     hts = [sum(ims[i].height + labh + gap for i in c) for c in cols]
     sheet = Image.new("RGB", (pad * 2 + colw * 2 + gap, pad * 2 + max(hts)), "white")
     dr = ImageDraw.Draw(sheet)
@@ -1367,7 +1516,8 @@ def main(argv: list[str]) -> int:
     made = [(1, fig1(data, out, problems)), (2, fig2(E, problems)), (3, fig3(problems)), (4, fig4(problems)),
             (5, fig5(problems)), (6, fig6(problems)), (7, fig7(E, problems)), (8, fig8(E, problems)),
             (9, fig9(E, data, problems)), (10, fig10(E, problems)), (11, fig11(data, problems)),
-            ("abstract", fig_abstract(E, problems))]                 # r31: the one under the abstract
+            ("abstract", fig_abstract(E, problems)),                 # r31: the one under the abstract
+            (12, fig12(data, problems)), (13, fig13(data, problems)), (14, fig14(problems))]   # r37
     for n, (fig, head, rows, ck) in made:
         save(fig, out, n, head, rows, ck, problems)
     contact_sheet(out)
