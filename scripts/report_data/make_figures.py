@@ -22,7 +22,9 @@ published by someone else; squares are runs below high effort (†) and rings ve
 within a quarter of a combined standard error of the line (‡); error bars only where the
 paper gives one or its scores give one (score ± 1.96 × SE). Every figure is checked before it is saved: no label overlaps
 another label, a point, a line or an error bar, nothing leaves the page, no text is under
-8.5 pt, and the numbers the captions state are the numbers drawn."""
+8.5 pt (7.5 pt in the figure under the abstract, whose axis and corner label masein's spec sets
+at 7.5), and the numbers the captions state are the numbers drawn. In the figure under the
+abstract no dot's white ring may reach another dot's colour."""
 from __future__ import annotations
 
 import csv
@@ -293,8 +295,9 @@ class Checker:
     """what a figure draws, read back from it: labels and the points, lines and bars they must
     not cover"""
 
-    def __init__(self, name: str):
-        self.name, self.problems, self.skip = name, [], set()
+    def __init__(self, name: str, floor: float = SMALL, rings: bool = False):
+        # floor: the smallest text allowed; rings: no dot's white ring may reach another's colour
+        self.name, self.problems, self.skip, self.floor, self.rings = name, [], set(), floor, rings
 
     def allow(self, *pairs):
         self.skip |= {frozenset(p) for p in pairs}
@@ -310,8 +313,8 @@ class Checker:
             b = t.get_window_extent(r)
             if b.width <= 0:
                 continue
-            if t.get_fontsize() < SMALL - 1e-6:
-                self.problems.append(f"under {SMALL} pt: {t.get_text()!r} ({t.get_fontsize()} pt)")
+            if t.get_fontsize() < self.floor - 1e-6:
+                self.problems.append(f"under {self.floor} pt: {t.get_text()!r} ({t.get_fontsize()} pt)")
             if b.x0 < -0.5 or b.y0 < -0.5 or b.x1 > W + 0.5 or b.y1 > H + 0.5:
                 self.problems.append(f"off the page: {t.get_text()!r}")
             pad, cut = 0.6 * fig.dpi / 72, 0.12 * b.height      # touching counts; the line's leading doesn't
@@ -334,7 +337,25 @@ class Checker:
                 if seg_hits_box(p, q, b):
                     self.problems.append(f"label on a line: {t.get_text()!r} ({owner or 'line'})")
                     break
+        if self.rings:
+            for a, b in combinations(self.dots(fig), 2):
+                if a.gap(b) < 0:
+                    self.problems.append(f"dots overlap: {a.gid} and {b.gid} ({a.gap(b):.1f} pt)")
         return self.problems
+
+    @staticmethod
+    def dots(fig) -> list["Dot"]:
+        """every scatter dot, in points: its centre, its colour's radius and its ring's outer edge"""
+        px, out = fig.dpi / 72, []
+        for ax in fig.axes:
+            for c in ax.collections:
+                if isinstance(c, PathCollection) and len(c.get_offsets()):
+                    offs = c.get_offset_transform().transform(c.get_offsets())
+                    sizes, lws = c.get_sizes(), c.get_linewidths()
+                    for i, (x, y) in enumerate(offs):
+                        r, w = math.sqrt(sizes[i % len(sizes)]) / 2, lws[i % len(lws)] / 2
+                        out.append(Dot(c.get_gid(), x / px, y / px, r - w, r + w))
+        return out
 
     def _skip(self, a, b):
         return frozenset((a.get_text(), b.get_text())) in self.skip
@@ -365,6 +386,16 @@ class Checker:
                 if ln.get_linestyle() not in ("None", "", " ") and len(xy) > 1:
                     segs += [(xy[i], xy[i + 1], ln.get_gid()) for i in range(len(xy) - 1)]
         return marks, segs
+
+
+class Dot:
+    def __init__(self, gid, x, y, colour, outer):
+        self.gid, self.x, self.y, self.colour, self.outer = gid, x, y, colour, outer
+
+    def gap(self, o: "Dot") -> float:
+        """points between one dot's ring and the other's colour, whichever is nearer (below 0: overlap)"""
+        d = math.hypot(self.x - o.x, self.y - o.y)
+        return d - max(self.outer + o.colour, o.outer + self.colour)
 
 
 def seg_hits_box(p, q, b) -> bool:
@@ -599,7 +630,7 @@ def fig2(E: dict, P: dict):
         rows = sorted([r for r in B[b]["rows"] if r["released"]], key=lambda r: (r["released"], -r["value"]))
         if b == "math":
             last = max(d(r["released"]) for r in rows)
-            ax.axvspan(X(last) + 12, X(t1), color="#F2F2F2", zorder=0, lw=0)
+            ax.axvspan(X(last) + 12, X(t1), color="#F8F8F8", zorder=0, lw=0)   # r35: half #F2F2F2's shade
             t = text(ax, (X(last) + 12 + X(t1)) / 2, 6, "not run by Epoch", ha="center", va="bottom", color=MUTED)
         best, path = None, []
         for r in rows:
@@ -996,6 +1027,9 @@ def glyph(ax, x, y, kind, size=5.2, colour=INK):
     return ln
 
 
+NP, NP_LINE = {"not published": "n/p"}, 12.0           # r35: n/p, and the legend line that says so
+
+
 def fig9(E: dict, data: Path, P: dict):
     B = E["benchmarks"]
     grid = list(csv.reader(open(data / "figure-8.csv", encoding="utf-8")))[1:]
@@ -1005,7 +1039,7 @@ def fig9(E: dict, data: Path, P: dict):
     for r in grid[1:]:
         if not groups or groups[-1] != r[0]:
             groups.append(r[0])
-    H = 22 + 26 + 18 + len(grid[1:]) * rh + len(groups) * ghead + 4
+    H = 22 + NP_LINE + 26 + 18 + len(grid[1:]) * rh + len(groups) * ghead + 4
     fig = figure(H / 72)
     ax = fig.add_axes([0, 0, 1, 1])
     W = WIDTH * 72
@@ -1023,7 +1057,9 @@ def fig9(E: dict, data: Path, P: dict):
         t = text(ax, lx + 21, y + 6.5, lab, va="center", gid="inside")
         lx = t.get_window_extent(fig.canvas.get_renderer()).transformed(ax.transData.inverted()).x1 + 16
     text(ax, lx, y + 6.5, "–  not run by Epoch", va="center", color=MUTED, gid="inside")
-    y += 22
+    # r35: the legend's second line, under "not run by Epoch" (one row would leave the page)
+    text(ax, lx, y + 6.5 + NP_LINE, "n/p  not published by its maker", va="center", color=MUTED, gid="inside")
+    y += 22 + NP_LINE
     for c, (l1, l2) in zip(cols, (("GPQA", "Diamond"), ("OTIS Mock", "AIME"), ("MATH", "Level 5"))):
         text(ax, c + cw / 2, y + 5, l1, ha="center", va="center", fontweight="bold", gid="inside")
         text(ax, c + cw / 2, y + 16, l2, ha="center", va="center", fontweight="bold", gid="inside")
@@ -1070,7 +1106,8 @@ def fig9(E: dict, data: Path, P: dict):
                 text(ax, c + cw / 2, y + rh / 2, "–", ha="center", va="center", color=MUTED, gid="inside")
                 line += ["", "", "not run"]
         par = PAR.get(r[1], r[14])
-        text(ax, px, y + rh / 2, par, ha="center", va="center", color=MUTED, gid="inside")
+        # r35: drawn as "n/p", which the legend explains; the CSV keeps the words
+        text(ax, px, y + rh / 2, NP.get(par, par), ha="center", va="center", color=MUTED, gid="inside")
         out.append(line + [par, EPOCH])
         y += rh
     assert len(grid[1:]) == 21 and ddag == 4, (len(grid[1:]), ddag)
@@ -1220,6 +1257,82 @@ def fig11(data: Path, P: dict):
 
 
 # ---------------------------------------------------------------------------
+# The figure under the abstract (r31, masein, 16 Nov): unnumbered. GPQA Diamond, the Masein
+# model's three modes among three of Epoch's models. Values and SEs as the report prints them
+# (Table 5; Table F1); the CSV keeps each one's 95% range (±1.96 SE). Drawn as one number line
+# (masein's design B, 16 Nov): the Masein modes above it on a blue track from Instant to High,
+# the other three below it, no error bars, no verdicts, no legend
+# ---------------------------------------------------------------------------
+
+ABSTRACT_EPOCH = [("Gemini 3.5 Flash-Lite", "high"), ("o4-mini", "high"), ("GPT-5 mini", "high")]
+# dot, score: the Masein modes in three blues, the other three in the house colours
+ABSTRACT_COLOURS = {"Instant": ("#9EBAEA", "#8EA7D3"), "Medium": ("#6E98E0", "#6389CA"),
+                    "High": ("#386CC4", "#3261B0"), "GPT-5 mini (high)": (MUSTARD, "#C28B30"),
+                    "o4-mini (high)": (GREEN, "#469069"), "Gemini 3.5 Flash-Lite (high)": (ORANGE, "#BE5F36")}
+ABSTRACT_TRACK = ("#C5D6F2", "#8BACE6")            # Instant's end to High's
+ABSTRACT_AXIS, ABSTRACT_TICKS = (73.4, 85.4), range(74, 85, 2)
+
+
+def gradient_bar(ax, x0: float, x1: float, colours: tuple[str, str], lw: float, gid: str, n: int = 120):
+    """a thick rounded bar along y = 0, its colour running left to right"""
+    xs = [x0 + (x1 - x0) * i / n for i in range(n + 1)]
+    a, b = ([int(c[i:i + 2], 16) / 255 for i in (1, 3, 5)] for c in colours)
+    cols = [tuple(p + (q - p) * i / (n - 1) for p, q in zip(a, b)) for i in range(n)]   # the ends exact
+    lc = LineCollection([[(xs[i], 0), (xs[i + 1], 0)] for i in range(n)], colors=cols, linewidths=lw,
+                        capstyle="round", zorder=2)
+    lc.set_gid(gid)
+    ax.add_collection(lc)
+
+
+def fig_abstract(E: dict, P: dict):
+    mz = E["masein"]["gpqa"]
+    rows = [("Masein model, High", True, mz["v"], mz["se"], "Table 5")]
+    rows += [(f"Masein model, {m}", True, v, se, "Table 5") for m, (v, se) in GPQA_MODES.items()]
+    by = {(r["model"], r["setting"]): r for r in E["benchmarks"]["gpqa"]["rows"]}
+    for m, s in ABSTRACT_EPOCH:
+        r = by[(m, s)]
+        rows.append((f"{m} ({s})", False, r["value"], r["se"], "Table F1"))
+    # as printed: one decimal, then the range
+    rows = sorted(((nm, me, round(v, 1), round(se, 1), src) for nm, me, v, se, src in rows), key=lambda r: -r[2])
+    fig = figure(1.5)
+    ax = axes_in(fig, 0.065, 0.03, WIDTH - 0.13, 1.44)
+    ax.set_xlim(72.3, 85.6)
+    ax.set_ylim(-1.3, 1.4)
+    ax.axis("off")
+    ax.plot(ABSTRACT_AXIS, [0, 0], color=AXIS, lw=0.8, zorder=1)
+    for x in ABSTRACT_TICKS:
+        ax.plot([x, x], [-0.07, 0.07], color=AXIS, lw=0.6, zorder=1)
+        text(ax, x, -0.2, f"{x}", ha="center", va="top", color=AXIS, fontsize=7.5)
+    mine = {nm.split(", ", 1)[1]: v for nm, me, v, se, src in rows if me}
+    gradient_bar(ax, mine["Instant"], mine["High"], ABSTRACT_TRACK, 7, "track")
+    out = []
+    for name, me, v, se, src in rows:
+        label = name.split(", ", 1)[1] if me else name
+        dot, score = ABSTRACT_COLOURS[label]
+        gid = "pt:" + label
+        sc = ax.scatter([v], [0], s=95 if me else 80, color=dot, edgecolor="white", linewidth=1.6,
+                        zorder=4 if me else 5)          # the other three over the track
+        sc.set_gid(gid)
+        up = 1 if me else -1
+        ln, = ax.plot([v, v], [0.16 * up, (0.47 if me else 0.5) * up], color=dot, lw=0.8, zorder=3)
+        ln.set_gid("leader:" + gid)
+        if me:
+            text(ax, v, 0.55, label, ha="center", va="bottom", fontsize=9, fontweight="bold", gid=gid)
+            text(ax, v, 0.93, f"{v:.1f}", ha="center", va="bottom", fontsize=10, fontweight="bold", color=score,
+                 gid=gid)
+        else:
+            text(ax, v, -0.56, label, ha="center", va="top", fontsize=8.5, gid=gid)
+            text(ax, v, -0.93, f"{v:.1f}", ha="center", va="top", fontsize=9, fontweight="bold", color=score,
+                 gid=gid)
+        lo, hi = round(v - 1.96 * se, 1), round(v + 1.96 * se, 1)
+        out.append([name, f"{v:.1f}", f"{se:.1f}", f"{lo:.1f}", f"{hi:.1f}", src, OURS if me else EPOCH])
+    text(ax, 72.4, 0.56, "Masein model", ha="left", va="bottom", fontsize=7.5, fontweight="bold", color=BLUE)
+    text(ax, 72.4, 0.32, "GPQA Diamond (%)", ha="left", va="bottom", fontsize=7.5, color=MUTED)
+    head = ["Model (setting)", "GPQA Diamond (%)", "SE", "95% low", "95% high", "In the report", "Source"]
+    return fig, head, out, Checker("abstract", floor=7.5, rings=True)
+
+
+# ---------------------------------------------------------------------------
 
 def contact_sheet(out: Path, n: int = 11) -> None:
     from PIL import Image, ImageDraw, ImageFont
@@ -1253,12 +1366,13 @@ def main(argv: list[str]) -> int:
     problems: dict = {}
     made = [(1, fig1(data, out, problems)), (2, fig2(E, problems)), (3, fig3(problems)), (4, fig4(problems)),
             (5, fig5(problems)), (6, fig6(problems)), (7, fig7(E, problems)), (8, fig8(E, problems)),
-            (9, fig9(E, data, problems)), (10, fig10(E, problems)), (11, fig11(data, problems))]
+            (9, fig9(E, data, problems)), (10, fig10(E, problems)), (11, fig11(data, problems)),
+            ("abstract", fig_abstract(E, problems))]                 # r31: the one under the abstract
     for n, (fig, head, rows, ck) in made:
         save(fig, out, n, head, rows, ck, problems)
     contact_sheet(out)
     bad = {n: p for n, p in problems.items() if p}
-    for n in sorted(problems):
+    for n in sorted(problems, key=lambda k: (isinstance(k, str), k if isinstance(k, int) else 0, str(k))):
         print(f"figure-{n}: " + ("ok" if not problems[n] else f"{len(problems[n])} problems"))
         for p in problems[n]:
             print("   ", p)
