@@ -24,7 +24,9 @@ pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase21d"
 GOOD, SKEWED = "fx/good-750m", "fx/skewed-360m"
 # our six rows, tested now — 22: Ornith-1.5's isn't run in this world
-LDA = [SPEC[x]["row"] for x in SPEC if x not in ("Ornith-1.5 Q4_K_M", "step8804")]  # 23b
+# 23b: not step8804; nor step2388's three versions, not in this world either
+LDA = [SPEC[x]["row"] for x in SPEC if x not in ("Ornith-1.5 Q4_K_M", "step8804")
+       and not x.startswith("step2388")]
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -109,10 +111,11 @@ def test_models_opens_on_latest(live, page, width, scheme):
     rows = page.evaluate(LATEST)
     # 27: Qwen's report and Epoch's run of one model are one row; step8804 (23b: not
     # scored yet) and Ornith-1.5 (22: not run in this world) have no score shown, so
-    # are hidden and counted under the table, a click away
+    # are hidden and counted under the table, a click away — and step2388's three
+    # versions, not in this world
     assert sorted(x for r in rows for x in r["labels"]) == sorted([*PICKED, *GLANCE])
     hid = page.locator("[data-latest] [data-mt-empty]")
-    assert hid.inner_text() == "2 more models have no score in these columns · show them"
+    assert hid.inner_text() == "5 more models have no score in these columns · show them"
     assert len({r["name"] for r in rows}) == len(rows)          # never two rows with one name
     # no rank and no average
     assert not any(h.lower() in ("#", "rank", "avg", "average") for h in heads)

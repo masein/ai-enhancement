@@ -5034,6 +5034,29 @@ Not before the demo: a new hidden set changes every Everyday score.
 - Point 9 came with 20.
 - Tests: `tests/test_18d1_scores_spending.py`.
 
+### step2388 on Models ▸ Latest — three versions of one file (19 Nov)
+
+- **The scorecard** (`eval_tasks/reports/step-checkpoints.json`) ends its `ours`
+  with step2388's three versions, each on Latest (`glance`), not in the picker,
+  no colour slot, no training step: "step2388 · High"
+  (`served/step2388-k3k6-2611 · thinking`), "step2388 · Medium"
+  (`served/step2388-k3k6-2611-medium-075`, the file's presence penalty 0.75) and
+  "step2388 · Instant" (`served/step2388-k3k6-2611`). The presence-0 Medium row
+  isn't one of them. Every run they read was asked with the file's own settings.
+- **A row's own name and line:** an `ours` row may carry `name` (shown instead
+  of the board's name, which doesn't tell the three apart) and `line` (a word
+  under it, after the size: "k3k6 runtime"). `service/reports.py` passes both
+  on; `rpOursRow` uses them. The other rows have neither and look as before,
+  except that the words every row of Latest's "ours" group shared ("lda
+  runtime", "thinking on") are no longer shared, so they stay on each row's line.
+- **Side effects:** the three are builds in "Two builds, question by question"
+  too (it takes the scorecard's rows), and rows in the published page's table
+  of our scores. "As of the last import" moves to step2388's newest import.
+- Deploy: `docker compose up -d --build bench`, then `docker ps` (bench
+  healthy). Nothing to import or score: the report reads the board's tables.
+- Tests: `tests/test_latest_step2388.py`; the scorecard's row lists in
+  `test_21c_page`, `test_21d_glance`, `test_22_ornith` and `test_23_paired`.
+
 ### 23b — beyond the score; step8804 in the scorecard (20 Oct)
 
 - **`service/beyond.py`:** each row's benchmark, from its newest scored

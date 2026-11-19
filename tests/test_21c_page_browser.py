@@ -65,7 +65,8 @@ def test_the_page_draws_from_our_server_alone(live, page, width, scheme):
     assert bg == ("rgb(247, 247, 245)" if scheme == "light" else "rgb(13, 13, 13)"), bg
     # our runs, each with its status
     rows = page.locator("#ours-body tr")
-    assert rows.count() == 8              # 22: and Ornith-1.5's; 23b: step8804's, not scored yet
+    # 22: and Ornith-1.5's; 23b: step8804's, not scored yet; and step2388's three, last
+    assert rows.count() == 11
     # 23b: step8804 first, not scored yet; then step4000 and step1000 as before
     assert rows.nth(0).locator("td").nth(1).inner_text() == "Not scored yet"
     assert rows.nth(1).locator("td").nth(1).inner_text() == "Complete · 21 of 21 chunks"
@@ -134,7 +135,7 @@ def test_the_numbers_are_21s_cell_for_cell(live, page):
     # 27b: modelTable's rows, each cell's own number
     from values27b import MT_FIRST
     theirs = page.eval_on_selector_all("[data-rp-ours] tbody tr", MT_FIRST)
-    assert len(theirs) == 8                           # 22: and Ornith-1.5's; 23b: step8804's
+    assert len(theirs) == 11          # 22: and Ornith-1.5's; 23b: step8804's; step2388's three
     for row in theirs:
         name, vals = row[0], row[1:1 + len(benches)]     # 25: the page's seven, then IF's two
         got = [v.split(" ± ")[0] for v in vals]
@@ -153,9 +154,11 @@ def test_the_numbers_are_21s_cell_for_cell(live, page):
         # Ornith-1.5's card; 21 against Ornith-1.5's own row too, one of ours
         # off the lda runtime as "Q4, earlier run" is
         # 23b: 21 against step8804 too, not scored yet. 25b: both against Gemma 4
-        # E4B and E2B, Google's own numbers
-        assert len(ref) == 51 and len(rows) == 48 and not {"Q4, earlier run",
-                                                           "Ornith-1.5 Q4_K_M"} & {
+        # E4B and E2B, Google's own numbers. And 21 against step2388's three
+        # versions, not scored in this world; the page's own list is as it was
+        late = {"Q4, earlier run", "Ornith-1.5 Q4_K_M", "step2388 · High", "step2388 · Medium",
+                "step2388 · Instant"}
+        assert len(ref) == 54 and len(rows) == 48 and not late & {
             r[0][0] for r in rows}, (pick, len(ref), len(rows))
         for r in rows:
             name, got = r[0][0], dict(zip(["gpqa", "hle", "otis", "math", "simpleqa", "mmlupro"],

@@ -227,7 +227,9 @@ def test_our_rows_equal_the_published_ones_but_step1000s(svc):
     got = get(svc, "ours")
     # 22: Ornith-1.5's rows, after the page was published, last — not scored
     # yet; 23b: step8804's, first, the same
-    late = ("Ornith-1.5 Q4_K_M", "step8804")
+    # and step2388's three versions, last, not in this world
+    late = ("Ornith-1.5 Q4_K_M", "step8804", "step2388 · High", "step2388 · Medium",
+            "step2388 · Instant")
     assert {r["status"] for r in got if r["model"] in late} == {"Not scored yet"}
     assert got[0]["model"] == "step8804" and got[0]["order"] == 0
     got = [r for r in got if r["model"] not in late]
@@ -333,7 +335,10 @@ def test_the_status_lines(svc):
                    "BF16": "Complete · 21 of 21 chunks", "Q2 (UD-Q2_K_XL)": "Complete · 21 of 21 chunks",
                    "Q4, earlier run": "7–8 Oct, Qwen's card settings",
                    "step8804": "Not scored yet",                         # 23b
-                   "Ornith-1.5 Q4_K_M": "Not scored yet"}                     # 22
+                   "Ornith-1.5 Q4_K_M": "Not scored yet",                     # 22
+                   # step2388's three versions: not in this world
+                   "step2388 · High": "Not scored yet", "step2388 · Medium": "Not scored yet",
+                   "step2388 · Instant": "Not scored yet"}
     # every box in, one benchmark waiting for its grader
     row = {"cells": {"a": {"state": "score"}, "b": {"state": "waits"}}, "chunks": [21, 21],
            "status": ""}

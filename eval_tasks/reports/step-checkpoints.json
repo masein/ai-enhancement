@@ -84,6 +84,33 @@
    "pick": true,
    "glance": true,
    "note": "measured here, on its card's settings; not the team's model"
+  },
+  {
+   "label": "step2388 · High",
+   "row": "served/step2388-k3k6-2611 · thinking",
+   "colour": null,
+   "pick": false,
+   "glance": true,
+   "name": "step2388 · High",
+   "line": "k3k6 runtime"
+  },
+  {
+   "label": "step2388 · Medium",
+   "row": "served/step2388-k3k6-2611-medium-075",
+   "colour": null,
+   "pick": false,
+   "glance": true,
+   "name": "step2388 · Medium",
+   "line": "k3k6 runtime"
+  },
+  {
+   "label": "step2388 · Instant",
+   "row": "served/step2388-k3k6-2611",
+   "colour": null,
+   "pick": false,
+   "glance": true,
+   "name": "step2388 · Instant",
+   "line": "k3k6 runtime"
   }
  ],
  "reference": "Q4 (UD-Q4_K_XL)",

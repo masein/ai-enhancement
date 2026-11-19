@@ -29573,9 +29573,14 @@ function rpOursRow(r, benches, o = {}) {
   const base = m ? mtRowOf(m) : { key: r.label, id: null, mark: 'here', colour: rpColour(r),
     name: displayName({ name: r.label }), group: 'ours' };
   const size = r.size ? `${(r.size / 1e9).toFixed(1)} GB` : undefined;
-  const line = m ? mtLine(m, { group: base.group, size: o.line ? '' : size, thinking: thinkingOf(m) })
-    : '';
-  return { ...base, key: 'ours:' + r.label, colour: r.colour != null ? rpColour(r) : base.colour,
+  const words = m ? mtLine(m, { group: base.group, size: o.line ? '' : size, thinking: thinkingOf(m) })
+    .split(' · ').filter(Boolean) : [];
+  // the report's own word for the line under the name ("k3k6 runtime"), after the size
+  if (r.line) words.splice(size && words[0] === size ? 1 : 0, 0, r.line);
+  const line = [...new Set(words)].join(' · ');
+  // and its own name, where the board's doesn't tell its rows apart ("step2388 · High")
+  return { ...base, ...(r.name ? { name: r.name } : {}), key: 'ours:' + r.label,
+    colour: r.colour != null ? rpColour(r) : base.colour,
     search: [base.search, r.label, r.row].filter(Boolean).join(' '),
     line: o.line ? [...line.split(' · ').filter(x => x && x !== r.quant), ...o.line] : line,
     attrs: o.attrs || {}, cells: Object.fromEntries(benches.map(b => {
