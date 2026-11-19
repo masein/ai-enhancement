@@ -138,9 +138,12 @@ def test_the_file_reads_its_builds_from_the_scorecard():
     rep = reports.files()["paired"]
     assert rep["kind"] == "paired" and rep["builds"] == {"from": "step-checkpoints"}
     assert [o["label"] for o in rep["ours"]] == [o["label"] for o in REP["ours"]]
-    # 23b: and step8804, first — eight builds, 28 pairs, opening on step8804 and step4000
+    # 23b: and step8804, first — opening on step8804 and step4000; step2388's three
+    # versions, last on the scorecard, are builds here too: eleven builds, 55 pairs
     assert EARLY in paired.labels(rep) and paired.labels(rep)[0] == "step8804"
-    assert len(paired.pairs(rep)) == 28
+    assert paired.labels(rep)[-3:] == ["step2388 · High", "step2388 · Medium",
+                                       "step2388 · Instant"]
+    assert len(paired.pairs(rep)) == 55
     assert rep["default"] == ["step8804", S4] and not rep.get("show_hidden")
     assert [b["key"] for b in rep["benchmarks"]] == [b["key"] for b in REP["benchmarks"]]
     text = (reported.REPORTS_DIR / "paired.json").read_text()

@@ -101,11 +101,14 @@ def test_latest_reads_the_report_alone(svc):
     # 22: Ornith-1.5 picked and on Latest too, last
     want = ["step8804", *PICKED, "Ornith-1.5 Q4_K_M"]
     assert [r["label"] for r in got["ours"] if r["pick"]] == want
-    assert [r["label"] for r in got["ours"] if r["glance"]] == want
+    # and step2388's three versions, on Latest but not in the picker, last
+    step2388 = ["step2388 · High", "step2388 · Medium", "step2388 · Instant"]
+    assert [r["label"] for r in got["ours"] if r["glance"]] == [*want, *step2388]
     from service import app
     meta = app.results_payload()["glance"]
     assert meta == {"report": "step-checkpoints", "title": REPORT["title"],
-                    "rows": [STEP8804_ROW, *(SPEC[x]["row"] for x in PICKED), ORNITH_ROW],
+                    "rows": [STEP8804_ROW, *(SPEC[x]["row"] for x in PICKED), ORNITH_ROW,
+                             *(SPEC[x]["row"] for x in step2388)],
                     "tasks": ["gpqa_diamond_epoch", "otis_aime_epoch", "mmlupro_tiger",
                               "hle_text_cais", "ifeval_google", "ifbench_test"]}
 

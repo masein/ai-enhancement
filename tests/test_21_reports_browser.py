@@ -180,8 +180,9 @@ def test_the_list_and_the_report_open_and_the_picker_moves_the_tiles(live, page,
     page.wait_for_selector("[data-report-section='every'] [data-mt-empty-toggle]:text('hide them')",
                            state="attached")
     ours_rows = every.locator("tr[data-mt-group='ours']")
-    assert ours_rows.count() == 8                     # 22: and Ornith-1.5; 23b: and step8804
-    assert every.locator("tr[data-mt-group='ours'] [data-mt-mark='here']").count() == 8
+    # 22: and Ornith-1.5; 23b: and step8804; and step2388's three versions
+    assert ours_rows.count() == 11
+    assert every.locator("tr[data-mt-group='ours'] [data-mt-mark='here']").count() == 11
     assert every.locator("[data-card-link]").count() >= 19
     # 22: and Ornith-1.5's card; 25b: Gemma 4 E4B's and E2B's, and Google's report
     assert page.locator("[data-rp-cards] a").count() == 10

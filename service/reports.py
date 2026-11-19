@@ -382,6 +382,11 @@ def our_rows(rep: dict, cells: dict) -> list[dict]:
                     "colour": o.get("colour"), "pick": bool(o.get("pick")),
                     # 22: on Models ▸ Latest, as a published row marked "glance" is
                     "glance": o.get("glance") is True,
+                    # the report's own name for the row, and a word for the line
+                    # under it, where the board's name doesn't tell its rows apart
+                    # (step2388's three modes: "step2388 · High", "k3k6 runtime")
+                    **({"name": o["name"]} if o.get("name") else {}),
+                    **({"line": o["line"]} if o.get("line") else {}),
                     # 23e: a checkpoint's training step
                     **({"step": o["step"]} if isinstance(o.get("step"), int) else {}),
                     # 24b: its file's quant and size, under its name

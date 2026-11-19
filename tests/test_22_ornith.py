@@ -523,7 +523,12 @@ def test_ornith_is_ours_on_latest_and_its_cards_claim_sits_beside_it(svc):  # no
     # Latest's rows: ours marked glance (every picked one), Ornith among them
     from service import app
     meta = app.results_payload()["glance"]
-    assert meta["rows"][-1] == "served/Ornith-1.5-35B-A3B-Q4_K_M · thinking"
+    # Ornith last of the picked ones; step2388's three versions after it, on Latest
+    # but not in the picker
+    assert meta["rows"][-4:] == ["served/Ornith-1.5-35B-A3B-Q4_K_M · thinking",
+                                 "served/step2388-k3k6-2611 · thinking",
+                                 "served/step2388-k3k6-2611-medium-075",
+                                 "served/step2388-k3k6-2611"]
     assert meta["rows"] == [x["row"] for x in rep["ours"] if x.get("glance")]
     # and the ran-out report's picker
     ro = json.loads((reports.REPORTS_DIR / "ran-out-of-room.json").read_text())
