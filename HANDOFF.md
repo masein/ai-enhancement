@@ -5034,6 +5034,30 @@ Not before the demo: a new hidden set changes every Everyday score.
 - Point 9 came with 20.
 - Tests: `tests/test_18d1_scores_spending.py`.
 
+### Two display quirks the step2388 rows showed (19 Nov)
+
+- **"N with no answer read" on IFEval and IFBench** (`service/frontier.py`): their
+  score checks each instruction on the reply and reads no answer out of it, so
+  every answer that didn't run out was counted, on every row (step8804 295 of
+  300, step2388 High 285). `reads_an_answer(task)` is false for the two:
+  `score_task` writes `unread: 0` for them, and `words()` never says it for
+  them, a score written before included. Results files written before keep
+  their count (the raw export copies it) until a benchmark is scored again;
+  nothing is rescored by this change.
+- **"35 of 40 chunks in" on a row with every benchmark scored**
+  (`service/reports.py` `chunks(reg, row)`): plan U wrote step2388's High and
+  Instant rows at once, and each row was counted against all 40 boxes. Given the
+  row, a box counts only its steps of the row's thinking ("on" for a
+  `· thinking` row, "off" for a plain one) and of the Frontier benchmarks
+  (DeviceMark and the showcase are kept in files of their own), and a box asked
+  with another model (`frontier_box.BOX_MODELS`, U40) is left out. High is 34 of
+  34 and Instant 4 of 4, so their status no longer counts chunks: High's says
+  "Complete", Instant's "5 of 9 benchmarks in", as Medium's does. Plan L is all
+  thinking on, so the lda rows' "21 of 21" is unchanged.
+- Deploy: `docker compose up -d --build bench`, then `docker ps` (bench
+  healthy). Nothing to import or score.
+- Tests: `tests/test_latest_display_quirks.py`.
+
 ### step2388 on Models ▸ Latest — three versions of one file (19 Nov)
 
 - **The scorecard** (`eval_tasks/reports/step-checkpoints.json`) ends its `ours`
