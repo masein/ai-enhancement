@@ -270,12 +270,18 @@ def _boxes(reg: dict) -> list[str]:
     return out
 
 
-def chunks(reg: dict) -> tuple[int, int] | None:
+def chunks(reg: dict, row: str = "") -> tuple[int, int] | None:
     """(boxes in, boxes planned) of the box plan a row's imports came from —
     a box is in when every step of it is: each benchmark it asks, and its
     shard, on the row (held, or merged whole); None when the row's boxes name
-    no plan"""
+    no plan. With `row`, only the plan's part that writes to it: a thinking
+    row's thinking-on steps, a plain row's thinking-off ones, of the Frontier
+    benchmarks this registry records (not DeviceMark or the showcase, kept in
+    files of their own), and no box asked with another model (plan U wrote
+    step2388's High and Instant rows at once, and its U40 is the original Q2's:
+    each row was counted against all 40)"""
     _scripts()
+    import frontier as fb
     import frontier_box as fbx
     letters = Counter(b[:1].upper() for b in _boxes(reg)
                       if b[:1].upper() in fbx.PLANS and b.upper() in fbx.PLANS[b[:1].upper()])
@@ -292,7 +298,20 @@ def chunks(reg: dict) -> tuple[int, int] | None:
             return True
         sh = shards.get(t) or {}
         return sh.get("n") == n and str(i) in (sh.get("have") or {})
-    boxes = [[st for st in box if st[0] != "parity"] for box in plan.values()]
+    on = row.endswith(" · thinking")
+    mid = row.removesuffix(" · thinking")
+    boxes = []
+    for label, box in plan.items():
+        other = fbx.BOX_MODELS.get(label)
+        if row and other and other != mid:
+            continue
+        steps = [st for st in box if st[0] != "parity"
+                 and (not row or (st[0] == ("on" if on else "off")
+                                  and all(t in fb.BENCH for t in st[1])))]
+        if steps or not row:                # without a row, every box as before
+            boxes.append(steps)
+    if not boxes:
+        return None
     done = sum(1 for box in boxes if all(part_in(t, shard) for _, ts, shard, _ in box
                                          for t in ts))
     return done, len(boxes)
@@ -366,7 +385,7 @@ def our_rows(rep: dict, cells: dict) -> list[dict]:
                 per[b["key"]] = {"v": None, "state": "held", "why": c["shardsHeld"]}
             else:
                 per[b["key"]] = {"v": None, "state": "none", "why": "not in yet"}
-        ch = chunks(reg)
+        ch = chunks(reg, mid)
         parts = []
         if ch and ch[0] < ch[1]:
             parts.append(f"{ch[0]} of {ch[1]} chunks in")

@@ -1125,8 +1125,8 @@ def score_task(row: Path, task: str, rec: dict, log=print, runs_log: bool = True
     out = plan["out"]
     ungraded, waiting = out["ungraded"], out["waiting"]
     ran_out = sum(1 for r in flat if r["ran_out"])
-    unread = sum(1 for r in flat if r["read"] is None and not r["ran_out"]
-                 and not r.get("unanswered"))
+    unread = (sum(1 for r in flat if r["read"] is None and not r["ran_out"]
+                  and not r.get("unanswered")) if reads_an_answer(task) else 0)
     errors = sum(1 for r in flat if r["error"])
     if out["state"] == "waiting":
         # 17d: answers asked again (another grader chosen) wait: the score made
@@ -1393,6 +1393,14 @@ def _unwrite(d: Path, task: str) -> None:
         old.unlink()
 
 
+def reads_an_answer(task: str) -> bool:
+    """whether the benchmark's score reads an answer out of the reply — IFEval
+    and IFBench don't: each instruction is checked on the whole reply after the
+    thinking (scripts/frontier.py score), so none of their answers is one "with
+    no answer read" (it was every answer that didn't run out, on every row)"""
+    return fb.BENCH[task].get("scorer") not in ("ifeval", "ifbench")
+
+
 def words(task: str, sc: dict) -> str:
     """"GPQA Diamond 61.6% ± 3.1 · 4 runs of 198 · 2 ran out" — or, for a
     graded benchmark not yet graded, "SimpleQA Verified: 1,000 answers wait for
@@ -1410,7 +1418,9 @@ def words(task: str, sc: dict) -> str:
             f"{sc['epochs']} run{'s' if sc['epochs'] != 1 else ''} of {sc['questions']:,}"]
     if sc.get("ran_out"):
         bits.append(f"{sc['ran_out']} ran out of room")
-    if sc.get("unread"):
+    # a score written before IFEval and IFBench stopped counting them keeps its
+    # count: never said for them
+    if sc.get("unread") and reads_an_answer(task):
         bits.append(f"{sc['unread']} with no answer read")
     if sc.get("ungraded"):
         bits.append(f"{sc['ungraded']} its grader gave no grade {GRADE_TRIES} times, counted "
