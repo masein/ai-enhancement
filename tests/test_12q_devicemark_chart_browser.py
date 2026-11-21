@@ -83,6 +83,8 @@ def test_the_chart_draws_rows_on_a_device_as_points_and_the_rest_as_lines(live, 
     assert any("don't reproduce these numbers" in x and "board as published" in x for x in lfm)
     cap = page.locator("[data-ondevice-caption]").inner_text()
     assert "the same 300 IFEval items" in cap and "our draw of the same design" in cap
+    # 19 Nov: no longer "greedy" for every row: each row says its own sampling
+    assert "greedy, a cap of" not in cap and "Each row says how its answers were sampled" in cap
     assert "never on the chart" in cap
     assert "CC-BY-4.0" in page.locator("[data-ondevice-credit]").inner_text()
     SCREENS.mkdir(parents=True, exist_ok=True)
@@ -289,6 +291,10 @@ LINE_LABELS = """() => {
 @pytest.mark.parametrize("width", [1400, 375])
 def test_our_crowded_lines_have_short_names_apart_and_inside(live, page, crowd, width):
     open_chart(page, live, width=width)
+    # 19 Nov: the checkpoint's run is greedy (no request recorded), so hidden until switched on
+    assert page.locator("[data-dm-line-label='served/C-step']").count() == 0
+    page.locator("[data-dm-greedy-toggle]").check()
+    page.wait_for_selector("[data-dm-line-label='served/C-step']")
     got = page.evaluate(LINE_LABELS)
     ys = sorted(x["y"] for x in got["ls"])
     assert all(b - a >= 11.99 for a, b in zip(ys, ys[1:])), ys
@@ -298,7 +304,8 @@ def test_our_crowded_lines_have_short_names_apart_and_inside(live, page, crowd, 
                     "served/C-la-mtp": "lookahead + MTP", "served/C-orig": "original",
                     "served/C-mtp · thinking": "MTP · thinking",
                     # r25: a checkpoint by its checkpoint, never "original", and lookahead on
-                    "served/C-step": "step2388 · lookahead"}
+                    # 19 Nov: and its sampling
+                    "served/C-step": "step2388 · lookahead · greedy"}
     # what each short name stands for, under the chart
     key = page.locator("[data-dm-key]").inner_text()
     assert "lookahead + MTP = phone build · MTP · lookahead · thinking off" in key

@@ -175,8 +175,9 @@ def test_a_checkpoint_on_devicemark_is_named_by_it_and_is_never_the_original(tmp
          {**plain, "phone": False, "name": "step8804 (lda runtime)", "file": "step8804.gguf"},
          thinking=True)
     got = {r["id"]: r for r in dm.rows(out)}
-    assert got["served/A-step8804-lda-2610"]["label"] == "step8804 · thinking off"
-    assert got["served/A-step8804-lda-2610 · thinking"]["label"] == "step8804 · thinking on"
+    # 19 Nov: a checkpoint names its sampling — greedy here, DeviceMark's protocol
+    assert got["served/A-step8804-lda-2610"]["label"] == "step8804 · thinking off · greedy"
+    assert got["served/A-step8804-lda-2610 · thinking"]["label"] == "step8804 · thinking on · greedy"
     assert got["served/A-step8804-lda-2610"]["retention"] is None
     assert got["served/Qwen3.6-35B-A3B-k4-LDA-phone-build"]["retention"] == {
         "of": "served/Qwen3.6-35B-A3B-Q4-original-k-8", "ifeval": 0.75, "mmlu_pro": 1.0,

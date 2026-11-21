@@ -97,10 +97,11 @@ def test_a_run_recorded_before_the_newer_switch_was_read_is_labelled_lookahead(s
                                              "name": "step2388 (k3k6 runtime)"})
         row = {r["id"]: r for r in svc.get("/api/devicemark").json()["rows"]}[rec["id"]]
         assert row["row"]["setup"]["lookahead"] is True
-        assert row["label"] == "step2388 · lookahead · thinking off"
+        # 19 Nov: and its sampling: no request recorded, so DeviceMark's greedy
+        assert row["label"] == "step2388 · lookahead · thinking off · greedy"
         assert row["retention"] is None                 # a checkpoint is never a phone build's original
         su = sdm.setup_of(served.get(rec["id"]), False)       # and a new run records it on
-        assert su["lookahead"] is True and dm.setup_label(su, False) == "step2388 · lookahead · thinking off"
+        assert su["lookahead"] is True and dm.setup_label(su, False) == "step2388 · lookahead · thinking off · greedy"
     finally:
         fake.close()
 

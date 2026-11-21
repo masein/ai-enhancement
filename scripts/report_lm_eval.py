@@ -6402,7 +6402,7 @@ const state = {
   trXAxis: 'step',                     // benchmark-join chart: step | tokens | compute
   cmpSel: [], cmpColors: {}, cmpOpen: {},
   rep: {},                                                 // 12m.2: api/reported, loaded once
-  dm: { sel: null, edit: null, focus: null, flash: null },
+  dm: { sel: null, edit: null, focus: null, flash: null, greedy: false },
   dmAns: {},                                               // 12q.C: a model's DeviceMark answers
   dmPart: null,                                            // 12q.C: the run "Open results" opened                           // 12q.B: api/devicemark, the On-device chart                               // radar: compared models (≤CMP_MAX)
   accScale: 'raw',                     // task panels: 'raw' | 'chance' (diverging)
@@ -13293,8 +13293,25 @@ const isDmKey = t => String(t).startsWith('dm:');
 const dmField = f => DM_FIELDS.find(x => x.f === f) || { f, short: f, name: f, unit: '' };
 const DM_THINKING = ' · thinking';
 const dmBaseId = id => String(id).endsWith(DM_THINKING) ? String(id).slice(0, -DM_THINKING.length) : id;
-const dmRowById = id => (((((DATA || {}).devicemark || {})[dmBaseId(id)] || {})
+// 19 Nov: a row hidden by default (a greedy run of our model) only with "Show greedy runs" on
+const dmRowById = id => { const r = (((((DATA || {}).devicemark || {})[dmBaseId(id)] || {})
   [String(id).endsWith(DM_THINKING) ? 'on' : 'off']) || {}).row || null;
+  return r && r.hidden && !((state || {}).dm || {}).greedy ? null : r; };
+// 19 Nov: how many rows "Show greedy runs of our models" brings back, and the switch itself
+const dmHiddenN = rows => rows ? rows.filter(r => r.hidden).length
+  : Object.values((DATA || {}).devicemark || {}).flatMap(x => [x.off, x.on])
+    .filter(c => c && c.row && c.row.hidden).length;
+function dmGreedySwitch(n) {
+  if (!n) return '';
+  return el('label', { class: 'small', 'data-dm-greedy': '1', 'data-tip': JSON.stringify([
+    'Greedy runs of our own models (step2388, step8804): DeviceMark’s protocol, temperature 0. '
+    + 'The models run with their own sampling, so these rows are hidden unless this is on; '
+    + 'shown, they aren’t ranked']) },
+    el('input', { type: 'checkbox', 'data-dm-greedy-toggle': '1',
+      checked: state.dm.greedy ? '' : null,
+      onchange: e => { state.dm.greedy = e.target.checked; render(); } }),
+    ` Show greedy runs of our models (${n})`);
+}
 function dmVal(id, f) {
   const r = dmRowById(id);
   if (!r) return null;
@@ -15761,11 +15778,19 @@ function dmLoad(force) {
 // chart's key and the hover give the whole label
 // r25: a checkpoint (step2388) isn't the original: it goes by its checkpoint, as the server's
 // label for it begins
-function dmShort(su, thinking, model, label) {
+// 19 Nov: and a checkpoint its expert path, the app's limits where it ran by them, and its
+// sampling — step2388's k3 run greedy and at the file's sampling never share a name
+function dmShort(su, thinking, model, label, sampling) {
   if (su.runtime !== 'llama-server') return String(model).split('/').pop() + (thinking ? ' · thinking' : '');
   const how = [su.lookahead ? 'lookahead' : '', su.mtp ? 'MTP' : ''].filter(Boolean).join(' + ');
   const ck = /^(step\d+)\b/.exec(label || '');
-  return (su.phone ? how || 'plain' : (ck ? ck[1] : 'original') + (how ? ` · ${how}` : ''))
+  if (ck && !su.phone) {
+    const req = su.request || {}, path = su.expert_path || req.expert_path;
+    return [ck[1], path ? `k${path}` : '', how, thinking ? 'thinking' : '',
+      req.thinking_budget_tokens ? 'the app’s limits' : '',
+      (sampling || {}).key === 'file' ? 'the file’s sampling' : 'greedy'].filter(Boolean).join(' · ');
+  }
+  return (su.phone ? how || 'plain' : 'original' + (how ? ` · ${how}` : ''))
     + (thinking ? ' · thinking' : '');
 }
 function dmOurs(r) {
@@ -15773,7 +15798,9 @@ function dmOurs(r) {
   const name = (su.runtime === 'llama-server' && su.name ? su.name : r.model)
     + (r.thinking ? ' · thinking' : '');
   return { id: r.id, name, label: r.label || name, external: false,
-    short: dmShort(su, r.thinking, r.model, r.label),
+    short: dmShort(su, r.thinking, r.model, r.label, r.sampling),
+    // 19 Nov: how its answers were sampled, and why it's hidden by default
+    sampling: r.sampling || null, hidden: r.hidden || null,
     kind: su.runtime === 'llama-server' ? 'served' : 'hf',
     composite: r.row.composite, benches: r.row.benches, answered_pct: r.row.answered_pct,
     median_tokens: r.row.median_tokens, time_frontier: r.row.time_frontier, device: r.device,
@@ -15789,10 +15816,14 @@ function dmRows() {
   const d = state.dm.data;
   if (!d) return [];
   // our runs of their open models sit in their rows (`ours`), never apart
-  return [...(d.rows || []).filter(r => !r.paired).map(dmOurs),
-    ...((d.external || {}).rows || []).map(r => ({ ...r, rank: r.rank_all }))]
+  return [...(d.rows || []).filter(r => !r.paired && (!r.hidden || state.dm.greedy)).map(dmOurs),
+    ...((d.external || {}).rows || []).map(r => ({ ...r, rank: r.rank_all,
+      sampling: r.sampling || DM_THEIR_SAMPLING }))]
     .sort((a, b) => (b.composite.value || 0) - (a.composite.value || 0));
 }
+// 19 Nov: DeviceMark's own rows, as their protocol samples them
+const DM_THEIR_SAMPLING = { key: 'greedy', short: 'greedy',
+  words: 'greedy, DeviceMark’s protocol, as their board publishes it' };
 // 12q.F: the items the server failed on: answered without its chat parsing, or not at all
 const dmOdd = r => [r.raw_fallback ? `${r.raw_fallback} raw fallback` : '',
   r.errors ? `${r.errors} no answer after a server error` : ''].filter(Boolean).join(' · ');
@@ -15829,6 +15860,8 @@ function dmTip(r) {
         + 'speed, drawn as a line' : 'no speed measured on a device yet: drawn as a line',
     r.external ? r.credit : 'ours, by DeviceMark’s protocol'
       + (r.inherited ? ` · ${r.inherited.line}` : ''),
+    ...(r.sampling ? [`sampling: ${r.sampling.words}`] : []),
+    ...(r.hidden ? [r.hidden] : []),
     ...(dmOdd(r) ? [dmOdd(r)] : []),
     ...(r.note ? [r.note] : [])];
 }
@@ -16058,6 +16091,9 @@ function dmSpec(rows) {
     { key: 'math', label: 'MATH', full: 'MATH (DeviceMark)', score: true, sub: '100 items' },
     { key: 'answered', label: 'Answered', full: 'Answered within the cap', score: true },
     { key: 'tokens', label: 'Median tokens', full: 'Median tokens an answer' },
+    // 19 Nov: each row's own sampling, from what its requests sent
+    { key: 'sampling', label: 'Sampling', full: 'How its answers were sampled', num: false,
+      sortable: false },
     { key: 'device', label: 'Device tok/s', full: 'Decode tok/s on a device', sortable: false },
     { key: 'server', label: 'Server tok/s', full: 'Our server’s speed test', sortable: false },
     { key: 'retention', label: 'Retention', full: 'A phone build’s score over the original’s',
@@ -16081,6 +16117,10 @@ function dmSpec(rows) {
         tip: ext && r.answered_of ? [`answered: ${r.answered_of}`] : [] },
       tokens: r.median_tokens == null ? { v: null } : { v: r.median_tokens,
         text: Math.round(r.median_tokens).toLocaleString('en'), noLead: true },
+      sampling: { keep: false, node: r.sampling ? el('span', { 'data-dm-sampling': r.id,
+        'data-dm-sampling-key': r.sampling.key, 'data-tip': JSON.stringify([r.sampling.words,
+          ...(r.hidden ? [r.hidden] : [])]), text: r.sampling.short
+          + (r.hidden ? ' · hidden by default' : '') }) : '–' },
       device: { v: r.device ? r.device.tok_s : null, keep: false, attrs: { 'data-dm-device-cell': r.id },
         node: [r.device ? `${r.device.tok_s}` : '–', !ext && LIVE ? ' ' : '',
           !ext && LIVE ? el('button', { class: 'ghost dm-dev-edit', 'data-dm-device-edit': r.id,
@@ -16160,6 +16200,8 @@ function lbOnDevice(ms) {
     return [card];
   }
   const d = D.data || {}, ext = d.external || {};
+  // 19 Nov: a hidden row a model page sent here turns "Show greedy runs" on
+  if (D.focus && !D.greedy && (d.rows || []).some(r => r.id === D.focus && r.hidden)) D.greedy = true;
   const rows = dmRows();
   // 12q.C: a row a model page or "Open results" sent here: scrolled to, marked
   if (D.focus && rows.some(r => r.id === D.focus)) {
@@ -16171,10 +16213,14 @@ function lbOnDevice(ms) {
   const editing = D.edit && rows.find(r => r.id === D.edit && !r.external);
   card.append(
     el('p', { class: 'small', 'data-ondevice-caption': '1', text: 'What is comparable: our rows '
-      + 'are run by DeviceMark’s protocol — 0-shot through the chat template, greedy, a cap of '
+      + 'are run by DeviceMark’s protocol — 0-shot through the chat template, a cap of '
       + `${(d.cap || 4096).toLocaleString()} generated tokens with the thinking counted, no `
       + 'answer counted wrong — on the same 300 IFEval items; MMLU-Pro (196) and MATH (100) are '
-      + `our draw of the same design (${d.version || 'devicemark-replica-v1'}). Our runs of `
+      + `our draw of the same design (${d.version || 'devicemark-replica-v1'}). Each row says `
+      + 'how its answers were sampled (Sampling): greedy — temperature 0, seed 0, as DeviceMark’s '
+      + 'protocol asks — unless it names the model file’s own sampling. Greedy runs of our own '
+      + 'models (step2388, step8804) are hidden, since those models run with their own sampling, '
+      + 'unless “Show greedy runs of our models” is on; shown, they aren’t ranked. Our runs of '
       + 'their open models (hf, bf16, our battery) sit beside their rows — in the table and in '
       + 'their point’s hover — and are never plotted at their device speed, which is their '
       + 'quantized build’s. Only a speed measured on a device places a row on the x-axis — our '
@@ -16184,6 +16230,7 @@ function lbOnDevice(ms) {
       text: `DeviceMark’s rows: their board as published (${ext.last_modified || ''}, fetched `
         + `${ext.fetched || ''}), ${ext.credit || ''} — their numbers, never changed; speeds on `
         + `${ext.device || 'their device'}.` }),
+    dmGreedySwitch((d.rows || []).filter(r => r.hidden && !r.paired).length),
     hfade('dmchart', el('div', { class: 'chartscroll', 'data-hkeep': 'dmchart' }, dmChart(rows))),
     dmKey(rows),
     modelTable(dmSpec(rows)),
@@ -16323,6 +16370,10 @@ function dmModelCard(m, mode) {
       r.label ? ` · ${r.label}` : '', ' · ',
       el('a', { href: '#', 'data-dm-card-chart': r.chart_id, text: 'its row on the On-device chart',
         onclick: e => { e.preventDefault(); dmOpenRow(r.chart_id); } })),
+    // 19 Nov: how its answers were sampled; a greedy run of our model is hidden on the chart
+    r.sampling ? el('p', { class: 'small se', 'data-dm-card-sampling': mode,
+      text: `Sampling: ${r.sampling.words}` + (r.hidden ? `. Hidden on Mobile ▸ DeviceMark `
+        + 'unless “Show greedy runs of our models” is on' : '') }) : '',
     r.theirs ? el('p', { class: 'small', 'data-dm-card-theirs': mode,
       title: r.theirs.mode_differs || null, text: dmTheirsLine(r.theirs) }) : '',
     // 15.2: answered on a rented GPU, whole or in part, and imported
@@ -17887,6 +17938,8 @@ function vLeaderboard(ms) {
       L.chip === 'knowledge' && staleSentence(ms) && !custom
         ? el('p', { class: 'warn', 'data-stale-diag': '1', text: staleSentence(ms) }) : '',
       repHiddenLine(),
+      // 19 Nov: DeviceMark's greedy runs of our models, hidden unless switched on
+      (dmv || (L.chip === 'mobileall' && !custom)) && LIVE ? dmGreedySwitch(dmHiddenN()) : '',
       // 12i.0: a chosen model with no score in these columns is not "tested"
       // 12n.1: a number measured on its GGUF counts too
       lbCustomLine(lbAll.length, lbAll.filter(m => (L.cols || DATA.accTasks)

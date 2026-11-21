@@ -975,6 +975,9 @@ def rows(out_dir: Path, launch=None) -> list[dict]:
         out.append({"id": mid + (" · thinking" if thinks else ""), "model": mid,
                     "thinking": thinks, "row": row,
                     "label": setup_label(row.get("setup") or {}, thinks, mid),
+                    # 19 Nov: how its answers were sampled, and why it's hidden by default
+                    "sampling": sampling_of_setup(row.get("setup") or {}),
+                    "hidden": hidden_why(row.get("setup") or {}, mid),
                     "server_tok_s": speed.get("decode_tok_s") if speed else None,
                     "server_label": SERVER_SPEED_LABEL if speed else None,
                     "device": device or None,
@@ -983,8 +986,12 @@ def rows(out_dir: Path, launch=None) -> list[dict]:
                     # 15.7: the reading it was scored by, and why it's provisional
                     "scoring": (row.get("setup") or {}).get("scoring") or "v1",
                     "provisional": provisional_why(row.get("setup") or {})})
-    rk = ranks([{"ci": r["row"]["composite"]["ci"]} for r in out])
-    for r, k in zip(out, rk):
+    # 19 Nov: a row hidden by default isn't ranked: the ranks are the shown rows'
+    shown = [r for r in out if not r["hidden"]]
+    rk = ranks([{"ci": r["row"]["composite"]["ci"]} for r in shown])
+    for r in out:
+        r["rank"] = None
+    for r, k in zip(shown, rk):
         r["rank"] = k
     for r in out:
         r["retention"] = retention(r, out)
@@ -1128,6 +1135,8 @@ def _beside(r: dict) -> dict:
             "label": f"{DTYPES.get(su.get('dtype'), su.get('dtype') or 'hf')}, our battery"
                      + (", thinking" if r["thinking"] else ""),
             "calibration": r["model"] in CALIBRATION,
+            # 19 Nov: how its answers were sampled, as on every row of ours
+            "sampling": r.get("sampling") or sampling_of_setup(su),
             **{k: row.get(k) for k in ("composite", "benches", "answered_pct", "median_tokens",
                                        "time_frontier")}}
 
@@ -1232,21 +1241,69 @@ def checkpoint_of(su: dict, model: str = "") -> str:
     return m.group(0) if m else ""
 
 
+def sampling_of_setup(su: dict) -> dict:
+    """19 Nov (masein): how a row's answers were sampled, from what its
+    requests sent — {"key": "greedy" | "file", "short", "words"}. A row on a
+    runtime of expert paths recorded its request (31.2): no temperature in it
+    is the file's own sampling for the path. Every other row of ours ran
+    DeviceMark's protocol: greedy, temperature 0 and seed 0 (an hf row
+    do_sample off)"""
+    req = su.get("request") if isinstance(su.get("request"), dict) else None
+    path = su.get("expert_path") or (req or {}).get("expert_path")
+    if req is not None and "temperature" not in req:
+        return {"key": "file", "short": "the file's sampling",
+                "words": f"the model file's own sampling for expert path k{path}: nothing sent "
+                         f"but the path and seed {req.get('seed', SEED)}"}
+    extra = []
+    if req is not None and "presence_penalty" in req:
+        extra.append(f"presence penalty {req['presence_penalty']:g}")
+    if ((req or {}).get("chat_template_kwargs") or {}).get("enable_thinking") is False:
+        extra.append("thinking off by the request")
+    if req is not None and req.get("thinking_budget_tokens"):
+        extra.append(f"the thinking stopped at {req['thinking_budget_tokens']:,} tokens and the "
+                     f"reply cut at {req.get('reply_limit') or 0:,} (the app's limits)")
+    return {"key": "greedy", "short": "greedy",
+            "words": "greedy, DeviceMark's protocol: temperature 0, seed 0"
+                     + "".join(f", {x}" for x in extra)}
+
+
+# 19 Nov: a checkpoint of our own model (step2388, step8804) run greedy is hidden
+# on Mobile ▸ DeviceMark — the model runs with its own sampling, and a greedy
+# row of it would be read as how it does. "Show greedy runs of our models"
+# brings such rows back, unranked; the rows stay on the board and their pages
+HIDDEN_WHY = ("a greedy run of our model {ck}: the model runs with its own sampling, so this "
+              "row is hidden on Mobile ▸ DeviceMark unless “Show greedy runs of our models” is on")
+
+
+def hidden_why(su: dict, model: str = "") -> str | None:
+    """19 Nov: why a row is hidden by default — a checkpoint of ours run greedy — or None"""
+    ck = checkpoint_of(su, model)
+    return HIDDEN_WHY.format(ck=ck) if ck and sampling_of_setup(su)["key"] == "greedy" else None
+
+
 def setup_label(su: dict, thinking: bool, model: str = "") -> str:
     """12q.B2: a served setup as the chart names it — "phone build (k4-LDA) ·
     MTP · thinking off"; any other row, its model. 30: a checkpoint by its
-    checkpoint — "step8804 · thinking off" """
+    checkpoint — "step8804 · thinking off". 19 Nov: and a checkpoint's expert
+    path, the app's limits where it ran by them, and its sampling, so two runs
+    of one file never share a name — "step2388 · k3 · lookahead · thinking off
+    · greedy" beside "… · the file's sampling" """
     if su.get("runtime") != "llama-server":
         return model + (" · thinking" if thinking else "")
     where = f"{su.get('name') or ''} {su.get('file') or ''} {model}"
     b = _BUILD.search(where)
     k = None if b else _TOP_K.search(where)
     tag = b.group(0) if b else f"k={k.group(1)}" if k else ""
+    ck = checkpoint_of(su, model)
+    req = su.get("request") if isinstance(su.get("request"), dict) else {}
+    path = su.get("expert_path") or req.get("expert_path")
     return " · ".join(x for x in (
-        checkpoint_of(su, model) or
-        ("phone build" if su.get("phone") else "original") + (f" ({tag})" if tag else ""),
+        ck or ("phone build" if su.get("phone") else "original") + (f" ({tag})" if tag else ""),
+        f"k{path}" if ck and path else "",
         "MTP" if su.get("mtp") else "", "lookahead" if su.get("lookahead") else "",
-        f"thinking {'on' if thinking else 'off'}") if x)
+        f"thinking {'on' if thinking else 'off'}",
+        "the app's limits" if ck and req.get("thinking_budget_tokens") else "",
+        sampling_of_setup(su)["short"] if ck else "") if x)
 
 
 def board(out_dir: Path, launch=None) -> dict:
@@ -1255,7 +1312,7 @@ def board(out_dir: Path, launch=None) -> dict:
     aren't ranked (their "☁" rows), as DeviceMark's board doesn't"""
     ours, theirs = rows(out_dir, launch), external_rows()
     pair(ours, theirs)
-    solo = [r for r in ours if not r.get("paired")]
+    solo = [r for r in ours if not r.get("paired") and not r.get("hidden")]
     ranked = [t for t in theirs if t["kind"] != "cloud"]
     rk = ranks([{"ci": r["row"]["composite"]["ci"]} for r in solo]
                + [{"ci": r["composite"]["ci"]} for r in ranked])
@@ -1355,7 +1412,9 @@ def model_runs(out_dir: Path, launch=None) -> dict[str, dict]:
                 "where": (row.get("setup") or {}).get("where"),
                 "scoring": r.get("scoring"), "provisional": r.get("provisional"),
                 # 15.4: its raw per-item run, where it was published
-                "raw_url": r.get("raw_url")}
+                "raw_url": r.get("raw_url"),
+                # 19 Nov: how its answers were sampled, and why it's hidden by default
+                "sampling": r.get("sampling"), "hidden": r.get("hidden")}
             # 12z A5: DeviceMark's own row beside ours, as the chart's table has it:
             # their number, and whether the two are a calibration point
             t = ext.get(r.get("paired") or "")

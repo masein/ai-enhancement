@@ -5034,6 +5034,37 @@ Not before the demo: a new hidden set changes every Everyday score.
 - Point 9 came with 20.
 - Tests: `tests/test_18d1_scores_spending.py`.
 
+### DeviceMark: each row's sampling; greedy runs of our models hidden (19 Nov)
+
+- **What each run sent** (the live board's run logs): every row of ours on Mobile
+  ▸ DeviceMark ran greedy (temperature 0, seed 0) except step2388's
+  `-file` row (run 428), which sent the path and the seed alone: the file's own
+  k3 sampling. step2388's 12 Nov rows ran greedy too: `-medium` (448, temperature
+  0, presence 0, thinking off by the request) and `-app` (449, temperature 0,
+  presence 0, the thinking stopped at 1,024 and the reply cut at 2,048).
+- **Each row's sampling** (`scripts/devicemark.py` `sampling_of_setup`): from the
+  request a row recorded (31.2's runtimes of expert paths): no temperature in it
+  is "the file's sampling", anything else, or no request recorded, "greedy".
+  Rows carry `sampling` {key, short, words}; the On-device table has a Sampling
+  column, the hover and the model page's card say the words. DeviceMark's own
+  rows say greedy, as their protocol asks.
+- **Hidden by default** (`hidden_why`): a greedy run of a checkpoint of our
+  model (step2388, step8804; by `checkpoint_of`): 419, 420, 448, 449, 388, 389.
+  Unranked (the ranks are the shown rows'), still on the board and their model
+  pages. "Show greedy runs of our models (N)" brings them back, on the chart, in
+  the table view and on Mobile ▸ All (`state.dm.greedy`); a model page's link
+  to a hidden row turns it on. Qwen3.6's original and phone builds stay.
+- **Labels:** a checkpoint's names its path, the app's limits where it ran by
+  them, and its sampling: 419 "step2388 · k3 · lookahead · thinking off ·
+  greedy", 428 "… · the file's sampling"; the chart's short names likewise.
+- **The caption** no longer says every row is greedy: each row says its
+  sampling, and greedy runs of our own models are hidden unless switched on.
+- Deploy: `docker compose up -d --build bench`, then `docker ps` (bench
+  healthy). Nothing to import or score: the rows are read as they are.
+- Tests: `tests/test_dm_sampling.py`, `tests/test_dm_sampling_browser.py`;
+  labels in `test_12z_a_data`, `test_30_served_here`; the caption and the
+  crowded chart in `test_12q_devicemark_chart_browser`.
+
 ### Two display quirks the step2388 rows showed (19 Nov)
 
 - **"N with no answer read" on IFEval and IFBench** (`service/frontier.py`): their
