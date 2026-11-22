@@ -5034,6 +5034,30 @@ Not before the demo: a new hidden set changes every Everyday score.
 - Point 9 came with 20.
 - Tests: `tests/test_18d1_scores_spending.py`.
 
+### Reports ▸ "Pilot: harder benchmarks" (22 Nov)
+
+- **What:** the pilot of harder benchmarks (21–22 Nov: step2388 High and Instant
+  against Qwen3.5-9B, granite-4.2-8b and LFM3-1.7B on seven rented 5090s) as a
+  report on Reports, internal, beside "Switching mode mid-chat". It shows the
+  verdicts, what a full run needs decided, the scores, each test's clean runs
+  and cost, the full-run estimate, the blind audit (unblinded per model) and
+  the boxes, time and money.
+- **A new report kind, `pilot`** (`service/pilot_report.py`): the report file
+  (`eval_tasks/reports/pilot-2026-11.json`) names its summary by `data`, a path
+  under `$BENCH_ROOT/pilot/`; anything outside it is never read. The summary is
+  the pilot's own (`board_summary.py`, kept with the pilot's scripts on
+  evalboard's `docs/pilot-2026-11` branch, not here), read when the page asks,
+  never worked out here. Nothing is imported into the board's tables; the
+  reports' stats worker skips the kind.
+- **No pilot numbers in the repo:** they live only in
+  `~/benchmarks/pilot/2026-11/summary.json` on the server (put there on 22 Nov).
+  Without the file the page says "Nothing imported yet".
+- Deploy: `docker compose up -d --build bench`, then `docker ps` (bench
+  healthy). Nothing to import or score.
+- Tests: `tests/test_pilot_report.py`, `tests/test_pilot_report_browser.py`
+  (a made-up summary); the Reports list in `test_21_reports` and
+  `test_25c_ondevice`.
+
 ### DeviceMark: each row's sampling; greedy runs of our models hidden (19 Nov)
 
 - **What each run sent** (the live board's run logs): every row of ours on Mobile

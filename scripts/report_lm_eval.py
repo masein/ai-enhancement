@@ -6344,6 +6344,15 @@ table.rp.latest th.src { text-align:left; }
 .ro-badge { margin-left:8px; font-size:var(--fs-1); vertical-align:middle;
   border:1px solid var(--warning); color:var(--warning-text); border-radius:999px;
   padding:1px 8px; font-weight:600; }
+/* a pilot's report: keep and drop, the rows dropped dimmed, the totals ruled off */
+.badge.pl-keep { color:var(--text-primary); font-weight:600; border-color:var(--text-secondary); }
+.badge.pl-drop { color:var(--muted); }
+table.pl-table td { vertical-align:top; }
+table.pl-table tr.pl-total > td { border-top:2px solid var(--border); }
+table.pl-table td.pl-off { color:var(--muted); }
+table.pl-table td.num + td:not(.num), table.pl-table th.num + th:not(.num) { padding-left:16px; }
+table.pl-table td.num .rp-sub { text-align:right; }
+.pl-se { color:var(--muted); }
 .ro-filters { display:flex; flex-wrap:wrap; gap:8px 16px; margin:var(--sp-2) 0; }
 .ro-filters select { max-width:100%; }
 .ro-rows { display:grid; gap:6px; }
@@ -29938,6 +29947,8 @@ function vReport(id) {
   if (d.kind === 'phone_tests') return vPhoneTests(id, d, back);
   // 32: switching mode mid-chat, internal
   if (d.kind === 'switch') return vSwitch(id, d, back);
+  // a pilot run outside the board, internal
+  if (d.kind === 'pilot') return vPilot(id, d, back);
   const benches = d.benchmarks, compared = benches.filter(b => b.compare);
   // 23b: opened on the first pick with a score — step8804 first in the
   // picker, step4000 shown until it is scored
@@ -31966,6 +31977,177 @@ function vSwitch(id, d, back) {
     d.imports.length ? el('p', { class: 'small se', text: 'Imported: ' + d.imports.map(x =>
       `${x.what}${x.part ? ' ' + x.part : ''} (${swN(x.chats)}, ${x.gpu || 'a GPU'})`).join(' · ') }) : '');
   return [back, head, part2, part1, notes].filter(Boolean);
+}
+// ---------------------------------------------------------------------------
+// A pilot's report — benchmarks tried on rented boxes outside the board, to
+// decide which are worth a full run — as the pilot's own summary has it
+// (service/pilot_report.py): the verdicts, what a full run needs decided, the
+// scores, each test's clean runs and cost, the full-run estimate, the blind
+// audit, the boxes, time and money. Internal; scores, counts and dollars only
+// ---------------------------------------------------------------------------
+const plN = (v, d = 1) => v == null ? '—' : Number(v).toFixed(d);
+const plRate = v => v == null ? '—' : Number.isInteger(Number(v)) ? String(Number(v)) : Number(v).toFixed(1);
+// a figure, or the word that stands for one ("board": stored answers, no GPU; "done")
+const plUsd = (v, d = 2) => typeof v === 'string' ? v : v == null ? '—' : '$' + Number(v).toFixed(d);
+const plUsd0 = v => typeof v === 'string' ? v : v == null ? '—'
+  : '$' + Math.round(Number(v)).toLocaleString('en');
+function plNotes(list, attrs = {}) {
+  const item = n => typeof n === 'string' ? el('li', { text: n })
+    : el('li', {}, n.text || '', (n.items || []).length ? el('ul', {}, n.items.map(item)) : null);
+  return (list || []).length ? el('ul', { class: 'rp-notes', ...attrs }, list.map(item)) : null;
+}
+function plTable(attrs, heads, rows) {
+  return el('div', { class: 'lb-wrap' }, el('table', { class: 'jd pl-table', ...attrs },
+    el('thead', {}, el('tr', {}, heads.map(h => el('th', typeof h === 'string' ? { text: h } : h)))),
+    el('tbody', {}, rows)));
+}
+function plCell(c) {
+  if (!c) return el('td', { class: 'num', text: '—' });
+  // a score not counted (Qwen's HLE, limit-bound): the word, and why
+  if (c.words) return el('td', { class: 'num pl-off', title: c.extra || null }, c.words,
+    c.extra ? el('span', { class: 'rp-sub', text: c.extra }) : null);
+  return el('td', { class: 'num' }, plN(c.score),
+    c.se ? el('span', { class: 'pl-se', text: ' ±' + plN(c.se) }) : null,
+    c.at_limit != null ? el('span', { class: 'rp-sub', text: `${c.at_limit} at limit` }) : null,
+    c.extra ? el('span', { class: 'rp-sub', text: c.extra }) : null);
+}
+function vPilot(id, d, back) {
+  const s = d.summary;
+  const tile = (k, label, v, note) => el('div', { class: 'tile', 'data-pl-tile': k },
+    el('div', { class: 'label', text: label }), el('div', { class: 'value', text: String(v) }),
+    note ? el('div', { class: 'note', text: note }) : null);
+  const title = () => el('h2', {}, d.title, el('span', { class: 'badge ro-badge', text: 'Internal' }));
+  const src = () => el('p', { class: 'small se', 'data-pl-source': '1', text: d.sources.ours.words });
+  if (!s) return [back, el('div', { class: 'card', 'data-report': id }, title(),
+    el('p', { class: 'sub', text: d.what }), src(),
+    el('p', { class: 'small', 'data-pl-none': '1', text: 'Nothing imported yet: the pilot’s '
+      + 'summary isn’t on this server.' }))];
+  const M = s.models || [], keys = M.map(m => m.key);
+  const lab = Object.fromEntries(M.map(m => [m.key, m.label]));
+  const short = Object.fromEntries(M.map(m => [m.key, m.short || m.label]));
+  const shortTh = M.map(m => ({ text: short[m.key], class: 'num', title: m.label }));
+  const V = s.verdicts || [], kept = V.filter(v => v.verdict === 'keep');
+  const F = s.full_run || { rows: [], later: [] };
+  const all = keys.length + (F.later || []).length;
+  const C = s.caps || {};
+  const head = el('div', { class: 'card', 'data-report': id }, title(),
+    el('p', { class: 'sub', text: d.what }), src(),
+    el('div', { class: 'tiles', 'data-pl-tiles': '1' },
+      tile('kept', 'Tests kept', `${kept.length} of ${V.length}`),
+      F.kept_total != null ? tile('full', 'Full run, kept tests', '~$' + Math.round(F.kept_total / 10) * 10,
+        `GPU, all ${all} models`) : null,
+      C.gpu ? tile('gpu', 'GPU', plUsd(C.gpu.used), `of the $${C.gpu.cap} cap`) : null,
+      C.api ? tile('api', 'API', plUsd(C.api.used), `of the $${C.api.cap} cap`) : null,
+      C.time ? tile('time', 'Time', C.time.used, `of the ${C.time.cap} cap`) : null),
+    s.intro ? el('p', { text: s.intro }) : null,
+    el('ul', { class: 'rp-notes', 'data-pl-models': '1' }, M.map(m => el('li', { 'data-pl-model': m.key },
+      el('b', { text: m.label }), ': ' + m.setup))));
+  const verdicts = el('div', { class: 'card', 'data-report-section': 'pl-verdicts' },
+    el('h2', { text: 'Verdicts' }),
+    s.rule_note ? el('p', { class: 'small se', text: s.rule_note }) : null,
+    el('ol', { class: 'rp-notes', 'data-pl-rule': '1' }, (s.rule || []).map(r => el('li', { text: r }))),
+    plTable({ 'data-pl-verdicts': '1' }, ['Test', 'Clean for all?', { text: lab.high || 'High', class: 'num' },
+      'Best rival', 'In 10–90%?', 'Frontier numbers', 'Verdict'],
+    V.map(v => el('tr', { 'data-pl-verdict': v.row, class: v.verdict === 'keep' ? null : 'dim' },
+      el('td', {}, el('b', { text: v.test })),
+      el('td', { text: v.clean }),
+      el('td', { class: 'num', text: plN(v.high) }),
+      el('td', { 'data-pl-best': v.row, text: `${short[v.best.model] || v.best.model} ${plN(v.best.score)}` }),
+      el('td', { text: v.in_band }),
+      el('td', { text: v.frontier }),
+      el('td', {}, el('span', { class: 'badge pl-' + v.verdict, 'data-pl-says': v.row, text: v.verdict }),
+        v.words ? el('span', { class: 'rp-sub', text: v.words }) : null)))));
+  const decide = (s.decisions || []).length ? el('div', { class: 'card', 'data-report-section': 'pl-decisions' },
+    el('h2', { text: 'What a full run needs decided' }),
+    el('ol', { class: 'rp-notes', 'data-pl-decisions': '1' }, s.decisions.map(x => el('li', { text: x }))))
+    : null;
+  const scores = el('div', { class: 'card', 'data-report-section': 'pl-scores' },
+    el('h2', { text: 'Scores' }),
+    plTable({ 'data-pl-scores': '1' }, ['Test (items)', ...M.map(m => ({ text: m.label, class: 'num' }))],
+      (s.scores || []).map(r => el('tr', { 'data-pl-score': r.key },
+        el('td', {}, el('b', { text: r.name }), ` (${r.items})`),
+        ...keys.map(k => {
+          const td = plCell(r.cells[k]);
+          td.setAttribute('data-pl-cell', `${r.key}|${k}`);
+          return td;
+        })))),
+    plNotes(s.score_notes, { 'data-pl-score-notes': '1' }));
+  const P = s.per_test || [];
+  const perTest = el('div', { class: 'card', 'data-report-section': 'pl-per-test' },
+    el('h2', { text: 'Per test: clean runs, harness errors, cost' }),
+    el('h3', { text: 'Clean runs (%) and harness errors' }),
+    plTable({ 'data-pl-clean': '1' }, ['Test', ...shortTh, 'Harness errors'],
+      P.map(r => el('tr', { 'data-pl-clean-row': r.test },
+        el('td', {}, el('b', { text: r.test }), r.clean_words ? el('span', { class: 'rp-sub', text: r.clean_words }) : null),
+        ...keys.map(k => el('td', { class: 'num', text: plRate(r.clean[k]) })),
+        el('td', { text: r.errors })))),
+    el('h3', { text: 'GPU dollars per item' }),
+    plTable({ 'data-pl-usd': '1' }, ['Test', ...shortTh],
+      P.map(r => el('tr', { 'data-pl-usd-row': r.test },
+        el('td', {}, el('b', { text: r.test }), r.usd_words ? el('span', { class: 'rp-sub', text: r.usd_words }) : null),
+        ...keys.map(k => el('td', { class: 'num', text: plUsd(r.usd_item[k], 3) }))))),
+    plNotes(s.per_test_notes));
+  const full = el('div', { class: 'card', 'data-report-section': 'pl-full' },
+    el('h2', { text: 'Full-run estimate' }),
+    plTable({ 'data-pl-full': '1' }, ['Test', { text: 'Full set', class: 'num' }, ...shortTh,
+      { text: 'Each later rival', class: 'num' }, { text: `All ${all}`, class: 'num' }],
+    [...F.rows.map(r => el('tr', { 'data-pl-full-row': r.test, class: r.dropped ? 'dim' : null },
+      el('td', {}, r.dropped ? 'Dropped: ' : null, el('b', { text: r.test })),
+      el('td', { class: 'num', text: r.full }),
+      ...keys.map(k => el('td', { class: 'num', text: plUsd0(r.cells[k]) })),
+      el('td', { class: 'num', text: plUsd0(r.later_each) }),
+      el('td', { class: 'num', 'data-pl-all': r.test, text: plUsd0(r.all_nine) }))),
+    F.kept_total != null ? el('tr', { class: 'pl-total', 'data-pl-full-total': '1' },
+      el('td', { colspan: keys.length + 3 }, el('b', { text: `The ${kept.length} kept test${kept.length === 1 ? '' : 's'}, all ${all} models` })),
+      el('td', { class: 'num' }, el('b', { text: plUsd0(F.kept_total) }))) : null]),
+    plNotes(F.notes));
+  const A = s.audit || {}, U = A.unblinded || {}, E = A.early_stop || {};
+  const audit = el('div', { class: 'card', 'data-report-section': 'pl-audit' },
+    el('h2', { text: 'Blind audit' }),
+    plNotes(A.drawn),
+    el('h3', { text: 'Unblinded, per model' }),
+    plTable({ 'data-pl-unblinded': '1' }, ['Model', { text: 'Runs', class: 'num' },
+      { text: 'Harness worked', class: 'num' }, { text: 'Score matches the run', class: 'num' },
+      { text: 'Flags', class: 'num' }, { text: 'Flags that change a score', class: 'num' }],
+    keys.filter(k => U[k]).map(k => el('tr', { 'data-pl-unblinded-row': k }, el('td', { text: lab[k] }),
+      ...['packets', 'harness_ok', 'consistent', 'flags', 'changes_score'].map(f =>
+        el('td', { class: 'num', text: String(U[k][f]) }))))),
+    el('h3', { text: 'Flags that change a score' }),
+    el('ul', { class: 'rp-notes', 'data-pl-changes': '1' }, (A.changes || []).map(c =>
+      el('li', {}, el('b', { text: c.title }), '. ' + c.text))),
+    E.text ? el('p', { text: E.text }) : null,
+    E.lost ? plTable({ 'data-pl-early': '1' }, ['Model', { text: 'Lost this way', class: 'num' },
+      { text: 'Most it could change the score', class: 'num' }],
+    keys.filter(k => k in E.lost).map(k => el('tr', { 'data-pl-early-row': k }, el('td', { text: lab[k] }),
+      el('td', { class: 'num', text: String(E.lost[k]) }),
+      el('td', { class: 'num', text: E.lost[k] ? '+' + plN((E.most || {})[k]) : '—' })))) : null,
+    E.after ? el('p', { class: 'small', text: E.after }) : null,
+    (A.other || []).length ? el('h3', { text: 'Flags that don’t change a score' }) : null,
+    plNotes(A.other, { 'data-pl-other': '1' }));
+  const B = s.boxes || { rows: [] };
+  const boxes = el('div', { class: 'card', 'data-report-section': 'pl-boxes' },
+    el('h2', { text: 'Boxes, time and money' }),
+    plTable({ 'data-pl-boxes': '1' }, ['Box', 'Role', { text: '$/h', class: 'num' },
+      { text: 'Hours', class: 'num' }, { text: 'GPU $', class: 'num' }, 'Destroyed (server time)'],
+    [...B.rows.map(b => el('tr', { 'data-pl-box': b.box }, el('td', {}, el('b', { text: b.box })),
+      el('td', { text: b.role }), el('td', { class: 'num', text: plN(b.rate, 3) }),
+      el('td', { class: 'num', text: plN(b.hours, 2) }), el('td', { class: 'num', text: plN(b.usd, 2) }),
+      el('td', { text: b.destroyed }))),
+    el('tr', { class: 'pl-total', 'data-pl-box': 'all' }, el('td', {}, el('b', { text: 'All' })),
+      el('td', {}), el('td', {}), el('td', { class: 'num' }, el('b', { text: plN(B.hours, 2) })),
+      el('td', { class: 'num' }, el('b', { text: plN(B.usd, 2) })), el('td', {}))]),
+    B.teardown ? el('p', { class: 'small', text: B.teardown }) : null,
+    el('ul', { class: 'rp-notes', 'data-pl-caps': '1' },
+      C.gpu ? el('li', {}, el('b', { text: 'GPU: ' }), `${plUsd(C.gpu.used)} of the $${C.gpu.cap} cap`) : null,
+      C.time ? el('li', {}, el('b', { text: 'Time: ' }),
+        `${C.time.used}, ${C.time.from} to ${C.time.to}, against the ${C.time.cap} cap`) : null,
+      C.api ? el('li', {}, el('b', { text: 'API: ' }), `${plUsd(C.api.used)} of the $${C.api.cap} cap`,
+        plNotes(s.api_notes)) : null),
+    s.credentials ? el('p', { class: 'small', 'data-pl-creds': '1', text: s.credentials }) : null);
+  const disclose = (s.disclosures || []).length ? el('div', { class: 'card',
+    'data-report-section': 'pl-disclosures' }, el('h2', { text: 'Disclosures' }), plNotes(s.disclosures))
+    : null;
+  return [back, head, verdicts, decide, scores, perTest, full, audit, boxes, disclose].filter(Boolean);
 }
 // ---------------------------------------------------------------------------
 // 21b: a report of the answers our models ran out of room on — for insight

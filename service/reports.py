@@ -1136,6 +1136,10 @@ def report(rid: str, payload: dict | None = None, compute: bool = False, a: str 
         # 32: switching mode mid-chat, the summary its import keeps (service/switch_report.py)
         from . import switch_report
         return switch_report.report(rep)
+    if rep.get("kind") == "pilot":
+        # a pilot run outside the board, its own summary (service/pilot_report.py)
+        from . import pilot_report
+        return pilot_report.report(rep)
     if payload is None:
         from . import app
         payload = app.results_payload()
@@ -1475,6 +1479,13 @@ def listing(payload: dict | None = None) -> list[dict]:
             out.append({"id": rid, "title": rep.get("title") or rid,
                         "what": rep.get("what") or "", "ours": [], "others": 0,
                         "internal": True, **switch_report.listing_line()})
+            continue
+        if rep.get("kind") == "pilot":
+            # internal, the pilot's own summary
+            from . import pilot_report
+            out.append({"id": rid, "title": rep.get("title") or rid,
+                        "what": rep.get("what") or "", "ours": [], "others": 0,
+                        "internal": True, **pilot_report.listing_line(rep)})
             continue
         rows = our_rows(rep, (payload or {}).get("cells") or {})
         if rep.get("kind") == "ran_out":
