@@ -1,0 +1,10 @@
+{
+  "id": "pilot-2026-11",
+  "kind": "pilot",
+  "order": 7,
+  "title": "Pilot: harder benchmarks",
+  "what": "Internal: ten harder benchmarks tried on small fixed subsets, one try per item — step2388 High and Instant against three phone rivals on rented RTX 5090s (21–22 Nov 2026) — and which are worth a full run: the verdicts, the scores, each test's clean runs and cost, the full-run estimate, the blind audit, and the boxes, time and money. Not a row of the board's tables.",
+  "data": "pilot/2026-11/summary.json",
+  "ours": [],
+  "benchmarks": []
+}
